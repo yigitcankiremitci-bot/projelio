@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Projelio",
+    "slug": "projelio",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "primaryColor": "#1E3A8A",
+    "splash": {
+      "backgroundColor": "#1E3A8A"
+    },
+    "ios": { "supportsTablet": true },
+    "android": {
+      "adaptiveIcon": { "backgroundColor": "#1E3A8A" }
+    },
+    "plugins": ["expo-notifications"]
+  }
+}

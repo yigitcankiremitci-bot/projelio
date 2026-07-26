@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Routes, Route, Link, useLocation } from "react-router-dom";
+import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import JobDetail from "./pages/JobDetail";
@@ -15,6 +15,7 @@ import { initPush } from "./push";
 export default function App() {
   const location = useLocation();
   const isAuthScreen = location.pathname === "/login";
+  const hasToken = !!localStorage.getItem("projelio_token");
 
   useEffect(() => {
     if (!isAuthScreen) void initPush();
@@ -26,6 +27,10 @@ export default function App() {
         <Route path="/login" element={<Login />} />
       </Routes>
     );
+  }
+
+  if (!hasToken) {
+    return <Navigate to="/login" replace />;
   }
 
   return (

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import JobDetail from "./pages/JobDetail";
 import ProjectDetail from "./pages/ProjectDetail";
 import CalendarView from "./pages/Calendar";
@@ -14,7 +15,7 @@ import { initPush } from "./push";
 
 export default function App() {
   const location = useLocation();
-  const isAuthScreen = location.pathname === "/login";
+  const isAuthScreen = location.pathname === "/login" || location.pathname === "/register";
   const hasToken = !!localStorage.getItem("projelio_token");
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function App() {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
       </Routes>
     );
   }

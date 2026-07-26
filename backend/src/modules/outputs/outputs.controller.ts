@@ -17,6 +17,12 @@ export class OutputsController {
     return this.outputsService.create(projectId, body);
   }
 
+  // NOT: bu route "outputs/:id" ile çakışmaması için ondan önce tanımlanmalı.
+  @Patch("outputs/reorder")
+  reorder(@Body("ids") ids: string[]) {
+    return this.outputsService.reorder(ids);
+  }
+
   @Patch("outputs/:id")
   update(@Param("id") id: string, @Body() body: any) {
     return this.outputsService.update(id, body);
@@ -25,5 +31,15 @@ export class OutputsController {
   @Delete("outputs/:id")
   remove(@Param("id") id: string) {
     return this.outputsService.remove(id);
+  }
+
+  @Patch("outputs/:id/archive")
+  archive(@Param("id") id: string) {
+    return this.outputsService.archive(id);
+  }
+
+  @Patch("outputs/:id/restore")
+  restore(@Param("id") id: string) {
+    return this.outputsService.restore(id);
   }
 }

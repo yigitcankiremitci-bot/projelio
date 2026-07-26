@@ -37,6 +37,12 @@ export class ProjectsController {
     return this.projectsService.create(req.user.userId, body);
   }
 
+  // NOT: bu route ":id" ile çakışmaması için ondan önce tanımlanmalı.
+  @Patch("reorder")
+  reorder(@Req() req: any, @Body("ids") ids: string[]) {
+    return this.projectsService.reorder(req.user.userId, ids);
+  }
+
   @Patch(":id")
   update(@Param("id") id: string, @Body() body: any) {
     return this.projectsService.update(id, body);
@@ -52,5 +58,15 @@ export class ProjectsController {
   @Delete(":id")
   remove(@Param("id") id: string) {
     return this.projectsService.remove(id);
+  }
+
+  @Patch(":id/archive")
+  archive(@Param("id") id: string) {
+    return this.projectsService.archive(id);
+  }
+
+  @Patch(":id/restore")
+  restore(@Param("id") id: string) {
+    return this.projectsService.restore(id);
   }
 }

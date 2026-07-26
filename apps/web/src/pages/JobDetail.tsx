@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Job, Project } from "@projelio/shared";
 import { api } from "../api/client";
 import ProjectCard from "../components/ProjectCard";
@@ -7,14 +7,17 @@ import CreateProjectModal from "../components/CreateProjectModal";
 import EditJobModal from "../components/EditJobModal";
 import { colors } from "../theme/colors";
 import { IconPlus, IconUser, IconCalendar, IconSettings } from "../components/icons";
+import { useSortableList } from "../lib/useSortableList";
 
 export default function JobDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const c = colors.light;
   const [job, setJob] = useState<Job | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const reload = () => {
     if (!id) return;
@@ -23,6 +26,25 @@ export default function JobDetail() {
   };
 
   useEffect(reload, [id]);
+
+  useSortableList(
+    gridRef,
+    {
+      onEnd: () => {
+        const el = gridRef.current;
+        if (!el) return;
+        const ids = Array.from(el.children)
+          .map((node) => (node as HTMLElement).dataset.id!)
+          .filter(Boolean);
+        setProjects((prev) => {
+          const byId = new Map(prev.map((p) => [p.id, p]));
+          return ids.map((pid) => byId.get(pid)!).filter(Boolean);
+        });
+        api.patch("/projects/reorder", { ids }).catch(() => reload());
+      },
+    },
+    [projects.length === 0]
+  );
 
   if (!id) return null;
 
@@ -43,18 +65,18 @@ export default function JobDetail() {
       />
 
       <div style={{ padding: "0 28px 28px" }}>
-        <Link to="/" style={{ fontSize: 12, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
+        <Link to="/" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
           ← İşler
         </Link>
 
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10, gap: 12 }}>
           <div>
-            <h1 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 4px" }}>
+            <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 4px" }}>
               {job?.title ?? "…"}
             </h1>
-            {job?.description && <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 8px" }}>{job.description}</p>}
+            {job?.description && <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 8px" }}>{job.description}</p>}
             {job && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 12, color: c.textSecondary }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 15, color: c.textSecondary }}>
                 {job.ownerName && (
                   <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                     <IconUser size={12} color={c.textSecondary} />
@@ -97,7 +119,7 @@ export default function JobDetail() {
                 border: "none",
                 background: c.primary,
                 color: "#fff",
-                fontSize: 13,
+                fontSize: 16,
                 fontWeight: 500,
                 whiteSpace: "nowrap",
               }}
@@ -122,15 +144,17 @@ export default function JobDetail() {
                 padding: 40,
                 textAlign: "center",
                 color: c.textSecondary,
-                fontSize: 13,
+                fontSize: 16,
               }}
             >
               Bu işte henüz proje yok.
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+            <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
               {projects.map((p) => (
-                <ProjectCard key={p.id} project={p} />
+                <div key={p.id} data-id={p.id}>
+                  <ProjectCard project={p} />
+                </div>
               ))}
             </div>
           )}
@@ -138,7 +162,15 @@ export default function JobDetail() {
       </div>
 
       {creating && <CreateProjectModal jobId={id} onClose={() => setCreating(false)} onCreated={reload} />}
-      {editing && job && <EditJobModal job={job} onClose={() => setEditing(false)} onSaved={reload} />}
+      {editing && job && (
+        <EditJobModal
+          job={job}
+          onClose={() => setEditing(false)}
+          onSaved={reload}
+          onDeleted={() => navigate("/")}
+          onArchived={() => navigate("/")}
+        />
+      )}
     </div>
   );
 }
@@ -147,8 +179,8 @@ function SummaryCard({ label, value }: { label: string; value: string | number }
   const c = colors.light;
   return (
     <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: "14px 16px" }}>
-      <div style={{ color: c.textSecondary, fontSize: 12, marginBottom: 6 }}>{label}</div>
-      <div style={{ color: c.textPrimary, fontSize: 22, fontWeight: 600 }}>{value}</div>
+      <div style={{ color: c.textSecondary, fontSize: 15, marginBottom: 6 }}>{label}</div>
+      <div style={{ color: c.textPrimary, fontSize: 27, fontWeight: 600 }}>{value}</div>
     </div>
   );
 }

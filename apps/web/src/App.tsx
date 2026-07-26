@@ -8,6 +8,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import CalendarView from "./pages/Calendar";
 import AdminPanel from "./pages/AdminPanel";
 import Settings from "./pages/Settings";
+import Archive from "./pages/Archive";
 import TasksOverview from "./pages/TasksOverview";
 import BottomNav from "./components/BottomNav";
 import NotificationBell from "./components/NotificationBell";
@@ -59,6 +60,7 @@ export default function App() {
           <Route path="/calendar" element={<CalendarView />} />
           <Route path="/tasks" element={<TasksOverview />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/archive" element={<Archive />} />
           <Route path="/admin" element={<AdminPanel />} />
         </Routes>
       </div>

@@ -11,7 +11,7 @@ export default function CalendarView() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
-      <h1 style={{ color: c.textPrimary, fontSize: 18, fontWeight: 500, margin: "0 0 20px" }}>Takvim</h1>
+      <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 500, margin: "0 0 20px" }}>Takvim</h1>
       <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
         {(["day", "week", "month"] as ViewMode[]).map((v) => (
           <button
@@ -23,7 +23,7 @@ export default function CalendarView() {
               border: `1px solid ${view === v ? c.primary : c.border}`,
               background: view === v ? c.primary : c.surface,
               color: view === v ? "#fff" : c.textPrimary,
-              fontSize: 13,
+              fontSize: 16,
             }}
           >
             {v === "day" ? "Günlük" : v === "week" ? "Haftalık" : "Aylık"}
@@ -44,7 +44,7 @@ export default function CalendarView() {
           padding: 48,
           textAlign: "center",
           color: c.textSecondary,
-          fontSize: 13,
+          fontSize: 16,
           background: c.surface,
         }}
       >

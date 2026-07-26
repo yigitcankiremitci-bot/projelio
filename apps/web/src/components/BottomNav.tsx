@@ -70,7 +70,7 @@ export default function BottomNav() {
               style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 0" }}
             >
               <Icon size={20} color={active ? c.accentDark : c.textSecondary} />
-              <span style={{ fontSize: 11, color: active ? c.accentDark : c.textSecondary, fontWeight: active ? 500 : 400 }}>
+              <span style={{ fontSize: 13, color: active ? c.accentDark : c.textSecondary, fontWeight: active ? 500 : 400 }}>
                 {item.label}
               </span>
             </Link>
@@ -112,7 +112,7 @@ export default function BottomNav() {
               style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 0" }}
             >
               <Icon size={20} color={active ? c.accentDark : c.textSecondary} />
-              <span style={{ fontSize: 11, color: active ? c.accentDark : c.textSecondary, fontWeight: active ? 500 : 400 }}>
+              <span style={{ fontSize: 13, color: active ? c.accentDark : c.textSecondary, fontWeight: active ? 500 : 400 }}>
                 {item.label}
               </span>
             </Link>

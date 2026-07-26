@@ -87,6 +87,10 @@ export default function ProjectDetail() {
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   };
 
+  const removeTaskFromState = (taskId: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== taskId && t.parentTaskId !== taskId));
+  };
+
   const handleCreateTask = async (
     status: TaskStatus,
     title: string,
@@ -133,6 +137,20 @@ export default function ProjectDetail() {
     });
   };
 
+  const handleReorderTasks = (ids: string[]) => {
+    if (!ids.length) return;
+    setTasks((prev) => {
+      const order = new Map(ids.map((taskId, index) => [taskId, index]));
+      const affected = prev.filter((t) => order.has(t.id));
+      const untouched = prev.filter((t) => !order.has(t.id));
+      affected.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
+      return [...untouched, ...affected];
+    });
+    api.patch("/tasks/reorder", { ids }).catch(() => {
+      if (id) api.get<Task[]>(`/projects/${id}/tasks`).then(setTasks).catch(() => {});
+    });
+  };
+
   const handleToggleComplete = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
@@ -172,7 +190,7 @@ export default function ProjectDetail() {
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
       <Link
         to={project ? `/jobs/${project.jobId}` : "/"}
-        style={{ fontSize: 12, color: c.textSecondary, marginBottom: 4, display: "inline-block" }}
+        style={{ fontSize: 15, color: c.textSecondary, marginBottom: 4, display: "inline-block" }}
       >
         ← Projeler
       </Link>
@@ -193,13 +211,13 @@ export default function ProjectDetail() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: project.description ? 8 : 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <h1 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{project.title}</h1>
+                <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{project.title}</h1>
                 <StatusBadge status={project.status} />
               </div>
               <button
                 onClick={() => setEditing(true)}
                 style={{
-                  fontSize: 12,
+                  fontSize: 15,
                   color: c.textPrimary,
                   background: hasCover ? "rgba(255,255,255,0.6)" : "transparent",
                   border: hasCover ? `1px solid rgba(26,31,41,0.25)` : `1px solid ${c.border}`,
@@ -213,7 +231,7 @@ export default function ProjectDetail() {
             </div>
 
             {project.description && (
-              <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 14px" }}>
+              <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 14px" }}>
                 {project.description}
               </p>
             )}
@@ -222,7 +240,7 @@ export default function ProjectDetail() {
               style={{
                 display: "flex",
                 gap: 24,
-                fontSize: 12,
+                fontSize: 15,
                 color: c.textSecondary,
                 borderTop: hasCover ? "1px solid rgba(26,31,41,0.2)" : `1px solid ${c.border}`,
                 paddingTop: 12,
@@ -255,6 +273,7 @@ export default function ProjectDetail() {
               onMoveTask={handleMoveTask}
               onToggleComplete={handleToggleComplete}
               onEditTask={setEditingTask}
+              onReorderTasks={handleReorderTasks}
             />
           )}
           {activeTab === "budget" && (
@@ -286,14 +305,14 @@ export default function ProjectDetail() {
 
       {parentCompletePrompt && (
         <Modal title="Görevi tamamla" onClose={() => setParentCompletePrompt(null)}>
-          <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
             <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{parentCompletePrompt.title}</strong> görevinin tüm alt
             görevleri tamamlandı. Bu görevi de tamamlandı olarak işaretlemek ister misin?
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button
               onClick={() => setParentCompletePrompt(null)}
-              style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 13 }}
+              style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 16 }}
             >
               Hayır
             </button>
@@ -302,7 +321,7 @@ export default function ProjectDetail() {
                 handleToggleComplete(parentCompletePrompt.id);
                 setParentCompletePrompt(null);
               }}
-              style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 13, fontWeight: 500 }}
+              style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 16, fontWeight: 500 }}
             >
               Evet, tamamla
             </button>
@@ -316,6 +335,14 @@ export default function ProjectDetail() {
           onClose={() => setEditingTask(null)}
           onSaved={(updated) => {
             updateTask(updated);
+            setEditingTask(null);
+          }}
+          onDeleted={(deletedTaskId) => {
+            removeTaskFromState(deletedTaskId);
+            setEditingTask(null);
+          }}
+          onArchived={(archivedTaskId) => {
+            removeTaskFromState(archivedTaskId);
             setEditingTask(null);
           }}
         />

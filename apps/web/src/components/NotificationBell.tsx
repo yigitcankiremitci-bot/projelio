@@ -113,7 +113,7 @@ export default function NotificationBell() {
               borderRadius: 8,
               background: c.danger,
               color: "#fff",
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: 600,
               display: "flex",
               alignItems: "center",
@@ -150,11 +150,11 @@ export default function NotificationBell() {
               borderBottom: `1px solid ${c.border}`,
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>Bildirimler</span>
+            <span style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary }}>Bildirimler</span>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
-                style={{ fontSize: 11, color: c.primary, background: "transparent", border: "none" }}
+                style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none" }}
               >
                 Tümünü okundu işaretle
               </button>
@@ -162,7 +162,7 @@ export default function NotificationBell() {
           </div>
 
           {notifications.length === 0 ? (
-            <p style={{ fontSize: 12, color: c.textSecondary, padding: 16, textAlign: "center", margin: 0 }}>
+            <p style={{ fontSize: 15, color: c.textSecondary, padding: 16, textAlign: "center", margin: 0 }}>
               Henüz bildirim yok.
             </p>
           ) : (
@@ -182,9 +182,9 @@ export default function NotificationBell() {
                     borderBottom: `1px solid ${c.border}`,
                   }}
                 >
-                  <span style={{ fontSize: 12.5, fontWeight: n.read ? 400 : 600, color: c.textPrimary }}>{n.title}</span>
-                  <span style={{ fontSize: 12, color: c.textSecondary }}>{n.body}</span>
-                  <span style={{ fontSize: 10, color: c.textSecondary }}>{timeAgo(n.createdAt)}</span>
+                  <span style={{ fontSize: 16, fontWeight: n.read ? 400 : 600, color: c.textPrimary }}>{n.title}</span>
+                  <span style={{ fontSize: 15, color: c.textSecondary }}>{n.body}</span>
+                  <span style={{ fontSize: 12, color: c.textSecondary }}>{timeAgo(n.createdAt)}</span>
                 </button>
               ))}
             </div>

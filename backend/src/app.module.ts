@@ -14,6 +14,7 @@ import { BudgetModule } from "./modules/budget/budget.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { CalendarModule } from "./modules/calendar/calendar.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { ArchiveModule } from "./modules/archive/archive.module";
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { AdminModule } from "./modules/admin/admin.module";
     NotificationsModule,
     CalendarModule,
     AdminModule,
+    ArchiveModule,
   ],
 })
 export class AppModule {}

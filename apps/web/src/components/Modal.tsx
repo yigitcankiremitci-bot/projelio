@@ -49,7 +49,7 @@ export default function Modal({ title, onClose, children, maxWidth = 400 }: Prop
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{title}</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{title}</h2>
           <button
             onClick={onClose}
             aria-label="Kapat"

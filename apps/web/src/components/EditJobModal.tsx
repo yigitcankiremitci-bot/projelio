@@ -4,14 +4,17 @@ import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
+import EntityDangerZone from "./EntityDangerZone";
 
 interface Props {
   job: Job;
   onClose: () => void;
   onSaved: () => void;
+  onDeleted?: () => void;
+  onArchived?: () => void;
 }
 
-export default function EditJobModal({ job, onClose, onSaved }: Props) {
+export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchived }: Props) {
   const c = colors.light;
   const [title, setTitle] = useState(job.title);
   const [description, setDescription] = useState(job.description ?? "");
@@ -19,6 +22,16 @@ export default function EditJobModal({ job, onClose, onSaved }: Props) {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const handleDelete = async () => {
+    await api.delete(`/jobs/${job.id}`);
+    onDeleted?.();
+  };
+
+  const handleArchive = async () => {
+    await api.patch(`/jobs/${job.id}/archive`, {});
+    onArchived?.();
+  };
 
   const handleCoverChange = (file: File | null) => {
     setCoverFile(file);
@@ -49,12 +62,12 @@ export default function EditJobModal({ job, onClose, onSaved }: Props) {
     <Modal title="İşi düzenle" onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -64,7 +77,7 @@ export default function EditJobModal({ job, onClose, onSaved }: Props) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, color: c.textSecondary }}>Kapak fotoğrafı</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Kapak fotoğrafı</label>
           {(coverPreview || job.coverImageUrl) && (
             <div
               style={{
@@ -77,16 +90,24 @@ export default function EditJobModal({ job, onClose, onSaved }: Props) {
           <input type="file" accept="image/*" onChange={(e) => handleCoverChange(e.target.files?.[0] ?? null)} />
         </div>
 
-        {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
+        {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 14, fontWeight: 500 }}
+          style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
           {loading ? "Kaydediliyor…" : "Kaydet"}
         </button>
       </form>
+
+      <EntityDangerZone
+        entityLabel="İşi"
+        onArchive={onArchived ? handleArchive : undefined}
+        onDelete={onDeleted ? handleDelete : undefined}
+        archiveMessage={`"${job.title}" işini arşive eklemek istediğine emin misin? Bu işe bağlı tüm projeler ve görevler de arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}
+        deleteMessage={`"${job.title}" işini silmek istediğine emin misin? Bu işe bağlı tüm projeler ve görevler de silinecek. Bu işlem geri alınamaz.`}
+      />
     </Modal>
   );
 }

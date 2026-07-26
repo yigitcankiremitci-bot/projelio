@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Task } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { applyOrder } from "../../common/reorder.util";
 
 function mapTask(row: any): Task {
   return {
@@ -18,6 +19,8 @@ function mapTask(row: any): Task {
     budgetStatus: row.budget_status ?? "pending",
     weekNumber: row.week_number ?? undefined,
     createdAt: row.created_at,
+    archivedAt: row.archived_at ?? undefined,
+    sortOrder: row.sort_order ?? 0,
   };
 }
 
@@ -33,6 +36,8 @@ export class TasksService {
       .from("tasks")
       .select()
       .eq("project_id", projectId)
+      .is("archived_at", null)
+      .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     if (error) throw error;
     return (data ?? []).map(mapTask);
@@ -182,5 +187,61 @@ export class TasksService {
   async remove(id: string): Promise<void> {
     const { error } = await this.supabase.client.from("tasks").delete().eq("id", id);
     if (error) throw error;
+  }
+
+  async archive(id: string): Promise<Task> {
+    const { data: row, error } = await this.supabase.client
+      .from("tasks")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Görev bulunamadı");
+
+    // Bu görevin varsa tüm alt görevlerini de arşivle
+    await this.supabase.client
+      .from("tasks")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("parent_task_id", id);
+
+    return mapTask(row);
+  }
+
+  async restore(id: string): Promise<Task> {
+    const { data: row, error } = await this.supabase.client
+      .from("tasks")
+      .update({ archived_at: null })
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Görev bulunamadı");
+
+    // Bu görevin varsa tüm alt görevlerini de geri getir
+    await this.supabase.client.from("tasks").update({ archived_at: null }).eq("parent_task_id", id);
+
+    return mapTask(row);
+  }
+
+  async reorder(ids: string[]): Promise<void> {
+    if (!ids?.length) return;
+    const { data: rows, error } = await this.supabase.client.from("tasks").select("id, project_id, parent_task_id").in("id", ids);
+    if (error) throw error;
+    if (!rows || rows.length !== ids.length) {
+      throw new BadRequestException("Geçersiz sıralama isteği");
+    }
+
+    const projectIds = new Set(rows.map((r: any) => r.project_id));
+    if (projectIds.size > 1) {
+      throw new BadRequestException("Sıralanan görevler aynı projeye ait olmalı");
+    }
+    // Ya hepsi aynı üst görevin altındaki alt görevler, ya da hepsi üst seviye görevler olmalı.
+    const parentIds = new Set(rows.map((r: any) => r.parent_task_id ?? null));
+    if (parentIds.size > 1) {
+      throw new BadRequestException("Sıralanan görevler aynı üst göreve/sütuna ait olmalı");
+    }
+
+    await applyOrder(this.supabase.client, "tasks", ids);
   }
 }

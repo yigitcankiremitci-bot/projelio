@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Output, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
@@ -6,6 +6,7 @@ import { IconPlus, IconChevronRight, IconEdit } from "./icons";
 import TaskColumn from "./TaskColumn";
 import CreateOutputModal from "./CreateOutputModal";
 import EditOutputModal from "./EditOutputModal";
+import { useSortableList } from "../lib/useSortableList";
 
 const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
 
@@ -21,6 +22,7 @@ interface Props {
   onMoveTask: (taskId: string, status: TaskStatus) => void;
   onToggleComplete: (taskId: string) => void;
   onEditTask: (task: Task) => void;
+  onReorderTasks: (ids: string[]) => void;
 }
 
 export default function OutputsPanel({
@@ -31,12 +33,14 @@ export default function OutputsPanel({
   onMoveTask,
   onToggleComplete,
   onEditTask,
+  onReorderTasks,
 }: Props) {
   const c = colors.light;
   const [outputs, setOutputs] = useState<Output[]>([]);
   const [selectedOutputId, setSelectedOutputId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [editingOutput, setEditingOutput] = useState<Output | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const reload = () => {
     api.get<Output[]>(`/projects/${projectId}/outputs`).then(setOutputs).catch(() => setOutputs([]));
@@ -46,7 +50,34 @@ export default function OutputsPanel({
     setOutputs((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
   };
 
+  const handleOutputRemoved = (removedOutputId: string) => {
+    setOutputs((prev) => prev.filter((o) => o.id !== removedOutputId));
+    setEditingOutput(null);
+    if (selectedOutputId === removedOutputId) setSelectedOutputId(null);
+  };
+
   useEffect(reload, [projectId]);
+
+  useSortableList(
+    listRef,
+    {
+      filter: "button",
+      preventOnFilter: false,
+      onEnd: () => {
+        const el = listRef.current;
+        if (!el) return;
+        const ids = Array.from(el.children)
+          .map((node) => (node as HTMLElement).dataset.id)
+          .filter((v): v is string => Boolean(v));
+        setOutputs((prev) => {
+          const byId = new Map(prev.map((o) => [o.id, o]));
+          return ids.map((oid) => byId.get(oid)!).filter(Boolean);
+        });
+        api.patch("/outputs/reorder", { ids }).catch(() => reload());
+      },
+    },
+    [outputs.length === 0]
+  );
 
   const selectedOutput = outputs.find((o) => o.id === selectedOutputId) ?? null;
 
@@ -63,16 +94,16 @@ export default function OutputsPanel({
       <div>
         <button
           onClick={() => setSelectedOutputId(null)}
-          style={{ fontSize: 12, color: c.textSecondary, background: "transparent", border: "none", padding: 0, marginBottom: 10 }}
+          style={{ fontSize: 15, color: c.textSecondary, background: "transparent", border: "none", padding: 0, marginBottom: 10 }}
         >
           ← Çıktılar
         </button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <div style={{ minWidth: 0 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 2px" }}>{selectedOutput.title}</h3>
+            <h3 style={{ fontSize: 19, fontWeight: 500, color: c.textPrimary, margin: "0 0 2px" }}>{selectedOutput.title}</h3>
             {selectedOutput.description && (
-              <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{selectedOutput.description}</p>
+              <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>{selectedOutput.description}</p>
             )}
           </div>
           <button
@@ -95,6 +126,8 @@ export default function OutputsPanel({
               onMove={onMoveTask}
               onToggleComplete={onToggleComplete}
               onEditTask={onEditTask}
+              onReorderTasks={onReorderTasks}
+              group={`tasks-${projectId}-${selectedOutput.id}`}
             />
           ))}
         </div>
@@ -105,7 +138,7 @@ export default function OutputsPanel({
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Çıktılar</h3>
+        <h3 style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Çıktılar</h3>
         <button
           onClick={() => setCreating(true)}
           style={{
@@ -117,7 +150,7 @@ export default function OutputsPanel({
             border: "none",
             background: c.primary,
             color: "#fff",
-            fontSize: 12,
+            fontSize: 15,
             fontWeight: 500,
           }}
         >
@@ -134,20 +167,21 @@ export default function OutputsPanel({
             padding: 32,
             textAlign: "center",
             color: c.textSecondary,
-            fontSize: 13,
+            fontSize: 16,
           }}
         >
           Henüz çıktı yok. Örneğin bir müzik projesinde "Sözler", "Master dosyası", "Albüm kapağı" gibi çıktılar
           oluşturabilirsin.
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {outputs.map((o) => {
             const topLevel = tasks.filter((t) => t.outputId === o.id && !t.parentTaskId);
             const completed = topLevel.filter((t) => t.status === "completed").length;
             return (
               <div
                 key={o.id}
+                data-id={o.id}
                 onClick={() => setSelectedOutputId(o.id)}
                 role="button"
                 tabIndex={0}
@@ -165,18 +199,18 @@ export default function OutputsPanel({
                 }}
               >
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 500, color: c.textPrimary, marginBottom: o.description ? 2 : 0 }}>
+                  <div style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary, marginBottom: o.description ? 2 : 0 }}>
                     {o.title}
                   </div>
                   {o.description && (
-                    <div style={{ fontSize: 12, color: c.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 15, color: c.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {o.description}
                     </div>
                   )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                   {topLevel.length > 0 && (
-                    <span style={{ fontSize: 11, color: c.textSecondary, background: c.background, border: `1px solid ${c.border}`, borderRadius: 20, padding: "2px 8px" }}>
+                    <span style={{ fontSize: 13, color: c.textSecondary, background: c.background, border: `1px solid ${c.border}`, borderRadius: 20, padding: "2px 8px" }}>
                       {completed}/{topLevel.length}
                     </span>
                   )}
@@ -200,7 +234,13 @@ export default function OutputsPanel({
 
       {creating && <CreateOutputModal projectId={projectId} onClose={() => setCreating(false)} onCreated={reload} />}
       {editingOutput && (
-        <EditOutputModal output={editingOutput} onClose={() => setEditingOutput(null)} onSaved={handleOutputSaved} />
+        <EditOutputModal
+          output={editingOutput}
+          onClose={() => setEditingOutput(null)}
+          onSaved={handleOutputSaved}
+          onDeleted={handleOutputRemoved}
+          onArchived={handleOutputRemoved}
+        />
       )}
     </div>
   );

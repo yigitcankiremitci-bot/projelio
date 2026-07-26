@@ -39,12 +39,12 @@ export default function TeamMemberModal({ member, tasks, onClose, onTaskUpdated 
 
   return (
     <Modal title={member.fullName ?? "Ekip üyesi"} onClose={onClose} maxWidth={420}>
-      <p style={{ fontSize: 12, color: c.textSecondary, margin: "0 0 14px" }}>
+      <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 14px" }}>
         Bu üyeye atamak istediğin görevleri işaretle. Bir görev yalnızca tek kişiye atanabilir.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto" }}>
         {sorted.length === 0 ? (
-          <p style={{ fontSize: 12, color: c.textSecondary }}>Bu projede görev yok.</p>
+          <p style={{ fontSize: 15, color: c.textSecondary }}>Bu projede görev yok.</p>
         ) : (
           sorted.map((t) => {
             const mine = t.assignedTo === member.userId;
@@ -81,11 +81,11 @@ export default function TeamMemberModal({ member, tasks, onClose, onTaskUpdated 
                 >
                   {mine && <IconCheck size={10} color="#fff" />}
                 </span>
-                <span style={{ fontSize: 12, color: c.textPrimary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {t.parentTaskId ? "↳ " : ""}
                   {t.title}
                 </span>
-                {takenByOther && <span style={{ fontSize: 10, color: c.textSecondary, flexShrink: 0 }}>atanmış</span>}
+                {takenByOther && <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>atanmış</span>}
               </button>
             );
           })

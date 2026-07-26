@@ -44,7 +44,7 @@ export default function AdminPanel() {
           >
             <IconShield size={18} color={c.accent} />
           </span>
-          <h2 style={{ color: c.textPrimary, fontSize: 16, fontWeight: 500, margin: "0 0 16px" }}>
+          <h2 style={{ color: c.textPrimary, fontSize: 20, fontWeight: 500, margin: "0 0 16px" }}>
             Korumalı admin paneli
           </h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -57,7 +57,7 @@ export default function AdminPanel() {
             />
             <button
               onClick={() => setUnlocked(password.length > 0)}
-              style={{ background: c.primary, color: "#fff", border: "none", padding: "10px 0", borderRadius: 8, fontSize: 14, fontWeight: 500 }}
+              style={{ background: c.primary, color: "#fff", border: "none", padding: "10px 0", borderRadius: 8, fontSize: 17, fontWeight: 500 }}
             >
               Giriş
             </button>
@@ -69,8 +69,8 @@ export default function AdminPanel() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
-      <h1 style={{ color: c.textPrimary, fontSize: 18, fontWeight: 500, margin: "0 0 8px" }}>Admin paneli</h1>
-      <p style={{ color: c.textSecondary, fontSize: 13 }}>
+      <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 500, margin: "0 0 8px" }}>Admin paneli</h1>
+      <p style={{ color: c.textSecondary, fontSize: 16 }}>
         Kullanıcılar, proje istatistikleri ve sistem durumu burada listelenir.
       </p>
     </div>

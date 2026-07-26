@@ -39,18 +39,23 @@ a {
   color: inherit;
 }
 
-input,
-select,
-button,
-textarea {
+button {
   font-family: inherit;
-  font-size: 14px;
+  font-size: 17px;
 }
 
+/*
+ * iOS Safari, font-size'ı 16px'ten küçük olan inputlara odaklanınca sayfayı
+ * otomatik yakınlaştırır (kullanıcı sonra elle uzaklaştırmak zorunda kalır).
+ * Bunu önlemek için mobilde (dar ekranlarda) inputları 16px tutuyoruz;
+ * masaüstünde eski 14px görünümü koruyoruz.
+ */
 input,
 select,
 textarea {
-  height: 40px;
+  font-family: inherit;
+  font-size: 19px;
+  height: 42px;
   padding: 0 12px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -58,6 +63,14 @@ textarea {
   color: var(--color-text-primary);
   outline: none;
   transition: border-color 0.15s ease;
+}
+
+@media (min-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 17px;
+  }
 }
 
 input:focus,
@@ -83,4 +96,24 @@ a:focus-visible,
 button:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+/*
+ * Basılı tutup sürükleyerek sıralama (SortableJS). Basılı tutulduğunda öğe
+ * "yerinden kalkmış" gibi hafifçe büyüyüp gölge kazanır; bırakılacağı yer
+ * soluk bir yer tutucu ile gösterilir.
+ */
+.sortable-chosen {
+  opacity: 0.97;
+  box-shadow: 0 10px 24px rgba(26, 31, 41, 0.22);
+  transform: scale(1.02);
+  z-index: 50;
+}
+
+.sortable-ghost {
+  opacity: 0.3;
+}
+
+.sortable-drag {
+  opacity: 0.97 !important;
 }

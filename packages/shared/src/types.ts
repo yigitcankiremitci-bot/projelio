@@ -18,6 +18,8 @@ export interface Job {
   description?: string;
   coverImageUrl?: string;
   createdAt: string;
+  archivedAt?: string;
+  sortOrder?: number;
 }
 
 export type ProjectStatus = "active" | "completed" | "archived";
@@ -34,6 +36,8 @@ export interface Project {
   deadline: string;
   status: ProjectStatus;
   createdAt: string;
+  archivedAt?: string;
+  sortOrder?: number;
 }
 
 export type MemberRole = "owner" | "member" | "subcontractor";
@@ -58,6 +62,8 @@ export interface Output {
   title: string;
   description?: string;
   createdAt: string;
+  archivedAt?: string;
+  sortOrder?: number;
 }
 
 export type TaskStatus = "todo" | "in_progress" | "completed";
@@ -77,6 +83,8 @@ export interface Task {
   budgetStatus: TaskBudgetStatus;
   weekNumber?: number;
   createdAt: string;
+  archivedAt?: string;
+  sortOrder?: number;
 }
 
 export interface TaskComment {
@@ -140,4 +148,48 @@ export interface PushSubscriptionKeys {
 export interface PushSubscriptionPayload {
   endpoint: string;
   keys: PushSubscriptionKeys;
+}
+
+export interface ArchivedJobEntry {
+  id: string;
+  title: string;
+  archivedAt: string;
+}
+
+export interface ArchivedProjectEntry {
+  id: string;
+  title: string;
+  archivedAt: string;
+  jobId: string;
+  jobTitle: string;
+}
+
+export interface ArchivedTaskEntry {
+  id: string;
+  title: string;
+  archivedAt: string;
+  isSubtask: boolean;
+  projectId: string;
+  projectTitle: string;
+  jobId: string;
+  jobTitle: string;
+  parentTaskId?: string;
+  parentTaskTitle?: string;
+}
+
+export interface ArchivedOutputEntry {
+  id: string;
+  title: string;
+  archivedAt: string;
+  projectId: string;
+  projectTitle: string;
+  jobId: string;
+  jobTitle: string;
+}
+
+export interface ArchiveSummary {
+  jobs: ArchivedJobEntry[];
+  projects: ArchivedProjectEntry[];
+  tasks: ArchivedTaskEntry[];
+  outputs: ArchivedOutputEntry[];
 }

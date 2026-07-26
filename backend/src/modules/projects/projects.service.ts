@@ -1,7 +1,10 @@
 import { randomUUID } from "crypto";
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Project } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { TasksService } from "../tasks/tasks.service";
+import { OutputsService } from "../outputs/outputs.service";
+import { applyOrder } from "../../common/reorder.util";
 
 const COVER_BUCKET = "project-covers";
 
@@ -18,18 +21,26 @@ function mapProject(row: any): Project {
     deadline: row.deadline,
     status: row.status,
     createdAt: row.created_at,
+    archivedAt: row.archived_at ?? undefined,
+    sortOrder: row.sort_order ?? 0,
   };
 }
 
 @Injectable()
 export class ProjectsService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private tasksService: TasksService,
+    private outputsService: OutputsService
+  ) {}
 
   async findAllForUser(userId: string): Promise<Project[]> {
     const { data, error } = await this.supabase.client
       .from("projects")
       .select()
       .eq("owner_id", userId)
+      .is("archived_at", null)
+      .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data ?? []).map(mapProject);
@@ -40,9 +51,25 @@ export class ProjectsService {
       .from("projects")
       .select()
       .eq("job_id", jobId)
+      .is("archived_at", null)
+      .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data ?? []).map(mapProject);
+  }
+
+  async reorder(userId: string, ids: string[]): Promise<void> {
+    if (!ids?.length) return;
+    const { data: rows, error } = await this.supabase.client.from("projects").select("id, owner_id, job_id").in("id", ids);
+    if (error) throw error;
+    if (!rows || rows.length !== ids.length || rows.some((r: any) => r.owner_id !== userId)) {
+      throw new BadRequestException("Geçersiz sıralama isteği");
+    }
+    const distinctJobIds = new Set(rows.map((r: any) => r.job_id));
+    if (distinctJobIds.size > 1) {
+      throw new BadRequestException("Sıralanan projeler aynı işe ait olmalı");
+    }
+    await applyOrder(this.supabase.client, "projects", ids);
   }
 
   async findOne(id: string): Promise<Project> {
@@ -98,6 +125,62 @@ export class ProjectsService {
   async remove(id: string): Promise<void> {
     const { error } = await this.supabase.client.from("projects").delete().eq("id", id);
     if (error) throw error;
+  }
+
+  async archive(id: string): Promise<Project> {
+    const { data: row, error } = await this.supabase.client
+      .from("projects")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Proje bulunamadı");
+
+    // Projeye bağlı üst seviye görevleri arşivle (alt görevler TasksService.archive içinde kademeli arşivlenir)
+    const { data: tasks } = await this.supabase.client
+      .from("tasks")
+      .select("id")
+      .eq("project_id", id)
+      .is("parent_task_id", null);
+    for (const t of tasks ?? []) {
+      await this.tasksService.archive(t.id);
+    }
+
+    // Projeye bağlı çıktıları arşivle
+    const { data: outputs } = await this.supabase.client.from("outputs").select("id").eq("project_id", id);
+    for (const o of outputs ?? []) {
+      await this.outputsService.archive(o.id);
+    }
+
+    return mapProject(row);
+  }
+
+  async restore(id: string): Promise<Project> {
+    const { data: row, error } = await this.supabase.client
+      .from("projects")
+      .update({ archived_at: null })
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Proje bulunamadı");
+
+    const { data: tasks } = await this.supabase.client
+      .from("tasks")
+      .select("id")
+      .eq("project_id", id)
+      .is("parent_task_id", null);
+    for (const t of tasks ?? []) {
+      await this.tasksService.restore(t.id);
+    }
+
+    const { data: outputs } = await this.supabase.client.from("outputs").select("id").eq("project_id", id);
+    for (const o of outputs ?? []) {
+      await this.outputsService.restore(o.id);
+    }
+
+    return mapProject(row);
   }
 
   async uploadCover(id: string, file: Express.Multer.File): Promise<Project> {

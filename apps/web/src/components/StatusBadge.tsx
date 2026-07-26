@@ -11,7 +11,7 @@ export default function StatusBadge({ status }: { status: ProjectStatus }) {
   return (
     <span
       style={{
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: 500,
         padding: "3px 9px",
         borderRadius: 20,

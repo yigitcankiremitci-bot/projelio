@@ -55,7 +55,7 @@ export default function Sidebar() {
         >
           <IconCheck size={15} color={c.primaryDark} />
         </span>
-        <span style={{ color: "#fff", fontSize: 16, fontWeight: 600 }}>Projelio</span>
+        <span style={{ color: "#fff", fontSize: 20, fontWeight: 600 }}>Projelio</span>
       </Link>
 
       {navItems.map((item) => {
@@ -76,7 +76,7 @@ export default function Sidebar() {
             }}
           >
             <Icon size={16} color={active ? c.accent : "#9AA6B4"} />
-            <span style={{ fontSize: 13, color: active ? "#fff" : "#C7CCD6" }}>{item.label}</span>
+            <span style={{ fontSize: 16, color: active ? "#fff" : "#C7CCD6" }}>{item.label}</span>
           </Link>
         );
       })}
@@ -96,7 +96,7 @@ export default function Sidebar() {
           }}
         >
           <IconLogout size={16} color="#9AA6B4" />
-          <span style={{ fontSize: 13, color: "#C7CCD6" }}>Çıkış yap</span>
+          <span style={{ fontSize: 16, color: "#C7CCD6" }}>Çıkış yap</span>
         </button>
       </div>
     </aside>

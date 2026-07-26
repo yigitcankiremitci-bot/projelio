@@ -69,10 +69,10 @@ export default function TasksOverview() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
-      <h1 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>Yapılacaklar</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>Yapılacaklar</h1>
 
       {loading ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
+        <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
       ) : groups.length === 0 ? (
         <div
           style={{
@@ -81,7 +81,7 @@ export default function TasksOverview() {
             padding: 40,
             textAlign: "center",
             color: c.textSecondary,
-            fontSize: 13,
+            fontSize: 16,
           }}
         >
           Görev yok.
@@ -92,7 +92,7 @@ export default function TasksOverview() {
             <div key={g.dateKey}>
               <h2
                 style={{
-                  fontSize: 12,
+                  fontSize: 15,
                   fontWeight: 500,
                   color: c.textSecondary,
                   margin: "0 0 8px",
@@ -125,8 +125,8 @@ export default function TasksOverview() {
                         flexShrink: 0,
                       }}
                     />
-                    <span style={{ fontSize: 13, color: c.textPrimary, flex: 1 }}>{t.title}</span>
-                    <span style={{ fontSize: 11, color: c.textSecondary }}>{t.projectTitle}</span>
+                    <span style={{ fontSize: 16, color: c.textPrimary, flex: 1 }}>{t.title}</span>
+                    <span style={{ fontSize: 13, color: c.textSecondary }}>{t.projectTitle}</span>
                   </Link>
                 ))}
               </div>

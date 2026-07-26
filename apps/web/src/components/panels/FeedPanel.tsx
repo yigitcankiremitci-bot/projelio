@@ -77,14 +77,14 @@ export default function FeedPanel({ projectId, tasks }: Props) {
           onChange={(e) => setPostBody(e.target.value.slice(0, 140))}
           placeholder="Ekiple bir şey paylaş… (140 karakter)"
           rows={2}
-          style={{ width: "100%", resize: "none", fontSize: 13, border: "none", outline: "none", background: "transparent", color: c.textPrimary }}
+          style={{ width: "100%", resize: "none", fontSize: 16, border: "none", outline: "none", background: "transparent", color: c.textPrimary }}
         />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
-          <span style={{ fontSize: 11, color: remaining < 20 ? c.danger : c.textSecondary }}>{remaining}</span>
+          <span style={{ fontSize: 13, color: remaining < 20 ? c.danger : c.textSecondary }}>{remaining}</span>
           <button
             type="submit"
             disabled={posting || !postBody.trim()}
-            style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: c.primary, color: "#fff", fontSize: 12, fontWeight: 500 }}
+            style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: c.primary, color: "#fff", fontSize: 15, fontWeight: 500 }}
           >
             Paylaş
           </button>
@@ -93,7 +93,7 @@ export default function FeedPanel({ projectId, tasks }: Props) {
 
       {completedTasks.length > 0 && (
         <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12 }}>
-          <h4 style={{ fontSize: 12, fontWeight: 500, color: c.textSecondary, margin: "0 0 8px" }}>Tamamlanan görevler</h4>
+          <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 8px" }}>Tamamlanan görevler</h4>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {completedTasks.map((t) => (
               <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -111,7 +111,7 @@ export default function FeedPanel({ projectId, tasks }: Props) {
                 >
                   <IconCheck size={9} color="#fff" />
                 </span>
-                <span style={{ fontSize: 12, color: c.textPrimary }}>{t.title}</span>
+                <span style={{ fontSize: 15, color: c.textPrimary }}>{t.title}</span>
               </div>
             ))}
           </div>
@@ -120,20 +120,20 @@ export default function FeedPanel({ projectId, tasks }: Props) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {loading ? (
-          <p style={{ fontSize: 12, color: c.textSecondary }}>Yükleniyor…</p>
+          <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
         ) : items.length === 0 ? (
-          <p style={{ fontSize: 12, color: c.textSecondary }}>Henüz bir paylaşım veya yorum yok.</p>
+          <p style={{ fontSize: 15, color: c.textSecondary }}>Henüz bir paylaşım veya yorum yok.</p>
         ) : (
           items.map((item) => (
             <div key={`${item.kind}-${item.id}`} style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "10px 12px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: c.textPrimary }}>{item.authorName}</span>
-                <span style={{ fontSize: 11, color: c.textSecondary }}>{new Date(item.createdAt).toLocaleDateString("tr-TR")}</span>
+                <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{item.authorName}</span>
+                <span style={{ fontSize: 13, color: c.textSecondary }}>{new Date(item.createdAt).toLocaleDateString("tr-TR")}</span>
               </div>
               {item.kind === "comment" && (
-                <p style={{ fontSize: 11, color: c.accentDark, margin: "0 0 4px" }}>"{item.taskTitle}" görevine yorum yaptı</p>
+                <p style={{ fontSize: 13, color: c.accentDark, margin: "0 0 4px" }}>"{item.taskTitle}" görevine yorum yaptı</p>
               )}
-              <p style={{ fontSize: 13, color: c.textPrimary, margin: 0, lineHeight: 1.45 }}>{item.body}</p>
+              <p style={{ fontSize: 16, color: c.textPrimary, margin: 0, lineHeight: 1.45 }}>{item.body}</p>
             </div>
           ))
         )}

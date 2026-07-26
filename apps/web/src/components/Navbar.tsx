@@ -45,7 +45,7 @@ export default function Navbar() {
         >
           <IconCheck size={13} color={c.primaryDark} />
         </span>
-        <span style={{ color: "#fff", fontSize: 15, fontWeight: 600 }}>Projelio</span>
+        <span style={{ color: "#fff", fontSize: 19, fontWeight: 600 }}>Projelio</span>
       </Link>
 
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -66,7 +66,7 @@ export default function Navbar() {
               }}
             >
               <Icon size={15} color={active ? c.accent : "#9AA6B4"} />
-              <span style={{ fontSize: 13, color: active ? "#fff" : "#C7CCD6" }}>{item.label}</span>
+              <span style={{ fontSize: 16, color: active ? "#fff" : "#C7CCD6" }}>{item.label}</span>
             </Link>
           );
         })}
@@ -85,7 +85,7 @@ export default function Navbar() {
           }}
         >
           <IconLogout size={15} color="#9AA6B4" />
-          <span style={{ fontSize: 13, color: "#C7CCD6" }}>Çıkış</span>
+          <span style={{ fontSize: 16, color: "#C7CCD6" }}>Çıkış</span>
         </button>
       </div>
     </nav>

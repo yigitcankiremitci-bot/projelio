@@ -49,15 +49,15 @@ export default function Register() {
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
           <img src="/logo.png" alt="Projelio" style={{ width: 48, height: 48, marginBottom: 14 }} />
-          <h1 style={{ color: c.textPrimary, fontSize: 20, fontWeight: 600, margin: 0 }}>Kayıt ol</h1>
-          <p style={{ color: c.textSecondary, fontSize: 13, margin: "6px 0 0" }}>
+          <h1 style={{ color: c.textPrimary, fontSize: 25, fontWeight: 600, margin: 0 }}>Kayıt ol</h1>
+          <p style={{ color: c.textSecondary, fontSize: 16, margin: "6px 0 0" }}>
             Freelance proje &amp; görev yönetimi
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 12, color: c.textSecondary }}>Ad Soyad</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>Ad Soyad</label>
             <input
               type="text"
               placeholder="Ad Soyad"
@@ -68,7 +68,7 @@ export default function Register() {
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 12, color: c.textSecondary }}>E-posta</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>E-posta</label>
             <input
               type="email"
               placeholder="ad.soyad@sirket.com"
@@ -79,7 +79,7 @@ export default function Register() {
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 12, color: c.textSecondary }}>Şifre</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>Şifre</label>
             <input
               type="password"
               placeholder="En az 8 karakter"
@@ -91,7 +91,7 @@ export default function Register() {
             />
           </div>
 
-          {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
+          {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
 
           <button
             type="submit"
@@ -103,14 +103,14 @@ export default function Register() {
               padding: "11px 0",
               borderRadius: 8,
               border: "none",
-              fontSize: 14,
+              fontSize: 17,
               fontWeight: 500,
             }}
           >
             {loading ? "Kayıt oluşturuluyor…" : "Kayıt ol"}
           </button>
 
-          <Link to="/login" style={{ fontSize: 12.5, color: c.textSecondary, textAlign: "center", marginTop: 4 }}>
+          <Link to="/login" style={{ fontSize: 16, color: c.textSecondary, textAlign: "center", marginTop: 4 }}>
             Zaten hesabın var mı? Giriş yap
           </Link>
         </form>

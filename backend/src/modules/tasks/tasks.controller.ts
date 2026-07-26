@@ -17,6 +17,12 @@ export class TasksController {
     return this.tasksService.create(projectId, body);
   }
 
+  // NOT: bu route "tasks/:id" ile çakışmaması için ondan önce tanımlanmalı.
+  @Patch("tasks/reorder")
+  reorder(@Body("ids") ids: string[]) {
+    return this.tasksService.reorder(ids);
+  }
+
   @Patch("tasks/:id")
   update(@Param("id") id: string, @Body() body: any) {
     return this.tasksService.update(id, body);
@@ -40,5 +46,15 @@ export class TasksController {
   @Delete("tasks/:id")
   remove(@Param("id") id: string) {
     return this.tasksService.remove(id);
+  }
+
+  @Patch("tasks/:id/archive")
+  archive(@Param("id") id: string) {
+    return this.tasksService.archive(id);
+  }
+
+  @Patch("tasks/:id/restore")
+  restore(@Param("id") id: string) {
+    return this.tasksService.restore(id);
   }
 }

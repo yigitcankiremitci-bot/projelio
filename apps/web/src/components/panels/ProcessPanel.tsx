@@ -293,17 +293,17 @@ export default function ProcessPanel({
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 11, color: c.textSecondary, flexShrink: 0 }}>
+          <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
             {new Date(project.startDate).toLocaleDateString("tr-TR")}
           </span>
           <div style={{ flex: 1, height: 8, borderRadius: 4, background: c.border, overflow: "hidden", position: "relative" }}>
             <div style={{ width: `${pct}%`, height: "100%", background: c.accent, borderRadius: 4, transition: "width 0.15s ease" }} />
           </div>
-          <span style={{ fontSize: 11, color: c.textSecondary, flexShrink: 0 }}>
+          <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
             {new Date(project.deadline).toLocaleDateString("tr-TR")}
           </span>
         </div>
-        <p style={{ textAlign: "center", fontSize: 12, color: c.textPrimary, margin: "10px 0 0" }}>
+        <p style={{ textAlign: "center", fontSize: 15, color: c.textPrimary, margin: "10px 0 0" }}>
           Görevlerin %{pct}'si tamamlandı ({done}/{total})
         </p>
 
@@ -319,7 +319,7 @@ export default function ProcessPanel({
                   border: "none",
                   background: viewMode === m.key ? c.primary : "transparent",
                   color: viewMode === m.key ? "#fff" : c.textSecondary,
-                  fontSize: 12,
+                  fontSize: 15,
                   fontWeight: 500,
                 }}
               >
@@ -341,7 +341,7 @@ export default function ProcessPanel({
                   border: `1px solid ${c.border}`,
                   background: c.background,
                   color: canGoPrevDay ? c.textPrimary : c.textSecondary,
-                  fontSize: 13,
+                  fontSize: 16,
                   flexShrink: 0,
                 }}
               >
@@ -369,7 +369,7 @@ export default function ProcessPanel({
                         border: `1px solid ${s.border}`,
                         background: s.background,
                         color: s.color,
-                        fontSize: 12,
+                        fontSize: 15,
                         fontWeight: s.fontWeight,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -393,7 +393,7 @@ export default function ProcessPanel({
                   border: `1px solid ${c.border}`,
                   background: c.background,
                   color: canGoNextDay ? c.textPrimary : c.textSecondary,
-                  fontSize: 13,
+                  fontSize: 16,
                   flexShrink: 0,
                 }}
               >
@@ -415,7 +415,7 @@ export default function ProcessPanel({
                   border: `1px solid ${c.border}`,
                   background: c.background,
                   color: canGoPrevWeek ? c.textPrimary : c.textSecondary,
-                  fontSize: 13,
+                  fontSize: 16,
                   flexShrink: 0,
                 }}
               >
@@ -442,7 +442,7 @@ export default function ProcessPanel({
                         border: `1px solid ${s.border}`,
                         background: s.background,
                         color: s.color,
-                        fontSize: 12,
+                        fontSize: 15,
                         fontWeight: s.fontWeight,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -466,7 +466,7 @@ export default function ProcessPanel({
                   border: `1px solid ${c.border}`,
                   background: c.background,
                   color: canGoNextWeek ? c.textPrimary : c.textSecondary,
-                  fontSize: 13,
+                  fontSize: 16,
                   flexShrink: 0,
                 }}
               >
@@ -488,7 +488,7 @@ export default function ProcessPanel({
                   border: `1px solid ${c.border}`,
                   background: c.background,
                   color: canGoPrevMonth ? c.textPrimary : c.textSecondary,
-                  fontSize: 13,
+                  fontSize: 16,
                   flexShrink: 0,
                 }}
               >
@@ -515,7 +515,7 @@ export default function ProcessPanel({
                         border: `1px solid ${s.border}`,
                         background: s.background,
                         color: s.color,
-                        fontSize: 12,
+                        fontSize: 15,
                         fontWeight: s.fontWeight,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -539,7 +539,7 @@ export default function ProcessPanel({
                   border: `1px solid ${c.border}`,
                   background: c.background,
                   color: canGoNextMonth ? c.textPrimary : c.textSecondary,
-                  fontSize: 13,
+                  fontSize: 16,
                   flexShrink: 0,
                 }}
               >
@@ -567,7 +567,7 @@ export default function ProcessPanel({
                       border: `1px solid ${active ? c.primary : c.border}`,
                       background: active ? c.primary : c.background,
                       color: active ? "#fff" : c.textPrimary,
-                      fontSize: 12,
+                      fontSize: 15,
                       fontWeight: 500,
                     }}
                   >
@@ -575,7 +575,7 @@ export default function ProcessPanel({
                     {count > 0 && (
                       <span
                         style={{
-                          fontSize: 10,
+                          fontSize: 12,
                           color: active ? "#fff" : c.textSecondary,
                           background: active ? "rgba(255,255,255,0.25)" : c.surface,
                           borderRadius: 20,
@@ -596,7 +596,7 @@ export default function ProcessPanel({
       {showKanban && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-            <h4 style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
+            <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
               {viewMode === "project" && project.title}
               {viewMode === "day" && `${dayLabel(selectedDay)} · ${selectedDay.toLocaleDateString("tr-TR")}`}
               {viewMode === "week" && selectedWeek != null && `${selectedWeek}. hafta`}
@@ -604,22 +604,22 @@ export default function ProcessPanel({
               {viewMode === "year" && selectedYear != null && `${selectedYear}. yıl`}
             </h4>
             {viewMode === "project" && (
-              <span style={{ fontSize: 11, color: c.textSecondary }}>
+              <span style={{ fontSize: 13, color: c.textSecondary }}>
                 {new Date(project.startDate).toLocaleDateString("tr-TR")} – {new Date(project.deadline).toLocaleDateString("tr-TR")}
               </span>
             )}
             {viewMode === "week" && selectedWeek != null && (
-              <span style={{ fontSize: 11, color: c.textSecondary }}>
+              <span style={{ fontSize: 13, color: c.textSecondary }}>
                 {weekRange(selectedWeek).start.toLocaleDateString("tr-TR")} – {weekRange(selectedWeek).end.toLocaleDateString("tr-TR")}
               </span>
             )}
             {viewMode === "month" && selectedMonth != null && (
-              <span style={{ fontSize: 11, color: c.textSecondary }}>
+              <span style={{ fontSize: 13, color: c.textSecondary }}>
                 {monthRange(selectedMonth).start.toLocaleDateString("tr-TR")} – {monthRange(selectedMonth).end.toLocaleDateString("tr-TR")}
               </span>
             )}
             {viewMode === "year" && selectedYear != null && (
-              <span style={{ fontSize: 11, color: c.textSecondary }}>
+              <span style={{ fontSize: 13, color: c.textSecondary }}>
                 {yearRange(selectedYear).start.toLocaleDateString("tr-TR")} – {yearRange(selectedYear).end.toLocaleDateString("tr-TR")}
               </span>
             )}
@@ -635,6 +635,7 @@ export default function ProcessPanel({
                 onMove={onMoveTask}
                 onToggleComplete={onToggleComplete}
                 onEditTask={onEditTask}
+                group={`tasks-process-${project.id}`}
               />
             ))}
           </div>

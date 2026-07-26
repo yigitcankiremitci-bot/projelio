@@ -46,7 +46,7 @@ export default function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }: 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h4 style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Ekip üyeleri</h4>
+        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Ekip üyeleri</h4>
         <button
           onClick={() => setAdding(true)}
           aria-label="Ekibe üye ekle"
@@ -66,9 +66,9 @@ export default function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }: 
       </div>
 
       {loading ? (
-        <p style={{ fontSize: 12, color: c.textSecondary }}>Yükleniyor…</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
       ) : members.length === 0 ? (
-        <p style={{ fontSize: 12, color: c.textSecondary }}>Henüz ekip üyesi eklenmedi.</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>Henüz ekip üyesi eklenmedi.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {members.map((m) => {
@@ -98,7 +98,7 @@ export default function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }: 
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 12,
+                    fontSize: 15,
                     fontWeight: 600,
                     color: c.primary,
                     flexShrink: 0,
@@ -108,18 +108,18 @@ export default function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }: 
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 13, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: 16, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {m.fullName ?? "Bilinmeyen kullanıcı"}
                     </span>
                     {m.userId === ownerId && (
-                      <span style={{ fontSize: 10, color: c.accentDark, background: `${c.accent}22`, borderRadius: 20, padding: "1px 7px" }}>
+                      <span style={{ fontSize: 12, color: c.accentDark, background: `${c.accent}22`, borderRadius: 20, padding: "1px 7px" }}>
                         Yönetici
                       </span>
                     )}
                   </div>
-                  <span style={{ fontSize: 11, color: c.textSecondary }}>{roleLabel[m.role] ?? m.role}</span>
+                  <span style={{ fontSize: 13, color: c.textSecondary }}>{roleLabel[m.role] ?? m.role}</span>
                 </div>
-                <span style={{ fontSize: 11, color: c.textSecondary, flexShrink: 0 }}>
+                <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
                   {done}/{total} görev
                 </span>
               </button>

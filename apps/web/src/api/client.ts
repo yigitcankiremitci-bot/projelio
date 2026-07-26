@@ -1,5 +1,15 @@
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
+async function parseResponse<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (!text) return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return undefined as T;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("projelio_token");
   const res = await fetch(`${API_URL}${path}`, {
@@ -11,7 +21,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   });
   if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`);
-  return res.json() as Promise<T>;
+  return parseResponse<T>(res);
 }
 
 async function uploadFile<T>(path: string, formData: FormData): Promise<T> {
@@ -22,7 +32,7 @@ async function uploadFile<T>(path: string, formData: FormData): Promise<T> {
     body: formData,
   });
   if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`);
-  return res.json() as Promise<T>;
+  return parseResponse<T>(res);
 }
 
 export const api = {

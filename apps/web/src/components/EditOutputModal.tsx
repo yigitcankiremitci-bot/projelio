@@ -3,19 +3,32 @@ import type { Output } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import Modal from "./Modal";
+import EntityDangerZone from "./EntityDangerZone";
 
 interface Props {
   output: Output;
   onClose: () => void;
   onSaved: (updated: Output) => void;
+  onDeleted?: (deletedOutputId: string) => void;
+  onArchived?: (archivedOutputId: string) => void;
 }
 
-export default function EditOutputModal({ output, onClose, onSaved }: Props) {
+export default function EditOutputModal({ output, onClose, onSaved, onDeleted, onArchived }: Props) {
   const c = colors.light;
   const [title, setTitle] = useState(output.title);
   const [description, setDescription] = useState(output.description ?? "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const handleDelete = async () => {
+    await api.delete(`/outputs/${output.id}`);
+    onDeleted?.(output.id);
+  };
+
+  const handleArchive = async () => {
+    await api.patch(`/outputs/${output.id}/archive`, {});
+    onArchived?.(output.id);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,12 +51,12 @@ export default function EditOutputModal({ output, onClose, onSaved }: Props) {
     <Modal title="Çıktıyı düzenle" onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -52,16 +65,24 @@ export default function EditOutputModal({ output, onClose, onSaved }: Props) {
           />
         </div>
 
-        {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
+        {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 14, fontWeight: 500 }}
+          style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
           {loading ? "Kaydediliyor…" : "Kaydet"}
         </button>
       </form>
+
+      <EntityDangerZone
+        entityLabel="Çıktıyı"
+        onArchive={onArchived ? handleArchive : undefined}
+        onDelete={onDeleted ? handleDelete : undefined}
+        archiveMessage={`"${output.title}" çıktısını arşive eklemek istediğine emin misin? Bu çıktıya bağlı görevler etkilenmez. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}
+        deleteMessage={`"${output.title}" çıktısını silmek istediğine emin misin? Bu çıktıya bağlı görevler silinmez, sadece çıktıdan ayrılır. Bu işlem geri alınamaz.`}
+      />
     </Modal>
   );
 }

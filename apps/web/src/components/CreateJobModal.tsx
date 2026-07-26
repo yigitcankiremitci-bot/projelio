@@ -34,21 +34,21 @@ export default function CreateJobModal({ onClose, onCreated }: Props) {
     <Modal title="Yeni iş" onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Örn. Web tasarım işleri" style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Kısa açıklama (opsiyonel)" style={{ width: "100%" }} />
         </div>
 
-        {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
+        {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 14, fontWeight: 500 }}
+          style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
           {loading ? "Oluşturuluyor…" : "İş oluştur"}
         </button>

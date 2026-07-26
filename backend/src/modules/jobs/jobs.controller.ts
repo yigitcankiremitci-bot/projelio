@@ -46,6 +46,12 @@ export class JobsController {
     return this.jobsService.create(req.user.userId, body);
   }
 
+  // NOT: bu route ":id" ile çakışmaması için ondan önce tanımlanmalı.
+  @Patch("reorder")
+  reorder(@Req() req: any, @Body("ids") ids: string[]) {
+    return this.jobsService.reorder(req.user.userId, ids);
+  }
+
   @Patch(":id")
   update(@Param("id") id: string, @Body() body: any) {
     return this.jobsService.update(id, body);
@@ -61,5 +67,15 @@ export class JobsController {
   @Delete(":id")
   remove(@Param("id") id: string) {
     return this.jobsService.remove(id);
+  }
+
+  @Patch(":id/archive")
+  archive(@Param("id") id: string) {
+    return this.jobsService.archive(id);
+  }
+
+  @Patch(":id/restore")
+  restore(@Param("id") id: string) {
+    return this.jobsService.restore(id);
   }
 }

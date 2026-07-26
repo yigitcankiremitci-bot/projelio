@@ -40,7 +40,7 @@ export default function ProjectTabs({ active, onChange }: Props) {
             border: "none",
             background: active === t.key ? c.primary : "transparent",
             color: active === t.key ? "#fff" : c.textSecondary,
-            fontSize: 13,
+            fontSize: 16,
             fontWeight: 500,
             cursor: "pointer",
             transition: "background 0.12s ease, color 0.12s ease",

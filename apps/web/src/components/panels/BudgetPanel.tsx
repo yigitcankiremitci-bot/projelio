@@ -17,8 +17,8 @@ function SummaryCard({ label, amount, color }: { label: string; amount: number; 
   const c = colors.light;
   return (
     <div style={{ flex: 1, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "12px 14px" }}>
-      <p style={{ fontSize: 11, color: c.textSecondary, margin: "0 0 4px" }}>{label}</p>
-      <p style={{ fontSize: 16, fontWeight: 600, color, margin: 0 }}>{amount.toLocaleString("tr-TR")} ₺</p>
+      <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{label}</p>
+      <p style={{ fontSize: 20, fontWeight: 600, color, margin: 0 }}>{amount.toLocaleString("tr-TR")} ₺</p>
     </div>
   );
 }
@@ -43,12 +43,12 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
   const myMembership = members.find((m) => m.userId === currentUserId);
   const canView = isOwner || myMembership?.canViewBudget;
 
-  if (loading) return <p style={{ fontSize: 12, color: c.textSecondary }}>Yükleniyor…</p>;
+  if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>;
 
   if (!canView) {
     return (
       <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 16 }}>
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Bu projenin bütçesini görüntüleme yetkin yok.</p>
+        <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>Bu projenin bütçesini görüntüleme yetkin yok.</p>
       </div>
     );
   }
@@ -111,23 +111,23 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
 
       <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "12px 14px", display: "flex", gap: 20 }}>
         <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 11, color: c.textSecondary, margin: "0 0 4px" }}>Proje toplam bütçesi</p>
-          <p style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary, margin: 0 }}>{project.totalBudget.toLocaleString("tr-TR")} ₺</p>
+          <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Proje toplam bütçesi</p>
+          <p style={{ fontSize: 19, fontWeight: 600, color: c.textPrimary, margin: 0 }}>{project.totalBudget.toLocaleString("tr-TR")} ₺</p>
         </div>
         <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 11, color: c.textSecondary, margin: "0 0 4px" }}>Yapılan harcamalar</p>
-          <p style={{ fontSize: 15, fontWeight: 600, color: c.danger, margin: 0 }}>{paidTotal.toLocaleString("tr-TR")} ₺</p>
+          <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Yapılan harcamalar</p>
+          <p style={{ fontSize: 19, fontWeight: 600, color: c.danger, margin: 0 }}>{paidTotal.toLocaleString("tr-TR")} ₺</p>
         </div>
         <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 11, color: c.textSecondary, margin: "0 0 4px" }}>Kalan varlık</p>
-          <p style={{ fontSize: 15, fontWeight: 600, color: c.success, margin: 0 }}>{remainingAsset.toLocaleString("tr-TR")} ₺</p>
+          <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Kalan varlık</p>
+          <p style={{ fontSize: 19, fontWeight: 600, color: c.success, margin: 0 }}>{remainingAsset.toLocaleString("tr-TR")} ₺</p>
         </div>
       </div>
 
       <div>
-        <h4 style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>Görev bütçeleri</h4>
+        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>Görev bütçeleri</h4>
         {budgetTasks.length === 0 ? (
-          <p style={{ fontSize: 12, color: c.textSecondary }}>Bütçe eklenmiş görev yok.</p>
+          <p style={{ fontSize: 15, color: c.textSecondary }}>Bütçe eklenmiş görev yok.</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {budgetTasks.map((t) => (
@@ -143,15 +143,15 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
                   padding: "8px 12px",
                 }}
               >
-                <span style={{ fontSize: 12, color: c.textPrimary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {taskLabel(t)}
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 500, color: c.textPrimary, flexShrink: 0 }}>
+                <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, flexShrink: 0 }}>
                   {(t.budget ?? 0).toLocaleString("tr-TR")} ₺
                 </span>
                 <span
                   style={{
-                    fontSize: 10,
+                    fontSize: 12,
                     flexShrink: 0,
                     padding: "2px 8px",
                     borderRadius: 20,
@@ -167,14 +167,14 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
                     <button
                       onClick={() => setBudgetStatus(t, "planned")}
                       disabled={approvingId === t.id}
-                      style={{ fontSize: 11, padding: "4px 9px", borderRadius: 6, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, flexShrink: 0 }}
+                      style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, flexShrink: 0 }}
                     >
                       Planlandı
                     </button>
                     <button
                       onClick={() => setBudgetStatus(t, "paid")}
                       disabled={approvingId === t.id}
-                      style={{ fontSize: 11, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: "#fff", flexShrink: 0 }}
+                      style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: "#fff", flexShrink: 0 }}
                     >
                       Ödendi
                     </button>
@@ -184,7 +184,7 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
                   <button
                     onClick={() => setBudgetStatus(t, "paid")}
                     disabled={approvingId === t.id}
-                    style={{ fontSize: 11, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: "#fff", flexShrink: 0 }}
+                    style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: "#fff", flexShrink: 0 }}
                   >
                     Ödendi olarak işaretle
                   </button>
@@ -198,7 +198,7 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
       {isOwner && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h4 style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Bütçeyi kimler görebilir</h4>
+            <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Bütçeyi kimler görebilir</h4>
             <button
               onClick={() => setAddingViewer((v) => !v)}
               disabled={nonViewers.length === 0}
@@ -218,7 +218,7 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
             </button>
           </div>
 
-          <p style={{ fontSize: 11, color: c.textSecondary, margin: "0 0 8px" }}>
+          <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 8px" }}>
             Varsayılan olarak bütçeyi yalnızca proje yöneticisi görür. Aşağıya eklediğin ekip üyeleri de görebilir.
           </p>
 
@@ -235,7 +235,7 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
               <button
                 onClick={handleAddViewer}
                 disabled={!viewerToAdd}
-                style={{ fontSize: 12, padding: "0 12px", borderRadius: 7, border: "none", background: c.primary, color: "#fff" }}
+                style={{ fontSize: 15, padding: "0 12px", borderRadius: 7, border: "none", background: c.primary, color: "#fff" }}
               >
                 Ekle
               </button>
@@ -243,7 +243,7 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
           )}
 
           {viewers.length === 0 ? (
-            <p style={{ fontSize: 12, color: c.textSecondary }}>Şu an sadece sen görebiliyorsun.</p>
+            <p style={{ fontSize: 15, color: c.textSecondary }}>Şu an sadece sen görebiliyorsun.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {viewers.map((m) => (
@@ -259,7 +259,7 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
                     padding: "8px 12px",
                   }}
                 >
-                  <span style={{ fontSize: 12, color: c.textPrimary }}>{m.fullName ?? "Bilinmeyen kullanıcı"}</span>
+                  <span style={{ fontSize: 15, color: c.textPrimary }}>{m.fullName ?? "Bilinmeyen kullanıcı"}</span>
                   <button
                     onClick={() => setVisibility(m, false)}
                     aria-label="Görüntüleme yetkisini kaldır"

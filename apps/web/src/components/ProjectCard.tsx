@@ -12,6 +12,7 @@ export default function ProjectCard({ project }: Props) {
   return (
     <Link
       to={`/projects/${project.id}`}
+      draggable={false}
       style={{
         display: "block",
         border: `1px solid ${c.border}`,
@@ -30,11 +31,11 @@ export default function ProjectCard({ project }: Props) {
       />
       <div style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 500, color: c.textPrimary }}>{project.title}</h3>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{project.title}</h3>
           <StatusBadge status={project.status} />
         </div>
         {project.description && (
-          <p style={{ color: c.textSecondary, fontSize: 12, margin: "0 0 14px", lineHeight: 1.5 }}>
+          <p style={{ color: c.textSecondary, fontSize: 15, margin: "0 0 14px", lineHeight: 1.5 }}>
             {project.description}
           </p>
         )}
@@ -42,7 +43,7 @@ export default function ProjectCard({ project }: Props) {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            fontSize: 12,
+            fontSize: 15,
             paddingTop: 10,
             borderTop: `1px solid ${c.border}`,
           }}

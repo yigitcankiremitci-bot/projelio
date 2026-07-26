@@ -13,6 +13,7 @@ export default function JobCard({ job, projectCount }: Props) {
   return (
     <Link
       to={`/jobs/${job.id}`}
+      draggable={false}
       style={{
         display: "block",
         border: `1px solid ${c.border}`,
@@ -30,12 +31,12 @@ export default function JobCard({ job, projectCount }: Props) {
         }}
       />
       <div style={{ padding: 16 }}>
-        <h3 style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 500, color: c.textPrimary }}>{job.title}</h3>
+        <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{job.title}</h3>
         {job.description && (
-          <p style={{ color: c.textSecondary, fontSize: 12, margin: "0 0 10px", lineHeight: 1.5 }}>{job.description}</p>
+          <p style={{ color: c.textSecondary, fontSize: 15, margin: "0 0 10px", lineHeight: 1.5 }}>{job.description}</p>
         )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5, color: c.textSecondary, marginBottom: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 15, color: c.textSecondary, marginBottom: 10 }}>
           {job.ownerName && (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <IconUser size={12} color={c.textSecondary} />
@@ -53,7 +54,7 @@ export default function JobCard({ job, projectCount }: Props) {
             display: "flex",
             alignItems: "center",
             gap: 6,
-            fontSize: 12,
+            fontSize: 15,
             paddingTop: 10,
             borderTop: `1px solid ${c.border}`,
             color: c.textSecondary,

@@ -52,16 +52,16 @@ export default function CreateTaskModal({ projectId: fixedProjectId, onClose }: 
   return (
     <Modal title="Yeni görev" onClose={onClose}>
       {loadingProjects ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Projeler yükleniyor…</p>
+        <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>Projeler yükleniyor…</p>
       ) : !fixedProjectId && projects.length === 0 ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
+        <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>
           Görev eklemek için önce bir proje oluşturman gerekiyor.
         </p>
       ) : (
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {!fixedProjectId && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 12, color: c.textSecondary }}>Proje</label>
+              <label style={{ fontSize: 15, color: c.textSecondary }}>Proje</label>
               <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={{ width: "100%" }}>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -73,21 +73,21 @@ export default function CreateTaskModal({ projectId: fixedProjectId, onClose }: 
           )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 12, color: c.textSecondary }}>Görev başlığı</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>Görev başlığı</label>
             <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Örn. Logo revizyonu" style={{ width: "100%" }} />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 12, color: c.textSecondary }}>Bitiş tarihi</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş tarihi</label>
             <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} required style={{ width: "100%" }} />
           </div>
 
-          {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
+          {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 14, fontWeight: 500 }}
+            style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
           >
             {loading ? "Oluşturuluyor…" : "Görev oluştur"}
           </button>

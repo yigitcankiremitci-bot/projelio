@@ -34,7 +34,7 @@ export default function CreateOutputModal({ projectId, onClose, onCreated }: Pro
     <Modal title="Yeni çıktı" onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -46,7 +46,7 @@ export default function CreateOutputModal({ projectId, onClose, onCreated }: Pro
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -55,12 +55,12 @@ export default function CreateOutputModal({ projectId, onClose, onCreated }: Pro
           />
         </div>
 
-        {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
+        {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 14, fontWeight: 500 }}
+          style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
           {loading ? "Oluşturuluyor…" : "Çıktı oluştur"}
         </button>

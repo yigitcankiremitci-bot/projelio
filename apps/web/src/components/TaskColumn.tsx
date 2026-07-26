@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import Sortable from "sortablejs";
 import type { Task, TaskStatus } from "@projelio/shared";
 import { colors } from "../theme/colors";
 import { IconPlus, IconChevronRight, IconCheck, IconEdit } from "./icons";
 import Modal from "./Modal";
+import { useSortableList } from "../lib/useSortableList";
 
 interface Props {
   status: TaskStatus;
@@ -12,6 +14,12 @@ interface Props {
   onMove: (taskId: string, status: TaskStatus) => void;
   onToggleComplete: (taskId: string) => void;
   onEditTask: (task: Task) => void;
+  // Aynı sütun içinde ya da sütunlar arasında (durum değişikliğiyle) basılı-tutup-sürükleme
+  // ile sıralama yapıldığında son sırayı kalıcı hale getirmek için çağrılır.
+  onReorderTasks?: (ids: string[]) => void;
+  // Sütunlar arası sürüklemenin çalışabilmesi için aynı görünümdeki tüm TaskColumn
+  // örnekleri aynı group değerini paylaşmalı.
+  group: string;
 }
 
 const columnLabel: Record<TaskStatus, string> = {
@@ -20,15 +28,26 @@ const columnLabel: Record<TaskStatus, string> = {
   completed: "Tamamlandı",
 };
 
-export default function TaskColumn({ status, allTasks, onCreate, onCreateSubtask, onMove, onToggleComplete, onEditTask }: Props) {
+export default function TaskColumn({
+  status,
+  allTasks,
+  onCreate,
+  onCreateSubtask,
+  onMove,
+  onToggleComplete,
+  onEditTask,
+  onReorderTasks,
+  group,
+}: Props) {
   const c = colors.light;
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
-  const [dragOver, setDragOver] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [subtaskParent, setSubtaskParent] = useState<string | null>(null);
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(null);
+  const topListRef = useRef<HTMLDivElement>(null);
+  const subtaskSortables = useRef<Map<string, Sortable>>(new Map());
 
   const isCompletedColumn = status === "completed";
 
@@ -71,6 +90,64 @@ export default function TaskColumn({ status, allTasks, onCreate, onCreateSubtask
       ghostGroups.push({ parent, subtasks: subs });
     }
   }
+
+  // Üst görev kartları: kendi sütununda basılı tutup sürükleyerek sıralanabilir,
+  // başka bir sütuna bırakıldığında ise görevin durumu değişir.
+  useSortableList(
+    topListRef,
+    {
+      group: { name: group, pull: true, put: true },
+      sort: Boolean(onReorderTasks),
+      handle: ".task-drag-handle",
+      filter: "button",
+      preventOnFilter: false,
+      onEnd: (evt) => {
+        const toEl = evt.to;
+        const fromEl = evt.from;
+        const taskId = evt.item.dataset.id;
+        if (!taskId) return;
+        if (toEl !== fromEl) {
+          const toStatus = toEl.dataset.status as TaskStatus | undefined;
+          if (toStatus) onMove(taskId, toStatus);
+        }
+        if (!onReorderTasks) return;
+        const ids = Array.from(toEl.children)
+          .map((node) => (node as HTMLElement).dataset.id)
+          .filter((v): v is string => Boolean(v));
+        onReorderTasks(ids);
+      },
+    },
+    [group, Boolean(onReorderTasks)]
+  );
+
+  const attachSubtaskSortable = (parentId: string) => (el: HTMLDivElement | null) => {
+    const existing = subtaskSortables.current.get(parentId);
+    if (existing) {
+      existing.destroy();
+      subtaskSortables.current.delete(parentId);
+    }
+    if (!el || !onReorderTasks) return;
+    const instance = Sortable.create(el, {
+      animation: 180,
+      delay: 350,
+      delayOnTouchOnly: false,
+      touchStartThreshold: 5,
+      forceFallback: true,
+      fallbackTolerance: 3,
+      ghostClass: "sortable-ghost",
+      chosenClass: "sortable-chosen",
+      dragClass: "sortable-drag",
+      filter: "button",
+      preventOnFilter: false,
+      onEnd: () => {
+        const ids = Array.from(el.children)
+          .map((node) => (node as HTMLElement).dataset.id)
+          .filter((v): v is string => Boolean(v));
+        onReorderTasks(ids);
+      },
+    });
+    subtaskSortables.current.set(parentId, instance);
+  };
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {
@@ -119,274 +196,266 @@ export default function TaskColumn({ status, allTasks, onCreate, onCreateSubtask
 
   return (
     <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDragOver(true);
-      }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const taskId = e.dataTransfer.getData("text/plain");
-        if (taskId) onMove(taskId, status);
-      }}
       style={{
         width: "100%",
         background: c.background,
-        border: `1px solid ${dragOver ? c.primary : c.border}`,
+        border: `1px solid ${c.border}`,
         borderRadius: 10,
         padding: 12,
-        transition: "border-color 0.1s ease",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <h4 style={{ color: c.textPrimary, fontSize: 13, fontWeight: 500, margin: 0 }}>{columnLabel[status]}</h4>
-        <span style={{ fontSize: 11, color: c.textSecondary, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 20, padding: "1px 7px" }}>
+        <h4 style={{ color: c.textPrimary, fontSize: 16, fontWeight: 500, margin: 0 }}>{columnLabel[status]}</h4>
+        <span style={{ fontSize: 13, color: c.textSecondary, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 20, padding: "1px 7px" }}>
           {realTopLevel.length}
         </span>
       </div>
 
-      {realTopLevel.map((t) => {
-        const subtasks = subtasksOf(t.id);
-        const isOpen = expanded.has(t.id);
-        const stats = subtaskStats(t.id);
-        const isOverdue = t.status !== "completed" && new Date(t.deadline) < new Date();
-        const isOverdueWithPendingSubtasks = isOverdue && stats.total > 0 && stats.remaining > 0;
-        return (
-          <div key={t.id} style={{ marginBottom: 8 }}>
-            <div
-              draggable
-              onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)}
-              onClick={() => toggleExpand(t.id)}
-              style={{
-                background: c.surface,
-                border: `1px solid ${c.border}`,
-                borderLeft: `3px solid ${columnAccent[status]}`,
-                borderRadius: 8,
-                padding: "10px 12px",
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button
-                  onClick={(e) => handleCheckboxClick(e, t.id, t.status, t.title)}
-                  aria-label={t.status === "completed" ? "Tamamlandıyı geri al" : "Tamamlandı olarak işaretle"}
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                    border: t.status === "completed" ? "none" : `1.5px solid ${c.border}`,
-                    background: t.status === "completed" ? c.accent : "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 0,
-                    cursor: "pointer",
-                  }}
-                >
-                  {t.status === "completed" && <IconCheck size={10} color="#fff" />}
-                </button>
-                <div style={{ display: "flex", alignItems: "center", gap: 5, flex: 1, minWidth: 0 }}>
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: t.status === "completed" ? c.textSecondary : isOverdueWithPendingSubtasks ? c.danger : c.textPrimary,
-                      textDecoration: t.status === "completed" ? "line-through" : "none",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {t.title}
-                  </span>
+      <div ref={topListRef} data-status={status}>
+        {realTopLevel.map((t) => {
+          const subtasks = subtasksOf(t.id);
+          const isOpen = expanded.has(t.id);
+          const stats = subtaskStats(t.id);
+          const isOverdue = t.status !== "completed" && new Date(t.deadline) < new Date();
+          const isOverdueWithPendingSubtasks = isOverdue && stats.total > 0 && stats.remaining > 0;
+          return (
+            <div key={t.id} data-id={t.id} style={{ marginBottom: 8 }}>
+              <div
+                className="task-drag-handle"
+                onClick={() => toggleExpand(t.id)}
+                style={{
+                  background: c.surface,
+                  border: `1px solid ${c.border}`,
+                  borderLeft: `3px solid ${columnAccent[status]}`,
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditTask(t);
-                    }}
-                    aria-label="Görevi düzenle"
-                    style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
-                  >
-                    <IconEdit size={13} color={c.textSecondary} />
-                  </button>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
-                  <span
+                    onClick={(e) => handleCheckboxClick(e, t.id, t.status, t.title)}
+                    aria-label={t.status === "completed" ? "Tamamlandıyı geri al" : "Tamamlandı olarak işaretle"}
                     style={{
-                      display: "inline-flex",
-                      transform: isOpen ? "rotate(90deg)" : "none",
-                      transition: "transform 0.1s ease",
+                      width: 18,
+                      height: 18,
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      border: t.status === "completed" ? "none" : `1.5px solid ${c.border}`,
+                      background: t.status === "completed" ? c.accent : "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 0,
+                      cursor: "pointer",
                     }}
                   >
-                    <IconChevronRight size={13} color={c.textSecondary} />
-                  </span>
-                  {subtaskStats(t.id).total > 0 && (
+                    {t.status === "completed" && <IconCheck size={10} color="#fff" />}
+                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, flex: 1, minWidth: 0 }}>
                     <span
                       style={{
-                        fontSize: 10,
-                        lineHeight: 1,
-                        color: c.textSecondary,
-                        background: c.background,
-                        border: `1px solid ${c.border}`,
-                        borderRadius: 20,
-                        minWidth: 14,
-                        height: 14,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "0 3px",
+                        fontSize: 16,
+                        color: t.status === "completed" ? c.textSecondary : isOverdueWithPendingSubtasks ? c.danger : c.textPrimary,
+                        textDecoration: t.status === "completed" ? "line-through" : "none",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {subtaskStats(t.id).remaining}/{subtaskStats(t.id).total}
+                      {t.title}
                     </span>
-                  )}
-                </div>
-              </div>
-              {(() => {
-                const { total, remaining } = subtaskStats(t.id);
-                const progressPct = total > 0 ? Math.round(((total - remaining) / total) * 100) : 0;
-                const start = t.startDate ?? t.createdAt;
-                return (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-                    <span style={{ fontSize: 10, color: c.textSecondary, flexShrink: 0 }}>
-                      {new Date(start).toLocaleDateString("tr-TR")}
-                    </span>
-                    <div style={{ flex: 1, height: 5, borderRadius: 3, background: c.border, overflow: "hidden", minWidth: 24 }}>
-                      <div
-                        style={{
-                          width: `${progressPct}%`,
-                          height: "100%",
-                          background: c.accent,
-                          borderRadius: 3,
-                          transition: "width 0.15s ease",
-                        }}
-                      />
-                    </div>
-                    <span style={{ fontSize: 10, color: c.textSecondary, flexShrink: 0 }}>
-                      {new Date(t.deadline).toLocaleDateString("tr-TR")}
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {isOpen && (
-              <div
-                style={{
-                  marginLeft: 14,
-                  marginTop: 6,
-                  paddingLeft: 12,
-                  borderLeft: `2px solid ${c.border}`,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
-                }}
-              >
-                {subtasks.map((sub) => (
-                  <div
-                    key={sub.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 7,
-                      background: c.surface,
-                      border: `1px solid ${c.border}`,
-                      borderRadius: 7,
-                      padding: "6px 9px",
-                    }}
-                  >
                     <button
-                      onClick={(e) => handleCheckboxClick(e, sub.id, sub.status, sub.title)}
-                      aria-label={sub.status === "completed" ? "Alt görev tamamlandıyı geri al" : "Alt görevi tamamlandı olarak işaretle"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditTask(t);
+                      }}
+                      aria-label="Görevi düzenle"
+                      style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
+                    >
+                      <IconEdit size={13} color={c.textSecondary} />
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
+                    <span
                       style={{
-                        width: 14,
-                        height: 14,
-                        borderRadius: "50%",
-                        flexShrink: 0,
-                        border: sub.status === "completed" ? "none" : `1.5px solid ${c.border}`,
-                        background: sub.status === "completed" ? c.accent : "transparent",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: 0,
-                        cursor: "pointer",
+                        display: "inline-flex",
+                        transform: isOpen ? "rotate(90deg)" : "none",
+                        transition: "transform 0.1s ease",
                       }}
                     >
-                      {sub.status === "completed" && <IconCheck size={8} color="#fff" />}
-                    </button>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
+                      <IconChevronRight size={13} color={c.textSecondary} />
+                    </span>
+                    {subtaskStats(t.id).total > 0 && (
                       <span
                         style={{
                           fontSize: 12,
-                          color: sub.status === "completed" ? c.textSecondary : c.textPrimary,
-                          textDecoration: sub.status === "completed" ? "line-through" : "none",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
+                          lineHeight: 1,
+                          color: c.textSecondary,
+                          background: c.background,
+                          border: `1px solid ${c.border}`,
+                          borderRadius: 20,
+                          minWidth: 14,
+                          height: 14,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "0 3px",
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {sub.title}
+                        {subtaskStats(t.id).remaining}/{subtaskStats(t.id).total}
                       </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEditTask(sub);
-                        }}
-                        aria-label="Alt görevi düzenle"
-                        style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
-                      >
-                        <IconEdit size={11} color={c.textSecondary} />
-                      </button>
-                    </div>
+                    )}
                   </div>
-                ))}
-
-                {subtaskParent === t.id ? (
-                  <form onSubmit={(e) => handleAddSubtask(e, t.id)}>
-                    <input
-                      autoFocus
-                      value={subtaskTitle}
-                      onChange={(e) => setSubtaskTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") {
-                          setSubtaskParent(null);
-                          setSubtaskTitle("");
-                        }
-                      }}
-                      onBlur={() => {
-                        if (!subtaskTitle.trim()) setSubtaskParent(null);
-                      }}
-                      placeholder="Alt görev başlığı, Enter'a bas"
-                      style={{ width: "100%", height: 30, fontSize: 12 }}
-                    />
-                  </form>
-                ) : (
-                  <button
-                    onClick={() => setSubtaskParent(t.id)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                      padding: "5px 8px",
-                      borderRadius: 7,
-                      border: "none",
-                      background: "transparent",
-                      color: c.textSecondary,
-                      fontSize: 12,
-                      alignSelf: "flex-start",
-                    }}
-                  >
-                    <IconPlus size={12} color={c.textSecondary} />
-                    Alt görev ekle
-                  </button>
-                )}
+                </div>
+                {(() => {
+                  const { total, remaining } = subtaskStats(t.id);
+                  const progressPct = total > 0 ? Math.round(((total - remaining) / total) * 100) : 0;
+                  const start = t.startDate ?? t.createdAt;
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+                      <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>
+                        {new Date(start).toLocaleDateString("tr-TR")}
+                      </span>
+                      <div style={{ flex: 1, height: 5, borderRadius: 3, background: c.border, overflow: "hidden", minWidth: 24 }}>
+                        <div
+                          style={{
+                            width: `${progressPct}%`,
+                            height: "100%",
+                            background: c.accent,
+                            borderRadius: 3,
+                            transition: "width 0.15s ease",
+                          }}
+                        />
+                      </div>
+                      <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>
+                        {new Date(t.deadline).toLocaleDateString("tr-TR")}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
-            )}
-          </div>
-        );
-      })}
+
+              {isOpen && (
+                <div
+                  style={{
+                    marginLeft: 14,
+                    marginTop: 6,
+                    paddingLeft: 12,
+                    borderLeft: `2px solid ${c.border}`,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  <div ref={attachSubtaskSortable(t.id)} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {subtasks.map((sub) => (
+                      <div
+                        key={sub.id}
+                        data-id={sub.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 7,
+                          background: c.surface,
+                          border: `1px solid ${c.border}`,
+                          borderRadius: 7,
+                          padding: "6px 9px",
+                        }}
+                      >
+                        <button
+                          onClick={(e) => handleCheckboxClick(e, sub.id, sub.status, sub.title)}
+                          aria-label={sub.status === "completed" ? "Alt görev tamamlandıyı geri al" : "Alt görevi tamamlandı olarak işaretle"}
+                          style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: "50%",
+                            flexShrink: 0,
+                            border: sub.status === "completed" ? "none" : `1.5px solid ${c.border}`,
+                            background: sub.status === "completed" ? c.accent : "transparent",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: 0,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {sub.status === "completed" && <IconCheck size={8} color="#fff" />}
+                        </button>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
+                          <span
+                            style={{
+                              fontSize: 15,
+                              color: sub.status === "completed" ? c.textSecondary : c.textPrimary,
+                              textDecoration: sub.status === "completed" ? "line-through" : "none",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {sub.title}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditTask(sub);
+                            }}
+                            aria-label="Alt görevi düzenle"
+                            style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
+                          >
+                            <IconEdit size={11} color={c.textSecondary} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {subtaskParent === t.id ? (
+                    <form onSubmit={(e) => handleAddSubtask(e, t.id)}>
+                      <input
+                        autoFocus
+                        value={subtaskTitle}
+                        onChange={(e) => setSubtaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            setSubtaskParent(null);
+                            setSubtaskTitle("");
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!subtaskTitle.trim()) setSubtaskParent(null);
+                        }}
+                        placeholder="Alt görev başlığı, Enter'a bas"
+                        style={{ width: "100%", height: 30, fontSize: 15 }}
+                      />
+                    </form>
+                  ) : (
+                    <button
+                      onClick={() => setSubtaskParent(t.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        padding: "5px 8px",
+                        borderRadius: 7,
+                        border: "none",
+                        background: "transparent",
+                        color: c.textSecondary,
+                        fontSize: 15,
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      <IconPlus size={12} color={c.textSecondary} />
+                      Alt görev ekle
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {ghostGroups.map(({ parent, subtasks }) => (
         <div key={parent.id} style={{ marginBottom: 8 }}>
@@ -403,8 +472,8 @@ export default function TaskColumn({ status, allTasks, onCreate, onCreateSubtask
               gap: 8,
             }}
           >
-            <span style={{ fontSize: 12, color: c.textSecondary, fontStyle: "italic", flex: 1 }}>{parent.title}</span>
-            <span style={{ fontSize: 10, color: c.textSecondary, whiteSpace: "nowrap" }}>{columnLabel[parent.status]}'de</span>
+            <span style={{ fontSize: 15, color: c.textSecondary, fontStyle: "italic", flex: 1 }}>{parent.title}</span>
+            <span style={{ fontSize: 12, color: c.textSecondary, whiteSpace: "nowrap" }}>{columnLabel[parent.status]}'de</span>
           </div>
 
           <div
@@ -453,7 +522,7 @@ export default function TaskColumn({ status, allTasks, onCreate, onCreateSubtask
                 <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
                   <span
                     style={{
-                      fontSize: 12,
+                      fontSize: 15,
                       color: c.textSecondary,
                       textDecoration: "line-through",
                       overflow: "hidden",
@@ -493,7 +562,7 @@ export default function TaskColumn({ status, allTasks, onCreate, onCreateSubtask
               if (!title.trim()) setAdding(false);
             }}
             placeholder="Görev başlığı yaz, Enter'a bas"
-            style={{ width: "100%", height: 34, fontSize: 13 }}
+            style={{ width: "100%", height: 34, fontSize: 16 }}
           />
         </form>
       ) : (
@@ -509,7 +578,7 @@ export default function TaskColumn({ status, allTasks, onCreate, onCreateSubtask
             border: "none",
             background: "transparent",
             color: c.textSecondary,
-            fontSize: 12,
+            fontSize: 15,
           }}
         >
           <IconPlus size={14} color={c.textSecondary} />
@@ -519,20 +588,20 @@ export default function TaskColumn({ status, allTasks, onCreate, onCreateSubtask
 
       {confirmTarget && (
         <Modal title="Görevi tamamla" onClose={() => setConfirmTarget(null)}>
-          <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
             <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{confirmTarget.title}</strong> görevini tamamlandı
             olarak işaretleyip "Tamamlandı" bölümüne taşımak istiyor musun?
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button
               onClick={() => setConfirmTarget(null)}
-              style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 13 }}
+              style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 16 }}
             >
               Vazgeç
             </button>
             <button
               onClick={confirmComplete}
-              style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 13, fontWeight: 500 }}
+              style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 16, fontWeight: 500 }}
             >
               Tamamlandı olarak işaretle
             </button>

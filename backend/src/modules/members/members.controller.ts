@@ -17,6 +17,16 @@ export class MembersController {
     return this.membersService.invite(projectId, body.userId, body.role);
   }
 
+  @Post("projects/:projectId/members")
+  addMember(@Param("projectId") projectId: string, @Body() body: { userId: string; role?: any }) {
+    return this.membersService.addMember(projectId, body.userId, body.role);
+  }
+
+  @Patch("members/:id/budget-visibility")
+  setBudgetVisibility(@Param("id") id: string, @Body("canViewBudget") canViewBudget: boolean) {
+    return this.membersService.setBudgetVisibility(id, canViewBudget);
+  }
+
   @Post("projects/:projectId/members/join-request")
   requestToJoin(@Param("projectId") projectId: string, @Body() body: { userId: string }) {
     return this.membersService.requestToJoin(projectId, body.userId);

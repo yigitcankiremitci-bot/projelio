@@ -10,13 +10,25 @@ export interface User {
   createdAt: string;
 }
 
+export interface Job {
+  id: string;
+  ownerId: string;
+  ownerName?: string;
+  title: string;
+  description?: string;
+  coverImageUrl?: string;
+  createdAt: string;
+}
+
 export type ProjectStatus = "active" | "completed" | "archived";
 
 export interface Project {
   id: string;
+  jobId: string;
   ownerId: string;
   title: string;
   description?: string;
+  coverImageUrl?: string;
   totalBudget: number;
   startDate: string;
   deadline: string;
@@ -34,19 +46,54 @@ export interface ProjectMember {
   role: MemberRole;
   status: MemberStatus;
   customAgreedRate?: number;
+  canViewBudget: boolean;
   joinedAt: string;
+  fullName?: string;
+  email?: string;
+}
+
+export interface Output {
+  id: string;
+  projectId: string;
+  title: string;
+  description?: string;
+  createdAt: string;
 }
 
 export type TaskStatus = "todo" | "in_progress" | "completed";
+export type TaskBudgetStatus = "pending" | "planned" | "paid";
 
 export interface Task {
   id: string;
   projectId: string;
+  outputId?: string;
   assignedTo?: string;
   title: string;
   startDate?: string;
   deadline: string;
   status: TaskStatus;
+  parentTaskId?: string;
+  budget?: number;
+  budgetStatus: TaskBudgetStatus;
+  weekNumber?: number;
+  createdAt: string;
+}
+
+export interface TaskComment {
+  id: string;
+  taskId: string;
+  userId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ProjectPost {
+  id: string;
+  projectId: string;
+  userId: string;
+  authorName: string;
+  body: string;
   createdAt: string;
 }
 
@@ -72,9 +119,25 @@ export interface NotificationPayload {
     | "team_invite"
     | "role_updated"
     | "budget_changed"
-    | "join_request";
+    | "join_request"
+    | "task_assigned"
+    | "task_updated"
+    | "member_joined"
+    | "daily_digest"
+    | "weekly_digest";
   title: string;
   body: string;
+  link?: string;
   createdAt: string;
   read: boolean;
+}
+
+export interface PushSubscriptionKeys {
+  p256dh: string;
+  auth: string;
+}
+
+export interface PushSubscriptionPayload {
+  endpoint: string;
+  keys: PushSubscriptionKeys;
 }

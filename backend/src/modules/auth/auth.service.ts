@@ -27,4 +27,10 @@ export class AuthService {
   private signToken(sub: string, email: string, role: string) {
     return { token: this.jwtService.sign({ sub, email, role }) };
   }
+
+  async me(userId: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) return null;
+    return { id: user.id, fullName: user.fullName, email: user.email, role: user.role };
+  }
 }

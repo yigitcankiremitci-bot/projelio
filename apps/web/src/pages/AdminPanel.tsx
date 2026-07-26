@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { colors } from "../theme/colors";
+import { IconShield } from "../components/icons";
 
 export default function AdminPanel() {
   const [unlocked, setUnlocked] = useState(false);
@@ -8,28 +9,70 @@ export default function AdminPanel() {
 
   if (!unlocked) {
     return (
-      <div style={{ maxWidth: 320, margin: "80px auto", textAlign: "center" }}>
-        <h2 style={{ color: c.primary }}>Korumalı Admin Paneli</h2>
-        <input
-          type="password"
-          placeholder="Admin şifresi"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button
-          onClick={() => setUnlocked(password.length > 0)}
-          style={{ marginLeft: 8, background: c.primary, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 8 }}
+      <div
+        style={{
+          minHeight: "100vh",
+          background: c.background,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 320,
+            background: c.surface,
+            border: `1px solid ${c.border}`,
+            borderRadius: 14,
+            padding: "32px 28px",
+            textAlign: "center",
+          }}
         >
-          Giriş
-        </button>
+          <span
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              background: c.primaryDark,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 14,
+            }}
+          >
+            <IconShield size={18} color={c.accent} />
+          </span>
+          <h2 style={{ color: c.textPrimary, fontSize: 16, fontWeight: 500, margin: "0 0 16px" }}>
+            Korumalı admin paneli
+          </h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <input
+              type="password"
+              placeholder="Admin şifresi"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{ width: "100%" }}
+            />
+            <button
+              onClick={() => setUnlocked(password.length > 0)}
+              style={{ background: c.primary, color: "#fff", border: "none", padding: "10px 0", borderRadius: 8, fontSize: 14, fontWeight: 500 }}
+            >
+              Giriş
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1 style={{ color: c.textPrimary }}>Admin Paneli</h1>
-      <p style={{ color: c.textSecondary }}>Kullanıcılar, proje istatistikleri ve sistem durumu burada listelenir.</p>
+    <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
+      <h1 style={{ color: c.textPrimary, fontSize: 18, fontWeight: 500, margin: "0 0 8px" }}>Admin paneli</h1>
+      <p style={{ color: c.textSecondary, fontSize: 13 }}>
+        Kullanıcılar, proje istatistikleri ve sistem durumu burada listelenir.
+      </p>
     </div>
   );
 }

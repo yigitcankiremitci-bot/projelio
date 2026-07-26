@@ -1,52 +1,48 @@
 import { useEffect, useState } from "react";
-import type { Project } from "@projelio/shared";
+import type { Job, Project } from "@projelio/shared";
 import { api } from "../api/client";
-import ProjectCard from "../components/ProjectCard";
+import JobCard from "../components/JobCard";
 import { colors } from "../theme/colors";
 
 export default function Dashboard() {
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const c = colors.light;
 
   useEffect(() => {
+    api.get<Job[]>("/jobs").then(setJobs).catch(() => setJobs([]));
     api.get<Project[]>("/projects").then(setProjects).catch(() => setProjects([]));
   }, []);
 
-  const active = projects.filter((p) => p.status === "active");
-  const upcoming = [...active].sort(
-    (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-  ).slice(0, 5);
-  const totalBudget = projects.reduce((sum, p) => sum + p.totalBudget, 0);
+  const projectCountByJob = projects.reduce<Record<string, number>>((acc, p) => {
+    acc[p.jobId] = (acc[p.jobId] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1 style={{ color: c.textPrimary }}>Ana Sayfa</h1>
+    <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
+      <h1 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>İşlerim</h1>
 
-      <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
-        <SummaryCard label="Aktif Projeler" value={active.length} />
-        <SummaryCard label="Yaklaşan Deadline" value={upcoming.length} />
-        <SummaryCard
-          label="Toplam Bütçe"
-          value={`${totalBudget.toLocaleString("tr-TR")} ₺`}
-        />
-      </div>
-
-      <h2 style={{ color: c.textPrimary }}>Projeler</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-        {projects.map((p) => (
-          <ProjectCard key={p.id} project={p} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SummaryCard({ label, value }: { label: string; value: string | number }) {
-  const c = colors.light;
-  return (
-    <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: 16, flex: 1 }}>
-      <div style={{ color: c.textSecondary, fontSize: 13 }}>{label}</div>
-      <div style={{ color: c.primary, fontSize: 24, fontWeight: 700 }}>{value}</div>
+      {jobs.length === 0 ? (
+        <div
+          style={{
+            border: `1px dashed ${c.border}`,
+            borderRadius: 12,
+            padding: 40,
+            textAlign: "center",
+            color: c.textSecondary,
+            fontSize: 13,
+          }}
+        >
+          Henüz iş yok.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+          {jobs.map((j) => (
+            <JobCard key={j.id} job={j} projectCount={projectCountByJob[j.id] ?? 0} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

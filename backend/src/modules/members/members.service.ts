@@ -11,7 +11,10 @@ function mapMember(row: any): ProjectMember {
     role: row.role,
     status: row.status,
     customAgreedRate: row.custom_agreed_rate != null ? Number(row.custom_agreed_rate) : undefined,
+    canViewBudget: row.can_view_budget ?? false,
     joinedAt: row.joined_at,
+    fullName: row.users?.full_name ?? undefined,
+    email: row.users?.email ?? undefined,
   };
 }
 
@@ -25,7 +28,7 @@ export class MembersService {
   async findByProject(projectId: string): Promise<ProjectMember[]> {
     const { data, error } = await this.supabase.client
       .from("project_members")
-      .select()
+      .select("*, users(full_name, email)")
       .eq("project_id", projectId);
     if (error) throw error;
     return (data ?? []).map(mapMember);
@@ -52,6 +55,40 @@ export class MembersService {
     return this.invite(projectId, userId, "member");
   }
 
+  // Proje yöneticisi ekibe doğrudan üye ekler (onay bekletmeden)
+  async addMember(
+    projectId: string,
+    userId: string,
+    role: ProjectMember["role"] = "member"
+  ): Promise<ProjectMember> {
+    const { data: row, error } = await this.supabase.client
+      .from("project_members")
+      .insert({ project_id: projectId, user_id: userId, role, status: "approved" })
+      .select("*, users(full_name, email)")
+      .single();
+    if (error) throw error;
+    this.notificationsService.notifyUser(
+      userId,
+      "member_joined",
+      "Ekibe Eklendin",
+      "Bir projeye eklendin.",
+      `/projects/${projectId}`
+    );
+    return mapMember(row);
+  }
+
+  async setBudgetVisibility(memberId: string, canViewBudget: boolean): Promise<ProjectMember> {
+    const { data: row, error } = await this.supabase.client
+      .from("project_members")
+      .update({ can_view_budget: canViewBudget })
+      .eq("id", memberId)
+      .select("*, users(full_name, email)")
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Üyelik bulunamadı");
+    return mapMember(row);
+  }
+
   async respond(memberId: string, approve: boolean): Promise<ProjectMember> {
     const { data: row, error } = await this.supabase.client
       .from("project_members")
@@ -61,7 +98,17 @@ export class MembersService {
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Üyelik isteği bulunamadı");
-    return mapMember(row);
+    const member = mapMember(row);
+    if (approve) {
+      this.notificationsService.notifyUser(
+        member.userId,
+        "member_joined",
+        "Projeye Katıldın",
+        "Katılım isteğin onaylandı.",
+        `/projects/${member.projectId}`
+      );
+    }
+    return member;
   }
 
   async setRate(memberId: string, rate: number): Promise<ProjectMember> {

@@ -6,8 +6,8 @@ mobil tarafındaki karşılıkları `apps/mobile/src/screens/` altındadır.
 
 ## Renk Kullanımı
 
-- **Ana renk (#1E3A8A — Derin Okyanus Mavisi):** Navbar, birincil butonlar, aktif durum vurguları.
-- **İkincil renk (#F59E0B — Kehribar):** Bütçe rakamları, durum rozetleri, premium/tamamlanma vurguları.
+- **Ana renk (#3E4858 — Gri-Lacivert / Slate Navy):** Sidebar, navbar, birincil butonlar, aktif durum vurguları.
+- **İkincil renk (#C0813F — Bronz Kehribar):** Bütçe rakamları, durum rozetleri, premium/tamamlanma vurguları.
 - Durum rozetleri anlamsal renklerle: Aktif = yeşil tonu, Arşivlendi = amber tonu, Tamamlandı = mavi tonu.
 
 ## Ekranlar

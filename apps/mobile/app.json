@@ -5,13 +5,13 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "primaryColor": "#1E3A8A",
+    "primaryColor": "#3E4858",
     "splash": {
-      "backgroundColor": "#1E3A8A"
+      "backgroundColor": "#1C222C"
     },
     "ios": { "supportsTablet": true },
     "android": {
-      "adaptiveIcon": { "backgroundColor": "#1E3A8A" }
+      "adaptiveIcon": { "backgroundColor": "#1C222C" }
     },
     "plugins": ["expo-notifications"]
   }

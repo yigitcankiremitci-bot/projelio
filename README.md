@@ -54,7 +54,8 @@ kopyalayıp kendi değerlerinizi girin (Supabase URL/anon key zaten dolu).
 
 ## Marka Renkleri
 
-- Ana renk: Derin Okyanus Mavisi / Koyu Indigo — `#1E3A8A`
-- İkincil renk: Sıcak Altın Sarı / Kehribar — `#F59E0B`
+- Ana renk: Gri-Lacivert / Slate Navy — `#3E4858`
+- İkincil renk: Bronz Kehribar — `#C0813F`
+- Renkler logo paletinden türetildi (`projelio-logo.pdf`).
 
 Detaylar için `packages/shared/src/theme.ts` dosyasına bakın.

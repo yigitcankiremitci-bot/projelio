@@ -17,9 +17,19 @@ export class TasksController {
     return this.tasksService.create(projectId, body);
   }
 
+  @Patch("tasks/:id")
+  update(@Param("id") id: string, @Body() body: any) {
+    return this.tasksService.update(id, body);
+  }
+
   @Patch("tasks/:id/status")
   updateStatus(@Param("id") id: string, @Body("status") status: any) {
     return this.tasksService.updateStatus(id, status);
+  }
+
+  @Patch("tasks/:id/budget-status")
+  updateBudgetStatus(@Param("id") id: string, @Body("budgetStatus") budgetStatus: any) {
+    return this.tasksService.updateBudgetStatus(id, budgetStatus);
   }
 
   @Patch("tasks/:id/schedule")

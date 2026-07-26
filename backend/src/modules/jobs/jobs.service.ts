@@ -28,16 +28,53 @@ export class JobsService {
     private projectsService: ProjectsService
   ) {}
 
+  // Kullanıcının sahibi olduğu işler + içindeki herhangi bir projeye ekibe
+  // (üye/taşeron fark etmez, onaylanmış şekilde) eklendiği işler. Böylece bir
+  // projeye taşeron olarak eklenen kullanıcı da "İşlerim" ekranında o iş dosyasını görür.
   async findAllForUser(userId: string): Promise<Job[]> {
-    const { data, error } = await this.supabase.client
+    const { data: owned, error: ownedError } = await this.supabase.client
       .from("jobs")
       .select("*, users(full_name)")
       .eq("owner_id", userId)
-      .is("archived_at", null)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return (data ?? []).map(mapJob);
+      .is("archived_at", null);
+    if (ownedError) throw ownedError;
+
+    const { data: memberships, error: membershipError } = await this.supabase.client
+      .from("project_members")
+      .select("project_id")
+      .eq("user_id", userId)
+      .eq("status", "approved");
+    if (membershipError) throw membershipError;
+
+    const memberProjectIds = (memberships ?? []).map((m: any) => m.project_id);
+    let memberJobs: any[] = [];
+    if (memberProjectIds.length > 0) {
+      const { data: memberProjects, error: memberProjectsError } = await this.supabase.client
+        .from("projects")
+        .select("job_id")
+        .in("id", memberProjectIds);
+      if (memberProjectsError) throw memberProjectsError;
+
+      const jobIds = Array.from(new Set((memberProjects ?? []).map((p: any) => p.job_id).filter(Boolean)));
+      if (jobIds.length > 0) {
+        const { data, error } = await this.supabase.client
+          .from("jobs")
+          .select("*, users(full_name)")
+          .in("id", jobIds)
+          .is("archived_at", null);
+        if (error) throw error;
+        memberJobs = data ?? [];
+      }
+    }
+
+    const byId = new Map<string, any>();
+    for (const row of [...(owned ?? []), ...memberJobs]) byId.set(row.id, row);
+
+    return Array.from(byId.values())
+      .map(mapJob)
+      .sort(
+        (a, b) => a.sortOrder - b.sortOrder || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
   }
 
   async reorder(userId: string, ids: string[]): Promise<void> {

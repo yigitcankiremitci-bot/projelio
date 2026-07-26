@@ -184,3 +184,23 @@ export function IconChevronDown({ size = 18, color = "currentColor" }: IconProps
     </svg>
   );
 }
+
+interface HeartIconProps extends IconProps {
+  filled?: boolean;
+}
+
+export function IconHeart({ size = 18, color = "currentColor", filled = false }: HeartIconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? color : "none"} stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20.5s-7.5-4.6-10-9.3C0.3 7.8 2 4 5.6 4c2 0 3.5 1.1 4.4 2.6C10.9 5.1 12.4 4 14.4 4 18 4 19.7 7.8 22 11.2c-2.5 4.7-10 9.3-10 9.3z" />
+    </svg>
+  );
+}
+
+export function IconMessageCircle({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.3 0-2.5-.3-3.6-.8L3 21l1.8-5.4A8.5 8.5 0 1 1 21 11.5z" />
+    </svg>
+  );
+}

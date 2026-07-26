@@ -31,7 +31,9 @@ export class TasksService {
     private notificationsService: NotificationsService
   ) {}
 
-  async findByProject(projectId: string): Promise<Task[]> {
+  // requestingUserId verilirse ve bu kullanıcı projede taşeron (subcontractor) ise,
+  // sonuç sadece kendisine atanmış görev/alt görevlerle sınırlandırılır.
+  async findByProject(projectId: string, requestingUserId?: string): Promise<Task[]> {
     const { data, error } = await this.supabase.client
       .from("tasks")
       .select()
@@ -40,7 +42,54 @@ export class TasksService {
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     if (error) throw error;
-    return (data ?? []).map(mapTask);
+    const tasks = (data ?? []).map(mapTask);
+
+    if (!requestingUserId) return tasks;
+    const visibleIds = await this.getVisibleTaskIdsForSubcontractor(projectId, requestingUserId);
+    if (!visibleIds) return tasks;
+    return tasks.filter((t) => visibleIds.has(t.id));
+  }
+
+  // Kullanıcının bu projedeki rolünü döner: proje sahibiyse "owner", project_members
+  // kaydı varsa oradaki rol ("member" / "subcontractor" / "owner"), yoksa null.
+  async getMembershipRole(projectId: string, userId: string): Promise<string | null> {
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("owner_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (project?.owner_id === userId) return "owner";
+
+    const { data: membership } = await this.supabase.client
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    return membership?.role ?? null;
+  }
+
+  // Kullanıcı bu projede taşeron değilse null döner (filtrelemeye gerek yok, tüm görevleri görebilir).
+  // Taşeronsa: kendisine atanmış görev/alt görevlerin id'lerini, alt görevler ağaçta doğru
+  // görünebilsin diye üst görevlerinin id'leriyle birlikte (sadece "kabuk" olarak) döner.
+  async getVisibleTaskIdsForSubcontractor(projectId: string, userId: string): Promise<Set<string> | null> {
+    const role = await this.getMembershipRole(projectId, userId);
+    if (role !== "subcontractor") return null;
+
+    const { data, error } = await this.supabase.client
+      .from("tasks")
+      .select("id, assigned_to, parent_task_id")
+      .eq("project_id", projectId);
+    if (error) throw error;
+    const rows = data ?? [];
+
+    const assignedIds = new Set(rows.filter((r: any) => r.assigned_to === userId).map((r: any) => r.id as string));
+    const parentIds = new Set(
+      rows
+        .filter((r: any) => assignedIds.has(r.id) && r.parent_task_id)
+        .map((r: any) => r.parent_task_id as string)
+    );
+    return new Set([...assignedIds, ...parentIds]);
   }
 
   async create(projectId: string, data: Partial<Task>): Promise<Task> {

@@ -9,12 +9,14 @@ function mapMember(row: any): ProjectMember {
     projectId: row.project_id,
     userId: row.user_id,
     role: row.role,
+    title: row.title ?? undefined,
     status: row.status,
     customAgreedRate: row.custom_agreed_rate != null ? Number(row.custom_agreed_rate) : undefined,
     canViewBudget: row.can_view_budget ?? false,
     joinedAt: row.joined_at,
     fullName: row.users?.full_name ?? undefined,
     email: row.users?.email ?? undefined,
+    username: row.users?.username ?? undefined,
   };
 }
 
@@ -28,7 +30,7 @@ export class MembersService {
   async findByProject(projectId: string): Promise<ProjectMember[]> {
     const { data, error } = await this.supabase.client
       .from("project_members")
-      .select("*, users(full_name, email)")
+      .select("*, users(full_name, email, username)")
       .eq("project_id", projectId);
     if (error) throw error;
     return (data ?? []).map(mapMember);
@@ -55,16 +57,19 @@ export class MembersService {
     return this.invite(projectId, userId, "member");
   }
 
-  // Proje yöneticisi ekibe doğrudan üye ekler (onay bekletmeden)
+  // Proje yöneticisi ekibe doğrudan üye ekler (onay bekletmeden).
+  // "title": proje yöneticisinin serbest yazdığı görev/unvan (örn. "Elektrik taşeronu");
+  // yetkilendirmeyi etkilemez, sadece görüntüleme amaçlıdır.
   async addMember(
     projectId: string,
     userId: string,
-    role: ProjectMember["role"] = "member"
+    role: ProjectMember["role"] = "member",
+    title?: string
   ): Promise<ProjectMember> {
     const { data: row, error } = await this.supabase.client
       .from("project_members")
-      .insert({ project_id: projectId, user_id: userId, role, status: "approved" })
-      .select("*, users(full_name, email)")
+      .insert({ project_id: projectId, user_id: userId, role, title: title?.trim() || null, status: "approved" })
+      .select("*, users(full_name, email, username)")
       .single();
     if (error) throw error;
     this.notificationsService.notifyUser(
@@ -77,12 +82,24 @@ export class MembersService {
     return mapMember(row);
   }
 
+  async setTitle(memberId: string, title: string): Promise<ProjectMember> {
+    const { data: row, error } = await this.supabase.client
+      .from("project_members")
+      .update({ title: title?.trim() || null })
+      .eq("id", memberId)
+      .select("*, users(full_name, email, username)")
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Üyelik bulunamadı");
+    return mapMember(row);
+  }
+
   async setBudgetVisibility(memberId: string, canViewBudget: boolean): Promise<ProjectMember> {
     const { data: row, error } = await this.supabase.client
       .from("project_members")
       .update({ can_view_budget: canViewBudget })
       .eq("id", memberId)
-      .select("*, users(full_name, email)")
+      .select("*, users(full_name, email, username)")
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Üyelik bulunamadı");

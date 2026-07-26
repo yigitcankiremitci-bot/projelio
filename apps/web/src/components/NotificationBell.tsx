@@ -84,14 +84,14 @@ export default function NotificationBell() {
   };
 
   return (
-    <div ref={ref} style={{ position: "fixed", top: 12, right: 12, zIndex: 40 }}>
+    <div ref={ref} style={{ position: "fixed", top: 14, right: 14, zIndex: 40 }}>
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label="Bildirimler"
         style={{
           position: "relative",
-          width: 36,
-          height: 36,
+          width: 52,
+          height: 52,
           borderRadius: "50%",
           border: `1px solid ${c.border}`,
           background: c.surface,
@@ -101,19 +101,19 @@ export default function NotificationBell() {
           boxShadow: "0 2px 8px rgba(26,31,41,0.08)",
         }}
       >
-        <IconBell size={17} color={c.textPrimary} />
+        <IconBell size={24} color={c.textPrimary} />
         {unreadCount > 0 && (
           <span
             style={{
               position: "absolute",
               top: -2,
               right: -2,
-              minWidth: 16,
-              height: 16,
-              borderRadius: 8,
+              minWidth: 20,
+              height: 20,
+              borderRadius: 10,
               background: c.danger,
               color: "#fff",
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: 600,
               display: "flex",
               alignItems: "center",
@@ -130,7 +130,7 @@ export default function NotificationBell() {
         <div
           style={{
             position: "absolute",
-            top: 44,
+            top: 60,
             right: 0,
             width: 320,
             maxHeight: 420,

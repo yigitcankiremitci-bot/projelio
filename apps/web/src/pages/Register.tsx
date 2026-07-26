@@ -6,6 +6,7 @@ import { colors } from "../theme/colors";
 export default function Register() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,11 +17,11 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      const { token } = await api.post<{ token: string }>("/auth/register", { fullName, email, password });
+      const { token } = await api.post<{ token: string }>("/auth/register", { fullName, email, password, username });
       localStorage.setItem("projelio_token", token);
       window.location.href = "/";
-    } catch {
-      setError("Kayıt oluşturulamadı. E-posta zaten kullanılıyor olabilir.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kayıt oluşturulamadı. E-posta zaten kullanılıyor olabilir.");
     } finally {
       setLoading(false);
     }
@@ -77,6 +78,38 @@ export default function Register() {
               required
               style={{ width: "100%" }}
             />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>Kullanıcı adı</label>
+            <div style={{ position: "relative" }}>
+              <span
+                style={{
+                  position: "absolute",
+                  left: 12,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: c.textSecondary,
+                  fontSize: 16,
+                  pointerEvents: "none",
+                }}
+              >
+                @
+              </span>
+              <input
+                type="text"
+                placeholder="kullaniciadi"
+                value={username}
+                onChange={(e) => setUsername(e.target.value.replace(/^@/, ""))}
+                required
+                minLength={3}
+                maxLength={30}
+                pattern="[a-zA-Z0-9_.]{3,30}"
+                style={{ width: "100%", paddingLeft: 26 }}
+              />
+            </div>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
+              Ekip üyesi eklerken seni bu kullanıcı adıyla arayabilirler.
+            </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Şifre</label>

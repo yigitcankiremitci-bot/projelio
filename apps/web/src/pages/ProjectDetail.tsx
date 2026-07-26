@@ -4,15 +4,18 @@ import type { Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import StatusBadge from "../components/StatusBadge";
 import EditProjectModal from "../components/EditProjectModal";
+import ExtendDeadlineModal from "../components/ExtendDeadlineModal";
 import TaskEditModal from "../components/TaskEditModal";
 import Modal from "../components/Modal";
 import ProjectTabs, { ProjectTab } from "../components/ProjectTabs";
-import FeedPanel from "../components/panels/FeedPanel";
-import TeamPanel from "../components/panels/TeamPanel";
-import BudgetPanel from "../components/panels/BudgetPanel";
-import OutputsPanel from "../components/OutputsPanel";
+import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
+import TeamPanel, { TeamPanelHandle } from "../components/panels/TeamPanel";
+import BudgetPanel, { BudgetPanelHandle } from "../components/panels/BudgetPanel";
+import OutputsPanel, { OutputsPanelHandle } from "../components/OutputsPanel";
 import ProcessPanel, { ProcessNavState, ViewMode, computeInitialProcessNavDates } from "../components/panels/ProcessPanel";
 import { colors } from "../theme/colors";
+import { IconSettings } from "../components/icons";
+import { useProjectFabAction } from "../lib/projectFab";
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -23,8 +26,30 @@ export default function ProjectDetail() {
   const [parentCompletePrompt, setParentCompletePrompt] = useState<Task | null>(null);
   const [activeTab, setActiveTab] = useState<ProjectTab>("tasks");
   const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+  const [extendingDeadline, setExtendingDeadline] = useState(false);
   const c = colors.light;
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
+  const outputsRef = useRef<OutputsPanelHandle>(null);
+  const feedRef = useRef<FeedPanelHandle>(null);
+  const teamRef = useRef<TeamPanelHandle>(null);
+  const budgetRef = useRef<BudgetPanelHandle>(null);
+
+  // Alt navigasyondaki "+" butonu, proje detayında hangi sekmedeysek ona uygun eylemi
+  // tetiklesin diye ProjectFabContext üzerinden kayıt yapılır (sekme değiştikçe güncellenir).
+  useProjectFabAction(
+    !project || !id
+      ? null
+      : activeTab === "tasks"
+      ? { label: "Yeni çıktı", onClick: () => outputsRef.current?.openCreate() }
+      : activeTab === "feed"
+      ? { label: "Yeni paylaşım", onClick: () => feedRef.current?.openCreate() }
+      : activeTab === "team"
+      ? { label: "Üye ekle", onClick: () => teamRef.current?.openCreate() }
+      : activeTab === "budget"
+      ? { label: "Gelir/Gider ekle", onClick: () => budgetRef.current?.openCreate() }
+      : { label: "Deadline'ı değiştir", onClick: () => setExtendingDeadline(true) },
+    [activeTab, project, id]
+  );
 
   // Süreç sekmesinin gün/hafta/ay/yıl gezinme durumu burada tutulur ki sekme değiştirince kaybolmasın.
   const [processViewMode, setProcessViewMode] = useState<ViewMode>("week");
@@ -200,34 +225,25 @@ export default function ProjectDetail() {
         return (
           <div
             style={{
+              position: "relative",
               background: hasCover
-                ? `linear-gradient(rgba(255,255,255,0.82), rgba(255,255,255,0.9)), center/cover url(${project.coverImageUrl})`
+                ? `linear-gradient(rgba(255,255,255,0.35), rgba(255,255,255,0.92)), center/cover url(${project.coverImageUrl})`
                 : c.surface,
               border: hasCover ? "none" : `1px solid ${c.border}`,
               borderRadius: 12,
               padding: 18,
               margin: "10px 0 24px",
+              minHeight: hasCover ? 260 : undefined,
+              display: hasCover ? "flex" : undefined,
+              flexDirection: hasCover ? "column" : undefined,
+              justifyContent: hasCover ? "flex-end" : undefined,
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: project.description ? 8 : 14 }}>
+            <div style={{ paddingRight: 64, marginBottom: project.description ? 8 : 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{project.title}</h1>
                 <StatusBadge status={project.status} />
               </div>
-              <button
-                onClick={() => setEditing(true)}
-                style={{
-                  fontSize: 15,
-                  color: c.textPrimary,
-                  background: hasCover ? "rgba(255,255,255,0.6)" : "transparent",
-                  border: hasCover ? `1px solid rgba(26,31,41,0.25)` : `1px solid ${c.border}`,
-                  borderRadius: 7,
-                  padding: "6px 12px",
-                  flexShrink: 0,
-                }}
-              >
-                Düzenle
-              </button>
             </div>
 
             {project.description && (
@@ -239,6 +255,7 @@ export default function ProjectDetail() {
             <div
               style={{
                 display: "flex",
+                flexWrap: "wrap",
                 gap: 24,
                 fontSize: 15,
                 color: c.textSecondary,
@@ -252,6 +269,27 @@ export default function ProjectDetail() {
               <span>Başlangıç: {new Date(project.startDate).toLocaleDateString("tr-TR")}</span>
               <span>Bitiş: {new Date(project.deadline).toLocaleDateString("tr-TR")}</span>
             </div>
+
+            <button
+              onClick={() => setEditing(true)}
+              aria-label="Projeyi düzenle"
+              style={{
+                position: "absolute",
+                top: 16,
+                right: 16,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                border: hasCover ? `1px solid rgba(26,31,41,0.2)` : `1px solid ${c.border}`,
+                background: hasCover ? "rgba(255,255,255,0.7)" : c.surface,
+                boxShadow: "0 2px 8px rgba(26,31,41,0.12)",
+              }}
+            >
+              <IconSettings size={17} color={c.textSecondary} />
+            </button>
           </div>
         );
       })()}
@@ -260,12 +298,13 @@ export default function ProjectDetail() {
         <div style={{ marginBottom: 24 }}>
           <ProjectTabs active={activeTab} onChange={setActiveTab} />
 
-          {activeTab === "feed" && <FeedPanel projectId={id} tasks={tasks} />}
+          {activeTab === "feed" && <FeedPanel ref={feedRef} projectId={id} tasks={tasks} />}
           {activeTab === "team" && (
-            <TeamPanel projectId={id} tasks={tasks} ownerId={project.ownerId} onTaskUpdated={updateTask} />
+            <TeamPanel ref={teamRef} projectId={id} tasks={tasks} ownerId={project.ownerId} onTaskUpdated={updateTask} />
           )}
           {activeTab === "tasks" && (
             <OutputsPanel
+              ref={outputsRef}
               projectId={id}
               tasks={tasks}
               onCreateTask={handleCreateTask}
@@ -278,6 +317,7 @@ export default function ProjectDetail() {
           )}
           {activeTab === "budget" && (
             <BudgetPanel
+              ref={budgetRef}
               project={project}
               tasks={tasks}
               projectId={id}
@@ -302,6 +342,17 @@ export default function ProjectDetail() {
       )}
 
       {editing && project && <EditProjectModal project={project} onClose={() => setEditing(false)} />}
+
+      {extendingDeadline && project && (
+        <ExtendDeadlineModal
+          project={project}
+          onClose={() => setExtendingDeadline(false)}
+          onSaved={(updated) => {
+            setProject(updated);
+            setExtendingDeadline(false);
+          }}
+        />
+      )}
 
       {parentCompletePrompt && (
         <Modal title="Görevi tamamla" onClose={() => setParentCompletePrompt(null)}>

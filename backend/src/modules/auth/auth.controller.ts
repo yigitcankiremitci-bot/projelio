@@ -9,7 +9,7 @@ export class AuthController {
 
   @Post("register")
   register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto.fullName, dto.email, dto.password);
+    return this.authService.register(dto.fullName, dto.email, dto.password, dto.username);
   }
 
   @Post("login")

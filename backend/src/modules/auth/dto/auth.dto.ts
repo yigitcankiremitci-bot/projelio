@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength } from "class-validator";
+import { IsEmail, IsString, Matches, MinLength } from "class-validator";
 
 export class RegisterDto {
   @IsString()
@@ -10,6 +10,13 @@ export class RegisterDto {
   @IsString()
   @MinLength(8)
   password!: string;
+
+  // Başında "@" olsun ya da olmasın kabul edilir, servis katmanında normalize edilir.
+  @IsString()
+  @Matches(/^@?[a-zA-Z0-9_.]{3,30}$/, {
+    message: "Kullanıcı adı 3-30 karakter olmalı; sadece harf, rakam, nokta ve alt çizgi içerebilir.",
+  })
+  username!: string;
 }
 
 export class LoginDto {

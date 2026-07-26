@@ -1,14 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Output, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
-import { IconPlus, IconChevronRight, IconEdit } from "./icons";
+import { IconChevronRight, IconEdit } from "./icons";
 import TaskColumn from "./TaskColumn";
 import CreateOutputModal from "./CreateOutputModal";
 import EditOutputModal from "./EditOutputModal";
 import { useSortableList } from "../lib/useSortableList";
 
 const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
+
+export interface OutputsPanelHandle {
+  openCreate: () => void;
+}
 
 interface Props {
   projectId: string;
@@ -25,7 +29,7 @@ interface Props {
   onReorderTasks: (ids: string[]) => void;
 }
 
-export default function OutputsPanel({
+const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel({
   projectId,
   tasks,
   onCreateTask,
@@ -34,13 +38,17 @@ export default function OutputsPanel({
   onToggleComplete,
   onEditTask,
   onReorderTasks,
-}: Props) {
+}, ref) {
   const c = colors.light;
   const [outputs, setOutputs] = useState<Output[]>([]);
   const [selectedOutputId, setSelectedOutputId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [editingOutput, setEditingOutput] = useState<Output | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    openCreate: () => setCreating(true),
+  }));
 
   const reload = () => {
     api.get<Output[]>(`/projects/${projectId}/outputs`).then(setOutputs).catch(() => setOutputs([]));
@@ -137,26 +145,8 @@ export default function OutputsPanel({
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+      <div style={{ marginBottom: 14 }}>
         <h3 style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Çıktılar</h3>
-        <button
-          onClick={() => setCreating(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "none",
-            background: c.primary,
-            color: "#fff",
-            fontSize: 15,
-            fontWeight: 500,
-          }}
-        >
-          <IconPlus size={13} color="#fff" />
-          Yeni çıktı
-        </button>
       </div>
 
       {outputs.length === 0 ? (
@@ -244,4 +234,6 @@ export default function OutputsPanel({
       )}
     </div>
   );
-}
+});
+
+export default OutputsPanel;

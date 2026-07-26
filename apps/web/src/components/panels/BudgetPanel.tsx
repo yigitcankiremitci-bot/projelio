@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
-import type { Project, ProjectMember, Task } from "@projelio/shared";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import type { BudgetTransaction, Project, ProjectMember, Task } from "@projelio/shared";
 import { api } from "../../api/client";
 import { colors } from "../../theme/colors";
 import { IconPlus, IconX } from "../icons";
+import CreateBudgetTransactionModal from "../CreateBudgetTransactionModal";
+
+export interface BudgetPanelHandle {
+  openCreate: () => void;
+}
 
 interface Props {
   project: Project;
@@ -23,13 +28,18 @@ function SummaryCard({ label, amount, color }: { label: string; amount: number; 
   );
 }
 
-export default function BudgetPanel({ project, tasks, projectId, currentUserId, isOwner, onTaskUpdated }: Props) {
+const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
+  { project, tasks, projectId, currentUserId, isOwner, onTaskUpdated },
+  ref
+) {
   const c = colors.light;
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [addingViewer, setAddingViewer] = useState(false);
   const [viewerToAdd, setViewerToAdd] = useState("");
+  const [transactions, setTransactions] = useState<BudgetTransaction[]>([]);
+  const [creatingEntry, setCreatingEntry] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -39,6 +49,17 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
       .catch(() => setMembers([]))
       .finally(() => setLoading(false));
   }, [projectId]);
+
+  useEffect(() => {
+    api
+      .get<BudgetTransaction[]>(`/projects/${projectId}/budget`)
+      .then(setTransactions)
+      .catch(() => setTransactions([]));
+  }, [projectId]);
+
+  useImperativeHandle(ref, () => ({
+    openCreate: () => setCreatingEntry(true),
+  }));
 
   const myMembership = members.find((m) => m.userId === currentUserId);
   const canView = isOwner || myMembership?.canViewBudget;
@@ -60,7 +81,17 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
   const plannedTotal = sumBy("planned");
   const paidTotal = sumBy("paid");
   const approvedTotal = plannedTotal + paidTotal;
-  const remainingAsset = project.totalBudget - paidTotal;
+
+  // Elle eklenen gelir/gider hareketleri (payout, ödenen görev bütçeleriyle aynı
+  // mantıkta bir gider olarak sayılır).
+  const manualIncome = transactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+  const manualExpense = transactions
+    .filter((t) => t.type === "expense" || t.type === "payout")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const effectiveBudget = project.totalBudget + manualIncome;
+  const totalSpent = paidTotal + manualExpense;
+  const remainingAsset = effectiveBudget - totalSpent;
 
   const setBudgetStatus = async (task: Task, status: Task["budgetStatus"]) => {
     setApprovingId(task.id);
@@ -112,16 +143,73 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
       <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "12px 14px", display: "flex", gap: 20 }}>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Proje toplam bütçesi</p>
-          <p style={{ fontSize: 19, fontWeight: 600, color: c.textPrimary, margin: 0 }}>{project.totalBudget.toLocaleString("tr-TR")} ₺</p>
+          <p style={{ fontSize: 19, fontWeight: 600, color: c.textPrimary, margin: 0 }}>{effectiveBudget.toLocaleString("tr-TR")} ₺</p>
+          {manualIncome > 0 && (
+            <p style={{ fontSize: 12, color: c.success, margin: "2px 0 0" }}>+{manualIncome.toLocaleString("tr-TR")} ₺ ek gelir dahil</p>
+          )}
         </div>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Yapılan harcamalar</p>
-          <p style={{ fontSize: 19, fontWeight: 600, color: c.danger, margin: 0 }}>{paidTotal.toLocaleString("tr-TR")} ₺</p>
+          <p style={{ fontSize: 19, fontWeight: 600, color: c.danger, margin: 0 }}>{totalSpent.toLocaleString("tr-TR")} ₺</p>
+          {manualExpense > 0 && (
+            <p style={{ fontSize: 12, color: c.danger, margin: "2px 0 0" }}>+{manualExpense.toLocaleString("tr-TR")} ₺ ek gider dahil</p>
+          )}
         </div>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Kalan varlık</p>
           <p style={{ fontSize: 19, fontWeight: 600, color: c.success, margin: 0 }}>{remainingAsset.toLocaleString("tr-TR")} ₺</p>
         </div>
+      </div>
+
+      <div>
+        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>Gelir & gider hareketleri</h4>
+        {transactions.length === 0 ? (
+          <p style={{ fontSize: 15, color: c.textSecondary }}>Henüz elle eklenmiş bir gelir/gider yok. Eklemek için alttaki + butonunu kullan.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {transactions.map((t) => {
+              const isIncome = t.type === "income";
+              const color = isIncome ? c.success : c.danger;
+              return (
+                <div
+                  key={t.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: c.surface,
+                    border: `1px solid ${c.border}`,
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      flexShrink: 0,
+                      padding: "2px 8px",
+                      borderRadius: 20,
+                      color,
+                      background: `${color}1a`,
+                    }}
+                  >
+                    {isIncome ? "Gelir" : "Gider"}
+                  </span>
+                  <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {t.description || (isIncome ? "Gelir" : "Gider")}
+                  </span>
+                  <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
+                    {new Date(t.createdAt).toLocaleDateString("tr-TR")}
+                  </span>
+                  <span style={{ fontSize: 15, fontWeight: 500, color, flexShrink: 0 }}>
+                    {isIncome ? "+" : "-"}
+                    {t.amount.toLocaleString("tr-TR")} ₺
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div>
@@ -273,6 +361,16 @@ export default function BudgetPanel({ project, tasks, projectId, currentUserId, 
           )}
         </div>
       )}
+
+      {creatingEntry && (
+        <CreateBudgetTransactionModal
+          projectId={projectId}
+          onClose={() => setCreatingEntry(false)}
+          onCreated={(tx) => setTransactions((prev) => [tx, ...prev])}
+        />
+      )}
     </div>
   );
-}
+});
+
+export default BudgetPanel;

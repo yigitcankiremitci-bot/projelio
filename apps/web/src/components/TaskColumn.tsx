@@ -158,26 +158,51 @@ export default function TaskColumn({
     });
   };
 
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Mobil klavyelerin "bitti/onay" tuşu her zaman gerçek bir Enter tuşu göndermeyip
+  // sadece input'un odağını kaybettirebiliyor (blur). Bu yüzden ekleme mantığı hem
+  // form submit hem de blur'dan çağrılabilen tek bir fonksiyonda toplanıyor; aynı anda
+  // ikisi birden tetiklense bile addingRef sayesinde görev iki kez eklenmiyor.
+  const addingTaskRef = useRef(false);
+  const addingSubtaskRef = useRef(false);
+
+  const commitAddTask = () => {
+    if (addingTaskRef.current) return;
     const trimmed = title.trim();
     if (!trimmed) {
       setAdding(false);
       return;
     }
+    addingTaskRef.current = true;
     onCreate(status, trimmed);
     setTitle("");
+    setTimeout(() => {
+      addingTaskRef.current = false;
+    }, 0);
   };
 
-  const handleAddSubtask = (e: React.FormEvent, parentId: string) => {
+  const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
+    commitAddTask();
+  };
+
+  const commitAddSubtask = (parentId: string) => {
+    if (addingSubtaskRef.current) return;
     const trimmed = subtaskTitle.trim();
     if (!trimmed) {
       setSubtaskParent(null);
       return;
     }
+    addingSubtaskRef.current = true;
     onCreateSubtask(parentId, trimmed);
     setSubtaskTitle("");
+    setTimeout(() => {
+      addingSubtaskRef.current = false;
+    }, 0);
+  };
+
+  const handleAddSubtask = (e: React.FormEvent, parentId: string) => {
+    e.preventDefault();
+    commitAddSubtask(parentId);
   };
 
   const handleCheckboxClick = (e: React.MouseEvent, taskId: string, currentStatus: TaskStatus, taskTitle: string) => {
@@ -258,9 +283,8 @@ export default function TaskColumn({
                         fontSize: 16,
                         color: t.status === "completed" ? c.textSecondary : isOverdueWithPendingSubtasks ? c.danger : c.textPrimary,
                         textDecoration: t.status === "completed" ? "line-through" : "none",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        overflowWrap: "break-word",
+                        wordBreak: "break-word",
                       }}
                     >
                       {t.title}
@@ -365,7 +389,10 @@ export default function TaskColumn({
                         }}
                       >
                         <button
-                          onClick={(e) => handleCheckboxClick(e, sub.id, sub.status, sub.title)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleComplete(sub.id);
+                          }}
                           aria-label={sub.status === "completed" ? "Alt görev tamamlandıyı geri al" : "Alt görevi tamamlandı olarak işaretle"}
                           style={{
                             width: 14,
@@ -389,9 +416,8 @@ export default function TaskColumn({
                               fontSize: 15,
                               color: sub.status === "completed" ? c.textSecondary : c.textPrimary,
                               textDecoration: sub.status === "completed" ? "line-through" : "none",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
+                              overflowWrap: "break-word",
+                              wordBreak: "break-word",
                             }}
                           >
                             {sub.title}
@@ -423,10 +449,10 @@ export default function TaskColumn({
                             setSubtaskTitle("");
                           }
                         }}
-                        onBlur={() => {
-                          if (!subtaskTitle.trim()) setSubtaskParent(null);
-                        }}
+                        onBlur={() => commitAddSubtask(t.id)}
                         placeholder="Alt görev başlığı, Enter'a bas"
+                        maxLength={200}
+                        enterKeyHint="done"
                         style={{ width: "100%", height: 30, fontSize: 15 }}
                       />
                     </form>
@@ -472,7 +498,7 @@ export default function TaskColumn({
               gap: 8,
             }}
           >
-            <span style={{ fontSize: 15, color: c.textSecondary, fontStyle: "italic", flex: 1 }}>{parent.title}</span>
+            <span style={{ fontSize: 15, color: c.textSecondary, fontStyle: "italic", flex: 1, minWidth: 0, overflowWrap: "break-word", wordBreak: "break-word" }}>{parent.title}</span>
             <span style={{ fontSize: 12, color: c.textSecondary, whiteSpace: "nowrap" }}>{columnLabel[parent.status]}'de</span>
           </div>
 
@@ -525,9 +551,8 @@ export default function TaskColumn({
                       fontSize: 15,
                       color: c.textSecondary,
                       textDecoration: "line-through",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      overflowWrap: "break-word",
+                      wordBreak: "break-word",
                     }}
                   >
                     {sub.title}
@@ -558,10 +583,10 @@ export default function TaskColumn({
                 setTitle("");
               }
             }}
-            onBlur={() => {
-              if (!title.trim()) setAdding(false);
-            }}
+            onBlur={commitAddTask}
             placeholder="Görev başlığı yaz, Enter'a bas"
+            maxLength={200}
+            enterKeyHint="done"
             style={{ width: "100%", height: 34, fontSize: 16 }}
           />
         </form>

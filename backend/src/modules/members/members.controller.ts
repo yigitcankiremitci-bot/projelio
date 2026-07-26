@@ -18,13 +18,18 @@ export class MembersController {
   }
 
   @Post("projects/:projectId/members")
-  addMember(@Param("projectId") projectId: string, @Body() body: { userId: string; role?: any }) {
-    return this.membersService.addMember(projectId, body.userId, body.role);
+  addMember(@Param("projectId") projectId: string, @Body() body: { userId: string; role?: any; title?: string }) {
+    return this.membersService.addMember(projectId, body.userId, body.role, body.title);
   }
 
   @Patch("members/:id/budget-visibility")
   setBudgetVisibility(@Param("id") id: string, @Body("canViewBudget") canViewBudget: boolean) {
     return this.membersService.setBudgetVisibility(id, canViewBudget);
+  }
+
+  @Patch("members/:id/title")
+  setTitle(@Param("id") id: string, @Body("title") title: string) {
+    return this.membersService.setTitle(id, title);
   }
 
   @Post("projects/:projectId/members/join-request")

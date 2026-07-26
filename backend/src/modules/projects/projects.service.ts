@@ -34,16 +34,44 @@ export class ProjectsService {
     private outputsService: OutputsService
   ) {}
 
+  // Kullanıcının sahibi olduğu projeler + ekibine (üye/taşeron fark etmez, onaylanmış
+  // şekilde) eklendiği projeler. Böylece ekibe eklenen bir taşeron da o projeyi
+  // "Projelerim" / görev listesi gibi ekranlarda görebilir.
   async findAllForUser(userId: string): Promise<Project[]> {
-    const { data, error } = await this.supabase.client
+    const { data: owned, error: ownedError } = await this.supabase.client
       .from("projects")
       .select()
       .eq("owner_id", userId)
-      .is("archived_at", null)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return (data ?? []).map(mapProject);
+      .is("archived_at", null);
+    if (ownedError) throw ownedError;
+
+    const { data: memberships, error: membershipError } = await this.supabase.client
+      .from("project_members")
+      .select("project_id")
+      .eq("user_id", userId)
+      .eq("status", "approved");
+    if (membershipError) throw membershipError;
+
+    const memberProjectIds = (memberships ?? []).map((m: any) => m.project_id);
+    let memberProjects: any[] = [];
+    if (memberProjectIds.length > 0) {
+      const { data, error } = await this.supabase.client
+        .from("projects")
+        .select()
+        .in("id", memberProjectIds)
+        .is("archived_at", null);
+      if (error) throw error;
+      memberProjects = data ?? [];
+    }
+
+    const byId = new Map<string, any>();
+    for (const row of [...(owned ?? []), ...memberProjects]) byId.set(row.id, row);
+
+    return Array.from(byId.values())
+      .map(mapProject)
+      .sort(
+        (a, b) => a.sortOrder - b.sortOrder || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
   }
 
   async findByJob(jobId: string): Promise<Project[]> {

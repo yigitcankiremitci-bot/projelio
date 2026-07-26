@@ -6,6 +6,7 @@ export interface User {
   id: string;
   fullName: string;
   email: string;
+  username: string;
   role: UserRole;
   createdAt: string;
 }
@@ -48,12 +49,16 @@ export interface ProjectMember {
   projectId: string;
   userId: string;
   role: MemberRole;
+  // Proje yöneticisinin serbest metinle belirlediği görev/unvan (örn. "Elektrik taşeronu").
+  // Yetkilendirme "role" alanına göre çalışır; "title" sadece görüntüleme amaçlıdır.
+  title?: string;
   status: MemberStatus;
   customAgreedRate?: number;
   canViewBudget: boolean;
   joinedAt: string;
   fullName?: string;
   email?: string;
+  username?: string;
 }
 
 export interface Output {
@@ -103,6 +108,20 @@ export interface ProjectPost {
   authorName: string;
   body: string;
   createdAt: string;
+  likeCount: number;
+  likedByMe: boolean;
+  commentCount: number;
+}
+
+export interface PostComment {
+  id: string;
+  postId: string;
+  userId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+  likeCount: number;
+  likedByMe: boolean;
 }
 
 export type BudgetTransactionType = "income" | "expense" | "payout";
@@ -132,7 +151,11 @@ export interface NotificationPayload {
     | "task_updated"
     | "member_joined"
     | "daily_digest"
-    | "weekly_digest";
+    | "weekly_digest"
+    | "post_mention"
+    | "post_comment"
+    | "post_like"
+    | "comment_like";
   title: string;
   body: string;
   link?: string;

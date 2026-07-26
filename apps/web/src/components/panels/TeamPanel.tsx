@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { ProjectMember, Task } from "@projelio/shared";
 import { api } from "../../api/client";
 import { colors } from "../../theme/colors";
-import { IconPlus } from "../icons";
 import AddMemberModal from "../AddMemberModal";
 import TeamMemberModal from "../TeamMemberModal";
+
+export interface TeamPanelHandle {
+  openCreate: () => void;
+}
 
 interface Props {
   projectId: string;
@@ -19,12 +22,16 @@ const roleLabel: Record<string, string> = {
   subcontractor: "Taşeron",
 };
 
-export default function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }: Props) {
+const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }, ref) {
   const c = colors.light;
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState<ProjectMember | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    openCreate: () => setAdding(true),
+  }));
 
   const load = () => {
     setLoading(true);
@@ -47,22 +54,6 @@ export default function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }: 
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Ekip üyeleri</h4>
-        <button
-          onClick={() => setAdding(true)}
-          aria-label="Ekibe üye ekle"
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: "50%",
-            border: "none",
-            background: c.primary,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <IconPlus size={14} color="#fff" />
-        </button>
       </div>
 
       {loading ? (
@@ -117,7 +108,10 @@ export default function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }: 
                       </span>
                     )}
                   </div>
-                  <span style={{ fontSize: 13, color: c.textSecondary }}>{roleLabel[m.role] ?? m.role}</span>
+                  <span style={{ fontSize: 13, color: c.textSecondary }}>
+                    {m.title ? m.title : roleLabel[m.role] ?? m.role}
+                    {m.title && ` · ${roleLabel[m.role] ?? m.role}`}
+                  </span>
                 </div>
                 <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
                   {done}/{total} görev
@@ -150,4 +144,6 @@ export default function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }: 
       )}
     </div>
   );
-}
+});
+
+export default TeamPanel;

@@ -13,8 +13,8 @@ export class TaskCommentsController {
   }
 
   @Get("projects/:projectId/comments")
-  findByProject(@Param("projectId") projectId: string) {
-    return this.taskCommentsService.findByProject(projectId);
+  findByProject(@Param("projectId") projectId: string, @Req() req: any) {
+    return this.taskCommentsService.findByProject(projectId, req.user.userId);
   }
 
   @Post("tasks/:taskId/comments")

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { TasksService } from "./tasks.service";
 
@@ -8,8 +8,8 @@ export class TasksController {
   constructor(private tasksService: TasksService) {}
 
   @Get("projects/:projectId/tasks")
-  findByProject(@Param("projectId") projectId: string) {
-    return this.tasksService.findByProject(projectId);
+  findByProject(@Param("projectId") projectId: string, @Req() req: any) {
+    return this.tasksService.findByProject(projectId, req.user.userId);
   }
 
   @Post("projects/:projectId/tasks")

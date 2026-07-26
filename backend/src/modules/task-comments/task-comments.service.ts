@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { TaskComment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { TasksService } from "../tasks/tasks.service";
 
 function mapComment(row: any): TaskComment {
   return {
@@ -15,7 +16,10 @@ function mapComment(row: any): TaskComment {
 
 @Injectable()
 export class TaskCommentsService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private tasksService: TasksService
+  ) {}
 
   async findByTask(taskId: string): Promise<TaskComment[]> {
     const { data, error } = await this.supabase.client
@@ -27,15 +31,22 @@ export class TaskCommentsService {
     return (data ?? []).map(mapComment);
   }
 
-  // Projedeki tüm görev/alt görevlere yapılan yorumlar (Akış sekmesi için)
-  async findByProject(projectId: string): Promise<(TaskComment & { taskTitle: string })[]> {
+  // Projedeki tüm görev/alt görevlere yapılan yorumlar (Akış sekmesi için).
+  // Çağıran taşeronsa (subcontractor), sadece kendisiyle ilgili görev/alt görevlere
+  // ait yorumlar döner; diğer roller için davranış değişmez.
+  async findByProject(projectId: string, requestingUserId?: string): Promise<(TaskComment & { taskTitle: string })[]> {
     const { data, error } = await this.supabase.client
       .from("task_comments")
       .select("*, users(full_name), tasks!inner(title, project_id)")
       .eq("tasks.project_id", projectId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data ?? []).map((row: any) => ({ ...mapComment(row), taskTitle: row.tasks?.title ?? "" }));
+    const comments = (data ?? []).map((row: any) => ({ ...mapComment(row), taskTitle: row.tasks?.title ?? "" }));
+
+    if (!requestingUserId) return comments;
+    const visibleIds = await this.tasksService.getVisibleTaskIdsForSubcontractor(projectId, requestingUserId);
+    if (!visibleIds) return comments;
+    return comments.filter((c) => visibleIds.has(c.taskId));
   }
 
   async create(taskId: string, userId: string, body: string): Promise<TaskComment> {

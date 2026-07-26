@@ -90,7 +90,7 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
       <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required style={{ width: "100%" }} />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>

@@ -17,7 +17,7 @@ export class CalendarController {
     @Query("projectId") projectId: string,
     @Query("scope") scope: "mine" | "team" = "mine"
   ) {
-    const tasks = await this.tasksService.findByProject(projectId);
+    const tasks = await this.tasksService.findByProject(projectId, req.user.userId);
     return this.calendarService.filterTasks(tasks, req.user.userId, scope);
   }
 }

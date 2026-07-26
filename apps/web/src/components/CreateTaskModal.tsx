@@ -74,7 +74,7 @@ export default function CreateTaskModal({ projectId: fixedProjectId, onClose }: 
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Görev başlığı</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Örn. Logo revizyonu" style={{ width: "100%" }} />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Örn. Logo revizyonu" maxLength={200} style={{ width: "100%" }} />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

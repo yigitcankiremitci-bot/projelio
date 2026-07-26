@@ -9,6 +9,7 @@ import { TasksModule } from "./modules/tasks/tasks.module";
 import { OutputsModule } from "./modules/outputs/outputs.module";
 import { TaskCommentsModule } from "./modules/task-comments/task-comments.module";
 import { ProjectPostsModule } from "./modules/project-posts/project-posts.module";
+import { PostCommentsModule } from "./modules/post-comments/post-comments.module";
 import { MembersModule } from "./modules/members/members.module";
 import { BudgetModule } from "./modules/budget/budget.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
@@ -28,6 +29,7 @@ import { ArchiveModule } from "./modules/archive/archive.module";
     OutputsModule,
     TaskCommentsModule,
     ProjectPostsModule,
+    PostCommentsModule,
     MembersModule,
     BudgetModule,
     NotificationsModule,

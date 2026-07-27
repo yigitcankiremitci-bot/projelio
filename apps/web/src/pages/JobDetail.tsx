@@ -167,6 +167,7 @@ export default function JobDetail() {
 
   const activeProjects = projects.filter((p) => p.status === "active");
   const pendingTasksCount = tasks.filter((t) => t.status !== "completed").length;
+  const completedTasksCount = tasks.filter((t) => t.status === "completed").length;
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
@@ -232,9 +233,10 @@ export default function JobDetail() {
         </Link>
 
         <div style={{ marginTop: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
             <SummaryCard label="Aktif proje" value={activeProjects.length} />
             <SummaryCard label="Bekleyen görev" value={pendingTasksCount} />
+            <SummaryCard label="Tamamlanmış görev" value={completedTasksCount} />
           </div>
 
           <TodayCompletedPanel tasks={tasks} projects={projects} />

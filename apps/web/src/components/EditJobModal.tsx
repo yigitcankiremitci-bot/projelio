@@ -5,6 +5,8 @@ import { colors } from "../theme/colors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
+import HireMemberModal from "./HireMemberModal";
+import { IconUser } from "./icons";
 
 interface Props {
   job: Job;
@@ -22,6 +24,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hiring, setHiring] = useState(false);
 
   const handleDelete = async () => {
     await api.delete(`/jobs/${job.id}`);
@@ -100,6 +103,32 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
           {loading ? "Kaydediliyor…" : "Kaydet"}
         </button>
       </form>
+
+      <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 16, paddingTop: 16 }}>
+        <button
+          type="button"
+          onClick={() => setHiring(true)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            width: "100%",
+            padding: "10px 0",
+            borderRadius: 8,
+            border: `1px solid ${c.border}`,
+            background: "transparent",
+            color: c.textPrimary,
+            fontSize: 16,
+            fontWeight: 500,
+          }}
+        >
+          <IconUser size={15} color={c.textSecondary} />
+          İşe al
+        </button>
+      </div>
+
+      {hiring && <HireMemberModal jobId={job.id} existingUserIds={[]} onClose={() => setHiring(false)} onHired={() => setHiring(false)} />}
 
       <EntityDangerZone
         entityLabel="İşi"

@@ -11,6 +11,7 @@ import { TaskCommentsModule } from "./modules/task-comments/task-comments.module
 import { ProjectPostsModule } from "./modules/project-posts/project-posts.module";
 import { PostCommentsModule } from "./modules/post-comments/post-comments.module";
 import { MembersModule } from "./modules/members/members.module";
+import { JobMembersModule } from "./modules/job-members/job-members.module";
 import { BudgetModule } from "./modules/budget/budget.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { CalendarModule } from "./modules/calendar/calendar.module";
@@ -31,6 +32,7 @@ import { ArchiveModule } from "./modules/archive/archive.module";
     ProjectPostsModule,
     PostCommentsModule,
     MembersModule,
+    JobMembersModule,
     BudgetModule,
     NotificationsModule,
     CalendarModule,

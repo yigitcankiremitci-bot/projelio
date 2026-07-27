@@ -61,6 +61,18 @@ export interface ProjectMember {
   username?: string;
 }
 
+export interface JobMember {
+  id: string;
+  jobId: string;
+  userId: string;
+  // İşe alan kişinin serbest metinle belirlediği görev/unvan (örn. "Grafik tasarımcı").
+  title?: string;
+  joinedAt: string;
+  fullName?: string;
+  email?: string;
+  username?: string;
+}
+
 export interface Output {
   id: string;
   projectId: string;

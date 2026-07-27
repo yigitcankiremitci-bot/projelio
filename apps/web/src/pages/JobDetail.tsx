@@ -4,6 +4,8 @@ import type { Job, Project, Task } from "@projelio/shared";
 import { api } from "../api/client";
 import ProjectCard from "../components/ProjectCard";
 import EditJobModal from "../components/EditJobModal";
+import JobTabs, { JobTab } from "../components/JobTabs";
+import JobTeamPanel from "../components/JobTeamPanel";
 import { colors } from "../theme/colors";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { useSortableList } from "../lib/useSortableList";
@@ -16,6 +18,7 @@ export default function JobDetail() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editing, setEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<JobTab>("projects");
   const gridRef = useRef<HTMLDivElement>(null);
 
   const reload = () => {
@@ -28,21 +31,21 @@ export default function JobDetail() {
 
   // İşe ait tüm projelerin görev (ve alt görev) sayısını toplamak için
   // her projenin görev listesini çekip birleştiriyoruz.
-  useEffect(() => {
+  const reloadTasks = () => {
     if (projects.length === 0) {
       setTasks([]);
       return;
     }
-    let cancelled = false;
     Promise.all(
       projects.map((p) => api.get<Task[]>(`/projects/${p.id}/tasks`).catch(() => [] as Task[]))
-    ).then((lists) => {
-      if (!cancelled) setTasks(lists.flat());
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [projects]);
+    ).then((lists) => setTasks(lists.flat()));
+  };
+
+  useEffect(reloadTasks, [projects]);
+
+  const updateTaskInState = (updated: Task) => {
+    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  };
 
   useSortableList(
     gridRef,
@@ -60,7 +63,7 @@ export default function JobDetail() {
         api.patch("/projects/reorder", { ids }).catch(() => reload());
       },
     },
-    [projects.length === 0]
+    [projects.length === 0, activeTab]
   );
 
   if (!id) return null;
@@ -137,27 +140,42 @@ export default function JobDetail() {
             <SummaryCard label="Bekleyen görev" value={pendingTasksCount} />
           </div>
 
-          {projects.length === 0 ? (
-            <div
-              style={{
-                border: `1px dashed ${c.border}`,
-                borderRadius: 12,
-                padding: 40,
-                textAlign: "center",
-                color: c.textSecondary,
-                fontSize: 16,
-              }}
-            >
-              Bu işte henüz proje yok.
-            </div>
+          <JobTabs active={activeTab} onChange={setActiveTab} />
+
+          {activeTab === "projects" ? (
+            projects.length === 0 ? (
+              <div
+                style={{
+                  border: `1px dashed ${c.border}`,
+                  borderRadius: 12,
+                  padding: 40,
+                  textAlign: "center",
+                  color: c.textSecondary,
+                  fontSize: 16,
+                }}
+              >
+                Bu işte henüz proje yok.
+              </div>
+            ) : (
+              <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+                {projects.map((p) => (
+                  <div key={p.id} data-id={p.id}>
+                    <ProjectCard project={p} />
+                  </div>
+                ))}
+              </div>
+            )
           ) : (
-            <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-              {projects.map((p) => (
-                <div key={p.id} data-id={p.id}>
-                  <ProjectCard project={p} />
-                </div>
-              ))}
-            </div>
+            id && (
+              <JobTeamPanel
+                jobId={id}
+                tasks={tasks}
+                projects={projects}
+                ownerId={job?.ownerId}
+                onTaskUpdated={updateTaskInState}
+                onTasksReload={reloadTasks}
+              />
+            )
           )}
         </div>
       </div>

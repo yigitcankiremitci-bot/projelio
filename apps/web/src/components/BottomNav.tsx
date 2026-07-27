@@ -1,9 +1,10 @@
 import { useContext, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { colors } from "../theme/colors";
-import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus } from "./icons";
+import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus, IconFolder } from "./icons";
 import CreateJobModal from "./CreateJobModal";
 import CreateProjectModal from "./CreateProjectModal";
+import CreateTaskModal from "./CreateTaskModal";
 import { ProjectFabContext } from "../lib/projectFab";
 
 const leftItems = [
@@ -19,25 +20,26 @@ const rightItems = [
 export default function BottomNav() {
   const c = colors.light;
   const location = useLocation();
-  const [modal, setModal] = useState<"job" | "project" | null>(null);
+  const [modal, setModal] = useState<"job" | "project" | "task" | null>(null);
+  const [choosing, setChoosing] = useState(false);
   const { action: fabAction } = useContext(ProjectFabContext);
 
   const isActive = (to: string) => (to === "/" ? location.pathname === "/" : location.pathname.startsWith(to));
 
   // Sayfaya göre "+" butonunun ne oluşturacağını belirle: ana sayfada iş,
-  // bir işin içindeyken proje. Bir projenin içindeyken ise o an aktif olan
-  // sekme (Çıktılar/Akış/Ekip/Bütçe/Süreç) ProjectFabContext üzerinden kendi
-  // eylemini kaydeder ve "+" butonu onu tetikler.
+  // bir işin içindeyken proje veya görev (küçük bir seçim menüsüyle). Bir
+  // projenin içindeyken ise o an aktif olan sekme (Çıktılar/Akış/Ekip/Bütçe/Süreç)
+  // ProjectFabContext üzerinden kendi eylemini kaydeder ve "+" butonu onu tetikler.
   const jobMatch = location.pathname.match(/^\/jobs\/([^/]+)/);
   const projectMatch = location.pathname.match(/^\/projects\/([^/]+)/);
 
-  let createAction: "job" | "project" | "custom" | null = null;
+  let createAction: "job" | "job-choice" | "custom" | null = null;
   let jobId: string | null = null;
 
   if (location.pathname === "/") {
     createAction = "job";
   } else if (jobMatch) {
-    createAction = "project";
+    createAction = "job-choice";
     jobId = jobMatch[1];
   } else if (projectMatch && fabAction) {
     createAction = "custom";
@@ -46,6 +48,8 @@ export default function BottomNav() {
   const handleFabClick = () => {
     if (createAction === "custom") {
       fabAction?.onClick();
+    } else if (createAction === "job-choice") {
+      setChoosing((prev) => !prev);
     } else if (createAction) {
       setModal(createAction);
     }
@@ -95,7 +99,7 @@ export default function BottomNav() {
                 position: "absolute",
                 top: 0,
                 left: "50%",
-                transform: "translate(-50%, -50%)",
+                transform: `translate(-50%, -50%) rotate(${choosing ? 45 : 0}deg)`,
                 width: 64,
                 height: 64,
                 borderRadius: "50%",
@@ -104,10 +108,74 @@ export default function BottomNav() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                transition: "transform 0.15s ease",
               }}
             >
               <IconPlus size={28} color={c.primaryDark} />
             </button>
+          )}
+
+          {choosing && jobId && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: 70,
+                left: "50%",
+                transform: "translateX(-50%)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                background: c.surface,
+                border: `1px solid ${c.border}`,
+                borderRadius: 12,
+                padding: 8,
+                boxShadow: "0 4px 16px rgba(26,31,41,0.18)",
+                zIndex: 31,
+              }}
+            >
+              <button
+                onClick={() => {
+                  setChoosing(false);
+                  setModal("project");
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "9px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "transparent",
+                  color: c.textPrimary,
+                  fontSize: 15,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <IconFolder size={15} color={c.textSecondary} />
+                Yeni proje
+              </button>
+              <button
+                onClick={() => {
+                  setChoosing(false);
+                  setModal("task");
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "9px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "transparent",
+                  color: c.textPrimary,
+                  fontSize: 15,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <IconListCheck size={15} color={c.textSecondary} />
+                Yeni görev
+              </button>
+            </div>
           )}
         </div>
 
@@ -129,9 +197,19 @@ export default function BottomNav() {
         })}
       </nav>
 
+      {choosing && (
+        <div
+          onClick={() => setChoosing(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 29 }}
+        />
+      )}
+
       {modal === "job" && <CreateJobModal onClose={() => setModal(null)} />}
       {modal === "project" && jobId && (
         <CreateProjectModal jobId={jobId} onClose={() => setModal(null)} />
+      )}
+      {modal === "task" && jobId && (
+        <CreateTaskModal jobId={jobId} onClose={() => setModal(null)} />
       )}
     </>
   );

@@ -232,7 +232,20 @@ export default function JobDetail() {
           ← İşler
         </Link>
 
-        <div style={{ marginTop: 20 }}>
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 5,
+            background: c.background,
+            margin: "0 -28px",
+            padding: "10px 28px 8px",
+          }}
+        >
+          <JobTabs active={activeTab} onChange={setActiveTab} />
+        </div>
+
+        <div style={{ marginTop: 6 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
             <SummaryCard label="Aktif proje" value={activeProjects.length} />
             <SummaryCard label="Bekleyen görev" value={pendingTasksCount} />
@@ -240,8 +253,6 @@ export default function JobDetail() {
           </div>
 
           <TodayCompletedPanel tasks={tasks} />
-
-          <JobTabs active={activeTab} onChange={setActiveTab} />
 
           {activeTab === "projects" && (
             projects.length === 0 ? (

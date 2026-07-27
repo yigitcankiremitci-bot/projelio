@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { io } from "socket.io-client";
 import type { JobMember, Project, Task } from "@projelio/shared";
-import { api } from "../api/client";
+import { api, API_URL } from "../api/client";
 import { colors } from "../theme/colors";
 import { IconPlus, IconChevronRight, IconCheck, IconActivity } from "./icons";
 import HireMemberModal from "./HireMemberModal";
@@ -34,6 +35,20 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTaskUp
   };
 
   useEffect(load, [jobId]);
+
+  // Ekip üyelerinden biri "üzerinde çalışıyorum" durumunu değiştirdiğinde,
+  // sayfa yenilenmeden bu panelde anlık görünmesi için soket üzerinden dinle.
+  useEffect(() => {
+    const socket = io(API_URL, { transports: ["websocket"] });
+    socket.on("active-worker-changed", (payload: { userId: string; activeTaskId: string | null }) => {
+      setMembers((prev) =>
+        prev.map((m) => (m.userId === payload.userId ? { ...m, activeTaskId: payload.activeTaskId ?? undefined } : m))
+      );
+    });
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   const taskCounts = (userId: string) => {
     const assigned = tasks.filter((t) => t.assignedTo === userId);
@@ -146,8 +161,10 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTaskUp
                       )}
                     </div>
                     {activeTask ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                        <IconActivity size={11} color={c.accentDark} filled />
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <span className="active-task-pulse" style={{ display: "inline-flex", borderRadius: "50%" }}>
+                          <IconActivity size={11} color={c.accentDark} filled />
+                        </span>
                         <span style={{ fontSize: 13, color: c.accentDark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           şu an: {activeTask.title}
                         </span>
@@ -247,7 +264,11 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTaskUp
                               </div>
                               <div style={{ fontSize: 12, color: c.textSecondary }}>{projectTitle(t.projectId)}</div>
                             </div>
-                            {t.id === m.activeTaskId && <IconActivity size={12} color={c.accentDark} filled />}
+                            {t.id === m.activeTaskId && (
+                              <span className="active-task-pulse" style={{ display: "inline-flex", borderRadius: "50%", flexShrink: 0 }}>
+                                <IconActivity size={12} color={c.accentDark} filled />
+                              </span>
+                            )}
                             {takenByOther && <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>atanmış</span>}
                           </button>
                         );

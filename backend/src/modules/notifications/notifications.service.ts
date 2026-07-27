@@ -89,6 +89,10 @@ export class NotificationsService {
     if (error) throw error;
   }
 
+  broadcastActiveWorker(userId: string, activeTaskId: string | null): void {
+    this.gateway.broadcastActiveWorker(userId, activeTaskId);
+  }
+
   getVapidPublicKey(): string {
     return process.env.VAPID_PUBLIC_KEY ?? "";
   }

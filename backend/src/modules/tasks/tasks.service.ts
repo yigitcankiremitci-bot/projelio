@@ -241,7 +241,9 @@ export class TasksService {
       .update({ active_task_id: active ? taskId : null })
       .eq("id", userId);
     if (error) throw error;
-    return { activeTaskId: active ? taskId : null };
+    const activeTaskId = active ? taskId : null;
+    this.notificationsService.broadcastActiveWorker(userId, activeTaskId);
+    return { activeTaskId };
   }
 
   async remove(id: string): Promise<void> {

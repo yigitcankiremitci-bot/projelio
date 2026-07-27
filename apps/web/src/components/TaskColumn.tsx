@@ -318,10 +318,11 @@ export default function TaskColumn({
                         }}
                         aria-label={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
                         title={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                        className={activeTaskId === t.id ? "active-task-pulse" : undefined}
                         style={{
                           background: activeTaskId === t.id ? `${c.accent}22` : "transparent",
                           border: "none",
-                          borderRadius: 6,
+                          borderRadius: "50%",
                           padding: 3,
                           display: "flex",
                           flexShrink: 0,
@@ -481,10 +482,11 @@ export default function TaskColumn({
                               }}
                               aria-label={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
                               title={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                              className={activeTaskId === sub.id ? "active-task-pulse" : undefined}
                               style={{
                                 background: activeTaskId === sub.id ? `${c.accent}22` : "transparent",
                                 border: "none",
-                                borderRadius: 6,
+                                borderRadius: "50%",
                                 padding: 2,
                                 display: "flex",
                                 flexShrink: 0,

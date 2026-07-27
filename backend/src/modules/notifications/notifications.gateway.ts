@@ -25,4 +25,10 @@ export class NotificationsGateway {
   sendToUser(userId: string, notification: NotificationPayload) {
     this.server.to(`user:${userId}`).emit("notification", notification);
   }
+
+  // Bir kullanıcı "üzerinde çalışıyorum" durumunu değiştirdiğinde, iş ekibi
+  // sekmesini açık tutan diğer tüm bağlı istemcilere anlık bildirir.
+  broadcastActiveWorker(userId: string, activeTaskId: string | null) {
+    this.server.emit("active-worker-changed", { userId, activeTaskId });
+  }
 }

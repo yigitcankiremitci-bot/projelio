@@ -21,6 +21,9 @@ function mapTask(row: any): Task {
     createdAt: row.created_at,
     archivedAt: row.archived_at ?? undefined,
     sortOrder: row.sort_order ?? 0,
+    completedAt: row.completed_at ?? undefined,
+    completedBy: row.completed_by ?? undefined,
+    completedByName: row.completed_by_user?.full_name ?? undefined,
   };
 }
 
@@ -36,7 +39,7 @@ export class TasksService {
   async findByProject(projectId: string, requestingUserId?: string): Promise<Task[]> {
     const { data, error } = await this.supabase.client
       .from("tasks")
-      .select()
+      .select("*, completed_by_user:users!tasks_completed_by_fkey(full_name)")
       .eq("project_id", projectId)
       .is("archived_at", null)
       .order("sort_order", { ascending: true })
@@ -185,12 +188,20 @@ export class TasksService {
     return mapTask(row);
   }
 
-  async updateStatus(id: string, status: Task["status"]): Promise<Task> {
+  async updateStatus(id: string, status: Task["status"], requestingUserId?: string): Promise<Task> {
+    // "Bugün yapılanlar" gibi ekip aktivite özetlerinde kimin ne zaman
+    // tamamladığını gösterebilmek için, tamamlanınca damga atıyor,
+    // geri alınırsa temizliyoruz.
+    const patch: Record<string, unknown> =
+      status === "completed"
+        ? { status, completed_at: new Date().toISOString(), completed_by: requestingUserId ?? null }
+        : { status, completed_at: null, completed_by: null };
+
     const { data: row, error } = await this.supabase.client
       .from("tasks")
-      .update({ status })
+      .update(patch)
       .eq("id", id)
-      .select()
+      .select("*, completed_by_user:users!tasks_completed_by_fkey(full_name)")
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Görev bulunamadı");

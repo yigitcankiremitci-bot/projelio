@@ -106,6 +106,10 @@ export interface Task {
   createdAt: string;
   archivedAt?: string;
   sortOrder?: number;
+  // Görev "tamamlandı" durumuna geçtiğinde doldurulur; tekrar geri alınırsa temizlenir.
+  completedAt?: string;
+  completedBy?: string;
+  completedByName?: string;
 }
 
 export interface TaskComment {

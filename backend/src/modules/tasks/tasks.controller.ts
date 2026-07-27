@@ -29,8 +29,8 @@ export class TasksController {
   }
 
   @Patch("tasks/:id/status")
-  updateStatus(@Param("id") id: string, @Body("status") status: any) {
-    return this.tasksService.updateStatus(id, status);
+  updateStatus(@Req() req: any, @Param("id") id: string, @Body("status") status: any) {
+    return this.tasksService.updateStatus(id, status, req.user.userId);
   }
 
   @Patch("tasks/:id/budget-status")

@@ -7,6 +7,7 @@ import EditJobModal from "../components/EditJobModal";
 import JobTabs, { JobTab } from "../components/JobTabs";
 import JobTeamPanel from "../components/JobTeamPanel";
 import JobTasksPanel, { JobTasksPanelHandle } from "../components/JobTasksPanel";
+import TodayCompletedPanel from "../components/TodayCompletedPanel";
 import TaskEditModal from "../components/TaskEditModal";
 import Modal from "../components/Modal";
 import { colors } from "../theme/colors";
@@ -100,7 +101,12 @@ export default function JobDetail() {
 
   const handleMoveTask = (taskId: string, status: TaskStatus) => {
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
-    api.patch(`/tasks/${taskId}/status`, { status }).catch(() => reloadTasks());
+    api
+      .patch(`/tasks/${taskId}/status`, { status })
+      // Tamamlanma zamanı/kişisi sunucuda hesaplanıyor ("Bugün yapılanlar" için);
+      // gerçek değeri almak üzere görevleri yeniden çekiyoruz.
+      .then(() => reloadTasks())
+      .catch(() => reloadTasks());
   };
 
   const handleToggleComplete = (taskId: string) => {
@@ -230,6 +236,8 @@ export default function JobDetail() {
             <SummaryCard label="Aktif proje" value={activeProjects.length} />
             <SummaryCard label="Bekleyen görev" value={pendingTasksCount} />
           </div>
+
+          <TodayCompletedPanel tasks={tasks} projects={projects} />
 
           <JobTabs active={activeTab} onChange={setActiveTab} />
 

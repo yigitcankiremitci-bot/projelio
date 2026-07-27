@@ -90,12 +90,33 @@ export class ProjectsService {
     if (!ids?.length) return;
     const { data: rows, error } = await this.supabase.client.from("projects").select("id, owner_id, job_id").in("id", ids);
     if (error) throw error;
-    if (!rows || rows.length !== ids.length || rows.some((r: any) => r.owner_id !== userId)) {
+    if (!rows || rows.length !== ids.length) {
       throw new BadRequestException("Geçersiz sıralama isteği");
     }
     const distinctJobIds = new Set(rows.map((r: any) => r.job_id));
     if (distinctJobIds.size > 1) {
       throw new BadRequestException("Sıralanan projeler aynı işe ait olmalı");
+    }
+    // Proje sahibinin dışında, işe alınan iş ekibi üyeleri de (job_members) o işin
+    // proje kartlarını sıralayabilmeli — sadece asıl proje sahibiyle sınırlı kalmasın.
+    const ownsAll = rows.every((r: any) => r.owner_id === userId);
+    if (!ownsAll) {
+      const jobId = rows[0].job_id;
+      const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", jobId).maybeSingle();
+      const isJobOwner = job?.owner_id === userId;
+      let isJobMember = false;
+      if (!isJobOwner) {
+        const { data: member } = await this.supabase.client
+          .from("job_members")
+          .select("id")
+          .eq("job_id", jobId)
+          .eq("user_id", userId)
+          .maybeSingle();
+        isJobMember = !!member;
+      }
+      if (!isJobOwner && !isJobMember) {
+        throw new BadRequestException("Geçersiz sıralama isteği");
+      }
     }
     await applyOrder(this.supabase.client, "projects", ids);
   }

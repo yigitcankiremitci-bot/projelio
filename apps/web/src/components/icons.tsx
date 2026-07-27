@@ -204,3 +204,13 @@ export function IconMessageCircle({ size = 18, color = "currentColor" }: IconPro
     </svg>
   );
 }
+
+// "Üzerinde çalışıyorum" durumu için: nabız/canlı yayın tarzı ikon.
+export function IconActivity({ size = 18, color = "currentColor", filled = false }: IconProps & { filled?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      {filled && <circle cx="12" cy="12" r="10" fill={color} opacity={0.14} stroke="none" />}
+      <path d="M3 12h4l2.5-7L14 19l2.5-7H21" />
+    </svg>
+  );
+}

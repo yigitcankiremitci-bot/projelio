@@ -26,6 +26,7 @@ export default function ProjectDetail() {
   const [parentCompletePrompt, setParentCompletePrompt] = useState<Task | null>(null);
   const [activeTab, setActiveTab] = useState<ProjectTab>("tasks");
   const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+  const [activeTaskId, setActiveTaskId] = useState<string | undefined>(undefined);
   const [extendingDeadline, setExtendingDeadline] = useState(false);
   const c = colors.light;
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
@@ -103,10 +104,21 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     api
-      .get<{ id: string } | null>("/auth/me")
-      .then((me) => setCurrentUserId(me?.id))
+      .get<{ id: string; activeTaskId?: string } | null>("/auth/me")
+      .then((me) => {
+        setCurrentUserId(me?.id);
+        setActiveTaskId(me?.activeTaskId);
+      })
       .catch(() => setCurrentUserId(undefined));
   }, []);
+
+  const handleToggleActive = (taskId: string) => {
+    const turningOn = activeTaskId !== taskId;
+    setActiveTaskId(turningOn ? taskId : undefined);
+    api.patch(`/tasks/${taskId}/active-worker`, { active: turningOn }).catch(() => {
+      setActiveTaskId((prev) => (turningOn ? undefined : prev));
+    });
+  };
 
   const updateTask = (updated: Task) => {
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
@@ -313,6 +325,8 @@ export default function ProjectDetail() {
               onToggleComplete={handleToggleComplete}
               onEditTask={setEditingTask}
               onReorderTasks={handleReorderTasks}
+              activeTaskId={activeTaskId}
+              onToggleActive={handleToggleActive}
             />
           )}
           {activeTab === "budget" && (
@@ -336,6 +350,8 @@ export default function ProjectDetail() {
               onToggleComplete={handleToggleComplete}
               onEditTask={setEditingTask}
               nav={processNav}
+              activeTaskId={activeTaskId}
+              onToggleActive={handleToggleActive}
             />
           )}
         </div>

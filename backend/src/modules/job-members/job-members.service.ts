@@ -13,6 +13,7 @@ function mapJobMember(row: any): JobMember {
     fullName: row.users?.full_name ?? undefined,
     email: row.users?.email ?? undefined,
     username: row.users?.username ?? undefined,
+    activeTaskId: row.users?.active_task_id ?? undefined,
   };
 }
 
@@ -26,7 +27,7 @@ export class JobMembersService {
   async findByJob(jobId: string): Promise<JobMember[]> {
     const { data, error } = await this.supabase.client
       .from("job_members")
-      .select("*, users(full_name, email, username)")
+      .select("*, users(full_name, email, username, active_task_id)")
       .eq("job_id", jobId)
       .order("joined_at", { ascending: true });
     if (error) throw error;

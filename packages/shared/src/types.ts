@@ -9,6 +9,8 @@ export interface User {
   username: string;
   role: UserRole;
   createdAt: string;
+  // Kullanıcının o an "üzerinde çalışıyorum" diyerek işaretlediği görev (varsa).
+  activeTaskId?: string;
 }
 
 export interface Job {
@@ -71,6 +73,8 @@ export interface JobMember {
   fullName?: string;
   email?: string;
   username?: string;
+  // Bu kişinin o an "üzerinde çalışıyorum" diyerek işaretlediği görev (varsa).
+  activeTaskId?: string;
 }
 
 export interface Output {

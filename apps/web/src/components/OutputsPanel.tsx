@@ -27,6 +27,8 @@ interface Props {
   onToggleComplete: (taskId: string) => void;
   onEditTask: (task: Task) => void;
   onReorderTasks: (ids: string[]) => void;
+  activeTaskId?: string;
+  onToggleActive?: (taskId: string) => void;
 }
 
 const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel({
@@ -38,6 +40,8 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   onToggleComplete,
   onEditTask,
   onReorderTasks,
+  activeTaskId,
+  onToggleActive,
 }, ref) {
   const c = colors.light;
   const [outputs, setOutputs] = useState<Output[]>([]);
@@ -136,6 +140,8 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
               onEditTask={onEditTask}
               onReorderTasks={onReorderTasks}
               group={`tasks-${projectId}-${selectedOutput.id}`}
+              activeTaskId={activeTaskId}
+              onToggleActive={onToggleActive}
             />
           ))}
         </div>

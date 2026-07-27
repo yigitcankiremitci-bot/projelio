@@ -1,10 +1,11 @@
 import { colors } from "../theme/colors";
 
-export type JobTab = "projects" | "team";
+export type JobTab = "projects" | "team" | "tasks";
 
 const tabs: { key: JobTab; label: string }[] = [
   { key: "projects", label: "Projeler" },
-  { key: "team", label: "İş ekibi" },
+  { key: "team", label: "Ekip" },
+  { key: "tasks", label: "İşler" },
 ];
 
 interface Props {

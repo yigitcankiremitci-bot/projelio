@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type { Job, Project, Task } from "@projelio/shared";
+import type { Job, Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import ProjectCard from "../components/ProjectCard";
 import EditJobModal from "../components/EditJobModal";
 import JobTabs, { JobTab } from "../components/JobTabs";
 import JobTeamPanel from "../components/JobTeamPanel";
+import JobTasksPanel, { JobTasksPanelHandle } from "../components/JobTasksPanel";
+import TaskEditModal from "../components/TaskEditModal";
+import Modal from "../components/Modal";
 import { colors } from "../theme/colors";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { useSortableList } from "../lib/useSortableList";
+import { useProjectFabAction } from "../lib/projectFab";
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -19,7 +23,19 @@ export default function JobDetail() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editing, setEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<JobTab>("projects");
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [parentCompletePrompt, setParentCompletePrompt] = useState<Task | null>(null);
+  const [currentUserActiveTaskId, setCurrentUserActiveTaskId] = useState<string | undefined>(undefined);
   const gridRef = useRef<HTMLDivElement>(null);
+  const previousStatusRef = useRef<Record<string, TaskStatus>>({});
+  const tasksPanelRef = useRef<JobTasksPanelHandle>(null);
+
+  // "İşler" sekmesindeyken alt navigasyondaki "+" butonu doğrudan görev ekleme
+  // formunu açsın (diğer sekmelerde eski proje/görev seçim menüsü geçerli kalır).
+  useProjectFabAction(
+    activeTab === "tasks" ? { label: "Görev ekle", onClick: () => tasksPanelRef.current?.openCreate() } : null,
+    [activeTab]
+  );
 
   const reload = () => {
     if (!id) return;
@@ -43,8 +59,83 @@ export default function JobDetail() {
 
   useEffect(reloadTasks, [projects]);
 
+  useEffect(() => {
+    api
+      .get<{ id: string; activeTaskId?: string } | null>("/auth/me")
+      .then((me) => setCurrentUserActiveTaskId(me?.activeTaskId))
+      .catch(() => setCurrentUserActiveTaskId(undefined));
+  }, []);
+
+  const handleToggleActive = (taskId: string) => {
+    const turningOn = currentUserActiveTaskId !== taskId;
+    setCurrentUserActiveTaskId(turningOn ? taskId : undefined);
+    api.patch(`/tasks/${taskId}/active-worker`, { active: turningOn }).catch(() => {
+      setCurrentUserActiveTaskId((prev) => (turningOn ? undefined : prev));
+    });
+  };
+
   const updateTaskInState = (updated: Task) => {
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  };
+
+  const removeTaskFromState = (taskId: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== taskId && t.parentTaskId !== taskId));
+  };
+
+  const handleCreateSubtask = async (parentTaskId: string, title: string) => {
+    const parent = tasks.find((t) => t.id === parentTaskId);
+    if (!parent) return;
+    try {
+      const created = await api.post<Task>(`/projects/${parent.projectId}/tasks`, {
+        title,
+        status: parent.status,
+        deadline: parent.deadline,
+        parentTaskId,
+      });
+      setTasks((prev) => [...prev, created]);
+    } catch {
+      // alt görev oluşturulamadı, kullanıcı tekrar deneyebilir
+    }
+  };
+
+  const handleMoveTask = (taskId: string, status: TaskStatus) => {
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
+    api.patch(`/tasks/${taskId}/status`, { status }).catch(() => reloadTasks());
+  };
+
+  const handleToggleComplete = (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    if (task.status === "completed") {
+      const previous = previousStatusRef.current[taskId] ?? "todo";
+      delete previousStatusRef.current[taskId];
+      handleMoveTask(taskId, previous);
+
+      if (task.parentTaskId) {
+        const parent = tasks.find((p) => p.id === task.parentTaskId);
+        if (parent && parent.status === "completed") {
+          handleMoveTask(parent.id, "in_progress");
+        }
+      }
+    } else {
+      previousStatusRef.current[taskId] = task.status;
+      handleMoveTask(taskId, "completed");
+      tasks
+        .filter((t) => t.parentTaskId === taskId && t.status !== "completed")
+        .forEach((sub) => {
+          previousStatusRef.current[sub.id] = sub.status;
+          handleMoveTask(sub.id, "completed");
+        });
+
+      if (task.parentTaskId) {
+        const parent = tasks.find((p) => p.id === task.parentTaskId);
+        if (parent && parent.status !== "completed") {
+          const siblings = tasks.filter((t) => t.parentTaskId === parent.id);
+          const allDone = siblings.every((s) => s.id === taskId || s.status === "completed");
+          if (allDone) setParentCompletePrompt(parent);
+        }
+      }
+    }
   };
 
   useSortableList(
@@ -142,7 +233,7 @@ export default function JobDetail() {
 
           <JobTabs active={activeTab} onChange={setActiveTab} />
 
-          {activeTab === "projects" ? (
+          {activeTab === "projects" && (
             projects.length === 0 ? (
               <div
                 style={{
@@ -165,17 +256,33 @@ export default function JobDetail() {
                 ))}
               </div>
             )
-          ) : (
-            id && (
-              <JobTeamPanel
-                jobId={id}
-                tasks={tasks}
-                projects={projects}
-                ownerId={job?.ownerId}
-                onTaskUpdated={updateTaskInState}
-                onTasksReload={reloadTasks}
-              />
-            )
+          )}
+
+          {activeTab === "team" && (
+            <JobTeamPanel
+              jobId={id}
+              tasks={tasks}
+              projects={projects}
+              ownerId={job?.ownerId}
+              onTaskUpdated={updateTaskInState}
+              onTasksReload={reloadTasks}
+            />
+          )}
+
+          {activeTab === "tasks" && (
+            <JobTasksPanel
+              ref={tasksPanelRef}
+              jobId={id}
+              projects={projects}
+              tasks={tasks}
+              onCreateSubtask={handleCreateSubtask}
+              onMoveTask={handleMoveTask}
+              onToggleComplete={handleToggleComplete}
+              onEditTask={setEditingTask}
+              onTasksReload={reloadTasks}
+              activeTaskId={currentUserActiveTaskId}
+              onToggleActive={handleToggleActive}
+            />
           )}
         </div>
       </div>
@@ -187,6 +294,51 @@ export default function JobDetail() {
           onSaved={reload}
           onDeleted={() => navigate("/")}
           onArchived={() => navigate("/")}
+        />
+      )}
+
+      {parentCompletePrompt && (
+        <Modal title="Görevi tamamla" onClose={() => setParentCompletePrompt(null)}>
+          <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
+            <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{parentCompletePrompt.title}</strong> görevinin tüm alt
+            görevleri tamamlandı. Bu görevi de tamamlandı olarak işaretlemek ister misin?
+          </p>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button
+              onClick={() => setParentCompletePrompt(null)}
+              style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 16 }}
+            >
+              Hayır
+            </button>
+            <button
+              onClick={() => {
+                handleToggleComplete(parentCompletePrompt.id);
+                setParentCompletePrompt(null);
+              }}
+              style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 16, fontWeight: 500 }}
+            >
+              Evet, tamamla
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {editingTask && (
+        <TaskEditModal
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSaved={(updated) => {
+            updateTaskInState(updated);
+            setEditingTask(null);
+          }}
+          onDeleted={(deletedTaskId) => {
+            removeTaskFromState(deletedTaskId);
+            setEditingTask(null);
+          }}
+          onArchived={(archivedTaskId) => {
+            removeTaskFromState(archivedTaskId);
+            setEditingTask(null);
+          }}
         />
       )}
     </div>

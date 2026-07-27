@@ -27,9 +27,10 @@ export default function BottomNav() {
   const isActive = (to: string) => (to === "/" ? location.pathname === "/" : location.pathname.startsWith(to));
 
   // Sayfaya göre "+" butonunun ne oluşturacağını belirle: ana sayfada iş,
-  // bir işin içindeyken proje veya görev (küçük bir seçim menüsüyle). Bir
-  // projenin içindeyken ise o an aktif olan sekme (Çıktılar/Akış/Ekip/Bütçe/Süreç)
-  // ProjectFabContext üzerinden kendi eylemini kaydeder ve "+" butonu onu tetikler.
+  // bir işin içindeyken (o an aktif sekme kendi eylemini kaydetmediyse) proje veya
+  // görev seçimi. Bir işin ya da projenin içinde aktif olan sekme (İşler/Ekip/Çıktılar/
+  // Akış/Bütçe/Süreç) ProjectFabContext üzerinden kendi eylemini kaydedebilir; kayıtlıysa
+  // "+" butonu öncelikle onu tetikler.
   const jobMatch = location.pathname.match(/^\/jobs\/([^/]+)/);
   const projectMatch = location.pathname.match(/^\/projects\/([^/]+)/);
 
@@ -38,11 +39,11 @@ export default function BottomNav() {
 
   if (location.pathname === "/") {
     createAction = "job";
+  } else if ((jobMatch || projectMatch) && fabAction) {
+    createAction = "custom";
   } else if (jobMatch) {
     createAction = "job-choice";
     jobId = jobMatch[1];
-  } else if (projectMatch && fabAction) {
-    createAction = "custom";
   }
 
   const handleFabClick = () => {

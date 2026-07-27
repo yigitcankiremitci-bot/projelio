@@ -10,6 +10,7 @@ export interface UserRecord {
   username: string;
   passwordHash: string;
   role: "admin" | "freelancer";
+  activeTaskId?: string;
 }
 
 // Dışarıya (frontend'e) dönülen güvenli kullanıcı görünümü - şifre hash'i içermez.
@@ -19,6 +20,7 @@ export interface PublicUser {
   email: string;
   username: string;
   role: "admin" | "freelancer";
+  activeTaskId?: string;
 }
 
 const USERNAME_PATTERN = /^[a-z0-9_.]{3,30}$/;
@@ -31,6 +33,7 @@ function mapUser(row: any): UserRecord {
     username: row.username,
     passwordHash: row.password_hash,
     role: row.role,
+    activeTaskId: row.active_task_id ?? undefined,
   };
 }
 

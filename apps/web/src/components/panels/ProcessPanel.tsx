@@ -36,6 +36,8 @@ interface Props {
   onToggleComplete: (taskId: string) => void;
   onEditTask: (task: Task) => void;
   nav: ProcessNavState;
+  activeTaskId?: string;
+  onToggleActive?: (taskId: string) => void;
 }
 
 export const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -93,6 +95,8 @@ export default function ProcessPanel({
   onToggleComplete,
   onEditTask,
   nav,
+  activeTaskId,
+  onToggleActive,
 }: Props) {
   const c = colors.light;
   const {
@@ -636,6 +640,8 @@ export default function ProcessPanel({
                 onToggleComplete={onToggleComplete}
                 onEditTask={onEditTask}
                 group={`tasks-process-${project.id}`}
+                activeTaskId={activeTaskId}
+                onToggleActive={onToggleActive}
               />
             ))}
           </div>

@@ -233,6 +233,17 @@ export class TasksService {
     return task;
   }
 
+  // Kullanıcının "üzerinde çalışıyorum" durumunu ayarlar. Aktif edildiğinde önceki
+  // aktif görevinin yerine geçer (bir kullanıcının tek anda tek aktif görevi olabilir).
+  async setActiveWorker(userId: string, taskId: string, active: boolean): Promise<{ activeTaskId: string | null }> {
+    const { error } = await this.supabase.client
+      .from("users")
+      .update({ active_task_id: active ? taskId : null })
+      .eq("id", userId);
+    if (error) throw error;
+    return { activeTaskId: active ? taskId : null };
+  }
+
   async remove(id: string): Promise<void> {
     const { error } = await this.supabase.client.from("tasks").delete().eq("id", id);
     if (error) throw error;

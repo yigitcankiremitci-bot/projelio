@@ -43,6 +43,13 @@ export class TasksController {
     return this.tasksService.updateSchedule(id, body.startDate, body.deadline);
   }
 
+  // Kullanıcı "üzerinde çalışıyorum" diyerek o an aktif olarak bu görevde çalıştığını
+  // işaretler/kaldırır. Bir kullanıcının aynı anda yalnızca tek bir aktif görevi olabilir.
+  @Patch("tasks/:id/active-worker")
+  setActiveWorker(@Req() req: any, @Param("id") id: string, @Body("active") active: boolean) {
+    return this.tasksService.setActiveWorker(req.user.userId, id, active);
+  }
+
   @Delete("tasks/:id")
   remove(@Param("id") id: string) {
     return this.tasksService.remove(id);

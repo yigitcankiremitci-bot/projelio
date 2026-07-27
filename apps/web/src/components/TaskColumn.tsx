@@ -2,14 +2,16 @@ import { useRef, useState } from "react";
 import Sortable from "sortablejs";
 import type { Task, TaskStatus } from "@projelio/shared";
 import { colors } from "../theme/colors";
-import { IconPlus, IconChevronRight, IconCheck, IconEdit } from "./icons";
+import { IconPlus, IconChevronRight, IconCheck, IconEdit, IconActivity } from "./icons";
 import Modal from "./Modal";
 import { useSortableList } from "../lib/useSortableList";
 
 interface Props {
   status: TaskStatus;
   allTasks: Task[];
-  onCreate: (status: TaskStatus, title: string) => void;
+  // Verilmezse (ör. birden fazla projeyi birleştiren iş-geneli görünümde) sütunun altındaki
+  // hızlı "Görev ekle" satırı gizlenir, çünkü hangi projeye/çıktıya ekleneceği belli olmaz.
+  onCreate?: (status: TaskStatus, title: string) => void;
   onCreateSubtask: (parentId: string, title: string) => void;
   onMove: (taskId: string, status: TaskStatus) => void;
   onToggleComplete: (taskId: string) => void;
@@ -20,6 +22,12 @@ interface Props {
   // Sütunlar arası sürüklemenin çalışabilmesi için aynı görünümdeki tüm TaskColumn
   // örnekleri aynı group değerini paylaşmalı.
   group: string;
+  // Giriş yapmış kullanıcının "üzerinde çalışıyorum" diyerek işaretlediği görev (varsa).
+  activeTaskId?: string;
+  onToggleActive?: (taskId: string) => void;
+  // Verilirse (ör. birden fazla projeyi birleştiren iş-geneli görünümde) her görevin altında
+  // hangi proje/çıktıya ait olduğunu gösteren küçük bir alt yazı render edilir.
+  getTaskMeta?: (task: Task) => string | undefined;
 }
 
 const columnLabel: Record<TaskStatus, string> = {
@@ -38,6 +46,9 @@ export default function TaskColumn({
   onEditTask,
   onReorderTasks,
   group,
+  activeTaskId,
+  onToggleActive,
+  getTaskMeta,
 }: Props) {
   const c = colors.light;
   const [adding, setAdding] = useState(false);
@@ -166,7 +177,7 @@ export default function TaskColumn({
   const addingSubtaskRef = useRef(false);
 
   const commitAddTask = () => {
-    if (addingTaskRef.current) return;
+    if (addingTaskRef.current || !onCreate) return;
     const trimmed = title.trim();
     if (!trimmed) {
       setAdding(false);
@@ -299,6 +310,26 @@ export default function TaskColumn({
                     >
                       <IconEdit size={13} color={c.textSecondary} />
                     </button>
+                    {onToggleActive && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleActive(t.id);
+                        }}
+                        aria-label={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                        title={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                        style={{
+                          background: activeTaskId === t.id ? `${c.accent}22` : "transparent",
+                          border: "none",
+                          borderRadius: 6,
+                          padding: 3,
+                          display: "flex",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <IconActivity size={13} color={activeTaskId === t.id ? c.accentDark : c.textSecondary} filled={activeTaskId === t.id} />
+                      </button>
+                    )}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
                     <span
@@ -333,6 +364,11 @@ export default function TaskColumn({
                     )}
                   </div>
                 </div>
+                {getTaskMeta?.(t) && (
+                  <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 3, overflowWrap: "break-word", wordBreak: "break-word" }}>
+                    {getTaskMeta(t)}
+                  </div>
+                )}
                 {(() => {
                   const { total, remaining } = subtaskStats(t.id);
                   const progressPct = total > 0 ? Math.round(((total - remaining) / total) * 100) : 0;
@@ -411,17 +447,22 @@ export default function TaskColumn({
                           {sub.status === "completed" && <IconCheck size={8} color="#fff" />}
                         </button>
                         <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
-                          <span
-                            style={{
-                              fontSize: 15,
-                              color: sub.status === "completed" ? c.textSecondary : c.textPrimary,
-                              textDecoration: sub.status === "completed" ? "line-through" : "none",
-                              overflowWrap: "break-word",
-                              wordBreak: "break-word",
-                            }}
-                          >
-                            {sub.title}
-                          </span>
+                          <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+                            <span
+                              style={{
+                                fontSize: 15,
+                                color: sub.status === "completed" ? c.textSecondary : c.textPrimary,
+                                textDecoration: sub.status === "completed" ? "line-through" : "none",
+                                overflowWrap: "break-word",
+                                wordBreak: "break-word",
+                              }}
+                            >
+                              {sub.title}
+                            </span>
+                            {getTaskMeta?.(sub) && (
+                              <span style={{ fontSize: 11, color: c.textSecondary }}>{getTaskMeta(sub)}</span>
+                            )}
+                          </div>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -432,6 +473,26 @@ export default function TaskColumn({
                           >
                             <IconEdit size={11} color={c.textSecondary} />
                           </button>
+                          {onToggleActive && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleActive(sub.id);
+                              }}
+                              aria-label={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                              title={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                              style={{
+                                background: activeTaskId === sub.id ? `${c.accent}22` : "transparent",
+                                border: "none",
+                                borderRadius: 6,
+                                padding: 2,
+                                display: "flex",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <IconActivity size={11} color={activeTaskId === sub.id ? c.accentDark : c.textSecondary} filled={activeTaskId === sub.id} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -571,45 +632,46 @@ export default function TaskColumn({
         </div>
       ))}
 
-      {adding ? (
-        <form onSubmit={handleAdd} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <input
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                setAdding(false);
-                setTitle("");
-              }
+      {onCreate &&
+        (adding ? (
+          <form onSubmit={handleAdd} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setAdding(false);
+                  setTitle("");
+                }
+              }}
+              onBlur={commitAddTask}
+              placeholder="Görev başlığı yaz, Enter'a bas"
+              maxLength={200}
+              enterKeyHint="done"
+              style={{ width: "100%", height: 34, fontSize: 16 }}
+            />
+          </form>
+        ) : (
+          <button
+            onClick={() => setAdding(true)}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "none",
+              background: "transparent",
+              color: c.textSecondary,
+              fontSize: 15,
             }}
-            onBlur={commitAddTask}
-            placeholder="Görev başlığı yaz, Enter'a bas"
-            maxLength={200}
-            enterKeyHint="done"
-            style={{ width: "100%", height: 34, fontSize: 16 }}
-          />
-        </form>
-      ) : (
-        <button
-          onClick={() => setAdding(true)}
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "8px 10px",
-            borderRadius: 8,
-            border: "none",
-            background: "transparent",
-            color: c.textSecondary,
-            fontSize: 15,
-          }}
-        >
-          <IconPlus size={14} color={c.textSecondary} />
-          Görev ekle
-        </button>
-      )}
+          >
+            <IconPlus size={14} color={c.textSecondary} />
+            Görev ekle
+          </button>
+        ))}
 
       {confirmTarget && (
         <Modal title="Görevi tamamla" onClose={() => setConfirmTarget(null)}>

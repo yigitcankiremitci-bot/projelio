@@ -110,6 +110,8 @@ export interface Task {
   completedAt?: string;
   completedBy?: string;
   completedByName?: string;
+  // Görevin bağlı olduğu projenin başlığı (arşivlenmiş projeler dahil, sunucu tarafında eklenir).
+  projectTitle?: string;
 }
 
 export interface TaskComment {

@@ -1,10 +1,9 @@
-import type { Project, Task } from "@projelio/shared";
+import type { Task } from "@projelio/shared";
 import { colors } from "../theme/colors";
 import { IconCheck } from "./icons";
 
 interface Props {
   tasks: Task[];
-  projects: Project[];
 }
 
 function isToday(iso?: string): boolean {
@@ -15,10 +14,9 @@ function isToday(iso?: string): boolean {
 }
 
 // İşin bugünkü aktivite özeti: tüm ekibin bugün tamamladığı görev/alt görevler,
-// kim tarafından bitirildiği ve saatiyle birlikte listelenir.
-export default function TodayCompletedPanel({ tasks, projects }: Props) {
+// hangi projeye ait olduğu, kim tarafından bitirildiği ve saatiyle birlikte listelenir.
+export default function TodayCompletedPanel({ tasks }: Props) {
   const c = colors.light;
-  const projectTitle = (projectId: string) => projects.find((p) => p.id === projectId)?.title;
 
   const completedToday = tasks
     .filter((t) => t.status === "completed" && isToday(t.completedAt))
@@ -96,8 +94,21 @@ export default function TodayCompletedPanel({ tasks, projects }: Props) {
                   {t.parentTaskId ? "↳ " : ""}
                   {t.title}
                 </div>
-                {projectTitle(t.projectId) && (
-                  <div style={{ fontSize: 12, color: c.textSecondary }}>{projectTitle(t.projectId)}</div>
+                {t.projectTitle && (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      fontSize: 12,
+                      color: c.textSecondary,
+                      background: c.surface,
+                      border: `1px solid ${c.border}`,
+                      borderRadius: 20,
+                      padding: "1px 8px",
+                      marginTop: 3,
+                    }}
+                  >
+                    {t.projectTitle}
+                  </span>
                 )}
               </div>
               <span style={{ fontSize: 13, color: c.accentDark, fontWeight: 500, flexShrink: 0, whiteSpace: "nowrap" }}>

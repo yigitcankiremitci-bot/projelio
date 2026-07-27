@@ -24,6 +24,7 @@ function mapTask(row: any): Task {
     completedAt: row.completed_at ?? undefined,
     completedBy: row.completed_by ?? undefined,
     completedByName: row.completed_by_user?.full_name ?? undefined,
+    projectTitle: row.projects?.title ?? undefined,
   };
 }
 
@@ -39,7 +40,7 @@ export class TasksService {
   async findByProject(projectId: string, requestingUserId?: string): Promise<Task[]> {
     const { data, error } = await this.supabase.client
       .from("tasks")
-      .select("*, completed_by_user:users!tasks_completed_by_fkey(full_name)")
+      .select("*, completed_by_user:users!tasks_completed_by_fkey(full_name), projects(title)")
       .eq("project_id", projectId)
       .is("archived_at", null)
       .order("sort_order", { ascending: true })
@@ -201,7 +202,7 @@ export class TasksService {
       .from("tasks")
       .update(patch)
       .eq("id", id)
-      .select("*, completed_by_user:users!tasks_completed_by_fkey(full_name)")
+      .select("*, completed_by_user:users!tasks_completed_by_fkey(full_name), projects(title)")
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Görev bulunamadı");

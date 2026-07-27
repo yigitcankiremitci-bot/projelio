@@ -239,7 +239,7 @@ export default function JobDetail() {
             <SummaryCard label="Tamamlanmış görev" value={completedTasksCount} />
           </div>
 
-          <TodayCompletedPanel tasks={tasks} projects={projects} />
+          <TodayCompletedPanel tasks={tasks} />
 
           <JobTabs active={activeTab} onChange={setActiveTab} />
 

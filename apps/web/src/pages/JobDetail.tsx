@@ -274,7 +274,6 @@ export default function JobDetail() {
               tasks={tasks}
               projects={projects}
               ownerId={job?.ownerId}
-              onTaskUpdated={updateTaskInState}
               onTasksReload={reloadTasks}
             />
           )}

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Sortable from "sortablejs";
 import type { Task, TaskStatus } from "@projelio/shared";
 import { colors } from "../theme/colors";
@@ -28,6 +28,10 @@ interface Props {
   // Verilirse (ör. birden fazla projeyi birleştiren iş-geneli görünümde) her görevin altında
   // hangi proje/çıktıya ait olduğunu gösteren küçük bir alt yazı render edilir.
   getTaskMeta?: (task: Task) => string | undefined;
+  // Verilirse (ör. iş ekibi sekmesinden bir göreve tıklanıp buraya yönlendirildiğinde),
+  // eşleşen görev/alt görev otomatik görünüre kaydırılır ve kısa süreliğine parlayarak
+  // fark edilir hale getirilir.
+  highlightTaskId?: string;
 }
 
 const columnLabel: Record<TaskStatus, string> = {
@@ -49,6 +53,7 @@ export default function TaskColumn({
   activeTaskId,
   onToggleActive,
   getTaskMeta,
+  highlightTaskId,
 }: Props) {
   const c = colors.light;
   const [adding, setAdding] = useState(false);
@@ -58,6 +63,24 @@ export default function TaskColumn({
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(null);
   const topListRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Hedef görev bir alt görevse, önce ait olduğu üst görevin açılır listesini genişlet
+  // ki DOM'da render olsun ve kaydırma/parlama animasyonu ona ulaşabilsin.
+  useEffect(() => {
+    if (!highlightTaskId) return;
+    const target = allTasks.find((t) => t.id === highlightTaskId);
+    if (target?.parentTaskId) {
+      setExpanded((prev) => (prev.has(target.parentTaskId!) ? prev : new Set(prev).add(target.parentTaskId!)));
+    }
+  }, [highlightTaskId, allTasks]);
+
+  // Hedef görev DOM'da render olduğunda (gerekirse üst görev açıldıktan sonra) görünüre kaydır.
+  useEffect(() => {
+    if (!highlightTaskId) return;
+    const el = rootRef.current?.querySelector(`[data-id="${highlightTaskId}"]`) as HTMLElement | null;
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightTaskId, expanded]);
   const subtaskSortables = useRef<Map<string, Sortable>>(new Map());
 
   const isCompletedColumn = status === "completed";
@@ -232,6 +255,7 @@ export default function TaskColumn({
 
   return (
     <div
+      ref={rootRef}
       style={{
         width: "100%",
         background: c.background,
@@ -257,7 +281,7 @@ export default function TaskColumn({
           return (
             <div key={t.id} data-id={t.id} style={{ marginBottom: 8 }}>
               <div
-                className="task-drag-handle"
+                className={`task-drag-handle${highlightTaskId === t.id ? " task-highlight-flash" : ""}`}
                 onClick={() => toggleExpand(t.id)}
                 style={{
                   background: c.surface,
@@ -415,6 +439,7 @@ export default function TaskColumn({
                       <div
                         key={sub.id}
                         data-id={sub.id}
+                        className={highlightTaskId === sub.id ? "task-highlight-flash" : undefined}
                         style={{
                           display: "flex",
                           alignItems: "center",

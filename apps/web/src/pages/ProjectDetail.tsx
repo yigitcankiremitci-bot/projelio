@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import type { Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import StatusBadge from "../components/StatusBadge";
@@ -19,6 +19,7 @@ import { useProjectFabAction } from "../lib/projectFab";
 
 export default function ProjectDetail() {
   const { id } = useParams();
+  const location = useLocation();
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editing, setEditing] = useState(false);
@@ -28,6 +29,7 @@ export default function ProjectDetail() {
   const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
   const [activeTaskId, setActiveTaskId] = useState<string | undefined>(undefined);
   const [extendingDeadline, setExtendingDeadline] = useState(false);
+  const [highlightTaskId, setHighlightTaskId] = useState<string | undefined>(undefined);
   const c = colors.light;
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
   const outputsRef = useRef<OutputsPanelHandle>(null);
@@ -111,6 +113,17 @@ export default function ProjectDetail() {
       })
       .catch(() => setCurrentUserId(undefined));
   }, []);
+
+  // İş ekibi sekmesinden bir göreve tıklanıp buraya yönlendirildiğinde, "Çıktılar"
+  // sekmesine geçip ilgili görevi vurgulamak için location.state üzerinden gelen
+  // hedefi okuyoruz. location.key her navigasyonda değiştiği için aynı göreve
+  // tekrar tıklanırsa da yeniden tetiklenir.
+  useEffect(() => {
+    const targetId = (location.state as { highlightTaskId?: string } | null)?.highlightTaskId;
+    if (!targetId) return;
+    setActiveTab("tasks");
+    setHighlightTaskId(targetId);
+  }, [location.key]);
 
   const handleToggleActive = (taskId: string) => {
     const turningOn = activeTaskId !== taskId;
@@ -327,6 +340,7 @@ export default function ProjectDetail() {
               onReorderTasks={handleReorderTasks}
               activeTaskId={activeTaskId}
               onToggleActive={handleToggleActive}
+              highlightTaskId={highlightTaskId}
             />
           )}
           {activeTab === "budget" && (

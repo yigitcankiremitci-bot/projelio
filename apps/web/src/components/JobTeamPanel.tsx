@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import type { JobMember, Project, Task } from "@projelio/shared";
 import { api, API_URL } from "../api/client";
@@ -12,18 +13,17 @@ interface Props {
   tasks: Task[];
   projects: Project[];
   ownerId?: string;
-  onTaskUpdated: (task: Task) => void;
   onTasksReload: () => void;
 }
 
-export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTaskUpdated, onTasksReload }: Props) {
+export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTasksReload }: Props) {
   const c = colors.light;
+  const navigate = useNavigate();
   const [members, setMembers] = useState<JobMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [hiring, setHiring] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [assigningTo, setAssigningTo] = useState<JobMember | null>(null);
-  const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -58,19 +58,10 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTaskUp
 
   const projectTitle = (projectId: string) => projects.find((p) => p.id === projectId)?.title ?? "";
 
-  const toggleAssignment = async (member: JobMember, task: Task) => {
-    const assigning = task.assignedTo !== member.userId;
-    setBusyTaskId(task.id);
-    try {
-      const updated = await api.patch<Task>(`/tasks/${task.id}`, {
-        assignedTo: assigning ? member.userId : null,
-      });
-      onTaskUpdated(updated);
-    } catch {
-      // görev güncellenemedi
-    } finally {
-      setBusyTaskId(null);
-    }
+  // Göreve tıklanınca ilgili projenin "Çıktılar" sekmesine gidip doğru çıktıyı açıyor
+  // ve görevi kısa süreliğine parlatarak fark edilir hale getiriyoruz.
+  const goToTask = (task: Task) => {
+    navigate(`/projects/${task.projectId}`, { state: { highlightTaskId: task.id } });
   };
 
   return (
@@ -108,11 +99,9 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTaskUp
             const isOpen = expandedId === m.id;
             const activeTask = m.activeTaskId ? tasks.find((t) => t.id === m.activeTaskId) : undefined;
 
-            const memberTasks = [...tasks].sort((a, b) => {
-              const aMine = a.assignedTo === m.userId ? 0 : 1;
-              const bMine = b.assignedTo === m.userId ? 0 : 1;
-              return aMine - bMine;
-            });
+            const memberTasks = tasks
+              .filter((t) => t.assignedTo === m.userId)
+              .sort((a, b) => (a.status === "completed" ? 1 : 0) - (b.status === "completed" ? 1 : 0));
 
             return (
               <div key={m.id} style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, overflow: "hidden" }}>
@@ -217,62 +206,66 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTaskUp
                 >
                   <div style={{ borderTop: `1px solid ${c.border}`, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
                     <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>
-                      Bu kişiye atamak istediğin görevleri işaretle.
+                      Bu kişiye atanmış görevler. Birine dokunarak ilgili proje ve çıktıya gidebilirsin.
                     </p>
                     {memberTasks.length === 0 ? (
-                      <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>Bu işte henüz görev yok.</p>
+                      <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>Henüz atanmış görevi yok.</p>
                     ) : (
-                      memberTasks.map((t) => {
-                        const mine = t.assignedTo === m.userId;
-                        const takenByOther = !!t.assignedTo && !mine;
-                        return (
-                          <button
-                            key={t.id}
-                            onClick={() => toggleAssignment(m, t)}
-                            disabled={busyTaskId === t.id}
+                      memberTasks.map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => goToTask(t)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "8px 10px",
+                            borderRadius: 8,
+                            border: `1px solid ${c.border}`,
+                            background: t.status === "completed" ? c.background : "transparent",
+                            textAlign: "left",
+                            opacity: t.parentTaskId ? 0.85 : 1,
+                          }}
+                        >
+                          <span
                             style={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "50%",
+                              flexShrink: 0,
+                              border: t.status === "completed" ? "none" : `1.5px solid ${c.border}`,
+                              background: t.status === "completed" ? c.success : "transparent",
                               display: "flex",
                               alignItems: "center",
-                              gap: 8,
-                              padding: "8px 10px",
-                              borderRadius: 8,
-                              border: `1px solid ${c.border}`,
-                              background: mine ? c.background : "transparent",
-                              textAlign: "left",
-                              opacity: t.parentTaskId ? 0.85 : 1,
+                              justifyContent: "center",
                             }}
                           >
-                            <span
+                            {t.status === "completed" && <IconCheck size={10} color="#fff" />}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
                               style={{
-                                width: 16,
-                                height: 16,
-                                borderRadius: 4,
-                                flexShrink: 0,
-                                border: mine ? "none" : `1.5px solid ${c.border}`,
-                                background: mine ? c.accent : "transparent",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
+                                fontSize: 15,
+                                color: c.textPrimary,
+                                textDecoration: t.status === "completed" ? "line-through" : "none",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
                               }}
                             >
-                              {mine && <IconCheck size={10} color="#fff" />}
-                            </span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 15, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {t.parentTaskId ? "↳ " : ""}
-                                {t.title}
-                              </div>
-                              <div style={{ fontSize: 12, color: c.textSecondary }}>{projectTitle(t.projectId)}</div>
+                              {t.parentTaskId ? "↳ " : ""}
+                              {t.title}
                             </div>
-                            {t.id === m.activeTaskId && (
-                              <span className="active-task-pulse" style={{ display: "inline-flex", borderRadius: "50%", flexShrink: 0 }}>
-                                <IconActivity size={12} color={c.accentDark} filled />
-                              </span>
-                            )}
-                            {takenByOther && <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>atanmış</span>}
-                          </button>
-                        );
-                      })
+                            <div style={{ fontSize: 12, color: c.textSecondary }}>{projectTitle(t.projectId)}</div>
+                          </div>
+                          {t.id === m.activeTaskId && (
+                            <span className="active-task-pulse" style={{ display: "inline-flex", borderRadius: "50%", flexShrink: 0 }}>
+                              <IconActivity size={12} color={c.accentDark} filled />
+                            </span>
+                          )}
+                          <IconChevronRight size={13} color={c.textSecondary} />
+                        </button>
+                      ))
                     )}
                   </div>
                 </div>

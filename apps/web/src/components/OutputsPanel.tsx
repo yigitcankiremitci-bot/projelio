@@ -29,6 +29,9 @@ interface Props {
   onReorderTasks: (ids: string[]) => void;
   activeTaskId?: string;
   onToggleActive?: (taskId: string) => void;
+  // Verilirse (ör. iş ekibi sekmesinden yönlendirildiğinde), bu görevin ait olduğu
+  // çıktı otomatik açılır ve görev kısa süreliğine parlayarak fark edilir hale gelir.
+  highlightTaskId?: string;
 }
 
 const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel({
@@ -42,6 +45,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   onReorderTasks,
   activeTaskId,
   onToggleActive,
+  highlightTaskId,
 }, ref) {
   const c = colors.light;
   const [outputs, setOutputs] = useState<Output[]>([]);
@@ -69,6 +73,20 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   };
 
   useEffect(reload, [projectId]);
+
+  // İş ekibi sekmesinden bir göreve tıklanıp buraya yönlendirildiğinde, o görevin
+  // ait olduğu çıktıyı otomatik açıyoruz (alt görevse üst görevin çıktısına bakılır).
+  useEffect(() => {
+    if (!highlightTaskId || outputs.length === 0) return;
+    const target = tasks.find((t) => t.id === highlightTaskId);
+    if (!target) return;
+    let outputId = target.outputId;
+    if (!outputId && target.parentTaskId) {
+      const parent = tasks.find((t) => t.id === target.parentTaskId);
+      outputId = parent?.outputId;
+    }
+    if (outputId) setSelectedOutputId(outputId);
+  }, [highlightTaskId, tasks, outputs]);
 
   useSortableList(
     listRef,
@@ -142,6 +160,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
               group={`tasks-${projectId}-${selectedOutput.id}`}
               activeTaskId={activeTaskId}
               onToggleActive={onToggleActive}
+              highlightTaskId={highlightTaskId}
             />
           ))}
         </div>

@@ -44,25 +44,25 @@ export class ProjectsController {
   }
 
   @Patch(":id")
-  update(@Param("id") id: string, @Body() body: any) {
-    return this.projectsService.update(id, body);
+  update(@Param("id") id: string, @Body() body: any, @Req() req: any) {
+    return this.projectsService.update(id, body, req.user.userId);
   }
 
   @Post(":id/cover")
   @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }))
-  uploadCover(@Param("id") id: string, @UploadedFile() file?: Express.Multer.File) {
+  uploadCover(@Param("id") id: string, @Req() req: any, @UploadedFile() file?: Express.Multer.File) {
     if (!file) throw new BadRequestException("Dosya bulunamadı");
-    return this.projectsService.uploadCover(id, file);
+    return this.projectsService.uploadCover(id, file, req.user.userId);
   }
 
   @Delete(":id")
-  remove(@Param("id") id: string) {
-    return this.projectsService.remove(id);
+  remove(@Param("id") id: string, @Req() req: any) {
+    return this.projectsService.remove(id, req.user.userId);
   }
 
   @Patch(":id/archive")
-  archive(@Param("id") id: string) {
-    return this.projectsService.archive(id);
+  archive(@Param("id") id: string, @Req() req: any) {
+    return this.projectsService.archive(id, req.user.userId);
   }
 
   @Patch(":id/restore")

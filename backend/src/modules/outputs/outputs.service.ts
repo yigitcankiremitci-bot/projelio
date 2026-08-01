@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Output } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { applyOrder } from "../../common/reorder.util";
 
 function mapOutput(row: any): Output {
@@ -17,7 +18,10 @@ function mapOutput(row: any): Output {
 
 @Injectable()
 export class OutputsService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private notificationsService: NotificationsService
+  ) {}
 
   async findByProject(projectId: string): Promise<Output[]> {
     const { data, error } = await this.supabase.client
@@ -44,7 +48,7 @@ export class OutputsService {
     await applyOrder(this.supabase.client, "outputs", ids);
   }
 
-  async create(projectId: string, data: Partial<Output>): Promise<Output> {
+  async create(projectId: string, data: Partial<Output>, createdBy?: string): Promise<Output> {
     const { data: row, error } = await this.supabase.client
       .from("outputs")
       .insert({
@@ -55,7 +59,40 @@ export class OutputsService {
       .select()
       .single();
     if (error) throw error;
-    return mapOutput(row);
+    const output = mapOutput(row);
+    // Yeni çıktı eklendiğinde proje ekibine (ekleyen hariç) push/bildirim gitsin.
+    void this.notifyTeamNewOutput(output, createdBy);
+    return output;
+  }
+
+  private async notifyTeamNewOutput(output: Output, createdBy?: string): Promise<void> {
+    try {
+      const [{ data: project }, { data: members }] = await Promise.all([
+        this.supabase.client.from("projects").select("owner_id").eq("id", output.projectId).maybeSingle(),
+        this.supabase.client
+          .from("project_members")
+          .select("user_id")
+          .eq("project_id", output.projectId)
+          .eq("status", "approved"),
+      ]);
+      const recipients = new Set<string>();
+      if (project?.owner_id) recipients.add(project.owner_id);
+      for (const m of members ?? []) recipients.add(m.user_id);
+      if (createdBy) recipients.delete(createdBy);
+      await Promise.all(
+        [...recipients].map((userId) =>
+          this.notificationsService.notifyUser(
+            userId,
+            "task_updated",
+            "Yeni Çıktı",
+            `"${output.title}" çıktısı eklendi.`,
+            `/projects/${output.projectId}`
+          )
+        )
+      );
+    } catch {
+      // bildirim gönderilemese de çıktı oluşturma başarılı sayılır
+    }
   }
 
   async update(id: string, data: Partial<Output>): Promise<Output> {

@@ -33,7 +33,31 @@ export class MembersService {
       .select("*, users(full_name, email, username)")
       .eq("project_id", projectId);
     if (error) throw error;
-    return (data ?? []).map(mapMember);
+    const members = (data ?? []).map(mapMember);
+
+    // Proje yöneticisi (sahibi) ekip sekmesinde her zaman görünsün: project_members
+    // kaydı yoksa sanal bir "owner" satırı olarak listenin başına eklenir.
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("owner_id, created_at, users:users!projects_owner_id_fkey(full_name, email, username)")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (project?.owner_id && !members.some((m) => m.userId === project.owner_id)) {
+      const ownerUser = (project as any).users;
+      members.unshift({
+        id: `owner-${project.owner_id}`,
+        projectId,
+        userId: project.owner_id,
+        role: "owner",
+        status: "approved",
+        canViewBudget: true,
+        joinedAt: (project as any).created_at,
+        fullName: ownerUser?.full_name ?? undefined,
+        email: ownerUser?.email ?? undefined,
+        username: ownerUser?.username ?? undefined,
+      } as ProjectMember);
+    }
+    return members;
   }
 
   // Proje yöneticisi tarafından davet gönderilir (e-posta veya bağlantı ile)

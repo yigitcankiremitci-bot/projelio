@@ -10,7 +10,9 @@ function mapTask(row: any): Task {
     projectId: row.project_id,
     outputId: row.output_id ?? undefined,
     assignedTo: row.assigned_to ?? undefined,
+    assignedToName: row.assigned_user?.full_name ?? undefined,
     title: row.title,
+    description: row.description ?? undefined,
     startDate: row.start_date ?? undefined,
     deadline: row.deadline,
     status: row.status,
@@ -40,7 +42,9 @@ export class TasksService {
   async findByProject(projectId: string, requestingUserId?: string): Promise<Task[]> {
     const { data, error } = await this.supabase.client
       .from("tasks")
-      .select("*, completed_by_user:users!tasks_completed_by_fkey(full_name), projects(title)")
+      .select(
+        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), projects(title)"
+      )
       .eq("project_id", projectId)
       .is("archived_at", null)
       .order("sort_order", { ascending: true })
@@ -96,14 +100,39 @@ export class TasksService {
     return new Set([...assignedIds, ...parentIds]);
   }
 
-  async create(projectId: string, data: Partial<Task>): Promise<Task> {
+  // Bildirimlerde "atayan" kişinin adı da görünsün diye kullanıcı adını çeker.
+  private async getUserName(userId?: string): Promise<string | null> {
+    if (!userId) return null;
+    const { data } = await this.supabase.client.from("users").select("full_name").eq("id", userId).maybeSingle();
+    return data?.full_name ?? null;
+  }
+
+  async create(projectId: string, data: Partial<Task>, requestingUserId?: string): Promise<Task> {
+    // Yeni görev/alt görev her zaman kendi listesinin EN ALTINA eklensin:
+    // kardeşleri arasındaki en büyük sort_order'ın bir fazlasını alır. (Önceden
+    // varsayılan 0 aldığı için son eklenen alt görev rastgele bir yere gidiyordu.)
+    let nextSortOrder = 0;
+    {
+      let query = this.supabase.client
+        .from("tasks")
+        .select("sort_order")
+        .eq("project_id", projectId)
+        .order("sort_order", { ascending: false })
+        .limit(1);
+      query = data.parentTaskId ? query.eq("parent_task_id", data.parentTaskId) : query.is("parent_task_id", null);
+      const { data: maxRows } = await query;
+      nextSortOrder = ((maxRows?.[0]?.sort_order as number | undefined) ?? -1) + 1;
+    }
+
     const { data: row, error } = await this.supabase.client
       .from("tasks")
       .insert({
+        sort_order: nextSortOrder,
         project_id: projectId,
         output_id: data.outputId ?? null,
         assigned_to: data.assignedTo ?? null,
         title: data.title ?? "",
+        description: data.description ?? null,
         start_date: data.startDate ?? null,
         deadline: data.deadline ?? new Date().toISOString(),
         status: data.status ?? "todo",
@@ -115,24 +144,61 @@ export class TasksService {
       .single();
     if (error) throw error;
     const task = mapTask(row);
-    if (task.assignedTo) {
-      void this.notificationsService.notifyUser(
-        task.assignedTo,
-        "task_assigned",
-        "Yeni Görev Atandı",
-        `"${task.title}" görevine atandınız.`,
-        `/projects/${task.projectId}`
+    if (task.assignedTo && task.assignedTo !== requestingUserId) {
+      void this.getUserName(requestingUserId).then((assigner) =>
+        this.notificationsService.notifyUser(
+          task.assignedTo!,
+          "task_assigned",
+          "Yeni Görev Atandı",
+          assigner
+            ? `${assigner}, sizi "${task.title}" görevine atadı.`
+            : `"${task.title}" görevine atandınız.`,
+          `/projects/${task.projectId}`
+        )
       );
+    }
+    // Yeni görev eklendiğinde (alt görevler hariç) proje ekibine push/bildirim gitsin.
+    if (!task.parentTaskId) {
+      void this.notifyTeamNewTask(task, requestingUserId);
     }
     return task;
   }
 
-  async update(id: string, data: Partial<Task>): Promise<Task> {
+  // Proje sahibi + onaylı üyelere (ekleyen ve zaten ayrıca bilgilendirilen atanan hariç)
+  // "yeni görev eklendi" bildirimi gönderir.
+  private async notifyTeamNewTask(task: Task, createdBy?: string): Promise<void> {
+    try {
+      const [{ data: project }, { data: members }, creatorName] = await Promise.all([
+        this.supabase.client.from("projects").select("owner_id").eq("id", task.projectId).maybeSingle(),
+        this.supabase.client.from("project_members").select("user_id").eq("project_id", task.projectId).eq("status", "approved"),
+        this.getUserName(createdBy),
+      ]);
+      const recipients = new Set<string>();
+      if (project?.owner_id) recipients.add(project.owner_id);
+      for (const m of members ?? []) recipients.add(m.user_id);
+      if (createdBy) recipients.delete(createdBy);
+      if (task.assignedTo) recipients.delete(task.assignedTo);
+
+      const body = creatorName
+        ? `${creatorName}, "${task.title}" görevini ekledi.`
+        : `"${task.title}" görevi eklendi.`;
+      await Promise.all(
+        [...recipients].map((userId) =>
+          this.notificationsService.notifyUser(userId, "task_updated", "Yeni Görev", body, `/projects/${task.projectId}`)
+        )
+      );
+    } catch {
+      // bildirim gönderilemese de görev oluşturma başarılı sayılır
+    }
+  }
+
+  async update(id: string, data: Partial<Task>, requestingUserId?: string): Promise<Task> {
     const { data: existingRow } = await this.supabase.client.from("tasks").select().eq("id", id).maybeSingle();
     const previous = existingRow ? mapTask(existingRow) : null;
 
     const patch: Record<string, unknown> = {};
     if (data.title !== undefined) patch.title = data.title;
+    if (data.description !== undefined) patch.description = data.description || null;
     if (data.startDate !== undefined) patch.start_date = data.startDate || null;
     if (data.deadline !== undefined) patch.deadline = data.deadline;
     if (data.assignedTo !== undefined) patch.assigned_to = data.assignedTo || null;
@@ -147,19 +213,25 @@ export class TasksService {
       .from("tasks")
       .update(patch)
       .eq("id", id)
-      .select()
+      .select(
+        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), projects(title)"
+      )
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Görev bulunamadı");
     const task = mapTask(row);
 
-    if (task.assignedTo && task.assignedTo !== previous?.assignedTo) {
-      void this.notificationsService.notifyUser(
-        task.assignedTo,
-        "task_assigned",
-        "Yeni Görev Atandı",
-        `"${task.title}" görevine atandınız.`,
-        `/projects/${task.projectId}`
+    if (task.assignedTo && task.assignedTo !== previous?.assignedTo && task.assignedTo !== requestingUserId) {
+      void this.getUserName(requestingUserId).then((assigner) =>
+        this.notificationsService.notifyUser(
+          task.assignedTo!,
+          "task_assigned",
+          "Yeni Görev Atandı",
+          assigner
+            ? `${assigner}, sizi "${task.title}" görevine atadı.`
+            : `"${task.title}" görevine atandınız.`,
+          `/projects/${task.projectId}`
+        )
       );
     } else if (
       task.assignedTo &&
@@ -202,12 +274,19 @@ export class TasksService {
       .from("tasks")
       .update(patch)
       .eq("id", id)
-      .select("*, completed_by_user:users!tasks_completed_by_fkey(full_name), projects(title)")
+      .select(
+        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), projects(title)"
+      )
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Görev bulunamadı");
     const task = mapTask(row);
-    if (task.assignedTo) {
+
+    if (status === "completed") {
+      // Tamamlanan görev tüm proje ekibine (tamamlayan hariç) bildirilsin;
+      // akışta da tamamlama saatiyle görünecek (frontend FeedPanel bunu gösteriyor).
+      void this.notifyTeamTaskCompleted(task, requestingUserId);
+    } else if (task.assignedTo && task.assignedTo !== requestingUserId) {
       void this.notificationsService.notifyUser(
         task.assignedTo,
         "task_updated",
@@ -217,6 +296,33 @@ export class TasksService {
       );
     }
     return task;
+  }
+
+  // Proje sahibi + onaylı üyelerden oluşan ekibe, görevi tamamlayan kişinin
+  // adıyla birlikte "görev tamamlandı" bildirimi gönderir.
+  private async notifyTeamTaskCompleted(task: Task, completedBy?: string): Promise<void> {
+    try {
+      const [{ data: project }, { data: members }, completerName] = await Promise.all([
+        this.supabase.client.from("projects").select("owner_id").eq("id", task.projectId).maybeSingle(),
+        this.supabase.client.from("project_members").select("user_id").eq("project_id", task.projectId),
+        this.getUserName(completedBy),
+      ]);
+      const recipients = new Set<string>();
+      if (project?.owner_id) recipients.add(project.owner_id);
+      for (const m of members ?? []) recipients.add(m.user_id);
+      if (completedBy) recipients.delete(completedBy);
+
+      const body = completerName
+        ? `${completerName}, "${task.title}" görevini tamamladı.`
+        : `"${task.title}" görevi tamamlandı.`;
+      await Promise.all(
+        [...recipients].map((userId) =>
+          this.notificationsService.notifyUser(userId, "task_updated", "Görev Tamamlandı", body, `/projects/${task.projectId}`)
+        )
+      );
+    } catch {
+      // bildirim gönderilemese de görev güncellemesi başarılı sayılır
+    }
   }
 
   async updateSchedule(id: string, startDate?: string, deadline?: string): Promise<Task> {

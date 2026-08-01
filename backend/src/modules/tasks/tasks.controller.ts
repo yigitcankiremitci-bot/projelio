@@ -13,8 +13,8 @@ export class TasksController {
   }
 
   @Post("projects/:projectId/tasks")
-  create(@Param("projectId") projectId: string, @Body() body: any) {
-    return this.tasksService.create(projectId, body);
+  create(@Param("projectId") projectId: string, @Body() body: any, @Req() req: any) {
+    return this.tasksService.create(projectId, body, req.user.userId);
   }
 
   // NOT: bu route "tasks/:id" ile çakışmaması için ondan önce tanımlanmalı.
@@ -24,8 +24,8 @@ export class TasksController {
   }
 
   @Patch("tasks/:id")
-  update(@Param("id") id: string, @Body() body: any) {
-    return this.tasksService.update(id, body);
+  update(@Param("id") id: string, @Body() body: any, @Req() req: any) {
+    return this.tasksService.update(id, body, req.user.userId);
   }
 
   @Patch("tasks/:id/status")

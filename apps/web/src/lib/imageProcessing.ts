@@ -21,6 +21,44 @@ function loadImageElement(file: File): Promise<HTMLImageElement> {
   });
 }
 
+// Profil fotoğrafı: kartta 116px gösteriliyor, 200px retina için yeterli.
+// Düşük kalite (%60) ile dosya ~10 KB civarında kalıyor.
+export const AVATAR_SIZE = 200;
+const AVATAR_QUALITY = 0.6;
+
+// Kullanıcının kırpma arayüzünde seçtiği alan: kaynak görselin piksel koordinatlarında
+// kare bir bölge. AvatarCropper bu değerleri hesaplayıp buraya geçirir.
+export interface CropArea {
+  x: number;
+  y: number;
+  size: number;
+}
+
+// Kırpılmış kareyi 200px'e ölçekleyip JPEG olarak sıkıştırır.
+export async function cropAvatarImage(file: File, crop: CropArea): Promise<File> {
+  try {
+    const img = await loadImageElement(file);
+    const canvas = document.createElement("canvas");
+    canvas.width = AVATAR_SIZE;
+    canvas.height = AVATAR_SIZE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+
+    // JPEG şeffaflık desteklemez; şeffaf PNG'lerin boş alanları siyah çıkmasın diye
+    // önce beyaz zemin çiziliyor.
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, AVATAR_SIZE, AVATAR_SIZE);
+    ctx.drawImage(img, crop.x, crop.y, crop.size, crop.size, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
+
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", AVATAR_QUALITY));
+    if (!blob) return file;
+    return new File([blob], "avatar.jpg", { type: "image/jpeg" });
+  } catch (err) {
+    console.error("Profil fotoğrafı işlenemedi, orijinal dosya yükleniyor:", err);
+    return file;
+  }
+}
+
 export async function resizeCoverImage(file: File): Promise<File> {
   try {
     // createImageBitmap yerine klasik <img> yükleme kullanılıyor; bazı tarayıcılarda

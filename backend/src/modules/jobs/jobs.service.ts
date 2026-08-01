@@ -1,8 +1,9 @@
 import { randomUUID } from "crypto";
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Job } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { ProjectsService } from "../projects/projects.service";
+import { OperationsService } from "../operations/operations.service";
 import { applyOrder } from "../../common/reorder.util";
 
 const COVER_BUCKET = "job-covers";
@@ -12,6 +13,10 @@ function mapJob(row: any): Job {
     id: row.id,
     ownerId: row.owner_id,
     ownerName: row.users?.full_name ?? undefined,
+    organizationId: row.organization_id ?? undefined,
+    organizationName: row.organizations?.name ?? undefined,
+    groupId: row.group_id ?? undefined,
+    groupName: row.groups?.name ?? undefined,
     title: row.title,
     description: row.description ?? undefined,
     coverImageUrl: row.cover_image_url ?? undefined,
@@ -25,7 +30,8 @@ function mapJob(row: any): Job {
 export class JobsService {
   constructor(
     private supabase: SupabaseService,
-    private projectsService: ProjectsService
+    private projectsService: ProjectsService,
+    private operationsService: OperationsService
   ) {}
 
   // Kullanıcının sahibi olduğu işler + içindeki herhangi bir projeye ekibe
@@ -34,7 +40,7 @@ export class JobsService {
   async findAllForUser(userId: string): Promise<Job[]> {
     const { data: owned, error: ownedError } = await this.supabase.client
       .from("jobs")
-      .select("*, users(full_name)")
+      .select("*, users(full_name), organizations(name), groups(name)")
       .eq("owner_id", userId)
       .is("archived_at", null);
     if (ownedError) throw ownedError;
@@ -59,7 +65,7 @@ export class JobsService {
       if (jobIds.length > 0) {
         const { data, error } = await this.supabase.client
           .from("jobs")
-          .select("*, users(full_name)")
+          .select("*, users(full_name), organizations(name), groups(name)")
           .in("id", jobIds)
           .is("archived_at", null);
         if (error) throw error;
@@ -70,18 +76,44 @@ export class JobsService {
     const byId = new Map<string, any>();
     for (const row of [...(owned ?? []), ...memberJobs]) byId.set(row.id, row);
 
-    return Array.from(byId.values())
+    const jobs = Array.from(byId.values())
       .map(mapJob)
       .sort(
         (a, b) => a.sortOrder - b.sortOrder || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
+
+    // Anasayfa kartlarındaki proje sayısı göstergesi gerçek sayıyı göstersin:
+    // (önceden yalnızca kullanıcının üyesi olduğu projeler sayılıyordu).
+    const allJobIds = jobs.map((j) => j.id);
+    if (allJobIds.length > 0) {
+      const { data: projectRows } = await this.supabase.client
+        .from("projects")
+        .select("job_id")
+        .in("job_id", allJobIds)
+        .is("archived_at", null);
+      const counts = new Map<string, number>();
+      for (const p of projectRows ?? []) {
+        counts.set(p.job_id, (counts.get(p.job_id) ?? 0) + 1);
+      }
+      for (const j of jobs) j.projectCount = counts.get(j.id) ?? 0;
+    }
+    return jobs;
   }
 
   async reorder(userId: string, ids: string[]): Promise<void> {
     if (!ids?.length) return;
     const { data: rows, error } = await this.supabase.client.from("jobs").select("id, owner_id").in("id", ids);
     if (error) throw error;
-    if (!rows || rows.length !== ids.length || rows.some((r: any) => r.owner_id !== userId)) {
+    if (!rows || rows.length !== ids.length) {
+      throw new BadRequestException("Geçersiz sıralama isteği");
+    }
+    // İş kartları sürükle-bırak: listede yalnızca sahibi olunan işler değil, ekip üyesi
+    // olarak görülen işler de bulunabildiği için katı "hepsinin sahibi ol" kuralı tüm
+    // sıralamayı reddediyor ve kartlar eski yerine dönüyordu. Kullanıcının panosunda
+    // gördüğü işleri sıralamasına izin veriyoruz.
+    const visibleJobs = await this.findAllForUser(userId);
+    const visibleIds = new Set(visibleJobs.map((j) => j.id));
+    if (rows.some((r: any) => !visibleIds.has(r.id))) {
       throw new BadRequestException("Geçersiz sıralama isteği");
     }
     await applyOrder(this.supabase.client, "jobs", ids);
@@ -90,7 +122,7 @@ export class JobsService {
   async findOne(id: string): Promise<Job> {
     const { data, error } = await this.supabase.client
       .from("jobs")
-      .select("*, users(full_name)")
+      .select("*, users(full_name), organizations(name), groups(name)")
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
@@ -98,48 +130,151 @@ export class JobsService {
     return mapJob(data);
   }
 
+  // Bir iş ya bir Organization'a, ya doğrudan bir Group'a, ya da hiçbirine
+  // (freelancer modu) bağlanabilir — ikisi birden set edilemez (DB'de de
+  // jobs_org_or_group_exclusive CHECK constraint'i ile korunuyor). Bir işe bağlanan
+  // organizasyon/grup, o işin altındaki tüm projelere de dolaylı olarak yansır.
+  private assertOrgGroupExclusive(organizationId?: string | null, groupId?: string | null): void {
+    if (organizationId && groupId) {
+      throw new BadRequestException("Bir iş aynı anda hem bir organizasyona hem bir gruba bağlanamaz");
+    }
+  }
+
   async create(ownerId: string, data: Partial<Job>): Promise<Job> {
+    this.assertOrgGroupExclusive(data.organizationId, data.groupId);
     const { data: row, error } = await this.supabase.client
       .from("jobs")
       .insert({
         owner_id: ownerId,
         title: data.title ?? "",
         description: data.description ?? null,
+        organization_id: data.organizationId ?? null,
+        group_id: data.groupId ?? null,
       })
-      .select("*, users(full_name)")
+      .select("*, users(full_name), organizations(name), groups(name)")
       .single();
     if (error) throw error;
     return mapJob(row);
   }
 
-  async update(id: string, data: Partial<Job>): Promise<Job> {
+  // Bir Organization'a bağlı işler (organization sahibi/üyesi tüm işleri görür;
+  // bunun dışındakiler yalnızca kendi görebildiği işleri görür).
+  async findByOrganization(organizationId: string, requestingUserId?: string): Promise<Job[]> {
+    const { data, error } = await this.supabase.client
+      .from("jobs")
+      .select("*, users(full_name), organizations(name), groups(name)")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    const jobs = (data ?? []).map(mapJob);
+    if (!requestingUserId) return jobs;
+
+    const { data: org } = await this.supabase.client
+      .from("organizations")
+      .select("owner_id")
+      .eq("id", organizationId)
+      .maybeSingle();
+    if (org?.owner_id === requestingUserId) return jobs;
+
+    const { data: orgMember } = await this.supabase.client
+      .from("organization_members")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", requestingUserId)
+      .eq("status", "approved")
+      .maybeSingle();
+    if (orgMember) return jobs;
+
+    const visibleJobs = await this.findAllForUser(requestingUserId);
+    const visibleIds = new Set(visibleJobs.map((j) => j.id));
+    return jobs.filter((j) => visibleIds.has(j.id));
+  }
+
+  // Bir Group'a doğrudan bağlı işler (bir Organization üzerinden değil).
+  async findByGroup(groupId: string, requestingUserId?: string): Promise<Job[]> {
+    const { data, error } = await this.supabase.client
+      .from("jobs")
+      .select("*, users(full_name), organizations(name), groups(name)")
+      .eq("group_id", groupId)
+      .is("archived_at", null)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    const jobs = (data ?? []).map(mapJob);
+    if (!requestingUserId) return jobs;
+
+    const { data: group } = await this.supabase.client.from("groups").select("owner_id").eq("id", groupId).maybeSingle();
+    if (group?.owner_id === requestingUserId) return jobs;
+
+    const { data: groupMember } = await this.supabase.client
+      .from("group_members")
+      .select("id")
+      .eq("group_id", groupId)
+      .eq("user_id", requestingUserId)
+      .maybeSingle();
+    if (groupMember) return jobs;
+
+    const visibleJobs = await this.findAllForUser(requestingUserId);
+    const visibleIds = new Set(visibleJobs.map((j) => j.id));
+    return jobs.filter((j) => visibleIds.has(j.id));
+  }
+
+  // Yalnızca işin sahibi iş detaylarını değiştirebilir / silebilir / arşivleyebilir.
+  // (Önceden işe eklenen herkes değiştirebiliyordu.)
+  private async assertOwner(id: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    const { data } = await this.supabase.client.from("jobs").select("owner_id").eq("id", id).maybeSingle();
+    if (!data) throw new NotFoundException("İş bulunamadı");
+    if (data.owner_id !== userId) throw new ForbiddenException("Bu işi yalnızca iş sahibi düzenleyebilir");
+  }
+
+  async update(id: string, data: Partial<Job>, requestingUserId?: string): Promise<Job> {
+    await this.assertOwner(id, requestingUserId);
     const patch: Record<string, unknown> = {};
     if (data.title !== undefined) patch.title = data.title;
     if (data.description !== undefined) patch.description = data.description;
     if (data.coverImageUrl !== undefined) patch.cover_image_url = data.coverImageUrl;
+    if (data.organizationId !== undefined || data.groupId !== undefined) {
+      const nextOrgId = data.organizationId !== undefined ? data.organizationId : undefined;
+      const nextGroupId = data.groupId !== undefined ? data.groupId : undefined;
+      this.assertOrgGroupExclusive(nextOrgId, nextGroupId);
+      if (data.organizationId !== undefined) {
+        patch.organization_id = data.organizationId ?? null;
+        // Organization set edilirken group_id de gönderilmediyse çakışmaması için temizle.
+        if (data.organizationId && data.groupId === undefined) patch.group_id = null;
+      }
+      if (data.groupId !== undefined) {
+        patch.group_id = data.groupId ?? null;
+        if (data.groupId && data.organizationId === undefined) patch.organization_id = null;
+      }
+    }
 
     const { data: row, error } = await this.supabase.client
       .from("jobs")
       .update(patch)
       .eq("id", id)
-      .select("*, users(full_name)")
+      .select("*, users(full_name), organizations(name), groups(name)")
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("İş bulunamadı");
     return mapJob(row);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, requestingUserId?: string): Promise<void> {
+    await this.assertOwner(id, requestingUserId);
     const { error } = await this.supabase.client.from("jobs").delete().eq("id", id);
     if (error) throw error;
   }
 
-  async archive(id: string): Promise<Job> {
+  async archive(id: string, requestingUserId?: string): Promise<Job> {
+    await this.assertOwner(id, requestingUserId);
     const { data: row, error } = await this.supabase.client
       .from("jobs")
       .update({ archived_at: new Date().toISOString() })
       .eq("id", id)
-      .select("*, users(full_name)")
+      .select("*, users(full_name), organizations(name), groups(name)")
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("İş bulunamadı");
@@ -150,6 +285,13 @@ export class JobsService {
       await this.projectsService.archive(p.id);
     }
 
+    // Programlar da aynı şekilde durdurulur; gelecekteki tekrarları veritabanı
+    // tetikleyicisi geri çeker, geçmiş kayıtlar olduğu gibi kalır.
+    const { data: operations } = await this.supabase.client.from("operations").select("id").eq("job_id", id);
+    for (const o of operations ?? []) {
+      await this.operationsService.archive(o.id);
+    }
+
     return mapJob(row);
   }
 
@@ -158,7 +300,7 @@ export class JobsService {
       .from("jobs")
       .update({ archived_at: null })
       .eq("id", id)
-      .select("*, users(full_name)")
+      .select("*, users(full_name), organizations(name), groups(name)")
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("İş bulunamadı");
@@ -168,10 +310,16 @@ export class JobsService {
       await this.projectsService.restore(p.id);
     }
 
+    const { data: operations } = await this.supabase.client.from("operations").select("id").eq("job_id", id);
+    for (const o of operations ?? []) {
+      await this.operationsService.restore(o.id);
+    }
+
     return mapJob(row);
   }
 
-  async uploadCover(id: string, file: Express.Multer.File): Promise<Job> {
+  async uploadCover(id: string, file: Express.Multer.File, requestingUserId?: string): Promise<Job> {
+    await this.assertOwner(id, requestingUserId);
     const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
     const path = `${id}/${randomUUID()}.${ext}`;
 

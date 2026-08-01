@@ -4,18 +4,8 @@ import { io, Socket } from "socket.io-client";
 import type { NotificationPayload } from "@projelio/shared";
 import { api, API_URL } from "../api/client";
 import { colors } from "../theme/colors";
+import { timeAgo } from "../lib/dates";
 import { IconBell } from "./icons";
-
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diffMs / 60000);
-  if (min < 1) return "az önce";
-  if (min < 60) return `${min} dk önce`;
-  const hour = Math.floor(min / 60);
-  if (hour < 24) return `${hour} sa önce`;
-  const day = Math.floor(hour / 24);
-  return `${day} gün önce`;
-}
 
 export default function NotificationBell() {
   const c = colors.light;
@@ -63,6 +53,21 @@ export default function NotificationBell() {
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  // Çana tıklayıp paneli açmak bildirimleri okundu sayar: rozet hemen sıfırlanır,
+  // sunucuya read-all gönderilir; okunmamışların görsel vurgusu ise panel
+  // kapanana kadar korunur ki kullanıcı hangilerinin yeni olduğunu görebilsin.
+  useEffect(() => {
+    if (open) {
+      if (unreadCount > 0) {
+        setUnreadCount(0);
+        api.patch("/notifications/read-all", {}).catch(() => {});
+      }
+    } else {
+      setNotifications((prev) => (prev.some((n) => !n.read) ? prev.map((n) => ({ ...n, read: true })) : prev));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   if (!localStorage.getItem("projelio_token")) return null;

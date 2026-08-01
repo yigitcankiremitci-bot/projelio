@@ -36,13 +36,13 @@ export default function CreateBudgetTransactionModal({ projectId, onClose, onCre
       onCreated(created);
       onClose();
     } catch {
-      setError(`${type === "income" ? "Gelir" : "Gider"} eklenemedi. Tekrar dene.`);
+      setError(`${type === "income" ? "Ödeme" : "Gider"} eklenemedi. Tekrar dene.`);
       setLoading(false);
     }
   };
 
   return (
-    <Modal title="Gelir / Gider ekle" onClose={onClose}>
+    <Modal title="Ödeme / gider ekle" onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -59,7 +59,7 @@ export default function CreateBudgetTransactionModal({ projectId, onClose, onCre
               fontWeight: 500,
             }}
           >
-            Gelir
+            Gelen ödeme
           </button>
           <button
             type="button"
@@ -88,6 +88,11 @@ export default function CreateBudgetTransactionModal({ projectId, onClose, onCre
             autoFocus
             style={{ width: "100%" }}
           />
+          {type === "income" && (
+            <span style={{ fontSize: 13, color: c.textSecondary }}>
+              Müşteriden tahsil ettiğin tutar — beklenen ödemeden düşülür.
+            </span>
+          )}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -110,7 +115,7 @@ export default function CreateBudgetTransactionModal({ projectId, onClose, onCre
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Ekleniyor…" : type === "income" ? "Geliri ekle" : "Gideri ekle"}
+          {loading ? "Ekleniyor…" : type === "income" ? "Ödemeyi ekle" : "Gideri ekle"}
         </button>
       </form>
     </Modal>

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Project } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { TasksService } from "../tasks/tasks.service";
@@ -74,7 +74,7 @@ export class ProjectsService {
       );
   }
 
-  async findByJob(jobId: string): Promise<Project[]> {
+  async findByJob(jobId: string, requestingUserId?: string): Promise<Project[]> {
     const { data, error } = await this.supabase.client
       .from("projects")
       .select()
@@ -83,7 +83,30 @@ export class ProjectsService {
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data ?? []).map(mapProject);
+    const projects = (data ?? []).map(mapProject);
+    if (!requestingUserId) return projects;
+
+    // Görünürlük kısıtı: iş sahibi ve işe alınmış iş ekibi üyeleri tüm projeleri görür;
+    // bunun dışındakiler (ör. tek bir proje görevine eklenen taşeron) yalnızca sahibi
+    // oldukları ya da ekibinde bulundukları projeleri görebilir.
+    const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", jobId).maybeSingle();
+    if (job?.owner_id === requestingUserId) return projects;
+
+    const { data: jobMember } = await this.supabase.client
+      .from("job_members")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("user_id", requestingUserId)
+      .maybeSingle();
+    if (jobMember) return projects;
+
+    const { data: memberships } = await this.supabase.client
+      .from("project_members")
+      .select("project_id")
+      .eq("user_id", requestingUserId)
+      .eq("status", "approved");
+    const memberProjectIds = new Set((memberships ?? []).map((m: any) => m.project_id));
+    return projects.filter((p) => p.ownerId === requestingUserId || memberProjectIds.has(p.id));
   }
 
   async reorder(userId: string, ids: string[]): Promise<void> {
@@ -150,7 +173,26 @@ export class ProjectsService {
     return mapProject(row);
   }
 
-  async update(id: string, data: Partial<Project>): Promise<Project> {
+  // Proje detaylarını yalnızca projenin sahibi ya da bağlı olduğu işin sahibi
+  // değiştirebilir. (Önceden işe/projeye eklenen herkes değiştirebiliyordu.)
+  private async assertCanManage(id: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("owner_id, job_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!project) throw new NotFoundException("Proje bulunamadı");
+    if (project.owner_id === userId) return;
+    if (project.job_id) {
+      const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", project.job_id).maybeSingle();
+      if (job?.owner_id === userId) return;
+    }
+    throw new ForbiddenException("Bu projeyi yalnızca proje veya iş sahibi düzenleyebilir");
+  }
+
+  async update(id: string, data: Partial<Project>, requestingUserId?: string): Promise<Project> {
+    await this.assertCanManage(id, requestingUserId);
     const patch: Record<string, unknown> = {};
     if (data.title !== undefined) patch.title = data.title;
     if (data.description !== undefined) patch.description = data.description;
@@ -171,12 +213,14 @@ export class ProjectsService {
     return mapProject(row);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, requestingUserId?: string): Promise<void> {
+    await this.assertCanManage(id, requestingUserId);
     const { error } = await this.supabase.client.from("projects").delete().eq("id", id);
     if (error) throw error;
   }
 
-  async archive(id: string): Promise<Project> {
+  async archive(id: string, requestingUserId?: string): Promise<Project> {
+    await this.assertCanManage(id, requestingUserId);
     const { data: row, error } = await this.supabase.client
       .from("projects")
       .update({ archived_at: new Date().toISOString() })
@@ -232,7 +276,8 @@ export class ProjectsService {
     return mapProject(row);
   }
 
-  async uploadCover(id: string, file: Express.Multer.File): Promise<Project> {
+  async uploadCover(id: string, file: Express.Multer.File, requestingUserId?: string): Promise<Project> {
+    await this.assertCanManage(id, requestingUserId);
     const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
     const path = `${id}/${randomUUID()}.${ext}`;
 

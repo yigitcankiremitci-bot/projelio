@@ -17,10 +17,15 @@ export class BudgetController {
     return this.budgetService.add(projectId, body);
   }
 
+  // remainingMargin: eldeki net (tahsil edilen − harcanan).
+  // expectedPayment: müşteriden henüz tahsil edilmemiş alacak.
   @Get("margin")
   async margin(@Param("projectId") projectId: string, @Query("totalBudget") totalBudget: string) {
-    const remainingMargin = await this.budgetService.calculateRemainingMargin(projectId, Number(totalBudget));
-    return { remainingMargin };
+    const [remainingMargin, expectedPayment] = await Promise.all([
+      this.budgetService.calculateRemainingMargin(projectId),
+      this.budgetService.calculateExpectedPayment(projectId, Number(totalBudget) || 0),
+    ]);
+    return { remainingMargin, expectedPayment };
   }
 
   // Excel / PDF dışa aktarma: gerçek implementasyon exceljs / pdfkit ile

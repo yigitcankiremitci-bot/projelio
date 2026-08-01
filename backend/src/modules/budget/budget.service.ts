@@ -1,16 +1,20 @@
-import { Injectable } from "@nestjs/common";
-import type { BudgetTransaction } from "@projelio/shared";
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import type { BudgetOverview, BudgetTransaction, ProjectBudgetSummary, RecurringPayment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 
 function mapTransaction(row: any): BudgetTransaction {
   return {
     id: row.id,
-    projectId: row.project_id,
+    projectId: row.project_id ?? undefined,
+    projectTitle: row.projects?.title ?? undefined,
+    ownerId: row.owner_id ?? undefined,
     userId: row.user_id ?? undefined,
     type: row.type,
     amount: Number(row.amount),
     description: row.description ?? undefined,
+    occurredAt: row.occurred_at,
+    recurringPaymentId: row.recurring_payment_id ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -25,24 +29,33 @@ export class BudgetService {
   async findByProject(projectId: string): Promise<BudgetTransaction[]> {
     const { data, error } = await this.supabase.client
       .from("budget_transactions")
-      .select()
+      .select("*, projects(title)")
       .eq("project_id", projectId)
-      .order("created_at", { ascending: false });
+      .order("occurred_at", { ascending: false });
     if (error) throw error;
     return (data ?? []).map(mapTransaction);
   }
 
   async add(projectId: string, data: Partial<BudgetTransaction>): Promise<BudgetTransaction> {
+    // Proje bazlı kayıtta defter sahibi, projenin sahibidir.
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("owner_id")
+      .eq("id", projectId)
+      .maybeSingle();
+
     const { data: row, error } = await this.supabase.client
       .from("budget_transactions")
       .insert({
         project_id: projectId,
+        owner_id: project?.owner_id ?? null,
         user_id: data.userId ?? null,
         type: data.type ?? "expense",
         amount: data.amount ?? 0,
         description: data.description ?? null,
+        occurred_at: data.occurredAt ?? new Date().toISOString().slice(0, 10),
       })
-      .select()
+      .select("*, projects(title)")
       .single();
     if (error) throw error;
     const tx = mapTransaction(row);
@@ -57,13 +70,176 @@ export class BudgetService {
     return tx;
   }
 
-  // Toplam bütçe - gider - hakediş/ödeme = kalan marj
-  async calculateRemainingMargin(projectId: string, totalBudget: number): Promise<number> {
+  // Projeden elde kalan net: tahsil edilen - harcanan.
+  // NOT: anlaşılan ücret (totalBudget) buraya EKLENMEZ; tahsil edilen para zaten
+  // o ücretin bir parçasıdır, eklemek aynı parayı iki kez saymak olurdu.
+  async calculateRemainingMargin(projectId: string): Promise<number> {
     const txs = await this.findByProject(projectId);
-    const spent = txs
-      .filter((t) => t.type === "expense" || t.type === "payout")
-      .reduce((sum, t) => sum + t.amount, 0);
-    const income = txs.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
-    return totalBudget + income - spent;
+    return sumByType(txs, "income") - sumSpent(txs);
   }
+
+  // Henüz tahsil edilmemiş alacak.
+  async calculateExpectedPayment(projectId: string, agreedFee: number): Promise<number> {
+    const txs = await this.findByProject(projectId);
+    return Math.max(0, agreedFee - sumByType(txs, "income"));
+  }
+
+  // --- Anasayfa bütçe sekmesi (kullanıcının kendi defteri) ---
+
+  // Kullanıcının sahibi olduğu projeler. Bütçe hassas bir veri olduğu için genel
+  // defterde yalnızca kendi projeleri toplanır; üyesi olduğu başkasının projesi
+  // buraya karışmaz (o proje kendi detay sayfasında ayrıca görülebiliyor).
+  private async ownedProjects(userId: string): Promise<{ id: string; title: string; total_budget: number }[]> {
+    const { data, error } = await this.supabase.client
+      .from("projects")
+      .select("id, title, total_budget")
+      .eq("owner_id", userId)
+      .is("archived_at", null);
+    if (error) throw error;
+    return data ?? [];
+  }
+
+  // Kullanıcının tüm hareketleri: kendi projelerine ait olanlar + projesiz genel kayıtlar.
+  async findAllForUser(userId: string, limit = 200): Promise<BudgetTransaction[]> {
+    const { data, error } = await this.supabase.client
+      .from("budget_transactions")
+      .select("*, projects(title)")
+      .eq("owner_id", userId)
+      .order("occurred_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []).map(mapTransaction);
+  }
+
+  async getOverview(userId: string): Promise<BudgetOverview> {
+    const [projects, transactions] = await Promise.all([
+      this.ownedProjects(userId),
+      this.findAllForUser(userId, 1000),
+    ]);
+
+    const byProject = new Map<string, BudgetTransaction[]>();
+    const general: BudgetTransaction[] = [];
+    for (const tx of transactions) {
+      if (!tx.projectId) {
+        general.push(tx);
+        continue;
+      }
+      const list = byProject.get(tx.projectId) ?? [];
+      list.push(tx);
+      byProject.set(tx.projectId, list);
+    }
+
+    const projectSummaries: ProjectBudgetSummary[] = projects.map((p) => {
+      const txs = byProject.get(p.id) ?? [];
+      const agreedFee = Number(p.total_budget);
+      const received = sumByType(txs, "income");
+      const expense = sumSpent(txs);
+      return {
+        projectId: p.id,
+        projectTitle: p.title,
+        agreedFee,
+        received,
+        // Tahsil edilen, anlaşılan ücretin içinden düşer — üstüne eklenmez.
+        expected: Math.max(0, agreedFee - received),
+        overpaid: Math.max(0, received - agreedFee),
+        expense,
+        netEarned: received - expense,
+        fullyCollected: agreedFee > 0 && received >= agreedFee,
+      };
+    });
+
+    const generalIncome = sumByType(general, "income");
+    const generalExpense = sumSpent(general);
+
+    const totalAgreedFee = projectSummaries.reduce((sum, p) => sum + p.agreedFee, 0);
+    const totalReceived = projectSummaries.reduce((sum, p) => sum + p.received, 0) + generalIncome;
+    const totalExpected = projectSummaries.reduce((sum, p) => sum + p.expected, 0);
+    const totalExpense = projectSummaries.reduce((sum, p) => sum + p.expense, 0) + generalExpense;
+
+    return {
+      totalAgreedFee,
+      totalReceived,
+      totalExpected,
+      totalExpense,
+      netEarned: totalReceived - totalExpense,
+      generalIncome,
+      generalExpense,
+      // Tahsil edilmeyi bekleyen en büyük alacak en üstte.
+      projects: projectSummaries.sort((a, b) => b.expected - a.expected || b.agreedFee - a.agreedFee),
+    };
+  }
+
+  // Anasayfadan eklenen kayıt: proje seçimi opsiyonel.
+  async createForUser(userId: string, data: Partial<BudgetTransaction>): Promise<BudgetTransaction> {
+    if (data.projectId) await this.assertOwnsProject(data.projectId, userId);
+
+    const { data: row, error } = await this.supabase.client
+      .from("budget_transactions")
+      .insert({
+        project_id: data.projectId ?? null,
+        owner_id: userId,
+        user_id: data.userId ?? null,
+        type: data.type ?? "expense",
+        amount: data.amount ?? 0,
+        description: data.description ?? null,
+        occurred_at: data.occurredAt ?? new Date().toISOString().slice(0, 10),
+      })
+      .select("*, projects(title)")
+      .single();
+    if (error) throw error;
+    return mapTransaction(row);
+  }
+
+  // Cron tarafından çağrılır: vadesi gelen düzenli ödemeyi deftere işler.
+  async createRecurringTransaction(payment: RecurringPayment, occurredAt: string): Promise<BudgetTransaction> {
+    const { data: row, error } = await this.supabase.client
+      .from("budget_transactions")
+      .insert({
+        project_id: payment.projectId ?? null,
+        owner_id: payment.ownerId,
+        type: payment.type,
+        amount: payment.amount,
+        description: payment.description ?? null,
+        occurred_at: occurredAt,
+        recurring_payment_id: payment.id,
+      })
+      .select("*, projects(title)")
+      .single();
+    if (error) throw error;
+    return mapTransaction(row);
+  }
+
+  async removeForUser(id: string, userId: string): Promise<{ success: true }> {
+    const { data: row } = await this.supabase.client
+      .from("budget_transactions")
+      .select("owner_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!row) throw new NotFoundException("Kayıt bulunamadı");
+    if (row.owner_id !== userId) throw new ForbiddenException("Bu kaydı silme yetkin yok");
+
+    const { error } = await this.supabase.client.from("budget_transactions").delete().eq("id", id);
+    if (error) throw error;
+    return { success: true };
+  }
+
+  private async assertOwnsProject(projectId: string, userId: string): Promise<void> {
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("owner_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!project) throw new NotFoundException("Proje bulunamadı");
+    if (project.owner_id !== userId) throw new ForbiddenException("Bu projeye kayıt ekleyemezsin");
+  }
+}
+
+function sumByType(txs: BudgetTransaction[], type: BudgetTransaction["type"]): number {
+  return txs.filter((t) => t.type === type).reduce((sum, t) => sum + t.amount, 0);
+}
+
+// Gider + hakediş/ödeme birlikte "harcanan" sayılır.
+function sumSpent(txs: BudgetTransaction[]): number {
+  return txs.filter((t) => t.type === "expense" || t.type === "payout").reduce((sum, t) => sum + t.amount, 0);
 }

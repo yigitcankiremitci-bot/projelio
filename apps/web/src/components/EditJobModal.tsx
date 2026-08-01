@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { Job } from "@projelio/shared";
+import { useEffect, useState } from "react";
+import type { Group, Job, Organization } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { resizeCoverImage } from "../lib/imageProcessing";
@@ -16,15 +16,29 @@ interface Props {
   onArchived?: () => void;
 }
 
+type LinkMode = "none" | "organization" | "group";
+
 export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchived }: Props) {
   const c = colors.light;
   const [title, setTitle] = useState(job.title);
   const [description, setDescription] = useState(job.description ?? "");
+  const [linkMode, setLinkMode] = useState<LinkMode>(job.organizationId ? "organization" : job.groupId ? "group" : "none");
+  const [organizationId, setOrganizationId] = useState(job.organizationId ?? "");
+  const [groupId, setGroupId] = useState(job.groupId ?? "");
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [hiring, setHiring] = useState(false);
+
+  useEffect(() => {
+    api.get<Organization[]>("/organizations").then(setOrganizations).catch(() => setOrganizations([]));
+    api.get<Group[]>("/groups").then(setGroups).catch(() => setGroups([]));
+  }, []);
+
+  const hasLinkOptions = organizations.length > 0 || groups.length > 0;
 
   const handleDelete = async () => {
     await api.delete(`/jobs/${job.id}`);
@@ -46,7 +60,12 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
     setError("");
     setLoading(true);
     try {
-      await api.patch(`/jobs/${job.id}`, { title, description: description || undefined });
+      await api.patch(`/jobs/${job.id}`, {
+        title,
+        description: description || undefined,
+        organizationId: linkMode === "organization" ? organizationId || undefined : null,
+        groupId: linkMode === "group" ? groupId || undefined : null,
+      });
       if (coverFile) {
         const resized = await resizeCoverImage(coverFile);
         const formData = new FormData();
@@ -78,6 +97,43 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
             style={{ width: "100%" }}
           />
         </div>
+
+        {hasLinkOptions && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>Bağlantı (opsiyonel)</label>
+            <select value={linkMode} onChange={(e) => setLinkMode(e.target.value as LinkMode)} style={{ width: "100%" }}>
+              <option value="none">Yok — bağımsız iş</option>
+              {organizations.length > 0 && <option value="organization">Bir organizasyona bağla</option>}
+              {groups.length > 0 && <option value="group">Bir gruba (holding) bağla</option>}
+            </select>
+
+            {linkMode === "organization" && (
+              <select value={organizationId} onChange={(e) => setOrganizationId(e.target.value)} required style={{ width: "100%" }}>
+                <option value="" disabled>
+                  Organizasyon seç…
+                </option>
+                {organizations.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {linkMode === "group" && (
+              <select value={groupId} onChange={(e) => setGroupId(e.target.value)} required style={{ width: "100%" }}>
+                <option value="" disabled>
+                  Grup seç…
+                </option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Kapak fotoğrafı</label>

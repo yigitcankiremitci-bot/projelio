@@ -21,14 +21,15 @@ export default function ProjectCard({ project }: Props) {
         background: c.surface,
       }}
     >
-      <div
-        style={{
-          aspectRatio: "3 / 1",
-          background: project.coverImageUrl
-            ? `center/cover url(${project.coverImageUrl})`
-            : `linear-gradient(135deg, ${c.accent}, ${c.accentDark})`,
-        }}
-      />
+      {/* Kapak eklenmemiş projeler kapaksız, küçük (kompakt) görünümde gösterilir. */}
+      {project.coverImageUrl && (
+        <div
+          style={{
+            aspectRatio: "3 / 1",
+            background: `center/cover url(${project.coverImageUrl})`,
+          }}
+        />
+      )}
       <div style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{project.title}</h3>

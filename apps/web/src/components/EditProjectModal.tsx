@@ -96,7 +96,7 @@ export default function EditProjectModal({ project, onClose }: Props) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Bütçe (₺)</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Anlaşılan ücret (₺)</label>
           <input type="number" min={0} value={totalBudget} onChange={(e) => setTotalBudget(e.target.value)} style={{ width: "100%" }} />
         </div>
 

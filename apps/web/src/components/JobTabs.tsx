@@ -1,9 +1,12 @@
 import { colors } from "../theme/colors";
 
-export type JobTab = "projects" | "team" | "tasks";
+export type JobTab = "projects" | "programs" | "team" | "tasks";
 
+// Projeler süreli ve biten işleri, Programlar süresiz ve tekrarlayan işleri tutar.
+// İkisi de bu işin altında yaşadığı için sekmeler yan yana durur.
 const tabs: { key: JobTab; label: string }[] = [
   { key: "projects", label: "Projeler" },
+  { key: "programs", label: "Programlar" },
   { key: "team", label: "Ekip" },
   { key: "tasks", label: "İşler" },
 ];

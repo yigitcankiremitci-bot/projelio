@@ -7,3 +7,7 @@ build/
 .expo/
 .DS_Store
 coverage/
+
+# Yedek ve otomatik üretilen geçici dosyalar
+*.bak
+vite.config.ts.timestamp-*.mjs

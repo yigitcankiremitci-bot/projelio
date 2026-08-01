@@ -140,14 +140,26 @@ export default function TaskColumn({
         const fromEl = evt.from;
         const taskId = evt.item.dataset.id;
         if (!taskId) return;
+        const ids = Array.from(toEl.children)
+          .map((node) => (node as HTMLElement).dataset.id)
+          .filter((v): v is string => Boolean(v));
         if (toEl !== fromEl) {
+          // Sortable kartın DOM düğümünü diğer sütuna fiziksel olarak taşır; React ise
+          // bir sonraki render'da aynı düğümü eski sütundan kaldırmaya çalışıp
+          // "removeChild" hatasıyla sayfayı beyaza düşürürdü. Bu yüzden DOM taşımasını
+          // hemen geri alıyoruz; kartın yeni sütunda görünmesini state güncellemesi
+          // (onMove) sağlıyor.
+          try {
+            toEl.removeChild(evt.item);
+            const referenceNode = fromEl.children[evt.oldIndex ?? fromEl.children.length] ?? null;
+            fromEl.insertBefore(evt.item, referenceNode);
+          } catch {
+            // DOM zaten React tarafından güncellendiyse sorun yok
+          }
           const toStatus = toEl.dataset.status as TaskStatus | undefined;
           if (toStatus) onMove(taskId, toStatus);
         }
         if (!onReorderTasks) return;
-        const ids = Array.from(toEl.children)
-          .map((node) => (node as HTMLElement).dataset.id)
-          .filter((v): v is string => Boolean(v));
         onReorderTasks(ids);
       },
     },
@@ -276,7 +288,13 @@ export default function TaskColumn({
           const subtasks = subtasksOf(t.id);
           const isOpen = expanded.has(t.id);
           const stats = subtaskStats(t.id);
-          const isOverdue = t.status !== "completed" && new Date(t.deadline) < new Date();
+          // Gün bazlı karşılaştırma: son günü bugün olan görevler gün bitmeden
+          // "gecikmiş" (kırmızı) görünmesin — sadece tarihi gerçekten geçmişse.
+          const deadlineDate = new Date(t.deadline);
+          const deadlineDay = new Date(deadlineDate.getFullYear(), deadlineDate.getMonth(), deadlineDate.getDate());
+          const now = new Date();
+          const todayDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const isOverdue = t.status !== "completed" && deadlineDay < todayDay;
           const isOverdueWithPendingSubtasks = isOverdue && stats.total > 0 && stats.remaining > 0;
           return (
             <div key={t.id} data-id={t.id} style={{ marginBottom: 8 }}>
@@ -394,6 +412,30 @@ export default function TaskColumn({
                     {getTaskMeta(t)}
                   </div>
                 )}
+                {t.description && (
+                  <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 4, overflowWrap: "break-word", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                    {t.description}
+                  </div>
+                )}
+                {t.assignedToName && (
+                  <div style={{ marginTop: 5 }}>
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: 12,
+                        color: c.accentDark,
+                        background: `${c.accent}1a`,
+                        border: `1px solid ${c.accent}55`,
+                        borderRadius: 20,
+                        padding: "1px 8px",
+                      }}
+                    >
+                      {t.assignedToName}
+                    </span>
+                  </div>
+                )}
                 {(() => {
                   const { total, remaining } = subtaskStats(t.id);
                   const progressPct = total > 0 ? Math.round(((total - remaining) / total) * 100) : 0;
@@ -488,6 +530,9 @@ export default function TaskColumn({
                             {getTaskMeta?.(sub) && (
                               <span style={{ fontSize: 11, color: c.textSecondary }}>{getTaskMeta(sub)}</span>
                             )}
+                            {sub.assignedToName && (
+                              <span style={{ fontSize: 11, color: c.accentDark }}>{sub.assignedToName}</span>
+                            )}
                           </div>
                           <button
                             onClick={(e) => {
@@ -536,12 +581,20 @@ export default function TaskColumn({
                             setSubtaskParent(null);
                             setSubtaskTitle("");
                           }
+                          // Mobil klavyelerin onay/bitti tuşu her zaman form submit tetiklemiyor;
+                          // Enter'ı doğrudan yakalayıp kaydediyoruz.
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            commitAddSubtask(t.id);
+                          }
                         }}
                         onBlur={() => commitAddSubtask(t.id)}
                         placeholder="Alt görev başlığı, Enter'a bas"
                         maxLength={200}
                         enterKeyHint="done"
-                        style={{ width: "100%", height: 30, fontSize: 15 }}
+                        // fontSize 16: iOS Safari 16px altındaki input'lara odaklanınca sayfayı
+                        // otomatik yakınlaştırıyordu (alt görev eklerken zoom problemi).
+                        style={{ width: "100%", height: 32, fontSize: 16 }}
                       />
                     </form>
                   ) : (
@@ -670,6 +723,10 @@ export default function TaskColumn({
                 if (e.key === "Escape") {
                   setAdding(false);
                   setTitle("");
+                }
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitAddTask();
                 }
               }}
               onBlur={commitAddTask}

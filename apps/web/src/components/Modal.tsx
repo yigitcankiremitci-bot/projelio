@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { colors } from "../theme/colors";
 import { IconX } from "./icons";
@@ -21,7 +22,11 @@ export default function Modal({ title, onClose, children, maxWidth = 400 }: Prop
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
+  // Modal her zaman body'ye taşınır (portal). Aksi halde CSS "transform" ya da
+  // "will-change" uygulanmış bir üst öğenin içinde kalırsa (örn. hover'da büyüyen
+  // kişi kartı) o öğe position:fixed için içeren blok haline gelir; modal ekranın
+  // ortası yerine o kartın üstünde açılır ve karartma sadece kartı kaplar.
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -60,6 +65,7 @@ export default function Modal({ title, onClose, children, maxWidth = 400 }: Prop
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

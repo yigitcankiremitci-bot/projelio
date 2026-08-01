@@ -82,16 +82,23 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
   const paidTotal = sumBy("paid");
   const approvedTotal = plannedTotal + paidTotal;
 
-  // Elle eklenen gelir/gider hareketleri (payout, ödenen görev bütçeleriyle aynı
-  // mantıkta bir gider olarak sayılır).
-  const manualIncome = transactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+  // Tahsilat mantığı: project.totalBudget müşteriyle anlaşılan TOPLAM ücrettir.
+  // "income" hareketleri bu ücretin parça parça tahsil edilmiş halidir — bu yüzden
+  // anlaşılan ücretin ÜSTÜNE EKLENMEZ, içinden düşülür. Aksi halde aynı para iki kez
+  // sayılır ve alacak olduğundan yüksek görünür.
+  const agreedFee = project.totalBudget;
+  const received = transactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+  const expectedPayment = Math.max(0, agreedFee - received);
+  const overpaid = Math.max(0, received - agreedFee);
+  const fullyCollected = agreedFee > 0 && received >= agreedFee;
+
+  // Dışarı çıkan para: elle eklenen gider/hakediş + ödendi olarak işaretlenmiş görev bütçeleri.
   const manualExpense = transactions
     .filter((t) => t.type === "expense" || t.type === "payout")
     .reduce((sum, t) => sum + t.amount, 0);
-
-  const effectiveBudget = project.totalBudget + manualIncome;
   const totalSpent = paidTotal + manualExpense;
-  const remainingAsset = effectiveBudget - totalSpent;
+  // Eldeki net: tahsil edilen − harcanan.
+  const netEarned = received - totalSpent;
 
   const setBudgetStatus = async (task: Task, status: Task["budgetStatus"]) => {
     setApprovingId(task.id);
@@ -140,31 +147,85 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
         <SummaryCard label="Ödenen" amount={paidTotal} color={c.accentDark} />
       </div>
 
-      <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "12px 14px", display: "flex", gap: 20 }}>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Proje toplam bütçesi</p>
-          <p style={{ fontSize: 19, fontWeight: 600, color: c.textPrimary, margin: 0 }}>{effectiveBudget.toLocaleString("tr-TR")} ₺</p>
-          {manualIncome > 0 && (
-            <p style={{ fontSize: 12, color: c.success, margin: "2px 0 0" }}>+{manualIncome.toLocaleString("tr-TR")} ₺ ek gelir dahil</p>
+      {/* Tahsilat durumu */}
+      <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "12px 14px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+          <div>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Anlaşılan ücret</p>
+            <p style={{ fontSize: 19, fontWeight: 600, color: c.textPrimary, margin: 0 }}>
+              {agreedFee.toLocaleString("tr-TR")} ₺
+            </p>
+          </div>
+          {fullyCollected && (
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                color: c.success,
+                background: `${c.success}1a`,
+                padding: "3px 10px",
+                borderRadius: 20,
+              }}
+            >
+              Tahsilat tamam
+              {overpaid > 0 && ` · +${overpaid.toLocaleString("tr-TR")} ₺ fazla`}
+            </span>
           )}
         </div>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Yapılan harcamalar</p>
-          <p style={{ fontSize: 19, fontWeight: 600, color: c.danger, margin: 0 }}>{totalSpent.toLocaleString("tr-TR")} ₺</p>
-          {manualExpense > 0 && (
-            <p style={{ fontSize: 12, color: c.danger, margin: "2px 0 0" }}>+{manualExpense.toLocaleString("tr-TR")} ₺ ek gider dahil</p>
-          )}
+
+        <div style={{ height: 6, borderRadius: 20, background: c.background, overflow: "hidden", marginBottom: 12 }}>
+          <div
+            style={{
+              width: `${agreedFee > 0 ? Math.min(100, (received / agreedFee) * 100) : 0}%`,
+              height: "100%",
+              background: c.success,
+            }}
+          />
         </div>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Kalan varlık</p>
-          <p style={{ fontSize: 19, fontWeight: 600, color: c.success, margin: 0 }}>{remainingAsset.toLocaleString("tr-TR")} ₺</p>
+
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 110 }}>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Gelen ödeme</p>
+            <p style={{ fontSize: 19, fontWeight: 600, color: c.success, margin: 0 }}>
+              {received.toLocaleString("tr-TR")} ₺
+            </p>
+          </div>
+          <div style={{ flex: 1, minWidth: 110 }}>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Beklenen ödeme</p>
+            <p
+              style={{
+                fontSize: 19,
+                fontWeight: 600,
+                color: expectedPayment > 0 ? c.warning : c.textSecondary,
+                margin: 0,
+              }}
+            >
+              {expectedPayment.toLocaleString("tr-TR")} ₺
+            </p>
+          </div>
+          <div style={{ flex: 1, minWidth: 110 }}>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Yapılan harcamalar</p>
+            <p style={{ fontSize: 19, fontWeight: 600, color: c.danger, margin: 0 }}>
+              {totalSpent.toLocaleString("tr-TR")} ₺
+            </p>
+          </div>
+          <div style={{ flex: 1, minWidth: 110 }}>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Net kazanç</p>
+            <p style={{ fontSize: 19, fontWeight: 600, color: netEarned < 0 ? c.danger : c.success, margin: 0 }}>
+              {netEarned.toLocaleString("tr-TR")} ₺
+            </p>
+            <p style={{ fontSize: 12, color: c.textSecondary, margin: "2px 0 0" }}>Gelen ödeme − harcama</p>
+          </div>
         </div>
       </div>
 
       <div>
-        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>Gelir & gider hareketleri</h4>
+        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>Ödeme hareketleri</h4>
         {transactions.length === 0 ? (
-          <p style={{ fontSize: 15, color: c.textSecondary }}>Henüz elle eklenmiş bir gelir/gider yok. Eklemek için alttaki + butonunu kullan.</p>
+          <p style={{ fontSize: 15, color: c.textSecondary }}>
+            Müşteriden tahsil ettiğin ödemeleri "gelen ödeme" olarak ekle; beklenen ödemeden otomatik düşülür. Eklemek
+            için alttaki + butonunu kullan.
+          </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {transactions.map((t) => {
@@ -193,10 +254,10 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                       background: `${color}1a`,
                     }}
                   >
-                    {isIncome ? "Gelir" : "Gider"}
+                    {isIncome ? "Gelen ödeme" : t.type === "payout" ? "Hakediş" : "Gider"}
                   </span>
                   <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {t.description || (isIncome ? "Gelir" : "Gider")}
+                    {t.description || (isIncome ? "Gelen ödeme" : "Gider")}
                   </span>
                   <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
                     {new Date(t.createdAt).toLocaleDateString("tr-TR")}

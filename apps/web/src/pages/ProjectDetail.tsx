@@ -49,7 +49,7 @@ export default function ProjectDetail() {
       : activeTab === "team"
       ? { label: "Üye ekle", onClick: () => teamRef.current?.openCreate() }
       : activeTab === "budget"
-      ? { label: "Gelir/Gider ekle", onClick: () => budgetRef.current?.openCreate() }
+      ? { label: "Ödeme / gider ekle", onClick: () => budgetRef.current?.openCreate() }
       : { label: "Deadline'ı değiştir", onClick: () => setExtendingDeadline(true) },
     [activeTab, project, id]
   );
@@ -90,6 +90,14 @@ export default function ProjectDetail() {
     api.get<Task[]>(`/projects/${id}/tasks`).then(setTasks).catch(() => setTasks([]));
   }, [id]);
 
+  // Tarayıcı sekmesinin başlığında proje adı yazsın.
+  useEffect(() => {
+    if (project?.title) document.title = `${project.title} · Projelio`;
+    return () => {
+      document.title = "Projelio";
+    };
+  }, [project?.title]);
+
   // Proje ilk yüklendiğinde Süreç gezinmesini bugüne/bu haftaya/bu aya sabitlenmiş makul varsayılanlarla başlat (yalnızca bir kez).
   useEffect(() => {
     if (!project || processNavInitialized.current) return;
@@ -123,6 +131,12 @@ export default function ProjectDetail() {
     if (!targetId) return;
     setActiveTab("tasks");
     setHighlightTaskId(targetId);
+    // Hedef bir kez tüketildikten sonra history state'ini temizle: aksi halde sayfa
+    // yenilenince ya da başka bir işlem sonrası aynı hedefe tekrar "ışınlanma" oluyordu.
+    window.history.replaceState({}, "");
+    // Parlama animasyonu bittikten sonra vurgusunu kaldır ki kalıcı kalmasın.
+    const timer = setTimeout(() => setHighlightTaskId(undefined), 3500);
+    return () => clearTimeout(timer);
   }, [location.key]);
 
   const handleToggleActive = (taskId: string) => {
@@ -238,12 +252,11 @@ export default function ProjectDetail() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
-      <Link
-        to={project ? `/jobs/${project.jobId}` : "/"}
-        style={{ fontSize: 15, color: c.textSecondary, marginBottom: 4, display: "inline-block" }}
-      >
-        ← Projeler
-      </Link>
+      {!project && (
+        <Link to="/" style={{ fontSize: 15, color: c.textSecondary, marginBottom: 4, display: "inline-block" }}>
+          ← Projeler
+        </Link>
+      )}
 
       {project && (() => {
         const hasCover = Boolean(project.coverImageUrl);
@@ -289,12 +302,14 @@ export default function ProjectDetail() {
               }}
             >
               <span>
-                Bütçe: <span style={{ color: c.accentDark, fontWeight: 500 }}>{project.totalBudget.toLocaleString("tr-TR")} ₺</span>
+                Ücret: <span style={{ color: c.accentDark, fontWeight: 500 }}>{project.totalBudget.toLocaleString("tr-TR")} ₺</span>
               </span>
               <span>Başlangıç: {new Date(project.startDate).toLocaleDateString("tr-TR")}</span>
               <span>Bitiş: {new Date(project.deadline).toLocaleDateString("tr-TR")}</span>
             </div>
 
+            {/* Düzenleme yalnızca proje sahibine görünür; sunucu tarafı da ayrıca yetki kontrolü yapar. */}
+            {(!currentUserId || currentUserId === project.ownerId) && (
             <button
               onClick={() => setEditing(true)}
               aria-label="Projeyi düzenle"
@@ -315,13 +330,33 @@ export default function ProjectDetail() {
             >
               <IconSettings size={17} color={c.textSecondary} />
             </button>
+            )}
           </div>
         );
       })()}
 
       {project && id && (
         <div style={{ marginBottom: 24 }}>
-          <ProjectTabs active={activeTab} onChange={setActiveTab} />
+          {/* Sayfa kaydırılsa da sekmeler (akış, ekip, çıktılar, bütçe, süreç) ve
+              geri bağlantısı üstte sabit kalır. */}
+          <div
+            style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 5,
+              background: c.background,
+              margin: "0 -28px",
+              padding: "10px 28px 8px",
+            }}
+          >
+            <Link
+              to={`/jobs/${project.jobId}`}
+              style={{ fontSize: 14, color: c.textSecondary, display: "inline-block", marginBottom: 6 }}
+            >
+              ← Projeler
+            </Link>
+            <ProjectTabs active={activeTab} onChange={setActiveTab} />
+          </div>
 
           {activeTab === "feed" && <FeedPanel ref={feedRef} projectId={id} tasks={tasks} />}
           {activeTab === "team" && (

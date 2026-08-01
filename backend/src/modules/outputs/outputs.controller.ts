@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { OutputsService } from "./outputs.service";
 
@@ -13,8 +13,8 @@ export class OutputsController {
   }
 
   @Post("projects/:projectId/outputs")
-  create(@Param("projectId") projectId: string, @Body() body: any) {
-    return this.outputsService.create(projectId, body);
+  create(@Param("projectId") projectId: string, @Body() body: any, @Req() req: any) {
+    return this.outputsService.create(projectId, body, req.user.userId);
   }
 
   // NOT: bu route "outputs/:id" ile çakışmaması için ondan önce tanımlanmalı.

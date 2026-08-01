@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import type { Output, Project, User } from "@projelio/shared";
+import type { Output, Project } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import Modal from "./Modal";
+import AssigneePicker from "./AssigneePicker";
 
 interface Props {
   // Sabit bir proje verilirse proje seçimi gösterilmez (ör. proje sayfasından açılınca).
@@ -39,7 +40,6 @@ export default function CreateTaskModal({
   const [outputId, setOutputId] = useState("");
   const [loadingOutputs, setLoadingOutputs] = useState(false);
 
-  const [users, setUsers] = useState<User[]>([]);
   const [assignedTo, setAssignedTo] = useState(fixedAssignedTo ?? "");
 
   const [title, setTitle] = useState("");
@@ -68,11 +68,6 @@ export default function CreateTaskModal({
     setProjectId((prev) => prev || (projectsProp.length > 0 ? projectsProp[0].id : ""));
   }, [projectsProp]);
 
-  useEffect(() => {
-    if (fixedAssignedTo) return;
-    api.get<User[]>("/users").then(setUsers).catch(() => setUsers([]));
-  }, [fixedAssignedTo]);
-
   // Seçilen projeye göre çıktı listesini çek.
   useEffect(() => {
     if (!projectId) {
@@ -85,7 +80,8 @@ export default function CreateTaskModal({
       .get<Output[]>(`/projects/${projectId}/outputs`)
       .then((os) => {
         setOutputs(os);
-        setOutputId(os.length > 0 ? os[0].id : "");
+        // Varsayılan: çıktısız proje görevi; istenirse listeden bir çıktı seçilir.
+        setOutputId("");
       })
       .catch(() => setOutputs([]))
       .finally(() => setLoadingOutputs(false));
@@ -93,7 +89,7 @@ export default function CreateTaskModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectId || !outputId) return;
+    if (!projectId) return;
     setError("");
     setLoading(true);
     try {
@@ -101,7 +97,8 @@ export default function CreateTaskModal({
         title,
         deadline: deadline ? new Date(deadline).toISOString() : new Date().toISOString(),
         status: "todo",
-        outputId,
+        // Çıktı seçmek zorunlu değil: seçilmezse doğrudan proje görevi olarak eklenir.
+        outputId: outputId || undefined,
         assignedTo: assignedTo || undefined,
       });
       if (onCreated) {
@@ -145,22 +142,21 @@ export default function CreateTaskModal({
 
           {loadingOutputs ? (
             <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>Çıktılar yükleniyor…</p>
-          ) : noOutputs ? (
-            <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>
-              Bu projede henüz çıktı yok. Görev ekleyebilmek için önce bir çıktı oluşturman gerekiyor.
-            </p>
           ) : (
             <>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 15, color: c.textSecondary }}>Çıktı</label>
-                <select value={outputId} onChange={(e) => setOutputId(e.target.value)} style={{ width: "100%" }}>
-                  {outputs.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {!noOutputs && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 15, color: c.textSecondary }}>Çıktı (opsiyonel)</label>
+                  <select value={outputId} onChange={(e) => setOutputId(e.target.value)} style={{ width: "100%" }}>
+                    <option value="">Çıktısız — proje görevi</option>
+                    {outputs.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 15, color: c.textSecondary }}>Görev başlığı</label>
@@ -191,14 +187,8 @@ export default function CreateTaskModal({
                     {fixedAssignedToName ?? "Seçili kişi"}
                   </div>
                 ) : (
-                  <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} style={{ width: "100%" }}>
-                    <option value="">Atanmamış</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.fullName}
-                      </option>
-                    ))}
-                  </select>
+                  // Tüm kullanıcılar yerine yalnızca seçili projenin ekibi, arama ile
+                  <AssigneePicker projectId={projectId} value={assignedTo} onChange={(userId) => setAssignedTo(userId)} />
                 )}
               </div>
 

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type { Job, Project, Task, TaskStatus } from "@projelio/shared";
+import type { Job, Operation, Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import ProjectCard from "../components/ProjectCard";
+import OperationCard from "../components/OperationCard";
+import CreateOperationModal from "../components/CreateOperationModal";
 import EditJobModal from "../components/EditJobModal";
 import JobTabs, { JobTab } from "../components/JobTabs";
 import JobTeamPanel from "../components/JobTeamPanel";
@@ -21,6 +23,8 @@ export default function JobDetail() {
   const c = colors.light;
   const [job, setJob] = useState<Job | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [creatingOperation, setCreatingOperation] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editing, setEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<JobTab>("projects");
@@ -31,10 +35,15 @@ export default function JobDetail() {
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
   const tasksPanelRef = useRef<JobTasksPanelHandle>(null);
 
-  // "İşler" sekmesindeyken alt navigasyondaki "+" butonu doğrudan görev ekleme
-  // formunu açsın (diğer sekmelerde eski proje/görev seçim menüsü geçerli kalır).
+  // "İşler" sekmesindeyken alt navigasyondaki "+" butonu doğrudan görev ekleme,
+  // "Programlar" sekmesindeyken doğrudan program ekleme formunu açsın (diğer
+  // sekmelerde eski proje/program/görev seçim menüsü geçerli kalır).
   useProjectFabAction(
-    activeTab === "tasks" ? { label: "Görev ekle", onClick: () => tasksPanelRef.current?.openCreate() } : null,
+    activeTab === "tasks"
+      ? { label: "Görev ekle", onClick: () => tasksPanelRef.current?.openCreate() }
+      : activeTab === "programs"
+      ? { label: "Yeni program", onClick: () => setCreatingOperation(true) }
+      : null,
     [activeTab]
   );
 
@@ -42,9 +51,36 @@ export default function JobDetail() {
     if (!id) return;
     api.get<Job>(`/jobs/${id}`).then(setJob).catch(() => setJob(null));
     api.get<Project[]>(`/jobs/${id}/projects`).then(setProjects).catch(() => setProjects([]));
+    api.get<Operation[]>(`/jobs/${id}/operations`).then(setOperations).catch(() => setOperations([]));
   };
 
   useEffect(reload, [id]);
+
+  // Canlı görünüm: başka bir ekip üyesi yeni proje eklediğinde/değiştirdiğinde sayfayı
+  // yenilemeye gerek kalmadan görünsün diye proje listesi kısa aralıklarla tazelenir.
+  // Gerçekten bir değişiklik yoksa state güncellenmez (gereksiz render/görev yüklemesi olmaz).
+  useEffect(() => {
+    if (!id) return;
+    const fingerprint = (list: Project[]) =>
+      JSON.stringify(list.map((p) => [p.id, p.title, p.status, p.sortOrder, p.coverImageUrl, p.deadline]));
+    const timer = setInterval(() => {
+      api
+        .get<Project[]>(`/jobs/${id}/projects`)
+        .then((fresh) => {
+          setProjects((prev) => (fingerprint(prev) === fingerprint(fresh) ? prev : fresh));
+        })
+        .catch(() => {});
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [id]);
+
+  // Tarayıcı sekmesinin başlığında her koşulda "Projelio" yerine işin adı yazsın.
+  useEffect(() => {
+    if (job?.title) document.title = `${job.title} · Projelio`;
+    return () => {
+      document.title = "Projelio";
+    };
+  }, [job?.title]);
 
   // İşe ait tüm projelerin görev (ve alt görev) sayısını toplamak için
   // her projenin görev listesini çekip birleştiriyoruz.
@@ -166,6 +202,7 @@ export default function JobDetail() {
   if (!id) return null;
 
   const activeProjects = projects.filter((p) => p.status === "active");
+  const activeOperations = operations.filter((o) => o.status === "active");
   const pendingTasksCount = tasks.filter((t) => t.status !== "completed").length;
   const completedTasksCount = tasks.filter((t) => t.status === "completed").length;
 
@@ -246,8 +283,9 @@ export default function JobDetail() {
         </div>
 
         <div style={{ marginTop: 6 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
             <SummaryCard label="Aktif proje" value={activeProjects.length} />
+            <SummaryCard label="Çalışan program" value={activeOperations.length} />
             <SummaryCard label="Bekleyen görev" value={pendingTasksCount} />
             <SummaryCard label="Tamamlanmış görev" value={completedTasksCount} />
           </div>
@@ -274,6 +312,35 @@ export default function JobDetail() {
                   <div key={p.id} data-id={p.id}>
                     <ProjectCard project={p} />
                   </div>
+                ))}
+              </div>
+            )
+          )}
+
+          {activeTab === "programs" && (
+            operations.length === 0 ? (
+              <div
+                style={{
+                  border: `1px dashed ${c.border}`,
+                  borderRadius: 12,
+                  padding: 40,
+                  textAlign: "center",
+                  color: c.textSecondary,
+                  fontSize: 16,
+                  lineHeight: 1.6,
+                }}
+              >
+                Bu işte henüz program yok.
+                <br />
+                <span style={{ fontSize: 14 }}>
+                  Program, bitişi olmayan ve tekrarlayan işler içindir — aylık bakım, haftalık
+                  raporlama, sosyal medya yönetimi gibi. Bitişi olan işler proje olarak açılır.
+                </span>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+                {operations.map((o) => (
+                  <OperationCard key={o.id} operation={o} />
                 ))}
               </div>
             )
@@ -306,6 +373,18 @@ export default function JobDetail() {
           )}
         </div>
       </div>
+
+      {creatingOperation && (
+        <CreateOperationModal
+          jobId={id}
+          onClose={() => setCreatingOperation(false)}
+          onCreated={(created) => {
+            setOperations((prev) => [...prev, created]);
+            // Yeni program açılır açılmaz rutin tanımlanabilsin diye detayına gidilir.
+            navigate(`/operations/${created.id}`);
+          }}
+        />
+      )}
 
       {editing && job && (
         <EditJobModal

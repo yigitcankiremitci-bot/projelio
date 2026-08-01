@@ -37,7 +37,12 @@ export class AuthService {
       email: user.email,
       username: user.username,
       role: user.role,
+      accountType: user.accountType,
       activeTaskId: user.activeTaskId,
+      onboardingCompletedAt: user.onboardingCompletedAt,
+      avatarUrl: user.avatarUrl,
+      title: user.title,
+      bio: user.bio,
     };
   }
 }

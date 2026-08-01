@@ -56,8 +56,11 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Bütçe (₺)</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Anlaşılan ücret (₺)</label>
           <input type="number" min={0} value={totalBudget} onChange={(e) => setTotalBudget(e.target.value)} placeholder="0" style={{ width: "100%" }} />
+          <span style={{ fontSize: 13, color: c.textSecondary }}>
+            Müşteriden tahsil edeceğin toplam tutar. Aldığın ödemeler bundan düşülür.
+          </span>
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>

@@ -205,6 +205,28 @@ export function IconMessageCircle({ size = 18, color = "currentColor" }: IconPro
   );
 }
 
+// Organization (Şirket/Marka) katmanı için bina ikonu.
+export function IconBuilding({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="3" width="12" height="18" rx="1.5" />
+      <path d="M9 8h2M9 12h2M9 16h2" />
+      <path d="M16 10h3a1 1 0 0 1 1 1v10h-4" />
+      <path d="M8 21h9" />
+    </svg>
+  );
+}
+
+// Group (Holding) katmanı için üst üste katmanlar ikonu.
+export function IconLayers({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l9 5-9 5-9-5 9-5z" />
+      <path d="M3 13l9 5 9-5" />
+    </svg>
+  );
+}
+
 // "Üzerinde çalışıyorum" durumu için: nabız/canlı yayın tarzı ikon.
 export function IconActivity({ size = 18, color = "currentColor", filled = false }: IconProps & { filled?: boolean }) {
   return (

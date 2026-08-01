@@ -35,9 +35,12 @@ export default function EditOutputModal({ output, onClose, onSaved, onDeleted, o
     setError("");
     setLoading(true);
     try {
+      // Açıklama tamamen silinmek istendiğinde null gönderiyoruz: "undefined"
+      // JSON'a hiç yazılmadığı için sunucu alanı güncellemiyor ve eski açıklama
+      // geri geliyordu (açıklama temizlenemiyor hatası).
       const updated = await api.patch<Output>(`/outputs/${output.id}`, {
         title,
-        description: description || undefined,
+        description: description.trim() ? description : null,
       });
       onSaved(updated);
       onClose();

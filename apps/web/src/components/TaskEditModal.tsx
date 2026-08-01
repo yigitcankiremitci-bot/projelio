@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import type { Task, TaskComment, User } from "@projelio/shared";
+import type { Task, TaskComment } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import Modal from "./Modal";
+import AssigneePicker from "./AssigneePicker";
 import EntityDangerZone from "./EntityDangerZone";
 
 interface Props {
@@ -21,11 +22,11 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
   const c = colors.light;
   const isSubtask = Boolean(task.parentTaskId);
   const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description ?? "");
   const [startDate, setStartDate] = useState(toDateInputValue(task.startDate));
   const [deadline, setDeadline] = useState(toDateInputValue(task.deadline));
   const [assignedTo, setAssignedTo] = useState(task.assignedTo ?? "");
   const [budget, setBudget] = useState(String(task.budget ?? 0));
-  const [users, setUsers] = useState<User[]>([]);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [commentBody, setCommentBody] = useState("");
   const [error, setError] = useState("");
@@ -43,7 +44,6 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
   };
 
   useEffect(() => {
-    api.get<User[]>("/users").then(setUsers).catch(() => setUsers([]));
     api
       .get<TaskComment[]>(`/tasks/${task.id}/comments`)
       .then(setComments)
@@ -57,6 +57,7 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
     try {
       const updated = await api.patch<Task>(`/tasks/${task.id}`, {
         title,
+        description: description.trim() ? description : null,
         startDate: startDate ? new Date(startDate).toISOString() : undefined,
         deadline: deadline ? new Date(deadline).toISOString() : undefined,
         assignedTo: assignedTo || null,
@@ -93,6 +94,18 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
           <input value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} style={{ width: "100%" }} />
         </div>
 
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Görevle ilgili kısa açıklama (opsiyonel)"
+            rows={3}
+            maxLength={2000}
+            style={{ width: "100%", fontSize: 16, resize: "vertical" }}
+          />
+        </div>
+
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Başlangıç tarihi</label>
@@ -107,14 +120,8 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Ekip</label>
-            <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} style={{ width: "100%" }}>
-              <option value="">Atanmamış</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.fullName}
-                </option>
-              ))}
-            </select>
+            {/* Tüm kullanıcılar yerine yalnızca proje ekibi, arama ile */}
+            <AssigneePicker projectId={task.projectId} value={assignedTo} onChange={(userId) => setAssignedTo(userId)} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Bütçe (₺)</label>

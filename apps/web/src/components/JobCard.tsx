@@ -22,14 +22,15 @@ export default function JobCard({ job, projectCount }: Props) {
         background: c.surface,
       }}
     >
-      <div
-        style={{
-          aspectRatio: "3 / 1",
-          background: job.coverImageUrl
-            ? `center/cover url(${job.coverImageUrl})`
-            : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,
-        }}
-      />
+      {/* Kapak eklenmemiş işler kapaksız, küçük (kompakt) görünümde gösterilir. */}
+      {job.coverImageUrl && (
+        <div
+          style={{
+            aspectRatio: "3 / 1",
+            background: `center/cover url(${job.coverImageUrl})`,
+          }}
+        />
+      )}
       <div style={{ padding: 16 }}>
         <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{job.title}</h3>
         {job.description && (

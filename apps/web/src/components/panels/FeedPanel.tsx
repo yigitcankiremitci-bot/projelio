@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import type { Task, TaskComment, ProjectPost, ProjectMember, PostComment } from "@projelio/shared";
 import { api } from "../../api/client";
 import { colors } from "../../theme/colors";
+import { formatDateTime } from "../../lib/dates";
 import { IconCheck, IconHeart, IconMessageCircle } from "../icons";
 
 export interface FeedPanelHandle {
@@ -16,7 +17,9 @@ interface Props {
 type FeedComment = TaskComment & { taskTitle: string };
 type FeedItem =
   | { kind: "post"; id: string; createdAt: string; post: ProjectPost }
-  | { kind: "comment"; id: string; createdAt: string; authorName: string; body: string; taskTitle: string };
+  | { kind: "comment"; id: string; createdAt: string; authorName: string; body: string; taskTitle: string }
+  // Tamamlanan görevler, tamamlanma saat ve tarihiyle birlikte akışta yayınlanır.
+  | { kind: "taskDone"; id: string; createdAt: string; task: Task };
 
 const MENTION_REGEX = /@[a-z0-9_.]{3,30}/gi;
 
@@ -148,6 +151,8 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, commentCount: p.commentCount + delta } : p)));
   };
 
+  const completedTasks = tasks.filter((t) => t.status === "completed" && !t.parentTaskId);
+
   const items: FeedItem[] = [
     ...posts.map((p) => ({ kind: "post" as const, id: p.id, createdAt: p.createdAt, post: p })),
     ...comments.map((cm) => ({
@@ -158,9 +163,13 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
       body: cm.body,
       taskTitle: cm.taskTitle,
     })),
+    ...completedTasks.map((t) => ({
+      kind: "taskDone" as const,
+      id: t.id,
+      createdAt: t.completedAt ?? t.createdAt,
+      task: t,
+    })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  const completedTasks = tasks.filter((t) => t.status === "completed" && !t.parentTaskId);
 
   const remaining = 140 - postBody.length;
 
@@ -233,32 +242,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
         )}
       </form>
 
-      {completedTasks.length > 0 && (
-        <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12 }}>
-          <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 8px" }}>Tamamlanan görevler</h4>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {completedTasks.map((t) => (
-              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                <span
-                  style={{
-                    width: 15,
-                    height: 15,
-                    borderRadius: "50%",
-                    background: c.accent,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <IconCheck size={9} color="#fff" />
-                </span>
-                <span style={{ fontSize: 15, color: c.textPrimary }}>{t.title}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Tamamlanan görevler artık aşağıdaki akışta, tamamlanma saat/tarihiyle birlikte gösteriliyor. */}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {loading ? (
@@ -274,6 +258,35 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
                 onLikeToggled={handleLikeToggled}
                 onCommentCountChanged={handleCommentCountChanged}
               />
+            ) : item.kind === "taskDone" ? (
+              <div
+                key={`done-${item.id}`}
+                style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "center", gap: 8 }}
+              >
+                <span
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    background: c.accent,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <IconCheck size={10} color="#fff" />
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 15, color: c.textPrimary }}>
+                    {item.task.completedByName ? `${item.task.completedByName}, ` : ""}
+                    <strong style={{ fontWeight: 500 }}>"{item.task.title}"</strong> görevini tamamladı
+                  </span>
+                </div>
+                <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>
+                  {formatDateTime(item.createdAt)}
+                </span>
+              </div>
             ) : (
               <div key={`comment-${item.id}`} style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "10px 12px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>

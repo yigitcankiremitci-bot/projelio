@@ -4,7 +4,10 @@ import { DatabaseModule } from "./database/database.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
+import { OperationsModule } from "./modules/operations/operations.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
+import { OrganizationsModule } from "./modules/organizations/organizations.module";
+import { GroupsModule } from "./modules/groups/groups.module";
 import { TasksModule } from "./modules/tasks/tasks.module";
 import { OutputsModule } from "./modules/outputs/outputs.module";
 import { TaskCommentsModule } from "./modules/task-comments/task-comments.module";
@@ -17,6 +20,7 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import { CalendarModule } from "./modules/calendar/calendar.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { ArchiveModule } from "./modules/archive/archive.module";
+import { AiAssistantModule } from "./modules/ai-assistant/ai-assistant.module";
 
 @Module({
   imports: [
@@ -25,7 +29,10 @@ import { ArchiveModule } from "./modules/archive/archive.module";
     AuthModule,
     UsersModule,
     ProjectsModule,
+    OperationsModule,
     JobsModule,
+    OrganizationsModule,
+    GroupsModule,
     TasksModule,
     OutputsModule,
     TaskCommentsModule,
@@ -38,6 +45,7 @@ import { ArchiveModule } from "./modules/archive/archive.module";
     CalendarModule,
     AdminModule,
     ArchiveModule,
+    AiAssistantModule,
   ],
 })
 export class AppModule {}

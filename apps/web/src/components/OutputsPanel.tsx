@@ -164,6 +164,21 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
             />
           ))}
         </div>
+
+        {/* Kalem ikonu bu görünümde de düzenleme modalını açabilsin: modal önceden
+            yalnızca liste görünümünde render ediliyordu, bu yüzden çalışmıyordu. */}
+        {editingOutput && (
+          <EditOutputModal
+            output={editingOutput}
+            onClose={() => setEditingOutput(null)}
+            onSaved={(updated) => {
+              handleOutputSaved(updated);
+              setEditingOutput(null);
+            }}
+            onDeleted={handleOutputRemoved}
+            onArchived={handleOutputRemoved}
+          />
+        )}
       </div>
     );
   }

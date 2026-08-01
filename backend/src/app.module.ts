@@ -21,6 +21,7 @@ import { CalendarModule } from "./modules/calendar/calendar.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { ArchiveModule } from "./modules/archive/archive.module";
 import { AiAssistantModule } from "./modules/ai-assistant/ai-assistant.module";
+import { HealthModule } from "./modules/health/health.module";
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { AiAssistantModule } from "./modules/ai-assistant/ai-assistant.module";
     AdminModule,
     ArchiveModule,
     AiAssistantModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

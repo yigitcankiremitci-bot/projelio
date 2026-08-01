@@ -148,6 +148,10 @@ export class AiAssistantService {
   private getClient(): Anthropic {
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
     if (!apiKey) {
+      this.logger.error(
+        "ANTHROPIC_API_KEY bu süreçte tanımlı değil. Yüklenen .env: " +
+          `${process.env.__PROJELIO_ENV_PATH ?? "(bilinmiyor)"}`
+      );
       throw new BadRequestException(
         "AI asistanı yapılandırılmamış: backend/.env dosyasına ANTHROPIC_API_KEY eklemeniz gerekiyor."
       );
@@ -385,6 +389,9 @@ export class AiAssistantService {
   ): Promise<ChatResult> {
     const trimmed = userMessage?.trim();
     if (!trimmed) throw new BadRequestException("Mesaj boş olamaz.");
+
+    // Teşhis izi: bu satır görünmüyorsa istek bu backend'e hiç ulaşmamıştır.
+    this.logger.log(`AI isteği alındı · kullanıcı=${userId.slice(0, 8)}… uzunluk=${trimmed.length}`);
 
     // Bakiye yetersizse hiç API çağrısı yapma.
     await this.creditsService.assertCanStart(userId);

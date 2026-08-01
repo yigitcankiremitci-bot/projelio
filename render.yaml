@@ -1,0 +1,65 @@
+# Render Blueprint — Projelio backend (NestJS API)
+#
+# Kullanımı: Render panelinde "New +" > "Blueprint" ile bu depoyu bağlayın.
+# Render bu dosyayı okuyup servisi otomatik oluşturur.
+#
+# NOT: sync:false işaretli değişkenler gizli olduğu için bu dosyada TUTULMAZ;
+# Render panelinde Environment sekmesinden elle girilir.
+
+services:
+  - type: web
+    name: projelio-api
+    runtime: node
+    plan: starter # $7/ay — uykuya dalmaz (cron işleri ve WebSocket için gerekli)
+    region: frankfurt # Supabase projesi eu-central-1'de; aynı bölge = düşük gecikme
+    branch: main
+
+    # Monorepo: kurulum ve derleme depo kökünden yapılır (npm workspaces).
+    buildCommand: npm install && npm run build --workspace=backend
+    startCommand: node backend/dist/main
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+
+      # --- Gizli değerler: Render panelinden girilecek ---
+      - key: JWT_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+
+      # Frontend'in adresi — CORS bu listeyle sınırlanır (virgülle çoğaltılabilir).
+      - key: CORS_ORIGINS
+        sync: false
+
+      # --- Genel ayarlar ---
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: ANTHROPIC_MODEL
+        value: claude-haiku-4-5-20251001
+
+      # --- AI kredi ekonomisi (bkz. backend/.env.example) ---
+      - key: AI_COMMISSION_RATE
+        value: "0.2"
+      - key: AI_CREDIT_UNIT_USD
+        value: "0.0001"
+      - key: AI_MIN_BALANCE_TO_START
+        value: "20"
+      - key: AI_WELCOME_CREDITS
+        value: "2000"
+      - key: AI_PROMPT_CACHING
+        value: "true"

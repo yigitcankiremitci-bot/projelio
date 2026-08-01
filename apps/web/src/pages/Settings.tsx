@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { User } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
-import { IconShield, IconLogout, IconChevronRight, IconArchive } from "../components/icons";
+import { IconShield, IconLogout, IconChevronRight, IconArchive, IconSparkle } from "../components/icons";
 import {
   FONT_SCALE_OPTIONS,
   FONT_SCALE_LABELS,
@@ -84,6 +84,16 @@ export default function Settings() {
           <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <IconShield size={17} color={c.textSecondary} />
             <span style={{ fontSize: 17, color: c.textPrimary }}>Admin paneli</span>
+          </span>
+          <IconChevronRight size={16} color={c.textSecondary} />
+        </button>
+
+        <div style={{ borderTop: `1px solid ${c.border}` }} />
+
+        <button onClick={() => navigate("/settings/ai-credits")} style={rowStyle}>
+          <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <IconSparkle size={17} color={c.accent} />
+            <span style={{ fontSize: 17, color: c.textPrimary }}>AI kredilerim</span>
           </span>
           <IconChevronRight size={16} color={c.textSecondary} />
         </button>

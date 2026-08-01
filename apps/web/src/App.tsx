@@ -21,7 +21,8 @@ import TasksOverview from "./pages/TasksOverview";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
 import NotificationBell from "./components/NotificationBell";
-import AiChatWidget from "./components/AiChatWidget";
+import AiLauncher from "./components/AiLauncher";
+import AiCreditsPage from "./pages/AiCredits";
 import { initPush } from "./push";
 import { colors } from "./theme/colors";
 import { ProjectFabContext } from "./lib/projectFab";
@@ -111,7 +112,7 @@ export default function App() {
           </Link>
         )}
         <NotificationBell />
-        <AiChatWidget />
+        <AiLauncher />
         <ProjectFabContext.Provider value={{ action: fabAction, setAction: setFabAction }}>
           <div style={{ paddingTop: HEADER_HEIGHT, paddingBottom: isDesktop ? 28 : 84 }}>
             <Routes>
@@ -127,6 +128,7 @@ export default function App() {
               <Route path="/tasks" element={<TasksOverview />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/archive" element={<Archive />} />
+              <Route path="/settings/ai-credits" element={<AiCreditsPage />} />
               <Route path="/admin" element={<AdminPanel />} />
             </Routes>
           </div>

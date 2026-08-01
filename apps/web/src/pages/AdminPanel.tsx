@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { colors } from "../theme/colors";
 import { IconShield } from "../components/icons";
+import AiCreditAdminPanel from "../components/AiCreditAdminPanel";
 
 export default function AdminPanel() {
   const [unlocked, setUnlocked] = useState(false);
@@ -70,9 +71,11 @@ export default function AdminPanel() {
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
       <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 500, margin: "0 0 8px" }}>Admin paneli</h1>
-      <p style={{ color: c.textSecondary, fontSize: 16 }}>
+      <p style={{ color: c.textSecondary, fontSize: 16, margin: "0 0 26px" }}>
         Kullanıcılar, proje istatistikleri ve sistem durumu burada listelenir.
       </p>
+
+      <AiCreditAdminPanel />
     </div>
   );
 }

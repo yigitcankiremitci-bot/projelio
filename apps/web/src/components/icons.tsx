@@ -205,6 +205,26 @@ export function IconMessageCircle({ size = 18, color = "currentColor" }: IconPro
   );
 }
 
+// Projelio AI için parıltı ikonu — asistanın her yerdeki görsel imzası.
+export function IconSparkle({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
+      <path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z" />
+    </svg>
+  );
+}
+
+// Sohbet gönderme (ok) ikonu.
+export function IconSend({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 19V5" />
+      <path d="M6 11l6-6 6 6" />
+    </svg>
+  );
+}
+
 // Organization (Şirket/Marka) katmanı için bina ikonu.
 export function IconBuilding({ size = 18, color = "currentColor" }: IconProps) {
   return (

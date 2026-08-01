@@ -56,6 +56,43 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       required: ["projectId"],
     },
   },
+  {
+    name: "list_project_members",
+    description:
+      "Bir projenin ekibini listeler (isim, kullanıcı adı, rol, id). Bir göreve kişi atamadan önce doğru kullanıcı id'sini bulmak için kullan.",
+    input_schema: {
+      type: "object",
+      properties: { projectId: { type: "string" } },
+      required: ["projectId"],
+    },
+  },
+  {
+    name: "search_tasks",
+    description:
+      "Kullanıcının erişebildiği tüm projelerde görev arar. Duruma, atanan kişiye, gecikmişliğe veya tarih aralığına göre filtreler. " +
+      "\"Bu hafta neler var\", \"geciken işlerim\", \"bana atanmış görevler\" gibi sorular için bunu kullan.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Görev başlığında aranacak metin (opsiyonel)." },
+        projectId: { type: "string", description: "Yalnızca belirli bir projede ara (opsiyonel)." },
+        status: { type: "string", enum: ["todo", "in_progress", "completed"] },
+        assignedToMe: { type: "boolean", description: "Yalnızca kullanıcıya atanmış görevler." },
+        overdue: { type: "boolean", description: "Yalnızca teslim tarihi geçmiş ve tamamlanmamış görevler." },
+        dueBefore: { type: "string", description: "Bu tarihten önce teslim edilecekler (YYYY-MM-DD)." },
+        dueAfter: { type: "string", description: "Bu tarihten sonra teslim edilecekler (YYYY-MM-DD)." },
+        limit: { type: "number", description: "En fazla kaç sonuç (varsayılan 25)." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_workspace_summary",
+    description:
+      "Kullanıcının genel durumunu özetler: aktif proje sayısı, geciken görevler, bu hafta teslim edilecekler, kendisine atanmış açık işler. " +
+      "\"Durumum ne\", \"neler yapmam lazım\", \"özet ver\" gibi sorular için kullan.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
 
   // --- Job (iş) yazma araçları -----------------------------------------
   {

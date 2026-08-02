@@ -172,3 +172,27 @@ button:focus-visible {
     animation: none;
   }
 }
+
+/*
+ * İş/proje kartlarının kapak fotoğrafı üzerindeki "+" hızlı ekleme düğmesi:
+ * masaüstünde yalnızca kart üzerine gelinince görünür. Dokunmatik cihazlarda
+ * hover kavramı olmadığı için (bkz. "hover: none") her zaman görünür kalır —
+ * aksi halde özelliğe erişilemezdi.
+ */
+.entity-card-cover-add {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.entity-card:hover .entity-card-cover-add {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .entity-card-cover-add {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

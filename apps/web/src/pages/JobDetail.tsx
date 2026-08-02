@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Job, Operation, Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import ProjectCard from "../components/ProjectCard";
@@ -28,7 +28,15 @@ export default function JobDetail() {
   const [creatingOperation, setCreatingOperation] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editing, setEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<JobTab>("projects");
+  // Sekme, URL'deki ?tab= ile eşleşir: sidebar'daki ağaçtan "Ekip" ya da "Dosyalar"
+  // gibi bir alt bağlantıya tıklandığında doğrudan o sekmeyle açılsın diye.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const validTabs: JobTab[] = ["projects", "programs", "team", "tasks", "files"];
+  const activeTab: JobTab = validTabs.includes(tabParam as JobTab) ? (tabParam as JobTab) : "projects";
+  const setActiveTab = (next: JobTab) => {
+    setSearchParams(next === "projects" ? {} : { tab: next }, { replace: true });
+  };
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [parentCompletePrompt, setParentCompletePrompt] = useState<Task | null>(null);
   const [currentUserActiveTaskId, setCurrentUserActiveTaskId] = useState<string | undefined>(undefined);

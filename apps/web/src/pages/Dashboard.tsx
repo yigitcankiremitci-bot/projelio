@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { Job, Project } from "@projelio/shared";
 import { api } from "../api/client";
 import JobCard from "../components/JobCard";
@@ -7,19 +7,28 @@ import { colors } from "../theme/colors";
 import { useSortableList } from "../lib/useSortableList";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useNavVisibility } from "../lib/useNavVisibility";
-import { IconBuilding, IconLayers, IconChevronRight, IconFolder, IconActivity } from "../components/icons";
+import { IconBuilding, IconLayers, IconChevronRight, IconFolder, IconActivity, IconFile } from "../components/icons";
 import ProfileCard from "../components/ProfileCard";
 import BudgetPanel from "../components/BudgetPanel";
+import AllFilesPanel from "../components/AllFilesPanel";
 
-type DashboardTab = "jobs" | "budget";
+type DashboardTab = "jobs" | "budget" | "files";
 
 const tabs: { key: DashboardTab; label: string; icon: typeof IconFolder }[] = [
   { key: "jobs", label: "İşler", icon: IconFolder },
   { key: "budget", label: "Bütçe", icon: IconActivity },
+  { key: "files", label: "Dosyalar", icon: IconFile },
 ];
 
 export default function Dashboard() {
-  const [tab, setTab] = useState<DashboardTab>("jobs");
+  // Sekme, URL'deki ?tab= ile eşleşir: sidebar'dan doğrudan "/?tab=budget" ya da
+  // "/?tab=files" gibi bir bağlantıyla gelindiğinde ilgili sekme açık başlasın diye.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab: DashboardTab = tabParam === "budget" || tabParam === "files" ? tabParam : "jobs";
+  const setTab = (next: DashboardTab) => {
+    setSearchParams(next === "jobs" ? {} : { tab: next }, { replace: true });
+  };
   const [jobs, setJobs] = useState<Job[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const c = colors.light;
@@ -67,11 +76,24 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: isDesktop ? "row" : "column",
+          alignItems: isDesktop ? "center" : "stretch",
+          justifyContent: "space-between",
+          gap: 16,
+          marginBottom: 20,
+        }}
+      >
         <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
-          {tab === "jobs" ? "İşlerim" : "Bütçem"}
+          {tab === "jobs" ? "İşlerim" : tab === "budget" ? "Bütçem" : "Dosyalarım"}
         </h1>
-        <ProfileCard />
+        {/* Masaüstünde sağa dayalı, mobilde ise kendi satırında ortalanmış görünür
+            (aksi halde dar ekranda satır kırılınca sola yapışık kalıyordu). */}
+        <div style={{ display: "flex", justifyContent: isDesktop ? "flex-end" : "center" }}>
+          <ProfileCard />
+        </div>
       </div>
 
       {/* İşler / Bütçe sekmeleri */}
@@ -105,6 +127,8 @@ export default function Dashboard() {
       </div>
 
       {tab === "budget" && <BudgetPanel />}
+
+      {tab === "files" && <AllFilesPanel jobs={jobs} />}
 
       {tab === "jobs" && !isDesktop && (showOrganizations || showGroups) && (
         <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>

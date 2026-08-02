@@ -1,21 +1,23 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { colors } from "../theme/colors";
-import { IconDashboard, IconCalendar, IconShield, IconLogout, IconCheck, IconBuilding, IconLayers } from "./icons";
+import { IconDashboard, IconCalendar, IconShield, IconLogout, IconSettings, IconActivity, IconFile } from "./icons";
 import { SIDEBAR_WIDTH } from "../lib/layout";
-import { useNavVisibility } from "../lib/useNavVisibility";
+import SidebarTree from "./SidebarTree";
 
 export default function Sidebar() {
   const c = colors.light;
   const location = useLocation();
   const navigate = useNavigate();
-  const { showOrganizations, showGroups } = useNavVisibility();
+  // Bütçe ve Dosyalar, Ana Sayfa'nın kendi sekmeleridir (bkz. Dashboard.tsx ?tab=);
+  // buradan doğrudan o sekmeyle açılacak şekilde bağlanır.
+  const searchTab = new URLSearchParams(location.search).get("tab");
 
   const navItems = [
-    { to: "/", label: "Ana Sayfa", icon: IconDashboard },
-    ...(showOrganizations ? [{ to: "/organizations", label: "Organizasyonlar", icon: IconBuilding }] : []),
-    ...(showGroups ? [{ to: "/groups", label: "Gruplar", icon: IconLayers }] : []),
-    { to: "/calendar", label: "Takvim", icon: IconCalendar },
-    { to: "/admin", label: "Admin", icon: IconShield },
+    { to: "/", label: "Ana Sayfa", icon: IconDashboard, active: location.pathname === "/" && !searchTab },
+    { to: "/?tab=budget", label: "Bütçe", icon: IconActivity, active: location.pathname === "/" && searchTab === "budget" },
+    { to: "/?tab=files", label: "Dosyalar", icon: IconFile, active: location.pathname === "/" && searchTab === "files" },
+    { to: "/calendar", label: "Takvim", icon: IconCalendar, active: location.pathname.startsWith("/calendar") },
+    { to: "/admin", label: "Admin", icon: IconShield, active: location.pathname.startsWith("/admin") },
   ];
 
   const handleLogout = () => {
@@ -61,23 +63,22 @@ export default function Sidebar() {
       >
         <span
           style={{
-            width: 26,
-            height: 26,
-            borderRadius: 7,
-            background: c.accent,
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            background: "#fff",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
           }}
         >
-          <IconCheck size={15} color={c.primaryDark} />
+          <img src="/logo.png" alt="Projelio" style={{ width: 24, height: 24 }} />
         </span>
-        <span style={{ color: "#fff", fontSize: 20, fontWeight: 600 }}>Projelio</span>
+        <span style={{ color: c.accent, fontSize: 20, fontWeight: 600 }}>Projelio</span>
       </Link>
 
       {navItems.map((item) => {
-        const active = item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to);
         const Icon = item.icon;
         return (
           <Link
@@ -89,17 +90,38 @@ export default function Sidebar() {
               gap: 10,
               padding: "9px 10px",
               borderRadius: 8,
-              background: active ? "rgba(255,255,255,0.08)" : "transparent",
-              borderLeft: active ? `2px solid ${c.accent}` : "2px solid transparent",
+              background: item.active ? "rgba(255,255,255,0.08)" : "transparent",
+              borderLeft: item.active ? `2px solid ${c.accent}` : "2px solid transparent",
             }}
           >
-            <Icon size={16} color={active ? c.accent : "#9AA6B4"} />
-            <span style={{ fontSize: 16, color: active ? "#fff" : "#C7CCD6" }}>{item.label}</span>
+            <Icon size={16} color={item.active ? c.accent : "#9AA6B4"} />
+            <span style={{ fontSize: 16, color: item.active ? "#fff" : "#C7CCD6" }}>{item.label}</span>
           </Link>
         );
       })}
 
+      {/* Grup > Organizasyon > İş gezinme ağacı: yalnızca kullanıcının erişebildiği
+          en az bir grup/organizasyon/iş varsa bir şey render eder. */}
+      <SidebarTree />
+
       <div style={{ marginTop: "auto" }}>
+        <Link
+          to="/settings"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "9px 10px",
+            borderRadius: 8,
+            background: location.pathname.startsWith("/settings") ? "rgba(255,255,255,0.08)" : "transparent",
+            borderLeft: location.pathname.startsWith("/settings") ? `2px solid ${c.accent}` : "2px solid transparent",
+          }}
+        >
+          <IconSettings size={16} color={location.pathname.startsWith("/settings") ? c.accent : "#9AA6B4"} />
+          <span style={{ fontSize: 16, color: location.pathname.startsWith("/settings") ? "#fff" : "#C7CCD6" }}>
+            Ayarlar
+          </span>
+        </Link>
         <button
           onClick={handleLogout}
           style={{

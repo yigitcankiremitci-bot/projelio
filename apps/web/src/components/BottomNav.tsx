@@ -1,7 +1,7 @@
 import { useContext, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { colors } from "../theme/colors";
-import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus, IconFolder, IconBuilding, IconLayers, IconActivity } from "./icons";
+import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus, IconFolder, IconBuilding, IconActivity } from "./icons";
 import CreateJobModal from "./CreateJobModal";
 import CreateProjectModal from "./CreateProjectModal";
 import CreateOperationModal from "./CreateOperationModal";
@@ -28,12 +28,13 @@ export default function BottomNav() {
   const [modal, setModal] = useState<ModalKind | null>(null);
   const [choosing, setChoosing] = useState(false);
   const { action: fabAction } = useContext(ProjectFabContext);
-  const { showOrganizations, showGroups } = useNavVisibility();
+  // Gruplar artık alt menüde ayrı bir sekme değil: mobilde ana sayfadaki
+  // kısayoldan erişiliyor (bkz. Dashboard.tsx), burada yalnızca Organizasyon kalır.
+  const { showOrganizations } = useNavVisibility();
 
   const leftItems = [
     { to: "/", label: "Ana sayfa", icon: IconDashboard },
     ...(showOrganizations ? [{ to: "/organizations", label: "Organizasyon", icon: IconBuilding }] : []),
-    ...(showGroups ? [{ to: "/groups", label: "Gruplar", icon: IconLayers }] : []),
   ];
 
   const isActive = (to: string) => (to === "/" ? location.pathname === "/" : location.pathname.startsWith(to));
@@ -242,9 +243,9 @@ export default function BottomNav() {
           bottom: 0,
           left: 0,
           right: 0,
-          // Safe-area (çentikli telefonlar) yüksekliğe eklenir; önceden padding sabit 58px
-          // yükseklikten yer çaldığı için simgeler yukarı taşıyordu.
-          height: "calc(58px + env(safe-area-inset-bottom))",
+          // Safe-area (çentikli telefonlar) yüksekliğe eklenir. Yükseklik ve üst padding,
+          // simge + etiketin bara sığması ve üstten taşmaması için 58px'ten 68px'e çıkarıldı.
+          height: "calc(68px + env(safe-area-inset-bottom))",
           background: c.surface,
           borderTop: `1px solid ${c.border}`,
           display: "flex",
@@ -261,7 +262,7 @@ export default function BottomNav() {
             <Link
               key={item.to}
               to={item.to}
-              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 2px", minWidth: 0 }}
+              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 2px 6px", minWidth: 0 }}
             >
               <Icon size={18} color={active ? c.accentDark : c.textSecondary} />
               <span
@@ -295,7 +296,7 @@ export default function BottomNav() {
             <Link
               key={item.to}
               to={item.to}
-              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 2px", minWidth: 0 }}
+              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 2px 6px", minWidth: 0 }}
             >
               <Icon size={18} color={active ? c.accentDark : c.textSecondary} />
               <span

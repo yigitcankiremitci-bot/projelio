@@ -12,6 +12,7 @@ import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import TeamPanel, { TeamPanelHandle } from "../components/panels/TeamPanel";
 import BudgetPanel, { BudgetPanelHandle } from "../components/panels/BudgetPanel";
 import OutputsPanel, { OutputsPanelHandle } from "../components/OutputsPanel";
+import FilesPanel from "../components/FilesPanel";
 import ProcessPanel, { ProcessNavState, ViewMode, computeInitialProcessNavDates } from "../components/panels/ProcessPanel";
 import { colors } from "../theme/colors";
 import { IconSettings } from "../components/icons";
@@ -50,6 +51,9 @@ export default function ProjectDetail() {
       ? { label: "Üye ekle", onClick: () => teamRef.current?.openCreate() }
       : activeTab === "budget"
       ? { label: "Ödeme / gider ekle", onClick: () => budgetRef.current?.openCreate() }
+      : // Dosyalar sekmesinin kendi yükleme alanı var; ayrıca FAB göstermeye gerek yok.
+      activeTab === "files"
+      ? null
       : { label: "Deadline'ı değiştir", onClick: () => setExtendingDeadline(true) },
     [activeTab, project, id]
   );
@@ -389,6 +393,7 @@ export default function ProjectDetail() {
               onTaskUpdated={updateTask}
             />
           )}
+          {activeTab === "files" && <FilesPanel projectId={id} />}
           {activeTab === "process" && (
             <ProcessPanel
               project={project}

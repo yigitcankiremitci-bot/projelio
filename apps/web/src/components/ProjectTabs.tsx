@@ -1,11 +1,12 @@
 import { colors } from "../theme/colors";
 
-export type ProjectTab = "feed" | "team" | "tasks" | "budget" | "process";
+export type ProjectTab = "feed" | "team" | "tasks" | "files" | "budget" | "process";
 
 const tabs: { key: ProjectTab; label: string }[] = [
   { key: "feed", label: "Akış" },
   { key: "team", label: "Ekip" },
   { key: "tasks", label: "Çıktılar" },
+  { key: "files", label: "Dosyalar" },
   { key: "budget", label: "Bütçe" },
   { key: "process", label: "Süreç" },
 ];

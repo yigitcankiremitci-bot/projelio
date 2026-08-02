@@ -21,6 +21,8 @@ import { CalendarModule } from "./modules/calendar/calendar.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { ArchiveModule } from "./modules/archive/archive.module";
 import { AiAssistantModule } from "./modules/ai-assistant/ai-assistant.module";
+import { GoogleModule } from "./modules/google/google.module";
+import { FilesModule } from "./modules/files/files.module";
 import { HealthModule } from "./modules/health/health.module";
 
 @Module({
@@ -47,6 +49,8 @@ import { HealthModule } from "./modules/health/health.module";
     AdminModule,
     ArchiveModule,
     AiAssistantModule,
+    GoogleModule,
+    FilesModule,
     HealthModule,
   ],
 })

@@ -1,9 +1,10 @@
 import { randomUUID } from "crypto";
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { Job } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { ProjectsService } from "../projects/projects.service";
 import { OperationsService } from "../operations/operations.service";
+import { FilesService } from "../files/files.service";
 import { applyOrder } from "../../common/reorder.util";
 
 const COVER_BUCKET = "job-covers";
@@ -28,10 +29,13 @@ function mapJob(row: any): Job {
 
 @Injectable()
 export class JobsService {
+  private readonly logger = new Logger(JobsService.name);
+
   constructor(
     private supabase: SupabaseService,
     private projectsService: ProjectsService,
-    private operationsService: OperationsService
+    private operationsService: OperationsService,
+    private filesService: FilesService
   ) {}
 
   // Kullanıcının sahibi olduğu işler + içindeki herhangi bir projeye ekibe
@@ -259,6 +263,15 @@ export class JobsService {
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("İş bulunamadı");
+
+    // Organizasyon/grup bağı değiştiyse kimin neye erişeceği de değişmiştir:
+    // yeni üst kademeye Drive izni verilmeli, eskisininki geri alınmalı.
+    if (patch.organization_id !== undefined || patch.group_id !== undefined) {
+      void this.filesService
+        .syncJobShares(id)
+        .catch((err) => this.logger.warn(`Drive izinleri eşitlenemedi (job=${id}): ${String(err)}`));
+    }
+
     return mapJob(row);
   }
 

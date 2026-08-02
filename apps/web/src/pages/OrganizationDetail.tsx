@@ -4,6 +4,7 @@ import type { Job, Organization } from "@projelio/shared";
 import { api } from "../api/client";
 import JobCard from "../components/JobCard";
 import EditOrganizationModal from "../components/EditOrganizationModal";
+import FilesPanel from "../components/FilesPanel";
 import { colors } from "../theme/colors";
 import { IconUser, IconCalendar, IconSettings, IconLayers } from "../components/icons";
 
@@ -125,6 +126,12 @@ export default function OrganizationDetail() {
             ))}
           </div>
         )}
+
+        {/* Hiyerarşi: organizasyona bağlı işlerin bütün dosyaları tek listede.
+            Yükleme burada yok — dosya her zaman bir işe ait olmak zorunda. */}
+        <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
+          {id && <FilesPanel organizationId={id} />}
+        </div>
       </div>
 
       {editing && organization && (

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { User } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
+import GoogleDriveCard from "../components/GoogleDriveCard";
 import { IconShield, IconLogout, IconChevronRight, IconArchive, IconSparkle } from "../components/icons";
 import {
   FONT_SCALE_OPTIONS,
@@ -116,6 +117,14 @@ export default function Settings() {
             <span style={{ fontSize: 17, color: c.danger }}>Çıkış yap</span>
           </span>
         </button>
+      </div>
+
+      <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "26px 0 10px", maxWidth: 420 }}>
+        Bağlı hesaplar
+      </h2>
+
+      <div style={{ maxWidth: 420 }}>
+        <GoogleDriveCard />
       </div>
 
       <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "26px 0 10px", maxWidth: 420 }}>

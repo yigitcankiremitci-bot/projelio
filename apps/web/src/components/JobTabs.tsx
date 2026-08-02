@@ -1,6 +1,6 @@
 import { colors } from "../theme/colors";
 
-export type JobTab = "projects" | "programs" | "team" | "tasks";
+export type JobTab = "projects" | "programs" | "team" | "tasks" | "files";
 
 // Projeler süreli ve biten işleri, Programlar süresiz ve tekrarlayan işleri tutar.
 // İkisi de bu işin altında yaşadığı için sekmeler yan yana durur.
@@ -9,6 +9,8 @@ const tabs: { key: JobTab; label: string }[] = [
   { key: "programs", label: "Programlar" },
   { key: "team", label: "Ekip" },
   { key: "tasks", label: "İşler" },
+  // Dosyalar işe aittir: iş sahibi altındaki tüm projelerin dosyalarını burada görür.
+  { key: "files", label: "Dosyalar" },
 ];
 
 interface Props {

@@ -1,0 +1,1191 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import { SupabaseService } from "../../database/supabase.service";
+import {
+  DriveNotConnectedError,
+  GoogleAccountsService,
+} from "../google/google-accounts.service";
+import {
+  DriveFileMissingError,
+  DriveService,
+  GOOGLE_DOC_EXPORT_MIME,
+  isGoogleDocMime,
+} from "../google/drive.service";
+import { NotificationsService } from "../notifications/notifications.service";
+
+/** Backend belleğinden geçirmeye razı olduğumuz üst sınır. Üstü resumable akışa gider. */
+export const INLINE_UPLOAD_LIMIT = 8 * 1024 * 1024;
+
+export interface ProjectFile {
+  id: string;
+  jobId: string;
+  /** Organizasyon/grup listelerinde dosyanın hangi işten geldiğini göstermek için. */
+  jobTitle?: string;
+  projectId?: string;
+  taskId?: string;
+  outputId?: string;
+  uploadedBy: string;
+  name: string;
+  mimeType: string;
+  sizeBytes?: number;
+  driveFileId: string;
+  webViewLink?: string;
+  iconLink?: string;
+  isGoogleDoc: boolean;
+  status: "pending" | "ready" | "missing";
+  createdAt: string;
+  canEditInDrive: boolean;
+}
+
+export interface FileContext {
+  projectId?: string;
+  taskId?: string;
+  outputId?: string;
+}
+
+/**
+ * Kullanıcının bir işteki erişim düzeyi.
+ *
+ *  job     -> iş sahibi ya da işe alınmış üye: işin BÜTÜN dosyalarını görür
+ *  project -> yalnızca bir/birkaç projeye eklenmiş kişi: sadece o projelerin
+ *             dosyalarını görür. İşin geneline ait dosyalar (project_id boş)
+ *             ona kapalıdır.
+ *  none    -> erişim yok
+ */
+interface JobAccess {
+  level: "job" | "project" | "none";
+  isJobOwner: boolean;
+  /** level='project' ise erişebildiği proje kimlikleri. */
+  projectIds: string[];
+}
+
+function mapFile(row: any, canEditInDrive: boolean): ProjectFile {
+  return {
+    id: row.id,
+    jobId: row.job_id,
+    projectId: row.project_id ?? undefined,
+    taskId: row.task_id ?? undefined,
+    outputId: row.output_id ?? undefined,
+    uploadedBy: row.uploaded_by,
+    name: row.name,
+    mimeType: row.mime_type,
+    sizeBytes: row.size_bytes !== null && row.size_bytes !== undefined ? Number(row.size_bytes) : undefined,
+    driveFileId: row.drive_file_id,
+    webViewLink: row.web_view_link ?? undefined,
+    iconLink: row.icon_link ?? undefined,
+    isGoogleDoc: row.is_google_doc ?? false,
+    status: row.status,
+    createdAt: row.created_at,
+    canEditInDrive,
+  };
+}
+
+@Injectable()
+export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
+
+  constructor(
+    private supabase: SupabaseService,
+    private accounts: GoogleAccountsService,
+    private drive: DriveService,
+    private notifications: NotificationsService
+  ) {}
+
+  // ============================================================ yetkilendirme
+  // Veritabanında RLS politikası yok (her şey service_role ile geçiyor), bu yüzden
+  // erişim kontrolü burada AÇIKÇA yapılmak zorunda. Bir dosya endpoint'inde bunu
+  // atlamak, başka bir işin belgelerini herkese açmak demektir.
+
+  /**
+   * İşin BÜTÜN dosyalarına erişmesi gereken kullanıcılar.
+   *
+   * Projelio'nun sahiplik zinciri: Grup > Organizasyon > İş > Proje.
+   * Üst kademe, altındaki her şeyi görebilmeli — bir holding sahibi, holdingine
+   * bağlı şirketlerin işlerindeki dosyaları görmek ister.
+   *
+   *   İşin sahibi ve iş ekibi
+   *   + İş bir organizasyona bağlıysa: o organizasyonun sahibi ve onaylı üyeleri
+   *   + İş (ya da bağlı olduğu organizasyon) bir gruba bağlıysa: grubun sahibi ve üyeleri
+   *
+   * Bağ kurulmamışsa (organization_id ve group_id boşsa) zincir işin kendisinde
+   * biter — serbest çalışanın işleri kimsenin holdingine görünmez.
+   *
+   * Hem yetki kontrolü hem Drive izin eşitlemesi bu tek listeden beslenir;
+   * ikisinin ayrışması "Projelio'da göremiyor ama Drive'da görüyor" gibi
+   * sessiz tutarsızlıklar üretirdi.
+   */
+  private async jobLevelUserIds(jobId: string): Promise<Set<string>> {
+    const { data: job, error } = await this.supabase.client
+      .from("jobs")
+      .select("owner_id, organization_id, group_id")
+      .eq("id", jobId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!job) throw new NotFoundException("İş bulunamadı");
+
+    const ids = new Set<string>();
+    if (job.owner_id) ids.add(job.owner_id);
+
+    const { data: jobMembers } = await this.supabase.client
+      .from("job_members")
+      .select("user_id")
+      .eq("job_id", jobId);
+    for (const m of jobMembers ?? []) ids.add(m.user_id);
+
+    // İş doğrudan gruba bağlı olabilir; organizasyon üzerinden de gruba bağlanabilir.
+    let groupId: string | null = job.group_id ?? null;
+
+    if (job.organization_id) {
+      const [{ data: org }, { data: orgMembers }] = await Promise.all([
+        this.supabase.client
+          .from("organizations")
+          .select("owner_id, group_id")
+          .eq("id", job.organization_id)
+          .maybeSingle(),
+        this.supabase.client
+          .from("organization_members")
+          .select("user_id")
+          .eq("organization_id", job.organization_id)
+          .eq("status", "approved"),
+      ]);
+      if (org?.owner_id) ids.add(org.owner_id);
+      for (const m of orgMembers ?? []) ids.add(m.user_id);
+      groupId = groupId ?? org?.group_id ?? null;
+    }
+
+    if (groupId) {
+      const [{ data: group }, { data: groupMembers }] = await Promise.all([
+        this.supabase.client.from("groups").select("owner_id").eq("id", groupId).maybeSingle(),
+        // group_members'ta onay durumu yok: eklenen kişi doğrudan üyedir.
+        this.supabase.client.from("group_members").select("user_id").eq("group_id", groupId),
+      ]);
+      if (group?.owner_id) ids.add(group.owner_id);
+      for (const m of groupMembers ?? []) ids.add(m.user_id);
+    }
+
+    return ids;
+  }
+
+  /**
+   * Kullanıcının bu işteki erişim düzeyini hesaplar.
+   *
+   * Yalnızca bir projeye çağrılmış kişi (tipik olarak taşeron) sadece o projeyi
+   * görür; hiyerarşideki üst kademeler ise işin tamamını görür.
+   */
+  private async resolveAccess(jobId: string, userId: string): Promise<JobAccess> {
+    const { data: job, error: jobError } = await this.supabase.client
+      .from("jobs")
+      .select("owner_id")
+      .eq("id", jobId)
+      .maybeSingle();
+    if (jobError) throw jobError;
+    if (!job) throw new NotFoundException("İş bulunamadı");
+
+    const jobLevel = await this.jobLevelUserIds(jobId);
+    if (jobLevel.has(userId)) {
+      return { level: "job", isJobOwner: job.owner_id === userId, projectIds: [] };
+    }
+
+    // Bu işin altındaki projelerden hangilerine üye ya da sahip?
+    const { data: projectMemberships, error } = await this.supabase.client
+      .from("projects")
+      .select("id, owner_id, project_members(user_id, status)")
+      .eq("job_id", jobId);
+    if (error) throw error;
+
+    const projectIds = (projectMemberships ?? [])
+      .filter(
+        (p: any) =>
+          p.owner_id === userId ||
+          (p.project_members ?? []).some((m: any) => m.user_id === userId && m.status === "approved")
+      )
+      .map((p: any) => p.id);
+
+    if (projectIds.length) return { level: "project", isJobOwner: false, projectIds };
+    return { level: "none", isJobOwner: false, projectIds: [] };
+  }
+
+  /** İşe herhangi bir düzeyde erişimi olduğunu doğrular. */
+  async assertJobAccess(jobId: string, userId: string): Promise<JobAccess> {
+    const access = await this.resolveAccess(jobId, userId);
+    if (access.level === "none") {
+      throw new ForbiddenException("Bu işin dosyalarına erişim yetkiniz yok");
+    }
+    return access;
+  }
+
+  /** Belirli bir bağlama (proje/iş geneli) yazma ya da okuma hakkı var mı? */
+  private assertContextAllowed(access: JobAccess, projectId?: string): void {
+    if (access.level === "job") return;
+    if (!projectId) {
+      throw new ForbiddenException(
+        "İşin geneline dosya eklemek için iş ekibinde olmanız gerekir"
+      );
+    }
+    if (!access.projectIds.includes(projectId)) {
+      throw new ForbiddenException("Bu projenin dosyalarına erişim yetkiniz yok");
+    }
+  }
+
+  /** Görev/çıktı hangi projeye ait? Dosya iliştirilirken proje bağlamını türetmek için. */
+  private async resolveProjectFromContext(context: FileContext): Promise<string | undefined> {
+    if (context.projectId) return context.projectId;
+
+    if (context.taskId) {
+      const { data } = await this.supabase.client
+        .from("tasks")
+        .select("project_id")
+        .eq("id", context.taskId)
+        .maybeSingle();
+      return data?.project_id ?? undefined;
+    }
+    if (context.outputId) {
+      const { data } = await this.supabase.client
+        .from("outputs")
+        .select("project_id")
+        .eq("id", context.outputId)
+        .maybeSingle();
+      return data?.project_id ?? undefined;
+    }
+    return undefined;
+  }
+
+  private async jobIdOfProject(projectId: string): Promise<string> {
+    const { data, error } = await this.supabase.client
+      .from("projects")
+      .select("job_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new NotFoundException("Proje bulunamadı");
+    return data.job_id;
+  }
+
+  private async isJobOwner(jobId: string, userId: string): Promise<boolean> {
+    const { data } = await this.supabase.client
+      .from("jobs")
+      .select("owner_id")
+      .eq("id", jobId)
+      .maybeSingle();
+    return data?.owner_id === userId;
+  }
+
+  // ============================================================ depolama sahibi
+
+  /**
+   * İşin dosyalarının tutulacağı Drive hesabını döndürür; yoksa kurar.
+   *
+   * İş başına TEK hesap: her üye kendi Drive'ına yükleseydi, o üye ekipten
+   * ayrıldığında işin dosyalarının bir kısmı erişilemez hâle gelirdi.
+   */
+  private async ensureJobStorage(
+    jobId: string,
+    actingUserId: string
+  ): Promise<{ accountId: string; rootFolderId: string }> {
+    const { data: existing, error } = await this.supabase.client
+      .from("job_storage")
+      .select()
+      .eq("job_id", jobId)
+      .maybeSingle();
+    if (error) throw error;
+    if (existing) {
+      return { accountId: existing.google_account_id, rootFolderId: existing.drive_folder_id };
+    }
+
+    const { data: job, error: jobError } = await this.supabase.client
+      .from("jobs")
+      .select("owner_id, title")
+      .eq("id", jobId)
+      .maybeSingle();
+    if (jobError) throw jobError;
+    if (!job) throw new NotFoundException("İş bulunamadı");
+
+    // Önce iş sahibinin Drive'ı; bağlı değilse işlemi yapan kullanıcınınki.
+    const candidates = [job.owner_id, actingUserId].filter(Boolean) as string[];
+    let account;
+    for (const candidateId of candidates) {
+      const found = await this.accounts.findByUserId(candidateId);
+      if (this.accounts.isDriveReady(found)) {
+        account = found;
+        break;
+      }
+    }
+    if (!account) {
+      throw new DriveNotConnectedError(
+        "Bu işte dosya saklamak için önce bir Google Drive hesabı bağlanmalı. Ayarlar > Google Drive."
+      );
+    }
+
+    const accessToken = await this.accounts.getAccessToken(account.id);
+
+    const root =
+      account.rootFolderId ?? (await this.drive.findOrCreateFolder(accessToken, "Projelio")).id;
+    if (!account.rootFolderId) await this.accounts.setRootFolderId(account.id, root);
+
+    const jobFolder = await this.drive.findOrCreateFolder(accessToken, job.title || "İş", root);
+
+    const { error: insertError } = await this.supabase.client.from("job_storage").insert({
+      job_id: jobId,
+      google_account_id: account.id,
+      drive_folder_id: jobFolder.id,
+      folder_web_view_link: jobFolder.webViewLink ?? null,
+    });
+    // Eşzamanlı iki yükleme aynı anda kurulum yapmış olabilir; ilk kazananın
+    // kaydıyla devam ederiz.
+    if (insertError && (insertError as any).code !== "23505") throw insertError;
+
+    void this.syncJobShares(jobId).catch((err) =>
+      this.logger.warn(`Drive paylaşımları eşitlenemedi (job=${jobId}): ${String(err)}`)
+    );
+
+    return { accountId: account.id, rootFolderId: jobFolder.id };
+  }
+
+  /**
+   * Bağlama uygun Drive klasörünü bulur/oluşturur.
+   *
+   * Ağaç:  Projelio / {İş} / Genel
+   *        Projelio / {İş} / {Proje} / Görevler / {Görev}
+   *        Projelio / {İş} / {Proje} / Çıktılar / {Çıktı}
+   */
+  private async ensureContextFolder(
+    jobId: string,
+    accountId: string,
+    jobRootFolderId: string,
+    context: FileContext & { resolvedProjectId?: string }
+  ): Promise<{ folderRowId: string; driveFolderId: string }> {
+    const accessToken = await this.accounts.getAccessToken(accountId);
+    const projectId = context.resolvedProjectId;
+
+    // --- İşin geneli
+    if (!projectId) {
+      return this.findOrCreateFolderRow(jobId, accessToken, {
+        kind: "general",
+        name: "Genel",
+        parentDriveId: jobRootFolderId,
+        match: (q) => q.eq("kind", "general"),
+      });
+    }
+
+    // --- Proje klasörü (görev/çıktı klasörlerinin de üstü)
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("title")
+      .eq("id", projectId)
+      .maybeSingle();
+
+    const projectFolder = await this.findOrCreateFolderRow(jobId, accessToken, {
+      kind: "project",
+      name: project?.title || "Proje",
+      parentDriveId: jobRootFolderId,
+      projectId,
+      match: (q) => q.eq("kind", "project").eq("project_id", projectId),
+    });
+
+    if (!context.taskId && !context.outputId) return projectFolder;
+
+    // --- Görev/çıktı klasörü
+    const isTask = Boolean(context.taskId);
+    const entityId = (context.taskId ?? context.outputId)!;
+    const { data: entity } = await this.supabase.client
+      .from(isTask ? "tasks" : "outputs")
+      .select("title")
+      .eq("id", entityId)
+      .maybeSingle();
+
+    // Ara klasör ("Görevler"/"Çıktılar") Drive'da tutulur ama ayrı satır olarak
+    // kaydedilmez: hiçbir dosya doğrudan ona iliştirilmiyor.
+    const groupFolder = await this.drive.findOrCreateFolder(
+      accessToken,
+      isTask ? "Görevler" : "Çıktılar",
+      projectFolder.driveFolderId
+    );
+
+    return this.findOrCreateFolderRow(jobId, accessToken, {
+      kind: isTask ? "task" : "output",
+      name: entity?.title || (isTask ? "Görev" : "Çıktı"),
+      parentDriveId: groupFolder.id,
+      parentRowId: projectFolder.folderRowId,
+      projectId,
+      taskId: context.taskId,
+      outputId: context.outputId,
+      match: (q) =>
+        isTask ? q.eq("kind", "task").eq("task_id", entityId) : q.eq("kind", "output").eq("output_id", entityId),
+    });
+  }
+
+  private async findOrCreateFolderRow(
+    jobId: string,
+    accessToken: string,
+    spec: {
+      kind: "general" | "project" | "task" | "output";
+      name: string;
+      parentDriveId: string;
+      parentRowId?: string;
+      projectId?: string;
+      taskId?: string;
+      outputId?: string;
+      match: (q: any) => any;
+    }
+  ): Promise<{ folderRowId: string; driveFolderId: string }> {
+    const { data: existing, error } = await spec
+      .match(this.supabase.client.from("job_folders").select().eq("job_id", jobId))
+      .maybeSingle();
+    if (error) throw error;
+    if (existing) return { folderRowId: existing.id, driveFolderId: existing.drive_folder_id };
+
+    const folder = await this.drive.findOrCreateFolder(accessToken, spec.name, spec.parentDriveId);
+
+    const { data: row, error: insertError } = await this.supabase.client
+      .from("job_folders")
+      .insert({
+        job_id: jobId,
+        parent_folder_id: spec.parentRowId ?? null,
+        kind: spec.kind,
+        project_id: spec.projectId ?? null,
+        task_id: spec.taskId ?? null,
+        output_id: spec.outputId ?? null,
+        name: spec.name,
+        drive_folder_id: folder.id,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      // Yarış durumu: aynı anda başka bir istek klasörü oluşturmuş olabilir.
+      if ((insertError as any).code === "23505") {
+        const { data: raced } = await spec
+          .match(this.supabase.client.from("job_folders").select().eq("job_id", jobId))
+          .maybeSingle();
+        if (raced) return { folderRowId: raced.id, driveFolderId: raced.drive_folder_id };
+      }
+      throw insertError;
+    }
+
+    return { folderRowId: row.id, driveFolderId: folder.id };
+  }
+
+  // ============================================================ paylaşım
+
+  /**
+   * İş ekibiyle Drive klasör izinlerini eşitler.
+   *
+   * İki seviye:
+   *   * İş sahibi + iş üyeleri -> işin KÖK klasörüne izin (her şeyi görürler)
+   *   * Yalnızca projeye eklenmiş kişiler -> sadece o projenin klasörüne izin
+   *
+   * Böylece bir projeye çağrılan taşeron, Drive'da da işin diğer projelerini
+   * göremez. Projelio'daki yetkiyle Drive'daki yetki aynı hikâyeyi anlatır.
+   *
+   * Google hesabı bağlı olmayan üyeler atlanır — dosyaları yine görür ve
+   * indirirler (backend proxy'si üzerinden), sadece Drive editörünü açamazlar.
+   */
+  async syncJobShares(jobId: string): Promise<{ granted: number; revoked: number }> {
+    const { data: storage } = await this.supabase.client
+      .from("job_storage")
+      .select()
+      .eq("job_id", jobId)
+      .maybeSingle();
+    if (!storage) return { granted: 0, revoked: 0 };
+
+    const ownerAccount = await this.accounts.findById(storage.google_account_id);
+    if (!this.accounts.isDriveReady(ownerAccount)) return { granted: 0, revoked: 0 };
+    const accessToken = await this.accounts.getAccessToken(ownerAccount.id);
+
+    const [jobLevel, { data: projects }, { data: grants }] = await Promise.all([
+      // İş ekibi + hiyerarşideki üst kademeler (organizasyon, grup) tek listeden gelir;
+      // Drive izinleri Projelio'daki yetkiyle birebir aynı hikâyeyi anlatsın.
+      this.jobLevelUserIds(jobId),
+      this.supabase.client
+        .from("projects")
+        .select("id, owner_id, project_members(user_id, status)")
+        .eq("job_id", jobId),
+      this.supabase.client.from("job_folder_grants").select().eq("job_id", jobId),
+    ]);
+
+    /** projectId -> erişmesi gereken kullanıcılar (iş düzeyindekiler hariç) */
+    const projectLevel = new Map<string, Set<string>>();
+    for (const project of projects ?? []) {
+      const users = new Set<string>();
+      if (project.owner_id) users.add(project.owner_id);
+      for (const m of project.project_members ?? []) {
+        if (m.status === "approved") users.add(m.user_id);
+      }
+      for (const u of jobLevel) users.delete(u);
+      if (users.size) projectLevel.set(project.id, users);
+    }
+
+    // Depolama sahibi dosyaların gerçek sahibi; kendine izin vermeye gerek yok.
+    jobLevel.delete(ownerAccount.userId);
+
+    let granted = 0;
+    let revoked = 0;
+
+    // --- artık hak etmeyenlerin izinlerini geri al
+    for (const grant of grants ?? []) {
+      const stillValid = grant.project_id
+        ? projectLevel.get(grant.project_id)?.has(grant.user_id)
+        : jobLevel.has(grant.user_id);
+      if (stillValid) continue;
+
+      try {
+        await this.drive.revokePermission(accessToken, grant.drive_file_id, grant.drive_permission_id);
+      } catch (err) {
+        this.logger.warn(`İzin geri alınamadı (grant=${grant.id}): ${String(err)}`);
+      }
+      await this.supabase.client.from("job_folder_grants").delete().eq("id", grant.id);
+      revoked += 1;
+    }
+
+    const existingJobGrants = new Set(
+      (grants ?? []).filter((g: any) => !g.project_id).map((g: any) => g.user_id)
+    );
+    const existingProjectGrants = new Set(
+      (grants ?? []).filter((g: any) => g.project_id).map((g: any) => `${g.project_id}:${g.user_id}`)
+    );
+
+    // --- iş düzeyi izinler (kök klasör)
+    for (const userId of jobLevel) {
+      if (existingJobGrants.has(userId)) continue;
+      granted += await this.grantOne(accessToken, {
+        jobId,
+        userId,
+        driveFileId: storage.drive_folder_id,
+      });
+    }
+
+    // --- proje düzeyi izinler (yalnızca o projenin klasörü)
+    for (const [projectId, users] of projectLevel) {
+      for (const userId of users) {
+        if (existingProjectGrants.has(`${projectId}:${userId}`)) continue;
+
+        // Proje klasörü henüz yoksa (o projeye hiç dosya yüklenmemişse) izin
+        // verecek bir hedef de yok. İlk yüklemede tekrar eşitlenecek.
+        const { data: folder } = await this.supabase.client
+          .from("job_folders")
+          .select("drive_folder_id")
+          .eq("job_id", jobId)
+          .eq("kind", "project")
+          .eq("project_id", projectId)
+          .maybeSingle();
+        if (!folder) continue;
+
+        granted += await this.grantOne(accessToken, {
+          jobId,
+          projectId,
+          userId,
+          driveFileId: folder.drive_folder_id,
+        });
+      }
+    }
+
+    return { granted, revoked };
+  }
+
+  private async grantOne(
+    accessToken: string,
+    params: { jobId: string; projectId?: string; userId: string; driveFileId: string }
+  ): Promise<number> {
+    const account = await this.accounts.findByUserId(params.userId);
+    if (!account) return 0; // Google hesabı yok: proxy ile erişmeye devam eder
+
+    try {
+      const { permissionId } = await this.drive.grantPermission(
+        accessToken,
+        params.driveFileId,
+        account.email,
+        "writer"
+      );
+      await this.supabase.client.from("job_folder_grants").insert({
+        job_id: params.jobId,
+        project_id: params.projectId ?? null,
+        user_id: params.userId,
+        granted_email: account.email,
+        drive_file_id: params.driveFileId,
+        drive_permission_id: permissionId,
+        role: "writer",
+      });
+      return 1;
+    } catch (err) {
+      this.logger.warn(`Drive izni verilemedi (user=${params.userId}): ${String(err)}`);
+      return 0;
+    }
+  }
+
+  /** Proje ekibi değiştiğinde çağrılır; işi bulup tam eşitleme yapar. */
+  async syncSharesForProject(projectId: string): Promise<void> {
+    const jobId = await this.jobIdOfProject(projectId);
+    await this.syncJobShares(jobId);
+  }
+
+  /**
+   * Kullanıcının Google hesabı bu dosyanın klasörüne erişebiliyor mu?
+   * Arayüzdeki "Drive'da düzenle" düğmesi buna bakar.
+   */
+  private async canEditInDrive(jobId: string, userId: string, projectId?: string): Promise<boolean> {
+    const { data: storage } = await this.supabase.client
+      .from("job_storage")
+      .select("google_account_id")
+      .eq("job_id", jobId)
+      .maybeSingle();
+    if (!storage) return false;
+
+    const ownerAccount = await this.accounts.findById(storage.google_account_id);
+    if (ownerAccount?.userId === userId) return true;
+
+    const { data: grants } = await this.supabase.client
+      .from("job_folder_grants")
+      .select("project_id")
+      .eq("job_id", jobId)
+      .eq("user_id", userId);
+
+    return (grants ?? []).some(
+      (g: any) => g.project_id === null || (projectId && g.project_id === projectId)
+    );
+  }
+
+  // ============================================================ listeleme
+
+  /**
+   * İşin dosyaları.
+   *
+   * scope:
+   *   all      -> erişilebilen her şey (iş geneli + projeler)
+   *   general  -> yalnızca işin geneline ait, projeye bağlı olmayanlar
+   *   project  -> belirli bir projenin dosyaları
+   */
+  async listByJob(
+    jobId: string,
+    userId: string,
+    filter: { scope?: "all" | "general" | "project"; projectId?: string; taskId?: string; outputId?: string } = {}
+  ): Promise<ProjectFile[]> {
+    const access = await this.assertJobAccess(jobId, userId);
+
+    let query = this.supabase.client
+      .from("files")
+      .select()
+      .eq("job_id", jobId)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false });
+
+    if (filter.taskId) query = query.eq("task_id", filter.taskId);
+    else if (filter.outputId) query = query.eq("output_id", filter.outputId);
+    else if (filter.projectId) {
+      this.assertContextAllowed(access, filter.projectId);
+      query = query.eq("project_id", filter.projectId);
+    } else if (filter.scope === "general") {
+      this.assertContextAllowed(access, undefined);
+      query = query.is("project_id", null);
+    } else if (access.level === "project") {
+      // Proje düzeyindeki kullanıcı "hepsi" istese bile yalnızca kendi
+      // projelerini görür; işin geneli ona kapalı.
+      query = query.in("project_id", access.projectIds);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    let rows = data ?? [];
+    // Görev/çıktı filtresiyle gelindiğinde de proje sınırını uygula.
+    if (access.level === "project") {
+      rows = rows.filter((r: any) => r.project_id && access.projectIds.includes(r.project_id));
+    }
+
+    return Promise.all(
+      rows.map(async (row: any) =>
+        mapFile(row, await this.canEditInDrive(jobId, userId, row.project_id ?? undefined))
+      )
+    );
+  }
+
+  // ------------------------------------------------- hiyerarşi: org / grup
+
+  /**
+   * Bir organizasyonun altındaki bütün işlerin dosyaları.
+   *
+   * Erişim: organizasyon sahibi, onaylı üyeleri ve — organizasyon bir gruba
+   * bağlıysa — o grubun sahibi/üyeleri.
+   */
+  async listByOrganization(organizationId: string, userId: string): Promise<ProjectFile[]> {
+    const { data: org, error } = await this.supabase.client
+      .from("organizations")
+      .select("owner_id, group_id")
+      .eq("id", organizationId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!org) throw new NotFoundException("Organizasyon bulunamadı");
+
+    const allowed =
+      org.owner_id === userId ||
+      (await this.isApprovedOrgMember(organizationId, userId)) ||
+      (org.group_id ? await this.hasGroupAccess(org.group_id, userId) : false);
+    if (!allowed) throw new ForbiddenException("Bu organizasyonun dosyalarına erişim yetkiniz yok");
+
+    const { data: jobs } = await this.supabase.client
+      .from("jobs")
+      .select("id")
+      .eq("organization_id", organizationId);
+
+    return this.listForJobIds((jobs ?? []).map((j: any) => j.id), userId);
+  }
+
+  /**
+   * Bir grubun altındaki bütün işlerin dosyaları.
+   *
+   * İki yoldan gelir: gruba doğrudan bağlı işler ve gruba bağlı
+   * organizasyonların işleri.
+   */
+  async listByGroup(groupId: string, userId: string): Promise<ProjectFile[]> {
+    if (!(await this.hasGroupAccess(groupId, userId))) {
+      throw new ForbiddenException("Bu grubun dosyalarına erişim yetkiniz yok");
+    }
+
+    const { data: orgs } = await this.supabase.client
+      .from("organizations")
+      .select("id")
+      .eq("group_id", groupId);
+    const orgIds = (orgs ?? []).map((o: any) => o.id);
+
+    const [{ data: directJobs }, { data: orgJobs }] = await Promise.all([
+      this.supabase.client.from("jobs").select("id").eq("group_id", groupId),
+      orgIds.length
+        ? this.supabase.client.from("jobs").select("id").in("organization_id", orgIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    const jobIds = new Set<string>([
+      ...(directJobs ?? []).map((j: any) => j.id),
+      ...(orgJobs ?? []).map((j: any) => j.id),
+    ]);
+
+    return this.listForJobIds([...jobIds], userId);
+  }
+
+  private async isApprovedOrgMember(organizationId: string, userId: string): Promise<boolean> {
+    const { data } = await this.supabase.client
+      .from("organization_members")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .maybeSingle();
+    return Boolean(data);
+  }
+
+  private async hasGroupAccess(groupId: string, userId: string): Promise<boolean> {
+    const [{ data: group }, { data: member }] = await Promise.all([
+      this.supabase.client.from("groups").select("owner_id").eq("id", groupId).maybeSingle(),
+      // group_members'ta onay durumu yok: eklenen kişi doğrudan üyedir.
+      this.supabase.client
+        .from("group_members")
+        .select("id")
+        .eq("group_id", groupId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+    ]);
+    return group?.owner_id === userId || Boolean(member);
+  }
+
+  /**
+   * Birden çok işin dosyalarını tek listede toplar.
+   *
+   * Buraya gelen kullanıcı hiyerarşi üzerinden yetkilendirilmiş olsa da her iş
+   * için erişim TEKRAR kontrol edilir: araya sonradan başka bir sahiplik kuralı
+   * girerse liste sessizce sızdırmasın.
+   */
+  private async listForJobIds(jobIds: string[], userId: string): Promise<ProjectFile[]> {
+    if (!jobIds.length) return [];
+
+    const [lists, { data: jobRows }] = await Promise.all([
+      Promise.all(
+        jobIds.map((jobId) =>
+          this.listByJob(jobId, userId, { scope: "all" }).catch(() => [] as ProjectFile[])
+        )
+      ),
+      this.supabase.client.from("jobs").select("id, title").in("id", jobIds),
+    ]);
+
+    const titles = new Map((jobRows ?? []).map((j: any) => [j.id, j.title as string]));
+
+    return lists
+      .flat()
+      .map((f) => ({ ...f, jobTitle: titles.get(f.jobId) }))
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+  }
+
+  /** Proje ekranından çağrılır: işi kendisi bulur. */
+  async listByProject(projectId: string, userId: string, filter: FileContext = {}): Promise<ProjectFile[]> {
+    const jobId = await this.jobIdOfProject(projectId);
+    return this.listByJob(jobId, userId, { ...filter, projectId: filter.taskId || filter.outputId ? undefined : projectId });
+  }
+
+  async findById(fileId: string, userId: string): Promise<{ row: any; file: ProjectFile }> {
+    const { data: row, error } = await this.supabase.client
+      .from("files")
+      .select()
+      .eq("id", fileId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Dosya bulunamadı");
+
+    const access = await this.assertJobAccess(row.job_id, userId);
+    this.assertContextAllowed(access, row.project_id ?? undefined);
+
+    return {
+      row,
+      file: mapFile(row, await this.canEditInDrive(row.job_id, userId, row.project_id ?? undefined)),
+    };
+  }
+
+  // ============================================================ yükleme
+
+  async uploadInline(
+    jobId: string,
+    userId: string,
+    file: Express.Multer.File,
+    context: FileContext
+  ): Promise<ProjectFile> {
+    if (!file) throw new BadRequestException("Dosya gönderilmedi");
+    if (file.size > INLINE_UPLOAD_LIMIT) {
+      throw new BadRequestException(
+        "Bu dosya doğrudan yükleme için çok büyük; parçalı yükleme akışını kullanın."
+      );
+    }
+
+    const access = await this.assertJobAccess(jobId, userId);
+    const resolvedProjectId = await this.resolveProjectFromContext(context);
+    this.assertContextAllowed(access, resolvedProjectId);
+
+    const { accountId, rootFolderId } = await this.ensureJobStorage(jobId, userId);
+    const target = await this.ensureContextFolder(jobId, accountId, rootFolderId, {
+      ...context,
+      resolvedProjectId,
+    });
+
+    const accessToken = await this.accounts.getAccessToken(accountId);
+    const uploaded = await this.drive.uploadMultipart(
+      accessToken,
+      {
+        name: this.safeFileName(file.originalname),
+        mimeType: file.mimetype || "application/octet-stream",
+        parentId: target.driveFolderId,
+      },
+      file.buffer
+    );
+
+    return this.persist(jobId, userId, accountId, uploaded, context, resolvedProjectId, target.folderRowId);
+  }
+
+  /**
+   * Proje/görev ekranından yükleme.
+   *
+   * Ön yüzün işi ayrıca bilmesine gerek kalmasın diye iş buradan türetilir;
+   * dosya yine işin deposuna, projenin klasörüne yazılır.
+   */
+  async uploadInlineForProject(
+    projectId: string,
+    userId: string,
+    file: Express.Multer.File,
+    context: Omit<FileContext, "projectId">
+  ): Promise<ProjectFile> {
+    const jobId = await this.jobIdOfProject(projectId);
+    return this.uploadInline(jobId, userId, file, { ...context, projectId });
+  }
+
+  async createUploadSessionForProject(
+    projectId: string,
+    userId: string,
+    payload: { name: string; mimeType: string; sizeBytes?: number } & Omit<FileContext, "projectId">
+  ): Promise<{ sessionId: string; uploadUrl: string }> {
+    const jobId = await this.jobIdOfProject(projectId);
+    return this.createUploadSession(jobId, userId, { ...payload, projectId });
+  }
+
+  async createUploadSession(
+    jobId: string,
+    userId: string,
+    payload: { name: string; mimeType: string; sizeBytes?: number } & FileContext
+  ): Promise<{ sessionId: string; uploadUrl: string }> {
+    if (!payload?.name) throw new BadRequestException("Dosya adı gerekli");
+
+    const access = await this.assertJobAccess(jobId, userId);
+    const resolvedProjectId = await this.resolveProjectFromContext(payload);
+    this.assertContextAllowed(access, resolvedProjectId);
+
+    const { accountId, rootFolderId } = await this.ensureJobStorage(jobId, userId);
+    const target = await this.ensureContextFolder(jobId, accountId, rootFolderId, {
+      ...payload,
+      resolvedProjectId,
+    });
+
+    const accessToken = await this.accounts.getAccessToken(accountId);
+    const uploadUrl = await this.drive.createResumableSession(accessToken, {
+      name: this.safeFileName(payload.name),
+      mimeType: payload.mimeType || "application/octet-stream",
+      parentId: target.driveFolderId,
+      sizeBytes: payload.sizeBytes,
+    });
+
+    const { data: row, error } = await this.supabase.client
+      .from("file_upload_sessions")
+      .insert({
+        job_id: jobId,
+        project_id: resolvedProjectId ?? null,
+        task_id: payload.taskId ?? null,
+        output_id: payload.outputId ?? null,
+        user_id: userId,
+        folder_id: target.folderRowId,
+        resumable_uri: uploadUrl,
+        name: payload.name,
+        mime_type: payload.mimeType || "application/octet-stream",
+        size_bytes: payload.sizeBytes ?? null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    return { sessionId: row.id, uploadUrl };
+  }
+
+  /**
+   * Tarayıcı yüklemeyi bitirdikten sonra çağrılır.
+   *
+   * driveFileId istemciden geliyor, bu yüzden ona güvenilmez: dosya Drive'dan
+   * gerçekten okunur ve bizim depolama hesabımızda olduğu doğrulanır.
+   */
+  async completeUploadSession(
+    sessionId: string,
+    userId: string,
+    driveFileId: string
+  ): Promise<ProjectFile> {
+    const { data: session, error } = await this.supabase.client
+      .from("file_upload_sessions")
+      .select()
+      .eq("id", sessionId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!session) throw new NotFoundException("Yükleme oturumu bulunamadı");
+    if (session.user_id !== userId) throw new ForbiddenException("Bu yükleme oturumu size ait değil");
+    if (session.completed_at) throw new BadRequestException("Bu yükleme zaten tamamlanmış");
+
+    const access = await this.assertJobAccess(session.job_id, userId);
+    this.assertContextAllowed(access, session.project_id ?? undefined);
+
+    const { data: storage } = await this.supabase.client
+      .from("job_storage")
+      .select()
+      .eq("job_id", session.job_id)
+      .maybeSingle();
+    if (!storage) throw new BadRequestException("İş depolaması bulunamadı");
+
+    const accessToken = await this.accounts.getAccessToken(storage.google_account_id);
+    const driveFile = await this.drive.getFile(accessToken, driveFileId);
+
+    await this.supabase.client
+      .from("file_upload_sessions")
+      .update({ completed_at: new Date().toISOString() })
+      .eq("id", sessionId);
+
+    return this.persist(
+      session.job_id,
+      userId,
+      storage.google_account_id,
+      driveFile,
+      { taskId: session.task_id ?? undefined, outputId: session.output_id ?? undefined },
+      session.project_id ?? undefined,
+      session.folder_id ?? undefined
+    );
+  }
+
+  private async persist(
+    jobId: string,
+    userId: string,
+    accountId: string,
+    driveFile: {
+      id: string;
+      name: string;
+      mimeType: string;
+      size?: number;
+      webViewLink?: string;
+      iconLink?: string;
+      md5Checksum?: string;
+    },
+    context: FileContext,
+    projectId?: string,
+    folderRowId?: string
+  ): Promise<ProjectFile> {
+    const { data: row, error } = await this.supabase.client
+      .from("files")
+      .insert({
+        job_id: jobId,
+        project_id: projectId ?? null,
+        folder_id: folderRowId ?? null,
+        task_id: context.taskId ?? null,
+        output_id: context.outputId ?? null,
+        uploaded_by: userId,
+        google_account_id: accountId,
+        name: driveFile.name,
+        mime_type: driveFile.mimeType,
+        size_bytes: driveFile.size ?? null,
+        drive_file_id: driveFile.id,
+        web_view_link: driveFile.webViewLink ?? null,
+        icon_link: driveFile.iconLink ?? null,
+        md5_checksum: driveFile.md5Checksum ?? null,
+        is_google_doc: isGoogleDocMime(driveFile.mimeType),
+        status: "ready",
+        last_verified_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    void this.notifyTeamNewFile(jobId, projectId, driveFile.name, userId);
+
+    // Yeni proje klasörü açılmış olabilir; o projenin üyelerine izin ver.
+    void this.syncJobShares(jobId).catch(() => undefined);
+
+    return mapFile(row, await this.canEditInDrive(jobId, userId, projectId));
+  }
+
+  /** Drive ve işletim sistemlerinde sorun çıkaran karakterleri temizler. */
+  private safeFileName(name: string): string {
+    return (name || "dosya").replace(/[\\/:*?"<>|]/g, "_").slice(0, 200);
+  }
+
+  // ============================================================ indirme
+
+  /**
+   * Dosya içeriğini Drive'dan çekip istemciye aktarmak için hazırlar.
+   *
+   * Google hesabı olmayan (veya klasöre izni bulunmayan) üyeler dosyaya ancak
+   * buradan ulaşır: yetki Projelio'nun kendi üyelik kontrolüyle verilir, Drive
+   * isteği depolama sahibinin token'ıyla yapılır.
+   */
+  async openDownload(
+    fileId: string,
+    userId: string
+  ): Promise<{ response: Response; fileName: string; mimeType: string }> {
+    const { row } = await this.findById(fileId, userId);
+
+    const accessToken = await this.accounts.getAccessToken(row.google_account_id);
+    try {
+      const response = await this.drive.downloadResponse(accessToken, row.drive_file_id, row.mime_type);
+      const exportAs = GOOGLE_DOC_EXPORT_MIME[row.mime_type];
+      return {
+        response,
+        // Google Dokümanı dışa aktarılırken uzantı kazanır: "Rapor" -> "Rapor.docx"
+        fileName: exportAs ? `${row.name}.${exportAs.ext}` : row.name,
+        mimeType: exportAs ? exportAs.mime : row.mime_type,
+      };
+    } catch (error) {
+      if (error instanceof DriveFileMissingError) await this.markMissing(row.id);
+      throw error;
+    }
+  }
+
+  private async markMissing(fileId: string): Promise<void> {
+    await this.supabase.client
+      .from("files")
+      .update({ status: "missing", last_verified_at: new Date().toISOString() })
+      .eq("id", fileId);
+  }
+
+  // ============================================================ düzenleme/silme
+
+  async rename(fileId: string, userId: string, name: string): Promise<ProjectFile> {
+    const { row } = await this.findById(fileId, userId);
+    const clean = this.safeFileName(name);
+    if (!clean.trim()) throw new BadRequestException("Dosya adı boş olamaz");
+
+    const accessToken = await this.accounts.getAccessToken(row.google_account_id);
+    await this.drive.renameFile(accessToken, row.drive_file_id, clean);
+
+    const { data: updated, error } = await this.supabase.client
+      .from("files")
+      .update({ name: clean })
+      .eq("id", fileId)
+      .select()
+      .single();
+    if (error) throw error;
+
+    return mapFile(updated, await this.canEditInDrive(row.job_id, userId, row.project_id ?? undefined));
+  }
+
+  /**
+   * Dosyayı Projelio'dan kaldırır.
+   *
+   * Varsayılan olarak Drive'daki dosyaya dokunulmaz — kullanıcının kendi
+   * depolamasındaki veriyi Projelio'daki bir tıklamayla yok etmek doğru olmaz.
+   * `alsoTrash` yalnızca açıkça istenirse çöp kutusuna taşır (kalıcı silmez).
+   */
+  async remove(fileId: string, userId: string, alsoTrash = false): Promise<void> {
+    const { row } = await this.findById(fileId, userId);
+
+    const isUploader = row.uploaded_by === userId;
+    const isOwner = await this.isJobOwner(row.job_id, userId);
+    if (!isUploader && !isOwner) {
+      throw new ForbiddenException("Bu dosyayı yalnızca yükleyen kişi veya iş sahibi kaldırabilir");
+    }
+
+    if (alsoTrash) {
+      try {
+        const accessToken = await this.accounts.getAccessToken(row.google_account_id);
+        await this.drive.trashFile(accessToken, row.drive_file_id);
+      } catch (err) {
+        this.logger.warn(`Drive'da çöp kutusuna taşınamadı (file=${fileId}): ${String(err)}`);
+      }
+    }
+
+    const { error } = await this.supabase.client
+      .from("files")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", fileId);
+    if (error) throw error;
+  }
+
+  // ============================================================ bildirim
+
+  private async notifyTeamNewFile(
+    jobId: string,
+    projectId: string | undefined,
+    fileName: string,
+    uploaderId: string
+  ): Promise<void> {
+    try {
+      const [{ data: job }, { data: jobMembers }] = await Promise.all([
+        this.supabase.client.from("jobs").select("owner_id").eq("id", jobId).maybeSingle(),
+        this.supabase.client.from("job_members").select("user_id").eq("job_id", jobId),
+      ]);
+
+      const recipients = new Set<string>();
+      if (job?.owner_id) recipients.add(job.owner_id);
+      for (const m of jobMembers ?? []) recipients.add(m.user_id);
+
+      // Dosya bir projeye iliştirilmişse o projenin ekibi de haberdar olsun.
+      if (projectId) {
+        const { data: members } = await this.supabase.client
+          .from("project_members")
+          .select("user_id")
+          .eq("project_id", projectId)
+          .eq("status", "approved");
+        for (const m of members ?? []) recipients.add(m.user_id);
+      }
+
+      recipients.delete(uploaderId);
+      const link = projectId ? `/projects/${projectId}` : `/jobs/${jobId}`;
+
+      await Promise.all(
+        [...recipients].map((userId) =>
+          this.notifications.notifyUser(userId, "task_updated", "Yeni Dosya", `"${fileName}" eklendi.`, link)
+        )
+      );
+    } catch {
+      // Bildirim gönderilemese de yükleme başarılı sayılır.
+    }
+  }
+}

@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { ProjectMember } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { FilesService } from "../files/files.service";
 import { NotificationsService } from "../notifications/notifications.service";
 
 function mapMember(row: any): ProjectMember {
@@ -22,10 +23,30 @@ function mapMember(row: any): ProjectMember {
 
 @Injectable()
 export class MembersService {
+  private readonly logger = new Logger(MembersService.name);
+
   constructor(
     private supabase: SupabaseService,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
+    private filesService: FilesService
   ) {}
+
+  /**
+   * Ekip değiştiğinde projenin Drive klasör izinlerini yeniden hizalar.
+   *
+   * Yeni üye eklendiğinde izin verilir, üyelikten çıkarıldığında geri alınır.
+   * Bu adım atlanırsa ayrılan üyenin Google hesabı projenin dosyalarına
+   * erişmeye devam eder — Projelio'dan çıkarılmış olsa bile.
+   *
+   * Beklemeden çağrılır: üye ekleme yanıtı Drive'ın yavaşlığına takılmasın.
+   */
+  private syncDriveShares(projectId: string): void {
+    void this.filesService
+      .syncSharesForProject(projectId)
+      .catch((err) =>
+        this.logger.warn(`Drive izinleri eşitlenemedi (project=${projectId}): ${String(err)}`)
+      );
+  }
 
   async findByProject(projectId: string): Promise<ProjectMember[]> {
     const { data, error } = await this.supabase.client
@@ -103,6 +124,7 @@ export class MembersService {
       "Bir projeye eklendin.",
       `/projects/${projectId}`
     );
+    this.syncDriveShares(projectId);
     return mapMember(row);
   }
 
@@ -149,6 +171,9 @@ export class MembersService {
         `/projects/${member.projectId}`
       );
     }
+    // Onay da ret de izin durumunu değiştirebilir: onaylanan erişim kazanır,
+    // reddedilen (daha önce onaylıysa) erişimini kaybeder.
+    this.syncDriveShares(member.projectId);
     return member;
   }
 

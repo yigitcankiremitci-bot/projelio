@@ -9,6 +9,7 @@ import EditJobModal from "../components/EditJobModal";
 import JobTabs, { JobTab } from "../components/JobTabs";
 import JobTeamPanel from "../components/JobTeamPanel";
 import JobTasksPanel, { JobTasksPanelHandle } from "../components/JobTasksPanel";
+import FilesPanel from "../components/FilesPanel";
 import TodayCompletedPanel from "../components/TodayCompletedPanel";
 import TaskEditModal from "../components/TaskEditModal";
 import Modal from "../components/Modal";
@@ -43,7 +44,8 @@ export default function JobDetail() {
       ? { label: "Görev ekle", onClick: () => tasksPanelRef.current?.openCreate() }
       : activeTab === "programs"
       ? { label: "Yeni program", onClick: () => setCreatingOperation(true) }
-      : null,
+      : // Dosyalar sekmesinin kendi yükleme alanı var; ayrıca FAB göstermeye gerek yok.
+        null,
     [activeTab]
   );
 
@@ -355,6 +357,8 @@ export default function JobDetail() {
               onTasksReload={reloadTasks}
             />
           )}
+
+          {activeTab === "files" && <FilesPanel jobId={id} />}
 
           {activeTab === "tasks" && (
             <JobTasksPanel

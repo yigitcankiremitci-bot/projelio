@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import GoogleSignInButton from "../components/GoogleSignInButton";
 import { colors } from "../theme/colors";
 
 export default function Login() {
@@ -103,6 +104,8 @@ export default function Login() {
             Hesabın yok mu? Kayıt ol
           </Link>
         </form>
+
+        <GoogleSignInButton label="Google ile giriş yap" />
       </div>
     </div>
   );

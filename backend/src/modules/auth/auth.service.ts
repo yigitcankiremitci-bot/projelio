@@ -18,13 +18,22 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
-    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+
+    // Google ile kayıt olan kullanıcının şifresi yoktur. Bunu "geçersiz şifre"
+    // diye geçiştirmek kullanıcıyı tekrar tekrar denemeye iter; doğru yolu söyle.
+    if (user && !user.passwordHash) {
+      throw new UnauthorizedException(
+        "Bu hesap Google ile oluşturulmuş. Lütfen \"Google ile devam et\" ile giriş yapın."
+      );
+    }
+
+    if (!user || !(await bcrypt.compare(password, user.passwordHash!))) {
       throw new UnauthorizedException("Geçersiz e-posta veya şifre");
     }
     return this.signToken(user.id, user.email, user.role);
   }
 
-  private signToken(sub: string, email: string, role: string) {
+  signToken(sub: string, email: string, role: string) {
     return { token: this.jwtService.sign({ sub, email, role }) };
   }
 

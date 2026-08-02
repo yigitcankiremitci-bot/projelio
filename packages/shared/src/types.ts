@@ -506,3 +506,52 @@ export interface ArchiveSummary {
   tasks: ArchivedTaskEntry[];
   outputs: ArchivedOutputEntry[];
 }
+
+// ============================================================ Dosyalar (Drive)
+
+export interface ProjectFile {
+  id: string;
+  /** Dosya her zaman bir İŞE aittir. */
+  jobId: string;
+  /** Organizasyon/grup listelerinde dosyanın hangi işten geldiğini göstermek için. */
+  jobTitle?: string;
+  /** Boşsa dosya işin geneline aittir; doluysa o projeye iliştirilmiştir. */
+  projectId?: string;
+  taskId?: string;
+  outputId?: string;
+  uploadedBy: string;
+  name: string;
+  mimeType: string;
+  sizeBytes?: number;
+  driveFileId: string;
+  webViewLink?: string;
+  iconLink?: string;
+  /** Google Dokümanlar/E-Tablolar/Sunular: ikili içeriği yoktur, dışa aktarılır. */
+  isGoogleDoc: boolean;
+  /** missing: dosya Drive'da bulunamadı (kullanıcı silmiş/taşımış olabilir). */
+  status: "pending" | "ready" | "missing";
+  createdAt: string;
+  /** Bu kullanıcının Drive klasörüne izni var mı — düzenle düğmesi buna bakar. */
+  canEditInDrive: boolean;
+}
+
+export interface GoogleDriveStatus {
+  /** Sunucuda Google istemci kimlikleri tanımlı mı? */
+  configured: boolean;
+  connected: boolean;
+  email?: string;
+  pictureUrl?: string;
+  driveReady: boolean;
+  /** Bağlıydı ama erişim koptu: kullanıcı yeniden bağlanmalı. */
+  needsReconnect: boolean;
+  quota?: {
+    limitBytes?: number;
+    usageBytes?: number;
+    usageInDriveBytes?: number;
+  };
+}
+
+export interface FileUploadSession {
+  sessionId: string;
+  uploadUrl: string;
+}

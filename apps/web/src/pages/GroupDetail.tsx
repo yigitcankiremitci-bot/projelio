@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import JobCard from "../components/JobCard";
 import OrganizationCard from "../components/OrganizationCard";
 import EditGroupModal from "../components/EditGroupModal";
+import FilesPanel from "../components/FilesPanel";
 import { colors } from "../theme/colors";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 
@@ -128,6 +129,12 @@ export default function GroupDetail() {
             ))}
           </div>
         )}
+
+        {/* Hiyerarşi: gruba bağlı işler + gruba bağlı organizasyonların işleri.
+            Yükleme burada yok — dosya her zaman bir işe ait olmak zorunda. */}
+        <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
+          {id && <FilesPanel groupId={id} />}
+        </div>
       </div>
 
       {editing && group && (

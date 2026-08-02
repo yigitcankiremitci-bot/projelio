@@ -6,6 +6,7 @@ import OnboardingWizard from "./components/OnboardingWizard";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import GoogleReturn from "./pages/GoogleReturn";
 import JobDetail from "./pages/JobDetail";
 import ProjectDetail from "./pages/ProjectDetail";
 import OperationDetail from "./pages/OperationDetail";
@@ -34,7 +35,13 @@ const HEADER_HEIGHT = 76;
 
 export default function App() {
   const location = useLocation();
-  const isAuthScreen = location.pathname === "/login" || location.pathname === "/register";
+  // Google dönüş ekranı da kimlik doğrulaması gerektirmeyen bir ekrandır: token
+  // henüz yerel depoda yok, tam da burada oluşturuluyor. Korumalı bölgeye
+  // koyarsak /login'e yönlenir ve akış hiç tamamlanamaz.
+  const isAuthScreen =
+    location.pathname === "/login" ||
+    location.pathname === "/register" ||
+    location.pathname === "/google/return";
   const hasToken = !!localStorage.getItem("projelio_token");
   const [fabAction, setFabAction] = useState<ProjectFabAction | null>(null);
   // Bilgisayarda (geniş ekran) sol sidebar + üstte tam genişlik header;
@@ -62,6 +69,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/google/return" element={<GoogleReturn />} />
       </Routes>
     );
   }

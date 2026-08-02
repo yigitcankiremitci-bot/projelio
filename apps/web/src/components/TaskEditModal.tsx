@@ -5,6 +5,7 @@ import { colors } from "../theme/colors";
 import Modal from "./Modal";
 import AssigneePicker from "./AssigneePicker";
 import EntityDangerZone from "./EntityDangerZone";
+import FilesPanel from "./FilesPanel";
 
 interface Props {
   task: Task;
@@ -139,6 +140,14 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
           {saving ? "Kaydediliyor…" : "Kaydet"}
         </button>
       </form>
+
+      {/* Program (operations) görevlerinin projesi yoktur; dosya bağlamı kurulamaz. */}
+      {task.projectId && (
+        <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Dosyalar</h3>
+          <FilesPanel projectId={task.projectId} taskId={task.id} compact />
+        </div>
+      )}
 
       <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
         <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Yorumlar</h3>

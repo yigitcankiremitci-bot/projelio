@@ -256,3 +256,53 @@ export function IconActivity({ size = 18, color = "currentColor", filled = false
     </svg>
   );
 }
+
+export function IconFile({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
+    </svg>
+  );
+}
+
+export function IconUpload({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M12 16V3" />
+      <path d="m7 8 5-5 5 5" />
+    </svg>
+  );
+}
+
+export function IconDownload({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M12 3v13" />
+      <path d="m7 11 5 5 5-5" />
+    </svg>
+  );
+}
+
+export function IconExternalLink({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </svg>
+  );
+}
+
+export function IconGoogleDrive({ size = 18 }: IconProps) {
+  // Drive'ın kendi renkleri: marka ikonu olduğu için tema rengine boyanmıyor.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M8.4 2.5 1.2 15l3.6 6.2 7.2-12.5z" fill="#0066DA" />
+      <path d="M15.6 2.5H8.4l7.2 12.5h7.2z" fill="#00AC47" />
+      <path d="m4.8 21.2 3.6-6.2h14.4l-3.6 6.2z" fill="#EA4335" />
+    </svg>
+  );
+}

@@ -13,7 +13,8 @@ export interface UserRecord {
   fullName: string;
   email: string;
   username: string;
-  passwordHash: string;
+  // Google ile kayıt olan kullanıcılarda şifre yoktur.
+  passwordHash?: string;
   role: "admin" | "freelancer";
   accountType: AccountType;
   activeTaskId?: string;
@@ -47,7 +48,7 @@ function mapUser(row: any): UserRecord {
     fullName: row.full_name,
     email: row.email,
     username: row.username,
-    passwordHash: row.password_hash,
+    passwordHash: row.password_hash ?? undefined,
     role: row.role,
     accountType: row.account_type,
     activeTaskId: row.active_task_id ?? undefined,
@@ -98,6 +99,69 @@ export class UsersService {
       throw error;
     }
     return mapUser(row);
+  }
+
+  /**
+   * Google ile ilk kez giriş yapan kullanıcıyı oluşturur.
+   *
+   * Şifre yoktur (password_hash null). Kullanıcı adı e-postanın yerel kısmından
+   * türetilir; çakışırsa sonuna sayı eklenerek boş bir ad bulunur — kullanıcıyı
+   * girişin ortasında "kullanıcı adı seçin" ekranına düşürmemek için.
+   */
+  async createFromGoogle(data: {
+    fullName: string;
+    email: string;
+    usernameSeed: string;
+    avatarUrl?: string;
+  }): Promise<UserRecord> {
+    const username = await this.findAvailableUsername(data.usernameSeed);
+
+    const { data: row, error } = await this.supabase.client
+      .from("users")
+      .insert({
+        full_name: data.fullName,
+        email: data.email,
+        password_hash: null,
+        username,
+        avatar_url: data.avatarUrl ?? null,
+      })
+      .select()
+      .single();
+    if (error) {
+      if ((error as any).code === "23505") throw new ConflictException("Bu e-posta zaten kullanılıyor.");
+      throw error;
+    }
+    return mapUser(row);
+  }
+
+  private async findAvailableUsername(seed: string): Promise<string> {
+    // Geçersiz karakterleri at, kısa kalırsa doldur: "a.b@x.com" -> "a.b"
+    let base = normalizeUsername(seed).replace(/[^a-z0-9_.]/g, "");
+    if (base.length < 3) base = `kullanici${base}`;
+    base = base.slice(0, 26);
+
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      const candidate = attempt === 0 ? base : `${base}${attempt}`;
+      const { data, error } = await this.supabase.client
+        .from("users")
+        .select("id")
+        .eq("username", candidate)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return candidate;
+    }
+    // 25 denemede boş ad bulunamadıysa rastgeleye düş - çarpışma olasılığı yok denecek kadar az.
+    return `${base}${randomUUID().slice(0, 6)}`;
+  }
+
+  /** Google ile gelen kullanıcının profil fotoğrafı yoksa Google'ınkini kullan. */
+  async setAvatarIfEmpty(userId: string, avatarUrl: string): Promise<void> {
+    const { error } = await this.supabase.client
+      .from("users")
+      .update({ avatar_url: avatarUrl })
+      .eq("id", userId)
+      .is("avatar_url", null);
+    if (error) throw error;
   }
 
   // Sadece dahili kullanım (auth.service login/register) için - şifre hash'ini içerir.

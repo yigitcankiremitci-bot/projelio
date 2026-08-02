@@ -1,6 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import type { JobMember } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { FilesService } from "../files/files.service";
 import { NotificationsService } from "../notifications/notifications.service";
 
 function mapJobMember(row: any): JobMember {
@@ -19,10 +20,28 @@ function mapJobMember(row: any): JobMember {
 
 @Injectable()
 export class JobMembersService {
+  private readonly logger = new Logger(JobMembersService.name);
+
   constructor(
     private supabase: SupabaseService,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
+    private filesService: FilesService
   ) {}
+
+  /**
+   * İş ekibi değiştiğinde Drive klasör izinlerini yeniden hizalar.
+   *
+   * İşe alınan kişi işin kök klasörüne erişim kazanır (yani tüm projelerin
+   * dosyalarına); çıkarıldığında izin geri alınır. Bu adım atlanırsa ayrılan
+   * kişinin Google hesabı işin dosyalarına erişmeye devam eder.
+   *
+   * Beklemeden çağrılır: işe alma yanıtı Drive'ın yavaşlığına takılmasın.
+   */
+  private syncDriveShares(jobId: string): void {
+    void this.filesService
+      .syncJobShares(jobId)
+      .catch((err) => this.logger.warn(`Drive izinleri eşitlenemedi (job=${jobId}): ${String(err)}`));
+  }
 
   async findByJob(jobId: string): Promise<JobMember[]> {
     const { data, error } = await this.supabase.client
@@ -50,11 +69,21 @@ export class JobMembersService {
       "Bir işe eklendin.",
       `/jobs/${jobId}`
     );
+    this.syncDriveShares(jobId);
     return mapJobMember(row);
   }
 
   async remove(id: string): Promise<void> {
+    // İzin geri alınabilmesi için hangi işe ait olduğunu SİLMEDEN ÖNCE öğren.
+    const { data: existing } = await this.supabase.client
+      .from("job_members")
+      .select("job_id")
+      .eq("id", id)
+      .maybeSingle();
+
     const { error } = await this.supabase.client.from("job_members").delete().eq("id", id);
     if (error) throw error;
+
+    if (existing?.job_id) this.syncDriveShares(existing.job_id);
   }
 }

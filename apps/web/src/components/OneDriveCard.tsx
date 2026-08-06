@@ -3,6 +3,7 @@ import type { GoogleDriveStatus } from "@projelio/shared";
 import { oneDriveApi } from "../api/files";
 import { formatFileSize } from "../lib/driveLinks";
 import { colors } from "../theme/colors";
+import { notifyCloudStorageChanged, onCloudStorageChanged } from "../lib/cloudStorageEvents";
 import ConfirmDialog from "./ConfirmDialog";
 import { IconOneDrive } from "./icons";
 
@@ -24,13 +25,20 @@ export default function OneDriveCard() {
 
   useEffect(() => {
     void load();
+    // Google Drive kartında bağlantı kurulur/kaldırılırsa bu kartın kilitli
+    // durumu da anında güncellensin.
+    return onCloudStorageChanged(() => void load());
   }, []);
 
   const handleConnect = async () => {
     setBusy(true);
     setError("");
     try {
-      const { configured, url } = await oneDriveApi.connectUrl("/settings");
+      const { configured, url, blockedBy } = await oneDriveApi.connectUrl("/settings");
+      if (blockedBy) {
+        setError("Zaten Google Drive bağlısınız. Değiştirmek için önce Drive bağlantısını kaldırın.");
+        return;
+      }
       if (!configured || !url) {
         setError("OneDrive entegrasyonu sunucuda yapılandırılmamış.");
         return;
@@ -49,6 +57,7 @@ export default function OneDriveCard() {
     try {
       await oneDriveApi.disconnect();
       await load();
+      notifyCloudStorageChanged();
     } catch (e: any) {
       setError(e?.message ?? "Bağlantı kaldırılamadı.");
     } finally {
@@ -127,6 +136,10 @@ export default function OneDriveCard() {
             Bağlantıyı kaldır
           </button>
         </>
+      ) : status.lockedByOtherProvider ? (
+        <p style={{ fontSize: 15, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
+          Depolama için şu an Google Drive kullanılıyor. Değiştirmek için önce Drive kartından bağlantıyı kaldırın.
+        </p>
       ) : (
         <>
           <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>

@@ -75,7 +75,7 @@ export const driveApi = {
   status: () => api.get<GoogleDriveStatus>("/google/status"),
   disconnect: () => api.post<{ ok: boolean }>("/google/disconnect", {}),
   connectUrl: (next?: string) =>
-    api.get<{ configured: boolean; url: string | null }>(
+    api.get<{ configured: boolean; url: string | null; blockedBy?: "google" | "microsoft" }>(
       `/google/connect-url${next ? `?next=${encodeURIComponent(next)}` : ""}`
     ),
   loginUrl: (next?: string) =>
@@ -96,7 +96,7 @@ export const oneDriveApi = {
   status: () => api.get<GoogleDriveStatus>("/microsoft/status"),
   disconnect: () => api.post<{ ok: boolean }>("/microsoft/disconnect", {}),
   connectUrl: (next?: string) =>
-    api.get<{ configured: boolean; url: string | null }>(
+    api.get<{ configured: boolean; url: string | null; blockedBy?: "google" | "microsoft" }>(
       `/microsoft/connect-url${next ? `?next=${encodeURIComponent(next)}` : ""}`
     ),
 };

@@ -722,6 +722,12 @@ export interface GoogleDriveStatus {
   driveReady: boolean;
   /** Bağlıydı ama erişim koptu: kullanıcı yeniden bağlanmalı. */
   needsReconnect: boolean;
+  /**
+   * Depolama sağlayıcısı yalnızca biri olabilir: kullanıcı diğer sağlayıcıyı
+   * (Google Drive ya da OneDrive) zaten bağlamışsa bu true döner ve bu
+   * sağlayıcı, önce diğeri kaldırılmadan bağlanamaz.
+   */
+  lockedByOtherProvider?: boolean;
   quota?: {
     limitBytes?: number;
     usageBytes?: number;

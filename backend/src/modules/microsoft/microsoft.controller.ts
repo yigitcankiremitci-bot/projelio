@@ -1,6 +1,7 @@
 import { Controller, Get, Logger, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import type { Response } from "express";
+import { GoogleAccountsService } from "../google/google-accounts.service";
 import { MicrosoftAccountsService } from "./microsoft-accounts.service";
 import { MicrosoftOAuthService } from "./microsoft-oauth.service";
 import { OneDriveService } from "./onedrive.service";
@@ -19,7 +20,9 @@ export class MicrosoftController {
   constructor(
     private oauth: MicrosoftOAuthService,
     private accounts: MicrosoftAccountsService,
-    private oneDrive: OneDriveService
+    private oneDrive: OneDriveService,
+    // Depolama sağlayıcısı yalnızca biri olabilir (bkz. microsoft.module.ts).
+    private googleAccounts: GoogleAccountsService
   ) {}
 
   /** Ayarlar ekranındaki "OneDrive'ı bağla" düğmesi buradan yönlendirme adresini alır. */
@@ -28,6 +31,13 @@ export class MicrosoftController {
   async connectUrl(@Req() req: any, @Query("next") next?: string) {
     if (!this.oauth.isDriveConfigured()) {
       return { configured: false as const, url: null };
+    }
+
+    // Depolama sağlayıcısı yalnızca biri olabilir: Google Drive zaten
+    // bağlıysa kullanıcı önce onu kaldırmadan OneDrive'ı bağlayamaz.
+    const googleAccount = await this.googleAccounts.findByUserId(req.user.userId);
+    if (this.googleAccounts.isDriveReady(googleAccount)) {
+      return { configured: true as const, url: null, blockedBy: "google" as const };
     }
 
     const existing = await this.accounts.findByUserId(req.user.userId);
@@ -76,6 +86,15 @@ export class MicrosoftController {
         throw new Error(`Hesabınıza zaten ${current.email} bağlı. Önce mevcut bağlantıyı kaldırın.`);
       }
 
+      // Yarış durumuna karşı: kullanıcı bu ekrana geldikten sonra başka bir
+      // sekmede Google Drive'ı bağlamış olabilir.
+      const googleAccount = await this.googleAccounts.findByUserId(parsed.userId);
+      if (this.googleAccounts.isDriveReady(googleAccount)) {
+        throw new Error(
+          "Zaten Google Drive bağlısınız. Depolama sağlayıcısını değiştirmek için önce Ayarlar'dan Drive bağlantısını kaldırın."
+        );
+      }
+
       await this.accounts.upsert({
         userId: parsed.userId,
         msSub: identity.sub,
@@ -115,7 +134,13 @@ export class MicrosoftController {
       }
     }
 
+    // Depolama sağlayıcısı yalnızca biri olabilir: Google Drive zaten
+    // kullanılıyorsa ön yüz "OneDrive'ı bağla" düğmesini kilitli göstermeli.
+    const googleAccount = driveReady ? undefined : await this.googleAccounts.findByUserId(req.user.userId);
+    const lockedByOtherProvider = !driveReady && this.googleAccounts.isDriveReady(googleAccount);
+
     return {
+      lockedByOtherProvider,
       configured,
       connected: Boolean(account),
       email: account?.email,

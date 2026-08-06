@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Logger, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import type { Response } from "express";
+import { MicrosoftAccountsService } from "../microsoft/microsoft-accounts.service";
 import { GoogleAccountsService } from "./google-accounts.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { DRIVE_SCOPE, GoogleOAuthService, LOGIN_SCOPES } from "./google-oauth.service";
@@ -14,7 +15,9 @@ export class GoogleController {
     private oauth: GoogleOAuthService,
     private googleAuth: GoogleAuthService,
     private accounts: GoogleAccountsService,
-    private drive: DriveService
+    private drive: DriveService,
+    // Depolama sağlayıcısı yalnızca biri olabilir (bkz. google.module.ts).
+    private msAccounts: MicrosoftAccountsService
   ) {}
 
   // ------------------------------------------------------------------- giriş
@@ -38,6 +41,13 @@ export class GoogleController {
   async connectUrl(@Req() req: any, @Query("next") next?: string) {
     if (!this.oauth.isDriveConfigured()) {
       return { configured: false as const, url: null };
+    }
+
+    // Depolama sağlayıcısı yalnızca biri olabilir: OneDrive zaten bağlıysa
+    // kullanıcı önce onu kaldırmadan Drive'ı bağlayamaz.
+    const msAccount = await this.msAccounts.findByUserId(req.user.userId);
+    if (this.msAccounts.isDriveReady(msAccount)) {
+      return { configured: true as const, url: null, blockedBy: "microsoft" as const };
     }
 
     const existing = await this.accounts.findByUserId(req.user.userId);
@@ -86,6 +96,15 @@ export class GoogleController {
       const next = parsed.next && parsed.next.startsWith("/") ? parsed.next : undefined;
 
       if (parsed.mode === "connect" && parsed.userId) {
+        // Yarış durumuna karşı: kullanıcı bu ekrana geldikten sonra başka bir
+        // sekmede OneDrive'ı bağlamış olabilir.
+        const msAccount = await this.msAccounts.findByUserId(parsed.userId);
+        if (this.msAccounts.isDriveReady(msAccount)) {
+          throw new Error(
+            "Zaten OneDrive bağlısınız. Depolama sağlayıcısını değiştirmek için önce Ayarlar'dan OneDrive bağlantısını kaldırın."
+          );
+        }
+
         await this.googleAuth.connectToExistingUser(parsed.userId, identity, {
           refreshToken: tokens.refresh_token,
           scopes,
@@ -142,12 +161,18 @@ export class GoogleController {
       }
     }
 
+    // Depolama sağlayıcısı yalnızca biri olabilir: OneDrive zaten kullanılıyorsa
+    // ön yüz "Drive'ı bağla" düğmesini kilitli göstermeli.
+    const msAccount = driveReady ? undefined : await this.msAccounts.findByUserId(req.user.userId);
+    const lockedByOtherProvider = !driveReady && this.msAccounts.isDriveReady(msAccount);
+
     return {
       configured,
       connected: Boolean(account),
       email: account?.email,
       pictureUrl: account?.pictureUrl,
       driveReady,
+      lockedByOtherProvider,
       // Kullanıcı Drive'ı bağlamıştı ama erişim koptu (iptal/invalid_grant).
       needsReconnect: Boolean(account && account.driveRevokedAt),
       quota,

@@ -110,7 +110,7 @@ export default function App() {
     <div style={{ minHeight: "100vh" }}>
       {me && !me.onboardingCompletedAt && <OnboardingWizard onCompleted={reloadMe} />}
 
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} overlay={!isDesktop} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} overlay={!isDesktop} isAdmin={me?.role === "admin"} />
 
       {/* Sidebar artık position:fixed olduğu için akışta yer kaplamıyor;
           içerik sütununu (yalnızca masaüstünde ve açıkken) onun genişliği kadar

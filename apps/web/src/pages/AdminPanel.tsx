@@ -1,14 +1,32 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { User } from "@projelio/shared";
+import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { IconShield } from "../components/icons";
 import AiCreditAdminPanel from "../components/AiCreditAdminPanel";
 
+/**
+ * Bu sayfa yalnızca role === "admin" olan kullanıcılara açılır.
+ * Not: Sidebar'daki "Admin" linki de zaten yalnızca admin'lere gösteriliyor
+ * (bkz. App.tsx / Sidebar.tsx); buradaki kontrol, birisi /admin adresine
+ * doğrudan girerse diye ikinci bir savunma katmanıdır. Asıl güvenlik zaten
+ * backend'de: her admin endpoint'i (kredi yükleme, marj raporu, bakiye
+ * takibi) req.user.role === "admin" olmadan 403 döner.
+ */
 export default function AdminPanel() {
-  const [unlocked, setUnlocked] = useState(false);
-  const [password, setPassword] = useState("");
   const c = colors.light;
+  const [me, setMe] = useState<User | null | undefined>(undefined);
 
-  if (!unlocked) {
+  useEffect(() => {
+    api
+      .get<User>("/auth/me")
+      .then(setMe)
+      .catch(() => setMe(null));
+  }, []);
+
+  if (me === undefined) return null;
+
+  if (!me || me.role !== "admin") {
     return (
       <div
         style={{
@@ -45,24 +63,12 @@ export default function AdminPanel() {
           >
             <IconShield size={18} color={c.accent} />
           </span>
-          <h2 style={{ color: c.textPrimary, fontSize: 20, fontWeight: 500, margin: "0 0 16px" }}>
-            Korumalı admin paneli
+          <h2 style={{ color: c.textPrimary, fontSize: 20, fontWeight: 500, margin: "0 0 8px" }}>
+            Bu sayfaya erişim yetkin yok
           </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <input
-              type="password"
-              placeholder="Admin şifresi"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ width: "100%" }}
-            />
-            <button
-              onClick={() => setUnlocked(password.length > 0)}
-              style={{ background: c.primary, color: "#fff", border: "none", padding: "10px 0", borderRadius: 8, fontSize: 17, fontWeight: 500 }}
-            >
-              Giriş
-            </button>
-          </div>
+          <p style={{ color: c.textSecondary, fontSize: 14, margin: 0, lineHeight: 1.5 }}>
+            Admin paneli yalnızca yönetici hesapları içindir.
+          </p>
         </div>
       </div>
     );

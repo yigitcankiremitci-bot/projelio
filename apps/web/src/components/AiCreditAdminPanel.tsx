@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { colors } from "../theme/colors";
 import { api } from "../api/client";
-import { aiChat } from "../api/aiChat";
+import { aiChat, type AiProviderBalance } from "../api/aiChat";
 import { IconSparkle } from "./icons";
 
 interface UserRow {
@@ -39,12 +39,49 @@ export default function AiCreditAdminPanel() {
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [margin, setMargin] = useState<MarginReport | null>(null);
 
+  const [providerBalance, setProviderBalance] = useState<AiProviderBalance | null>(null);
+  const [topupAmount, setTopupAmount] = useState("50");
+  const [topupNote, setTopupNote] = useState("");
+  const [topupSaving, setTopupSaving] = useState(false);
+  const [topupFeedback, setTopupFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const loadProviderBalance = () => {
+    aiChat
+      .getProviderBalance()
+      .then(setProviderBalance)
+      .catch(() => {});
+  };
+
   useEffect(() => {
     aiChat
       .getMarginReport(30)
       .then((r) => setMargin(r as unknown as MarginReport))
       .catch(() => {});
+    loadProviderBalance();
   }, []);
+
+  const handleProviderTopUp = async () => {
+    const amountUsd = Number(topupAmount);
+    if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
+      setTopupFeedback({ ok: false, text: "Geçerli bir tutar gir." });
+      return;
+    }
+    setTopupSaving(true);
+    setTopupFeedback(null);
+    try {
+      const result = await aiChat.topUpProviderBalance(amountUsd, topupNote.trim() || undefined);
+      setProviderBalance(result);
+      setTopupFeedback({
+        ok: true,
+        text: `$${amountUsd.toFixed(2)} kaydedildi. Kalan bakiye: ${result.remainingCredits.toLocaleString("tr-TR")} kredi karşılığı.`,
+      });
+      setTopupNote("");
+    } catch (err: any) {
+      setTopupFeedback({ ok: false, text: err?.message ?? "Kaydedilemedi." });
+    } finally {
+      setTopupSaving(false);
+    }
+  };
 
   // Arama kutusu için basit gecikmeli sorgu.
   useEffect(() => {
@@ -154,6 +191,91 @@ export default function AiCreditAdminPanel() {
             Doğrulamak için console.anthropic.com'daki kullanım ekranıyla karşılaştırın; ciddi bir
             fark varsa fiyat tablosu güncellenmelidir.
           </p>
+        </div>
+      )}
+
+      {/* Anthropic bakiyesi: gerçekten yüklenen para ile şimdiye kadarki gerçek maliyet
+          karşılaştırılıp "elimde ne kadar kaldı" tahmini gösterilir. Anthropic bakiyeyi
+          okuyabileceğimiz bir API sunmadığı için admin, console.anthropic.com'a bakiye
+          yükledikçe bunu aşağıdaki formla burada da kaydeder. */}
+      {providerBalance && (
+        <div
+          style={{
+            background: c.surface,
+            border: `1px solid ${c.border}`,
+            borderRadius: 12,
+            padding: 16,
+            marginBottom: 18,
+          }}
+        >
+          <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 10 }}>Anthropic bakiyesi</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 14 }}>
+            <Metric label="Yüklenen (ömür boyu)" value={`$${providerBalance.toppedUpUsd.toFixed(2)}`} />
+            <Metric label="Kullanılan (gerçek maliyet)" value={`$${providerBalance.spentUsd.toFixed(2)}`} />
+            <Metric
+              label="Kalan kredi"
+              value={providerBalance.remainingCredits.toLocaleString("tr-TR")}
+              highlight={providerBalance.remainingCredits < 20000 ? c.danger : c.success}
+            />
+          </div>
+          <p style={{ fontSize: 11.5, color: c.textSecondary, margin: "0 0 14px", lineHeight: 1.5 }}>
+            "Kalan kredi", Anthropic'e yüklediğin gerçek bakiyenin ne kadarının kaldığını, aşağıdaki
+            kullanıcı kredisi ile aynı birimde gösterir — kullanıcılara ne kadar kredi dağıtabileceğine
+            karar vermek için buna bak. Anthropic konsolunda bakiye yükledikçe aşağıdan buraya ekle.
+          </p>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 120px" }}>
+              <label style={labelStyle(c)}>Yüklenen tutar (USD)</label>
+              <input
+                type="number"
+                min={0.01}
+                step="0.01"
+                value={topupAmount}
+                onChange={(e) => setTopupAmount(e.target.value)}
+                style={inputStyle(c)}
+              />
+            </div>
+            <div style={{ flex: "2 1 160px" }}>
+              <label style={labelStyle(c)}>Not (opsiyonel)</label>
+              <input
+                value={topupNote}
+                onChange={(e) => setTopupNote(e.target.value)}
+                placeholder="Ör. Ağustos yüklemesi"
+                style={inputStyle(c)}
+              />
+            </div>
+            <button
+              onClick={handleProviderTopUp}
+              disabled={topupSaving}
+              style={{
+                padding: "9px 16px",
+                borderRadius: 9,
+                border: "none",
+                background: c.primaryDark,
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: topupSaving ? "default" : "pointer",
+                opacity: topupSaving ? 0.6 : 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {topupSaving ? "Kaydediliyor…" : "Anthropic'e yükledim"}
+            </button>
+          </div>
+          {topupFeedback && (
+            <p
+              style={{
+                margin: "10px 0 0",
+                fontSize: 13.5,
+                lineHeight: 1.5,
+                color: topupFeedback.ok ? c.success : c.danger,
+              }}
+            >
+              {topupFeedback.text}
+            </p>
+          )}
         </div>
       )}
 

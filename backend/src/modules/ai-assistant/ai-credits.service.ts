@@ -1,6 +1,12 @@
 import { BadRequestException, HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
-import { calculateUsageCost, COMMISSION_RATE, MIN_BALANCE_TO_START, WELCOME_CREDITS } from "./ai-credits.config";
+import {
+  calculateUsageCost,
+  COMMISSION_RATE,
+  CREDIT_UNIT_USD,
+  MIN_BALANCE_TO_START,
+  WELCOME_CREDITS,
+} from "./ai-credits.config";
 
 /**
  * Bakiye yetersizliğini HTTP 402 (Payment Required) ile bildirir; istemci bu kodu
@@ -164,6 +170,65 @@ export class AiCreditsService {
       .limit(limit);
     if (error) throw error;
     return (data ?? []).map(mapTransaction);
+  }
+
+  /**
+   * Admin, Anthropic konsolunda (console.anthropic.com) hesaba gerçek para yüklediğinde
+   * bunu buraya kaydeder. Anthropic'in bakiyeyi okuyabileceğimiz bir API'si yok; bu yüzden
+   * "kalan bakiye" burada yüklenen tutarlar ile şimdiye kadarki gerçek Anthropic maliyeti
+   * (ai_credit_transactions.cost_usd, komisyonsuz) karşılaştırılarak hesaplanır.
+   */
+  async topUpProviderBalance(amountUsd: number, description: string | undefined, createdBy: string): Promise<void> {
+    if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
+      throw new BadRequestException("Yüklenen tutar pozitif bir sayı olmalı.");
+    }
+    const { error } = await this.supabase.client.from("ai_provider_balance_topups").insert({
+      amount_usd: amountUsd,
+      description: description ?? null,
+      created_by: createdBy,
+    });
+    if (error) throw error;
+  }
+
+  /**
+   * Projelio'nun Anthropic hesabında ne kadar bakiye kaldığının tahmini.
+   * remainingCredits: aynı tahmini, kullanıcıya kredi yüklerken girilen birimle (kredi)
+   * karşılaştırılabilsin diye CREDIT_UNIT_USD ile çevrilmiş hâli — admin "bu kullanıcıya
+   * 5000 kredi versem elimde ne kalır" sorusunu buradan cevaplayabilir.
+   */
+  async getProviderBalanceStatus(): Promise<{
+    toppedUpUsd: number;
+    spentUsd: number;
+    remainingUsd: number;
+    remainingCredits: number;
+    lastTopups: { amountUsd: number; description?: string; createdAt: string }[];
+  }> {
+    const [topupsResult, usageResult] = await Promise.all([
+      this.supabase.client
+        .from("ai_provider_balance_topups")
+        .select("amount_usd, description, created_at")
+        .order("created_at", { ascending: false }),
+      this.supabase.client.from("ai_credit_transactions").select("cost_usd").eq("type", "usage"),
+    ]);
+    if (topupsResult.error) throw topupsResult.error;
+    if (usageResult.error) throw usageResult.error;
+
+    const topups = topupsResult.data ?? [];
+    const toppedUpUsd = topups.reduce((sum, r: any) => sum + Number(r.amount_usd ?? 0), 0);
+    const spentUsd = (usageResult.data ?? []).reduce((sum, r: any) => sum + Number(r.cost_usd ?? 0), 0);
+    const remainingUsd = toppedUpUsd - spentUsd;
+
+    return {
+      toppedUpUsd: Number(toppedUpUsd.toFixed(2)),
+      spentUsd: Number(spentUsd.toFixed(4)),
+      remainingUsd: Number(remainingUsd.toFixed(4)),
+      remainingCredits: Math.round(remainingUsd / CREDIT_UNIT_USD),
+      lastTopups: topups.slice(0, 10).map((r: any) => ({
+        amountUsd: Number(r.amount_usd),
+        description: r.description ?? undefined,
+        createdAt: r.created_at,
+      })),
+    };
   }
 
   /** Projelio'nun marj raporu: ham maliyet, satış bedeli ve kâr (admin için). */

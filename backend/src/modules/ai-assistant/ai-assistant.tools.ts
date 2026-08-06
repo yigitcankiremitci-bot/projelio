@@ -235,6 +235,63 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: { taskId: { type: "string" } }, required: ["taskId"] },
   },
 
+  // --- Toplu işlem aracı (kredi tasarrufu için) ----------------------------
+  {
+    name: "create_tasks",
+    description:
+      "Bir projede BİRDEN FAZLA görevi tek seferde oluşturur. Kullanıcı \"şu projeye şu N görevi ekle\" dediğinde " +
+      "her görev için ayrı ayrı create_task çağırmak yerine bunu bir kez çağır (daha az tur = daha az kredi).",
+    input_schema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        tasks: {
+          type: "array",
+          description: "Oluşturulacak görevlerin listesi.",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              description: { type: "string" },
+              deadline: { type: "string", description: "ISO tarih/saat" },
+              startDate: { type: "string", description: "ISO tarih/saat" },
+              assignedTo: { type: "string", description: "Atanacak kullanıcının id'si (opsiyonel)" },
+              budget: { type: "number" },
+              parentTaskId: { type: "string" },
+            },
+            required: ["title", "deadline"],
+          },
+        },
+      },
+      required: ["projectId", "tasks"],
+    },
+  },
+
+  // --- Görev yorumları ------------------------------------------------------
+  {
+    name: "list_task_comments",
+    description: "Bir görevin yorumlarını (aktivite/sosyal geçmişini) listeler.",
+    input_schema: { type: "object", properties: { taskId: { type: "string" } }, required: ["taskId"] },
+  },
+  {
+    name: "add_task_comment",
+    description: "Bir göreve yorum ekler.",
+    input_schema: {
+      type: "object",
+      properties: { taskId: { type: "string" }, body: { type: "string" } },
+      required: ["taskId", "body"],
+    },
+  },
+
+  // --- Bildirimler ------------------------------------------------------------
+  {
+    name: "get_notifications_summary",
+    description:
+      "Kullanıcının okunmamış bildirim sayısını ve en son bildirimlerini getirir. " +
+      "\"Bildirimlerim var mı\", \"yeni bir şey var mı\" gibi sorular için kullan.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+
   // --- Bütçe yazma aracı ---------------------------------------------------
   {
     name: "add_budget_transaction",

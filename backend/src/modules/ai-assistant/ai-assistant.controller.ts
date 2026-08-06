@@ -100,6 +100,21 @@ export class AiAssistantController {
     );
   }
 
+  // Projelio'nun Anthropic hesabında tahmini kalan bakiye (bkz. AiCreditsService.getProviderBalanceStatus).
+  @Get("admin/provider-balance")
+  providerBalance(@Req() req: any) {
+    this.assertAdmin(req);
+    return this.creditsService.getProviderBalanceStatus();
+  }
+
+  // Admin, Anthropic konsolunda hesaba gerçek para yükledikten sonra bunu burada kaydeder.
+  @Post("admin/provider-balance/topup")
+  async providerBalanceTopUp(@Req() req: any, @Body() body: { amountUsd: number; description?: string }) {
+    this.assertAdmin(req);
+    await this.creditsService.topUpProviderBalance(Number(body.amountUsd), body.description, req.user.userId);
+    return this.creditsService.getProviderBalanceStatus();
+  }
+
   // Projelio'nun marj raporu: ham Anthropic maliyeti, kullanıcıdan alınan bedel ve kâr.
   @Get("admin/margin")
   margin(@Req() req: any, @Query("days") days?: string) {

@@ -14,9 +14,13 @@ interface Props {
   // tıklanınca kapanan bir karartma katmanı eklenir; false ise (masaüstü)
   // mevcut sabit panel davranışı korunur.
   overlay: boolean;
+  // Admin linki sadece role === "admin" olan kullanıcılarda gösterilir. Asıl korumayı
+  // AdminPanel.tsx (ve her admin endpoint'inin backend'deki assertAdmin kontrolü) sağlar;
+  // burası sadece navigasyonda gereksiz/karışıklık yaratan bir linki gizler.
+  isAdmin: boolean;
 }
 
-export default function Sidebar({ open, onClose, overlay }: Props) {
+export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
   const c = colors.light;
   const location = useLocation();
   const navigate = useNavigate();
@@ -29,7 +33,9 @@ export default function Sidebar({ open, onClose, overlay }: Props) {
     { to: "/?tab=budget", label: "Bütçe", icon: IconActivity, active: location.pathname === "/" && searchTab === "budget" },
     { to: "/?tab=files", label: "Dosyalar", icon: IconFile, active: location.pathname === "/" && searchTab === "files" },
     { to: "/calendar", label: "Takvim", icon: IconCalendar, active: location.pathname.startsWith("/calendar") },
-    { to: "/admin", label: "Admin", icon: IconShield, active: location.pathname.startsWith("/admin") },
+    ...(isAdmin
+      ? [{ to: "/admin", label: "Admin", icon: IconShield, active: location.pathname.startsWith("/admin") }]
+      : []),
   ];
 
   const handleLogout = () => {

@@ -14,6 +14,8 @@ import { ProjectsService } from "../projects/projects.service";
 import { JobsService } from "../jobs/jobs.service";
 import { BudgetService } from "../budget/budget.service";
 import { MembersService } from "../members/members.service";
+import { TaskCommentsService } from "../task-comments/task-comments.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { AI_TOOLS, CRITICAL_TOOLS } from "./ai-assistant.tools";
 import { AiCreditsService } from "./ai-credits.service";
 import { AiConversationsService } from "./ai-conversations.service";
@@ -27,8 +29,15 @@ const PENDING_ACTION_TTL_MS = 10 * 60 * 1000; // 10 dakika
 
 /** Modelin tek yanıtta üretebileceği azami token. Asistan yanıtları kısa olmalı. */
 const MAX_TOKENS = Number(process.env.AI_MAX_TOKENS ?? 800);
-/** Bir istek için azami araç turu. Her tur ayrı bir API çağrısıdır. */
-const MAX_TOOL_ITERATIONS = Number(process.env.AI_MAX_TOOL_ITERATIONS ?? 4);
+/**
+ * Bir istek için azami araç turu. Her tur ayrı bir API çağrısıdır.
+ * 4'ten 8'e çıkarıldı: çok adımlı istekler (ör. "3 görev ekle, birini ata, özet ver")
+ * eskiden bu sınıra çarpıp "isteğini tamamlayamadım" ile bitiyordu. Tur sayısı arttıkça
+ * maliyet de artar, ama bir isteğin YARIM kalıp kullanıcının aynı şeyi tekrar sorması
+ * (= 2 kat kredi) daha pahalıya gelir. create_tasks gibi toplu araçlar da tur sayısını
+ * azaltarak bu limitin pratikte daha az zorlanmasını sağlar.
+ */
+const MAX_TOOL_ITERATIONS = Number(process.env.AI_MAX_TOOL_ITERATIONS ?? 8);
 /** Araç sonuçlarının azami karakter uzunluğu. */
 const MAX_TOOL_RESULT_CHARS = Number(process.env.AI_MAX_TOOL_RESULT_CHARS ?? 2500);
 /** Sistem promptuna gömülen iş/proje sayısı (gerisi list_* araçlarıyla çekilir). */
@@ -137,6 +146,8 @@ export class AiAssistantService {
     private jobsService: JobsService,
     private budgetService: BudgetService,
     private membersService: MembersService,
+    private taskCommentsService: TaskCommentsService,
+    private notificationsService: NotificationsService,
     private creditsService: AiCreditsService,
     private conversationsService: AiConversationsService
   ) {}
@@ -345,13 +356,18 @@ export class AiAssistantService {
       "",
       "## Davranış kuralları",
       "- Her zaman Türkçe yaz. Kısa, net ve doğal konuş; gereksiz dolgu cümlesi kurma.",
-      "- Bir işlemi yapmak için gereken id'yi bilmiyorsan önce ilgili list_* / get_* aracıyla bul. Kullanıcıya asla id sorma; isimden eşleştir.",
+      "- Elindeki araçları kullanmadan asla \"yapamıyorum\" deme. Önce ilgili list_*/get_*/search_* aracını dene; " +
+        "gerekli id'yi bilmiyorsan önce onunla bul. Kullanıcıya asla id sorma; isimden eşleştir.",
       "- Aynı isimde birden fazla kayıt varsa hangisini kastettiğini sor.",
-      "- Çok adımlı isteklerde (ör. \"şu projeye 3 görev ekle\") adımları arka arkaya kendin yürüt, her adım için kullanıcıya dönme.",
+      "- Çok adımlı isteklerde (ör. \"şu projeye 3 görev ekle\") adımları arka arkaya kendin yürüt, her adım için kullanıcıya dönme. " +
+        "Birden fazla görev eklerken create_task'ı tekrar tekrar çağırmak yerine create_tasks ile tek seferde ekle.",
       "- Bir işlemi tamamladıktan sonra ne yaptığını tek cümleyle özetle. Uzun listeler yerine önemli olanı öne çıkar.",
       "- Silme, arşivleme ve bütçe hareketi işlemleri sistem tarafından otomatik olarak kullanıcıya onaylatılır. Sen sadece aracı doğru parametrelerle çağır; \"onaylıyor musun?\" diye ayrıca sorma.",
       "- Bir araç yetki hatası dönerse bunu kullanıcıya nazikçe açıkla ve aynı işlemi tekrar deneme.",
       "- Araçlardan dönen veriye sadık kal; bilmediğin bir şeyi uydurma.",
+      "- Kullanıcının istediği şey elindeki araçlarla KESİNLİKLE yapılamıyorsa (örn. dosya/departman/katalog gibi " +
+        "henüz araç kapsamına girmeyen bir alan), bunu açıkça ve kısaca söyle; asla varmış gibi yanıt uydurma ya da " +
+        "ilgisiz bir araca zorlama.",
       "- Kullanıcı belirsiz konuşursa (ör. \"şunu hallet\") en olası yorumu yap ve ne yaptığını söyle; tamamen anlaşılmazsa tek bir netleştirici soru sor.",
       "- Tarih ifadelerini çöz: \"yarın\", \"haftaya\", \"ayın 15'i\" gibi ifadeleri bugünün tarihine göre gerçek tarihe dönüştür.",
       "- Aynı bilgiyi iki kez sorgulama; bir araçtan aldığın sonucu hatırla ve tekrar çağırma.",
@@ -937,6 +953,56 @@ export class AiAssistantService {
         await this.requireProjectRole(task.projectId, userId, userRole, ["owner"]);
         await this.tasksService.remove(input.taskId);
         return { success: true };
+      }
+
+      case "create_tasks": {
+        await this.requireProjectRole(input.projectId, userId, userRole, ["owner", "member", "subcontractor"]);
+        const items: any[] = Array.isArray(input.tasks) ? input.tasks : [];
+        const created: unknown[] = [];
+        const failed: unknown[] = [];
+        for (const item of items) {
+          try {
+            const task = await this.tasksService.create(
+              input.projectId,
+              {
+                title: item.title,
+                description: item.description,
+                deadline: item.deadline,
+                startDate: item.startDate,
+                assignedTo: item.assignedTo,
+                budget: item.budget,
+                parentTaskId: item.parentTaskId,
+              },
+              userId
+            );
+            created.push(compactTask(task));
+          } catch (err: any) {
+            failed.push({ title: item?.title, error: err?.message ?? "bilinmeyen hata" });
+          }
+        }
+        return { createdCount: created.length, created, failed: failed.length ? failed : undefined };
+      }
+
+      case "list_task_comments": {
+        const task = await this.getTaskOrThrow(input.taskId);
+        await this.requireProjectRole(task.projectId, userId, userRole, ["owner", "member", "subcontractor"]);
+        const comments = await this.taskCommentsService.findByTask(input.taskId);
+        return comments.map((c) => pruneEmpty({ author: c.authorName, body: c.body, createdAt: shortDate(c.createdAt) }));
+      }
+
+      case "add_task_comment": {
+        const task = await this.getTaskOrThrow(input.taskId);
+        await this.requireProjectRole(task.projectId, userId, userRole, ["owner", "member", "subcontractor"]);
+        const comment = await this.taskCommentsService.create(input.taskId, userId, input.body);
+        return { success: true, author: comment.authorName };
+      }
+
+      case "get_notifications_summary": {
+        const { notifications, unreadCount } = await this.notificationsService.findForUser(userId, 5);
+        return {
+          unreadCount,
+          latest: notifications.map((n) => pruneEmpty({ title: n.title, read: n.read, createdAt: shortDate(n.createdAt) })),
+        };
       }
 
       case "add_budget_transaction": {

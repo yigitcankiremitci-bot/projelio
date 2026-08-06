@@ -83,6 +83,13 @@ export class AiAssistantController {
 
   // --- Yönetim ------------------------------------------------------------
 
+  // Tüm kullanıcıların AI kredi bakiyesini tek listede döner (admin paneli için).
+  @Get("admin/users-credits")
+  usersCredits(@Req() req: any) {
+    this.assertAdmin(req);
+    return this.creditsService.listAllBalances();
+  }
+
   // Admin bir kullanıcıya kredi yükler. (Ödeme sağlayıcısı entegre edilene kadar
   // bakiye yüklemenin tek yolu budur.)
   @Post("admin/credits/topup")

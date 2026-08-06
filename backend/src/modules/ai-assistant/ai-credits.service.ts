@@ -173,6 +173,46 @@ export class AiCreditsService {
   }
 
   /**
+   * Admin paneli için: her kullanıcının AI kredi bakiyesini tek listede döner.
+   * Henüz hiç AI kullanmamış kullanıcıların bakiye satırı olmayabilir (satır ilk
+   * `getBalance` çağrısında lazy oluşturulur) — bu yüzden users tablosundan başlayıp
+   * bakiyeyi LEFT JOIN gibi eşleriz; satırı yoksa 0 gösteririz.
+   */
+  async listAllBalances(): Promise<
+    {
+      userId: string;
+      fullName: string;
+      username: string;
+      email: string;
+      balance: number;
+      lifetimePurchased: number;
+      lifetimeSpent: number;
+    }[]
+  > {
+    const [usersResult, balancesResult] = await Promise.all([
+      this.supabase.client.from("users").select("id, full_name, username, email").order("full_name"),
+      this.supabase.client.from("ai_credit_balances").select("user_id, balance, lifetime_purchased, lifetime_spent"),
+    ]);
+    if (usersResult.error) throw usersResult.error;
+    if (balancesResult.error) throw balancesResult.error;
+
+    const balanceByUser = new Map((balancesResult.data ?? []).map((r: any) => [r.user_id, r]));
+
+    return (usersResult.data ?? []).map((u: any) => {
+      const b = balanceByUser.get(u.id);
+      return {
+        userId: u.id,
+        fullName: u.full_name,
+        username: u.username,
+        email: u.email,
+        balance: Number(b?.balance ?? 0),
+        lifetimePurchased: Number(b?.lifetime_purchased ?? 0),
+        lifetimeSpent: Number(b?.lifetime_spent ?? 0),
+      };
+    });
+  }
+
+  /**
    * Admin, Anthropic konsolunda (console.anthropic.com) hesaba gerçek para yüklediğinde
    * bunu buraya kaydeder. Anthropic'in bakiyeyi okuyabileceğimiz bir API'si yok; bu yüzden
    * "kalan bakiye" burada yüklenen tutarlar ile şimdiye kadarki gerçek Anthropic maliyeti

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { colors } from "../theme/colors";
 import { api } from "../api/client";
-import { aiChat, type AiProviderBalance } from "../api/aiChat";
+import { aiChat, type AiProviderBalance, type AiUserBalanceRow } from "../api/aiChat";
 import { IconSparkle } from "./icons";
 
 interface UserRow {
@@ -52,13 +52,38 @@ export default function AiCreditAdminPanel() {
       .catch(() => {});
   };
 
+  const [userBalances, setUserBalances] = useState<AiUserBalanceRow[] | null>(null);
+  const [userBalancesError, setUserBalancesError] = useState<string | null>(null);
+  const [userListFilter, setUserListFilter] = useState("");
+
+  const loadUserBalances = () => {
+    aiChat
+      .getUsersCredits()
+      .then((rows) => {
+        setUserBalances(rows);
+        setUserBalancesError(null);
+      })
+      .catch((err: any) => setUserBalancesError(err?.message ?? "Kullanıcı listesi yüklenemedi."));
+  };
+
   useEffect(() => {
     aiChat
       .getMarginReport(30)
       .then((r) => setMargin(r as unknown as MarginReport))
       .catch(() => {});
     loadProviderBalance();
+    loadUserBalances();
   }, []);
+
+  const filteredUserBalances = (userBalances ?? []).filter((u) => {
+    const q = userListFilter.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      u.fullName.toLowerCase().includes(q) ||
+      u.username?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q)
+    );
+  });
 
   const handleProviderTopUp = async () => {
     const amountUsd = Number(topupAmount);
@@ -117,6 +142,7 @@ export default function AiCreditAdminPanel() {
         ).toLocaleString("tr-TR")}.`,
       });
       setNote("");
+      loadUserBalances();
     } catch (err: any) {
       setFeedback({ ok: false, text: err?.message ?? "Kredi yüklenemedi." });
     } finally {
@@ -279,6 +305,101 @@ export default function AiCreditAdminPanel() {
         </div>
       )}
 
+      {/* Kullanıcılar ve kredi bakiyeleri */}
+      <div
+        style={{
+          background: c.surface,
+          border: `1px solid ${c.border}`,
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 18,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 10 }}>
+          <div style={{ fontSize: 13, color: c.textSecondary }}>
+            Kullanıcılar {userBalances ? `(${userBalances.length})` : ""}
+          </div>
+          <input
+            value={userListFilter}
+            onChange={(e) => setUserListFilter(e.target.value)}
+            placeholder="Ada, kullanıcı adına veya e-postaya göre filtrele…"
+            style={{ ...inputStyle(c), width: "auto", flex: 1, maxWidth: 280, padding: "6px 10px", fontSize: 13 }}
+          />
+        </div>
+
+        {userBalancesError && <p style={{ fontSize: 13, color: c.danger, margin: 0 }}>{userBalancesError}</p>}
+
+        {!userBalancesError && !userBalances && (
+          <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
+        )}
+
+        {!userBalancesError && userBalances && (
+          <div style={{ maxHeight: 340, overflowY: "auto", borderRadius: 9, border: `1px solid ${c.border}` }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+              <thead>
+                <tr style={{ background: c.background, position: "sticky", top: 0 }}>
+                  <th style={thStyle(c)}>Kullanıcı</th>
+                  <th style={thStyle(c, "right")}>Bakiye</th>
+                  <th style={thStyle(c, "right")}>Ömür boyu yüklenen</th>
+                  <th style={thStyle(c, "right")}>Ömür boyu harcanan</th>
+                  <th style={thStyle(c, "right")}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUserBalances.map((u) => (
+                  <tr key={u.userId} style={{ borderTop: `1px solid ${c.border}` }}>
+                    <td style={tdStyle(c)}>
+                      <div style={{ color: c.textPrimary }}>{u.fullName}</div>
+                      <div style={{ fontSize: 11.5, color: c.textSecondary }}>
+                        {u.username ? `@${u.username}` : u.email}
+                      </div>
+                    </td>
+                    <td style={{ ...tdStyle(c), textAlign: "right", fontWeight: 600, color: u.balance <= 0 ? c.danger : c.textPrimary }}>
+                      {Math.round(u.balance).toLocaleString("tr-TR")}
+                    </td>
+                    <td style={{ ...tdStyle(c), textAlign: "right", color: c.textSecondary }}>
+                      {Math.round(u.lifetimePurchased).toLocaleString("tr-TR")}
+                    </td>
+                    <td style={{ ...tdStyle(c), textAlign: "right", color: c.textSecondary }}>
+                      {Math.round(u.lifetimeSpent).toLocaleString("tr-TR")}
+                    </td>
+                    <td style={{ ...tdStyle(c), textAlign: "right" }}>
+                      <button
+                        onClick={() => {
+                          setSelected({ id: u.userId, fullName: u.fullName, username: u.username, email: u.email });
+                          setQuery("");
+                          setResults([]);
+                          setFeedback(null);
+                        }}
+                        style={{
+                          background: "transparent",
+                          border: `1px solid ${c.border}`,
+                          borderRadius: 7,
+                          padding: "4px 9px",
+                          fontSize: 12,
+                          color: c.accent,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Kredi yükle
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredUserBalances.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ ...tdStyle(c), textAlign: "center", color: c.textSecondary }}>
+                      Sonuç yok.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Kredi yükleme */}
       <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: 16 }}>
         <label style={labelStyle(c)}>Kullanıcı</label>
@@ -424,6 +545,21 @@ function Metric({ label, value, highlight }: { label: string; value: string; hig
 
 function labelStyle(c: typeof colors.light): React.CSSProperties {
   return { display: "block", fontSize: 13, color: c.textSecondary, marginBottom: 5 };
+}
+
+function thStyle(c: typeof colors.light, align: "left" | "right" = "left"): React.CSSProperties {
+  return {
+    textAlign: align,
+    padding: "8px 12px",
+    fontSize: 11.5,
+    fontWeight: 600,
+    color: c.textSecondary,
+    whiteSpace: "nowrap",
+  };
+}
+
+function tdStyle(c: typeof colors.light): React.CSSProperties {
+  return { padding: "8px 12px", color: c.textPrimary, verticalAlign: "middle" };
 }
 
 function inputStyle(c: typeof colors.light): React.CSSProperties {

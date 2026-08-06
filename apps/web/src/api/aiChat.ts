@@ -53,6 +53,16 @@ export interface AiCreditTransaction {
   createdAt: string;
 }
 
+export interface AiUserBalanceRow {
+  userId: string;
+  fullName: string;
+  username: string;
+  email: string;
+  balance: number;
+  lifetimePurchased: number;
+  lifetimeSpent: number;
+}
+
 export interface AiProviderBalance {
   toppedUpUsd: number;
   spentUsd: number;
@@ -80,6 +90,7 @@ export const aiChat = {
   topUp: (userId: string, credits: number, description?: string) =>
     api.post<AiCredits>("/ai/admin/credits/topup", { userId, credits, description }),
   getMarginReport: (days = 30) => api.get<Record<string, unknown>>(`/ai/admin/margin?days=${days}`),
+  getUsersCredits: () => api.get<AiUserBalanceRow[]>("/ai/admin/users-credits"),
 
   getProviderBalance: () => api.get<AiProviderBalance>("/ai/admin/provider-balance"),
   topUpProviderBalance: (amountUsd: number, description?: string) =>

@@ -12,7 +12,7 @@ import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import TeamPanel, { TeamPanelHandle } from "../components/panels/TeamPanel";
 import BudgetPanel, { BudgetPanelHandle } from "../components/panels/BudgetPanel";
 import OutputsPanel, { OutputsPanelHandle } from "../components/OutputsPanel";
-import FilesPanel from "../components/FilesPanel";
+import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
 import ProcessPanel, { ProcessNavState, ViewMode, computeInitialProcessNavDates } from "../components/panels/ProcessPanel";
 import { colors } from "../theme/colors";
 import { IconSettings } from "../components/icons";
@@ -37,6 +37,7 @@ export default function ProjectDetail() {
   const feedRef = useRef<FeedPanelHandle>(null);
   const teamRef = useRef<TeamPanelHandle>(null);
   const budgetRef = useRef<BudgetPanelHandle>(null);
+  const filesRef = useRef<FilesPanelHandle>(null);
 
   // Alt navigasyondaki "+" butonu, proje detayında hangi sekmedeysek ona uygun eylemi
   // tetiklesin diye ProjectFabContext üzerinden kayıt yapılır (sekme değiştikçe güncellenir).
@@ -51,9 +52,14 @@ export default function ProjectDetail() {
       ? { label: "Üye ekle", onClick: () => teamRef.current?.openCreate() }
       : activeTab === "budget"
       ? { label: "Ödeme / gider ekle", onClick: () => budgetRef.current?.openCreate() }
-      : // Dosyalar sekmesinin kendi yükleme alanı var; ayrıca FAB göstermeye gerek yok.
-      activeTab === "files"
-      ? null
+      : activeTab === "files"
+      ? {
+          label: "Dosya ekle",
+          options: [
+            { label: "Dosya yükle", onClick: () => filesRef.current?.openUpload() },
+            { label: "Yeni dosya oluştur", onClick: () => filesRef.current?.openCreateNative() },
+          ],
+        }
       : { label: "Deadline'ı değiştir", onClick: () => setExtendingDeadline(true) },
     [activeTab, project, id]
   );
@@ -266,11 +272,13 @@ export default function ProjectDetail() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
+    <div style={{ minHeight: "100vh", background: c.background }}>
       {!project && (
-        <Link to="/" style={{ fontSize: 15, color: c.textSecondary, marginBottom: 4, display: "inline-block" }}>
-          ← Projeler
-        </Link>
+        <div style={{ padding: 28 }}>
+          <Link to="/" style={{ fontSize: 15, color: c.textSecondary, marginBottom: 4, display: "inline-block" }}>
+            ← Projeler
+          </Link>
+        </div>
       )}
 
       {project && (() => {
@@ -282,11 +290,9 @@ export default function ProjectDetail() {
               background: hasCover
                 ? `linear-gradient(rgba(255,255,255,0.35), rgba(255,255,255,0.92)), center/cover url(${project.coverImageUrl})`
                 : c.surface,
-              border: hasCover ? "none" : `1px solid ${c.border}`,
-              borderRadius: 12,
-              padding: 18,
-              margin: "10px 0 24px",
-              minHeight: hasCover ? 260 : undefined,
+              borderBottom: hasCover ? "none" : `1px solid ${c.border}`,
+              padding: hasCover ? "20px 28px" : "18px 28px",
+              minHeight: hasCover ? 330 : undefined,
               display: hasCover ? "flex" : undefined,
               flexDirection: hasCover ? "column" : undefined,
               justifyContent: hasCover ? "flex-end" : undefined,
@@ -330,7 +336,7 @@ export default function ProjectDetail() {
               aria-label="Projeyi düzenle"
               style={{
                 position: "absolute",
-                top: 16,
+                bottom: 16,
                 right: 16,
                 display: "flex",
                 alignItems: "center",
@@ -351,7 +357,7 @@ export default function ProjectDetail() {
       })()}
 
       {project && id && (
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ padding: "0 28px 28px" }}>
           {/* Sayfa kaydırılsa da sekmeler (akış, ekip, çıktılar, bütçe, süreç) ve
               geri bağlantısı üstte sabit kalır. */}
           <div
@@ -406,7 +412,7 @@ export default function ProjectDetail() {
               onTaskUpdated={updateTask}
             />
           )}
-          {activeTab === "files" && <FilesPanel projectId={id} />}
+          {activeTab === "files" && <FilesPanel ref={filesRef} projectId={id} />}
           {activeTab === "process" && (
             <ProcessPanel
               project={project}

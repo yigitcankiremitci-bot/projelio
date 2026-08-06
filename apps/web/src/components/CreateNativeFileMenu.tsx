@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
 import type { NativeFileKind } from "../api/files";
 import { colors } from "../theme/colors";
 import Modal from "./Modal";
 import { IconChevronDown, IconFile, IconPlus } from "./icons";
+
+export interface CreateNativeFileMenuHandle {
+  /** Dışarıdan (örn. Dosyalar sekmesinin "+" FAB seçeneği) tür listesini açar. */
+  openMenu: () => void;
+}
 
 interface Props {
   target: { jobId: string } | { projectId: string } | { departmentId: string };
@@ -30,10 +35,18 @@ const MICROSOFT_KINDS: { kind: NativeFileKind; label: string }[] = [
 /**
  * "Yeni dosya oluştur" — bağlı sağlayıcıya göre (Google Dokümanlar/E-Tablolar/
  * Sunular ya da boş Word/Excel/PowerPoint) doğrudan Drive/OneDrive'da boş bir
- * dosya açar ve Projelio'ya kaydeder. Oluşturulan dosya yeni sekmede kendi
- * editöründe açılır — kullanıcı hemen yazmaya başlayabilsin diye.
+ * dosya açar ve Projelio'ya kaydeder.
+ *
+ * Oluşturulan dosya artık otomatik yeni sekmede AÇILMAZ — Projelio'nun geniş
+ * önizleme modalında (bkz. FilesPanel.handleFileAdded -> FilePreviewModal)
+ * gösterilir; kullanıcı isterse oradaki "Xda düzenle" düğmesiyle kendi
+ * sekmesinde açar. Böylece varsayılan olarak Projelio'dan hiç ayrılmadan devam
+ * edilir, ayrılmak tamamen kullanıcının tercihi olur.
  */
-export default function CreateNativeFileMenu({ target, taskId, outputId, provider, onCreated }: Props) {
+const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(function CreateNativeFileMenu(
+  { target, taskId, outputId, provider, onCreated },
+  ref
+) {
   const c = colors.light;
   const [open, setOpen] = useState(false);
   const [pendingKind, setPendingKind] = useState<{ kind: NativeFileKind; label: string } | null>(null);
@@ -43,6 +56,8 @@ export default function CreateNativeFileMenu({ target, taskId, outputId, provide
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const kinds = provider === "google" ? GOOGLE_KINDS : MICROSOFT_KINDS;
+
+  useImperativeHandle(ref, () => ({ openMenu: () => setOpen(true) }));
 
   useEffect(() => {
     if (!open) return;
@@ -67,7 +82,6 @@ export default function CreateNativeFileMenu({ target, taskId, outputId, provide
     try {
       const created = await filesApi.createNativeFile(target, { kind: pendingKind.kind, name: name.trim(), taskId, outputId });
       onCreated(created);
-      if (created.webViewLink) window.open(created.webViewLink, "_blank", "noopener,noreferrer");
       setPendingKind(null);
     } catch (e: any) {
       setError(e?.message ?? "Dosya oluşturulamadı");
@@ -179,4 +193,6 @@ export default function CreateNativeFileMenu({ target, taskId, outputId, provide
       )}
     </div>
   );
-}
+});
+
+export default CreateNativeFileMenu;

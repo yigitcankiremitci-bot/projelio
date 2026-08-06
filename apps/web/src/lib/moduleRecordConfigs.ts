@@ -108,6 +108,76 @@ const financeEntryConfig: ModuleRecordConfig = {
   },
 };
 
+// ============================================================ Alacak-Borç (Finans Muhasebe)
+// Şirket Bütçe sekmesindeki gelir/gider defterinden ayrı: burada henüz TAHSİL
+// EDİLMEMİŞ/ÖDENMEMİŞ tutarlar (kimden alacaklısın, kime borçlusun) takip edilir —
+// vade tarihi ve açık/kapandı durumuyla (bkz. OrgBudgetPanel).
+const receivablesPayablesConfig: ModuleRecordConfig = {
+  title: "Alacak-Borç",
+  addLabel: "Kayıt ekle",
+  emptyLabel: "Henüz alacak/borç kaydı yok.",
+  fields: [
+    {
+      key: "type",
+      label: "Tür",
+      type: "select",
+      required: true,
+      defaultValue: "receivable",
+      options: [
+        { value: "receivable", label: "Alacak" },
+        { value: "payable", label: "Borç" },
+      ],
+    },
+    { key: "counterparty", label: "Kimden / Kime", type: "text", required: true, placeholder: "Örn. ABC Ltd." },
+    { key: "amount", label: "Tutar", type: "number", required: true },
+    CURRENCY_FIELD,
+    { key: "category", label: "Kategori", type: "text", placeholder: "Örn. Satış, Kira, Hizmet" },
+    { key: "dueDate", label: "Vade tarihi", type: "date" },
+    {
+      key: "status",
+      label: "Durum",
+      type: "select",
+      defaultValue: "open",
+      options: [
+        { value: "open", label: "Açık" },
+        { value: "settled", label: "Kapandı" },
+      ],
+    },
+    { key: "description", label: "Açıklama", type: "textarea" },
+  ],
+  summary: (d) =>
+    `${d.type === "payable" ? "Borç" : "Alacak"} · ${d.counterparty ?? ""} · ${fmtMoney(d.amount, d.currency)}`,
+  detail: (d) => {
+    const statusLabel = d.status === "settled" ? (d.type === "payable" ? "Ödendi" : "Tahsil edildi") : "Açık";
+    return [statusLabel, d.dueDate as string | undefined, d.category as string | undefined].filter(Boolean).join(" · ") || undefined;
+  },
+  computeStats: (records) => {
+    // Farklı para birimlerini toplamamak için her ikisi de para birimine göre
+    // gruplanır (bkz. financeEntryConfig.computeStats'taki aynı yaklaşım).
+    const sumByCurrency = (rows: ModuleRecord[]) => {
+      const totals = new Map<string, number>();
+      for (const r of rows) {
+        const currency = (r.data.currency as string) || "TRY";
+        totals.set(currency, (totals.get(currency) ?? 0) + (Number(r.data.amount) || 0));
+      }
+      return totals;
+    };
+    const openReceivable = sumByCurrency(records.filter((r) => r.data.type !== "payable" && r.data.status !== "settled"));
+    const openPayable = sumByCurrency(records.filter((r) => r.data.type === "payable" && r.data.status !== "settled"));
+
+    if (openReceivable.size === 0 && openPayable.size === 0) {
+      return [
+        { label: "Açık alacak", value: fmtMoney(0, "TRY") },
+        { label: "Açık borç", value: fmtMoney(0, "TRY") },
+      ];
+    }
+    const stats: ModuleSummaryStat[] = [];
+    for (const [currency, sum] of openReceivable) stats.push({ label: `Açık alacak (${currency})`, value: fmtMoney(sum, currency) });
+    for (const [currency, sum] of openPayable) stats.push({ label: `Açık borç (${currency})`, value: fmtMoney(sum, currency) });
+    return stats;
+  },
+};
+
 // ============================================================ Fatura (Finans Muhasebe)
 const invoiceConfig: ModuleRecordConfig = {
   title: "Faturalar",
@@ -461,6 +531,7 @@ const goalConfig: ModuleRecordConfig = {
 
 export const MODULE_RECORD_CONFIGS: Record<string, ModuleRecordConfig> = {
   fm_gelir_gider: financeEntryConfig,
+  fm_alacak_borc: receivablesPayablesConfig,
   fm_fatura: invoiceConfig,
   mid_musteri_modulu: customerConfig,
   spd_musteri_modulu: customerConfig,

@@ -107,18 +107,24 @@ export default function NotificationBell() {
         aria-label="Bildirimler"
         style={{
           position: "relative",
-          width: 52,
-          height: 52,
+          width: 44,
+          height: 44,
           borderRadius: "50%",
-          border: `1px solid ${c.border}`,
-          background: c.surface,
+          border: "none",
+          // Bu buton her sayfada (kapak fotoğraflı olsun olmasın) aynı görünmeli;
+          // yarı saydam koyu bir daire hem fotoğrafların hem düz header'ın
+          // üzerinde okunur kalır (bkz. DepartmentDetail'deki kapak düzenleme
+          // ikonlarıyla aynı desen).
+          background: "rgba(26,31,41,0.5)",
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow: "0 2px 8px rgba(26,31,41,0.08)",
+          boxShadow: "0 2px 8px rgba(26,31,41,0.18)",
         }}
       >
-        <IconBell size={24} color={c.textPrimary} />
+        <IconBell size={20} color="#fff" />
         {unreadCount > 0 && (
           <span
             style={{

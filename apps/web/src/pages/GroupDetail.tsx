@@ -41,7 +41,7 @@ export default function GroupDetail() {
       <div
         style={{
           position: "relative",
-          height: 200,
+          height: 270,
           background: group?.coverImageUrl
             ? `linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.95)), center/cover url(${group.coverImageUrl})`
             : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,
@@ -53,7 +53,7 @@ export default function GroupDetail() {
       >
         {/* Kişi kartı: serbest çalışan anasayfasıyla (Dashboard) aynı bileşen, kapak
             görselinin/gradientinin üstüne bindirilmiş — sağ üstte, yer kaplamadan. */}
-        <div style={{ position: "absolute", top: 20, right: 28, zIndex: 3 }}>
+        <div style={{ position: "absolute", top: 76, right: 28, zIndex: 3 }}>
           <ProfileCard />
         </div>
 

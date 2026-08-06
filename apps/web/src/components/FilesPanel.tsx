@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { GoogleDriveStatus, ProjectFile } from "@projelio/shared";
 import { driveApi, filesApi, oneDriveApi, uploadFile } from "../api/files";
 import type { FileScope } from "../api/files";
@@ -8,6 +8,7 @@ import { colors } from "../theme/colors";
 import BrowseDriveModal from "./BrowseDriveModal";
 import ConfirmDialog from "./ConfirmDialog";
 import CreateNativeFileMenu from "./CreateNativeFileMenu";
+import type { CreateNativeFileMenuHandle } from "./CreateNativeFileMenu";
 import FilePreviewModal from "./FilePreviewModal";
 import {
   IconDownload,
@@ -54,17 +55,34 @@ interface UploadingItem {
   error?: string;
 }
 
-export default function FilesPanel({
-  jobId,
-  projectId,
-  taskId,
-  outputId,
-  organizationId,
-  groupId,
-  departmentId,
-  scope,
-  compact = false,
-}: Props) {
+/**
+ * Sayfa (ProjectDetail/JobDetail/DepartmentDetail) alt navigasyondaki "+"
+ * düğmesini bu sekmedeyken buraya bağlamak için kullanır — TeamPanelHandle/
+ * OutputsPanelHandle ile birebir aynı desen. FAB'ın KENDİSİ burada değil,
+ * çağıran sayfada kayıtlıdır (useProjectFabAction sayfa başına TEK yerden
+ * çağrılmalı — bkz. DepartmentsPanel'deki "iki bileşen aynı eylemi kaydediyor"
+ * hatasının çözümü); bu panel yalnızca tetikleyici metotları dışa açar.
+ */
+export interface FilesPanelHandle {
+  openUpload: () => void;
+  /** Sağlayıcı henüz bağlı/hazır değilse sessizce başarısız olmak yerine kullanıcıya açıklayıcı bir hata gösterir. */
+  openCreateNative: () => void;
+}
+
+const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
+  {
+    jobId,
+    projectId,
+    taskId,
+    outputId,
+    organizationId,
+    groupId,
+    departmentId,
+    scope,
+    compact = false,
+  },
+  ref
+) {
   const c = colors.light;
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [googleStatus, setGoogleStatus] = useState<GoogleDriveStatus | null>(null);
@@ -77,7 +95,13 @@ export default function FilesPanel({
   const [pendingDelete, setPendingDelete] = useState<ProjectFile | null>(null);
   const [browsing, setBrowsing] = useState(false);
   const [pickerError, setPickerError] = useState("");
+  // Google ve Microsoft durumu iki AYRI istekle gelir; biri diğerinden önce
+  // dönerse (örn. yalnızca OneDrive bağlıyken Google isteği önce döner) o anlık
+  // "anyReady=false" görünüp driveMissing uyarısı bir anlığına yanıp söner.
+  // İkisi de dönene kadar bekleyip uyarıyı ona göre göstermek bunu önler.
+  const [statusLoading, setStatusLoading] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
+  const createMenuRef = useRef<CreateNativeFileMenuHandle>(null);
 
   // Organizasyon/grup ekranı salt okunurdur: dosya bir işe ait olmak zorunda,
   // "hangi işe?" sorusunun cevabı burada yok.
@@ -118,8 +142,11 @@ export default function FilesPanel({
   // Kullanıcı iki sağlayıcıdan yalnızca birini bağlamış olabilir; yükleme
   // engeli ikisi de hazır değilse devreye girmeli (bkz. driveMissing).
   useEffect(() => {
-    driveApi.status().then(setGoogleStatus).catch(() => setGoogleStatus(null));
-    oneDriveApi.status().then(setMsStatus).catch(() => setMsStatus(null));
+    setStatusLoading(true);
+    Promise.allSettled([
+      driveApi.status().then(setGoogleStatus).catch(() => setGoogleStatus(null)),
+      oneDriveApi.status().then(setMsStatus).catch(() => setMsStatus(null)),
+    ]).finally(() => setStatusLoading(false));
   }, []);
 
   const handleFiles = async (selected: FileList | null) => {
@@ -169,7 +196,7 @@ export default function FilesPanel({
   // ikisinden birini bağlamışsa (hangisi olursa olsun) engel kalkar.
   const anyConfigured = Boolean(googleStatus?.configured || msStatus?.configured);
   const anyReady = Boolean(googleStatus?.driveReady || msStatus?.driveReady);
-  const driveMissing = anyConfigured && !anyReady;
+  const driveMissing = !statusLoading && anyConfigured && !anyReady;
   // "Drive'dan seç"/"Yeni dosya" için hangi sağlayıcı bağlı: Google Drive
   // öncelikli (bkz. CloudStorageService.findAccountForUser'daki aynı sıralama).
   const connectedProvider: "google" | "microsoft" | undefined = googleStatus?.driveReady
@@ -178,8 +205,12 @@ export default function FilesPanel({
     ? "microsoft"
     : undefined;
 
-  const handleImported = (file: ProjectFile) => {
+  // Yeni oluşturulan/içe aktarılan dosya listeye eklenir VE hemen geniş önizleme
+  // modalında açılır — kullanıcı Projelio'dan hiç ayrılmadan görür; ayrılmak
+  // (Xda düzenle) tamamen kendi tercihi olur (bkz. CreateNativeFileMenu üstündeki not).
+  const handleFileAdded = (file: ProjectFile) => {
     setFiles((prev) => [file, ...prev]);
+    setPreview(file);
   };
 
   const handleBrowseDriveClick = () => {
@@ -188,7 +219,7 @@ export default function FilesPanel({
       openGooglePicker(async ({ id, name }) => {
         try {
           const created = await filesApi.importFromDrive(target, { sourceFileId: id, name, taskId, outputId });
-          handleImported(created);
+          handleFileAdded(created);
         } catch (e: any) {
           setPickerError(e?.message ?? "Dosya içe aktarılamadı");
         }
@@ -201,6 +232,17 @@ export default function FilesPanel({
   // İş ekranında dosyanın hangi projeden geldiğini göstermek gerekir; proje
   // ekranında zaten belli olduğu için gösterilmez.
   const showOrigin = Boolean(jobId && !projectId && !taskId && !outputId);
+
+  useImperativeHandle(ref, () => ({
+    openUpload: () => inputRef.current?.click(),
+    openCreateNative: () => {
+      if (createMenuRef.current) {
+        createMenuRef.current.openMenu();
+      } else {
+        setPickerError("Yeni dosya oluşturmak için önce Google Drive ya da OneDrive hesabınızı bağlayın (Ayarlar > Bağlı hesaplar).");
+      }
+    },
+  }));
 
   return (
     <div>
@@ -231,11 +273,12 @@ export default function FilesPanel({
                 {connectedProvider === "microsoft" ? "OneDrive'dan seç" : "Drive'dan seç"}
               </button>
               <CreateNativeFileMenu
+                ref={createMenuRef}
                 target={target}
                 taskId={taskId}
                 outputId={outputId}
                 provider={connectedProvider}
-                onCreated={handleImported}
+                onCreated={handleFileAdded}
               />
             </>
           )}
@@ -445,7 +488,7 @@ export default function FilesPanel({
           taskId={taskId}
           outputId={outputId}
           onClose={() => setBrowsing(false)}
-          onImported={handleImported}
+          onImported={handleFileAdded}
         />
       )}
 
@@ -464,7 +507,9 @@ export default function FilesPanel({
       )}
     </div>
   );
-}
+});
+
+export default FilesPanel;
 
 function IconButton({
   title,

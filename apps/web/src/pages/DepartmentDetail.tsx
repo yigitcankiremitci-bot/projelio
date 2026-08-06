@@ -9,7 +9,7 @@ import DepartmentBudgetPanel, { DepartmentBudgetPanelHandle } from "../component
 import DepartmentTabs, { DepartmentTab } from "../components/DepartmentTabs";
 import ProductsPanel from "../components/ProductsPanel";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
-import FilesPanel from "../components/FilesPanel";
+import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
 import DepartmentSettingsModal from "../components/DepartmentSettingsModal";
 import ProfileCard from "../components/ProfileCard";
 import { resizeCoverImage } from "../lib/imageProcessing";
@@ -48,6 +48,7 @@ export default function DepartmentDetail() {
   const teamRef = useRef<DepartmentMembersListHandle>(null);
   const tasksRef = useRef<DepartmentTasksPanelHandle>(null);
   const budgetRef = useRef<DepartmentBudgetPanelHandle>(null);
+  const filesRef = useRef<FilesPanelHandle>(null);
 
   const reload = () => {
     if (!id) return;
@@ -70,8 +71,7 @@ export default function DepartmentDetail() {
   // Alt navigasyondaki "+" butonu, proje detayındaki (ProjectDetail) ile aynı desende:
   // departman detayında hangi sekmedeysek ona uygun eylemi tetikler. Ürün Yönetimi
   // departmanının "Modüller" sekmesi kendi "Ürün/Hizmet ekle" düğmesini kullanır (bkz.
-  // ProductsPanel useFab=false), Dosyalar sekmesinin de kendi yükleme alanı var —
-  // proje tarafındaki desenle birebir aynı, bu ikisinde FAB gösterilmez.
+  // ProductsPanel useFab=false); Dosyalar sekmesi dosya yükleme/oluşturma seçimini açar.
   useProjectFabAction(
     !department
       ? null
@@ -83,6 +83,14 @@ export default function DepartmentDetail() {
       ? { label: "Görev ekle", onClick: () => tasksRef.current?.openCreate() }
       : activeTab === "budget"
       ? { label: "Kayıt ekle", onClick: () => budgetRef.current?.openCreate() }
+      : activeTab === "files"
+      ? {
+          label: "Dosya ekle",
+          options: [
+            { label: "Dosya yükle", onClick: () => filesRef.current?.openUpload() },
+            { label: "Yeni dosya oluştur", onClick: () => filesRef.current?.openCreateNative() },
+          ],
+        }
       : null,
     [activeTab, department?.id]
   );
@@ -127,7 +135,7 @@ export default function DepartmentDetail() {
       <div
         style={{
           position: "relative",
-          height: 252,
+          height: 320,
           background: coverUrl
             ? `linear-gradient(rgba(26,31,41,0.15), rgba(26,31,41,0.6)), center/cover url(${coverUrl})`
             : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,
@@ -139,7 +147,7 @@ export default function DepartmentDetail() {
       >
         {/* Kişi kartı: diğer anasayfalarla aynı bileşen, kapak görselinin üstüne bindirilmiş —
             sağ üstteki kapak düzenleme ikonlarının altında, yer kaplamadan. */}
-        <div style={{ position: "absolute", top: 56, right: 14, zIndex: 3 }}>
+        <div style={{ position: "absolute", top: 76, right: 14, zIndex: 3 }}>
           <ProfileCard />
         </div>
 
@@ -154,7 +162,7 @@ export default function DepartmentDetail() {
         </div>
 
         {department && (
-          <div style={{ position: "absolute", top: 14, right: 14, display: "flex", gap: 6 }}>
+          <div style={{ position: "absolute", bottom: 14, right: 14, display: "flex", gap: 6 }}>
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
@@ -269,7 +277,7 @@ export default function DepartmentDetail() {
               </>
             )}
 
-            {activeTab === "files" && <FilesPanel departmentId={department.id} />}
+            {activeTab === "files" && <FilesPanel ref={filesRef} departmentId={department.id} />}
           </>
         )}
       </div>

@@ -93,6 +93,17 @@ export default function App() {
     return <Navigate to="/login" replace />;
   }
 
+  // İş/Proje/Program/Organizasyon/Departman/Grup detay sayfaları en üstte tam
+  // genişlikte bir kapak fotoğrafı/gradyanı gösterir (bkz. ilgili sayfaların
+  // return'ünün ilk elemanı). Bu sayfalarda kapak, sayfanın gerçek en üstüne
+  // (y=0) kadar uzansın diye burada normalde her sayfaya uygulanan
+  // HEADER_HEIGHT boşluğu ve dekoratif header çubuğunun opak arka planı
+  // kaldırılır; sidebar açma düğmesi/logo/bildirim çanı/AI başlatıcı zaten
+  // ayrı position:fixed öğeler olduğu için kapağın üzerinde yüzmeye devam eder.
+  const isCoverPage = /^\/(jobs|projects|operations|organizations|departments|groups)\/[^/]+$/.test(
+    location.pathname
+  );
+
   const c = colors.light;
 
   return (
@@ -106,19 +117,21 @@ export default function App() {
           sağa kaydırıyoruz. Mobilde sidebar bir çekmece/overlay olduğu için
           içerik hiçbir zaman kaymaz. */}
       <div style={{ marginLeft: isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0, minHeight: "100vh", position: "relative" }}>
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0,
-            right: 0,
-            height: HEADER_HEIGHT,
-            background: c.surface,
-            borderBottom: `1px solid ${c.border}`,
-            boxShadow: "0 2px 6px rgba(26,31,41,0.05)",
-            zIndex: 35,
-          }}
-        />
+        {!isCoverPage && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0,
+              right: 0,
+              height: HEADER_HEIGHT,
+              background: c.surface,
+              borderBottom: `1px solid ${c.border}`,
+              boxShadow: "0 2px 6px rgba(26,31,41,0.05)",
+              zIndex: 35,
+            }}
+          />
+        )}
         {/* Sidebar kapalıyken (masaüstünde veya mobilde) sol üstte küçük bir ok
             butonu ve onun yanında Projelio logosu gösterilir; oka basınca sidebar
             açılır, logoya basınca ana sayfaya gidilir. Sidebar açıkken zaten kendi
@@ -167,7 +180,7 @@ export default function App() {
         <NotificationBell />
         <AiLauncher />
         <ProjectFabContext.Provider value={{ action: fabAction, setAction: setFabAction }}>
-          <div style={{ paddingTop: HEADER_HEIGHT, paddingBottom: isDesktop ? 28 : 84 }}>
+          <div style={{ paddingTop: isCoverPage ? 0 : HEADER_HEIGHT, paddingBottom: isDesktop ? 28 : 84 }}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/jobs/:id" element={<JobDetail />} />

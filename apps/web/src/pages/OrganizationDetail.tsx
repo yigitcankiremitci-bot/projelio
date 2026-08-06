@@ -8,6 +8,7 @@ import FilesPanel from "../components/FilesPanel";
 import DepartmentsPanel, { DepartmentsPanelHandle } from "../components/DepartmentsPanel";
 import ProductsPanel, { ProductsPanelHandle } from "../components/ProductsPanel";
 import ModulesPanel from "../components/ModulesPanel";
+import OrgBudgetPanel, { OrgBudgetPanelHandle } from "../components/OrgBudgetPanel";
 import AddModuleRecordModal from "../components/AddModuleRecordModal";
 import QuickFileUploadModal from "../components/QuickFileUploadModal";
 import OrgTabs, { OrgTab } from "../components/OrgTabs";
@@ -46,7 +47,7 @@ export default function OrganizationDetail() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const validTabs: OrgTab[] = ["home", "flow", "departments", "products", "files"];
+  const validTabs: OrgTab[] = ["home", "flow", "departments", "products", "budget", "files"];
   const activeTab: OrgTab = validTabs.includes(tabParam as OrgTab) ? (tabParam as OrgTab) : "home";
   const setActiveTab = (next: OrgTab) => {
     setSearchParams(next === "home" ? {} : { tab: next }, { replace: true });
@@ -54,6 +55,7 @@ export default function OrganizationDetail() {
   const feedRef = useRef<FeedPanelHandle>(null);
   const departmentsRef = useRef<DepartmentsPanelHandle>(null);
   const productsRef = useRef<ProductsPanelHandle>(null);
+  const budgetRef = useRef<OrgBudgetPanelHandle>(null);
   // "İşe al" ve "Gelir/gider ekle" aynı modalı (bkz. AddModuleRecordModal),
   // yalnızca moduleKey'i değiştirerek kullanır.
   const [addingRecordModule, setAddingRecordModule] = useState<string | null>(null);
@@ -90,7 +92,7 @@ export default function OrganizationDetail() {
       <div
         style={{
           position: "relative",
-          height: 200,
+          height: 270,
           background: organization?.coverImageUrl
             ? `linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.95)), center/cover url(${organization.coverImageUrl})`
             : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,
@@ -103,7 +105,7 @@ export default function OrganizationDetail() {
         {/* Kişi kartı: serbest çalışan anasayfasıyla (Dashboard) aynı bileşen, ama burada
             ekstra yer kaplamasın diye kapak görselinin/gradientinin üstüne bindirilmiş —
             sağ üstte. */}
-        <div style={{ position: "absolute", top: 20, right: 28, zIndex: 3 }}>
+        <div style={{ position: "absolute", top: 76, right: 28, zIndex: 3 }}>
           <ProfileCard />
         </div>
 
@@ -209,6 +211,12 @@ export default function OrganizationDetail() {
         )}
         {activeTab === "departments" && <DepartmentsPanel organizationId={id} layout="grid" />}
         {activeTab === "products" && <ProductsPanel organizationId={id} departmentId={productDepartmentId} />}
+        {activeTab === "budget" && (
+          <>
+            <BudgetFabRegistrar budgetRef={budgetRef} />
+            <OrgBudgetPanel ref={budgetRef} organizationId={id} />
+          </>
+        )}
         {activeTab === "files" && <FilesPanel organizationId={id} />}
       </div>
 
@@ -254,6 +262,25 @@ function FlowFabRegistrar({ feedRef }: { feedRef: React.RefObject<FeedPanelHandl
   // efekt yalnızca mount/unmount'ta çalışır; onClick içindeki feedRef.current
   // her tıklamada güncel değeri okur.
   useProjectFabAction({ label: "Yeni paylaşım", onClick: () => feedRef.current?.openCreate() }, [feedRef]);
+  return null;
+}
+
+// Bütçe sekmesindeki "+" düğmesi de Anasayfa'daki gibi birden fazla seçenek
+// sunar: gelir/gider/alacak/borç dört ayrı hızlı ekleme kısayolu (bkz.
+// OrgBudgetPanel.openQuickAdd).
+function BudgetFabRegistrar({ budgetRef }: { budgetRef: React.RefObject<OrgBudgetPanelHandle | null> }) {
+  useProjectFabAction(
+    {
+      label: "Kayıt ekle",
+      options: [
+        { label: "Gelir ekle", onClick: () => budgetRef.current?.openQuickAdd("income") },
+        { label: "Gider ekle", onClick: () => budgetRef.current?.openQuickAdd("expense") },
+        { label: "Alacak ekle", onClick: () => budgetRef.current?.openQuickAdd("receivable") },
+        { label: "Borç ekle", onClick: () => budgetRef.current?.openQuickAdd("payable") },
+      ],
+    },
+    [budgetRef]
+  );
   return null;
 }
 

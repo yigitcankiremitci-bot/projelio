@@ -119,7 +119,7 @@ export default function OperationDetail() {
       <div
         style={{
           position: "relative",
-          height: 220,
+          height: 290,
           background: operation?.coverImageUrl
             ? `linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.95)), center/cover url(${operation.coverImageUrl})`
             : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,

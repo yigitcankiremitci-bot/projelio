@@ -1,6 +1,6 @@
 import { colors } from "../theme/colors";
 
-export type OrgTab = "home" | "flow" | "departments" | "products" | "files";
+export type OrgTab = "home" | "flow" | "departments" | "products" | "budget" | "files";
 
 // JobTabs ile aynı sekme görünümü. Anasayfa, organizasyonun özeti (Ürün/Hizmet +
 // Departmanlar + Modüller kartları) — varsayılan sekme budur. Departmanlar
@@ -13,6 +13,7 @@ const tabs: { key: OrgTab; label: string }[] = [
   { key: "flow", label: "Sosyal" },
   { key: "departments", label: "Departmanlar" },
   { key: "products", label: "Ürün/Hizmet" },
+  { key: "budget", label: "Bütçe" },
   { key: "files", label: "Dosyalar" },
 ];
 

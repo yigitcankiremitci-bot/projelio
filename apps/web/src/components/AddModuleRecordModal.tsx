@@ -10,6 +10,14 @@ interface Props {
   moduleKey: string;
   /** Departman seçici için — verilirse kullanıcı isteğe bağlı bir departman işaretleyebilir. */
   departments?: Department[];
+  /**
+   * Bazı alanları önceden doldurup formdan tamamen gizler — örn. Bütçe
+   * sekmesindeki "Gelir ekle" hızlı seçeneği `{ type: "income" }` geçirir,
+   * kullanıcı tekrar "Tür" seçmek zorunda kalmaz (bkz. OrgBudgetPanel).
+   */
+  presetData?: Record<string, string>;
+  /** Modal başlığını config.addLabel yerine bununla değiştirir (örn. "Gelir ekle"). */
+  titleOverride?: string;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -21,19 +29,31 @@ interface Props {
  * aynı alan tanımlarını kullanır, sadece ayrı bir modül ekranına gitmeden
  * doğrudan Anasayfa'da açılır.
  */
-export default function AddModuleRecordModal({ organizationId, moduleKey, departments, onClose, onSaved }: Props) {
+export default function AddModuleRecordModal({
+  organizationId,
+  moduleKey,
+  departments,
+  presetData,
+  titleOverride,
+  onClose,
+  onSaved,
+}: Props) {
   const c = colors.light;
   const config = MODULE_RECORD_CONFIGS[moduleKey];
   const [departmentId, setDepartmentId] = useState("");
   const [form, setForm] = useState<Record<string, string>>(() => {
     const f: Record<string, string> = {};
-    for (const field of config.fields) f[field.key] = field.defaultValue ?? "";
+    for (const field of config.fields) f[field.key] = presetData?.[field.key] ?? field.defaultValue ?? "";
     return f;
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   if (!config) return null;
+
+  // Önceden doldurulmuş alanlar forma hiç çizilmez — kullanıcı yalnızca geri
+  // kalanları görür (bkz. presetData üstündeki not).
+  const visibleFields = config.fields.filter((field) => presetData?.[field.key] === undefined);
 
   const handleSave = async () => {
     setError("");
@@ -65,7 +85,7 @@ export default function AddModuleRecordModal({ organizationId, moduleKey, depart
   };
 
   return (
-    <Modal title={config.addLabel} onClose={onClose}>
+    <Modal title={titleOverride ?? config.addLabel} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {departments && departments.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -81,7 +101,7 @@ export default function AddModuleRecordModal({ organizationId, moduleKey, depart
           </div>
         )}
 
-        {config.fields.map((field) => (
+        {visibleFields.map((field) => (
           <div key={field.key} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>
               {field.label}
@@ -135,7 +155,7 @@ export default function AddModuleRecordModal({ organizationId, moduleKey, depart
             fontWeight: 500,
           }}
         >
-          {saving ? "Kaydediliyor…" : config.addLabel}
+          {saving ? "Kaydediliyor…" : titleOverride ?? config.addLabel}
         </button>
       </div>
     </Modal>

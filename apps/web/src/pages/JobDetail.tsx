@@ -9,7 +9,7 @@ import EditJobModal from "../components/EditJobModal";
 import JobTabs, { JobTab } from "../components/JobTabs";
 import JobTeamPanel from "../components/JobTeamPanel";
 import JobTasksPanel, { JobTasksPanelHandle } from "../components/JobTasksPanel";
-import FilesPanel from "../components/FilesPanel";
+import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
 import TodayCompletedPanel from "../components/TodayCompletedPanel";
 import TaskEditModal from "../components/TaskEditModal";
 import Modal from "../components/Modal";
@@ -43,17 +43,26 @@ export default function JobDetail() {
   const gridRef = useRef<HTMLDivElement>(null);
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
   const tasksPanelRef = useRef<JobTasksPanelHandle>(null);
+  const filesRef = useRef<FilesPanelHandle>(null);
 
   // "İşler" sekmesindeyken alt navigasyondaki "+" butonu doğrudan görev ekleme,
-  // "Programlar" sekmesindeyken doğrudan program ekleme formunu açsın (diğer
-  // sekmelerde eski proje/program/görev seçim menüsü geçerli kalır).
+  // "Programlar" sekmesindeyken doğrudan program ekleme formunu açsın, "Dosyalar"
+  // sekmesindeyken dosya yükleme/oluşturma seçimini açsın (diğer sekmelerde eski
+  // proje/program/görev seçim menüsü geçerli kalır).
   useProjectFabAction(
     activeTab === "tasks"
       ? { label: "Görev ekle", onClick: () => tasksPanelRef.current?.openCreate() }
       : activeTab === "programs"
       ? { label: "Yeni program", onClick: () => setCreatingOperation(true) }
-      : // Dosyalar sekmesinin kendi yükleme alanı var; ayrıca FAB göstermeye gerek yok.
-        null,
+      : activeTab === "files"
+      ? {
+          label: "Dosya ekle",
+          options: [
+            { label: "Dosya yükle", onClick: () => filesRef.current?.openUpload() },
+            { label: "Yeni dosya oluştur", onClick: () => filesRef.current?.openCreateNative() },
+          ],
+        }
+      : null,
     [activeTab]
   );
 
@@ -221,7 +230,7 @@ export default function JobDetail() {
       <div
         style={{
           position: "relative",
-          height: 260,
+          height: 330,
           background: job?.coverImageUrl
             ? `linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.95)), center/cover url(${job.coverImageUrl})`
             : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,
@@ -366,7 +375,7 @@ export default function JobDetail() {
             />
           )}
 
-          {activeTab === "files" && <FilesPanel jobId={id} />}
+          {activeTab === "files" && <FilesPanel ref={filesRef} jobId={id} />}
 
           {activeTab === "tasks" && (
             <JobTasksPanel

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import type { Department } from "@projelio/shared";
+import { applyOrder } from "../../common/reorder.util";
 import { SupabaseService } from "../../database/supabase.service";
 
 const COVER_BUCKET = "department-covers";
@@ -110,6 +111,24 @@ export class DepartmentsService {
     }
 
     return departments;
+  }
+
+  // Departmanlar sekmesinde basılı tutup sürükleyerek sıralama (bkz.
+  // OrganizationsService.reorder ile aynı desen — useSortableList).
+  async reorder(organizationId: string, ids: string[], requestingUserId?: string): Promise<void> {
+    if (!ids?.length) return;
+    await this.assertOrgOwner(organizationId, requestingUserId);
+
+    const { data: rows, error } = await this.supabase.client
+      .from("departments")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .in("id", ids);
+    if (error) throw error;
+    if (!rows || rows.length !== ids.length) {
+      throw new BadRequestException("Geçersiz sıralama isteği");
+    }
+    await applyOrder(this.supabase.client, "departments", ids);
   }
 
   async findOne(id: string): Promise<Department> {

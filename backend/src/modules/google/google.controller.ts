@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Logger, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Logger, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import type { Response } from "express";
 import { MicrosoftAccountsService } from "../microsoft/microsoft-accounts.service";
@@ -184,6 +184,27 @@ export class GoogleController {
   async disconnect(@Req() req: any) {
     await this.accounts.disconnectDrive(req.user.userId);
     return { ok: true };
+  }
+
+  /**
+   * Frontend'deki Google Picker widget'ının kullandığı kısa ömürlü Drive erişim
+   * jetonu.
+   *
+   * Picker, kullanıcının Drive'ında gezinip dosya seçmeyi TARAYICIDA yapar —
+   * backend hiç araya girmez (bkz. drive.service.ts üstündeki not). Buradan
+   * dönen jetonun kapsamı hâlâ `drive.file` (DRIVE_SCOPE): Picker aracılığıyla
+   * seçilen her dosya için Google otomatik olarak kalıcı erişim veriyor, bu
+   * yüzden scope genişletmeye gerek kalmıyor.
+   */
+  @Get("google/picker-token")
+  @UseGuards(AuthGuard("jwt"))
+  async pickerToken(@Req() req: any) {
+    const account = await this.accounts.findByUserId(req.user.userId);
+    if (!this.accounts.isDriveReady(account)) {
+      throw new BadRequestException("Google Drive bağlı değil.");
+    }
+    const accessToken = await this.accounts.getAccessToken(account!.id);
+    return { accessToken, expiresInSeconds: 3000 };
   }
 
   // ----------------------------------------------------------------- yardımcı

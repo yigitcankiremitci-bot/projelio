@@ -1,14 +1,15 @@
 import { colors } from "../theme/colors";
 
-export type OrgTab = "flow" | "departments" | "products" | "files";
+export type OrgTab = "home" | "flow" | "departments" | "products" | "files";
 
-// JobTabs ile aynı sekme görünümü — "departmanlar ve dosyalar, tıpkı iş
-// anasayfasındaki gibi sekme görünümünde olsun". Modüller ayrı bir sekme değil
-// — Departmanlar sekmesinin altında, anasayfada kart olarak gösterilir (bkz.
-// OrganizationDetail.tsx). Sosyal, departman sekmelerindeki desenin aynısı:
-// organizasyona bağlı TÜM departmanların akışlarını (+ organizasyona doğrudan
-// yapılan paylaşımları) tek bir zaman çizelgesinde toplar (bkz. FeedPanel).
+// JobTabs ile aynı sekme görünümü. Anasayfa, organizasyonun özeti (Ürün/Hizmet +
+// Departmanlar + Modüller kartları) — varsayılan sekme budur. Departmanlar
+// sekmesi ise yalnızca departman yönetimi (ekleme/listeleme) için ayrı bir
+// ekrandır (bkz. OrganizationDetail.tsx). Sosyal, organizasyona bağlı TÜM
+// departmanların akışlarını (+ organizasyona doğrudan yapılan paylaşımları)
+// tek bir zaman çizelgesinde toplar (bkz. FeedPanel).
 const tabs: { key: OrgTab; label: string }[] = [
+  { key: "home", label: "Anasayfa" },
   { key: "flow", label: "Sosyal" },
   { key: "departments", label: "Departmanlar" },
   { key: "products", label: "Ürün/Hizmet" },

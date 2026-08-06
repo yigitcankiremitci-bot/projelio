@@ -21,7 +21,7 @@ import { AuthGuard } from "@nestjs/passport";
 import { JwtService } from "@nestjs/jwt";
 import type { Response } from "express";
 import { memoryStorage } from "multer";
-import { FilesService, INLINE_UPLOAD_LIMIT } from "./files.service";
+import { FilesService, INLINE_UPLOAD_LIMIT, type NativeFileKind } from "./files.service";
 
 interface FileAccessClaims {
   typ: "file_access";
@@ -77,6 +77,38 @@ export class FilesController {
   async syncDepartmentShares(@Param("departmentId") departmentId: string, @Req() req: any) {
     await this.filesService.assertDepartmentAccess(departmentId, req.user.userId);
     return this.filesService.syncDepartmentShares(departmentId);
+  }
+
+  // ------------------------------------------------- göz atma / içe aktarma / yeni dosya
+
+  @Get("departments/:departmentId/files/browse")
+  @UseGuards(AuthGuard("jwt"))
+  browseDepartment(
+    @Param("departmentId") departmentId: string,
+    @Req() req: any,
+    @Query("folderId") folderId?: string
+  ) {
+    return this.filesService.browseForDepartment(departmentId, req.user.userId, folderId);
+  }
+
+  @Post("departments/:departmentId/files/import")
+  @UseGuards(AuthGuard("jwt"))
+  importToDepartment(
+    @Param("departmentId") departmentId: string,
+    @Body() body: { sourceFileId: string; name?: string },
+    @Req() req: any
+  ) {
+    return this.filesService.importForDepartment(departmentId, req.user.userId, body?.sourceFileId, body?.name);
+  }
+
+  @Post("departments/:departmentId/files/create-native")
+  @UseGuards(AuthGuard("jwt"))
+  createNativeInDepartment(
+    @Param("departmentId") departmentId: string,
+    @Body() body: { kind: NativeFileKind; name: string },
+    @Req() req: any
+  ) {
+    return this.filesService.createNativeForDepartment(departmentId, req.user.userId, body?.kind, body?.name);
   }
 
   // -------------------------------------------------------------- listeleme
@@ -201,6 +233,76 @@ export class FilesController {
   async syncShares(@Param("jobId") jobId: string, @Req() req: any) {
     await this.filesService.assertJobAccess(jobId, req.user.userId);
     return this.filesService.syncJobShares(jobId);
+  }
+
+  // ------------------------------------------------- göz atma / içe aktarma / yeni dosya
+
+  @Get("jobs/:jobId/files/browse")
+  @UseGuards(AuthGuard("jwt"))
+  browseJob(@Param("jobId") jobId: string, @Req() req: any, @Query("folderId") folderId?: string) {
+    return this.filesService.browseForJob(jobId, req.user.userId, folderId);
+  }
+
+  @Post("jobs/:jobId/files/import")
+  @UseGuards(AuthGuard("jwt"))
+  importToJob(
+    @Param("jobId") jobId: string,
+    @Body() body: { sourceFileId: string; name?: string; projectId?: string; taskId?: string; outputId?: string },
+    @Req() req: any
+  ) {
+    return this.filesService.importForJob(jobId, req.user.userId, body?.sourceFileId, {
+      name: body?.name,
+      projectId: body?.projectId || undefined,
+      taskId: body?.taskId || undefined,
+      outputId: body?.outputId || undefined,
+    });
+  }
+
+  @Post("jobs/:jobId/files/create-native")
+  @UseGuards(AuthGuard("jwt"))
+  createNativeInJob(
+    @Param("jobId") jobId: string,
+    @Body() body: { kind: NativeFileKind; name: string; projectId?: string; taskId?: string; outputId?: string },
+    @Req() req: any
+  ) {
+    return this.filesService.createNativeForJob(jobId, req.user.userId, body?.kind, body?.name, {
+      projectId: body?.projectId || undefined,
+      taskId: body?.taskId || undefined,
+      outputId: body?.outputId || undefined,
+    });
+  }
+
+  @Get("projects/:projectId/files/browse")
+  @UseGuards(AuthGuard("jwt"))
+  browseProject(@Param("projectId") projectId: string, @Req() req: any, @Query("folderId") folderId?: string) {
+    return this.filesService.browseForProject(projectId, req.user.userId, folderId);
+  }
+
+  @Post("projects/:projectId/files/import")
+  @UseGuards(AuthGuard("jwt"))
+  importToProject(
+    @Param("projectId") projectId: string,
+    @Body() body: { sourceFileId: string; name?: string; taskId?: string; outputId?: string },
+    @Req() req: any
+  ) {
+    return this.filesService.importForProject(projectId, req.user.userId, body?.sourceFileId, {
+      name: body?.name,
+      taskId: body?.taskId || undefined,
+      outputId: body?.outputId || undefined,
+    });
+  }
+
+  @Post("projects/:projectId/files/create-native")
+  @UseGuards(AuthGuard("jwt"))
+  createNativeInProject(
+    @Param("projectId") projectId: string,
+    @Body() body: { kind: NativeFileKind; name: string; taskId?: string; outputId?: string },
+    @Req() req: any
+  ) {
+    return this.filesService.createNativeForProject(projectId, req.user.userId, body?.kind, body?.name, {
+      taskId: body?.taskId || undefined,
+      outputId: body?.outputId || undefined,
+    });
   }
 
   // ------------------------------------------------------- içerik erişimi

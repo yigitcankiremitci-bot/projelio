@@ -8,7 +8,8 @@ import FilesPanel from "../components/FilesPanel";
 import DepartmentsPanel, { DepartmentsPanelHandle } from "../components/DepartmentsPanel";
 import ProductsPanel, { ProductsPanelHandle } from "../components/ProductsPanel";
 import ModulesPanel from "../components/ModulesPanel";
-import AddModuleModal from "../components/AddModuleModal";
+import AddModuleRecordModal from "../components/AddModuleRecordModal";
+import QuickFileUploadModal from "../components/QuickFileUploadModal";
 import OrgTabs, { OrgTab } from "../components/OrgTabs";
 import ProfileCard from "../components/ProfileCard";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
@@ -25,8 +26,11 @@ const NO_TASKS: Task[] = [];
 
 // Not: bir organizasyonun (şirket/işletme) "İşler" görünümü yoktur — iş (job) kavramı
 // yalnızca serbest çalışan ve taşeron hesaplarına özgüdür. Şirket içi çalışma
-// Departmanlar üzerinden yürütülür (bkz. DepartmentsPanel). Departmanlar/Ürün-Hizmet/
-// Dosyalar, JobTabs ile aynı sekme görünümünde gösterilir (bkz. OrgTabs).
+// Departmanlar üzerinden yürütülür (bkz. DepartmentsPanel). Anasayfa/Sosyal/
+// Departmanlar/Ürün-Hizmet/Dosyalar, JobTabs ile aynı sekme görünümünde
+// gösterilir (bkz. OrgTabs). Anasayfa varsayılan sekmedir ve organizasyonun
+// özetini (Ürün/Hizmet + Departmanlar + Modüller) gösterir; Departmanlar
+// sekmesi ise yalnızca departman yönetimi içindir.
 export default function OrganizationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -37,29 +41,37 @@ export default function OrganizationDetail() {
   // yetkisi çalışsın diye Ürün Yönetimi departmanının id'si burada tutulur
   // (bkz. ProductsPanel/ProductsService.assertCanManage).
   const [productDepartmentId, setProductDepartmentId] = useState<string | undefined>(undefined);
+  // Anasayfadaki birleşik "+" menüsünün departman seçicileri (İşe al/Gelir-Gider
+  // kayıtları, Dosya ekle) için tüm departman listesi burada tutulur.
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const validTabs: OrgTab[] = ["flow", "departments", "products", "files"];
-  const activeTab: OrgTab = validTabs.includes(tabParam as OrgTab) ? (tabParam as OrgTab) : "departments";
+  const validTabs: OrgTab[] = ["home", "flow", "departments", "products", "files"];
+  const activeTab: OrgTab = validTabs.includes(tabParam as OrgTab) ? (tabParam as OrgTab) : "home";
   const setActiveTab = (next: OrgTab) => {
-    setSearchParams(next === "departments" ? {} : { tab: next }, { replace: true });
+    setSearchParams(next === "home" ? {} : { tab: next }, { replace: true });
   };
   const feedRef = useRef<FeedPanelHandle>(null);
   const departmentsRef = useRef<DepartmentsPanelHandle>(null);
   const productsRef = useRef<ProductsPanelHandle>(null);
-  const [addingModule, setAddingModule] = useState(false);
-  // ModulesPanel kendi verisini kendi yükler ve dışarıdan tetiklenebilir bir
-  // yenileme fonksiyonu sunmaz; modül eklendiğinde bu key artırılıp bileşen
-  // yeniden mount edilerek listesinin tazelenmesi sağlanır.
-  const [modulesRefreshKey, setModulesRefreshKey] = useState(0);
+  // "İşe al" ve "Gelir/gider ekle" aynı modalı (bkz. AddModuleRecordModal),
+  // yalnızca moduleKey'i değiştirerek kullanır.
+  const [addingRecordModule, setAddingRecordModule] = useState<string | null>(null);
+  const [addingFile, setAddingFile] = useState(false);
 
   const reload = () => {
     if (!id) return;
     api.get<Organization>(`/organizations/${id}`).then(setOrganization).catch(() => setOrganization(null));
     api
       .get<Department[]>(`/organizations/${id}/departments`)
-      .then((depts) => setProductDepartmentId(depts.find((d) => d.catalogKey === "urun_yonetimi")?.id))
-      .catch(() => setProductDepartmentId(undefined));
+      .then((depts) => {
+        setDepartments(depts);
+        setProductDepartmentId(depts.find((d) => d.catalogKey === "urun_yonetimi")?.id);
+      })
+      .catch(() => {
+        setDepartments([]);
+        setProductDepartmentId(undefined);
+      });
   };
 
   useEffect(reload, [id]);
@@ -172,22 +184,30 @@ export default function OrganizationDetail() {
           </>
         )}
 
-        {activeTab === "departments" && (
+        {activeTab === "home" && (
           <>
             <HomeAddFabRegistrar
               productsRef={productsRef}
               departmentsRef={departmentsRef}
-              setAddingModule={setAddingModule}
+              setAddingRecordModule={setAddingRecordModule}
+              setAddingFile={setAddingFile}
             />
-            <ProductsPanel ref={productsRef} organizationId={id} departmentId={productDepartmentId} useFab={false} />
+            <ProductsPanel
+              ref={productsRef}
+              organizationId={id}
+              departmentId={productDepartmentId}
+              useFab={false}
+              showAddButton={false}
+            />
             <div style={{ marginTop: 28 }}>
               <DepartmentsPanel ref={departmentsRef} organizationId={id} useFab={false} />
             </div>
             <div style={{ marginTop: 28 }}>
-              <ModulesPanel key={modulesRefreshKey} organizationId={id} />
+              <ModulesPanel organizationId={id} />
             </div>
           </>
         )}
+        {activeTab === "departments" && <DepartmentsPanel organizationId={id} layout="grid" />}
         {activeTab === "products" && <ProductsPanel organizationId={id} departmentId={productDepartmentId} />}
         {activeTab === "files" && <FilesPanel organizationId={id} />}
       </div>
@@ -202,11 +222,21 @@ export default function OrganizationDetail() {
         />
       )}
 
-      {addingModule && (
-        <AddModuleModal
+      {addingRecordModule && (
+        <AddModuleRecordModal
           organizationId={id}
-          onClose={() => setAddingModule(false)}
-          onAdded={() => setModulesRefreshKey((k) => k + 1)}
+          moduleKey={addingRecordModule}
+          departments={departments}
+          onClose={() => setAddingRecordModule(null)}
+          onSaved={() => setAddingRecordModule(null)}
+        />
+      )}
+
+      {addingFile && (
+        <QuickFileUploadModal
+          departments={departments}
+          onClose={() => setAddingFile(false)}
+          onUploaded={() => setAddingFile(false)}
         />
       )}
     </div>
@@ -227,28 +257,35 @@ function FlowFabRegistrar({ feedRef }: { feedRef: React.RefObject<FeedPanelHandl
   return null;
 }
 
-// Departmanlar sekmesindeki tek "+" düğmesi artık üç paneli (Ürün/Hizmet,
-// Departman, Modül) birden temsil eder — tıklanınca job-choice ile aynı küçük
-// seçim menüsü açılır (bkz. BottomNav/ProjectFabAction.options).
+// Anasayfa sekmesindeki tek "+" düğmesi, sık kullanılan beş ekleme eylemini
+// birden temsil eder — tıklanınca job-choice ile aynı küçük seçim menüsü
+// (butonun üstüne doğru açılan liste) çıkar (bkz. BottomNav/ProjectFabAction.options).
+// Modül ekleme burada YOK: o, her departmanın kendi sayfasından yapılır (bkz.
+// ModulesPanel'deki not) — bu menü yalnızca en sık tekrarlanan günlük eylemler
+// için bir kısayoldur.
 function HomeAddFabRegistrar({
   productsRef,
   departmentsRef,
-  setAddingModule,
+  setAddingRecordModule,
+  setAddingFile,
 }: {
   productsRef: React.RefObject<ProductsPanelHandle | null>;
   departmentsRef: React.RefObject<DepartmentsPanelHandle | null>;
-  setAddingModule: (value: boolean) => void;
+  setAddingRecordModule: (value: string | null) => void;
+  setAddingFile: (value: boolean) => void;
 }) {
   useProjectFabAction(
     {
       label: "Ekle",
       options: [
-        { label: "Ürün/Hizmet ekle", onClick: () => productsRef.current?.openAdd() },
-        { label: "Departman ekle", onClick: () => departmentsRef.current?.openAdd() },
-        { label: "Modül ekle", onClick: () => setAddingModule(true) },
+        { label: "Ürün ekle", onClick: () => productsRef.current?.openAdd() },
+        { label: "İşe al", onClick: () => setAddingRecordModule("ik_ise_alim_oryantasyon") },
+        { label: "Gelir/gider ekle", onClick: () => setAddingRecordModule("fm_gelir_gider") },
+        { label: "Departman kur", onClick: () => departmentsRef.current?.openAdd() },
+        { label: "Dosya ekle", onClick: () => setAddingFile(true) },
       ],
     },
-    [productsRef, departmentsRef, setAddingModule]
+    [productsRef, departmentsRef, setAddingRecordModule, setAddingFile]
   );
   return null;
 }

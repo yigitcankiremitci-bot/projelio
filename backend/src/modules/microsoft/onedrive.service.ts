@@ -1,6 +1,29 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BLANK_DOCX_BASE64, BLANK_PPTX_BASE64, BLANK_XLSX_BASE64 } from "./office-templates";
 
 const GRAPH_API = "https://graph.microsoft.com/v1.0";
+
+/** createNativeFile için desteklenen boş Office şablonları — office-templates.ts'teki base64 ikililerden üretilir. */
+export const ONEDRIVE_NATIVE_TEMPLATES: Record<
+  "docx" | "xlsx" | "pptx",
+  { base64: string; mimeType: string; extension: string }
+> = {
+  docx: {
+    base64: BLANK_DOCX_BASE64,
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    extension: "docx",
+  },
+  xlsx: {
+    base64: BLANK_XLSX_BASE64,
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    extension: "xlsx",
+  },
+  pptx: {
+    base64: BLANK_PPTX_BASE64,
+    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    extension: "pptx",
+  },
+};
 
 export interface DriveFile {
   id: string;
@@ -270,6 +293,106 @@ export class OneDriveService {
       if (error instanceof OneDriveFileMissingError) return;
       throw error;
     }
+  }
+
+  // ------------------------------------------------------------- göz atma / içe aktarma
+  //
+  // Aşağıdaki üç metot yalnızca `Files.Read.All` (bkz. ONEDRIVE_BROWSE_SCOPE,
+  // microsoft-oauth.service.ts) sayesinde mümkün — kullanıcının OneDrive'ının
+  // tamamını (uygulama klasörünün dışını da) kapsar. Google tarafında bunun
+  // karşılığı yok çünkü orada Picker widget'ı kullanılıyor (bkz. drive.service.ts
+  // üstündeki açıklama).
+
+  /**
+   * Bir klasörün alt öğelerini listeler. `folderId` verilmezse OneDrive'ın
+   * kökünden ("Dosyalarım") başlar — uygulamanın özel klasörüyle sınırlı
+   * olan getAppRootFolder'ın aksine burada amaç kullanıcının tüm Drive'ında
+   * gezinebilmek.
+   */
+  async listFiles(accessToken: string, folderId?: string): Promise<DriveFile[]> {
+    const path = folderId
+      ? `/me/drive/items/${folderId}/children?$select=id,name,folder,file,size,webUrl&$orderby=folder desc,name`
+      : `/me/drive/root/children?$select=id,name,folder,file,size,webUrl&$orderby=folder desc,name`;
+    const json = await this.call<any>(accessToken, path);
+    return ((json?.value ?? []) as any[]).map(mapItem);
+  }
+
+  /**
+   * Var olan bir OneDrive öğesini (kullanıcının Drive'ının herhangi bir
+   * yerinden) belirtilen hedef klasöre kopyalar — "Drive'dan seç" akışında
+   * seçilen dosyayı Projelio'nun kendi klasörüne (approot altına) almak için.
+   *
+   * Graph'ın copy uç noktası ASENKRON çalışır: 202 Accepted ile birlikte bir
+   * "monitor" URL'i döner, biz de kopyalama tamamlanana kadar bu URL'i kısa
+   * aralıklarla yoklarız (Google'ın senkron /files/copy'sinden farklı).
+   */
+  async copyFile(
+    accessToken: string,
+    itemId: string,
+    destParentId: string,
+    newName?: string
+  ): Promise<DriveFile> {
+    const res = await fetch(`${GRAPH_API}/me/drive/items/${itemId}/copy`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Prefer: "respond-async",
+      },
+      body: JSON.stringify({
+        parentReference: { id: destParentId },
+        ...(newName ? { name: newName } : {}),
+      }),
+    });
+
+    if (res.status === 404) throw new OneDriveFileMissingError(itemId);
+    if (!res.ok) {
+      const body = await res.text();
+      this.logger.error(`OneDrive kopyalama başlatılamadı ${res.status}: ${body}`);
+      throw new BadRequestException("Dosya OneDrive içinde kopyalanamadı.");
+    }
+
+    const monitorUrl = res.headers.get("Location");
+    if (!monitorUrl) {
+      // Bazı durumlarda Graph küçük dosyaları senkron tamamlayıp doğrudan
+      // öğeyi döndürebiliyor.
+      const json = await res.json().catch(() => null);
+      if (json?.id) return mapItem(json);
+      throw new BadRequestException("Dosya OneDrive içinde kopyalanamadı (izleme adresi alınamadı).");
+    }
+
+    // 20 x 500ms ~= 10 saniye üst sınır; çoğu dosya için kopyalama çok daha
+    // hızlı tamamlanır.
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const statusRes = await fetch(monitorUrl);
+      const statusJson = await statusRes.json().catch(() => null);
+      if (statusJson?.status === "completed" && statusJson?.resourceId) {
+        return this.getFile(accessToken, statusJson.resourceId);
+      }
+      if (statusJson?.status === "failed") {
+        throw new BadRequestException("Dosya OneDrive içinde kopyalanamadı.");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    throw new BadRequestException("Dosya kopyalama zaman aşımına uğradı, lütfen tekrar deneyin.");
+  }
+
+  /**
+   * Boş bir Word/Excel/PowerPoint dosyası oluşturur (office-templates.ts'teki
+   * hazır şablon baytlarını yükleyerek — Graph'ta yalnızca meta veriyle boş bir
+   * Office dosyası oluşturmanın bir yolu yok, Google Dokümanlar'ın aksine
+   * OneDrive'da "sanal" doküman türü bulunmuyor).
+   */
+  async createNativeFile(
+    accessToken: string,
+    kind: "docx" | "xlsx" | "pptx",
+    name: string,
+    parentId?: string
+  ): Promise<DriveFile> {
+    const template = ONEDRIVE_NATIVE_TEMPLATES[kind];
+    const fileName = name.toLowerCase().endsWith(`.${template.extension}`) ? name : `${name}.${template.extension}`;
+    const content = Buffer.from(template.base64, "base64");
+    return this.uploadMultipart(accessToken, { name: fileName, mimeType: template.mimeType, parentId }, content);
   }
 
   // ------------------------------------------------------------------- silme

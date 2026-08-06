@@ -47,6 +47,21 @@ export interface DriveQuota {
   usageInDriveBytes?: number;
 }
 
+/**
+ * "Yeni dosya oluştur" menüsünde seçilebilecek Google'a özgü doküman türleri.
+ *
+ * Google Drive'da göz atma/seçme, OneDrive'dan farklı olarak kendi backend
+ * uç noktamızla değil, Google'ın resmi Picker penceresiyle yapılır (bkz.
+ * frontend GooglePickerButton) — bu yüzden burada OneDriveService'teki gibi
+ * bir `listFiles` yok; yalnızca Picker'ın seçtiği dosyayı kopyalayan
+ * `copyFile` ve yeni boş doküman oluşturan `createNativeFile` var.
+ */
+export const GOOGLE_NATIVE_MIME: Record<"gdoc" | "gsheet" | "gslide", string> = {
+  gdoc: "application/vnd.google-apps.document",
+  gsheet: "application/vnd.google-apps.spreadsheet",
+  gslide: "application/vnd.google-apps.presentation",
+};
+
 const FILE_FIELDS = "id,name,mimeType,size,webViewLink,iconLink,md5Checksum,trashed";
 
 function mapFile(json: any): DriveFile {
@@ -155,6 +170,39 @@ export class DriveService {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
+    });
+    return mapFile(json);
+  }
+
+  // ------------------------------------------------------- göz atma / içe aktarma
+  //
+  // `drive.file` scope'u normalde yalnızca uygulamanın oluşturduğu dosyaları
+  // görür — ama kullanıcı Picker penceresinden (bkz. frontend GooglePickerButton)
+  // bir dosya seçtiğinde Google, seçilen dosya için otomatik olarak kalıcı erişim
+  // verir. copyFile bu seçilen dosyayı Projelio'nun kendi klasörüne kopyalar;
+  // scope genişletmeye hiç gerek kalmaz (bkz. google-oauth.service.ts DRIVE_SCOPE).
+
+  /** Picker'da seçilen dosyayı hedef klasöre kopyalar — orijinali kullanıcının Drive'ında kalır. */
+  async copyFile(accessToken: string, fileId: string, destParentId: string, newName?: string): Promise<DriveFile> {
+    const json = await this.call<any>(accessToken, `/files/${fileId}/copy?fields=${FILE_FIELDS}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parents: [destParentId], ...(newName ? { name: newName } : {}) }),
+    });
+    return mapFile(json);
+  }
+
+  /**
+   * Yeni boş bir Google Dokümanlar/E-Tablolar/Sunular dosyası oluşturur.
+   *
+   * Google, bu native mimeType'lar için içerik yüklemeden boş bir dosya
+   * oluşturabiliyor — OneDrive'daki karşılığından (bkz. OneDriveService) farkı bu.
+   */
+  async createNativeFile(accessToken: string, name: string, mimeType: string, parentId: string): Promise<DriveFile> {
+    const json = await this.call<any>(accessToken, `/files?fields=${FILE_FIELDS}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, mimeType, parents: [parentId] }),
     });
     return mapFile(json);
   }

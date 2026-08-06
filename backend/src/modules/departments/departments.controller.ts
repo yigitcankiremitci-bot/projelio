@@ -44,6 +44,12 @@ export class DepartmentsController {
     return this.departmentsService.create(organizationId, body, req.user.userId);
   }
 
+  // Departmanlar sekmesinde basılı tutup sürükleyerek sıralama (bkz. OrganizationsController.reorder).
+  @Patch("organizations/:organizationId/departments/reorder")
+  reorder(@Param("organizationId") organizationId: string, @Body("ids") ids: string[], @Req() req: any) {
+    return this.departmentsService.reorder(organizationId, ids, req.user.userId);
+  }
+
   @Get("departments/:id")
   findOne(@Param("id") id: string) {
     return this.departmentsService.findOne(id);

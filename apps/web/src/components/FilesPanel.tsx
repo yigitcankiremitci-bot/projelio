@@ -3,13 +3,17 @@ import type { GoogleDriveStatus, ProjectFile } from "@projelio/shared";
 import { driveApi, filesApi, oneDriveApi, uploadFile } from "../api/files";
 import type { FileScope } from "../api/files";
 import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
+import { openGooglePicker } from "../lib/googlePicker";
 import { colors } from "../theme/colors";
+import BrowseDriveModal from "./BrowseDriveModal";
 import ConfirmDialog from "./ConfirmDialog";
+import CreateNativeFileMenu from "./CreateNativeFileMenu";
 import FilePreviewModal from "./FilePreviewModal";
 import {
   IconDownload,
   IconExternalLink,
   IconFile,
+  IconFolder,
   IconGoogleDrive,
   IconOneDrive,
   IconTrash,
@@ -71,6 +75,8 @@ export default function FilesPanel({
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<ProjectFile | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ProjectFile | null>(null);
+  const [browsing, setBrowsing] = useState(false);
+  const [pickerError, setPickerError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Organizasyon/grup ekranı salt okunurdur: dosya bir işe ait olmak zorunda,
@@ -164,6 +170,33 @@ export default function FilesPanel({
   const anyConfigured = Boolean(googleStatus?.configured || msStatus?.configured);
   const anyReady = Boolean(googleStatus?.driveReady || msStatus?.driveReady);
   const driveMissing = anyConfigured && !anyReady;
+  // "Drive'dan seç"/"Yeni dosya" için hangi sağlayıcı bağlı: Google Drive
+  // öncelikli (bkz. CloudStorageService.findAccountForUser'daki aynı sıralama).
+  const connectedProvider: "google" | "microsoft" | undefined = googleStatus?.driveReady
+    ? "google"
+    : msStatus?.driveReady
+    ? "microsoft"
+    : undefined;
+
+  const handleImported = (file: ProjectFile) => {
+    setFiles((prev) => [file, ...prev]);
+  };
+
+  const handleBrowseDriveClick = () => {
+    setPickerError("");
+    if (connectedProvider === "google") {
+      openGooglePicker(async ({ id, name }) => {
+        try {
+          const created = await filesApi.importFromDrive(target, { sourceFileId: id, name, taskId, outputId });
+          handleImported(created);
+        } catch (e: any) {
+          setPickerError(e?.message ?? "Dosya içe aktarılamadı");
+        }
+      }).catch((e: Error) => setPickerError(e.message));
+      return;
+    }
+    if (connectedProvider === "microsoft") setBrowsing(true);
+  };
 
   // İş ekranında dosyanın hangi projeden geldiğini göstermek gerekir; proje
   // ekranında zaten belli olduğu için gösterilmez.
@@ -176,6 +209,36 @@ export default function FilesPanel({
           <h3 style={{ fontSize: 19, fontWeight: 500, color: c.textPrimary, margin: 0, flex: 1 }}>
             Dosyalar
           </h3>
+          {!readOnly && !driveMissing && connectedProvider && (
+            <>
+              <button
+                onClick={handleBrowseDriveClick}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 7,
+                  padding: "9px 13px",
+                  borderRadius: 9,
+                  border: `1px solid ${c.border}`,
+                  background: "transparent",
+                  color: c.textPrimary,
+                  fontSize: 15,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                <IconFolder size={16} color={c.textPrimary} />
+                {connectedProvider === "microsoft" ? "OneDrive'dan seç" : "Drive'dan seç"}
+              </button>
+              <CreateNativeFileMenu
+                target={target}
+                taskId={taskId}
+                outputId={outputId}
+                provider={connectedProvider}
+                onCreated={handleImported}
+              />
+            </>
+          )}
           {!readOnly && (
           <button
             onClick={() => inputRef.current?.click()}
@@ -200,6 +263,8 @@ export default function FilesPanel({
           )}
         </div>
       )}
+
+      {pickerError && <div style={{ color: c.danger, fontSize: 14, marginBottom: 10 }}>{pickerError}</div>}
 
       <input
         ref={inputRef}
@@ -372,6 +437,16 @@ export default function FilesPanel({
             </div>
           ))}
         </div>
+      )}
+
+      {browsing && (
+        <BrowseDriveModal
+          target={target}
+          taskId={taskId}
+          outputId={outputId}
+          onClose={() => setBrowsing(false)}
+          onImported={handleImported}
+        />
       )}
 
       {preview && (

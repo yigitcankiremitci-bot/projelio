@@ -9,19 +9,26 @@ const AUTH_ENDPOINT = "https://login.microsoftonline.com/common/oauth2/v2.0/auth
 const TOKEN_ENDPOINT = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
 /**
- * OneDrive izni.
+ * OneDrive izinleri.
  *
- * `Files.ReadWrite.AppFolder`, Google'ın `drive.file` scope'unun Microsoft
- * Graph karşılığı: uygulama yalnızca kendi özel "uygulama klasörüne"
- * (/me/drive/special/approot) erişir, kullanıcının OneDrive'ının geri kalanına
- * hiç dokunamaz. Google tarafında olduğu gibi burada da geniş erişim
- * istemiyoruz.
+ * `Files.ReadWrite.AppFolder`: uygulamanın kendi özel "uygulama klasörüne"
+ * (/me/drive/special/approot) yazdığı/yüklediği dosyalar için — Projelio'nun
+ * oluşturduğu ve içine dosya yüklediği klasör hâlâ bu izinle sınırlı.
+ *
+ * `Files.Read.All`: kullanıcı "Drive'dan dosya seç" akışını kullanıp
+ * OneDrive'ının tamamını gözden geçirip mevcut bir dosyayı Projelio'ya
+ * içe aktarmak istediğinde gerekiyor (bkz. OneDriveService.listFiles/copyFile).
+ * Google tarafında bunun karşılığı Picker widget'ı ile scope genişletmeden
+ * çözülüyor; Microsoft'ta Picker eşdeğeri olmadığından ve bu geniş iznin
+ * onayı (ücretsiz yayıncı doğrulaması dışında) production'ı engellemediğinden
+ * burada scope genişletme yolunu seçtik (bkz. proje kararları).
  *
  * Graph scope'ları v2.0 uç noktasında tam nitelikli (resource önekli) verilir;
  * openid/email/profile/offline_access ise standart OIDC scope'ları, önek almaz.
  */
 export const MICROSOFT_LOGIN_SCOPES = ["openid", "email", "profile", "offline_access"];
 export const ONEDRIVE_SCOPE = "https://graph.microsoft.com/Files.ReadWrite.AppFolder";
+export const ONEDRIVE_BROWSE_SCOPE = "https://graph.microsoft.com/Files.Read.All";
 
 export interface MicrosoftOAuthStatePayload {
   typ: "microsoft_oauth";
@@ -113,7 +120,7 @@ export class MicrosoftOAuthService {
       redirect_uri: this.redirectUri,
       response_type: "code",
       response_mode: "query",
-      scope: [...MICROSOFT_LOGIN_SCOPES, ONEDRIVE_SCOPE].join(" "),
+      scope: [...MICROSOFT_LOGIN_SCOPES, ONEDRIVE_SCOPE, ONEDRIVE_BROWSE_SCOPE].join(" "),
       // offline_access scope'u refresh_token için yeterli ama Microsoft da tıpkı
       // Google gibi, kullanıcı daha önce onay verdiyse consent ekranını atlayıp
       // sessiz geçebiliyor — bu durumda refresh_token gelmeyebilir. prompt=consent
@@ -138,7 +145,7 @@ export class MicrosoftOAuthService {
         client_secret: this.clientSecret!,
         redirect_uri: this.redirectUri,
         grant_type: "authorization_code",
-        scope: [...MICROSOFT_LOGIN_SCOPES, ONEDRIVE_SCOPE].join(" "),
+        scope: [...MICROSOFT_LOGIN_SCOPES, ONEDRIVE_SCOPE, ONEDRIVE_BROWSE_SCOPE].join(" "),
       }),
     });
 
@@ -171,7 +178,7 @@ export class MicrosoftOAuthService {
         client_secret: this.clientSecret!,
         refresh_token: refreshToken,
         grant_type: "refresh_token",
-        scope: [...MICROSOFT_LOGIN_SCOPES, ONEDRIVE_SCOPE].join(" "),
+        scope: [...MICROSOFT_LOGIN_SCOPES, ONEDRIVE_SCOPE, ONEDRIVE_BROWSE_SCOPE].join(" "),
       }),
     });
 

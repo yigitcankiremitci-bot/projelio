@@ -23,13 +23,19 @@ interface Props {
   // ProductsPanelHandle.openAdd ile tetiklenir. Organizasyonun "Ürün/Hizmet"
   // sekmesinde (tek başına gösterildiğinde) varsayılan olarak FAB kullanılır.
   useFab?: boolean;
+  // useFab=false iken satır içi "+ Ürün/Hizmet ekle" düğmesi normalde gösterilir;
+  // Anasayfa'da bu düğme yerine tek, birleşik "+" menüsü var (bkz.
+  // OrganizationDetail) — orada showAddButton=false verilip düğme tamamen
+  // gizlenir, ekleme yalnızca ProductsPanelHandle.openAdd ile tetiklenir.
+  showAddButton?: boolean;
 }
 
 // Ürün Yönetimi departmanından eklenen ürün/hizmetler; hem departman detayında hem de
-// şirket anasayfasında (Departmanlar sekmesinin üstünde) ve ayrı "Ürün/Hizmet"
-// sekmesinde iş kartlarıyla aynı görünümde (bkz. ProductCard) listelenir.
+// şirket Anasayfa sekmesinde (Departmanlar kartlarının üstünde, bkz.
+// OrganizationDetail) ve ayrı "Ürün/Hizmet" sekmesinde iş kartlarıyla aynı
+// görünümde (bkz. ProductCard) listelenir.
 const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPanel(
-  { organizationId, departmentId, useFab = true },
+  { organizationId, departmentId, useFab = true, showAddButton = true },
   ref
 ) {
   const c = colors.light;
@@ -57,7 +63,7 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Ürün/Hizmet</h2>
-        {!useFab && (
+        {!useFab && showAddButton && (
           <button
             onClick={() => setAdding(true)}
             style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: c.primary, background: "transparent", border: "none" }}

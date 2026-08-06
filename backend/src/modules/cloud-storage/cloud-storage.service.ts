@@ -1,11 +1,14 @@
-import { Injectable } from "@nestjs/common";
-import { DriveService, GOOGLE_DOC_EXPORT_MIME, isGoogleDocMime } from "../google/drive.service";
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { DriveService, GOOGLE_DOC_EXPORT_MIME, GOOGLE_NATIVE_MIME, isGoogleDocMime } from "../google/drive.service";
 import { GoogleAccountsService } from "../google/google-accounts.service";
 import { MicrosoftAccountsService } from "../microsoft/microsoft-accounts.service";
 import { OneDriveService } from "../microsoft/onedrive.service";
 import type { CloudAccount, CloudFile, ResolvedCloudAccount, StorageProvider } from "./cloud-storage.types";
 
 export { GOOGLE_DOC_EXPORT_MIME, isGoogleDocMime };
+
+/** "Yeni dosya oluştur" menüsünde sunulan tüm dosya türleri — sağlayıcıya göre yalnızca bir alt küme geçerli. */
+export type NativeFileKind = "gdoc" | "gsheet" | "gslide" | "docx" | "xlsx" | "pptx";
 
 /**
  * FilesService'in Google Drive'a VE OneDrive'a aynı çağrılarla konuşmasını
@@ -179,5 +182,62 @@ export class CloudStorageService {
     return provider === "google"
       ? this.googleDrive.revokePermission(accessToken, fileId, permissionId)
       : this.oneDrive.revokePermission(accessToken, fileId, permissionId);
+  }
+
+  // ------------------------------------------------------- göz atma / içe aktarma
+
+  /**
+   * Sağlayıcının bir klasörünün alt öğelerini listeler.
+   *
+   * Yalnızca OneDrive için anlamlı: Google tarafında "Drive'dan seç" akışı
+   * backend'den bağımsız, tarayıcıda açılan resmi Picker widget'ıyla çözülüyor
+   * (bkz. drive.service.ts üstündeki not) — bu yüzden Google için bu metodun
+   * çağrılması bir kullanım hatasıdır, FilesController Google için ayrı bir
+   * "picker-token" ucu sunar.
+   */
+  async listFiles(provider: StorageProvider, accessToken: string, folderId?: string): Promise<CloudFile[]> {
+    if (provider === "google") {
+      throw new BadRequestException("Google Drive'da dosya gezinme Picker penceresi ile yapılır.");
+    }
+    return this.oneDrive.listFiles(accessToken, folderId);
+  }
+
+  /** Sağlayıcının kendi Drive'ında var olan bir dosyayı hedef klasöre kopyalar (içe aktarma). */
+  async copyFile(
+    provider: StorageProvider,
+    accessToken: string,
+    fileId: string,
+    destParentId: string,
+    newName?: string
+  ): Promise<CloudFile> {
+    return provider === "google"
+      ? this.googleDrive.copyFile(accessToken, fileId, destParentId, newName)
+      : this.oneDrive.copyFile(accessToken, fileId, destParentId, newName);
+  }
+
+  /**
+   * Boş bir doküman/tablo/sunum oluşturur. `kind`, sağlayıcının desteklediği
+   * türlerden biri olmalı: Google için gdoc/gsheet/gslide, Microsoft için
+   * docx/xlsx/pptx — biri diğerinin dosya türünü oluşturamaz (bkz. NativeFileKind).
+   */
+  async createNativeFile(
+    provider: StorageProvider,
+    accessToken: string,
+    kind: NativeFileKind,
+    name: string,
+    parentId?: string
+  ): Promise<CloudFile> {
+    if (provider === "google") {
+      if (kind !== "gdoc" && kind !== "gsheet" && kind !== "gslide") {
+        throw new BadRequestException("Google Drive'da yalnızca Dokümanlar, E-Tablolar ve Sunular oluşturulabilir.");
+      }
+      const parent = parentId ?? (await this.googleDrive.findOrCreateFolder(accessToken, "Projelio")).id;
+      return this.googleDrive.createNativeFile(accessToken, name, GOOGLE_NATIVE_MIME[kind], parent);
+    }
+
+    if (kind !== "docx" && kind !== "xlsx" && kind !== "pptx") {
+      throw new BadRequestException("OneDrive'da yalnızca Word, Excel ve PowerPoint dosyaları oluşturulabilir.");
+    }
+    return this.oneDrive.createNativeFile(accessToken, kind, name, parentId);
   }
 }

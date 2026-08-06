@@ -19,6 +19,14 @@ export interface FileContext {
 /** Dosya listeleme kapsamı. */
 export type FileScope = "all" | "general" | "project";
 
+function targetBase(target: { jobId: string } | { projectId: string } | { departmentId: string }): string {
+  return "jobId" in target
+    ? `/jobs/${target.jobId}`
+    : "projectId" in target
+    ? `/projects/${target.projectId}`
+    : `/departments/${target.departmentId}`;
+}
+
 function query(params: Record<string, string | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -26,6 +34,19 @@ function query(params: Record<string, string | undefined>): string {
   }
   const s = search.toString();
   return s ? `?${s}` : "";
+}
+
+/** Google için gdoc/gsheet/gslide; Microsoft için docx/xlsx/pptx — bkz. backend NativeFileKind. */
+export type NativeFileKind = "gdoc" | "gsheet" | "gslide" | "docx" | "xlsx" | "pptx";
+
+/** "Drive'dan seç" gezinme sonucundaki tek bir öğe (dosya ya da klasör). */
+export interface DriveBrowseEntry {
+  id: string;
+  name: string;
+  isFolder: boolean;
+  mimeType: string;
+  size?: number;
+  iconLink?: string;
 }
 
 export const filesApi = {
@@ -57,6 +78,24 @@ export const filesApi = {
   syncShares: (jobId: string) =>
     api.post<{ granted: number; revoked: number }>(`/jobs/${jobId}/files/sync-shares`, {}),
 
+  /** OneDrive'da bir klasörün alt öğelerini listeler ("Drive'dan seç" akışı). Google Picker kullandığı için buraya düşmez. */
+  browse: (target: { jobId: string } | { projectId: string } | { departmentId: string }, folderId?: string) =>
+    api.get<{ provider: "google" | "microsoft"; entries: DriveBrowseEntry[] }>(
+      `${targetBase(target)}/files/browse${folderId ? `?folderId=${encodeURIComponent(folderId)}` : ""}`
+    ),
+
+  /** Sağlayıcının kendi Drive'ında var olan bir dosyayı Projelio'nun klasörüne kopyalar ve kaydeder. */
+  importFromDrive: (
+    target: { jobId: string } | { projectId: string } | { departmentId: string },
+    body: { sourceFileId: string; name?: string; taskId?: string; outputId?: string }
+  ) => api.post<ProjectFile>(`${targetBase(target)}/files/import`, body),
+
+  /** Boş bir Doküman/Tablo/Sunum ya da Word/Excel/PowerPoint oluşturur. */
+  createNativeFile: (
+    target: { jobId: string } | { projectId: string } | { departmentId: string },
+    body: { kind: NativeFileKind; name: string; taskId?: string; outputId?: string }
+  ) => api.post<ProjectFile>(`${targetBase(target)}/files/create-native`, body),
+
   /**
    * İçerik adresi üretir.
    *
@@ -83,6 +122,8 @@ export const driveApi = {
       `/auth/google/url${next ? `?next=${encodeURIComponent(next)}` : ""}`
     ),
   exchange: (code: string) => api.post<{ token: string }>("/auth/google/exchange", { code }),
+  /** Frontend'de açılan resmi Google Picker widget'ı için kısa ömürlü Drive erişim jetonu. */
+  pickerToken: () => api.get<{ accessToken: string; expiresInSeconds: number }>("/google/picker-token"),
 };
 
 /**
@@ -116,12 +157,7 @@ export async function uploadFile(
   onProgress?: (ratio: number) => void
 ): Promise<ProjectFile> {
   // Proje ekranından yüklerken işi backend türetir; ön yüzün bilmesine gerek yok.
-  const base =
-    "jobId" in target
-      ? `/jobs/${target.jobId}`
-      : "projectId" in target
-      ? `/projects/${target.projectId}`
-      : `/departments/${target.departmentId}`;
+  const base = targetBase(target);
   // Departmanın bağlamı (proje/görev/çıktı) olmadığı için taskId/outputId yalnızca
   // iş/proje hedeflerinde anlamlı.
   const isDepartment = "departmentId" in target;

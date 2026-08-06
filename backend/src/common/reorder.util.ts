@@ -6,7 +6,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
  */
 export async function applyOrder(
   client: SupabaseClient,
-  table: "jobs" | "projects" | "operations" | "tasks" | "outputs" | "organizations" | "groups",
+  table: "jobs" | "projects" | "operations" | "tasks" | "outputs" | "organizations" | "groups" | "departments",
   orderedIds: string[]
 ): Promise<void> {
   await Promise.all(orderedIds.map((id, index) => client.from(table).update({ sort_order: index }).eq("id", id)));

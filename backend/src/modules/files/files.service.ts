@@ -8,10 +8,38 @@ import {
 import { SupabaseService } from "../../database/supabase.service";
 import { DriveNotConnectedError } from "../google/google-accounts.service";
 import { DriveFileMissingError } from "../google/drive.service";
-import { OneDriveFileMissingError } from "../microsoft/onedrive.service";
-import { CloudStorageService, GOOGLE_DOC_EXPORT_MIME, isGoogleDocMime } from "../cloud-storage/cloud-storage.service";
-import type { StorageProvider } from "../cloud-storage/cloud-storage.types";
+import { FOLDER_MIME, OneDriveFileMissingError } from "../microsoft/onedrive.service";
+import {
+  CloudStorageService,
+  GOOGLE_DOC_EXPORT_MIME,
+  isGoogleDocMime,
+  type NativeFileKind,
+} from "../cloud-storage/cloud-storage.service";
+import type { CloudFile, StorageProvider } from "../cloud-storage/cloud-storage.types";
 import { NotificationsService } from "../notifications/notifications.service";
+
+export type { NativeFileKind };
+
+/** "Drive'dan seç" gezinme sonucundaki tek bir öğe (dosya ya da klasör). */
+export interface DriveBrowseEntry {
+  id: string;
+  name: string;
+  isFolder: boolean;
+  mimeType: string;
+  size?: number;
+  iconLink?: string;
+}
+
+function toBrowseEntry(f: CloudFile): DriveBrowseEntry {
+  return {
+    id: f.id,
+    name: f.name,
+    isFolder: f.mimeType === FOLDER_MIME,
+    mimeType: f.mimeType,
+    size: f.size,
+    iconLink: f.iconLink,
+  };
+}
 
 /** Backend belleğinden geçirmeye razı olduğumuz üst sınır. Üstü resumable akışa gider. */
 export const INLINE_UPLOAD_LIMIT = 8 * 1024 * 1024;
@@ -1510,6 +1538,169 @@ export class FilesService {
   /** Drive/OneDrive ve işletim sistemlerinde sorun çıkaran karakterleri temizler. */
   private safeFileName(name: string): string {
     return (name || "dosya").replace(/[\\/:*?"<>|]/g, "_").slice(0, 200);
+  }
+
+  // ================================================== göz atma / içe aktarma / yeni dosya
+  //
+  // "Drive'dan seç" iki farklı yoldan çözülür:
+  //   * OneDrive: browseForJob/browseForDepartment ile klasör klasör gezinilir
+  //     (bkz. onedrive.service.ts listFiles — Files.Read.All scope'u sayesinde).
+  //   * Google Drive: gezinme backend'e hiç uğramaz, tarayıcıda resmi Picker
+  //     widget'ı açılır (bkz. google.controller.ts pickerToken). Picker'dan
+  //     seçilen dosya, aşağıdaki importFor* metotlarıyla (sourceFileId zaten
+  //     elde) içe aktarılır — bu kısım her iki sağlayıcı için ortaktır.
+  //
+  // "Yeni dosya oluştur" da ortak: createNativeFor* sağlayıcıya göre doğru
+  // şablonu (Google Dokümanlar/E-Tablolar/Sunular ya da boş Word/Excel/
+  // PowerPoint) CloudStorageService üzerinden oluşturup aynı persist akışına sokar.
+
+  async browseForJob(jobId: string, userId: string, folderId?: string): Promise<{ provider: StorageProvider; entries: DriveBrowseEntry[] }> {
+    await this.assertJobAccess(jobId, userId);
+    const { provider, accountId } = await this.ensureJobStorage(jobId, userId);
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    const files = await this.cloudStorage.listFiles(provider, accessToken, folderId);
+    return { provider, entries: files.map(toBrowseEntry) };
+  }
+
+  async browseForProject(projectId: string, userId: string, folderId?: string) {
+    const jobId = await this.jobIdOfProject(projectId);
+    return this.browseForJob(jobId, userId, folderId);
+  }
+
+  async browseForDepartment(
+    departmentId: string,
+    userId: string,
+    folderId?: string
+  ): Promise<{ provider: StorageProvider; entries: DriveBrowseEntry[] }> {
+    await this.assertDepartmentAccess(departmentId, userId);
+    const { provider, accountId } = await this.ensureDepartmentStorage(departmentId, userId);
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    const files = await this.cloudStorage.listFiles(provider, accessToken, folderId);
+    return { provider, entries: files.map(toBrowseEntry) };
+  }
+
+  async importForJob(
+    jobId: string,
+    userId: string,
+    sourceFileId: string,
+    opts: FileContext & { name?: string } = {}
+  ): Promise<ProjectFile> {
+    if (!sourceFileId) throw new BadRequestException("sourceFileId gerekli");
+    const access = await this.assertJobAccess(jobId, userId);
+    const resolvedProjectId = await this.resolveProjectFromContext(opts);
+    this.assertContextAllowed(access, resolvedProjectId);
+
+    const { provider, accountId, rootFolderId } = await this.ensureJobStorage(jobId, userId);
+    const target = await this.ensureContextFolder(jobId, provider, accountId, rootFolderId, {
+      ...opts,
+      resolvedProjectId,
+    });
+
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    const copied = await this.cloudStorage.copyFile(
+      provider,
+      accessToken,
+      sourceFileId,
+      target.driveFolderId,
+      opts.name ? this.safeFileName(opts.name) : undefined
+    );
+
+    return this.persist(jobId, userId, provider, accountId, copied, opts, resolvedProjectId, target.folderRowId);
+  }
+
+  async importForProject(
+    projectId: string,
+    userId: string,
+    sourceFileId: string,
+    opts: Omit<FileContext, "projectId"> & { name?: string } = {}
+  ): Promise<ProjectFile> {
+    const jobId = await this.jobIdOfProject(projectId);
+    return this.importForJob(jobId, userId, sourceFileId, { ...opts, projectId });
+  }
+
+  async importForDepartment(
+    departmentId: string,
+    userId: string,
+    sourceFileId: string,
+    name?: string
+  ): Promise<ProjectFile> {
+    if (!sourceFileId) throw new BadRequestException("sourceFileId gerekli");
+    await this.assertDepartmentAccess(departmentId, userId);
+
+    const { provider, accountId, folderId } = await this.ensureDepartmentStorage(departmentId, userId);
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    const copied = await this.cloudStorage.copyFile(
+      provider,
+      accessToken,
+      sourceFileId,
+      folderId,
+      name ? this.safeFileName(name) : undefined
+    );
+
+    return this.persistDepartmentFile(departmentId, userId, provider, accountId, copied);
+  }
+
+  async createNativeForJob(
+    jobId: string,
+    userId: string,
+    kind: NativeFileKind,
+    name: string,
+    opts: FileContext = {}
+  ): Promise<ProjectFile> {
+    if (!name?.trim()) throw new BadRequestException("Dosya adı gerekli");
+    const access = await this.assertJobAccess(jobId, userId);
+    const resolvedProjectId = await this.resolveProjectFromContext(opts);
+    this.assertContextAllowed(access, resolvedProjectId);
+
+    const { provider, accountId, rootFolderId } = await this.ensureJobStorage(jobId, userId);
+    const target = await this.ensureContextFolder(jobId, provider, accountId, rootFolderId, {
+      ...opts,
+      resolvedProjectId,
+    });
+
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    const created = await this.cloudStorage.createNativeFile(
+      provider,
+      accessToken,
+      kind,
+      this.safeFileName(name),
+      target.driveFolderId
+    );
+
+    return this.persist(jobId, userId, provider, accountId, created, opts, resolvedProjectId, target.folderRowId);
+  }
+
+  async createNativeForProject(
+    projectId: string,
+    userId: string,
+    kind: NativeFileKind,
+    name: string,
+    opts: Omit<FileContext, "projectId"> = {}
+  ): Promise<ProjectFile> {
+    const jobId = await this.jobIdOfProject(projectId);
+    return this.createNativeForJob(jobId, userId, kind, name, { ...opts, projectId });
+  }
+
+  async createNativeForDepartment(
+    departmentId: string,
+    userId: string,
+    kind: NativeFileKind,
+    name: string
+  ): Promise<ProjectFile> {
+    if (!name?.trim()) throw new BadRequestException("Dosya adı gerekli");
+    await this.assertDepartmentAccess(departmentId, userId);
+
+    const { provider, accountId, folderId } = await this.ensureDepartmentStorage(departmentId, userId);
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    const created = await this.cloudStorage.createNativeFile(
+      provider,
+      accessToken,
+      kind,
+      this.safeFileName(name),
+      folderId
+    );
+
+    return this.persistDepartmentFile(departmentId, userId, provider, accountId, created);
   }
 
   // ============================================================ indirme

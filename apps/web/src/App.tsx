@@ -7,11 +7,13 @@ import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import GoogleReturn from "./pages/GoogleReturn";
+import MicrosoftReturn from "./pages/MicrosoftReturn";
 import JobDetail from "./pages/JobDetail";
 import ProjectDetail from "./pages/ProjectDetail";
 import OperationDetail from "./pages/OperationDetail";
 import Organizations from "./pages/Organizations";
 import OrganizationDetail from "./pages/OrganizationDetail";
+import DepartmentDetail from "./pages/DepartmentDetail";
 import Groups from "./pages/Groups";
 import GroupDetail from "./pages/GroupDetail";
 import CalendarView from "./pages/Calendar";
@@ -30,6 +32,7 @@ import { ProjectFabContext } from "./lib/projectFab";
 import type { ProjectFabAction } from "./lib/projectFab";
 import { useIsDesktop } from "./lib/useIsDesktop";
 import { SIDEBAR_WIDTH } from "./lib/layout";
+import { IconChevronRight } from "./components/icons";
 
 const HEADER_HEIGHT = 76;
 
@@ -38,16 +41,27 @@ export default function App() {
   // Google dönüş ekranı da kimlik doğrulaması gerektirmeyen bir ekrandır: token
   // henüz yerel depoda yok, tam da burada oluşturuluyor. Korumalı bölgeye
   // koyarsak /login'e yönlenir ve akış hiç tamamlanamaz.
+  // Microsoft dönüşünde token zaten var (yalnızca "bağlama" akışı), ama aynı
+  // bağımsız, tam ekran kart tasarımını paylaşması için burada tutuluyor.
   const isAuthScreen =
     location.pathname === "/login" ||
     location.pathname === "/register" ||
-    location.pathname === "/google/return";
+    location.pathname === "/google/return" ||
+    location.pathname === "/microsoft/return";
   const hasToken = !!localStorage.getItem("projelio_token");
   const [fabAction, setFabAction] = useState<ProjectFabAction | null>(null);
   // Bilgisayarda (geniş ekran) sol sidebar + üstte tam genişlik header;
   // telefonda (dar ekran) sidebar kaybolur, alt menü (BottomNav) ve
   // sol üstte yüzen logo geri gelir. Pencere yeniden boyutlandırıldığında canlı güncellenir.
   const isDesktop = useIsDesktop();
+  // Sidebar artık masaüstünde de mobilde de açılıp kapanabiliyor: masaüstünde
+  // varsayılan açık (eski davranış), mobilde varsayılan kapalı (üstteki oka
+  // basılınca bir çekmece gibi açılır). Ekran genişliği eşiği aşıldığında
+  // (masaüstü <-> mobil geçişinde) varsayılana geri dönülür.
+  const [sidebarOpen, setSidebarOpen] = useState(isDesktop);
+  useEffect(() => {
+    setSidebarOpen(isDesktop);
+  }, [isDesktop]);
   // Giriş yapmış her kullanıcı için bir kez kontrol edilir: onboardingCompletedAt
   // boşsa (yeni kayıt ya da bu özellik eklenmeden önce kaydolmuş mevcut kullanıcı)
   // sihirbaz gösterilir, tamamlanana kadar uygulamanın geri kalanı erişilemez.
@@ -70,6 +84,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/google/return" element={<GoogleReturn />} />
+        <Route path="/microsoft/return" element={<MicrosoftReturn />} />
       </Routes>
     );
   }
@@ -84,16 +99,18 @@ export default function App() {
     <div style={{ minHeight: "100vh" }}>
       {me && !me.onboardingCompletedAt && <OnboardingWizard onCompleted={reloadMe} />}
 
-      {isDesktop && <Sidebar />}
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} overlay={!isDesktop} />
 
       {/* Sidebar artık position:fixed olduğu için akışta yer kaplamıyor;
-          içerik sütununu onun genişliği kadar sağa kaydırıyoruz. */}
-      <div style={{ marginLeft: isDesktop ? SIDEBAR_WIDTH : 0, minHeight: "100vh", position: "relative" }}>
+          içerik sütununu (yalnızca masaüstünde ve açıkken) onun genişliği kadar
+          sağa kaydırıyoruz. Mobilde sidebar bir çekmece/overlay olduğu için
+          içerik hiçbir zaman kaymaz. */}
+      <div style={{ marginLeft: isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0, minHeight: "100vh", position: "relative" }}>
         <div
           style={{
             position: "fixed",
             top: 0,
-            left: isDesktop ? SIDEBAR_WIDTH : 0,
+            left: isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0,
             right: 0,
             height: HEADER_HEIGHT,
             background: c.surface,
@@ -102,22 +119,50 @@ export default function App() {
             zIndex: 35,
           }}
         />
-        {/* Masaüstünde Projelio logosu zaten sidebar'ın üstünde görünüyor;
-            burada tekrar göstermeye gerek yok, sadece mobilde (sidebar yokken) gösterilir. */}
-        {!isDesktop && (
-          <Link
-            to="/"
-            style={{
-              position: "fixed",
-              top: 14,
-              left: 14,
-              zIndex: 40,
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <img src="/logo.png" alt="Projelio" style={{ width: 48, height: 48 }} />
-          </Link>
+        {/* Sidebar kapalıyken (masaüstünde veya mobilde) sol üstte küçük bir ok
+            butonu ve onun yanında Projelio logosu gösterilir; oka basınca sidebar
+            açılır, logoya basınca ana sayfaya gidilir. Sidebar açıkken zaten kendi
+            logosunu ve kapatma okunu içeriyor, burada ayrıca bir şey göstermeye
+            gerek yok. */}
+        {!sidebarOpen && (
+          <>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Sidebar'ı aç"
+              title="Sidebar'ı aç"
+              style={{
+                position: "fixed",
+                top: 14,
+                left: 14,
+                zIndex: 40,
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: c.surface,
+                border: `1px solid ${c.border}`,
+                boxShadow: "0 2px 8px rgba(26,31,41,0.12)",
+              }}
+            >
+              <IconChevronRight size={18} color={c.textSecondary} />
+            </button>
+            <Link
+              to="/"
+              aria-label="Projelio - Ana sayfa"
+              style={{
+                position: "fixed",
+                top: 10,
+                left: 62,
+                zIndex: 40,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <img src="/logo.png" alt="Projelio" style={{ width: 48, height: 48 }} />
+            </Link>
+          </>
         )}
         <NotificationBell />
         <AiLauncher />
@@ -130,6 +175,7 @@ export default function App() {
               <Route path="/operations/:id" element={<OperationDetail />} />
               <Route path="/organizations" element={<Organizations />} />
               <Route path="/organizations/:id" element={<OrganizationDetail />} />
+              <Route path="/departments/:id" element={<DepartmentDetail />} />
               <Route path="/groups" element={<Groups />} />
               <Route path="/groups/:id" element={<GroupDetail />} />
               <Route path="/calendar" element={<CalendarView />} />

@@ -17,10 +17,32 @@ export class TasksController {
     return this.tasksService.create(projectId, body, req.user.userId);
   }
 
+  @Get("departments/:departmentId/tasks")
+  findByDepartment(@Param("departmentId") departmentId: string) {
+    return this.tasksService.findByDepartment(departmentId);
+  }
+
+  @Post("departments/:departmentId/tasks")
+  createForDepartment(@Param("departmentId") departmentId: string, @Body() body: any, @Req() req: any) {
+    return this.tasksService.createForDepartment(departmentId, body, req.user.userId);
+  }
+
   // NOT: bu route "tasks/:id" ile çakışmaması için ondan önce tanımlanmalı.
   @Patch("tasks/reorder")
   reorder(@Body("ids") ids: string[]) {
     return this.tasksService.reorder(ids);
+  }
+
+  // NOT: "tasks/:id" ile çakışmasın diye ondan önce tanımlanmalı (aksi halde
+  // "duplicate"/"move" birer :id gibi yorumlanır).
+  @Post("tasks/duplicate")
+  duplicate(@Body("ids") ids: string[], @Req() req: any) {
+    return this.tasksService.duplicate(ids, req.user.userId);
+  }
+
+  @Patch("tasks/move")
+  move(@Body() body: { ids: string[]; projectId?: string; departmentId?: string }, @Req() req: any) {
+    return this.tasksService.move(body.ids, { projectId: body.projectId, departmentId: body.departmentId }, req.user.userId);
   }
 
   @Patch("tasks/:id")

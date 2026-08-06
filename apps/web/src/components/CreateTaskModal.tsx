@@ -44,6 +44,8 @@ export default function CreateTaskModal({
 
   const [title, setTitle] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [durationValue, setDurationValue] = useState("");
+  const [durationUnit, setDurationUnit] = useState<"hours" | "days">("hours");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -93,6 +95,7 @@ export default function CreateTaskModal({
     setError("");
     setLoading(true);
     try {
+      const trimmedDuration = durationValue.trim();
       await api.post(`/projects/${projectId}/tasks`, {
         title,
         deadline: deadline ? new Date(deadline).toISOString() : new Date().toISOString(),
@@ -100,6 +103,9 @@ export default function CreateTaskModal({
         // Çıktı seçmek zorunlu değil: seçilmezse doğrudan proje görevi olarak eklenir.
         outputId: outputId || undefined,
         assignedTo: assignedTo || undefined,
+        // Tahmini süre opsiyonel: doldurulmadıysa hiç gönderilmez.
+        estimatedDurationValue: trimmedDuration ? Number(trimmedDuration) : undefined,
+        estimatedDurationUnit: trimmedDuration ? durationUnit : undefined,
       });
       if (onCreated) {
         onCreated();
@@ -166,6 +172,29 @@ export default function CreateTaskModal({
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş tarihi</label>
                 <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} required style={{ width: "100%" }} />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 15, color: c.textSecondary }}>Tahmini süre (opsiyonel)</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.5"
+                    value={durationValue}
+                    onChange={(e) => setDurationValue(e.target.value)}
+                    placeholder="Örn. 4"
+                    style={{ flex: 1 }}
+                  />
+                  <select
+                    value={durationUnit}
+                    onChange={(e) => setDurationUnit(e.target.value as "hours" | "days")}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="hours">Saat</option>
+                    <option value="days">Gün</option>
+                  </select>
+                </div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

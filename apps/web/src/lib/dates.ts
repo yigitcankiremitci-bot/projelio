@@ -24,3 +24,12 @@ export function formatDateTime(iso: string): string {
   const d = parseServerDate(iso);
   return `${d.toLocaleDateString("tr-TR")} ${d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`;
 }
+
+/** Görevin tahmini iş süresi: "4 sa" / "2 gün" gibi kısa bir etiket üretir. */
+export function formatTaskDuration(value?: number, unit?: "hours" | "days"): string | undefined {
+  if (value == null || !unit) return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  const trimmed = n % 1 === 0 ? n.toString() : n.toString().replace(".", ",");
+  return unit === "hours" ? `${trimmed} sa` : `${trimmed} gün`;
+}

@@ -1,28 +1,28 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type { Group, Job, Organization } from "@projelio/shared";
+import type { Group, Organization } from "@projelio/shared";
 import { api } from "../api/client";
-import JobCard from "../components/JobCard";
 import OrganizationCard from "../components/OrganizationCard";
 import EditGroupModal from "../components/EditGroupModal";
 import FilesPanel from "../components/FilesPanel";
+import ProfileCard from "../components/ProfileCard";
 import { colors } from "../theme/colors";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 
+// Not: "İşler" (job) kavramı yalnızca serbest çalışan/taşeron hesaplarına özgüdür;
+// bir holding doğrudan iş değil, organizasyon (ve onların departmanlarını) yönetir.
 export default function GroupDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const c = colors.light;
   const [group, setGroup] = useState<Group | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [jobs, setJobs] = useState<Job[]>([]);
   const [editing, setEditing] = useState(false);
 
   const reload = () => {
     if (!id) return;
     api.get<Group>(`/groups/${id}`).then(setGroup).catch(() => setGroup(null));
     api.get<Organization[]>(`/groups/${id}/organizations`).then(setOrganizations).catch(() => setOrganizations([]));
-    api.get<Job[]>(`/groups/${id}/jobs`).then(setJobs).catch(() => setJobs([]));
   };
 
   useEffect(reload, [id]);
@@ -51,6 +51,12 @@ export default function GroupDetail() {
           justifyContent: "flex-end",
         }}
       >
+        {/* Kişi kartı: serbest çalışan anasayfasıyla (Dashboard) aynı bileşen, kapak
+            görselinin/gradientinin üstüne bindirilmiş — sağ üstte, yer kaplamadan. */}
+        <div style={{ position: "absolute", top: 20, right: 28, zIndex: 3 }}>
+          <ProfileCard />
+        </div>
+
         <div style={{ paddingRight: 64 }}>
           <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 4px" }}>{group?.name ?? "…"}</h1>
           {group?.description && <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 8px" }}>{group.description}</p>}
@@ -111,28 +117,8 @@ export default function GroupDetail() {
           </div>
         )}
 
-        <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 14px" }}>
-          Gruba doğrudan bağlı işler
-        </h2>
-        <p style={{ fontSize: 15, color: c.textSecondary, margin: "-8px 0 14px" }}>
-          Belirli bir organizasyona değil, doğrudan holding'e bağlı işler.
-        </p>
-
-        {jobs.length === 0 ? (
-          <div style={{ border: `1px dashed ${c.border}`, borderRadius: 12, padding: 24, textAlign: "center", color: c.textSecondary, fontSize: 15 }}>
-            Gruba doğrudan bağlı iş yok.
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-            {jobs.map((j) => (
-              <JobCard key={j.id} job={j} projectCount={j.projectCount ?? 0} />
-            ))}
-          </div>
-        )}
-
-        {/* Hiyerarşi: gruba bağlı işler + gruba bağlı organizasyonların işleri.
-            Yükleme burada yok — dosya her zaman bir işe ait olmak zorunda. */}
-        <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
+        {/* Hiyerarşi: gruba bağlı organizasyonların departmanlarındaki tüm dosyalar. */}
+        <div style={{ marginTop: 8, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
           {id && <FilesPanel groupId={id} />}
         </div>
       </div>

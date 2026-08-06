@@ -1,10 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import type { ProjectMember } from "@projelio/shared";
+import type { DepartmentMember, ProjectMember } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 
+// Hem proje ekibi hem departman kadrosu için ortak, minimal görüntü şekli.
+interface PickableMember {
+  userId: string;
+  fullName?: string;
+  username?: string;
+}
+
 interface Props {
-  projectId: string;
+  // İkisinden biri verilmeli: proje görevleri için projectId, departman
+  // görevleri için departmentId.
+  projectId?: string;
+  departmentId?: string;
   value: string; // seçili kullanıcı id'si ("" = atanmamış)
   onChange: (userId: string, name?: string) => void;
   placeholder?: string;
@@ -12,26 +22,45 @@ interface Props {
 
 /**
  * Görev atama seçici: tüm kullanıcıları listeleyen açılır kutu yerine, yalnızca
- * ilgili projenin ekibini (sahip + üyeler) gösterir ve ada/kullanıcı adına göre
- * yazarak arama yapılmasını sağlar.
+ * ilgili projenin ekibini (sahip + üyeler) ya da departmanın kadrosunu gösterir
+ * ve ada/kullanıcı adına göre yazarak arama yapılmasını sağlar.
  */
-export default function AssigneePicker({ projectId, value, onChange, placeholder = "İsim yazarak ara…" }: Props) {
+export default function AssigneePicker({ projectId, departmentId, value, onChange, placeholder = "İsim yazarak ara…" }: Props) {
   const c = colors.light;
-  const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [members, setMembers] = useState<PickableMember[]>([]);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (departmentId) {
+      api
+        .get<DepartmentMember[]>(`/departments/${departmentId}/members`)
+        .then((list) =>
+          setMembers(
+            list
+              .filter((m) => m.status === "approved" && m.userId)
+              .map((m) => ({ userId: m.userId as string, fullName: m.fullName, username: m.username }))
+          )
+        )
+        .catch(() => setMembers([]));
+      return;
+    }
     if (!projectId) {
       setMembers([]);
       return;
     }
     api
       .get<ProjectMember[]>(`/projects/${projectId}/members`)
-      .then((list) => setMembers(list.filter((m) => m.status === "approved" || m.role === "owner")))
+      .then((list) =>
+        setMembers(
+          list
+            .filter((m) => m.status === "approved" || m.role === "owner")
+            .map((m) => ({ userId: m.userId, fullName: m.fullName, username: m.username }))
+        )
+      )
       .catch(() => setMembers([]));
-  }, [projectId]);
+  }, [projectId, departmentId]);
 
   useEffect(() => {
     if (!open) return;
@@ -95,7 +124,7 @@ export default function AssigneePicker({ projectId, value, onChange, placeholder
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder={members.length === 0 ? "Bu projede ekip üyesi yok" : placeholder}
+          placeholder={members.length === 0 ? (departmentId ? "Bu departmanda kadro üyesi yok" : "Bu projede ekip üyesi yok") : placeholder}
           disabled={members.length === 0}
           style={{ width: "100%", fontSize: 16 }}
         />

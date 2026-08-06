@@ -41,6 +41,44 @@ export class FilesController {
     private jwtService: JwtService
   ) {}
 
+  // -------------------------------------------------------------- departman
+
+  @Get("departments/:departmentId/files")
+  @UseGuards(AuthGuard("jwt"))
+  listByDepartment(@Param("departmentId") departmentId: string, @Req() req: any) {
+    return this.filesService.listByDepartment(departmentId, req.user.userId);
+  }
+
+  @Post("departments/:departmentId/files")
+  @UseGuards(AuthGuard("jwt"))
+  @UseInterceptors(
+    FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: INLINE_UPLOAD_LIMIT } })
+  )
+  uploadToDepartment(
+    @Param("departmentId") departmentId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any
+  ) {
+    return this.filesService.uploadInlineForDepartment(departmentId, req.user.userId, file);
+  }
+
+  @Post("departments/:departmentId/files/upload-session")
+  @UseGuards(AuthGuard("jwt"))
+  createDepartmentUploadSession(
+    @Param("departmentId") departmentId: string,
+    @Body() body: { name: string; mimeType: string; sizeBytes?: number },
+    @Req() req: any
+  ) {
+    return this.filesService.createUploadSessionForDepartment(departmentId, req.user.userId, body);
+  }
+
+  @Post("departments/:departmentId/files/sync-shares")
+  @UseGuards(AuthGuard("jwt"))
+  async syncDepartmentShares(@Param("departmentId") departmentId: string, @Req() req: any) {
+    await this.filesService.assertDepartmentAccess(departmentId, req.user.userId);
+    return this.filesService.syncDepartmentShares(departmentId);
+  }
+
   // -------------------------------------------------------------- listeleme
 
   @Get("jobs/:jobId/files")

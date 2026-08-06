@@ -1,19 +1,33 @@
-import { useEffect, useState } from "react";
-import { colors } from "../theme/colors";
-import { IconSparkle } from "./icons";
+import { useEffect, useRef, useState } from "react";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import AiAssistantPanel from "./AiAssistantPanel";
 
+const BASE_SIZE = 132;
+const HOVER_SCALE = 1.28;
+const EYES_CLOSED_DURATION = 300;
+const IDLE_BLINK_RANGE: [number, number] = [10000, 12000];
+const HOVER_BLINK_RANGE: [number, number] = [4000, 6000];
+
 /**
- * Projelio AI'ın uygulama genelindeki giriş noktası: her ekranda duran tetikleyici
- * düğme + sağdan açılan asistan paneli.
+ * Lio'nun (Projelio AI asistanı) uygulama genelindeki giriş noktası: sağ altta
+ * duran maskot düğmesi + sağdan açılan sohbet paneli.
+ *
+ * Taban görsel her zaman gözleri kapalı Lio'dur; gözlerin bulunduğu görsel
+ * varsayılan olarak üstte açık durur, ara sıra kısa süreliğine kaybolup
+ * (göz kırpma) geri gelir.
  *
  * Klavye kısayolu: Cmd/Ctrl + K
  */
 export default function AiLauncher() {
-  const c = colors.light;
   const isDesktop = useIsDesktop();
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [eyesClosed, setEyesClosed] = useState(false);
+  const hoveredRef = useRef(hovered);
+
+  useEffect(() => {
+    hoveredRef.current = hovered;
+  }, [hovered]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -26,6 +40,31 @@ export default function AiLauncher() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
+  // Lio arada bir göz kırpar: normalde 10-12sn'de bir, üzerine gelinince
+  // ilgisi artmış gibi 4-6sn'de bir — her seferinde 0.3sn'liğine gözler kapanır.
+  useEffect(() => {
+    let reopenTimeout: ReturnType<typeof setTimeout>;
+    let scheduleTimeout: ReturnType<typeof setTimeout>;
+
+    const scheduleNext = () => {
+      const [min, max] = hoveredRef.current ? HOVER_BLINK_RANGE : IDLE_BLINK_RANGE;
+      const delay = min + Math.random() * (max - min);
+      scheduleTimeout = setTimeout(() => {
+        setEyesClosed(true);
+        reopenTimeout = setTimeout(() => {
+          setEyesClosed(false);
+          scheduleNext();
+        }, EYES_CLOSED_DURATION);
+      }, delay);
+    };
+
+    scheduleNext();
+    return () => {
+      clearTimeout(scheduleTimeout);
+      clearTimeout(reopenTimeout);
+    };
+  }, []);
+
   // Mobilde alt menünün üstünde kalsın; masaüstünde ekranın sağ altına otursun.
   const bottom = isDesktop ? 22 : 96;
 
@@ -34,29 +73,63 @@ export default function AiLauncher() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          aria-label="Projelio AI'ı aç"
-          title="Projelio AI (⌘K)"
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          aria-label="Lio'yu aç"
+          title="Lio (⌘K)"
           style={{
             position: "fixed",
             right: 18,
             bottom,
-            height: 48,
-            paddingLeft: 14,
-            paddingRight: isDesktop ? 18 : 14,
-            borderRadius: 999,
+            width: BASE_SIZE,
+            height: BASE_SIZE,
+            padding: 0,
             border: "none",
-            background: c.primaryDark,
-            color: "#fff",
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-            boxShadow: "0 6px 20px rgba(26,31,41,0.30)",
+            background: "transparent",
+            overflow: "visible",
             zIndex: 45,
             cursor: "pointer",
           }}
         >
-          <IconSparkle size={20} color={c.accent} />
-          {isDesktop && <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: 0.2 }}>Projelio AI</span>}
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "100%",
+              transform: `scale(${hovered ? HOVER_SCALE : 1})`,
+              transformOrigin: "bottom right",
+              transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
+              filter: "drop-shadow(0 4px 10px rgba(26,31,41,0.28))",
+            }}
+          >
+            <img
+              src="/lio-base.png"
+              alt="Lio"
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                display: "block",
+                objectFit: "contain",
+              }}
+            />
+            <img
+              src="/lio-eyes.png"
+              alt=""
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                display: "block",
+                objectFit: "contain",
+                opacity: eyesClosed ? 0 : 1,
+                transition: "opacity 0.15s ease-in-out",
+              }}
+            />
+          </div>
         </button>
       )}
 

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GoogleDriveStatus, ProjectFile } from "@projelio/shared";
-import { driveApi, filesApi, uploadFile } from "../api/files";
+import { driveApi, filesApi, oneDriveApi, uploadFile } from "../api/files";
 import type { FileScope } from "../api/files";
-import { driveEditUrl, fileKindLabel, formatFileSize } from "../lib/driveLinks";
+import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
 import { colors } from "../theme/colors";
 import ConfirmDialog from "./ConfirmDialog";
 import FilePreviewModal from "./FilePreviewModal";
@@ -11,6 +11,7 @@ import {
   IconExternalLink,
   IconFile,
   IconGoogleDrive,
+  IconOneDrive,
   IconTrash,
   IconUpload,
 } from "./icons";
@@ -34,6 +35,8 @@ interface Props {
    */
   organizationId?: string;
   groupId?: string;
+  /** Departman ekranı: dosyalar iş hiyerarşisinden bağımsız, düz bir liste. */
+  departmentId?: string;
   /** İş ekranında: hepsi / yalnızca işin geneli. */
   scope?: FileScope;
   /** Modal içinde başlık ve büyük yükleme alanı gösterilmez. */
@@ -54,12 +57,14 @@ export default function FilesPanel({
   outputId,
   organizationId,
   groupId,
+  departmentId,
   scope,
   compact = false,
 }: Props) {
   const c = colors.light;
   const [files, setFiles] = useState<ProjectFile[]>([]);
-  const [status, setStatus] = useState<GoogleDriveStatus | null>(null);
+  const [googleStatus, setGoogleStatus] = useState<GoogleDriveStatus | null>(null);
+  const [msStatus, setMsStatus] = useState<GoogleDriveStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [uploads, setUploads] = useState<UploadingItem[]>([]);
@@ -73,8 +78,13 @@ export default function FilesPanel({
   const readOnly = Boolean(organizationId || groupId);
 
   const target = useMemo(
-    () => (jobId ? ({ jobId } as const) : ({ projectId: projectId! } as const)),
-    [jobId, projectId]
+    () =>
+      departmentId
+        ? ({ departmentId } as const)
+        : jobId
+        ? ({ jobId } as const)
+        : ({ projectId: projectId! } as const),
+    [departmentId, jobId, projectId]
   );
 
   const load = useCallback(() => {
@@ -83,6 +93,8 @@ export default function FilesPanel({
       ? filesApi.listByOrganization(organizationId)
       : groupId
       ? filesApi.listByGroup(groupId)
+      : departmentId
+      ? filesApi.listByDepartment(departmentId)
       : jobId
       ? filesApi.listByJob(jobId, { scope: scope ?? "all", projectId, taskId, outputId })
       : filesApi.listByProject(projectId!, { taskId, outputId });
@@ -91,14 +103,17 @@ export default function FilesPanel({
       .then(setFiles)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [organizationId, groupId, jobId, projectId, taskId, outputId, scope]);
+  }, [organizationId, groupId, departmentId, jobId, projectId, taskId, outputId, scope]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  // Kullanıcı iki sağlayıcıdan yalnızca birini bağlamış olabilir; yükleme
+  // engeli ikisi de hazır değilse devreye girmeli (bkz. driveMissing).
   useEffect(() => {
-    driveApi.status().then(setStatus).catch(() => setStatus(null));
+    driveApi.status().then(setGoogleStatus).catch(() => setGoogleStatus(null));
+    oneDriveApi.status().then(setMsStatus).catch(() => setMsStatus(null));
   }, []);
 
   const handleFiles = async (selected: FileList | null) => {
@@ -143,9 +158,12 @@ export default function FilesPanel({
     }
   };
 
-  // Drive hiç bağlı değilse yükleme yapılamaz; kullanıcıyı boş bir hata yerine
-  // doğrudan çözüme yönlendir.
-  const driveMissing = Boolean(status && status.configured && !status.driveReady);
+  // Hiçbir sağlayıcı (Drive/OneDrive) bağlı değilse yükleme yapılamaz;
+  // kullanıcıyı boş bir hata yerine doğrudan çözüme yönlendir. Kullanıcı
+  // ikisinden birini bağlamışsa (hangisi olursa olsun) engel kalkar.
+  const anyConfigured = Boolean(googleStatus?.configured || msStatus?.configured);
+  const anyReady = Boolean(googleStatus?.driveReady || msStatus?.driveReady);
+  const driveMissing = anyConfigured && !anyReady;
 
   // İş ekranında dosyanın hangi projeden geldiğini göstermek gerekir; proje
   // ekranında zaten belli olduğu için gösterilmez.
@@ -194,7 +212,7 @@ export default function FilesPanel({
         style={{ display: "none" }}
       />
 
-      {driveMissing && status && !readOnly && <DriveNotice status={status} />}
+      {driveMissing && !readOnly && <DriveNotice google={googleStatus} microsoft={msStatus} />}
 
       {!readOnly && (
       <div
@@ -226,7 +244,11 @@ export default function FilesPanel({
         <div style={{ marginTop: 6 }}>
           {dragging ? "Bırakın, yükleyelim" : "Dosyaları buraya sürükleyin veya tıklayın"}
         </div>
-        <div style={{ fontSize: 13, marginTop: 3 }}>İşin Google Drive klasöründe saklanır</div>
+        <div style={{ fontSize: 13, marginTop: 3 }}>
+          {departmentId
+            ? "Departmanın bağlı Drive/OneDrive klasöründe saklanır"
+            : "İşin bağlı Drive/OneDrive klasöründe saklanır"}
+        </div>
       </div>
       )}
 
@@ -319,7 +341,7 @@ export default function FilesPanel({
                   </div>
                   <div style={{ fontSize: 13, color: c.textSecondary }}>
                     {file.status === "missing"
-                      ? "Drive'da bulunamadı"
+                      ? `${driveProviderLabel(file)}'da bulunamadı`
                       : [
                           // Üst kademede dosyanın hangi işten geldiği kritik bilgi.
                           readOnly ? file.jobTitle : null,
@@ -337,7 +359,7 @@ export default function FilesPanel({
                 <IconDownload size={16} color={c.textSecondary} />
               </IconButton>
               <IconButton
-                title="Drive'da düzenle"
+                title={`${driveProviderLabel(file)}'da düzenle`}
                 onClick={() => window.open(driveEditUrl(file), "_blank", "noopener,noreferrer")}
               >
                 <IconExternalLink size={16} color={c.textSecondary} />
@@ -359,7 +381,7 @@ export default function FilesPanel({
       {pendingDelete && (
         <ConfirmDialog
           title="Dosyayı kaldır"
-          message={`"${pendingDelete.name}" Projelio'dan kaldırılacak. Dosya Google Drive'da kalmaya devam eder.`}
+          message={`"${pendingDelete.name}" Projelio'dan kaldırılacak. Dosya ${driveProviderLabel(pendingDelete)}'da kalmaya devam eder.`}
           confirmLabel="Kaldır"
           onConfirm={handleDelete}
           onCancel={() => setPendingDelete(null)}
@@ -402,11 +424,12 @@ function IconButton({
   );
 }
 
-function DriveNotice({ status }: { status: GoogleDriveStatus }) {
+function DriveNotice({ google, microsoft }: { google: GoogleDriveStatus | null; microsoft: GoogleDriveStatus | null }) {
   const c = colors.light;
-  const message = status.needsReconnect
-    ? "Google Drive erişiminiz sona ermiş. Dosya yüklemek için yeniden bağlanın."
-    : "Dosya yükleyebilmek için önce Google Drive hesabınızı bağlayın.";
+  const needsReconnect = Boolean(google?.needsReconnect || microsoft?.needsReconnect);
+  const message = needsReconnect
+    ? "Bulut depolama erişiminiz sona ermiş. Dosya yüklemek için yeniden bağlanın."
+    : "Dosya yükleyebilmek için önce Google Drive ya da OneDrive hesabınızı bağlayın.";
 
   return (
     <div
@@ -422,6 +445,7 @@ function DriveNotice({ status }: { status: GoogleDriveStatus }) {
       }}
     >
       <IconGoogleDrive size={18} />
+      <IconOneDrive size={18} />
       <div style={{ flex: 1, fontSize: 15, color: c.textPrimary }}>{message}</div>
       <a
         href="/settings"

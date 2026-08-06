@@ -1,16 +1,18 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
-import { GoogleCoreModule } from "../google/google-core.module";
+import { CloudStorageModule } from "../cloud-storage/cloud-storage.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { FilesController } from "./files.controller";
 import { FilesService } from "./files.service";
 
 @Module({
   imports: [
-    // Bilerek GoogleModule değil: o UsersModule'ü çeker ve
+    // CloudStorageModule, Google Drive'ı VE OneDrive'ı tek bir servis
+    // arkasında birleştirir (bkz. cloud-storage.module.ts). Bilerek GoogleModule
+    // değil GoogleCoreModule kullanır: o UsersModule'ü çeker ve
     // Jobs > Files > Google > Users > Organizations > Jobs döngüsü doğar.
-    GoogleCoreModule,
+    CloudStorageModule,
     NotificationsModule,
     PassportModule,
     JwtModule.register({

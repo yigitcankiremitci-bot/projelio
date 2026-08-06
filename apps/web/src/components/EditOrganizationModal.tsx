@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import type { Group, Organization } from "@projelio/shared";
+import type { Group, Organization, OrgType } from "@projelio/shared";
+import { ORG_TYPE_LABEL } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { resizeCoverImage } from "../lib/imageProcessing";
@@ -19,6 +20,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
   const [name, setName] = useState(organization.name);
   const [description, setDescription] = useState(organization.description ?? "");
   const [groupId, setGroupId] = useState(organization.groupId ?? "");
+  const [orgType, setOrgType] = useState<OrgType>(organization.orgType ?? "sirket");
   const [groups, setGroups] = useState<Group[]>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -53,6 +55,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
         name,
         description: description || undefined,
         groupId: groupId || null,
+        orgType,
       });
       if (coverFile) {
         const resized = await resizeCoverImage(coverFile);
@@ -93,6 +96,17 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Ölçek</label>
+          <select value={orgType} onChange={(e) => setOrgType(e.target.value as OrgType)} style={{ width: "100%" }}>
+            {(Object.keys(ORG_TYPE_LABEL) as OrgType[]).map((type) => (
+              <option key={type} value={type}>
+                {ORG_TYPE_LABEL[type]}
               </option>
             ))}
           </select>

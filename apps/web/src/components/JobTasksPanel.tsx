@@ -4,6 +4,10 @@ import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import TaskColumn from "./TaskColumn";
 import CreateTaskModal from "./CreateTaskModal";
+import TaskSelectionBar from "./TaskSelectionBar";
+import MoveTaskModal from "./MoveTaskModal";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { useTaskSelection } from "../lib/useTaskSelection";
 
 const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
 
@@ -29,12 +33,30 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
   ref
 ) {
   const c = colors.light;
+  const isDesktop = useIsDesktop();
   const [creating, setCreating] = useState(false);
   const [outputs, setOutputs] = useState<Output[]>([]);
+  const selection = useTaskSelection();
+  const [duplicating, setDuplicating] = useState(false);
+  const [movingOpen, setMovingOpen] = useState(false);
 
   useImperativeHandle(ref, () => ({
     openCreate: () => setCreating(true),
   }));
+
+  const handleDuplicateSelected = async () => {
+    if (selection.selectedIds.size === 0) return;
+    setDuplicating(true);
+    try {
+      await api.post<Task[]>("/tasks/duplicate", { ids: Array.from(selection.selectedIds) });
+      onTasksReload();
+      selection.clear();
+    } catch {
+      // çoğaltılamadı, kullanıcı tekrar deneyebilir
+    } finally {
+      setDuplicating(false);
+    }
+  };
 
   useEffect(() => {
     if (projects.length === 0) {
@@ -70,7 +92,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
   });
 
   const getTaskMeta = (task: Task): string | undefined => {
-    const projectTitle = projectTitleById.get(task.projectId);
+    const projectTitle = task.projectId ? projectTitleById.get(task.projectId) : undefined;
     let outputId = task.outputId;
     if (!outputId && task.parentTaskId) {
       const parent = tasks.find((t) => t.id === task.parentTaskId);
@@ -86,6 +108,20 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
       <div style={{ marginBottom: 14 }}>
         <h3 style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary, margin: 0 }}>İşler</h3>
       </div>
+
+      {tasks.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <TaskSelectionBar
+            selectionMode={selection.selectionMode}
+            selectedCount={selection.selectedIds.size}
+            busy={duplicating}
+            onEnable={selection.toggleSelectionMode}
+            onCancel={selection.clear}
+            onDuplicate={handleDuplicateSelected}
+            onMove={() => setMovingOpen(true)}
+          />
+        </div>
+      )}
 
       {tasks.length === 0 ? (
         <div
@@ -137,26 +173,55 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
               </div>
             </div>
           )}
-          {columns.map((status) => (
-            <TaskColumn
-              key={status}
-              status={status}
-              allTasks={sortedTasks}
-              onCreateSubtask={onCreateSubtask}
-              onMove={onMoveTask}
-              onToggleComplete={onToggleComplete}
-              onEditTask={onEditTask}
-              group={`tasks-job-${jobId}`}
-              activeTaskId={activeTaskId}
-              onToggleActive={onToggleActive}
-              getTaskMeta={getTaskMeta}
-            />
-          ))}
+          {/* Masaüstünde üç sütun yan yana, dar ekranda alt alta. */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: isDesktop ? "row" : "column",
+              alignItems: isDesktop ? "flex-start" : undefined,
+              gap: 14,
+              overflowX: isDesktop ? "auto" : undefined,
+            }}
+          >
+            {columns.map((status) => (
+              <div
+                key={status}
+                style={isDesktop ? { flex: "1 1 260px", minWidth: 260 } : { width: "100%" }}
+              >
+                <TaskColumn
+                  status={status}
+                  allTasks={sortedTasks}
+                  onCreateSubtask={onCreateSubtask}
+                  onMove={onMoveTask}
+                  onToggleComplete={onToggleComplete}
+                  onEditTask={onEditTask}
+                  group={`tasks-job-${jobId}`}
+                  activeTaskId={activeTaskId}
+                  onToggleActive={onToggleActive}
+                  getTaskMeta={getTaskMeta}
+                  selectionMode={selection.selectionMode}
+                  selectedIds={selection.selectedIds}
+                  onToggleSelect={selection.toggleSelect}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {creating && (
         <CreateTaskModal jobId={jobId} projects={projects} onClose={() => setCreating(false)} onCreated={onTasksReload} />
+      )}
+
+      {movingOpen && (
+        <MoveTaskModal
+          taskIds={Array.from(selection.selectedIds)}
+          onClose={() => setMovingOpen(false)}
+          onMoved={() => {
+            selection.clear();
+            onTasksReload();
+          }}
+        />
       )}
     </div>
   );

@@ -6,7 +6,11 @@ import { IconChevronRight, IconEdit } from "./icons";
 import TaskColumn from "./TaskColumn";
 import CreateOutputModal from "./CreateOutputModal";
 import EditOutputModal from "./EditOutputModal";
+import TaskSelectionBar from "./TaskSelectionBar";
+import MoveTaskModal from "./MoveTaskModal";
 import { useSortableList } from "../lib/useSortableList";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { useTaskSelection } from "../lib/useTaskSelection";
 
 const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
 
@@ -15,7 +19,10 @@ export interface OutputsPanelHandle {
 }
 
 interface Props {
-  projectId: string;
+  // İkisinden biri verilmeli: proje çıktıları için projectId, departman
+  // çıktıları için departmentId.
+  projectId?: string;
+  departmentId?: string;
   tasks: Task[];
   onCreateTask: (
     status: TaskStatus,
@@ -32,10 +39,15 @@ interface Props {
   // Verilirse (ör. iş ekibi sekmesinden yönlendirildiğinde), bu görevin ait olduğu
   // çıktı otomatik açılır ve görev kısa süreliğine parlayarak fark edilir hale gelir.
   highlightTaskId?: string;
+  // Çoklu seçimle çoğaltma/taşıma sonrası üst bileşenin kendi `tasks` state'ini
+  // güncelleyebilmesi için (bkz. TaskSelectionBar/MoveTaskModal, useTaskSelection).
+  onTasksDuplicated?: (created: Task[]) => void;
+  onTasksMoved?: (moved: Task[]) => void;
 }
 
 const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel({
   projectId,
+  departmentId,
   tasks,
   onCreateTask,
   onCreateSubtask,
@@ -46,20 +58,43 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   activeTaskId,
   onToggleActive,
   highlightTaskId,
+  onTasksDuplicated,
+  onTasksMoved,
 }, ref) {
   const c = colors.light;
+  const isDesktop = useIsDesktop();
   const [outputs, setOutputs] = useState<Output[]>([]);
   const [selectedOutputId, setSelectedOutputId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [editingOutput, setEditingOutput] = useState<Output | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const selection = useTaskSelection();
+  const [duplicating, setDuplicating] = useState(false);
+  const [movingOpen, setMovingOpen] = useState(false);
+
+  const handleDuplicateSelected = async () => {
+    if (selection.selectedIds.size === 0) return;
+    setDuplicating(true);
+    try {
+      const created = await api.post<Task[]>("/tasks/duplicate", { ids: Array.from(selection.selectedIds) });
+      onTasksDuplicated?.(created);
+      selection.clear();
+    } catch {
+      // çoğaltılamadı, kullanıcı tekrar deneyebilir
+    } finally {
+      setDuplicating(false);
+    }
+  };
 
   useImperativeHandle(ref, () => ({
     openCreate: () => setCreating(true),
   }));
 
+  const scopeKey = departmentId ?? projectId ?? "";
+  const outputsPath = departmentId ? `/departments/${departmentId}/outputs` : `/projects/${projectId}/outputs`;
+
   const reload = () => {
-    api.get<Output[]>(`/projects/${projectId}/outputs`).then(setOutputs).catch(() => setOutputs([]));
+    api.get<Output[]>(outputsPath).then(setOutputs).catch(() => setOutputs([]));
   };
 
   const handleOutputSaved = (updated: Output) => {
@@ -72,7 +107,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
     if (selectedOutputId === removedOutputId) setSelectedOutputId(null);
   };
 
-  useEffect(reload, [projectId]);
+  useEffect(reload, [projectId, departmentId]);
 
   // İş ekibi sekmesinden bir göreve tıklanıp buraya yönlendirildiğinde, o görevin
   // ait olduğu çıktıyı otomatik açıyoruz (alt görevse üst görevin çıktısına bakılır).
@@ -123,7 +158,10 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
     return (
       <div>
         <button
-          onClick={() => setSelectedOutputId(null)}
+          onClick={() => {
+            selection.clear();
+            setSelectedOutputId(null);
+          }}
           style={{ fontSize: 15, color: c.textSecondary, background: "transparent", border: "none", padding: 0, marginBottom: 10 }}
         >
           ← Çıktılar
@@ -145,25 +183,62 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
           </button>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <TaskSelectionBar
+          selectionMode={selection.selectionMode}
+          selectedCount={selection.selectedIds.size}
+          busy={duplicating}
+          onEnable={selection.toggleSelectionMode}
+          onCancel={selection.clear}
+          onDuplicate={handleDuplicateSelected}
+          onMove={() => setMovingOpen(true)}
+        />
+
+        {/* Masaüstünde üç sütun yan yana, dar ekranda alt alta. */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: isDesktop ? "row" : "column",
+            alignItems: isDesktop ? "flex-start" : undefined,
+            gap: 14,
+            overflowX: isDesktop ? "auto" : undefined,
+          }}
+        >
           {columns.map((status) => (
-            <TaskColumn
+            <div
               key={status}
-              status={status}
-              allTasks={outputTasks}
-              onCreate={(s, title) => onCreateTask(s, title, { outputId: selectedOutput.id })}
-              onCreateSubtask={onCreateSubtask}
-              onMove={onMoveTask}
-              onToggleComplete={onToggleComplete}
-              onEditTask={onEditTask}
-              onReorderTasks={onReorderTasks}
-              group={`tasks-${projectId}-${selectedOutput.id}`}
-              activeTaskId={activeTaskId}
-              onToggleActive={onToggleActive}
-              highlightTaskId={highlightTaskId}
-            />
+              style={isDesktop ? { flex: "1 1 260px", minWidth: 260 } : { width: "100%" }}
+            >
+              <TaskColumn
+                status={status}
+                allTasks={outputTasks}
+                onCreate={(s, title) => onCreateTask(s, title, { outputId: selectedOutput.id })}
+                onCreateSubtask={onCreateSubtask}
+                onMove={onMoveTask}
+                onToggleComplete={onToggleComplete}
+                onEditTask={onEditTask}
+                onReorderTasks={onReorderTasks}
+                group={`tasks-${scopeKey}-${selectedOutput.id}`}
+                activeTaskId={activeTaskId}
+                onToggleActive={onToggleActive}
+                highlightTaskId={highlightTaskId}
+                selectionMode={selection.selectionMode}
+                selectedIds={selection.selectedIds}
+                onToggleSelect={selection.toggleSelect}
+              />
+            </div>
           ))}
         </div>
+
+        {movingOpen && (
+          <MoveTaskModal
+            taskIds={Array.from(selection.selectedIds)}
+            onClose={() => setMovingOpen(false)}
+            onMoved={(moved) => {
+              onTasksMoved?.(moved);
+              selection.clear();
+            }}
+          />
+        )}
 
         {/* Kalem ikonu bu görünümde de düzenleme modalını açabilsin: modal önceden
             yalnızca liste görünümünde render ediliyordu, bu yüzden çalışmıyordu. */}
@@ -262,7 +337,14 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
         </div>
       )}
 
-      {creating && <CreateOutputModal projectId={projectId} onClose={() => setCreating(false)} onCreated={reload} />}
+      {creating && (
+        <CreateOutputModal
+          projectId={projectId}
+          departmentId={departmentId}
+          onClose={() => setCreating(false)}
+          onCreated={reload}
+        />
+      )}
       {editingOutput && (
         <EditOutputModal
           output={editingOutput}

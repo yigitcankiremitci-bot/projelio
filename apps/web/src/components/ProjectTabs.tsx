@@ -3,7 +3,7 @@ import { colors } from "../theme/colors";
 export type ProjectTab = "feed" | "team" | "tasks" | "files" | "budget" | "process";
 
 const tabs: { key: ProjectTab; label: string }[] = [
-  { key: "feed", label: "Akış" },
+  { key: "feed", label: "Sosyal" },
   { key: "team", label: "Ekip" },
   { key: "tasks", label: "Çıktılar" },
   { key: "files", label: "Dosyalar" },

@@ -17,6 +17,16 @@ export class OutputsController {
     return this.outputsService.create(projectId, body, req.user.userId);
   }
 
+  @Get("departments/:departmentId/outputs")
+  findByDepartment(@Param("departmentId") departmentId: string) {
+    return this.outputsService.findByDepartment(departmentId);
+  }
+
+  @Post("departments/:departmentId/outputs")
+  createForDepartment(@Param("departmentId") departmentId: string, @Body() body: any, @Req() req: any) {
+    return this.outputsService.createForDepartment(departmentId, body, req.user.userId);
+  }
+
   // NOT: bu route "outputs/:id" ile çakışmaması için ondan önce tanımlanmalı.
   @Patch("outputs/reorder")
   reorder(@Body("ids") ids: string[]) {

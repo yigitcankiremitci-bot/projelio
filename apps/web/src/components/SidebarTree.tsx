@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import type { Job } from "@projelio/shared";
+import type { Department, Job } from "@projelio/shared";
 import { colors } from "../theme/colors";
 import { useSidebarHierarchy, SidebarGroupNode, SidebarOrgNode } from "../lib/useSidebarHierarchy";
-import { IconBuilding, IconLayers, IconFolder, IconChevronRight, IconChevronDown } from "./icons";
+import { IconBuilding, IconLayers, IconFolder, IconListCheck, IconChevronRight, IconChevronDown } from "./icons";
 
 type IconComp = typeof IconBuilding;
 
@@ -39,7 +39,8 @@ export default function SidebarTree() {
     const jobMatch = location.pathname.match(/^\/jobs\/([^/]+)/);
     const orgMatch = location.pathname.match(/^\/organizations\/([^/]+)/);
     const groupMatch = location.pathname.match(/^\/groups\/([^/]+)/);
-    if (!jobMatch && !orgMatch && !groupMatch) return;
+    const deptMatch = location.pathname.match(/^\/departments\/([^/]+)/);
+    if (!jobMatch && !orgMatch && !groupMatch && !deptMatch) return;
 
     const allJobs: Job[] = [
       ...groups.flatMap((g) => [...g.orgs.flatMap((o) => o.jobs), ...g.jobs]),
@@ -79,6 +80,20 @@ export default function SidebarTree() {
       if (groupMatch) {
         next.add(`group:${groupMatch[1]}`);
         next.add("cat:groups");
+      }
+      if (deptMatch) {
+        const allOrgNodes: SidebarOrgNode[] = [...groups.flatMap((g) => g.orgs), ...standaloneOrgs];
+        const parentOrgNode = allOrgNodes.find((node) => node.departments.some((d) => d.id === deptMatch[1]));
+        if (parentOrgNode) {
+          next.add(`org:${parentOrgNode.org.id}`);
+          const parentGroup = groups.find((g) => g.orgs.some((o) => o.org.id === parentOrgNode.org.id));
+          if (parentGroup) {
+            next.add(`group:${parentGroup.group.id}`);
+            next.add("cat:groups");
+          } else {
+            next.add("cat:orgs");
+          }
+        }
       }
       return next;
     });
@@ -134,10 +149,28 @@ export default function SidebarTree() {
     );
   };
 
+  const renderDepartment = (dept: Department, depth: number) => {
+    const active = location.pathname === `/departments/${dept.id}`;
+    return (
+      <Row
+        key={dept.id}
+        to={`/departments/${dept.id}`}
+        icon={IconListCheck}
+        label={dept.name}
+        depth={depth}
+        active={active}
+        expandable={false}
+        expanded={false}
+        onToggle={() => {}}
+      />
+    );
+  };
+
   const renderOrg = (node: SidebarOrgNode, depth: number) => {
     const key = `org:${node.org.id}`;
     const isExpanded = expanded.has(key);
     const active = location.pathname === `/organizations/${node.org.id}`;
+    const hasChildren = node.departments.length > 0 || node.jobs.length > 0;
     return (
       <div key={node.org.id}>
         <Row
@@ -146,11 +179,16 @@ export default function SidebarTree() {
           label={node.org.name}
           depth={depth}
           active={active}
-          expandable={node.jobs.length > 0}
+          expandable={hasChildren}
           expanded={isExpanded}
           onToggle={() => toggle(key)}
         />
-        {isExpanded && node.jobs.map((job) => renderJob(job, depth + 1))}
+        {isExpanded && (
+          <>
+            {node.departments.map((dept) => renderDepartment(dept, depth + 1))}
+            {node.jobs.map((job) => renderJob(job, depth + 1))}
+          </>
+        )}
       </div>
     );
   };

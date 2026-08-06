@@ -17,6 +17,7 @@ function mapOrganization(row: any): Organization {
     name: row.name,
     description: row.description ?? undefined,
     coverImageUrl: row.cover_image_url ?? undefined,
+    orgType: row.org_type ?? "sirket",
     createdAt: row.created_at,
     archivedAt: row.archived_at ?? undefined,
     sortOrder: row.sort_order ?? 0,
@@ -30,7 +31,10 @@ export class OrganizationsService {
     private jobsService: JobsService
   ) {}
 
-  // Kullanıcının sahibi olduğu organizasyonlar + üyesi olduğu (approved) organizasyonlar.
+  // Kullanıcının sahibi olduğu organizasyonlar + üyesi olduğu (approved) organizasyonlar
+  // + onaylı kadrosunda olduğu bir departmanın bağlı olduğu organizasyonlar (bir
+  // çalışan/taşeron departmana kabul edildiğinde — "işe başladığında" — o
+  // organizasyon ve departmanları sidebar'da görünmeye başlasın).
   async findAllForUser(userId: string): Promise<Organization[]> {
     const { data: owned, error: ownedError } = await this.supabase.client
       .from("organizations")
@@ -58,8 +62,35 @@ export class OrganizationsService {
       memberOrgs = data ?? [];
     }
 
+    const { data: deptMemberships, error: deptMembershipError } = await this.supabase.client
+      .from("department_members")
+      .select("department_id")
+      .eq("user_id", userId)
+      .eq("status", "approved");
+    if (deptMembershipError) throw deptMembershipError;
+
+    const deptIds = (deptMemberships ?? []).map((m: any) => m.department_id);
+    let deptOrgs: any[] = [];
+    if (deptIds.length > 0) {
+      const { data: depts, error: deptsError } = await this.supabase.client
+        .from("departments")
+        .select("organization_id")
+        .in("id", deptIds);
+      if (deptsError) throw deptsError;
+      const deptOrgIds = Array.from(new Set((depts ?? []).map((d: any) => d.organization_id)));
+      if (deptOrgIds.length > 0) {
+        const { data, error } = await this.supabase.client
+          .from("organizations")
+          .select("*, users(full_name), groups(name)")
+          .in("id", deptOrgIds)
+          .is("archived_at", null);
+        if (error) throw error;
+        deptOrgs = data ?? [];
+      }
+    }
+
     const byId = new Map<string, any>();
-    for (const row of [...(owned ?? []), ...memberOrgs]) byId.set(row.id, row);
+    for (const row of [...(owned ?? []), ...memberOrgs, ...deptOrgs]) byId.set(row.id, row);
 
     const orgs = Array.from(byId.values())
       .map(mapOrganization)
@@ -150,6 +181,7 @@ export class OrganizationsService {
         group_id: data.groupId ?? null,
         name: data.name ?? "",
         description: data.description ?? null,
+        org_type: data.orgType === "isletme" ? "isletme" : "sirket",
       })
       .select("*, users(full_name), groups(name)")
       .single();
@@ -171,6 +203,7 @@ export class OrganizationsService {
     if (data.description !== undefined) patch.description = data.description;
     if (data.groupId !== undefined) patch.group_id = data.groupId ?? null;
     if (data.coverImageUrl !== undefined) patch.cover_image_url = data.coverImageUrl;
+    if (data.orgType !== undefined) patch.org_type = data.orgType === "isletme" ? "isletme" : "sirket";
 
     const { data: row, error } = await this.supabase.client
       .from("organizations")

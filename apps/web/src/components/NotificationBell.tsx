@@ -19,9 +19,19 @@ export default function NotificationBell() {
   useEffect(() => {
     if (!localStorage.getItem("projelio_token")) return;
 
+    // "cancelled" bayrağı olmadan: React StrictMode (geliştirmede) bu effect'i
+    // mount->cleanup->mount diye iki kez çalıştırıyor. Soket, /auth/me isteği
+    // döndükten SONRA (asenkron) oluşturulduğu için ilk çalıştırmanın cleanup'ı
+    // henüz oluşmamış soketi temizleyemiyor, sonra ikinci çalıştırma da kendi
+    // soketini açıyor — aynı kullanıcı için iki canlı soket kalıyor ve her
+    // bildirim iki kez işleniyordu ("aynı bildirim 2 tane gidiyor" hatası).
+    // cancelled=true olduğunda geç gelen .then() soket açmayı vazgeçiyor.
+    let cancelled = false;
+
     api
       .get<{ notifications: NotificationPayload[]; unreadCount: number }>("/notifications")
       .then(({ notifications, unreadCount }) => {
+        if (cancelled) return;
         setNotifications(notifications);
         setUnreadCount(unreadCount);
       })
@@ -30,7 +40,7 @@ export default function NotificationBell() {
     api
       .get<{ id: string } | null>("/auth/me")
       .then((me) => {
-        if (!me) return;
+        if (cancelled || !me) return;
         const socket = io(API_URL, { transports: ["websocket"] });
         socketRef.current = socket;
         socket.emit("register", me.id);
@@ -42,7 +52,9 @@ export default function NotificationBell() {
       .catch(() => {});
 
     return () => {
+      cancelled = true;
       socketRef.current?.disconnect();
+      socketRef.current = null;
     };
   }, []);
 

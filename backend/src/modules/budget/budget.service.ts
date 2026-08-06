@@ -7,6 +7,7 @@ function mapTransaction(row: any): BudgetTransaction {
   return {
     id: row.id,
     projectId: row.project_id ?? undefined,
+    departmentId: row.department_id ?? undefined,
     projectTitle: row.projects?.title ?? undefined,
     ownerId: row.owner_id ?? undefined,
     userId: row.user_id ?? undefined,
@@ -68,6 +69,77 @@ export class BudgetService {
       );
     }
     return tx;
+  }
+
+  // --- Departman bütçesi (Bütçe sekmesi) ---
+  // Finansal veri hassas olduğu için yalnızca organizasyon sahibi ya da o
+  // departmanın onaylı yöneticisi kayıt ekleyip silebilir (bkz. ModuleRecordsService
+  // ile aynı desen). Görüntüleme, kadrodaki herkese açıktır.
+  private async assertCanManageDepartment(departmentId: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    const { data: dept } = await this.supabase.client
+      .from("departments")
+      .select("organization_id")
+      .eq("id", departmentId)
+      .maybeSingle();
+    if (!dept) throw new NotFoundException("Departman bulunamadı");
+    const { data: org } = await this.supabase.client
+      .from("organizations")
+      .select("owner_id")
+      .eq("id", dept.organization_id)
+      .maybeSingle();
+    if (org?.owner_id === userId) return;
+    const { data: managerRow } = await this.supabase.client
+      .from("department_members")
+      .select("id")
+      .eq("department_id", departmentId)
+      .eq("user_id", userId)
+      .eq("role", "manager")
+      .eq("status", "approved")
+      .maybeSingle();
+    if (managerRow) return;
+    throw new ForbiddenException("Bu bütçeyi yalnızca organizasyon sahibi veya departman yöneticisi düzenleyebilir");
+  }
+
+  async findByDepartment(departmentId: string): Promise<BudgetTransaction[]> {
+    const { data, error } = await this.supabase.client
+      .from("budget_transactions")
+      .select("*")
+      .eq("department_id", departmentId)
+      .order("occurred_at", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapTransaction);
+  }
+
+  async addForDepartment(departmentId: string, data: Partial<BudgetTransaction>, requestingUserId?: string): Promise<BudgetTransaction> {
+    await this.assertCanManageDepartment(departmentId, requestingUserId);
+    const { data: row, error } = await this.supabase.client
+      .from("budget_transactions")
+      .insert({
+        department_id: departmentId,
+        type: data.type ?? "expense",
+        amount: data.amount ?? 0,
+        description: data.description ?? null,
+        occurred_at: data.occurredAt ?? new Date().toISOString().slice(0, 10),
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return mapTransaction(row);
+  }
+
+  async removeForDepartment(id: string, requestingUserId?: string): Promise<{ success: true }> {
+    const { data: row } = await this.supabase.client
+      .from("budget_transactions")
+      .select("department_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!row || !row.department_id) throw new NotFoundException("Kayıt bulunamadı");
+    await this.assertCanManageDepartment(row.department_id, requestingUserId);
+    const { error } = await this.supabase.client.from("budget_transactions").delete().eq("id", id);
+    if (error) throw error;
+    return { success: true };
   }
 
   // Projeden elde kalan net: tahsil edilen - harcanan.

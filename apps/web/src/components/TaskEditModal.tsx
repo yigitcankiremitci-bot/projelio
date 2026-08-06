@@ -28,6 +28,10 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
   const [deadline, setDeadline] = useState(toDateInputValue(task.deadline));
   const [assignedTo, setAssignedTo] = useState(task.assignedTo ?? "");
   const [budget, setBudget] = useState(String(task.budget ?? 0));
+  const [durationValue, setDurationValue] = useState(
+    task.estimatedDurationValue != null ? String(task.estimatedDurationValue) : ""
+  );
+  const [durationUnit, setDurationUnit] = useState<"hours" | "days">(task.estimatedDurationUnit ?? "hours");
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [commentBody, setCommentBody] = useState("");
   const [error, setError] = useState("");
@@ -56,6 +60,7 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
     setError("");
     setSaving(true);
     try {
+      const trimmedDuration = durationValue.trim();
       const updated = await api.patch<Task>(`/tasks/${task.id}`, {
         title,
         description: description.trim() ? description : null,
@@ -63,6 +68,8 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
         deadline: deadline ? new Date(deadline).toISOString() : undefined,
         assignedTo: assignedTo || null,
         budget: Number(budget) || 0,
+        estimatedDurationValue: trimmedDuration ? Number(trimmedDuration) : null,
+        estimatedDurationUnit: trimmedDuration ? durationUnit : null,
       });
       onSaved(updated);
     } catch {
@@ -88,7 +95,7 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
   };
 
   return (
-    <Modal title="Görevi düzenle" onClose={onClose} maxWidth={460}>
+    <Modal title="Görevi düzenle" onClose={onClose} maxWidth={1280}>
       <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
@@ -96,12 +103,12 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Notlar</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Görevle ilgili kısa açıklama (opsiyonel)"
-            rows={3}
+            placeholder="Görevle ilgili notlar (opsiyonel)"
+            rows={5}
             maxLength={2000}
             style={{ width: "100%", fontSize: 16, resize: "vertical" }}
           />
@@ -121,12 +128,40 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Ekip</label>
-            {/* Tüm kullanıcılar yerine yalnızca proje ekibi, arama ile */}
-            <AssigneePicker projectId={task.projectId} value={assignedTo} onChange={(userId) => setAssignedTo(userId)} />
+            {/* Tüm kullanıcılar yerine yalnızca proje ekibi/departman kadrosu, arama ile */}
+            <AssigneePicker
+              projectId={task.projectId}
+              departmentId={task.departmentId}
+              value={assignedTo}
+              onChange={(userId) => setAssignedTo(userId)}
+            />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Bütçe (₺)</label>
             <input type="number" min={0} value={budget} onChange={(e) => setBudget(e.target.value)} style={{ width: "100%" }} />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Tahmini süre (opsiyonel)</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              type="number"
+              min={0}
+              step="0.5"
+              value={durationValue}
+              onChange={(e) => setDurationValue(e.target.value)}
+              placeholder="Örn. 4"
+              style={{ flex: 1 }}
+            />
+            <select
+              value={durationUnit}
+              onChange={(e) => setDurationUnit(e.target.value as "hours" | "days")}
+              style={{ flex: 1 }}
+            >
+              <option value="hours">Saat</option>
+              <option value="days">Gün</option>
+            </select>
           </div>
         </div>
 

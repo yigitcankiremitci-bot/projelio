@@ -129,6 +129,14 @@ export function IconChevronRight({ size = 18, color = "currentColor" }: IconProp
   );
 }
 
+export function IconChevronLeft({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 6l-6 6 6 6" />
+    </svg>
+  );
+}
+
 export function IconEdit({ size = 18, color = "currentColor" }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
@@ -146,6 +154,28 @@ export function IconTrash({ size = 18, color = "currentColor" }: IconProps) {
       <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
       <path d="M10 11v6" />
       <path d="M14 11v6" />
+    </svg>
+  );
+}
+
+export function IconCopy({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+    </svg>
+  );
+}
+
+export function IconMove({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 9l-3 3 3 3" />
+      <path d="M9 5l3-3 3 3" />
+      <path d="M15 19l-3 3-3-3" />
+      <path d="M19 9l3 3-3 3" />
+      <path d="M2 12h20" />
+      <path d="M12 2v20" />
     </svg>
   );
 }
@@ -303,6 +333,22 @@ export function IconGoogleDrive({ size = 18 }: IconProps) {
       <path d="M8.4 2.5 1.2 15l3.6 6.2 7.2-12.5z" fill="#0066DA" />
       <path d="M15.6 2.5H8.4l7.2 12.5h7.2z" fill="#00AC47" />
       <path d="m4.8 21.2 3.6-6.2h14.4l-3.6 6.2z" fill="#EA4335" />
+    </svg>
+  );
+}
+
+export function IconOneDrive({ size = 18 }: IconProps) {
+  // OneDrive'ın kendi mavi tonları: marka ikonu olduğu için tema rengine boyanmıyor.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M9.6 9a4.9 4.9 0 0 1 4.5 2.9 3.9 3.9 0 0 1 3 .9 3.7 3.7 0 0 1-.7 7.4H7.4a4.3 4.3 0 0 1-.8-8.5A4.9 4.9 0 0 1 9.6 9z"
+        fill="#0078D4"
+      />
+      <path
+        d="M6.6 11.7a4.3 4.3 0 0 0 .8 8.5h8.6a3.7 3.7 0 0 0 1.6-.4 3.7 3.7 0 0 1-3.4 2.2H7.4a4.3 4.3 0 0 1-.8-8.5 4.9 4.9 0 0 1 0-1.8z"
+        fill="#1490DF"
+      />
     </svg>
   );
 }

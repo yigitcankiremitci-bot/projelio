@@ -4,7 +4,7 @@ import { SupabaseService } from "../../database/supabase.service";
 
 const AVATAR_BUCKET = "avatars";
 
-export type AccountType = "freelancer" | "organization_owner" | "group_owner";
+export type AccountType = "freelancer" | "organization_owner" | "group_owner" | "employee" | "subcontractor";
 
 // Kimlik doğrulama akışında (login/register) kullanılan, hash'i de içeren dahili tip.
 // Bu tip HİÇBİR ZAMAN doğrudan bir controller yanıtı olarak dönmemeli.
@@ -40,7 +40,7 @@ export interface PublicUser {
 }
 
 const USERNAME_PATTERN = /^[a-z0-9_.]{3,30}$/;
-const ACCOUNT_TYPES: AccountType[] = ["freelancer", "organization_owner", "group_owner"];
+const ACCOUNT_TYPES: AccountType[] = ["freelancer", "organization_owner", "group_owner", "employee", "subcontractor"];
 
 function mapUser(row: any): UserRecord {
   return {

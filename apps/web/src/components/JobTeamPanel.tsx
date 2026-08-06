@@ -56,7 +56,7 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTasksR
     return { total: assigned.length, done };
   };
 
-  const projectTitle = (projectId: string) => projects.find((p) => p.id === projectId)?.title ?? "";
+  const projectTitle = (projectId?: string) => projects.find((p) => p.id === projectId)?.title ?? "";
 
   // Göreve tıklanınca ilgili projenin "Çıktılar" sekmesine gidip doğru çıktıyı açıyor
   // ve görevi kısa süreliğine parlatarak fark edilir hale getiriyoruz.

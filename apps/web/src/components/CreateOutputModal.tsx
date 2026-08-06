@@ -4,12 +4,14 @@ import { colors } from "../theme/colors";
 import Modal from "./Modal";
 
 interface Props {
-  projectId: string;
+  // İkisinden biri verilmeli.
+  projectId?: string;
+  departmentId?: string;
   onClose: () => void;
   onCreated: () => void;
 }
 
-export default function CreateOutputModal({ projectId, onClose, onCreated }: Props) {
+export default function CreateOutputModal({ projectId, departmentId, onClose, onCreated }: Props) {
   const c = colors.light;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -21,7 +23,8 @@ export default function CreateOutputModal({ projectId, onClose, onCreated }: Pro
     setError("");
     setLoading(true);
     try {
-      await api.post(`/projects/${projectId}/outputs`, { title, description: description || undefined });
+      const path = departmentId ? `/departments/${departmentId}/outputs` : `/projects/${projectId}/outputs`;
+      await api.post(path, { title, description: description || undefined });
       onCreated();
       onClose();
     } catch {

@@ -6,6 +6,7 @@ import {
   canRenderLocally,
   driveEditUrl,
   drivePreviewUrl,
+  driveProviderLabel,
   fileKindLabel,
   formatFileSize,
 } from "../lib/driveLinks";
@@ -168,7 +169,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
             }}
           >
             <IconExternalLink size={16} color="#fff" />
-            Drive'da düzenle
+            {driveProviderLabel(file)}'da düzenle
           </button>
 
           <button
@@ -184,8 +185,8 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
         <div style={{ flex: 1, background: c.background, position: "relative" }}>
           {file.status === "missing" ? (
             <EmptyState
-              title="Dosya Drive'da bulunamadı"
-              detail="Dosya Google Drive üzerinden silinmiş veya taşınmış olabilir."
+              title={`Dosya ${driveProviderLabel(file)}'da bulunamadı`}
+              detail={`Dosya ${driveProviderLabel(file)} üzerinden silinmiş veya taşınmış olabilir.`}
             />
           ) : loadError ? (
             <EmptyState title="Önizleme açılamadı" detail={loadError} />
@@ -243,8 +244,9 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
                     fontSize: 14,
                   }}
                 >
-                  Önizleme boş görünüyorsa Google hesabınız bu klasöre henüz eklenmemiş olabilir.
-                  Ayarlar'dan Google Drive'ı bağlayın; dosyayı her hâlükârda İndir ile açabilirsiniz.
+                  Önizleme boş görünüyorsa {driveProviderLabel(file)} hesabınız bu klasöre henüz
+                  eklenmemiş olabilir. Ayarlar'dan {driveProviderLabel(file)}'ı bağlayın; dosyayı her
+                  hâlükârda İndir ile açabilirsiniz.
                 </div>
               )}
             </>

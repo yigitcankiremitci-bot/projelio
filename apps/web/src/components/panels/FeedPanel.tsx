@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { Task, TaskComment, ProjectPost, ProjectMember, PostComment } from "@projelio/shared";
+import type { Task, TaskComment, ProjectPost, ProjectMember, DepartmentMember, PostComment, Department } from "@projelio/shared";
 import { api } from "../../api/client";
 import { colors } from "../../theme/colors";
 import { formatDateTime } from "../../lib/dates";
@@ -10,8 +10,21 @@ export interface FeedPanelHandle {
 }
 
 interface Props {
-  projectId: string;
+  // Üçünden biri verilmeli: proje akışı için projectId, departman akışı için
+  // departmentId, şirket/işletme anasayfasındaki toplu akış için organizationId
+  // (bu durumda organizasyona bağlı TÜM departmanların akışları da içine karışır,
+  // bkz. backend ProjectPostsService.findByOrganization).
+  projectId?: string;
+  departmentId?: string;
+  organizationId?: string;
   tasks: Task[];
+}
+
+// Hem proje ekibinin hem departman kadrosunun @etiketleme için ortak, minimal görünümü.
+interface FeedMember {
+  userId: string;
+  fullName?: string;
+  username?: string;
 }
 
 type FeedComment = TaskComment & { taskTitle: string };
@@ -60,16 +73,23 @@ function getMentionQuery(text: string, cursor: number): { start: number; query: 
   return { start: at, query };
 }
 
-const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projectId, tasks }, ref) {
+const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projectId, departmentId, organizationId, tasks }, ref) {
   const c = colors.light;
   const [comments, setComments] = useState<FeedComment[]>([]);
   const [posts, setPosts] = useState<ProjectPost[]>([]);
-  const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [members, setMembers] = useState<FeedMember[]>([]);
   const [postBody, setPostBody] = useState("");
   const [posting, setPosting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mentionQuery, setMentionQuery] = useState<{ start: number; query: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const postsPath = organizationId
+    ? `/organizations/${organizationId}/posts`
+    : departmentId
+    ? `/departments/${departmentId}/posts`
+    : `/projects/${projectId}/posts`;
+  const membersPath = departmentId ? `/departments/${departmentId}/members` : `/projects/${projectId}/members`;
 
   useImperativeHandle(ref, () => ({
     openCreate: () => {
@@ -80,17 +100,58 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
 
   useEffect(() => {
     setLoading(true);
+
+    // @etiketleme önerileri: organizasyon akışında organizasyona bağlı TÜM
+    // departmanların kadrosu birleştirilir (N+1 ama departman sayısı küçük);
+    // proje/departman akışında zaten tek bir üye listesi var.
+    const loadMembers = (): Promise<FeedMember[]> => {
+      if (organizationId) {
+        return api
+          .get<Department[]>(`/organizations/${organizationId}/departments`)
+          .then((depts) =>
+            Promise.all(depts.map((d) => api.get<DepartmentMember[]>(`/departments/${d.id}/members`).catch(() => [])))
+          )
+          .then((lists) =>
+            lists
+              .flat()
+              .filter((m) => m.status === "approved" && m.userId)
+              .map((m): FeedMember => ({ userId: m.userId as string, fullName: m.fullName, username: m.username }))
+          )
+          .catch(() => []);
+      }
+      if (departmentId) {
+        return api
+          .get<DepartmentMember[]>(membersPath)
+          .then((list) =>
+            list
+              .filter((m) => m.status === "approved" && m.userId)
+              .map((m): FeedMember => ({ userId: m.userId as string, fullName: m.fullName, username: m.username }))
+          )
+          .catch(() => []);
+      }
+      return api
+        .get<ProjectMember[]>(membersPath)
+        .then((list) =>
+          list
+            .filter((m) => m.status === "approved")
+            .map((m): FeedMember => ({ userId: m.userId, fullName: m.fullName, username: m.username }))
+        )
+        .catch(() => []);
+    };
+
     Promise.all([
-      api.get<FeedComment[]>(`/projects/${projectId}/comments`).catch(() => []),
-      api.get<ProjectPost[]>(`/projects/${projectId}/posts`).catch(() => []),
-      api.get<ProjectMember[]>(`/projects/${projectId}/members`).catch(() => []),
-    ]).then(([c, p, m]) => {
-      setComments(c);
+      // Görev yorumlarını akışa karıştırma özelliği şimdilik yalnızca projelerde var
+      // (departman/organizasyon akışları için henüz toplu bir yorum uç noktası yok).
+      projectId ? api.get<FeedComment[]>(`/projects/${projectId}/comments`).catch(() => []) : Promise.resolve([]),
+      api.get<ProjectPost[]>(postsPath).catch(() => []),
+      loadMembers(),
+    ]).then(([cm, p, m]) => {
+      setComments(cm);
       setPosts(p);
-      setMembers(m.filter((mm) => mm.status === "approved"));
+      setMembers(m);
       setLoading(false);
     });
-  }, [projectId]);
+  }, [projectId, departmentId, organizationId]);
 
   const mentionResults = mentionQuery
     ? members
@@ -108,7 +169,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
     setMentionQuery(getMentionQuery(value, cursor));
   };
 
-  const selectMention = (member: ProjectMember) => {
+  const selectMention = (member: FeedMember) => {
     if (!mentionQuery || !member.username) return;
     const cursorNow = textareaRef.current?.selectionStart ?? postBody.length;
     const before = postBody.slice(0, mentionQuery.start);
@@ -132,7 +193,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
     if (!trimmed) return;
     setPosting(true);
     try {
-      const created = await api.post<ProjectPost>(`/projects/${projectId}/posts`, { body: trimmed });
+      const created = await api.post<ProjectPost>(postsPath, { body: trimmed });
       setPosts((prev) => [created, ...prev]);
       setPostBody("");
       setMentionQuery(null);
@@ -183,7 +244,13 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
           ref={textareaRef}
           value={postBody}
           onChange={handleBodyChange}
-          placeholder="Ekiple bir şey paylaş… @ ile ekipten birini etiketleyebilirsin (140 karakter)"
+          placeholder={
+            organizationId
+              ? "Şirketle bir şey paylaş… @ ile herhangi bir departman kadrosundan birini etiketleyebilirsin (140 karakter)"
+              : departmentId
+              ? "Departmanla bir şey paylaş… @ ile kadrodan birini etiketleyebilirsin (140 karakter)"
+              : "Ekiple bir şey paylaş… @ ile ekipten birini etiketleyebilirsin (140 karakter)"
+          }
           rows={2}
           style={{ width: "100%", resize: "none", fontSize: 16, border: "none", outline: "none", background: "transparent", color: c.textPrimary }}
         />
@@ -216,7 +283,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
           >
             {mentionResults.map((m) => (
               <button
-                key={m.id}
+                key={m.userId}
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -372,9 +439,31 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
 
   return (
     <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "10px 12px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-        <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{post.authorName}</span>
-        <span style={{ fontSize: 13, color: c.textSecondary }}>{new Date(post.createdAt).toLocaleDateString("tr-TR")}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+          <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {post.authorName}
+          </span>
+          {/* Şirket akışında (organizasyon aggregate görünümü) hangi departmandan
+              geldiğini gösteren rozet — organizasyona doğrudan yapılmış bir
+              paylaşımda bu alan boş olduğu için rozet gösterilmez. */}
+          {post.sourceDepartmentName && (
+            <span
+              style={{
+                fontSize: 12,
+                color: c.accentDark,
+                background: `${c.accent}22`,
+                borderRadius: 20,
+                padding: "1px 8px",
+                flexShrink: 0,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {post.sourceDepartmentName}
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>{new Date(post.createdAt).toLocaleDateString("tr-TR")}</span>
       </div>
       <p style={{ fontSize: 16, color: c.textPrimary, margin: "0 0 8px", lineHeight: 1.45 }}>{renderMentions(post.body, c.primary)}</p>
 

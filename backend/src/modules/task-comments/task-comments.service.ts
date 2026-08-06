@@ -31,7 +31,7 @@ export class TaskCommentsService {
     return (data ?? []).map(mapComment);
   }
 
-  // Projedeki tüm görev/alt görevlere yapılan yorumlar (Akış sekmesi için).
+  // Projedeki tüm görev/alt görevlere yapılan yorumlar (Sosyal sekmesi için).
   // Çağıran taşeronsa (subcontractor), sadece kendisiyle ilgili görev/alt görevlere
   // ait yorumlar döner; diğer roller için davranış değişmez.
   async findByProject(projectId: string, requestingUserId?: string): Promise<(TaskComment & { taskTitle: string })[]> {

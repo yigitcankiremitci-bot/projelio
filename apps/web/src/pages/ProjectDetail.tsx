@@ -159,6 +159,17 @@ export default function ProjectDetail() {
     setTasks((prev) => prev.filter((t) => t.id !== taskId && t.parentTaskId !== taskId));
   };
 
+  // Çoğaltılan görevler bu projeye eklenir; taşınanlar (başka bir proje/departmana
+  // gittiği için) bu projenin görünümünden kalkar (bkz. TaskSelectionBar/MoveTaskModal).
+  const handleTasksDuplicated = (created: Task[]) => {
+    setTasks((prev) => [...prev, ...created]);
+  };
+
+  const handleTasksMoved = (moved: Task[]) => {
+    const movedIds = new Set(moved.map((t) => t.id));
+    setTasks((prev) => prev.filter((t) => !movedIds.has(t.id)));
+  };
+
   const handleCreateTask = async (
     status: TaskStatus,
     title: string,
@@ -380,6 +391,8 @@ export default function ProjectDetail() {
               activeTaskId={activeTaskId}
               onToggleActive={handleToggleActive}
               highlightTaskId={highlightTaskId}
+              onTasksDuplicated={handleTasksDuplicated}
+              onTasksMoved={handleTasksMoved}
             />
           )}
           {activeTab === "budget" && (
@@ -406,6 +419,8 @@ export default function ProjectDetail() {
               nav={processNav}
               activeTaskId={activeTaskId}
               onToggleActive={handleToggleActive}
+              onTasksDuplicated={handleTasksDuplicated}
+              onTasksMoved={handleTasksMoved}
             />
           )}
         </div>

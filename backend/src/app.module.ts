@@ -22,8 +22,17 @@ import { AdminModule } from "./modules/admin/admin.module";
 import { ArchiveModule } from "./modules/archive/archive.module";
 import { AiAssistantModule } from "./modules/ai-assistant/ai-assistant.module";
 import { GoogleModule } from "./modules/google/google.module";
+import { MicrosoftModule } from "./modules/microsoft/microsoft.module";
 import { FilesModule } from "./modules/files/files.module";
 import { HealthModule } from "./modules/health/health.module";
+import { CatalogModule } from "./modules/catalog/catalog.module";
+import { DepartmentsModule } from "./modules/departments/departments.module";
+import { DepartmentMembersModule } from "./modules/department-members/department-members.module";
+import { OrganizationModulesModule } from "./modules/organization-modules/organization-modules.module";
+import { JobModulesModule } from "./modules/job-modules/job-modules.module";
+import { PartnersModule } from "./modules/partners/partners.module";
+import { ProductsModule } from "./modules/products/products.module";
+import { ModuleRecordsModule } from "./modules/module-records/module-records.module";
 
 @Module({
   imports: [
@@ -50,8 +59,17 @@ import { HealthModule } from "./modules/health/health.module";
     ArchiveModule,
     AiAssistantModule,
     GoogleModule,
+    MicrosoftModule,
     FilesModule,
     HealthModule,
+    CatalogModule,
+    DepartmentsModule,
+    DepartmentMembersModule,
+    OrganizationModulesModule,
+    JobModulesModule,
+    PartnersModule,
+    ProductsModule,
+    ModuleRecordsModule,
   ],
 })
 export class AppModule {}

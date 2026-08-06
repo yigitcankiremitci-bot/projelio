@@ -1,9 +1,19 @@
 import { createContext, useContext, useEffect } from "react";
 import type { DependencyList } from "react";
 
-export interface ProjectFabAction {
+export interface ProjectFabActionOption {
   label: string;
   onClick: () => void;
+}
+
+export interface ProjectFabAction {
+  label: string;
+  // Tek bir eylem için onClick yeterli. Birden fazla ekleme seçeneği sunmak
+  // gerektiğinde (örn. şirket anasayfasında "+" ile departman/ürün-hizmet/modül
+  // arasından seçim) onClick yerine options verilir — BottomNav bu durumda
+  // doğrudan tetiklemek yerine küçük bir seçim menüsü açar (bkz. job-choice deseni).
+  onClick?: () => void;
+  options?: ProjectFabActionOption[];
 }
 
 interface ProjectFabContextValue {
@@ -11,7 +21,7 @@ interface ProjectFabContextValue {
   setAction: (action: ProjectFabAction | null) => void;
 }
 
-// Proje detay sayfasındaki her sekme (Çıktılar/Akış/Ekip/Bütçe/Süreç), alt navigasyondaki
+// Proje detay sayfasındaki her sekme (Çıktılar/Sosyal/Ekip/Bütçe/Süreç), alt navigasyondaki
 // "+" butonunun o an ne yapacağını bu context üzerinden bildirir. BottomNav rota bazlı
 // varsayılan davranış yerine burada kayıtlı olan eylemi kullanır.
 export const ProjectFabContext = createContext<ProjectFabContextValue>({

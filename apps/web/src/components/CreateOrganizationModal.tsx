@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import type { Group } from "@projelio/shared";
+import type { Group, OrgType } from "@projelio/shared";
+import { ORG_TYPE_LABEL } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import Modal from "./Modal";
@@ -15,6 +16,7 @@ export default function CreateOrganizationModal({ onClose, onCreated, fixedGroup
   const c = colors.light;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [orgType, setOrgType] = useState<OrgType>("sirket");
   const [groupId, setGroupId] = useState(fixedGroupId ?? "");
   const [groups, setGroups] = useState<Group[]>([]);
   const [error, setError] = useState("");
@@ -30,7 +32,7 @@ export default function CreateOrganizationModal({ onClose, onCreated, fixedGroup
     setError("");
     setLoading(true);
     try {
-      await api.post("/organizations", { name, description: description || undefined, groupId: groupId || undefined });
+      await api.post("/organizations", { name, description: description || undefined, orgType, groupId: groupId || undefined });
       onClose();
       if (onCreated) onCreated();
       else window.location.reload();
@@ -51,6 +53,17 @@ export default function CreateOrganizationModal({ onClose, onCreated, fixedGroup
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Kısa açıklama (opsiyonel)" style={{ width: "100%" }} />
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Ölçek</label>
+          <select value={orgType} onChange={(e) => setOrgType(e.target.value as OrgType)} style={{ width: "100%" }}>
+            {(Object.keys(ORG_TYPE_LABEL) as OrgType[]).map((type) => (
+              <option key={type} value={type}>
+                {ORG_TYPE_LABEL[type]}
+              </option>
+            ))}
+          </select>
         </div>
 
         {!fixedGroupId && (

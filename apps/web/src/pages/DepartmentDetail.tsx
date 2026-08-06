@@ -1,0 +1,291 @@
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import type { Department, Task } from "@projelio/shared";
+import { api } from "../api/client";
+import DepartmentMembersList, { DepartmentMembersListHandle } from "../components/DepartmentMembersList";
+import DepartmentModulesPanel from "../components/DepartmentModulesPanel";
+import DepartmentTasksPanel, { DepartmentTasksPanelHandle } from "../components/DepartmentTasksPanel";
+import DepartmentBudgetPanel, { DepartmentBudgetPanelHandle } from "../components/DepartmentBudgetPanel";
+import DepartmentTabs, { DepartmentTab } from "../components/DepartmentTabs";
+import ProductsPanel from "../components/ProductsPanel";
+import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
+import FilesPanel from "../components/FilesPanel";
+import DepartmentSettingsModal from "../components/DepartmentSettingsModal";
+import ProfileCard from "../components/ProfileCard";
+import { resizeCoverImage } from "../lib/imageProcessing";
+import { getDepartmentCoverUrl, hasCustomDepartmentCover } from "../lib/departmentCovers";
+import { useProjectFabAction } from "../lib/projectFab";
+import { colors } from "../theme/colors";
+import { IconLayers, IconEdit, IconX, IconSettings } from "../components/icons";
+
+// Bir departmanın kendi sayfası: iç dinamikler üstteki sekmelerle ayrılır —
+// Sosyal (Twitter mantığında paylaşım/yorum/beğeni akışı), Görevler (doğrudan
+// kanban — "Çıktılar" ara katmanı yok), Ekip (kadro), Bütçe (görev bütçesi
+// onayları + otomatik hesaplanan özetler + genel gelir/gider defteri), Modüller
+// (departmana özel etkinleştirilen araçlar). Bkz. ProjectDetail/ProjectTabs ile
+// birebir aynı desen; sekmeler ?tab= sorgu parametresiyle tutulur.
+export default function DepartmentDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const c = colors.light;
+  const [department, setDepartment] = useState<Department | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const validTabs: DepartmentTab[] = ["flow", "team", "tasks", "budget", "modules", "files"];
+  // ?tab= yoksa departmanın kendi açılış tercihi kullanılır (ayarlardan
+  // kişiselleştirilebilir); departman henüz yüklenmediyse "tasks" varsayılır.
+  const defaultTab: DepartmentTab = (department?.defaultTab as DepartmentTab) || "tasks";
+  const activeTab: DepartmentTab = validTabs.includes(tabParam as DepartmentTab) ? (tabParam as DepartmentTab) : defaultTab;
+  const setActiveTab = (next: DepartmentTab) => {
+    setSearchParams(next === defaultTab ? {} : { tab: next }, { replace: true });
+  };
+
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const feedRef = useRef<FeedPanelHandle>(null);
+  const teamRef = useRef<DepartmentMembersListHandle>(null);
+  const tasksRef = useRef<DepartmentTasksPanelHandle>(null);
+  const budgetRef = useRef<DepartmentBudgetPanelHandle>(null);
+
+  const reload = () => {
+    if (!id) return;
+    api.get<Department>(`/departments/${id}`).then(setDepartment).catch(() => setDepartment(null));
+    api
+      .get<Task[]>(`/departments/${id}/tasks`)
+      .then(setTasks)
+      .catch(() => setTasks([]));
+  };
+
+  useEffect(reload, [id]);
+
+  useEffect(() => {
+    if (department?.name) document.title = `${department.name} · Projelio`;
+    return () => {
+      document.title = "Projelio";
+    };
+  }, [department?.name]);
+
+  // Alt navigasyondaki "+" butonu, proje detayındaki (ProjectDetail) ile aynı desende:
+  // departman detayında hangi sekmedeysek ona uygun eylemi tetikler. Ürün Yönetimi
+  // departmanının "Modüller" sekmesi kendi "Ürün/Hizmet ekle" düğmesini kullanır (bkz.
+  // ProductsPanel useFab=false), Dosyalar sekmesinin de kendi yükleme alanı var —
+  // proje tarafındaki desenle birebir aynı, bu ikisinde FAB gösterilmez.
+  useProjectFabAction(
+    !department
+      ? null
+      : activeTab === "flow"
+      ? { label: "Yeni paylaşım", onClick: () => feedRef.current?.openCreate() }
+      : activeTab === "team"
+      ? { label: "Kişi davet et", onClick: () => teamRef.current?.openCreate() }
+      : activeTab === "tasks"
+      ? { label: "Görev ekle", onClick: () => tasksRef.current?.openCreate() }
+      : activeTab === "budget"
+      ? { label: "Kayıt ekle", onClick: () => budgetRef.current?.openCreate() }
+      : null,
+    [activeTab, department?.id]
+  );
+
+  const handleCoverSelected = async (file: File | null) => {
+    if (!file || !id) return;
+    setCoverUploading(true);
+    try {
+      const resized = await resizeCoverImage(file);
+      const formData = new FormData();
+      formData.append("file", resized);
+      const updated = await api.uploadFile<Department>(`/departments/${id}/cover`, formData);
+      setDepartment(updated);
+    } catch {
+      // yüklenemedi, kullanıcı tekrar deneyebilir
+    } finally {
+      setCoverUploading(false);
+    }
+  };
+
+  const handleRemoveCover = async () => {
+    if (!id) return;
+    setCoverUploading(true);
+    try {
+      const updated = await api.delete<Department>(`/departments/${id}/cover`);
+      setDepartment(updated);
+    } catch {
+      // kaldırılamadı, kullanıcı tekrar deneyebilir
+    } finally {
+      setCoverUploading(false);
+    }
+  };
+
+  if (!id) return null;
+
+  const isProductDepartment = department?.catalogKey === "urun_yonetimi";
+  const coverUrl = department ? getDepartmentCoverUrl(department) : undefined;
+  const isCustomCover = department ? hasCustomDepartmentCover(department) : false;
+
+  return (
+    <div style={{ minHeight: "100vh", background: c.background }}>
+      <div
+        style={{
+          position: "relative",
+          height: 252,
+          background: coverUrl
+            ? `linear-gradient(rgba(26,31,41,0.15), rgba(26,31,41,0.6)), center/cover url(${coverUrl})`
+            : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,
+          padding: "20px 28px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "flex-end",
+        }}
+      >
+        {/* Kişi kartı: diğer anasayfalarla aynı bileşen, kapak görselinin üstüne bindirilmiş —
+            sağ üstteki kapak düzenleme ikonlarının altında, yer kaplamadan. */}
+        <div style={{ position: "absolute", top: 56, right: 14, zIndex: 3 }}>
+          <ProfileCard />
+        </div>
+
+        <div style={{ paddingRight: 90 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <IconLayers size={16} color="#fff" />
+            <h1 style={{ fontSize: 20, fontWeight: 500, color: "#fff", margin: 0 }}>{department?.name ?? "…"}</h1>
+          </div>
+          {department?.description && (
+            <p style={{ fontSize: 15, color: "rgba(255,255,255,0.85)", margin: 0 }}>{department.description}</p>
+          )}
+        </div>
+
+        {department && (
+          <div style={{ position: "absolute", top: 14, right: 14, display: "flex", gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Departman ayarları"
+              title="Departman ayarları"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: "50%",
+                border: "none",
+                background: "rgba(26,31,41,0.55)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <IconSettings size={15} color="#fff" />
+            </button>
+            {isCustomCover && (
+              <button
+                type="button"
+                onClick={handleRemoveCover}
+                disabled={coverUploading}
+                aria-label="Kapağı kaldır, varsayılana dön"
+                title="Varsayılan kapağa dön"
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: "50%",
+                  border: "none",
+                  background: "rgba(26,31,41,0.55)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <IconX size={15} color="#fff" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={coverUploading}
+              aria-label="Kapak fotoğrafını değiştir"
+              title="Kapak fotoğrafını değiştir"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: "50%",
+                border: "none",
+                background: "rgba(26,31,41,0.55)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <IconEdit size={15} color="#fff" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                void handleCoverSelected(e.target.files?.[0] ?? null);
+                e.target.value = "";
+              }}
+              style={{ display: "none" }}
+            />
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: "0 28px 28px" }}>
+        <Link
+          to={department ? `/organizations/${department.organizationId}?tab=departments` : "/organizations"}
+          style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}
+        >
+          ← Departmanlar
+        </Link>
+
+        {department && (
+          <>
+            <DepartmentTabs active={activeTab} onChange={setActiveTab} />
+
+            {activeTab === "flow" && <FeedPanel ref={feedRef} departmentId={department.id} tasks={tasks} />}
+
+            {activeTab === "team" && (
+              <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: 16 }}>
+                <DepartmentMembersList ref={teamRef} departmentId={department.id} onChanged={reload} />
+              </div>
+            )}
+
+            {activeTab === "tasks" && <DepartmentTasksPanel ref={tasksRef} departmentId={department.id} />}
+
+            {activeTab === "budget" && <DepartmentBudgetPanel ref={budgetRef} departmentId={department.id} />}
+
+            {activeTab === "modules" && (
+              <>
+                <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: 16 }}>
+                  <DepartmentModulesPanel
+                    organizationId={department.organizationId}
+                    departmentId={department.id}
+                    departmentKey={department.catalogKey}
+                  />
+                </div>
+
+                {isProductDepartment && (
+                  <div style={{ marginTop: 20 }}>
+                    <ProductsPanel organizationId={department.organizationId} departmentId={department.id} useFab={false} />
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === "files" && <FilesPanel departmentId={department.id} />}
+          </>
+        )}
+      </div>
+
+      {settingsOpen && department && (
+        <DepartmentSettingsModal
+          department={department}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={(updated) => {
+            setDepartment(updated);
+            setSettingsOpen(false);
+          }}
+          onDeleted={() => navigate(`/organizations/${department.organizationId}?tab=departments`)}
+          onArchived={() => navigate(`/organizations/${department.organizationId}?tab=departments`)}
+        />
+      )}
+    </div>
+  );
+}

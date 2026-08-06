@@ -1,31 +1,58 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import type { Job, Project } from "@projelio/shared";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
+import type { Job, Organization, Group, Project, User } from "@projelio/shared";
 import { api } from "../api/client";
 import JobCard from "../components/JobCard";
 import { colors } from "../theme/colors";
 import { useSortableList } from "../lib/useSortableList";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useNavVisibility } from "../lib/useNavVisibility";
-import { IconBuilding, IconLayers, IconChevronRight, IconFolder, IconActivity, IconFile } from "../components/icons";
+import { IconBuilding, IconLayers, IconChevronRight, IconFolder, IconActivity, IconFile, IconSparkle } from "../components/icons";
 import ProfileCard from "../components/ProfileCard";
 import BudgetPanel from "../components/BudgetPanel";
 import AllFilesPanel from "../components/AllFilesPanel";
+import DashboardModulesPanel from "../components/DashboardModulesPanel";
 
-type DashboardTab = "jobs" | "budget" | "files";
+type DashboardTab = "jobs" | "budget" | "files" | "modules";
 
 const tabs: { key: DashboardTab; label: string; icon: typeof IconFolder }[] = [
   { key: "jobs", label: "İşler", icon: IconFolder },
   { key: "budget", label: "Bütçe", icon: IconActivity },
   { key: "files", label: "Dosyalar", icon: IconFile },
+  { key: "modules", label: "Modüller", icon: IconSparkle },
 ];
 
 export default function Dashboard() {
+  // Anasayfa yalnızca serbest çalışan (ve henüz kadroya bağlanmamış çalışan/taşeron)
+  // içindir — "İşlerim" mantığı buna göredir. Bir şirket/işletme/holding sahibi giriş
+  // yaptığında burada değil, kurduğu yapının Departmanlar görünümünde olmalı
+  // (Doküman 1: "Mevcut Projelio yapısı Serbest Çalışan tipi için uygundur").
+  // undefined = henüz belirlenmedi (yüklemede), null = yönlendirme yok, string = hedef yol.
+  const [redirectTo, setRedirectTo] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    api
+      .get<User>("/auth/me")
+      .then(async (me) => {
+        if (me.accountType === "organization_owner") {
+          const orgs = await api.get<Organization[]>("/organizations").catch(() => []);
+          setRedirectTo(orgs[0] ? `/organizations/${orgs[0].id}` : null);
+        } else if (me.accountType === "group_owner") {
+          const groups = await api.get<Group[]>("/groups").catch(() => []);
+          setRedirectTo(groups[0] ? `/groups/${groups[0].id}` : null);
+        } else {
+          setRedirectTo(null);
+        }
+      })
+      .catch(() => setRedirectTo(null));
+  }, []);
+
   // Sekme, URL'deki ?tab= ile eşleşir: sidebar'dan doğrudan "/?tab=budget" ya da
   // "/?tab=files" gibi bir bağlantıyla gelindiğinde ilgili sekme açık başlasın diye.
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const tab: DashboardTab = tabParam === "budget" || tabParam === "files" ? tabParam : "jobs";
+  const tab: DashboardTab =
+    tabParam === "budget" || tabParam === "files" || tabParam === "modules" ? tabParam : "jobs";
   const setTab = (next: DashboardTab) => {
     setSearchParams(next === "jobs" ? {} : { tab: next }, { replace: true });
   };
@@ -74,6 +101,11 @@ export default function Dashboard() {
     return acc;
   }, {});
 
+  // Hesap tipi belirlenene kadar "İşlerim" görünümünü göstermeyelim (yanlış görünüm
+  // bir an için parlayıp kaybolmasın); organizasyon/grup sahibiyse oraya yönlendir.
+  if (redirectTo === undefined) return null;
+  if (redirectTo) return <Navigate to={redirectTo} replace />;
+
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
       <div
@@ -87,7 +119,7 @@ export default function Dashboard() {
         }}
       >
         <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
-          {tab === "jobs" ? "İşlerim" : tab === "budget" ? "Bütçem" : "Dosyalarım"}
+          {tab === "jobs" ? "İşlerim" : tab === "budget" ? "Bütçem" : tab === "files" ? "Dosyalarım" : "Modüller"}
         </h1>
         {/* Masaüstünde sağa dayalı, mobilde ise kendi satırında ortalanmış görünür
             (aksi halde dar ekranda satır kırılınca sola yapışık kalıyordu). */}
@@ -129,6 +161,8 @@ export default function Dashboard() {
       {tab === "budget" && <BudgetPanel />}
 
       {tab === "files" && <AllFilesPanel jobs={jobs} />}
+
+      {tab === "modules" && <DashboardModulesPanel jobs={jobs} />}
 
       {tab === "jobs" && !isDesktop && (showOrganizations || showGroups) && (
         <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>

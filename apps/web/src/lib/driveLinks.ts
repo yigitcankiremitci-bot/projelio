@@ -1,7 +1,7 @@
 import type { ProjectFile } from "@projelio/shared";
 
 /**
- * Drive dosyaları için önizleme ve düzenleme adresleri.
+ * Drive/OneDrive dosyaları için önizleme ve düzenleme adresleri.
  *
  * ÖNEMLİ: Google, Dokümanlar/E-Tablolar/Sunular editörünü `X-Frame-Options:
  * SAMEORIGIN` ile korur — editör başka bir siteye iframe olarak GÖMÜLEMEZ.
@@ -10,6 +10,13 @@ import type { ProjectFile } from "@projelio/shared";
  * Bu yüzden akış şöyle: Projelio içinde `/preview` ile göster, "Düzenle"
  * denince Drive editörünü yeni sekmede aç. Kullanıcı sekmeyi kapatıp döndüğünde
  * önizleme yenilenir.
+ *
+ * OneDrive tarafında Google Dokümanlar'a karşılık gelen "sanal, ikili
+ * içeriği olmayan" bir format yok (bkz. backend/onedrive.service.ts) ve
+ * Graph API'nin Google'ın `/preview`'ına karşılık gelen genel, kimlik
+ * doğrulaması istemeyen bir gömme adresi yok. Bu yüzden OneDrive dosyaları
+ * için hem önizleme hem düzenleme, öğenin kendi `webViewLink`'ine (OneDrive'ın
+ * web görünümü/Office Online editörü) yönlendirir.
  */
 
 const GOOGLE_EDITOR_PATHS: Record<string, string> = {
@@ -21,6 +28,9 @@ const GOOGLE_EDITOR_PATHS: Record<string, string> = {
 
 /** Projelio içinde iframe'e gömülebilen, salt okunur önizleme adresi. */
 export function drivePreviewUrl(file: ProjectFile): string {
+  if (file.storageProvider === "microsoft") {
+    return file.webViewLink ?? `https://onedrive.live.com`;
+  }
   const editorPath = GOOGLE_EDITOR_PATHS[file.mimeType];
   if (editorPath) {
     return `https://docs.google.com/${editorPath}/d/${file.driveFileId}/preview`;
@@ -31,6 +41,9 @@ export function drivePreviewUrl(file: ProjectFile): string {
 
 /** Yeni sekmede açılacak düzenleme adresi. */
 export function driveEditUrl(file: ProjectFile): string {
+  if (file.storageProvider === "microsoft") {
+    return file.webViewLink ?? `https://onedrive.live.com`;
+  }
   const editorPath = GOOGLE_EDITOR_PATHS[file.mimeType];
   if (editorPath) {
     return `https://docs.google.com/${editorPath}/d/${file.driveFileId}/edit`;
@@ -40,9 +53,17 @@ export function driveEditUrl(file: ProjectFile): string {
   return file.webViewLink ?? `https://drive.google.com/file/d/${file.driveFileId}/view`;
 }
 
-/** Drive'ın paylaşım ekranı — kullanıcı dışarıdan birini eklemek isterse. */
+/** Bulut sağlayıcısının paylaşım ekranı — kullanıcı dışarıdan birini eklemek isterse. */
 export function driveShareUrl(file: ProjectFile): string {
+  if (file.storageProvider === "microsoft") {
+    return file.webViewLink ?? `https://onedrive.live.com`;
+  }
   return `https://drive.google.com/file/d/${file.driveFileId}/view?usp=sharing`;
+}
+
+/** Kartlarda/düğmelerde "Drive'da" ya da "OneDrive'da" gibi sağlayıcıya özel metin için. */
+export function driveProviderLabel(file: ProjectFile): string {
+  return file.storageProvider === "microsoft" ? "OneDrive" : "Drive";
 }
 
 /**

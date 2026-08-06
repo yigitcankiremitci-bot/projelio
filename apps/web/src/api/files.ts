@@ -46,6 +46,9 @@ export const filesApi = {
   /** Hiyerarşi: gruba bağlı işler + gruba bağlı organizasyonların işleri. */
   listByGroup: (groupId: string) => api.get<ProjectFile[]>(`/groups/${groupId}/files`),
 
+  /** Departman ekranı: dosyalar düz bir listedir, iş hiyerarşisi yok. */
+  listByDepartment: (departmentId: string) => api.get<ProjectFile[]>(`/departments/${departmentId}/files`),
+
   rename: (fileId: string, name: string) => api.patch<ProjectFile>(`/files/${fileId}`, { name }),
 
   remove: (fileId: string, alsoTrash = false) =>
@@ -83,27 +86,51 @@ export const driveApi = {
 };
 
 /**
+ * driveApi'nin OneDrive karşılığı.
+ *
+ * Google'dan fark: "OneDrive ile giriş" diye bir akış yok (loginUrl/exchange
+ * yok) — kullanıcı zaten Projelio'ya girişini yapmış olmalı, buradaki
+ * uç noktalar yalnızca mevcut hesaba bir OneDrive bağlantısı ekler/kaldırır.
+ */
+export const oneDriveApi = {
+  status: () => api.get<GoogleDriveStatus>("/microsoft/status"),
+  disconnect: () => api.post<{ ok: boolean }>("/microsoft/disconnect", {}),
+  connectUrl: (next?: string) =>
+    api.get<{ configured: boolean; url: string | null }>(
+      `/microsoft/connect-url${next ? `?next=${encodeURIComponent(next)}` : ""}`
+    ),
+};
+
+/**
  * Dosya yükler.
  *
  * Küçük dosyalar backend üzerinden gider (tek istek, basit). Büyük dosyalar için
- * backend'den bir Drive yükleme adresi alınır ve tarayıcı parçaları DOĞRUDAN
- * Google'a gönderir — içerik backend'in belleğinden ve bant genişliğinden geçmez,
- * bağlantı koparsa kaldığı yerden devam edebilir.
+ * backend'den bir Drive/OneDrive yükleme adresi alınır ve tarayıcı parçaları
+ * DOĞRUDAN bulut sağlayıcısına gönderir — içerik backend'in belleğinden ve bant
+ * genişliğinden geçmez, bağlantı koparsa kaldığı yerden devam edebilir.
  */
 export async function uploadFile(
-  target: { jobId: string } | { projectId: string },
+  target: { jobId: string } | { projectId: string } | { departmentId: string },
   file: File,
   context: Omit<FileContext, "projectId"> = {},
   onProgress?: (ratio: number) => void
 ): Promise<ProjectFile> {
   // Proje ekranından yüklerken işi backend türetir; ön yüzün bilmesine gerek yok.
-  const base = "jobId" in target ? `/jobs/${target.jobId}` : `/projects/${target.projectId}`;
+  const base =
+    "jobId" in target
+      ? `/jobs/${target.jobId}`
+      : "projectId" in target
+      ? `/projects/${target.projectId}`
+      : `/departments/${target.departmentId}`;
+  // Departmanın bağlamı (proje/görev/çıktı) olmadığı için taskId/outputId yalnızca
+  // iş/proje hedeflerinde anlamlı.
+  const isDepartment = "departmentId" in target;
 
   if (file.size <= INLINE_LIMIT) {
     const form = new FormData();
     form.append("file", file);
-    if (context.taskId) form.append("taskId", context.taskId);
-    if (context.outputId) form.append("outputId", context.outputId);
+    if (!isDepartment && context.taskId) form.append("taskId", context.taskId);
+    if (!isDepartment && context.outputId) form.append("outputId", context.outputId);
     onProgress?.(0.1);
     const result = await api.uploadFile<ProjectFile>(`${base}/files`, form);
     onProgress?.(1);
@@ -116,8 +143,8 @@ export async function uploadFile(
       name: file.name,
       mimeType: file.type || "application/octet-stream",
       sizeBytes: file.size,
-      taskId: context.taskId,
-      outputId: context.outputId,
+      taskId: isDepartment ? undefined : context.taskId,
+      outputId: isDepartment ? undefined : context.outputId,
     }
   );
 
@@ -125,6 +152,17 @@ export async function uploadFile(
   return api.post<ProjectFile>(`/files/sessions/${session.sessionId}/complete`, { driveFileId });
 }
 
+/**
+ * İki sağlayıcının parçalı yükleme protokolü ara adımda farklı yanıt verir:
+ *
+ *  - Google Drive: 308 "Resume Incomplete" + `Range` başlığı (alınan son bayt).
+ *  - OneDrive (Microsoft Graph): 202 "Accepted" + gövdede `nextExpectedRanges`
+ *    dizisi (bir sonraki beklenen aralığın başlangıcı).
+ *
+ * Hangi sağlayıcı olduğunu burada bilmemize gerek yok: adrese PUT ediyoruz,
+ * yanıtın şekline göre devam ediyoruz. Son parçada ikisi de dosyanın id'sini
+ * içeren bir JSON gövdesiyle 200/201 döner.
+ */
 async function uploadInChunks(
   uploadUrl: string,
   file: File,
@@ -142,7 +180,7 @@ async function uploadInChunks(
       body: chunk,
     });
 
-    // 308 = "devam et": Drive parçayı aldı, sonraki parçayı bekliyor.
+    // Google: parça alındı, sonraki parça bekleniyor.
     if (res.status === 308) {
       const range = res.headers.get("range");
       // Drive kaç bayt aldığını söyler; ondan devam ederiz. Söylemezse kendi
@@ -152,10 +190,19 @@ async function uploadInChunks(
       continue;
     }
 
+    // OneDrive: parça alındı, sonraki beklenen aralık gövdede gelir.
+    if (res.status === 202) {
+      const json = await res.json().catch(() => null);
+      const nextRange: string | undefined = json?.nextExpectedRanges?.[0];
+      offset = nextRange ? Number(nextRange.split("-")[0]) : end;
+      onProgress?.(offset / file.size);
+      continue;
+    }
+
     if (res.ok) {
       onProgress?.(1);
       const json = await res.json();
-      if (!json?.id) throw new Error("Google Drive dosya kimliği döndürmedi.");
+      if (!json?.id) throw new Error("Bulut deposu dosya kimliği döndürmedi.");
       return json.id as string;
     }
 

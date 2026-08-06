@@ -1,0 +1,31 @@
+import { Module } from "@nestjs/common";
+import { JwtModule } from "@nestjs/jwt";
+import { PassportModule } from "@nestjs/passport";
+import { MicrosoftAccountsService } from "./microsoft-accounts.service";
+import { MicrosoftController } from "./microsoft.controller";
+import { MicrosoftOAuthService } from "./microsoft-oauth.service";
+import { OneDriveService } from "./onedrive.service";
+
+/**
+ * "OneDrive'ı bağla" akışı (Ayarlar ekranı) + FilesModule'ün kullandığı
+ * OneDrive "boru tesisatı" (token yönetimi + Graph API çağrıları).
+ *
+ * Google'daki google.module.ts / google-core.module.ts ikilisinden farklı
+ * olarak burada bölünmeye gerek yok: "Microsoft ile giriş" diye bir akış
+ * olmadığı için UsersModule'e bağımlılık yok, dolayısıyla Google tarafındaki
+ * döngü riski (bkz. google-core.module.ts) burada oluşmuyor.
+ */
+@Module({
+  imports: [
+    PassportModule,
+    // `state` parametresini imzalamak için; oturum token'ıyla aynı anahtar.
+    JwtModule.register({
+      secret: process.env.JWT_SECRET ?? "change-me",
+      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? "7d" },
+    }),
+  ],
+  controllers: [MicrosoftController],
+  providers: [MicrosoftOAuthService, MicrosoftAccountsService, OneDriveService],
+  exports: [MicrosoftOAuthService, MicrosoftAccountsService, OneDriveService],
+})
+export class MicrosoftModule {}

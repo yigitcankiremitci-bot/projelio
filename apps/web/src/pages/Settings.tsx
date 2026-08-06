@@ -4,6 +4,7 @@ import type { User } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import GoogleDriveCard from "../components/GoogleDriveCard";
+import OneDriveCard from "../components/OneDriveCard";
 import { IconShield, IconLogout, IconChevronRight, IconArchive, IconSparkle } from "../components/icons";
 import {
   FONT_SCALE_OPTIONS,
@@ -125,6 +126,7 @@ export default function Settings() {
 
       <div style={{ maxWidth: 420 }}>
         <GoogleDriveCard />
+        <OneDriveCard />
       </div>
 
       <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "26px 0 10px", maxWidth: 420 }}>

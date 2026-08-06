@@ -1,7 +1,7 @@
 import { useContext, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { colors } from "../theme/colors";
-import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus, IconFolder, IconBuilding, IconActivity } from "./icons";
+import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus, IconFolder, IconActivity } from "./icons";
 import CreateJobModal from "./CreateJobModal";
 import CreateProjectModal from "./CreateProjectModal";
 import CreateOperationModal from "./CreateOperationModal";
@@ -10,11 +10,9 @@ import CreateOrganizationModal from "./CreateOrganizationModal";
 import CreateGroupModal from "./CreateGroupModal";
 import { ProjectFabContext } from "../lib/projectFab";
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { useNavVisibility } from "../lib/useNavVisibility";
 import { SIDEBAR_WIDTH } from "../lib/layout";
 
 const rightItems = [
-  { to: "/calendar", label: "Takvim", icon: IconCalendar },
   { to: "/tasks", label: "Yapılacaklar", icon: IconListCheck },
   { to: "/settings", label: "Ayarlar", icon: IconSettings },
 ];
@@ -28,13 +26,15 @@ export default function BottomNav() {
   const [modal, setModal] = useState<ModalKind | null>(null);
   const [choosing, setChoosing] = useState(false);
   const { action: fabAction } = useContext(ProjectFabContext);
-  // Gruplar artık alt menüde ayrı bir sekme değil: mobilde ana sayfadaki
-  // kısayoldan erişiliyor (bkz. Dashboard.tsx), burada yalnızca Organizasyon kalır.
-  const { showOrganizations } = useNavVisibility();
 
+  // Organizasyon/Grup artık burada ayrı bir sekme değil: mobilde de artık üstteki
+  // ok ile açılan sidebar (Grup > Organizasyon > İş ağacı) üzerinden erişiliyor,
+  // ayrıca ana sayfadaki kısayoldan da ulaşılabiliyor (bkz. Dashboard.tsx).
+  // Takvim, "+" butonu ana sayfanın hemen yanında değil de Takvim ile Yapılacaklar'ın
+  // ortasında görünsün diye sağdaki değil soldaki gruba (FAB'ın hemen öncesine) alındı.
   const leftItems = [
     { to: "/", label: "Ana sayfa", icon: IconDashboard },
-    ...(showOrganizations ? [{ to: "/organizations", label: "Organizasyon", icon: IconBuilding }] : []),
+    { to: "/calendar", label: "Takvim", icon: IconCalendar },
   ];
 
   const isActive = (to: string) => (to === "/" ? location.pathname === "/" : location.pathname.startsWith(to));
@@ -49,13 +49,15 @@ export default function BottomNav() {
   const projectMatch = location.pathname.match(/^\/projects\/([^/]+)/);
   const operationMatch = location.pathname.match(/^\/operations\/([^/]+)/);
   const groupDetailMatch = location.pathname.match(/^\/groups\/([^/]+)$/);
+  const orgDetailMatch = location.pathname.match(/^\/organizations\/([^/]+)$/);
+  const deptDetailMatch = location.pathname.match(/^\/departments\/([^/]+)$/);
 
   let createAction: "job" | "job-choice" | "custom" | ModalKind | null = null;
   let jobId: string | null = null;
   let groupIdForOrg: string | null = null;
   let fabLabel = "Oluştur";
 
-  if ((jobMatch || projectMatch || operationMatch) && fabAction) {
+  if ((jobMatch || projectMatch || operationMatch || orgDetailMatch || deptDetailMatch) && fabAction) {
     createAction = "custom";
     fabLabel = fabAction.label;
   } else if (jobMatch) {
@@ -72,6 +74,16 @@ export default function BottomNav() {
     createAction = "organization-in-group";
     groupIdForOrg = groupDetailMatch[1];
     fabLabel = "Bu gruba organizasyon ekle";
+  } else if (orgDetailMatch) {
+    // Bir organizasyonun içindeyken varsayılan "Yeni iş" eylemi uygulanmaz — şirket/işletme
+    // bağlamında iş (job) kavramı yok, "+" o an sayfanın kayıtlı ettiği eyleme (departman
+    // ekleme) bağlıdır. Kayıtlı eylem yoksa buton basitçe gizlenir.
+    createAction = null;
+  } else if (deptDetailMatch) {
+    // Departman detayında da varsayılan bir eylem yok — kadro daveti sayfanın kendi
+    // "+ Kişi davet et" düğmesiyle yapılır; "+" yalnızca Ürün Yönetimi departmanında
+    // ProductsPanel'in kayıt ettirdiği "Ürün/Hizmet ekle" eylemine bağlıdır.
+    createAction = null;
   } else {
     // "+" düğmesi diğer tüm sayfalarda da (ana sayfa, takvim, yapılacaklar, ayarlar)
     // görünür ve yeni iş oluşturur.
@@ -79,9 +91,17 @@ export default function BottomNav() {
     fabLabel = "Yeni iş";
   }
 
+  // Kayıtlı eylem birden fazla seçenek sunuyorsa (bkz. ProjectFabAction.options),
+  // doğrudan tetiklemek yerine job-choice ile aynı küçük seçim menüsü açılır.
+  const hasCustomOptions = createAction === "custom" && !!fabAction?.options?.length;
+
   const handleFabClick = () => {
     if (createAction === "custom") {
-      fabAction?.onClick();
+      if (hasCustomOptions) {
+        setChoosing((prev) => !prev);
+      } else {
+        fabAction?.onClick?.();
+      }
     } else if (createAction === "job-choice") {
       setChoosing((prev) => !prev);
     } else if (createAction) {
@@ -111,7 +131,20 @@ export default function BottomNav() {
     </button>
   );
 
-  const choosingMenu = choosing && jobId && (
+  // jobId'deyken sabit üç seçenek (proje/program/görev); özel bir fabAction
+  // birden fazla seçenek kaydettiyse (bkz. options) onlar kullanılır.
+  const choiceMenuItems: { label: string; icon: typeof IconFolder; onClick: () => void }[] = jobId
+    ? [
+        { label: "Yeni proje", icon: IconFolder, onClick: () => setModal("project") },
+        // Program: süresi olmayan, tekrarlayan işlerden oluşan çalışma.
+        { label: "Yeni program", icon: IconActivity, onClick: () => setModal("operation") },
+        { label: "Yeni görev", icon: IconListCheck, onClick: () => setModal("task") },
+      ]
+    : hasCustomOptions
+    ? fabAction!.options!.map((opt) => ({ label: opt.label, icon: IconPlus, onClick: opt.onClick }))
+    : [];
+
+  const choosingMenu = choosing && choiceMenuItems.length > 0 && (
     <div
       style={{
         position: "absolute",
@@ -129,70 +162,30 @@ export default function BottomNav() {
         zIndex: 31,
       }}
     >
-      <button
-        onClick={() => {
-          setChoosing(false);
-          setModal("project");
-        }}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "9px 14px",
-          borderRadius: 8,
-          border: "none",
-          background: "transparent",
-          color: c.textPrimary,
-          fontSize: 15,
-          whiteSpace: "nowrap",
-        }}
-      >
-        <IconFolder size={15} color={c.textSecondary} />
-        Yeni proje
-      </button>
-      {/* Program: süresi olmayan, tekrarlayan işlerden oluşan çalışma. */}
-      <button
-        onClick={() => {
-          setChoosing(false);
-          setModal("operation");
-        }}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "9px 14px",
-          borderRadius: 8,
-          border: "none",
-          background: "transparent",
-          color: c.textPrimary,
-          fontSize: 15,
-          whiteSpace: "nowrap",
-        }}
-      >
-        <IconActivity size={15} color={c.textSecondary} />
-        Yeni program
-      </button>
-      <button
-        onClick={() => {
-          setChoosing(false);
-          setModal("task");
-        }}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "9px 14px",
-          borderRadius: 8,
-          border: "none",
-          background: "transparent",
-          color: c.textPrimary,
-          fontSize: 15,
-          whiteSpace: "nowrap",
-        }}
-      >
-        <IconListCheck size={15} color={c.textSecondary} />
-        Yeni görev
-      </button>
+      {choiceMenuItems.map((item) => (
+        <button
+          key={item.label}
+          onClick={() => {
+            setChoosing(false);
+            item.onClick();
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "9px 14px",
+            borderRadius: 8,
+            border: "none",
+            background: "transparent",
+            color: c.textPrimary,
+            fontSize: 15,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <item.icon size={15} color={c.textSecondary} />
+          {item.label}
+        </button>
+      ))}
     </div>
   );
 

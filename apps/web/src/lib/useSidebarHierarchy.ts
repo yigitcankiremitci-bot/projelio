@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
-import type { Group, Job, Organization } from "@projelio/shared";
+import type { Department, Group, Job, Organization } from "@projelio/shared";
 import { api } from "../api/client";
 
 /**
- * Sidebar'daki gezinme ağacının veri modeli. Hiyerarşi: Grup -> Organizasyon -> İş.
+ * Sidebar'daki gezinme ağacının veri modeli. Hiyerarşi: Grup -> Organizasyon -> (Departman | İş).
  * Bir Organizasyon bir Gruba bağlı olabilir ya da bağımsız durabilir; bir İş de aynı
  * şekilde bir Organizasyona, doğrudan bir Gruba ya da hiçbirine bağlı olabilir
  * (bkz. Job.organizationId / Job.groupId — @projelio/shared, ikisi birden set edilmez).
+ * Departmanlar yalnızca organizasyonlara bağlıdır (bkz. Department.organizationId).
  */
 export interface SidebarOrgNode {
   org: Organization;
   jobs: Job[];
+  departments: Department[];
 }
 
 export interface SidebarGroupNode {
@@ -28,7 +30,12 @@ export interface SidebarHierarchy {
   loading: boolean;
 }
 
-function buildHierarchy(groups: Group[], orgs: Organization[], jobs: Job[]): Omit<SidebarHierarchy, "loading"> {
+function buildHierarchy(
+  groups: Group[],
+  orgs: Organization[],
+  jobs: Job[],
+  departmentsByOrgId: Map<string, Department[]>
+): Omit<SidebarHierarchy, "loading"> {
   const jobsByOrgId = new Map<string, Job[]>();
   const jobsByGroupIdDirect = new Map<string, Job[]>();
   const standaloneJobs: Job[] = [];
@@ -49,9 +56,14 @@ function buildHierarchy(groups: Group[], orgs: Organization[], jobs: Job[]): Omi
 
   const orgsByGroupId = new Map<string, Organization[]>();
   const standaloneOrgList: Organization[] = [];
+  // Bir organizasyonun groupId'si olabilir ama o grup kullanıcının erişebildiği
+  // /groups listesinde yer almayabilir (örn. bir departmana kadro olarak kabul
+  // edilen ama o grubun üyesi olmayan bir çalışan). Bu durumda organizasyon
+  // hiç görünmemek yerine bağımsızmış gibi (grupsuz) gösterilir.
+  const knownGroupIds = new Set(groups.map((g) => g.id));
 
   for (const org of orgs) {
-    if (org.groupId) {
+    if (org.groupId && knownGroupIds.has(org.groupId)) {
       const list = orgsByGroupId.get(org.groupId) ?? [];
       list.push(org);
       orgsByGroupId.set(org.groupId, list);
@@ -60,7 +72,11 @@ function buildHierarchy(groups: Group[], orgs: Organization[], jobs: Job[]): Omi
     }
   }
 
-  const toOrgNode = (org: Organization): SidebarOrgNode => ({ org, jobs: jobsByOrgId.get(org.id) ?? [] });
+  const toOrgNode = (org: Organization): SidebarOrgNode => ({
+    org,
+    jobs: jobsByOrgId.get(org.id) ?? [],
+    departments: departmentsByOrgId.get(org.id) ?? [],
+  });
 
   const groupNodes: SidebarGroupNode[] = groups.map((group) => ({
     group,
@@ -78,12 +94,15 @@ function buildHierarchy(groups: Group[], orgs: Organization[], jobs: Job[]): Omi
 /**
  * Sidebar'daki gezinme ağacı için gereken tüm veriyi tek seferde çeker (mevcut
  * /groups, /organizations, /jobs uçları — yeni bir backend uç noktasına gerek yok)
- * ve client tarafında Grup > Organizasyon > İş ağacını kurar.
+ * ve client tarafında Grup > Organizasyon > (Departman | İş) ağacını kurar.
+ * Departmanlar organizasyon başına ayrıca çekilir (/organizations/:id/departments —
+ * tüm organizasyonların departmanlarını tek seferde dönen bir uç nokta yok).
  */
 export function useSidebarHierarchy(): SidebarHierarchy {
   const [groups, setGroups] = useState<Group[]>([]);
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [departmentsByOrgId, setDepartmentsByOrgId] = useState<Map<string, Department[]>>(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -93,18 +112,30 @@ export function useSidebarHierarchy(): SidebarHierarchy {
       api.get<Group[]>("/groups").catch(() => []),
       api.get<Organization[]>("/organizations").catch(() => []),
       api.get<Job[]>("/jobs").catch(() => []),
-    ]).then(([g, o, j]) => {
-      if (cancelled) return;
-      setGroups(g);
-      setOrgs(o);
-      setJobs(j);
-      setLoading(false);
-    });
+    ])
+      .then(async ([g, o, j]) => {
+        if (cancelled) return;
+        setGroups(g);
+        setOrgs(o);
+        setJobs(j);
+
+        const deptLists = await Promise.all(
+          o.map((org) => api.get<Department[]>(`/organizations/${org.id}/departments`).catch(() => []))
+        );
+        if (cancelled) return;
+        const map = new Map<string, Department[]>();
+        o.forEach((org, idx) => map.set(org.id, deptLists[idx]));
+        setDepartmentsByOrgId(map);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const hierarchy = buildHierarchy(groups, orgs, jobs);
+  const hierarchy = buildHierarchy(groups, orgs, jobs, departmentsByOrgId);
   return { ...hierarchy, loading };
 }

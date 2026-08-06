@@ -60,20 +60,40 @@ export class UsersController {
 
   // İlk giriş onboarding sihirbazı: kullanıcı hesap tipini seçer, "organization_owner"
   // ya da "group_owner" seçtiyse aynı anda kendi Organizasyonu/Grubu da oluşturulur.
+  // "employee"/"subcontractor" seçenlerinde herhangi bir yapı kurulmaz — bu kişiler
+  // bir departmanın kadrosuna (department_members) davetle bağlanır.
   @Patch("me/onboarding")
   async completeOnboarding(
     @Req() req: any,
-    @Body() body: { accountType: AccountType; organizationName?: string; groupName?: string }
+    @Body()
+    body: {
+      accountType: AccountType;
+      organizationName?: string;
+      // "sirket" (büyük ölçek) ya da "isletme" (küçük ölçek) — verilmezse "sirket" varsayılır.
+      orgType?: "sirket" | "isletme";
+      groupName?: string;
+    }
   ) {
     const userId = req.user.userId;
+    let organizationId: string | undefined;
+    let groupId: string | undefined;
+
     if (body.accountType === "organization_owner") {
       if (!body.organizationName?.trim()) throw new BadRequestException("Organizasyon adı gerekli");
-      await this.organizationsService.create(userId, { name: body.organizationName.trim() });
+      const org = await this.organizationsService.create(userId, {
+        name: body.organizationName.trim(),
+        orgType: body.orgType === "isletme" ? "isletme" : "sirket",
+      });
+      organizationId = org.id;
     } else if (body.accountType === "group_owner") {
       if (!body.groupName?.trim()) throw new BadRequestException("Grup adı gerekli");
-      await this.groupsService.create(userId, { name: body.groupName.trim() });
+      const group = await this.groupsService.create(userId, { name: body.groupName.trim() });
+      groupId = group.id;
     }
-    return this.usersService.completeOnboarding(userId, body.accountType);
+    const user = await this.usersService.completeOnboarding(userId, body.accountType);
+    // Frontend, sihirbaz kapanınca kullanıcıyı doğrudan oluşturulan organizasyona/gruba
+    // yönlendirebilsin diye kimlikleri de döneriz (departman seçimine hemen başlasın diye).
+    return { ...user, organizationId, groupId };
   }
 
   @Get(":id")

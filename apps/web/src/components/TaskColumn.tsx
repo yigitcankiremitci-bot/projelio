@@ -1,10 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import Sortable from "sortablejs";
 import type { Task, TaskStatus } from "@projelio/shared";
 import { colors } from "../theme/colors";
 import { IconPlus, IconChevronRight, IconCheck, IconEdit, IconActivity } from "./icons";
 import Modal from "./Modal";
 import { useSortableList } from "../lib/useSortableList";
+import { formatTaskDuration } from "../lib/dates";
+
+export interface TaskColumnHandle {
+  // Dışarıdan (ör. departman/iş sayfasındaki "+" FAB'ından) sütunun hızlı
+  // "Görev ekle" giriş kutusunu açar — sütunun kendi "+ Görev ekle" düğmesine
+  // basmışsınız gibi davranır.
+  openCreate: () => void;
+}
 
 interface Props {
   status: TaskStatus;
@@ -32,6 +40,12 @@ interface Props {
   // eşleşen görev/alt görev otomatik görünüre kaydırılır ve kısa süreliğine parlayarak
   // fark edilir hale getirilir.
   highlightTaskId?: string;
+  // Seçim modu: her kartın başında bir checkbox belirir (üst görev + alt görev),
+  // sürükle-bırak devre dışı kalır — çoklu seçimle çoğaltma/taşıma için (bkz.
+  // useTaskSelection/TaskSelectionBar).
+  selectionMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (taskId: string) => void;
 }
 
 const columnLabel: Record<TaskStatus, string> = {
@@ -40,7 +54,7 @@ const columnLabel: Record<TaskStatus, string> = {
   completed: "Tamamlandı",
 };
 
-export default function TaskColumn({
+const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   status,
   allTasks,
   onCreate,
@@ -54,10 +68,17 @@ export default function TaskColumn({
   onToggleActive,
   getTaskMeta,
   highlightTaskId,
-}: Props) {
+  selectionMode,
+  selectedIds,
+  onToggleSelect,
+}, ref) {
   const c = colors.light;
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
+
+  useImperativeHandle(ref, () => ({
+    openCreate: () => setAdding(true),
+  }));
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [subtaskParent, setSubtaskParent] = useState<string | null>(null);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -130,8 +151,8 @@ export default function TaskColumn({
   useSortableList(
     topListRef,
     {
-      group: { name: group, pull: true, put: true },
-      sort: Boolean(onReorderTasks),
+      group: { name: group, pull: !selectionMode, put: !selectionMode },
+      sort: Boolean(onReorderTasks) && !selectionMode,
       handle: ".task-drag-handle",
       filter: "button",
       preventOnFilter: false,
@@ -163,7 +184,7 @@ export default function TaskColumn({
         onReorderTasks(ids);
       },
     },
-    [group, Boolean(onReorderTasks)]
+    [group, Boolean(onReorderTasks), selectionMode]
   );
 
   const attachSubtaskSortable = (parentId: string) => (el: HTMLDivElement | null) => {
@@ -172,7 +193,7 @@ export default function TaskColumn({
       existing.destroy();
       subtaskSortables.current.delete(parentId);
     }
-    if (!el || !onReorderTasks) return;
+    if (!el || !onReorderTasks || selectionMode) return;
     const instance = Sortable.create(el, {
       animation: 180,
       delay: 350,
@@ -311,6 +332,30 @@ export default function TaskColumn({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {selectionMode && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleSelect?.(t.id);
+                      }}
+                      aria-label={selectedIds?.has(t.id) ? "Seçimi kaldır" : "Seç"}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 5,
+                        flexShrink: 0,
+                        border: `1.5px solid ${selectedIds?.has(t.id) ? c.primary : c.border}`,
+                        background: selectedIds?.has(t.id) ? c.primary : "transparent",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 0,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {selectedIds?.has(t.id) && <IconCheck size={11} color="#fff" />}
+                    </button>
+                  )}
                   <button
                     onClick={(e) => handleCheckboxClick(e, t.id, t.status, t.title)}
                     aria-label={t.status === "completed" ? "Tamamlandıyı geri al" : "Tamamlandı olarak işaretle"}
@@ -417,23 +462,42 @@ export default function TaskColumn({
                     {t.description}
                   </div>
                 )}
-                {t.assignedToName && (
-                  <div style={{ marginTop: 5 }}>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        fontSize: 12,
-                        color: c.accentDark,
-                        background: `${c.accent}1a`,
-                        border: `1px solid ${c.accent}55`,
-                        borderRadius: 20,
-                        padding: "1px 8px",
-                      }}
-                    >
-                      {t.assignedToName}
-                    </span>
+                {(t.assignedToName || formatTaskDuration(t.estimatedDurationValue, t.estimatedDurationUnit)) && (
+                  <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    {t.assignedToName && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: 12,
+                          color: c.accentDark,
+                          background: `${c.accent}1a`,
+                          border: `1px solid ${c.accent}55`,
+                          borderRadius: 20,
+                          padding: "1px 8px",
+                        }}
+                      >
+                        {t.assignedToName}
+                      </span>
+                    )}
+                    {formatTaskDuration(t.estimatedDurationValue, t.estimatedDurationUnit) && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: 12,
+                          color: c.textSecondary,
+                          background: c.background,
+                          border: `1px solid ${c.border}`,
+                          borderRadius: 20,
+                          padding: "1px 8px",
+                        }}
+                      >
+                        {formatTaskDuration(t.estimatedDurationValue, t.estimatedDurationUnit)}
+                      </span>
+                    )}
                   </div>
                 )}
                 {(() => {
@@ -492,6 +556,30 @@ export default function TaskColumn({
                           padding: "6px 9px",
                         }}
                       >
+                        {selectionMode && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleSelect?.(sub.id);
+                            }}
+                            aria-label={selectedIds?.has(sub.id) ? "Seçimi kaldır" : "Seç"}
+                            style={{
+                              width: 14,
+                              height: 14,
+                              borderRadius: 4,
+                              flexShrink: 0,
+                              border: `1.5px solid ${selectedIds?.has(sub.id) ? c.primary : c.border}`,
+                              background: selectedIds?.has(sub.id) ? c.primary : "transparent",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              padding: 0,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {selectedIds?.has(sub.id) && <IconCheck size={9} color="#fff" />}
+                          </button>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -530,8 +618,17 @@ export default function TaskColumn({
                             {getTaskMeta?.(sub) && (
                               <span style={{ fontSize: 11, color: c.textSecondary }}>{getTaskMeta(sub)}</span>
                             )}
-                            {sub.assignedToName && (
-                              <span style={{ fontSize: 11, color: c.accentDark }}>{sub.assignedToName}</span>
+                            {(sub.assignedToName || formatTaskDuration(sub.estimatedDurationValue, sub.estimatedDurationUnit)) && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                {sub.assignedToName && (
+                                  <span style={{ fontSize: 11, color: c.accentDark }}>{sub.assignedToName}</span>
+                                )}
+                                {formatTaskDuration(sub.estimatedDurationValue, sub.estimatedDurationUnit) && (
+                                  <span style={{ fontSize: 11, color: c.textSecondary }}>
+                                    {formatTaskDuration(sub.estimatedDurationValue, sub.estimatedDurationUnit)}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
                           <button
@@ -781,4 +878,6 @@ export default function TaskColumn({
       )}
     </div>
   );
-}
+});
+
+export default TaskColumn;

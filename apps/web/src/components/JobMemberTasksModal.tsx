@@ -17,7 +17,7 @@ export default function JobMemberTasksModal({ member, tasks, projects, onClose, 
   const c = colors.light;
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const projectTitle = (projectId: string) => projects.find((p) => p.id === projectId)?.title ?? "";
+  const projectTitle = (projectId?: string) => projects.find((p) => p.id === projectId)?.title ?? "";
 
   const toggle = async (task: Task) => {
     const assigning = task.assignedTo !== member.userId;

@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { PostComment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
-import { MembersService } from "../members/members.service";
+import { ProjectPostsService } from "../project-posts/project-posts.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { extractMentionHandles } from "../../common/mentions.util";
 
@@ -22,7 +22,11 @@ function mapComment(row: any, likeCount: number, likedByMe: boolean): PostCommen
 export class PostCommentsService {
   constructor(
     private supabase: SupabaseService,
-    private membersService: MembersService,
+    // Proje ekibi / departman kadrosu ayrımını tek bir yerde tutan yardımcı
+    // (bkz. ProjectPostsService.resolveScopeMembers) burada da kullanılıyor —
+    // yorum bir paylaşıma bağlı, paylaşımın proje mi departman mı olduğuna göre
+    // doğru ekibe bildirim gitmesi gerekiyor.
+    private projectPostsService: ProjectPostsService,
     private notificationsService: NotificationsService
   ) {}
 
@@ -94,19 +98,17 @@ export class PostCommentsService {
       if (comment && comment.user_id && comment.user_id !== userId) {
         const { data: post } = await this.supabase.client
           .from("project_posts")
-          .select("project_id")
+          .select("project_id, department_id, organization_id")
           .eq("id", comment.post_id)
           .maybeSingle();
         if (post) {
-          const members = await this.membersService.findByProject(post.project_id);
+          const { members, link } = await this.projectPostsService.resolveScopeMembers({
+            projectId: post.project_id ?? undefined,
+            departmentId: post.department_id ?? undefined,
+            organizationId: post.organization_id ?? undefined,
+          });
           const actorName = members.find((m) => m.userId === userId)?.fullName ?? "Bir ekip üyesi";
-          await this.notificationsService.notifyUser(
-            comment.user_id,
-            "comment_like",
-            "Yorumun beğenildi",
-            `${actorName} yorumunu beğendi.`,
-            `/projects/${post.project_id}`
-          );
+          await this.notificationsService.notifyUser(comment.user_id, "comment_like", "Yorumun beğenildi", `${actorName} yorumunu beğendi.`, link);
         }
       }
     }
@@ -120,16 +122,20 @@ export class PostCommentsService {
   }
 
   // Yorumu yapan kişi dışında paylaşımın sahibine, ve yorum metninde etiketlenen
-  // "@kullaniciadi" ekip üyelerine bildirim gönderir.
+  // "@kullaniciadi" ekip üyelerine/kadro üyelerine bildirim gönderir.
   private async notifyPostAuthorAndMentions(postId: string, actingUserId: string, body: string): Promise<void> {
     const { data: post } = await this.supabase.client
       .from("project_posts")
-      .select("user_id, project_id")
+      .select("user_id, project_id, department_id, organization_id")
       .eq("id", postId)
       .maybeSingle();
     if (!post) return;
 
-    const members = await this.membersService.findByProject(post.project_id);
+    const { members, link } = await this.projectPostsService.resolveScopeMembers({
+      projectId: post.project_id ?? undefined,
+      departmentId: post.department_id ?? undefined,
+      organizationId: post.organization_id ?? undefined,
+    });
     const actorName = members.find((m) => m.userId === actingUserId)?.fullName ?? "Bir ekip üyesi";
 
     if (post.user_id !== actingUserId) {
@@ -138,7 +144,7 @@ export class PostCommentsService {
         "post_comment",
         "Paylaşımına yorum yapıldı",
         `${actorName} paylaşımına yorum yaptı: "${body.slice(0, 80)}"`,
-        `/projects/${post.project_id}`
+        link
       );
     }
 
@@ -148,13 +154,7 @@ export class PostCommentsService {
       (m) => m.username && handles.includes(m.username.toLowerCase()) && m.userId !== actingUserId
     );
     for (const m of mentioned) {
-      await this.notificationsService.notifyUser(
-        m.userId,
-        "post_mention",
-        "Bir yorumda etiketlendin",
-        `${actorName} seni bir yorumda etiketledi.`,
-        `/projects/${post.project_id}`
-      );
+      await this.notificationsService.notifyUser(m.userId, "post_mention", "Bir yorumda etiketlendin", `${actorName} seni bir yorumda etiketledi.`, link);
     }
   }
 }

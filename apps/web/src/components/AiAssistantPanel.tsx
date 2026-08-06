@@ -32,7 +32,7 @@ const SUGGESTIONS = [
 ];
 
 const GREETING =
-  "Merhaba! Ben Projelio Asistan. Projelerini, görevlerini ve bütçeni buradan yönetebilirsin — yazman yeterli.";
+  "Merhaba! Ben Lio. Projelerini, görevlerini ve bütçeni buradan yönetebilirsin — yazman yeterli.";
 
 export default function AiAssistantPanel({ open, onClose }: Props) {
   const c = colors.light;
@@ -247,18 +247,15 @@ export default function AiAssistantPanel({ open, onClose }: Props) {
             style={{
               width: 36,
               height: 36,
-              borderRadius: 10,
-              background: "rgba(255,255,255,0.12)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              borderRadius: "50%",
+              overflow: "hidden",
               flexShrink: 0,
             }}
           >
-            <IconSparkle size={20} color={c.accent} />
+            <img src="/lio-open.png" alt="Lio" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.2 }}>Projelio AI</div>
+            <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.2 }}>Lio</div>
             <div style={{ fontSize: 12, opacity: 0.75 }}>
               {credits ? `${formatCredits(credits.balance)} kredi` : "Yükleniyor…"}
             </div>
@@ -445,7 +442,7 @@ export default function AiAssistantPanel({ open, onClose }: Props) {
             </button>
           </div>
           <p style={{ margin: "8px 2px 0", fontSize: 11, color: c.textSecondary }}>
-            Projelio AI hata yapabilir; önemli işlemleri kontrol edin.
+            Lio hata yapabilir; önemli işlemleri kontrol edin.
           </p>
         </div>
       </aside>

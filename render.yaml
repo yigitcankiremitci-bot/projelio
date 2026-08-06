@@ -55,6 +55,18 @@ services:
       - key: GOOGLE_TOKEN_ENC_KEY
         sync: false
 
+      # OneDrive dosya depolama (bkz. backend/.env.example) — Azure Portal'daki
+      # uygulama kaydına production backend URL'i icin ikinci bir redirect URI
+      # eklenmeli (localhost'a ek olarak).
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_REDIRECT_URI
+        sync: false
+      - key: MICROSOFT_TOKEN_ENC_KEY
+        sync: false
+
       # Frontend'in adresi — CORS bu listeyle sınırlanır (virgülle çoğaltılabilir).
       - key: CORS_ORIGINS
         sync: false

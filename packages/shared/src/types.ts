@@ -5,7 +5,10 @@ export type UserRole = "admin" | "freelancer";
 // Kullanıcının hiyerarşideki hangi seviyeyi yönettiğini belirler; navigasyonda hangi
 // panellerin/isimlendirmenin gösterileceğine bu karar verir. Sonradan yükseltilebilir
 // (freelancer -> organization_owner -> group_owner), signup'ta sabitlenmez.
-export type AccountType = "freelancer" | "organization_owner" | "group_owner";
+// employee/subcontractor: bir organizasyona bağlı olarak çalışacağını baştan bilen
+// kullanıcılar için (davet bekleyen "kadro" pozisyonuyla sonradan eşleşirler,
+// bkz. DepartmentMember). Bu ikisi kendi organizasyonunu kurmaz.
+export type AccountType = "freelancer" | "organization_owner" | "group_owner" | "employee" | "subcontractor";
 
 // Kullanıcı kendi unvanını yazmadıysa (User.title boşsa) profilinde hesap tipine göre
 // bu varsayılan unvan gösterilir. Kullanıcı ayarlardan kendi metnini girerse o öncelikli
@@ -14,6 +17,15 @@ export const DEFAULT_TITLE_BY_ACCOUNT_TYPE: Record<AccountType, string> = {
   freelancer: "Serbest Çalışan",
   organization_owner: "Organizasyon Sahibi",
   group_owner: "Grup Sahibi",
+  employee: "Çalışan",
+  subcontractor: "Taşeron",
+};
+
+// Organizasyonun ölçeği. Aynı şema, ölçek farkı — sihirbazda kullanıcı seçer.
+export type OrgType = "sirket" | "isletme";
+export const ORG_TYPE_LABEL: Record<OrgType, string> = {
+  sirket: "Şirket",
+  isletme: "İşletme",
 };
 
 export function resolveUserTitle(user: { title?: string; accountType?: AccountType }): string {
@@ -90,11 +102,156 @@ export interface Organization {
   name: string;
   description?: string;
   coverImageUrl?: string;
+  // sirket = büyük ölçekli, isletme = küçük ölçekli. Aynı şema, ölçek farkı.
+  orgType: OrgType;
   createdAt: string;
   archivedAt?: string;
   sortOrder?: number;
   // Bu organizasyona bağlı İş sayısı.
   jobCount?: number;
+}
+
+// ============================================================ Departmanlar / Kadro
+
+// ISO 9001 uyumlu standart departman tanımı (referans/sabit veri).
+export interface DepartmentCatalogEntry {
+  key: string;
+  name: string;
+  description?: string;
+  mainTaskAreas?: string;
+  sortOrder: number;
+}
+
+export type ModuleScope = "organization" | "holding";
+
+// Departman/holding bazlı modül-araç kataloğu (referans/sabit veri).
+export interface ModuleCatalogEntry {
+  key: string;
+  departmentKey?: string;
+  name: string;
+  description?: string;
+  scope: ModuleScope;
+  // true ise serbest çalışan panelindeki "Modüller" sekmesinde de listelenir.
+  appliesToFreelancer: boolean;
+  sortOrder: number;
+}
+
+// Bir organizasyonun kurulum sihirbazında seçtiği/oluşturduğu departman.
+export interface Department {
+  id: string;
+  organizationId: string;
+  catalogKey?: string;
+  name: string;
+  description?: string;
+  // Kullanıcının özel olarak yüklediği kapak fotoğrafı. Boşsa (kaldırıldıysa
+  // veya hiç yüklenmediyse), istemci catalogKey'e göre 10 standart departmanın
+  // varsayılan kapak fotoğrafına döner (bkz. apps/web DEFAULT_DEPARTMENT_COVERS).
+  coverImageUrl?: string;
+  sortOrder: number;
+  // Departman sayfası açıldığında öntanımlı gelecek sekme. Organizasyon sahibi
+  // departman ayarlarından değiştirebilir; boşsa "tasks" (Görevler) varsayılır.
+  defaultTab?: string;
+  createdAt: string;
+  archivedAt?: string;
+  // Sunucu tarafında eklenir: bu departmandaki (removed hariç) kadro sayısı.
+  memberCount?: number;
+}
+
+// Ürün Yönetimi departmanından eklenen ürün/hizmet. Şirket anasayfasında
+// (OrganizationDetail "Ürünler" sekmesi) iş kartlarıyla aynı görünümde listelenir.
+export interface Product {
+  id: string;
+  organizationId: string;
+  departmentId?: string;
+  name: string;
+  description?: string;
+  coverImageUrl?: string;
+  price?: number;
+  currency?: string;
+  sortOrder: number;
+  createdAt: string;
+  archivedAt?: string;
+}
+
+export type DepartmentMemberRole = "manager" | "employee" | "subcontractor";
+export type DepartmentMemberStatus = "invited" | "pending" | "approved" | "rejected" | "removed";
+
+// "Kadro": bir departmana bağlı kişi + rolü + pozisyon adı. userId boşsa henüz hesap
+// açmamış, davet bekleyen bir pozisyondur (inviteEmail ile tanımlanır).
+export interface DepartmentMember {
+  id: string;
+  departmentId: string;
+  userId?: string;
+  inviteEmail?: string;
+  role: DepartmentMemberRole;
+  title?: string;
+  reportsTo?: string;
+  status: DepartmentMemberStatus;
+  // İşten çıkarılan/departmandan ayrılan kişinin, yöneticinin izin verdiği belgeleri
+  // görebileceği son tarih. Boşsa sınırsız/geçerli erişim.
+  accessUntil?: string;
+  invitedBy?: string;
+  joinedAt: string;
+  fullName?: string;
+  email?: string;
+  username?: string;
+}
+
+// Kurulum sihirbazında organizasyonun etkinleştirdiği modül.
+export interface OrganizationModule {
+  id: string;
+  organizationId: string;
+  moduleKey: string;
+  createdAt: string;
+}
+
+// Serbest çalışanın "Modüller" sekmesinden bir işe atadığı modül.
+export interface JobModule {
+  id: string;
+  jobId: string;
+  moduleKey: string;
+  createdAt: string;
+}
+
+// ============================================================ Ortaklar (hisse)
+
+export type PartnerStatus = "invited" | "pending" | "approved" | "rejected" | "removed";
+
+// Holding/şirket/işletmeye hisse yüzdesiyle ortak olan kişi.
+export interface Partner {
+  id: string;
+  groupId?: string;
+  organizationId?: string;
+  userId?: string;
+  inviteEmail?: string;
+  equityPercent: number;
+  grantedBy?: string;
+  status: PartnerStatus;
+  createdAt: string;
+  fullName?: string;
+  email?: string;
+  username?: string;
+}
+
+// Ortağı ekleyen kişinin, ortağa görünür kıldığı modül/bölüm.
+export interface PartnerModuleGrant {
+  id: string;
+  partnerId: string;
+  moduleKey: string;
+  createdAt: string;
+}
+
+// Tam özellikli hale getirilen bir modülün (Gelir-Gider, Fatura, Müşteri, İşe
+// Alım vb.) tek bir kaydı. Alanlar modüle göre değiştiği için serbest biçimli
+// (data) tutulur — frontend'deki moduleRecordConfigs.ts bu alanları tanımlar.
+export interface ModuleRecord {
+  id: string;
+  organizationId: string;
+  departmentId?: string;
+  moduleKey: string;
+  data: Record<string, unknown>;
+  createdAt: string;
+  archivedAt?: string;
 }
 
 export type ProjectStatus = "active" | "completed" | "archived";
@@ -266,7 +423,9 @@ export interface JobMember {
 
 export interface Output {
   id: string;
-  projectId: string;
+  // Bir çıktı ya bir projeye ya bir departmana aittir (ikisi birden değil).
+  projectId?: string;
+  departmentId?: string;
   title: string;
   description?: string;
   createdAt: string;
@@ -279,7 +438,9 @@ export type TaskBudgetStatus = "pending" | "planned" | "paid";
 
 export interface Task {
   id: string;
-  projectId: string;
+  // Bir görev projeye, programa (operation) ya da departmana ait olabilir.
+  projectId?: string;
+  departmentId?: string;
   outputId?: string;
   assignedTo?: string;
   // Atanan kişinin görünen adı (sunucu tarafında users tablosundan eklenir);
@@ -295,6 +456,10 @@ export interface Task {
   budget?: number;
   budgetStatus: TaskBudgetStatus;
   weekNumber?: number;
+  // Görevi yapacak kişinin bildirdiği tahmini iş süresi (opsiyonel). Deadline "ne
+  // zamana kadar bitmeli"yi, bu "ne kadar sürer"i tutar — ikisi bağımsızdır.
+  estimatedDurationValue?: number;
+  estimatedDurationUnit?: "hours" | "days";
   createdAt: string;
   archivedAt?: string;
   sortOrder?: number;
@@ -317,7 +482,14 @@ export interface TaskComment {
 
 export interface ProjectPost {
   id: string;
-  projectId: string;
+  // Bir paylaşım proje/departman/organizasyondan tam olarak birine aittir (aynı anda birden fazlasına değil).
+  projectId?: string;
+  departmentId?: string;
+  organizationId?: string;
+  // Yalnızca organizasyon akışında (bkz. şirket anasayfası "Sosyal" sekmesi) anlamlıdır: paylaşım
+  // organizasyona bağlı bir departmandan (findByOrganization ile toplanan) geliyorsa o
+  // departmanın adı burada döner; organizasyona doğrudan yapılmış bir paylaşımsa boştur.
+  sourceDepartmentName?: string;
   userId: string;
   authorName: string;
   body: string;
@@ -344,6 +516,8 @@ export interface BudgetTransaction {
   id: string;
   // Projeye bağlı olmayan (genel işletme gideri gibi) kayıtlarda boştur.
   projectId?: string;
+  // Departman bütçesine ait kayıtlarda dolu, diğerlerinde boştur.
+  departmentId?: string;
   projectTitle?: string;
   // Kaydın ait olduğu defterin sahibi.
   ownerId?: string;
@@ -511,10 +685,11 @@ export interface ArchiveSummary {
 
 export interface ProjectFile {
   id: string;
-  /** Dosya her zaman bir İŞE aittir. */
-  jobId: string;
+  /** Dosya ya bir İŞE ya bir DEPARTMANA aittir (ikisinden tam biri dolu). */
+  jobId?: string;
   /** Organizasyon/grup listelerinde dosyanın hangi işten geldiğini göstermek için. */
   jobTitle?: string;
+  departmentId?: string;
   /** Boşsa dosya işin geneline aittir; doluysa o projeye iliştirilmiştir. */
   projectId?: string;
   taskId?: string;
@@ -528,13 +703,16 @@ export interface ProjectFile {
   iconLink?: string;
   /** Google Dokümanlar/E-Tablolar/Sunular: ikili içeriği yoktur, dışa aktarılır. */
   isGoogleDoc: boolean;
-  /** missing: dosya Drive'da bulunamadı (kullanıcı silmiş/taşımış olabilir). */
+  /** Dosyanın gerçek içeriği hangi bulut sağlayıcısında: Google Drive ya da OneDrive. */
+  storageProvider: "google" | "microsoft";
+  /** missing: dosya Drive'da/OneDrive'da bulunamadı (kullanıcı silmiş/taşımış olabilir). */
   status: "pending" | "ready" | "missing";
   createdAt: string;
-  /** Bu kullanıcının Drive klasörüne izni var mı — düzenle düğmesi buna bakar. */
+  /** Bu kullanıcının Drive/OneDrive klasörüne izni var mı — düzenle düğmesi buna bakar. */
   canEditInDrive: boolean;
 }
 
+/** Google Drive VE OneDrive bağlantı kartlarının paylaştığı durum şekli. */
 export interface GoogleDriveStatus {
   /** Sunucuda Google istemci kimlikleri tanımlı mı? */
   configured: boolean;

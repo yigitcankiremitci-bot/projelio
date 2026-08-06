@@ -1,7 +1,12 @@
+import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { Project, Task, TaskStatus } from "@projelio/shared";
+import { api } from "../../api/client";
 import { colors } from "../../theme/colors";
 import TaskColumn from "../TaskColumn";
+import TaskSelectionBar from "../TaskSelectionBar";
+import MoveTaskModal from "../MoveTaskModal";
+import { useTaskSelection } from "../../lib/useTaskSelection";
 
 type CreateOptions = { weekNumber?: number; deadline?: string; startDate?: string };
 export type ViewMode = "project" | "day" | "week" | "month" | "year";
@@ -38,6 +43,8 @@ interface Props {
   nav: ProcessNavState;
   activeTaskId?: string;
   onToggleActive?: (taskId: string) => void;
+  onTasksDuplicated?: (created: Task[]) => void;
+  onTasksMoved?: (moved: Task[]) => void;
 }
 
 export const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -97,8 +104,27 @@ export default function ProcessPanel({
   nav,
   activeTaskId,
   onToggleActive,
+  onTasksDuplicated,
+  onTasksMoved,
 }: Props) {
   const c = colors.light;
+  const selection = useTaskSelection();
+  const [duplicating, setDuplicating] = useState(false);
+  const [movingOpen, setMovingOpen] = useState(false);
+
+  const handleDuplicateSelected = async () => {
+    if (selection.selectedIds.size === 0) return;
+    setDuplicating(true);
+    try {
+      const created = await api.post<Task[]>("/tasks/duplicate", { ids: Array.from(selection.selectedIds) });
+      onTasksDuplicated?.(created);
+      selection.clear();
+    } catch {
+      // çoğaltılamadı, kullanıcı tekrar deneyebilir
+    } finally {
+      setDuplicating(false);
+    }
+  };
   const {
     viewMode,
     setViewMode,
@@ -628,6 +654,17 @@ export default function ProcessPanel({
               </span>
             )}
           </div>
+
+          <TaskSelectionBar
+            selectionMode={selection.selectionMode}
+            selectedCount={selection.selectedIds.size}
+            busy={duplicating}
+            onEnable={selection.toggleSelectionMode}
+            onCancel={selection.clear}
+            onDuplicate={handleDuplicateSelected}
+            onMove={() => setMovingOpen(true)}
+          />
+
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {sortedColumns.map((status) => (
               <TaskColumn
@@ -642,9 +679,23 @@ export default function ProcessPanel({
                 group={`tasks-process-${project.id}`}
                 activeTaskId={activeTaskId}
                 onToggleActive={onToggleActive}
+                selectionMode={selection.selectionMode}
+                selectedIds={selection.selectedIds}
+                onToggleSelect={selection.toggleSelect}
               />
             ))}
           </div>
+
+          {movingOpen && (
+            <MoveTaskModal
+              taskIds={Array.from(selection.selectedIds)}
+              onClose={() => setMovingOpen(false)}
+              onMoved={(moved) => {
+                onTasksMoved?.(moved);
+                selection.clear();
+              }}
+            />
+          )}
         </div>
       )}
 

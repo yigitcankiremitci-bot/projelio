@@ -122,6 +122,15 @@ export class AiAssistantController {
     return this.creditsService.getProviderBalanceStatus();
   }
 
+  // Admin, Anthropic Console'daki Cost sayfasından okuduğu gerçek ömür boyu maliyeti
+  // buraya bir referans noktası olarak kaydeder (bkz. AiCreditsService.recordCostCheckpoint).
+  @Post("admin/provider-balance/checkpoint")
+  async providerBalanceCheckpoint(@Req() req: any, @Body() body: { amountUsd: number; description?: string }) {
+    this.assertAdmin(req);
+    await this.creditsService.recordCostCheckpoint(Number(body.amountUsd), body.description, req.user.userId);
+    return this.creditsService.getProviderBalanceStatus();
+  }
+
   // Projelio'nun marj raporu: ham Anthropic maliyeti, kullanıcıdan alınan bedel ve kâr.
   @Get("admin/margin")
   margin(@Req() req: any, @Query("days") days?: string) {

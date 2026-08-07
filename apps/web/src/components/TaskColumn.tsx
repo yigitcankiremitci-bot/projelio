@@ -1,10 +1,13 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import Sortable from "sortablejs";
-import type { Task, TaskStatus } from "@projelio/shared";
+import type { Task, TaskPriority, TaskStatus } from "@projelio/shared";
+import { MAX_TASK_PRIORITY } from "@projelio/shared";
+import { api } from "../api/client";
 import { colors } from "../theme/colors";
-import { IconPlus, IconChevronRight, IconCheck, IconEdit, IconActivity } from "./icons";
+import { IconPlus, IconChevronRight, IconCheck, IconEdit, IconActivity, IconStar } from "./icons";
 import Modal from "./Modal";
-import { useSortableList } from "../lib/useSortableList";
+import { useSortableList, LONG_PRESS_DELAY } from "../lib/useSortableList";
+import { useUndo } from "../lib/undo";
 import { formatTaskDuration } from "../lib/dates";
 
 export interface TaskColumnHandle {
@@ -20,10 +23,16 @@ interface Props {
   // Verilmezse (ör. birden fazla projeyi birleştiren iş-geneli görünümde) sütunun altındaki
   // hızlı "Görev ekle" satırı gizlenir, çünkü hangi projeye/çıktıya ekleneceği belli olmaz.
   onCreate?: (status: TaskStatus, title: string) => void;
-  onCreateSubtask: (parentId: string, title: string) => void;
+  // Verilmezse alt görev katmanı tamamen kapanır: kartlar açılmaz, ok işareti ve
+  // "Alt görev ekle" gösterilmez. Kişisel Yapılacaklar panosu böyle çalışır —
+  // orada kartların alt görevi olamaz (bkz. TasksOverview).
+  onCreateSubtask?: (parentId: string, title: string) => void;
   onMove: (taskId: string, status: TaskStatus) => void;
   onToggleComplete: (taskId: string) => void;
   onEditTask: (task: Task) => void;
+  // Verilirse görev/alt görev başlığına çift tıklanarak adı yerinde değiştirilebilir;
+  // PATCH bu bileşende atılır, üst bileşen yalnızca kendi state'ini günceller.
+  onTaskRenamed?: (updated: Task) => void;
   // Aynı sütun içinde ya da sütunlar arasında (durum değişikliğiyle) basılı-tutup-sürükleme
   // ile sıralama yapıldığında son sırayı kalıcı hale getirmek için çağrılır.
   onReorderTasks?: (ids: string[]) => void;
@@ -33,9 +42,30 @@ interface Props {
   // Giriş yapmış kullanıcının "üzerinde çalışıyorum" diyerek işaretlediği görev (varsa).
   activeTaskId?: string;
   onToggleActive?: (taskId: string) => void;
+  // Karma listelerde (bkz. Yapılacaklar) bazı kartlar gerçek bir görev değildir;
+  // "üzerinde çalışıyorum" yalnızca gerçek görevlerde anlamlıdır (users.active_task_id
+  // tasks tablosuna FK). Verilmezse tüm kartlarda gösterilir (eski davranış).
+  canToggleActive?: (task: Task) => boolean;
+  // Ad değiştirme normalde PATCH /tasks/:id'ye gider. Görevleri başka bir uç
+  // noktada yaşayan listeler (Yapılacaklar'daki kişisel kartlar) burayı geçerek
+  // kendi isteklerini atar. Güncellenmiş görevi döndürmelidir.
+  onRenameTask?: (task: Task, title: string) => Promise<Task>;
   // Verilirse (ör. birden fazla projeyi birleştiren iş-geneli görünümde) her görevin altında
   // hangi proje/çıktıya ait olduğunu gösteren küçük bir alt yazı render edilir.
   getTaskMeta?: (task: Task) => string | undefined;
+  // Verilirse kartın başında küçük yuvarlak bir görsel gösterilir. Farklı
+  // kaynakların karıştığı listelerde (bkz. Yapılacaklar) kartın nereye ait
+  // olduğunu metni okumadan ayırt etmeye yarar. url yoksa label'ın ilk harfi
+  // yedek olarak basılır.
+  getTaskAvatar?: (task: Task) => { url?: string; label: string } | undefined;
+  // Öncelik yıldızları, güncellemeyi karşılayacak bir taraf olduğu için
+  // onTaskRenamed verildiğinde tıklanabilir olur; verilmediğinde yalnızca dolu
+  // yıldızlar okunur şekilde basılır.
+  //
+  // İstek varsayılan olarak PATCH /tasks/:id'ye gider (ad değiştirmedeki desenin
+  // aynısı). Görevleri başka bir uçta yaşayan listeler (Yapılacaklar'daki kişisel
+  // kartlar) burayı geçerek kendi isteğini atar; güncellenmiş görevi döndürmelidir.
+  onSetPriority?: (task: Task, priority: TaskPriority) => Promise<Task>;
   // Verilirse (ör. iş ekibi sekmesinden bir göreve tıklanıp buraya yönlendirildiğinde),
   // eşleşen görev/alt görev otomatik görünüre kaydırılır ve kısa süreliğine parlayarak
   // fark edilir hale getirilir.
@@ -54,6 +84,17 @@ const columnLabel: Record<TaskStatus, string> = {
   completed: "Tamamlandı",
 };
 
+/**
+ * Tarihi gün olarak biçimler; tarih yoksa ya da geçersizse boş string döner.
+ * Kişisel Yapılacaklar kartlarının tarihi olmayabilir — "Invalid Date" basmak
+ * yerine o alanı boş bırakıyoruz.
+ */
+function formatDay(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("tr-TR");
+}
+
 const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   status,
   allTasks,
@@ -62,11 +103,16 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   onMove,
   onToggleComplete,
   onEditTask,
+  onTaskRenamed,
   onReorderTasks,
   group,
   activeTaskId,
   onToggleActive,
+  canToggleActive,
+  onRenameTask,
   getTaskMeta,
+  getTaskAvatar,
+  onSetPriority,
   highlightTaskId,
   selectionMode,
   selectedIds,
@@ -85,6 +131,10 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(null);
   const topListRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  // Başlığa çift tıklayınca yerinde ad değiştirme (bkz. renderTitle).
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const { pushUndo } = useUndo();
 
   // Hedef görev bir alt görevse, önce ait olduğu üst görevin açılır listesini genişlet
   // ki DOM'da render olsun ve kaydırma/parlama animasyonu ona ulaşabilsin.
@@ -105,6 +155,8 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   const subtaskSortables = useRef<Map<string, Sortable>>(new Map());
 
   const isCompletedColumn = status === "completed";
+  // Alt görev katmanı yalnızca üst bileşen onCreateSubtask verdiğinde açılır.
+  const subtasksEnabled = Boolean(onCreateSubtask);
 
   const columnAccent: Record<TaskStatus, string> = {
     todo: c.textSecondary,
@@ -196,7 +248,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     if (!el || !onReorderTasks || selectionMode) return;
     const instance = Sortable.create(el, {
       animation: 180,
-      delay: 350,
+      delay: LONG_PRESS_DELAY,
       delayOnTouchOnly: false,
       touchStartThreshold: 5,
       forceFallback: true,
@@ -217,6 +269,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   };
 
   const toggleExpand = (id: string) => {
+    if (!subtasksEnabled) return;
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -231,6 +284,176 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   // ikisi birden tetiklense bile addingRef sayesinde görev iki kez eklenmiyor.
   const addingTaskRef = useRef(false);
   const addingSubtaskRef = useRef(false);
+
+  // ---------------------------------------------------------------- Ad değiştirme
+  // Başlığa çift tıklamak metni bir input'a çevirir. Enter ya da odak kaybı
+  // kaydeder, Esc vazgeçer. Kaydetme geri alınabilir (Cmd/Ctrl+Z).
+  const startRename = (task: Task) => {
+    if (selectionMode || !onTaskRenamed) return;
+    setRenamingId(task.id);
+    setRenameValue(task.title);
+  };
+
+  const commitRename = async (task: Task) => {
+    const trimmed = renameValue.trim();
+    setRenamingId(null);
+    if (!onTaskRenamed || !trimmed || trimmed === task.title) return;
+    const previousTitle = task.title;
+    const applyTitle = async (value: string) => {
+      const updated = onRenameTask
+        ? await onRenameTask(task, value)
+        : await api.patch<Task>(`/tasks/${task.id}`, { title: value });
+      onTaskRenamed(updated);
+    };
+    try {
+      await applyTitle(trimmed);
+      pushUndo({
+        label: task.parentTaskId ? "Alt görev adı" : "Görev adı",
+        run: () => applyTitle(previousTitle),
+        redo: () => applyTitle(trimmed),
+      });
+    } catch {
+      // güncellenemedi, kullanıcı tekrar deneyebilir
+    }
+  };
+
+  /** Görev/alt görev başlığı: normalde metin, çift tıklanınca düzenlenebilir input. */
+  const renderTitle = (task: Task, fontSize: number, color: string) => {
+    if (renamingId === task.id) {
+      return (
+        <input
+          autoFocus
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onBlur={() => void commitRename(task)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void commitRename(task);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              setRenamingId(null);
+            }
+          }}
+          aria-label="Görev adı"
+          style={{ flex: 1, minWidth: 0, height: 30, fontSize, padding: "0 8px" }}
+        />
+      );
+    }
+    return (
+      <span
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          startRename(task);
+        }}
+        title={onTaskRenamed && !selectionMode ? "Adı değiştirmek için çift tıkla" : undefined}
+        style={{
+          fontSize,
+          color,
+          textDecoration: task.status === "completed" ? "line-through" : "none",
+          overflowWrap: "break-word",
+          wordBreak: "break-word",
+        }}
+      >
+        {task.title}
+      </span>
+    );
+  };
+
+  // Yıldızın üzerine gelince o dereceye kadar doldurarak önizleme yapar;
+  // tıklamadan önce "kaç yıldız veriyorum" görünür olmalı.
+  const [hoverStar, setHoverStar] = useState<{ taskId: string; value: number } | null>(null);
+
+  /**
+   * Öncelik yıldızları. onTaskRenamed verilmişse (yani güncellemeyi karşılayacak
+   * bir taraf varsa) tıklanabilir; verilmemişse yalnızca dolu yıldızlar okunur
+   * şekilde basılır — önceliksiz görevde hiçbir şey görünmez, kart sessiz kalır.
+   */
+  const applyPriority = async (task: Task, priority: TaskPriority) => {
+    if (!onTaskRenamed) return;
+    const previous = (task.priority ?? 0) as TaskPriority;
+    if (previous === priority) return;
+    const request = async (value: TaskPriority) => {
+      const updated = onSetPriority
+        ? await onSetPriority(task, value)
+        : await api.patch<Task>(`/tasks/${task.id}`, { priority: value });
+      onTaskRenamed(updated);
+    };
+    try {
+      await request(priority);
+      pushUndo({
+        label: "Görev önceliği",
+        run: () => request(previous),
+        redo: () => request(priority),
+      });
+    } catch {
+      // güncellenemedi, kullanıcı tekrar deneyebilir
+    }
+  };
+
+  const renderPriority = (task: Task) => {
+    const current = task.priority ?? 0;
+    if (!onTaskRenamed) {
+      if (current === 0) return null;
+      return (
+        <div
+          aria-label={`Öncelik ${current}/${MAX_TASK_PRIORITY}`}
+          style={{ display: "flex", gap: 1, marginTop: 5 }}
+        >
+          {Array.from({ length: current }, (_, i) => (
+            <IconStar key={i} size={12} color={c.accent} filled />
+          ))}
+        </div>
+      );
+    }
+
+    const preview = hoverStar?.taskId === task.id ? hoverStar.value : null;
+    return (
+      <div
+        role="radiogroup"
+        aria-label="Öncelik"
+        onMouseLeave={() => setHoverStar(null)}
+        style={{ display: "flex", gap: 1, marginTop: 5 }}
+      >
+        {Array.from({ length: MAX_TASK_PRIORITY }, (_, i) => {
+          const value = (i + 1) as TaskPriority;
+          const filled = value <= (preview ?? current);
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={current === value}
+              aria-label={`${value} yıldız`}
+              title={current === value ? "Önceliği kaldır" : `${value} yıldız`}
+              onMouseEnter={() => setHoverStar({ taskId: task.id, value })}
+              onClick={(e) => {
+                e.stopPropagation();
+                // Aynı yıldıza tekrar basmak önceliği kaldırır — yanlışlıkla
+                // verilen bir dereceyi geri almanın tek yolu bu olmalı.
+                void applyPriority(task, current === value ? 0 : value);
+              }}
+              style={{
+                display: "flex",
+                padding: 1,
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                lineHeight: 0,
+              }}
+            >
+              <IconStar
+                size={13}
+                color={filled ? c.accent : c.border}
+                filled={filled}
+              />
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
 
   const commitAddTask = () => {
     if (addingTaskRef.current || !onCreate) return;
@@ -253,7 +476,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   };
 
   const commitAddSubtask = (parentId: string) => {
-    if (addingSubtaskRef.current) return;
+    if (addingSubtaskRef.current || !onCreateSubtask) return;
     const trimmed = subtaskTitle.trim();
     if (!trimmed) {
       setSubtaskParent(null);
@@ -307,7 +530,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
       <div ref={topListRef} data-status={status}>
         {realTopLevel.map((t) => {
           const subtasks = subtasksOf(t.id);
-          const isOpen = expanded.has(t.id);
+          const isOpen = subtasksEnabled && expanded.has(t.id);
           const stats = subtaskStats(t.id);
           // Gün bazlı karşılaştırma: son günü bugün olan görevler gün bitmeden
           // "gecikmiş" (kırmızı) görünmesin — sadece tarihi gerçekten geçmişse.
@@ -328,7 +551,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                   borderLeft: `3px solid ${columnAccent[status]}`,
                   borderRadius: 8,
                   padding: "10px 12px",
-                  cursor: "pointer",
+                  cursor: subtasksEnabled ? "pointer" : "default",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -375,18 +598,51 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                   >
                     {t.status === "completed" && <IconCheck size={10} color="#fff" />}
                   </button>
+                  {(() => {
+                    const avatar = getTaskAvatar?.(t);
+                    if (!avatar) return null;
+                    return (
+                      <span
+                        title={avatar.label}
+                        aria-label={avatar.label}
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: "50%",
+                          overflow: "hidden",
+                          flexShrink: 0,
+                          background: c.background,
+                          border: `1px solid ${c.border}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 11,
+                          fontWeight: 500,
+                          color: c.textSecondary,
+                        }}
+                      >
+                        {avatar.url ? (
+                          <img
+                            src={avatar.url}
+                            alt=""
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                        ) : (
+                          avatar.label.charAt(0).toLocaleUpperCase("tr")
+                        )}
+                      </span>
+                    );
+                  })()}
                   <div style={{ display: "flex", alignItems: "center", gap: 5, flex: 1, minWidth: 0 }}>
-                    <span
-                      style={{
-                        fontSize: 16,
-                        color: t.status === "completed" ? c.textSecondary : isOverdueWithPendingSubtasks ? c.danger : c.textPrimary,
-                        textDecoration: t.status === "completed" ? "line-through" : "none",
-                        overflowWrap: "break-word",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {t.title}
-                    </span>
+                    {renderTitle(
+                      t,
+                      16,
+                      t.status === "completed"
+                        ? c.textSecondary
+                        : isOverdueWithPendingSubtasks
+                        ? c.danger
+                        : c.textPrimary
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -397,7 +653,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                     >
                       <IconEdit size={13} color={c.textSecondary} />
                     </button>
-                    {onToggleActive && (
+                    {onToggleActive && (canToggleActive?.(t) ?? true) && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -420,16 +676,18 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                     )}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        transform: isOpen ? "rotate(90deg)" : "none",
-                        transition: "transform 0.1s ease",
-                      }}
-                    >
-                      <IconChevronRight size={13} color={c.textSecondary} />
-                    </span>
-                    {subtaskStats(t.id).total > 0 && (
+                    {subtasksEnabled && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          transform: isOpen ? "rotate(90deg)" : "none",
+                          transition: "transform 0.1s ease",
+                        }}
+                      >
+                        <IconChevronRight size={13} color={c.textSecondary} />
+                      </span>
+                    )}
+                    {subtasksEnabled && subtaskStats(t.id).total > 0 && (
                       <span
                         style={{
                           fontSize: 12,
@@ -500,29 +758,37 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                     )}
                   </div>
                 )}
+                {renderPriority(t)}
                 {(() => {
                   const { total, remaining } = subtaskStats(t.id);
                   const progressPct = total > 0 ? Math.round(((total - remaining) / total) * 100) : 0;
-                  const start = t.startDate ?? t.createdAt;
+                  const start = formatDay(t.startDate ?? t.createdAt);
+                  // Yapılacaklar panosundaki kişisel görevlerin tarihi olmayabilir;
+                  // "Invalid Date" basmak yerine o ucu boş bırakıyoruz.
+                  const due = formatDay(t.deadline);
+                  // İlerleme çubuğu alt görev tamamlanmasını gösterir. Alt görevi
+                  // olmayan bir görevde hep boş durup "%0 bitti" gibi yanlış bir
+                  // sinyal veriyordu; artık yalnızca gösterecek bir şey varken çıkıyor.
+                  if (!start && !due) return null;
                   return (
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-                      <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>
-                        {new Date(start).toLocaleDateString("tr-TR")}
-                      </span>
-                      <div style={{ flex: 1, height: 5, borderRadius: 3, background: c.border, overflow: "hidden", minWidth: 24 }}>
-                        <div
-                          style={{
-                            width: `${progressPct}%`,
-                            height: "100%",
-                            background: c.accent,
-                            borderRadius: 3,
-                            transition: "width 0.15s ease",
-                          }}
-                        />
-                      </div>
-                      <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>
-                        {new Date(t.deadline).toLocaleDateString("tr-TR")}
-                      </span>
+                      <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{start}</span>
+                      {total > 0 ? (
+                        <div style={{ flex: 1, height: 5, borderRadius: 3, background: c.border, overflow: "hidden", minWidth: 24 }}>
+                          <div
+                            style={{
+                              width: `${progressPct}%`,
+                              height: "100%",
+                              background: c.accent,
+                              borderRadius: 3,
+                              transition: "width 0.15s ease",
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <span style={{ flex: 1, minWidth: 24 }} />
+                      )}
+                      <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{due}</span>
                     </div>
                   );
                 })()}
@@ -604,17 +870,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                         </button>
                         <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
-                            <span
-                              style={{
-                                fontSize: 15,
-                                color: sub.status === "completed" ? c.textSecondary : c.textPrimary,
-                                textDecoration: sub.status === "completed" ? "line-through" : "none",
-                                overflowWrap: "break-word",
-                                wordBreak: "break-word",
-                              }}
-                            >
-                              {sub.title}
-                            </span>
+                            {renderTitle(sub, 15, sub.status === "completed" ? c.textSecondary : c.textPrimary)}
                             {getTaskMeta?.(sub) && (
                               <span style={{ fontSize: 11, color: c.textSecondary }}>{getTaskMeta(sub)}</span>
                             )}

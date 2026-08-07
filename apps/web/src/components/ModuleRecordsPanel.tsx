@@ -3,11 +3,16 @@ import type { ModuleRecord } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import type { ModuleRecordConfig } from "../lib/moduleRecordConfigs";
+import { useUndo } from "../lib/undo";
 import { IconTrash } from "./icons";
 
+// Kayıtların sahibi iki türlü olabilir (bkz. 037_freelancer_modules.sql):
+// bir organizasyon (şirket/işletme departman modülleri) ya da bir iş (serbest
+// çalışanın anasayfadan bir işe attığı modüller). İkisinden tam olarak biri verilir.
 interface Props {
-  organizationId: string;
+  organizationId?: string;
   departmentId?: string;
+  jobId?: string;
   moduleKey: string;
   config: ModuleRecordConfig;
 }
@@ -22,7 +27,7 @@ function defaultForm(config: ModuleRecordConfig): Record<string, string> {
 // Alım…) veri girişi + liste ekranı. moduleRecordConfigs.ts'teki alan
 // tanımından form ve özet satırlarını üretir — yeni bir modül tam özellikli
 // yapılmak istendiğinde buraya dokunmadan sadece o dosyaya bir tanım eklenir.
-export default function ModuleRecordsPanel({ organizationId, departmentId, moduleKey, config }: Props) {
+export default function ModuleRecordsPanel({ organizationId, departmentId, jobId, moduleKey, config }: Props) {
   const c = colors.light;
   const [records, setRecords] = useState<ModuleRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,17 +35,20 @@ export default function ModuleRecordsPanel({ organizationId, departmentId, modul
   const [form, setForm] = useState<Record<string, string>>(() => defaultForm(config));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const { pushDestructive } = useUndo();
+
+  const basePath = jobId ? `/jobs/${jobId}/module-records` : `/organizations/${organizationId}/module-records`;
 
   const load = () => {
     setLoading(true);
     api
-      .get<ModuleRecord[]>(`/organizations/${organizationId}/module-records?moduleKey=${encodeURIComponent(moduleKey)}`)
+      .get<ModuleRecord[]>(`${basePath}?moduleKey=${encodeURIComponent(moduleKey)}`)
       .then(setRecords)
       .catch(() => setRecords([]))
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [organizationId, moduleKey]);
+  useEffect(load, [basePath, moduleKey]);
 
   const resetForm = () => setForm(defaultForm(config));
 
@@ -60,7 +68,7 @@ export default function ModuleRecordsPanel({ organizationId, departmentId, modul
         if (v === undefined || v === "") continue;
         data[field.key] = field.type === "number" ? Number(v) : v;
       }
-      await api.post(`/organizations/${organizationId}/module-records`, { departmentId, moduleKey, data });
+      await api.post(basePath, jobId ? { moduleKey, data } : { departmentId, moduleKey, data });
       resetForm();
       setAdding(false);
       load();
@@ -71,9 +79,18 @@ export default function ModuleRecordsPanel({ organizationId, departmentId, modul
     }
   };
 
-  const handleDelete = async (id: string) => {
-    await api.delete(`/module-records/${id}`).catch(() => {});
-    load();
+  // Silme hemen sunucuya gitmez: satır listeden düşürülür, gerçek DELETE birkaç
+  // saniye sonra atılır. Bu pencerede Cmd/Ctrl+Z basılırsa istek hiç gönderilmez
+  // ve liste sunucudan (hâlâ duran kayıtla birlikte) tazelenir.
+  const handleDelete = (id: string) => {
+    setRecords((prev) => prev.filter((r) => r.id !== id));
+    pushDestructive({
+      label: "Kayıt silme",
+      commit: async () => {
+        await api.delete(`/module-records/${id}`).catch(() => {});
+      },
+      restore: load,
+    });
   };
 
   return (

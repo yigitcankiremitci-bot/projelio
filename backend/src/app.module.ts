@@ -33,6 +33,7 @@ import { JobModulesModule } from "./modules/job-modules/job-modules.module";
 import { PartnersModule } from "./modules/partners/partners.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ModuleRecordsModule } from "./modules/module-records/module-records.module";
+import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.module";
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { ModuleRecordsModule } from "./modules/module-records/module-records.mod
     PartnersModule,
     ProductsModule,
     ModuleRecordsModule,
+    PersonalTodosModule,
   ],
 })
 export class AppModule {}

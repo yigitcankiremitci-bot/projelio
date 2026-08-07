@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { OperationRoutine, RoutineFreq } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
+import { useUndo } from "../lib/undo";
 import Modal from "./Modal";
 
 interface Props {
@@ -66,6 +67,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
   const [preview, setPreview] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { pushDestructive } = useUndo();
 
   // Formdaki kuralı sunucunun anladığı biçime çevirir. Önizleme ve kaydetme
   // aynı gövdeyi kullanır ki gördüğün tarihler kaydedilenle birebir aynı olsun.
@@ -146,7 +148,14 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
     if (!routine) return;
     setLoading(true);
     try {
-      await api.delete(`/routines/${routine.id}`);
+      // Silme birkaç saniye geciktirilir; bu pencerede Cmd/Ctrl+Z ile vazgeçilebilir.
+      pushDestructive({
+        label: "Rutin silme",
+        commit: async () => {
+          await api.delete(`/routines/${routine.id}`).catch(() => {});
+        },
+        restore: onSaved,
+      });
       onDeleted?.();
       onSaved();
       onClose();

@@ -529,6 +529,53 @@ const goalConfig: ModuleRecordConfig = {
   ],
 };
 
+// ============================================================ Genel amaçlı (fallback)
+// Katalogda olup henüz kendine özel alan tanımı yazılmamış modüller için basit
+// bir "kayıt defteri": başlık + durum + tarih + not. Böylece hiçbir modül boş
+// kabuk olarak kalmıyor; bir modül tam özellikli yapıldığında aşağıdaki
+// MODULE_RECORD_CONFIGS'e eklenip bu fallback devreden çıkar.
+function genericConfig(moduleName: string): ModuleRecordConfig {
+  return {
+    title: moduleName,
+    addLabel: "Kayıt ekle",
+    emptyLabel: "Henüz kayıt yok.",
+    fields: [
+      { key: "title", label: "Başlık", type: "text", required: true },
+      {
+        key: "status",
+        label: "Durum",
+        type: "select",
+        defaultValue: "open",
+        options: [
+          { value: "open", label: "Açık" },
+          { value: "in_progress", label: "Devam ediyor" },
+          { value: "done", label: "Tamamlandı" },
+        ],
+      },
+      { key: "date", label: "Tarih", type: "date" },
+      { key: "notes", label: "Not", type: "textarea" },
+    ],
+    summary: (d) => (d.title as string) ?? "",
+    detail: (d) => {
+      const statusLabel: Record<string, string> = { open: "Açık", in_progress: "Devam ediyor", done: "Tamamlandı" };
+      return [statusLabel[d.status as string], d.date as string | undefined].filter(Boolean).join(" · ") || undefined;
+    },
+    computeStats: (records) => [
+      { label: "Toplam", value: String(records.length) },
+      { label: "Devam eden", value: String(countBy(records, "status", "in_progress")) },
+      { label: "Tamamlanan", value: String(countBy(records, "status", "done")) },
+    ],
+  };
+}
+
+/**
+ * Bir modülün veri giriş tanımını verir. Modüle özel bir tanım yoksa genel amaçlı
+ * kayıt defterine düşer — bu yüzden her zaman bir config döner.
+ */
+export function getModuleRecordConfig(moduleKey: string, moduleName: string): ModuleRecordConfig {
+  return MODULE_RECORD_CONFIGS[moduleKey] ?? genericConfig(moduleName);
+}
+
 export const MODULE_RECORD_CONFIGS: Record<string, ModuleRecordConfig> = {
   fm_gelir_gider: financeEntryConfig,
   fm_alacak_borc: receivablesPayablesConfig,

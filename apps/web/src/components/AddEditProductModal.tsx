@@ -78,9 +78,10 @@ export default function AddEditProductModal({
     onArchived?.();
   };
 
+  // DELETE isteğini EntityDangerZone geciktirmeli olarak atar (bkz. resourcePath);
+  // burada yalnızca silme sonrası arayüz davranışı kalır.
   const handleDelete = async () => {
     if (!product) return;
-    await api.delete(`/products/${product.id}`);
     onDeleted?.();
   };
 
@@ -137,6 +138,7 @@ export default function AddEditProductModal({
       {isEdit && (
         <EntityDangerZone
           entityLabel="Ürün/Hizmeti"
+          resourcePath={product ? `/products/${product.id}` : undefined}
           onArchive={onArchived ? handleArchive : undefined}
           onDelete={onDeleted ? handleDelete : undefined}
           archiveMessage={`"${product?.name}" ürün/hizmetini arşive eklemek istediğine emin misin?`}

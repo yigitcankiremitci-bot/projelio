@@ -15,6 +15,7 @@ import OrgTabs, { OrgTab } from "../components/OrgTabs";
 import ProfileCard from "../components/ProfileCard";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
+import { usePageHeader } from "../lib/pageHeader";
 import { colors } from "../theme/colors";
 import { IconUser, IconCalendar, IconSettings, IconLayers } from "../components/icons";
 
@@ -85,11 +86,16 @@ export default function OrganizationDetail() {
     };
   }, [organization?.name]);
 
+  // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
+  const coverRef = useRef<HTMLDivElement>(null);
+  usePageHeader(organization?.name, coverRef, [organization?.name]);
+
   if (!id) return null;
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
       <div
+        ref={coverRef}
         style={{
           position: "relative",
           height: 270,

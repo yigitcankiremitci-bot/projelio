@@ -44,9 +44,35 @@ function mapTransaction(row: any): CreditTransaction {
   };
 }
 
+/** Anthropic'in Cost Report API'sinden okunan ömür boyu maliyetin bellek içi önbelleği. */
+interface RealCostCacheEntry {
+  value: number;
+  fetchedAt: number;
+}
+
+/**
+ * Admin paneli her açıldığında/yenilendiğinde bu endpoint'e istek gitmesin diye
+ * ("polling once per minute for sustained use" — Anthropic'in kendi önerisi) taze
+ * bir önbellek tutulur. Taze önbellek yoksa ama az önce başarılı bir sonuç alındıysa,
+ * yeni istek 429 (hız sınırı) ile başarısız olduğunda o eski sonuca (biraz daha uzun
+ * bir süre için) düşülür — böylece geçici bir hız sınırı "kendi tahminimize" gürültülü
+ * bir şekilde geri dönmeye sebep olmaz.
+ */
+const REAL_COST_FRESH_TTL_MS = 5 * 60_000;
+const REAL_COST_STALE_FALLBACK_MS = 30 * 60_000;
+/**
+ * 429 (hız sınırı) alındığında bu süre boyunca Anthropic'e hiç istek atılmaz —
+ * yeni/dönüştürülmüş organizasyonlarda Cost Report API'nin izin verdiği hız çok
+ * düşük olabiliyor; art arda denemek sadece logu doldurup hesabı daha da
+ * "şüpheli" gösterir. Bekleme süresi dolunca tek bir deneme daha yapılır.
+ */
+const REAL_COST_COOLDOWN_AFTER_429_MS = 10 * 60_000;
+
 @Injectable()
 export class AiCreditsService {
   private readonly logger = new Logger(AiCreditsService.name);
+  private realCostCache: RealCostCacheEntry | null = null;
+  private realCostBlockedUntil = 0;
 
   constructor(private supabase: SupabaseService) {}
 
@@ -231,38 +257,231 @@ export class AiCreditsService {
   }
 
   /**
+   * Anthropic'in resmi "Cost Report" Admin API'sinden (https://api.anthropic.com/v1/organizations/cost_report)
+   * ömür boyu GERÇEK maliyeti çeker. Bu bizim kendi token sayımımıza değil, doğrudan
+   * Anthropic'in faturalandırdığı rakama dayanır — yani en doğru kaynaktır.
+   *
+   * Ayrı bir "Admin API key" gerektirir (backend/.env → ANTHROPIC_ADMIN_API_KEY=sk-ant-admin01-...),
+   * normal ANTHROPIC_API_KEY'den farklıdır ve Anthropic Console'da organizasyon
+   * admin/owner yetkisiyle oluşturulur. Anahtar yoksa veya istek başarısız olursa null
+   * döner ve çağıran taraf kendi tahminine (ai_credit_transactions.cost_usd) düşer —
+   * bu yüzden özellik kapalıyken hiçbir şey bozulmaz.
+   */
+  /**
+   * sanityCeilingUsd: kendi token bazlı tahminimizin (internalEstimateUsd) çok üzerinde
+   * bir rakam gelirse (ör. birim/kümülatif hesap hatası), bunu SESSİZCE göstermek yerine
+   * reddedip loglarız — yanlış ama "resmi" görünen bir rakamı admin'e göstermek, kendi
+   * tahminimizi göstermekten daha kötüdür. Marj: gerçek fiyatlandırma bizim tablomuzdan
+   * biraz farklı olabilir diye ×5 + 0,50 tampon bırakılır.
+   */
+  private async fetchAnthropicRealCostUsd(sinceIso: string, sanityCeilingUsd: number): Promise<number | null> {
+    const adminKey = process.env.ANTHROPIC_ADMIN_API_KEY?.trim();
+    if (!adminKey) return null;
+
+    const now = Date.now();
+    if (this.realCostCache && now - this.realCostCache.fetchedAt < REAL_COST_FRESH_TTL_MS) {
+      return this.realCostCache.value;
+    }
+    if (now < this.realCostBlockedUntil) {
+      // Az önce 429 aldık; bekleme süresi dolmadan tekrar denemiyoruz — elimizdeki
+      // en son (varsa bayat) sonuca düşülür.
+      if (this.realCostCache && now - this.realCostCache.fetchedAt < REAL_COST_STALE_FALLBACK_MS) {
+        return this.realCostCache.value;
+      }
+      return null;
+    }
+
+    try {
+      let total = 0;
+      let page: string | undefined;
+      let bucketCount = 0;
+      let resultCount = 0;
+      const sampleResults: any[] = [];
+      // ending_at döngü boyunca SABİT tutulur: her sayfada yeniden hesaplanırsa
+      // (ör. Date.now()), sayfalar arası pencere kayar ve next_page imleciyle
+      // tutarsızlık/çift sayım riski oluşur.
+      const endingAtIso = new Date().toISOString();
+      // Güvenlik: API bir sebeple sürekli has_more=true dönerse sonsuz döngüye
+      // girmeyelim diye sayfa sayısı sınırlanır (günlük bucket ile bu kadar sayfa
+      // pratikte yıllarca veriye karşılık gelir).
+      for (let i = 0; i < 50; i++) {
+        // Sayfalar arasında kısa bir bekleme: bu endpoint dakikada bir sorgulanacak
+        // şekilde tasarlanmış, art arda aralıksız istek yeni/düşük limitli admin
+        // key'lerde hız sınırına çarpıyordu.
+        if (i > 0) await new Promise((resolve) => setTimeout(resolve, 400));
+
+        const url = new URL("https://api.anthropic.com/v1/organizations/cost_report");
+        url.searchParams.set("starting_at", sinceIso);
+        url.searchParams.set("ending_at", endingAtIso);
+        url.searchParams.set("limit", "31");
+        if (page) url.searchParams.set("page", page);
+
+        const res = await fetch(url, {
+          headers: {
+            "x-api-key": adminKey,
+            "anthropic-version": "2023-06-01",
+          },
+        });
+        if (!res.ok) {
+          this.logger.warn(`Anthropic cost_report isteği başarısız (${res.status}): ${await res.text()}`);
+          if (res.status === 429) {
+            this.realCostBlockedUntil = now + REAL_COST_COOLDOWN_AFTER_429_MS;
+          }
+          // Elimizde az önce alınmış bir sonuç varsa (30 dk'ya kadar) ona düş;
+          // yoksa null dönüp çağıran taraf kendi tahminini kullansın.
+          if (this.realCostCache && now - this.realCostCache.fetchedAt < REAL_COST_STALE_FALLBACK_MS) {
+            return this.realCostCache.value;
+          }
+          return null;
+        }
+        const body: any = await res.json();
+        for (const bucket of body.data ?? []) {
+          bucketCount++;
+          for (const result of bucket.results ?? []) {
+            resultCount++;
+            if (sampleResults.length < 12) sampleResults.push(result);
+            total += Number(result.amount ?? 0);
+          }
+        }
+        if (!body.has_more || !body.next_page) break;
+        page = body.next_page;
+      }
+
+      // Teşhis: Console'daki gerçek rakamla karşılaştırabilmek için ham dökümü logla.
+      this.logger.log(
+        `Anthropic cost_report ham sonuç: bucket=${bucketCount} result=${resultCount} toplam=${total} ` +
+          `aralık=[${sinceIso} .. ${endingAtIso}] örnekler=${JSON.stringify(sampleResults)}`
+      );
+
+      if (total > sanityCeilingUsd) {
+        this.logger.warn(
+          `Anthropic cost_report şüpheli: toplam=${total} kendi tahminimizin (${sanityCeilingUsd} tavan) çok üzerinde. ` +
+            `Bu sonucu REDDEDİP kendi tahminimize düşülüyor — bkz. yukarıdaki ham döküm.`
+        );
+        // Şüpheli sonucu önbelleğe YAZMIYORUZ ki bir dahaki temiz denemede tekrar hesaplansın.
+        return null;
+      }
+
+      this.realCostCache = { value: total, fetchedAt: now };
+      return total;
+    } catch (err: any) {
+      this.logger.warn(`Anthropic cost_report çağrısı başarısız: ${err?.message ?? err}`);
+      if (this.realCostCache && now - this.realCostCache.fetchedAt < REAL_COST_STALE_FALLBACK_MS) {
+        return this.realCostCache.value;
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Admin, Anthropic Console'ın Cost sayfasında gördüğü gerçek ömür boyu maliyeti
+   * bir "referans noktası" (checkpoint) olarak kaydeder. getProviderBalanceStatus bu
+   * noktayı bulursa, o andan SONRAKİ kullanımı kendi tahminimizle üstüne ekleyip
+   * gösterir — Cost Report API'si (bkz. fetchAnthropicRealCostUsd) güvenilir hale
+   * gelene kadar en tutarlı yöntem budur.
+   */
+  async recordCostCheckpoint(amountUsd: number, description: string | undefined, createdBy: string): Promise<void> {
+    if (!Number.isFinite(amountUsd) || amountUsd < 0) {
+      throw new BadRequestException("Tutar 0 veya pozitif bir sayı olmalı.");
+    }
+    const { error } = await this.supabase.client.from("ai_provider_cost_checkpoints").insert({
+      amount_usd: amountUsd,
+      description: description ?? null,
+      created_by: createdBy,
+    });
+    if (error) throw error;
+  }
+
+  /**
    * Projelio'nun Anthropic hesabında ne kadar bakiye kaldığının tahmini.
-   * remainingCredits: aynı tahmini, kullanıcıya kredi yüklerken girilen birimle (kredi)
-   * karşılaştırılabilsin diye CREDIT_UNIT_USD ile çevrilmiş hâli — admin "bu kullanıcıya
-   * 5000 kredi versem elimde ne kalır" sorusunu buradan cevaplayabilir.
+   *
+   * spentUsd üç kaynaktan biriyle belirlenir, öncelik sırasıyla:
+   *  1. "manual_checkpoint" — admin'in Console'dan elle girdiği son referans noktası +
+   *     o noktadan sonraki kullanımın kendi tahminimiz kadarı. En güvenilir kaynak,
+   *     çünkü bir insan gerçek Console rakamını doğrulamış.
+   *  2. "anthropic_api" — Cost Report API'sinden canlı çekilen, kendi tahminimize göre
+   *     mantıksız derecede yüksek OLMAYAN sonuç.
+   *  3. "internal_estimate" — hiçbiri yoksa/başarısızsa kendi token bazlı tahminimiz.
+   * internalEstimateUsd her zaman (checkpoint sonrası delta için de) hesaplanıp dönülür.
+   *
+   * remainingCredits hesabında dikkat edilmesi gereken nokta: remainingUsd, Anthropic'e
+   * ödenen HAM maliyet (komisyonsuz) üzerinden hesaplanır; CREDIT_UNIT_USD ise kullanıcıya
+   * SATILAN kredinin birim fiyatıdır (komisyon dahil). İkisini doğrudan bölmek kalan
+   * kapasiteyi ~%20 düşük gösterir. Doğru çevrim: ham USD'yi önce satış bedeline
+   * (× (1+komisyon)) çevirip sonra kredi birimine bölmek.
    */
   async getProviderBalanceStatus(): Promise<{
     toppedUpUsd: number;
     spentUsd: number;
+    spentUsdSource: "manual_checkpoint" | "anthropic_api" | "internal_estimate";
+    internalEstimateUsd: number;
     remainingUsd: number;
     remainingCredits: number;
     lastTopups: { amountUsd: number; description?: string; createdAt: string }[];
+    lastCheckpoint?: { amountUsd: number; createdAt: string };
   }> {
-    const [topupsResult, usageResult] = await Promise.all([
+    const [topupsResult, usageResult, checkpointResult] = await Promise.all([
       this.supabase.client
         .from("ai_provider_balance_topups")
         .select("amount_usd, description, created_at")
         .order("created_at", { ascending: false }),
-      this.supabase.client.from("ai_credit_transactions").select("cost_usd").eq("type", "usage"),
+      this.supabase.client.from("ai_credit_transactions").select("cost_usd, created_at").eq("type", "usage"),
+      this.supabase.client
+        .from("ai_provider_cost_checkpoints")
+        .select("amount_usd, created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
     if (topupsResult.error) throw topupsResult.error;
     if (usageResult.error) throw usageResult.error;
+    if (checkpointResult.error) throw checkpointResult.error;
 
     const topups = topupsResult.data ?? [];
+    const usageRows = usageResult.data ?? [];
+    const checkpoint = checkpointResult.data as { amount_usd: number; created_at: string } | null;
     const toppedUpUsd = topups.reduce((sum, r: any) => sum + Number(r.amount_usd ?? 0), 0);
-    const spentUsd = (usageResult.data ?? []).reduce((sum, r: any) => sum + Number(r.cost_usd ?? 0), 0);
+    const internalEstimateUsd = usageRows.reduce((sum, r: any) => sum + Number(r.cost_usd ?? 0), 0);
+
+    let spentUsd: number;
+    let spentUsdSource: "manual_checkpoint" | "anthropic_api" | "internal_estimate";
+
+    if (checkpoint) {
+      const checkpointAt = new Date(checkpoint.created_at).getTime();
+      const deltaSinceCheckpoint = usageRows
+        .filter((r: any) => new Date(r.created_at).getTime() > checkpointAt)
+        .reduce((sum, r: any) => sum + Number(r.cost_usd ?? 0), 0);
+      spentUsd = Number(checkpoint.amount_usd) + deltaSinceCheckpoint;
+      spentUsdSource = "manual_checkpoint";
+    } else {
+      // Anthropic'e SADECE gerçekten veri olabilecek tarihten itibaren sorulur — geniş
+      // (ör. 1 yıllık) bir aralık, çok fazla günlük bucket'ı art arda, aralıksız sayfalayıp
+      // yeni admin key'lerin düşük hız sınırına çarpmamıza sebep oluyordu (bkz. gözlenen
+      // 429'lar). En eski kayıt, en eski kullanım ya da en eski yükleme tarihinden hangisi
+      // daha eskiyse odur; hiçbiri yoksa 30 gün öncesi kullanılır (zaten maliyet 0 olacak).
+      const allDates = [...usageRows.map((r: any) => r.created_at), ...topups.map((r: any) => r.created_at)].filter(
+        Boolean
+      );
+      const earliestIso =
+        allDates.length > 0
+          ? new Date(Math.min(...allDates.map((d: string) => new Date(d).getTime()))).toISOString()
+          : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const sanityCeilingUsd = Math.max(internalEstimateUsd * 5 + 0.5, 2);
+      const realCostUsd = await this.fetchAnthropicRealCostUsd(earliestIso, sanityCeilingUsd);
+      spentUsd = realCostUsd ?? internalEstimateUsd;
+      spentUsdSource = realCostUsd !== null ? "anthropic_api" : "internal_estimate";
+    }
+
     const remainingUsd = toppedUpUsd - spentUsd;
 
     return {
       toppedUpUsd: Number(toppedUpUsd.toFixed(2)),
       spentUsd: Number(spentUsd.toFixed(4)),
+      spentUsdSource,
+      internalEstimateUsd: Number(internalEstimateUsd.toFixed(4)),
       remainingUsd: Number(remainingUsd.toFixed(4)),
-      remainingCredits: Math.round(remainingUsd / CREDIT_UNIT_USD),
+      lastCheckpoint: checkpoint ? { amountUsd: Number(checkpoint.amount_usd), createdAt: checkpoint.created_at } : undefined,
+      remainingCredits: Math.round((remainingUsd * (1 + COMMISSION_RATE)) / CREDIT_UNIT_USD),
       lastTopups: topups.slice(0, 10).map((r: any) => ({
         amountUsd: Number(r.amount_usd),
         description: r.description ?? undefined,

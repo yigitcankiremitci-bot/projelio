@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { useProjectFabAction } from "../lib/projectFab";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
+import { useUndo } from "../lib/undo";
 import ModuleRecordsPanel from "./ModuleRecordsPanel";
 import { IconCheck, IconX } from "./icons";
 
@@ -31,6 +32,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const { pushUndo } = useUndo();
 
   const load = () => {
     if (!departmentKey) {
@@ -67,6 +69,19 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
       if (expandedKey === moduleKey) setExpandedKey(null);
       await api.delete(`/organizations/${organizationId}/modules/${moduleKey}`);
       load();
+      // Modülü kapatmak kayıtları silmez, sadece etkinliği kaldırır — geri alma
+      // basitçe aynı modülü yeniden etkinleştirir.
+      pushUndo({
+        label: "Modül kaldırma",
+        run: async () => {
+          await api.post(`/organizations/${organizationId}/modules`, { moduleKeys: [moduleKey] });
+          load();
+        },
+        redo: async () => {
+          await api.delete(`/organizations/${organizationId}/modules/${moduleKey}`);
+          load();
+        },
+      });
     } finally {
       setBusyKey(null);
     }

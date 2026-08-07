@@ -9,6 +9,13 @@ interface Props {
   onCancel: () => void;
   onDuplicate: () => void;
   onMove: () => void;
+  /**
+   * Panolardaki tek satırlık araç çubuğunun içine yerleşmek için: kapalıyken
+   * yalnızca "Seç" düğmesi döner (kendi satırını açmaz), açıkken tam genişlikte
+   * bar olarak bir alt satıra kayar — o halde sayaç ve eylemler için yer gerekiyor.
+   * Çağıran, kapsayıcısını `display: flex; flex-wrap: wrap` yapmalıdır.
+   */
+  inline?: boolean;
 }
 
 // Görev sütunlarının üstünde gösterilen seçim araç çubuğu: kapalıyken tek bir
@@ -23,13 +30,13 @@ export default function TaskSelectionBar({
   onCancel,
   onDuplicate,
   onMove,
+  inline,
 }: Props) {
   const c = colors.light;
 
   if (!selectionMode) {
-    return (
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-        <button
+    const enableButton = (
+      <button
           type="button"
           onClick={onEnable}
           style={{
@@ -44,11 +51,12 @@ export default function TaskSelectionBar({
             fontSize: 13,
           }}
         >
-          <IconCheck size={13} color={c.textSecondary} />
-          Seç
-        </button>
-      </div>
+        <IconCheck size={13} color={c.textSecondary} />
+        Seç
+      </button>
     );
+    if (inline) return enableButton;
+    return <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>{enableButton}</div>;
   }
 
   const disabled = selectedCount === 0 || busy;
@@ -61,7 +69,10 @@ export default function TaskSelectionBar({
         justifyContent: "space-between",
         gap: 10,
         flexWrap: "wrap",
-        marginBottom: 10,
+        // Satır içi kullanımda tam genişlik alıp bir alt satıra kayar: sayaç ve
+        // eylemler araç çubuğunun yanına sığmaz.
+        flexBasis: inline ? "100%" : undefined,
+        marginBottom: inline ? 0 : 10,
         padding: "8px 12px",
         borderRadius: 10,
         border: `1px solid ${c.border}`,

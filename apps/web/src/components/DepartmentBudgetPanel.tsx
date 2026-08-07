@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { BudgetTransaction, BudgetTransactionType, Task, TaskBudgetStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
+import { useUndo } from "../lib/undo";
 import { IconTrash } from "./icons";
 
 export interface DepartmentBudgetPanelHandle {
@@ -77,6 +78,7 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+  const { pushDestructive } = useUndo();
 
   const load = () => {
     setLoading(true);
@@ -125,9 +127,17 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
     }
   };
 
+  // Silme hemen sunucuya gitmez: satır listeden düşürülür, gerçek DELETE birkaç
+  // saniye sonra atılır; bu pencerede Cmd/Ctrl+Z basılırsa istek hiç gönderilmez.
   const handleDelete = async (id: string) => {
-    await api.delete(`/departments/${departmentId}/budget/${id}`).catch(() => {});
-    load();
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    pushDestructive({
+      label: "Kayıt silme",
+      commit: async () => {
+        await api.delete(`/departments/${departmentId}/budget/${id}`).catch(() => {});
+      },
+      restore: load,
+    });
   };
 
   const handleBudgetStatusChange = async (taskId: string, status: TaskBudgetStatus) => {

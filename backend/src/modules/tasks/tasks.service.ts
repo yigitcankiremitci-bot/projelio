@@ -17,6 +17,7 @@ function mapTask(row: any): Task {
     startDate: row.start_date ?? undefined,
     deadline: row.deadline,
     status: row.status,
+    priority: row.priority ?? 0,
     parentTaskId: row.parent_task_id ?? undefined,
     budget: row.budget != null ? Number(row.budget) : 0,
     budgetStatus: row.budget_status ?? "pending",
@@ -344,6 +345,11 @@ export class TasksService {
     }
     if (data.weekNumber !== undefined) patch.week_number = data.weekNumber;
     if (data.outputId !== undefined) patch.output_id = data.outputId;
+    // Öncelik yıldızı 0-5. Aralık dışı bir değer DB'deki CHECK'e takılıp 500
+    // dönerdi; burada sınırlayıp anlamlı bir kayda çeviriyoruz.
+    if (data.priority !== undefined) {
+      patch.priority = Math.min(5, Math.max(0, Math.trunc(Number(data.priority) || 0)));
+    }
     // İkisi birlikte gönderilir (bkz. TaskEditModal/CreateTaskModal): DB'de "biri
     // varsa diğeri de olmalı" kısıtı var, bu yüzden tek tek değil çift olarak set edilir.
     if (data.estimatedDurationValue !== undefined || data.estimatedDurationUnit !== undefined) {

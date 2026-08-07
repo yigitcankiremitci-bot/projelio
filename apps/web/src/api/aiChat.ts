@@ -66,9 +66,12 @@ export interface AiUserBalanceRow {
 export interface AiProviderBalance {
   toppedUpUsd: number;
   spentUsd: number;
+  spentUsdSource: "manual_checkpoint" | "anthropic_api" | "internal_estimate";
+  internalEstimateUsd: number;
   remainingUsd: number;
   remainingCredits: number;
   lastTopups: { amountUsd: number; description?: string; createdAt: string }[];
+  lastCheckpoint?: { amountUsd: number; createdAt: string };
 }
 
 export const aiChat = {
@@ -95,4 +98,6 @@ export const aiChat = {
   getProviderBalance: () => api.get<AiProviderBalance>("/ai/admin/provider-balance"),
   topUpProviderBalance: (amountUsd: number, description?: string) =>
     api.post<AiProviderBalance>("/ai/admin/provider-balance/topup", { amountUsd, description }),
+  setProviderCostCheckpoint: (amountUsd: number, description?: string) =>
+    api.post<AiProviderBalance>("/ai/admin/provider-balance/checkpoint", { amountUsd, description }),
 };

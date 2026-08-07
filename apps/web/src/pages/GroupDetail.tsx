@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Group, Organization } from "@projelio/shared";
 import { api } from "../api/client";
@@ -8,6 +8,7 @@ import FilesPanel from "../components/FilesPanel";
 import ProfileCard from "../components/ProfileCard";
 import { colors } from "../theme/colors";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
+import { usePageHeader } from "../lib/pageHeader";
 
 // Not: "İşler" (job) kavramı yalnızca serbest çalışan/taşeron hesaplarına özgüdür;
 // bir holding doğrudan iş değil, organizasyon (ve onların departmanlarını) yönetir.
@@ -34,11 +35,16 @@ export default function GroupDetail() {
     };
   }, [group?.name]);
 
+  // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
+  const coverRef = useRef<HTMLDivElement>(null);
+  usePageHeader(group?.name, coverRef, [group?.name]);
+
   if (!id) return null;
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
       <div
+        ref={coverRef}
         style={{
           position: "relative",
           height: 270,

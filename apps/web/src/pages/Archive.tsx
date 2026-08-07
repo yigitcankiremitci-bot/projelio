@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { ArchiveSummary, ArchivedTaskEntry } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
+import { useRefreshOnUndo, useUndo } from "../lib/undo";
 import { IconArchive, IconRestore, IconTrash } from "../components/icons";
 import ConfirmDialog from "../components/ConfirmDialog";
 
@@ -100,12 +101,16 @@ export default function Archive() {
   const [data, setData] = useState<ArchiveSummary | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ kind: EntityKind; id: string; title: string } | null>(null);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
+  const { pushDestructive } = useUndo();
 
   const reload = () => {
     api.get<ArchiveSummary>("/archive").then(setData).catch(() => setData(null));
   };
 
   useEffect(reload, []);
+  // Geri/ileri alma sunucu durumunu değiştirir; liste kendini tazelemeli.
+  useRefreshOnUndo(reload);
 
   const restore = async (kind: EntityKind, id: string) => {
     setRestoringId(id);
@@ -117,17 +122,41 @@ export default function Archive() {
     }
   };
 
+  // Kalıcı silme birkaç saniye geciktirilir: liste hemen tazelenmez, istek
+  // gitmeden önce Cmd/Ctrl+Z ile vazgeçilebilir (bkz. lib/undo.tsx).
   const handlePermanentDelete = async () => {
     if (!confirmDelete) return;
-    await api.delete(`/${confirmDelete.kind}/${confirmDelete.id}`);
+    const { kind, id } = confirmDelete;
     setConfirmDelete(null);
-    reload();
+    setPendingDeleteIds((prev) => [...prev, id]);
+    pushDestructive({
+      label: "Kalıcı silme",
+      commit: async () => {
+        await api.delete(`/${kind}/${id}`).catch(() => {});
+        setPendingDeleteIds((prev) => prev.filter((x) => x !== id));
+        reload();
+      },
+      restore: () => setPendingDeleteIds((prev) => prev.filter((x) => x !== id)),
+    });
+  };
+
+  // Silinmesi bekleyen kayıtlar listede gösterilmez; geri alınırsa yeniden belirir.
+  const visibleData: ArchiveSummary | null = data && {
+    ...data,
+    jobs: data.jobs.filter((j) => !pendingDeleteIds.includes(j.id)),
+    projects: data.projects.filter((p) => !pendingDeleteIds.includes(p.id)),
+    tasks: data.tasks.filter((t) => !pendingDeleteIds.includes(t.id)),
+    outputs: data.outputs.filter((o) => !pendingDeleteIds.includes(o.id)),
   };
 
   const isEmpty =
-    data && data.jobs.length === 0 && data.projects.length === 0 && data.tasks.length === 0 && data.outputs.length === 0;
+    visibleData &&
+    visibleData.jobs.length === 0 &&
+    visibleData.projects.length === 0 &&
+    visibleData.tasks.length === 0 &&
+    visibleData.outputs.length === 0;
 
-  const groups = data ? buildGroups(data) : [];
+  const groups = visibleData ? buildGroups(visibleData) : [];
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>

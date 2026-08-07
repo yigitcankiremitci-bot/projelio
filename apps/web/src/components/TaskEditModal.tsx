@@ -38,8 +38,9 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
   const [saving, setSaving] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
 
+  // DELETE isteğini EntityDangerZone geciktirmeli olarak atar (bkz. resourcePath);
+  // burada yalnızca silme sonrası arayüz davranışı kalır.
   const handleDelete = async () => {
-    await api.delete(`/tasks/${task.id}`);
     onDeleted?.(task.id);
   };
 
@@ -224,6 +225,7 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
 
       <EntityDangerZone
         entityLabel={isSubtask ? "Alt görevi" : "Görevi"}
+        resourcePath={`/tasks/${task.id}`}
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
         archiveMessage={

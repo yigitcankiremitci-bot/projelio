@@ -20,8 +20,9 @@ export default function EditOutputModal({ output, onClose, onSaved, onDeleted, o
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // DELETE isteğini EntityDangerZone geciktirmeli olarak atar (bkz. resourcePath);
+  // burada yalnızca silme sonrası arayüz davranışı kalır.
   const handleDelete = async () => {
-    await api.delete(`/outputs/${output.id}`);
     onDeleted?.(output.id);
   };
 
@@ -81,6 +82,7 @@ export default function EditOutputModal({ output, onClose, onSaved, onDeleted, o
 
       <EntityDangerZone
         entityLabel="Çıktıyı"
+        resourcePath={`/outputs/${output.id}`}
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
         archiveMessage={`"${output.title}" çıktısını arşive eklemek istediğine emin misin? Bu çıktıya bağlı görevler etkilenmez. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}

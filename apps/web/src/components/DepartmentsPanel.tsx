@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { useProjectFabAction } from "../lib/projectFab";
 import { useSortableList } from "../lib/useSortableList";
+import { useLatestRef, useRefreshOnUndo, useReorderUndo } from "../lib/undo";
 import DepartmentCard from "./DepartmentCard";
 import { IconX } from "./icons";
 
@@ -40,6 +41,8 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const registerReorderUndo = useReorderUndo();
+  const departmentsRef = useLatestRef(departments);
 
   const load = () => {
     setLoading(true);
@@ -55,6 +58,8 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
   };
 
   useEffect(load, [organizationId]);
+  // Geri/ileri alma sunucu durumunu değiştirir; liste kendini tazelemeli.
+  useRefreshOnUndo(load);
 
   useImperativeHandle(ref, () => ({ openAdd: () => setAdding(true) }));
 
@@ -70,11 +75,14 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
         const ids = Array.from(el.children)
           .map((node) => (node as HTMLElement).dataset.id!)
           .filter(Boolean);
+        const endpoint = `/organizations/${organizationId}/departments/reorder`;
+        const previousIds = departmentsRef.current.map((d) => d.id);
         setDepartments((prev) => {
           const byId = new Map(prev.map((d) => [d.id, d]));
           return ids.map((id) => byId.get(id)!).filter(Boolean);
         });
-        api.patch(`/organizations/${organizationId}/departments/reorder`, { ids }).catch(() => load());
+        api.patch(endpoint, { ids }).catch(() => load());
+        registerReorderUndo(endpoint, previousIds, ids, load);
       },
     },
     [layout, departments.length === 0]

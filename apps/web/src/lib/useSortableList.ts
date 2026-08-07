@@ -3,7 +3,11 @@ import type { RefObject } from "react";
 import Sortable, { SortableOptions } from "sortablejs";
 
 // Kısa süre basılı tutunca aktifleşen "tut-taşı" sıralaması için ortak ayarlar.
-const LONG_PRESS_DELAY = 350;
+// Sürüklemeyi başlatan basılı tutma süresi (ms). Tek kaynak: bu hook'u kullanmayan
+// yerler de (bkz. TaskColumn'daki alt görev listesi) buradan almalı ki tüm
+// uygulamada aynı his olsun. Çok kısaltılırsa normal tıklama/kaydırma hareketleri
+// yanlışlıkla sürükleme olarak algılanmaya başlar.
+export const LONG_PRESS_DELAY = 180;
 
 /**
  * Verilen container ref'inin doğrudan çocuklarını, basılı tutup sürükleyerek

@@ -3,6 +3,7 @@ import type { ModuleRecord } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import AddModuleRecordModal from "./AddModuleRecordModal";
+import { useUndo } from "../lib/undo";
 import { IconTrash } from "./icons";
 
 export type BudgetQuickAddKind = "income" | "expense" | "receivable" | "payable";
@@ -90,6 +91,7 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
   const [loading, setLoading] = useState(true);
   const [quickAdd, setQuickAdd] = useState<BudgetQuickAddKind | null>(null);
   const [settlingId, setSettlingId] = useState<string | null>(null);
+  const { pushDestructive } = useUndo();
 
   const load = () => {
     setLoading(true);
@@ -109,9 +111,19 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
     openQuickAdd: (kind) => setQuickAdd(kind),
   }));
 
+  // Silme hemen sunucuya gitmez: satır listeden düşürülür, gerçek DELETE birkaç
+  // saniye sonra atılır; bu pencerede Cmd/Ctrl+Z basılırsa istek hiç gönderilmez.
   const handleDelete = async (id: string) => {
-    await api.delete(`/module-records/${id}`).catch(() => {});
-    load();
+    // Kayıt iki listeden birinde: hangisinde olduğunu bilmeye gerek yok, ikisinden de düş.
+    setLedger((prev) => prev.filter((r) => r.id !== id));
+    setRp((prev) => prev.filter((r) => r.id !== id));
+    pushDestructive({
+      label: "Kayıt silme",
+      commit: async () => {
+        await api.delete(`/module-records/${id}`).catch(() => {});
+      },
+      restore: load,
+    });
   };
 
   const handleSettle = async (record: ModuleRecord) => {

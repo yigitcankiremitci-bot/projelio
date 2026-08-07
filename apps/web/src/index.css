@@ -99,6 +99,144 @@ button:focus-visible {
 }
 
 /*
+ * Sidebar gezinme "butonları" (bkz. src/components/Sidebar.tsx). Sayfa adları
+ * ikonsuz, tam genişlikte birer buton gibi durur; :hover / :active durumları ve
+ * geçiş animasyonları inline style ile yazılamadığı için burada.
+ */
+.sidebar-nav-btn {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  margin-bottom: 2px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #c7ccd6;
+  font-size: 16px;
+  font-weight: 400;
+  text-align: left;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 180ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* Aktif sayfayı gösteren, yükseklikte açılıp kapanan sol kenar çubuğu. */
+.sidebar-nav-btn::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-accent);
+  transform: translateY(-50%);
+  transition: height 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  transform: translateX(3px);
+}
+
+.sidebar-nav-btn:active {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateX(3px) scale(0.98);
+}
+
+.sidebar-nav-btn.is-active {
+  background: rgba(255, 255, 255, 0.11);
+  color: #fff;
+  font-weight: 500;
+}
+
+.sidebar-nav-btn.is-active::before {
+  height: 55%;
+}
+
+/* Çıkış gibi ikincil kalması gereken eylem. */
+.sidebar-nav-btn.is-muted {
+  color: #9aa6b4;
+}
+
+/*
+ * "Ana Sayfa" satırındaki gizli dişli: yalnızca satırın üstüne gelince (ya da
+ * klavyeyle odaklanınca) belirir ve düğmenin nereye gideceğini seçtiren modalı
+ * açar. Sadece masaüstünde render edilir — mobilde aynı ayar Ayarlar sayfasında.
+ */
+.sidebar-nav-row {
+  position: relative;
+}
+
+.sidebar-nav-row .sidebar-nav-btn {
+  /* Dişli metnin üstüne binmesin diye sağda yer bırakılır. */
+  padding-right: 40px;
+}
+
+.sidebar-nav-gear {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.85);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    background-color 150ms ease;
+}
+
+.sidebar-nav-row:hover .sidebar-nav-gear,
+.sidebar-nav-gear:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+
+.sidebar-nav-gear:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-nav-gear {
+    transition: none;
+    transform: translateY(-50%);
+  }
+
+  .sidebar-nav-row:hover .sidebar-nav-gear,
+  .sidebar-nav-gear:focus-visible {
+    transform: translateY(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-nav-btn,
+  .sidebar-nav-btn::before {
+    transition: none;
+  }
+
+  .sidebar-nav-btn:hover,
+  .sidebar-nav-btn:active {
+    transform: none;
+  }
+}
+
+/*
  * Basılı tutup sürükleyerek sıralama (SortableJS). Basılı tutulduğunda öğe
  * "yerinden kalkmış" gibi hafifçe büyüyüp gölge kazanır; bırakılacağı yer
  * soluk bir yer tutucu ile gösterilir.

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useRef, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Operation, OperationOccurrence, OperationRoutine, OperationStatus } from "@projelio/shared";
 import { api } from "../api/client";
@@ -8,6 +8,7 @@ import OperationHealthBadge, { AdherenceDots } from "../components/OperationHeal
 import { colors } from "../theme/colors";
 import { IconCalendar, IconCheck, IconEdit, IconUser } from "../components/icons";
 import { useProjectFabAction } from "../lib/projectFab";
+import { usePageHeader } from "../lib/pageHeader";
 
 const periodLabel: Record<string, string> = { weekly: "hafta", monthly: "ay", yearly: "yıl" };
 
@@ -112,11 +113,16 @@ export default function OperationDetail() {
     setStatusPrompt(null);
   };
 
+  // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
+  const coverRef = useRef<HTMLDivElement>(null);
+  usePageHeader(operation?.title, coverRef, [operation?.title]);
+
   if (!id) return null;
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
       <div
+        ref={coverRef}
         style={{
           position: "relative",
           height: 290,

@@ -31,8 +31,9 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
     api.get<Group[]>("/groups").then(setGroups).catch(() => setGroups([]));
   }, []);
 
+  // DELETE isteğini EntityDangerZone geciktirmeli olarak atar (bkz. resourcePath);
+  // burada yalnızca silme sonrası arayüz davranışı kalır.
   const handleDelete = async () => {
-    await api.delete(`/organizations/${organization.id}`);
     onDeleted?.();
   };
 
@@ -133,6 +134,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
 
       <EntityDangerZone
         entityLabel="Organizasyonu"
+        resourcePath={`/organizations/${organization.id}`}
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
         archiveMessage={`"${organization.name}" organizasyonunu arşive eklemek istediğine emin misin? Bu organizasyona bağlı tüm projeler de arşive taşınır.`}

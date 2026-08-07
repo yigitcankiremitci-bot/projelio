@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import type { Department, Job } from "@projelio/shared";
 import { colors } from "../theme/colors";
 import { useSidebarHierarchy, SidebarGroupNode, SidebarOrgNode } from "../lib/useSidebarHierarchy";
-import { IconBuilding, IconLayers, IconFolder, IconListCheck, IconChevronRight, IconChevronDown } from "./icons";
+import { IconBuilding, IconBriefcase, IconLayers, IconFolder, IconListCheck, IconChevronRight, IconChevronDown } from "./icons";
 
 type IconComp = typeof IconBuilding;
 
@@ -32,6 +32,11 @@ export default function SidebarTree() {
   // aldığı için varsayılan olarak açık başlar (kullanıcı eskisi gibi listeyi hemen
   // görsün); tekil grup/organizasyon/iş düğümleri ise varsayılan kapalı.
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["cat:groups", "cat:orgs"]));
+  // Bir organizasyona/gruba bağlı olmayan işler ("İşlerim" sayfasındaki bağımsız
+  // işler) sidebar'da alt alta serilmek yerine tek bir "İşlerim" düğümünde
+  // toplanır. Düğüm varsayılan olarak AÇIK geldiği için açık olanı değil,
+  // kullanıcının onu elle kapatıp kapatmadığını tutuyoruz.
+  const [myJobsCollapsed, setMyJobsCollapsed] = useState(false);
 
   // Kullanıcı derinlerdeyken (bir işin/organizasyonun/grubun içindeyken) o yolu
   // otomatik aç — elle açılmış diğer dalları kapatmadan, sadece ekler.
@@ -97,10 +102,26 @@ export default function SidebarTree() {
       }
       return next;
     });
+
+    // Bağımsız bir işin içine girildiyse, kullanıcı daha önce elle kapatmış olsa
+    // bile "İşlerim" düğümünü tekrar aç — aksi halde aktif satır görünmez olurdu.
+    if (jobMatch) {
+      const job = allJobs.find((j) => j.id === jobMatch[1]);
+      if (job && !job.organizationId && !job.groupId) setMyJobsCollapsed(false);
+    }
     // groups/standaloneOrgs/standaloneJobs referansları her fetch'te değişir;
     // burada yalnızca rota değiştiğinde tetiklenmesi yeterli.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
+
+  // Tek organizasyon durumunda "Organizasyonlar" başlığı kaldırıldığı için o
+  // organizasyon artık en üst seviyede duruyor; eskiden kategori açık geldiğinde
+  // görünen alt öğeler kaybolmasın diye varsayılan olarak açık başlatılır.
+  const soleOrgId = standaloneOrgs.length === 1 ? standaloneOrgs[0].org.id : null;
+  useEffect(() => {
+    if (!soleOrgId) return;
+    setExpanded((prev) => (prev.has(`org:${soleOrgId}`) ? prev : new Set(prev).add(`org:${soleOrgId}`)));
+  }, [soleOrgId]);
 
   if (loading) return null;
   if (groups.length === 0 && standaloneOrgs.length === 0 && standaloneJobs.length === 0) return null;
@@ -125,6 +146,7 @@ export default function SidebarTree() {
         <Row
           to={`/jobs/${job.id}`}
           icon={IconFolder}
+          imageUrl={job.coverImageUrl}
           label={job.title}
           depth={depth}
           active={jobActive}
@@ -176,6 +198,7 @@ export default function SidebarTree() {
         <Row
           to={`/organizations/${node.org.id}`}
           icon={IconBuilding}
+          imageUrl={node.org.coverImageUrl}
           label={node.org.name}
           depth={depth}
           active={active}
@@ -230,7 +253,7 @@ export default function SidebarTree() {
     <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
       <div
         style={{
-          fontSize: 11,
+          fontSize: 13,
           fontWeight: 600,
           letterSpacing: 0.5,
           textTransform: "uppercase",
@@ -257,7 +280,13 @@ export default function SidebarTree() {
         </div>
       )}
 
-      {standaloneOrgs.length > 0 && (
+      {/* Tek bir organizasyon varsa "Organizasyonlar" başlığı gereksiz bir ara
+          katman oluyor: onun yerine organizasyonun kendisi doğrudan en üst
+          seviyede, kapak resminin minik hâliyle birlikte gösterilir. Birden fazla
+          olduğunda eski kategori başlığı davranışı korunur. */}
+      {standaloneOrgs.length === 1 && renderOrg(standaloneOrgs[0], 0)}
+
+      {standaloneOrgs.length > 1 && (
         <div>
           <Row
             to="/organizations"
@@ -273,7 +302,24 @@ export default function SidebarTree() {
         </div>
       )}
 
-      {standaloneJobs.map((job) => renderJob(job, 0))}
+      {/* Bir organizasyona/gruba bağlı olmayan işler tek tek kök seviyede
+          durmak yerine kapatılabilir bir "İşlerim" düğümü altında toplanır.
+          Bu düğümün gidilecek ayrı bir sayfası yok (işlerin tam listesi zaten
+          Ana Sayfa), o yüzden link değil; tıklanınca sadece açılıp kapanır. */}
+      {standaloneJobs.length > 0 && (
+        <div>
+          <Row
+            icon={IconBriefcase}
+            label="İşlerim"
+            depth={0}
+            active={false}
+            expandable
+            expanded={!myJobsCollapsed}
+            onToggle={() => setMyJobsCollapsed((v) => !v)}
+          />
+          {!myJobsCollapsed && standaloneJobs.map((job) => renderJob(job, 1))}
+        </div>
+      )}
     </div>
   );
 }
@@ -281,6 +327,7 @@ export default function SidebarTree() {
 function Row({
   to,
   icon: Icon,
+  imageUrl,
   label,
   depth,
   active,
@@ -288,8 +335,13 @@ function Row({
   expanded,
   onToggle,
 }: {
-  to: string;
+  // Verilmezse satır bir link değil, sadece alt öğeleri açıp kapatan bir başlık
+  // olur (örn. gidilecek bir sayfası olmayan "İşler" toplayıcısı).
+  to?: string;
   icon: IconComp;
+  // Varsa ikon yerine gösterilen minik kapak resmi (örn. organizasyonun kapağı).
+  // Yüklenemezse sessizce ikona geri düşülür.
+  imageUrl?: string;
   label: string;
   depth: number;
   active: boolean;
@@ -297,6 +349,55 @@ function Row({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(imageUrl) && !imageFailed;
+  const contentStyle = {
+    flex: 1,
+    minWidth: 0,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "6px 8px",
+    borderRadius: 7,
+    background: active ? "rgba(255,255,255,0.08)" : "transparent",
+    border: "none",
+    textAlign: "left" as const,
+  };
+  const content = (
+    <>
+      {showImage ? (
+        <img
+          src={imageUrl}
+          alt=""
+          onError={() => setImageFailed(true)}
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: 4,
+            objectFit: "cover",
+            flexShrink: 0,
+            border: active ? `1px solid ${colors.light.accent}` : "1px solid rgba(255,255,255,0.15)",
+          }}
+        />
+      ) : (
+        <Icon size={15} color={active ? colors.light.accent : INACTIVE_ICON} />
+      )}
+      <span
+        style={{
+          // iOS Safari, 16px altındaki metinlerde okunabilirlik için otomatik
+          // ölçekleme/zoom uygulayabiliyor; sidebar satırlarını 16px'in altına
+          // düşürmüyoruz.
+          fontSize: 16,
+          color: active ? "#fff" : INACTIVE_TEXT,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </span>
+    </>
+  );
   return (
     <div style={{ display: "flex", alignItems: "center" }}>
       {expandable ? (
@@ -306,7 +407,7 @@ function Row({
           aria-label={expanded ? "Daralt" : "Genişlet"}
           style={{
             width: 20,
-            height: 28,
+            height: 30,
             flexShrink: 0,
             marginLeft: depth * 14,
             display: "flex",
@@ -316,38 +417,20 @@ function Row({
             border: "none",
           }}
         >
-          {expanded ? <IconChevronDown size={11} color={INACTIVE_ICON} /> : <IconChevronRight size={11} color={INACTIVE_ICON} />}
+          {expanded ? <IconChevronDown size={12} color={INACTIVE_ICON} /> : <IconChevronRight size={12} color={INACTIVE_ICON} />}
         </button>
       ) : (
         <span style={{ width: 20, marginLeft: depth * 14, flexShrink: 0 }} />
       )}
-      <Link
-        to={to}
-        title={label}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "6px 8px",
-          borderRadius: 7,
-          background: active ? "rgba(255,255,255,0.08)" : "transparent",
-        }}
-      >
-        <Icon size={13} color={active ? colors.light.accent : INACTIVE_ICON} />
-        <span
-          style={{
-            fontSize: 14,
-            color: active ? "#fff" : INACTIVE_TEXT,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {label}
-        </span>
-      </Link>
+      {to ? (
+        <Link to={to} title={label} style={contentStyle}>
+          {content}
+        </Link>
+      ) : (
+        <button type="button" onClick={onToggle} title={label} style={{ ...contentStyle, background: "transparent" }}>
+          {content}
+        </button>
+      )}
     </div>
   );
 }
@@ -372,7 +455,7 @@ function LeafRow({ to, label, depth, active }: { to: string; label: string; dept
       >
         <span
           style={{
-            fontSize: 13,
+            fontSize: 16,
             color: active ? "#fff" : "#98A2B0",
             overflow: "hidden",
             textOverflow: "ellipsis",

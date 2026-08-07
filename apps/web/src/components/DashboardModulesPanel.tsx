@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Job, JobModule, ModuleCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
+import { useUndo } from "../lib/undo";
 import { IconSparkle, IconX } from "./icons";
 
 interface Props {
@@ -19,6 +20,7 @@ export default function DashboardModulesPanel({ jobs }: Props) {
   const [loading, setLoading] = useState(true);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { pushUndo } = useUndo();
 
   const loadAssignments = () => {
     if (jobs.length === 0) {
@@ -47,12 +49,25 @@ export default function DashboardModulesPanel({ jobs }: Props) {
 
   const assignedJobsFor = (moduleKey: string) => jobs.filter((j) => (byJob[j.id] ?? []).some((m) => m.moduleKey === moduleKey));
 
+  // Modül atama/kaldırma tersine çevrilebilir bir eşleştirme olduğu için geri
+  // alma basit: karşıt isteği at ve listeyi tazele (kayıtlar silinmiyor).
   const assign = async (moduleKey: string, jobId: string) => {
     setBusy(true);
     try {
       await api.post(`/jobs/${jobId}/modules`, { moduleKey });
       setPickerFor(null);
       loadAssignments();
+      pushUndo({
+        label: "Modül atama",
+        run: async () => {
+          await api.delete(`/jobs/${jobId}/modules/${moduleKey}`);
+          loadAssignments();
+        },
+        redo: async () => {
+          await api.post(`/jobs/${jobId}/modules`, { moduleKey });
+          loadAssignments();
+        },
+      });
     } finally {
       setBusy(false);
     }
@@ -63,6 +78,17 @@ export default function DashboardModulesPanel({ jobs }: Props) {
     try {
       await api.delete(`/jobs/${jobId}/modules/${moduleKey}`);
       loadAssignments();
+      pushUndo({
+        label: "Modül kaldırma",
+        run: async () => {
+          await api.post(`/jobs/${jobId}/modules`, { moduleKey });
+          loadAssignments();
+        },
+        redo: async () => {
+          await api.delete(`/jobs/${jobId}/modules/${moduleKey}`);
+          loadAssignments();
+        },
+      });
     } finally {
       setBusy(false);
     }

@@ -17,12 +17,17 @@ import ProcessPanel, { ProcessNavState, ViewMode, computeInitialProcessNavDates 
 import { colors } from "../theme/colors";
 import { IconSettings } from "../components/icons";
 import { useProjectFabAction } from "../lib/projectFab";
+import { usePageHeader } from "../lib/pageHeader";
+import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 
 export default function ProjectDetail() {
   const { id } = useParams();
   const location = useLocation();
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const { pushUndo } = useUndo();
+  const registerReorderUndo = useReorderUndo();
+  const tasksRef = useLatestRef(tasks);
   const [editing, setEditing] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [parentCompletePrompt, setParentCompletePrompt] = useState<Task | null>(null);
@@ -45,7 +50,15 @@ export default function ProjectDetail() {
     !project || !id
       ? null
       : activeTab === "tasks"
-      ? { label: "Yeni çıktı", onClick: () => outputsRef.current?.openCreate() }
+      ? {
+          // Sekme hem görev hem çıktı barındırıyor; "+" hangisini eklediğini
+          // sormalı (bkz. BottomNav'daki seçim menüsü deseni).
+          label: "Görev veya çıktı ekle",
+          options: [
+            { label: "Yeni görev", onClick: () => outputsRef.current?.openCreateTask() },
+            { label: "Yeni çıktı", onClick: () => outputsRef.current?.openCreateOutput() },
+          ],
+        }
       : activeTab === "feed"
       ? { label: "Yeni paylaşım", onClick: () => feedRef.current?.openCreate() }
       : activeTab === "team"
@@ -94,11 +107,16 @@ export default function ProjectDetail() {
     setSelectedYear: setProcessSelectedYear,
   };
 
-  useEffect(() => {
+  const reloadAll = () => {
     if (!id) return;
     api.get<Project>(`/projects/${id}`).then(setProject).catch(() => setProject(null));
     api.get<Task[]>(`/projects/${id}/tasks`).then(setTasks).catch(() => setTasks([]));
-  }, [id]);
+  };
+
+  useEffect(reloadAll, [id]);
+  // Geri/ileri alma sunucu durumunu değiştirir (ör. silinen görev geri gelir);
+  // sayfa kendini tazelemeli, yoksa ancak yenileyince görünür.
+  useRefreshOnUndo(reloadAll);
 
   // Tarayıcı sekmesinin başlığında proje adı yazsın.
   useEffect(() => {
@@ -215,15 +233,36 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleMoveTask = (taskId: string, status: TaskStatus) => {
+  const reloadTasks = () => {
+    if (id) api.get<Task[]>(`/projects/${id}/tasks`).then(setTasks).catch(() => {});
+  };
+
+  const handleMoveTask = (taskId: string, status: TaskStatus, registerUndo = true) => {
+    const previousStatus = tasksRef.current.find((t) => t.id === taskId)?.status;
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
-    api.patch(`/tasks/${taskId}/status`, { status }).catch(() => {
-      if (id) api.get<Task[]>(`/projects/${id}/tasks`).then(setTasks).catch(() => {});
-    });
+    api.patch(`/tasks/${taskId}/status`, { status }).catch(reloadTasks);
+    // registerUndo=false: bu çağrı başka bir işlemin yan etkisi (örn. üst görev
+    // tamamlanınca alt görevlerin de kapanması) — yığında ayrı adım olmamalı.
+    if (registerUndo && previousStatus && previousStatus !== status) {
+      pushUndo({
+        label: "Görev durumu",
+        run: async () => {
+          await api.patch(`/tasks/${taskId}/status`, { status: previousStatus });
+          reloadTasks();
+        },
+        redo: async () => {
+          await api.patch(`/tasks/${taskId}/status`, { status });
+          reloadTasks();
+        },
+      });
+    }
   };
 
   const handleReorderTasks = (ids: string[]) => {
     if (!ids.length) return;
+    // Geri alma için yalnızca bu sürüklemeden etkilenen görevlerin eski sırası.
+    const affectedIds = new Set(ids);
+    const previousIds = tasksRef.current.filter((t) => affectedIds.has(t.id)).map((t) => t.id);
     setTasks((prev) => {
       const order = new Map(ids.map((taskId, index) => [taskId, index]));
       const affected = prev.filter((t) => order.has(t.id));
@@ -231,9 +270,8 @@ export default function ProjectDetail() {
       affected.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
       return [...untouched, ...affected];
     });
-    api.patch("/tasks/reorder", { ids }).catch(() => {
-      if (id) api.get<Task[]>(`/projects/${id}/tasks`).then(setTasks).catch(() => {});
-    });
+    api.patch("/tasks/reorder", { ids }).catch(reloadTasks);
+    registerReorderUndo("/tasks/reorder", previousIds, ids, reloadTasks);
   };
 
   const handleToggleComplete = (taskId: string) => {
@@ -247,7 +285,8 @@ export default function ProjectDetail() {
       if (task.parentTaskId) {
         const parent = tasks.find((p) => p.id === task.parentTaskId);
         if (parent && parent.status === "completed") {
-          handleMoveTask(parent.id, "in_progress");
+          // Yan etki: geri alma yığınında ayrı bir adım olmasın.
+          handleMoveTask(parent.id, "in_progress", false);
         }
       }
     } else {
@@ -257,7 +296,7 @@ export default function ProjectDetail() {
         .filter((t) => t.parentTaskId === taskId && t.status !== "completed")
         .forEach((sub) => {
           previousStatusRef.current[sub.id] = sub.status;
-          handleMoveTask(sub.id, "completed");
+          handleMoveTask(sub.id, "completed", false);
         });
 
       if (task.parentTaskId) {
@@ -270,6 +309,10 @@ export default function ProjectDetail() {
       }
     }
   };
+
+  // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
+  const coverRef = useRef<HTMLDivElement>(null);
+  usePageHeader(project?.title, coverRef, [project?.title]);
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
@@ -285,6 +328,7 @@ export default function ProjectDetail() {
         const hasCover = Boolean(project.coverImageUrl);
         return (
           <div
+            ref={coverRef}
             style={{
               position: "relative",
               background: hasCover
@@ -393,6 +437,7 @@ export default function ProjectDetail() {
               onMoveTask={handleMoveTask}
               onToggleComplete={handleToggleComplete}
               onEditTask={setEditingTask}
+              onTaskRenamed={updateTask}
               onReorderTasks={handleReorderTasks}
               activeTaskId={activeTaskId}
               onToggleActive={handleToggleActive}
@@ -422,6 +467,7 @@ export default function ProjectDetail() {
               onMoveTask={handleMoveTask}
               onToggleComplete={handleToggleComplete}
               onEditTask={setEditingTask}
+              onTaskRenamed={updateTask}
               nav={processNav}
               activeTaskId={activeTaskId}
               onToggleActive={handleToggleActive}

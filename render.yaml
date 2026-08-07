@@ -35,6 +35,12 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Admin panelindeki "Anthropic bakiyesi" kartının gerçek maliyet verisini
+      # Cost Report API'sinden çekebilmesi için (bkz. AiCreditsService).
+      # console.anthropic.com > Settings > Admin keys'den alınır, normal
+      # ANTHROPIC_API_KEY'den farklıdır. Yoksa özellik sessizce kendi tahminine düşer.
+      - key: ANTHROPIC_ADMIN_API_KEY
+        sync: false
       - key: VAPID_PUBLIC_KEY
         sync: false
       - key: VAPID_PRIVATE_KEY

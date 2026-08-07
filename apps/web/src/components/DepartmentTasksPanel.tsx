@@ -5,10 +5,13 @@ import { colors } from "../theme/colors";
 import TaskColumn, { TaskColumnHandle } from "./TaskColumn";
 import TaskEditModal from "./TaskEditModal";
 import TaskSelectionBar from "./TaskSelectionBar";
+import TaskSortMenu from "./TaskSortMenu";
 import MoveTaskModal from "./MoveTaskModal";
 import Modal from "./Modal";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useTaskSelection } from "../lib/useTaskSelection";
+import { sortTasks, type TaskSortMode } from "../lib/taskSort";
+import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 
 export interface DepartmentTasksPanelHandle {
   openCreate: () => void;
@@ -38,8 +41,12 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
   const columnRefs = useRef<Partial<Record<TaskStatus, TaskColumnHandle | null>>>({});
   const selection = useTaskSelection();
+  const [sort, setSort] = useState<TaskSortMode>("manual");
   const [duplicating, setDuplicating] = useState(false);
   const [movingOpen, setMovingOpen] = useState(false);
+  const { pushUndo } = useUndo();
+  const registerReorderUndo = useReorderUndo();
+  const tasksRef = useLatestRef(tasks);
 
   useImperativeHandle(ref, () => ({
     openCreate: () => columnRefs.current.todo?.openCreate(),
@@ -54,6 +61,8 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
       .finally(() => setLoading(false));
   };
   useEffect(load, [departmentId]);
+  // Geri/ileri alma sunucu durumunu değiştirir; liste kendini tazelemeli.
+  useRefreshOnUndo(load);
 
   const updateTask = (updated: Task) => {
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
@@ -89,13 +98,32 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
     }
   };
 
-  const handleMoveTask = (taskId: string, status: TaskStatus) => {
+  const handleMoveTask = (taskId: string, status: TaskStatus, registerUndo = true) => {
+    const previousStatus = tasksRef.current.find((t) => t.id === taskId)?.status;
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
     api.patch(`/tasks/${taskId}/status`, { status }).catch(() => load());
+    // registerUndo=false: bu çağrı zaten bir geri alma işleminin kendisi ya da
+    // başka bir işlemin yan etkisi (örn. üst görev tamamlanınca alt görevler).
+    if (registerUndo && previousStatus && previousStatus !== status) {
+      pushUndo({
+        label: "Görev durumu",
+        run: async () => {
+          await api.patch(`/tasks/${taskId}/status`, { status: previousStatus });
+          load();
+        },
+        redo: async () => {
+          await api.patch(`/tasks/${taskId}/status`, { status });
+          load();
+        },
+      });
+    }
   };
 
   const handleReorderTasks = (ids: string[]) => {
     if (!ids.length) return;
+    // Geri alma için yalnızca bu sürüklemeden etkilenen görevlerin eski sırası.
+    const affectedIds = new Set(ids);
+    const previousIds = tasksRef.current.filter((t) => affectedIds.has(t.id)).map((t) => t.id);
     setTasks((prev) => {
       const order = new Map(ids.map((taskId, index) => [taskId, index]));
       const affected = prev.filter((t) => order.has(t.id));
@@ -104,6 +132,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
       return [...untouched, ...affected];
     });
     api.patch("/tasks/reorder", { ids }).catch(() => load());
+    registerReorderUndo("/tasks/reorder", previousIds, ids, load);
   };
 
   const handleToggleComplete = (taskId: string) => {
@@ -117,7 +146,8 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
       if (task.parentTaskId) {
         const parent = tasks.find((p) => p.id === task.parentTaskId);
         if (parent && parent.status === "completed") {
-          handleMoveTask(parent.id, "in_progress");
+          // Yan etki: geri alma yığınında ayrı bir adım olmasın.
+          handleMoveTask(parent.id, "in_progress", false);
         }
       }
     } else {
@@ -127,7 +157,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
         .filter((t) => t.parentTaskId === taskId && t.status !== "completed")
         .forEach((sub) => {
           previousStatusRef.current[sub.id] = sub.status;
-          handleMoveTask(sub.id, "completed");
+          handleMoveTask(sub.id, "completed", false);
         });
 
       if (task.parentTaskId) {
@@ -159,15 +189,24 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
 
   return (
     <div>
-      <TaskSelectionBar
-        selectionMode={selection.selectionMode}
-        selectedCount={selection.selectedIds.size}
-        busy={duplicating}
-        onEnable={selection.toggleSelectionMode}
-        onCancel={selection.clear}
-        onDuplicate={handleDuplicateSelected}
-        onMove={() => setMovingOpen(true)}
-      />
+
+      {/* Tek satırlık araç çubuğu: sağda sıralama ve seçim. Seçim modu
+          açıldığında bar tam genişlik alıp alta kayar. */}
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        <div style={{ marginLeft: "auto" }}>
+          <TaskSortMenu value={sort} onChange={setSort} />
+        </div>
+        <TaskSelectionBar
+          inline
+          selectionMode={selection.selectionMode}
+          selectedCount={selection.selectedIds.size}
+          busy={duplicating}
+          onEnable={selection.toggleSelectionMode}
+          onCancel={selection.clear}
+          onDuplicate={handleDuplicateSelected}
+          onMove={() => setMovingOpen(true)}
+        />
+      </div>
 
       {/* Masaüstünde üç sütun (Devam eden/Yapılacak/Tamamlandı) yan yana, dar ekranda
           (mobil) alt alta — bkz. useIsDesktop. */}
@@ -190,13 +229,16 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
                 columnRefs.current[status] = el;
               }}
               status={status}
-              allTasks={tasks}
+              allTasks={sortTasks(tasks, sort)}
               onCreate={handleCreateTask}
               onCreateSubtask={handleCreateSubtask}
               onMove={handleMoveTask}
               onToggleComplete={handleToggleComplete}
               onEditTask={setEditingTask}
-              onReorderTasks={handleReorderTasks}
+              onTaskRenamed={updateTask}
+              // Başka bir ölçütle sıralıyken sürükleyip sıra değiştirmek anlamsız:
+              // kart bırakıldığı yerde durmaz, ölçüte göre geri sıçrar.
+              onReorderTasks={sort === "manual" ? handleReorderTasks : undefined}
               group={`dept-tasks-${departmentId}`}
               selectionMode={selection.selectionMode}
               selectedIds={selection.selectedIds}

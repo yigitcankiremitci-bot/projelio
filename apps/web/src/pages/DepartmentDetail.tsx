@@ -15,6 +15,7 @@ import ProfileCard from "../components/ProfileCard";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import { getDepartmentCoverUrl, hasCustomDepartmentCover } from "../lib/departmentCovers";
 import { useProjectFabAction } from "../lib/projectFab";
+import { usePageHeader } from "../lib/pageHeader";
 import { colors } from "../theme/colors";
 import { IconLayers, IconEdit, IconX, IconSettings } from "../components/icons";
 
@@ -124,6 +125,10 @@ export default function DepartmentDetail() {
     }
   };
 
+  // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
+  const coverRef = useRef<HTMLDivElement>(null);
+  usePageHeader(department?.name, coverRef, [department?.name]);
+
   if (!id) return null;
 
   const isProductDepartment = department?.catalogKey === "urun_yonetimi";
@@ -133,6 +138,7 @@ export default function DepartmentDetail() {
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
       <div
+        ref={coverRef}
         style={{
           position: "relative",
           height: 320,

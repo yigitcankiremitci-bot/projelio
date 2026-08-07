@@ -45,8 +45,9 @@ export default function DepartmentSettingsModal({ department, onClose, onSaved, 
     }
   };
 
+  // DELETE isteğini EntityDangerZone geciktirmeli olarak atar (bkz. resourcePath);
+  // burada yalnızca silme sonrası arayüz davranışı kalır.
   const handleDelete = async () => {
-    await api.delete(`/departments/${department.id}`);
     onDeleted?.();
   };
 
@@ -106,6 +107,7 @@ export default function DepartmentSettingsModal({ department, onClose, onSaved, 
 
       <EntityDangerZone
         entityLabel="Departmanı"
+        resourcePath={`/departments/${department.id}`}
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
         archiveMessage={`"${department.name}" departmanını arşive eklemek istediğine emin misin? Departman, organizasyonun departman listesinden kaldırılır; ekip, görevler ve dosyalar korunur.`}

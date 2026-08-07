@@ -5,8 +5,10 @@ import { api } from "../../api/client";
 import { colors } from "../../theme/colors";
 import TaskColumn from "../TaskColumn";
 import TaskSelectionBar from "../TaskSelectionBar";
+import TaskSortMenu from "../TaskSortMenu";
 import MoveTaskModal from "../MoveTaskModal";
 import { useTaskSelection } from "../../lib/useTaskSelection";
+import { sortTasks, type TaskSortMode } from "../../lib/taskSort";
 
 type CreateOptions = { weekNumber?: number; deadline?: string; startDate?: string };
 export type ViewMode = "project" | "day" | "week" | "month" | "year";
@@ -40,6 +42,8 @@ interface Props {
   onMoveTask: (taskId: string, status: TaskStatus) => void;
   onToggleComplete: (taskId: string) => void;
   onEditTask: (task: Task) => void;
+  // Başlığa çift tıklayarak yerinde ad değiştirme (bkz. TaskColumn.onTaskRenamed).
+  onTaskRenamed?: (updated: Task) => void;
   nav: ProcessNavState;
   activeTaskId?: string;
   onToggleActive?: (taskId: string) => void;
@@ -101,6 +105,7 @@ export default function ProcessPanel({
   onMoveTask,
   onToggleComplete,
   onEditTask,
+  onTaskRenamed,
   nav,
   activeTaskId,
   onToggleActive,
@@ -109,6 +114,7 @@ export default function ProcessPanel({
 }: Props) {
   const c = colors.light;
   const selection = useTaskSelection();
+  const [sort, setSort] = useState<TaskSortMode>("manual");
   const [duplicating, setDuplicating] = useState(false);
   const [movingOpen, setMovingOpen] = useState(false);
 
@@ -655,27 +661,37 @@ export default function ProcessPanel({
             )}
           </div>
 
-          <TaskSelectionBar
-            selectionMode={selection.selectionMode}
-            selectedCount={selection.selectedIds.size}
-            busy={duplicating}
-            onEnable={selection.toggleSelectionMode}
-            onCancel={selection.clear}
-            onDuplicate={handleDuplicateSelected}
-            onMove={() => setMovingOpen(true)}
-          />
+
+          {/* Tek satırlık araç çubuğu: sağda sıralama ve seçim. Seçim modu
+              açıldığında bar tam genişlik alıp alta kayar. */}
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+            <div style={{ marginLeft: "auto" }}>
+              <TaskSortMenu value={sort} onChange={setSort} />
+            </div>
+            <TaskSelectionBar
+              inline
+              selectionMode={selection.selectionMode}
+              selectedCount={selection.selectedIds.size}
+              busy={duplicating}
+              onEnable={selection.toggleSelectionMode}
+              onCancel={selection.clear}
+              onDuplicate={handleDuplicateSelected}
+              onMove={() => setMovingOpen(true)}
+            />
+          </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {sortedColumns.map((status) => (
               <TaskColumn
                 key={status}
                 status={status}
-                allTasks={filteredTasks}
+                allTasks={sortTasks(filteredTasks, sort)}
                 onCreate={(s, title) => onCreateTask(s, title, createOptions)}
                 onCreateSubtask={onCreateSubtask}
                 onMove={onMoveTask}
                 onToggleComplete={onToggleComplete}
                 onEditTask={onEditTask}
+                onTaskRenamed={onTaskRenamed}
                 group={`tasks-process-${project.id}`}
                 activeTaskId={activeTaskId}
                 onToggleActive={onToggleActive}

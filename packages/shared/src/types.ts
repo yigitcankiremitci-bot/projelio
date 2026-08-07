@@ -246,7 +246,11 @@ export interface PartnerModuleGrant {
 // (data) tutulur — frontend'deki moduleRecordConfigs.ts bu alanları tanımlar.
 export interface ModuleRecord {
   id: string;
-  organizationId: string;
+  // Bir kayıt ya bir organizasyona (şirket/işletme modülleri) ya da bir İŞ'e
+  // (serbest çalışanın anasayfadan attığı modüller) aittir — ikisi birden değil.
+  // Bkz. database/migrations/037_freelancer_modules.sql module_records_owner_chk.
+  organizationId?: string;
+  jobId?: string;
   departmentId?: string;
   moduleKey: string;
   data: Record<string, unknown>;
@@ -452,6 +456,8 @@ export interface Task {
   startDate?: string;
   deadline: string;
   status: TaskStatus;
+  /** Öncelik yıldızı 0-5. Görevin özelliğidir, ekibin tamamına görünür. */
+  priority: TaskPriority;
   parentTaskId?: string;
   budget?: number;
   budgetStatus: TaskBudgetStatus;
@@ -738,4 +744,88 @@ export interface GoogleDriveStatus {
 export interface FileUploadSession {
   sessionId: string;
   uploadUrl: string;
+}
+
+// ---------------------------------------------------------------- Yapılacaklar
+// Kişisel kanban panosu. İki tür kart barındırır:
+//  - "personal": kullanıcının kendi eklediği, hiçbir işe/projeye bağlı olmayan
+//    görevler. Bunları kullanıcıdan başkası GÖREMEZ.
+//  - "assigned": kullanıcıya atanmış gerçek proje/program/departman görevleri.
+//    Görevin kendisi projede herkese açıktır; buradaki kişisel not, kişisel
+//    tarih, sıralama ve gizleme yalnızca kullanıcıya aittir.
+
+/**
+ * Öncelik yıldızı: 0 = belirtilmemiş, 1 en düşük … 5 en yüksek.
+ * Hem gerçek görevler (Task) hem kişisel yapılacaklar aynı ölçeği kullanır.
+ */
+export type TaskPriority = 0 | 1 | 2 | 3 | 4 | 5;
+
+export const MAX_TASK_PRIORITY = 5;
+export type PersonalBoardSource = "personal" | "assigned";
+
+export interface PersonalTodo {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  /** Kullanıcının karta verdiği opsiyonel etiket rengi (#RRGGBB). */
+  color?: string;
+  dueDate?: string;
+  sortOrder: number;
+  completedAt?: string;
+  archivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Atanan bir görevin, kullanıcının kişisel panosundaki katmanı. Buradaki hiçbir
+ * alan proje tarafına yansımaz — görevin kendisi (tasks tablosu) değişmez.
+ */
+export interface PersonalTaskPrefs {
+  taskId: string;
+  sortOrder: number;
+  /** Yalnızca kullanıcıya görünür not. Görev yorumlarından tamamen ayrıdır. */
+  personalNote?: string;
+  /** Kullanıcının kendine koyduğu iç hedef; görevin gerçek deadline'ı değişmez. */
+  personalDueDate?: string;
+  isPinned: boolean;
+  /** Kart kullanıcının panosundan gizlendi; görev projede aynen duruyor. */
+  isHidden: boolean;
+}
+
+/** Panodaki tek bir kart — kaynağı ne olursa olsun aynı şekli taşır. */
+export interface PersonalBoardItem {
+  itemId: string;
+  source: PersonalBoardSource;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  color?: string;
+  /** Gösterilecek tarih: kişisel tarih varsa o, yoksa görevin deadline'ı. */
+  effectiveDueDate?: string;
+  /** Yalnızca "assigned" kartlarda dolu: görevin projedeki gerçek deadline'ı. */
+  projectDeadline?: string;
+  sortOrder: number;
+  isPinned: boolean;
+  isHidden: boolean;
+  personalNote?: string;
+  projectId?: string;
+  projectTitle?: string;
+  operationId?: string;
+  operationTitle?: string;
+  departmentId?: string;
+  departmentName?: string;
+  /**
+   * Kartın nereye ait olduğunu gösteren yuvarlak görsel. "assigned" kartlarda
+   * görevin en yakın kapsayıcısının (proje/program/departman, proje kendi
+   * kapağını koymamışsa bağlı olduğu işin) kapak fotoğrafı. "personal"
+   * kartlarda boştur — arayüz orada kullanıcının profil fotoğrafını gösterir.
+   */
+  coverImageUrl?: string;
+  completedAt?: string;
+  createdAt: string;
 }

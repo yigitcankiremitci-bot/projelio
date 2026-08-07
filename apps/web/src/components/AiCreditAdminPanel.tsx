@@ -3,6 +3,7 @@ import { colors } from "../theme/colors";
 import { api } from "../api/client";
 import { aiChat, type AiProviderBalance, type AiUserBalanceRow } from "../api/aiChat";
 import { IconSparkle } from "./icons";
+import { useIsDesktop } from "../lib/useIsDesktop";
 
 interface UserRow {
   id: string;
@@ -29,6 +30,7 @@ interface MarginReport {
  */
 export default function AiCreditAdminPanel() {
   const c = colors.light;
+  const isDesktop = useIsDesktop();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<UserRow[]>([]);
@@ -44,6 +46,10 @@ export default function AiCreditAdminPanel() {
   const [topupNote, setTopupNote] = useState("");
   const [topupSaving, setTopupSaving] = useState(false);
   const [topupFeedback, setTopupFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const [checkpointAmount, setCheckpointAmount] = useState("");
+  const [checkpointSaving, setCheckpointSaving] = useState(false);
+  const [checkpointFeedback, setCheckpointFeedback] = useState<{ ok: boolean; text: string } | null>(null);
 
   const loadProviderBalance = () => {
     aiChat
@@ -108,6 +114,26 @@ export default function AiCreditAdminPanel() {
     }
   };
 
+  const handleSetCheckpoint = async () => {
+    const amountUsd = Number(checkpointAmount);
+    if (!Number.isFinite(amountUsd) || amountUsd < 0) {
+      setCheckpointFeedback({ ok: false, text: "Geçerli bir tutar gir (Console > Cost sayfasındaki toplam)." });
+      return;
+    }
+    setCheckpointSaving(true);
+    setCheckpointFeedback(null);
+    try {
+      const result = await aiChat.setProviderCostCheckpoint(amountUsd);
+      setProviderBalance(result);
+      setCheckpointFeedback({ ok: true, text: `Referans nokta $${amountUsd.toFixed(2)} olarak kaydedildi.` });
+      setCheckpointAmount("");
+    } catch (err: any) {
+      setCheckpointFeedback({ ok: false, text: err?.message ?? "Kaydedilemedi." });
+    } finally {
+      setCheckpointSaving(false);
+    }
+  };
+
   // Arama kutusu için basit gecikmeli sorgu.
   useEffect(() => {
     const q = query.trim();
@@ -151,7 +177,7 @@ export default function AiCreditAdminPanel() {
   };
 
   return (
-    <section style={{ maxWidth: 560 }}>
+    <section style={{ maxWidth: isDesktop ? 1280 : 560, width: "100%" }}>
       <h2
         style={{
           fontSize: 16,
@@ -167,7 +193,15 @@ export default function AiCreditAdminPanel() {
         AI kredi yönetimi
       </h2>
 
-      {/* Marj raporu */}
+      {/* Marj raporu + Anthropic bakiyesi: masaüstünde yan yana, mobilde alt alta. */}
+      <div
+        style={{
+          display: isDesktop ? "grid" : "block",
+          gridTemplateColumns: isDesktop ? "1fr 1fr" : undefined,
+          gap: isDesktop ? 18 : 0,
+          alignItems: "start",
+        }}
+      >
       {margin && (
         <div
           style={{
@@ -175,7 +209,7 @@ export default function AiCreditAdminPanel() {
             border: `1px solid ${c.border}`,
             borderRadius: 12,
             padding: 16,
-            marginBottom: 18,
+            marginBottom: isDesktop ? 0 : 18,
           }}
         >
           <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 10 }}>
@@ -231,7 +265,7 @@ export default function AiCreditAdminPanel() {
             border: `1px solid ${c.border}`,
             borderRadius: 12,
             padding: 16,
-            marginBottom: 18,
+            marginBottom: isDesktop ? 0 : 18,
           }}
         >
           <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 10 }}>Anthropic bakiyesi</div>
@@ -244,11 +278,78 @@ export default function AiCreditAdminPanel() {
               highlight={providerBalance.remainingCredits < 20000 ? c.danger : c.success}
             />
           </div>
-          <p style={{ fontSize: 11.5, color: c.textSecondary, margin: "0 0 14px", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 11.5, color: c.textSecondary, margin: "0 0 6px", lineHeight: 1.5 }}>
             "Kalan kredi", Anthropic'e yüklediğin gerçek bakiyenin ne kadarının kaldığını, aşağıdaki
             kullanıcı kredisi ile aynı birimde gösterir — kullanıcılara ne kadar kredi dağıtabileceğine
             karar vermek için buna bak. Anthropic konsolunda bakiye yükledikçe aşağıdan buraya ekle.
           </p>
+          <p style={{ fontSize: 11.5, color: c.textSecondary, margin: "0 0 14px", lineHeight: 1.5 }}>
+            {providerBalance.spentUsdSource === "manual_checkpoint" ? (
+              <>
+                "Kullanılan" rakamı, {providerBalance.lastCheckpoint &&
+                  new Date(providerBalance.lastCheckpoint.createdAt).toLocaleDateString("tr-TR")}{" "}
+                tarihinde Console'dan girdiğin ${providerBalance.lastCheckpoint?.amountUsd.toFixed(2)} referans
+                noktası + o tarihten sonraki kendi tahminimiz. Yeni bir referans noktası girersen bunun
+                üzerine yazılır.
+              </>
+            ) : providerBalance.spentUsdSource === "anthropic_api" ? (
+              <>
+                "Kullanılan" rakamı doğrudan Anthropic'in Cost Report API'sinden geliyor (gerçek fatura).
+                Kendi token bazlı tahminimiz: ${providerBalance.internalEstimateUsd.toFixed(2)}.
+              </>
+            ) : (
+              <>
+                "Kullanılan" rakamı şu an kendi token bazlı tahminimiz (${providerBalance.internalEstimateUsd.toFixed(2)}) —
+                Anthropic'in gerçek verisine bağlanmak için backend/.env'e <code>ANTHROPIC_ADMIN_API_KEY</code> eklenmeli,
+                ya da aşağıdan Console'daki gerçek rakamla elle eşitleyebilirsin.
+              </>
+            )}
+          </p>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 14 }}>
+            <div style={{ flex: "1 1 160px" }}>
+              <label style={labelStyle(c)}>Console'daki gerçek "Total cost" ($)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={checkpointAmount}
+                onChange={(e) => setCheckpointAmount(e.target.value)}
+                placeholder="Ör. 0.55"
+                style={inputStyle(c)}
+              />
+            </div>
+            <button
+              onClick={handleSetCheckpoint}
+              disabled={checkpointSaving}
+              style={{
+                padding: "9px 16px",
+                borderRadius: 9,
+                border: `1px solid ${c.border}`,
+                background: "transparent",
+                color: c.accent,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: checkpointSaving ? "default" : "pointer",
+                opacity: checkpointSaving ? 0.6 : 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {checkpointSaving ? "Kaydediliyor…" : "Bu rakamla eşitle"}
+            </button>
+          </div>
+          {checkpointFeedback && (
+            <p
+              style={{
+                margin: "0 0 14px",
+                fontSize: 13.5,
+                lineHeight: 1.5,
+                color: checkpointFeedback.ok ? c.success : c.danger,
+              }}
+            >
+              {checkpointFeedback.text}
+            </p>
+          )}
 
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 120px" }}>
@@ -304,6 +405,19 @@ export default function AiCreditAdminPanel() {
           )}
         </div>
       )}
+      </div>
+
+      <div style={{ height: isDesktop ? 18 : 0 }} />
+
+      {/* Kullanıcılar (geniş) + kredi yükleme formu (yan panel): masaüstünde yan yana. */}
+      <div
+        style={{
+          display: isDesktop ? "grid" : "block",
+          gridTemplateColumns: isDesktop ? "1.7fr 1fr" : undefined,
+          gap: isDesktop ? 18 : 0,
+          alignItems: "start",
+        }}
+      >
 
       {/* Kullanıcılar ve kredi bakiyeleri */}
       <div
@@ -312,7 +426,7 @@ export default function AiCreditAdminPanel() {
           border: `1px solid ${c.border}`,
           borderRadius: 12,
           padding: 16,
-          marginBottom: 18,
+          marginBottom: isDesktop ? 0 : 18,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 10 }}>
@@ -334,7 +448,14 @@ export default function AiCreditAdminPanel() {
         )}
 
         {!userBalancesError && userBalances && (
-          <div style={{ maxHeight: 340, overflowY: "auto", borderRadius: 9, border: `1px solid ${c.border}` }}>
+          <div
+            style={{
+              maxHeight: isDesktop ? 480 : 340,
+              overflowY: "auto",
+              borderRadius: 9,
+              border: `1px solid ${c.border}`,
+            }}
+          >
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
               <thead>
                 <tr style={{ background: c.background, position: "sticky", top: 0 }}>
@@ -528,6 +649,7 @@ export default function AiCreditAdminPanel() {
             {feedback.text}
           </p>
         )}
+      </div>
       </div>
     </section>
   );

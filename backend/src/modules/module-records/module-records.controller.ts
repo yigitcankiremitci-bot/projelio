@@ -21,6 +21,21 @@ export class ModuleRecordsController {
     return this.moduleRecordsService.create(organizationId, body, req.user.userId);
   }
 
+  // Serbest çalışan tarafı: kayıtlar organizasyona değil, modülün atandığı işe bağlı.
+  @Get("jobs/:jobId/module-records")
+  findByJob(@Param("jobId") jobId: string, @Query("moduleKey") moduleKey?: string) {
+    return this.moduleRecordsService.findByJob(jobId, moduleKey);
+  }
+
+  @Post("jobs/:jobId/module-records")
+  createForJob(
+    @Param("jobId") jobId: string,
+    @Body() body: { moduleKey?: string; data?: Record<string, unknown> },
+    @Req() req: any
+  ) {
+    return this.moduleRecordsService.createForJob(jobId, body, req.user.userId);
+  }
+
   @Patch("module-records/:id")
   update(@Param("id") id: string, @Body("data") data: Record<string, unknown>, @Req() req: any) {
     return this.moduleRecordsService.update(id, data, req.user.userId);

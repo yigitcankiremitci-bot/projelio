@@ -23,8 +23,9 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // DELETE isteğini EntityDangerZone geciktirmeli olarak atar (bkz. resourcePath);
+  // burada yalnızca silme sonrası arayüz davranışı kalır.
   const handleDelete = async () => {
-    await api.delete(`/groups/${group.id}`);
     onDeleted?.();
   };
 
@@ -97,6 +98,7 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
 
       <EntityDangerZone
         entityLabel="Grubu"
+        resourcePath={`/groups/${group.id}`}
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
         archiveMessage={`"${group.name}" grubunu arşive eklemek istediğine emin misin? Bu gruba bağlı tüm organizasyonlar ve projeler de arşive taşınır.`}

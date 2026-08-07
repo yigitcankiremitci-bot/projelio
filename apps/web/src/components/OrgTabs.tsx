@@ -1,4 +1,5 @@
 import { colors } from "../theme/colors";
+import { useIsDesktop } from "../lib/useIsDesktop";
 
 export type OrgTab = "home" | "flow" | "departments" | "products" | "budget" | "files";
 
@@ -24,10 +25,17 @@ interface Props {
 
 export default function OrgTabs({ active, onChange }: Props) {
   const c = colors.light;
+  const isDesktop = useIsDesktop();
   return (
     <div
       style={{
-        display: "flex",
+        // 6 sekme dar ekranda tek sirada okunmuyordu. Serbest satir kirilmasi
+        // (flex-wrap) genislige gore 4+2 gibi dengesiz bolunmeler uretiyor; grid
+        // ile bolunme deterministik: mobilde 3+3, masaustunde tek sira.
+        display: "grid",
+        gridTemplateColumns: isDesktop
+          ? `repeat(${tabs.length}, minmax(0, 1fr))`
+          : "repeat(3, minmax(0, 1fr))",
         gap: 4,
         background: c.surface,
         border: `1px solid ${c.border}`,
@@ -41,8 +49,11 @@ export default function OrgTabs({ active, onChange }: Props) {
           key={t.key}
           onClick={() => onChange(t.key)}
           style={{
-            flex: 1,
-            padding: "8px 0",
+            padding: "8px 4px",
+            lineHeight: 1.25,
+            // Hucreye sigmayan uzun etiket (ornegin buyutulmus yazi olceginde
+            // "Departmanlar") tasmak yerine ikinci satira insin.
+            overflowWrap: "break-word",
             borderRadius: 7,
             border: "none",
             background: active === t.key ? c.primary : "transparent",

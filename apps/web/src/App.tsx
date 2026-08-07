@@ -29,12 +29,160 @@ import AiCreditsPage from "./pages/AiCredits";
 import { initPush } from "./push";
 import { colors } from "./theme/colors";
 import { ProjectFabContext } from "./lib/projectFab";
+import { PageHeaderProvider, usePageHeaderState } from "./lib/pageHeader";
+import { UndoProvider } from "./lib/undo";
 import type { ProjectFabAction } from "./lib/projectFab";
 import { useIsDesktop } from "./lib/useIsDesktop";
 import { SIDEBAR_WIDTH } from "./lib/layout";
-import { IconChevronRight } from "./components/icons";
+import { IconChevronRight, IconUser } from "./components/icons";
 
 const HEADER_HEIGHT = 76;
+
+// Kapak sayfalarında aşağı kaydırırken beliren sabit başlığın iki satırı.
+// Üst satır logonun/bildirim çanının arkasına opak bir zemin koyar (kapak
+// sayfalarında normalde böyle bir zemin yok, bu yüzden içerik onların altından
+// geçerken karışıyordu); alt satır sayfanın adını taşır.
+const STICKY_TOP_ROW = 68;
+const STICKY_TITLE_ROW = 44;
+
+/**
+ * Kapak sayfalarında aşağı kaydırınca beliren sabit başlık.
+ *
+ * Bu sayfalarda kapak görseli sayfanın en üstüne (y=0) kadar uzansın diye üstteki
+ * opak şerit kaldırılmıştı; sonuç olarak aşağı kaydırırken içerik, sabit duran
+ * logonun ve bildirim çanının altından geçip onlarla karışıyordu. Artık kapağın
+ * alt kenarı üst şeridin altına geçtiği anda opak bir başlık beliriyor: üst satır
+ * logo/çan bandına zemin oluyor, alt satır sayfanın adını taşıyor, içerik de
+ * ikisinin altından akıp gidiyor.
+ */
+function CoverStickyHeader({ visibleOn, left, user }: { visibleOn: boolean; left: number; user: User | null }) {
+  const c = colors.light;
+  const registration = usePageHeaderState();
+  const [passed, setPassed] = useState(false);
+
+  const coverRef = registration?.coverRef;
+
+  useEffect(() => {
+    if (!visibleOn || !coverRef) {
+      setPassed(false);
+      return;
+    }
+    // Kapak yükseklikleri sayfadan sayfaya değiştiği (ve projede kapak yoksa
+    // tamamen değişken olduğu) için sabit bir kaydırma eşiği yerine kapağın
+    // kendisi ölçülüyor.
+    const check = () => {
+      const el = coverRef.current;
+      if (!el) return;
+      setPassed(el.getBoundingClientRect().bottom <= STICKY_TOP_ROW + STICKY_TITLE_ROW);
+    };
+    check();
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    return () => {
+      window.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+    };
+  }, [visibleOn, coverRef]);
+
+  if (!visibleOn || !registration) return null;
+
+  return (
+    <div
+      aria-hidden={!passed}
+      style={{
+        position: "fixed",
+        top: 0,
+        left,
+        right: 0,
+        // Logo ve bildirim çanı (zIndex 40) bu şeridin ÜSTÜNDE kalır; içerik
+        // (zIndex yok) altından geçer.
+        zIndex: 34,
+        background: c.surface,
+        borderBottom: `1px solid ${c.border}`,
+        boxShadow: "0 1px 6px rgba(26,31,41,0.06)",
+        opacity: passed ? 1 : 0,
+        transform: passed ? "none" : "translateY(-8px)",
+        transition: "opacity 0.16s ease, transform 0.16s ease",
+        // Görünmezken altındaki içeriğe tıklanabilmeli.
+        pointerEvents: passed ? "auto" : "none",
+      }}
+    >
+      {/* Üst satır: yalnızca zemin. Logo/çan zaten ayrı position:fixed öğeler. */}
+      <div style={{ height: STICKY_TOP_ROW }} />
+      {/* Alt satır: solda sayfanın adı, sağda kişi kartının küçültülmüş hali.
+          Kapağın üstündeki büyük kişi kartı (bkz. ProfileCard) yukarı kayıp gözden
+          kaybolduğu için burada yalnızca kimlik göstergesi olarak fotoğraf + ad
+          kalıyor; satır yükselmesin diye unvan, açıklama ve düzenleme simgesi yok. */}
+      <div
+        style={{
+          height: STICKY_TITLE_ROW,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "0 28px",
+          borderTop: `1px solid ${c.border}`,
+        }}
+      >
+        <span
+          title={registration.title}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: 16,
+            fontWeight: 500,
+            color: c.textPrimary,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {registration.title}
+        </span>
+
+        {user && (
+          <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, maxWidth: "45%" }}>
+            <span
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: "50%",
+                overflow: "hidden",
+                flexShrink: 0,
+                background: c.background,
+                border: `1px solid ${c.border}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt=""
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <IconUser size={14} color={c.textSecondary} />
+              )}
+            </span>
+            <span
+              title={user.fullName}
+              style={{
+                fontSize: 14,
+                color: c.textSecondary,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {user.fullName}
+            </span>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const location = useLocation();
@@ -107,6 +255,10 @@ export default function App() {
   const c = colors.light;
 
   return (
+    // Geri alma (Cmd/Ctrl+Z) tüm sayfaları kapsadığı için sağlayıcı en dışta;
+    // bekleyen silmelerin sayfalar arasında gezinirken de yaşaması gerekiyor.
+    <UndoProvider>
+    <PageHeaderProvider>
     <div style={{ minHeight: "100vh" }}>
       {me && !me.onboardingCompletedAt && <OnboardingWizard onCompleted={reloadMe} />}
 
@@ -125,13 +277,25 @@ export default function App() {
               left: isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0,
               right: 0,
               height: HEADER_HEIGHT,
-              background: c.surface,
-              borderBottom: `1px solid ${c.border}`,
-              boxShadow: "0 2px 6px rgba(26,31,41,0.05)",
+              // Kasıtlı olarak sayfa arka planıyla AYNI renk (beyaz değil): bu şerit
+              // dekoratif bir başlık çubuğu değil, yukarı kaydırılan içeriğin sabit
+              // duran bildirim çanı / AI düğmesi / sidebar okunun altından geçerken
+              // görünmesini engelleyen bir maske. Beyaz olduğunda sayfanın üstünde
+              // sırıtan bir bant gibi duruyordu; çerçeve ve gölge de bu yüzden yok.
+              background: c.background,
               zIndex: 35,
             }}
           />
         )}
+        {/* Kapak sayfalarında kaydırma başlayınca beliren opak başlık şeridi.
+            Logo/çan ondan sonra render ediliyor ki (ve daha yüksek zIndex ile)
+            şeridin üstünde kalsınlar. */}
+        <CoverStickyHeader
+          visibleOn={isCoverPage}
+          left={isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0}
+          user={me}
+        />
+
         {/* Sidebar kapalıyken (masaüstünde veya mobilde) sol üstte küçük bir ok
             butonu ve onun yanında Projelio logosu gösterilir; oka basınca sidebar
             açılır, logoya basınca ana sayfaya gidilir. Sidebar açıkken zaten kendi
@@ -205,5 +369,7 @@ export default function App() {
         </ProjectFabContext.Provider>
       </div>
     </div>
+    </PageHeaderProvider>
+    </UndoProvider>
   );
 }

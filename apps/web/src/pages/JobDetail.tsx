@@ -16,7 +16,9 @@ import Modal from "../components/Modal";
 import { colors } from "../theme/colors";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { useSortableList } from "../lib/useSortableList";
+import { useLatestRef, useRefreshOnUndo, useReorderUndo } from "../lib/undo";
 import { useProjectFabAction } from "../lib/projectFab";
+import { usePageHeader } from "../lib/pageHeader";
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -41,6 +43,8 @@ export default function JobDetail() {
   const [parentCompletePrompt, setParentCompletePrompt] = useState<Task | null>(null);
   const [currentUserActiveTaskId, setCurrentUserActiveTaskId] = useState<string | undefined>(undefined);
   const gridRef = useRef<HTMLDivElement>(null);
+  const registerReorderUndo = useReorderUndo();
+  const projectsRef = useLatestRef(projects);
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
   const tasksPanelRef = useRef<JobTasksPanelHandle>(null);
   const filesRef = useRef<FilesPanelHandle>(null);
@@ -74,6 +78,8 @@ export default function JobDetail() {
   };
 
   useEffect(reload, [id]);
+  // Geri/ileri alma sunucu durumunu değiştirir; sayfa kendini tazelemeli.
+  useRefreshOnUndo(reload);
 
   // Canlı görünüm: başka bir ekip üyesi yeni proje eklediğinde/değiştirdiğinde sayfayı
   // yenilemeye gerek kalmadan görünsün diye proje listesi kısa aralıklarla tazelenir.
@@ -208,15 +214,21 @@ export default function JobDetail() {
         const ids = Array.from(el.children)
           .map((node) => (node as HTMLElement).dataset.id!)
           .filter(Boolean);
+        const previousIds = projectsRef.current.map((p) => p.id);
         setProjects((prev) => {
           const byId = new Map(prev.map((p) => [p.id, p]));
           return ids.map((pid) => byId.get(pid)!).filter(Boolean);
         });
         api.patch("/projects/reorder", { ids }).catch(() => reload());
+        registerReorderUndo("/projects/reorder", previousIds, ids, reload);
       },
     },
     [projects.length === 0, activeTab]
   );
+
+  // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
+  const coverRef = useRef<HTMLDivElement>(null);
+  usePageHeader(job?.title, coverRef, [job?.title]);
 
   if (!id) return null;
 
@@ -228,6 +240,7 @@ export default function JobDetail() {
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
       <div
+        ref={coverRef}
         style={{
           position: "relative",
           height: 330,
@@ -387,6 +400,7 @@ export default function JobDetail() {
               onMoveTask={handleMoveTask}
               onToggleComplete={handleToggleComplete}
               onEditTask={setEditingTask}
+              onTaskRenamed={updateTaskInState}
               onTasksReload={reloadTasks}
               activeTaskId={currentUserActiveTaskId}
               onToggleActive={handleToggleActive}

@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import AddBudgetEntryModal from "./AddBudgetEntryModal";
 import AddRecurringPaymentModal from "./AddRecurringPaymentModal";
+import { useUndo } from "../lib/undo";
 import { IconPlus, IconTrash, IconEdit, IconCalendar, IconFolder } from "./icons";
 
 function formatMoney(amount: number): string {
@@ -35,6 +36,7 @@ export default function BudgetPanel() {
   const [addingEntry, setAddingEntry] = useState(false);
   const [addingRecurring, setAddingRecurring] = useState(false);
   const [editingRecurring, setEditingRecurring] = useState<RecurringPayment | null>(null);
+  const { pushDestructive } = useUndo();
 
   const reload = () => {
     api.get<BudgetOverview>("/budget/overview").then(setOverview).catch(() => setOverview(null));
@@ -44,14 +46,30 @@ export default function BudgetPanel() {
 
   useEffect(reload, []);
 
+  // Silme hemen sunucuya gitmez: satır listeden düşürülür, gerçek DELETE birkaç
+  // saniye sonra atılır; bu pencerede Cmd/Ctrl+Z basılırsa istek hiç gönderilmez.
   const deleteTransaction = async (id: string) => {
-    await api.delete(`/budget/transactions/${id}`);
-    reload();
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    pushDestructive({
+      label: "Kayıt silme",
+      commit: async () => {
+        await api.delete(`/budget/transactions/${id}`).catch(() => {});
+        reload();
+      },
+      restore: reload,
+    });
   };
 
   const deleteRecurring = async (id: string) => {
-    await api.delete(`/budget/recurring/${id}`);
-    reload();
+    setRecurring((prev) => prev.filter((r) => r.id !== id));
+    pushDestructive({
+      label: "Düzenli ödeme silme",
+      commit: async () => {
+        await api.delete(`/budget/recurring/${id}`).catch(() => {});
+        reload();
+      },
+      restore: reload,
+    });
   };
 
   const toggleRecurring = async (payment: RecurringPayment) => {

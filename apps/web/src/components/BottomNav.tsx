@@ -11,6 +11,7 @@ import CreateGroupModal from "./CreateGroupModal";
 import { ProjectFabContext } from "../lib/projectFab";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { SIDEBAR_WIDTH } from "../lib/layout";
+import { useHomeTarget } from "../lib/homeTarget";
 
 const rightItems = [
   { to: "/tasks", label: "Yapılacaklar", icon: IconListCheck },
@@ -26,18 +27,22 @@ export default function BottomNav() {
   const [modal, setModal] = useState<ModalKind | null>(null);
   const [choosing, setChoosing] = useState(false);
   const { action: fabAction } = useContext(ProjectFabContext);
+  const homeTarget = useHomeTarget();
 
   // Organizasyon/Grup artık burada ayrı bir sekme değil: mobilde de artık üstteki
   // ok ile açılan sidebar (Grup > Organizasyon > İş ağacı) üzerinden erişiliyor,
   // ayrıca ana sayfadaki kısayoldan da ulaşılabiliyor (bkz. Dashboard.tsx).
   // Takvim, "+" butonu ana sayfanın hemen yanında değil de Takvim ile Yapılacaklar'ın
   // ortasında görünsün diye sağdaki değil soldaki gruba (FAB'ın hemen öncesine) alındı.
+  // "Ana sayfa" düğmesinin hedefi Ayarlar > Gezinme'den değiştirilebilir
+  // (bkz. lib/homeTarget.ts); etiket sabit kalır, değişen sadece gittiği yer.
   const leftItems = [
-    { to: "/", label: "Ana sayfa", icon: IconDashboard },
+    { to: homeTarget.path, label: "Ana sayfa", icon: IconDashboard },
     { to: "/calendar", label: "Takvim", icon: IconCalendar },
   ];
 
-  const isActive = (to: string) => (to === "/" ? location.pathname === "/" : location.pathname.startsWith(to));
+  const isActive = (to: string) =>
+    to === "/" ? location.pathname === "/" : to.includes("?") ? location.pathname + location.search === to : location.pathname.startsWith(to);
 
   // Sayfaya göre "+" butonunun ne oluşturacağını belirle: ana sayfada iş, bir işin
   // içindeyken (o an aktif sekme kendi eylemini kaydetmediyse) proje veya görev seçimi,
@@ -57,7 +62,13 @@ export default function BottomNav() {
   let groupIdForOrg: string | null = null;
   let fabLabel = "Oluştur";
 
-  if ((jobMatch || projectMatch || operationMatch || orgDetailMatch || deptDetailMatch) && fabAction) {
+  // Bir sayfa kendi eylemini kaydettiyse (useProjectFabAction) her zaman o kazanır.
+  // Eskiden bu yalnızca iş/proje/program/organizasyon/departman detaylarında
+  // geçerliydi; o rota listesi her yeni sayfada güncellenmeyi gerektiriyordu ve
+  // Yapılacaklar sayfası listede olmadığı için "+" orada "Yeni iş" açıyordu.
+  // Eylemi kaydeden sayfa zaten unmount olurken temizliyor, dolayısıyla rota
+  // kontrolüne gerek yok.
+  if (fabAction) {
     createAction = "custom";
     fabLabel = fabAction.label;
   } else if (jobMatch) {

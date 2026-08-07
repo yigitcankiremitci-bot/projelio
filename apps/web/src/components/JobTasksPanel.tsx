@@ -3,10 +3,12 @@ import type { Output, Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import TaskColumn from "./TaskColumn";
+import TaskSortMenu from "./TaskSortMenu";
 import CreateTaskModal from "./CreateTaskModal";
 import TaskSelectionBar from "./TaskSelectionBar";
 import MoveTaskModal from "./MoveTaskModal";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { useTaskSelection } from "../lib/useTaskSelection";
 
 const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
@@ -23,13 +25,15 @@ interface Props {
   onMoveTask: (taskId: string, status: TaskStatus) => void;
   onToggleComplete: (taskId: string) => void;
   onEditTask: (task: Task) => void;
+  // Başlığa çift tıklayarak yerinde ad değiştirme (bkz. TaskColumn.onTaskRenamed).
+  onTaskRenamed?: (updated: Task) => void;
   onTasksReload: () => void;
   activeTaskId?: string;
   onToggleActive?: (taskId: string) => void;
 }
 
 const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPanel(
-  { jobId, projects, tasks, onCreateSubtask, onMoveTask, onToggleComplete, onEditTask, onTasksReload, activeTaskId, onToggleActive },
+  { jobId, projects, tasks, onCreateSubtask, onMoveTask, onToggleComplete, onEditTask, onTaskRenamed, onTasksReload, activeTaskId, onToggleActive },
   ref
 ) {
   const c = colors.light;
@@ -37,6 +41,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
   const [creating, setCreating] = useState(false);
   const [outputs, setOutputs] = useState<Output[]>([]);
   const selection = useTaskSelection();
+  const [sort, setSort] = useState<TaskSortMode>("manual");
   const [duplicating, setDuplicating] = useState(false);
   const [movingOpen, setMovingOpen] = useState(false);
 
@@ -71,10 +76,12 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
   const projectTitleById = new Map(projects.map((p) => [p.id, p.title]));
   const outputTitleById = new Map(outputs.map((o) => [o.id, o.title]));
 
-  // İşler bölümünde en son eklenen görev yukarıda görünsün.
-  const sortedTasks = [...tasks].sort(
+  // Bu panoda elle sıralama yok; "Kendi sıram" burada panonun kendi varsayılanı
+  // demek: en son eklenen görev yukarıda. Diğer ölçütler ortak sıralamaya devreder.
+  const defaultOrdered = [...tasks].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
+  const sortedTasks = sort === "manual" ? defaultOrdered : sortTasks(tasks, sort);
 
   // "Bugün yapılacaklar": bugünü kapsayan (başlangıç ≤ bugün ≤ bitiş) ve henüz
   // tamamlanmamış üst seviye görevler ayrı bir bölümde öne çıkarılır.
@@ -84,7 +91,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
     const d = new Date(iso);
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   };
-  const todayTasks = sortedTasks.filter((t) => {
+  const todayTasks = defaultOrdered.filter((t) => {
     if (t.parentTaskId || t.status === "completed") return false;
     const start = dayOf(t.startDate ?? t.createdAt);
     const end = dayOf(t.deadline);
@@ -110,8 +117,14 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
       </div>
 
       {tasks.length > 0 && (
-        <div style={{ marginBottom: 14 }}>
+        // Tek satırlık araç çubuğu: sağda sıralama ve seçim. Seçim modu
+        // açıldığında bar tam genişlik alıp alta kayar.
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+          <div style={{ marginLeft: "auto" }}>
+            <TaskSortMenu value={sort} onChange={setSort} />
+          </div>
           <TaskSelectionBar
+            inline
             selectionMode={selection.selectionMode}
             selectedCount={selection.selectedIds.size}
             busy={duplicating}
@@ -173,6 +186,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
               </div>
             </div>
           )}
+
           {/* Masaüstünde üç sütun yan yana, dar ekranda alt alta. */}
           <div
             style={{
@@ -195,6 +209,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
                   onMove={onMoveTask}
                   onToggleComplete={onToggleComplete}
                   onEditTask={onEditTask}
+                  onTaskRenamed={onTaskRenamed}
                   group={`tasks-job-${jobId}`}
                   activeTaskId={activeTaskId}
                   onToggleActive={onToggleActive}

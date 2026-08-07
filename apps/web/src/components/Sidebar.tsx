@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { colors } from "../theme/colors";
-import { IconDashboard, IconCalendar, IconShield, IconLogout, IconSettings, IconActivity, IconFile, IconChevronLeft } from "./icons";
+import { IconChevronLeft, IconSettings } from "./icons";
 import { SIDEBAR_WIDTH } from "../lib/layout";
 import SidebarTree from "./SidebarTree";
+import HomeTargetModal from "./HomeTargetModal";
+import { useHomeTarget, DEFAULT_HOME_TARGET } from "../lib/homeTarget";
 
 interface Props {
   // Kapalıyken sidebar hiç render edilmez (App.tsx'te bunun yerine küçük bir
@@ -27,15 +30,28 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
   // Bütçe ve Dosyalar, Ana Sayfa'nın kendi sekmeleridir (bkz. Dashboard.tsx ?tab=);
   // buradan doğrudan o sekmeyle açılacak şekilde bağlanır.
   const searchTab = new URLSearchParams(location.search).get("tab");
+  // "Ana Sayfa" düğmesinin hedefi kullanıcı tarafından değiştirilebilir
+  // (bkz. lib/homeTarget.ts). Etiket sabit kalır — değişen sadece nereye gittiği.
+  const homeTarget = useHomeTarget();
+  const [homeTargetModalOpen, setHomeTargetModalOpen] = useState(false);
+  const homeIsDefault = homeTarget.path === DEFAULT_HOME_TARGET.path;
 
-  const navItems = [
-    { to: "/", label: "Ana Sayfa", icon: IconDashboard, active: location.pathname === "/" && !searchTab },
-    { to: "/?tab=budget", label: "Bütçe", icon: IconActivity, active: location.pathname === "/" && searchTab === "budget" },
-    { to: "/?tab=files", label: "Dosyalar", icon: IconFile, active: location.pathname === "/" && searchTab === "files" },
-    { to: "/calendar", label: "Takvim", icon: IconCalendar, active: location.pathname.startsWith("/calendar") },
-    ...(isAdmin
-      ? [{ to: "/admin", label: "Admin", icon: IconShield, active: location.pathname.startsWith("/admin") }]
-      : []),
+  const navItems: { to: string; label: string; active: boolean; isHome?: boolean }[] = [
+    {
+      to: homeTarget.path,
+      label: "Ana Sayfa",
+      isHome: true,
+      active: homeIsDefault
+        ? location.pathname === "/" && !searchTab
+        : location.pathname + location.search === homeTarget.path,
+    },
+    { to: "/?tab=budget", label: "Bütçe", active: location.pathname === "/" && searchTab === "budget" },
+    { to: "/?tab=files", label: "Dosyalar", active: location.pathname === "/" && searchTab === "files" },
+    { to: "/calendar", label: "Takvim", active: location.pathname.startsWith("/calendar") },
+    // Mobilde BottomNav'da olan "Yapılacaklar" (/tasks) masaüstünde hiçbir yerden
+    // erişilebilir değildi; aynı sayfa buraya da bağlandı.
+    { to: "/tasks", label: "Yapılacaklar", active: location.pathname.startsWith("/tasks") },
+    ...(isAdmin ? [{ to: "/admin", label: "Admin", active: location.pathname.startsWith("/admin") }] : []),
   ];
 
   const handleLogout = () => {
@@ -129,68 +145,61 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
           </button>
         </div>
 
+        {/* Sayfa bağlantıları ikonsuz, buton görünümlü satırlar. Hover/aktif
+            durumları ve geçiş animasyonları src/index.css'teki .sidebar-nav-btn
+            sınıfında (inline style ile :hover yazılamıyor). */}
         {navItems.map((item) => {
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.to}
-            to={item.to}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "9px 10px",
-              borderRadius: 8,
-              background: item.active ? "rgba(255,255,255,0.08)" : "transparent",
-              borderLeft: item.active ? `2px solid ${c.accent}` : "2px solid transparent",
-            }}
-          >
-            <Icon size={16} color={item.active ? c.accent : "#9AA6B4"} />
-            <span style={{ fontSize: 16, color: item.active ? "#fff" : "#C7CCD6" }}>{item.label}</span>
-          </Link>
-        );
-      })}
+          const link = (
+            <Link
+              to={item.to}
+              className={`sidebar-nav-btn${item.active ? " is-active" : ""}`}
+              aria-current={item.active ? "page" : undefined}
+              title={item.isHome && !homeIsDefault ? `Ana Sayfa → ${homeTarget.label}` : undefined}
+            >
+              {item.label}
+            </Link>
+          );
+          // Ana Sayfa satırında, yalnızca üstüne gelince beliren bir dişli var:
+          // düğmenin nereye gideceğini seçtiren modalı açar. Mobilde sidebar bir
+          // çekmece ve hover kavramı yok — orada aynı ayar Ayarlar sayfasında.
+          // key olarak "to" kullanılamaz: kullanıcı Ana Sayfa hedefini örneğin
+          // /tasks yaparsa iki satır aynı yolu gösterip key çakışması olur.
+          if (!item.isHome || overlay) return <div key={item.label}>{link}</div>;
+          return (
+            <div key={item.label} className="sidebar-nav-row">
+              {link}
+              <button
+                type="button"
+                className="sidebar-nav-gear"
+                onClick={() => setHomeTargetModalOpen(true)}
+                aria-label="Ana Sayfa düğmesinin gideceği yeri değiştir"
+                title="Ana Sayfa düğmesini ayarla"
+              >
+                <IconSettings size={14} color="#C7CCD6" />
+              </button>
+            </div>
+          );
+        })}
 
       {/* Grup > Organizasyon > İş gezinme ağacı: yalnızca kullanıcının erişebildiği
           en az bir grup/organizasyon/iş varsa bir şey render eder. */}
       <SidebarTree />
 
-      <div style={{ marginTop: "auto" }}>
+      <div style={{ marginTop: "auto", paddingTop: 10 }}>
         <Link
           to="/settings"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "9px 10px",
-            borderRadius: 8,
-            background: location.pathname.startsWith("/settings") ? "rgba(255,255,255,0.08)" : "transparent",
-            borderLeft: location.pathname.startsWith("/settings") ? `2px solid ${c.accent}` : "2px solid transparent",
-          }}
+          className={`sidebar-nav-btn${location.pathname.startsWith("/settings") ? " is-active" : ""}`}
+          aria-current={location.pathname.startsWith("/settings") ? "page" : undefined}
         >
-          <IconSettings size={16} color={location.pathname.startsWith("/settings") ? c.accent : "#9AA6B4"} />
-          <span style={{ fontSize: 16, color: location.pathname.startsWith("/settings") ? "#fff" : "#C7CCD6" }}>
-            Ayarlar
-          </span>
+          Ayarlar
         </Link>
-        <button
-          onClick={handleLogout}
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "9px 10px",
-            borderRadius: 8,
-            background: "transparent",
-            border: "none",
-          }}
-        >
-          <IconLogout size={16} color="#9AA6B4" />
-          <span style={{ fontSize: 16, color: "#C7CCD6" }}>Çıkış yap</span>
+        <button type="button" onClick={handleLogout} className="sidebar-nav-btn is-muted">
+          Çıkış yap
         </button>
       </div>
     </aside>
+
+    {homeTargetModalOpen && <HomeTargetModal onClose={() => setHomeTargetModalOpen(false)} />}
     </>
   );
 }

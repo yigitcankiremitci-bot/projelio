@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import AiAssistantPanel from "./AiAssistantPanel";
 
-const BASE_SIZE = 132;
+// Lio'nun düğme boyutu. Dar ekranda hem ekranın çok büyük bir kısmını kaplıyor
+// hem de alt menüye ve içeriğe fazla yaklaşıyordu; masaüstünde olduğu gibi kalıyor.
+const BASE_SIZE_DESKTOP = 132;
+const BASE_SIZE_MOBILE = 88;
 const HOVER_SCALE = 1.28;
 const EYES_CLOSED_DURATION = 300;
 const IDLE_BLINK_RANGE: [number, number] = [10000, 12000];
@@ -67,6 +70,7 @@ export default function AiLauncher() {
 
   // Mobilde alt menünün üstünde kalsın; masaüstünde ekranın sağ altına otursun.
   const bottom = isDesktop ? 22 : 96;
+  const size = isDesktop ? BASE_SIZE_DESKTOP : BASE_SIZE_MOBILE;
 
   return (
     <>
@@ -81,8 +85,8 @@ export default function AiLauncher() {
             position: "fixed",
             right: 18,
             bottom,
-            width: BASE_SIZE,
-            height: BASE_SIZE,
+            width: size,
+            height: size,
             padding: 0,
             border: "none",
             background: "transparent",

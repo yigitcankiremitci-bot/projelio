@@ -36,8 +36,9 @@ export default function EditProjectModal({ project, onClose }: Props) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // DELETE isteğini EntityDangerZone geciktirmeli olarak atar (bkz. resourcePath);
+  // burada yalnızca silme sonrası arayüz davranışı kalır.
   const handleDelete = async () => {
-    await api.delete(`/projects/${project.id}`);
     navigate(`/jobs/${project.jobId}`);
   };
 
@@ -149,6 +150,7 @@ export default function EditProjectModal({ project, onClose }: Props) {
 
       <EntityDangerZone
         entityLabel="Projeyi"
+        resourcePath={`/projects/${project.id}`}
         onArchive={handleArchive}
         onDelete={handleDelete}
         archiveMessage={`"${project.title}" projesini arşive eklemek istediğine emin misin? Bu projeye bağlı tüm görevler, alt görevler ve çıktılar da arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}

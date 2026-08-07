@@ -14,6 +14,8 @@ import {
   getFontScaleOption,
   setFontScaleOption,
 } from "../lib/fontScale";
+import HomeTargetModal from "../components/HomeTargetModal";
+import { useHomeTarget } from "../lib/homeTarget";
 
 const rowStyle: React.CSSProperties = {
   width: "100%",
@@ -30,6 +32,8 @@ export default function Settings() {
   const c = colors.light;
   const navigate = useNavigate();
   const [fontScale, setFontScale] = useState<FontScaleOption>(getFontScaleOption());
+  const homeTarget = useHomeTarget();
+  const [homeTargetModalOpen, setHomeTargetModalOpen] = useState(false);
   const [me, setMe] = useState<User | null>(null);
   const [username, setUsername] = useState("");
   const [savingUsername, setSavingUsername] = useState(false);
@@ -119,6 +123,44 @@ export default function Settings() {
           </span>
         </button>
       </div>
+
+      {/* Masaüstünde bu ayara sidebar'daki "Ana Sayfa" satırının üstüne gelince
+          beliren dişliden de ulaşılır; mobilde sidebar bir çekmece ve hover
+          kavramı olmadığı için tek erişim noktası burasıdır. */}
+      <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "26px 0 10px", maxWidth: 420 }}>
+        Gezinme
+      </h2>
+
+      <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: 16, maxWidth: 420 }}>
+        <div style={{ fontSize: 16, color: c.textPrimary, marginBottom: 4 }}>Ana Sayfa düğmesi</div>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 12px", lineHeight: 1.4 }}>
+          Menüdeki Ana Sayfa düğmesine bastığında nereye gideceğini seçebilirsin. Bu tercih yalnızca bu cihazda
+          geçerlidir.
+        </p>
+        <button
+          type="button"
+          onClick={() => setHomeTargetModalOpen(true)}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            padding: "10px 12px",
+            borderRadius: 9,
+            border: `1px solid ${c.border}`,
+            background: c.background,
+            textAlign: "left",
+          }}
+        >
+          <span style={{ fontSize: 15, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {homeTarget.label}
+          </span>
+          <IconChevronRight size={16} color={c.textSecondary} />
+        </button>
+      </div>
+
+      {homeTargetModalOpen && <HomeTargetModal onClose={() => setHomeTargetModalOpen(false)} />}
 
       <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "26px 0 10px", maxWidth: 420 }}>
         Bağlı hesaplar

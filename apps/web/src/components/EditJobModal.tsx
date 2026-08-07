@@ -28,8 +28,9 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
   const [loading, setLoading] = useState(false);
   const [hiring, setHiring] = useState(false);
 
+  // DELETE isteğini EntityDangerZone geciktirmeli olarak atar (bkz. resourcePath);
+  // burada yalnızca silme sonrası arayüz davranışı kalır.
   const handleDelete = async () => {
-    await api.delete(`/jobs/${job.id}`);
     onDeleted?.();
   };
 
@@ -137,6 +138,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
 
       <EntityDangerZone
         entityLabel="İşi"
+        resourcePath={`/jobs/${job.id}`}
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
         archiveMessage={`"${job.title}" işini arşive eklemek istediğine emin misin? Bu işe bağlı tüm projeler ve görevler de arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}

@@ -21,9 +21,12 @@ const tabs: { key: DepartmentTab; label: string }[] = [
 interface Props {
   active: DepartmentTab;
   onChange: (tab: DepartmentTab) => void;
+  // Sabit başlığın üst bandındaki küçültülmüş kopya (bkz. DepartmentDetail
+  // usePageHeaderTabs) marginBottom'u kaldırmak için kullanır.
+  style?: React.CSSProperties;
 }
 
-export default function DepartmentTabs({ active, onChange }: Props) {
+export default function DepartmentTabs({ active, onChange, style }: Props) {
   const c = colors.light;
   const isDesktop = useIsDesktop();
   return (
@@ -42,6 +45,7 @@ export default function DepartmentTabs({ active, onChange }: Props) {
         borderRadius: 10,
         padding: 4,
         marginBottom: 16,
+        ...style,
       }}
     >
       {tabs.map((t) => (

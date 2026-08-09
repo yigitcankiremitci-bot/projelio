@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { MembersService } from "./members.service";
 
@@ -8,42 +8,44 @@ export class MembersController {
   constructor(private membersService: MembersService) {}
 
   @Get("projects/:projectId/members")
-  findByProject(@Param("projectId") projectId: string) {
-    return this.membersService.findByProject(projectId);
+  findByProject(@Param("projectId") projectId: string, @Req() req: any) {
+    return this.membersService.findByProject(projectId, req.user.userId);
   }
 
   @Post("projects/:projectId/members/invite")
-  invite(@Param("projectId") projectId: string, @Body() body: { userId: string; role?: any }) {
-    return this.membersService.invite(projectId, body.userId, body.role);
+  invite(@Param("projectId") projectId: string, @Body() body: { userId: string; role?: any }, @Req() req: any) {
+    return this.membersService.invite(projectId, body.userId, body.role, req.user.userId);
   }
 
   @Post("projects/:projectId/members")
-  addMember(@Param("projectId") projectId: string, @Body() body: { userId: string; role?: any; title?: string }) {
-    return this.membersService.addMember(projectId, body.userId, body.role, body.title);
+  addMember(@Param("projectId") projectId: string, @Body() body: { userId: string; role?: any; title?: string }, @Req() req: any) {
+    return this.membersService.addMember(projectId, body.userId, body.role, body.title, req.user.userId);
   }
 
   @Patch("members/:id/budget-visibility")
-  setBudgetVisibility(@Param("id") id: string, @Body("canViewBudget") canViewBudget: boolean) {
-    return this.membersService.setBudgetVisibility(id, canViewBudget);
+  setBudgetVisibility(@Param("id") id: string, @Body("canViewBudget") canViewBudget: boolean, @Req() req: any) {
+    return this.membersService.setBudgetVisibility(id, canViewBudget, req.user.userId);
   }
 
   @Patch("members/:id/title")
-  setTitle(@Param("id") id: string, @Body("title") title: string) {
-    return this.membersService.setTitle(id, title);
+  setTitle(@Param("id") id: string, @Body("title") title: string, @Req() req: any) {
+    return this.membersService.setTitle(id, title, req.user.userId);
   }
 
+  // NOT: userId artık body'den değil, giriş yapmış kullanıcıdan alınıyor —
+  // aksi halde biri başkası adına katılım isteği açabilirdi.
   @Post("projects/:projectId/members/join-request")
-  requestToJoin(@Param("projectId") projectId: string, @Body() body: { userId: string }) {
-    return this.membersService.requestToJoin(projectId, body.userId);
+  requestToJoin(@Param("projectId") projectId: string, @Req() req: any) {
+    return this.membersService.requestToJoin(projectId, req.user.userId);
   }
 
   @Patch("members/:id/respond")
-  respond(@Param("id") id: string, @Body("approve") approve: boolean) {
-    return this.membersService.respond(id, approve);
+  respond(@Param("id") id: string, @Body("approve") approve: boolean, @Req() req: any) {
+    return this.membersService.respond(id, approve, req.user.userId);
   }
 
   @Patch("members/:id/rate")
-  setRate(@Param("id") id: string, @Body("rate") rate: number) {
-    return this.membersService.setRate(id, rate);
+  setRate(@Param("id") id: string, @Body("rate") rate: number, @Req() req: any) {
+    return this.membersService.setRate(id, rate, req.user.userId);
   }
 }

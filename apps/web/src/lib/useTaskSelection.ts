@@ -29,6 +29,9 @@ export function useTaskSelection(): TaskSelection {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      // Son seçili öğe de kaldırıldıysa seçim modundan otomatik çık — kullanıcı
+      // "Vazgeç"e basmadan tek tek işareti kaldırdığında modda takılı kalmasın.
+      if (next.size === 0) setSelectionMode(false);
       return next;
     });
   }, []);

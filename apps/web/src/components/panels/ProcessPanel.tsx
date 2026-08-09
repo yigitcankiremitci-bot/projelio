@@ -7,8 +7,10 @@ import TaskColumn from "../TaskColumn";
 import TaskSelectionBar from "../TaskSelectionBar";
 import TaskSortMenu from "../TaskSortMenu";
 import MoveTaskModal from "../MoveTaskModal";
+import ConfirmDialog from "../ConfirmDialog";
 import { useTaskSelection } from "../../lib/useTaskSelection";
 import { sortTasks, type TaskSortMode } from "../../lib/taskSort";
+import { useUndo } from "../../lib/undo";
 
 type CreateOptions = { weekNumber?: number; deadline?: string; startDate?: string };
 export type ViewMode = "project" | "day" | "week" | "month" | "year";
@@ -49,6 +51,8 @@ interface Props {
   onToggleActive?: (taskId: string) => void;
   onTasksDuplicated?: (created: Task[]) => void;
   onTasksMoved?: (moved: Task[]) => void;
+  onTasksArchived?: (ids: string[]) => void;
+  onTasksDeleted?: (ids: string[]) => void;
 }
 
 export const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -111,11 +115,16 @@ export default function ProcessPanel({
   onToggleActive,
   onTasksDuplicated,
   onTasksMoved,
+  onTasksArchived,
+  onTasksDeleted,
 }: Props) {
   const c = colors.light;
   const selection = useTaskSelection();
+  const { pushUndo, pushDestructive } = useUndo();
   const [sort, setSort] = useState<TaskSortMode>("manual");
   const [duplicating, setDuplicating] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [confirmingBulkAction, setConfirmingBulkAction] = useState<"archive" | "delete" | null>(null);
   const [movingOpen, setMovingOpen] = useState(false);
 
   const handleDuplicateSelected = async () => {
@@ -130,6 +139,52 @@ export default function ProcessPanel({
     } finally {
       setDuplicating(false);
     }
+  };
+
+  // Seçili görevleri (ve üst seviye olanlarınsa alt görevlerini) toplu arşivler.
+  // Onay modalının (ConfirmDialog) onConfirm'ü olarak kullanılır — hata fırlatırsa
+  // modal açık kalıp hata mesajı gösterir, o yüzden burada hatayı yutmuyoruz.
+  const handleArchiveSelected = async () => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+    setArchiving(true);
+    try {
+      await api.patch<Task[]>("/tasks/bulk-archive", { ids });
+      onTasksArchived?.(ids);
+      // Arşivleme geri alınabilir: her görev zaten tekil /restore uç noktasına
+      // sahip ve o uç nokta alt görevleri de kendiliğinden geri getiriyor.
+      pushUndo({
+        label: `${ids.length} görev arşivleme`,
+        run: async () => {
+          await Promise.all(ids.map((id) => api.patch(`/tasks/${id}/restore`, {})));
+        },
+        redo: async () => {
+          await api.patch("/tasks/bulk-archive", { ids });
+        },
+      });
+      selection.clear();
+      setConfirmingBulkAction(null);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  // Seçili görevleri (ve alt görevlerini) toplu siler. Kalıcı silme sunucuda
+  // geri alınamadığı için hemen yapılmaz: arayüzden hemen kaldırılır ama gerçek
+  // istek birkaç saniye ertelenir (bkz. lib/undo pushDestructive) — tekil görev
+  // silmede olduğu gibi bu pencerede Cmd/Ctrl+Z ile iptal edilebilir.
+  const handleDeleteSelected = () => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+    onTasksDeleted?.(ids);
+    pushDestructive({
+      label: `${ids.length} görev silme`,
+      commit: () => api.post("/tasks/bulk-delete", { ids }),
+      restore: () => {},
+      entityIds: ids,
+    });
+    selection.clear();
+    setConfirmingBulkAction(null);
   };
   const {
     viewMode,
@@ -672,11 +727,13 @@ export default function ProcessPanel({
               inline
               selectionMode={selection.selectionMode}
               selectedCount={selection.selectedIds.size}
-              busy={duplicating}
+              busy={duplicating || archiving}
               onEnable={selection.toggleSelectionMode}
               onCancel={selection.clear}
               onDuplicate={handleDuplicateSelected}
               onMove={() => setMovingOpen(true)}
+              onArchive={() => setConfirmingBulkAction("archive")}
+              onDelete={() => setConfirmingBulkAction("delete")}
             />
           </div>
 
@@ -710,6 +767,26 @@ export default function ProcessPanel({
                 onTasksMoved?.(moved);
                 selection.clear();
               }}
+            />
+          )}
+          {confirmingBulkAction === "archive" && (
+            <ConfirmDialog
+              title="Görevleri arşivle"
+              message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
+              confirmLabel="Arşivle"
+              danger={false}
+              onCancel={() => setConfirmingBulkAction(null)}
+              onConfirm={handleArchiveSelected}
+            />
+          )}
+          {confirmingBulkAction === "delete" && (
+            <ConfirmDialog
+              title="Görevleri sil"
+              message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`}
+              confirmLabel="Sil"
+              danger
+              onCancel={() => setConfirmingBulkAction(null)}
+              onConfirm={handleDeleteSelected}
             />
           )}
         </div>

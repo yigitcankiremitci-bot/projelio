@@ -144,7 +144,7 @@ export class ProjectsService {
     await applyOrder(this.supabase.client, "projects", ids);
   }
 
-  async findOne(id: string): Promise<Project> {
+  async findOne(id: string, requestingUserId?: string): Promise<Project> {
     const { data, error } = await this.supabase.client
       .from("projects")
       .select()
@@ -152,7 +152,36 @@ export class ProjectsService {
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException("Proje bulunamadı");
+    await this.assertCanView(id, data, requestingUserId);
     return mapProject(data);
+  }
+
+  // Proje detayını kimler görebilir: proje sahibi, bağlı olduğu işin sahibi ya da
+  // ekibi, veya projenin onaylı üyeleri (bkz. findByJob'daki görünürlük kuralıyla
+  // aynı desen). requestingUserId verilmezse (dahili çağrılar) kontrol atlanır.
+  private async assertCanView(projectId: string, projectRow: { owner_id: string; job_id?: string | null }, userId?: string): Promise<void> {
+    if (!userId) return;
+    if (projectRow.owner_id === userId) return;
+    if (projectRow.job_id) {
+      const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", projectRow.job_id).maybeSingle();
+      if (job?.owner_id === userId) return;
+      const { data: jobMember } = await this.supabase.client
+        .from("job_members")
+        .select("id")
+        .eq("job_id", projectRow.job_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (jobMember) return;
+    }
+    const { data: membership } = await this.supabase.client
+      .from("project_members")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .maybeSingle();
+    if (membership) return;
+    throw new ForbiddenException("Bu projeyi görüntüleme yetkiniz yok");
   }
 
   async create(ownerId: string, data: Partial<Project>): Promise<Project> {
@@ -249,7 +278,9 @@ export class ProjectsService {
     return mapProject(row);
   }
 
-  async restore(id: string): Promise<Project> {
+  async restore(id: string, requestingUserId?: string): Promise<Project> {
+    await this.assertCanManage(id, requestingUserId);
+
     const { data: row, error } = await this.supabase.client
       .from("projects")
       .update({ archived_at: null })

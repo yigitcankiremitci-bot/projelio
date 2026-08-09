@@ -2,18 +2,20 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import type { Output, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
-import { IconChevronRight, IconEdit } from "./icons";
+import { IconArchive, IconCheck, IconChevronRight, IconCopy, IconEdit, IconMove, IconTrash, IconX } from "./icons";
 import TaskColumn, { TaskColumnHandle } from "./TaskColumn";
 import CreateOutputModal from "./CreateOutputModal";
 import EditOutputModal from "./EditOutputModal";
 import TaskSelectionBar from "./TaskSelectionBar";
 import TaskSortMenu from "./TaskSortMenu";
 import MoveTaskModal from "./MoveTaskModal";
+import ConfirmDialog from "./ConfirmDialog";
 import { useSortableList } from "../lib/useSortableList";
-import { useLatestRef, useRefreshOnUndo, useReorderUndo } from "../lib/undo";
+import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useTaskSelection } from "../lib/useTaskSelection";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
+import { usePageHeaderActions } from "../lib/pageHeader";
 
 const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
 
@@ -55,10 +57,15 @@ interface Props {
   // Verilirse (ör. iş ekibi sekmesinden yönlendirildiğinde), bu görevin ait olduğu
   // çıktı otomatik açılır ve görev kısa süreliğine parlayarak fark edilir hale gelir.
   highlightTaskId?: string;
-  // Çoklu seçimle çoğaltma/taşıma sonrası üst bileşenin kendi `tasks` state'ini
-  // güncelleyebilmesi için (bkz. TaskSelectionBar/MoveTaskModal, useTaskSelection).
+  // Çoklu seçimle çoğaltma/taşıma/arşivleme/silme sonrası üst bileşenin kendi
+  // `tasks` state'ini güncelleyebilmesi için (bkz. TaskSelectionBar/MoveTaskModal,
+  // useTaskSelection). Arşivleme ve silme, seçilen üst seviye görevin varsa tüm alt
+  // görevlerini de kapsar; verilen id listesi yalnızca üst seviye (kullanıcının
+  // doğrudan seçtiği) id'leri içerir, çağıran taraf alt görevleri de temizlemelidir.
   onTasksDuplicated?: (created: Task[]) => void;
   onTasksMoved?: (moved: Task[]) => void;
+  onTasksArchived?: (ids: string[]) => void;
+  onTasksDeleted?: (ids: string[]) => void;
 }
 
 const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel({
@@ -77,6 +84,8 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   highlightTaskId,
   onTasksDuplicated,
   onTasksMoved,
+  onTasksArchived,
+  onTasksDeleted,
 }, ref) {
   const c = colors.light;
   const isDesktop = useIsDesktop();
@@ -85,7 +94,11 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   const [creating, setCreating] = useState(false);
   const [editingOutput, setEditingOutput] = useState<Output | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Sabit başlığın Sırala/Seç kopyası, bu satır ekrandan çıkana kadar
+  // belirmesin diye (bkz. usePageHeaderActions sourceRef, App.tsx).
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const registerReorderUndo = useReorderUndo();
+  const { pushUndo, pushDestructive } = useUndo();
   const outputsRef = useLatestRef(outputs);
   const selection = useTaskSelection();
   const [sort, setSort] = useState<TaskSortMode>("manual");
@@ -95,6 +108,8 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   const pendingCreateTaskRef = useRef(false);
   const [duplicating, setDuplicating] = useState(false);
   const [movingOpen, setMovingOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [confirmingBulkAction, setConfirmingBulkAction] = useState<"archive" | "delete" | null>(null);
 
   const handleDuplicateSelected = async () => {
     if (selection.selectedIds.size === 0) return;
@@ -108,6 +123,52 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
     } finally {
       setDuplicating(false);
     }
+  };
+
+  // Seçili görevleri (ve üst seviye olanlarınsa alt görevlerini) toplu arşivler.
+  // Onay modalının (ConfirmDialog) onConfirm'ü olarak kullanılır — hata fırlatırsa
+  // modal açık kalıp hata mesajı gösterir, o yüzden burada hatayı yutmuyoruz.
+  const handleArchiveSelected = async () => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+    setArchiving(true);
+    try {
+      await api.patch<Task[]>("/tasks/bulk-archive", { ids });
+      onTasksArchived?.(ids);
+      // Arşivleme geri alınabilir: her görev zaten tekil /restore uç noktasına
+      // sahip ve o uç nokta alt görevleri de kendiliğinden geri getiriyor.
+      pushUndo({
+        label: `${ids.length} görev arşivleme`,
+        run: async () => {
+          await Promise.all(ids.map((id) => api.patch(`/tasks/${id}/restore`, {})));
+        },
+        redo: async () => {
+          await api.patch("/tasks/bulk-archive", { ids });
+        },
+      });
+      selection.clear();
+      setConfirmingBulkAction(null);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  // Seçili görevleri (ve alt görevlerini) toplu siler. Kalıcı silme sunucuda
+  // geri alınamadığı için hemen yapılmaz: arayüzden hemen kaldırılır ama gerçek
+  // istek birkaç saniye ertelenir (bkz. lib/undo pushDestructive) — tekil görev
+  // silmede olduğu gibi bu pencerede Cmd/Ctrl+Z ile iptal edilebilir.
+  const handleDeleteSelected = () => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+    onTasksDeleted?.(ids);
+    pushDestructive({
+      label: `${ids.length} görev silme`,
+      commit: () => api.post("/tasks/bulk-delete", { ids }),
+      restore: () => {},
+      entityIds: ids,
+    });
+    selection.clear();
+    setConfirmingBulkAction(null);
   };
 
   useImperativeHandle(ref, () => ({
@@ -262,7 +323,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
    * (bkz. TaskSelectionBar inline).
    */
   const toolbar = (
-    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+    <div ref={toolbarRef} style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
       <div role="group" aria-label="Görünüm" style={{ display: "flex", gap: 4 }}>
         {(
           [
@@ -280,8 +341,8 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
             }}
             aria-pressed={view === t.value}
             style={{
-              padding: "6px 14px",
-              fontSize: 14,
+              padding: "8px 16px",
+              fontSize: 15,
               borderRadius: 8,
               border: `1px solid ${view === t.value ? c.primary : c.border}`,
               background: view === t.value ? `${c.primary}12` : c.surface,
@@ -301,13 +362,176 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
         inline
         selectionMode={selection.selectionMode}
         selectedCount={selection.selectedIds.size}
-        busy={duplicating}
+        busy={duplicating || archiving}
         onEnable={selection.toggleSelectionMode}
         onCancel={selection.clear}
         onDuplicate={handleDuplicateSelected}
         onMove={() => setMovingOpen(true)}
+        onArchive={() => setConfirmingBulkAction("archive")}
+        onDelete={() => setConfirmingBulkAction("delete")}
       />
     </div>
+  );
+
+  /**
+   * Yukarıdaki toolbar'ın kısaltılmış hâli: sayfa aşağı kaydırılıp üstte proje
+   * adı + kişi kartı satırı sabitlendiğinde (bkz. App.tsx CoverStickyHeader,
+   * usePageHeaderActions) o satırda da gösterilir. Görevler/Çıktılar başlığın
+   * hemen yanında solda kalır; Sırala/Seç ise kişi kartının yanında sağda
+   * gösterilir. Aynı state'i kullandığı için toolbar ile birbiriyle senkron
+   * kalır; seçim modu açıkken satır taşmasın diye Çoğalt/Taşı/Vazgeç
+   * ikon-only düğmelere indirgenir (TaskSelectionBar'daki tam genişlikli bara
+   * burada yer yok).
+   */
+  const headerViewToggle = (
+    <div role="group" aria-label="Görünüm" style={{ display: "flex", gap: 4 }}>
+      {(
+        [
+          { value: "tasks", label: "Görevler" },
+          { value: "outputs", label: "Çıktılar" },
+        ] as { value: OutputsView; label: string }[]
+      ).map((t) => (
+        <button
+          key={t.value}
+          type="button"
+          onClick={() => {
+            selection.clear();
+            setSelectedOutputId(null);
+            setView(t.value);
+          }}
+          aria-pressed={view === t.value}
+          style={{
+            padding: "7px 14px",
+            fontSize: 14,
+            borderRadius: 8,
+            border: `1px solid ${view === t.value ? c.primary : c.border}`,
+            background: view === t.value ? `${c.primary}12` : c.surface,
+            color: view === t.value ? c.textPrimary : c.textSecondary,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const headerSortSelect = (
+    <>
+      <TaskSortMenu value={sort} onChange={setSort} />
+
+      {selection.selectionMode ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+          <span style={{ fontSize: 14, color: c.textSecondary, whiteSpace: "nowrap" }}>
+            {selection.selectedIds.size > 0 ? `${selection.selectedIds.size} seçili` : "Görev seç"}
+          </span>
+          <button
+            type="button"
+            onClick={handleDuplicateSelected}
+            disabled={selection.selectedIds.size === 0 || duplicating}
+            aria-label="Seçilenleri çoğalt"
+            title="Çoğalt"
+            style={{
+              display: "flex",
+              padding: 8,
+              borderRadius: 7,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              opacity: selection.selectedIds.size === 0 || duplicating ? 0.5 : 1,
+            }}
+          >
+            <IconCopy size={15} color={c.textSecondary} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMovingOpen(true)}
+            disabled={selection.selectedIds.size === 0}
+            aria-label="Seçilenleri taşı"
+            title="Taşı"
+            style={{
+              display: "flex",
+              padding: 8,
+              borderRadius: 7,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              opacity: selection.selectedIds.size === 0 ? 0.5 : 1,
+            }}
+          >
+            <IconMove size={15} color={c.textSecondary} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmingBulkAction("archive")}
+            disabled={selection.selectedIds.size === 0}
+            aria-label="Seçilenleri arşivle"
+            title="Arşivle"
+            style={{
+              display: "flex",
+              padding: 8,
+              borderRadius: 7,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              opacity: selection.selectedIds.size === 0 ? 0.5 : 1,
+            }}
+          >
+            <IconArchive size={15} color={c.textSecondary} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmingBulkAction("delete")}
+            disabled={selection.selectedIds.size === 0}
+            aria-label="Seçilenleri sil"
+            title="Sil"
+            style={{
+              display: "flex",
+              padding: 8,
+              borderRadius: 7,
+              border: `1px solid ${c.danger}`,
+              background: "transparent",
+              opacity: selection.selectedIds.size === 0 ? 0.5 : 1,
+            }}
+          >
+            <IconTrash size={15} color={c.danger} />
+          </button>
+          <button
+            type="button"
+            onClick={selection.clear}
+            aria-label="Seçimi iptal et"
+            title="Vazgeç"
+            style={{ display: "flex", padding: 8, borderRadius: 7, border: "none", background: "transparent" }}
+          >
+            <IconX size={15} color={c.textSecondary} />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={selection.toggleSelectionMode}
+          aria-label="Görev seçimini aç"
+          title="Seç"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "7px 13px",
+            borderRadius: 8,
+            border: `1px solid ${c.border}`,
+            background: c.surface,
+            color: c.textSecondary,
+            fontSize: 14,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <IconCheck size={14} color={c.textSecondary} />
+          Seç
+        </button>
+      )}
+    </>
+  );
+
+  usePageHeaderActions(
+    { left: headerViewToggle, right: headerSortSelect, sourceRef: toolbarRef },
+    [view, sort, selection.selectionMode, selection.selectedIds.size, duplicating, archiving]
   );
 
   const sharedModals = (
@@ -320,6 +544,26 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
             onTasksMoved?.(moved);
             selection.clear();
           }}
+        />
+      )}
+      {confirmingBulkAction === "archive" && (
+        <ConfirmDialog
+          title="Görevleri arşivle"
+          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
+          confirmLabel="Arşivle"
+          danger={false}
+          onCancel={() => setConfirmingBulkAction(null)}
+          onConfirm={handleArchiveSelected}
+        />
+      )}
+      {confirmingBulkAction === "delete" && (
+        <ConfirmDialog
+          title="Görevleri sil"
+          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`}
+          confirmLabel="Sil"
+          danger
+          onCancel={() => setConfirmingBulkAction(null)}
+          onConfirm={handleDeleteSelected}
         />
       )}
       {creating && (

@@ -43,15 +43,15 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
       if (onCreated) onCreated(created);
       else window.location.reload();
     } catch {
-      setError("Program oluşturulamadı. Tekrar dene.");
+      setError("Rutin oluşturulamadı. Tekrar dene.");
       setLoading(false);
     }
   };
 
   return (
-    <Modal title="Yeni program" onClose={onClose}>
+    <Modal title="Yeni rutin" onClose={onClose}>
       <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 14px", lineHeight: 1.5 }}>
-        Program, bitiş tarihi olmayan ve tekrarlayan işlerden oluşan bir çalışmadır — sosyal medya
+        Rutin, bitiş tarihi olmayan ve tekrarlayan işlerden oluşan bir çalışmadır — sosyal medya
         yönetimi, aylık bakım, haftalık raporlama gibi. Bitişi olan işler için proje aç.
       </p>
 
@@ -105,7 +105,7 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
           </div>
         </div>
         <span style={{ fontSize: 13, color: c.textSecondary, marginTop: -6 }}>
-          Programın sonu olmadığı için toplam bütçe yerine dönemsel çalışma ücreti tutulur.
+          Rutinin sonu olmadığı için toplam bütçe yerine dönemsel çalışma ücreti tutulur.
         </span>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -135,7 +135,7 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
             fontWeight: 500,
           }}
         >
-          {loading ? "Oluşturuluyor…" : "Program oluştur"}
+          {loading ? "Oluşturuluyor…" : "Rutin oluştur"}
         </button>
         <span style={{ fontSize: 13, color: c.textSecondary, textAlign: "center" }}>
           Sonraki adımda tekrar eden işleri (rutinleri) tanımlayacaksın.

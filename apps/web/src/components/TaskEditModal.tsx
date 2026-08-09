@@ -177,7 +177,7 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
         </button>
       </form>
 
-      {/* Program (operations) görevlerinin projesi yoktur; dosya bağlamı kurulamaz. */}
+      {/* Rutin (operations) görevlerinin projesi yoktur; dosya bağlamı kurulamaz. */}
       {task.projectId && (
         <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
           <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Dosyalar</h3>
@@ -235,8 +235,8 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
         }
         deleteMessage={
           isSubtask
-            ? `"${task.title}" alt görevini silmek istediğine emin misin? Bu işlem geri alınamaz.`
-            : `"${task.title}" görevini silmek istediğine emin misin? Varsa bu göreve bağlı tüm alt görevler de silinecek. Bu işlem geri alınamaz.`
+            ? `"${task.title}" alt görevini silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`
+            : `"${task.title}" görevini silmek istediğine emin misin? Varsa bu göreve bağlı tüm alt görevler de silinecek. Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`
         }
       />
     </Modal>

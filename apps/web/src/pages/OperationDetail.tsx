@@ -150,7 +150,7 @@ export default function OperationDetail() {
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <IconCalendar size={12} color={c.textSecondary} />
                 {new Date(operation.startedOn).toLocaleDateString("tr-TR")} başladı
-                {/* Programın bitiş tarihi yoktur; kapatılana kadar çalışır. */}
+                {/* Rutinin bitiş tarihi yoktur; kapatılana kadar çalışır. */}
                 {operation.endedOn && ` · ${new Date(operation.endedOn).toLocaleDateString("tr-TR")} kapandı`}
               </span>
               <span style={{ color: c.accentDark, fontWeight: 500 }}>
@@ -169,7 +169,7 @@ export default function OperationDetail() {
           ← İşe dön
         </Link>
 
-        {/* Programda ilerleme yüzdesi yerine düzen ölçülür. */}
+        {/* Rutinde ilerleme yüzdesi yerine düzen ölçülür. */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
           <SummaryCard label="Uyum oranı" value={operation?.adherencePct != null ? `%${operation.adherencePct}` : "—"} />
           <SummaryCard label="Aktif rutin" value={operation?.activeRoutineCount ?? 0} />
@@ -193,7 +193,7 @@ export default function OperationDetail() {
             )}
             {operation.status !== "ended" && (
               <button onClick={() => setStatusPrompt("ended")} style={ghostButton(c)}>
-                Programı kapat
+                Rutini kapat
               </button>
             )}
           </div>
@@ -203,7 +203,7 @@ export default function OperationDetail() {
         <SectionTitle>Rutinler</SectionTitle>
         {routines.length === 0 ? (
           <EmptyBox>
-            Bu programda henüz rutin yok. Programı ayakta tutan tekrarlayan işleri buraya ekle —
+            Bu rutinde henüz tanımlı rutin yok. Rutini ayakta tutan tekrarlayan işleri buraya ekle —
             görevler bu kurallardan otomatik açılır.
           </EmptyBox>
         ) : (
@@ -267,7 +267,7 @@ export default function OperationDetail() {
           <EmptyBox>
             {routines.length === 0
               ? "Rutin eklediğinde tekrarlar burada otomatik görünecek."
-              : "Yaklaşan tekrar yok. Program duraklatılmış olabilir."}
+              : "Yaklaşan tekrar yok. Rutin duraklatılmış olabilir."}
           </EmptyBox>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -294,13 +294,13 @@ export default function OperationDetail() {
 
       {statusPrompt && (
         <Modal
-          title={statusPrompt === "paused" ? "Programı duraklat" : "Programı kapat"}
+          title={statusPrompt === "paused" ? "Rutini duraklat" : "Rutini kapat"}
           onClose={() => setStatusPrompt(null)}
         >
           <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
             {statusPrompt === "paused"
               ? "Gelecekteki, henüz üzerinde çalışılmamış tekrarlar geri çekilir. Geçmiş kayıtlar ve tamamlanmış görevler olduğu gibi kalır. İstediğin zaman devam ettirebilirsin."
-              : "Program kapatılır ve yeni tekrar üretilmez. Bir proje gibi \"tamamlanmaz\" — sadece durdurulur. Geçmiş kayıtlar korunur."}
+              : "Rutin kapatılır ve yeni tekrar üretilmez. Bir proje gibi \"tamamlanmaz\" — sadece durdurulur. Geçmiş kayıtlar korunur."}
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button onClick={() => setStatusPrompt(null)} style={ghostButton(c)}>

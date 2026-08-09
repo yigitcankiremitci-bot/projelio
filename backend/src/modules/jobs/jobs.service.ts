@@ -298,7 +298,7 @@ export class JobsService {
       await this.projectsService.archive(p.id);
     }
 
-    // Programlar da aynı şekilde durdurulur; gelecekteki tekrarları veritabanı
+    // Rutinler de aynı şekilde durdurulur; gelecekteki tekrarları veritabanı
     // tetikleyicisi geri çeker, geçmiş kayıtlar olduğu gibi kalır.
     const { data: operations } = await this.supabase.client.from("operations").select("id").eq("job_id", id);
     for (const o of operations ?? []) {

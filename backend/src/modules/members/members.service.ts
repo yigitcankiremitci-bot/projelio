@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { ProjectMember } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { FilesService } from "../files/files.service";
@@ -48,7 +48,69 @@ export class MembersService {
       );
   }
 
-  async findByProject(projectId: string): Promise<ProjectMember[]> {
+  // Proje yöneticisi: proje sahibi ya da (proje bir işe bağlıysa) o işin sahibi.
+  // Davet gönderme, doğrudan üye ekleme, ücret/görünürlük belirleme gibi yönetimsel
+  // işlemler yalnızca yöneticiye açık (bkz. projects.service.ts'teki assertCanManage
+  // ile aynı desen — kasıtlı olarak burada da ayrıca uygulanıyor, modüller arası
+  // döngüsel bağımlılık yaratmamak için).
+  private async assertIsProjectManager(projectId: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("owner_id, job_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!project) throw new NotFoundException("Proje bulunamadı");
+    if (project.owner_id === userId) return;
+    if (project.job_id) {
+      const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", project.job_id).maybeSingle();
+      if (job?.owner_id === userId) return;
+    }
+    throw new ForbiddenException("Bu işlemi yalnızca proje veya iş sahibi yapabilir");
+  }
+
+  // Ekip listesini (isim/e-posta içerdiği için) proje yöneticisi ve projenin
+  // onaylı üyeleri görebilir; projeyle hiç ilgisi olmayan biri göremez.
+  private async assertCanViewTeam(projectId: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("owner_id, job_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!project) throw new NotFoundException("Proje bulunamadı");
+    if (project.owner_id === userId) return;
+    if (project.job_id) {
+      const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", project.job_id).maybeSingle();
+      if (job?.owner_id === userId) return;
+    }
+    const { data: membership } = await this.supabase.client
+      .from("project_members")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .maybeSingle();
+    if (membership) return;
+    throw new ForbiddenException("Bu projenin ekibini yalnızca proje ekibi görebilir");
+  }
+
+  // Bir üyelik kaydının hangi projeye ait olduğunu ve kimin üyeliği olduğunu döner —
+  // memberId üzerinden çalışan uçlar (setTitle, respond, setRate, ...) yetki
+  // kontrolünden önce buna ihtiyaç duyar.
+  private async getMemberScope(memberId: string): Promise<{ projectId: string; userId: string } | null> {
+    const { data } = await this.supabase.client
+      .from("project_members")
+      .select("project_id, user_id")
+      .eq("id", memberId)
+      .maybeSingle();
+    if (!data) return null;
+    return { projectId: data.project_id, userId: data.user_id };
+  }
+
+  async findByProject(projectId: string, requestingUserId?: string): Promise<ProjectMember[]> {
+    await this.assertCanViewTeam(projectId, requestingUserId);
+
     const { data, error } = await this.supabase.client
       .from("project_members")
       .select("*, users(full_name, email, username)")
@@ -85,8 +147,11 @@ export class MembersService {
   async invite(
     projectId: string,
     userId: string,
-    role: ProjectMember["role"] = "member"
+    role: ProjectMember["role"] = "member",
+    requestingUserId?: string
   ): Promise<ProjectMember> {
+    await this.assertIsProjectManager(projectId, requestingUserId);
+
     const { data: row, error } = await this.supabase.client
       .from("project_members")
       .insert({ project_id: projectId, user_id: userId, role })
@@ -97,9 +162,17 @@ export class MembersService {
     return mapMember(row);
   }
 
-  // Freelancer var olan bir projeye katılım isteği atar
+  // Freelancer var olan bir projeye katılım isteği atar. Controller, userId'nin
+  // her zaman isteği yapan kullanıcının kendisi olduğunu garanti eder — böylece
+  // biri başka bir kullanıcı adına katılım isteği açamaz.
   async requestToJoin(projectId: string, userId: string): Promise<ProjectMember> {
-    return this.invite(projectId, userId, "member");
+    const { data: row, error } = await this.supabase.client
+      .from("project_members")
+      .insert({ project_id: projectId, user_id: userId, role: "member" })
+      .select()
+      .single();
+    if (error) throw error;
+    return mapMember(row);
   }
 
   // Proje yöneticisi ekibe doğrudan üye ekler (onay bekletmeden).
@@ -109,8 +182,11 @@ export class MembersService {
     projectId: string,
     userId: string,
     role: ProjectMember["role"] = "member",
-    title?: string
+    title?: string,
+    requestingUserId?: string
   ): Promise<ProjectMember> {
+    await this.assertIsProjectManager(projectId, requestingUserId);
+
     const { data: row, error } = await this.supabase.client
       .from("project_members")
       .insert({ project_id: projectId, user_id: userId, role, title: title?.trim() || null, status: "approved" })
@@ -128,7 +204,11 @@ export class MembersService {
     return mapMember(row);
   }
 
-  async setTitle(memberId: string, title: string): Promise<ProjectMember> {
+  async setTitle(memberId: string, title: string, requestingUserId?: string): Promise<ProjectMember> {
+    const scope = await this.getMemberScope(memberId);
+    if (!scope) throw new NotFoundException("Üyelik bulunamadı");
+    await this.assertIsProjectManager(scope.projectId, requestingUserId);
+
     const { data: row, error } = await this.supabase.client
       .from("project_members")
       .update({ title: title?.trim() || null })
@@ -140,7 +220,11 @@ export class MembersService {
     return mapMember(row);
   }
 
-  async setBudgetVisibility(memberId: string, canViewBudget: boolean): Promise<ProjectMember> {
+  async setBudgetVisibility(memberId: string, canViewBudget: boolean, requestingUserId?: string): Promise<ProjectMember> {
+    const scope = await this.getMemberScope(memberId);
+    if (!scope) throw new NotFoundException("Üyelik bulunamadı");
+    await this.assertIsProjectManager(scope.projectId, requestingUserId);
+
     const { data: row, error } = await this.supabase.client
       .from("project_members")
       .update({ can_view_budget: canViewBudget })
@@ -152,7 +236,17 @@ export class MembersService {
     return mapMember(row);
   }
 
-  async respond(memberId: string, approve: boolean): Promise<ProjectMember> {
+  // Bir üyelik kaydı ya proje yöneticisinin gönderdiği bir davettir (kabul/red
+  // edecek olan davet edilen kişidir) ya da bir katılım isteğidir (onaylayacak
+  // olan proje yöneticisidir). İkisi de aynı tabloda ayrım yapılmadan tutulduğu
+  // için burada ikisine de izin veriyoruz; üçüncü bir kişiye izin vermiyoruz.
+  async respond(memberId: string, approve: boolean, requestingUserId?: string): Promise<ProjectMember> {
+    const scope = await this.getMemberScope(memberId);
+    if (!scope) throw new NotFoundException("Üyelik isteği bulunamadı");
+    if (requestingUserId && requestingUserId !== scope.userId) {
+      await this.assertIsProjectManager(scope.projectId, requestingUserId);
+    }
+
     const { data: row, error } = await this.supabase.client
       .from("project_members")
       .update({ status: approve ? "approved" : "rejected" })
@@ -177,7 +271,11 @@ export class MembersService {
     return member;
   }
 
-  async setRate(memberId: string, rate: number): Promise<ProjectMember> {
+  async setRate(memberId: string, rate: number, requestingUserId?: string): Promise<ProjectMember> {
+    const scope = await this.getMemberScope(memberId);
+    if (!scope) throw new NotFoundException("Üyelik bulunamadı");
+    await this.assertIsProjectManager(scope.projectId, requestingUserId);
+
     const { data: row, error } = await this.supabase.client
       .from("project_members")
       .update({ custom_agreed_rate: rate })

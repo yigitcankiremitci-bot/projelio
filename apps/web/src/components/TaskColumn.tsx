@@ -337,7 +337,12 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
             }
           }}
           aria-label="Görev adı"
-          style={{ flex: 1, minWidth: 0, height: 30, fontSize, padding: "0 8px" }}
+          // fontSize en az 16: alt görevlerin okuma boyutu (15) bundan küçük —
+          // input o boyutta kalsaydı iOS Safari odaklanınca sayfayı otomatik
+          // yakınlaştırıyordu (bkz. aşağıdaki "Alt görev ekle" input'undaki
+          // aynı düzeltme). Görünüm boyutu (span) etkilenmiyor, yalnızca
+          // düzenleme sırasındaki input.
+          style={{ flex: 1, minWidth: 0, height: 30, fontSize: Math.max(fontSize, 16), padding: "0 8px" }}
         />
       );
     }

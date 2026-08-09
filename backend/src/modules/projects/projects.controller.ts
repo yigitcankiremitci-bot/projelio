@@ -16,6 +16,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { AuthGuard } from "@nestjs/passport";
 import { memoryStorage } from "multer";
 import { ProjectsService } from "./projects.service";
+import { CreateProjectDto, UpdateProjectDto } from "./dto/project.dto";
 
 @Controller("projects")
 @UseGuards(AuthGuard("jwt"))
@@ -28,12 +29,12 @@ export class ProjectsController {
   }
 
   @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.projectsService.findOne(id);
+  findOne(@Param("id") id: string, @Req() req: any) {
+    return this.projectsService.findOne(id, req.user.userId);
   }
 
   @Post()
-  create(@Req() req: any, @Body() body: any) {
+  create(@Req() req: any, @Body() body: CreateProjectDto) {
     return this.projectsService.create(req.user.userId, body);
   }
 
@@ -44,7 +45,7 @@ export class ProjectsController {
   }
 
   @Patch(":id")
-  update(@Param("id") id: string, @Body() body: any, @Req() req: any) {
+  update(@Param("id") id: string, @Body() body: UpdateProjectDto, @Req() req: any) {
     return this.projectsService.update(id, body, req.user.userId);
   }
 
@@ -66,7 +67,7 @@ export class ProjectsController {
   }
 
   @Patch(":id/restore")
-  restore(@Param("id") id: string) {
-    return this.projectsService.restore(id);
+  restore(@Param("id") id: string, @Req() req: any) {
+    return this.projectsService.restore(id, req.user.userId);
   }
 }

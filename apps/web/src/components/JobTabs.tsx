@@ -3,11 +3,12 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 
 export type JobTab = "projects" | "programs" | "team" | "tasks" | "files";
 
-// Projeler süreli ve biten işleri, Programlar süresiz ve tekrarlayan işleri tutar.
-// İkisi de bu işin altında yaşadığı için sekmeler yan yana durur.
+// Projeler süreli ve biten işleri, Rutinler (kodda "program"/"operation") süresiz
+// ve tekrarlayan işleri tutar. İkisi de bu işin altında yaşadığı için sekmeler
+// yan yana durur.
 const tabs: { key: JobTab; label: string }[] = [
   { key: "projects", label: "Projeler" },
-  { key: "programs", label: "Programlar" },
+  { key: "programs", label: "Rutinler" },
   { key: "team", label: "Ekip" },
   { key: "tasks", label: "İşler" },
   // Dosyalar işe aittir: iş sahibi altındaki tüm projelerin dosyalarını burada görür.
@@ -17,9 +18,12 @@ const tabs: { key: JobTab; label: string }[] = [
 interface Props {
   active: JobTab;
   onChange: (tab: JobTab) => void;
+  // Sabit başlığın üst bandındaki küçültülmüş kopya (bkz. JobDetail
+  // usePageHeaderTabs) marginBottom'u kaldırmak için kullanır.
+  style?: React.CSSProperties;
 }
 
-export default function JobTabs({ active, onChange }: Props) {
+export default function JobTabs({ active, onChange, style }: Props) {
   const c = colors.light;
   const isDesktop = useIsDesktop();
   return (
@@ -38,6 +42,7 @@ export default function JobTabs({ active, onChange }: Props) {
         borderRadius: 10,
         padding: 4,
         marginBottom: 16,
+        ...style,
       }}
     >
       {tabs.map((t) => (

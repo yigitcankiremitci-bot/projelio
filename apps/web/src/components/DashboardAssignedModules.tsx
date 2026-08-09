@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { getModuleRecordConfig } from "../lib/moduleRecordConfigs";
 import ModuleRecordsPanel from "./ModuleRecordsPanel";
+import ModuleTeamPanel from "./ModuleTeamPanel";
 import Modal from "./Modal";
 import { IconSparkle } from "./icons";
 
@@ -184,6 +185,11 @@ export default function DashboardAssignedModules({ jobs }: Props) {
             moduleKey={open.moduleKey}
             config={getModuleRecordConfig(open.moduleKey, open.moduleName)}
           />
+          {/* Serbest çalışan bir işe başkasını aldıysa (job_members) o kişiyi de
+              modüle atayabilsin — tek kişilik kullanımda ekip boş kalır. */}
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${c.border}` }}>
+            <ModuleTeamPanel jobId={open.job.id} moduleKey={open.moduleKey} />
+          </div>
           <Link
             to={`/jobs/${open.job.id}`}
             style={{ display: "inline-block", marginTop: 12, fontSize: 13, color: c.primary }}

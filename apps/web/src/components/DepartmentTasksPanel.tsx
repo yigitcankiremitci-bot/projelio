@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { Task, TaskStatus } from "@projelio/shared";
+import type { Task, TaskStatus, User } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import TaskColumn, { TaskColumnHandle } from "./TaskColumn";
@@ -7,6 +7,7 @@ import TaskEditModal from "./TaskEditModal";
 import TaskSelectionBar from "./TaskSelectionBar";
 import TaskSortMenu from "./TaskSortMenu";
 import MoveTaskModal from "./MoveTaskModal";
+import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useTaskSelection } from "../lib/useTaskSelection";
@@ -43,14 +44,35 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
   const selection = useTaskSelection();
   const [sort, setSort] = useState<TaskSortMode>("manual");
   const [duplicating, setDuplicating] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [movingOpen, setMovingOpen] = useState(false);
-  const { pushUndo } = useUndo();
+  const [confirmingBulkAction, setConfirmingBulkAction] = useState<"archive" | "delete" | null>(null);
+  const { pushUndo, pushDestructive } = useUndo();
   const registerReorderUndo = useReorderUndo();
   const tasksRef = useLatestRef(tasks);
+  // "Üzerinde çalışıyorum" işareti — diğer kanbanlarla aynı kaynak
+  // (users.active_task_id, bkz. ProjectDetail/JobDetail/TasksOverview).
+  const [activeTaskId, setActiveTaskId] = useState<string | undefined>(undefined);
 
   useImperativeHandle(ref, () => ({
     openCreate: () => columnRefs.current.todo?.openCreate(),
   }));
+
+  useEffect(() => {
+    api
+      .get<User | null>("/auth/me")
+      .then((user) => setActiveTaskId(user?.activeTaskId))
+      .catch(() => setActiveTaskId(undefined));
+  }, []);
+
+  // Diğer panellerle aynı davranış: aynı göreve tekrar basmak işareti kaldırır.
+  const handleToggleActive = (taskId: string) => {
+    const turningOn = activeTaskId !== taskId;
+    setActiveTaskId(turningOn ? taskId : undefined);
+    api.patch(`/tasks/${taskId}/active-worker`, { active: turningOn }).catch(() => {
+      setActiveTaskId((prev) => (turningOn ? undefined : prev));
+    });
+  };
 
   const load = () => {
     setLoading(true);
@@ -72,11 +94,39 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
     setTasks((prev) => prev.filter((t) => t.id !== taskId && t.parentTaskId !== taskId));
   };
 
+  // Toplu arşivleme/silme yalnızca kullanıcının doğrudan seçtiği üst seviye
+  // id'leri döndürür — alt görevler sunucuda kendiliğinden kapsandığı için
+  // burada da `removeTaskFromState` ile aynı mantıkla listeden düşürülürler.
+  const removeTasksFromState = (ids: string[]) => {
+    const idSet = new Set(ids);
+    setTasks((prev) => prev.filter((t) => !idSet.has(t.id) && !(t.parentTaskId && idSet.has(t.parentTaskId))));
+  };
+
+  // Görev/alt görev oluşturmayı Cmd/Ctrl+Z ile geri alınabilir yapar (bkz.
+  // ProjectDetail.tsx registerTaskCreateUndo — aynı desen).
+  const registerTaskCreateUndo = (createdId: string, payload: Record<string, unknown>) => {
+    let currentId = createdId;
+    pushUndo({
+      label: "Görev oluşturma",
+      run: async () => {
+        await api.delete(`/tasks/${currentId}`);
+        load();
+      },
+      redo: async () => {
+        const recreated = await api.post<Task>(`/departments/${departmentId}/tasks`, payload);
+        currentId = recreated.id;
+        load();
+      },
+    });
+  };
+
   const handleCreateTask = async (status: TaskStatus, title: string) => {
     const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const payload = { title, status, deadline };
     try {
-      const created = await api.post<Task>(`/departments/${departmentId}/tasks`, { title, status, deadline });
+      const created = await api.post<Task>(`/departments/${departmentId}/tasks`, payload);
       setTasks((prev) => [...prev, created]);
+      registerTaskCreateUndo(created.id, payload);
     } catch {
       // görev oluşturulamadı, kullanıcı tekrar deneyebilir
     }
@@ -85,14 +135,11 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
   const handleCreateSubtask = async (parentTaskId: string, title: string) => {
     const parent = tasks.find((t) => t.id === parentTaskId);
     if (!parent) return;
+    const payload = { title, status: parent.status, deadline: parent.deadline, parentTaskId };
     try {
-      const created = await api.post<Task>(`/departments/${departmentId}/tasks`, {
-        title,
-        status: parent.status,
-        deadline: parent.deadline,
-        parentTaskId,
-      });
+      const created = await api.post<Task>(`/departments/${departmentId}/tasks`, payload);
       setTasks((prev) => [...prev, created]);
+      registerTaskCreateUndo(created.id, payload);
     } catch {
       // alt görev oluşturulamadı, kullanıcı tekrar deneyebilir
     }
@@ -185,6 +232,54 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
     }
   };
 
+  // Seçili görevleri (ve üst seviye olanlarınsa alt görevlerini) toplu arşivler.
+  // ConfirmDialog'un onConfirm'ü olarak kullanılır — hata fırlatırsa modal açık
+  // kalıp hata mesajı gösterir, o yüzden hatayı yutmuyoruz.
+  const handleArchiveSelected = async () => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+    setArchiving(true);
+    try {
+      await api.patch<Task[]>("/tasks/bulk-archive", { ids });
+      removeTasksFromState(ids);
+      // Arşivleme geri alınabilir: her görev zaten tekil /restore uç noktasına
+      // sahip ve o uç nokta alt görevleri de kendiliğinden geri getiriyor.
+      pushUndo({
+        label: `${ids.length} görev arşivleme`,
+        run: async () => {
+          await Promise.all(ids.map((id) => api.patch(`/tasks/${id}/restore`, {})));
+          load();
+        },
+        redo: async () => {
+          await api.patch("/tasks/bulk-archive", { ids });
+          removeTasksFromState(ids);
+        },
+      });
+      selection.clear();
+      setConfirmingBulkAction(null);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  // Seçili görevleri (ve alt görevlerini) toplu siler. Kalıcı silme sunucuda
+  // geri alınamadığı için hemen yapılmaz: arayüzden hemen kaldırılır ama gerçek
+  // istek birkaç saniye ertelenir (bkz. lib/undo pushDestructive) — bu pencerede
+  // Cmd/Ctrl+Z ile iptal edilebilir.
+  const handleDeleteSelected = () => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+    removeTasksFromState(ids);
+    pushDestructive({
+      label: `${ids.length} görev silme`,
+      commit: () => api.post("/tasks/bulk-delete", { ids }),
+      restore: () => load(),
+      entityIds: ids,
+    });
+    selection.clear();
+    setConfirmingBulkAction(null);
+  };
+
   if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>;
 
   return (
@@ -200,11 +295,13 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
           inline
           selectionMode={selection.selectionMode}
           selectedCount={selection.selectedIds.size}
-          busy={duplicating}
+          busy={duplicating || archiving}
           onEnable={selection.toggleSelectionMode}
           onCancel={selection.clear}
           onDuplicate={handleDuplicateSelected}
           onMove={() => setMovingOpen(true)}
+          onArchive={() => setConfirmingBulkAction("archive")}
+          onDelete={() => setConfirmingBulkAction("delete")}
         />
       </div>
 
@@ -243,6 +340,8 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
               selectionMode={selection.selectionMode}
               selectedIds={selection.selectedIds}
               onToggleSelect={selection.toggleSelect}
+              activeTaskId={activeTaskId}
+              onToggleActive={handleToggleActive}
             />
           </div>
         ))}
@@ -301,6 +400,27 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
             selection.clear();
             load();
           }}
+        />
+      )}
+
+      {confirmingBulkAction === "archive" && (
+        <ConfirmDialog
+          title="Görevleri arşivle"
+          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
+          confirmLabel="Arşivle"
+          danger={false}
+          onCancel={() => setConfirmingBulkAction(null)}
+          onConfirm={handleArchiveSelected}
+        />
+      )}
+      {confirmingBulkAction === "delete" && (
+        <ConfirmDialog
+          title="Görevleri sil"
+          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`}
+          confirmLabel="Sil"
+          danger
+          onCancel={() => setConfirmingBulkAction(null)}
+          onConfirm={handleDeleteSelected}
         />
       )}
     </div>

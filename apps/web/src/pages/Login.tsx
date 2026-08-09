@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api/client";
+import { api, ApiError } from "../api/client";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import { colors } from "../theme/colors";
 
@@ -9,21 +9,41 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Şifre doğru ama e-posta doğrulanmamışsa backend 403 döner; bu durumda
+  // kullanıcıya çıkışsız bir hata değil, "tekrar gönder" seçeneği sunmalıyız.
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
   const c = colors.light;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setNeedsVerification(false);
+    setResendState("idle");
     setLoading(true);
     try {
       const { token } = await api.post<{ token: string }>("/auth/login", { email, password });
       localStorage.setItem("projelio_token", token);
       window.location.href = "/";
-    } catch {
-      setError("E-posta veya şifre hatalı.");
+    } catch (err) {
+      // Backend bazı durumlarda (ör. Google ile kaydolmuş bir hesaba şifreyle
+      // giriş denemesi) özel, yardımcı bir mesaj döndürüyor — genel "hatalı"
+      // mesajıyla ezmeyip onu göstermeliyiz.
+      setError(err instanceof Error ? err.message : "E-posta veya şifre hatalı.");
+      if (err instanceof ApiError && err.status === 403) setNeedsVerification(true);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResendVerification = async () => {
+    setResendState("sending");
+    try {
+      await api.post("/auth/resend-verification", { email });
+    } catch {
+      // Yanıt her durumda aynı olduğu için ayrıca hata gösterilmez.
+    }
+    setResendState("sent");
   };
 
   return (
@@ -68,7 +88,12 @@ export default function Login() {
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Şifre</label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <label style={{ fontSize: 15, color: c.textSecondary }}>Şifre</label>
+              <Link to="/forgot-password" style={{ fontSize: 14, color: c.textSecondary }}>
+                Şifremi unuttum
+              </Link>
+            </div>
             <input
               type="password"
               placeholder="••••••••"
@@ -82,6 +107,29 @@ export default function Login() {
           {error && (
             <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>
           )}
+
+          {needsVerification &&
+            (resendState === "sent" ? (
+              <p style={{ color: c.textSecondary, fontSize: 14, margin: 0 }}>
+                Yeni doğrulama bağlantısı gönderildi. E-postanı kontrol et.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resendState === "sending"}
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${c.border}`,
+                  color: c.textSecondary,
+                  padding: "9px 0",
+                  borderRadius: 8,
+                  fontSize: 15,
+                }}
+              >
+                {resendState === "sending" ? "Gönderiliyor…" : "Doğrulama bağlantısını tekrar gönder"}
+              </button>
+            ))}
 
           <button
             type="submit"

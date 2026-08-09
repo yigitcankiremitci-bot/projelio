@@ -12,9 +12,11 @@ interface Props {
 }
 
 // Kartlar açıklama uzunluğuna ya da kapak fotoğrafı olup olmamasına göre boy
-// değiştirmesin diye kapak alanı ve toplam kart yüksekliği sabittir. Uzun
-// açıklamalar 2 satırda "…" ile kesilir; tıklanınca kart genişleyip tam metni
-// gösterir (proje detayına gitmez, sadece o kart büyür).
+// değiştirmesin diye kapak alanı ve toplam kart yüksekliği HER ZAMAN sabittir
+// (kart hiç büyümez/küçülmez — ör. kısa bir açıklama açıldığında kart daha
+// önce boşluğa yayılan içerik kaybolunca küçülüyordu). Uzun açıklamalar 2
+// satırda "…" ile kesilir; tıklanınca kartın boyutu değişmeden açıklama alanı
+// kendi içinde kayarak (scroll) tam metni gösterir.
 const COVER_HEIGHT = 104;
 const CARD_HEIGHT = 280;
 
@@ -68,7 +70,7 @@ export default function ProjectCard({ project }: Props) {
         borderRadius: 12,
         overflow: "hidden",
         background: c.surface,
-        height: expanded ? "auto" : CARD_HEIGHT,
+        height: CARD_HEIGHT,
       }}
     >
       {/* Kapak: fotoğraf yoksa bile aynı yükseklikte, açık renkli bir yer tutucu ile gösterilir. */}
@@ -143,7 +145,7 @@ export default function ProjectCard({ project }: Props) {
         />
       </div>
 
-      <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: expanded ? undefined : 1, minHeight: 0 }}>
+      <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
           <h3
             style={{
@@ -171,8 +173,9 @@ export default function ProjectCard({ project }: Props) {
               margin: "0 0 14px",
               lineHeight: 1.5,
               cursor: "pointer",
+              minHeight: 0,
               ...(expanded
-                ? {}
+                ? { flex: 1, overflowY: "auto" as const }
                 : {
                     display: "-webkit-box",
                     WebkitLineClamp: 2,

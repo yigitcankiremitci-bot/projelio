@@ -27,7 +27,53 @@ export class BudgetService {
     private notificationsService: NotificationsService
   ) {}
 
-  async findByProject(projectId: string): Promise<BudgetTransaction[]> {
+  // Proje bütçesi: finansal veri hassas olduğu için görüntüleme yalnızca proje/iş
+  // sahibine ve "bütçeyi görebilir" izni açık onaylı üyelere açık (bkz. departman
+  // bütçesindeki assertCanManageDepartment ile aynı gerekçe/desen).
+  private async assertCanViewBudget(projectId: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("owner_id, job_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!project) throw new NotFoundException("Proje bulunamadı");
+    if (project.owner_id === userId) return;
+    if (project.job_id) {
+      const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", project.job_id).maybeSingle();
+      if (job?.owner_id === userId) return;
+    }
+    const { data: membership } = await this.supabase.client
+      .from("project_members")
+      .select("can_view_budget")
+      .eq("project_id", projectId)
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .maybeSingle();
+    if (membership?.can_view_budget) return;
+    throw new ForbiddenException("Bu projenin bütçesini görüntüleme yetkiniz yok");
+  }
+
+  // Kayıt ekleme/silme yalnızca proje ya da (varsa) iş sahibine açık.
+  private async assertCanManageBudget(projectId: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("owner_id, job_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!project) throw new NotFoundException("Proje bulunamadı");
+    if (project.owner_id === userId) return;
+    if (project.job_id) {
+      const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", project.job_id).maybeSingle();
+      if (job?.owner_id === userId) return;
+    }
+    throw new ForbiddenException("Bu projenin bütçesine kayıt eklemeyi yalnızca proje veya iş sahibi yapabilir");
+  }
+
+  async findByProject(projectId: string, requestingUserId?: string): Promise<BudgetTransaction[]> {
+    await this.assertCanViewBudget(projectId, requestingUserId);
+
     const { data, error } = await this.supabase.client
       .from("budget_transactions")
       .select("*, projects(title)")
@@ -37,7 +83,9 @@ export class BudgetService {
     return (data ?? []).map(mapTransaction);
   }
 
-  async add(projectId: string, data: Partial<BudgetTransaction>): Promise<BudgetTransaction> {
+  async add(projectId: string, data: Partial<BudgetTransaction>, requestingUserId?: string): Promise<BudgetTransaction> {
+    await this.assertCanManageBudget(projectId, requestingUserId);
+
     // Proje bazlı kayıtta defter sahibi, projenin sahibidir.
     const { data: project } = await this.supabase.client
       .from("projects")
@@ -145,14 +193,20 @@ export class BudgetService {
   // Projeden elde kalan net: tahsil edilen - harcanan.
   // NOT: anlaşılan ücret (totalBudget) buraya EKLENMEZ; tahsil edilen para zaten
   // o ücretin bir parçasıdır, eklemek aynı parayı iki kez saymak olurdu.
-  async calculateRemainingMargin(projectId: string): Promise<number> {
-    const txs = await this.findByProject(projectId);
+  async calculateRemainingMargin(projectId: string, requestingUserId?: string): Promise<number> {
+    const txs = await this.findByProject(projectId, requestingUserId);
     return sumByType(txs, "income") - sumSpent(txs);
   }
 
-  // Henüz tahsil edilmemiş alacak.
-  async calculateExpectedPayment(projectId: string, agreedFee: number): Promise<number> {
-    const txs = await this.findByProject(projectId);
+  // Henüz tahsil edilmemiş alacak. agreedFee istemciden değil her zaman DB'deki
+  // güncel proje bütçesinden okunur — istemcide eski/senkron olmayan bir değer
+  // (ör. bütçe az önce başka biri tarafından değiştirildiyse) yanlış sonuç üretmesin diye.
+  async calculateExpectedPayment(projectId: string, requestingUserId?: string): Promise<number> {
+    const [txs, project] = await Promise.all([
+      this.findByProject(projectId, requestingUserId),
+      this.supabase.client.from("projects").select("total_budget").eq("id", projectId).maybeSingle(),
+    ]);
+    const agreedFee = Number(project.data?.total_budget ?? 0);
     return Math.max(0, agreedFee - sumByType(txs, "income"));
   }
 

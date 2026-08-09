@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import Modal from "./Modal";
 import { IconStar } from "./icons";
+import { useUndo } from "../lib/undo";
 
 function toDateInputValue(iso?: string) {
   return iso ? new Date(iso).toISOString().slice(0, 10) : "";
@@ -24,6 +25,7 @@ interface Props {
  */
 export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
   const c = colors.light;
+  const { pushUndo } = useUndo();
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description ?? "");
   const [priority, setPriority] = useState<TaskPriority>(item.priority);
@@ -55,6 +57,18 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
     try {
       // Kalıcı silmez, arşivler — yanlışlıkla silme geri alınabilsin diye.
       await api.delete(`/todos/${item.itemId}`);
+      // Gerçek görevlerdeki tekil silme/arşivleme gibi (bkz. EntityDangerZone)
+      // Cmd/Ctrl+Z ile geri alınabilir olsun — arşivleme süresiz geri alınabilir
+      // olduğu için burada pushDestructive değil, doğrudan pushUndo kullanılır.
+      pushUndo({
+        label: "Kişisel görev silme",
+        run: async () => {
+          await api.patch(`/todos/${item.itemId}/restore`, {});
+        },
+        redo: async () => {
+          await api.delete(`/todos/${item.itemId}`);
+        },
+      });
       onChanged();
     } catch {
       setError("Görev silinemedi. Tekrar dene.");

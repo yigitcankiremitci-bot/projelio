@@ -7,9 +7,11 @@ import TaskSortMenu from "./TaskSortMenu";
 import CreateTaskModal from "./CreateTaskModal";
 import TaskSelectionBar from "./TaskSelectionBar";
 import MoveTaskModal from "./MoveTaskModal";
+import ConfirmDialog from "./ConfirmDialog";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { useTaskSelection } from "../lib/useTaskSelection";
+import { useUndo } from "../lib/undo";
 
 const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
 
@@ -30,20 +32,41 @@ interface Props {
   onTasksReload: () => void;
   activeTaskId?: string;
   onToggleActive?: (taskId: string) => void;
+  // Toplu arşivleme/silme sonrası üst bileşenin kendi `tasks` state'ini
+  // güncelleyebilmesi için (bkz. ProjectDetail.tsx removeTasksFromState).
+  onTasksArchived?: (ids: string[]) => void;
+  onTasksDeleted?: (ids: string[]) => void;
 }
 
 const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPanel(
-  { jobId, projects, tasks, onCreateSubtask, onMoveTask, onToggleComplete, onEditTask, onTaskRenamed, onTasksReload, activeTaskId, onToggleActive },
+  {
+    jobId,
+    projects,
+    tasks,
+    onCreateSubtask,
+    onMoveTask,
+    onToggleComplete,
+    onEditTask,
+    onTaskRenamed,
+    onTasksReload,
+    activeTaskId,
+    onToggleActive,
+    onTasksArchived,
+    onTasksDeleted,
+  },
   ref
 ) {
   const c = colors.light;
   const isDesktop = useIsDesktop();
+  const { pushUndo, pushDestructive } = useUndo();
   const [creating, setCreating] = useState(false);
   const [outputs, setOutputs] = useState<Output[]>([]);
   const selection = useTaskSelection();
   const [sort, setSort] = useState<TaskSortMode>("manual");
   const [duplicating, setDuplicating] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [movingOpen, setMovingOpen] = useState(false);
+  const [confirmingBulkAction, setConfirmingBulkAction] = useState<"archive" | "delete" | null>(null);
 
   useImperativeHandle(ref, () => ({
     openCreate: () => setCreating(true),
@@ -61,6 +84,83 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
     } finally {
       setDuplicating(false);
     }
+  };
+
+  // Seçili görevleri (ve üst seviye olanlarınsa alt görevlerini) toplu arşivler.
+  // ConfirmDialog'un onConfirm'ü olarak kullanılır — hata fırlatırsa modal açık
+  // kalıp hata mesajı gösterir, o yüzden hatayı yutmuyoruz.
+  const handleArchiveSelected = async () => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+    setArchiving(true);
+    try {
+      await api.patch<Task[]>("/tasks/bulk-archive", { ids });
+      onTasksArchived?.(ids);
+      // Arşivleme geri alınabilir: her görev zaten tekil /restore uç noktasına
+      // sahip ve o uç nokta alt görevleri de kendiliğinden geri getiriyor.
+      // Geri alma sonrası liste tazelemesini JobDetail.tsx'teki
+      // useRefreshOnUndo(reload) üstlenir, burada tekrarlamaya gerek yok.
+      pushUndo({
+        label: `${ids.length} görev arşivleme`,
+        run: async () => {
+          await Promise.all(ids.map((id) => api.patch(`/tasks/${id}/restore`, {})));
+        },
+        redo: async () => {
+          await api.patch("/tasks/bulk-archive", { ids });
+        },
+      });
+      selection.clear();
+      setConfirmingBulkAction(null);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  // Seçili görevleri (ve alt görevlerini) toplu siler. Kalıcı silme sunucuda
+  // geri alınamadığı için hemen yapılmaz: arayüzden hemen kaldırılır ama gerçek
+  // istek birkaç saniye ertelenir (bkz. lib/undo pushDestructive) — bu pencerede
+  // Cmd/Ctrl+Z ile iptal edilebilir.
+  const handleDeleteSelected = () => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+    onTasksDeleted?.(ids);
+    pushDestructive({
+      label: `${ids.length} görev silme`,
+      commit: () => api.post("/tasks/bulk-delete", { ids }),
+      restore: () => {},
+      entityIds: ids,
+    });
+    selection.clear();
+    setConfirmingBulkAction(null);
+  };
+
+  // Görev oluşturmayı Cmd/Ctrl+Z ile geri alınabilir yapar (bkz. ProjectDetail.tsx
+  // registerTaskCreateUndo — aynı desen). "run" az önce oluşan kaydı siler, "redo"
+  // döndürülen görevin alanlarından yeniden oluşturur.
+  const registerTaskCreateUndo = (task: Task) => {
+    if (!task.projectId) return;
+    let currentId = task.id;
+    const payload = {
+      title: task.title,
+      status: task.status,
+      deadline: task.deadline,
+      outputId: task.outputId,
+      assignedTo: task.assignedTo,
+      estimatedDurationValue: task.estimatedDurationValue,
+      estimatedDurationUnit: task.estimatedDurationUnit,
+    };
+    pushUndo({
+      label: "Görev oluşturma",
+      run: async () => {
+        await api.delete(`/tasks/${currentId}`);
+        onTasksReload();
+      },
+      redo: async () => {
+        const recreated = await api.post<Task>(`/projects/${task.projectId}/tasks`, payload);
+        currentId = recreated.id;
+        onTasksReload();
+      },
+    });
   };
 
   useEffect(() => {
@@ -127,11 +227,13 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
             inline
             selectionMode={selection.selectionMode}
             selectedCount={selection.selectedIds.size}
-            busy={duplicating}
+            busy={duplicating || archiving}
             onEnable={selection.toggleSelectionMode}
             onCancel={selection.clear}
             onDuplicate={handleDuplicateSelected}
             onMove={() => setMovingOpen(true)}
+            onArchive={() => setConfirmingBulkAction("archive")}
+            onDelete={() => setConfirmingBulkAction("delete")}
           />
         </div>
       )}
@@ -225,7 +327,15 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
       )}
 
       {creating && (
-        <CreateTaskModal jobId={jobId} projects={projects} onClose={() => setCreating(false)} onCreated={onTasksReload} />
+        <CreateTaskModal
+          jobId={jobId}
+          projects={projects}
+          onClose={() => setCreating(false)}
+          onCreated={(created) => {
+            onTasksReload();
+            registerTaskCreateUndo(created);
+          }}
+        />
       )}
 
       {movingOpen && (
@@ -236,6 +346,27 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
             selection.clear();
             onTasksReload();
           }}
+        />
+      )}
+
+      {confirmingBulkAction === "archive" && (
+        <ConfirmDialog
+          title="Görevleri arşivle"
+          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
+          confirmLabel="Arşivle"
+          danger={false}
+          onCancel={() => setConfirmingBulkAction(null)}
+          onConfirm={handleArchiveSelected}
+        />
+      )}
+      {confirmingBulkAction === "delete" && (
+        <ConfirmDialog
+          title="Görevleri sil"
+          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`}
+          confirmLabel="Sil"
+          danger
+          onCancel={() => setConfirmingBulkAction(null)}
+          onConfirm={handleDeleteSelected}
         />
       )}
     </div>

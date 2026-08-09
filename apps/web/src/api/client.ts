@@ -1,5 +1,24 @@
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
+/**
+ * HTTP durum kodunu da taşıyan hata tipi.
+ *
+ * Bazı ekranların hatanın METNİNE değil TÜRÜNE göre davranması gerekiyor —
+ * ör. giriş ekranı "şifre yanlış" (401) ile "e-posta doğrulanmamış" (403)
+ * durumlarını ayırıp ikincisinde "doğrulama bağlantısını tekrar gönder"
+ * seçeneği gösteriyor. Error'dan türediği için mevcut `err instanceof Error`
+ * kontrolleri çalışmaya devam eder.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function parseResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   if (!text) return undefined as T;
@@ -29,7 +48,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       if (text) message = text;
     }
-    throw new Error(message);
+    throw new ApiError(message, res.status);
   }
   return parseResponse<T>(res);
 }
@@ -51,6 +70,11 @@ export const api = {
     request<T>(path, { method: "POST", body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
-  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  // keepalive: true — sekme/pencere kapatılırken de isteğin tamamlanmasına izin
+  // verir. Özellikle geciktirilmiş silme akışının (bkz. lib/undo.tsx pushDestructive)
+  // beforeunload sırasında attığı "flush" isteği için kritik: keepalive olmadan
+  // tarayıcı bu isteği sayfa kapanırken iptal edebilir, kayıt "silinmiş" görünüp
+  // sunucuda hâlâ durabilir.
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE", keepalive: true }),
   uploadFile: <T>(path: string, formData: FormData) => uploadFile<T>(path, formData),
 };

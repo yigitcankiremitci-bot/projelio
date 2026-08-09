@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { ModuleRecord } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { ModuleMembersService } from "../module-members/module-members.service";
 
 function mapModuleRecord(row: any): ModuleRecord {
   return {
@@ -24,38 +25,48 @@ function mapModuleRecord(row: any): ModuleRecord {
 // attığı modüller). Bkz. 037_freelancer_modules.sql.
 @Injectable()
 export class ModuleRecordsService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private moduleMembers: ModuleMembersService
+  ) {}
 
-  /** Serbest çalışan tarafı: kaydı yalnızca işin sahibi yönetebilir. */
-  private async assertCanManageJob(jobId: string, userId?: string): Promise<void> {
+  /**
+   * Serbest çalışan tarafı: işin sahibi ya da modüle atanmış kişi yazabilir.
+   * (042 öncesinde yalnızca iş sahibiydi.)
+   */
+  private async assertCanManageJob(jobId: string, moduleKey: string, userId?: string): Promise<void> {
     if (!userId) return;
-    const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", jobId).maybeSingle();
-    if (!job) throw new NotFoundException("İş bulunamadı");
-    if (job.owner_id !== userId) throw new ForbiddenException("Bu kaydı yalnızca işin sahibi düzenleyebilir");
+    const access = await this.moduleMembers.resolveJobAccess(jobId, moduleKey, userId);
+    if (!access.canWrite) {
+      throw new ForbiddenException("Bu kaydı yalnızca işin sahibi veya modüle atanmış kişiler düzenleyebilir");
+    }
   }
 
-  private async assertCanManage(organizationId: string, departmentId?: string, userId?: string): Promise<void> {
+  /**
+   * Yazma yetkisi. Yetki çözümlemesi ModuleMembersService'te tek yerde tanımlı:
+   * organizasyon sahibi > departman yöneticisi > modül üyesi (bkz. 042).
+   *
+   * 042 öncesinde yalnızca organizasyon sahibi ve departman yöneticisi
+   * yazabiliyordu; modüle atanan sıradan çalışanlar kayıt giremiyordu.
+   */
+  private async assertCanManage(
+    organizationId: string,
+    moduleKey: string,
+    departmentId?: string,
+    userId?: string
+  ): Promise<void> {
     if (!userId) return;
-    const { data: org } = await this.supabase.client
-      .from("organizations")
-      .select("owner_id")
-      .eq("id", organizationId)
-      .maybeSingle();
-    if (!org) throw new NotFoundException("Organizasyon bulunamadı");
-    if (org.owner_id === userId) return;
-
-    if (departmentId) {
-      const { data: managerRow } = await this.supabase.client
-        .from("department_members")
-        .select("id")
-        .eq("department_id", departmentId)
-        .eq("user_id", userId)
-        .eq("role", "manager")
-        .eq("status", "approved")
-        .maybeSingle();
-      if (managerRow) return;
+    const access = await this.moduleMembers.resolveOrganizationAccess(
+      organizationId,
+      moduleKey,
+      userId,
+      departmentId
+    );
+    if (!access.canWrite) {
+      throw new ForbiddenException(
+        "Bu kaydı yalnızca organizasyon sahibi, departman yöneticisi veya modüle atanmış kişiler düzenleyebilir"
+      );
     }
-    throw new ForbiddenException("Bu kaydı yalnızca organizasyon sahibi veya departman yöneticisi düzenleyebilir");
   }
 
   async findByOrganization(organizationId: string, moduleKey?: string): Promise<ModuleRecord[]> {
@@ -90,7 +101,7 @@ export class ModuleRecordsService {
     requestingUserId?: string
   ): Promise<ModuleRecord> {
     if (!payload.moduleKey) throw new BadRequestException("moduleKey gerekli");
-    await this.assertCanManageJob(jobId, requestingUserId);
+    await this.assertCanManageJob(jobId, payload.moduleKey, requestingUserId);
 
     // Kayıt yalnızca o işe gerçekten atanmış bir modüle girilebilir — aksi halde
     // anasayfada görünmeyen bir modüle veri yazılabilirdi.
@@ -130,7 +141,7 @@ export class ModuleRecordsService {
     requestingUserId?: string
   ): Promise<ModuleRecord> {
     if (!data.moduleKey) throw new BadRequestException("moduleKey gerekli");
-    await this.assertCanManage(organizationId, data.departmentId, requestingUserId);
+    await this.assertCanManage(organizationId, data.moduleKey, data.departmentId, requestingUserId);
 
     const { data: row, error } = await this.supabase.client
       .from("module_records")
@@ -149,8 +160,10 @@ export class ModuleRecordsService {
 
   /** Kaydın sahibine (organizasyon ya da iş) göre doğru yetki kontrolünü seçer. */
   private async assertCanManageRecord(record: ModuleRecord, userId?: string): Promise<void> {
-    if (record.jobId) return this.assertCanManageJob(record.jobId, userId);
-    if (record.organizationId) return this.assertCanManage(record.organizationId, record.departmentId, userId);
+    if (record.jobId) return this.assertCanManageJob(record.jobId, record.moduleKey, userId);
+    if (record.organizationId) {
+      return this.assertCanManage(record.organizationId, record.moduleKey, record.departmentId, userId);
+    }
     throw new NotFoundException("Kayıt bulunamadı");
   }
 

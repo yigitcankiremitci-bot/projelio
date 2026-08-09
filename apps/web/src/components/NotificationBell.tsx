@@ -41,9 +41,14 @@ export default function NotificationBell() {
       .get<{ id: string } | null>("/auth/me")
       .then((me) => {
         if (cancelled || !me) return;
+        const token = localStorage.getItem("projelio_token");
+        if (!token) return;
         const socket = io(API_URL, { transports: ["websocket"] });
         socketRef.current = socket;
-        socket.emit("register", me.id);
+        // Sunucu artık ham bir userId değil, doğrulanmış bir JWT bekliyor
+        // (bkz. notifications.gateway.ts) — başka bir kullanıcının bildirim
+        // odasına kimliksiz katılmayı engellemek için.
+        socket.emit("register", token);
         socket.on("notification", (notification: NotificationPayload) => {
           setNotifications((prev) => [notification, ...prev].slice(0, 50));
           setUnreadCount((n) => n + 1);

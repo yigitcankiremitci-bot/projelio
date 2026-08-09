@@ -63,7 +63,7 @@ export default function BottomNav() {
   let fabLabel = "Oluştur";
 
   // Bir sayfa kendi eylemini kaydettiyse (useProjectFabAction) her zaman o kazanır.
-  // Eskiden bu yalnızca iş/proje/program/organizasyon/departman detaylarında
+  // Eskiden bu yalnızca iş/proje/rutin/organizasyon/departman detaylarında
   // geçerliydi; o rota listesi her yeni sayfada güncellenmeyi gerektiriyordu ve
   // Yapılacaklar sayfası listede olmadığı için "+" orada "Yeni iş" açıyordu.
   // Eylemi kaydeden sayfa zaten unmount olurken temizliyor, dolayısıyla rota
@@ -74,7 +74,7 @@ export default function BottomNav() {
   } else if (jobMatch) {
     createAction = "job-choice";
     jobId = jobMatch[1];
-    fabLabel = "Proje, program veya görev ekle";
+    fabLabel = "Proje, rutin veya görev ekle";
   } else if (location.pathname === "/organizations") {
     createAction = "organization";
     fabLabel = "Yeni organizasyon";
@@ -142,13 +142,13 @@ export default function BottomNav() {
     </button>
   );
 
-  // jobId'deyken sabit üç seçenek (proje/program/görev); özel bir fabAction
+  // jobId'deyken sabit üç seçenek (proje/rutin/görev); özel bir fabAction
   // birden fazla seçenek kaydettiyse (bkz. options) onlar kullanılır.
   const choiceMenuItems: { label: string; icon: typeof IconFolder; onClick: () => void }[] = jobId
     ? [
         { label: "Yeni proje", icon: IconFolder, onClick: () => setModal("project") },
-        // Program: süresi olmayan, tekrarlayan işlerden oluşan çalışma.
-        { label: "Yeni program", icon: IconActivity, onClick: () => setModal("operation") },
+        // Rutin: süresi olmayan, tekrarlayan işlerden oluşan çalışma (kodda "operation").
+        { label: "Yeni rutin", icon: IconActivity, onClick: () => setModal("operation") },
         { label: "Yeni görev", icon: IconListCheck, onClick: () => setModal("task") },
       ]
     : hasCustomOptions

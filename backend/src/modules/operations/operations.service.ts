@@ -111,7 +111,7 @@ function normalizeIntArray(value: unknown): number[] | null {
 export class OperationsService {
   constructor(private supabase: SupabaseService) {}
 
-  // ---------------------------------------------------------------- programlar
+  // ---------------------------------------------------------------- rutinler
 
   private async healthByIds(ids: string[]): Promise<Map<string, any>> {
     if (ids.length === 0) return new Map();
@@ -161,9 +161,9 @@ export class OperationsService {
       );
   }
 
-  // Görünürlük kuralı projelerdekiyle aynı: iş sahibi ve iş ekibi tüm programları
+  // Görünürlük kuralı projelerdekiyle aynı: iş sahibi ve iş ekibi tüm rutinleri
   // görür; dışarıdakiler yalnızca sahibi oldukları ya da ekibinde bulundukları
-  // programları görebilir.
+  // rutinleri görebilir.
   async findByJob(jobId: string, requestingUserId?: string): Promise<Operation[]> {
     const { data, error } = await this.supabase.client
       .from("operations")
@@ -210,13 +210,13 @@ export class OperationsService {
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
-    if (!data) throw new NotFoundException("Program bulunamadı");
+    if (!data) throw new NotFoundException("Rutin bulunamadı");
     const health = await this.healthByIds([id]);
     return mapOperation(data, health.get(id));
   }
 
   async create(ownerId: string, data: Partial<Operation>): Promise<Operation> {
-    if (!data.jobId) throw new BadRequestException("Program bir işe bağlı olmalı");
+    if (!data.jobId) throw new BadRequestException("Rutin bir işe bağlı olmalı");
     const { data: row, error } = await this.supabase.client
       .from("operations")
       .insert({
@@ -242,7 +242,7 @@ export class OperationsService {
       .select("owner_id, job_id")
       .eq("id", id)
       .maybeSingle();
-    if (!operation) throw new NotFoundException("Program bulunamadı");
+    if (!operation) throw new NotFoundException("Rutin bulunamadı");
     if (operation.owner_id === userId) return;
     if (operation.job_id) {
       const { data: job } = await this.supabase.client
@@ -252,7 +252,7 @@ export class OperationsService {
         .maybeSingle();
       if (job?.owner_id === userId) return;
     }
-    throw new ForbiddenException("Bu programı yalnızca program veya iş sahibi düzenleyebilir");
+    throw new ForbiddenException("Bu rutini yalnızca rutin veya iş sahibi düzenleyebilir");
   }
 
   async update(id: string, data: Partial<Operation>, requestingUserId?: string): Promise<Operation> {
@@ -266,7 +266,7 @@ export class OperationsService {
     if (data.timezone !== undefined) patch.timezone = data.timezone;
     if (data.coverImageUrl !== undefined) patch.cover_image_url = data.coverImageUrl;
 
-    // Program "tamamlanmaz": kapatılırken bitiş tarihi zorunludur, tekrar
+    // Rutin "tamamlanmaz": kapatılırken bitiş tarihi zorunludur, tekrar
     // açıldığında bitiş tarihi temizlenir.
     if (data.status !== undefined) {
       patch.status = data.status;
@@ -286,7 +286,7 @@ export class OperationsService {
       .select()
       .maybeSingle();
     if (error) throw error;
-    if (!row) throw new NotFoundException("Program bulunamadı");
+    if (!row) throw new NotFoundException("Rutin bulunamadı");
     return mapOperation(row);
   }
 
@@ -299,7 +299,7 @@ export class OperationsService {
     if (error) throw error;
     if (!rows || rows.length !== ids.length) throw new BadRequestException("Geçersiz sıralama isteği");
     if (new Set(rows.map((r: any) => r.job_id)).size > 1) {
-      throw new BadRequestException("Sıralanan programlar aynı işe ait olmalı");
+      throw new BadRequestException("Sıralanan rutinler aynı işe ait olmalı");
     }
     if (!rows.every((r: any) => r.owner_id === userId)) {
       const jobId = rows[0].job_id;
@@ -323,7 +323,7 @@ export class OperationsService {
     if (error) throw error;
   }
 
-  // Arşivleme programı durdurur: veritabanı tetikleyicisi gelecekteki, henüz
+  // Arşivleme rutini durdurur: veritabanı tetikleyicisi gelecekteki, henüz
   // dokunulmamış tekrarları otomatik olarak geri çeker. Geçmiş kayıtlar durur.
   async archive(id: string, requestingUserId?: string): Promise<Operation> {
     await this.assertCanManage(id, requestingUserId);
@@ -334,7 +334,7 @@ export class OperationsService {
       .select()
       .maybeSingle();
     if (error) throw error;
-    if (!row) throw new NotFoundException("Program bulunamadı");
+    if (!row) throw new NotFoundException("Rutin bulunamadı");
     return mapOperation(row);
   }
 
@@ -346,7 +346,7 @@ export class OperationsService {
       .select()
       .maybeSingle();
     if (error) throw error;
-    if (!row) throw new NotFoundException("Program bulunamadı");
+    if (!row) throw new NotFoundException("Rutin bulunamadı");
     return mapOperation(row);
   }
 

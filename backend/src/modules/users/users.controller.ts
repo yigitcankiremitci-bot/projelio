@@ -30,8 +30,8 @@ export class UsersController {
   ) {}
 
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query("limit") limit?: string) {
+    return this.usersService.findAll(limit ? Number(limit) : undefined);
   }
 
   // NOT: bu route ":id" ile çakışmaması için ondan önce tanımlanmalı.

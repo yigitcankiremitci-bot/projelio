@@ -15,6 +15,10 @@ interface Props {
   jobId?: string;
   moduleKey: string;
   config: ModuleRecordConfig;
+  // Modüle atanmamış departman üyeleri kayıtları görebilir ama değiştiremez
+  // (bkz. 042_module_members.sql yetki sırası). Verilmezse yazma varsayılır —
+  // sunucu her hâlükârda kendi kontrolünü yapar, bu yalnızca arayüz kolaylığı.
+  canWrite?: boolean;
 }
 
 function defaultForm(config: ModuleRecordConfig): Record<string, string> {
@@ -27,7 +31,14 @@ function defaultForm(config: ModuleRecordConfig): Record<string, string> {
 // Alım…) veri girişi + liste ekranı. moduleRecordConfigs.ts'teki alan
 // tanımından form ve özet satırlarını üretir — yeni bir modül tam özellikli
 // yapılmak istendiğinde buraya dokunmadan sadece o dosyaya bir tanım eklenir.
-export default function ModuleRecordsPanel({ organizationId, departmentId, jobId, moduleKey, config }: Props) {
+export default function ModuleRecordsPanel({
+  organizationId,
+  departmentId,
+  jobId,
+  moduleKey,
+  config,
+  canWrite = true,
+}: Props) {
   const c = colors.light;
   const [records, setRecords] = useState<ModuleRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,16 +108,22 @@ export default function ModuleRecordsPanel({ organizationId, departmentId, jobId
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{config.title}</h5>
-        <button
-          onClick={() => {
-            setAdding((v) => !v);
-            resetForm();
-            setError("");
-          }}
-          style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none" }}
-        >
-          {adding ? "Vazgeç" : `+ ${config.addLabel}`}
-        </button>
+        {canWrite ? (
+          <button
+            onClick={() => {
+              setAdding((v) => !v);
+              resetForm();
+              setError("");
+            }}
+            style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none" }}
+          >
+            {adding ? "Vazgeç" : `+ ${config.addLabel}`}
+          </button>
+        ) : (
+          <span style={{ fontSize: 12, color: c.textSecondary }} title="Bu modüle atanan kişiler kayıt ekleyebilir">
+            Salt görüntüleme
+          </span>
+        )}
       </div>
 
       {!loading && config.computeStats && records.length > 0 && (
@@ -199,9 +216,11 @@ export default function ModuleRecordsPanel({ organizationId, departmentId, jobId
                   <div style={{ fontSize: 14, color: c.textPrimary }}>{config.summary(r.data)}</div>
                   {detail && <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>{detail}</div>}
                 </div>
-                <button onClick={() => handleDelete(r.id)} aria-label="Kaydı sil" style={{ background: "transparent", border: "none" }}>
-                  <IconTrash size={14} color={c.textSecondary} />
-                </button>
+                {canWrite && (
+                  <button onClick={() => handleDelete(r.id)} aria-label="Kaydı sil" style={{ background: "transparent", border: "none" }}>
+                    <IconTrash size={14} color={c.textSecondary} />
+                  </button>
+                )}
               </div>
             );
           })}

@@ -11,6 +11,10 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Kayıt artık doğrudan giriş yaptırmıyor: kullanıcı e-postasındaki bağlantıya
+  // tıklamadan giriş yapamıyor (bkz. AuthService.register/login).
+  const [registered, setRegistered] = useState(false);
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
   const c = colors.light;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,15 +22,91 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      const { token } = await api.post<{ token: string }>("/auth/register", { fullName, email, password, username });
-      localStorage.setItem("projelio_token", token);
-      window.location.href = "/";
+      await api.post("/auth/register", { fullName, email, password, username });
+      setRegistered(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kayıt oluşturulamadı. E-posta zaten kullanılıyor olabilir.");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleResend = async () => {
+    setResendState("sending");
+    try {
+      await api.post("/auth/resend-verification", { email });
+    } catch {
+      // Yanıt her durumda aynı olduğu için hata da kullanıcıya ayrı gösterilmez.
+    }
+    setResendState("sent");
+  };
+
+  if (registered) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: c.background,
+          padding: 24,
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 380,
+            background: c.surface,
+            border: `1px solid ${c.border}`,
+            borderRadius: 14,
+            padding: "36px 32px",
+            textAlign: "center",
+          }}
+        >
+          <img src="/logo.png" alt="Projelio" style={{ width: 48, height: 48, marginBottom: 14 }} />
+          <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 600, margin: "0 0 10px" }}>
+            E-postanı kontrol et
+          </h1>
+          <p style={{ color: c.textSecondary, fontSize: 15, margin: "0 0 6px", lineHeight: 1.6 }}>
+            <strong style={{ color: c.textPrimary }}>{email}</strong> adresine bir doğrulama bağlantısı gönderdik.
+            Bağlantıya tıkladıktan sonra giriş yapabilirsin.
+          </p>
+          <p style={{ color: c.textSecondary, fontSize: 13, margin: "0 0 22px", lineHeight: 1.6 }}>
+            Bağlantı 24 saat geçerli. E-posta birkaç dakika içinde gelmezse spam klasörüne de bak.
+          </p>
+
+          {resendState === "sent" ? (
+            <p style={{ color: c.textSecondary, fontSize: 14, margin: "0 0 18px" }}>
+              Yeni bağlantı gönderildi.
+            </p>
+          ) : (
+            <button
+              onClick={handleResend}
+              disabled={resendState === "sending"}
+              style={{
+                background: "transparent",
+                border: `1px solid ${c.border}`,
+                color: c.textSecondary,
+                padding: "9px 18px",
+                borderRadius: 8,
+                fontSize: 15,
+                marginBottom: 18,
+              }}
+            >
+              {resendState === "sending" ? "Gönderiliyor…" : "Bağlantıyı tekrar gönder"}
+            </button>
+          )}
+
+          <div>
+            <Link to="/login" style={{ fontSize: 16, color: c.primary }}>
+              Giriş ekranına dön
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

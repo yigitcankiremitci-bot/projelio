@@ -1,5 +1,5 @@
 import { colors } from "../theme/colors";
-import { IconCheck, IconCopy, IconMove, IconX } from "./icons";
+import { IconArchive, IconCheck, IconCopy, IconMove, IconTrash, IconX } from "./icons";
 
 interface Props {
   selectionMode: boolean;
@@ -7,8 +7,17 @@ interface Props {
   busy?: boolean;
   onEnable: () => void;
   onCancel: () => void;
-  onDuplicate: () => void;
-  onMove: () => void;
+  /**
+   * Çoğalt/Taşı/Arşivle/Sil düğmelerinin tümü opsiyonel: yalnızca verilenler
+   * gösterilir. Gerçek işlemi bu bileşen yapmaz — çağıran taraf onay modalını
+   * (bkz. ConfirmDialog) açıp gerçek toplu isteği kendisi yapar. Bazı panolarda
+   * (ör. Yapılacaklar sayfası, kişisel + atanan görevleri tek listede karıştırır)
+   * Çoğalt/Taşı'nın karşılığı yoktur, o yüzden onlar da opsiyonel.
+   */
+  onDuplicate?: () => void;
+  onMove?: () => void;
+  onArchive?: () => void;
+  onDelete?: () => void;
   /**
    * Panolardaki tek satırlık araç çubuğunun içine yerleşmek için: kapalıyken
    * yalnızca "Seç" düğmesi döner (kendi satırını açmaz), açıkken tam genişlikte
@@ -30,6 +39,8 @@ export default function TaskSelectionBar({
   onCancel,
   onDuplicate,
   onMove,
+  onArchive,
+  onDelete,
   inline,
 }: Props) {
   const c = colors.light;
@@ -42,16 +53,16 @@ export default function TaskSelectionBar({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 6,
-            padding: "6px 12px",
+            gap: 7,
+            padding: "8px 16px",
             borderRadius: 8,
             border: `1px solid ${c.border}`,
             background: c.surface,
             color: c.textSecondary,
-            fontSize: 13,
+            fontSize: 15,
           }}
         >
-        <IconCheck size={13} color={c.textSecondary} />
+        <IconCheck size={15} color={c.textSecondary} />
         Seç
       </button>
     );
@@ -73,74 +84,124 @@ export default function TaskSelectionBar({
         // eylemler araç çubuğunun yanına sığmaz.
         flexBasis: inline ? "100%" : undefined,
         marginBottom: inline ? 0 : 10,
-        padding: "8px 12px",
+        padding: "10px 14px",
         borderRadius: 10,
         border: `1px solid ${c.border}`,
         background: c.surface,
       }}
     >
-      <span style={{ fontSize: 14, color: c.textPrimary, fontWeight: 500 }}>
+      <span style={{ fontSize: 15, color: c.textPrimary, fontWeight: 500 }}>
         {selectedCount > 0 ? `${selectedCount} görev seçili` : "Görev seç"}
       </span>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          onClick={onDuplicate}
-          disabled={disabled}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            padding: "6px 11px",
-            borderRadius: 7,
-            border: `1px solid ${c.border}`,
-            background: "transparent",
-            color: c.textPrimary,
-            fontSize: 13,
-            opacity: disabled ? 0.5 : 1,
-            cursor: disabled ? "default" : "pointer",
-          }}
-        >
-          <IconCopy size={13} color={c.textSecondary} />
-          Çoğalt
-        </button>
-        <button
-          type="button"
-          onClick={onMove}
-          disabled={disabled}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            padding: "6px 11px",
-            borderRadius: 7,
-            border: `1px solid ${c.border}`,
-            background: "transparent",
-            color: c.textPrimary,
-            fontSize: 13,
-            opacity: disabled ? 0.5 : 1,
-            cursor: disabled ? "default" : "pointer",
-          }}
-        >
-          <IconMove size={13} color={c.textSecondary} />
-          Taşı
-        </button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {onDuplicate && (
+          <button
+            type="button"
+            onClick={onDuplicate}
+            disabled={disabled}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 14px",
+              borderRadius: 7,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textPrimary,
+              fontSize: 14,
+              opacity: disabled ? 0.5 : 1,
+              cursor: disabled ? "default" : "pointer",
+            }}
+          >
+            <IconCopy size={14} color={c.textSecondary} />
+            Çoğalt
+          </button>
+        )}
+        {onMove && (
+          <button
+            type="button"
+            onClick={onMove}
+            disabled={disabled}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 14px",
+              borderRadius: 7,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textPrimary,
+              fontSize: 14,
+              opacity: disabled ? 0.5 : 1,
+              cursor: disabled ? "default" : "pointer",
+            }}
+          >
+            <IconMove size={14} color={c.textSecondary} />
+            Taşı
+          </button>
+        )}
+        {onArchive && (
+          <button
+            type="button"
+            onClick={onArchive}
+            disabled={disabled}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 14px",
+              borderRadius: 7,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textPrimary,
+              fontSize: 14,
+              opacity: disabled ? 0.5 : 1,
+              cursor: disabled ? "default" : "pointer",
+            }}
+          >
+            <IconArchive size={14} color={c.textSecondary} />
+            Arşivle
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={disabled}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 14px",
+              borderRadius: 7,
+              border: `1px solid ${c.danger}`,
+              background: "transparent",
+              color: c.danger,
+              fontSize: 14,
+              opacity: disabled ? 0.5 : 1,
+              cursor: disabled ? "default" : "pointer",
+            }}
+          >
+            <IconTrash size={14} color={c.danger} />
+            Sil
+          </button>
+        )}
         <button
           type="button"
           onClick={onCancel}
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 5,
-            padding: "6px 11px",
+            gap: 6,
+            padding: "8px 14px",
             borderRadius: 7,
             border: "none",
             background: "transparent",
             color: c.textSecondary,
-            fontSize: 13,
+            fontSize: 14,
           }}
         >
-          <IconX size={13} color={c.textSecondary} />
+          <IconX size={14} color={c.textSecondary} />
           Vazgeç
         </button>
       </div>

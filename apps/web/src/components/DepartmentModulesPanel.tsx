@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import type { ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
+import type { ModuleAccess, ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { useProjectFabAction } from "../lib/projectFab";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
 import { useUndo } from "../lib/undo";
 import ModuleRecordsPanel from "./ModuleRecordsPanel";
+import ModuleTeamPanel from "./ModuleTeamPanel";
 import { IconCheck, IconX } from "./icons";
 
 interface Props {
@@ -32,6 +33,9 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  // Açılan modüldeki yetki bir kez çözülüp hem ekip paneline hem kayıt paneline
+  // veriliyor — her ikisi ayrı ayrı sormasın.
+  const [access, setAccess] = useState<ModuleAccess | null>(null);
   const { pushUndo } = useUndo();
 
   const load = () => {
@@ -53,6 +57,29 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
   };
 
   useEffect(load, [organizationId, departmentKey]);
+
+  // Modül açıldığında o modüldeki yetkiyi çöz. Kapanınca sıfırlanır ki bir
+  // sonraki modül eski yetkiyle render edilmesin.
+  useEffect(() => {
+    if (!expandedKey) {
+      setAccess(null);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get<ModuleAccess>(
+        `/organizations/${organizationId}/module-access?moduleKey=${encodeURIComponent(expandedKey)}&departmentId=${departmentId}`
+      )
+      .then((a) => {
+        if (!cancelled) setAccess(a);
+      })
+      .catch(() => {
+        if (!cancelled) setAccess(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [expandedKey, organizationId, departmentId]);
 
   // Özel (kataloğa dayanmayan) departmanların önceden tanımlı modülü yok, o
   // yüzden bu sayfalarda "+" düğmesi devreye girmez.
@@ -191,8 +218,30 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
                 </div>
 
                 {isExpanded && config && (
-                  <div style={{ borderTop: `1px solid ${c.border}`, padding: "12px 14px", background: c.surface }}>
-                    <ModuleRecordsPanel organizationId={organizationId} departmentId={departmentId} moduleKey={entry.key} config={config} />
+                  <div
+                    style={{
+                      borderTop: `1px solid ${c.border}`,
+                      padding: "12px 14px",
+                      background: c.surface,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 14,
+                    }}
+                  >
+                    <ModuleTeamPanel
+                      organizationId={organizationId}
+                      departmentId={departmentId}
+                      moduleKey={entry.key}
+                      access={access ?? undefined}
+                    />
+                    <div style={{ borderTop: `1px solid ${c.border}` }} />
+                    <ModuleRecordsPanel
+                      organizationId={organizationId}
+                      departmentId={departmentId}
+                      moduleKey={entry.key}
+                      config={config}
+                      canWrite={access?.canWrite ?? true}
+                    />
                   </div>
                 )}
               </div>

@@ -19,6 +19,9 @@ export interface UserRecord {
   accountType: AccountType;
   activeTaskId?: string;
   onboardingCompletedAt?: string;
+  // Boşsa kullanıcı e-postasını henüz doğrulamamıştır ve giriş yapamaz
+  // (bkz. 044_email_verification.sql, AuthService.login).
+  emailVerifiedAt?: string;
   avatarUrl?: string;
   title?: string;
   bio?: string;
@@ -34,6 +37,7 @@ export interface PublicUser {
   accountType: AccountType;
   activeTaskId?: string;
   onboardingCompletedAt?: string;
+  emailVerifiedAt?: string;
   avatarUrl?: string;
   title?: string;
   bio?: string;
@@ -53,6 +57,7 @@ function mapUser(row: any): UserRecord {
     accountType: row.account_type,
     activeTaskId: row.active_task_id ?? undefined,
     onboardingCompletedAt: row.onboarding_completed_at ?? undefined,
+    emailVerifiedAt: row.email_verified_at ?? undefined,
     avatarUrl: row.avatar_url ?? undefined,
     title: row.title ?? undefined,
     bio: row.bio ?? undefined,
@@ -66,6 +71,16 @@ function toPublicUser(user: UserRecord): PublicUser {
 
 export function normalizeUsername(raw: string): string {
   return raw.trim().replace(/^@/, "").toLowerCase();
+}
+
+// E-posta karşılaştırmaları büyük/küçük harfe duyarsız olmalı: "Ali@Gmail.com" ile
+// kaydolan biri "ali@gmail.com" ile giriş yapabilmeli, ve ikisi ayrı hesap
+// sayılmamalı. `email` sütunu DB'de case-sensitive UNIQUE olduğu için bu
+// normalizasyonun HER YAZMA/OKUMA noktasında (create, createFromGoogle,
+// findByEmail) tutarlı şekilde uygulanması şart — aksi halde aynı adresin farklı
+// yazımlarıyla iki ayrı satır oluşabilir.
+export function normalizeEmail(raw: string): string {
+  return raw.trim().toLowerCase();
 }
 
 export function assertValidUsername(username: string): void {
@@ -83,12 +98,13 @@ export class UsersService {
   async create(data: { fullName: string; email: string; passwordHash: string; username: string }): Promise<UserRecord> {
     const username = normalizeUsername(data.username);
     assertValidUsername(username);
+    const email = normalizeEmail(data.email);
 
     const { data: row, error } = await this.supabase.client
       .from("users")
       .insert({
         full_name: data.fullName,
-        email: data.email,
+        email,
         password_hash: data.passwordHash,
         username,
       })
@@ -115,15 +131,20 @@ export class UsersService {
     avatarUrl?: string;
   }): Promise<UserRecord> {
     const username = await this.findAvailableUsername(data.usernameSeed);
+    const email = normalizeEmail(data.email);
 
     const { data: row, error } = await this.supabase.client
       .from("users")
       .insert({
         full_name: data.fullName,
-        email: data.email,
+        email,
         password_hash: null,
         username,
         avatar_url: data.avatarUrl ?? null,
+        // Google ile açılan hesaplarda e-posta doğrulaması istemiyoruz: adresin
+        // sahibi olduğu zaten Google tarafından doğrulanmış oluyor (bkz.
+        // google-auth.service.ts'teki identity.emailVerified kontrolü).
+        email_verified_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -169,7 +190,7 @@ export class UsersService {
     const { data: row, error } = await this.supabase.client
       .from("users")
       .select()
-      .eq("email", email)
+      .eq("email", normalizeEmail(email))
       .maybeSingle();
     if (error) throw error;
     return row ? mapUser(row) : undefined;
@@ -186,8 +207,13 @@ export class UsersService {
     return row ? mapUser(row) : undefined;
   }
 
-  async findAll(): Promise<PublicUser[]> {
-    const { data, error } = await this.supabase.client.from("users").select();
+  // Sınırsız kullanıcı listesi hem gereksiz bir veri ifşasıydı (herkesin e-postası/
+  // kullanıcı adı tüm giriş yapmış kullanıcılara açıktı) hem de kullanıcı sayısı
+  // arttıkça büyüyen bir performans riskiydi. Zaten hedefe yönelik arama için
+  // `search()` var; bu uç nokta artık makul bir üst sınırla dönüyor.
+  async findAll(limit = 100): Promise<PublicUser[]> {
+    const safeLimit = Math.min(Math.max(1, limit), 1000);
+    const { data, error } = await this.supabase.client.from("users").select().limit(safeLimit);
     if (error) throw error;
     return (data ?? []).map((row: any) => toPublicUser(mapUser(row)));
   }

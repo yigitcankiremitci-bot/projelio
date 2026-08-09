@@ -48,9 +48,12 @@ export class TasksService {
     private notificationsService: NotificationsService
   ) {}
 
-  // requestingUserId verilirse ve bu kullanıcı projede taşeron (subcontractor) ise,
-  // sonuç sadece kendisine atanmış görev/alt görevlerle sınırlandırılır.
+  // requestingUserId verilirse önce projeye erişimi olduğu doğrulanır; ayrıca bu
+  // kullanıcı projede taşeron (subcontractor) ise, sonuç sadece kendisine atanmış
+  // görev/alt görevlerle sınırlandırılır.
   async findByProject(projectId: string, requestingUserId?: string): Promise<Task[]> {
+    await this.assertProjectAccess(projectId, requestingUserId);
+
     const { data, error } = await this.supabase.client
       .from("tasks")
       .select(
@@ -69,7 +72,9 @@ export class TasksService {
     return tasks.filter((t) => visibleIds.has(t.id));
   }
 
-  async findByDepartment(departmentId: string): Promise<Task[]> {
+  async findByDepartment(departmentId: string, requestingUserId?: string): Promise<Task[]> {
+    await this.assertDepartmentAccess(departmentId, requestingUserId);
+
     const { data, error } = await this.supabase.client
       .from("tasks")
       .select(
@@ -110,8 +115,10 @@ export class TasksService {
     throw new ForbiddenException("Bu departmanın görevlerini yalnızca kadrosundaki kişiler yönetebilir");
   }
 
-  // Kullanıcının bu projedeki rolünü döner: proje sahibiyse "owner", project_members
-  // kaydı varsa oradaki rol ("member" / "subcontractor" / "owner"), yoksa null.
+  // Kullanıcının bu projedeki rolünü döner: proje sahibiyse "owner", onaylı bir
+  // project_members kaydı varsa oradaki rol ("member" / "subcontractor" / "owner"),
+  // yoksa null. Yalnızca "approved" durumundaki üyelikler sayılır — reddedilmiş ya
+  // da hâlâ onay bekleyen bir katılım isteği erişim vermemeli.
   async getMembershipRole(projectId: string, userId: string): Promise<string | null> {
     const { data: project } = await this.supabase.client
       .from("projects")
@@ -125,8 +132,39 @@ export class TasksService {
       .select("role")
       .eq("project_id", projectId)
       .eq("user_id", userId)
+      .eq("status", "approved")
       .maybeSingle();
     return membership?.role ?? null;
+  }
+
+  // Kullanıcının bu projeye herhangi bir erişimi (sahip/üye/taşeron) var mı.
+  // requestingUserId verilmezse (dahili çağrılar) kontrol atlanır — projeler
+  // modülündeki assertCanManage ile aynı desen.
+  async assertProjectAccess(projectId: string, userId?: string, message?: string): Promise<void> {
+    if (!userId) return;
+    const role = await this.getMembershipRole(projectId, userId);
+    if (!role) throw new ForbiddenException(message ?? "Bu projeye erişim yetkiniz yok");
+  }
+
+  // Bir görevin ait olduğu proje ya da departmana göre doğru erişim kontrolünü uygular.
+  private async assertTaskAccess(
+    task: { projectId?: string | null; departmentId?: string | null } | null | undefined,
+    userId?: string
+  ): Promise<void> {
+    if (!task || !userId) return;
+    if (task.projectId) {
+      await this.assertProjectAccess(task.projectId, userId, "Bu görevi yalnızca proje sahibi veya ekibi yönetebilir");
+    } else if (task.departmentId) {
+      await this.assertDepartmentAccess(task.departmentId, userId);
+    }
+  }
+
+  // Var olan bir görevin proje/departman kapsamını çeker; sonra assertTaskAccess'e verilir.
+  // Görev bulunamazsa null döner — çağıran taraf zaten kendi NotFoundException'ını fırlatır.
+  private async getTaskScope(id: string): Promise<{ projectId?: string | null; departmentId?: string | null } | null> {
+    const { data } = await this.supabase.client.from("tasks").select("project_id, department_id").eq("id", id).maybeSingle();
+    if (!data) return null;
+    return { projectId: data.project_id, departmentId: data.department_id };
   }
 
   // Kullanıcı bu projede taşeron değilse null döner (filtrelemeye gerek yok, tüm görevleri görebilir).
@@ -192,6 +230,8 @@ export class TasksService {
   }
 
   async create(projectId: string, data: Partial<Task>, requestingUserId?: string): Promise<Task> {
+    await this.assertProjectAccess(projectId, requestingUserId, "Bu projeye görev ekleme yetkiniz yok");
+
     // Yeni görev/alt görev her zaman kendi listesinin EN ALTINA eklensin:
     // kardeşleri arasındaki en büyük sort_order'ın bir fazlasını alır. (Önceden
     // varsayılan 0 aldığı için son eklenen alt görev rastgele bir yere gidiyordu.)
@@ -332,6 +372,7 @@ export class TasksService {
   async update(id: string, data: Partial<Task>, requestingUserId?: string): Promise<Task> {
     const { data: existingRow } = await this.supabase.client.from("tasks").select().eq("id", id).maybeSingle();
     const previous = existingRow ? mapTask(existingRow) : null;
+    await this.assertTaskAccess(previous, requestingUserId);
 
     const patch: Record<string, unknown> = {};
     if (data.title !== undefined) patch.title = data.title;
@@ -397,7 +438,9 @@ export class TasksService {
     return task;
   }
 
-  async updateBudgetStatus(id: string, budgetStatus: Task["budgetStatus"]): Promise<Task> {
+  async updateBudgetStatus(id: string, budgetStatus: Task["budgetStatus"], requestingUserId?: string): Promise<Task> {
+    await this.assertTaskAccess(await this.getTaskScope(id), requestingUserId);
+
     const { data: row, error } = await this.supabase.client
       .from("tasks")
       .update({ budget_status: budgetStatus })
@@ -410,6 +453,8 @@ export class TasksService {
   }
 
   async updateStatus(id: string, status: Task["status"], requestingUserId?: string): Promise<Task> {
+    await this.assertTaskAccess(await this.getTaskScope(id), requestingUserId);
+
     // "Bugün yapılanlar" gibi ekip aktivite özetlerinde kimin ne zaman
     // tamamladığını gösterebilmek için, tamamlanınca damga atıyor,
     // geri alınırsa temizliyoruz.
@@ -467,7 +512,9 @@ export class TasksService {
     }
   }
 
-  async updateSchedule(id: string, startDate?: string, deadline?: string): Promise<Task> {
+  async updateSchedule(id: string, startDate?: string, deadline?: string, requestingUserId?: string): Promise<Task> {
+    await this.assertTaskAccess(await this.getTaskScope(id), requestingUserId);
+
     const patch: Record<string, unknown> = {};
     if (startDate) patch.start_date = startDate;
     if (deadline) patch.deadline = deadline;
@@ -506,12 +553,16 @@ export class TasksService {
     return { activeTaskId };
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, requestingUserId?: string): Promise<void> {
+    await this.assertTaskAccess(await this.getTaskScope(id), requestingUserId);
+
     const { error } = await this.supabase.client.from("tasks").delete().eq("id", id);
     if (error) throw error;
   }
 
-  async archive(id: string): Promise<Task> {
+  async archive(id: string, requestingUserId?: string): Promise<Task> {
+    await this.assertTaskAccess(await this.getTaskScope(id), requestingUserId);
+
     const { data: row, error } = await this.supabase.client
       .from("tasks")
       .update({ archived_at: new Date().toISOString() })
@@ -530,7 +581,93 @@ export class TasksService {
     return mapTask(row);
   }
 
-  async restore(id: string): Promise<Task> {
+  // Seçili görev(ler)i (ve üst seviye olanlarınsa tüm alt görevlerini) toplu
+  // arşivler. `duplicate`/`move` ile aynı desen: üst görevi de seçilmiş bir alt
+  // görev ayrıca işlenmez, üst görevin çocuk-arşivleme adımıyla zaten kapsanır.
+  async bulkArchive(ids: string[], requestingUserId?: string): Promise<Task[]> {
+    if (!ids?.length) return [];
+    const { data: rows, error } = await this.supabase.client
+      .from("tasks")
+      .select("*")
+      .in("id", ids)
+      .is("archived_at", null);
+    if (error) throw error;
+    if (!rows?.length) return [];
+
+    const departmentIds = new Set(rows.filter((r: any) => r.department_id).map((r: any) => r.department_id as string));
+    for (const deptId of departmentIds) {
+      await this.assertDepartmentAccess(deptId, requestingUserId);
+    }
+    const projectIds = new Set(rows.filter((r: any) => r.project_id).map((r: any) => r.project_id as string));
+    for (const projectId of projectIds) {
+      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri arşivleme yetkiniz yok");
+    }
+
+    const idSet = new Set(rows.map((r: any) => r.id as string));
+    const archivedAt = new Date().toISOString();
+    const selectCols =
+      "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), projects(title)";
+    const archived: Task[] = [];
+
+    for (const row of rows) {
+      // Üst görevi de seçilmiş bir alt görev, üst görevle birlikte zaten arşivlenecek.
+      if (row.parent_task_id && idSet.has(row.parent_task_id)) continue;
+
+      const { data: updatedRow, error: updateError } = await this.supabase.client
+        .from("tasks")
+        .update({ archived_at: archivedAt })
+        .eq("id", row.id)
+        .select(selectCols)
+        .maybeSingle();
+      if (updateError) throw updateError;
+      if (updatedRow) archived.push(mapTask(updatedRow));
+
+      // Bu görevin varsa tüm alt görevlerini de arşivle.
+      const { data: childRows, error: childError } = await this.supabase.client
+        .from("tasks")
+        .update({ archived_at: archivedAt })
+        .eq("parent_task_id", row.id)
+        .is("archived_at", null)
+        .select(selectCols);
+      if (childError) throw childError;
+      for (const child of childRows ?? []) archived.push(mapTask(child));
+    }
+
+    return archived;
+  }
+
+  // Seçili görev(ler)i toplu siler. `parent_task_id` FK'si ON DELETE CASCADE
+  // olduğu için (bkz. migration 002_add_task_parent_id) üst görev silinince alt
+  // görevleri veritabanı tarafından otomatik silinir; tek satırlık toplu DELETE
+  // bu yüzden hem üst hem alt görev id'leri için güvenle kullanılabilir.
+  async bulkRemove(ids: string[], requestingUserId?: string): Promise<string[]> {
+    if (!ids?.length) return [];
+    const { data: rows, error } = await this.supabase.client
+      .from("tasks")
+      .select("id, project_id, department_id")
+      .in("id", ids);
+    if (error) throw error;
+    if (!rows?.length) return [];
+
+    const departmentIds = new Set(rows.filter((r: any) => r.department_id).map((r: any) => r.department_id as string));
+    for (const deptId of departmentIds) {
+      await this.assertDepartmentAccess(deptId, requestingUserId);
+    }
+    const projectIds = new Set(rows.filter((r: any) => r.project_id).map((r: any) => r.project_id as string));
+    for (const projectId of projectIds) {
+      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri silme yetkiniz yok");
+    }
+
+    const idsToDelete = rows.map((r: any) => r.id as string);
+    const { error: deleteError } = await this.supabase.client.from("tasks").delete().in("id", idsToDelete);
+    if (deleteError) throw deleteError;
+
+    return idsToDelete;
+  }
+
+  async restore(id: string, requestingUserId?: string): Promise<Task> {
+    await this.assertTaskAccess(await this.getTaskScope(id), requestingUserId);
+
     const { data: row, error } = await this.supabase.client
       .from("tasks")
       .update({ archived_at: null })
@@ -544,14 +681,6 @@ export class TasksService {
     await this.supabase.client.from("tasks").update({ archived_at: null }).eq("parent_task_id", id);
 
     return mapTask(row);
-  }
-
-  // Kullanıcının hedef projede herhangi bir rolü (sahip/üye/taşeron) var mı —
-  // görev taşırken hedefe erişimi olmayan bir projeye taşınmasın diye.
-  private async assertProjectAccess(projectId: string, userId?: string): Promise<void> {
-    if (!userId) return;
-    const role = await this.getMembershipRole(projectId, userId);
-    if (!role) throw new ForbiddenException("Bu projeye görev taşıma yetkiniz yok");
   }
 
   // Seçili görev(ler)i (ve üst seviye olanlarınsa tüm alt görevlerini) kopyalar.
@@ -571,6 +700,12 @@ export class TasksService {
     const departmentIds = new Set(rows.filter((r: any) => r.department_id).map((r: any) => r.department_id as string));
     for (const deptId of departmentIds) {
       await this.assertDepartmentAccess(deptId, requestingUserId);
+    }
+    // Proje bağlamındaki kaynak görevler için de erişim kontrolü — aksi halde
+    // erişimi olmayan bir projenin görevleri, erişimi olduğu bir yere kopyalanabilirdi.
+    const sourceProjectIds = new Set(rows.filter((r: any) => r.project_id).map((r: any) => r.project_id as string));
+    for (const projectId of sourceProjectIds) {
+      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri çoğaltma yetkiniz yok");
     }
 
     const nextOrderCache = new Map<string, number>();
@@ -659,7 +794,7 @@ export class TasksService {
     if (target.projectId && target.departmentId) {
       throw new BadRequestException("Hedef olarak yalnızca proje ya da departmandan biri seçilebilir");
     }
-    if (target.projectId) await this.assertProjectAccess(target.projectId, requestingUserId);
+    if (target.projectId) await this.assertProjectAccess(target.projectId, requestingUserId, "Bu projeye görev taşıma yetkiniz yok");
     if (target.departmentId) await this.assertDepartmentAccess(target.departmentId, requestingUserId);
 
     const { data: rows, error } = await this.supabase.client
@@ -669,6 +804,17 @@ export class TasksService {
       .is("archived_at", null);
     if (error) throw error;
     if (!rows?.length) return [];
+
+    // Kaynak görevlerin ait olduğu proje(ler)/departman(lar) için de erişim kontrolü —
+    // yalnızca hedefe erişimi olması, başkasının görevini taşımaya yetmemeli.
+    const sourceProjectIds = new Set(rows.filter((r: any) => r.project_id).map((r: any) => r.project_id as string));
+    for (const projectId of sourceProjectIds) {
+      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri taşıma yetkiniz yok");
+    }
+    const sourceDepartmentIds = new Set(rows.filter((r: any) => r.department_id).map((r: any) => r.department_id as string));
+    for (const departmentId of sourceDepartmentIds) {
+      await this.assertDepartmentAccess(departmentId, requestingUserId);
+    }
 
     const idSet = new Set(rows.map((r: any) => r.id as string));
     const topLevelRows = rows.filter((r: any) => !(r.parent_task_id && idSet.has(r.parent_task_id)));
@@ -728,7 +874,7 @@ export class TasksService {
     return moved;
   }
 
-  async reorder(ids: string[]): Promise<void> {
+  async reorder(ids: string[], requestingUserId?: string): Promise<void> {
     if (!ids?.length) return;
     const { data: rows, error } = await this.supabase.client
       .from("tasks")
@@ -749,6 +895,8 @@ export class TasksService {
     if (parentIds.size > 1) {
       throw new BadRequestException("Sıralanan görevler aynı üst göreve/sütuna ait olmalı");
     }
+
+    await this.assertTaskAccess({ projectId: rows[0].project_id, departmentId: rows[0].department_id }, requestingUserId);
 
     await applyOrder(this.supabase.client, "tasks", ids);
   }

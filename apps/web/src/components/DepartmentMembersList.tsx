@@ -72,8 +72,12 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
   // yazısı sayfayı yenilemeye gerek kalmadan "kadroda"ya döner.
   useEffect(() => {
     if (!currentUserId) return;
+    const token = localStorage.getItem("projelio_token");
+    if (!token) return;
     const socket: Socket = io(API_URL, { transports: ["websocket"] });
-    socket.emit("register", currentUserId);
+    // Sunucu artık ham bir userId değil, doğrulanmış bir JWT bekliyor (bkz.
+    // notifications.gateway.ts).
+    socket.emit("register", token);
     socket.on("notification", (notification: NotificationPayload) => {
       if (notification.link === `/departments/${departmentId}`) load();
     });

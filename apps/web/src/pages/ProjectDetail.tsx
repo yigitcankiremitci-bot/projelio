@@ -17,7 +17,8 @@ import ProcessPanel, { ProcessNavState, ViewMode, computeInitialProcessNavDates 
 import { colors } from "../theme/colors";
 import { IconSettings } from "../components/icons";
 import { useProjectFabAction } from "../lib/projectFab";
-import { usePageHeader } from "../lib/pageHeader";
+import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
+import { useIsDesktop } from "../lib/useIsDesktop";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 
 export default function ProjectDetail() {
@@ -194,6 +195,36 @@ export default function ProjectDetail() {
     setTasks((prev) => prev.filter((t) => !movedIds.has(t.id)));
   };
 
+  // Toplu arşivleme/silme (bkz. TaskSelectionBar) yalnızca kullanıcının doğrudan
+  // seçtiği üst seviye id'leri döndürür — alt görevler sunucuda kendiliğinden
+  // kapsandığı için burada da `removeTaskFromState` ile aynı mantıkla (id VEYA
+  // parentTaskId eşleşiyorsa) listeden düşürülürler.
+  const removeTasksFromState = (ids: string[]) => {
+    const idSet = new Set(ids);
+    setTasks((prev) => prev.filter((t) => !idSet.has(t.id) && !(t.parentTaskId && idSet.has(t.parentTaskId))));
+  };
+
+  // Görev/alt görev oluşturmayı Cmd/Ctrl+Z ile geri alınabilir yapar: "run" az
+  // önce oluşan kaydı siler, "redo" aynı bilgilerle yeniden oluşturur. Redo her
+  // seferinde YENİ bir id ürettiği için (silinen kayıt kalıcı gitti), bir sonraki
+  // undo'nun doğru id'yi silebilmesi için bu id'yi bir kapanış değişkeninde
+  // güncel tutuyoruz.
+  const registerTaskCreateUndo = (createdId: string, payload: Record<string, unknown>) => {
+    let currentId = createdId;
+    pushUndo({
+      label: "Görev oluşturma",
+      run: async () => {
+        await api.delete(`/tasks/${currentId}`);
+        reloadTasks();
+      },
+      redo: async () => {
+        const recreated = await api.post<Task>(`/projects/${id}/tasks`, payload);
+        currentId = recreated.id;
+        reloadTasks();
+      },
+    });
+  };
+
   const handleCreateTask = async (
     status: TaskStatus,
     title: string,
@@ -201,16 +232,18 @@ export default function ProjectDetail() {
   ) => {
     if (!id) return;
     const deadline = options?.deadline ?? project?.deadline ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const payload = {
+      title,
+      status,
+      deadline,
+      startDate: options?.startDate,
+      weekNumber: options?.weekNumber,
+      outputId: options?.outputId,
+    };
     try {
-      const created = await api.post<Task>(`/projects/${id}/tasks`, {
-        title,
-        status,
-        deadline,
-        startDate: options?.startDate,
-        weekNumber: options?.weekNumber,
-        outputId: options?.outputId,
-      });
+      const created = await api.post<Task>(`/projects/${id}/tasks`, payload);
       setTasks((prev) => [...prev, created]);
+      registerTaskCreateUndo(created.id, payload);
     } catch {
       // görev oluşturulamadı, kullanıcı tekrar deneyebilir
     }
@@ -220,14 +253,11 @@ export default function ProjectDetail() {
     if (!id) return;
     const parent = tasks.find((t) => t.id === parentTaskId);
     if (!parent) return;
+    const payload = { title, status: parent.status, deadline: parent.deadline, parentTaskId };
     try {
-      const created = await api.post<Task>(`/projects/${id}/tasks`, {
-        title,
-        status: parent.status,
-        deadline: parent.deadline,
-        parentTaskId,
-      });
+      const created = await api.post<Task>(`/projects/${id}/tasks`, payload);
       setTasks((prev) => [...prev, created]);
+      registerTaskCreateUndo(created.id, payload);
     } catch {
       // alt görev oluşturulamadı, kullanıcı tekrar deneyebilir
     }
@@ -313,6 +343,16 @@ export default function ProjectDetail() {
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
   const coverRef = useRef<HTMLDivElement>(null);
   usePageHeader(project?.title, coverRef, [project?.title]);
+  const isDesktop = useIsDesktop();
+  // Kaydırılınca sabit başlığın en üst (normalde boş) bandında da sekmeler
+  // görünsün diye (bkz. lib/pageHeader usePageHeaderTabs, App.tsx) — aksi
+  // halde o bant boş/beyaz kalıyor, sekmelere geri dönmek için yukarı kadar
+  // kaydırmak gerekiyordu. Yalnızca masaüstünde: dar ekranda sayfanın kendi
+  // sekme çubuğu zaten normal akışta sabit kalıyor.
+  usePageHeaderTabs(
+    isDesktop ? <ProjectTabs active={activeTab} onChange={setActiveTab} style={{ marginBottom: 0 }} /> : null,
+    [activeTab, isDesktop]
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
@@ -444,6 +484,8 @@ export default function ProjectDetail() {
               highlightTaskId={highlightTaskId}
               onTasksDuplicated={handleTasksDuplicated}
               onTasksMoved={handleTasksMoved}
+              onTasksArchived={removeTasksFromState}
+              onTasksDeleted={removeTasksFromState}
             />
           )}
           {activeTab === "budget" && (
@@ -473,6 +515,8 @@ export default function ProjectDetail() {
               onToggleActive={handleToggleActive}
               onTasksDuplicated={handleTasksDuplicated}
               onTasksMoved={handleTasksMoved}
+              onTasksArchived={removeTasksFromState}
+              onTasksDeleted={removeTasksFromState}
             />
           )}
         </div>

@@ -51,9 +51,9 @@ export default function TaskSortMenu({ value, onChange }: Props) {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 6,
-          padding: "6px 10px",
-          fontSize: 13,
+          gap: 7,
+          padding: "8px 14px",
+          fontSize: 15,
           borderRadius: 8,
           border: `1px solid ${isDefault ? c.border : c.primary}`,
           background: isDefault ? c.surface : `${c.primary}12`,
@@ -61,7 +61,7 @@ export default function TaskSortMenu({ value, onChange }: Props) {
           whiteSpace: "nowrap",
         }}
       >
-        <IconSortDescending size={15} color={isDefault ? c.textSecondary : c.primary} />
+        <IconSortDescending size={17} color={isDefault ? c.textSecondary : c.primary} />
         {!isDefault && active.label}
       </button>
 
@@ -96,8 +96,8 @@ export default function TaskSortMenu({ value, onChange }: Props) {
                 alignItems: "center",
                 gap: 8,
                 width: "100%",
-                padding: "8px 10px",
-                fontSize: 14,
+                padding: "10px 12px",
+                fontSize: 15,
                 textAlign: "left",
                 border: "none",
                 borderRadius: 7,
@@ -106,7 +106,7 @@ export default function TaskSortMenu({ value, onChange }: Props) {
               }}
             >
               <span style={{ width: 14, display: "flex", flexShrink: 0 }}>
-                {value === s.value && <IconCheck size={13} color={c.primary} />}
+                {value === s.value && <IconCheck size={14} color={c.primary} />}
               </span>
               {s.label}
             </button>

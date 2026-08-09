@@ -19,8 +19,11 @@ export class AdminController {
     return this.adminService.getSystemStats();
   }
 
+  // Admin'e özel görünüm: rol zaten @Roles("admin") ile korunuyor, bu yüzden
+  // genel /users uç noktasındaki (tüm giriş yapmış kullanıcılara açık) daha
+  // sıkı varsayılan üst sınır yerine daha yüksek bir tavan kullanılır.
   @Get("users")
   getUsers() {
-    return this.usersService.findAll();
+    return this.usersService.findAll(1000);
   }
 }

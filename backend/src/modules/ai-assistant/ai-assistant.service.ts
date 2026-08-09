@@ -820,12 +820,12 @@ export class AiAssistantService {
       case "list_budget_transactions": {
         await this.requireProjectRole(input.projectId, userId, userRole, ["owner"]);
         const [transactions, project] = await Promise.all([
-          this.budgetService.findByProject(input.projectId),
-          this.projectsService.findOne(input.projectId),
+          this.budgetService.findByProject(input.projectId, userId),
+          this.projectsService.findOne(input.projectId, userId),
         ]);
         const [remainingMargin, expectedPayment] = await Promise.all([
-          this.budgetService.calculateRemainingMargin(input.projectId),
-          this.budgetService.calculateExpectedPayment(input.projectId, project.totalBudget),
+          this.budgetService.calculateRemainingMargin(input.projectId, userId),
+          this.budgetService.calculateExpectedPayment(input.projectId, userId),
         ]);
         return {
           transactions,

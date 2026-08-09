@@ -16,9 +16,10 @@ import Modal from "../components/Modal";
 import { colors } from "../theme/colors";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { useSortableList } from "../lib/useSortableList";
-import { useLatestRef, useRefreshOnUndo, useReorderUndo } from "../lib/undo";
+import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 import { useProjectFabAction } from "../lib/projectFab";
-import { usePageHeader } from "../lib/pageHeader";
+import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
+import { useIsDesktop } from "../lib/useIsDesktop";
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -44,20 +45,22 @@ export default function JobDetail() {
   const [currentUserActiveTaskId, setCurrentUserActiveTaskId] = useState<string | undefined>(undefined);
   const gridRef = useRef<HTMLDivElement>(null);
   const registerReorderUndo = useReorderUndo();
+  const { pushUndo } = useUndo();
   const projectsRef = useLatestRef(projects);
+  const tasksRef = useLatestRef(tasks);
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
   const tasksPanelRef = useRef<JobTasksPanelHandle>(null);
   const filesRef = useRef<FilesPanelHandle>(null);
 
   // "İşler" sekmesindeyken alt navigasyondaki "+" butonu doğrudan görev ekleme,
-  // "Programlar" sekmesindeyken doğrudan program ekleme formunu açsın, "Dosyalar"
+  // "Rutinler" sekmesindeyken doğrudan rutin ekleme formunu açsın, "Dosyalar"
   // sekmesindeyken dosya yükleme/oluşturma seçimini açsın (diğer sekmelerde eski
-  // proje/program/görev seçim menüsü geçerli kalır).
+  // proje/rutin/görev seçim menüsü geçerli kalır).
   useProjectFabAction(
     activeTab === "tasks"
       ? { label: "Görev ekle", onClick: () => tasksPanelRef.current?.openCreate() }
       : activeTab === "programs"
-      ? { label: "Yeni program", onClick: () => setCreatingOperation(true) }
+      ? { label: "Yeni rutin", onClick: () => setCreatingOperation(true) }
       : activeTab === "files"
       ? {
           label: "Dosya ekle",
@@ -144,23 +147,49 @@ export default function JobDetail() {
     setTasks((prev) => prev.filter((t) => t.id !== taskId && t.parentTaskId !== taskId));
   };
 
+  // Toplu arşivleme/silme (bkz. JobTasksPanel > TaskSelectionBar) yalnızca
+  // kullanıcının doğrudan seçtiği üst seviye id'leri döndürür — alt görevler
+  // sunucuda kendiliğinden kapsandığı için burada da `removeTaskFromState` ile
+  // aynı mantıkla (id VEYA parentTaskId eşleşiyorsa) listeden düşürülürler.
+  const removeTasksFromState = (ids: string[]) => {
+    const idSet = new Set(ids);
+    setTasks((prev) => prev.filter((t) => !idSet.has(t.id) && !(t.parentTaskId && idSet.has(t.parentTaskId))));
+  };
+
+  // Alt görev oluşturmayı Cmd/Ctrl+Z ile geri alınabilir yapar (bkz.
+  // ProjectDetail.tsx registerTaskCreateUndo — aynı desen).
+  const registerTaskCreateUndo = (task: Task, payload: Record<string, unknown>) => {
+    if (!task.projectId) return;
+    let currentId = task.id;
+    pushUndo({
+      label: "Görev oluşturma",
+      run: async () => {
+        await api.delete(`/tasks/${currentId}`);
+        reloadTasks();
+      },
+      redo: async () => {
+        const recreated = await api.post<Task>(`/projects/${task.projectId}/tasks`, payload);
+        currentId = recreated.id;
+        reloadTasks();
+      },
+    });
+  };
+
   const handleCreateSubtask = async (parentTaskId: string, title: string) => {
     const parent = tasks.find((t) => t.id === parentTaskId);
     if (!parent) return;
+    const payload = { title, status: parent.status, deadline: parent.deadline, parentTaskId };
     try {
-      const created = await api.post<Task>(`/projects/${parent.projectId}/tasks`, {
-        title,
-        status: parent.status,
-        deadline: parent.deadline,
-        parentTaskId,
-      });
+      const created = await api.post<Task>(`/projects/${parent.projectId}/tasks`, payload);
       setTasks((prev) => [...prev, created]);
+      registerTaskCreateUndo(created, payload);
     } catch {
       // alt görev oluşturulamadı, kullanıcı tekrar deneyebilir
     }
   };
 
-  const handleMoveTask = (taskId: string, status: TaskStatus) => {
+  const handleMoveTask = (taskId: string, status: TaskStatus, registerUndo = true) => {
+    const previousStatus = tasksRef.current.find((t) => t.id === taskId)?.status;
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
     api
       .patch(`/tasks/${taskId}/status`, { status })
@@ -168,6 +197,21 @@ export default function JobDetail() {
       // gerçek değeri almak üzere görevleri yeniden çekiyoruz.
       .then(() => reloadTasks())
       .catch(() => reloadTasks());
+    // registerUndo=false: bu çağrı başka bir işlemin yan etkisi (örn. üst görev
+    // tamamlanınca alt görevlerin de kapanması) — yığında ayrı adım olmamalı.
+    if (registerUndo && previousStatus && previousStatus !== status) {
+      pushUndo({
+        label: "Görev durumu",
+        run: async () => {
+          await api.patch(`/tasks/${taskId}/status`, { status: previousStatus });
+          reloadTasks();
+        },
+        redo: async () => {
+          await api.patch(`/tasks/${taskId}/status`, { status });
+          reloadTasks();
+        },
+      });
+    }
   };
 
   const handleToggleComplete = (taskId: string) => {
@@ -181,7 +225,7 @@ export default function JobDetail() {
       if (task.parentTaskId) {
         const parent = tasks.find((p) => p.id === task.parentTaskId);
         if (parent && parent.status === "completed") {
-          handleMoveTask(parent.id, "in_progress");
+          handleMoveTask(parent.id, "in_progress", false);
         }
       }
     } else {
@@ -191,7 +235,7 @@ export default function JobDetail() {
         .filter((t) => t.parentTaskId === taskId && t.status !== "completed")
         .forEach((sub) => {
           previousStatusRef.current[sub.id] = sub.status;
-          handleMoveTask(sub.id, "completed");
+          handleMoveTask(sub.id, "completed", false);
         });
 
       if (task.parentTaskId) {
@@ -229,6 +273,13 @@ export default function JobDetail() {
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
   const coverRef = useRef<HTMLDivElement>(null);
   usePageHeader(job?.title, coverRef, [job?.title]);
+  const isDesktop = useIsDesktop();
+  // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
+  // (bkz. ProjectDetail'deki aynı desen).
+  usePageHeaderTabs(
+    isDesktop ? <JobTabs active={activeTab} onChange={setActiveTab} style={{ marginBottom: 0 }} /> : null,
+    [activeTab, isDesktop]
+  );
 
   if (!id) return null;
 
@@ -317,7 +368,7 @@ export default function JobDetail() {
         <div style={{ marginTop: 6 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
             <SummaryCard label="Aktif proje" value={activeProjects.length} />
-            <SummaryCard label="Çalışan program" value={activeOperations.length} />
+            <SummaryCard label="Çalışan rutin" value={activeOperations.length} />
             <SummaryCard label="Bekleyen görev" value={pendingTasksCount} />
             <SummaryCard label="Tamamlanmış görev" value={completedTasksCount} />
           </div>
@@ -362,10 +413,10 @@ export default function JobDetail() {
                   lineHeight: 1.6,
                 }}
               >
-                Bu işte henüz program yok.
+                Bu işte henüz rutin yok.
                 <br />
                 <span style={{ fontSize: 14 }}>
-                  Program, bitişi olmayan ve tekrarlayan işler içindir — aylık bakım, haftalık
+                  Rutin, bitişi olmayan ve tekrarlayan işler içindir — aylık bakım, haftalık
                   raporlama, sosyal medya yönetimi gibi. Bitişi olan işler proje olarak açılır.
                 </span>
               </div>
@@ -404,6 +455,8 @@ export default function JobDetail() {
               onTasksReload={reloadTasks}
               activeTaskId={currentUserActiveTaskId}
               onToggleActive={handleToggleActive}
+              onTasksArchived={removeTasksFromState}
+              onTasksDeleted={removeTasksFromState}
             />
           )}
         </div>
@@ -415,7 +468,7 @@ export default function JobDetail() {
           onClose={() => setCreatingOperation(false)}
           onCreated={(created) => {
             setOperations((prev) => [...prev, created]);
-            // Yeni program açılır açılmaz rutin tanımlanabilsin diye detayına gidilir.
+            // Yeni rutin açılır açılmaz alt kural tanımlanabilsin diye detayına gidilir.
             navigate(`/operations/${created.id}`);
           }}
         />

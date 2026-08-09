@@ -45,7 +45,7 @@ export default function OperationCard({ operation }: Props) {
           </p>
         )}
 
-        {/* Projedeki ilerleme çubuğunun yerini uyum oranı alır: programın sonu
+        {/* Projedeki ilerleme çubuğunun yerini uyum oranı alır: rutinin sonu
             olmadığı için "yüzde kaçı bitti" sorusunun cevabı yoktur. */}
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: c.textSecondary, marginBottom: 5 }}>

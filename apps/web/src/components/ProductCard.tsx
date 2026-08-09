@@ -11,9 +11,11 @@ interface Props {
   onCoverUpdated: (coverImageUrl?: string) => void;
 }
 
-// JobCard ile aynı görsel dil (kapak yüksekliği/kart yüksekliği sabit) — "Şirket
-// anasayfasında ürün departmanından eklenen ürünler tıpkı iş kartları gibi görünsün".
-// Ürün/hizmetlerin ayrı bir detay sayfası yok; karta tıklamak düzenleme modalını açar.
+// JobCard ile aynı görsel dil (kapak yüksekliği/kart yüksekliği HER ZAMAN sabit,
+// hiç büyümez/küçülmez) — "Şirket anasayfasında ürün departmanından eklenen
+// ürünler tıpkı iş kartları gibi görünsün". Ürün/hizmetlerin ayrı bir detay
+// sayfası yok; karta tıklamak düzenleme modalını açar, açıklamaya tıklamaksa
+// kartın boyutunu değiştirmeden açıklama alanını kendi içinde kaydırır.
 const COVER_HEIGHT = 104;
 const CARD_HEIGHT = 296;
 
@@ -80,7 +82,7 @@ export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) 
         borderRadius: 12,
         overflow: "hidden",
         background: c.surface,
-        height: expanded ? "auto" : CARD_HEIGHT,
+        height: CARD_HEIGHT,
       }}
     >
       <div
@@ -152,7 +154,7 @@ export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) 
         />
       </div>
 
-      <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: expanded ? undefined : 1, minHeight: 0 }}>
+      <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         <h3
           style={{
             margin: "0 0 6px",
@@ -176,8 +178,9 @@ export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) 
               margin: "0 0 10px",
               lineHeight: 1.5,
               cursor: "pointer",
+              minHeight: 0,
               ...(expanded
-                ? {}
+                ? { flex: 1, overflowY: "auto" as const }
                 : {
                     display: "-webkit-box",
                     WebkitLineClamp: 2,

@@ -43,7 +43,7 @@ export class JobsController {
     return this.projectsService.findByJob(id, req.user.userId);
   }
 
-  // Bir işin altında projelerin yanı sıra programlar da yaşar (süreli iş / sürekli iş).
+  // Bir işin altında projelerin yanı sıra rutinler de yaşar (süreli iş / sürekli iş).
   @Get(":id/operations")
   findOperations(@Param("id") id: string, @Req() req: any) {
     return this.operationsService.findByJob(id, req.user.userId);

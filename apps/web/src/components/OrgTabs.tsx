@@ -21,9 +21,12 @@ const tabs: { key: OrgTab; label: string }[] = [
 interface Props {
   active: OrgTab;
   onChange: (tab: OrgTab) => void;
+  // Sabit başlığın üst bandındaki küçültülmüş kopya (bkz. OrganizationDetail
+  // usePageHeaderTabs) marginBottom'u kaldırmak için kullanır.
+  style?: React.CSSProperties;
 }
 
-export default function OrgTabs({ active, onChange }: Props) {
+export default function OrgTabs({ active, onChange, style }: Props) {
   const c = colors.light;
   const isDesktop = useIsDesktop();
   return (
@@ -42,6 +45,7 @@ export default function OrgTabs({ active, onChange }: Props) {
         borderRadius: 10,
         padding: 4,
         marginBottom: 16,
+        ...style,
       }}
     >
       {tabs.map((t) => (

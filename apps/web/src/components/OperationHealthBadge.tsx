@@ -1,7 +1,7 @@
 import type { OperationHealth, OperationStatus } from "@projelio/shared";
 import { colors } from "../theme/colors";
 
-// Programda "% tamamlandı" anlamsızdır (bitiş yok, payda sonsuz). Onun yerine
+// Rutinde "% tamamlandı" anlamsızdır (bitiş yok, payda sonsuz). Onun yerine
 // uyum oranından türeyen bir sağlık durumu gösterilir.
 const healthStyle: Record<OperationHealth, { label: string; bg: string; text: string }> = {
   healthy: { label: "Düzenli", bg: "#E1F3E8", text: "#1B6B3C" },
@@ -21,8 +21,8 @@ interface Props {
   health?: OperationHealth;
 }
 
-// Program duraklatılmış/kapatılmışsa sağlık oranı yanıltıcı olur (tekrar üretilmiyor),
-// bu yüzden o durumda doğrudan programın durumu gösterilir.
+// Rutin duraklatılmış/kapatılmışsa sağlık oranı yanıltıcı olur (tekrar üretilmiyor),
+// bu yüzden o durumda doğrudan rutinin durumu gösterilir.
 export default function OperationHealthBadge({ status, health }: Props) {
   const s = status !== "active" ? statusStyle[status] : healthStyle[health ?? "idle"];
   return (
@@ -43,7 +43,7 @@ export default function OperationHealthBadge({ status, health }: Props) {
 }
 
 // Rutinin son N tekrarını nokta ızgarası olarak gösterir: ilerleme çubuğunun
-// programdaki karşılığı budur — "ne kadarı bitti" değil, "ne kadar düzenli".
+// rutindeki karşılığı budur — "ne kadarı bitti" değil, "ne kadar düzenli".
 export function AdherenceDots({
   results,
   size = 8,

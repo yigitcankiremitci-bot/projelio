@@ -32,6 +32,7 @@ import { OrganizationModulesModule } from "./modules/organization-modules/organi
 import { JobModulesModule } from "./modules/job-modules/job-modules.module";
 import { PartnersModule } from "./modules/partners/partners.module";
 import { ProductsModule } from "./modules/products/products.module";
+import { ModuleMembersModule } from "./modules/module-members/module-members.module";
 import { ModuleRecordsModule } from "./modules/module-records/module-records.module";
 import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.module";
 
@@ -70,6 +71,7 @@ import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.mod
     JobModulesModule,
     PartnersModule,
     ProductsModule,
+    ModuleMembersModule,
     ModuleRecordsModule,
     PersonalTodosModule,
   ],

@@ -6,6 +6,9 @@ import OnboardingWizard from "./components/OnboardingWizard";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import VerifyEmail from "./pages/VerifyEmail";
 import GoogleReturn from "./pages/GoogleReturn";
 import MicrosoftReturn from "./pages/MicrosoftReturn";
 import JobDetail from "./pages/JobDetail";
@@ -55,10 +58,24 @@ const STICKY_TITLE_ROW = 44;
  * logo/çan bandına zemin oluyor, alt satır sayfanın adını taşıyor, içerik de
  * ikisinin altından akıp gidiyor.
  */
-function CoverStickyHeader({ visibleOn, left, user }: { visibleOn: boolean; left: number; user: User | null }) {
+function CoverStickyHeader({
+  visibleOn,
+  left,
+  sidebarOpen,
+  user,
+}: {
+  visibleOn: boolean;
+  left: number;
+  // Sidebar kapalıyken sol üstte yüzen logo/aç düğmesi bu şeridin üstünde
+  // (daha yüksek zIndex ile) durur — sekme çubuğu (bkz. registration.tabs)
+  // onların altına girmesin diye sol tarafta yer açılır.
+  sidebarOpen: boolean;
+  user: User | null;
+}) {
   const c = colors.light;
   const registration = usePageHeaderState();
   const [passed, setPassed] = useState(false);
+  const isDesktop = useIsDesktop();
 
   const coverRef = registration?.coverRef;
 
@@ -70,10 +87,20 @@ function CoverStickyHeader({ visibleOn, left, user }: { visibleOn: boolean; left
     // Kapak yükseklikleri sayfadan sayfaya değiştiği (ve projede kapak yoksa
     // tamamen değişken olduğu) için sabit bir kaydırma eşiği yerine kapağın
     // kendisi ölçülüyor.
+    //
+    // Sayfanın kendi araç çubuğu varsa (bkz. usePageHeaderActions sourceRef —
+    // ör. OutputsPanel'in Görevler/Çıktılar + Sırala/Seç satırı) kapak geçilir
+    // geçilmez değil, o satır da ekrandan çıkana kadar beklenir. Aksi halde
+    // araç çubuğu hâlâ görünürken sabit başlıktaki küçültülmüş kopyası da
+    // belirip aynı düğmeler bir an için iki kez görünüyordu.
     const check = () => {
       const el = coverRef.current;
       if (!el) return;
-      setPassed(el.getBoundingClientRect().bottom <= STICKY_TOP_ROW + STICKY_TITLE_ROW);
+      const toolbarEl = registration?.actions?.sourceRef?.current;
+      const bottom = toolbarEl
+        ? Math.max(el.getBoundingClientRect().bottom, toolbarEl.getBoundingClientRect().bottom)
+        : el.getBoundingClientRect().bottom;
+      setPassed(bottom <= STICKY_TOP_ROW + STICKY_TITLE_ROW);
     };
     check();
     window.addEventListener("scroll", check, { passive: true });
@@ -82,7 +109,7 @@ function CoverStickyHeader({ visibleOn, left, user }: { visibleOn: boolean; left
       window.removeEventListener("scroll", check);
       window.removeEventListener("resize", check);
     };
-  }, [visibleOn, coverRef]);
+  }, [visibleOn, coverRef, registration?.actions?.sourceRef]);
 
   if (!visibleOn || !registration) return null;
 
@@ -107,9 +134,35 @@ function CoverStickyHeader({ visibleOn, left, user }: { visibleOn: boolean; left
         pointerEvents: passed ? "auto" : "none",
       }}
     >
-      {/* Üst satır: yalnızca zemin. Logo/çan zaten ayrı position:fixed öğeler. */}
-      <div style={{ height: STICKY_TOP_ROW }} />
-      {/* Alt satır: solda sayfanın adı, sağda kişi kartının küçültülmüş hali.
+      {/* Üst satır: normalde yalnızca zemin (logo/çan zaten ayrı position:fixed
+          öğeler). Sayfa kendi sekme çubuğunu kaydettiyse (bkz. usePageHeaderTabs
+          — ör. ProjectDetail) burada gösterilir; aksi halde boş kalır. Yalnızca
+          masaüstünde: dar ekranda sekmeler zaten sayfanın kendi akışında kalıyor. */}
+      <div
+        style={{
+          height: STICKY_TOP_ROW,
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        {isDesktop && registration.tabs && (
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: `0 28px 0 ${sidebarOpen ? 28 : 170}px`,
+              // Bildirim çanı (zIndex 40) sağda sabit duruyor; sekmeler onun
+              // altına girmesin diye sağda da yer bırakılır.
+              paddingRight: 70,
+            }}
+          >
+            {registration.tabs}
+          </div>
+        )}
+      </div>
+      {/* Alt satır: solda sayfanın adı, ardından (varsa) sayfaya özgü ek kontroller
+          (bkz. usePageHeaderActions — ör. OutputsPanel'in Görevler/Çıktılar +
+          Sırala/Seç kontrolleri), sağda kişi kartının küçültülmüş hali.
           Kapağın üstündeki büyük kişi kartı (bkz. ProfileCard) yukarı kayıp gözden
           kaybolduğu için burada yalnızca kimlik göstergesi olarak fotoğraf + ad
           kalıyor; satır yükselmesin diye unvan, açıklama ve düzenleme simgesi yok. */}
@@ -123,21 +176,46 @@ function CoverStickyHeader({ visibleOn, left, user }: { visibleOn: boolean; left
           borderTop: `1px solid ${c.border}`,
         }}
       >
-        <span
-          title={registration.title}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            fontSize: 16,
-            fontWeight: 500,
-            color: c.textPrimary,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {registration.title}
-        </span>
+        {(() => {
+          // Ek kontroller yalnızca masaüstünde gösterilir: dar ekranlarda bu satıra
+          // sığmıyorlar, mobilde kontroller sayfanın kendi (kaydırılabilen) akışında
+          // hâlâ erişilebilir durumda kalıyor.
+          const showActions = isDesktop && Boolean(registration.actions);
+          return (
+            <>
+              <span
+                title={registration.title}
+                style={{
+                  flex: showActions ? "0 1 auto" : 1,
+                  minWidth: 0,
+                  maxWidth: showActions ? 200 : undefined,
+                  fontSize: 16,
+                  fontWeight: 500,
+                  color: c.textPrimary,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {registration.title}
+              </span>
+
+              {showActions && registration.actions?.left && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  {registration.actions.left}
+                </div>
+              )}
+
+              {showActions && <div style={{ flex: 1 }} />}
+
+              {showActions && registration.actions?.right && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  {registration.actions.right}
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {user && (
           <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, maxWidth: "45%" }}>
@@ -194,6 +272,9 @@ export default function App() {
   const isAuthScreen =
     location.pathname === "/login" ||
     location.pathname === "/register" ||
+    location.pathname === "/forgot-password" ||
+    location.pathname === "/reset-password" ||
+    location.pathname === "/verify-email" ||
     location.pathname === "/google/return" ||
     location.pathname === "/microsoft/return";
   const hasToken = !!localStorage.getItem("projelio_token");
@@ -231,6 +312,9 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/google/return" element={<GoogleReturn />} />
         <Route path="/microsoft/return" element={<MicrosoftReturn />} />
       </Routes>
@@ -241,7 +325,7 @@ export default function App() {
     return <Navigate to="/login" replace />;
   }
 
-  // İş/Proje/Program/Organizasyon/Departman/Grup detay sayfaları en üstte tam
+  // İş/Proje/Rutin/Organizasyon/Departman/Grup detay sayfaları en üstte tam
   // genişlikte bir kapak fotoğrafı/gradyanı gösterir (bkz. ilgili sayfaların
   // return'ünün ilk elemanı). Bu sayfalarda kapak, sayfanın gerçek en üstüne
   // (y=0) kadar uzansın diye burada normalde her sayfaya uygulanan
@@ -293,6 +377,7 @@ export default function App() {
         <CoverStickyHeader
           visibleOn={isCoverPage}
           left={isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0}
+          sidebarOpen={sidebarOpen}
           user={me}
         />
 

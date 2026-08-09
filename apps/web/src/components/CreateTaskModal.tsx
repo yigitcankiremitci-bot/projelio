@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Output, Project } from "@projelio/shared";
+import type { Output, Project, Task } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import Modal from "./Modal";
@@ -18,8 +18,10 @@ interface Props {
   fixedAssignedTo?: string;
   fixedAssignedToName?: string;
   onClose: () => void;
-  // Verilirse sayfa yönlendirmesi yapılmaz, sadece bu çağrılır (liste yerinde güncellenir).
-  onCreated?: () => void;
+  // Verilirse sayfa yönlendirmesi yapılmaz, sadece bu çağrılır (liste yerinde
+  // güncellenir). Oluşturulan görevi de alır — çağıran bunu Cmd/Ctrl+Z ile geri
+  // alınabilir kaydetmek için kullanabilir (bkz. JobTasksPanel).
+  onCreated?: (created: Task) => void;
 }
 
 export default function CreateTaskModal({
@@ -96,7 +98,7 @@ export default function CreateTaskModal({
     setLoading(true);
     try {
       const trimmedDuration = durationValue.trim();
-      await api.post(`/projects/${projectId}/tasks`, {
+      const created = await api.post<Task>(`/projects/${projectId}/tasks`, {
         title,
         deadline: deadline ? new Date(deadline).toISOString() : new Date().toISOString(),
         status: "todo",
@@ -108,7 +110,7 @@ export default function CreateTaskModal({
         estimatedDurationUnit: trimmedDuration ? durationUnit : undefined,
       });
       if (onCreated) {
-        onCreated();
+        onCreated(created);
         onClose();
       } else {
         window.location.href = `/projects/${projectId}`;

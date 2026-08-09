@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PersonalBoardItem, PersonalBoardSource, Task, TaskPriority, TaskStatus, User } from "@projelio/shared";
+import type { PersonalBoardItem, PersonalBoardSource, PersonalTodo, Task, TaskPriority, TaskStatus, User } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import TaskColumn, { TaskColumnHandle } from "../components/TaskColumn";
 import TaskEditModal from "../components/TaskEditModal";
 import PersonalTodoModal from "../components/PersonalTodoModal";
+import TaskSelectionBar from "../components/TaskSelectionBar";
+import ConfirmDialog from "../components/ConfirmDialog";
+import MoveTaskModal from "../components/MoveTaskModal";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useLatestRef, useRefreshOnUndo, useUndo } from "../lib/undo";
 import { useProjectFabAction } from "../lib/projectFab";
+import { useTaskSelection } from "../lib/useTaskSelection";
 import TaskSortMenu from "../components/TaskSortMenu";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 
@@ -63,8 +67,12 @@ export default function TasksOverview() {
   const columnRefs = useRef<Partial<Record<TaskStatus, TaskColumnHandle | null>>>({});
   // Bir kart "Tamamlandı"dan geri alındığında hangi kolona döneceği.
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
-  const { pushUndo } = useUndo();
+  const { pushUndo, pushDestructive } = useUndo();
   const itemsRef = useLatestRef(items);
+  const selection = useTaskSelection();
+  const [archiving, setArchiving] = useState(false);
+  const [confirmingBulkAction, setConfirmingBulkAction] = useState<"archive" | "delete" | null>(null);
+  const [movingOpen, setMovingOpen] = useState(false);
 
   const load = useCallback(() => {
     api
@@ -95,6 +103,14 @@ export default function TasksOverview() {
     for (const i of items) map.set(i.itemId, i.source);
     return map;
   }, [items]);
+
+  // "Taşı" yalnızca atanan (gerçek) görevler için anlamlı: kişisel görevlerin
+  // bağlı olacağı bir proje/departman kavramı yok. Seçim kişisel+atanan
+  // karışık olabileceği için taşınabilir alt küme burada ayrıca hesaplanır.
+  const movableSelectedIds = useMemo(
+    () => Array.from(selection.selectedIds).filter((taskId) => sourceById.get(taskId) === "assigned"),
+    [selection.selectedIds, sourceById]
+  );
 
   // TaskColumn kartları `allTasks` dizisindeki sırayla basar, dolayısıyla seçili
   // ölçüt burada uygulanır. Sıralama mantığı tüm panolarla ortak (lib/taskSort);
@@ -159,10 +175,33 @@ export default function TasksOverview() {
 
   // ------------------------------------------------------------- Eylemler
 
+  /**
+   * Yeni kart oluşturmayı geri alınabilir yapar. "todos/:id" DELETE'i kalıcı
+   * silmiyor, arşivliyor (bkz. PersonalTodosService.archive) — o yüzden geri
+   * alma burada da diğer panellerdeki gibi sil+yeniden oluştur örüntüsünü
+   * kullanabiliyor, ama silme adımı aslında zararsız bir arşivleme.
+   */
+  const registerTodoCreateUndo = (createdId: string, payload: { title: string; status: TaskStatus }) => {
+    let currentId = createdId;
+    pushUndo({
+      label: "Görev oluşturma",
+      run: async () => {
+        await api.delete(`/todos/${currentId}`);
+        load();
+      },
+      redo: async () => {
+        const recreated = await api.post<PersonalTodo>("/todos", payload);
+        currentId = recreated.id;
+        load();
+      },
+    });
+  };
+
   const handleCreate = async (status: TaskStatus, title: string) => {
     try {
-      await api.post("/todos", { title, status });
+      const created = await api.post<PersonalTodo>("/todos", { title, status });
       load();
+      registerTodoCreateUndo(created.id, { title, status });
     } catch {
       // eklenemedi, kullanıcı tekrar deneyebilir
     }
@@ -232,6 +271,96 @@ export default function TasksOverview() {
         load();
       },
     });
+  };
+
+  const removeItemsFromState = (ids: string[]) => {
+    const removed = new Set(ids);
+    setItems((prev) => prev.filter((i) => !removed.has(i.itemId)));
+  };
+
+  /**
+   * Seçili kartları toplu arşivler. Pano iki ayrı kaynağı karıştırdığı için
+   * (bkz. dosya başı açıklaması) seçim, kişisel ve atanan id'lere ayrılıp her
+   * biri kendi uç noktasına gönderilir; tek bir Cmd/Ctrl+Z ikisini de geri alır.
+   */
+  const handleArchiveSelected = async () => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+    const personalIds = ids.filter((id) => sourceById.get(id) === "personal");
+    const assignedIds = ids.filter((id) => sourceById.get(id) === "assigned");
+    setArchiving(true);
+    try {
+      await Promise.all([
+        ...personalIds.map((id) => api.delete(`/todos/${id}`)),
+        assignedIds.length ? api.patch<Task[]>("/tasks/bulk-archive", { ids: assignedIds }) : Promise.resolve(undefined),
+      ]);
+      removeItemsFromState(ids);
+      pushUndo({
+        label: `${ids.length} görev arşivleme`,
+        run: async () => {
+          await Promise.all([
+            ...personalIds.map((id) => api.patch(`/todos/${id}/restore`, {})),
+            ...assignedIds.map((id) => api.patch(`/tasks/${id}/restore`, {})),
+          ]);
+          load();
+        },
+        redo: async () => {
+          await Promise.all([
+            ...personalIds.map((id) => api.delete(`/todos/${id}`)),
+            assignedIds.length ? api.patch("/tasks/bulk-archive", { ids: assignedIds }) : Promise.resolve(undefined),
+          ]);
+          load();
+        },
+      });
+      selection.clear();
+      setConfirmingBulkAction(null);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  /**
+   * Seçili kartları toplu siler. Kişisel görevlerde gerçek bir silme uç noktası
+   * yok — "todos/:id" DELETE'i zaten arşivliyor (bkz. PersonalTodosService.archive) —
+   * o yüzden kişisel kartlar için bu, süresiz geri alınabilir bir arşivleme.
+   * Atanan kartlarda ise gerçek/kalıcı silme var; diğer panellerdeki gibi
+   * birkaç saniye ertelenmiş commit ile Cmd/Ctrl+Z penceresi açılır
+   * (bkz. lib/undo pushDestructive). İki kaynak karışık seçildiyse iki ayrı
+   * geri alma girdisi oluşur, ikisi de kendi Cmd/Ctrl+Z'siyle geri alınabilir.
+   */
+  const handleDeleteSelected = () => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+    const personalIds = ids.filter((id) => sourceById.get(id) === "personal");
+    const assignedIds = ids.filter((id) => sourceById.get(id) === "assigned");
+    removeItemsFromState(ids);
+
+    if (personalIds.length > 0) {
+      Promise.all(personalIds.map((id) => api.delete(`/todos/${id}`))).catch(() => load());
+      pushUndo({
+        label: `${personalIds.length} kişisel görev silme`,
+        run: async () => {
+          await Promise.all(personalIds.map((id) => api.patch(`/todos/${id}/restore`, {})));
+          load();
+        },
+        redo: async () => {
+          await Promise.all(personalIds.map((id) => api.delete(`/todos/${id}`)));
+          load();
+        },
+      });
+    }
+
+    if (assignedIds.length > 0) {
+      pushDestructive({
+        label: `${assignedIds.length} görev silme`,
+        commit: () => api.post("/tasks/bulk-delete", { ids: assignedIds }),
+        restore: () => {},
+        entityIds: assignedIds,
+      });
+    }
+
+    selection.clear();
+    setConfirmingBulkAction(null);
   };
 
   const handleToggleComplete = (itemId: string) => {
@@ -349,11 +478,14 @@ export default function TasksOverview() {
           {FILTERS.map((f) => (
             <button
               key={f.value}
-              onClick={() => setFilter(f.value)}
+              onClick={() => {
+                selection.clear();
+                setFilter(f.value);
+              }}
               aria-pressed={filter === f.value}
               style={{
-                padding: "6px 12px",
-                fontSize: 13,
+                padding: "8px 16px",
+                fontSize: 15,
                 borderRadius: 8,
                 border: `1px solid ${filter === f.value ? c.primary : c.border}`,
                 background: filter === f.value ? `${c.primary}12` : c.surface,
@@ -367,7 +499,21 @@ export default function TasksOverview() {
 
         {/* Sıralama ölçütü. Filtrenin hemen yanında ama ayrı bir kontrol:
             filtre neyin görüneceğini, bu ise hangi düzende görüneceğini seçer. */}
-        <TaskSortMenu value={sort} onChange={setSort} />
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <TaskSortMenu value={sort} onChange={setSort} />
+        </div>
+
+        <TaskSelectionBar
+          inline
+          selectionMode={selection.selectionMode}
+          selectedCount={selection.selectedIds.size}
+          busy={archiving}
+          onEnable={selection.toggleSelectionMode}
+          onCancel={selection.clear}
+          onMove={movableSelectedIds.length > 0 ? () => setMovingOpen(true) : undefined}
+          onArchive={() => setConfirmingBulkAction("archive")}
+          onDelete={() => setConfirmingBulkAction("delete")}
+        />
       </header>
 
       <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 18px" }}>
@@ -418,6 +564,9 @@ export default function TasksOverview() {
                 getTaskMeta={getTaskMeta}
                 getTaskAvatar={getTaskAvatar}
                 group="personal-board"
+                selectionMode={selection.selectionMode}
+                selectedIds={selection.selectedIds}
+                onToggleSelect={selection.toggleSelect}
               />
             </div>
           ))}
@@ -453,6 +602,39 @@ export default function TasksOverview() {
             setEditingPersonal(null);
             load();
           }}
+        />
+      )}
+
+      {movingOpen && (
+        <MoveTaskModal
+          taskIds={movableSelectedIds}
+          onClose={() => setMovingOpen(false)}
+          onMoved={() => {
+            setMovingOpen(false);
+            selection.clear();
+            load();
+          }}
+        />
+      )}
+
+      {confirmingBulkAction === "archive" && (
+        <ConfirmDialog
+          title="Görevleri arşivle"
+          message={`${selection.selectedIds.size} görevi arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
+          confirmLabel="Arşivle"
+          danger={false}
+          onCancel={() => setConfirmingBulkAction(null)}
+          onConfirm={handleArchiveSelected}
+        />
+      )}
+      {confirmingBulkAction === "delete" && (
+        <ConfirmDialog
+          title="Görevleri sil"
+          message={`${selection.selectedIds.size} görevi silmek istediğine emin misin? Kişisel görevler arşivlenir ve istediğin zaman geri getirebilirsin; atanmış görevler birkaç saniye içinde Cmd/Ctrl+Z ile geri alınabilir, sonrasında kalıcı olarak silinir.`}
+          confirmLabel="Sil"
+          danger
+          onCancel={() => setConfirmingBulkAction(null)}
+          onConfirm={handleDeleteSelected}
         />
       )}
     </div>

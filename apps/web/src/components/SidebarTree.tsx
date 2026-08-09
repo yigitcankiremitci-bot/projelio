@@ -3,31 +3,47 @@ import { Link, useLocation } from "react-router-dom";
 import type { Department, Job } from "@projelio/shared";
 import { colors } from "../theme/colors";
 import { useSidebarHierarchy, SidebarGroupNode, SidebarOrgNode } from "../lib/useSidebarHierarchy";
-import { IconBuilding, IconBriefcase, IconLayers, IconFolder, IconListCheck, IconChevronRight, IconChevronDown } from "./icons";
+import {
+  IconBuilding,
+  IconBriefcase,
+  IconLayers,
+  IconFolder,
+  IconListCheck,
+  IconChevronRight,
+  IconChevronDown,
+  IconActivity,
+  IconUser,
+  IconFile,
+} from "./icons";
 
 type IconComp = typeof IconBuilding;
 
 // İş düğümünün altında her zaman gösterilen sabit kısayollar — JobTabs'taki
 // sekmelerin karşılığı. Veriye bağlı değildir (bir işin henüz projesi olmasa
-// bile "Projeler" kısayolu görünür, tıklayınca boş listeyi gösterir).
-const JOB_LEAF_TABS: { tab: string; label: string }[] = [
-  { tab: "projects", label: "Projeler" },
-  { tab: "programs", label: "Programlar" },
-  { tab: "team", label: "Ekip" },
-  { tab: "files", label: "Dosyalar" },
+// bile "Projeler" kısayolu görünür, tıklayınca boş listeyi gösterir). "Ekip"/
+// "Dosyalar" da ikon taşır ki Projeler/Rutinler'in Row tabanlı satırlarıyla
+// aynı hizada dursun (bkz. LeafRow icon prop). "programs" tab anahtarı kodda
+// (rota/JobDetail) hâlâ "program" (operation), yalnızca kullanıcıya görünen
+// etiket "Rutinler" — "Program" adı kafa karıştırıyordu.
+const JOB_LEAF_TABS: { tab: string; label: string; icon: IconComp }[] = [
+  { tab: "projects", label: "Projeler", icon: IconFolder },
+  { tab: "programs", label: "Rutinler", icon: IconActivity },
+  { tab: "team", label: "Ekip", icon: IconUser },
+  { tab: "files", label: "Dosyalar", icon: IconFile },
 ];
 
 const INACTIVE_ICON = "#9AA6B4";
 const INACTIVE_TEXT = "#C7CCD6";
 
 /**
- * Sol menüdeki Grup > Organizasyon > İş > (Projeler/Programlar/Ekip/Dosyalar)
+ * Sol menüdeki Grup > Organizasyon > İş > (Projeler/Rutinler/Ekip/Dosyalar)
  * gezinme ağacı. Yalnızca gerçekten var olan seviyeler gösterilir — grubu ya da
  * organizasyonu olmayan bir kullanıcı için hiçbir şey render etmez.
  */
 export default function SidebarTree() {
   const location = useLocation();
-  const { groups, standaloneOrgs, standaloneJobs, loading } = useSidebarHierarchy();
+  const { groups, standaloneOrgs, standaloneJobs, openProjectsByJobId, openOperationsByJobId, loading } =
+    useSidebarHierarchy();
   // "Gruplar" ve "Organizasyonlar" kategori başlıkları, eski düz linklerin yerini
   // aldığı için varsayılan olarak açık başlar (kullanıcı eskisi gibi listeyi hemen
   // görsün); tekil grup/organizasyon/iş düğümleri ise varsayılan kapalı.
@@ -45,7 +61,13 @@ export default function SidebarTree() {
     const orgMatch = location.pathname.match(/^\/organizations\/([^/]+)/);
     const groupMatch = location.pathname.match(/^\/groups\/([^/]+)/);
     const deptMatch = location.pathname.match(/^\/departments\/([^/]+)/);
-    if (!jobMatch && !orgMatch && !groupMatch && !deptMatch) return;
+    // Bir proje/rutin sayfasındaysak da işin (dolayısıyla üstündeki
+    // organizasyon/grubun) açılması gerekir — aksi halde aktif satır (bkz.
+    // renderJob'un altına eklediği proje/rutin kısayolları) ağaçta gizli
+    // kalır. Hangi işe ait olduğu id üzerinden açık listelerden bulunur.
+    const projectMatch = location.pathname.match(/^\/projects\/([^/]+)/);
+    const operationMatch = location.pathname.match(/^\/operations\/([^/]+)/);
+    if (!jobMatch && !orgMatch && !groupMatch && !deptMatch && !projectMatch && !operationMatch) return;
 
     const allJobs: Job[] = [
       ...groups.flatMap((g) => [...g.orgs.flatMap((o) => o.jobs), ...g.jobs]),
@@ -53,11 +75,30 @@ export default function SidebarTree() {
       ...standaloneJobs,
     ];
 
+    let derivedJobId: string | undefined;
+    if (projectMatch) {
+      for (const [jobId, projects] of openProjectsByJobId) {
+        if (projects.some((p) => p.id === projectMatch[1])) {
+          derivedJobId = jobId;
+          break;
+        }
+      }
+    }
+    if (!derivedJobId && operationMatch) {
+      for (const [jobId, ops] of openOperationsByJobId) {
+        if (ops.some((op) => op.id === operationMatch[1])) {
+          derivedJobId = jobId;
+          break;
+        }
+      }
+    }
+    const effectiveJobId = jobMatch?.[1] ?? derivedJobId;
+
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (jobMatch) {
-        const job = allJobs.find((j) => j.id === jobMatch[1]);
-        next.add(`job:${jobMatch[1]}`);
+      if (effectiveJobId) {
+        const job = allJobs.find((j) => j.id === effectiveJobId);
+        next.add(`job:${effectiveJobId}`);
         if (job?.organizationId) {
           next.add(`org:${job.organizationId}`);
           const parentGroup = groups.find((g) => g.orgs.some((o) => o.org.id === job.organizationId));
@@ -72,8 +113,18 @@ export default function SidebarTree() {
           next.add("cat:groups");
         }
       }
+      // Doğrudan bir proje/rutinin sayfasına gelindiyse "Projeler"/"Rutinler"
+      // alt listesi de açık gelsin — aksi halde aktif kart bulunması için
+      // kullanıcının ayrıca tıklaması gerekirdi.
+      if (projectMatch && effectiveJobId) next.add(`jobtab:${effectiveJobId}:projects`);
+      if (operationMatch && effectiveJobId) next.add(`jobtab:${effectiveJobId}:programs`);
       if (orgMatch) {
-        next.add(`org:${orgMatch[1]}`);
+        // NOT: organizasyonun KENDİSİ (`org:${id}`) burada eklenmiyor —
+        // organizasyon satırına tıklamak zaten o sayfaya götürüyor, departman/iş
+        // alt listesinin de otomatik açılması istenmeyen bir yan etkiydi (bkz.
+        // Row onLabelDoubleClick: açıp kapatmak artık bilinçli bir eylem).
+        // Yalnızca üst grup/kategori açılır ki bu organizasyonun satırı, kapalı
+        // bir grubun altında gizli kalmasın.
         const parentGroup = groups.find((g) => g.orgs.some((o) => o.org.id === orgMatch[1]));
         if (parentGroup) {
           next.add(`group:${parentGroup.group.id}`);
@@ -105,14 +156,17 @@ export default function SidebarTree() {
 
     // Bağımsız bir işin içine girildiyse, kullanıcı daha önce elle kapatmış olsa
     // bile "İşlerim" düğümünü tekrar aç — aksi halde aktif satır görünmez olurdu.
-    if (jobMatch) {
-      const job = allJobs.find((j) => j.id === jobMatch[1]);
+    if (effectiveJobId) {
+      const job = allJobs.find((j) => j.id === effectiveJobId);
       if (job && !job.organizationId && !job.groupId) setMyJobsCollapsed(false);
     }
     // groups/standaloneOrgs/standaloneJobs referansları her fetch'te değişir;
-    // burada yalnızca rota değiştiğinde tetiklenmesi yeterli.
+    // burada yalnızca rota değiştiğinde tetiklenmesi yeterli. openProjectsByJobId/
+    // openOperationsByJobId ise yalnızca ilk veri geldiğinde bir kez değişir —
+    // proje/rutin sayfasına doğrudan girildiğinde (sidebar verisi henüz
+    // yüklenmemişken) eşleşmeyi yakalamak için bağımlılıkta tutuluyor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+  }, [location.pathname, openProjectsByJobId, openOperationsByJobId]);
 
   // Tek organizasyon durumunda "Organizasyonlar" başlığı kaldırıldığı için o
   // organizasyon artık en üst seviyede duruyor; eskiden kategori açık geldiğinde
@@ -141,6 +195,8 @@ export default function SidebarTree() {
     const key = `job:${job.id}`;
     const isExpanded = expanded.has(key);
     const jobActive = location.pathname === `/jobs/${job.id}`;
+    const openProjects = openProjectsByJobId.get(job.id) ?? [];
+    const openOperations = openOperationsByJobId.get(job.id) ?? [];
     return (
       <div key={job.id}>
         <Row
@@ -157,10 +213,68 @@ export default function SidebarTree() {
         {isExpanded &&
           JOB_LEAF_TABS.map((t) => {
             const tabActive = jobActive && (searchTab === t.tab || (!searchTab && t.tab === "projects"));
+
+            // "Projeler"/"Rutinler": kendi kapak resmiyle tek tek listelenen açık
+            // öğeleri olduğu için (bkz. useSidebarHierarchy openProjectsByJobId/
+            // openOperationsByJobId) diğer sabit sekmeler gibi düz bir link değil,
+            // iş/organizasyon düğümleriyle aynı açılır-kapanır Row kullanılır.
+            if (t.tab === "projects" || t.tab === "programs") {
+              const isProjects = t.tab === "projects";
+              const items = isProjects ? openProjects : openOperations;
+              const subKey = `jobtab:${job.id}:${t.tab}`;
+              const subExpanded = expanded.has(subKey);
+              return (
+                <div key={t.tab}>
+                  <Row
+                    to={isProjects ? `/jobs/${job.id}` : `/jobs/${job.id}?tab=${t.tab}`}
+                    icon={t.icon}
+                    label={t.label}
+                    depth={depth + 1}
+                    active={tabActive}
+                    expandable={items.length > 0}
+                    expanded={subExpanded}
+                    onToggle={() => toggle(subKey)}
+                    onLabelDoubleClick={items.length > 0 ? () => toggle(subKey) : undefined}
+                  />
+                  {subExpanded &&
+                    (isProjects
+                      ? openProjects.map((p) => (
+                          <Row
+                            key={p.id}
+                            to={`/projects/${p.id}`}
+                            icon={IconFolder}
+                            imageUrl={p.coverImageUrl}
+                            label={p.title}
+                            depth={depth + 2}
+                            active={location.pathname === `/projects/${p.id}`}
+                            expandable={false}
+                            expanded={false}
+                            onToggle={() => {}}
+                          />
+                        ))
+                      : openOperations.map((op) => (
+                          <Row
+                            key={op.id}
+                            to={`/operations/${op.id}`}
+                            icon={IconActivity}
+                            imageUrl={op.coverImageUrl}
+                            label={op.title}
+                            depth={depth + 2}
+                            active={location.pathname === `/operations/${op.id}`}
+                            expandable={false}
+                            expanded={false}
+                            onToggle={() => {}}
+                          />
+                        )))}
+                </div>
+              );
+            }
+
             return (
               <LeafRow
                 key={t.tab}
-                to={t.tab === "projects" ? `/jobs/${job.id}` : `/jobs/${job.id}?tab=${t.tab}`}
+                to={`/jobs/${job.id}?tab=${t.tab}`}
+                icon={t.icon}
                 label={t.label}
                 depth={depth + 1}
                 active={tabActive}
@@ -205,6 +319,7 @@ export default function SidebarTree() {
           expandable={hasChildren}
           expanded={isExpanded}
           onToggle={() => toggle(key)}
+          onLabelDoubleClick={hasChildren ? () => toggle(key) : undefined}
         />
         {isExpanded && (
           <>
@@ -304,18 +419,22 @@ export default function SidebarTree() {
 
       {/* Bir organizasyona/gruba bağlı olmayan işler tek tek kök seviyede
           durmak yerine kapatılabilir bir "İşlerim" düğümü altında toplanır.
-          Bu düğümün gidilecek ayrı bir sayfası yok (işlerin tam listesi zaten
-          Ana Sayfa), o yüzden link değil; tıklanınca sadece açılıp kapanır. */}
+          İşlerin tam listesi zaten Ana Sayfa'da olduğu için tek tıklama oraya
+          götürür (bkz. Dashboard varsayılan "jobs" sekmesi); açıp kapatmak
+          artık yalnızca oktaki dar hedefte değil, metne çift tıklayarak da
+          yapılabilir (bkz. Row onLabelDoubleClick). */}
       {standaloneJobs.length > 0 && (
         <div>
           <Row
+            to="/"
             icon={IconBriefcase}
             label="İşlerim"
             depth={0}
-            active={false}
+            active={location.pathname === "/"}
             expandable
             expanded={!myJobsCollapsed}
             onToggle={() => setMyJobsCollapsed((v) => !v)}
+            onLabelDoubleClick={() => setMyJobsCollapsed((v) => !v)}
           />
           {!myJobsCollapsed && standaloneJobs.map((job) => renderJob(job, 1))}
         </div>
@@ -334,6 +453,7 @@ function Row({
   expandable,
   expanded,
   onToggle,
+  onLabelDoubleClick,
 }: {
   // Verilmezse satır bir link değil, sadece alt öğeleri açıp kapatan bir başlık
   // olur (örn. gidilecek bir sayfası olmayan "İşler" toplayıcısı).
@@ -348,6 +468,12 @@ function Row({
   expandable: boolean;
   expanded: boolean;
   onToggle: () => void;
+  // Verilirse, satırın metnine çift tıklamak da (oktaki tekil tıklamanın yanı
+  // sıra) açıp kapatır — tek tıklama linke tıklamış gibi sayfaya gider, bu
+  // yüzden "genişlet" işlevi normalde yalnızca oktaki dar hedeften erişilebilir;
+  // çift tıklama daha büyük, bulması kolay bir alternatif hedef sağlar (bkz.
+  // "şirket başlığı" org satırı, "İşlerim" düğümü).
+  onLabelDoubleClick?: () => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = Boolean(imageUrl) && !imageFailed;
@@ -423,11 +549,17 @@ function Row({
         <span style={{ width: 20, marginLeft: depth * 14, flexShrink: 0 }} />
       )}
       {to ? (
-        <Link to={to} title={label} style={contentStyle}>
+        <Link to={to} title={label} onDoubleClick={onLabelDoubleClick} style={contentStyle}>
           {content}
         </Link>
       ) : (
-        <button type="button" onClick={onToggle} title={label} style={{ ...contentStyle, background: "transparent" }}>
+        <button
+          type="button"
+          onClick={onToggle}
+          onDoubleClick={onLabelDoubleClick}
+          title={label}
+          style={{ ...contentStyle, background: "transparent" }}
+        >
           {content}
         </button>
       )}
@@ -435,7 +567,23 @@ function Row({
   );
 }
 
-function LeafRow({ to, label, depth, active }: { to: string; label: string; depth: number; active: boolean }) {
+function LeafRow({
+  to,
+  icon: Icon,
+  label,
+  depth,
+  active,
+}: {
+  to: string;
+  // Verilirse Row'daki gibi ikon + boşluk + etiket düzeni kullanılır. Sabit
+  // sekmelerden ikonu olmayanlar (yalnızca metin) eski haliyle kalır; ikonlu
+  // olanlar ikon aynı satırda kardeşleriyle (bkz. Projeler/Rutinler Row'u)
+  // hizalansın diye eklendi — aksi halde metin ikonsuz daha geride başlıyordu.
+  icon?: IconComp;
+  label: string;
+  depth: number;
+  active: boolean;
+}) {
   return (
     <div style={{ display: "flex", alignItems: "center" }}>
       <span style={{ width: 20, marginLeft: depth * 14, flexShrink: 0 }} />
@@ -447,12 +595,14 @@ function LeafRow({ to, label, depth, active }: { to: string; label: string; dept
           minWidth: 0,
           display: "flex",
           alignItems: "center",
+          gap: 8,
           padding: "5px 8px",
           borderRadius: 7,
           background: active ? "rgba(255,255,255,0.08)" : "transparent",
           borderLeft: active ? `2px solid ${colors.light.accent}` : "2px solid transparent",
         }}
       >
+        {Icon && <Icon size={15} color={active ? colors.light.accent : INACTIVE_ICON} />}
         <span
           style={{
             fontSize: 16,

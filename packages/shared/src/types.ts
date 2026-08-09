@@ -46,6 +46,9 @@ export interface User {
   activeTaskId?: string;
   // Null ise kullanıcı henüz ilk giriş onboarding sihirbazını tamamlamadı demektir.
   onboardingCompletedAt?: string;
+  // Null ise kullanıcı e-posta adresini henüz doğrulamamıştır ve giriş yapamaz
+  // (bkz. 044_email_verification.sql). Google ile açılan hesaplarda kayıt anında dolar.
+  emailVerifiedAt?: string;
   // Anasayfadaki kişi kartında gösterilen profil alanları — hepsi opsiyonel.
   avatarUrl?: string;
   // Kullanıcının kendi profilinde gösterdiği görev/unvan (örn. "Serbest Grafik Tasarımcı").
@@ -211,6 +214,54 @@ export interface JobModule {
   jobId: string;
   moduleKey: string;
   createdAt: string;
+}
+
+// ============================================================ Modül ekibi
+
+// Roller department_members ile bilinçli olarak aynı: kullanıcı iki farklı yerde
+// iki farklı rol sözlüğü öğrenmek zorunda kalmasın.
+//   manager        — modül ayarlarını ve ekibini yönetir
+//   employee       — kayıt ekler/düzenler
+//   subcontractor  — dış kaynak; kayıt ekler/düzenler ancak ekibi göremez
+export type ModuleMemberRole = DepartmentMemberRole;
+export type ModuleMemberStatus = "invited" | "pending" | "approved" | "removed";
+
+// Bir modüle atanan kişi. Atananlar o modülde kayıt oluşturup düzenleyebilir —
+// bu tablo olmadan yalnızca organizasyon sahibi ve departman yöneticisi
+// yazabiliyordu (bkz. database/migrations/042_module_members.sql).
+export interface ModuleMember {
+  id: string;
+  // module_records ile aynı desen: kayıt ya organizasyona ya İŞ'e aittir.
+  organizationId?: string;
+  jobId?: string;
+  // Aynı modül birden fazla departmanda etkin olabilir; atamanın hangi
+  // departman bağlamında yapıldığını belirtir. Serbest çalışanda boş.
+  departmentId?: string;
+  moduleKey: string;
+  userId?: string;
+  inviteEmail?: string;
+  role: ModuleMemberRole;
+  status: ModuleMemberStatus;
+  assignedBy?: string;
+  createdAt: string;
+  removedAt?: string;
+  fullName?: string;
+  email?: string;
+  username?: string;
+  avatarUrl?: string;
+}
+
+// Kullanıcının bir modüldeki etkin yetkisi. Modül panelini render ederken
+// hangi eylemlerin gösterileceğini belirler.
+export interface ModuleAccess {
+  moduleKey: string;
+  canRead: boolean;
+  canWrite: boolean;
+  canManageTeam: boolean;
+  // Yetkinin nereden geldiği — arayüzde "organizasyon sahibi olduğunuz için
+  // görüyorsunuz" gibi açıklamalar için.
+  reason: "owner" | "department_manager" | "module_member" | "department_member" | "none";
+  role?: ModuleMemberRole;
 }
 
 // ============================================================ Ortaklar (hisse)

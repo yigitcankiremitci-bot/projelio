@@ -44,6 +44,12 @@ interface DestructiveParams {
   restore: () => void | Promise<void>;
   /** Varsa, silinmeyi bekleyen kaydın id'si — listeler bu kaydı gizlemek için okur. */
   entityId?: string;
+  /**
+   * Toplu silme gibi BİRDEN FAZLA kaydı tek bir geri alınabilir adımda toplamak
+   * için (bkz. TaskSelectionBar toplu "Sil"). `entityId` ile birlikte de
+   * verilebilir, ikisi birleştirilir.
+   */
+  entityIds?: string[];
 }
 
 type Entry =
@@ -53,7 +59,7 @@ type Entry =
 /** İleri alma yığınındaki bir adım: işlemi tekrar uygular ve geri alma yığınına geri koyar. */
 interface RedoItem {
   label: string;
-  apply: () => void;
+  apply: () => void | Promise<void>;
 }
 
 export interface UndoContextValue {
@@ -164,12 +170,33 @@ export function useReorderUndo() {
   );
 }
 
-/** Odak bir metin alanındaysa kısayolu tarayıcıya bırak. */
+/** `entityId` ve `entityIds`'i tek bir listede birleştirir (bkz. DestructiveParams). */
+function destructiveIds(params: { entityId?: string; entityIds?: string[] }): string[] {
+  const ids = params.entityIds ?? [];
+  return params.entityId ? [params.entityId, ...ids] : ids;
+}
+
+/**
+ * Odak bir metin alanındaysa VE o alanda gerçekten (tarayıcının geri alabileceği)
+ * içerik varsa kısayolu tarayıcıya bırak. Boş bir alan (ör. hızlı görev ekleme
+ * kutusu: Enter'a basıp görevi oluşturduktan sonra bir sonrakini yazabilmek için
+ * odaklı ve BOŞ kalır, bkz. TaskColumn commitAddTask/commitAddSubtask) için
+ * tarayıcının geri alacağı bir şey yoktur — o durumda Cmd/Ctrl+Z uygulamanın
+ * kendi geri alma yığınına gitmeli, yoksa az önce oluşturulan görev "geri
+ * alınamıyor" gibi görünür (kısayol sessizce input'un boş native geçmişine gider).
+ */
 function isEditingText(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el) return false;
   const tag = el.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+  if (tag === "SELECT") return true;
+  if (tag === "INPUT" || tag === "TEXTAREA") {
+    return (el as HTMLInputElement | HTMLTextAreaElement).value.trim().length > 0;
+  }
+  if (el.isContentEditable) {
+    return (el.textContent ?? "").trim().length > 0;
+  }
+  return false;
 }
 
 export function UndoProvider({ children }: { children: ReactNode }) {
@@ -183,6 +210,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
   const [refreshToken, setRefreshToken] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const sync = useCallback(() => {
     setCanUndo(undoStack.current.length > 0);
@@ -193,11 +221,51 @@ export function UndoProvider({ children }: { children: ReactNode }) {
   // alınmamış veriyi çeker.
   const bumpRefresh = useCallback(() => setRefreshToken((v) => v + 1), []);
 
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
+  const clearToastTimers = useCallback(() => {
+    if (toastTimer.current) {
+      clearTimeout(toastTimer.current);
+      toastTimer.current = null;
+    }
+    if (toastInterval.current) {
+      clearInterval(toastInterval.current);
+      toastInterval.current = null;
+    }
   }, []);
+
+  const showToast = useCallback(
+    (message: string, durationMs: number = TOAST_MS) => {
+      clearToastTimers();
+      setToast(message);
+      toastTimer.current = setTimeout(() => setToast(null), durationMs);
+    },
+    [clearToastTimers]
+  );
+
+  /**
+   * Yıkıcı bir işlem (silme) başladığında gösterilen bildirimi saniye saniye
+   * geri sayan bir mesaja çevirir — kullanıcı tam olarak kaç saniyesi kaldığını
+   * görür (bkz. bug raporu: kullanıcı geri alınabilir olduğunu fark etmiyordu).
+   * Süre dolunca (gerçek silme isteği o an gider) ya da başka bir toast
+   * tetiklendiğinde geri sayım durur.
+   */
+  const showCountdownToast = useCallback(
+    (label: string, totalSeconds: number) => {
+      clearToastTimers();
+      let remaining = totalSeconds;
+      const render = () => `${label} — ${remaining} sn içinde Cmd/Ctrl+Z ile geri alabilirsin`;
+      setToast(render());
+      toastInterval.current = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearToastTimers();
+          setToast(null);
+          return;
+        }
+        setToast(render());
+      }, 1000);
+    },
+    [clearToastTimers]
+  );
 
   const pushEntry = useCallback(
     (entry: Entry) => {
@@ -208,12 +276,25 @@ export function UndoProvider({ children }: { children: ReactNode }) {
         const dropped = undoStack.current.shift();
         if (dropped?.kind === "destructive") {
           clearTimeout(dropped.timer);
-          void dropped.commit();
+          const ids = destructiveIds(dropped);
+          // "Yığından düştü" demek "artık geri alınamaz, gerçek isteği gönder"
+          // demek — ama hata olursa da (bkz. registerDestructive'teki zamanlayıcı
+          // ile aynı desen) sessizce yutulmamalı, en azından bekleyen-silme
+          // işaretini temizleyip listeleri tazelemeli (aksi halde kayıt
+          // sonsuza dek "bekliyor" gibi gizli kalır — bkz. bug raporu).
+          void Promise.resolve(dropped.commit())
+            .catch(() => {
+              showToast(`${dropped.label} silinemedi, ağ bağlantını kontrol et`);
+            })
+            .finally(() => {
+              if (ids.length) setPendingDeleteIds((prev) => prev.filter((x) => !ids.includes(x)));
+              bumpRefresh();
+            });
         }
       }
       sync();
     },
-    [sync]
+    [sync, showToast, bumpRefresh]
   );
 
   /**
@@ -223,31 +304,53 @@ export function UndoProvider({ children }: { children: ReactNode }) {
   const registerDestructive = useCallback(
     (params: DestructiveParams, clearRedo: boolean) => {
       if (clearRedo) redoStack.current = [];
-      const { label, commit, restore, entityId } = params;
+      const { label, commit, restore, entityId, entityIds } = params;
+      const ids = destructiveIds(params);
       const forget = () => {
-        if (entityId) setPendingDeleteIds((prev) => prev.filter((x) => x !== entityId));
+        if (ids.length) setPendingDeleteIds((prev) => prev.filter((x) => !ids.includes(x)));
       };
       const timer = setTimeout(() => {
         // Süre doldu: artık geri alınamaz, yığından düşür ve isteği gönder.
         undoStack.current = undoStack.current.filter((e) => !(e.kind === "destructive" && e.timer === timer));
         sync();
-        void Promise.resolve(commit()).finally(forget);
+        void Promise.resolve(commit())
+          .catch(() => {
+            // İstek başarısız oldu: sessizce yutmak yerine haber ver ve
+            // listeleri tazele — aksi halde kayıt sunucuda hâlâ dururken
+            // arayüzde "silinmiş" gibi görünmeye devam eder.
+            showToast(`${label} silinemedi, ağ bağlantını kontrol et`);
+          })
+          .finally(() => {
+            forget();
+            bumpRefresh();
+          });
       }, DESTRUCTIVE_DELAY_MS);
-      if (entityId) setPendingDeleteIds((prev) => (prev.includes(entityId) ? prev : [...prev, entityId]));
+      if (ids.length) setPendingDeleteIds((prev) => Array.from(new Set([...prev, ...ids])));
       pushEntry({
         kind: "destructive",
         label,
         commit,
-        // Geri alınırsa kaydı gizleme listesinden de çıkar ki tekrar görünsün.
+        // Geri alınırsa kayıtları gizleme listesinden de çıkar ki tekrar görünsünler.
         restore: () => {
           forget();
           return restore();
         },
         entityId,
+        entityIds,
         timer,
       });
+
+      // Yalnızca yeni bir kullanıcı eyleminde (ileri almanın kendi yeniden
+      // kaydı değil) bildir — aksi halde "ileri al" her tetiklendiğinde de
+      // aynı bildirim tekrar çıkar. Bu, kullanıcının silmenin birkaç saniye
+      // geri alınabilir olduğunu FARK ETMESİNİN tek yolu; aksi halde bunu
+      // ancak tesadüfen Cmd+Z'ye basarsa öğrenirdi. Geri sayım, gerçek silme
+      // isteğinin gideceği anla (DESTRUCTIVE_DELAY_MS) örtüşecek şekilde ayarlı.
+      if (clearRedo) {
+        showCountdownToast(label, Math.round(DESTRUCTIVE_DELAY_MS / 1000));
+      }
     },
-    [pushEntry, sync]
+    [pushEntry, sync, showToast, showCountdownToast, bumpRefresh]
   );
 
   const registerUndoable = useCallback(
@@ -268,6 +371,12 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     [registerDestructive]
   );
 
+  // NOT: `run`/`restore` başarısız olabilir (ağ hatası, yetki sorunu vb.). Eskiden
+  // bu durumda bile "geri alındı" mesajı gösterilip adım yığından sessizce
+  // düşürülüyordu — kullanıcı işlemin geri alındığını sanıyor ama sunucuda hiçbir
+  // şey değişmemiş oluyordu ve tekrar denemenin bir yolu kalmıyordu. Artık sonucu
+  // bekliyoruz: başarılıysa "geri alındı" gösterip ileri alma yığınına ekliyoruz,
+  // başarısızsa adımı GERİ yığına koyup hata mesajı gösteriyoruz ki tekrar denenebilsin.
   const undo = useCallback(() => {
     const entry = undoStack.current.pop();
     if (!entry) {
@@ -275,48 +384,65 @@ export function UndoProvider({ children }: { children: ReactNode }) {
       showToast("Geri alınacak bir işlem yok");
       return;
     }
+    // Yığından çıkarıldığını hemen yansıt (buton/durum geri bildirimi); işlem
+    // başarısız olursa aşağıda geri koyup tekrar senkronlayacağız.
+    sync();
 
     if (entry.kind === "destructive") {
       clearTimeout(entry.timer);
-      void Promise.resolve(entry.restore())
-        .catch(() => {})
-        .finally(bumpRefresh);
-      const params: DestructiveParams = {
-        label: entry.label,
-        commit: entry.commit,
-        restore: entry.restore,
-        entityId: entry.entityId,
-      };
-      redoStack.current.push({
-        label: entry.label,
-        apply: () => {
-          registerDestructive(params, false);
+      Promise.resolve(entry.restore())
+        .then(() => {
           bumpRefresh();
-        },
-      });
-    } else {
-      void Promise.resolve(entry.run())
-        .catch(() => {})
-        .finally(bumpRefresh);
-      if (entry.redo) {
-        redoStack.current.push({
-          label: entry.label,
-          apply: () => {
-            void Promise.resolve(entry.redo!())
-              .catch(() => {})
-              .finally(bumpRefresh);
-            registerUndoable(entry, false);
-          },
+          const params: DestructiveParams = {
+            label: entry.label,
+            commit: entry.commit,
+            restore: entry.restore,
+            entityId: entry.entityId,
+            entityIds: entry.entityIds,
+          };
+          redoStack.current.push({
+            label: entry.label,
+            apply: () => {
+              registerDestructive(params, false);
+              bumpRefresh();
+            },
+          });
+          sync();
+          showToast(`${entry.label} geri alındı`);
+        })
+        .catch(() => {
+          // Geri alma isteği başarısız oldu: adımı yığına geri koy, sessizce kaybolmasın.
+          undoStack.current.push(entry);
+          sync();
+          showToast(`${entry.label} geri alınamadı, tekrar dene`);
         });
-      } else {
-        // Bu adım ileri alınamıyorsa zinciri kır — yarım uygulanmış bir
-        // durum oluşmasındansa ileri alma kapansın.
-        redoStack.current = [];
-      }
+    } else {
+      Promise.resolve(entry.run())
+        .then(() => {
+          bumpRefresh();
+          if (entry.redo) {
+            redoStack.current.push({
+              label: entry.label,
+              apply: async () => {
+                await Promise.resolve(entry.redo!());
+                bumpRefresh();
+                registerUndoable(entry, false);
+              },
+            });
+          } else {
+            // Bu adım ileri alınamıyorsa zinciri kır — yarım uygulanmış bir
+            // durum oluşmasındansa ileri alma kapansın.
+            redoStack.current = [];
+          }
+          sync();
+          showToast(`${entry.label} geri alındı`);
+        })
+        .catch(() => {
+          undoStack.current.push(entry);
+          sync();
+          showToast(`${entry.label} geri alınamadı, tekrar dene`);
+        });
     }
-
-    sync();
-    showToast(`${entry.label} geri alındı`);
   }, [bumpRefresh, registerDestructive, registerUndoable, showToast, sync]);
 
   const redo = useCallback(() => {
@@ -326,9 +452,18 @@ export function UndoProvider({ children }: { children: ReactNode }) {
       showToast("İleri alınacak bir işlem yok");
       return;
     }
-    item.apply();
     sync();
-    showToast(`${item.label} ileri alındı`);
+    Promise.resolve(item.apply())
+      .then(() => {
+        sync();
+        showToast(`${item.label} ileri alındı`);
+      })
+      .catch(() => {
+        // İleri alma başarısız oldu: adımı yığına geri koy, tekrar denenebilsin.
+        redoStack.current.push(item);
+        sync();
+        showToast(`${item.label} ileri alınamadı, tekrar dene`);
+      });
   }, [showToast, sync]);
 
   useEffect(() => {

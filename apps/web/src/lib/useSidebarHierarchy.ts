@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Department, Group, Job, Organization } from "@projelio/shared";
+import type { Department, Group, Job, Operation, Organization, Project } from "@projelio/shared";
 import { api } from "../api/client";
 
 /**
@@ -27,6 +27,11 @@ export interface SidebarHierarchy {
   standaloneOrgs: SidebarOrgNode[];
   // Ne bir organizasyona ne bir gruba bağlı, bağımsız (freelance) işler.
   standaloneJobs: Job[];
+  // Her işin AÇIK (arşivlenmemiş/bitmemiş) projeleri ve rutinleri (kodda
+  // "operation") — sidebar'da "Projeler"/"Rutinler" kısayollarının altında tek
+  // tek listelenir (bkz. SidebarTree.renderJob). Job id'sine göre anahtarlanır.
+  openProjectsByJobId: Map<string, Project[]>;
+  openOperationsByJobId: Map<string, Operation[]>;
   loading: boolean;
 }
 
@@ -35,7 +40,7 @@ function buildHierarchy(
   orgs: Organization[],
   jobs: Job[],
   departmentsByOrgId: Map<string, Department[]>
-): Omit<SidebarHierarchy, "loading"> {
+): Omit<SidebarHierarchy, "loading" | "openProjectsByJobId" | "openOperationsByJobId"> {
   const jobsByOrgId = new Map<string, Job[]>();
   const jobsByGroupIdDirect = new Map<string, Job[]>();
   const standaloneJobs: Job[] = [];
@@ -103,6 +108,8 @@ export function useSidebarHierarchy(): SidebarHierarchy {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [departmentsByOrgId, setDepartmentsByOrgId] = useState<Map<string, Department[]>>(new Map());
+  const [openProjectsByJobId, setOpenProjectsByJobId] = useState<Map<string, Project[]>>(new Map());
+  const [openOperationsByJobId, setOpenOperationsByJobId] = useState<Map<string, Operation[]>>(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -119,13 +126,28 @@ export function useSidebarHierarchy(): SidebarHierarchy {
         setOrgs(o);
         setJobs(j);
 
-        const deptLists = await Promise.all(
-          o.map((org) => api.get<Department[]>(`/organizations/${org.id}/departments`).catch(() => []))
-        );
+        const [deptLists, projectLists, operationLists] = await Promise.all([
+          Promise.all(o.map((org) => api.get<Department[]>(`/organizations/${org.id}/departments`).catch(() => []))),
+          Promise.all(j.map((job) => api.get<Project[]>(`/jobs/${job.id}/projects`).catch(() => []))),
+          Promise.all(j.map((job) => api.get<Operation[]>(`/jobs/${job.id}/operations`).catch(() => []))),
+        ]);
         if (cancelled) return;
-        const map = new Map<string, Department[]>();
-        o.forEach((org, idx) => map.set(org.id, deptLists[idx]));
-        setDepartmentsByOrgId(map);
+
+        const deptMap = new Map<string, Department[]>();
+        o.forEach((org, idx) => deptMap.set(org.id, deptLists[idx]));
+        setDepartmentsByOrgId(deptMap);
+
+        // Sidebar'da yalnızca AÇIK olanlar görünür: tamamlanmış/arşivlenmiş
+        // projeler ve bitmiş rutinler gezinme ağacını kalabalıklaştırmasın
+        // (bkz. SidebarTree.renderJob — "Projeler"/"Rutinler" altında listelenir).
+        const projMap = new Map<string, Project[]>();
+        j.forEach((job, idx) => projMap.set(job.id, projectLists[idx].filter((p) => p.status === "active")));
+        setOpenProjectsByJobId(projMap);
+
+        const opMap = new Map<string, Operation[]>();
+        j.forEach((job, idx) => opMap.set(job.id, operationLists[idx].filter((o2) => o2.status !== "ended")));
+        setOpenOperationsByJobId(opMap);
+
         setLoading(false);
       })
       .catch(() => {
@@ -137,5 +159,5 @@ export function useSidebarHierarchy(): SidebarHierarchy {
   }, []);
 
   const hierarchy = buildHierarchy(groups, orgs, jobs, departmentsByOrgId);
-  return { ...hierarchy, loading };
+  return { ...hierarchy, openProjectsByJobId, openOperationsByJobId, loading };
 }

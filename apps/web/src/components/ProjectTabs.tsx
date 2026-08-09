@@ -17,9 +17,13 @@ const tabs: { key: ProjectTab; label: string }[] = [
 interface Props {
   active: ProjectTab;
   onChange: (tab: ProjectTab) => void;
+  // Sabit başlığın üst bandındaki küçültülmüş kopya (bkz. ProjectDetail
+  // usePageHeaderTabs) marginBottom'u kaldırmak için kullanır — o bantta
+  // altında başka içerik olmadığından boşluk gereksiz.
+  style?: React.CSSProperties;
 }
 
-export default function ProjectTabs({ active, onChange }: Props) {
+export default function ProjectTabs({ active, onChange, style }: Props) {
   const c = colors.light;
   const isDesktop = useIsDesktop();
   return (
@@ -38,6 +42,7 @@ export default function ProjectTabs({ active, onChange }: Props) {
         borderRadius: 10,
         padding: 4,
         marginBottom: 16,
+        ...style,
       }}
     >
       {tabs.map((t) => (

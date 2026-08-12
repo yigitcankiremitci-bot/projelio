@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import type { ModuleAccess, ModuleMember, ModuleMemberRole } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { NO_ACCESS, decideAccess } from "./module-access";
 
 function mapModuleMember(row: any): ModuleMember {
   return {
@@ -23,14 +24,6 @@ function mapModuleMember(row: any): ModuleMember {
     avatarUrl: row.users?.avatar_url ?? undefined,
   };
 }
-
-const NO_ACCESS = (moduleKey: string): ModuleAccess => ({
-  moduleKey,
-  canRead: false,
-  canWrite: false,
-  canManageTeam: false,
-  reason: "none",
-});
 
 /**
  * Modül ekibi ve modül yetkisi.
@@ -60,13 +53,9 @@ export class ModuleMembersService {
   /**
    * Bir kullanıcının organizasyon içindeki bir modüldeki etkin yetkisi.
    *
-   * Sıra önemli: en geniş yetkiden en dara doğru bakılır, ilk eşleşen kazanır.
-   *   1. organizasyon sahibi          → tam yetki
-   *   2. modülün etkin olduğu departmanın onaylı yöneticisi → tam yetki
-   *   3. modül üyesi (manager)        → tam yetki
-   *   4. modül üyesi (employee/subcontractor) → okuma + yazma
-   *   5. modülün etkin olduğu departmanın onaylı üyesi → yalnızca okuma
-   *   6. hiçbiri                      → erişim yok
+   * Burada yalnızca *gerçekler* toplanır; karar saf `decideAccess` fonksiyonunda
+   * verilir (bkz. module-access.ts) — böylece yetki sırası veritabanı taklidi
+   * gerektirmeden test edilebiliyor.
    */
   async resolveOrganizationAccess(
     organizationId: string,
@@ -76,7 +65,6 @@ export class ModuleMembersService {
   ): Promise<ModuleAccess> {
     if (!userId) return NO_ACCESS(moduleKey);
 
-    // 1. Organizasyon sahibi
     const { data: org } = await this.supabase.client
       .from("organizations")
       .select("owner_id")
@@ -84,16 +72,22 @@ export class ModuleMembersService {
       .maybeSingle();
     if (!org) throw new NotFoundException("Organizasyon bulunamadı");
     if (org.owner_id === userId) {
-      return { moduleKey, canRead: true, canWrite: true, canManageTeam: true, reason: "owner" };
+      return decideAccess(moduleKey, {
+        isOwner: true,
+        isDepartmentManager: false,
+        isDepartmentMember: false,
+        moduleMemberRoles: [],
+      });
     }
 
-    // 2 ve 5. Departman üyeliği. departmentId verilmişse yalnızca o departmana,
+    // Departman üyeliği. departmentId verilmişse yalnızca o departmana,
     // verilmemişse modülün etkin olduğu tüm departmanlara bakılır — böylece
     // "modül hangi departmanda açık?" bilgisi çağıranın sorumluluğu olmaktan çıkar.
     const departmentIds = departmentId
       ? [departmentId]
       : await this.departmentsWithModule(organizationId, moduleKey);
 
+    let isDepartmentManager = false;
     let isDepartmentMember = false;
     if (departmentIds.length > 0) {
       const { data: deptRows } = await this.supabase.client
@@ -104,14 +98,11 @@ export class ModuleMembersService {
         .eq("status", "approved");
 
       for (const row of deptRows ?? []) {
-        if (row.role === "manager") {
-          return { moduleKey, canRead: true, canWrite: true, canManageTeam: true, reason: "department_manager" };
-        }
-        isDepartmentMember = true;
+        if (row.role === "manager") isDepartmentManager = true;
+        else isDepartmentMember = true;
       }
     }
 
-    // 3 ve 4. Modül üyeliği
     let memberQuery = this.supabase.client
       .from("module_members")
       .select("role")
@@ -125,24 +116,13 @@ export class ModuleMembersService {
     if (departmentId) memberQuery = memberQuery.or(`department_id.eq.${departmentId},department_id.is.null`);
 
     const { data: memberRows } = await memberQuery;
-    if (memberRows && memberRows.length > 0) {
-      const isManager = memberRows.some((r: any) => r.role === "manager");
-      return {
-        moduleKey,
-        canRead: true,
-        canWrite: true,
-        canManageTeam: isManager,
-        reason: "module_member",
-        role: isManager ? "manager" : (memberRows[0].role as ModuleMemberRole),
-      };
-    }
 
-    // 5. Departman üyesi ama modüle atanmamış → yalnızca okuma
-    if (isDepartmentMember) {
-      return { moduleKey, canRead: true, canWrite: false, canManageTeam: false, reason: "department_member" };
-    }
-
-    return NO_ACCESS(moduleKey);
+    return decideAccess(moduleKey, {
+      isOwner: false,
+      isDepartmentManager,
+      isDepartmentMember,
+      moduleMemberRoles: (memberRows ?? []).map((r: any) => r.role as ModuleMemberRole),
+    });
   }
 
   /** Serbest çalışan tarafı: iş sahibi tam yetkili, atanan kişiler yazabilir. */
@@ -151,8 +131,14 @@ export class ModuleMembersService {
 
     const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", jobId).maybeSingle();
     if (!job) throw new NotFoundException("İş bulunamadı");
+
     if (job.owner_id === userId) {
-      return { moduleKey, canRead: true, canWrite: true, canManageTeam: true, reason: "owner" };
+      return decideAccess(moduleKey, {
+        isOwner: true,
+        isDepartmentManager: false,
+        isDepartmentMember: false,
+        moduleMemberRoles: [],
+      });
     }
 
     const { data: memberRows } = await this.supabase.client
@@ -164,19 +150,13 @@ export class ModuleMembersService {
       .eq("status", "approved")
       .is("removed_at", null);
 
-    if (memberRows && memberRows.length > 0) {
-      const isManager = memberRows.some((r: any) => r.role === "manager");
-      return {
-        moduleKey,
-        canRead: true,
-        canWrite: true,
-        canManageTeam: isManager,
-        reason: "module_member",
-        role: isManager ? "manager" : (memberRows[0].role as ModuleMemberRole),
-      };
-    }
-
-    return NO_ACCESS(moduleKey);
+    // Serbest çalışanda departman kavramı yok: yetki ya sahiplikten ya atamadan gelir.
+    return decideAccess(moduleKey, {
+      isOwner: false,
+      isDepartmentManager: false,
+      isDepartmentMember: false,
+      moduleMemberRoles: (memberRows ?? []).map((r: any) => r.role as ModuleMemberRole),
+    });
   }
 
   /** Modülün bir organizasyonda hangi departmanlarda etkinleştirildiği. */

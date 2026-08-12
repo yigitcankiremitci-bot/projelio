@@ -6,7 +6,7 @@ import { IconSparkle } from "./icons";
 interface Props {
   entry: ModuleCatalogEntry;
   // Bulunabilirse (bu modülün departmanı bu organizasyonda gerçekten kurulmuşsa)
-  // karta tıklamak o departmanın sayfasına götürür.
+  // karta tıklamak doğrudan o modülün çalışma alanını açar.
   departmentId?: string;
 }
 
@@ -77,8 +77,16 @@ export default function ModuleCard({ entry, departmentId }: Props) {
   } as const;
 
   if (departmentId) {
+    // tab=modules olmadan departmanın varsayılan sekmesine (genelde Görevler)
+    // düşüyorduk ve kullanıcı tıkladığı modülü hiç göremiyordu.
+    // module=<key> ise DepartmentModulesPanel'e hangi modülün açılacağını söyler.
     return (
-      <Link to={`/departments/${departmentId}`} draggable={false} className="entity-card" style={cardStyle}>
+      <Link
+        to={`/departments/${departmentId}?tab=modules&module=${encodeURIComponent(entry.key)}`}
+        draggable={false}
+        className="entity-card"
+        style={cardStyle}
+      >
         {content}
       </Link>
     );

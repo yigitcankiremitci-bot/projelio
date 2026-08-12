@@ -131,6 +131,14 @@ alter table public.organization_modules
 comment on column public.organization_modules.department_id is
   'Modulun etkinlestirildigi departman. Bos ise organizasyon geneli (kurulum sihirbazindan gelen eski kayitlar boyledir).';
 
+-- DİKKAT: Aşağıdaki iki ifade 044_restore_organization_modules_unique.sql ile
+-- GERİ ALINDI. Sebebi: organization-modules.service.ts modül etkinleştirmeyi
+-- upsert(..., { onConflict: "organization_id,module_key" }) ile yapıyor ve
+-- Postgres'te ON CONFLICT hedefi tam olarak o iki kolonda bir unique index
+-- ister — coalesce'lu ifade indeksi bu hedefi karşılamıyor, "Modül ekle"
+-- akışı bozuluyor. Çoklu departman tekilliği kod tarafıyla birlikte Faz 3'te
+-- gelecek. Migration'lar sıfırdan oynatılırsa 044 bunu düzeltir.
+
 -- Eski (organization_id, module_key) tekilliği artık fazla kısıtlayıcı:
 -- aynı modül iki departmanda etkin olabilmeli.
 alter table public.organization_modules

@@ -124,13 +124,93 @@ Serbest çalışan tarafında (`resolveJobAccess`): iş sahibi tam yetkili, mod�
 
 > `module_records.remove()` hâlâ sert `DELETE` yapıyor. Arşivlemeye çevrilmesi Faz 1'e ait bir arketip kararı; bu fazda bilerek dokunulmadı.
 
-### Faz 1 — A2 motoru
+### Faz 0.5 — Modül tanımları ✅ TAMAMLANDI
 
-`ModuleRecordsPanel`'i tam liste bileşenine çıkar: filtre, arama, sıralama, düzenleme, arşivleme (sert silme kaldırılır), hızlı ekleme formu, dışa aktarma, toplu işlem.
+Faz 1'i beklemeden, mevcut motorun üstüne 28 yeni modül tanımı yazıldı. Kapsam **12 → 40 modül**.
 
-**Kazanç:** Tek dosya değişikliği mevcut 12 modülü **ve** generic fallback'e düşen tüm modülleri birden iyileştirir. En yüksek getirili adım.
+Config dosyaları departman bazlı bölündü; dışa açık API (`MODULE_RECORD_CONFIGS`, `getModuleRecordConfig`, `ModuleRecordConfig`) değişmedi:
 
-> Hızlı ekleme formu (`quick_create_fields`) bu fazda gelmeli — Gelir-Gider'de bugün 2, Müşteri'de 1 zorunlu alan var, ama tam form yine de uzun görünüyor.
+```
+lib/moduleConfigs/shared.ts              tipler + yardımcılar (fmtMoney, countBy, moneyStats, opts, labelOf…)
+lib/moduleConfigs/finans.ts              7 modül
+lib/moduleConfigs/pazarlama.ts           8 modül
+lib/moduleConfigs/insanKaynaklari.ts     5 modül
+lib/moduleConfigs/operasyon.ts           4 modül
+lib/moduleConfigs/hukuk.ts               3 modül
+lib/moduleConfigs/musteriIliskileri.ts   3 modül
+lib/moduleConfigs/bilgiTeknolojileri.ts  3 modül
+lib/moduleConfigs/satis.ts               3 modül
+lib/moduleConfigs/yonetim.ts             3 modül
+lib/moduleConfigs/index.ts               kayıt defteri + generic fallback
+lib/moduleRecordConfigs.ts               eski import yolu (re-export)
+```
+
+#### Kapsam (57 katalog kaydı)
+
+| | Sayı | Not |
+|---|---|---|
+| Tam tanımlı | **40** | |
+| A6 türev panel | 11 | Veri girişi almaz, panel motorunu bekliyor (Faz 5) |
+| Çekirdek | 5 | Proje/program/görev/çıktı/dosya — modül değil |
+| Kendi tablosu | 1 | `uyd_urunler` → `products` |
+| **Beklenmeyen boşluk** | **0** | |
+
+#### Mevcut motorun sınırladığı yerler
+
+Alan tipi sözlüğü hâlâ 5 tip (`text`, `textarea`, `number`, `date`, `select`). Bunun sonuçları:
+
+- "Karşı taraf", "sorumlu", "zimmetli kişi" gibi alanlar **serbest metin** — `entity_ref` / `user_ref` Faz 2'de.
+- Aşamalı modüller (satış hunisi, destek talebi, kalite kontrol) liste + aşama alanı olarak çalışıyor; kanban Faz 6'da.
+- `oud_depo` miktarı doğrudan tutuyor; hareket defterinden türetme Faz 6'da. Kritik seviye uyarısı bu haliyle de çalışıyor.
+- Vizyon/misyon tek kayıtlık form (A1) olması gerekirken liste; **her kayıt bir sürüm** gibi çalışacak şekilde tasarlandı, veri kaybı olmadan A1'e indirgenebilir.
+
+#### Kalan iş
+
+`module_catalog.description` 57 kayıtta hâlâ boş — kurulum sihirbazında kullanıcı ne seçtiğini görmüyor. Artık her modülün ne yaptığı belli olduğuna göre bu bir sonraki migration'da doldurulabilir.
+
+### Faz 1 — A2 motoru ✅ TAMAMLANDI
+
+`ModuleRecordsPanel` tam liste bileşenine çıkarıldı. Tek dosya değişikliği 40 modülü **ve** generic fallback'e düşen her modülü birden etkiliyor.
+
+| Yetenek | Nasıl çalışıyor |
+|---|---|
+| **Kayıt düzenleme** | Satıra tıkla → aynı form düzenleme kipinde açılır |
+| **Arşivleme** | Sert silme kaldırıldı; `archived_at` yazılır, kayıt listeden düşer ama veritabanında kalır. Geri alma sunucudan gerçekten geri getirir (`PATCH /module-records/:id/restore`) |
+| **Arama** | Kaydın tüm metin/sayı alanlarında, Türkçe küçük harf duyarlı |
+| **Filtre** | `select` tipli her alan için otomatik açılır liste |
+| **Sıralama** | `date` ve `number` alanları için artan/azalan. Değeri olmayan kayıtlar her zaman sona düşer |
+| **Hızlı ekleme** | Form yalnızca zorunlu alanları gösterir; "Tüm alanlar" ile açılır. Gizli kalan zorunlu bir alan varsa doğrulama formu otomatik genişletir |
+| **Araç çubuğu eşiği** | 8 kayıttan azken gizli — az kayıtta yer kaplamaktan başka işe yaramıyor |
+
+Bu fazdan **dışa aktarma (CSV/XLSX)** ve **toplu işlem** bilinçli olarak sonraya bırakıldı: ikisi de yeni bağımlılık ya da seçim durumu yönetimi istiyor, oysa yukarıdakiler tek dosyada çözülüyor.
+
+### Test altyapısı ✅ TAMAMLANDI
+
+Projede test yoktu. Vitest/jest yerine **Node 22'nin yerleşik test koşucusu** kullanıldı — yeni bağımlılık eklenmedi.
+
+```
+npm test                    tüm testler
+npm test -- --filter=access  yalnızca eşleşen dosyalar
+npm run typecheck           backend + web TypeScript denetimi
+```
+
+| Dosya | Ne test ediyor | Test sayısı |
+|---|---|---|
+| `backend/.../module-access.test.ts` | 6 kademeli yetki matrisi, öncelik kuralları, serbest çalışan senaryosu | 22 |
+| `apps/web/.../shared.test.ts` | Para birimi toplama, biçimlendirme, sayaç ve etiket yardımcıları | 27 |
+| `apps/web/.../moduleConfigs.test.ts` | 40 modülün alan tutarlılığı, özet/gösterge dayanıklılığı, katalog kapsaması | 367 |
+| | **Toplam** | **416** |
+
+Yetki kararı test edilebilsin diye `decideAccess` saf bir fonksiyona ayrıldı (`module-access.ts`): servis yalnızca *gerçekleri* toplar, kararı bu fonksiyon verir. Böylece sistemin en güvenlik-kritik mantığı Supabase taklidi olmadan test ediliyor.
+
+**Testlerin yakaladığı gerçek sorunlar:**
+
+- Göstergelerde `NaN` / `undefined` sızıntısı (eksik alanlı kayıtlarda)
+- Tekrar eden gösterge etiketi (React'te `key` olarak kullanılıyor, liste bozulur)
+- Kataloğa uymayan eski `select` değerlerinde ham anahtarın ekranda görünmesi
+- Farklı para birimlerinin yanlışlıkla toplanması
+
+Ayrıca `backend/tsconfig.build.json` eklendi: test dosyaları üretim derlemesine girmiyor.
 
 ### Faz 2 — Alan tipi genişletmesi
 

@@ -41,8 +41,14 @@ export class ModuleRecordsController {
     return this.moduleRecordsService.update(id, data, req.user.userId);
   }
 
+  // Silme değil arşivleme — kayıt listeden düşer ama veritabanında kalır.
   @Delete("module-records/:id")
   remove(@Param("id") id: string, @Req() req: any) {
     return this.moduleRecordsService.remove(id, req.user.userId);
+  }
+
+  @Patch("module-records/:id/restore")
+  restore(@Param("id") id: string, @Req() req: any) {
+    return this.moduleRecordsService.restore(id, req.user.userId);
   }
 }

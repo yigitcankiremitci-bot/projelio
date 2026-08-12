@@ -182,10 +182,37 @@ export class ModuleRecordsService {
     return mapModuleRecord(row);
   }
 
+  /**
+   * Kayıt silinmez, arşivlenir.
+   *
+   * Finansal ve sözleşmesel kayıtlarda sert silme kabul edilemez: hem denetim
+   * izi kaybolur hem Denetim panelinin okuyacağı veri kalmaz. Arşivlenen kayıt
+   * listelerden düşer (findByOrganization/findByJob archived_at is null filtreler)
+   * ama veritabanında durur.
+   * Bkz. docs/moduller/00-modul-mimarisi.md — "arşivle, silme" arketip kararı.
+   */
   async remove(id: string, requestingUserId?: string): Promise<void> {
     const existing = await this.findOne(id);
     await this.assertCanManageRecord(existing, requestingUserId);
-    const { error } = await this.supabase.client.from("module_records").delete().eq("id", id);
+    const { error } = await this.supabase.client
+      .from("module_records")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", id);
     if (error) throw error;
+  }
+
+  /** Arşivden geri alma — arayüzdeki "geri al" akışı bunu çağırır. */
+  async restore(id: string, requestingUserId?: string): Promise<ModuleRecord> {
+    const existing = await this.findOne(id);
+    await this.assertCanManageRecord(existing, requestingUserId);
+    const { data: row, error } = await this.supabase.client
+      .from("module_records")
+      .update({ archived_at: null })
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Kayıt bulunamadı");
+    return mapModuleRecord(row);
   }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { ModuleAccess, ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
@@ -36,7 +37,25 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
   // Açılan modüldeki yetki bir kez çözülüp hem ekip paneline hem kayıt paneline
   // veriliyor — her ikisi ayrı ayrı sormasın.
   const [access, setAccess] = useState<ModuleAccess | null>(null);
+  const [notice, setNotice] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
   const { pushUndo } = useUndo();
+
+  // Şirket sayfasındaki modül kartından gelindiyse (?module=<key>) o modül
+  // doğrudan açılır — kullanıcı tıkladığı modülü bir de listeden aramasın.
+  // Parametre bir kez kullanılıp URL'den düşürülür, yoksa kullanıcı modülü
+  // kapattığında sayfa yenilenince geri açılırdı.
+  useEffect(() => {
+    const requested = searchParams.get("module");
+    if (!requested) return;
+    // Henüz veri girişi olmayan modüller (analiz/raporlama gibi panel modülleri)
+    // açılamıyor; sessizce hiçbir şey olmasın diye sebebini yazıyoruz.
+    if (MODULE_RECORD_CONFIGS[requested]) setExpandedKey(requested);
+    else setNotice("Bu modül henüz veri girişine açık değil — diğer modüllerin verisinden gösterge üretecek.");
+    const next = new URLSearchParams(searchParams);
+    next.delete("module");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const load = () => {
     if (!departmentKey) {
@@ -133,6 +152,31 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Modüller</h4>
+
+      {notice && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            color: c.textSecondary,
+            background: c.background,
+            border: `1px solid ${c.border}`,
+            borderRadius: 8,
+            padding: "8px 10px",
+          }}
+        >
+          <span style={{ flex: 1 }}>{notice}</span>
+          <button
+            onClick={() => setNotice("")}
+            aria-label="Kapat"
+            style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
+          >
+            <IconX size={13} color={c.textSecondary} />
+          </button>
+        </div>
+      )}
 
       {adding && (
         <AddModulesForm

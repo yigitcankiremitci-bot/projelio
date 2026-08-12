@@ -7,7 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -n backend,web -c blue,green \"npm run start:dev --workspace=backend\" \"npm run dev --workspace=@projelio/web\""
+    "dev": "concurrently -n backend,web -c blue,green \"npm run start:dev --workspace=backend\" \"npm run dev --workspace=@projelio/web\"",
+    "test": "node scripts/run-tests.mjs",
+    "typecheck": "tsc --noEmit -p backend/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

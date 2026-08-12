@@ -11,6 +11,7 @@ import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import GoogleReturn from "./pages/GoogleReturn";
 import MicrosoftReturn from "./pages/MicrosoftReturn";
+import Privacy from "./pages/Privacy";
 import JobDetail from "./pages/JobDetail";
 import ProjectDetail from "./pages/ProjectDetail";
 import OperationDetail from "./pages/OperationDetail";
@@ -279,7 +280,10 @@ export default function App() {
     location.pathname === "/reset-password" ||
     location.pathname === "/verify-email" ||
     location.pathname === "/google/return" ||
-    location.pathname === "/microsoft/return";
+    location.pathname === "/microsoft/return" ||
+    // Gizlilik politikası herkese açık olmalı: Meta (WhatsApp Business Platform)
+    // app'i yayınlarken giriş gerektirmeyen bir politika URL'i zorunlu tutuyor.
+    location.pathname === "/privacy";
   const hasToken = !!localStorage.getItem("projelio_token");
   const [fabAction, setFabAction] = useState<ProjectFabAction | null>(null);
   // Bilgisayarda (geniş ekran) sol sidebar + üstte tam genişlik header;
@@ -320,6 +324,7 @@ export default function App() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/google/return" element={<GoogleReturn />} />
         <Route path="/microsoft/return" element={<MicrosoftReturn />} />
+        <Route path="/privacy" element={<Privacy />} />
       </Routes>
     );
   }

@@ -154,6 +154,19 @@ export default function Login() {
         </form>
 
         <GoogleSignInButton label="Google ile giriş yap" />
+
+        <Link
+          to="/privacy"
+          style={{
+            display: "block",
+            textAlign: "center",
+            marginTop: 20,
+            fontSize: 14,
+            color: c.textSecondary,
+          }}
+        >
+          Gizlilik Politikası
+        </Link>
       </div>
     </div>
   );

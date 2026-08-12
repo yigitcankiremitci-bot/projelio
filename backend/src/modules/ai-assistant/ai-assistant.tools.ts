@@ -308,4 +308,179 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       required: ["projectId", "type", "amount"],
     },
   },
+
+  // --- Takvim / kişisel planlama ---------------------------------------------
+  //
+  // Bu araçlar diğerlerinden bir konuda ayrılır: burada model KARAR VERMEZ,
+  // KONUŞUR. Kullanıcının haftasını hangi yüzdelerle böleceği onun kararıdır;
+  // modelin işi doğru soruları sormak, cevabı yapıya çevirmek ve aritmetiği
+  // suggest_schedule'a bırakmaktır. Model yüzde dağıtımını kendi kafasından
+  // saatlere çevirmeye kalkarsa hem yanlış hesaplar hem gereksiz token yakar.
+  {
+    name: "get_plan_overview",
+    description:
+      "Kullanıcının bir dönemdeki (gün/hafta/ay) planını özetler: dönemin teması, odak alanı hedefleri, " +
+      "takvime düşen ve tamamlanan süreler, hedef-gerçek sapması. " +
+      "\"Bu hafta nasıl gidiyor\", \"planıma ne kadar uydum\", \"bu ay ne yapacaktım\" gibi sorular için kullan. " +
+      "Planlama sohbetine başlamadan ÖNCE mutlaka bunu çağır: kullanıcının hâlihazırda ne planladığını bilmeden soru sorma.",
+    input_schema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["day", "week", "month"], description: "Varsayılan: week." },
+        date: { type: "string", description: "Dönemin içindeki herhangi bir gün (YYYY-MM-DD). Varsayılan: bugün." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "list_focus_areas",
+    description:
+      "Kullanıcının odak alanlarını listeler (ör. Yazılım, Müzik Prodüksiyon, İçerik). " +
+      "Planlama yüzdeleri bu alanlara dağıtılır. Hedef yazmadan önce hangi alanların var olduğunu buradan öğren.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "set_period_plan",
+    description:
+      "Bir dönemin planını yazar: teması ve odak alanı hedefleri. Haftalık/aylık planlama sihirbazının ANA aracıdır. " +
+      "Hedefler dönemin YENİ TAM HÂLİDİR — listede olmayan eski hedefler silinir, bu yüzden değişiklik yaparken " +
+      "korunmasını istediğin hedefleri de listeye dahil et. " +
+      "Odak alanını adıyla verebilirsin (focusAreaName); o adda bir alan yoksa otomatik oluşturulur, " +
+      "yani önce ayrı bir araçla alan yaratmana gerek yok. " +
+      "Yüzdelerin toplamı 100 olmak zorunda değildir; kalan pay kullanıcının esneklik payıdır.",
+    input_schema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["day", "week", "month"], description: "Varsayılan: week." },
+        date: { type: "string", description: "Dönemin içindeki herhangi bir gün (YYYY-MM-DD). Varsayılan: bugün." },
+        theme: { type: "string", description: "Dönemin tek cümlelik niyeti. Kullanıcının kendi cümlesine sadık kal." },
+        capacityMinutes: {
+          type: "number",
+          description: "Dönem için ayrılan toplam çalışma dakikası. Kullanıcı 'bu hafta yarım çalışacağım' derse doldur, yoksa boş bırak.",
+        },
+        targets: {
+          type: "array",
+          description: "Dönemin hedefleri.",
+          items: {
+            type: "object",
+            properties: {
+              focusAreaName: { type: "string", description: "Odak alanının adı. Yoksa oluşturulur." },
+              title: { type: "string", description: "Odak alanına bağlı olmayan serbest hedef başlığı." },
+              sharePct: { type: "number", description: "Dönemin yüzde kaçı (0-100)." },
+              targetMinutes: { type: "number", description: "Yüzde yerine doğrudan dakika verilecekse." },
+              targetCount: { type: "number", description: "Adet hedefi, ör. 10 içerik." },
+              unit: { type: "string", description: "Adet hedefinin birimi: içerik, video, teklif." },
+            },
+            required: [],
+          },
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "suggest_schedule",
+    description:
+      "Dönemin hedeflerini kullanıcının çalışma saatlerine göre takvime dağıtır ve saat bloklarını üretir. " +
+      "Yüzdeleri saate çevirme işini SEN yapma, bu aracı çağır: hesabı sunucu yapar, elle konmuş bloklara dokunmaz, " +
+      "yer yetmezse eksik kalan süreyi (shortfall) bildirir. " +
+      "apply=false ile önce öneriyi göster, kullanıcı onaylarsa apply=true ile uygula. Ay için çalışmaz; ay hedefleri haftalara bölünür.",
+    input_schema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["day", "week"], description: "Varsayılan: week." },
+        date: { type: "string", description: "Dönemin içindeki herhangi bir gün (YYYY-MM-DD). Varsayılan: bugün." },
+        apply: { type: "boolean", description: "true ise bloklar gerçekten takvime yazılır. Varsayılan false (önizleme)." },
+        replaceExisting: {
+          type: "boolean",
+          description: "true ise bu aralıktaki, kullanıcının henüz dokunmadığı eski AI önerileri silinip yenisi kurulur.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "list_time_blocks",
+    description:
+      "Bir tarih aralığındaki takvim bloklarını listeler. \"Bugün saat kaçta ne yapıyorum\", \"yarın boş muyum\" " +
+      "gibi sorular için kullan.",
+    input_schema: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "Başlangıç tarihi (YYYY-MM-DD)." },
+        to: { type: "string", description: "Bitiş tarihi (YYYY-MM-DD)." },
+      },
+      required: ["from", "to"],
+    },
+  },
+  {
+    name: "create_time_blocks",
+    description:
+      "Takvime bir veya birden çok saat bloğu ekler. Kullanıcı belirli bir işi belirli bir saate koymak istediğinde kullan " +
+      "(\"salı sabahı 2 saat müzik\"). Genel bir haftalık dağıtım için bunu tek tek çağırma, suggest_schedule kullan. " +
+      "Bir bloğu gerçek bir göreve bağlamak için taskId ver: kullanıcının erişebildiği HERHANGİ bir proje ya da " +
+      "program görevi olabilir, kendisine atanmış olması gerekmez. Görevin id'sini search_tasks ile bul.",
+    input_schema: {
+      type: "object",
+      properties: {
+        blocks: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              blockDate: { type: "string", description: "YYYY-MM-DD" },
+              startsAt: { type: "string", description: "HH:MM" },
+              endsAt: { type: "string", description: "HH:MM" },
+              title: { type: "string" },
+              focusAreaName: { type: "string", description: "Odak alanının adı. Yoksa oluşturulur." },
+              taskId: { type: "string", description: "Kullanıcının erişebildiği bir proje/program görevinin id'si." },
+              note: { type: "string" },
+            },
+            required: ["blockDate", "startsAt", "endsAt"],
+          },
+        },
+      },
+      required: ["blocks"],
+    },
+  },
+  {
+    name: "update_time_block_status",
+    description:
+      "Bir takvim bloğunu tamamlandı/atlandı olarak işaretler ya da planlanan durumuna geri alır. " +
+      "Kullanıcı \"sabahki bloğu yaptım\" dediğinde kullan. Gerçekleşen süre verilmezse planlanan süre gerçekleşmiş sayılır.",
+    input_schema: {
+      type: "object",
+      properties: {
+        blockId: { type: "string" },
+        status: { type: "string", enum: ["planned", "done", "skipped"] },
+        actualMinutes: { type: "number", description: "Gerçekten kaç dakika sürdü (opsiyonel)." },
+      },
+      required: ["blockId", "status"],
+    },
+  },
+  {
+    name: "get_due_ritual",
+    description:
+      "Kullanıcının bugün bekleyen planlama ritüeli (gün başı / hafta başı / ay başı sihirbazı) var mı diye bakar; " +
+      "varsa sorulacak soruları ve bir önceki oturumun özetini döner. " +
+      "Kullanıcı \"planlayalım\", \"haftamı kuralım\", \"bugün ne yapsam\" dediğinde ilk bunu çağır.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "complete_ritual",
+    description:
+      "Planlama sihirbazı oturumunu kapatır ve özetini kaydeder. Hedefleri set_period_plan ile YAZDIKTAN SONRA çağır. " +
+      "Kaydettiğin özet bir sonraki oturumda sana geri verilir — \"geçen hafta şuna ağırlık vereceğini söylemiştin\" " +
+      "diyebilmen bu özete bağlı, o yüzden kullanıcının kendi kararlarını ve gerekçelerini yaz.",
+    input_schema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["daily", "weekly", "monthly"] },
+        summary: { type: "string", description: "Oturumun özeti: kullanıcı ne karar verdi, neden." },
+        answers: { type: "object", description: "Soru anahtarı -> cevap eşlemesi (opsiyonel)." },
+        status: { type: "string", enum: ["done", "skipped"], description: "Kullanıcı planlamak istemediyse skipped." },
+      },
+      required: ["kind"],
+    },
+  },
 ];

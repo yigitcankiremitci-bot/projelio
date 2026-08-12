@@ -9,6 +9,14 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 interface Props {
   open: boolean;
   onClose: () => void;
+  /**
+   * Panel açılırken otomatik gönderilecek mesaj (bkz. lib/askLio.ts).
+   * Takvim'deki "Lio ile planla" gibi noktalar sohbeti hazır bir soruyla
+   * başlatır; kullanıcı ayrıca "gönder"e basmak zorunda kalmaz.
+   */
+  initialMessage?: string | null;
+  /** Mesaj gönderildikten sonra çağrılır; aksi halde her açılışta tekrar giderdi. */
+  onInitialMessageSent?: () => void;
 }
 
 interface PendingConfirmation {
@@ -34,7 +42,7 @@ const SUGGESTIONS = [
 const GREETING =
   "Merhaba! Ben Lio. Projelerini, görevlerini ve bütçeni buradan yönetebilirsin — yazman yeterli.";
 
-export default function AiAssistantPanel({ open, onClose }: Props) {
+export default function AiAssistantPanel({ open, onClose, initialMessage, onInitialMessageSent }: Props) {
   const c = colors.light;
   const isDesktop = useIsDesktop();
 
@@ -166,6 +174,27 @@ export default function AiAssistantPanel({ open, onClose }: Props) {
       setSending(false);
     }
   };
+
+  /**
+   * Dışarıdan gelen açılış mesajını gönderir (bkz. lib/askLio.ts).
+   *
+   * `sentInitialRef` React 18'in geliştirme modundaki çift render'ına karşı:
+   * o olmadan aynı mesaj iki kez gidip kullanıcıdan iki kez kredi düşerdi.
+   */
+  const sentInitialRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open || !initialMessage || sending) return;
+    if (sentInitialRef.current === initialMessage) return;
+    sentInitialRef.current = initialMessage;
+    // Yeni bir soru her zaman temiz bir sohbette başlar: takvim planlaması,
+    // yarım kalmış bir bütçe konuşmasının altına eklenmemeli.
+    setActiveId(null);
+    setMessages([]);
+    void send(initialMessage);
+    onInitialMessageSent?.();
+    // `send` her render'da yeniden oluşuyor; bağımlılığa eklemek döngü yapar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialMessage]);
 
   const handleConfirmAction = async () => {
     if (!confirmation) return;

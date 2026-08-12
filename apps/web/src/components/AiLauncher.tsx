@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { onAskLio } from "../lib/askLio";
+import { tourAnchor } from "../lib/tour/types";
 import AiAssistantPanel from "./AiAssistantPanel";
 
 // Lio'nun düğme boyutu. Dar ekranda hem ekranın çok büyük bir kısmını kaplıyor
@@ -26,6 +28,10 @@ export default function AiLauncher() {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [eyesClosed, setEyesClosed] = useState(false);
+  // Başka bir sayfadan (ör. Takvim'deki "Lio ile planla") gelen açılış mesajı.
+  // Panel bunu gönderdikten sonra sıfırlar, aksi halde panel her açıldığında
+  // aynı mesaj tekrar gider.
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const hoveredRef = useRef(hovered);
 
   useEffect(() => {
@@ -42,6 +48,15 @@ export default function AiLauncher() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(
+    () =>
+      onAskLio((message) => {
+        setPendingMessage(message);
+        setOpen(true);
+      }),
+    []
+  );
 
   // Lio arada bir göz kırpar: normalde 10-12sn'de bir, üzerine gelinince
   // ilgisi artmış gibi 4-6sn'de bir — her seferinde 0.3sn'liğine gözler kapanır.
@@ -76,6 +91,7 @@ export default function AiLauncher() {
     <>
       {!open && (
         <button
+          {...tourAnchor("lio-launcher")}
           onClick={() => setOpen(true)}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
@@ -137,7 +153,12 @@ export default function AiLauncher() {
         </button>
       )}
 
-      <AiAssistantPanel open={open} onClose={() => setOpen(false)} />
+      <AiAssistantPanel
+        open={open}
+        onClose={() => setOpen(false)}
+        initialMessage={pendingMessage}
+        onInitialMessageSent={() => setPendingMessage(null)}
+      />
     </>
   );
 }

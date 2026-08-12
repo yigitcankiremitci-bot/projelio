@@ -880,3 +880,296 @@ export interface PersonalBoardItem {
   completedAt?: string;
   createdAt: string;
 }
+
+// --- Takvim: kişisel planlama katmanı ----------------------------------------
+// Görevin deadline'ı bir SON tarihtir; kişinin haftasını nasıl geçireceğini
+// anlatmaz. Planlama katmanı bu boşluğu dolduran ayrı bir eksendir:
+//
+//   PlanFocusArea  "neye vakit ayırıyorum"   (Yazılım, Müzik, İçerik)
+//        ↓
+//   PlanPeriod     "bu dönemin niyeti ne"     (gün / hafta / ay)
+//        ↓
+//   PlanTarget     "dönemi nasıl bölüyorum"   (%60 yazılım, 10 içerik)
+//        ↓
+//   PlanTimeBlock  "takvimde nereye düşüyor"  (Salı 09:00-11:30)
+//
+// Halkaların hepsi opsiyoneldir: kullanıcı hiç hedef koymadan da takvime blok
+// atabilir, hiç blok atmadan da hedef koyabilir.
+// (bkz. database/migrations/045_planning_calendar.sql)
+
+/**
+ * Kullanıcının vaktini bölüştürdüğü alan. Serbest çalışanın işleri proje
+ * sınırlarıyla birebir örtüşmediği için (üç ayrı müşteri projesi aynı "yazılım"
+ * kovasına düşer) jobs/projects'ten ayrı bir kavramdır.
+ */
+export interface PlanFocusArea {
+  id: string;
+  name: string;
+  color?: string;
+  /** Opsiyonel: alan bir işe karşılık geliyorsa raporlamada eşleştirilir. */
+  jobId?: string;
+  jobTitle?: string;
+  sortOrder: number;
+  archivedAt?: string;
+  createdAt: string;
+}
+
+export type PlanPeriodKind = "day" | "week" | "month";
+export type PlanPeriodStatus = "draft" | "active" | "closed";
+
+/**
+ * Bir gün, hafta veya ay. Üç kademe de aynı şekli taşır: bir başlangıç, bir
+ * niyet cümlesi, bir kapasite ve dönem sonunda bir değerlendirme.
+ */
+export interface PlanPeriod {
+  id: string;
+  kind: PlanPeriodKind;
+  /** Kademeye göre normalize edilmiş başlangıç: gün / pazartesi / ayın 1'i. */
+  periodStart: string;
+  /** Dönemin son günü (sunucuda periodStart + kademeden hesaplanır). */
+  periodEnd: string;
+  /** "Bu hafta ağırlığı neye vereceğim" — dönemin tek cümlelik niyeti. */
+  theme?: string;
+  note?: string;
+  reviewNote?: string;
+  /** Dönem için ayrılan toplam çalışma dakikası. Boşsa tercihlerden hesaplanır. */
+  capacityMinutes?: number;
+  status: PlanPeriodStatus;
+  createdAt: string;
+  closedAt?: string;
+  /** Dönemin hedefleri (getPeriod ile birlikte döner). */
+  targets?: PlanTarget[];
+}
+
+/**
+ * Dönemin bir odak alanına ayrılan payı. İki hedef dili aynı satırda yaşar,
+ * çünkü kullanıcı ikisini bir arada kurar: "%60 yazılım, ayrıca 10 içerik".
+ *
+ * Yüzdelerin toplamı 100 olmak zorunda DEĞİLDİR; kalan pay esneklik payıdır.
+ */
+export interface PlanTarget {
+  id: string;
+  periodId: string;
+  focusAreaId?: string;
+  focusAreaName?: string;
+  focusAreaColor?: string;
+  /** Odak alanına bağlı olmayan serbest hedefler için başlık. */
+  title?: string;
+  /** Dönemin yüzde kaçı (0-100). */
+  sharePct?: number;
+  targetMinutes?: number;
+  targetCount?: number;
+  /** Adet hedefinin birimi: "içerik", "video". */
+  unit?: string;
+  /** Elle ilerletilen sayaç; zaman hedefleri bloklardan hesaplanır. */
+  doneCount: number;
+  sortOrder: number;
+}
+
+/** Bloğu kim koydu: kullanıcı, Lio, yoksa bir programın rutini mi. */
+export type PlanBlockSource = "manual" | "lio" | "routine";
+export type PlanBlockStatus = "planned" | "done" | "skipped";
+
+/**
+ * Takvimdeki somut zaman kutusu.
+ *
+ * Blok görevin KENDİSİ DEĞİL, ona ayrılan zamandır: bir görev birden çok bloğa
+ * bölünebilir, blok silinince görev yerinde durur. Bu ayrım bilinçli — aksi
+ * halde takvimden bir kutu silmek projedeki işi silerdi.
+ */
+export interface PlanTimeBlock {
+  id: string;
+  /** YYYY-MM-DD */
+  blockDate: string;
+  /** HH:MM */
+  startsAt: string;
+  /** HH:MM */
+  endsAt: string;
+  /** startsAt/endsAt farkı; sunucuda hesaplanır. */
+  plannedMinutes: number;
+  title?: string;
+  note?: string;
+  color?: string;
+  focusAreaId?: string;
+  focusAreaName?: string;
+  focusAreaColor?: string;
+  /** Gerçek bir göreve bağlıysa dolu. taskId ve personalTodoId birlikte olmaz. */
+  taskId?: string;
+  personalTodoId?: string;
+  /** Bağlı kartın başlığı; blok kendi başlığını taşımıyorsa arayüz bunu gösterir. */
+  linkedTitle?: string;
+  linkedStatus?: TaskStatus;
+  source: PlanBlockSource;
+  status: PlanBlockStatus;
+  /** Gerçekleşen süre. Boşsa planlanan süre gerçekleşmiş kabul edilir. */
+  actualMinutes?: number;
+  completedAt?: string;
+  sortOrder: number;
+}
+
+/**
+ * Kullanıcının çalışma ritmi. Lio bir haftayı dağıtırken "kaç saatlik bir
+ * haftadan bahsediyoruz" sorusunun cevabını buradan alır.
+ */
+export interface PlanPreferences {
+  timezone: string;
+  /** 0 = Pazar … 6 = Cumartesi (JS getDay() ile aynı ölçek). */
+  workdays: number[];
+  /** HH:MM */
+  dayStart: string;
+  /** HH:MM */
+  dayEnd: string;
+  dailyTargetMinutes: number;
+  focusBlockMinutes: number;
+  breakMinutes: number;
+  ritualsEnabled: boolean;
+  weeklyRitualWeekday: number;
+  weeklyRitualTime: string;
+  dailyRitualTime: string;
+  /** 1-28 arası: her ayda karşılığı olsun diye 28 ile sınırlı. */
+  monthlyRitualDay: number;
+}
+
+export type PlanRitualKind = "daily" | "weekly" | "monthly";
+export type PlanRitualStatus = "pending" | "done" | "skipped";
+
+/**
+ * Lio'nun hafta başı / gün başı / ay başı sihirbaz oturumu.
+ *
+ * Kayıt iki işe yarar: aynı ritüel aynı gün iki kez sorulmaz, ve Lio bir
+ * sonraki oturumda "geçen hafta şuna ağırlık vereceğini söylemiştin, ne oldu?"
+ * diye sorabilir.
+ */
+export interface PlanRitual {
+  id: string;
+  kind: PlanRitualKind;
+  /** YYYY-MM-DD */
+  occurredOn: string;
+  periodId?: string;
+  status: PlanRitualStatus;
+  answers: Record<string, unknown>;
+  summary?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+/**
+ * "Bugün hangi ritüelin zamanı geldi" cevabı. Zamanlanmış bir görev (cron)
+ * yok; sunucu bunu bugünün tarihi + tercihlerden hesaplar.
+ */
+export interface PlanRitualPrompt {
+  kind: PlanRitualKind;
+  /** Ritüelin ait olduğu dönemin başlangıcı. */
+  periodStart: string;
+  periodKind: PlanPeriodKind;
+  /** Dönem kaydı zaten varsa id'si; yoksa sihirbaz açılışında oluşturulur. */
+  periodId?: string;
+  /** Sihirbazın açılış başlığı ve soruları. */
+  title: string;
+  questions: PlanRitualQuestion[];
+  /** Bir önceki aynı türden oturumun özeti; Lio bunun üzerine konuşur. */
+  previousSummary?: string;
+}
+
+export interface PlanRitualQuestion {
+  key: string;
+  question: string;
+  hint?: string;
+}
+
+/**
+ * Bir dönemin hedef/gerçek karşılaştırması — takvimin "verimlilik yüzdeleri"
+ * ekranının tek kaynağı (v_plan_period_progress).
+ *
+ * Hedefi olup hiç bloğu olmayan alanlar da (henüz takvime düşmemiş hedef),
+ * bloğu olup hedefi olmayan alanlar da (plan dışı çalışma) listede görünür;
+ * ikisi de kullanıcının görmesi gereken sapmalardır.
+ */
+export interface PlanProgressRow {
+  targetId?: string;
+  focusAreaId?: string;
+  focusAreaName?: string;
+  focusAreaColor?: string;
+  targetTitle?: string;
+  /** Hedeflenen pay. */
+  sharePct?: number;
+  targetMinutes?: number;
+  targetCount?: number;
+  unit?: string;
+  doneCount: number;
+  /** Takvime düşen (atlanmamış) toplam süre. */
+  plannedMinutes: number;
+  /** Tamamlanmış blokların süresi. */
+  doneMinutes: number;
+  blockCount: number;
+  doneBlockCount: number;
+  /** Bu alanın, dönemde planlanan zamandan aldığı pay. */
+  plannedSharePct?: number;
+  /** Bu alanın, dönemde yapılan zamandan aldığı pay. */
+  doneSharePct?: number;
+}
+
+export interface PlanPeriodProgress {
+  period: PlanPeriod;
+  rows: PlanProgressRow[];
+  /** Dönemde takvime düşen toplam süre. */
+  plannedMinutes: number;
+  /** Dönemde tamamlanan toplam süre. */
+  doneMinutes: number;
+  /** Dönemin toplam kapasitesi (kayıtta yoksa tercihlerden hesaplanır). */
+  capacityMinutes: number;
+  /** Hedef yüzdelerinin toplamı; 100'ü aşarsa arayüz uyarır. */
+  sharePctTotal: number;
+  /** Kapasitenin yüzde kaçı takvime dolduruldu. */
+  fillPct: number;
+  /** Takvime düşen sürenin yüzde kaçı gerçekten yapıldı. */
+  adherencePct: number;
+}
+
+/**
+ * Takvime bağlanabilecek bir görev.
+ *
+ * Kişisel panodaki (PersonalBoardItem) kartlardan farkı kapsamı: pano
+ * kullanıcının "kendi tabağını" gösterir (kişisel görevler + kendisine
+ * atananlar), bu liste ise erişebildiği TÜM proje ve program görevlerini
+ * kapsar. Serbest çalışan çoğu zaman kendi projesindeki bir işe kimseye
+ * atamadan zaman ayırmak ister; o iş panoda görünmez ama burada görünür.
+ */
+export interface SchedulableTask {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  deadline?: string;
+  assignedTo?: string;
+  assignedToName?: string;
+  projectId?: string;
+  projectTitle?: string;
+  operationId?: string;
+  operationTitle?: string;
+  jobId?: string;
+  jobTitle?: string;
+  /** Görevin tahmini süresi dakikaya çevrilmiş hâli; blok bu uzunlukta açılır. */
+  estimatedMinutes?: number;
+}
+
+/** Takvimin gün/hafta/ay görünümlerini tek istekte besleyen paket. */
+export interface PlanCalendarView {
+  kind: PlanPeriodKind;
+  from: string;
+  to: string;
+  /**
+   * Çalışma ritmi. Takvim gridinin hangi saatler arasında çizileceği, hangi
+   * günlerin soluk gösterileceği ve yeni blokların varsayılan uzunluğu buradan
+   * geliyor; ayrı bir istekle çekilseydi grid ilk render'da yanlış saatlerle
+   * çizilip sonra yerinden oynardı.
+   */
+  preferences: PlanPreferences;
+  blocks: PlanTimeBlock[];
+  /** Görünüm aralığına düşen, henüz bloğa bağlanmamış görevler. */
+  unscheduled: PersonalBoardItem[];
+  focusAreas: PlanFocusArea[];
+  progress: PlanPeriodProgress;
+  /** Bugün bekleyen ritüel varsa dolu. */
+  ritual?: PlanRitualPrompt;
+}

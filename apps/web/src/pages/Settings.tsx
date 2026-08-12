@@ -16,6 +16,7 @@ import {
 } from "../lib/fontScale";
 import HomeTargetModal from "../components/HomeTargetModal";
 import { useHomeTarget } from "../lib/homeTarget";
+import WorkRhythmSettings from "../components/plan/WorkRhythmSettings";
 
 const rowStyle: React.CSSProperties = {
   width: "100%",
@@ -161,6 +162,15 @@ export default function Settings() {
       </div>
 
       {homeTargetModalOpen && <HomeTargetModal onClose={() => setHomeTargetModalOpen(false)} />}
+
+      {/* Takvim sayfasının ve Lio'nun dağıtım yaparken kullandığı çerçeve.
+          Gezinmenin hemen ardında duruyor: kullanıcı takvimi ilk kez kurarken
+          en çok bu ayarları arıyor. */}
+      <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "26px 0 10px", maxWidth: 420 }}>
+        Çalışma ritmi
+      </h2>
+
+      <WorkRhythmSettings />
 
       <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "26px 0 10px", maxWidth: 420 }}>
         Bağlı hesaplar

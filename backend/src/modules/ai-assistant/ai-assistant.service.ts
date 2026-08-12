@@ -16,6 +16,7 @@ import { BudgetService } from "../budget/budget.service";
 import { MembersService } from "../members/members.service";
 import { TaskCommentsService } from "../task-comments/task-comments.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { PlanningService } from "../planning/planning.service";
 import { AI_TOOLS, CRITICAL_TOOLS } from "./ai-assistant.tools";
 import { AiCreditsService } from "./ai-credits.service";
 import { AiConversationsService } from "./ai-conversations.service";
@@ -108,6 +109,16 @@ function pruneEmpty<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return out as Partial<T>;
 }
 
+/**
+ * Dakikaları saate çevirirken kullanılan yuvarlama.
+ *
+ * Modele "5.25 saat" demek yeterli; "5.2483333" hem token yakar hem cümleye
+ * o hassasiyetle geçtiğinde kullanıcıya saçma görünür.
+ */
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
 function compactTask(task: any): Record<string, unknown> {
   return pruneEmpty({
     id: task.id,
@@ -148,6 +159,7 @@ export class AiAssistantService {
     private membersService: MembersService,
     private taskCommentsService: TaskCommentsService,
     private notificationsService: NotificationsService,
+    private planningService: PlanningService,
     private creditsService: AiCreditsService,
     private conversationsService: AiConversationsService
   ) {}
@@ -371,6 +383,26 @@ export class AiAssistantService {
       "- Kullanıcı belirsiz konuşursa (ör. \"şunu hallet\") en olası yorumu yap ve ne yaptığını söyle; tamamen anlaşılmazsa tek bir netleştirici soru sor.",
       "- Tarih ifadelerini çöz: \"yarın\", \"haftaya\", \"ayın 15'i\" gibi ifadeleri bugünün tarihine göre gerçek tarihe dönüştür.",
       "- Aynı bilgiyi iki kez sorgulama; bir araçtan aldığın sonucu hatırla ve tekrar çağırma.",
+      "",
+      "## Planlama sihirbazı (Takvim)",
+      "Projelio'nun takvimi kullanıcının gününü, haftasını ve ayını planladığı yerdir. Burada rolün değişir:",
+      "karar veren sen değil KULLANICIDIR, sen doğru soruları soran ve cevabı yapıya çeviren kişisin.",
+      "- Akış her zaman aynı: önce get_plan_overview ile mevcut planı OKU, sonra sor, sonra set_period_plan ile yaz, " +
+        "sonra suggest_schedule ile takvime dağıt, en sonda complete_ritual ile oturumu kapat.",
+      "- Kullanıcının hâlihazırda ne planladığını okumadan soru sorma. \"Bu hafta ne yapacaksın?\" diye sormak, " +
+        "kullanıcı zaten hedeflerini girmişse onu tekrar konuşturmaktır.",
+      "- Aynı anda en fazla iki soru sor. Sihirbazın soru listesi bir ISKELETTIR, hepsini sırayla okuman gerekmez; " +
+        "kullanıcı zaten cevaplamışsa atla.",
+      "- Yüzdeleri saate SEN çevirme. \"%60 yazılım\" gibi bir dağılımı takvime yaymak için suggest_schedule'ı çağır; " +
+        "hesabı sunucu yapar. Kendi aritmetiğin yanlış olur ve kullanıcının haftası yanlış kurulur.",
+      "- suggest_schedule'ı önce apply=false ile çağır, ne olacağını özetle, kullanıcı onaylarsa apply=true ile uygula.",
+      "- Dağıtımda yerleşemeyen süre (shortfall) dönerse bunu MUTLAKA söyle ve ne yapılabileceğini öner " +
+        "(kapasiteyi artırmak, bir hedefi küçültmek, bir işi haftaya atmak). Sessizce geçme.",
+      "- Hedeflerin toplamı %100 olmak zorunda değil. Kullanıcı %90 dağıttıysa \"eksik\" deme; kalan pay esneklik payıdır.",
+      "- Teşvik edici ol ama abartma. Kullanıcı geçen haftayı tutturamadıysa suçlama, sebebini sor ve planı gerçekçi kur; " +
+        "aynı hedefi küçültmeden tekrar yazmak işe yaramıyor.",
+      "- Gün planında kısa konuş. Sabah 09:00'da uzun bir oturum kimsenin işine yaramaz: tek bir \"bugünün ana işi\" " +
+        "çıkar, günü bloklara böl, bitir.",
       "",
       "Aşağıda sana kullanıcının bugünkü bağlamı verilecek. Oradaki id'leri doğrudan kullanabilirsin;",
       "listede olmayan bir şey için list_* araçlarına başvur.",
@@ -1017,8 +1049,204 @@ export class AiAssistantService {
         });
       }
 
+      // --- Takvim / kişisel planlama -------------------------------------
+      //
+      // Bu araçların hepsi PlanningService'e geçer; oradaki güvenlik notu
+      // burada da geçerlidir: userId daima oturumdan gelir, hiçbir plan
+      // kaydına başka bir kullanıcının id'siyle ulaşılamaz.
+
+      case "get_plan_overview": {
+        const progress = await this.planningService.getProgress(
+          userId,
+          input.kind ?? "week",
+          input.date ?? new Date().toISOString().slice(0, 10)
+        );
+        // Modele yalnızca konuşurken işine yarayacak alanlar veriliyor:
+        // ham satırların tamamı (blok sayıları, id'ler) token yakıyor,
+        // cümle kurmaya katkısı olmuyor.
+        return pruneEmpty({
+          donem: `${progress.period.periodStart} → ${progress.period.periodEnd}`,
+          tema: progress.period.theme,
+          kapasiteSaat: round1(progress.capacityMinutes / 60),
+          takvimeDusenSaat: round1(progress.plannedMinutes / 60),
+          tamamlananSaat: round1(progress.doneMinutes / 60),
+          doluluk: `%${progress.fillPct}`,
+          planaSadakat: `%${progress.adherencePct}`,
+          hedefYuzdeToplami: progress.sharePctTotal,
+          alanlar: progress.rows.map((r) =>
+            pruneEmpty({
+              alan: r.focusAreaName ?? r.targetTitle ?? "(kategorisiz)",
+              hedefYuzde: r.sharePct,
+              gerceklesenYuzde: r.doneSharePct,
+              takvimdeSaat: round1(r.plannedMinutes / 60),
+              yapilanSaat: round1(r.doneMinutes / 60),
+              adetHedefi: r.targetCount != null ? `${r.doneCount}/${r.targetCount} ${r.unit ?? ""}`.trim() : undefined,
+            })
+          ),
+        });
+      }
+
+      case "list_focus_areas": {
+        const areas = await this.planningService.listFocusAreas(userId);
+        return areas.map((a) => ({ id: a.id, ad: a.name }));
+      }
+
+      case "set_period_plan": {
+        const kind = input.kind ?? "week";
+        const date = input.date ?? new Date().toISOString().slice(0, 10);
+        const period = await this.planningService.ensurePeriod(userId, kind, date);
+
+        if (input.theme !== undefined || input.capacityMinutes !== undefined) {
+          await this.planningService.updatePeriod(userId, period.id, {
+            theme: input.theme,
+            capacityMinutes: input.capacityMinutes,
+            // Plan yazıldığı anda dönem taslak olmaktan çıkar.
+            status: "active",
+          });
+        }
+
+        const incoming: any[] = Array.isArray(input.targets) ? input.targets : [];
+        const targets = [];
+        for (const t of incoming) {
+          // Modelin önce alanı yaratıp sonra id'sini taşıması iki ek araç turu
+          // demek; adı verip geçmesine izin veriyoruz (tur = kredi).
+          const focusAreaId = t.focusAreaName
+            ? await this.resolveFocusArea(userId, t.focusAreaName)
+            : t.focusAreaId;
+          targets.push({
+            focusAreaId,
+            title: focusAreaId ? undefined : t.title,
+            sharePct: t.sharePct,
+            targetMinutes: t.targetMinutes,
+            targetCount: t.targetCount,
+            unit: t.unit,
+          });
+        }
+
+        const saved = incoming.length ? await this.planningService.setTargets(userId, period.id, targets) : [];
+        return {
+          donem: `${period.periodStart} → ${period.periodEnd}`,
+          tema: input.theme ?? period.theme ?? null,
+          hedefler: saved.map((t) =>
+            pruneEmpty({
+              alan: t.focusAreaName ?? t.title,
+              yuzde: t.sharePct,
+              adet: t.targetCount,
+              birim: t.unit,
+            })
+          ),
+        };
+      }
+
+      case "suggest_schedule": {
+        const result = await this.planningService.suggestSchedule(
+          userId,
+          input.kind ?? "week",
+          input.date ?? new Date().toISOString().slice(0, 10),
+          { apply: input.apply === true, replaceExisting: input.replaceExisting === true }
+        );
+        return pruneEmpty({
+          aralik: `${result.from} → ${result.to}`,
+          uygulandi: result.applied,
+          onerilenBlokSayisi: result.proposedCount,
+          onerilenSaat: round1(result.proposedMinutes / 60),
+          // Takvimde yer kalmadığı için karşılanamayan süre. Modelin bunu
+          // kullanıcıya SÖYLEMESİ gerekiyor; sessizce yutulursa kullanıcı
+          // hedefini kurduğunu sanır.
+          yerlesemeyen: result.shortfall.length
+            ? result.shortfall.map((s) => `${s.focusAreaName}: ${round1(s.minutes / 60)} saat`)
+            : undefined,
+        });
+      }
+
+      case "list_time_blocks": {
+        const blocks = await this.planningService.listBlocks(userId, input.from, input.to);
+        return blocks.map((b) =>
+          pruneEmpty({
+            id: b.id,
+            tarih: b.blockDate,
+            saat: `${b.startsAt}-${b.endsAt}`,
+            baslik: b.title ?? b.linkedTitle,
+            alan: b.focusAreaName,
+            durum: b.status,
+          })
+        );
+      }
+
+      case "create_time_blocks": {
+        const incoming: any[] = Array.isArray(input.blocks) ? input.blocks : [];
+        const blocks = [];
+        for (const b of incoming) {
+          blocks.push({
+            blockDate: b.blockDate,
+            startsAt: b.startsAt,
+            endsAt: b.endsAt,
+            title: b.title,
+            note: b.note,
+            taskId: b.taskId,
+            focusAreaId: b.focusAreaName ? await this.resolveFocusArea(userId, b.focusAreaName) : undefined,
+            // Lio'nun koyduğu bloklar işaretlenir; kullanıcı "önerileri temizle"
+            // dediğinde kendi elle koyduklarıyla karışmasınlar.
+            source: "lio" as const,
+          });
+        }
+        const created = await this.planningService.createBlocks(userId, blocks);
+        return { eklenen: created.length };
+      }
+
+      case "update_time_block_status": {
+        const block = await this.planningService.setBlockStatus(
+          userId,
+          input.blockId,
+          input.status,
+          input.actualMinutes
+        );
+        return { id: block.id, durum: block.status };
+      }
+
+      case "get_due_ritual": {
+        const ritual = await this.planningService.getDueRitual(userId);
+        if (!ritual) return { bekleyenRitual: null };
+        return pruneEmpty({
+          tur: ritual.kind,
+          donem: ritual.periodStart,
+          sorular: ritual.questions.map((q) => q.question),
+          oncekiOzet: ritual.previousSummary,
+        });
+      }
+
+      case "complete_ritual": {
+        const ritual = await this.planningService.completeRitual(userId, {
+          kind: input.kind,
+          answers: input.answers,
+          summary: input.summary,
+          status: input.status,
+        });
+        return { tur: ritual.kind, tarih: ritual.occurredOn, durum: ritual.status };
+      }
+
       default:
         throw new BadRequestException(`Bilinmeyen araç: ${name}`);
     }
+  }
+
+  /**
+   * Odak alanını adından bulur, yoksa oluşturur.
+   *
+   * Modelin "önce alanı yarat, id'sini al, sonra hedefi yaz" diye üç tura
+   * yayılması hem yavaş hem pahalı. Ad eşleşmesi büyük/küçük harf ve baştaki
+   * sondaki boşluklara duyarsız — kullanıcı bir hafta "Yazılım", ertesi hafta
+   * "yazılım" derse aynı alan kullanılır, veri ikiye bölünmez.
+   */
+  private async resolveFocusArea(userId: string, name: string): Promise<string | undefined> {
+    const wanted = name?.trim();
+    if (!wanted) return undefined;
+
+    const areas = await this.planningService.listFocusAreas(userId);
+    const match = areas.find((a) => a.name.trim().toLocaleLowerCase("tr") === wanted.toLocaleLowerCase("tr"));
+    if (match) return match.id;
+
+    const created = await this.planningService.createFocusArea(userId, { name: wanted });
+    return created.id;
   }
 }

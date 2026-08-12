@@ -35,6 +35,7 @@ import { ProductsModule } from "./modules/products/products.module";
 import { ModuleMembersModule } from "./modules/module-members/module-members.module";
 import { ModuleRecordsModule } from "./modules/module-records/module-records.module";
 import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.module";
+import { PlanningModule } from "./modules/planning/planning.module";
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.mod
     ModuleMembersModule,
     ModuleRecordsModule,
     PersonalTodosModule,
+    PlanningModule,
   ],
 })
 export class AppModule {}

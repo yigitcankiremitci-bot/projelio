@@ -14,6 +14,7 @@ import BudgetPanel from "../components/BudgetPanel";
 import AllFilesPanel from "../components/AllFilesPanel";
 import DashboardModulesPanel from "../components/DashboardModulesPanel";
 import DashboardAssignedModules from "../components/DashboardAssignedModules";
+import { tourAnchor } from "../lib/tour/types";
 
 type DashboardTab = "jobs" | "budget" | "files" | "modules";
 
@@ -204,6 +205,7 @@ export default function Dashboard() {
           Ekran genişliğine göre değil, gerçekten yer kalmadığında kırıldığı için
           ayrı bir mobil/masaüstü dalına gerek yok. */}
       <div
+        {...tourAnchor("dashboard-tabs")}
         style={{
           display: "flex",
           flexWrap: "wrap",
@@ -218,6 +220,7 @@ export default function Dashboard() {
             <button
               key={t.key}
               type="button"
+              {...tourAnchor(`dashboard-tab-${t.key}`)}
               onClick={() => setTab(t.key)}
               style={{
                 display: "flex",

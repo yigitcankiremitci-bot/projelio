@@ -5,6 +5,7 @@ import type { NotificationPayload } from "@projelio/shared";
 import { api, API_URL } from "../api/client";
 import { colors } from "../theme/colors";
 import { timeAgo } from "../lib/dates";
+import { tourAnchor } from "../lib/tour/types";
 import { IconBell } from "./icons";
 
 export default function NotificationBell() {
@@ -106,7 +107,7 @@ export default function NotificationBell() {
   };
 
   return (
-    <div ref={ref} style={{ position: "fixed", top: 14, right: 14, zIndex: 40 }}>
+    <div ref={ref} {...tourAnchor("notification-bell")} style={{ position: "fixed", top: 14, right: 14, zIndex: 40 }}>
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label="Bildirimler"

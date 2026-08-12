@@ -34,6 +34,9 @@ import { colors } from "./theme/colors";
 import { ProjectFabContext } from "./lib/projectFab";
 import { PageHeaderProvider, usePageHeaderState } from "./lib/pageHeader";
 import { UndoProvider } from "./lib/undo";
+import { TourProvider } from "./lib/tour/TourContext";
+import TourOverlay from "./components/tour/TourOverlay";
+import TourLauncher from "./components/tour/TourLauncher";
 import type { ProjectFabAction } from "./lib/projectFab";
 import { useIsDesktop } from "./lib/useIsDesktop";
 import { SIDEBAR_WIDTH } from "./lib/layout";
@@ -343,6 +346,10 @@ export default function App() {
     // bekleyen silmelerin sayfalar arasında gezinirken de yaşaması gerekiyor.
     <UndoProvider>
     <PageHeaderProvider>
+    {/* Sesli + yazılı kullanım turu. Kurulum sihirbazı hâlâ açıkken kendiliğinden
+        başlamaz (autoStartEnabled); kullanıcı isterse sağ üstteki "?" düğmesinden
+        her an başlatabilir. */}
+    <TourProvider autoStartEnabled={Boolean(me?.onboardingCompletedAt)}>
     <div style={{ minHeight: "100vh" }}>
       {me && !me.onboardingCompletedAt && <OnboardingWizard onCompleted={reloadMe} />}
 
@@ -427,6 +434,8 @@ export default function App() {
           </>
         )}
         <NotificationBell />
+        {me?.onboardingCompletedAt && <TourLauncher />}
+        <TourOverlay />
         <AiLauncher />
         <ProjectFabContext.Provider value={{ action: fabAction, setAction: setFabAction }}>
           <div style={{ paddingTop: isCoverPage ? 0 : HEADER_HEIGHT, paddingBottom: isDesktop ? 28 : 84 }}>
@@ -454,6 +463,7 @@ export default function App() {
         </ProjectFabContext.Provider>
       </div>
     </div>
+    </TourProvider>
     </PageHeaderProvider>
     </UndoProvider>
   );

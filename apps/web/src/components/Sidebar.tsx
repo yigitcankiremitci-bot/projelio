@@ -6,6 +6,7 @@ import { SIDEBAR_WIDTH } from "../lib/layout";
 import SidebarTree from "./SidebarTree";
 import HomeTargetModal from "./HomeTargetModal";
 import { useHomeTarget, DEFAULT_HOME_TARGET } from "../lib/homeTarget";
+import { tourAnchor } from "../lib/tour/types";
 
 interface Props {
   // Kapalıyken sidebar hiç render edilmez (App.tsx'te bunun yerine küçük bir
@@ -74,6 +75,7 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
       )}
       <aside
         className="app-sidebar"
+        {...tourAnchor("sidebar")}
         style={{
           width: overlay ? Math.min(SIDEBAR_WIDTH + 24, 360) : SIDEBAR_WIDTH,
           flexShrink: 0,
@@ -183,7 +185,9 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
 
       {/* Grup > Organizasyon > İş gezinme ağacı: yalnızca kullanıcının erişebildiği
           en az bir grup/organizasyon/iş varsa bir şey render eder. */}
-      <SidebarTree />
+      <div {...tourAnchor("sidebar-tree")}>
+        <SidebarTree />
+      </div>
 
       <div style={{ marginTop: "auto", paddingTop: 10 }}>
         <Link

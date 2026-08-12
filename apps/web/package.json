@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tour:metin": "node scripts/tour-audio.mjs metin",
+    "tour:eksik": "node scripts/tour-audio.mjs eksik",
+    "tour:manifest": "node scripts/tour-audio.mjs manifest"
   },
   "dependencies": {
     "@projelio/shared": "*",

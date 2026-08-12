@@ -10,6 +10,7 @@ import CreateOrganizationModal from "./CreateOrganizationModal";
 import CreateGroupModal from "./CreateGroupModal";
 import { ProjectFabContext } from "../lib/projectFab";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { tourAnchor } from "../lib/tour/types";
 import { SIDEBAR_WIDTH } from "../lib/layout";
 import { useHomeTarget } from "../lib/homeTarget";
 
@@ -122,6 +123,7 @@ export default function BottomNav() {
 
   const fabButton = (
     <button
+      {...tourAnchor("bottom-nav-fab")}
       onClick={handleFabClick}
       aria-label={fabLabel}
       style={{

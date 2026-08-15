@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
-import type { NotificationPayload } from "@projelio/shared";
+import type { JobMember, NotificationPayload } from "@projelio/shared";
 import { api, API_URL } from "../api/client";
 import { colors } from "../theme/colors";
 import { timeAgo } from "../lib/dates";
 import { tourAnchor } from "../lib/tour/types";
+import { fetchPendingJobInvites, onJobInvitesChanged, respondToJobInvite } from "../lib/jobInvites";
 import { IconBell } from "./icons";
 
 export default function NotificationBell() {
@@ -14,8 +15,34 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState<NotificationPayload[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+  // Bekleyen iş davetleri bildirimlerden ayrı tutulur: bildirim okununca kaybolur,
+  // davet ise yanıtlanana kadar durmalı. Rozet ikisinin toplamını gösterir.
+  const [invites, setInvites] = useState<JobMember[]>([]);
+  const [answering, setAnswering] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
+
+  const loadInvites = () => {
+    fetchPendingJobInvites().then(setInvites);
+  };
+
+  // Kabul/ret burada, listeden ayrılmadan verilir. Kabul edilen iş anında
+  // anasayfadaki "Katıldıklarım" listesine düşsün diye respondToJobInvite
+  // olayı yayınlar (bkz. lib/jobInvites.ts).
+  const answerInvite = async (invite: JobMember, approve: boolean) => {
+    if (answering) return;
+    setAnswering(invite.id);
+    try {
+      await respondToJobInvite(invite.id, approve);
+      setInvites((prev) => prev.filter((i) => i.id !== invite.id));
+      if (approve) {
+        setOpen(false);
+        navigate(`/jobs/${invite.jobId}`);
+      }
+    } finally {
+      setAnswering(null);
+    }
+  };
 
   useEffect(() => {
     if (!localStorage.getItem("projelio_token")) return;
@@ -53,6 +80,8 @@ export default function NotificationBell() {
         socket.on("notification", (notification: NotificationPayload) => {
           setNotifications((prev) => [notification, ...prev].slice(0, 50));
           setUnreadCount((n) => n + 1);
+          // Yeni bir iş daveti geldiyse kabul/ret satırı da anında belirsin.
+          if (notification.type === "job_invite") loadInvites();
         });
       })
       .catch(() => {});
@@ -62,6 +91,14 @@ export default function NotificationBell() {
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
+  }, []);
+
+  // Bekleyen iş davetleri: açılışta bir kez, sonra davet başka bir yerden
+  // (iş sayfasındaki şeritten) yanıtlandığında tazelenir.
+  useEffect(() => {
+    if (!localStorage.getItem("projelio_token")) return;
+    loadInvites();
+    return onJobInvitesChanged(loadInvites);
   }, []);
 
   useEffect(() => {
@@ -89,6 +126,11 @@ export default function NotificationBell() {
   }, [open]);
 
   if (!localStorage.getItem("projelio_token")) return null;
+
+  // Yanıt bekleyen davet, okunmamış bildirimden farklı: paneli açmak onu
+  // "gördüm" saymaz, o yüzden rozet okundu işaretlendikten sonra da davet
+  // sayısını göstermeye devam eder.
+  const badgeCount = unreadCount + invites.length;
 
   const handleSelect = async (n: NotificationPayload) => {
     setOpen(false);
@@ -131,7 +173,7 @@ export default function NotificationBell() {
         }}
       >
         <IconBell size={20} color="#fff" />
-        {unreadCount > 0 && (
+        {badgeCount > 0 && (
           <span
             style={{
               position: "absolute",
@@ -150,7 +192,7 @@ export default function NotificationBell() {
               padding: "0 3px",
             }}
           >
-            {unreadCount > 9 ? "9+" : unreadCount}
+            {badgeCount > 9 ? "9+" : badgeCount}
           </span>
         )}
       </button>
@@ -190,10 +232,84 @@ export default function NotificationBell() {
             )}
           </div>
 
+          {/* Yanıt bekleyen iş davetleri en üstte, kabul/ret düğmeleriyle:
+              kullanıcı işe eklenmeden önce kimin hangi işe eklediğini görüp
+              karar verir (bkz. lib/jobInvites.ts). */}
+          {invites.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div
+                style={{
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: c.textSecondary,
+                  background: `${c.accent}0f`,
+                }}
+              >
+                Yanıt bekleyen davetler
+              </div>
+              {invites.map((invite) => (
+                <div
+                  key={invite.id}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    padding: "10px 14px",
+                    borderBottom: `1px solid ${c.border}`,
+                    background: `${c.accent}0a`,
+                  }}
+                >
+                  <span style={{ fontSize: 15, color: c.textPrimary }}>
+                    <strong>{invite.invitedByName ?? "Bir kullanıcı"}</strong> seni{" "}
+                    <strong>“{invite.jobTitle ?? "bir iş"}”</strong> işine ekledi
+                    {invite.title ? ` (${invite.title})` : ""}. Kabul ediyor musun?
+                  </span>
+                  <span style={{ fontSize: 12, color: c.textSecondary }}>{timeAgo(invite.joinedAt)}</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={() => answerInvite(invite, true)}
+                      disabled={answering === invite.id}
+                      style={{
+                        flex: 1,
+                        padding: "7px 10px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: c.primary,
+                        color: "#fff",
+                        fontSize: 14,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Kabul et
+                    </button>
+                    <button
+                      onClick={() => answerInvite(invite, false)}
+                      disabled={answering === invite.id}
+                      style={{
+                        flex: 1,
+                        padding: "7px 10px",
+                        borderRadius: 8,
+                        border: `1px solid ${c.border}`,
+                        background: c.surface,
+                        color: c.textSecondary,
+                        fontSize: 14,
+                      }}
+                    >
+                      Reddet
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {notifications.length === 0 ? (
-            <p style={{ fontSize: 15, color: c.textSecondary, padding: 16, textAlign: "center", margin: 0 }}>
-              Henüz bildirim yok.
-            </p>
+            invites.length === 0 && (
+              <p style={{ fontSize: 15, color: c.textSecondary, padding: 16, textAlign: "center", margin: 0 }}>
+                Henüz bildirim yok.
+              </p>
+            )
           ) : (
             <div style={{ display: "flex", flexDirection: "column" }}>
               {notifications.map((n) => (

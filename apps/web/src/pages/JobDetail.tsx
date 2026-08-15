@@ -8,6 +8,7 @@ import CreateOperationModal from "../components/CreateOperationModal";
 import EditJobModal from "../components/EditJobModal";
 import JobTabs, { JobTab } from "../components/JobTabs";
 import JobTeamPanel from "../components/JobTeamPanel";
+import JobInviteBanner from "../components/JobInviteBanner";
 import JobTasksPanel, { JobTasksPanelHandle } from "../components/JobTasksPanel";
 import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
 import TodayCompletedPanel from "../components/TodayCompletedPanel";
@@ -351,6 +352,10 @@ export default function JobDetail() {
         <Link to="/" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
           ← İşler
         </Link>
+
+        {/* Bildirimdeki davetten gelindiyse kararı burada da verebilsin; bekleyen
+            davet yoksa bileşen hiçbir şey çizmez. */}
+        <JobInviteBanner jobId={id} />
 
         <div
           style={{

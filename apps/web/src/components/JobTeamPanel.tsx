@@ -148,6 +148,19 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTasksR
                           Yönetici
                         </span>
                       )}
+                      {/* İşe alma bir davettir: kişi kabul edene kadar ekipten
+                          sayılmaz. İş sahibi kimin beklediğini, kimin reddettiğini
+                          görsün ki boşuna beklemesin. */}
+                      {m.status === "pending" && (
+                        <span style={{ fontSize: 12, color: c.textSecondary, background: c.background, border: `1px solid ${c.border}`, borderRadius: 20, padding: "1px 7px" }}>
+                          Yanıt bekliyor
+                        </span>
+                      )}
+                      {m.status === "rejected" && (
+                        <span style={{ fontSize: 12, color: c.danger, background: `${c.danger}14`, borderRadius: 20, padding: "1px 7px" }}>
+                          Reddetti
+                        </span>
+                      )}
                     </div>
                     {activeTask ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -278,10 +291,14 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTasksR
       {hiring && (
         <HireMemberModal
           jobId={jobId}
-          existingUserIds={members.map((m) => m.userId)}
+          // Daveti reddetmiş kişi tekrar davet edilebilmeli; yalnızca ekipte
+          // olan ve yanıt bekleyenler arama sonuçlarından elenir.
+          existingUserIds={members.filter((m) => m.status !== "rejected").map((m) => m.userId)}
           onClose={() => setHiring(false)}
-          onHired={(m) => {
-            setMembers((prev) => [...prev, m]);
+          onHired={() => {
+            // Reddedilmiş bir kayıt yeniden davete döndüğünde listeye ikinci kez
+            // eklenmemesi için listeyi sunucudan tazeliyoruz.
+            load();
             setHiring(false);
           }}
         />

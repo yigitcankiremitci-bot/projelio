@@ -629,12 +629,23 @@ export interface JobMember {
   userId: string;
   // İşe alan kişinin serbest metinle belirlediği görev/unvan (örn. "Grafik tasarımcı").
   title?: string;
+  // İşe alma bir davettir: kişi kabul edene kadar "pending" bekler. Yalnızca
+  // "approved" olanlar işin dosyalarına erişir ve işi anasayfalarında görür.
+  status: "pending" | "approved" | "rejected";
   joinedAt: string;
+  // Davetin yanıtlandığı an (kabul ya da ret); bekleyen davetlerde boştur.
+  respondedAt?: string;
   fullName?: string;
   email?: string;
   username?: string;
   // Bu kişinin o an "üzerinde çalışıyorum" diyerek işaretlediği görev (varsa).
   activeTaskId?: string;
+  // Daveti gönderen kişi — bildirimde ve davet şeridinde "X seni ekledi" demek için.
+  invitedBy?: string;
+  invitedByName?: string;
+  // Bekleyen davet listesinde kartın hangi işe ait olduğunu göstermek için
+  // (findPendingForUser doldurur; iş ekibi listesinde boştur).
+  jobTitle?: string;
 }
 
 export interface Output {
@@ -824,6 +835,11 @@ export interface NotificationPayload {
     | "task_due_1h"
     | "project_deadline_24h"
     | "team_invite"
+    // Bir işe (job) davet edildin — kabul/ret bekliyor. Bildirim çanı bu tipi
+    // görünce satır içi "Kabul et / Reddet" düğmelerini gösterir.
+    | "job_invite"
+    // Davet yanıtlandı: iş sahibine "X daveti kabul etti/reddetti" der.
+    | "job_invite_answered"
     | "role_updated"
     | "budget_changed"
     | "recurring_payment_due"

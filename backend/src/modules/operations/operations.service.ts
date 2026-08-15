@@ -191,6 +191,8 @@ export class OperationsService {
       .select("id")
       .eq("job_id", jobId)
       .eq("user_id", requestingUserId)
+      // Yalnızca daveti kabul etmiş iş ekibi üyeleri (bkz. job_members.status).
+      .eq("status", "approved")
       .maybeSingle();
     if (jobMember) return operations;
 
@@ -310,6 +312,7 @@ export class OperationsService {
           .select("id")
           .eq("job_id", jobId)
           .eq("user_id", userId)
+          .eq("status", "approved")
           .maybeSingle();
         if (!member) throw new BadRequestException("Geçersiz sıralama isteği");
       }

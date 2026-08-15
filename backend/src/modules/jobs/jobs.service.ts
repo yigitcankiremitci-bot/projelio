@@ -38,9 +38,11 @@ export class JobsService {
     private filesService: FilesService
   ) {}
 
-  // Kullanıcının sahibi olduğu işler + içindeki herhangi bir projeye ekibe
-  // (üye/taşeron fark etmez, onaylanmış şekilde) eklendiği işler. Böylece bir
-  // projeye taşeron olarak eklenen kullanıcı da "İşlerim" ekranında o iş dosyasını görür.
+  // Kullanıcının sahibi olduğu işler + doğrudan iş ekibine alındığı (job_members,
+  // daveti kabul etmiş) işler + içindeki herhangi bir projeye ekibe (üye/taşeron
+  // fark etmez, onaylanmış şekilde) eklendiği işler. Böylece hem işe alınan kişi
+  // hem de bir projeye taşeron olarak eklenen kullanıcı "İşlerim" ekranında o iş
+  // dosyasını görür.
   async findAllForUser(userId: string): Promise<Job[]> {
     const { data: owned, error: ownedError } = await this.supabase.client
       .from("jobs")
@@ -48,6 +50,30 @@ export class JobsService {
       .eq("owner_id", userId)
       .is("archived_at", null);
     if (ownedError) throw ownedError;
+
+    // İş ekibi üyelikleri: bir kullanıcı hiçbir projeye eklenmeden doğrudan işe
+    // alınmış olabilir. Bu sorgu eksikti; işe alınan kişi bildirimi alıyor ama iş
+    // anasayfasındaki "Katıldıklarım" listesine hiç düşmüyordu.
+    // Yalnızca daveti KABUL EDİLMİŞ üyelikler sayılır — bekleyen/reddedilen davet
+    // kullanıcının panosunu kirletmemeli.
+    const { data: jobMemberships, error: jobMembershipError } = await this.supabase.client
+      .from("job_members")
+      .select("job_id")
+      .eq("user_id", userId)
+      .eq("status", "approved");
+    if (jobMembershipError) throw jobMembershipError;
+
+    const hiredJobIds = Array.from(new Set((jobMemberships ?? []).map((m: any) => m.job_id).filter(Boolean)));
+    let hiredJobs: any[] = [];
+    if (hiredJobIds.length > 0) {
+      const { data, error } = await this.supabase.client
+        .from("jobs")
+        .select("*, users(full_name), organizations(name), groups(name)")
+        .in("id", hiredJobIds)
+        .is("archived_at", null);
+      if (error) throw error;
+      hiredJobs = data ?? [];
+    }
 
     const { data: memberships, error: membershipError } = await this.supabase.client
       .from("project_members")
@@ -78,7 +104,7 @@ export class JobsService {
     }
 
     const byId = new Map<string, any>();
-    for (const row of [...(owned ?? []), ...memberJobs]) byId.set(row.id, row);
+    for (const row of [...(owned ?? []), ...hiredJobs, ...memberJobs]) byId.set(row.id, row);
 
     const jobs = Array.from(byId.values())
       .map(mapJob)

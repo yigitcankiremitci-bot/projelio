@@ -56,14 +56,19 @@ export default function HireMemberModal({ jobId, existingUserIds, onClose, onHir
       });
       onHired(created);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kullanıcı işe alınamadı. Tekrar dene.");
+      setError(err instanceof Error ? err.message : "Davet gönderilemedi. Tekrar dene.");
       setSaving(false);
     }
   };
 
   return (
-    <Modal title="İşe al" onClose={onClose} maxWidth={380}>
+    <Modal title="İşe davet et" onClose={onClose} maxWidth={380}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* Ekleme artık tek taraflı değil: kişi bildirimden kabul edene kadar
+            ekibe katılmış sayılmaz, işin dosyalarını da göremez. */}
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
+          Seçtiğin kişiye davet bildirimi gider; kabul ettiğinde ekibe katılır.
+        </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Kullanıcı</label>
 
@@ -165,7 +170,7 @@ export default function HireMemberModal({ jobId, existingUserIds, onClose, onHir
           disabled={saving || !selectedUser}
           style={{ background: c.primary, color: "#fff", padding: "10px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {saving ? "İşe alınıyor…" : "İşe al"}
+          {saving ? "Davet gönderiliyor…" : "Davet gönder"}
         </button>
       </form>
     </Modal>

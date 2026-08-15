@@ -79,7 +79,12 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
         .get<JobMember[]>(`/jobs/${jobId}/members`)
         .then((list) =>
           setCandidates(
-            list.filter((m) => !assigned.has(m.userId)).map((m) => ({ userId: m.userId, label: displayName(m) }))
+            // Yanıt bekleyen / reddetmiş davetler ekipten sayılmaz — modüle
+            // atanacak kişiler yalnızca daveti kabul etmiş olanlardır
+            // (departman tarafındaki status === "approved" kuralıyla aynı).
+            list
+              .filter((m) => m.status === "approved" && !assigned.has(m.userId))
+              .map((m) => ({ userId: m.userId, label: displayName(m) }))
           )
         )
         .catch(() => setCandidates([]));

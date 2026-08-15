@@ -190,7 +190,10 @@ export class FilesService {
     const { data: jobMembers } = await this.supabase.client
       .from("job_members")
       .select("user_id")
-      .eq("job_id", jobId);
+      .eq("job_id", jobId)
+      // Drive klasörü yalnızca daveti kabul etmiş ekiple paylaşılır; bekleyen
+      // davet sahibi henüz ekipten sayılmaz.
+      .eq("status", "approved");
     for (const m of jobMembers ?? []) ids.add(m.user_id);
 
     // İş doğrudan gruba bağlı olabilir; organizasyon üzerinden de gruba bağlanabilir.
@@ -1812,7 +1815,7 @@ export class FilesService {
     try {
       const [{ data: job }, { data: jobMembers }] = await Promise.all([
         this.supabase.client.from("jobs").select("owner_id").eq("id", jobId).maybeSingle(),
-        this.supabase.client.from("job_members").select("user_id").eq("job_id", jobId),
+        this.supabase.client.from("job_members").select("user_id").eq("job_id", jobId).eq("status", "approved"),
       ]);
 
       const recipients = new Set<string>();

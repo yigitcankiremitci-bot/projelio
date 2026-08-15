@@ -68,7 +68,9 @@ export function useModuleReferences(scope: Scope, enabled: boolean): ReferenceSo
         );
         setUsers(
           m
-            .filter((x: any) => x.userId)
+            // İş ekibinde daveti bekleyen/reddeden kayıtlar da dönebiliyor;
+            // referans alanında yalnızca fiilen ekipte olanlar listelenmeli.
+            .filter((x: any) => x.userId && (x.status ?? "approved") === "approved")
             .map((x: any) => ({
               id: x.userId as string,
               label: x.fullName ?? x.username ?? x.email ?? "İsimsiz",

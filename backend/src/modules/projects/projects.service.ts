@@ -97,6 +97,8 @@ export class ProjectsService {
       .select("id")
       .eq("job_id", jobId)
       .eq("user_id", requestingUserId)
+      // Yalnızca daveti kabul etmiş iş ekibi üyeleri: bekleyen davet erişim vermez.
+      .eq("status", "approved")
       .maybeSingle();
     if (jobMember) return projects;
 
@@ -134,6 +136,7 @@ export class ProjectsService {
           .select("id")
           .eq("job_id", jobId)
           .eq("user_id", userId)
+          .eq("status", "approved")
           .maybeSingle();
         isJobMember = !!member;
       }
@@ -170,6 +173,7 @@ export class ProjectsService {
         .select("id")
         .eq("job_id", projectRow.job_id)
         .eq("user_id", userId)
+        .eq("status", "approved")
         .maybeSingle();
       if (jobMember) return;
     }

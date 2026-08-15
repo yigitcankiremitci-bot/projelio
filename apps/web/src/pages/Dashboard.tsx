@@ -8,6 +8,7 @@ import { useSortableList } from "../lib/useSortableList";
 import { useRefreshOnUndo, useReorderUndo, useWithoutPendingDeletes } from "../lib/undo";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useNavVisibility } from "../lib/useNavVisibility";
+import { onJobInvitesChanged } from "../lib/jobInvites";
 import { IconBuilding, IconLayers, IconChevronRight, IconFolder, IconActivity, IconFile, IconSparkle } from "../components/icons";
 import ProfileCard from "../components/ProfileCard";
 import BudgetPanel from "../components/BudgetPanel";
@@ -149,6 +150,10 @@ export default function Dashboard() {
   // Geri/ileri alma sunucu durumunu değiştirir (ör. silinen iş geri gelir);
   // liste kendini tazelemeli, yoksa ancak sayfa yenilenince görünür.
   useRefreshOnUndo(reloadAll);
+  // Bir iş daveti kabul edilince (bildirim çanından ya da iş sayfasından) o iş
+  // "Katıldıklarım" ızgarasına anında düşsün — kullanıcı sayfayı yenilemek
+  // zorunda kalmasın.
+  useEffect(() => onJobInvitesChanged(reloadJobs), []);
 
   // /jobs hem kullanıcının sahibi olduğu işleri hem de bir projesine ekip üyesi
   // olarak eklendiği işleri döner (bkz. jobs.service.ts findAllForUser). Sunucudan

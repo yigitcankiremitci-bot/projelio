@@ -1,4 +1,15 @@
-import { NOTES_FIELD, countBy, countWhere, joinDetail, labelOf, opts, type ModuleRecordConfig } from "./shared";
+import {
+  NOTES_FIELD,
+  countBy,
+  countWhere,
+  daysFromNow,
+  joinDetail,
+  labelOf,
+  opts,
+  partyField,
+  todayISO,
+  type ModuleRecordConfig,
+} from "./shared";
 
 // HUKUK ve UYUM departmanının modülleri.
 // Üçü de belge odaklı kayıt defteri (A2): taraf, tarih, durum, ek.
@@ -7,11 +18,12 @@ import { NOTES_FIELD, countBy, countWhere, joinDetail, labelOf, opts, type Modul
 const CONTRACT_STATUS = { active: "Aktif", expired: "Süresi doldu", cancelled: "İptal edildi" };
 
 export const contractConfig: ModuleRecordConfig = {
+  periodKey: "startDate",
   title: "Sözleşmeler",
   addLabel: "Sözleşme ekle",
   emptyLabel: "Henüz sözleşme kaydı yok.",
   fields: [
-    { key: "counterpartyName", label: "Karşı taraf", type: "text", required: true },
+    partyField("counterpartyName", "Karşı taraf", { required: true }),
     { key: "contractType", label: "Sözleşme türü", type: "text", placeholder: "Örn. Hizmet, Kira, Tedarik" },
     { key: "startDate", label: "Başlangıç tarihi", type: "date" },
     { key: "endDate", label: "Bitiş tarihi", type: "date" },
@@ -25,9 +37,8 @@ export const contractConfig: ModuleRecordConfig = {
   },
   computeStats: (records) => {
     // Bitişine 30 günden az kalan aktif sözleşmeler: yenileme kaçırılmasın.
-    const today = new Date();
-    const soon = new Date(today.getTime() + 30 * 86400000).toISOString().slice(0, 10);
-    const todayStr = today.toISOString().slice(0, 10);
+    const todayStr = todayISO();
+    const soon = daysFromNow(30);
     return [
       { label: "Aktif", value: String(countBy(records, "status", "active")) },
       {
@@ -63,6 +74,7 @@ const IP_STATUS = {
 };
 
 export const intellectualPropertyConfig: ModuleRecordConfig = {
+  periodKey: "applicationDate",
   title: "Marka / Patent / Telif",
   addLabel: "Kayıt ekle",
   emptyLabel: "Henüz fikri mülkiyet kaydı yok.",
@@ -83,11 +95,10 @@ export const intellectualPropertyConfig: ModuleRecordConfig = {
       d.renewalDate ? `Yenileme: ${d.renewalDate}` : undefined
     ),
   computeStats: (records) => {
-    const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10);
+    const todayStr = todayISO();
     // Fikri mülkiyette yenileme penceresi sözleşmeden geniş tutulur (90 gün) —
     // tescil yenileme süreçleri bürokratik olarak uzun sürer.
-    const soon = new Date(today.getTime() + 90 * 86400000).toISOString().slice(0, 10);
+    const soon = daysFromNow(90);
     return [
       { label: "Tescilli", value: String(countBy(records, "status", "registered")) },
       {
@@ -115,6 +126,7 @@ const RELEVANCE = { high: "Yüksek", medium: "Orta", low: "Düşük" };
 const COMPLIANCE = { compliant: "Uyumlu", gap: "Eksik var", reviewing: "İnceleniyor" };
 
 export const regulationConfig: ModuleRecordConfig = {
+  periodKey: "effectiveDate",
   title: "Mevzuatlar",
   addLabel: "Mevzuat ekle",
   emptyLabel: "Henüz mevzuat kaydı yok.",

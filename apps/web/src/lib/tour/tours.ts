@@ -157,7 +157,7 @@ export const TOURS: Tour[] = [
     match: /^\/(\?.*)?$/,
     steps: [
       {
-        id: "genel",
+        id: "butce-genel",
         title: "Bütçe sekmesi",
         text: "Bütçe, girdiğin her gelir ve gideri işlerine bağlar. Böylece hangi işin ne kazandırdığını ayrı ayrı görürsün.",
         speech:
@@ -185,7 +185,7 @@ export const TOURS: Tour[] = [
     match: /^\/calendar/,
     steps: [
       {
-        id: "genel",
+        id: "takvim-genel",
         title: "Takvim",
         text: "Teslim tarihi olan her görev burada görünür. Bir günü tıklayarak o güne doğrudan iş ekleyebilirsin.",
         speech:

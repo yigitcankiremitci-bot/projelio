@@ -15,10 +15,23 @@ export class ModuleRecordsController {
   @Post("organizations/:organizationId/module-records")
   create(
     @Param("organizationId") organizationId: string,
-    @Body() body: { departmentId?: string; moduleKey?: string; data?: Record<string, unknown> },
+    @Body() body: { departmentId?: string; moduleKey?: string; data?: Record<string, unknown>; scopeRef?: string },
     @Req() req: any
   ) {
     return this.moduleRecordsService.create(organizationId, body, req.user.userId);
+  }
+
+  // Modül kullanım göstergeleri — sekme yerleşiminin girdisi (sayfa başına tek
+  // sorgu). Bkz. docs/moduller/24-yerlesim-modul-yuzeyleri.md §4
+  @Get("organizations/:organizationId/module-stats")
+  organizationStats(@Param("organizationId") organizationId: string, @Req() req: any) {
+    return this.moduleRecordsService.organizationModuleStats(organizationId, req.user.userId);
+  }
+
+  // Serbest çalışan anasayfası: kullanıcının kendi işlerindeki modüller.
+  @Get("me/module-stats")
+  myStats(@Req() req: any) {
+    return this.moduleRecordsService.myJobModuleStats(req.user.userId);
   }
 
   // Serbest çalışan tarafı: kayıtlar organizasyona değil, modülün atandığı işe bağlı.
@@ -50,5 +63,35 @@ export class ModuleRecordsController {
   @Patch("module-records/:id/restore")
   restore(@Param("id") id: string, @Req() req: any) {
     return this.moduleRecordsService.restore(id, req.user.userId);
+  }
+
+  // ---- A1 (Form / Doküman): taslak, onay, sürüm ----
+  // Yürürlükteki metni yalnızca /approve değiştirir; /draft okuma görünümüne
+  // dokunmaz. Bkz. docs/moduller/20-motor-a1-form.md
+
+  @Patch("module-records/:id/draft")
+  saveDraft(@Param("id") id: string, @Body("data") data: Record<string, unknown>, @Req() req: any) {
+    return this.moduleRecordsService.saveDraft(id, data ?? {}, req.user.userId);
+  }
+
+  @Delete("module-records/:id/draft")
+  discardDraft(@Param("id") id: string, @Req() req: any) {
+    return this.moduleRecordsService.discardDraft(id, req.user.userId);
+  }
+
+  @Post("module-records/:id/approve")
+  approve(@Param("id") id: string, @Body("note") note: string | undefined, @Req() req: any) {
+    return this.moduleRecordsService.approve(id, note, req.user.userId);
+  }
+
+  @Get("module-records/:id/versions")
+  listVersions(@Param("id") id: string) {
+    return this.moduleRecordsService.listVersions(id);
+  }
+
+  // Sürüme dönüş taslağa yükler, yayımlamaz — kullanıcı okuyup onaylar.
+  @Post("module-records/:id/versions/:versionId/revert")
+  revert(@Param("id") id: string, @Param("versionId") versionId: string, @Req() req: any) {
+    return this.moduleRecordsService.revertToVersion(id, versionId, req.user.userId);
   }
 }

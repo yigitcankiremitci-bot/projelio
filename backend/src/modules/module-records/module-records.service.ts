@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import type { ModuleRecord } from "@projelio/shared";
+import type { ModuleRecord, ModuleRecordVersion, ModuleStatsResponse, ModuleUsageStat } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 
@@ -13,6 +13,21 @@ function mapModuleRecord(row: any): ModuleRecord {
     data: row.data ?? {},
     createdAt: row.created_at,
     archivedAt: row.archived_at ?? undefined,
+    // A1 (form) alanları — diğer arketiplerde boş kalır.
+    draftData: row.draft_data ?? undefined,
+    scopeRef: row.scope_ref ?? undefined,
+    updatedAt: row.updated_at ?? undefined,
+  };
+}
+
+function mapVersion(row: any): ModuleRecordVersion {
+  return {
+    id: row.id,
+    recordId: row.record_id,
+    data: row.data ?? {},
+    approvedBy: row.approved_by ?? undefined,
+    approvedAt: row.approved_at,
+    note: row.note ?? undefined,
   };
 }
 
@@ -137,7 +152,7 @@ export class ModuleRecordsService {
 
   async create(
     organizationId: string,
-    data: { departmentId?: string; moduleKey?: string; data?: Record<string, unknown> },
+    data: { departmentId?: string; moduleKey?: string; data?: Record<string, unknown>; scopeRef?: string },
     requestingUserId?: string
   ): Promise<ModuleRecord> {
     if (!data.moduleKey) throw new BadRequestException("moduleKey gerekli");
@@ -150,6 +165,8 @@ export class ModuleRecordsService {
         department_id: data.departmentId ?? null,
         module_key: data.moduleKey,
         data: data.data ?? {},
+        // A1: kapsam başına tek kayıt. Boş = organizasyon kapsamı.
+        scope_ref: data.scopeRef ?? null,
         created_by: requestingUserId ?? null,
       })
       .select("*")
@@ -173,13 +190,301 @@ export class ModuleRecordsService {
 
     const { data: row, error } = await this.supabase.client
       .from("module_records")
-      .update({ data: patchData })
+      .update({ data: patchData, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select("*")
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Kayıt bulunamadı");
     return mapModuleRecord(row);
+  }
+
+  // ============================================================ Kullanım göstergeleri (yerleşim)
+  //
+  // Sekme yerleşiminin girdisi. Yeni tablo yok: modülün açılma tarihi
+  // organization_modules/job_modules'tan, hacim ve son hareket module_records'tan,
+  // atanmışlık module_members'tan geliyor.
+  //
+  // Toplama SQL'de değil burada yapılıyor: PostgREST'te group by dolambaçlı ve
+  // satır sayısı (bir organizasyonun tüm modül kayıtları) bunu gerektirecek
+  // ölçekte değil. Ölçek büyürse tek bir view'a taşınır, sözleşme değişmez.
+  // Bkz. docs/moduller/24-yerlesim-modul-yuzeyleri.md §4
+
+  private aggregate(
+    rows: { module_key: string; created_at?: string; updated_at?: string; job_id?: string }[]
+  ): Map<string, { count: number; lastActivityAt?: string; jobId?: string }> {
+    const byModule = new Map<string, { count: number; lastActivityAt?: string; jobId?: string }>();
+    for (const row of rows) {
+      const current = byModule.get(row.module_key) ?? { count: 0 };
+      current.count += 1;
+      const touched = row.updated_at ?? row.created_at;
+      if (touched && (!current.lastActivityAt || touched > current.lastActivityAt)) {
+        current.lastActivityAt = touched;
+        // Modül birden fazla işe atanmış olabilir; sekme en son çalışılanı açar.
+        if (row.job_id) current.jobId = row.job_id;
+      }
+      byModule.set(row.module_key, current);
+    }
+    return byModule;
+  }
+
+  private async moduleNames(keys: string[]): Promise<Map<string, string>> {
+    if (keys.length === 0) return new Map();
+    const { data } = await this.supabase.client.from("module_catalog").select("key, name").in("key", keys);
+    return new Map((data ?? []).map((r: any) => [r.key, r.name as string]));
+  }
+
+  async organizationModuleStats(organizationId: string, userId?: string): Promise<ModuleStatsResponse> {
+    const [enabled, records, assignments, departments, org] = await Promise.all([
+      this.supabase.client
+        .from("organization_modules")
+        .select("module_key, created_at")
+        .eq("organization_id", organizationId),
+      this.supabase.client
+        .from("module_records")
+        .select("module_key, created_at, updated_at")
+        .eq("organization_id", organizationId)
+        .is("archived_at", null),
+      userId
+        ? this.supabase.client
+            .from("module_members")
+            .select("module_key")
+            .eq("organization_id", organizationId)
+            .eq("user_id", userId)
+            .eq("status", "approved")
+            .is("removed_at", null)
+        : Promise.resolve({ data: [] as any[] }),
+      this.supabase.client.from("departments").select("id").eq("organization_id", organizationId),
+      this.supabase.client.from("organizations").select("owner_id").eq("id", organizationId).maybeSingle(),
+    ]);
+
+    const departmentIds = (departments.data ?? []).map((d: any) => d.id as string);
+    // Kullanıcı sayısı: onaylı departman üyeleri + sahibi. Aynı kişi birden çok
+    // departmanda olabilir, bu yüzden tekilleştiriliyor.
+    const people = new Set<string>();
+    if ((org as any)?.data?.owner_id) people.add((org as any).data.owner_id);
+    if (departmentIds.length > 0) {
+      const { data: members } = await this.supabase.client
+        .from("department_members")
+        .select("user_id")
+        .in("department_id", departmentIds)
+        .eq("status", "approved");
+      for (const m of members ?? []) if (m.user_id) people.add(m.user_id as string);
+    }
+
+    const usage = this.aggregate((records.data ?? []) as any[]);
+    const assigned = new Set((assignments.data ?? []).map((a: any) => a.module_key as string));
+    const keys = (enabled.data ?? []).map((e: any) => e.module_key as string);
+    const names = await this.moduleNames(keys);
+
+    const modules: ModuleUsageStat[] = (enabled.data ?? []).map((e: any) => {
+      const stat = usage.get(e.module_key);
+      return {
+        moduleKey: e.module_key,
+        moduleName: names.get(e.module_key) ?? e.module_key,
+        recordCount: stat?.count ?? 0,
+        lastActivityAt: stat?.lastActivityAt,
+        enabledAt: e.created_at,
+        assignedToMe: assigned.has(e.module_key),
+      };
+    });
+
+    return {
+      size: { userCount: people.size, departmentCount: departmentIds.length },
+      modules,
+    };
+  }
+
+  /**
+   * Serbest çalışan anasayfası: kullanıcının KENDİ işlerine atadığı modüller.
+   *
+   * Ekip üyesi olarak dahil olduğu işler dışarıda: anasayfanın sekme çubuğu
+   * kişinin kendi işini yönettiği yer, başkasının işinin modülü oraya çıkmamalı.
+   */
+  async myJobModuleStats(userId: string): Promise<ModuleStatsResponse> {
+    const { data: jobs } = await this.supabase.client.from("jobs").select("id").eq("owner_id", userId);
+    const jobIds = (jobs ?? []).map((j: any) => j.id as string);
+    if (jobIds.length === 0) {
+      return { size: { userCount: 1, departmentCount: 0 }, modules: [] };
+    }
+
+    const [enabled, records, assignments] = await Promise.all([
+      this.supabase.client.from("job_modules").select("module_key, job_id, created_at").in("job_id", jobIds),
+      this.supabase.client
+        .from("module_records")
+        .select("module_key, job_id, created_at, updated_at")
+        .in("job_id", jobIds)
+        .is("archived_at", null),
+      this.supabase.client
+        .from("module_members")
+        .select("module_key")
+        .in("job_id", jobIds)
+        .eq("user_id", userId)
+        .eq("status", "approved")
+        .is("removed_at", null),
+    ]);
+
+    const usage = this.aggregate((records.data ?? []) as any[]);
+    const assigned = new Set((assignments.data ?? []).map((a: any) => a.module_key as string));
+
+    // Aynı modül birden fazla işe atanmış olabilir; sekme için tek satıra
+    // indiriliyor: en erken atama tarihi, en son çalışılan iş.
+    const byKey = new Map<string, { jobId: string; enabledAt: string }>();
+    for (const row of (enabled.data ?? []) as any[]) {
+      const current = byKey.get(row.module_key);
+      if (!current || row.created_at < current.enabledAt) {
+        byKey.set(row.module_key, { jobId: row.job_id, enabledAt: row.created_at });
+      }
+    }
+
+    const names = await this.moduleNames(Array.from(byKey.keys()));
+    const modules: ModuleUsageStat[] = Array.from(byKey.entries()).map(([key, meta]) => {
+      const stat = usage.get(key);
+      return {
+        moduleKey: key,
+        moduleName: names.get(key) ?? key,
+        recordCount: stat?.count ?? 0,
+        lastActivityAt: stat?.lastActivityAt,
+        enabledAt: meta.enabledAt,
+        assignedToMe: assigned.has(key),
+        jobId: stat?.jobId ?? meta.jobId,
+      };
+    });
+
+    // Serbest çalışan tek kişidir: departman yok, en küçük ölçek.
+    return { size: { userCount: 1, departmentCount: 0 }, modules };
+  }
+
+  // ============================================================ A1 — taslak / onay / sürüm
+  //
+  // A1 (Form / Doküman) modüllerinde "kaydet" ile "yayımla" ayrıdır:
+  // düzenleme draft_data'ya yazılır ve okuma görünümü hâlâ onaylı metni
+  // gösterir; onay verildiğinde yürürlükteki metin sürüm arşivine taşınır ve
+  // taslak yürürlüğe girer.
+  //
+  // Kural: ONAY DIŞINDA HİÇBİR YOL yürürlükteki metni değiştiremez. update()
+  // yalnızca diğer arketiplerde kullanılır; A1 panelleri saveDraft/approve
+  // çağırır.
+  // Bkz. docs/moduller/20-motor-a1-form.md §4
+
+  /** Onay yetkisi: taslak yazmak yetmez, yayımlamak ayrı yetkidir. */
+  private async assertCanApproveRecord(record: ModuleRecord, userId?: string): Promise<void> {
+    if (!userId) return;
+    const access = record.jobId
+      ? await this.moduleMembers.resolveJobAccess(record.jobId, record.moduleKey, userId)
+      : await this.moduleMembers.resolveOrganizationAccess(
+          record.organizationId!,
+          record.moduleKey,
+          userId,
+          record.departmentId
+        );
+    // canManageTeam = sahip / departman yöneticisi / modül yöneticisi.
+    if (!access.canManageTeam) {
+      throw new ForbiddenException("Bu metni yalnızca modül yöneticisi veya organizasyon sahibi onaylayabilir");
+    }
+  }
+
+  /** Taslağı kaydeder. Yürürlükteki metne dokunmaz. */
+  async saveDraft(id: string, draftData: Record<string, unknown>, requestingUserId?: string): Promise<ModuleRecord> {
+    const existing = await this.findOne(id);
+    await this.assertCanManageRecord(existing, requestingUserId);
+
+    const { data: row, error } = await this.supabase.client
+      .from("module_records")
+      .update({ draft_data: draftData, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Kayıt bulunamadı");
+    return mapModuleRecord(row);
+  }
+
+  /** Taslağı atar; yürürlükteki metin olduğu gibi kalır. */
+  async discardDraft(id: string, requestingUserId?: string): Promise<ModuleRecord> {
+    const existing = await this.findOne(id);
+    await this.assertCanManageRecord(existing, requestingUserId);
+
+    const { data: row, error } = await this.supabase.client
+      .from("module_records")
+      .update({ draft_data: null, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Kayıt bulunamadı");
+    return mapModuleRecord(row);
+  }
+
+  /**
+   * Taslağı yürürlüğe alır.
+   *
+   * Sıra önemli: önce ESKİ metin arşive yazılır, sonra yenisi yürürlüğe geçer.
+   * Ters sırada bir hata olursa eski metin kaybolurdu.
+   */
+  async approve(id: string, note?: string, requestingUserId?: string): Promise<ModuleRecord> {
+    const existing = await this.findOne(id);
+    await this.assertCanApproveRecord(existing, requestingUserId);
+
+    if (!existing.draftData) {
+      throw new BadRequestException("Onaylanacak bir değişiklik yok");
+    }
+
+    // İlk onayda yürürlükte anlamlı bir metin olmayabilir (kayıt taslak olarak
+    // doğdu); boş bir sürüm satırı yazmanın değeri yok.
+    const hasPrevious = Object.keys(existing.data ?? {}).length > 0;
+    if (hasPrevious) {
+      const { error: versionError } = await this.supabase.client.from("module_record_versions").insert({
+        record_id: id,
+        data: existing.data,
+        approved_by: requestingUserId ?? null,
+        note: note ?? null,
+      });
+      if (versionError) throw versionError;
+    }
+
+    const { data: row, error } = await this.supabase.client
+      .from("module_records")
+      .update({ data: existing.draftData, draft_data: null, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Kayıt bulunamadı");
+    return mapModuleRecord(row);
+  }
+
+  /** Sürüm geçmişi — yeniden eskiye. */
+  async listVersions(id: string): Promise<ModuleRecordVersion[]> {
+    const { data, error } = await this.supabase.client
+      .from("module_record_versions")
+      .select("*")
+      .eq("record_id", id)
+      .order("approved_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapVersion);
+  }
+
+  /**
+   * Eski bir sürüme dönüş.
+   *
+   * Doğrudan yürürlüğe GİRMEZ: eski metin taslağa yüklenir, kullanıcı okur ve
+   * onaylarsa yayımlanır. Böylece "geri al" tek tuşla sessizce yayın yapmaz.
+   */
+  async revertToVersion(id: string, versionId: string, requestingUserId?: string): Promise<ModuleRecord> {
+    const existing = await this.findOne(id);
+    await this.assertCanApproveRecord(existing, requestingUserId);
+
+    const { data: version, error } = await this.supabase.client
+      .from("module_record_versions")
+      .select("*")
+      .eq("id", versionId)
+      .eq("record_id", id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!version) throw new NotFoundException("Sürüm bulunamadı");
+
+    return this.saveDraft(id, version.data ?? {}, requestingUserId);
   }
 
   /**

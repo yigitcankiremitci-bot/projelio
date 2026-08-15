@@ -39,9 +39,30 @@ export class CatalogService {
     return (data ?? []).map(mapDepartmentCatalog);
   }
 
+  /**
+   * Bir departmanın modülleri.
+   *
+   * Departman eşlemesi artık module_catalog.department_key'de değil,
+   * module_catalog_departments'ta: bir modül birden fazla departmana açılabilir
+   * (ör. Müşteri modülü hem Satış hem Müşteri İlişkileri'nde). Tekil kolon
+   * geriye dönük uyumluluk için duruyor ve birincil departmanı gösteriyor.
+   * Bkz. 046_party_and_customer_merge.sql
+   */
   async findModules(opts: { departmentKey?: string; freelancerOnly?: boolean } = {}): Promise<ModuleCatalogEntry[]> {
+    let keysForDepartment: string[] | null = null;
+    if (opts.departmentKey) {
+      const { data: mapping, error: mappingError } = await this.supabase.client
+        .from("module_catalog_departments")
+        .select("module_key")
+        .eq("department_key", opts.departmentKey);
+      if (mappingError) throw mappingError;
+      keysForDepartment = (mapping ?? []).map((r: any) => r.module_key);
+      // Eşleme yoksa boş dönmek doğru: o departmana atanmış modül yok demektir.
+      if (keysForDepartment.length === 0) return [];
+    }
+
     let query = this.supabase.client.from("module_catalog").select("*").order("sort_order", { ascending: true });
-    if (opts.departmentKey) query = query.eq("department_key", opts.departmentKey);
+    if (keysForDepartment) query = query.in("key", keysForDepartment);
     if (opts.freelancerOnly) query = query.eq("applies_to_freelancer", true);
     const { data, error } = await query;
     if (error) throw error;

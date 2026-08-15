@@ -14,16 +14,23 @@ import BudgetPanel from "../components/BudgetPanel";
 import AllFilesPanel from "../components/AllFilesPanel";
 import DashboardModulesPanel from "../components/DashboardModulesPanel";
 import DashboardAssignedModules from "../components/DashboardAssignedModules";
+import ModuleSurface from "../components/ModuleSurface";
+import { useModuleTabs } from "../lib/useModuleTabs";
 import { tourAnchor } from "../lib/tour/types";
 
-type DashboardTab = "jobs" | "budget" | "files" | "modules";
+// Sabit sekmeler + (varsa) terfi etmiş modül sekmeleri. Modül sekmeleri
+// "Modüller"in soluna girer: kullanıcı en sık kullandığı modülü çekirdek
+// sekmelerin hemen yanında bulur, katalog en sağda kalır.
+// Bkz. docs/moduller/24-yerlesim-modul-yuzeyleri.md §3
+type DashboardTab = "jobs" | "budget" | "files" | "modules" | (string & {});
 
-const tabs: { key: DashboardTab; label: string; icon: typeof IconFolder }[] = [
+const coreTabs: { key: DashboardTab; label: string; icon: typeof IconFolder }[] = [
   { key: "jobs", label: "İşler", icon: IconFolder },
   { key: "budget", label: "Bütçe", icon: IconActivity },
   { key: "files", label: "Dosyalar", icon: IconFile },
-  { key: "modules", label: "Modüller", icon: IconSparkle },
 ];
+
+const catalogTab = { key: "modules" as DashboardTab, label: "Modüller", icon: IconSparkle };
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
@@ -100,11 +107,22 @@ export default function Dashboard() {
   // "/?tab=files" gibi bir bağlantıyla gelindiğinde ilgili sekme açık başlasın diye.
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
+  // Terfi etmiş modüller: puanlama ve slot sayısı useModuleTabs içinde
+  // (bkz. lib/moduleLayout.ts). Serbest çalışan bağlamı — organizasyon yok.
+  const moduleTabs = useModuleTabs();
+  const openModuleTab = moduleTabs.find((m) => m.key === tabParam);
   const tab: DashboardTab =
-    tabParam === "budget" || tabParam === "files" || tabParam === "modules" ? tabParam : "jobs";
+    tabParam === "budget" || tabParam === "files" || tabParam === "modules" || openModuleTab
+      ? (tabParam as DashboardTab)
+      : "jobs";
   const setTab = (next: DashboardTab) => {
     setSearchParams(next === "jobs" ? {} : { tab: next }, { replace: true });
   };
+  const tabs: { key: DashboardTab; label: string; icon: typeof IconFolder; isNew?: boolean }[] = [
+    ...coreTabs,
+    ...moduleTabs.map((m) => ({ key: m.key, label: m.name, icon: IconSparkle, isNew: m.isNew })),
+    catalogTab,
+  ];
   const [jobs, setJobs] = useState<Job[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const c = colors.light;
@@ -190,7 +208,15 @@ export default function Dashboard() {
         }}
       >
         <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
-          {tab === "jobs" ? "İşlerim" : tab === "budget" ? "Bütçem" : tab === "files" ? "Dosyalarım" : "Modüller"}
+          {openModuleTab
+            ? openModuleTab.name
+            : tab === "jobs"
+              ? "İşlerim"
+              : tab === "budget"
+                ? "Bütçem"
+                : tab === "files"
+                  ? "Dosyalarım"
+                  : "Modüller"}
         </h1>
         {/* Masaüstünde sağa dayalı, mobilde ise kendi satırında ortalanmış görünür
             (aksi halde dar ekranda satır kırılınca sola yapışık kalıyordu). */}
@@ -242,10 +268,28 @@ export default function Dashboard() {
             >
               <t.icon size={15} color={isActive ? c.accentDark : c.textSecondary} />
               {t.label}
+              {/* Terfi görünür olur, düşüş sessizdir: yeni gelen sekme tek
+                  seferlik bir noktayla kendini tanıtır. */}
+              {t.isNew && (
+                <span
+                  title="Sık kullandığın için üste alındı"
+                  style={{ width: 6, height: 6, borderRadius: "50%", background: c.accent, flexShrink: 0 }}
+                />
+              )}
             </button>
           );
         })}
       </div>
+
+      {/* Terfi etmiş modül: sekmenin içeriği modülün kendisi. jobId, modülün en
+          son çalışıldığı iştir (bkz. myJobModuleStats). */}
+      {openModuleTab && (
+        <ModuleSurface
+          moduleKey={openModuleTab.key}
+          moduleName={openModuleTab.name}
+          jobId={openModuleTab.jobId}
+        />
+      )}
 
       {tab === "budget" && <BudgetPanel />}
 

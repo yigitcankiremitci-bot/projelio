@@ -23,6 +23,7 @@ if (envPath) {
 import { NestFactory } from "@nestjs/core";
 import { Logger, ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module";
+import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
 async function bootstrap() {
   const logger = new Logger("Bootstrap");
@@ -58,6 +59,10 @@ async function bootstrap() {
   }
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  // Hangi uç noktada, hangi sebeple hata alındığını log'a yazar. Varsayılan
+  // filtre "TypeError: fetch failed" deyip asıl sebebi (error.cause) yutuyordu.
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // Render gibi platformlar dinlenen adresi 0.0.0.0 bekler; yalnızca localhost'a
   // bağlanılırsa dışarıdan erişilemez ve sağlık kontrolü başarısız olur.

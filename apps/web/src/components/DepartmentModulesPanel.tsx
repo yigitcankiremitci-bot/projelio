@@ -5,8 +5,11 @@ import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { useProjectFabAction } from "../lib/projectFab";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
+import { isOpenableModule } from "../lib/entityModules";
+import { moduleSurface } from "../lib/moduleSurfaces";
 import { useUndo } from "../lib/undo";
-import ModuleRecordsPanel from "./ModuleRecordsPanel";
+import ModuleModal from "./ModuleModal";
+import ModuleSurface from "./ModuleSurface";
 import ModuleTeamPanel from "./ModuleTeamPanel";
 import { IconCheck, IconX } from "./icons";
 
@@ -33,6 +36,8 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  // Modal yüzeyli modüller satır içinde açılmaz (bkz. lib/moduleSurfaces.ts).
+  const [modalKey, setModalKey] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   // Açılan modüldeki yetki bir kez çözülüp hem ekip paneline hem kayıt paneline
   // veriliyor — her ikisi ayrı ayrı sormasın.
@@ -79,15 +84,19 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
 
   // Modül açıldığında o modüldeki yetkiyi çöz. Kapanınca sıfırlanır ki bir
   // sonraki modül eski yetkiyle render edilmesin.
+  //
+  // Modal yüzeyli modüller expandedKey'i doldurmaz; yetki onlar için de
+  // çözülmeli, yoksa (ör. Kimlik ve Yön'de) onay düğmesi hiç görünmez.
+  const activeKey = expandedKey ?? modalKey;
   useEffect(() => {
-    if (!expandedKey) {
+    if (!activeKey) {
       setAccess(null);
       return;
     }
     let cancelled = false;
     api
       .get<ModuleAccess>(
-        `/organizations/${organizationId}/module-access?moduleKey=${encodeURIComponent(expandedKey)}&departmentId=${departmentId}`
+        `/organizations/${organizationId}/module-access?moduleKey=${encodeURIComponent(activeKey)}&departmentId=${departmentId}`
       )
       .then((a) => {
         if (!cancelled) setAccess(a);
@@ -98,7 +107,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
     return () => {
       cancelled = true;
     };
-  }, [expandedKey, organizationId, departmentId]);
+  }, [activeKey, organizationId, departmentId]);
 
   // Özel (kataloğa dayanmayan) departmanların önceden tanımlı modülü yok, o
   // yüzden bu sayfalarda "+" düğmesi devreye girmez.
@@ -113,6 +122,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
     setBusyKey(moduleKey);
     try {
       if (expandedKey === moduleKey) setExpandedKey(null);
+      if (modalKey === moduleKey) setModalKey(null);
       await api.delete(`/organizations/${organizationId}/modules/${moduleKey}`);
       load();
       // Modülü kapatmak kayıtları silmez, sadece etkinliği kaldırır — geri alma
@@ -147,6 +157,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
   }
 
   const activeCatalog = catalog.filter((e) => isEnabled(e.key));
+  const modalEntry = modalKey ? catalog.find((e) => e.key === modalKey) ?? null : null;
   const availableCatalog = catalog.filter((e) => !isEnabled(e.key));
 
   return (
@@ -200,7 +211,13 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {activeCatalog.map((entry) => {
             const config = MODULE_RECORD_CONFIGS[entry.key];
-            const isExpanded = expandedKey === entry.key;
+            // Müşteri gibi ortak varlığa yazan modüllerin kendi paneli var,
+            // module_records tanımı yok — yine de açılabilir olmalı.
+            const openable = isOpenableModule(entry.key, Boolean(config));
+            // Yüzey modülün tanımından gelir: kısa iş modalde biter, çalışma
+            // alanı olan modül satır içinde açılır (bkz. lib/moduleSurfaces.ts).
+            const opensInModal = moduleSurface(entry.key) === "modal";
+            const isExpanded = expandedKey === entry.key && !opensInModal;
             return (
               <div
                 key={entry.key}
@@ -209,8 +226,12 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
                 <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 6px 6px 12px" }}>
                   <button
                     type="button"
-                    onClick={() => config && setExpandedKey(isExpanded ? null : entry.key)}
-                    disabled={!config}
+                    onClick={() => {
+                      if (!openable) return;
+                      if (opensInModal) setModalKey(entry.key);
+                      else setExpandedKey(isExpanded ? null : entry.key);
+                    }}
+                    disabled={!openable}
                     style={{
                       flex: 1,
                       minWidth: 0,
@@ -221,7 +242,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
                       textAlign: "left",
                       background: "transparent",
                       border: "none",
-                      cursor: config ? "pointer" : "default",
+                      cursor: openable ? "pointer" : "default",
                     }}
                   >
                     <span
@@ -244,7 +265,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
                         <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>{entry.description}</div>
                       )}
                     </div>
-                    {config && (
+                    {openable && (
                       <span style={{ fontSize: 12, color: c.primary, fontWeight: 500, flexShrink: 0 }}>
                         {isExpanded ? "Kapat" : "Aç"}
                       </span>
@@ -261,7 +282,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
                   </button>
                 </div>
 
-                {isExpanded && config && (
+                {isExpanded && openable && (
                   <div
                     style={{
                       borderTop: `1px solid ${c.border}`,
@@ -279,12 +300,13 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
                       access={access ?? undefined}
                     />
                     <div style={{ borderTop: `1px solid ${c.border}` }} />
-                    <ModuleRecordsPanel
+                    <ModuleSurface
+                      moduleKey={entry.key}
+                      moduleName={entry.name}
                       organizationId={organizationId}
                       departmentId={departmentId}
-                      moduleKey={entry.key}
-                      config={config}
-                      canWrite={access?.canWrite ?? true}
+                      departmentKey={departmentKey}
+                      access={access}
                     />
                   </div>
                 )}
@@ -292,6 +314,21 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
             );
           })}
         </div>
+      )}
+
+      {/* Modal yüzeyli modüller satır içinde açılmaz: iş tek ekranda biter ve
+          kullanıcı kapatınca listedeki yerine döner. */}
+      {modalEntry && (
+        <ModuleModal
+          moduleKey={modalEntry.key}
+          moduleName={modalEntry.name}
+          description={modalEntry.description}
+          organizationId={organizationId}
+          departmentId={departmentId}
+          departmentKey={departmentKey}
+          access={access}
+          onClose={() => setModalKey(null)}
+        />
       )}
     </div>
   );

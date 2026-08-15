@@ -1,7 +1,12 @@
 import { colors } from "../theme/colors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 
-export type OrgTab = "home" | "flow" | "departments" | "products" | "budget" | "files";
+// Terfi etmiş modüller de bu çubuğa girdiği için tip string'e açıldı: sabit
+// sekme anahtarları + modül katalog anahtarları.
+// Bkz. docs/moduller/24-yerlesim-modul-yuzeyleri.md §3
+export type OrgTab = "home" | "flow" | "departments" | "products" | "budget" | "files" | (string & {});
+
+export const CORE_ORG_TABS = ["home", "flow", "departments", "products", "budget", "files"];
 
 // JobTabs ile aynı sekme görünümü. Anasayfa, organizasyonun özeti (Ürün/Hizmet +
 // Departmanlar + Modüller kartları) — varsayılan sekme budur. Departmanlar
@@ -9,7 +14,7 @@ export type OrgTab = "home" | "flow" | "departments" | "products" | "budget" | "
 // ekrandır (bkz. OrganizationDetail.tsx). Sosyal, organizasyona bağlı TÜM
 // departmanların akışlarını (+ organizasyona doğrudan yapılan paylaşımları)
 // tek bir zaman çizelgesinde toplar (bkz. FeedPanel).
-const tabs: { key: OrgTab; label: string }[] = [
+const coreTabs: { key: OrgTab; label: string }[] = [
   { key: "home", label: "Anasayfa" },
   { key: "flow", label: "Sosyal" },
   { key: "departments", label: "Departmanlar" },
@@ -24,11 +29,17 @@ interface Props {
   // Sabit başlığın üst bandındaki küçültülmüş kopya (bkz. OrganizationDetail
   // usePageHeaderTabs) marginBottom'u kaldırmak için kullanır.
   style?: React.CSSProperties;
+  /** Terfi etmiş modüller — çekirdek sekmelerin SONUNA eklenir, araya girmez. */
+  moduleTabs?: { key: string; label: string; isNew?: boolean }[];
 }
 
-export default function OrgTabs({ active, onChange, style }: Props) {
+export default function OrgTabs({ active, onChange, style, moduleTabs = [] }: Props) {
   const c = colors.light;
   const isDesktop = useIsDesktop();
+  const tabs: { key: OrgTab; label: string; isNew?: boolean }[] = [
+    ...coreTabs,
+    ...moduleTabs.map((m) => ({ key: m.key as OrgTab, label: m.label, isNew: m.isNew })),
+  ];
   return (
     <div
       style={{
@@ -69,6 +80,20 @@ export default function OrgTabs({ active, onChange, style }: Props) {
           }}
         >
           {t.label}
+          {/* Terfi görünür olur, düşüş sessizdir (bkz. doküman §3.4). */}
+          {t.isNew && (
+            <span
+              title="Sık kullandığın için üste alındı"
+              style={{
+                display: "inline-block",
+                marginLeft: 6,
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: active === t.key ? "#fff" : c.accent,
+              }}
+            />
+          )}
         </button>
       ))}
     </div>

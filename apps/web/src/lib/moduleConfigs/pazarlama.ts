@@ -1,8 +1,8 @@
 import {
-  CURRENCY_FIELD,
   NOTES_FIELD,
   countBy,
   countWhere,
+  currencyField,
   joinDetail,
   labelOf,
   moneyStats,
@@ -27,6 +27,7 @@ const SOCIAL_PLATFORM = {
 const SOCIAL_STATUS = { draft: "Taslak", scheduled: "Planlandı", published: "Yayınlandı" };
 
 export const socialMediaConfig: ModuleRecordConfig = {
+  periodKey: "scheduledDate",
   title: "Sosyal Medya",
   addLabel: "Gönderi ekle",
   emptyLabel: "Henüz planlanmış gönderi yok.",
@@ -55,6 +56,7 @@ export const socialMediaConfig: ModuleRecordConfig = {
 const EMAIL_STATUS = { draft: "Taslak", scheduled: "Planlandı", sent: "Gönderildi", cancelled: "İptal" };
 
 export const emailCampaignConfig: ModuleRecordConfig = {
+  periodKey: "sendDate",
   title: "E-mail Kampanyaları",
   addLabel: "Kampanya ekle",
   emptyLabel: "Henüz e-posta kampanyası yok.",
@@ -106,14 +108,14 @@ const AD_PLATFORM = {
 const AD_STATUS = { draft: "Taslak", live: "Yayında", paused: "Duraklatıldı", ended: "Bitti" };
 
 export const advertisingConfig: ModuleRecordConfig = {
+  periodKey: "startDate",
   title: "Reklam Kampanyaları",
   addLabel: "Kampanya ekle",
   emptyLabel: "Henüz reklam kampanyası yok.",
   fields: [
     { key: "campaignName", label: "Kampanya", type: "text", required: true },
     { key: "platform", label: "Platform", type: "select", defaultValue: "google", options: opts(AD_PLATFORM) },
-    { key: "amount", label: "Bütçe", type: "number" },
-    CURRENCY_FIELD,
+    currencyField("amount", "Bütçe"),
     { key: "startDate", label: "Başlangıç", type: "date" },
     { key: "endDate", label: "Bitiş", type: "date" },
     { key: "status", label: "Durum", type: "select", defaultValue: "draft", options: opts(AD_STATUS) },
@@ -140,6 +142,7 @@ const SEO_CHANNEL = { seo: "SEO (organik)", sem: "SEM (ücretli)", both: "Her ik
 const SEO_STATUS = { tracking: "Takipte", improving: "İyileşiyor", declining: "Geriliyor", reached: "Hedefe ulaşıldı" };
 
 export const seoSemConfig: ModuleRecordConfig = {
+  periodKey: "lastCheckDate",
   title: "SEO / SEM",
   addLabel: "Anahtar kelime ekle",
   emptyLabel: "Henüz takip edilen anahtar kelime yok.",
@@ -178,6 +181,7 @@ const PRICE_POSITION = { cheaper: "Bizden ucuz", similar: "Benzer", pricier: "Bi
 const THREAT_LEVEL = { low: "Düşük", medium: "Orta", high: "Yüksek" };
 
 export const competitorConfig: ModuleRecordConfig = {
+  periodKey: "lastReviewDate",
   title: "Rakip ve Sektör Analizi",
   addLabel: "Rakip ekle",
   emptyLabel: "Henüz rakip kaydı yok.",
@@ -253,6 +257,7 @@ const PRICING_STRATEGY = {
 const PRODUCT_STATUS = { idea: "Fikir", developing: "Geliştiriliyor", live: "Yayında", retired: "Emekli" };
 
 export const productStrategyConfig: ModuleRecordConfig = {
+  periodKey: "launchDate",
   title: "Ürün Stratejileri",
   addLabel: "Strateji ekle",
   emptyLabel: "Henüz ürün stratejisi yok.",

@@ -11,7 +11,9 @@ import ModulesPanel from "../components/ModulesPanel";
 import OrgBudgetPanel, { OrgBudgetPanelHandle } from "../components/OrgBudgetPanel";
 import AddModuleRecordModal from "../components/AddModuleRecordModal";
 import QuickFileUploadModal from "../components/QuickFileUploadModal";
-import OrgTabs, { OrgTab } from "../components/OrgTabs";
+import OrgTabs, { CORE_ORG_TABS, OrgTab } from "../components/OrgTabs";
+import ModuleSurface from "../components/ModuleSurface";
+import { useModuleTabs } from "../lib/useModuleTabs";
 import ProfileCard from "../components/ProfileCard";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
@@ -49,8 +51,12 @@ export default function OrganizationDetail() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const validTabs: OrgTab[] = ["home", "flow", "departments", "products", "budget", "files"];
-  const activeTab: OrgTab = validTabs.includes(tabParam as OrgTab) ? (tabParam as OrgTab) : "home";
+  // Terfi etmiş modüller de sekme olabilir: geçerli sekme listesi çekirdek
+  // sekmeler + o anki modül sekmeleridir (bkz. lib/moduleLayout.ts).
+  const moduleTabs = useModuleTabs(id);
+  const openModuleTab = moduleTabs.find((m) => m.key === tabParam);
+  const activeTab: OrgTab =
+    CORE_ORG_TABS.includes(tabParam ?? "") || openModuleTab ? (tabParam as OrgTab) : "home";
   const setActiveTab = (next: OrgTab) => {
     setSearchParams(next === "home" ? {} : { tab: next }, { replace: true });
   };
@@ -94,7 +100,12 @@ export default function OrganizationDetail() {
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
   // (bkz. ProjectDetail'deki aynı desen).
   usePageHeaderTabs(
-    isDesktop ? <OrgTabs active={activeTab} onChange={setActiveTab} style={{ marginBottom: 0 }} /> : null,
+    isDesktop ? <OrgTabs
+        active={activeTab}
+        onChange={setActiveTab}
+        moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
+        style={{ marginBottom: 0 }}
+      /> : null,
     [activeTab, isDesktop]
   );
 
@@ -191,7 +202,17 @@ export default function OrganizationDetail() {
           ← Organizasyonlar
         </Link>
 
-        <OrgTabs active={activeTab} onChange={setActiveTab} />
+        <OrgTabs
+          active={activeTab}
+          onChange={setActiveTab}
+          moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
+        />
+
+        {/* Terfi etmiş modül: sekmenin içeriği modülün kendisi. Departman
+            bağlamı yok — organizasyon geneli açılır. */}
+        {openModuleTab && id && (
+          <ModuleSurface moduleKey={openModuleTab.key} moduleName={openModuleTab.name} organizationId={id} />
+        )}
 
         {activeTab === "flow" && (
           <>

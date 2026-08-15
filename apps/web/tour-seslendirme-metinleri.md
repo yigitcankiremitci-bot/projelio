@@ -88,7 +88,7 @@ Modüller sekmesi, Finans, İnsan Kaynakları, Satış gibi hazır çalışma al
 
 _Gelir-gider girmek, tekrarlayan ödemeler ve bütçe özetleri._
 
-### public/tour-audio/tr/butce-nasil-calisir/genel.mp3
+### public/tour-audio/tr/butce-nasil-calisir/butce-genel.mp3
 
 **Bütçe sekmesi**
 
@@ -104,7 +104,7 @@ Yeni bir kayıt eklerken tutarı, tarihi ve kaydın bağlı olduğu işi seçers
 
 _Görevlerin takvime nasıl düşer, çalışma ritmini nasıl kurarsın?_
 
-### public/tour-audio/tr/takvim-nasil-calisir/genel.mp3
+### public/tour-audio/tr/takvim-nasil-calisir/takvim-genel.mp3
 
 **Takvim**
 

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { ENTITY_MODULE_KEYS, isEntityModule } from "../entityModules";
 import { MODULE_RECORD_CONFIGS, getModuleRecordConfig } from "./index";
 import type { ModuleFieldConfig, ModuleRecordConfig } from "./shared";
 
@@ -7,19 +8,23 @@ import type { ModuleFieldConfig, ModuleRecordConfig } from "./shared";
 // gösterge fonksiyonları hiçbir veri kombinasyonunda patlamamalı.
 // Modül tanımları lib/moduleConfigs/ altında, katalog eşlemesi index.ts'te.
 
-// module_catalog'daki 57 anahtar (043_module_catalog_descriptions.sql ile aynı liste).
+// module_catalog'daki 56 anahtar.
+// 046'da iki müşteri anahtarı (mid_musteri_modulu, spd_musteri_modulu) tek
+// crm_musteri'de birleşti; crm_musteri ortak `party` varlığına yazdığı için
+// module_records tanımı YOKTUR, kendi paneli vardır.
 const CATALOG_KEYS = [
+  "crm_musteri",
   "bt_ag_guvenlik", "bt_donanim", "bt_yazilim",
   "fm_alacak_borc", "fm_analiz_rapor", "fm_butce_hazirlama", "fm_fatura", "fm_finansal_planlama",
   "fm_gelir_gider", "fm_nakit_akis", "fm_risk_yonetimi", "fm_sermaye_yatirim_takip", "fm_vergi_takip",
   "holding_analiz", "holding_denetim", "holding_raporlama",
   "hud_marka_patent_telif", "hud_mevzuatlar", "hud_sozlesme",
   "ik_bordro_ozluk", "ik_egitim_gelisim", "ik_ic_iletisim_kultur", "ik_ise_alim_oryantasyon", "ik_performans_izleme",
-  "mid_musteri_modulu", "mid_sikayet_oneri", "mid_teknik_destek",
+  "mid_sikayet_oneri", "mid_teknik_destek",
   "oud_depo", "oud_kalite_kontrol", "oud_sevkiyat_yonetimi", "oud_tedarik",
-  "pd_buyume_hedefleri", "pd_dijital_pazarlama_seo_sem", "pd_email", "pd_hedef_kitle",
+  "pd_buyume_hedefleri", "pd_dijital_pazarlama", "pd_dijital_pazarlama_seo_sem", "pd_email", "pd_hedef_kitle",
   "pd_musteri_kazanim_optimizasyonu", "pd_rakip_sektor_analizi", "pd_reklam", "pd_sosyal_medya", "pd_urun_stratejileri",
-  "spd_musteri_modulu", "spd_ortaklik_dagitim", "spd_pazar_arastirma", "spd_satis_planlama_b2b_b2c",
+  "spd_ortaklik_dagitim", "spd_pazar_arastirma", "spd_satis_planlama_b2b_b2c",
   "uyd_urunler",
   "yonetim_analiz", "yonetim_butce_yonetimi", "yonetim_cikti_yonetimi", "yonetim_denetim", "yonetim_dosya_yonetimi",
   "yonetim_gorev_yonetimi", "yonetim_hedef_belirleme", "yonetim_misyon_sablonu", "yonetim_program_yonetimi",
@@ -31,13 +36,14 @@ const A6_PANELS = [
   "holding_analiz", "holding_raporlama", "holding_denetim",
   "yonetim_analiz", "yonetim_raporlama", "yonetim_denetim", "yonetim_butce_yonetimi",
   "fm_analiz_rapor", "fm_nakit_akis", "fm_finansal_planlama",
-  "pd_musteri_kazanim_optimizasyonu",
+  "pd_musteri_kazanim_optimizasyonu", "pd_dijital_pazarlama",
 ];
 const CORE = [
   "yonetim_proje_yonetimi", "yonetim_program_yonetimi", "yonetim_gorev_yonetimi",
   "yonetim_cikti_yonetimi", "yonetim_dosya_yonetimi",
 ];
-const OWN_TABLE = ["uyd_urunler"];
+// Kendi tablosuna/varlığına yazan modüller — module_records kullanmazlar.
+const OWN_TABLE = ["uyd_urunler", ...ENTITY_MODULE_KEYS];
 
 const entries = Object.entries(MODULE_RECORD_CONFIGS);
 
@@ -45,11 +51,22 @@ const entries = Object.entries(MODULE_RECORD_CONFIGS);
 function sampleValue(field: ModuleFieldConfig): unknown {
   switch (field.type) {
     case "number":
+    case "currency":
       return 1250.5;
     case "date":
       return "2026-08-12";
     case "select":
       return field.options?.[0]?.value ?? "";
+    case "multiselect":
+      return field.options?.[0]?.value ?? "";
+    case "entity_ref":
+    case "user_ref":
+      // Kayıtta id durur; ekranda ada çevrilmesi panelin işi (toDisplayData).
+      // Göstergeler ham veriyle çalıştığı için burada da ham id veriliyor.
+      return "0f8fad5b-d9cb-469f-a165-70867728950e";
+    case "formula":
+      // Hesaplanan alan kaydedilmez; kayıtta bulunmaması normaldir.
+      return undefined;
     default:
       return `${field.label} örnek`;
   }
@@ -74,8 +91,26 @@ describe("katalog kapsama", () => {
     assert.deepEqual(beklenmeyen, [], "sessizce generic fallback'e düşen modül var");
   });
 
-  test("40 modül tanımlı", () => {
-    assert.equal(entries.length, 40);
+  test("38 kayıt tanımı + 1 varlık modülü tanımlı", () => {
+    assert.equal(entries.length, 38);
+    assert.equal(ENTITY_MODULE_KEYS.length, 1);
+  });
+
+  test("varlık modülleri katalogda var ama kayıt tanımı YOK", () => {
+    // Ortak varlığa yazarlar (party), module_records'a değil. İkisi birden
+    // tanımlıysa hangi tabloya yazılacağı belirsizleşir.
+    for (const key of ENTITY_MODULE_KEYS) {
+      assert.ok(CATALOG_KEYS.includes(key), `${key} katalogda yok`);
+      assert.equal(MODULE_RECORD_CONFIGS[key], undefined, `${key} hem varlık hem kayıt modülü`);
+    }
+  });
+
+  test("birleşen eski müşteri anahtarları tamamen kalktı", () => {
+    for (const eski of ["mid_musteri_modulu", "spd_musteri_modulu"]) {
+      assert.equal(MODULE_RECORD_CONFIGS[eski], undefined, `${eski} hâlâ tanımlı`);
+      assert.ok(!CATALOG_KEYS.includes(eski), `${eski} hâlâ katalog listesinde`);
+    }
+    assert.ok(isEntityModule("crm_musteri"));
   });
 
   test("tanımsız anahtar generic kayıt defterine düşer", () => {
@@ -200,16 +235,18 @@ describe("para birimi göstergeleri", () => {
   // işi; onlar shared.test.ts'te doğrudan test ediliyor. Burada yalnızca bu
   // yolun gerçekten kullanıldığını doğruluyoruz: iki farklı para biriminde
   // 100'er birim, hiçbir göstergede 200 olarak toplanmamalı.
-  const paraliModuller = entries.filter(([, c]) => c.fields.some((f) => f.key === "currency"));
+  // Faz 2'den sonra para birimi ayrı bir select alanı değil, `currency` tipli
+  // alanın ikinci anahtarı (bkz. shared.ts currencyField).
+  const paraliModuller = entries.filter(([, c]) => c.fields.some((f) => f.type === "currency"));
 
   test("para birimi olan modül sayısı beklendiği gibi", () => {
-    assert.ok(paraliModuller.length >= 8, `beklenenden az: ${paraliModuller.length}`);
+    assert.ok(paraliModuller.length >= 7, `beklenenden az: ${paraliModuller.length}`);
   });
 
   for (const [key, config] of paraliModuller) {
     if (!config.computeStats) continue;
     test(`${key}: farklı para birimleri toplanmıyor`, () => {
-      const amountField = config.fields.find((f) => f.type === "number")!.key;
+      const amountField = config.fields.find((f) => f.type === "currency")!.key;
       const records = [
         sampleRecord(config, "try", { currency: "TRY", [amountField]: 100 }),
         sampleRecord(config, "usd", { currency: "USD", [amountField]: 100 }),

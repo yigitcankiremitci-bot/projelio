@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import type { Job, JobModule, ModuleCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
-import { getModuleRecordConfig } from "../lib/moduleRecordConfigs";
-import ModuleRecordsPanel from "./ModuleRecordsPanel";
+import { moduleModalWidth } from "../lib/moduleSurfaces";
+import ModuleSurface from "./ModuleSurface";
 import ModuleTeamPanel from "./ModuleTeamPanel";
 import Modal from "./Modal";
 import { IconSparkle } from "./icons";
@@ -179,12 +179,13 @@ export default function DashboardAssignedModules({ jobs }: Props) {
       </div>
 
       {open && (
-        <Modal title={open.moduleName} onClose={() => setOpenKey(null)} maxWidth={560}>
-          <ModuleRecordsPanel
-            jobId={open.job.id}
-            moduleKey={open.moduleKey}
-            config={getModuleRecordConfig(open.moduleKey, open.moduleName)}
-          />
+        <Modal
+          title={open.moduleName}
+          onClose={() => setOpenKey(null)}
+          maxWidth={moduleModalWidth(open.moduleKey)}
+          mobileFullScreen
+        >
+          <ModuleSurface jobId={open.job.id} moduleKey={open.moduleKey} moduleName={open.moduleName} />
           {/* Serbest çalışan bir işe başkasını aldıysa (job_members) o kişiyi de
               modüle atayabilsin — tek kişilik kullanımda ekip boş kalır. */}
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${c.border}` }}>

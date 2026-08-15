@@ -1,13 +1,15 @@
 import {
-  CURRENCY_FIELD,
   NOTES_FIELD,
   countBy,
   countWhere,
+  currencyField,
   fmtMoney,
   joinDetail,
   labelOf,
   moneyStats,
   opts,
+  partyField,
+  userField,
   type ModuleRecordConfig,
 } from "./shared";
 
@@ -30,17 +32,17 @@ const SALES_STAGE = {
 const CLOSED_STAGES = ["won", "lost"];
 
 export const salesPipelineConfig: ModuleRecordConfig = {
+  periodKey: "expectedCloseDate",
   title: "Satış Planlama",
   addLabel: "Fırsat ekle",
   emptyLabel: "Henüz satış fırsatı yok.",
   fields: [
     { key: "opportunityName", label: "Fırsat", type: "text", required: true },
-    { key: "customerName", label: "Müşteri", type: "text" },
+    partyField("customerName", "Müşteri"),
     { key: "channel", label: "Kanal", type: "select", defaultValue: "b2b", options: opts(SALES_CHANNEL) },
-    { key: "amount", label: "Beklenen tutar", type: "number" },
-    CURRENCY_FIELD,
+    currencyField("amount", "Beklenen tutar"),
     { key: "expectedCloseDate", label: "Beklenen kapanış", type: "date" },
-    { key: "owner", label: "Sorumlu", type: "text" },
+    userField("owner", "Sorumlu"),
     { key: "stage", label: "Aşama", type: "select", defaultValue: "lead", options: opts(SALES_STAGE) },
     NOTES_FIELD,
   ],
@@ -75,11 +77,12 @@ const PARTNER_TYPE = {
 const PARTNER_STATUS = { talking: "Görüşülüyor", active: "Aktif", paused: "Askıda", ended: "Sonlandı" };
 
 export const partnershipConfig: ModuleRecordConfig = {
+  periodKey: "startDate",
   title: "Ortaklık ve Dağıtım",
   addLabel: "Ortak ekle",
   emptyLabel: "Henüz ortaklık kaydı yok.",
   fields: [
-    { key: "partnerName", label: "Ortak / bayi", type: "text", required: true },
+    partyField("partnerName", "Ortak / bayi", { required: true, entityRole: "distributor" }),
     { key: "partnerType", label: "Tür", type: "select", defaultValue: "dealer", options: opts(PARTNER_TYPE) },
     { key: "region", label: "Bölge", type: "text", placeholder: "Örn. Ege, Marmara, Almanya" },
     { key: "contactInfo", label: "İletişim", type: "text" },
@@ -117,6 +120,7 @@ const RESEARCH_TYPE = {
 const RESEARCH_STATUS = { planned: "Planlandı", ongoing: "Devam ediyor", done: "Tamamlandı" };
 
 export const marketResearchConfig: ModuleRecordConfig = {
+  periodKey: "conductedDate",
   title: "Pazar ve Araştırma",
   addLabel: "Araştırma ekle",
   emptyLabel: "Henüz araştırma kaydı yok.",

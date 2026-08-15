@@ -1,12 +1,13 @@
 import {
-  CURRENCY_FIELD,
   NOTES_FIELD,
   countBy,
   countWhere,
+  currencyField,
   joinDetail,
   labelOf,
   moneyStats,
   opts,
+  userField,
   type ModuleRecordConfig,
 } from "./shared";
 
@@ -52,6 +53,7 @@ const TRAINING_TYPE = {
 const TRAINING_STATUS = { planned: "Planlandı", ongoing: "Devam ediyor", done: "Tamamlandı", cancelled: "İptal" };
 
 export const trainingConfig: ModuleRecordConfig = {
+  periodKey: "plannedDate",
   title: "Eğitim ve Gelişim",
   addLabel: "Eğitim ekle",
   emptyLabel: "Henüz eğitim planı yok.",
@@ -60,8 +62,7 @@ export const trainingConfig: ModuleRecordConfig = {
     { key: "participant", label: "Katılımcı", type: "text", placeholder: "Kişi veya ekip" },
     { key: "trainingType", label: "Tür", type: "select", defaultValue: "internal", options: opts(TRAINING_TYPE) },
     { key: "plannedDate", label: "Planlanan tarih", type: "date" },
-    { key: "cost", label: "Maliyet", type: "number" },
-    CURRENCY_FIELD,
+    currencyField("cost", "Maliyet"),
     { key: "status", label: "Durum", type: "select", defaultValue: "planned", options: opts(TRAINING_STATUS) },
     NOTES_FIELD,
   ],
@@ -85,6 +86,7 @@ const RATING = {
 };
 
 export const performanceConfig: ModuleRecordConfig = {
+  periodKey: "reviewDate",
   title: "Performans İzleme",
   addLabel: "Değerlendirme ekle",
   emptyLabel: "Henüz performans değerlendirmesi yok.",
@@ -94,7 +96,7 @@ export const performanceConfig: ModuleRecordConfig = {
     { key: "goalAchievement", label: "Hedef gerçekleşme (%)", type: "number" },
     { key: "rating", label: "Değerlendirme", type: "select", defaultValue: "meets", options: opts(RATING) },
     { key: "reviewDate", label: "Değerlendirme tarihi", type: "date" },
-    { key: "reviewer", label: "Değerlendiren", type: "text" },
+    userField("reviewer", "Değerlendiren"),
     { key: "notes", label: "Geri bildirim", type: "textarea" },
   ],
   summary: (d) => `${d.employeeName ?? ""}${d.period ? ` · ${d.period}` : ""}`,
@@ -122,6 +124,7 @@ export const performanceConfig: ModuleRecordConfig = {
 const PAYROLL_STATUS = { draft: "Hazırlanıyor", approved: "Onaylandı", paid: "Ödendi" };
 
 export const payrollConfig: ModuleRecordConfig = {
+  periodKey: "paymentDate",
   title: "Bordro ve Özlük",
   addLabel: "Bordro ekle",
   emptyLabel: "Henüz bordro kaydı yok.",
@@ -129,8 +132,7 @@ export const payrollConfig: ModuleRecordConfig = {
     { key: "employeeName", label: "Çalışan", type: "text", required: true },
     { key: "period", label: "Dönem", type: "text", required: true, placeholder: "Örn. 2026/07" },
     { key: "grossSalary", label: "Brüt ücret", type: "number" },
-    { key: "amount", label: "Net ödeme", type: "number", required: true },
-    CURRENCY_FIELD,
+    currencyField("amount", "Net ödeme", { required: true }),
     { key: "status", label: "Durum", type: "select", defaultValue: "draft", options: opts(PAYROLL_STATUS) },
     { key: "paymentDate", label: "Ödeme tarihi", type: "date" },
     NOTES_FIELD,
@@ -158,6 +160,7 @@ const INTERNAL_TYPE = {
 const INTERNAL_STATUS = { planned: "Planlandı", published: "Yayınlandı", done: "Tamamlandı" };
 
 export const internalCommsConfig: ModuleRecordConfig = {
+  periodKey: "date",
   title: "İç İletişim ve Kültür",
   addLabel: "Kayıt ekle",
   emptyLabel: "Henüz duyuru veya etkinlik yok.",

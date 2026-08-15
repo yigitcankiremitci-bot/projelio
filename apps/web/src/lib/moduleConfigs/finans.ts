@@ -1,14 +1,17 @@
 import {
-  CURRENCY_FIELD,
   NOTES_FIELD,
   countBy,
   countWhere,
+  currencyField,
   fmtMoney,
   joinDetail,
   labelOf,
   moneyStats,
   opts,
+  partyField,
   sumByCurrency,
+  todayISO,
+  userField,
   type ModuleRecordConfig,
 } from "./shared";
 
@@ -22,13 +25,13 @@ import {
 const ENTRY_TYPE = { income: "Gelir", expense: "Gider" };
 
 export const financeEntryConfig: ModuleRecordConfig = {
+  periodKey: "entryDate",
   title: "Gelir-Gider",
   addLabel: "Kayıt ekle",
   emptyLabel: "Henüz gelir/gider kaydı yok.",
   fields: [
     { key: "type", label: "Tür", type: "select", required: true, defaultValue: "income", options: opts(ENTRY_TYPE) },
-    { key: "amount", label: "Tutar", type: "number", required: true },
-    CURRENCY_FIELD,
+    currencyField("amount", "Tutar", { required: true }),
     { key: "category", label: "Kategori", type: "text", placeholder: "Örn. Kira, Yazılım, Satış" },
     { key: "entryDate", label: "Tarih", type: "date" },
     { key: "description", label: "Açıklama", type: "textarea" },
@@ -59,14 +62,14 @@ const RP_TYPE = { receivable: "Alacak", payable: "Borç" };
 const RP_STATUS = { open: "Açık", settled: "Kapandı" };
 
 export const receivablesPayablesConfig: ModuleRecordConfig = {
+  periodKey: "dueDate",
   title: "Alacak-Borç",
   addLabel: "Kayıt ekle",
   emptyLabel: "Henüz alacak/borç kaydı yok.",
   fields: [
     { key: "type", label: "Tür", type: "select", required: true, defaultValue: "receivable", options: opts(RP_TYPE) },
-    { key: "counterparty", label: "Kimden / Kime", type: "text", required: true, placeholder: "Örn. ABC Ltd." },
-    { key: "amount", label: "Tutar", type: "number", required: true },
-    CURRENCY_FIELD,
+    partyField("counterparty", "Kimden / Kime", { required: true }),
+    currencyField("amount", "Tutar", { required: true }),
     { key: "category", label: "Kategori", type: "text", placeholder: "Örn. Satış, Kira, Hizmet" },
     { key: "dueDate", label: "Vade tarihi", type: "date" },
     { key: "status", label: "Durum", type: "select", defaultValue: "open", options: opts(RP_STATUS) },
@@ -89,6 +92,7 @@ const INVOICE_DIRECTION = { issued: "Kesilen", received: "Alınan" };
 const INVOICE_STATUS = { pending: "Bekliyor", paid: "Ödendi" };
 
 export const invoiceConfig: ModuleRecordConfig = {
+  periodKey: "issueDate",
   title: "Faturalar",
   addLabel: "Fatura ekle",
   emptyLabel: "Henüz fatura kaydı yok.",
@@ -101,10 +105,9 @@ export const invoiceConfig: ModuleRecordConfig = {
       defaultValue: "issued",
       options: opts(INVOICE_DIRECTION),
     },
-    { key: "counterpartyName", label: "Müşteri / Tedarikçi", type: "text", required: true },
+    partyField("counterpartyName", "Müşteri / Tedarikçi", { required: true }),
     { key: "invoiceNo", label: "Fatura no", type: "text" },
-    { key: "amount", label: "Tutar", type: "number", required: true },
-    CURRENCY_FIELD,
+    currencyField("amount", "Tutar", { required: true }),
     { key: "status", label: "Durum", type: "select", defaultValue: "pending", options: opts(INVOICE_STATUS) },
     { key: "issueDate", label: "Tarih", type: "date" },
   ],
@@ -135,6 +138,7 @@ const TAX_TYPE = {
 const TAX_STATUS = { pending: "Bekliyor", declared: "Beyan edildi", paid: "Ödendi" };
 
 export const taxTrackingConfig: ModuleRecordConfig = {
+  periodKey: "dueDate",
   title: "Vergi Takibi",
   addLabel: "Yükümlülük ekle",
   emptyLabel: "Henüz vergi yükümlülüğü kaydı yok.",
@@ -142,8 +146,7 @@ export const taxTrackingConfig: ModuleRecordConfig = {
     { key: "taxType", label: "Vergi türü", type: "select", required: true, defaultValue: "kdv", options: opts(TAX_TYPE) },
     { key: "period", label: "Dönem", type: "text", required: true, placeholder: "Örn. 2026/07" },
     { key: "dueDate", label: "Son ödeme tarihi", type: "date", required: true },
-    { key: "amount", label: "Tutar", type: "number" },
-    CURRENCY_FIELD,
+    currencyField("amount", "Tutar"),
     { key: "status", label: "Durum", type: "select", defaultValue: "pending", options: opts(TAX_STATUS) },
     NOTES_FIELD,
   ],
@@ -154,7 +157,7 @@ export const taxTrackingConfig: ModuleRecordConfig = {
     const pending = records.filter((r) => r.data.status !== "paid");
     // Vadesi geçmiş ve hâlâ ödenmemiş olanlar ayrıca uyarılır — bu modülün en
     // kritik göstergesi gecikme.
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     const overdue = countWhere(records, (d) => d.status !== "paid" && typeof d.dueDate === "string" && d.dueDate < today);
     return [
       { label: "Bekleyen", value: String(pending.length) },
@@ -183,10 +186,9 @@ export const budgetPlanConfig: ModuleRecordConfig = {
       defaultValue: "expense",
       options: opts(BUDGET_DIRECTION),
     },
-    { key: "plannedAmount", label: "Planlanan tutar", type: "number", required: true },
-    CURRENCY_FIELD,
+    currencyField("plannedAmount", "Planlanan tutar", { required: true }),
     { key: "period", label: "Dönem", type: "text", placeholder: "Örn. 2026 Q3, 2026" },
-    { key: "owner", label: "Sorumlu", type: "text" },
+    userField("owner", "Sorumlu"),
     NOTES_FIELD,
   ],
   summary: (d) =>
@@ -216,6 +218,7 @@ const INVESTMENT_TYPE = {
 const INVESTMENT_STATUS = { planned: "Planlandı", done: "Yapıldı", returned: "Geri döndü", cancelled: "İptal" };
 
 export const investmentConfig: ModuleRecordConfig = {
+  periodKey: "investmentDate",
   title: "Sermaye ve Yatırım",
   addLabel: "Yatırım ekle",
   emptyLabel: "Henüz yatırım kaydı yok.",
@@ -228,8 +231,7 @@ export const investmentConfig: ModuleRecordConfig = {
       defaultValue: "equipment",
       options: opts(INVESTMENT_TYPE),
     },
-    { key: "amount", label: "Tutar", type: "number", required: true },
-    CURRENCY_FIELD,
+    currencyField("amount", "Tutar", { required: true }),
     { key: "investmentDate", label: "Tarih", type: "date" },
     { key: "expectedReturnPercent", label: "Beklenen getiri (%)", type: "number" },
     { key: "status", label: "Durum", type: "select", defaultValue: "planned", options: opts(INVESTMENT_STATUS) },
@@ -272,7 +274,7 @@ export const riskConfig: ModuleRecordConfig = {
     { key: "category", label: "Kategori", type: "select", defaultValue: "operational", options: opts(RISK_CATEGORY) },
     { key: "likelihood", label: "Olasılık", type: "select", defaultValue: "medium", options: opts(RISK_LEVEL) },
     { key: "impact", label: "Etki", type: "select", defaultValue: "medium", options: opts(RISK_LEVEL) },
-    { key: "owner", label: "Sorumlu", type: "text" },
+    userField("owner", "Sorumlu"),
     { key: "mitigation", label: "Alınacak önlem", type: "textarea" },
     { key: "status", label: "Durum", type: "select", defaultValue: "open", options: opts(RISK_STATUS) },
   ],

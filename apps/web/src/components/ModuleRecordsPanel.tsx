@@ -3,7 +3,10 @@ import type { ModuleRecord } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import type { ModuleFieldConfig, ModuleRecordConfig } from "../lib/moduleRecordConfigs";
+import { isReferenceValue } from "../lib/moduleRecordConfigs";
+import { hasDynamicFields, toDisplayData, useModuleReferences } from "../lib/moduleReferences";
 import { useUndo } from "../lib/undo";
+import ModuleFieldInput from "./ModuleFieldInput";
 import { IconTrash } from "./icons";
 
 // Kayıtların sahibi iki türlü olabilir (bkz. 037_freelancer_modules.sql):
@@ -29,22 +32,40 @@ const TOOLBAR_THRESHOLD = 8;
 
 function emptyForm(fields: ModuleFieldConfig[]): Record<string, string> {
   const f: Record<string, string> = {};
-  for (const field of fields) f[field.key] = field.defaultValue ?? "";
+  for (const field of fields) {
+    f[field.key] = field.defaultValue ?? "";
+    // currency alanı iki anahtar yönetir; para biriminin de varsayılanı olmalı.
+    if (field.type === "currency") f[field.currencyKey ?? "currency"] = "TRY";
+  }
   return f;
 }
 
 function formFromRecord(fields: ModuleFieldConfig[], record: ModuleRecord): Record<string, string> {
   const f: Record<string, string> = {};
+  const read = (key: string) => {
+    const v = record.data[key];
+    return v === undefined || v === null ? "" : String(v);
+  };
   for (const field of fields) {
-    const v = record.data[field.key];
-    f[field.key] = v === undefined || v === null ? "" : String(v);
+    f[field.key] = read(field.key);
+    // Para birimi ayrı anahtarda duruyor; yüklenmezse düzenlemede TRY'ye
+    // sıfırlanır ve kullanıcı farkında olmadan tutarın birimini değiştirir.
+    if (field.type === "currency") {
+      const ck = field.currencyKey ?? "currency";
+      f[ck] = read(ck) || "TRY";
+    }
   }
   return f;
 }
 
-/** Aramada kullanılacak, kaydın tüm metinsel içeriği. */
-function searchableText(record: ModuleRecord): string {
-  return Object.values(record.data)
+/**
+ * Aramada kullanılacak metin.
+ *
+ * Ham veri değil GÖSTERİM verisi taranır: referans alanlarında kayıtta UUID
+ * durur, kullanıcı ise gördüğü adı arar.
+ */
+function searchableText(displayData: Record<string, unknown>): string {
+  return Object.values(displayData)
     .filter((v) => typeof v === "string" || typeof v === "number")
     .join(" ")
     .toLocaleLowerCase("tr");
@@ -80,6 +101,16 @@ export default function ModuleRecordsPanel({
   const { pushUndo } = useUndo();
 
   const basePath = jobId ? `/jobs/${jobId}/module-records` : `/organizations/${organizationId}/module-records`;
+  const partyPath = jobId ? `/jobs/${jobId}/party` : `/organizations/${organizationId}/party`;
+
+  // Referans alanı olmayan modüllerde müşteri/üye listesi çekilmez.
+  const references = useModuleReferences({ organizationId, departmentId, jobId }, hasDynamicFields(config));
+
+  /** Kayıtların ekranda görünen hali: referanslar ada çevrilmiş, formüller hesaplanmış. */
+  const displayOf = useMemo(
+    () => (data: Record<string, unknown>) => toDisplayData(config, data, references.resolve),
+    [config, references.resolve]
+  );
 
   const load = () => {
     setLoading(true);
@@ -113,7 +144,7 @@ export default function ModuleRecordsPanel({
     const q = search.trim().toLocaleLowerCase("tr");
     let rows = records;
 
-    if (q) rows = rows.filter((r) => searchableText(r).includes(q));
+    if (q) rows = rows.filter((r) => searchableText(displayOf(r.data)).includes(q));
 
     for (const [key, value] of Object.entries(filters)) {
       if (value) rows = rows.filter((r) => r.data[key] === value);
@@ -135,7 +166,7 @@ export default function ModuleRecordsPanel({
       });
     }
     return rows;
-  }, [records, search, filters, sortKey, config.fields]);
+  }, [records, search, filters, sortKey, config.fields, displayOf]);
 
   const hasActiveFilter = search.trim() !== "" || Object.values(filters).some(Boolean);
   const showToolbar = records.length > TOOLBAR_THRESHOLD || hasActiveFilter;
@@ -159,6 +190,33 @@ export default function ModuleRecordsPanel({
     setError("");
   };
 
+  /**
+   * Kayıt bir müşteriye referans veriyorsa müşteri kartının geçmişine düşer.
+   *
+   * "Modüller birbirini besliyor" ilkesinin ilk somut hali: fatura kesince,
+   * destek talebi açınca ya da sözleşme girince müşteri kartında görünür.
+   *
+   * Bilerek "en iyi çaba": başarısız olursa kaydın kendisi etkilenmez —
+   * aktivite bir yan kayıttır, asıl veri değil. Alan tanımları yalnızca
+   * frontend'de olduğu için bu bağı sunucu kuramıyor; tanımlar paylaşılan
+   * pakete taşınırsa backend'e alınabilir.
+   */
+  const logToReferencedParties = async (data: Record<string, unknown>) => {
+    const partyIds = config.fields
+      .filter((f) => f.type === "entity_ref" && f.entity === "party")
+      .map((f) => data[f.key])
+      .filter(isReferenceValue);
+
+    for (const partyId of new Set(partyIds)) {
+      await api
+        .post(`/party/${partyId}/activities`, {
+          type: "sistem",
+          summary: `${config.title}: ${config.summary(data) || "yeni kayıt"}`,
+        })
+        .catch(() => {});
+    }
+  };
+
   const handleSave = async () => {
     setError("");
     // Doğrulama tüm alanlar üzerinden yapılır: hızlı formda gizli kalan zorunlu
@@ -174,15 +232,26 @@ export default function ModuleRecordsPanel({
     try {
       const data: Record<string, unknown> = {};
       for (const field of config.fields) {
+        // Hesaplanan alanlar kaydedilmez; her okumada yeniden üretilir, aksi
+        // halde kaynak alan değişince bayat bir değer kalırdı.
+        if (field.type === "formula") continue;
         const v = form[field.key];
         if (v === undefined || v === "") continue;
-        data[field.key] = field.type === "number" ? Number(v) : v;
+        data[field.key] = field.type === "number" || field.type === "currency" ? Number(v) : v;
       }
+      // currency alanı para birimini ayrı anahtara yazar (bkz. shared.ts currencyField).
+      for (const field of config.fields) {
+        if (field.type !== "currency") continue;
+        const ck = field.currencyKey ?? "currency";
+        if (form[ck]) data[ck] = form[ck];
+      }
+
       if (formMode?.kind === "edit") {
         await api.patch(`/module-records/${formMode.id}`, { data });
       } else {
         await api.post(basePath, jobId ? { moduleKey, data } : { departmentId, moduleKey, data });
       }
+      void logToReferencedParties(data);
       closeForm();
       load();
     } catch (err) {
@@ -209,8 +278,6 @@ export default function ModuleRecordsPanel({
       },
     });
   };
-
-  const inputStyle = { width: "100%" } as const;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -318,36 +385,13 @@ export default function ModuleRecordsPanel({
                 {field.label}
                 {field.required ? " *" : ""}
               </label>
-              {field.type === "select" ? (
-                <select
-                  value={form[field.key] ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, [field.key]: e.target.value }))}
-                  style={inputStyle}
-                >
-                  {!field.required && <option value="">—</option>}
-                  {field.options?.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              ) : field.type === "textarea" ? (
-                <textarea
-                  value={form[field.key] ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, [field.key]: e.target.value }))}
-                  placeholder={field.placeholder}
-                  rows={2}
-                  style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
-                />
-              ) : (
-                <input
-                  type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-                  value={form[field.key] ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, [field.key]: e.target.value }))}
-                  placeholder={field.placeholder}
-                  style={inputStyle}
-                />
-              )}
+              <ModuleFieldInput
+                field={field}
+                form={form}
+                setValue={(key, value) => setForm((f) => ({ ...f, [key]: value }))}
+                references={references}
+                createPartyPath={partyPath}
+              />
             </div>
           ))}
 
@@ -393,7 +437,8 @@ export default function ModuleRecordsPanel({
             </span>
           )}
           {visible.map((r) => {
-            const detail = config.detail?.(r.data);
+            const shown = displayOf(r.data);
+            const detail = config.detail?.(shown);
             const isEditing = formMode?.kind === "edit" && formMode.id === r.id;
             return (
               <div
@@ -422,7 +467,7 @@ export default function ModuleRecordsPanel({
                     cursor: canWrite ? "pointer" : "default",
                   }}
                 >
-                  <div style={{ fontSize: 14, color: c.textPrimary }}>{config.summary(r.data)}</div>
+                  <div style={{ fontSize: 14, color: c.textPrimary }}>{config.summary(shown)}</div>
                   {detail && <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>{detail}</div>}
                 </button>
                 {canWrite && (

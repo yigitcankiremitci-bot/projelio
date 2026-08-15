@@ -1,4 +1,13 @@
-import { NOTES_FIELD, countBy, countWhere, joinDetail, labelOf, opts, type ModuleRecordConfig } from "./shared";
+import {
+  NOTES_FIELD,
+  countBy,
+  countWhere,
+  joinDetail,
+  labelOf,
+  opts,
+  partyField,
+  type ModuleRecordConfig,
+} from "./shared";
 
 // OPERASYON / ÜRETİM departmanının modülleri.
 //
@@ -11,12 +20,13 @@ import { NOTES_FIELD, countBy, countWhere, joinDetail, labelOf, opts, type Modul
 const PROCUREMENT_STATUS = { requested: "Talep edildi", ordered: "Sipariş verildi", received: "Teslim alındı" };
 
 export const procurementConfig: ModuleRecordConfig = {
+  periodKey: "expectedDate",
   title: "Tedarik",
   addLabel: "Talep ekle",
   emptyLabel: "Henüz tedarik kaydı yok.",
   fields: [
     { key: "itemName", label: "Ürün / Hizmet", type: "text", required: true },
-    { key: "supplierName", label: "Tedarikçi", type: "text" },
+    partyField("supplierName", "Tedarikçi", { entityRole: "supplier" }),
     { key: "quantity", label: "Miktar", type: "number" },
     { key: "status", label: "Durum", type: "select", defaultValue: "requested", options: opts(PROCUREMENT_STATUS) },
     { key: "expectedDate", label: "Beklenen tarih", type: "date" },
@@ -84,11 +94,12 @@ const SHIPMENT_STATUS = {
 };
 
 export const shipmentConfig: ModuleRecordConfig = {
+  periodKey: "shipDate",
   title: "Sevkiyat",
   addLabel: "Sevkiyat ekle",
   emptyLabel: "Henüz sevkiyat kaydı yok.",
   fields: [
-    { key: "customerName", label: "Müşteri / alıcı", type: "text", required: true },
+    partyField("customerName", "Müşteri / alıcı", { required: true, entityRole: "customer" }),
     { key: "shipmentNo", label: "Sevkiyat no", type: "text" },
     { key: "itemSummary", label: "Gönderilen", type: "text", placeholder: "Örn. 3 koli, 12 adet" },
     { key: "shipDate", label: "Çıkış tarihi", type: "date" },
@@ -130,6 +141,7 @@ const QUALITY_STATUS = {
 };
 
 export const qualityControlConfig: ModuleRecordConfig = {
+  periodKey: "detectedDate",
   title: "Kalite Kontrol",
   addLabel: "Kayıt ekle",
   emptyLabel: "Henüz kalite kaydı yok.",

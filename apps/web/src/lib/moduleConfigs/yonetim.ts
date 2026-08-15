@@ -1,4 +1,12 @@
-import { NOTES_FIELD, countBy, joinDetail, labelOf, opts, type ModuleRecordConfig } from "./shared";
+import {
+  NOTES_FIELD,
+  countBy,
+  joinDetail,
+  labelOf,
+  opts,
+  userField,
+  type ModuleRecordConfig,
+} from "./shared";
 
 // YÖNETİM departmanının modülleri.
 //
@@ -12,12 +20,13 @@ import { NOTES_FIELD, countBy, joinDetail, labelOf, opts, type ModuleRecordConfi
 const GOAL_STATUS = { not_started: "Başlanmadı", in_progress: "Devam ediyor", done: "Tamamlandı" };
 
 export const goalConfig: ModuleRecordConfig = {
+  periodKey: "targetDate",
   title: "Hedefler",
   addLabel: "Hedef ekle",
   emptyLabel: "Henüz hedef tanımlanmadı.",
   fields: [
     { key: "title", label: "Hedef", type: "text", required: true },
-    { key: "owner", label: "Sorumlu", type: "text" },
+    userField("owner", "Sorumlu"),
     { key: "targetDate", label: "Hedef tarih", type: "date" },
     { key: "status", label: "Durum", type: "select", defaultValue: "not_started", options: opts(GOAL_STATUS) },
     NOTES_FIELD,
@@ -40,6 +49,7 @@ const STATEMENT_STATUS = { draft: "Taslak", approved: "Onaylandı", outdated: "G
 const HORIZON = { y1: "1 yıl", y3: "3 yıl", y5: "5 yıl", y10: "10 yıl" };
 
 export const visionConfig: ModuleRecordConfig = {
+  periodKey: "effectiveDate",
   title: "Vizyon",
   addLabel: "Vizyon ekle",
   emptyLabel: "Henüz vizyon tanımlanmadı.",
@@ -65,6 +75,7 @@ export const visionConfig: ModuleRecordConfig = {
 };
 
 export const missionConfig: ModuleRecordConfig = {
+  periodKey: "effectiveDate",
   title: "Misyon",
   addLabel: "Misyon ekle",
   emptyLabel: "Henüz misyon tanımlanmadı.",

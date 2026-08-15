@@ -1,4 +1,13 @@
-import { NOTES_FIELD, countBy, countWhere, joinDetail, labelOf, opts, type ModuleRecordConfig } from "./shared";
+import {
+  NOTES_FIELD,
+  countBy,
+  countWhere,
+  joinDetail,
+  labelOf,
+  opts,
+  userField,
+  type ModuleRecordConfig,
+} from "./shared";
 
 // BİLGİ TEKNOLOJİLERİ / YAZILIM departmanının modülleri.
 
@@ -8,6 +17,7 @@ import { NOTES_FIELD, countBy, countWhere, joinDetail, labelOf, opts, type Modul
 const SOFTWARE_STATUS = { active: "Aktif", expiring: "Yakında yenilenecek", expired: "Süresi doldu" };
 
 export const softwareConfig: ModuleRecordConfig = {
+  periodKey: "renewalDate",
   title: "Yazılım / Araç Envanteri",
   addLabel: "Araç ekle",
   emptyLabel: "Henüz kayıtlı yazılım/araç yok.",
@@ -42,6 +52,7 @@ const HARDWARE_TYPE = {
 const HARDWARE_STATUS = { in_use: "Kullanımda", in_stock: "Depoda", service: "Serviste", retired: "Hurda" };
 
 export const hardwareConfig: ModuleRecordConfig = {
+  periodKey: "purchaseDate",
   title: "Donanım / Zimmet",
   addLabel: "Donanım ekle",
   emptyLabel: "Henüz donanım kaydı yok.",
@@ -49,7 +60,7 @@ export const hardwareConfig: ModuleRecordConfig = {
     { key: "assetName", label: "Cihaz", type: "text", required: true, placeholder: "Örn. MacBook Pro 14" },
     { key: "assetType", label: "Tür", type: "select", defaultValue: "computer", options: opts(HARDWARE_TYPE) },
     { key: "serialNo", label: "Seri no", type: "text" },
-    { key: "assignedTo", label: "Zimmetli kişi", type: "text" },
+    userField("assignedTo", "Zimmetli kişi"),
     { key: "purchaseDate", label: "Alım tarihi", type: "date" },
     { key: "status", label: "Durum", type: "select", defaultValue: "in_use", options: opts(HARDWARE_STATUS) },
     NOTES_FIELD,
@@ -82,6 +93,7 @@ const SEVERITY = { low: "Düşük", medium: "Orta", high: "Yüksek", critical: "
 const SECURITY_STATUS = { open: "Açık", investigating: "İnceleniyor", closed: "Kapandı" };
 
 export const networkSecurityConfig: ModuleRecordConfig = {
+  periodKey: "detectedDate",
   title: "Ağ ve Güvenlik",
   addLabel: "Kayıt ekle",
   emptyLabel: "Henüz güvenlik kaydı yok.",
@@ -90,7 +102,7 @@ export const networkSecurityConfig: ModuleRecordConfig = {
     { key: "type", label: "Tür", type: "select", defaultValue: "check", options: opts(SECURITY_TYPE) },
     { key: "severity", label: "Önem derecesi", type: "select", defaultValue: "medium", options: opts(SEVERITY) },
     { key: "detectedDate", label: "Tespit / kontrol tarihi", type: "date" },
-    { key: "owner", label: "Sorumlu", type: "text" },
+    userField("owner", "Sorumlu"),
     { key: "status", label: "Durum", type: "select", defaultValue: "open", options: opts(SECURITY_STATUS) },
     { key: "notes", label: "Bulgular / alınan aksiyon", type: "textarea" },
   ],

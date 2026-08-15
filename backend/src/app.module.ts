@@ -33,6 +33,7 @@ import { JobModulesModule } from "./modules/job-modules/job-modules.module";
 import { PartnersModule } from "./modules/partners/partners.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ModuleMembersModule } from "./modules/module-members/module-members.module";
+import { PartyModule } from "./modules/party/party.module";
 import { ModuleRecordsModule } from "./modules/module-records/module-records.module";
 import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.module";
 import { PlanningModule } from "./modules/planning/planning.module";
@@ -74,6 +75,7 @@ import { PlanningModule } from "./modules/planning/planning.module";
     ProductsModule,
     ModuleMembersModule,
     ModuleRecordsModule,
+    PartyModule,
     PersonalTodosModule,
     PlanningModule,
   ],

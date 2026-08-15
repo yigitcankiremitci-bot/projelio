@@ -16,7 +16,7 @@ import {
   performanceConfig,
   trainingConfig,
 } from "./insanKaynaklari";
-import { complaintConfig, customerConfig, supportTicketConfig } from "./musteriIliskileri";
+import { complaintConfig, supportTicketConfig } from "./musteriIliskileri";
 import { procurementConfig, qualityControlConfig, shipmentConfig, warehouseConfig } from "./operasyon";
 import {
   advertisingConfig,
@@ -120,7 +120,6 @@ export const MODULE_RECORD_CONFIGS: Record<string, ModuleRecordConfig> = {
 
   // SATIŞ ve İŞ GELİŞTİRME
   spd_satis_planlama_b2b_b2c: salesPipelineConfig,
-  spd_musteri_modulu: customerConfig,
   spd_ortaklik_dagitim: partnershipConfig,
   spd_pazar_arastirma: marketResearchConfig,
 
@@ -136,7 +135,8 @@ export const MODULE_RECORD_CONFIGS: Record<string, ModuleRecordConfig> = {
   bt_ag_guvenlik: networkSecurityConfig,
 
   // MÜŞTERİ İLİŞKİLERİ
-  mid_musteri_modulu: customerConfig,
+  // Müşteri modülü burada yok: crm_musteri ortak `party` varlığına yazar ve
+  // kendi paneli vardır (bkz. lib/entityModules.ts).
   mid_sikayet_oneri: complaintConfig,
   mid_teknik_destek: supportTicketConfig,
 

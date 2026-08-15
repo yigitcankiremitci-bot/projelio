@@ -264,6 +264,118 @@ export interface ModuleAccess {
   role?: ModuleMemberRole;
 }
 
+// ============================================================ Ortak varlık: party
+//
+// Dış dünyadaki kişi ve kurumların TEK kaydı. Modül veriyi sahiplenmez; ortak
+// bir varlığa açılan penceredir. Bu yüzden Satış ve Müşteri İlişkileri aynı
+// müşteriye bakar, ayrı kayıt tutmaz.
+// Bkz. database/migrations/046_party_and_customer_merge.sql ve
+//      docs/moduller/03-ortak-varlik-party.md
+//
+// DİKKAT: Partner (yukarıdaki, hisse ortağı) ve Party farklı şeylerdir.
+//   users   → Projelio hesabı olan ekip üyesi
+//   Partner → şirkete HİSSE ile ortak olan kişi (iç kavram)
+//   Party   → şirketin DIŞINDAKİ kişi/kurum
+
+// Rol bir alandır, tablo değil: aynı firma hem müşteri hem tedarikçi olabilir.
+// Rol EKLENİR, silinmez — ilk fatura kesilince lead üzerine customer eklenir.
+export type PartyRole = "lead" | "customer" | "supplier" | "candidate" | "distributor" | "other";
+export type PartyType = "person" | "company";
+export type PartyStatus = "active" | "passive" | "blocked";
+
+export interface PartyAddress {
+  country?: string;
+  city?: string;
+  district?: string;
+  line?: string;
+  postalCode?: string;
+}
+
+export interface Party {
+  id: string;
+  // module_records ile aynı desen: ya organizasyona ya İŞ'e ait.
+  organizationId?: string;
+  jobId?: string;
+
+  partyType: PartyType;
+  displayName: string;
+  legalName?: string;
+
+  taxNumber?: string;
+  taxOffice?: string;
+
+  email?: string;
+  phone?: string;
+  website?: string;
+  address?: PartyAddress;
+
+  roles: PartyRole[];
+  status: PartyStatus;
+  source?: string;
+
+  ownerUserId?: string;
+  parentPartyId?: string;
+  linkedUserId?: string;
+  /** Yinelenen kayıt birleştirildiyse hedef kaydın id'si. */
+  mergedIntoId?: string;
+
+  /** Organizasyona özel ek alanlar. */
+  data: Record<string, unknown>;
+  notes?: string;
+
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string;
+
+  // Sunucuda hesaplanan, yazılamayan alanlar.
+  ownerName?: string;
+  contactCount?: number;
+  lastActivityAt?: string;
+}
+
+/** Kurumdaki kişi. B2B'de firma bir, muhatap birden fazladır. */
+export interface PartyContact {
+  id: string;
+  partyId: string;
+  name: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+  isPrimary: boolean;
+  notes?: string;
+  createdAt: string;
+  archivedAt?: string;
+}
+
+export type PartyActivityType = "not" | "arama" | "toplanti" | "eposta" | "teklif" | "ziyaret" | "sistem";
+
+/**
+ * Temas geçmişi. Manuel notların yanı sıra diğer modüller de yazar
+ * (related_type/related_id) — müşteri kartı tek akışta fatura, talep ve
+ * fırsatı birlikte gösterir.
+ */
+export interface PartyActivity {
+  id: string;
+  partyId: string;
+  type: PartyActivityType;
+  occurredAt: string;
+  summary: string;
+  userId?: string;
+  relatedType?: string;
+  relatedId?: string;
+  createdAt: string;
+  userName?: string;
+}
+
+/** Kayıt eklenirken/güncellenirken tespit edilen olası yinelenen kayıt. */
+export interface PartyDuplicate {
+  party: Party;
+  /** block: kayıt açılmaz (vergi no). warn: kullanıcıya sorulur. */
+  severity: "block" | "warn";
+  reason: "tax_number" | "email" | "name";
+}
+
 // ============================================================ Ortaklar (hisse)
 
 export type PartnerStatus = "invited" | "pending" | "approved" | "rejected" | "removed";
@@ -307,6 +419,55 @@ export interface ModuleRecord {
   data: Record<string, unknown>;
   createdAt: string;
   archivedAt?: string;
+
+  // ---- A1 (Form / Doküman) arketipi ----
+  // Yürürlükteki metin daima `data`'dadır. `draftData` onaylanmamış
+  // değişikliklerdir: kaydedilir ama okuma görünümünde gösterilmez; boş ise
+  // bekleyen değişiklik yoktur. Bkz. docs/moduller/20-motor-a1-form.md
+  draftData?: Record<string, unknown>;
+  // "Kapsam başına tek kayıt" kuralında kapsamı adresler (ör. products.id).
+  // Boş = organizasyon/iş kapsamı.
+  scopeRef?: string;
+  updatedAt?: string;
+}
+
+/**
+ * A1 modüllerinde yürürlükten DÜŞEN metin.
+ *
+ * Yürürlükteki metin her zaman ModuleRecord.data'dadır; burada yalnızca geçmiş
+ * durur. Böylece okuma yolu tek sorgu kalır, sürüm geçmişi istendiğinde açılır.
+ */
+export interface ModuleRecordVersion {
+  id: string;
+  recordId: string;
+  data: Record<string, unknown>;
+  approvedBy?: string;
+  approvedAt: string;
+  note?: string;
+}
+
+/**
+ * Bir modülün kullanım göstergeleri — sekme yerleşiminin girdisi.
+ *
+ * Tıklama günlüğü tutulmuyor: kayıt hareketi kullanımın daha dürüst
+ * göstergesi, çünkü insan baktığı yeri değil çalıştığı yeri doldurur.
+ * Bkz. docs/moduller/24-yerlesim-modul-yuzeyleri.md §4
+ */
+export interface ModuleUsageStat {
+  moduleKey: string;
+  moduleName: string;
+  recordCount: number;
+  lastActivityAt?: string;
+  enabledAt?: string;
+  assignedToMe: boolean;
+  /** Serbest çalışan tarafında modülün açılacağı iş. */
+  jobId?: string;
+}
+
+export interface ModuleStatsResponse {
+  /** Şirket büyüklüğü — kaç modül sekmesi gösterileceğini belirler. */
+  size: { userCount: number; departmentCount: number };
+  modules: ModuleUsageStat[];
 }
 
 export type ProjectStatus = "active" | "completed" | "archived";

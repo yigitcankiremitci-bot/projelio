@@ -1,47 +1,34 @@
-import { NOTES_FIELD, countBy, countWhere, joinDetail, labelOf, opts, type ModuleRecordConfig } from "./shared";
+import {
+  countBy,
+  countWhere,
+  joinDetail,
+  labelOf,
+  opts,
+  partyField,
+  userField,
+  type ModuleRecordConfig,
+} from "./shared";
 
 // MÜŞTERİ İLİŞKİLERİ departmanının modülleri.
 //
-// Not: Müşteri modülü hem Müşteri İlişkileri (mid_musteri_modulu) hem Satış ve
-// İş Geliştirme (spd_musteri_modulu) kataloğunda aynı adla geçiyor. İkisi de bu
-// yapılandırmayı kullanıyor ama AYRI module_key ile AYRI kayıt yazıyor — yani
-// aynı müşteri iki departmanda iki farklı kayıt oluyor.
-// Bu bilinen bir veri bölünmesi; tek `party` tablosunda birleştirilmesi Faz 3'e ait.
-// Bkz. docs/moduller/03-ortak-varlik-party.md ve 11-modul-crm_musteri.md
-
-// ============================================================ Müşteri
-const CUSTOMER_STATUS = { lead: "Aday", active: "Aktif", inactive: "Pasif" };
-
-export const customerConfig: ModuleRecordConfig = {
-  title: "Müşteriler",
-  addLabel: "Müşteri ekle",
-  emptyLabel: "Henüz müşteri kaydı yok.",
-  fields: [
-    { key: "name", label: "İsim", type: "text", required: true },
-    { key: "contact", label: "İletişim (telefon/e-posta)", type: "text" },
-    { key: "status", label: "Durum", type: "select", defaultValue: "lead", options: opts(CUSTOMER_STATUS) },
-    NOTES_FIELD,
-  ],
-  summary: (d) => (d.name as string) ?? "",
-  detail: (d) => joinDetail(labelOf(CUSTOMER_STATUS, d.status), d.contact as string),
-  computeStats: (records) => [
-    { label: "Toplam", value: String(records.length) },
-    { label: "Aktif", value: String(countBy(records, "status", "active")) },
-    { label: "Aday", value: String(countBy(records, "status", "lead")) },
-  ],
-};
+// Müşteri modülü burada YOK: artık ortak `party` varlığına yazıyor ve kendi
+// paneli var (CustomersPanel). Önceden mid_musteri_modulu ve spd_musteri_modulu
+// diye iki ayrı anahtar vardı; aynı arayüzü kullanıyor ama ayrı kayıt tutuyor,
+// yani aynı müşteri iki departmanda bölünüyordu.
+// Bkz. 046_party_and_customer_merge.sql, lib/entityModules.ts
 
 // ============================================================ Şikayet ve Öneri
 const COMPLAINT_TYPE = { complaint: "Şikayet", suggestion: "Öneri" };
 const COMPLAINT_STATUS = { open: "Açık", resolved: "Çözüldü" };
 
 export const complaintConfig: ModuleRecordConfig = {
+  periodKey: "date",
   title: "Şikayet ve Öneri",
   addLabel: "Kayıt ekle",
   emptyLabel: "Henüz şikayet/öneri kaydı yok.",
   fields: [
     { key: "type", label: "Tür", type: "select", defaultValue: "complaint", options: opts(COMPLAINT_TYPE) },
-    { key: "customerName", label: "Müşteri adı", type: "text" },
+    partyField("customerName", "Müşteri", { entityRole: "customer" }),
     { key: "description", label: "Açıklama", type: "textarea", required: true },
     { key: "status", label: "Durum", type: "select", defaultValue: "open", options: opts(COMPLAINT_STATUS) },
     { key: "date", label: "Tarih", type: "date" },
@@ -74,15 +61,16 @@ const TICKET_STATUS = {
 };
 
 export const supportTicketConfig: ModuleRecordConfig = {
+  periodKey: "openedDate",
   title: "Teknik Destek",
   addLabel: "Talep aç",
   emptyLabel: "Henüz destek talebi yok.",
   fields: [
     { key: "subject", label: "Konu", type: "text", required: true },
-    { key: "customerName", label: "Müşteri", type: "text" },
+    partyField("customerName", "Müşteri", { entityRole: "customer" }),
     { key: "priority", label: "Öncelik", type: "select", defaultValue: "normal", options: opts(TICKET_PRIORITY) },
     { key: "channel", label: "Geliş kanalı", type: "select", defaultValue: "email", options: opts(TICKET_CHANNEL) },
-    { key: "assignee", label: "Sorumlu", type: "text" },
+    userField("assignee", "Sorumlu"),
     { key: "openedDate", label: "Açılış tarihi", type: "date" },
     { key: "status", label: "Durum", type: "select", defaultValue: "open", options: opts(TICKET_STATUS) },
     { key: "description", label: "Açıklama", type: "textarea" },

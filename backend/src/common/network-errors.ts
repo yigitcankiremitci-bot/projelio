@@ -27,6 +27,27 @@ const MAX_DEPTH = 5;
 
 export function describeError(error: unknown): string {
   if (error instanceof Error) return `${error.name}: ${error.message}`;
+
+  // Supabase/PostgREST hataları Error DEĞİL, düz nesnedir:
+  // { message, code, details, hint }. String() bunları "[object Object]"e
+  // çevirip logu tamamen işe yaramaz hale getiriyordu — hangi tablonun
+  // hangi kolonunun eksik olduğu tam da bu alanların içinde yazıyor.
+  if (error && typeof error === "object") {
+    const e = error as { message?: unknown; code?: unknown; details?: unknown; hint?: unknown };
+    if (typeof e.message === "string") {
+      const parts = [e.code ? `[${String(e.code)}]` : null, e.message];
+      if (e.details) parts.push(`· ayrıntı: ${String(e.details)}`);
+      if (e.hint) parts.push(`· ipucu: ${String(e.hint)}`);
+      return parts.filter(Boolean).join(" ");
+    }
+    // message'ı olmayan nesneler için de en azından içeriği görelim.
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
+    }
+  }
+
   return String(error);
 }
 

@@ -14,6 +14,10 @@ export default function Login() {
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
   const c = colors.light;
+  // Oturumu geçersizleşen kullanıcı buraya sebepsizce fırlatılmasın: neden
+  // çıkarıldığını bilmezse "verilerim silindi" sanıyor (bkz. api/client.ts
+  // handleExpiredSession).
+  const sessionExpired = new URLSearchParams(window.location.search).get("session") === "expired";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +78,21 @@ export default function Login() {
             Freelance proje &amp; görev yönetimi
           </p>
         </div>
+
+        {sessionExpired && (
+          <p
+            style={{
+              color: c.textSecondary,
+              fontSize: 15,
+              margin: "0 0 16px",
+              padding: "10px 12px",
+              border: `1px solid ${c.border}`,
+              borderRadius: 8,
+            }}
+          >
+            Oturumun sona erdi. Verilerin yerinde — tekrar giriş yaptığında hepsi karşında olacak.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

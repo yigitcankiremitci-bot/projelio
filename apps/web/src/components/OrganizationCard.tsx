@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { coverBackground } from "../lib/covers";
 import type { Organization } from "@projelio/shared";
 import { colors } from "../theme/colors";
 import { IconFolder, IconLayers, IconBuilding } from "./icons";
@@ -22,7 +23,7 @@ export default function OrganizationCard({ organization }: Props) {
       }}
     >
       {organization.coverImageUrl ? (
-        <div style={{ aspectRatio: "3 / 1", background: `center/cover url(${organization.coverImageUrl})` }} />
+        <div style={{ aspectRatio: "3 / 1", background: coverBackground(organization.coverImageUrl) }} />
       ) : (
         <div style={{ aspectRatio: "3 / 1", background: c.background, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <IconBuilding size={22} color={c.textSecondary} />

@@ -122,6 +122,16 @@ export interface ModuleRecordConfig {
    * bırakmak, kullanıcının veri kaybettiğini sanmasına yol açardı.
    */
   periodKey?: string;
+
+  /**
+   * Pano (kanban) görünümünde kayıtların hangi alana göre sütunlara ayrılacağı.
+   *
+   * Verilmezse panel ilk uygun `select` alanını kendisi seçer — çoğu modülde
+   * doğru alan zaten "durum"dur. Bu anahtar yalnızca birden fazla select alanı
+   * olan ve varsayılanın yanlış geldiği modüller için var (ör. Gelir-Gider'de
+   * kayıtlar kategoriye değil türe göre bölünmeli).
+   */
+  boardKey?: string;
   // Liste satırında kalın gösterilecek özet (örn. "+ 1.250,00 TRY · Kira").
   summary: (data: Record<string, unknown>) => string;
   // İkinci satır (opsiyonel, daha soluk gösterilir).

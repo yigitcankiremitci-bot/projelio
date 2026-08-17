@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { findCoverPreset } from "../lib/covers";
 import { Link, useLocation } from "react-router-dom";
 import type { Department, Job } from "@projelio/shared";
 import { colors } from "../theme/colors";
@@ -476,7 +477,10 @@ function Row({
   onLabelDoubleClick?: () => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const showImage = Boolean(imageUrl) && !imageFailed;
+  // Hazır kapaklar (preset:...) bir dosya değil CSS gradyanıdır; <img> ile
+  // gösterilemez, küçük renkli bir kare olarak çizilir.
+  const presetCover = findCoverPreset(imageUrl);
+  const showImage = Boolean(imageUrl) && !presetCover && !imageFailed;
   const contentStyle = {
     flex: 1,
     minWidth: 0,
@@ -491,7 +495,19 @@ function Row({
   };
   const content = (
     <>
-      {showImage ? (
+      {presetCover ? (
+        <span
+          aria-hidden
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: 4,
+            flexShrink: 0,
+            background: presetCover.background,
+            border: active ? `1px solid ${colors.light.accent}` : "1px solid rgba(255,255,255,0.15)",
+          }}
+        />
+      ) : showImage ? (
         <img
           src={imageUrl}
           alt=""

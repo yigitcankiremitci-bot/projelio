@@ -26,6 +26,10 @@ const ENTRY_TYPE = { income: "Gelir", expense: "Gider" };
 
 export const financeEntryConfig: ModuleRecordConfig = {
   periodKey: "entryDate",
+  // Pano görünümünde gelir ve gider iki ayrı sütun olur. Varsayılan seçim
+  // (ilk select alanı) burada zaten "type" ama açıkça yazılıyor: bu modülde
+  // sütunların türe göre bölünmesi bir tasarım kararı, tesadüf değil.
+  boardKey: "type",
   title: "Gelir-Gider",
   addLabel: "Kayıt ekle",
   emptyLabel: "Henüz gelir/gider kaydı yok.",

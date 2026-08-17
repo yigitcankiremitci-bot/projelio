@@ -31,6 +31,8 @@ function mapTask(row: any): Task {
     completedBy: row.completed_by ?? undefined,
     completedByName: row.completed_by_user?.full_name ?? undefined,
     projectTitle: row.projects?.title ?? undefined,
+    sourceModuleKey: row.source_module_key ?? undefined,
+    sourceRecordId: row.source_record_id ?? undefined,
   };
 }
 
@@ -265,6 +267,9 @@ export class TasksService {
         week_number: data.weekNumber ?? null,
         estimated_duration_value: data.estimatedDurationValue ?? null,
         estimated_duration_unit: data.estimatedDurationUnit ?? null,
+        // Modül kaydından doğan görevlerde kaynak taşınır (bkz. 051).
+        source_module_key: data.sourceModuleKey ?? null,
+        source_record_id: data.sourceRecordId ?? null,
       })
       .select()
       .single();

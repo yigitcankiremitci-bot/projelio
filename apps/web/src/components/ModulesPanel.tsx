@@ -13,6 +13,9 @@ interface Props {
 // gösterir — böylece yöneticiler her departmana ayrı ayrı girmeden ekli tüm
 // modülleri tek yerde görebilir. Ekleme/kaldırma ilgili departmanın kendi
 // sayfasından ("+" düğmesi) yapılır; bu sekme salt görünürlük içindir.
+// Bu sayıya kadar tek satır; üstünde iki satıra bölünüp yana kaydırılır.
+const SINGLE_ROW_LIMIT = 4;
+
 export default function ModulesPanel({ organizationId }: Props) {
   const c = colors.light;
   const [enabled, setEnabled] = useState<OrganizationModule[]>([]);
@@ -61,7 +64,25 @@ export default function ModulesPanel({ organizationId }: Props) {
           Henüz etkinleştirilmiş modül yok. Bir departmanın sayfasından "+" ile modül ekleyebilirsin.
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+        // Anasayfada modüller departman kartlarıyla aynı mantıkta: yana
+        // kaydırmalı, EN FAZLA İKİ SATIR. Tam liste 20+ modülde sayfanın
+        // yarısını kaplıyor ve altındaki hiçbir şey görünmüyordu; burası bir
+        // özet, modül yönetimi departman sayfasında yapılıyor.
+        //
+        // Az sayıda modülde iki satır tuhaf duruyor (üç modül 2+1 diye
+        // bölünürdü), o yüzden eşik altında tek satır kalıyor.
+        <div
+          style={{
+            display: "grid",
+            gridAutoFlow: "column",
+            gridTemplateRows: activeEntries.length > SINGLE_ROW_LIMIT ? "repeat(2, auto)" : "auto",
+            gridAutoColumns: "240px",
+            gap: 14,
+            overflowX: "auto",
+            // Kaydırma çubuğu kartların altına yapışmasın.
+            paddingBottom: 6,
+          }}
+        >
           {activeEntries.map((entry) => (
             <ModuleCard key={entry.key} entry={entry} departmentId={entry.departmentKey ? deptIdByCatalogKey.get(entry.departmentKey) : undefined} />
           ))}

@@ -18,6 +18,7 @@ import OperationDetail from "./pages/OperationDetail";
 import Organizations from "./pages/Organizations";
 import OrganizationDetail from "./pages/OrganizationDetail";
 import DepartmentDetail from "./pages/DepartmentDetail";
+import ModulePage from "./pages/ModulePage";
 import Groups from "./pages/Groups";
 import GroupDetail from "./pages/GroupDetail";
 import CalendarView from "./pages/Calendar";
@@ -100,10 +101,17 @@ function CoverStickyHeader({
     const check = () => {
       const el = coverRef.current;
       if (!el) return;
-      const toolbarEl = registration?.actions?.sourceRef?.current;
-      const bottom = toolbarEl
-        ? Math.max(el.getBoundingClientRect().bottom, toolbarEl.getBoundingClientRect().bottom)
-        : el.getBoundingClientRect().bottom;
+      // Şerit, ekranda hâlâ görünen HİÇBİR kaynağın altında kalmamalı: kapak,
+      // sayfanın araç çubuğu ve sayfanın kendi sekme çubuğu. Sekme çubuğu
+      // hesaba katılmadığında kapak geçilir geçilmez şerit beliriyor, ama
+      // sayfanın kendi sekmeleri hâlâ ekranda olduğu için her düğme bir alt
+      // satırda ikinci kez görünüyordu.
+      const sources = [
+        el,
+        registration?.actions?.sourceRef?.current,
+        registration?.tabs?.sourceRef?.current,
+      ].filter(Boolean) as HTMLElement[];
+      const bottom = Math.max(...sources.map((node) => node.getBoundingClientRect().bottom));
       setPassed(bottom <= STICKY_TOP_ROW + STICKY_TITLE_ROW);
     };
     check();
@@ -113,7 +121,7 @@ function CoverStickyHeader({
       window.removeEventListener("scroll", check);
       window.removeEventListener("resize", check);
     };
-  }, [visibleOn, coverRef, registration?.actions?.sourceRef]);
+  }, [visibleOn, coverRef, registration?.actions?.sourceRef, registration?.tabs?.sourceRef]);
 
   if (!visibleOn || !registration) return null;
 
@@ -160,7 +168,7 @@ function CoverStickyHeader({
               paddingRight: 70,
             }}
           >
-            {registration.tabs}
+            {registration.tabs.node}
           </div>
         )}
       </div>
@@ -452,6 +460,9 @@ export default function App() {
               <Route path="/organizations" element={<Organizations />} />
               <Route path="/organizations/:id" element={<OrganizationDetail />} />
               <Route path="/departments/:id" element={<DepartmentDetail />} />
+              {/* Sayfa yüzeyli modüller kendi adreslerinde açılır (bkz. lib/moduleSurfaces.ts). */}
+              <Route path="/departments/:departmentId/modules/:moduleKey" element={<ModulePage />} />
+              <Route path="/jobs/:jobId/modules/:moduleKey" element={<ModulePage />} />
               <Route path="/groups" element={<Groups />} />
               <Route path="/groups/:id" element={<GroupDetail />} />
               <Route path="/calendar" element={<CalendarView />} />

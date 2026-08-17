@@ -6,6 +6,8 @@ import OrganizationCard from "../components/OrganizationCard";
 import EditGroupModal from "../components/EditGroupModal";
 import FilesPanel from "../components/FilesPanel";
 import ProfileCard from "../components/ProfileCard";
+import EntityCover, { coverActionButton } from "../components/EntityCover";
+import { coverText } from "../lib/covers";
 import { colors } from "../theme/colors";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { usePageHeader } from "../lib/pageHeader";
@@ -43,66 +45,35 @@ export default function GroupDetail() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
-      <div
-        ref={coverRef}
-        style={{
-          position: "relative",
-          height: 270,
-          background: group?.coverImageUrl
-            ? `linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.95)), center/cover url(${group.coverImageUrl})`
-            : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,
-          padding: "20px 28px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "flex-end",
-        }}
-      >
-        {/* Kişi kartı: serbest çalışan anasayfasıyla (Dashboard) aynı bileşen, kapak
-            görselinin/gradientinin üstüne bindirilmiş — sağ üstte, yer kaplamadan. */}
-        <div style={{ position: "absolute", top: 76, right: 28, zIndex: 3 }}>
-          <ProfileCard />
-        </div>
-
-        <div style={{ paddingRight: 64 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 4px" }}>{group?.name ?? "…"}</h1>
-          {group?.description && <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 8px" }}>{group.description}</p>}
-          {group && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 15, color: c.textSecondary }}>
+      <EntityCover
+        coverRef={coverRef}
+        coverImageUrl={group?.coverImageUrl}
+        height={270}
+        title={group?.name ?? "…"}
+        description={group?.description}
+        meta={
+          group && (
+            <>
               {group.ownerName && (
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <IconUser size={12} color={c.textSecondary} />
+                  <IconUser size={12} color={coverText.secondary} />
                   {group.ownerName}
                 </span>
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <IconCalendar size={12} color={c.textSecondary} />
+                <IconCalendar size={12} color={coverText.secondary} />
                 {new Date(group.createdAt).toLocaleDateString("tr-TR")} kuruldu
               </span>
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={() => setEditing(true)}
-          aria-label="Grubu düzenle"
-          style={{
-            position: "absolute",
-            bottom: 16,
-            right: 16,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 48,
-            height: 48,
-            borderRadius: 10,
-            border: `1px solid ${c.border}`,
-            background: c.surface,
-            boxShadow: "0 2px 8px rgba(26,31,41,0.12)",
-          }}
-        >
-          <IconSettings size={20} color={c.textSecondary} />
-        </button>
-      </div>
+            </>
+          )
+        }
+        aside={<ProfileCard />}
+        action={
+          <button onClick={() => setEditing(true)} aria-label="Grubu düzenle" style={coverActionButton(c)}>
+            <IconSettings size={20} color={c.textSecondary} />
+          </button>
+        }
+      />
 
       <div style={{ padding: "0 28px 28px" }}>
         <Link to="/groups" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>

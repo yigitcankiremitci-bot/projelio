@@ -29,7 +29,20 @@ export interface PageHeaderRegistration {
    * alt bileşen (ör. OutputsPanel) kaydedebiliyor, sekme çubuğunu ise sayfanın
    * kendisi (üst bileşen) — ikisi aynı state'i paylaşırsa biri diğerini silerdi.
    */
-  tabs?: ReactNode;
+  tabs?: PageHeaderTabs;
+}
+
+export interface PageHeaderTabs {
+  node: ReactNode;
+  /**
+   * Sayfanın kendi (akıştaki) sekme çubuğunun DOM öğesi.
+   *
+   * Verilirse sabit şeritteki kopya, ancak BU çubuk yukarı kayıp şeridin altına
+   * geçtikten sonra belirir. Verilmezse eşik kapağa göre hesaplanır ve sayfanın
+   * kendi sekmeleri hâlâ ekrandayken kopyası da belirir — her düğme iki kez
+   * görünür. Aynı sorun araç çubuğunda yaşanmıştı (bkz. PageHeaderActions.sourceRef).
+   */
+  sourceRef?: RefObject<HTMLElement>;
 }
 
 export interface PageHeaderActions {
@@ -50,8 +63,8 @@ interface PageHeaderContextValue {
   setRegistration: (value: PageHeaderRegistration | null) => void;
   actions: PageHeaderActions | null;
   setActions: (value: PageHeaderActions | null) => void;
-  tabs: ReactNode | null;
-  setTabs: (value: ReactNode | null) => void;
+  tabs: PageHeaderTabs | null;
+  setTabs: (value: PageHeaderTabs | null) => void;
 }
 
 const PageHeaderContext = createContext<PageHeaderContextValue>({
@@ -66,7 +79,7 @@ const PageHeaderContext = createContext<PageHeaderContextValue>({
 export function PageHeaderProvider({ children }: { children: ReactNode }) {
   const [registration, setRegistration] = useState<PageHeaderRegistration | null>(null);
   const [actions, setActions] = useState<PageHeaderActions | null>(null);
-  const [tabs, setTabs] = useState<ReactNode | null>(null);
+  const [tabs, setTabs] = useState<PageHeaderTabs | null>(null);
   const value = useMemo(
     () => ({ registration, setRegistration, actions, setActions, tabs, setTabs }),
     [registration, actions, tabs]
@@ -118,10 +131,14 @@ export function usePageHeaderActions(actions: PageHeaderActions | null, deps: De
  * sekmenin (ör. OutputsPanel) `usePageHeaderActions` ile kaydettiği `left`/
  * `right` ile aynı state'i PAYLAŞMAZ, bu yüzden biri diğerini silmez.
  */
-export function usePageHeaderTabs(tabs: ReactNode | null, deps: DependencyList) {
+export function usePageHeaderTabs(
+  tabs: ReactNode | null,
+  deps: DependencyList,
+  sourceRef?: RefObject<HTMLElement>
+) {
   const { setTabs } = useContext(PageHeaderContext);
   useEffect(() => {
-    setTabs(tabs);
+    setTabs(tabs ? { node: tabs, sourceRef } : null);
     return () => setTabs(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);

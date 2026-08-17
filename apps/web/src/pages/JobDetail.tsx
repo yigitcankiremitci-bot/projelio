@@ -7,7 +7,10 @@ import OperationCard from "../components/OperationCard";
 import CreateOperationModal from "../components/CreateOperationModal";
 import EditJobModal from "../components/EditJobModal";
 import JobTabs, { JobTab } from "../components/JobTabs";
+import JobModulesPanel from "../components/JobModulesPanel";
 import JobTeamPanel from "../components/JobTeamPanel";
+import EntityCover, { coverActionButton } from "../components/EntityCover";
+import { coverText } from "../lib/covers";
 import JobInviteBanner from "../components/JobInviteBanner";
 import JobTasksPanel, { JobTasksPanelHandle } from "../components/JobTasksPanel";
 import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
@@ -36,7 +39,7 @@ export default function JobDetail() {
   // gibi bir alt bağlantıya tıklandığında doğrudan o sekmeyle açılsın diye.
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const validTabs: JobTab[] = ["projects", "programs", "team", "tasks", "files"];
+  const validTabs: JobTab[] = ["projects", "programs", "team", "tasks", "files", "modules"];
   const activeTab: JobTab = validTabs.includes(tabParam as JobTab) ? (tabParam as JobTab) : "projects";
   const setActiveTab = (next: JobTab) => {
     setSearchParams(next === "projects" ? {} : { tab: next }, { replace: true });
@@ -277,9 +280,15 @@ export default function JobDetail() {
   const isDesktop = useIsDesktop();
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
   // (bkz. ProjectDetail'deki aynı desen).
+  // Akıştaki sekme çubuğunun DOM öğesi: sabit şerit ancak bu çubuk yukarı kayıp
+  // gözden kaybolduktan sonra belirsin, yoksa sekmeler bir an iki kez görünür
+  // (bkz. lib/pageHeader PageHeaderTabs.sourceRef).
+  const tabsRef = useRef<HTMLDivElement>(null);
+
   usePageHeaderTabs(
     isDesktop ? <JobTabs active={activeTab} onChange={setActiveTab} style={{ marginBottom: 0 }} /> : null,
-    [activeTab, isDesktop]
+    [activeTab, isDesktop],
+    tabsRef
   );
 
   if (!id) return null;
@@ -291,62 +300,38 @@ export default function JobDetail() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
-      <div
-        ref={coverRef}
-        style={{
-          position: "relative",
-          height: 330,
-          background: job?.coverImageUrl
-            ? `linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.95)), center/cover url(${job.coverImageUrl})`
-            : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,
-          padding: "20px 28px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "flex-end",
-        }}
-      >
-        <div style={{ paddingRight: 64 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 4px" }}>
-            {job?.title ?? "…"}
-          </h1>
-          {job?.description && <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 8px" }}>{job.description}</p>}
-          {job && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 15, color: c.textSecondary }}>
+      <EntityCover
+        coverRef={coverRef}
+        coverImageUrl={job?.coverImageUrl}
+        height={330}
+        title={job?.title ?? "…"}
+        description={job?.description}
+        meta={
+          job && (
+            <>
               {job.ownerName && (
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <IconUser size={12} color={c.textSecondary} />
+                  <IconUser size={12} color={coverText.secondary} />
                   {job.ownerName}
                 </span>
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <IconCalendar size={12} color={c.textSecondary} />
+                <IconCalendar size={12} color={coverText.secondary} />
                 {new Date(job.createdAt).toLocaleDateString("tr-TR")} kuruldu
               </span>
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={() => setEditing(true)}
-          aria-label="İşi düzenle"
-          style={{
-            position: "absolute",
-            bottom: 16,
-            right: 16,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 48,
-            height: 48,
-            borderRadius: 10,
-            border: `1px solid ${c.border}`,
-            background: c.surface,
-            boxShadow: "0 2px 8px rgba(26,31,41,0.12)",
-          }}
-        >
-          <IconSettings size={20} color={c.textSecondary} />
-        </button>
-      </div>
+            </>
+          )
+        }
+        action={
+          <button
+            onClick={() => setEditing(true)}
+            aria-label="İşi düzenle"
+            style={coverActionButton(c)}
+          >
+            <IconSettings size={20} color={c.textSecondary} />
+          </button>
+        }
+      />
 
       <div style={{ padding: "0 28px 28px" }}>
         <Link to="/" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
@@ -367,7 +352,9 @@ export default function JobDetail() {
             padding: "10px 28px 8px",
           }}
         >
-          <JobTabs active={activeTab} onChange={setActiveTab} />
+          <div ref={tabsRef}>
+            <JobTabs active={activeTab} onChange={setActiveTab} />
+          </div>
         </div>
 
         <div style={{ marginTop: 6 }}>
@@ -445,6 +432,10 @@ export default function JobDetail() {
           )}
 
           {activeTab === "files" && <FilesPanel ref={filesRef} jobId={id} />}
+
+          {/* Modüller işin içinde de görünür: anasayfadan atanan modüle
+              ulaşmak için kullanıcıyı anasayfaya geri göndermek gerekmiyor. */}
+          {activeTab === "modules" && id && <JobModulesPanel jobId={id} />}
 
           {activeTab === "tasks" && (
             <JobTasksPanel

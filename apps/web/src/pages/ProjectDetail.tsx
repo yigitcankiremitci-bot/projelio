@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { COVER_TEXT_VEIL, COVER_VEIL_HEIGHT, coverBackground, coverText } from "../lib/covers";
 import { Link, useLocation, useParams } from "react-router-dom";
 import type { Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
@@ -349,9 +350,15 @@ export default function ProjectDetail() {
   // halde o bant boş/beyaz kalıyor, sekmelere geri dönmek için yukarı kadar
   // kaydırmak gerekiyordu. Yalnızca masaüstünde: dar ekranda sayfanın kendi
   // sekme çubuğu zaten normal akışta sabit kalıyor.
+  // Akıştaki sekme çubuğunun DOM öğesi: sabit şerit ancak bu çubuk yukarı kayıp
+  // gözden kaybolduktan sonra belirsin, yoksa sekmeler bir an iki kez görünür
+  // (bkz. lib/pageHeader PageHeaderTabs.sourceRef).
+  const tabsRef = useRef<HTMLDivElement>(null);
+
   usePageHeaderTabs(
     isDesktop ? <ProjectTabs active={activeTab} onChange={setActiveTab} style={{ marginBottom: 0 }} /> : null,
-    [activeTab, isDesktop]
+    [activeTab, isDesktop],
+    tabsRef
   );
 
   return (
@@ -371,9 +378,8 @@ export default function ProjectDetail() {
             ref={coverRef}
             style={{
               position: "relative",
-              background: hasCover
-                ? `linear-gradient(rgba(255,255,255,0.35), rgba(255,255,255,0.92)), center/cover url(${project.coverImageUrl})`
-                : c.surface,
+              background: hasCover ? coverBackground(project.coverImageUrl) : c.surface,
+              overflow: hasCover ? "hidden" : undefined,
               borderBottom: hasCover ? "none" : `1px solid ${c.border}`,
               padding: hasCover ? "20px 28px" : "18px 28px",
               minHeight: hasCover ? 330 : undefined,
@@ -382,7 +388,22 @@ export default function ProjectDetail() {
               justifyContent: hasCover ? "flex-end" : undefined,
             }}
           >
-            <div style={{ paddingRight: 64, marginBottom: project.description ? 8 : 14 }}>
+            {hasCover && (
+              <div
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: COVER_VEIL_HEIGHT,
+                  background: COVER_TEXT_VEIL,
+                  pointerEvents: "none",
+                }}
+              />
+            )}
+
+            <div style={{ position: "relative", paddingRight: 64, marginBottom: project.description ? 8 : 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{project.title}</h1>
                 <StatusBadge status={project.status} />
@@ -390,18 +411,26 @@ export default function ProjectDetail() {
             </div>
 
             {project.description && (
-              <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 14px" }}>
+              <p
+                style={{
+                  position: "relative",
+                  fontSize: 16,
+                  color: hasCover ? coverText.secondary : c.textSecondary,
+                  margin: "0 0 14px",
+                }}
+              >
                 {project.description}
               </p>
             )}
 
             <div
               style={{
+                position: "relative",
                 display: "flex",
                 flexWrap: "wrap",
                 gap: 24,
                 fontSize: 15,
-                color: c.textSecondary,
+                color: hasCover ? coverText.secondary : c.textSecondary,
                 borderTop: hasCover ? "1px solid rgba(26,31,41,0.2)" : `1px solid ${c.border}`,
                 paddingTop: 12,
               }}
@@ -460,7 +489,9 @@ export default function ProjectDetail() {
             >
               ← Projeler
             </Link>
-            <ProjectTabs active={activeTab} onChange={setActiveTab} />
+            <div ref={tabsRef}>
+              <ProjectTabs active={activeTab} onChange={setActiveTab} />
+            </div>
           </div>
 
           {activeTab === "feed" && <FeedPanel ref={feedRef} projectId={id} tasks={tasks} />}

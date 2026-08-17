@@ -5,6 +5,8 @@ import { api } from "../api/client";
 import Modal from "../components/Modal";
 import RoutineModal from "../components/RoutineModal";
 import OperationHealthBadge, { AdherenceDots } from "../components/OperationHealthBadge";
+import EntityCover from "../components/EntityCover";
+import { coverText } from "../lib/covers";
 import { colors } from "../theme/colors";
 import { IconCalendar, IconCheck, IconEdit, IconUser } from "../components/icons";
 import { useProjectFabAction } from "../lib/projectFab";
@@ -121,34 +123,22 @@ export default function OperationDetail() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
-      <div
-        ref={coverRef}
-        style={{
-          position: "relative",
-          height: 290,
-          background: operation?.coverImageUrl
-            ? `linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.95)), center/cover url(${operation.coverImageUrl})`
-            : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,
-          padding: "20px 28px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "flex-end",
-        }}
-      >
-        <div style={{ paddingRight: 64 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
-              {operation?.title ?? "…"}
-            </h1>
+      <EntityCover
+        coverRef={coverRef}
+        coverImageUrl={operation?.coverImageUrl}
+        height={290}
+        title={
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+            {operation?.title ?? "…"}
             {operation && <OperationHealthBadge status={operation.status} health={operation.health} />}
-          </div>
-          {operation?.description && (
-            <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 8px" }}>{operation.description}</p>
-          )}
-          {operation && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 15, color: c.textSecondary }}>
+          </span>
+        }
+        description={operation?.description}
+        meta={
+          operation && (
+            <>
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <IconCalendar size={12} color={c.textSecondary} />
+                <IconCalendar size={12} color={coverText.secondary} />
                 {new Date(operation.startedOn).toLocaleDateString("tr-TR")} başladı
                 {/* Rutinin bitiş tarihi yoktur; kapatılana kadar çalışır. */}
                 {operation.endedOn && ` · ${new Date(operation.endedOn).toLocaleDateString("tr-TR")} kapandı`}
@@ -156,10 +146,10 @@ export default function OperationDetail() {
               <span style={{ color: c.accentDark, fontWeight: 500 }}>
                 {operation.budgetPerPeriod.toLocaleString("tr-TR")} ₺/{periodLabel[operation.budgetPeriod] ?? "ay"}
               </span>
-            </div>
-          )}
-        </div>
-      </div>
+            </>
+          )
+        }
+      />
 
       <div style={{ padding: "0 28px 28px" }}>
         <Link

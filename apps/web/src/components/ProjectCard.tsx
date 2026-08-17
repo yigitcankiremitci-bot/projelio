@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { coverBackground } from "../lib/covers";
 import { Link } from "react-router-dom";
 import type { Project } from "@projelio/shared";
 import { api } from "../api/client";
@@ -79,7 +80,7 @@ export default function ProjectCard({ project }: Props) {
           position: "relative",
           height: COVER_HEIGHT,
           flexShrink: 0,
-          background: coverUrl ? `center/cover url(${coverUrl})` : c.background,
+          background: coverUrl ? coverBackground(coverUrl) : c.background,
           display: coverUrl ? undefined : "flex",
           alignItems: coverUrl ? undefined : "center",
           justifyContent: coverUrl ? undefined : "center",

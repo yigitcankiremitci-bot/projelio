@@ -698,6 +698,10 @@ export interface Task {
   completedByName?: string;
   // Görevin bağlı olduğu projenin başlığı (arşivlenmiş projeler dahil, sunucu tarafında eklenir).
   projectTitle?: string;
+  // Görev bir modül kaydından doğduysa kaynağı. Bağ tek yönlü ve gevşektir:
+  // kayıt arşivlense de görev yaşar. Bkz. 051_task_module_source.sql
+  sourceModuleKey?: string;
+  sourceRecordId?: string;
 }
 
 export interface TaskComment {

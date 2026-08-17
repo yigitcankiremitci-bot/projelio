@@ -1,4 +1,5 @@
 import { useState } from "react";
+import CoverPicker from "./CoverPicker";
 import type { Group } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
@@ -18,6 +19,8 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
   const c = colors.light;
   const [name, setName] = useState(group.name);
   const [description, setDescription] = useState(group.description ?? "");
+  // Seçili kapak: yüklenmiş bir URL, "preset:<key>" ya da kapak yok.
+  const [coverValue, setCoverValue] = useState<string | undefined>(group.coverImageUrl);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -44,7 +47,11 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
     setError("");
     setLoading(true);
     try {
-      await api.patch(`/groups/${group.id}`, { name, description: description || undefined });
+      await api.patch(`/groups/${group.id}`, {
+        name,
+        description: description || undefined,
+        ...(coverValue !== group.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
+      });
       if (coverFile) {
         const resized = await resizeCoverImage(coverFile);
         const formData = new FormData();
@@ -77,13 +84,12 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
           />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Kapak fotoğrafı</label>
-          {(coverPreview || group.coverImageUrl) && (
-            <div style={{ height: 90, borderRadius: 8, background: `center/cover url(${coverPreview ?? group.coverImageUrl})` }} />
-          )}
-          <input type="file" accept="image/*" onChange={(e) => handleCoverChange(e.target.files?.[0] ?? null)} />
-        </div>
+        <CoverPicker
+          value={coverValue}
+          filePreview={coverPreview}
+          onSelectPreset={setCoverValue}
+          onFile={handleCoverChange}
+        />
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
 

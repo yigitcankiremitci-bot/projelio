@@ -85,6 +85,90 @@ Tek bir `ModuleModal` sarmalayıcı; bugünkü `Modal` bileşeninin üstüne mod
 
 Derin bağlantı önemsiz görünüyor ama modalin sayfaya göre tek gerçek dezavantajını kapatıyor: paylaşılabilir adres.
 
+### 2.5 Modül nereden açılır
+
+Departmanda modüller **kart ızgarası** olarak listelenir — şirket anasayfasındaki
+modül kartlarıyla aynı görünüm. Liste hâli modülleri "ayar satırı" gibi
+gösteriyordu; oysa bunlar açılıp içinde çalışılan araçlar.
+
+| Yüzey | Karta tıklayınca |
+|---|---|
+| `page` | `/departments/:departmentId/modules/:moduleKey` — modülün kendi sayfası |
+| `modal` | Kart yerinde modal açılır, kapanınca ızgaradaki yerine dönülür |
+
+Modülün kendi sayfası olmasının üç kazancı var: çalışma alanı departman
+listesinin arasına sıkışmıyor, adres paylaşılabiliyor, sayfa yenilenince
+kaybolmuyor. Ekip paneli sayfada modülün **altında** durur — önce iş, sonra kim
+çalışıyor.
+
+---
+
+## 2.6 Kayıt listelerinin biçimi
+
+Üç kural, tüm A2 modüllerinde ortak (`ModuleRecordsPanel`):
+
+1. **Satır genişliği sınırlı (920px).** Geniş ekranda satır ekranı baştan sona
+   kat edince göz satır başını kaybediyor. Pano görünümü sütunlara bölündüğü
+   için bu sınırdan muaf.
+2. **Düzenleme kalem simgesiyle, modalde.** Önceden satıra tıklamak düzenleme
+   açıyordu: hangi eylemin ne yapacağı belirsizdi ve form listenin arasına
+   girince kullanıcı hangi kaydı düzenlediğini kaybediyordu. Artık her satırda
+   açık bir kalem düğmesi var, form modalde açılıyor.
+3. **Pano (kanban) seçeneği.** Kayıtlar bir `select` alanına göre sütunlara
+   bölünebiliyorsa görünüm seçici çıkar. Sütun alanı `config.boardKey` ile
+   bildirilir; bildirilmezse 2–6 seçenekli ilk select alanı seçilir (daha
+   fazlası okunmaz bir şerit olur). Alanı boş kayıtlar "Belirtilmemiş"
+   sütununda toplanır — pano görünümünde sessizce kaybolmasınlar.
+
+Gelir-Gider'de sütunlar türe göre bölünür (`boardKey: "type"`): gelir ve gider
+yan yana iki sütun.
+
+**Henüz yok:** sütunlar arası sürükle-bırak. Kayıt taşımak şimdilik kalem →
+alanı değiştir üzerinden yapılıyor.
+
+## 2.7 Modül → görev köprüsü
+
+Bir sosyal medya planı, tedarik talebi ya da kalite uygunsuzluğu girildiğinde iş
+orada bitmiyor: birinin onu yapması gerekiyor. Köprü olmadan kullanıcı aynı
+cümleyi bir de departman görevlerine elle yazıyor, iki kayıt arasında hiçbir bağ
+kalmıyordu.
+
+Her kayıt satırında **"Göreve dönüştür"** düğmesi var. Açılan modal görev
+başlığını kaydın özetinden, teslim tarihini kaydın kendi tarih alanından
+(`config.periodKey`) doldurur; kişi seçimi departman kadrosundan yapılır
+(`AssigneePicker`). Görev departmanın görev listesine düşer.
+
+Bağ görevde saklanır (`tasks.source_module_key`, `tasks.source_record_id` —
+migration `051`):
+
+- Modül panelinde satır, o kayıttan kaç görev doğduğunu rozetle gösterir.
+- Aynı kayıttan ikinci görev açmak **yasak değil** — bir plan birden fazla kişiye
+  bölünebilir — ama modal kullanıcıyı uyarır.
+- Bağ tek yönlü ve gevşek: görev silinse kayıt, kayıt arşivlense görev etkilenmez.
+
+Ara tablo yerine görevde iki kolon: bağ görevin bir niteliği (nereden geldi),
+ayrı bir varlık değil.
+
+**Sınır:** köprü şimdilik yalnızca departman bağlamında. Serbest çalışanda
+görevler projeye bağlı ve hangi projeye yazılacağı ayrı bir karar; o yüzden
+düğme orada görünmüyor.
+
+---
+
+## 2.8 Panoda sürükle-bırak
+
+Pano sütunları arasında kart sürüklenebiliyor; bırakıldığı sütunun değeri kayda
+yazılır. Görev panosuyla aynı ayarlar kullanılıyor (`useSortableList`): kısa
+basılı tutunca kalkar, böylece normal kaydırma yanlışlıkla sürükleme sayılmaz.
+
+Sütun içi sıralama kapalı (`sort: false`) — sıra alan tanımından geliyor, önemli
+olan kaydın hangi sütuna bırakıldığı. Boş sütunlar da hedef olabilsin diye en az
+bir satır yüksekliğinde duruyor ve "Buraya sürükle" diyor.
+
+Yerel durum önce güncellenir, sonra sunucuya yazılır: sürükleme bittiğinde kart
+yeni sütunda kalmalı, isteğin dönmesini bekleyip geri zıplamamalı. İstek
+başarısız olursa liste sunucudan tazelenir.
+
 ---
 
 ## 3. Yerleşim — otomatik sekme terfisi

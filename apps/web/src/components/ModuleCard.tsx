@@ -1,13 +1,20 @@
 import { Link } from "react-router-dom";
 import type { ModuleCatalogEntry } from "@projelio/shared";
 import { colors } from "../theme/colors";
-import { IconSparkle } from "./icons";
+import { IconSparkle, IconX } from "./icons";
 
 interface Props {
   entry: ModuleCatalogEntry;
   // Bulunabilirse (bu modülün departmanı bu organizasyonda gerçekten kurulmuşsa)
   // karta tıklamak doğrudan o modülün çalışma alanını açar.
   departmentId?: string;
+  /** departmentId yerine doğrudan bir hedef adres (modülün kendi sayfası). */
+  to?: string;
+  /** Adres yerine yerinde bir eylem — modal yüzeyli modüller için. */
+  onClick?: () => void;
+  /** Sağ üstteki kaldırma düğmesi. Verilmezse gösterilmez. */
+  onRemove?: () => void;
+  removeDisabled?: boolean;
 }
 
 // Diğer kartlarla (Departman/Ürün/İş) aynı sabit-boy mantığı ama kapak fotoğrafı
@@ -15,7 +22,7 @@ interface Props {
 // sabit ve eşit olsun".
 const CARD_HEIGHT = 128;
 
-export default function ModuleCard({ entry, departmentId }: Props) {
+export default function ModuleCard({ entry, departmentId, to, onClick, onRemove, removeDisabled }: Props) {
   const c = colors.light;
   const content = (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: 16 }}>
@@ -74,7 +81,73 @@ export default function ModuleCard({ entry, departmentId }: Props) {
     background: c.surface,
     height: CARD_HEIGHT,
     overflow: "hidden",
+    position: "relative",
   } as const;
+
+  // Kaldırma düğmesi kartın kendi tıklama alanının DIŞINDA durmalı: aksi halde
+  // modülü açmak isteyen kullanıcı kazara kapatabilir.
+  const removeButton = onRemove && (
+    <button
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onRemove();
+      }}
+      disabled={removeDisabled}
+      aria-label="Modülü kapat"
+      title="Modülü devre dışı bırak"
+      style={{
+        position: "absolute",
+        top: 8,
+        right: 8,
+        zIndex: 1,
+        background: "transparent",
+        border: "none",
+        padding: 4,
+        display: "flex",
+        cursor: "pointer",
+      }}
+    >
+      <IconX size={13} color={c.textSecondary} />
+    </button>
+  );
+
+  // Modal yüzeyli modüller adrese gitmez, yerinde açılır.
+  if (onClick) {
+    return (
+      <div style={cardStyle}>
+        {removeButton}
+        <button
+          type="button"
+          onClick={onClick}
+          className="entity-card"
+          style={{
+            display: "block",
+            width: "100%",
+            height: "100%",
+            textAlign: "left",
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+          }}
+        >
+          {content}
+        </button>
+      </div>
+    );
+  }
+
+  if (to) {
+    return (
+      <div style={cardStyle}>
+        {removeButton}
+        <Link to={to} draggable={false} className="entity-card" style={{ display: "block", height: "100%" }}>
+          {content}
+        </Link>
+      </div>
+    );
+  }
 
   if (departmentId) {
     // tab=modules olmadan departmanın varsayılan sekmesine (genelde Görevler)

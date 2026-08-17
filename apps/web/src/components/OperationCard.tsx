@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { coverBackground } from "../lib/covers";
 import type { Operation } from "@projelio/shared";
 import { colors } from "../theme/colors";
 import OperationHealthBadge from "./OperationHealthBadge";
@@ -31,7 +32,7 @@ export default function OperationCard({ operation }: Props) {
       }}
     >
       {operation.coverImageUrl && (
-        <div style={{ aspectRatio: "3 / 1", background: `center/cover url(${operation.coverImageUrl})` }} />
+        <div style={{ aspectRatio: "3 / 1", background: coverBackground(operation.coverImageUrl) }} />
       )}
       <div style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import CoverPicker from "./CoverPicker";
 import { useNavigate } from "react-router-dom";
 import type { Project, ProjectStatus } from "@projelio/shared";
 import { api } from "../api/client";
@@ -31,6 +32,8 @@ export default function EditProjectModal({ project, onClose }: Props) {
   const [startDate, setStartDate] = useState(toDateInputValue(project.startDate));
   const [deadline, setDeadline] = useState(toDateInputValue(project.deadline));
   const [status, setStatus] = useState<ProjectStatus>(project.status);
+  // Seçili kapak: yüklenmiş bir URL, "preset:<key>" ya da kapak yok.
+  const [coverValue, setCoverValue] = useState<string | undefined>(project.coverImageUrl);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -64,6 +67,9 @@ export default function EditProjectModal({ project, onClose }: Props) {
         startDate: new Date(startDate).toISOString(),
         deadline: new Date(deadline).toISOString(),
         status,
+        // Hazır kapak seçimi / kapağı kaldırma doğrudan bu alanla kaydedilir;
+        // dosya yüklemesi ayrı uçtan gider. Değişmediyse hiç gönderilmez.
+        ...(coverValue !== project.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
       });
       if (coverFile) {
         const resized = await resizeCoverImage(coverFile);
@@ -123,19 +129,12 @@ export default function EditProjectModal({ project, onClose }: Props) {
           </select>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Kapak fotoğrafı</label>
-          {(coverPreview || project.coverImageUrl) && (
-            <div
-              style={{
-                height: 90,
-                borderRadius: 8,
-                background: `center/cover url(${coverPreview ?? project.coverImageUrl})`,
-              }}
-            />
-          )}
-          <input type="file" accept="image/*" onChange={(e) => handleCoverChange(e.target.files?.[0] ?? null)} />
-        </div>
+        <CoverPicker
+          value={coverValue}
+          filePreview={coverPreview}
+          onSelectPreset={setCoverValue}
+          onFile={handleCoverChange}
+        />
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
 

@@ -1,13 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ModuleRecord } from "@projelio/shared";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ModuleRecord, Task } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import type { ModuleFieldConfig, ModuleRecordConfig } from "../lib/moduleRecordConfigs";
 import { isReferenceValue } from "../lib/moduleRecordConfigs";
 import { hasDynamicFields, toDisplayData, useModuleReferences } from "../lib/moduleReferences";
 import { useUndo } from "../lib/undo";
+import { useSortableList } from "../lib/useSortableList";
+import type { SortableOptions } from "sortablejs";
+import Modal from "./Modal";
+import TaskFromRecordModal from "./TaskFromRecordModal";
 import ModuleFieldInput from "./ModuleFieldInput";
-import { IconTrash } from "./icons";
+import { IconEdit, IconListCheck, IconTrash } from "./icons";
 
 // Kayıtların sahibi iki türlü olabilir (bkz. 037_freelancer_modules.sql):
 // bir organizasyon (şirket/işletme departman modülleri) ya da bir iş (serbest
@@ -98,6 +102,14 @@ export default function ModuleRecordsPanel({
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [sortKey, setSortKey] = useState("");
+  // Liste mi pano mı. Pano, kayıtları bir select alanına göre sütunlara böler
+  // (görev kanbanıyla aynı okuma biçimi) ve geniş ekranda satırların ekranı
+  // baştan sona kat etmesini engeller.
+  const [view, setView] = useState<"list" | "board">("list");
+  // Bu modül kayıtlarından doğmuş görevler: kayıt id -> görev sayısı.
+  const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
+  // Göreve dönüştürme modalinin açık olduğu kayıt.
+  const [taskFor, setTaskFor] = useState<ModuleRecord | null>(null);
   const { pushUndo } = useUndo();
 
   const basePath = jobId ? `/jobs/${jobId}/module-records` : `/organizations/${organizationId}/module-records`;
@@ -123,6 +135,46 @@ export default function ModuleRecordsPanel({
 
   useEffect(load, [basePath, moduleKey]);
 
+  /**
+   * Bu modül kayıtlarından doğmuş görevler.
+   *
+   * Departman görevleri tek istekte çekilip kaynağına göre sayılıyor: her kayıt
+   * için ayrı sorgu atmak 50 kayıtlık bir listede 50 istek olurdu. Görev
+   * köprüsü yalnızca departman bağlamında var — serbest çalışanda görevler
+   * projeye bağlı, hangi projeye yazılacağı ayrı bir karar.
+   */
+  const loadTaskCounts = () => {
+    if (!departmentId) return;
+    api
+      .get<Task[]>(`/departments/${departmentId}/tasks`)
+      .then((tasks) => {
+        const counts: Record<string, number> = {};
+        for (const t of tasks) {
+          if (t.sourceModuleKey !== moduleKey || !t.sourceRecordId) continue;
+          counts[t.sourceRecordId] = (counts[t.sourceRecordId] ?? 0) + 1;
+        }
+        setTaskCounts(counts);
+      })
+      .catch(() => setTaskCounts({}));
+  };
+
+  useEffect(loadTaskCounts, [departmentId, moduleKey]);
+
+  /**
+   * Kaydı panoda başka bir sütuna taşır.
+   *
+   * Önce yerel durum güncellenir, sonra sunucuya yazılır: sürükleme bittiğinde
+   * kart yeni sütunda kalmalı, isteğin dönmesini bekleyip geri zıplamamalı.
+   * İstek başarısız olursa listeyi sunucudan tazeleyip gerçeğe döneriz.
+   */
+  const moveRecord = async (recordId: string, value: string) => {
+    const record = records.find((r) => r.id === recordId);
+    if (!record || !boardField) return;
+    const nextData = { ...record.data, [boardField.key]: value };
+    setRecords((rs) => rs.map((r) => (r.id === recordId ? { ...r, data: nextData } : r)));
+    await api.patch(`/module-records/${recordId}`, { data: nextData }).catch(() => load());
+  };
+
   // ============================================================ Alan grupları
   // Hızlı ekleme formu yalnızca zorunlu alanları gösterir. 12 alanlı bir form
   // kullanıcıyı kaydetmeden vazgeçirir; gerisi "Tüm alanlar" ile açılır.
@@ -138,6 +190,20 @@ export default function ModuleRecordsPanel({
     () => config.fields.filter((f) => f.type === "date" || f.type === "number"),
     [config.fields]
   );
+
+  /**
+   * Pano sütunlarını üreten alan.
+   *
+   * Modül kendi alanını bildirmemişse (config.boardKey) ilk uygun select alanı
+   * seçilir: 2–6 seçenekli olanlar sütuna dönüşebilir, daha fazlası ekranda
+   * okunmaz bir şerit olur ve pano listeden daha kötü hale gelir.
+   */
+  const boardField = useMemo(() => {
+    if (config.boardKey) return config.fields.find((f) => f.key === config.boardKey);
+    return config.fields.find(
+      (f) => f.type === "select" && (f.options?.length ?? 0) >= 2 && (f.options?.length ?? 0) <= 6
+    );
+  }, [config.fields, config.boardKey]);
 
   // ============================================================ Görüntülenen liste
   const visible = useMemo(() => {
@@ -279,16 +345,91 @@ export default function ModuleRecordsPanel({
     });
   };
 
+  /** Bir kaydın satır/kart gövdesi: özet, detay ve düzenle/arşivle düğmeleri. */
+  const renderRecord = (r: ModuleRecord) => {
+    const shown = displayOf(r.data);
+    const detail = config.detail?.(shown);
+    const taskCount = taskCounts[r.id] ?? 0;
+    return (
+      <div
+        key={r.id}
+        // Panoda sürükle-bırak bu iki veriyle çalışıyor: hangi kayıt, hangi sütun.
+        data-id={r.id}
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 8,
+          padding: "8px 10px",
+          borderRadius: 8,
+          background: c.background,
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, color: c.textPrimary }}>{config.summary(shown)}</div>
+          {detail && <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>{detail}</div>}
+        </div>
+        {canWrite && departmentId && (
+          // Görev köprüsü: kayıt girildi, şimdi birinin yapması gerekiyor.
+          // Sayı rozeti, aynı kayıttan kaç görev doğduğunu gösterir.
+          <button
+            onClick={() => setTaskFor(r)}
+            aria-label="Göreve dönüştür"
+            title={taskCount > 0 ? `${taskCount} görev oluşturulmuş — bir tane daha ekle` : "Göreve dönüştür"}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 3,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 2,
+              flexShrink: 0,
+              color: taskCount > 0 ? c.primary : c.textSecondary,
+            }}
+          >
+            <IconListCheck size={14} color={taskCount > 0 ? c.primary : c.textSecondary} />
+            {taskCount > 0 && <span style={{ fontSize: 11 }}>{taskCount}</span>}
+          </button>
+        )}
+        {canWrite && (
+          <>
+            {/* Düzenleme artık satırın kendisine tıklamakla değil, açık bir
+                kalem düğmesiyle başlar: satıra tıklamak kazara düzenleme
+                açıyordu ve hangi eylemin ne yapacağı belirsizdi. */}
+            <button
+              onClick={() => openEdit(r)}
+              aria-label="Kaydı düzenle"
+              title="Düzenle"
+              style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2, flexShrink: 0 }}
+            >
+              <IconEdit size={14} color={c.textSecondary} />
+            </button>
+            <button
+              onClick={() => handleArchive(r)}
+              aria-label="Kaydı arşivle"
+              title="Arşivle"
+              style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2, flexShrink: 0 }}
+            >
+              <IconTrash size={14} color={c.textSecondary} />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    // Genişlik sınırı: geniş ekranda satırlar ekranı baştan sona kat edince göz
+    // satır başını kaybediyor. Pano görünümü sütunlara bölündüğü için sınırdan muaf.
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: view === "board" ? "none" : 920 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{config.title}</h5>
         {canWrite ? (
           <button
-            onClick={() => (formMode ? closeForm() : openCreate())}
+            onClick={openCreate}
             style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
           >
-            {formMode ? "Vazgeç" : `+ ${config.addLabel}`}
+            {`+ ${config.addLabel}`}
           </button>
         ) : (
           <span style={{ fontSize: 12, color: c.textSecondary }} title="Bu modüle atanan kişiler kayıt ekleyebilir">
@@ -374,11 +515,41 @@ export default function ModuleRecordsPanel({
         </div>
       )}
 
+      {/* Görünüm seçici yalnızca panoya bölünebilen modüllerde. Tek sütunluk bir
+          pano listeden daha kötü olurdu. */}
+      {boardField && records.length > 0 && (
+        <div style={{ display: "flex", gap: 4 }}>
+          {(["list", "board"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                fontSize: 12,
+                padding: "4px 10px",
+                borderRadius: 6,
+                cursor: "pointer",
+                border: `1px solid ${view === v ? c.primary : c.border}`,
+                background: view === v ? `${c.primary}18` : "transparent",
+                color: view === v ? c.primary : c.textSecondary,
+              }}
+            >
+              {v === "list" ? "Liste" : `Pano · ${boardField.label}`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Ekleme ve düzenleme modalde: form listenin arasına girdiğinde kullanıcı
+          hangi kaydı düzenlediğini kaybediyordu ve uzun formlarda liste ekrandan
+          taşıyordu. */}
       {formMode && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, background: c.background, borderRadius: 10, padding: 10 }}>
-          {formMode.kind === "edit" && (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>Kaydı düzenliyorsun</span>
-          )}
+        <Modal
+          title={formMode.kind === "edit" ? `${config.title} — düzenle` : config.addLabel}
+          onClose={closeForm}
+          maxWidth={560}
+          mobileFullScreen
+        >
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {visibleFields.map((field) => (
             <div key={field.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <label style={{ fontSize: 12, color: c.textSecondary }}>
@@ -413,14 +584,28 @@ export default function ModuleRecordsPanel({
           )}
 
           {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={{ padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14 }}
-          >
-            {saving ? "Kaydediliyor…" : formMode.kind === "edit" ? "Güncelle" : "Kaydet"}
-          </button>
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                flex: 1,
+                padding: "8px 0",
+                borderRadius: 8,
+                border: "none",
+                background: c.primary,
+                color: "#fff",
+                fontSize: 14,
+              }}
+            >
+              {saving ? "Kaydediliyor…" : formMode.kind === "edit" ? "Güncelle" : "Kaydet"}
+            </button>
+            <button onClick={closeForm} disabled={saving} style={{ padding: "8px 16px", fontSize: 14 }}>
+              Vazgeç
+            </button>
+          </div>
         </div>
+        </Modal>
       )}
 
       {loading ? (
@@ -436,55 +621,139 @@ export default function ModuleRecordsPanel({
               {visible.length} / {records.length} kayıt
             </span>
           )}
-          {visible.map((r) => {
-            const shown = displayOf(r.data);
-            const detail = config.detail?.(shown);
-            const isEditing = formMode?.kind === "edit" && formMode.id === r.id;
-            return (
-              <div
-                key={r.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  background: c.background,
-                  outline: isEditing ? `1.5px solid ${c.primary}` : "none",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => canWrite && (isEditing ? closeForm() : openEdit(r))}
-                  disabled={!canWrite}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    textAlign: "left",
-                    background: "transparent",
-                    border: "none",
-                    padding: 0,
-                    cursor: canWrite ? "pointer" : "default",
-                  }}
-                >
-                  <div style={{ fontSize: 14, color: c.textPrimary }}>{config.summary(shown)}</div>
-                  {detail && <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>{detail}</div>}
-                </button>
-                {canWrite && (
-                  <button
-                    onClick={() => handleArchive(r)}
-                    aria-label="Kaydı arşivle"
-                    title="Arşivle"
-                    style={{ background: "transparent", border: "none", cursor: "pointer" }}
+
+          {view === "list" && visible.map(renderRecord)}
+
+          {view === "board" && boardField && (
+            <div
+              style={{
+                display: "grid",
+                // Sütun sayısı sabit değil: ekrana sığdığı kadar sütun, kalanı
+                // yatay kaydırma. Görev panosuyla aynı okuma biçimi.
+                gridAutoFlow: "column",
+                gridAutoColumns: "minmax(240px, 1fr)",
+                gap: 10,
+                overflowX: "auto",
+                paddingBottom: 4,
+              }}
+            >
+              {[
+                ...(boardField.options ?? []),
+                // Alanı boş bırakılmış kayıtlar da bir sütunda görünmeli, yoksa
+                // pano görünümünde sessizce kaybolurlardı.
+                { value: "", label: "Belirtilmemiş" },
+              ]
+                .map((option) => ({
+                  option,
+                  rows: visible.filter((r) => (r.data[boardField.key] ?? "") === option.value),
+                }))
+                .filter(({ option, rows }) => option.value !== "" || rows.length > 0)
+                .map(({ option, rows }) => (
+                  <BoardColumn
+                    key={option.value || "_bos"}
+                    label={option.label}
+                    value={option.value}
+                    count={rows.length}
+                    canDrag={canWrite}
+                    onDrop={moveRecord}
                   >
-                    <IconTrash size={14} color={c.textSecondary} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
+                    {rows.map(renderRecord)}
+                  </BoardColumn>
+                ))}
+            </div>
+          )}
         </div>
       )}
+
+      {/* Modül kaydını göreve dönüştürme: modüller ile çekirdek arasındaki köprü. */}
+      {taskFor && departmentId && (
+        <TaskFromRecordModal
+          departmentId={departmentId}
+          moduleKey={moduleKey}
+          moduleTitle={config.title}
+          recordId={taskFor.id}
+          defaultTitle={config.summary(displayOf(taskFor.data)) || config.title}
+          defaultDeadline={config.periodKey ? (taskFor.data[config.periodKey] as string | undefined) : undefined}
+          existingCount={taskCounts[taskFor.id] ?? 0}
+          onClose={() => setTaskFor(null)}
+          onCreated={loadTaskCounts}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Panodaki tek sütun.
+ *
+ * Sürükle-bırak sortablejs ile ve görev panosuyla AYNI ayarlarla çalışır
+ * (bkz. useSortableList): kısa basılı tutunca kalkar, böylece normal kaydırma
+ * hareketi yanlışlıkla sürükleme sayılmaz. Sütunlar ortak bir grup adı
+ * paylaştığı için kartlar sütunlar arasında taşınabilir.
+ */
+function BoardColumn({
+  label,
+  value,
+  count,
+  canDrag,
+  onDrop,
+  children,
+}: {
+  label: string;
+  value: string;
+  count: number;
+  canDrag: boolean;
+  onDrop: (recordId: string, value: string) => void;
+  children: React.ReactNode;
+}) {
+  const c = colors.light;
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useSortableList(
+    listRef,
+    // onAdd sortablejs'in Options tipinde, SortableOptions'ta değil; hook ortak
+    // ayarları SortableOptions olarak alıyor. Cast yalnızca tip katmanında —
+    // seçenek nesnesi Sortable.create'e olduğu gibi geçiyor.
+    ({
+      group: canDrag ? "module-board" : { name: "module-board", pull: false, put: false },
+      // Sıra içi taşımanın bir anlamı yok (sıralama alan tanımından geliyor);
+      // önemli olan kaydın HANGİ sütuna bırakıldığı.
+      sort: false,
+      onAdd: (evt: { item: HTMLElement; to: HTMLElement }) => {
+        const recordId = evt.item.dataset.id;
+        const target = evt.to.dataset.column;
+        if (recordId && target !== undefined) onDrop(recordId, target);
+      },
+    } as unknown) as SortableOptions,
+    [value, canDrag, count]
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: c.textSecondary, padding: "0 2px" }}>
+        <span style={{ fontWeight: 500 }}>{label}</span>
+        <span
+          style={{
+            fontSize: 11,
+            background: c.background,
+            border: `1px solid ${c.border}`,
+            borderRadius: 999,
+            padding: "0 6px",
+          }}
+        >
+          {count}
+        </span>
+      </div>
+      {/* Sürükleme hedefi liste kabının kendisi: boş sütuna da bırakılabilmeli,
+          bu yüzden boşken bile en az bir satırlık yüksekliği var. */}
+      <div
+        ref={listRef}
+        data-column={value}
+        style={{ display: "flex", flexDirection: "column", gap: 6, minHeight: 44 }}
+      >
+        {children}
+      </div>
+      {count === 0 && <span style={{ fontSize: 12, color: c.textSecondary, padding: "0 2px" }}>Buraya sürükle</span>}
     </div>
   );
 }

@@ -15,6 +15,8 @@ import OrgTabs, { CORE_ORG_TABS, OrgTab } from "../components/OrgTabs";
 import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
 import ProfileCard from "../components/ProfileCard";
+import EntityCover, { coverActionButton } from "../components/EntityCover";
+import { coverText } from "../lib/covers";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
@@ -99,6 +101,11 @@ export default function OrganizationDetail() {
   const isDesktop = useIsDesktop();
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
   // (bkz. ProjectDetail'deki aynı desen).
+  // Akıştaki sekme çubuğunun DOM öğesi: sabit şerit ancak bu çubuk yukarı kayıp
+  // gözden kaybolduktan sonra belirsin, yoksa sekmeler bir an iki kez görünür
+  // (bkz. lib/pageHeader PageHeaderTabs.sourceRef).
+  const tabsRef = useRef<HTMLDivElement>(null);
+
   usePageHeaderTabs(
     isDesktop ? <OrgTabs
         active={activeTab}
@@ -106,43 +113,23 @@ export default function OrganizationDetail() {
         moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
         style={{ marginBottom: 0 }}
       /> : null,
-    [activeTab, isDesktop]
+    [activeTab, isDesktop],
+    tabsRef
   );
 
   if (!id) return null;
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
-      <div
-        ref={coverRef}
-        style={{
-          position: "relative",
-          height: 270,
-          background: organization?.coverImageUrl
-            ? `linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.95)), center/cover url(${organization.coverImageUrl})`
-            : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,
-          padding: "20px 28px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "flex-end",
-        }}
-      >
-        {/* Kişi kartı: serbest çalışan anasayfasıyla (Dashboard) aynı bileşen, ama burada
-            ekstra yer kaplamasın diye kapak görselinin/gradientinin üstüne bindirilmiş —
-            sağ üstte. */}
-        <div style={{ position: "absolute", top: 76, right: 28, zIndex: 3 }}>
-          <ProfileCard />
-        </div>
-
-        <div style={{ paddingRight: 64 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 4px" }}>
-            {organization?.name ?? "…"}
-          </h1>
-          {organization?.description && (
-            <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 8px" }}>{organization.description}</p>
-          )}
-          {organization && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 15, color: c.textSecondary }}>
+      <EntityCover
+        coverRef={coverRef}
+        coverImageUrl={organization?.coverImageUrl}
+        height={270}
+        title={organization?.name ?? "…"}
+        description={organization?.description}
+        meta={
+          organization && (
+            <>
               <span
                 style={{
                   fontSize: 12,
@@ -157,56 +144,46 @@ export default function OrganizationDetail() {
               </span>
               {organization.ownerName && (
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <IconUser size={12} color={c.textSecondary} />
+                  <IconUser size={12} color={coverText.secondary} />
                   {organization.ownerName}
                 </span>
               )}
               {organization.groupName && (
-                <Link to={`/groups/${organization.groupId}`} style={{ display: "flex", alignItems: "center", gap: 5, color: c.textSecondary }}>
-                  <IconLayers size={12} color={c.textSecondary} />
+                <Link
+                  to={`/groups/${organization.groupId}`}
+                  style={{ display: "flex", alignItems: "center", gap: 5, color: coverText.secondary }}
+                >
+                  <IconLayers size={12} color={coverText.secondary} />
                   {organization.groupName}
                 </Link>
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <IconCalendar size={12} color={c.textSecondary} />
+                <IconCalendar size={12} color={coverText.secondary} />
                 {new Date(organization.createdAt).toLocaleDateString("tr-TR")} kuruldu
               </span>
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={() => setEditing(true)}
-          aria-label="Organizasyonu düzenle"
-          style={{
-            position: "absolute",
-            bottom: 16,
-            right: 16,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 48,
-            height: 48,
-            borderRadius: 10,
-            border: `1px solid ${c.border}`,
-            background: c.surface,
-            boxShadow: "0 2px 8px rgba(26,31,41,0.12)",
-          }}
-        >
-          <IconSettings size={20} color={c.textSecondary} />
-        </button>
-      </div>
+            </>
+          )
+        }
+        aside={<ProfileCard />}
+        action={
+          <button onClick={() => setEditing(true)} aria-label="Organizasyonu düzenle" style={coverActionButton(c)}>
+            <IconSettings size={20} color={c.textSecondary} />
+          </button>
+        }
+      />
 
       <div style={{ padding: "0 28px 28px" }}>
         <Link to="/organizations" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
           ← Organizasyonlar
         </Link>
 
-        <OrgTabs
-          active={activeTab}
-          onChange={setActiveTab}
-          moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
-        />
+        <div ref={tabsRef}>
+          <OrgTabs
+            active={activeTab}
+            onChange={setActiveTab}
+            moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
+          />
+        </div>
 
         {/* Terfi etmiş modül: sekmenin içeriği modülün kendisi. Departman
             bağlamı yok — organizasyon geneli açılır. */}

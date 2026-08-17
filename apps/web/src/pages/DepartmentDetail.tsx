@@ -12,13 +12,12 @@ import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
 import DepartmentSettingsModal from "../components/DepartmentSettingsModal";
 import ProfileCard from "../components/ProfileCard";
-import { resizeCoverImage } from "../lib/imageProcessing";
-import { getDepartmentCoverUrl, hasCustomDepartmentCover } from "../lib/departmentCovers";
+import { getDepartmentCoverUrl } from "../lib/departmentCovers";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { colors } from "../theme/colors";
-import { IconLayers, IconEdit, IconX, IconSettings } from "../components/icons";
+import { IconLayers, IconSettings } from "../components/icons";
 
 // Bir departmanın kendi sayfası: iç dinamikler üstteki sekmelerle ayrılır —
 // Sosyal (Twitter mantığında paylaşım/yorum/beğeni akışı), Görevler (doğrudan
@@ -43,9 +42,7 @@ export default function DepartmentDetail() {
     setSearchParams(next === defaultTab ? {} : { tab: next }, { replace: true });
   };
 
-  const [coverUploading, setCoverUploading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const feedRef = useRef<FeedPanelHandle>(null);
   const teamRef = useRef<DepartmentMembersListHandle>(null);
   const tasksRef = useRef<DepartmentTasksPanelHandle>(null);
@@ -97,51 +94,27 @@ export default function DepartmentDetail() {
     [activeTab, department?.id]
   );
 
-  const handleCoverSelected = async (file: File | null) => {
-    if (!file || !id) return;
-    setCoverUploading(true);
-    try {
-      const resized = await resizeCoverImage(file);
-      const formData = new FormData();
-      formData.append("file", resized);
-      const updated = await api.uploadFile<Department>(`/departments/${id}/cover`, formData);
-      setDepartment(updated);
-    } catch {
-      // yüklenemedi, kullanıcı tekrar deneyebilir
-    } finally {
-      setCoverUploading(false);
-    }
-  };
-
-  const handleRemoveCover = async () => {
-    if (!id) return;
-    setCoverUploading(true);
-    try {
-      const updated = await api.delete<Department>(`/departments/${id}/cover`);
-      setDepartment(updated);
-    } catch {
-      // kaldırılamadı, kullanıcı tekrar deneyebilir
-    } finally {
-      setCoverUploading(false);
-    }
-  };
-
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
   const coverRef = useRef<HTMLDivElement>(null);
   usePageHeader(department?.name, coverRef, [department?.name]);
   const isDesktop = useIsDesktop();
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
   // (bkz. ProjectDetail'deki aynı desen).
+  // Akıştaki sekme çubuğunun DOM öğesi: sabit şerit ancak bu çubuk yukarı kayıp
+  // gözden kaybolduktan sonra belirsin, yoksa sekmeler bir an iki kez görünür
+  // (bkz. lib/pageHeader PageHeaderTabs.sourceRef).
+  const tabsRef = useRef<HTMLDivElement>(null);
+
   usePageHeaderTabs(
     isDesktop ? <DepartmentTabs active={activeTab} onChange={setActiveTab} style={{ marginBottom: 0 }} /> : null,
-    [activeTab, isDesktop]
+    [activeTab, isDesktop],
+    tabsRef
   );
 
   if (!id) return null;
 
   const isProductDepartment = department?.catalogKey === "urun_yonetimi";
   const coverUrl = department ? getDepartmentCoverUrl(department) : undefined;
-  const isCustomCover = department ? hasCustomDepartmentCover(department) : false;
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
@@ -176,76 +149,27 @@ export default function DepartmentDetail() {
         </div>
 
         {department && (
-          <div style={{ position: "absolute", bottom: 14, right: 14, display: "flex", gap: 6 }}>
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              aria-label="Departman ayarları"
-              title="Departman ayarları"
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: "50%",
-                border: "none",
-                background: "rgba(26,31,41,0.55)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <IconSettings size={15} color="#fff" />
-            </button>
-            {isCustomCover && (
-              <button
-                type="button"
-                onClick={handleRemoveCover}
-                disabled={coverUploading}
-                aria-label="Kapağı kaldır, varsayılana dön"
-                title="Varsayılan kapağa dön"
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: "50%",
-                  border: "none",
-                  background: "rgba(26,31,41,0.55)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <IconX size={15} color="#fff" />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={coverUploading}
-              aria-label="Kapak fotoğrafını değiştir"
-              title="Kapak fotoğrafını değiştir"
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: "50%",
-                border: "none",
-                background: "rgba(26,31,41,0.55)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <IconEdit size={15} color="#fff" />
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                void handleCoverSelected(e.target.files?.[0] ?? null);
-                e.target.value = "";
-              }}
-              style={{ display: "none" }}
-            />
-          </div>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Departman ayarları"
+            title="Departman ayarları"
+            style={{
+              position: "absolute",
+              bottom: 14,
+              right: 14,
+              width: 34,
+              height: 34,
+              borderRadius: "50%",
+              border: "none",
+              background: "rgba(26,31,41,0.55)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <IconSettings size={15} color="#fff" />
+          </button>
         )}
       </div>
 
@@ -259,7 +183,9 @@ export default function DepartmentDetail() {
 
         {department && (
           <>
-            <DepartmentTabs active={activeTab} onChange={setActiveTab} />
+            <div ref={tabsRef}>
+              <DepartmentTabs active={activeTab} onChange={setActiveTab} />
+            </div>
 
             {activeTab === "flow" && <FeedPanel ref={feedRef} departmentId={department.id} tasks={tasks} />}
 
@@ -304,6 +230,9 @@ export default function DepartmentDetail() {
             setDepartment(updated);
             setSettingsOpen(false);
           }}
+          // Kapak değişimi anında kaydedilir: modal açık kalır, arkadaki başlık
+          // yeni kapağı hemen gösterir.
+          onCoverChanged={setDepartment}
           onDeleted={() => navigate(`/organizations/${department.organizationId}?tab=departments`)}
           onArchived={() => navigate(`/organizations/${department.organizationId}?tab=departments`)}
         />

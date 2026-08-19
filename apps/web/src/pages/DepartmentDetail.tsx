@@ -6,7 +6,7 @@ import DepartmentMembersList, { DepartmentMembersListHandle } from "../component
 import DepartmentModulesPanel from "../components/DepartmentModulesPanel";
 import DepartmentTasksPanel, { DepartmentTasksPanelHandle } from "../components/DepartmentTasksPanel";
 import DepartmentBudgetPanel, { DepartmentBudgetPanelHandle } from "../components/DepartmentBudgetPanel";
-import DepartmentTabs, { DepartmentTab } from "../components/DepartmentTabs";
+import DepartmentTabs, { DepartmentTab, visibleDepartmentTabs } from "../components/DepartmentTabs";
 import ProductsPanel from "../components/ProductsPanel";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
@@ -15,7 +15,6 @@ import ProfileCard from "../components/ProfileCard";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
-import { useIsDesktop } from "../lib/useIsDesktop";
 import { colors } from "../theme/colors";
 import { IconLayers, IconSettings } from "../components/icons";
 
@@ -33,10 +32,17 @@ export default function DepartmentDetail() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const validTabs: DepartmentTab[] = ["flow", "team", "tasks", "budget", "modules", "files"];
+  // Geçerli sekmeler kullanıcının yetkisine göre daralır: taşeron Bütçe ve Ekip
+  // sekmelerini hiç görmez (bkz. DepartmentTabs.visibleDepartmentTabs). ?tab=budget
+  // ile doğrudan gelinse bile aşağıdaki fallback devreye girer — sunucu da zaten
+  // 403 döner, bu yalnızca boş ekran göstermemek için.
+  const access = department?.viewerAccess;
+  const validTabs: DepartmentTab[] = visibleDepartmentTabs(access).map((t) => t.key);
   // ?tab= yoksa departmanın kendi açılış tercihi kullanılır (ayarlardan
   // kişiselleştirilebilir); departman henüz yüklenmediyse "tasks" varsayılır.
-  const defaultTab: DepartmentTab = (department?.defaultTab as DepartmentTab) || "tasks";
+  // Tercih edilen sekme kullanıcıya kapalıysa ilk açık sekmeye düşülür.
+  const preferredTab: DepartmentTab = (department?.defaultTab as DepartmentTab) || "tasks";
+  const defaultTab: DepartmentTab = validTabs.includes(preferredTab) ? preferredTab : validTabs[0] ?? "tasks";
   const activeTab: DepartmentTab = validTabs.includes(tabParam as DepartmentTab) ? (tabParam as DepartmentTab) : defaultTab;
   const setActiveTab = (next: DepartmentTab) => {
     setSearchParams(next === defaultTab ? {} : { tab: next }, { replace: true });
@@ -76,12 +82,18 @@ export default function DepartmentDetail() {
       ? null
       : activeTab === "flow"
       ? { label: "Yeni paylaşım", onClick: () => feedRef.current?.openCreate() }
-      : activeTab === "team"
-      ? { label: "Kişi davet et", onClick: () => teamRef.current?.openCreate() }
+      : // Kadroya davet ve bütçeye kayıt: yalnızca yönetebilenler (org sahibi /
+      // departman yöneticisi). Diğerlerinde "+" butonu hiç çıkmaz.
+      activeTab === "team"
+      ? access?.canManage === false
+        ? null
+        : { label: "Kişi davet et", onClick: () => teamRef.current?.openCreate() }
       : activeTab === "tasks"
       ? { label: "Görev ekle", onClick: () => tasksRef.current?.openCreate() }
       : activeTab === "budget"
-      ? { label: "Kayıt ekle", onClick: () => budgetRef.current?.openCreate() }
+      ? access?.canManage === false
+        ? null
+        : { label: "Kayıt ekle", onClick: () => budgetRef.current?.openCreate() }
       : activeTab === "files"
       ? {
           label: "Dosya ekle",
@@ -91,13 +103,18 @@ export default function DepartmentDetail() {
           ],
         }
       : null,
-    [activeTab, department?.id]
+    [activeTab, department?.id, access?.canManage]
   );
 
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
   const coverRef = useRef<HTMLDivElement>(null);
-  usePageHeader(department?.name, coverRef, [department?.name]);
-  const isDesktop = useIsDesktop();
+  // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
+  const backRef = useRef<HTMLDivElement>(null);
+  usePageHeader(department?.name, coverRef, [department?.name, department?.organizationId], {
+    to: department ? `/organizations/${department.organizationId}?tab=departments` : "/organizations",
+    label: "Departmanlar",
+    sourceRef: backRef,
+  });
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
   // (bkz. ProjectDetail'deki aynı desen).
   // Akıştaki sekme çubuğunun DOM öğesi: sabit şerit ancak bu çubuk yukarı kayıp
@@ -106,8 +123,16 @@ export default function DepartmentDetail() {
   const tabsRef = useRef<HTMLDivElement>(null);
 
   usePageHeaderTabs(
-    isDesktop ? <DepartmentTabs active={activeTab} onChange={setActiveTab} style={{ marginBottom: 0 }} /> : null,
-    [activeTab, isDesktop],
+    // Mobilde de kaydediliyor: orada sayfanın kendi sekme çubuğu kaydırınca
+    // sabit şeridin altında kalıp erişilemez oluyordu (bkz. App.tsx).
+    <DepartmentTabs
+      active={activeTab}
+      onChange={setActiveTab}
+      access={access}
+      style={{ marginBottom: 0 }}
+      scrollable
+    />,
+    [activeTab, access],
     tabsRef
   );
 
@@ -148,7 +173,8 @@ export default function DepartmentDetail() {
           )}
         </div>
 
-        {department && (
+        {/* Ayarlar dişlisi yalnızca yönetebilenlere: taşeron/çalışan tıklasa 403 alırdı. */}
+        {department && access?.canManage !== false && (
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
@@ -174,22 +200,24 @@ export default function DepartmentDetail() {
       </div>
 
       <div style={{ padding: "0 28px 28px" }}>
-        <Link
-          to={department ? `/organizations/${department.organizationId}?tab=departments` : "/organizations"}
-          style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}
-        >
-          ← Departmanlar
-        </Link>
+        <div ref={backRef}>
+          <Link
+            to={department ? `/organizations/${department.organizationId}?tab=departments` : "/organizations"}
+            style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}
+          >
+            ← Departmanlar
+          </Link>
+        </div>
 
         {department && (
           <>
             <div ref={tabsRef}>
-              <DepartmentTabs active={activeTab} onChange={setActiveTab} />
+              <DepartmentTabs active={activeTab} onChange={setActiveTab} access={access} />
             </div>
 
             {activeTab === "flow" && <FeedPanel ref={feedRef} departmentId={department.id} tasks={tasks} />}
 
-            {activeTab === "team" && (
+            {activeTab === "team" && access?.canViewTeam !== false && (
               <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: 16 }}>
                 <DepartmentMembersList ref={teamRef} departmentId={department.id} onChanged={reload} />
               </div>
@@ -197,7 +225,10 @@ export default function DepartmentDetail() {
 
             {activeTab === "tasks" && <DepartmentTasksPanel ref={tasksRef} departmentId={department.id} />}
 
-            {activeTab === "budget" && <DepartmentBudgetPanel ref={budgetRef} departmentId={department.id} />}
+            {/* Sekme zaten gizli; ?tab=budget ile doğrudan gelinirse de panel açılmasın. */}
+            {activeTab === "budget" && access?.canViewBudget !== false && (
+              <DepartmentBudgetPanel ref={budgetRef} departmentId={department.id} />
+            )}
 
             {activeTab === "modules" && (
               <>

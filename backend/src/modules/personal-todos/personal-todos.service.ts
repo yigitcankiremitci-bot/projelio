@@ -77,11 +77,28 @@ export class PersonalTodosService {
       .map(mapBoardItem);
   }
 
+
+  /**
+   * Görev bu kullanıcıya atanmış mı? Bir görevin birden fazla atananı olabildiği
+   * için (bkz. migration 053) kontrol `tasks.assigned_to` üzerinden yapılamaz:
+   * o yalnızca BİRİNCİL atanandır, ikinci kişi olarak eklenen biri kendi
+   * panosundaki kartı ne taşıyabilir ne de açabilirdi.
+   */
+  private async assertAssigned(taskId: string, userId: string): Promise<void> {
+    const { data } = await this.supabase.client
+      .from("task_assignees")
+      .select("id")
+      .eq("task_id", taskId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!data) throw new NotFoundException("Görev bulunamadı veya size atanmamış");
+  }
+
   // --------------------------------------------------- Kişisel görev CRUD
 
   async create(
     userId: string,
-    body: { title?: string; description?: string; status?: TaskStatus; priority?: number; color?: string; dueDate?: string }
+    body: { title?: string; description?: string; status?: TaskStatus; priority?: number; color?: string; dueDate?: string; dueTime?: string; reminderLeadMinutes?: number }
   ): Promise<PersonalTodo> {
     const title = (body.title ?? "").trim();
     if (!title) throw new BadRequestException("Görev başlığı boş olamaz");
@@ -118,6 +135,9 @@ export class PersonalTodosService {
         priority,
         color: body.color || null,
         due_date: body.dueDate || null,
+        due_time: body.dueTime || null,
+        // Hatırlatma yalnızca saat varsa (DB'de de CHECK var).
+        reminder_lead_minutes: body.dueTime ? (body.reminderLeadMinutes ?? null) : null,
         sort_order: (last?.sort_order ?? -1) + 1,
         // status='completed' ile completed_at arasındaki tutarlılık veritabanında
         // CHECK ile zorunlu; burada da aynı kuralı uyguluyoruz.
@@ -132,7 +152,7 @@ export class PersonalTodosService {
   async update(
     userId: string,
     id: string,
-    body: { title?: string; description?: string; status?: TaskStatus; priority?: number; color?: string | null; dueDate?: string | null }
+    body: { title?: string; description?: string; status?: TaskStatus; priority?: number; color?: string | null; dueDate?: string | null; dueTime?: string | null; reminderLeadMinutes?: number | null }
   ): Promise<PersonalTodo> {
     const patch: Record<string, unknown> = {};
 
@@ -145,6 +165,17 @@ export class PersonalTodosService {
     if (body.priority !== undefined) patch.priority = clampPriority(body.priority);
     if (body.color !== undefined) patch.color = body.color || null;
     if (body.dueDate !== undefined) patch.due_date = body.dueDate || null;
+    // Saat ya da ön süre değiştiyse hatırlatma yeniden kurulmalı: damga
+    // temizlenmezse zamanlanmış iş bu kaydı bir daha hiç ele almaz.
+    if (body.dueTime !== undefined) {
+      patch.due_time = body.dueTime || null;
+      patch.reminder_sent_at = null;
+      if (!body.dueTime) patch.reminder_lead_minutes = null;
+    }
+    if (body.reminderLeadMinutes !== undefined) {
+      patch.reminder_lead_minutes = body.reminderLeadMinutes ?? null;
+      patch.reminder_sent_at = null;
+    }
     if (body.status !== undefined) {
       const status = this.assertStatus(body.status);
       patch.status = status;
@@ -247,6 +278,8 @@ export class PersonalTodosService {
       return { ok: true };
     }
 
+    // Atananlardan HERHANGİ biri durumu değiştirebilir (bkz. assertAssigned).
+    await this.assertAssigned(body.itemId, userId);
     const { data, error } = await this.supabase.client
       .from("tasks")
       .update({
@@ -255,7 +288,6 @@ export class PersonalTodosService {
         completed_by: status === "completed" ? userId : null,
       })
       .eq("id", body.itemId)
-      .eq("assigned_to", userId)
       .is("archived_at", null)
       .select("id")
       .maybeSingle();
@@ -302,13 +334,13 @@ export class PersonalTodosService {
    * dar — görev istekte bulunan kullanıcıya atanmış olmalı.
    */
   async findAssignedTask(userId: string, taskId: string): Promise<any> {
+    await this.assertAssigned(taskId, userId);
     const { data, error } = await this.supabase.client
       .from("tasks")
       .select(
         "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), projects(title)"
       )
       .eq("id", taskId)
-      .eq("assigned_to", userId)
       .is("archived_at", null)
       .maybeSingle();
     if (error) throw error;
@@ -329,11 +361,11 @@ export class PersonalTodosService {
   ): Promise<{ ok: true }> {
     // Görevin gerçekten bu kullanıcıya atanmış olduğunu doğrula; aksi halde
     // herhangi bir task id'si için pref satırı yazılabilirdi.
+    await this.assertAssigned(taskId, userId);
     const { data: task, error: taskError } = await this.supabase.client
       .from("tasks")
       .select("id")
       .eq("id", taskId)
-      .eq("assigned_to", userId)
       .is("archived_at", null)
       .maybeSingle();
     if (taskError) throw taskError;
@@ -418,6 +450,9 @@ function mapTodo(row: any): PersonalTodo {
     priority: (row.priority ?? 0) as TaskPriority,
     color: row.color ?? undefined,
     dueDate: row.due_date ?? undefined,
+    dueTime: row.due_time ? String(row.due_time).slice(0, 5) : undefined,
+    reminderLeadMinutes: row.reminder_lead_minutes ?? undefined,
+    reminderSentAt: row.reminder_sent_at ?? undefined,
     sortOrder: row.sort_order ?? 0,
     completedAt: row.completed_at ?? undefined,
     archivedAt: row.archived_at ?? undefined,
@@ -436,6 +471,8 @@ function mapBoardItem(row: any): PersonalBoardItem {
     priority: (row.priority ?? 0) as TaskPriority,
     color: row.color ?? undefined,
     effectiveDueDate: row.effective_due_date ?? undefined,
+    // "17:30:00" -> "17:30" (bkz. tasks.service mapTask — aynı biçim).
+    deadlineTime: row.deadline_time ? String(row.deadline_time).slice(0, 5) : undefined,
     projectDeadline: row.project_deadline ?? undefined,
     sortOrder: row.sort_order ?? 0,
     isPinned: Boolean(row.is_pinned),

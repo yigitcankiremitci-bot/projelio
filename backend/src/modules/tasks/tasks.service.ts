@@ -1,8 +1,46 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import type { Task } from "@projelio/shared";
+import type { Task, TaskAssignee, TaskAttachment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { applyOrder } from "../../common/reorder.util";
+import { assertSubtaskMoveAllowed, assertSubtaskMoveRequest, subtaskScopePatch } from "./subtask-move";
+
+function mapAttachment(row: any): TaskAttachment {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    kind: row.kind,
+    url: row.url,
+    label: row.label ?? undefined,
+    fileName: row.file_name ?? undefined,
+    fileSize: row.file_size != null ? Number(row.file_size) : undefined,
+    createdBy: row.created_by ?? undefined,
+    createdByName: row.creator?.full_name ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+/**
+ * Görevin atananları. Sorguya task_assignees dahil edilmediyse (eski/dar
+ * select'ler) undefined döner — "atanan yok" ile "bilgi çekilmedi" karışmasın.
+ * Birincil atanan her zaman başa alınır; gerisi atanma sırasına göre.
+ */
+function mapAssignees(row: any): TaskAssignee[] | undefined {
+  const rows = row.task_assignees;
+  if (!Array.isArray(rows)) return undefined;
+  const list: TaskAssignee[] = rows.map((a: any) => ({
+    userId: a.user_id,
+    fullName: a.users?.full_name ?? undefined,
+    avatarUrl: a.users?.avatar_url ?? undefined,
+    assignedAt: a.assigned_at ?? undefined,
+  }));
+  const primary = row.assigned_to;
+  return list.sort((x, y) => {
+    if (x.userId === primary) return -1;
+    if (y.userId === primary) return 1;
+    return (x.assignedAt ?? "").localeCompare(y.assignedAt ?? "");
+  });
+}
 
 function mapTask(row: any): Task {
   return {
@@ -12,10 +50,15 @@ function mapTask(row: any): Task {
     outputId: row.output_id ?? undefined,
     assignedTo: row.assigned_to ?? undefined,
     assignedToName: row.assigned_user?.full_name ?? undefined,
+    assignees: mapAssignees(row),
     title: row.title,
     description: row.description ?? undefined,
     startDate: row.start_date ?? undefined,
     deadline: row.deadline,
+    // "17:30:00" -> "17:30": arayüzdeki <input type="time"> saniye beklemiyor.
+    deadlineTime: row.deadline_time ? String(row.deadline_time).slice(0, 5) : undefined,
+    reminderLeadMinutes: row.reminder_lead_minutes ?? undefined,
+    reminderSentAt: row.reminder_sent_at ?? undefined,
     status: row.status,
     priority: row.priority ?? 0,
     parentTaskId: row.parent_task_id ?? undefined,
@@ -59,7 +102,7 @@ export class TasksService {
     const { data, error } = await this.supabase.client
       .from("tasks")
       .select(
-        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), projects(title)"
+        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
       )
       .eq("project_id", projectId)
       .is("archived_at", null)
@@ -80,7 +123,7 @@ export class TasksService {
     const { data, error } = await this.supabase.client
       .from("tasks")
       .select(
-        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name)"
+        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url))"
       )
       .eq("department_id", departmentId)
       .is("archived_at", null)
@@ -115,6 +158,191 @@ export class TasksService {
       .maybeSingle();
     if (memberRow) return;
     throw new ForbiddenException("Bu departmanın görevlerini yalnızca kadrosundaki kişiler yönetebilir");
+  }
+
+  /**
+   * Görevin atanan listesini verilen kümeye eşitler ve `tasks.assigned_to`yu
+   * listenin ilk üyesiyle senkron tutar.
+   *
+   * İki kaynağı tek yerde birleştirmenin sebebi: `assigned_to` hâlâ birçok
+   * sorgunun (Yapılacaklar panosu dışında liste/filtre/bildirim) dayandığı alan.
+   * İkisi ayrı yollardan güncellenirse er ya da geç ayrışırlar; "görevde üç kişi
+   * yazıyor ama kart boş" gibi hatalar buradan çıkar.
+   *
+   * Yeni eklenenlere bildirim gider, çıkarılanlara gitmez — birinin listeden
+   * düşürülmesi ona bildirilecek bir "atama" değil.
+   */
+  private async syncAssignees(
+    taskId: string,
+    userIds: string[],
+    requestingUserId?: string,
+    notifyContext?: { title: string; link?: string }
+  ): Promise<void> {
+    // Sıra korunarak tekilleştirilir: ilk eleman birincil atanan olacak.
+    const next = Array.from(new Set(userIds.filter(Boolean)));
+
+    const { data: existingRows } = await this.supabase.client
+      .from("task_assignees")
+      .select("user_id")
+      .eq("task_id", taskId);
+    const existing = new Set((existingRows ?? []).map((r: any) => r.user_id as string));
+
+    const toAdd = next.filter((id) => !existing.has(id));
+    const toRemove = [...existing].filter((id) => !next.includes(id));
+
+    if (toRemove.length) {
+      await this.supabase.client.from("task_assignees").delete().eq("task_id", taskId).in("user_id", toRemove);
+    }
+    if (toAdd.length) {
+      await this.supabase.client
+        .from("task_assignees")
+        .insert(toAdd.map((userId) => ({ task_id: taskId, user_id: userId, assigned_by: requestingUserId ?? null })));
+    }
+
+    await this.supabase.client
+      .from("tasks")
+      .update({ assigned_to: next[0] ?? null })
+      .eq("id", taskId);
+
+    if (notifyContext) {
+      const assigner = await this.getUserName(requestingUserId);
+      for (const userId of toAdd) {
+        if (userId === requestingUserId) continue;
+        this.notificationsService.notifyUser(
+          userId,
+          "task_assigned",
+          "Yeni Görev Atandı",
+          assigner
+            ? `${assigner}, sizi "${notifyContext.title}" görevine atadı.`
+            : `"${notifyContext.title}" görevine atandınız.`,
+          notifyContext.link
+        );
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------ ekler
+  //
+  // Ek, görevin bir parçası: yetki kontrolü de görevin kendi erişim kuralını
+  // kullanır (proje üyeliği ya da departman kadrosu). Ayrı bir izin katmanı
+  // açmıyoruz — "görevi görebilen ekini de görür" tek ve anlaşılır kural.
+  //
+  // BURAYA DOSYA YÜKLENMEZ. Dosyalar Google Drive / OneDrive'da yaşar ve files
+  // modülü üzerinden bağlanır (bkz. FilesPanel); bu tablo yalnızca BAĞLANTI
+  // tutar. Dosyanın kendisini kendi depomuza kopyalamak, aynı belgenin iki yerde
+  // ayrı ayrı yaşamasına ve hangisinin güncel olduğunun belirsizleşmesine yol
+  // açıyordu — kullanıcının dosyası kendi bulutunda kalmalı.
+
+  async findAttachments(taskId: string, requestingUserId?: string): Promise<TaskAttachment[]> {
+    await this.assertTaskAccess(await this.getTaskScope(taskId), requestingUserId);
+    const { data, error } = await this.supabase.client
+      .from("task_attachments")
+      .select("*, creator:users!task_attachments_created_by_fkey(full_name)")
+      .eq("task_id", taskId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(mapAttachment);
+  }
+
+  async addLinkAttachment(
+    taskId: string,
+    body: { url?: string; label?: string },
+    requestingUserId?: string
+  ): Promise<TaskAttachment> {
+    await this.assertTaskAccess(await this.getTaskScope(taskId), requestingUserId);
+    const url = (body.url ?? "").trim();
+    if (!url) throw new BadRequestException("Bağlantı adresi boş olamaz");
+
+    const { data, error } = await this.supabase.client
+      .from("task_attachments")
+      .insert({
+        task_id: taskId,
+        kind: "link",
+        url,
+        label: body.label?.trim() || null,
+        created_by: requestingUserId ?? null,
+      })
+      .select("*, creator:users!task_attachments_created_by_fkey(full_name)")
+      .single();
+    if (error) throw error;
+    return mapAttachment(data);
+  }
+
+  async removeAttachment(attachmentId: string, requestingUserId?: string): Promise<{ success: true }> {
+    const { data: row } = await this.supabase.client
+      .from("task_attachments")
+      .select("task_id")
+      .eq("id", attachmentId)
+      .maybeSingle();
+    if (!row) throw new NotFoundException("Ek bulunamadı");
+    await this.assertTaskAccess(await this.getTaskScope(row.task_id), requestingUserId);
+
+    // Depodaki dosya bilerek silinmiyor: aynı url'i başka bir yere kopyalamış
+    // olabilir ve kova temizliği ayrı bir bakım işi. Kayıt kalkınca ek listede
+    // görünmez, kullanıcı için işlem tamamlanmış olur.
+    const { error } = await this.supabase.client.from("task_attachments").delete().eq("id", attachmentId);
+    if (error) throw error;
+    return { success: true };
+  }
+
+  /**
+   * Tek bir görevi tam kaydıyla döndürür. Kısmi görünümlerden (pano kartı, rutin
+   * tekrar satırı) düzenleme modalı açılırken kullanılır: eksik alanlarla açılan
+   * bir form kaydederken o alanları siler.
+   */
+  async findById(id: string, requestingUserId?: string): Promise<Task> {
+    await this.assertTaskAccess(await this.getTaskScope(id), requestingUserId);
+    return this.reloadTask(id);
+  }
+
+  /**
+   * Kullanıcının kendi isteğiyle görevden ayrılması (atamadan çıkması).
+   *
+   * Görevi silmez, başkalarının atamasına dokunmaz; yalnızca kendi satırını
+   * kaldırır. Son atanan da ayrılırsa görev "atanmamış" hale gelir — kimseye
+   * zorla bırakılmaktansa sahipsiz kalması daha dürüst, ekip bunu görüp
+   * yeniden atayabilir.
+   *
+   * `syncAssignees` üzerinden gidiyor ki `tasks.assigned_to` (birincil atanan)
+   * da güncellensin: iki kaynağı ayrı ayrı yazmak onları er ya da geç ayırır.
+   */
+  async leaveTask(taskId: string, userId: string): Promise<Task> {
+    await this.assertTaskAccess(await this.getTaskScope(taskId), userId);
+
+    const { data: rows } = await this.supabase.client
+      .from("task_assignees")
+      .select("user_id")
+      .eq("task_id", taskId);
+    const current = (rows ?? []).map((r: any) => r.user_id as string);
+    if (!current.includes(userId)) throw new NotFoundException("Bu göreve atanmış değilsin");
+
+    await this.syncAssignees(
+      taskId,
+      current.filter((id) => id !== userId),
+      userId
+    );
+    return this.reloadTask(taskId);
+  }
+
+  /** Atamalar yazıldıktan sonra görevi güncel hâliyle (atananlar dahil) okur. */
+  private async reloadTask(id: string): Promise<Task> {
+    const { data: row } = await this.supabase.client
+      .from("tasks")
+      .select(
+        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
+      )
+      .eq("id", id)
+      .maybeSingle();
+    if (!row) throw new NotFoundException("Görev bulunamadı");
+    return mapTask(row);
+  }
+
+  /** İstekteki atama alanlarını tek bir listeye indirger. */
+  private resolveAssigneeIds(data: Partial<Task>): string[] | undefined {
+    if (Array.isArray(data.assignedToIds)) return data.assignedToIds.filter(Boolean);
+    // Eski istemciler yalnızca assignedTo gönderiyor; tek kişilik liste sayılır.
+    if (data.assignedTo !== undefined) return data.assignedTo ? [data.assignedTo] : [];
+    return undefined;
   }
 
   // Kullanıcının bu projedeki rolünü döner: proje sahibiyse "owner", onaylı bir
@@ -256,11 +484,19 @@ export class TasksService {
         sort_order: nextSortOrder,
         project_id: projectId,
         output_id: data.outputId ?? null,
-        assigned_to: data.assignedTo ?? null,
+        // Atama yapılmadıysa görev oluşturana atanır. Yapılacaklar panosunun
+        // kaynağı (v_personal_board) yalnızca assigned_to üzerinden çalıştığı
+        // için, atanmamış görevler hiç kimsenin panosuna düşmüyordu: kendi
+        // işindeki projeye görev ekleyen kullanıcı onu Yapılacaklar'da hiç
+        // göremiyordu. Başkasına atamak isteyen zaten assignedTo gönderiyor.
+        assigned_to: data.assignedTo ?? requestingUserId ?? null,
         title: data.title ?? "",
         description: data.description ?? null,
         start_date: data.startDate ?? null,
         deadline: data.deadline ?? new Date().toISOString(),
+        deadline_time: data.deadlineTime || null,
+        // Hatırlatma yalnızca saat varsa kurulabilir (DB'de de CHECK var).
+        reminder_lead_minutes: data.deadlineTime ? (data.reminderLeadMinutes ?? null) : null,
         status: data.status ?? "todo",
         parent_task_id: data.parentTaskId ?? null,
         budget: data.budget ?? 0,
@@ -275,24 +511,23 @@ export class TasksService {
       .single();
     if (error) throw error;
     const task = mapTask(row);
-    if (task.assignedTo && task.assignedTo !== requestingUserId) {
-      void this.getUserName(requestingUserId).then((assigner) =>
-        this.notificationsService.notifyUser(
-          task.assignedTo!,
-          "task_assigned",
-          "Yeni Görev Atandı",
-          assigner
-            ? `${assigner}, sizi "${task.title}" görevine atadı.`
-            : `"${task.title}" görevine atandınız.`,
-          taskLink(task)
-        )
-      );
+
+    // Atama ilişkisi ayrı tabloda tutulur (bkz. 053); insert'teki assigned_to
+    // yalnızca birincil atanandır, listenin tamamı burada kurulur.
+    const requested = this.resolveAssigneeIds(data) ?? [];
+    const assignees = requested.length ? requested : task.assignedTo ? [task.assignedTo] : [];
+    if (assignees.length) {
+      await this.syncAssignees(task.id, assignees, requestingUserId, {
+        title: task.title,
+        link: taskLink(task),
+      });
     }
+
     // Yeni görev eklendiğinde (alt görevler hariç) proje ekibine push/bildirim gitsin.
     if (!task.parentTaskId) {
       void this.notifyTeamNewTask(task, requestingUserId);
     }
-    return task;
+    return this.reloadTask(task.id);
   }
 
   async createForDepartment(departmentId: string, data: Partial<Task>, requestingUserId?: string): Promise<Task> {
@@ -317,11 +552,16 @@ export class TasksService {
         sort_order: nextSortOrder,
         department_id: departmentId,
         output_id: data.outputId ?? null,
-        assigned_to: data.assignedTo ?? null,
+        // Proje görevlerindeki kuralın aynısı: atama yapılmadıysa görev
+        // oluşturana atanır. Aksi halde görev hiç kimsenin Yapılacaklar
+        // panosuna düşmüyor (bkz. v_personal_board yalnızca assigned_to'ya bakar).
+        assigned_to: data.assignedTo ?? requestingUserId ?? null,
         title: data.title ?? "",
         description: data.description ?? null,
         start_date: data.startDate ?? null,
         deadline: data.deadline ?? new Date().toISOString(),
+        deadline_time: data.deadlineTime || null,
+        reminder_lead_minutes: data.deadlineTime ? (data.reminderLeadMinutes ?? null) : null,
         status: data.status ?? "todo",
         parent_task_id: data.parentTaskId ?? null,
         budget: data.budget ?? 0,
@@ -333,23 +573,23 @@ export class TasksService {
       .single();
     if (error) throw error;
     const task = mapTask(row);
-    if (task.assignedTo && task.assignedTo !== requestingUserId) {
-      void this.getUserName(requestingUserId).then((assigner) =>
-        this.notificationsService.notifyUser(
-          task.assignedTo!,
-          "task_assigned",
-          "Yeni Görev Atandı",
-          assigner
-            ? `${assigner}, sizi "${task.title}" görevine atadı.`
-            : `"${task.title}" görevine atandınız.`,
-          taskLink(task)
-        )
-      );
+
+    // Proje görevlerindeki desenin aynısı: atama ilişkisi ayrı tabloda tutulur
+    // (bkz. 055). Bu satır olmadan görev hiç kimsenin Yapılacaklar panosuna
+    // düşmüyordu — pano artık task_assignees'ten besleniyor, assigned_to'dan değil.
+    const requested = this.resolveAssigneeIds(data) ?? [];
+    const assignees = requested.length ? requested : task.assignedTo ? [task.assignedTo] : [];
+    if (assignees.length) {
+      await this.syncAssignees(task.id, assignees, requestingUserId, {
+        title: task.title,
+        link: taskLink(task),
+      });
     }
+
     if (!task.parentTaskId) {
       void this.notifyTeamNewTask(task, requestingUserId);
     }
-    return task;
+    return assignees.length ? this.reloadTask(task.id) : task;
   }
 
   // Proje/departman sahibi + onaylı üyelere (ekleyen ve zaten ayrıca bilgilendirilen atanan hariç)
@@ -384,7 +624,21 @@ export class TasksService {
     if (data.description !== undefined) patch.description = data.description || null;
     if (data.startDate !== undefined) patch.start_date = data.startDate || null;
     if (data.deadline !== undefined) patch.deadline = data.deadline;
-    if (data.assignedTo !== undefined) patch.assigned_to = data.assignedTo || null;
+    // Saat ya da ön süre değiştiyse hatırlatma yeniden kurulmalı: gönderildi
+    // damgası temizlenmezse zamanlanmış iş bu görevi bir daha hiç ele almaz.
+    if (data.deadlineTime !== undefined) {
+      patch.deadline_time = data.deadlineTime || null;
+      patch.reminder_sent_at = null;
+      // Saat kaldırıldıysa hatırlatma da düşer (DB'deki CHECK ile aynı kural).
+      if (!data.deadlineTime) patch.reminder_lead_minutes = null;
+    }
+    if (data.reminderLeadMinutes !== undefined) {
+      patch.reminder_lead_minutes = data.reminderLeadMinutes ?? null;
+      patch.reminder_sent_at = null;
+    }
+    // Atama artık ayrı tabloda (bkz. 053): assigned_to'yu burada elle set etmiyoruz,
+    // aşağıda syncAssignees hem listeyi hem birincil atananı birlikte yazıyor.
+    const requestedAssignees = this.resolveAssigneeIds(data);
     if (data.budget !== undefined) {
       patch.budget = data.budget;
       patch.budget_status = "pending";
@@ -408,39 +662,104 @@ export class TasksService {
       .update(patch)
       .eq("id", id)
       .select(
-        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), projects(title)"
+        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
       )
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Görev bulunamadı");
     const task = mapTask(row);
 
-    if (task.assignedTo && task.assignedTo !== previous?.assignedTo && task.assignedTo !== requestingUserId) {
-      void this.getUserName(requestingUserId).then((assigner) =>
-        this.notificationsService.notifyUser(
-          task.assignedTo!,
-          "task_assigned",
-          "Yeni Görev Atandı",
-          assigner
-            ? `${assigner}, sizi "${task.title}" görevine atadı.`
-            : `"${task.title}" görevine atandınız.`,
-          taskLink(task)
-        )
-      );
-    } else if (
-      task.assignedTo &&
-      previous &&
-      (previous.title !== task.title || previous.deadline !== task.deadline || previous.startDate !== task.startDate)
-    ) {
-      void this.notificationsService.notifyUser(
-        task.assignedTo,
-        "task_updated",
-        "Görev Güncellendi",
-        `"${task.title}" görevinde güncelleme var.`,
-        taskLink(task)
-      );
+    // Atama listesi istekte varsa eşitlenir; bildirim yalnızca YENİ eklenenlere
+    // gider (syncAssignees içinde), listeden çıkarılanlara değil.
+    if (requestedAssignees) {
+      await this.syncAssignees(id, requestedAssignees, requestingUserId, {
+        title: task.title,
+        link: taskLink(task),
+      });
     }
-    return task;
+
+    const contentChanged =
+      previous &&
+      (previous.title !== task.title || previous.deadline !== task.deadline || previous.startDate !== task.startDate);
+    if (contentChanged) {
+      // İçerik değiştiyse görevde yer alan HERKES haberdar olmalı, yalnızca
+      // birincil atanan değil.
+      const { data: rows } = await this.supabase.client
+        .from("task_assignees")
+        .select("user_id")
+        .eq("task_id", id);
+      for (const r of rows ?? []) {
+        if ((r as any).user_id === requestingUserId) continue;
+        void this.notificationsService.notifyUser(
+          (r as any).user_id,
+          "task_updated",
+          "Görev Güncellendi",
+          `"${task.title}" görevinde güncelleme var.`,
+          taskLink(task)
+        );
+      }
+    }
+
+    return requestedAssignees ? this.reloadTask(id) : task;
+  }
+
+  /**
+   * Bir ALT GÖREVİ başka bir üst görevin altına taşır.
+   *
+   * Neden `update()` içinde değil: oradan `parent_task_id` yazılabilseydi
+   * herhangi bir görev herhangi birinin altına düşer, uygulamanın her yerinde
+   * varsayılan iki seviyelik yapı (görev → alt görev) bozulurdu. Burada taşıma
+   * kendi kurallarıyla çalışıyor:
+   * - yalnızca hâlihazırda alt görev olan bir kayıt taşınabilir,
+   * - hedef bir ÜST görev olmalı (alt görevin altına alt görev asılmaz),
+   * - hedef başka bir projede/departmandaysa alt görev onun kapsamını devralır,
+   *   yoksa üst göreviyle farklı yerlerde yaşayan bir kayıt ortaya çıkardı.
+   */
+  async updateParent(id: string, parentTaskId: string, requestingUserId?: string): Promise<Task> {
+    assertSubtaskMoveRequest(id, parentTaskId);
+
+    const { data: row } = await this.supabase.client.from("tasks").select().eq("id", id).maybeSingle();
+    if (!row) throw new NotFoundException("Görev bulunamadı");
+    const task = mapTask(row);
+    await this.assertTaskAccess(task, requestingUserId);
+    if (task.parentTaskId === parentTaskId) return task;
+
+    const { data: parentRow } = await this.supabase.client
+      .from("tasks")
+      .select()
+      .eq("id", parentTaskId)
+      .maybeSingle();
+    if (!parentRow) throw new NotFoundException("Hedef üst görev bulunamadı");
+    const parent = mapTask(parentRow);
+    await this.assertTaskAccess(parent, requestingUserId);
+    assertSubtaskMoveAllowed(task, parent);
+
+    // Hedefin sonuna eklenir; kullanıcı bırakır bırakmaz gelen reorder isteği
+    // (bkz. TaskColumn) kesin sırayı yazar.
+    const { data: maxRows } = await this.supabase.client
+      .from("tasks")
+      .select("sort_order")
+      .eq("parent_task_id", parentTaskId)
+      .order("sort_order", { ascending: false })
+      .limit(1);
+
+    const patch: Record<string, unknown> = {
+      parent_task_id: parentTaskId,
+      sort_order: ((maxRows?.[0]?.sort_order as number | undefined) ?? -1) + 1,
+      ...subtaskScopePatch(row, parentRow),
+    };
+
+    const { data: updatedRow, error } = await this.supabase.client
+      .from("tasks")
+      .update(patch)
+      .eq("id", id)
+      .select(
+        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
+      )
+      .maybeSingle();
+    if (error) throw error;
+    if (!updatedRow) throw new NotFoundException("Görev bulunamadı");
+    return mapTask(updatedRow);
   }
 
   async updateBudgetStatus(id: string, budgetStatus: Task["budgetStatus"], requestingUserId?: string): Promise<Task> {
@@ -473,7 +792,7 @@ export class TasksService {
       .update(patch)
       .eq("id", id)
       .select(
-        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), projects(title)"
+        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
       )
       .maybeSingle();
     if (error) throw error;
@@ -611,7 +930,7 @@ export class TasksService {
     const idSet = new Set(rows.map((r: any) => r.id as string));
     const archivedAt = new Date().toISOString();
     const selectCols =
-      "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), projects(title)";
+      "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)";
     const archived: Task[] = [];
 
     for (const row of rows) {
@@ -752,10 +1071,22 @@ export class TasksService {
           sort_order: sortOrder,
         })
         .select(
-          "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), projects(title)"
+          "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
         )
         .single();
       if (insertError) throw insertError;
+      // Kopyaya atamalar da taşınır; yoksa kopya hiçbir panoda görünmez
+      // (bkz. 055 — pano task_assignees'ten besleniyor).
+      const { data: sourceAssignees } = await this.supabase.client
+        .from("task_assignees")
+        .select("user_id")
+        .eq("task_id", row.id);
+      const userIds = (sourceAssignees ?? []).map((a: any) => a.user_id as string);
+      if (userIds.length) {
+        await this.supabase.client
+          .from("task_assignees")
+          .insert(userIds.map((userId) => ({ task_id: inserted.id, user_id: userId, assigned_by: requestingUserId ?? null })));
+      }
       return inserted;
     };
 
@@ -857,7 +1188,7 @@ export class TasksService {
         .update(patch)
         .eq("id", id)
         .select(
-          "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), projects(title)"
+          "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
         )
         .maybeSingle();
       if (updateError) throw updateError;

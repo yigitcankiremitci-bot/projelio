@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
 import { colors } from "../theme/colors";
+import CardDescription from "./CardDescription";
 import { IconLayers, IconUser, IconEdit } from "./icons";
 
 interface Props {
@@ -158,20 +159,7 @@ export default function DepartmentCard({ department, onCoverUpdated }: Props) {
           {department.name}
         </h3>
         {department.description && (
-          <p
-            style={{
-              color: c.textSecondary,
-              fontSize: 15,
-              margin: "0 0 10px",
-              lineHeight: 1.5,
-              display: "-webkit-box",
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: "vertical" as const,
-              overflow: "hidden",
-            }}
-          >
-            {department.description}
-          </p>
+          <CardDescription text={department.description} lines={3} />
         )}
 
         <div

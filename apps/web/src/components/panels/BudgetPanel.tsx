@@ -2,8 +2,9 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { BudgetTransaction, Project, ProjectMember, Task } from "@projelio/shared";
 import { api } from "../../api/client";
 import { colors } from "../../theme/colors";
-import { IconPlus, IconX } from "../icons";
+import { IconPlus, IconX, IconEdit, IconTrash } from "../icons";
 import CreateBudgetTransactionModal from "../CreateBudgetTransactionModal";
+import { useUndo, useWithoutPendingDeletes } from "../../lib/undo";
 
 export interface BudgetPanelHandle {
   openCreate: () => void;
@@ -40,6 +41,70 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
   const [viewerToAdd, setViewerToAdd] = useState("");
   const [transactions, setTransactions] = useState<BudgetTransaction[]>([]);
   const [creatingEntry, setCreatingEntry] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<BudgetTransaction | null>(null);
+  const { pushUndo, pushDestructive } = useUndo();
+
+  const reloadTransactions = () => {
+    api
+      .get<BudgetTransaction[]>(`/projects/${projectId}/budget`)
+      .then(setTransactions)
+      .catch(() => setTransactions([]));
+  };
+
+  // Kayıt ekleme/düzenleme de geri alınabilir olmalı: bütçe girerken en sık
+  // yapılan hata yanlış tutar yazmak ve Cmd/Ctrl+Z burada hiç çalışmıyordu.
+  const handleCreated = (tx: BudgetTransaction) => {
+    setTransactions((prev) => [tx, ...prev]);
+    pushUndo({
+      label: tx.type === "income" ? "Ödeme eklendi" : "Gider eklendi",
+      run: async () => {
+        await api.delete(`/budget/transactions/${tx.id}`).catch(() => {});
+        reloadTransactions();
+      },
+      redo: async () => {
+        await api.post(`/projects/${projectId}/budget`, {
+          type: tx.type,
+          amount: tx.amount,
+          description: tx.description,
+        });
+        reloadTransactions();
+      },
+    });
+  };
+
+  const handleEdited = (previous: BudgetTransaction, saved: BudgetTransaction) => {
+    setTransactions((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
+    const apply = async (value: BudgetTransaction) => {
+      await api
+        .patch(`/budget/transactions/${value.id}`, {
+          type: value.type,
+          amount: value.amount,
+          description: value.description ?? "",
+        })
+        .catch(() => {});
+      reloadTransactions();
+    };
+    pushUndo({
+      label: "Bütçe kaydı düzenlendi",
+      run: () => apply(previous),
+      redo: () => apply(saved),
+    });
+  };
+
+  const handleDelete = (tx: BudgetTransaction) => {
+    pushDestructive({
+      label: "Bütçe kaydı silindi",
+      entityId: tx.id,
+      commit: async () => {
+        await api.delete(`/budget/transactions/${tx.id}`).catch(() => {});
+        reloadTransactions();
+      },
+      restore: reloadTransactions,
+    });
+  };
+
+  // Silinmeyi bekleyen kayıt (geri alma penceresi) sunucudan hâlâ geliyor; elenir.
+  const visibleTransactions = useWithoutPendingDeletes(transactions);
 
   useEffect(() => {
     setLoading(true);
@@ -221,14 +286,14 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
 
       <div>
         <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>Ödeme hareketleri</h4>
-        {transactions.length === 0 ? (
+        {visibleTransactions.length === 0 ? (
           <p style={{ fontSize: 15, color: c.textSecondary }}>
             Müşteriden tahsil ettiğin ödemeleri "gelen ödeme" olarak ekle; beklenen ödemeden otomatik düşülür. Eklemek
             için alttaki + butonunu kullan.
           </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {transactions.map((t) => {
+            {visibleTransactions.map((t) => {
               const isIncome = t.type === "income";
               const color = isIncome ? c.success : c.danger;
               return (
@@ -266,6 +331,32 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                     {isIncome ? "+" : "-"}
                     {t.amount.toLocaleString("tr-TR")} ₺
                   </span>
+
+                  {/* Düğmeler `isOwner`a BAĞLANMAZ: proje kaydında owner_id boş
+                      olabiliyor (kayıt işin sahibine ait sayılır), o durumda
+                      sunucu işleme izin verdiği hâlde düğmeler gizleniyordu.
+                      Yetki kontrolü zaten sunucuda (assertCanManageTransaction);
+                      kayıt ekleme düğmesi de aynı şekilde açık.
+                      Düzenli ödemeden otomatik düşen kayıt elle değiştirilmez,
+                      kuralın kendisinden yönetilir (bkz. RecurringPayment). */}
+                  {!t.recurringPaymentId && (
+                    <span style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                      <button
+                        onClick={() => setEditingEntry(t)}
+                        aria-label="Kaydı düzenle"
+                        style={{ background: "transparent", border: "none", padding: 4, display: "flex", cursor: "pointer" }}
+                      >
+                        <IconEdit size={14} color={c.textSecondary} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(t)}
+                        aria-label="Kaydı sil"
+                        style={{ background: "transparent", border: "none", padding: 4, display: "flex", cursor: "pointer" }}
+                      >
+                        <IconTrash size={14} color={c.textSecondary} />
+                      </button>
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -427,7 +518,16 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
         <CreateBudgetTransactionModal
           projectId={projectId}
           onClose={() => setCreatingEntry(false)}
-          onCreated={(tx) => setTransactions((prev) => [tx, ...prev])}
+          onSaved={handleCreated}
+        />
+      )}
+
+      {editingEntry && (
+        <CreateBudgetTransactionModal
+          projectId={projectId}
+          transaction={editingEntry}
+          onClose={() => setEditingEntry(null)}
+          onSaved={(saved) => handleEdited(editingEntry, saved)}
         />
       )}
     </div>

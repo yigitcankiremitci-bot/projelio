@@ -9,7 +9,7 @@ getirmek için yapılması gerekenleri anlatır.
 1. [console.cloud.google.com](https://console.cloud.google.com) > yeni proje oluşturun.
 2. **APIs & Services > Library**'den şunları etkinleştirin:
    - Google Drive API
-   - Google Picker API (ileride "Drive'ımdan dosya seç" özelliği için)
+   - Google Picker API ("Drive'dan seç" düğmesi için — bkz. §2.1)
 3. **APIs & Services > OAuth consent screen**:
    - User type: **External**
    - Uygulama adı, destek e-postası, logo, gizlilik politikası ve kullanım
@@ -56,6 +56,51 @@ bağlantısı kopar ve herkesin yeniden bağlanması gerekir.
 Değişkenler tanımlı değilse özellik sessizce kapalı kalır: "Google ile devam et"
 düğmesi hiç görünmez, Ayarlar'daki Drive kartı "yapılandırılmamış" der. Mevcut
 şifreli giriş etkilenmez.
+
+### 2.1 "Drive'dan seç" (Picker) — ayrı iki değişken
+
+Dosya **yüklemek** yukarıdaki backend değişkenleriyle çalışır. Ama Dosyalar
+panelindeki **"Drive'dan seç"** düğmesi, kullanıcının kendi Drive'ında gezinmesi
+için Google'ın resmi Picker widget'ını açar. Bu widget **tarayıcıda** çalışır ve
+doğrudan Google'a gider — backend'e hiç uğramaz, dolayısıyla
+`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` ona yetmez. Kendi frontend
+değişkenlerini ister:
+
+`apps/web/.env` (üretimde Netlify panelinden):
+
+```bash
+VITE_GOOGLE_PICKER_API_KEY=AIza...
+VITE_GOOGLE_PICKER_APP_ID=123456789012
+```
+
+**`VITE_GOOGLE_PICKER_API_KEY` nasıl alınır**
+
+1. **APIs & Services > Library**'den **Google Picker API**'yi etkinleştirin
+   (§1'de zaten yaptıysanız atlayın).
+2. **Credentials > Create Credentials > API key**.
+3. Oluşan anahtarı **kısıtlayın** — kısıtlanmamış anahtar herkesin kullanımına
+   açıktır ve kotanızı tüketir:
+   - *Application restrictions* > **Websites**: `http://localhost:5173/*` ve
+     `https://<frontend-alan-adiniz>/*`
+   - *API restrictions* > **Restrict key** > yalnızca **Google Picker API**
+
+   Bu anahtar gizli bir sır değildir (tarayıcıya gömülür); güvenliği yukarıdaki
+   iki kısıtlamadan gelir.
+
+**`VITE_GOOGLE_PICKER_APP_ID` nasıl alınır**
+
+Google Cloud projesinin **numarası** — proje *kimliği* (`projelio-123abc`) değil,
+salt rakamlardan oluşan numara. Cloud Console ana sayfasında *Project info*
+kartında **Project number** olarak yazar.
+
+Neden gerekli: kullandığımız dar `drive.file` scope'unda uygulama yalnızca kendi
+oluşturduğu ya da kullanıcının açıkça seçtiği dosyalara erişebilir. "Açıkça
+seçti" bilgisini Google, Picker'ı açan uygulamanın numarasıyla eşleştirir. Boş
+bırakılırsa kullanıcı dosyayı seçebilir ama arkasından yapılan istek 404 döner —
+sessiz ve teşhisi zor bir hata.
+
+Anahtar tanımlı değilse düğme, ne yapılması gerektiğini söyleyen bir hata
+gösterir; dosya yükleme ve diğer Drive özellikleri etkilenmez.
 
 ## 3. Veritabanı
 

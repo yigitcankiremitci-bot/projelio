@@ -3,6 +3,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { DriveService } from "./drive.service";
 import { GoogleAccountsService } from "./google-accounts.service";
 import { GoogleOAuthService } from "./google-oauth.service";
+import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
 
 /**
  * Google Drive'ın "boru tesisatı": OAuth token yönetimi ve Drive API çağrıları.
@@ -23,8 +24,8 @@ import { GoogleOAuthService } from "./google-oauth.service";
   imports: [
     // `state` parametresini imzalamak için; oturum token'ıyla aynı anahtar.
     JwtModule.register({
-      secret: process.env.JWT_SECRET ?? "change-me",
-      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? "7d" },
+      secret: getJwtSecret(),
+      signOptions: { expiresIn: getJwtExpiresIn() },
     }),
   ],
   providers: [GoogleOAuthService, GoogleAccountsService, DriveService],

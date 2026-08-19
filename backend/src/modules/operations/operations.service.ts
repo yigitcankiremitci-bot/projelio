@@ -7,6 +7,7 @@ import type {
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { applyOrder } from "../../common/reorder.util";
+import { detectImageUpload } from "../../common/upload-image.util";
 
 const COVER_BUCKET = "project-covers";
 
@@ -97,6 +98,21 @@ function mapOccurrence(row: any): OperationOccurrence {
     completedBy: row.completed_by ?? undefined,
     skippedAt: row.skipped_at ?? undefined,
     createdAt: row.created_at,
+    attachments: Array.isArray(row.task_attachments)
+      ? row.task_attachments.map((a: any) => ({
+          id: a.id,
+          taskId: row.id,
+          kind: a.kind,
+          url: a.url,
+          label: a.label ?? undefined,
+          createdAt: row.created_at,
+        }))
+      : undefined,
+    // Drive/OneDrive dosyaları ayrı tabloda yaşar (bkz. files); satırdaki dosya
+    // rozetinin hedefi bu liste.
+    files: Array.isArray(row.files)
+      ? row.files.map((f: any) => ({ id: f.id, name: f.name, webViewLink: f.web_view_link ?? undefined }))
+      : undefined,
   };
 }
 
@@ -341,7 +357,8 @@ export class OperationsService {
     return mapOperation(row);
   }
 
-  async restore(id: string): Promise<Operation> {
+  async restore(id: string, requestingUserId?: string): Promise<Operation> {
+    await this.assertCanManage(id, requestingUserId);
     const { data: row, error } = await this.supabase.client
       .from("operations")
       .update({ archived_at: null })
@@ -355,12 +372,14 @@ export class OperationsService {
 
   async uploadCover(id: string, file: Express.Multer.File, requestingUserId?: string): Promise<Operation> {
     await this.assertCanManage(id, requestingUserId);
-    const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
+    // Tur ve uzanti istemcinin sozune degil, dosyanin ilk baytlarindaki
+    // imzaya gore belirlenir (bkz. common/upload-image.util.ts).
+    const { contentType, ext } = detectImageUpload(file);
     const path = `operations/${id}/${randomUUID()}.${ext}`;
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(COVER_BUCKET)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);
@@ -501,7 +520,10 @@ export class OperationsService {
     let query = this.supabase.client
       .from("tasks")
       .select(
-        "*, assigned_user:users!tasks_assigned_to_fkey(full_name), routine:operation_routines(title)"
+        // Ekler de geliyor: listedeki satır "link/dosya var mı" rozetini
+        // gösterebilsin diye (bkz. 060). Ayrı bir istek atmak, her tekrar için
+        // bir sorgu demek olurdu.
+        "*, assigned_user:users!tasks_assigned_to_fkey(full_name), routine:operation_routines(title), task_attachments(id, kind, url, label), files(id, name, web_view_link)"
       )
       .eq("operation_id", operationId)
       .is("archived_at", null);

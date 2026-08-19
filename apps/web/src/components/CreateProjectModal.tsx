@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
+import { notifyCreationRequestsChanged, readCreateOutcome } from "../lib/creationRequests";
 import Modal from "./Modal";
 
 interface Props {
@@ -18,21 +19,31 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
   const [deadline, setDeadline] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Taşeron, sahibi olmadığı işin altına proje açamaz: talep onaya düşer.
+  const [sentForApproval, setSentForApproval] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await api.post("/projects", {
-        jobId,
-        title,
-        description: description || undefined,
-        totalBudget: Number(totalBudget) || 0,
-        startDate: startDate ? new Date(startDate).toISOString() : new Date().toISOString(),
-        deadline: deadline ? new Date(deadline).toISOString() : new Date().toISOString(),
-        status: "active",
-      });
+      const result = readCreateOutcome(
+        await api.post("/projects", {
+          jobId,
+          title,
+          description: description || undefined,
+          totalBudget: Number(totalBudget) || 0,
+          startDate: startDate ? new Date(startDate).toISOString() : new Date().toISOString(),
+          deadline: deadline ? new Date(deadline).toISOString() : new Date().toISOString(),
+          status: "active",
+        })
+      );
+      if (result.pending) {
+        setSentForApproval(true);
+        setLoading(false);
+        notifyCreationRequestsChanged();
+        return;
+      }
       onClose();
       if (onCreated) onCreated();
       else window.location.reload();
@@ -41,6 +52,26 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
       setLoading(false);
     }
   };
+
+  if (sentForApproval) {
+    return (
+      <Modal title="Onaya gönderildi" onClose={onClose}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <p style={{ fontSize: 16, color: c.textPrimary, margin: 0, lineHeight: 1.5 }}>
+            <strong>{title}</strong> talebiniz işin sahibine iletildi. Onaylandığında bildirim
+            alacak ve proje listenizde göreceksiniz.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
+          >
+            Tamam
+          </button>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal title="Yeni proje" onClose={onClose}>

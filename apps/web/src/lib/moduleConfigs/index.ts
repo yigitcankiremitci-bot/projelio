@@ -25,7 +25,6 @@ import {
   growthGoalConfig,
   productStrategyConfig,
   seoSemConfig,
-  socialMediaConfig,
   targetAudienceConfig,
 } from "./pazarlama";
 import { marketResearchConfig, partnershipConfig, salesPipelineConfig } from "./satis";
@@ -112,7 +111,8 @@ export const MODULE_RECORD_CONFIGS: Record<string, ModuleRecordConfig> = {
   pd_rakip_sektor_analizi: competitorConfig,
   pd_hedef_kitle: targetAudienceConfig,
   pd_dijital_pazarlama_seo_sem: seoSemConfig,
-  pd_sosyal_medya: socialMediaConfig,
+  // pd_sosyal_medya burada YOK: kendi tablolarına yazıyor ve kendi paneli var
+  // (bkz. 054_social_media.sql, SocialMediaPanel.tsx).
   pd_email: emailCampaignConfig,
   pd_reklam: advertisingConfig,
   pd_urun_stratejileri: productStrategyConfig,

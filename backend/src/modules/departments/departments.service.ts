@@ -1,8 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "crypto";
-import type { Department } from "@projelio/shared";
+import type { Department, DepartmentAccess, DepartmentMemberRole } from "@projelio/shared";
 import { applyOrder } from "../../common/reorder.util";
 import { SupabaseService } from "../../database/supabase.service";
+import { decideDepartmentAccess } from "./department-access";
+import { detectImageUpload } from "../../common/upload-image.util";
 
 const COVER_BUCKET = "department-covers";
 
@@ -39,6 +41,83 @@ export class DepartmentsService {
       .maybeSingle();
     if (!data) throw new NotFoundException("Organizasyon bulunamadı");
     if (data.owner_id !== userId) throw new ForbiddenException("Bu organizasyonu yalnızca sahibi düzenleyebilir");
+  }
+
+  // --- Görünürlük ---------------------------------------------------------
+  //
+  // Bir departman, kadrosunda olmayan hiç kimseye görünmez. Bu kural eskiden
+  // yoktu: findByOrganization requestingUserId almadığı için bir departmana
+  // taşeron olarak eklenen kullanıcı, sidebar'ın çektiği
+  // /organizations/:id/departments yanıtında organizasyonun TÜM departmanlarını
+  // görüyordu. Karar mantığı department-access.ts'te (saf, test edilebilir);
+  // burada yalnızca o fonksiyonun ihtiyacı olan gerçekler toplanıyor.
+
+  /** Bir kullanıcının organizasyon seviyesindeki konumu — departman başına tekrar sorulmasın. */
+  private async orgStanding(
+    organizationId: string,
+    userId: string
+  ): Promise<{ isOrgOwner: boolean; isOrgMember: boolean }> {
+    const { data: org } = await this.supabase.client
+      .from("organizations")
+      .select("owner_id")
+      .eq("id", organizationId)
+      .maybeSingle();
+    if (org?.owner_id === userId) return { isOrgOwner: true, isOrgMember: true };
+
+    const { data: member } = await this.supabase.client
+      .from("organization_members")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .maybeSingle();
+    return { isOrgOwner: false, isOrgMember: !!member };
+  }
+
+  /** Kullanıcının verilen departmanlardaki ONAYLI kadro rolleri. */
+  private async approvedRoles(
+    departmentIds: string[],
+    userId: string
+  ): Promise<Map<string, DepartmentMemberRole>> {
+    const roles = new Map<string, DepartmentMemberRole>();
+    if (departmentIds.length === 0) return roles;
+    const { data } = await this.supabase.client
+      .from("department_members")
+      .select("department_id, role")
+      .in("department_id", departmentIds)
+      .eq("user_id", userId)
+      .eq("status", "approved");
+    for (const row of data ?? []) roles.set(row.department_id, row.role as DepartmentMemberRole);
+    return roles;
+  }
+
+  /**
+   * Tek bir departman için kullanıcının görünürlüğü. userId verilmezse (dahili
+   * çağrılar, arka plan işleri) tam yetki varsayılır — mevcut desenle aynı.
+   */
+  async getAccess(departmentId: string, userId?: string): Promise<DepartmentAccess> {
+    if (!userId) {
+      return { role: "owner", canView: true, canViewTeam: true, canViewBudget: true, canManage: true };
+    }
+    const { data: dept } = await this.supabase.client
+      .from("departments")
+      .select("organization_id")
+      .eq("id", departmentId)
+      .maybeSingle();
+    if (!dept) throw new NotFoundException("Departman bulunamadı");
+
+    const [standing, roles] = await Promise.all([
+      this.orgStanding(dept.organization_id, userId),
+      this.approvedRoles([departmentId], userId),
+    ]);
+    return decideDepartmentAccess({ ...standing, membershipRole: roles.get(departmentId) });
+  }
+
+  /** getAccess + "göremiyorsan 403" kısayolu. */
+  async assertCanView(departmentId: string, userId?: string): Promise<DepartmentAccess> {
+    const access = await this.getAccess(departmentId, userId);
+    if (!access.canView) throw new ForbiddenException("Bu departmanı görüntüleme yetkiniz yok");
+    return access;
   }
 
   // Kullanıcının sahibi olduğu organizasyonlardaki TÜM departmanlar + onaylı
@@ -87,7 +166,11 @@ export class DepartmentsService {
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
   }
 
-  async findByOrganization(organizationId: string): Promise<Department[]> {
+  // requestingUserId verilirse liste kullanıcının GÖREBİLDİĞİ departmanlara
+  // indirgenir: organizasyon sahibi/üyesi hepsini, kadro üyesi (çalışan/taşeron)
+  // yalnızca kendi departmanlarını görür. Her kayda viewerAccess iliştirilir ki
+  // arayüz Bütçe/Ekip sekmelerini yetkisi olmayana hiç göstermesin.
+  async findByOrganization(organizationId: string, requestingUserId?: string): Promise<Department[]> {
     const { data, error } = await this.supabase.client
       .from("departments")
       .select("*")
@@ -96,7 +179,23 @@ export class DepartmentsService {
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     if (error) throw error;
-    const departments = (data ?? []).map(mapDepartment);
+    let departments = (data ?? []).map(mapDepartment);
+
+    if (requestingUserId) {
+      const [standing, roles] = await Promise.all([
+        this.orgStanding(organizationId, requestingUserId),
+        this.approvedRoles(
+          departments.map((d) => d.id),
+          requestingUserId
+        ),
+      ]);
+      departments = departments
+        .map((d) => ({
+          ...d,
+          viewerAccess: decideDepartmentAccess({ ...standing, membershipRole: roles.get(d.id) }),
+        }))
+        .filter((d) => d.viewerAccess?.canView);
+    }
 
     const deptIds = departments.map((d) => d.id);
     if (deptIds.length > 0) {
@@ -131,11 +230,17 @@ export class DepartmentsService {
     await applyOrder(this.supabase.client, "departments", ids);
   }
 
-  async findOne(id: string): Promise<Department> {
+  // requestingUserId verilirse kadroda olmayan kullanıcı 403 alır — departman
+  // sayfasının doğrudan URL ile açılması da bu kapıdan geçer.
+  async findOne(id: string, requestingUserId?: string): Promise<Department> {
     const { data, error } = await this.supabase.client.from("departments").select("*").eq("id", id).maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException("Departman bulunamadı");
-    return mapDepartment(data);
+    const department = mapDepartment(data);
+    if (requestingUserId) {
+      department.viewerAccess = await this.assertCanView(id, requestingUserId);
+    }
+    return department;
   }
 
   // catalogKey verilirse departman katalogdaki standart isim/açıklamayla açılır
@@ -250,12 +355,14 @@ export class DepartmentsService {
     const existing = await this.findOne(id);
     await this.assertOrgOwner(existing.organizationId, requestingUserId);
 
-    const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
+    // Tur ve uzanti istemcinin sozune degil, dosyanin ilk baytlarindaki
+    // imzaya gore belirlenir (bkz. common/upload-image.util.ts).
+    const { contentType, ext } = detectImageUpload(file);
     const path = `${id}/${randomUUID()}.${ext}`;
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(COVER_BUCKET)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);

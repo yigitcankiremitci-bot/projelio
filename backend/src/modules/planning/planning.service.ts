@@ -882,10 +882,17 @@ export class PlanningService {
     // Departman görevleri gibi, kapsam sorgularına düşmeyen ama kullanıcıya
     // atanmış işler bu üçüncü kolla geliyor.
     if (!opts.projectId) {
+      // Atama ayrı tabloda (bkz. migration 053): birincil atanan olmayan ama
+      // göreve eklenmiş kullanıcı da bu listeyi görmeli.
+      const { data: assignedRows } = await this.supabase.client
+        .from("task_assignees")
+        .select("task_id")
+        .eq("user_id", userId);
+      const assignedIds = (assignedRows ?? []).map((r: any) => r.task_id as string);
       let q = this.supabase.client
         .from("tasks")
         .select(select)
-        .eq("assigned_to", userId)
+        .in("id", assignedIds.length ? assignedIds : ["00000000-0000-0000-0000-000000000000"])
         .is("archived_at", null)
         .neq("status", "completed")
         .limit(limit * 2);

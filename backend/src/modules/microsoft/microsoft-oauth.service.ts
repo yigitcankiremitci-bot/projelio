@@ -30,10 +30,57 @@ export const MICROSOFT_LOGIN_SCOPES = ["openid", "email", "profile", "offline_ac
 export const ONEDRIVE_SCOPE = "https://graph.microsoft.com/Files.ReadWrite.AppFolder";
 export const ONEDRIVE_BROWSE_SCOPE = "https://graph.microsoft.com/Files.Read.All";
 
+/**
+ * Posta izinleri (E-posta modülü gelen kutusu).
+ *
+ * `Mail.ReadWrite` okuma + okundu işaretleme + taslak oluşturma, `Mail.Send`
+ * yanıt gönderme. Google'daki Gmail scope'larının aksine bunlar yıllık bağımsız
+ * güvenlik denetimi (CASA) gerektirmiyor; Microsoft tarafında yayıncı
+ * doğrulaması yeterli. E-posta modülünün önce Outlook ile başlamasının sebebi
+ * bu (bkz. docs/moduller/15-eposta-gelen-kutusu.md §1).
+ *
+ * DEPOLAMA SCOPE'LARI BİLEREK BURADA YOK: posta bağlarken OneDrive izni de
+ * istenirse, depolaması Google Drive olan bir kullanıcı farkında olmadan
+ * "OneDrive hazır" durumuna düşer (bkz. MicrosoftAccountsService.isDriveReady)
+ * ve depolama sağlayıcısı sessizce değişmiş gibi görünür. İki izin kümesi ayrı
+ * onaylardan geçer.
+ */
+export const MAIL_SCOPES = [
+  "https://graph.microsoft.com/Mail.ReadWrite",
+  "https://graph.microsoft.com/Mail.Send",
+  // `User.Read` OLMADAN /me çağrılamaz — openid/profile yalnızca id_token
+  // üretir, Graph'ın /me kaynağına erişim vermez. Kutunun gerçek adresini
+  // (takma ad / UPN farkı) oradan okuduğumuz için gerekli; düşük ayrıcalıklı
+  // ve yönetici onayı istemeyen bir izin.
+  "https://graph.microsoft.com/User.Read",
+];
+
+/** OneDrive bağlama akışının istediği izinler. */
+export const DRIVE_CONNECT_SCOPES = [...MICROSOFT_LOGIN_SCOPES, ONEDRIVE_SCOPE, ONEDRIVE_BROWSE_SCOPE];
+/** Posta bağlama akışının istediği izinler. */
+export const MAIL_CONNECT_SCOPES = [...MICROSOFT_LOGIN_SCOPES, ...MAIL_SCOPES];
+
 export interface MicrosoftOAuthStatePayload {
   typ: "microsoft_oauth";
   /** Bu akış her zaman "connect": önce giriş yapmış kullanıcı OneDrive'ı bağlar. */
   userId: string;
+  /**
+   * Ne bağlanıyor: depolama mı posta mı.
+   *
+   * Verilmezse "drive" — bu alan eklenmeden önce imzalanmış (10 dakika ömürlü)
+   * state'ler akış ortasında geçersizleşmesin diye.
+   */
+  mode?: "drive" | "mail";
+  /** Posta akışında: kutunun bağlanacağı modül kapsamı. */
+  organizationId?: string;
+  departmentId?: string;
+  jobId?: string;
+  /**
+   * Posta akışında: bağlanacak kutu kullanıcının kendi kutusu değilse
+   * paylaşılan kutunun adresi (ör. info@sirket.com). Kullanıcının o kutuda
+   * Exchange tarafında tam erişim yetkisi olmalı.
+   */
+  sharedMailbox?: string;
   /** Akış bitince kullanıcının döneceği ön yüz yolu. */
   next?: string;
 }
@@ -70,6 +117,21 @@ export class MicrosoftOAuthService {
     return (
       process.env.MICROSOFT_REDIRECT_URI?.trim() ||
       `${process.env.BACKEND_URL?.trim() || "http://localhost:3000"}/auth/microsoft/callback`
+    );
+  }
+
+  /**
+   * Posta bağlama akışının dönüş adresi.
+   *
+   * Depolamadan AYRI bir adres: iki akışın geri dönüşü farklı controller'lara
+   * düşüyor (MicrosoftController vs MailboxController) ve tek adres kullanmak
+   * modüller arasında döngüsel bağımlılık doğuruyordu. Azure'da her iki URI de
+   * kayıtlı olmalı.
+   */
+  get mailRedirectUri(): string {
+    return (
+      process.env.MICROSOFT_MAIL_REDIRECT_URI?.trim() ||
+      `${process.env.BACKEND_URL?.trim() || "http://localhost:3000"}/mail/microsoft/callback`
     );
   }
 
@@ -112,15 +174,21 @@ export class MicrosoftOAuthService {
     return decoded;
   }
 
-  buildAuthUrl(options: { state: string; loginHint?: string }): string {
+  buildAuthUrl(options: {
+    state: string;
+    loginHint?: string;
+    scopes?: string[];
+    /** Verilmezse depolama akışının adresi. */
+    redirectUri?: string;
+  }): string {
     this.assertConfigured();
 
     const params = new URLSearchParams({
       client_id: this.clientId!,
-      redirect_uri: this.redirectUri,
+      redirect_uri: options.redirectUri ?? this.redirectUri,
       response_type: "code",
       response_mode: "query",
-      scope: [...MICROSOFT_LOGIN_SCOPES, ONEDRIVE_SCOPE, ONEDRIVE_BROWSE_SCOPE].join(" "),
+      scope: (options.scopes ?? DRIVE_CONNECT_SCOPES).join(" "),
       // offline_access scope'u refresh_token için yeterli ama Microsoft da tıpkı
       // Google gibi, kullanıcı daha önce onay verdiyse consent ekranını atlayıp
       // sessiz geçebiliyor — bu durumda refresh_token gelmeyebilir. prompt=consent
@@ -133,7 +201,7 @@ export class MicrosoftOAuthService {
     return `${AUTH_ENDPOINT}?${params.toString()}`;
   }
 
-  async exchangeCode(code: string): Promise<MicrosoftTokenResponse> {
+  async exchangeCode(code: string, scopes?: string[], redirectUri?: string): Promise<MicrosoftTokenResponse> {
     this.assertConfigured();
 
     const res = await fetch(TOKEN_ENDPOINT, {
@@ -143,9 +211,10 @@ export class MicrosoftOAuthService {
         code,
         client_id: this.clientId!,
         client_secret: this.clientSecret!,
-        redirect_uri: this.redirectUri,
+        // Kod hangi adrese verildiyse takas da onunla yapılmak zorunda.
+        redirect_uri: redirectUri ?? this.redirectUri,
         grant_type: "authorization_code",
-        scope: [...MICROSOFT_LOGIN_SCOPES, ONEDRIVE_SCOPE, ONEDRIVE_BROWSE_SCOPE].join(" "),
+        scope: (scopes ?? DRIVE_CONNECT_SCOPES).join(" "),
       }),
     });
 
@@ -166,7 +235,16 @@ export class MicrosoftOAuthService {
    * işaretleyip kullanıcıdan yeniden bağlanmasını istemeli.
    */
   async refreshAccessToken(
-    refreshToken: string
+    refreshToken: string,
+    /**
+     * Hangi izinler için jeton isteniyor.
+     *
+     * Microsoft'ta erişim jetonu istenen scope kümesine göre çıkar: posta
+     * okumak için OneDrive scope'lu bir jeton işe yaramaz. Kullanıcı o izni
+     * hiç onaylamadıysa istek `invalid_grant`/`consent_required` ile döner ve
+     * çağıran taraf "yeniden bağlanın" der.
+     */
+    scopes?: string[]
   ): Promise<{ accessToken: string; expiresIn: number } | { invalidGrant: true }> {
     this.assertConfigured();
 
@@ -178,7 +256,7 @@ export class MicrosoftOAuthService {
         client_secret: this.clientSecret!,
         refresh_token: refreshToken,
         grant_type: "refresh_token",
-        scope: [...MICROSOFT_LOGIN_SCOPES, ONEDRIVE_SCOPE, ONEDRIVE_BROWSE_SCOPE].join(" "),
+        scope: (scopes ?? DRIVE_CONNECT_SCOPES).join(" "),
       }),
     });
 

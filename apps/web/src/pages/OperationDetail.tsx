@@ -1,16 +1,19 @@
 import { useRef, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type { Operation, OperationOccurrence, OperationRoutine, OperationStatus } from "@projelio/shared";
+import type { Operation, OperationOccurrence, OperationRoutine, OperationStatus, Task } from "@projelio/shared";
 import { api } from "../api/client";
 import Modal from "../components/Modal";
 import RoutineModal from "../components/RoutineModal";
+import EditOperationModal from "../components/EditOperationModal";
+import TaskEditModal from "../components/TaskEditModal";
 import OperationHealthBadge, { AdherenceDots } from "../components/OperationHealthBadge";
-import EntityCover from "../components/EntityCover";
+import EntityCover, { coverActionButton } from "../components/EntityCover";
 import { coverText } from "../lib/covers";
 import { colors } from "../theme/colors";
-import { IconCalendar, IconCheck, IconEdit, IconUser } from "../components/icons";
+import { IconCalendar, IconCheck, IconEdit, IconExternalLink, IconFile, IconSettings, IconUser } from "../components/icons";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader } from "../lib/pageHeader";
+import { useCurrentUser } from "../lib/useCurrentUser";
 
 const periodLabel: Record<string, string> = { weekly: "hafta", monthly: "ay", yearly: "yıl" };
 
@@ -32,10 +35,17 @@ export default function OperationDetail() {
   const c = colors.light;
 
   const [operation, setOperation] = useState<Operation | null>(null);
+  const { user: currentUser } = useCurrentUser();
   const [routines, setRoutines] = useState<OperationRoutine[]>([]);
   const [occurrences, setOccurrences] = useState<OperationOccurrence[]>([]);
   const [routineModal, setRoutineModal] = useState<{ routine?: OperationRoutine } | null>(null);
   const [statusPrompt, setStatusPrompt] = useState<OperationStatus | null>(null);
+  const [editing, setEditing] = useState(false);
+  // Açık tekrarın TAM görev kaydı: tekrarlar birer görev olduğu için düzenleme
+  // ortak TaskEditModal ile yapılır (bkz. 060 — ayrı bir "tekrar modalı" yok).
+  const [openOccurrence, setOpenOccurrence] = useState<Task | null>(null);
+  // Geçmiş bölümü uzun olabilir; varsayılan kapalı.
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const reload = () => {
     if (!id) return;
@@ -82,6 +92,17 @@ export default function OperationDetail() {
     [occurrences, graceById]
   );
 
+  // Tamamlanan/atlanan/kaçırılan tüm geçmiş tekrarlar, en yeniden eskiye.
+  // Önceden yalnızca son 12 tekrarın nokta ızgarası vardı: "yapıldı mı"
+  // görünüyor, NE yapıldığı görünmüyordu (bkz. ekler).
+  const history = useMemo(
+    () =>
+      occurrences
+        .filter((o) => new Date(o.occurrenceOn) < today || o.status === "completed" || o.skippedAt)
+        .sort((a, b) => b.occurrenceOn.localeCompare(a.occurrenceOn)),
+    [occurrences]
+  );
+
   // Rutin kartındaki nokta ızgarası için son 12 tekrarın sonucu.
   const recentByRoutine = useMemo(() => {
     const map = new Map<string, OccurrenceState[]>();
@@ -106,6 +127,18 @@ export default function OperationDetail() {
       .catch(reload);
   };
 
+  /**
+   * Tekrarın tam görev kaydını çekip düzenleme modalını açar. Listedeki
+   * OperationOccurrence kısmi bir görünüm; modalı onunla açmak kaydederken
+   * bütçe/süre gibi alanları sıfırlardı (bkz. TasksOverview'daki aynı desen).
+   */
+  const openOccurrenceModal = (occurrenceId: string) => {
+    api
+      .get<Task>(`/tasks/${occurrenceId}`)
+      .then(setOpenOccurrence)
+      .catch(() => setOpenOccurrence(null));
+  };
+
   const skipOccurrence = (occurrenceId: string, skipped: boolean) => {
     api.patch(`/occurrences/${occurrenceId}/skip`, { skipped }).then(reload).catch(reload);
   };
@@ -117,7 +150,13 @@ export default function OperationDetail() {
 
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
   const coverRef = useRef<HTMLDivElement>(null);
-  usePageHeader(operation?.title, coverRef, [operation?.title]);
+  // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
+  const backRef = useRef<HTMLDivElement>(null);
+  usePageHeader(operation?.title, coverRef, [operation?.title, operation?.jobId], {
+    to: operation ? `/jobs/${operation.jobId}?tab=programs` : "/",
+    label: "Rutinler",
+    sourceRef: backRef,
+  });
 
   if (!id) return null;
 
@@ -149,15 +188,27 @@ export default function OperationDetail() {
             </>
           )
         }
+        action={
+          // Rutini yalnızca kuran kişi düzenleyebilir (OperationsService.assertCanManage).
+          operation && currentUser?.id === operation.ownerId ? (
+            <button onClick={() => setEditing(true)} aria-label="Rutini düzenle" style={coverActionButton(c)}>
+              <IconSettings size={20} color={c.textSecondary} />
+            </button>
+          ) : undefined
+        }
       />
 
       <div style={{ padding: "0 28px 28px" }}>
-        <Link
-          to={operation ? `/jobs/${operation.jobId}` : "/"}
-          style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}
-        >
-          ← İşe dön
-        </Link>
+        {/* ?tab=programs: geri dönünce işin varsayılan sekmesi (Projeler) değil,
+            geldiğimiz Rutinler sekmesi açılsın (bkz. JobTabs "programs"). */}
+        <div ref={backRef}>
+          <Link
+            to={operation ? `/jobs/${operation.jobId}?tab=programs` : "/"}
+            style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}
+          >
+            ← Rutinler
+          </Link>
+        </div>
 
         {/* Rutinde ilerleme yüzdesi yerine düzen ölçülür. */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
@@ -267,8 +318,52 @@ export default function OperationDetail() {
                 occurrence={o}
                 onComplete={() => setOccurrenceStatus(o.id, true)}
                 onSkip={() => skipOccurrence(o.id, true)}
+                onOpen={() => openOccurrenceModal(o.id)}
               />
             ))}
+          </div>
+        )}
+
+        {/* ---- Geçmiş tekrarlar ----
+            Nokta ızgarası "yapıldı mı" sorusunu cevaplıyor ama kayıtlara
+            erişilemiyordu. Liste uzayabildiği için varsayılan kapalı. */}
+        {history.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((v) => !v)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontSize: 17,
+                fontWeight: 500,
+                color: c.textPrimary,
+              }}
+            >
+              Geçmiş
+              <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 400 }}>
+                {history.length} tekrar · {historyOpen ? "gizle" : "göster"}
+              </span>
+            </button>
+
+            {historyOpen && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+                {history.map((o) => (
+                  <OccurrenceRow
+                    key={o.id}
+                    occurrence={o}
+                    onComplete={() => setOccurrenceStatus(o.id, o.status !== "completed")}
+                    onSkip={() => skipOccurrence(o.id, !o.skippedAt)}
+                    onOpen={() => openOccurrenceModal(o.id)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -279,6 +374,21 @@ export default function OperationDetail() {
           routine={routineModal.routine}
           onClose={() => setRoutineModal(null)}
           onSaved={reload}
+        />
+      )}
+
+      {editing && operation && <EditOperationModal operation={operation} onClose={() => setEditing(false)} />}
+
+      {openOccurrence && (
+        <TaskEditModal
+          task={openOccurrence}
+          // Tekrarın projesi yok; dosya bağlamı rutinin bağlı olduğu iştir.
+          fileJobId={operation?.jobId}
+          onClose={() => setOpenOccurrence(null)}
+          onSaved={() => {
+            setOpenOccurrence(null);
+            reload();
+          }}
         />
       )}
 
@@ -311,13 +421,18 @@ function OccurrenceRow({
   overdue,
   onComplete,
   onSkip,
+  onOpen,
 }: {
   occurrence: OperationOccurrence;
   overdue?: boolean;
   onComplete: () => void;
   onSkip: () => void;
+  /** Verilirse satır başlığı tıklanabilir olur ve tekrarın detay modalını açar. */
+  onOpen?: () => void;
 }) {
   const c = colors.light;
+  const links = occurrence.attachments ?? [];
+  const files = occurrence.files ?? [];
   return (
     <div
       style={{
@@ -350,7 +465,16 @@ function OccurrenceRow({
       </button>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, color: c.textPrimary }}>{occurrence.title}</div>
+        {/* Başlık tıklanınca tekrarın kendi modalı açılır: tekrar bir görev
+            olduğu için düzenleme, atama, saat ve ekler orada (bkz. 060). */}
+        <div
+          onClick={onOpen}
+          role={onOpen ? "button" : undefined}
+          title={onOpen ? "Tekrarı aç: düzenle, link/dosya ekle" : undefined}
+          style={{ fontSize: 15, color: c.textPrimary, cursor: onOpen ? "pointer" : "default" }}
+        >
+          {occurrence.title}
+        </div>
         <div style={{ display: "flex", gap: 10, fontSize: 13, color: overdue ? c.danger : c.textSecondary }}>
           <span>{new Date(occurrence.occurrenceOn).toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long" })}</span>
           {occurrence.assignedToName && (
@@ -361,6 +485,56 @@ function OccurrenceRow({
           )}
         </div>
       </div>
+
+      {/* Ek rozetleri: tekrarın çıktısına listeden tek tıkla gidilebilsin.
+          Tek ek varsa doğrudan açılır; birden fazlaysa hangisine gidileceğine
+          kullanıcı karar vermeli, o yüzden modal açılır. */}
+      {links.length > 0 && (
+        <button
+          onClick={() => (links.length === 1 ? window.open(links[0].url, "_blank", "noreferrer") : onOpen?.())}
+          aria-label={links.length === 1 ? "Bağlantıyı aç" : `${links.length} bağlantı`}
+          title={links.length === 1 ? links[0].label || links[0].url : `${links.length} bağlantı — açmak için tıkla`}
+          style={{ background: "transparent", border: "none", padding: 4, display: "flex", cursor: "pointer", flexShrink: 0 }}
+        >
+          <IconExternalLink size={15} color={c.primary} />
+        </button>
+      )}
+
+      {files.length > 0 && (
+        <button
+          onClick={() =>
+            files.length === 1 && files[0].webViewLink
+              ? window.open(files[0].webViewLink, "_blank", "noreferrer")
+              : onOpen?.()
+          }
+          aria-label={files.length === 1 ? "Dosyayı aç" : `${files.length} dosya`}
+          title={files.length === 1 ? files[0].name : `${files.length} dosya — açmak için tıkla`}
+          style={{ background: "transparent", border: "none", padding: 4, display: "flex", cursor: "pointer", flexShrink: 0 }}
+        >
+          <IconFile size={15} color={c.primary} />
+        </button>
+      )}
+
+      {/* Düzenleme kalemi: modal yalnızca başlığa tıklayarak açılıyordu ve
+          kimse fark etmiyordu. Rutin kartlarındaki kalemle aynı simge —
+          "buradan düzenlenir" işareti uygulamada tek ve tanıdık kalsın. */}
+      {onOpen && (
+        <button
+          onClick={onOpen}
+          aria-label="Tekrarı düzenle"
+          title="Düzenle: başlık, açıklama, saat, link ve dosya"
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: 4,
+            display: "flex",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          <IconEdit size={15} color={c.textSecondary} />
+        </button>
+      )}
 
       <button
         onClick={onSkip}

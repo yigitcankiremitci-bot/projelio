@@ -4,10 +4,14 @@ import { MODULE_FORM_CONFIGS } from "../lib/moduleForms";
 import { getModuleRecordConfig } from "../lib/moduleRecordConfigs";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleConfigs";
 import { PANEL_CONFIGS } from "../lib/panelConfigs";
+import { isMailModule } from "../lib/mailbox";
+import { isSocialMediaModule } from "../lib/socialMedia";
 import CustomersPanel from "./CustomersPanel";
+import EmailModulePanel from "./EmailModulePanel";
 import ModuleFormPanel from "./ModuleFormPanel";
 import ModulePanelView from "./ModulePanelView";
 import ModuleRecordsPanel from "./ModuleRecordsPanel";
+import SocialMediaPanel from "./SocialMediaPanel";
 
 /**
  * Bir modülün içeriği — hangi motor olduğuna bakmadan.
@@ -68,6 +72,35 @@ export default function ModuleSurface({
     return <ModulePanelView config={panelConfig} organizationId={organizationId} jobId={jobId} />;
   }
 
+  if (isSocialMediaModule(moduleKey)) {
+    // Kendi tablolarına yazan modül (bkz. 054_social_media.sql): hesap yönetimi
+    // ve "aynı içerik birden çok kanalda" ilişkisi module_records'ın tek jsonb
+    // sütununa sığmıyordu.
+    return (
+      <SocialMediaPanel
+        organizationId={organizationId}
+        departmentId={departmentId}
+        jobId={jobId}
+        canWrite={canWrite}
+      />
+    );
+  }
+
+  if (isMailModule(moduleKey)) {
+    // E-posta modülü iki yüzey taşıyor: canlı gelen kutusu (Graph üzerinden,
+    // saklanmıyor) ve kampanya kayıtları (module_records). Bkz. EmailModulePanel.
+    return (
+      <EmailModulePanel
+        organizationId={organizationId}
+        departmentId={departmentId}
+        jobId={jobId}
+        moduleKey={moduleKey}
+        moduleName={moduleName}
+        canWrite={canWrite}
+      />
+    );
+  }
+
   if (isEntityModule(moduleKey)) {
     // Ortak varlığa yazar: iki departman AYNI kayıtları görür, yalnızca görünüm
     // profili değişir.
@@ -102,6 +135,7 @@ export function isOpenable(moduleKey: string): boolean {
     Boolean(MODULE_FORM_CONFIGS[moduleKey]) ||
     Boolean(PANEL_CONFIGS[moduleKey]) ||
     isEntityModule(moduleKey) ||
+    isSocialMediaModule(moduleKey) ||
     Boolean(MODULE_RECORD_CONFIGS[moduleKey])
   );
 }

@@ -17,11 +17,15 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { AuthGuard } from "@nestjs/passport";
 import { memoryStorage } from "multer";
 import { OperationsService } from "./operations.service";
+import { AccessService } from "../../common/access/access.service";
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
 export class OperationsController {
-  constructor(private operationsService: OperationsService) {}
+  constructor(
+    private operationsService: OperationsService,
+    private access: AccessService
+  ) {}
 
   @Get("operations")
   findAll(@Req() req: any) {
@@ -39,8 +43,10 @@ export class OperationsController {
     return this.operationsService.previewRoutineDates(body);
   }
 
+  // Rutin, bağlı olduğu işin görünürlüğünü devralır (bkz. AccessService).
   @Get("operations/:id")
-  findOne(@Param("id") id: string) {
+  async findOne(@Param("id") id: string, @Req() req: any) {
+    await this.access.assertCanViewOperation(id, req.user.userId);
     return this.operationsService.findOne(id);
   }
 
@@ -72,14 +78,15 @@ export class OperationsController {
   }
 
   @Patch("operations/:id/restore")
-  restore(@Param("id") id: string) {
-    return this.operationsService.restore(id);
+  restore(@Param("id") id: string, @Req() req: any) {
+    return this.operationsService.restore(id, req.user.userId);
   }
 
   // ------------------------------------------------------------------ rutinler
 
   @Get("operations/:id/routines")
-  findRoutines(@Param("id") id: string) {
+  async findRoutines(@Param("id") id: string, @Req() req: any) {
+    await this.access.assertCanViewOperation(id, req.user.userId);
     return this.operationsService.findRoutines(id);
   }
 
@@ -101,7 +108,13 @@ export class OperationsController {
   // ----------------------------------------------------------------- tekrarlar
 
   @Get("operations/:id/occurrences")
-  findOccurrences(@Param("id") id: string, @Query("from") from?: string, @Query("to") to?: string) {
+  async findOccurrences(
+    @Param("id") id: string,
+    @Req() req: any,
+    @Query("from") from?: string,
+    @Query("to") to?: string
+  ) {
+    await this.access.assertCanViewOperation(id, req.user.userId);
     return this.operationsService.findOccurrences(id, from, to);
   }
 

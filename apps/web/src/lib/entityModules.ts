@@ -13,6 +13,7 @@
  */
 import { isFormModule } from "./moduleForms";
 import { isPanelModule } from "./panelConfigs";
+import { isSocialMediaModule } from "./socialMedia";
 
 export const ENTITY_MODULE_KEYS = ["crm_musteri"] as const;
 
@@ -25,9 +26,16 @@ export function isEntityModule(moduleKey: string): moduleKey is EntityModuleKey 
 /**
  * Modül açılabilir mi.
  *
- * Dört yol var: ortak varlık paneli (party), türev panel (A6), form modülü (A1)
- * ya da kayıt tanımı (A2). Hiçbiri yoksa modül listede görünür ama tıklanamaz.
+ * Beş yol var: ortak varlık paneli (party), türev panel (A6), form modülü (A1),
+ * kendi tablosuna yazan özel panel (sosyal medya) ya da kayıt tanımı (A2).
+ * Hiçbiri yoksa modül listede görünür ama tıklanamaz.
  */
 export function isOpenableModule(moduleKey: string, hasRecordConfig: boolean): boolean {
-  return isEntityModule(moduleKey) || isPanelModule(moduleKey) || isFormModule(moduleKey) || hasRecordConfig;
+  return (
+    isEntityModule(moduleKey) ||
+    isPanelModule(moduleKey) ||
+    isFormModule(moduleKey) ||
+    isSocialMediaModule(moduleKey) ||
+    hasRecordConfig
+  );
 }

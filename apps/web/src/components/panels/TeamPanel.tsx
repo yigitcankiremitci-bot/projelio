@@ -4,6 +4,8 @@ import { api } from "../../api/client";
 import { colors } from "../../theme/colors";
 import AddMemberModal from "../AddMemberModal";
 import TeamMemberModal from "../TeamMemberModal";
+import { isAssignedTo } from "../../lib/taskAssignees";
+import { useCurrentUser } from "../../lib/useCurrentUser";
 
 export interface TeamPanelHandle {
   openCreate: () => void;
@@ -28,6 +30,7 @@ const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projec
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState<ProjectMember | null>(null);
+  const { user: currentUser } = useCurrentUser();
 
   useImperativeHandle(ref, () => ({
     openCreate: () => setAdding(true),
@@ -45,15 +48,48 @@ const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projec
   useEffect(load, [projectId]);
 
   const taskCounts = (userId: string) => {
-    const assigned = tasks.filter((t) => t.assignedTo === userId);
+    const assigned = tasks.filter((t) => isAssignedTo(t, userId));
     const done = assigned.filter((t) => t.status === "completed").length;
     return { total: assigned.length, done };
+  };
+
+  /**
+   * Kendi üyeliğim — proje sahibi hariç herkes ayrılabilir. Sahip ayrılırsa
+   * proje sahipsiz kalır: kimse üye ekleyemez, bütçeyi göremez, projeyi
+   * kapatamaz (sunucu da aynı kuralı uyguluyor).
+   */
+  const myMembership = currentUser
+    ? members.find((m) => m.userId === currentUser.id && m.role !== "owner")
+    : undefined;
+  const isProjectOwner = currentUser?.id === ownerId;
+
+  const handleLeave = async () => {
+    if (!window.confirm("Bu projeden ayrılmak istediğine emin misin? Sana atanmış görevler ekipte kalır.")) return;
+    await api.delete(`/projects/${projectId}/members/me`).catch(() => {});
+    load();
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Ekip üyeleri</h4>
+        {myMembership && !isProjectOwner && (
+          <button
+            type="button"
+            onClick={handleLeave}
+            style={{
+              padding: "6px 12px",
+              fontSize: 13,
+              borderRadius: 8,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.danger,
+              cursor: "pointer",
+            }}
+          >
+            Projeden ayrıl
+          </button>
+        )}
       </div>
 
       {loading ? (

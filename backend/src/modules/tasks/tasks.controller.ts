@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { TasksService } from "./tasks.service";
 import { CreateTaskDto, UpdateTaskDto } from "./dto/task.dto";
@@ -64,6 +74,15 @@ export class TasksController {
     return this.tasksService.update(id, body, req.user.userId);
   }
 
+  // Bir ALT GÖREVİ başka bir üst görevin altına taşır (bkz. TaskColumn'daki alt
+  // görev sürükle-bırakı). "tasks/:id" gövdesinden parent_task_id yazdırmak yerine
+  // ayrı bir uç: taşımanın kendine ait kuralları var (iki seviye korunur, hedefin
+  // proje/departman kapsamı devralınır).
+  @Patch("tasks/:id/parent")
+  updateParent(@Param("id") id: string, @Body("parentTaskId") parentTaskId: string, @Req() req: any) {
+    return this.tasksService.updateParent(id, parentTaskId, req.user.userId);
+  }
+
   @Patch("tasks/:id/status")
   updateStatus(@Req() req: any, @Param("id") id: string, @Body("status") status: any) {
     return this.tasksService.updateStatus(id, status, req.user.userId);
@@ -84,6 +103,36 @@ export class TasksController {
   @Patch("tasks/:id/active-worker")
   setActiveWorker(@Req() req: any, @Param("id") id: string, @Body("active") active: boolean) {
     return this.tasksService.setActiveWorker(req.user.userId, id, active);
+  }
+
+  // ------------------------------------------------------------------ ekler
+  // Rutin tekrarları da birer görev olduğu için (bkz. 060) bu uçlar hem proje/
+  // departman görevlerinde hem tekrarlarda çalışır — ayrı bir uç kümesi yok.
+
+  @Get("tasks/:id/attachments")
+  findAttachments(@Param("id") id: string, @Req() req: any) {
+    return this.tasksService.findAttachments(id, req.user.userId);
+  }
+
+  @Get("tasks/:id")
+  findOne(@Param("id") id: string, @Req() req: any) {
+    return this.tasksService.findById(id, req.user.userId);
+  }
+
+  @Post("tasks/:id/attachments/link")
+  addLink(@Param("id") id: string, @Body() body: any, @Req() req: any) {
+    return this.tasksService.addLinkAttachment(id, body, req.user.userId);
+  }
+
+  // Görevden ayrılma: kullanıcı kendini atananlar listesinden çıkarır.
+  @Delete("tasks/:id/assignees/me")
+  leaveTask(@Param("id") id: string, @Req() req: any) {
+    return this.tasksService.leaveTask(id, req.user.userId);
+  }
+
+  @Delete("task-attachments/:attachmentId")
+  removeAttachment(@Param("attachmentId") attachmentId: string, @Req() req: any) {
+    return this.tasksService.removeAttachment(attachmentId, req.user.userId);
   }
 
   @Delete("tasks/:id")

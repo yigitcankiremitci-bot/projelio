@@ -6,7 +6,8 @@ import ProjectCard from "../components/ProjectCard";
 import OperationCard from "../components/OperationCard";
 import CreateOperationModal from "../components/CreateOperationModal";
 import EditJobModal from "../components/EditJobModal";
-import JobTabs, { JobTab } from "../components/JobTabs";
+import JobTabs, { JobTab, visibleJobTabs } from "../components/JobTabs";
+import { useCurrentUser, useIsSubcontractor } from "../lib/useCurrentUser";
 import JobModulesPanel from "../components/JobModulesPanel";
 import JobTeamPanel from "../components/JobTeamPanel";
 import EntityCover, { coverActionButton } from "../components/EntityCover";
@@ -23,7 +24,6 @@ import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
-import { useIsDesktop } from "../lib/useIsDesktop";
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -33,13 +33,21 @@ export default function JobDetail() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
   const [creatingOperation, setCreatingOperation] = useState(false);
+  const [endedOpen, setEndedOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editing, setEditing] = useState(false);
   // Sekme, URL'deki ?tab= ile eşleşir: sidebar'daki ağaçtan "Ekip" ya da "Dosyalar"
   // gibi bir alt bağlantıya tıklandığında doğrudan o sekmeyle açılsın diye.
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const validTabs: JobTab[] = ["projects", "programs", "team", "tasks", "files", "modules"];
+  // Taşeron işi görür ama Ekip ve Modüller sekmelerini görmez; ?tab= ile
+  // doğrudan gelinse bile Projeler'e düşer (sunucu da 403 döner).
+  const isSubcontractor = useIsSubcontractor();
+  // İş başlığını/detaylarını yalnızca işi KURAN kişi değiştirebilir; sunucu da
+  // aynı kuralı uyguluyor (JobsService.assertOwner). Ekip üyesi ve taşeron için
+  // dişli hiç render edilmez.
+  const { user: currentUser } = useCurrentUser();
+  const validTabs: JobTab[] = visibleJobTabs(isSubcontractor).map((t) => t.key);
   const activeTab: JobTab = validTabs.includes(tabParam as JobTab) ? (tabParam as JobTab) : "projects";
   const setActiveTab = (next: JobTab) => {
     setSearchParams(next === "projects" ? {} : { tab: next }, { replace: true });
@@ -276,8 +284,9 @@ export default function JobDetail() {
 
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
   const coverRef = useRef<HTMLDivElement>(null);
-  usePageHeader(job?.title, coverRef, [job?.title]);
-  const isDesktop = useIsDesktop();
+  // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
+  const backRef = useRef<HTMLDivElement>(null);
+  usePageHeader(job?.title, coverRef, [job?.title], { to: "/", label: "İşler", sourceRef: backRef });
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
   // (bkz. ProjectDetail'deki aynı desen).
   // Akıştaki sekme çubuğunun DOM öğesi: sabit şerit ancak bu çubuk yukarı kayıp
@@ -286,8 +295,16 @@ export default function JobDetail() {
   const tabsRef = useRef<HTMLDivElement>(null);
 
   usePageHeaderTabs(
-    isDesktop ? <JobTabs active={activeTab} onChange={setActiveTab} style={{ marginBottom: 0 }} /> : null,
-    [activeTab, isDesktop],
+    // Mobilde de kaydediliyor: orada sayfanın kendi sekme çubuğu kaydırınca
+    // sabit şeridin altında kalıp erişilemez oluyordu (bkz. App.tsx).
+    <JobTabs
+      active={activeTab}
+      onChange={setActiveTab}
+      isSubcontractor={isSubcontractor}
+      style={{ marginBottom: 0 }}
+      scrollable
+    />,
+    [activeTab, isSubcontractor],
     tabsRef
   );
 
@@ -295,6 +312,9 @@ export default function JobDetail() {
 
   const activeProjects = projects.filter((p) => p.status === "active");
   const activeOperations = operations.filter((o) => o.status === "active");
+  // Kapatılan rutinler silinmiyor, yalnızca aktiflerin arasından çıkarılıyor:
+  // geçmiş kayıtlarına ve eklerine erişim gerekiyor (bkz. 060).
+  const endedOperations = operations.filter((o) => o.status === "ended");
   const pendingTasksCount = tasks.filter((t) => t.status !== "completed").length;
   const completedTasksCount = tasks.filter((t) => t.status === "completed").length;
 
@@ -323,37 +343,42 @@ export default function JobDetail() {
           )
         }
         action={
-          <button
-            onClick={() => setEditing(true)}
-            aria-label="İşi düzenle"
-            style={coverActionButton(c)}
-          >
-            <IconSettings size={20} color={c.textSecondary} />
-          </button>
+          job && currentUser?.id === job.ownerId ? (
+            <button
+              onClick={() => setEditing(true)}
+              aria-label="İşi düzenle"
+              style={coverActionButton(c)}
+            >
+              <IconSettings size={20} color={c.textSecondary} />
+            </button>
+          ) : undefined
         }
       />
 
       <div style={{ padding: "0 28px 28px" }}>
-        <Link to="/" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
-          ← İşler
-        </Link>
+        <div ref={backRef}>
+          <Link to="/" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
+            ← İşler
+          </Link>
+        </div>
 
         {/* Bildirimdeki davetten gelindiyse kararı burada da verebilsin; bekleyen
             davet yoksa bileşen hiçbir şey çizmez. */}
         <JobInviteBanner jobId={id} />
 
+        {/* Bu çubuk eskiden position:sticky idi; ama kaydırınca beliren üst şerit
+            (zIndex 34) onun üstüne bindiği için sekmeler ekranda duruyor gözükmesine
+            rağmen görünmez oluyordu. Artık normal akışta kalıp yukarı kayıyor ve
+            yerini şeritteki kopyası alıyor (bkz. usePageHeaderTabs, App.tsx). */}
         <div
           style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 5,
             background: c.background,
             margin: "0 -28px",
             padding: "10px 28px 8px",
           }}
         >
           <div ref={tabsRef}>
-            <JobTabs active={activeTab} onChange={setActiveTab} />
+            <JobTabs active={activeTab} onChange={setActiveTab} isSubcontractor={isSubcontractor} />
           </div>
         </div>
 
@@ -385,7 +410,14 @@ export default function JobDetail() {
               <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
                 {projects.map((p) => (
                   <div key={p.id} data-id={p.id}>
-                    <ProjectCard project={p} />
+                    <ProjectCard
+                      project={p}
+                      // Sunucudaki kuralın aynısı: proje sahibi ya da işin sahibi.
+                      canManage={Boolean(currentUser && (currentUser.id === p.ownerId || currentUser.id === job?.ownerId))}
+                      onStatusChanged={(updated) =>
+                        setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+                      }
+                    />
                   </div>
                 ))}
               </div>
@@ -414,11 +446,63 @@ export default function JobDetail() {
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-                {operations.map((o) => (
+                {/* Kapatılmış rutinler artık ayrı bir bölümde (aşağıda) — burada
+                    yalnızca çalışan ve duraklatılmış olanlar durur, aksi halde
+                    kapanmış onlarca rutin aktiflerin arasında kayboluyordu. */}
+                {operations
+                  .filter((o) => o.status !== "ended")
+                  .map((o) => (
                   <OperationCard key={o.id} operation={o} />
                 ))}
               </div>
             )
+          )}
+
+          {/* ---- Kapatılmış rutinler ----
+              Kapatılan bir rutin listeden düşmez, buraya iner: tekrar geçmişi ve
+              eklenmiş link/dosyalar hâlâ okunabilir olmalı. Varsayılan kapalı;
+              zamanla birikeceği için aktiflerin dikkatini dağıtmasın. */}
+          {activeTab === "programs" && endedOperations.length > 0 && (
+            <div style={{ marginTop: 28 }}>
+              <button
+                type="button"
+                onClick={() => setEndedOpen((v) => !v)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  fontSize: 17,
+                  fontWeight: 500,
+                  color: c.textPrimary,
+                }}
+              >
+                Kapatılmış rutinler
+                <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 400 }}>
+                  {endedOperations.length} rutin · {endedOpen ? "gizle" : "göster"}
+                </span>
+              </button>
+
+              {endedOpen && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                    gap: 14,
+                    marginTop: 12,
+                    // Kapanmış oldukları görsel olarak da belli olsun.
+                    opacity: 0.72,
+                  }}
+                >
+                  {endedOperations.map((o) => (
+                    <OperationCard key={o.id} operation={o} />
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {activeTab === "team" && (

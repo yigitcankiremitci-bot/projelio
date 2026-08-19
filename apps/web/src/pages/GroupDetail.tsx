@@ -39,7 +39,9 @@ export default function GroupDetail() {
 
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
   const coverRef = useRef<HTMLDivElement>(null);
-  usePageHeader(group?.name, coverRef, [group?.name]);
+  // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
+  const backRef = useRef<HTMLDivElement>(null);
+  usePageHeader(group?.name, coverRef, [group?.name], { to: "/groups", label: "Gruplar", sourceRef: backRef });
 
   if (!id) return null;
 
@@ -76,9 +78,11 @@ export default function GroupDetail() {
       />
 
       <div style={{ padding: "0 28px 28px" }}>
-        <Link to="/groups" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
-          ← Gruplar
-        </Link>
+        <div ref={backRef}>
+          <Link to="/groups" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
+            ← Gruplar
+          </Link>
+        </div>
 
         <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 14px" }}>Organizasyonlar</h2>
 

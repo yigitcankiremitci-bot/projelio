@@ -86,11 +86,13 @@ export default function ModulePage() {
           {parent.label}
         </Link>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: c.textPrimary }}>{title}</h1>
-        {entry?.description && (
-          <p style={{ margin: 0, fontSize: 14, color: c.textSecondary, maxWidth: 720, lineHeight: 1.5 }}>
-            {entry.description}
-          </p>
-        )}
+        {/* Katalog açıklaması BİLEREK gösterilmiyor.
+            O cümle "bu modülü açarsam ne göreceğim" sorusunu yanıtlamak için
+            yazıldı; yeri modül kartı ve "Modül ekle" seçim ekranı. Sayfanın
+            içindeyken cevabı zaten ekranda — burada yalnızca yer kaplıyor ve
+            modül geliştikçe eskiyor (E-posta modülü kampanya defteriyken
+            yazılan cümle, gelen kutusu eklendikten sonra yanlış kalmıştı).
+            Açıklama metni module_catalog.description'da duruyor. */}
       </div>
 
       <ModuleSurface

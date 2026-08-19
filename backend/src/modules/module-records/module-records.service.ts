@@ -84,7 +84,20 @@ export class ModuleRecordsService {
     }
   }
 
-  async findByOrganization(organizationId: string, moduleKey?: string): Promise<ModuleRecord[]> {
+  /**
+   * OKUMA da yetkiye bağlı. Eskiden bu metot userId almıyordu: organizasyon
+   * id'sini bilen herhangi bir oturumlu kullanıcı — bir departmana taşeron
+   * olarak eklenmiş biri dahil — şirketin Gelir-Gider defterini
+   * (`?moduleKey=fm_gelir_gider`, bkz. OrgBudgetPanel) okuyabiliyordu.
+   *
+   * Filtre kayıt kayıt değil, (modül, departman) çifti başına çözülür: aynı
+   * çift için tek yetki sorgusu yeter, yüzlerce kayıt yüzlerce sorgu açmasın.
+   */
+  async findByOrganization(
+    organizationId: string,
+    moduleKey?: string,
+    requestingUserId?: string
+  ): Promise<ModuleRecord[]> {
     let query = this.supabase.client
       .from("module_records")
       .select("*")
@@ -94,7 +107,22 @@ export class ModuleRecordsService {
     if (moduleKey) query = query.eq("module_key", moduleKey);
     const { data, error } = await query;
     if (error) throw error;
-    return (data ?? []).map(mapModuleRecord);
+    const records = (data ?? []).map(mapModuleRecord);
+    if (!requestingUserId) return records;
+
+    const readable = new Map<string, boolean>();
+    const scopeKey = (r: ModuleRecord) => `${r.moduleKey}::${r.departmentId ?? ""}`;
+    for (const key of new Set(records.map(scopeKey))) {
+      const [mk, deptId] = key.split("::");
+      const access = await this.moduleMembers.resolveOrganizationAccess(
+        organizationId,
+        mk,
+        requestingUserId,
+        deptId || undefined
+      );
+      readable.set(key, access.canRead);
+    }
+    return records.filter((r) => readable.get(scopeKey(r)));
   }
 
   async findByJob(jobId: string, moduleKey?: string): Promise<ModuleRecord[]> {

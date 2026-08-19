@@ -1,7 +1,7 @@
 import { useState } from "react";
 import CoverPicker from "./CoverPicker";
 import { useNavigate } from "react-router-dom";
-import type { Project, ProjectStatus } from "@projelio/shared";
+import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, type Project, type ProjectStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { resizeCoverImage } from "../lib/imageProcessing";
@@ -12,12 +12,6 @@ interface Props {
   project: Project;
   onClose: () => void;
 }
-
-const statusOptions: { value: ProjectStatus; label: string }[] = [
-  { value: "active", label: "Aktif" },
-  { value: "completed", label: "Tamamlandı" },
-  { value: "archived", label: "Arşivlendi" },
-];
 
 function toDateInputValue(iso: string) {
   return new Date(iso).toISOString().slice(0, 10);
@@ -121,9 +115,9 @@ export default function EditProjectModal({ project, onClose }: Props) {
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Durum</label>
           <select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)} style={{ width: "100%" }}>
-            {statusOptions.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
+            {PROJECT_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {PROJECT_STATUS_LABELS[s]}
               </option>
             ))}
           </select>

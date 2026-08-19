@@ -2,20 +2,29 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuard
 import { AuthGuard } from "@nestjs/passport";
 import type { Party, PartyActivity, PartyContact, PartyRole } from "@projelio/shared";
 import { PartyService } from "./party.service";
+import { AccessService } from "../../common/access/access.service";
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
 export class PartyController {
-  constructor(private partyService: PartyService) {}
+  constructor(
+    private partyService: PartyService,
+    private access: AccessService
+  ) {}
 
   // ============================================================ Organizasyon
 
+  // Müşteri/tedarikçi kayıtları ticari veridir: organizasyonu görebilenlere
+  // açık, taşerona kapalı.
   @Get("organizations/:organizationId/party")
-  findByOrganization(
+  async findByOrganization(
     @Param("organizationId") organizationId: string,
+    @Req() req: any,
     @Query("role") role?: PartyRole,
     @Query("departmentId") departmentId?: string
   ) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
     return this.partyService.findAll({ organizationId, departmentId }, { role });
   }
 
@@ -41,7 +50,9 @@ export class PartyController {
   // ============================================================ Serbest çalışan
 
   @Get("jobs/:jobId/party")
-  findByJob(@Param("jobId") jobId: string, @Query("role") role?: PartyRole) {
+  async findByJob(@Param("jobId") jobId: string, @Req() req: any, @Query("role") role?: PartyRole) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
     return this.partyService.findAll({ jobId }, { role });
   }
 

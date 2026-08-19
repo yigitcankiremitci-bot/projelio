@@ -1,14 +1,21 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { PartnersService } from "./partners.service";
+import { AccessService } from "../../common/access/access.service";
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
 export class PartnersController {
-  constructor(private partnersService: PartnersService) {}
+  constructor(
+    private partnersService: PartnersService,
+    private access: AccessService
+  ) {}
 
+  // Ortaklık ve hisse oranları: en hassas kurumsal veri. Taşerona tamamen kapalı.
   @Get("organizations/:organizationId/partners")
-  findByOrganization(@Param("organizationId") organizationId: string) {
+  async findByOrganization(@Param("organizationId") organizationId: string, @Req() req: any) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
     return this.partnersService.findByOrganization(organizationId);
   }
 
@@ -22,7 +29,9 @@ export class PartnersController {
   }
 
   @Get("groups/:groupId/partners")
-  findByGroup(@Param("groupId") groupId: string) {
+  async findByGroup(@Param("groupId") groupId: string, @Req() req: any) {
+    await this.access.assertCanViewGroup(groupId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
     return this.partnersService.findByGroup(groupId);
   }
 

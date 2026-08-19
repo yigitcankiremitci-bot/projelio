@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
+import { detectImageUpload } from "../../common/upload-image.util";
 
 const AVATAR_BUCKET = "avatars";
 
@@ -300,12 +301,14 @@ export class UsersService {
   }
 
   async uploadAvatar(userId: string, file: Express.Multer.File): Promise<PublicUser> {
-    const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
+    // Tur ve uzanti istemcinin sozune degil, dosyanin ilk baytlarindaki
+    // imzaya gore belirlenir (bkz. common/upload-image.util.ts).
+    const { contentType, ext } = detectImageUpload(file);
     const path = `${userId}/${randomUUID()}.${ext}`;
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(AVATAR_BUCKET)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = this.supabase.client.storage.from(AVATAR_BUCKET).getPublicUrl(path);

@@ -5,7 +5,11 @@ import type { Task } from "@projelio/shared";
 export class CalendarService {
   // "Sadece Benim Görevlerim" / "Tüm Ekip Takvimi" filtreleme
   filterTasks(tasks: Task[], userId: string, scope: "mine" | "team"): Task[] {
-    return scope === "mine" ? tasks.filter((t) => t.assignedTo === userId) : tasks;
+    // Bir görevin birden fazla atananı olabilir (bkz. migration 053); assignedTo
+    // yalnızca birincil atanandır, ikinci kişi kendi takviminde görevi göremezdi.
+    const mine = (t: Task) =>
+      t.assignees?.length ? t.assignees.some((a) => a.userId === userId) : t.assignedTo === userId;
+    return scope === "mine" ? tasks.filter(mine) : tasks;
   }
 
   // Sürükle-bırak ile tarih güncelleme sonrası çağrılır

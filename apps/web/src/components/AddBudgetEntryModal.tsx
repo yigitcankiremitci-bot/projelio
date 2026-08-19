@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
-import type { BudgetTransactionType, Project } from "@projelio/shared";
+import type { BudgetTransaction, BudgetTransactionType, Project } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import Modal from "./Modal";
 
 interface Props {
+  /** Verilirse form düzenleme kipinde açılır; yoksa yeni kayıt eklenir. */
+  transaction?: BudgetTransaction;
   onClose: () => void;
-  onSaved: () => void;
+  /** Kaydedilen kayıt geri verilir: çağıran bunu geri alma yığınına koyabilsin. */
+  onSaved: (saved: BudgetTransaction) => void;
 }
 
 const typeOptions: { value: BudgetTransactionType; label: string }[] = [
@@ -20,13 +23,14 @@ function todayString() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export default function AddBudgetEntryModal({ onClose, onSaved }: Props) {
+export default function AddBudgetEntryModal({ transaction, onClose, onSaved }: Props) {
   const c = colors.light;
-  const [type, setType] = useState<BudgetTransactionType>("expense");
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [projectId, setProjectId] = useState("");
-  const [occurredAt, setOccurredAt] = useState(todayString());
+  const editing = Boolean(transaction);
+  const [type, setType] = useState<BudgetTransactionType>(transaction?.type ?? "expense");
+  const [amount, setAmount] = useState(transaction ? String(transaction.amount) : "");
+  const [description, setDescription] = useState(transaction?.description ?? "");
+  const [projectId, setProjectId] = useState(transaction?.projectId ?? "");
+  const [occurredAt, setOccurredAt] = useState(transaction?.occurredAt?.slice(0, 10) ?? todayString());
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,23 +44,28 @@ export default function AddBudgetEntryModal({ onClose, onSaved }: Props) {
     setError("");
     setLoading(true);
     try {
-      await api.post("/budget/transactions", {
+      const payload = {
         type,
         amount: Number(amount) || 0,
-        description: description || undefined,
-        projectId: projectId || undefined,
+        // Düzenlemede boş açıklama/proje "temizle" anlamına gelmeli; bu yüzden
+        // undefined değil, boş değer gönderiliyor.
+        description: editing ? description : description || undefined,
+        projectId: editing ? projectId || null : projectId || undefined,
         occurredAt,
-      });
-      onSaved();
+      };
+      const saved = transaction
+        ? await api.patch<BudgetTransaction>(`/budget/transactions/${transaction.id}`, payload)
+        : await api.post<BudgetTransaction>("/budget/transactions", payload);
+      onSaved(saved);
       onClose();
     } catch {
-      setError("Kayıt eklenemedi. Tekrar dene.");
+      setError(editing ? "Kayıt güncellenemedi. Tekrar dene." : "Kayıt eklenemedi. Tekrar dene.");
       setLoading(false);
     }
   };
 
   return (
-    <Modal title="Gelir / gider ekle" onClose={onClose}>
+    <Modal title={editing ? "Kaydı düzenle" : "Gelir / gider ekle"} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Tür</label>

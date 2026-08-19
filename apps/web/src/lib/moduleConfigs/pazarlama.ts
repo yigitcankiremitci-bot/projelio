@@ -13,40 +13,15 @@ import {
 // PAZARLAMA ve BÜYÜME departmanının modülleri.
 
 // ============================================================ Sosyal medya
-// A5 (takvim) arketibi. Takvim görünümü ve plandan otomatik görev üretimi
-// A5 motoruyla gelecek — bugün planlanan tarih bir alan.
-const SOCIAL_PLATFORM = {
-  instagram: "Instagram",
-  facebook: "Facebook",
-  twitter: "X / Twitter",
-  linkedin: "LinkedIn",
-  tiktok: "TikTok",
-  youtube: "YouTube",
-  other: "Diğer",
-};
-const SOCIAL_STATUS = { draft: "Taslak", scheduled: "Planlandı", published: "Yayınlandı" };
-
-export const socialMediaConfig: ModuleRecordConfig = {
-  periodKey: "scheduledDate",
-  title: "Sosyal Medya",
-  addLabel: "Gönderi ekle",
-  emptyLabel: "Henüz planlanmış gönderi yok.",
-  fields: [
-    { key: "platform", label: "Platform", type: "select", defaultValue: "instagram", options: opts(SOCIAL_PLATFORM) },
-    { key: "title", label: "Başlık / konu", type: "text", required: true },
-    { key: "scheduledDate", label: "Planlanan tarih", type: "date" },
-    { key: "status", label: "Durum", type: "select", defaultValue: "draft", options: opts(SOCIAL_STATUS) },
-    NOTES_FIELD,
-  ],
-  summary: (d) => (d.title as string) ?? "",
-  detail: (d) =>
-    joinDetail(labelOf(SOCIAL_PLATFORM, d.platform), labelOf(SOCIAL_STATUS, d.status), d.scheduledDate as string),
-  computeStats: (records) => [
-    { label: "Taslak", value: String(countBy(records, "status", "draft")) },
-    { label: "Planlanan", value: String(countBy(records, "status", "scheduled")) },
-    { label: "Yayınlanan", value: String(countBy(records, "status", "published")) },
-  ],
-};
+// Burada TANIM YOK: pd_sosyal_medya artık kendi tablolarına yazıyor
+// (social_accounts / social_posts / social_post_targets / social_post_media,
+// bkz. 054_social_media.sql) ve kendi paneli var (SocialMediaPanel).
+//
+// Sebep: hesap yönetimi ve "aynı içerik birden çok kanalda, kanala göre değişen
+// metinle" ilişkisi module_records'ın tek jsonb sütununa sığmıyordu. Alan
+// tanımı burada bırakılsaydı aynı modül iki farklı tabloya yazabilir hale
+// gelirdi — hangisinin doğru olduğu belirsizleşirdi.
+// Bkz. docs/moduller/13-modul-sosyal-medya.md
 
 // ============================================================ E-mail pazarlama
 // Sosyal medyayla aynı motoru kullanır (A5); ikisinin tek "İçerik Takvimi"

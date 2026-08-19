@@ -32,8 +32,8 @@ export class OrganizationsController {
   }
 
   @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.organizationsService.findOne(id);
+  findOne(@Param("id") id: string, @Req() req: any) {
+    return this.organizationsService.findOne(id, req.user.userId);
   }
 
   // Bu organizasyona bağlı işler (hiyerarşi: Organizasyon -> İş -> Proje).
@@ -76,7 +76,7 @@ export class OrganizationsController {
   }
 
   @Patch(":id/restore")
-  restore(@Param("id") id: string) {
-    return this.organizationsService.restore(id);
+  restore(@Param("id") id: string, @Req() req: any) {
+    return this.organizationsService.restore(id, req.user.userId);
   }
 }

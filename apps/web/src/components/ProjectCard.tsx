@@ -1,15 +1,28 @@
 import { useRef, useState } from "react";
 import { coverBackground } from "../lib/covers";
 import { Link } from "react-router-dom";
-import type { Project } from "@projelio/shared";
+import type { Project, ProjectStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import { colors } from "../theme/colors";
+import CardDescription from "./CardDescription";
 import { IconFolder, IconPlus } from "./icons";
 import StatusBadge from "./StatusBadge";
 
 interface Props {
   project: Project;
+  /**
+   * Durum rozeti tıklanabilir olsun mu. Sunucuda kural "proje ya da iş sahibi"
+   * (bkz. ProjectsService.assertCanManage); arayüzde de aynı kişiye açılıyor ki
+   * kimse tıklayıp 403 ile karşılaşmasın.
+   */
+  canManage?: boolean;
+  /**
+   * Durum değişince güncel projeyi bildirir. `canManage` veriliyorsa bu da
+   * verilmeli — kart durumu kendi state'inde tutmuyor, listedeki kayıt
+   * tazelenmezse rozet eski değerde kalır.
+   */
+  onStatusChanged?: (project: Project) => void;
 }
 
 // Kartlar açıklama uzunluğuna ya da kapak fotoğrafı olup olmamasına göre boy
@@ -21,18 +34,16 @@ interface Props {
 const COVER_HEIGHT = 104;
 const CARD_HEIGHT = 280;
 
-export default function ProjectCard({ project }: Props) {
+export default function ProjectCard({ project, canManage, onStatusChanged }: Props) {
   const c = colors.light;
-  const [expanded, setExpanded] = useState(false);
   const [coverUrl, setCoverUrl] = useState(project.coverImageUrl);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const toggleExpanded = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setExpanded((prev) => !prev);
+  const handleStatusChange = async (status: ProjectStatus) => {
+    const updated = await api.patch<Project>(`/projects/${project.id}`, { status }).catch(() => null);
+    if (updated) onStatusChanged?.(updated);
   };
 
   const handleAddCoverClick = (e: React.MouseEvent) => {
@@ -162,31 +173,10 @@ export default function ProjectCard({ project }: Props) {
           >
             {project.title}
           </h3>
-          <StatusBadge status={project.status} />
+          <StatusBadge status={project.status} onChange={canManage ? handleStatusChange : undefined} />
         </div>
         {project.description && (
-          <p
-            onClick={toggleExpanded}
-            title={expanded ? undefined : "Tamamını görmek için tıkla"}
-            style={{
-              color: c.textSecondary,
-              fontSize: 15,
-              margin: "0 0 14px",
-              lineHeight: 1.5,
-              cursor: "pointer",
-              minHeight: 0,
-              ...(expanded
-                ? { flex: 1, overflowY: "auto" as const }
-                : {
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical" as const,
-                    overflow: "hidden",
-                  }),
-            }}
-          >
-            {project.description}
-          </p>
+          <CardDescription text={project.description} />
         )}
 
         <div

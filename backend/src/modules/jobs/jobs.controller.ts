@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  Inject,
+  forwardRef,
   Body,
   Controller,
   Delete,
@@ -18,6 +20,8 @@ import { memoryStorage } from "multer";
 import { JobsService } from "./jobs.service";
 import { ProjectsService } from "../projects/projects.service";
 import { OperationsService } from "../operations/operations.service";
+import { AccessService } from "../../common/access/access.service";
+import { CreationRequestsService } from "../creation-requests/creation-requests.service";
 
 @Controller("jobs")
 @UseGuards(AuthGuard("jwt"))
@@ -25,7 +29,10 @@ export class JobsController {
   constructor(
     private jobsService: JobsService,
     private projectsService: ProjectsService,
-    private operationsService: OperationsService
+    private operationsService: OperationsService,
+    private access: AccessService,
+    @Inject(forwardRef(() => CreationRequestsService))
+    private creationRequests: CreationRequestsService
   ) {}
 
   @Get()
@@ -33,8 +40,11 @@ export class JobsController {
     return this.jobsService.findAllForUser(req.user.userId);
   }
 
+  // İş detayı: eskiden hiç yetki sorulmuyordu — id'yi bilen herkes başkasının
+  // iş dosyasını açabiliyordu.
   @Get(":id")
-  findOne(@Param("id") id: string) {
+  async findOne(@Param("id") id: string, @Req() req: any) {
+    await this.access.assertCanViewJob(id, req.user.userId);
     return this.jobsService.findOne(id);
   }
 
@@ -49,9 +59,30 @@ export class JobsController {
     return this.operationsService.findByJob(id, req.user.userId);
   }
 
+  /**
+   * Taşeron bir ORGANİZASYONA bağlı iş açmak istediğinde kayıt doğrudan
+   * oluşmaz: talep açılır, yetkililere bildirim (+push) gider, onaylanınca iş
+   * doğar (bkz. CreationRequestsService). Organizasyona bağlanmayan kişisel iş
+   * ve taşeron olmayan kullanıcılar eskisi gibi doğrudan açar.
+   *
+   * Yanıt iki biçimden biridir — istemci hangisi olduğunu `outcome` ile anlar,
+   * ayrı bir uç çağırmak zorunda kalmaz (bkz. shared CreateOrRequestResult).
+   */
   @Post()
-  create(@Req() req: any, @Body() body: any) {
-    return this.jobsService.create(req.user.userId, body);
+  async create(@Req() req: any, @Body() body: any) {
+    const userId = req.user.userId;
+    const needsApproval = await this.creationRequests.requiresApproval("job", userId, {
+      organizationId: body?.organizationId,
+    });
+    if (needsApproval) {
+      const request = await this.creationRequests.create(userId, {
+        kind: "job",
+        organizationId: body.organizationId,
+        payload: { title: body?.title, description: body?.description },
+      });
+      return { outcome: "pending", request };
+    }
+    return { outcome: "created", entity: await this.jobsService.create(userId, body) };
   }
 
   // NOT: bu route ":id" ile çakışmaması için ondan önce tanımlanmalı.
@@ -83,7 +114,7 @@ export class JobsController {
   }
 
   @Patch(":id/restore")
-  restore(@Param("id") id: string) {
-    return this.jobsService.restore(id);
+  restore(@Param("id") id: string, @Req() req: any) {
+    return this.jobsService.restore(id, req.user.userId);
   }
 }

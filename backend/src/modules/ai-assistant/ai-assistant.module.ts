@@ -26,6 +26,9 @@ import { PlanningModule } from "../planning/planning.module";
   ],
   controllers: [AiAssistantController],
   providers: [AiAssistantService, AiCreditsService, AiConversationsService],
-  exports: [AiCreditsService],
+  // AiAssistantService dışarı açık: e-posta modülü yanıt taslağı üretmek için
+  // draftText() çağırıyor (bkz. MailboxService.draftReply). Kredi muhasebesi ve
+  // Anthropic istemcisi tek yerde kalsın diye ikinci bir istemci kurulmuyor.
+  exports: [AiCreditsService, AiAssistantService],
 })
 export class AiAssistantModule {}

@@ -5,6 +5,7 @@ import { NotificationsService } from "./notifications.service";
 import { NotificationsController } from "./notifications.controller";
 import { DeadlineReminderProcessor } from "./deadline-reminder.processor";
 import { DigestProcessor } from "./digest.processor";
+import { getJwtSecret } from "../../common/config/env";
 
 @Module({
   // JwtModule burada da (auth.module.ts'teki aynı secret ile) kayıtlı: gateway,
@@ -12,7 +13,7 @@ import { DigestProcessor } from "./digest.processor";
   // (bkz. notifications.gateway.ts — client artık ham bir userId değil, JWT gönderir).
   imports: [
     JwtModule.register({
-      secret: process.env.JWT_SECRET ?? "change-me",
+      secret: getJwtSecret(),
     }),
   ],
   controllers: [NotificationsController],

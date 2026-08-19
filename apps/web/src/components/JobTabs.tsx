@@ -16,14 +16,39 @@ const tabs: { key: JobTab; label: string }[] = [
   { key: "modules", label: "Modüller" },
 ];
 
+/**
+ * Taşerona kapalı iş sekmeleri: Ekip (kim çalışıyor) ve Modüller (işin
+ * kurumsal araçları). Taşeron işi görür — orada çalışıyor — ama işin ekibini
+ * ve modüllerini görmez. Sunucu da bu uçları reddeder
+ * (bkz. backend job-members / job-modules controller).
+ */
+const SUBCONTRACTOR_HIDDEN: JobTab[] = ["team", "modules"];
+
+export function visibleJobTabs(isSubcontractor: boolean): { key: JobTab; label: string }[] {
+  if (!isSubcontractor) return tabs;
+  return tabs.filter((t) => !SUBCONTRACTOR_HIDDEN.includes(t.key));
+}
+
 interface Props {
   active: JobTab;
   onChange: (tab: JobTab) => void;
+  /** Taşeron hesabı ise Ekip ve Modüller sekmeleri hiç render edilmez. */
+  isSubcontractor?: boolean;
   // Sabit başlığın üst bandındaki küçültülmüş kopya (bkz. JobDetail
   // usePageHeaderTabs) marginBottom'u kaldırmak için kullanır.
   style?: React.CSSProperties;
+  /** Tek satır + yana kaydırma (bkz. TabBar): sabit şeritteki kopya kullanır. */
+  scrollable?: boolean;
 }
 
-export default function JobTabs({ active, onChange, style }: Props) {
-  return <TabBar tabs={tabs} active={active} onChange={(k) => onChange(k as JobTab)} style={style} />;
+export default function JobTabs({ active, onChange, style, scrollable, isSubcontractor = false }: Props) {
+  return (
+    <TabBar
+      tabs={visibleJobTabs(isSubcontractor)}
+      active={active}
+      onChange={(k) => onChange(k as JobTab)}
+      style={style}
+      scrollable={scrollable}
+    />
+  );
 }

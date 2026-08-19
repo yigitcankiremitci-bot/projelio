@@ -3,7 +3,9 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import type { Organization } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { JobsService } from "../jobs/jobs.service";
+import { AccessService } from "../../common/access/access.service";
 import { applyOrder } from "../../common/reorder.util";
+import { detectImageUpload } from "../../common/upload-image.util";
 
 const COVER_BUCKET = "organization-covers";
 
@@ -28,7 +30,8 @@ function mapOrganization(row: any): Organization {
 export class OrganizationsService {
   constructor(
     private supabase: SupabaseService,
-    private jobsService: JobsService
+    private jobsService: JobsService,
+    private access: AccessService
   ) {}
 
   // Kullanıcının sahibi olduğu organizasyonlar + üyesi olduğu (approved) organizasyonlar
@@ -162,7 +165,11 @@ export class OrganizationsService {
     await applyOrder(this.supabase.client, "organizations", ids);
   }
 
-  async findOne(id: string): Promise<Organization> {
+  // requestingUserId verilirse organizasyon yalnızca ona erişimi olanlara açılır:
+  // sahibi, onaylı üyesi ya da bir departmanının onaylı kadrosunda olan kişi
+  // (findAllForUser ile TAM AYNI daire — sidebar'da görünmeyen bir organizasyon
+  // doğrudan URL ile de açılamamalı). Verilmezse (dahili çağrılar) kontrol atlanır.
+  async findOne(id: string, requestingUserId?: string): Promise<Organization> {
     const { data, error } = await this.supabase.client
       .from("organizations")
       .select("*, users(full_name), groups(name)")
@@ -170,7 +177,19 @@ export class OrganizationsService {
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException("Organizasyon bulunamadı");
-    return mapOrganization(data);
+
+    const organization = mapOrganization(data);
+
+    if (requestingUserId) {
+      // Görünürlük ve sekme yetkileri tek kaynaktan (bkz. AccessService).
+      const access = await this.access.organizationAccess(id, requestingUserId);
+      if (!access.canView) {
+        throw new ForbiddenException("Bu organizasyonu görüntüleme yetkiniz yok");
+      }
+      organization.viewerAccess = access;
+    }
+
+    return organization;
   }
 
   async create(ownerId: string, data: Partial<Organization>): Promise<Organization> {
@@ -242,7 +261,8 @@ export class OrganizationsService {
     return mapOrganization(row);
   }
 
-  async restore(id: string): Promise<Organization> {
+  async restore(id: string, requestingUserId?: string): Promise<Organization> {
+    await this.assertOwner(id, requestingUserId);
     const { data: row, error } = await this.supabase.client
       .from("organizations")
       .update({ archived_at: null })
@@ -262,12 +282,14 @@ export class OrganizationsService {
 
   async uploadCover(id: string, file: Express.Multer.File, requestingUserId?: string): Promise<Organization> {
     await this.assertOwner(id, requestingUserId);
-    const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
+    // Tur ve uzanti istemcinin sozune degil, dosyanin ilk baytlarindaki
+    // imzaya gore belirlenir (bkz. common/upload-image.util.ts).
+    const { contentType, ext } = detectImageUpload(file);
     const path = `${id}/${randomUUID()}.${ext}`;
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(COVER_BUCKET)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);

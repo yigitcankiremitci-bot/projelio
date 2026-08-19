@@ -1,6 +1,9 @@
 import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from "class-validator";
 
-const PROJECT_STATUSES = ["active", "completed", "archived"] as const;
+// @projelio/shared'daki ProjectStatus ile aynı küme (bkz. migration 063).
+// class-validator'ın çalışma zamanında bir diziye ihtiyacı olduğu için burada
+// tekrarlanıyor — TASK_STATUSES ile aynı desen.
+const PROJECT_STATUSES = ["active", "on_hold", "passive", "completed", "archived"] as const;
 
 // NOT: Tüm alanlar bilinçli olarak geniş tutuluyor (ör. tarihler için katı ISO
 // formatı zorlanmıyor) — amaç, frontend'in zaten gönderdiği alanları kısıtlamak

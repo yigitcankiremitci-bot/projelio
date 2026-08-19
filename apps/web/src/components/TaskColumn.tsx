@@ -1,14 +1,19 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import Sortable from "sortablejs";
+import Sortable, { type SortableEvent } from "sortablejs";
 import type { Task, TaskPriority, TaskStatus } from "@projelio/shared";
 import { MAX_TASK_PRIORITY } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { IconPlus, IconChevronRight, IconCheck, IconEdit, IconActivity, IconStar } from "./icons";
 import Modal from "./Modal";
-import { useSortableList, LONG_PRESS_DELAY } from "../lib/useSortableList";
+import AutoGrowTextarea from "./AutoGrowTextarea";
+import { useSortableList, SORTABLE_BASE_OPTIONS } from "../lib/useSortableList";
+import { useKeepInView } from "../lib/useKeepInView";
 import { useUndo } from "../lib/undo";
 import { formatTaskDuration } from "../lib/dates";
+import { coverBackground } from "../lib/covers";
+import { assigneeLabels } from "../lib/taskAssignees";
+
 
 export interface TaskColumnHandle {
   // Dışarıdan (ör. departman/iş sayfasındaki "+" FAB'ından) sütunun hızlı
@@ -76,7 +81,43 @@ interface Props {
   selectionMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (taskId: string) => void;
+  /**
+   * Karta çift tıklandığında çağrılır (başlık hariç — orada yerinde ad
+   * değiştirme var, bkz. renderTitle). Görevin "asıl evine" gitmek için:
+   * Yapılacaklar panosundaki bir iş görevi kendi projesinde yaşıyor, kullanıcı
+   * onu bağlamıyla görmek istediğinde tek yol elle projeyi bulmaktı.
+   */
+  onOpenSource?: (task: Task) => void;
 }
+
+/**
+ * Alt görev açıklamalarının rengi. Tema paletinde bu iş için ayrı bir ton yok;
+ * `textSecondary` (#66707F) alt görevin atanan/süre bilgisinde zaten kullanılıyor
+ * ve açıklama onlardan ayırt edilemiyordu. Bu mavi-gri ton beyaz yüzeyde 5.4:1
+ * kontrast verir (WCAG AA eşiği 4.5:1) — `covers.ts`teki COVER_TEXT_SECONDARY
+ * ile aynı gerekçe: paletin dışında ama ölçülmüş bir istisna.
+ */
+const SUBTASK_DESCRIPTION_COLOR = "#5A6B8C";
+
+/**
+ * Bir görev kartının alt görev listesini açmasını isteyen olay. Alt görev
+ * sürüklenirken kapalı bir kartın üzerinde beklenince tetiklenir; sürükleme
+ * BAŞKA bir sütunda başlamış olabileceği için doğrudan state'e yazamıyoruz —
+ * olay kartın üzerinde tetiklenir, kartı tutan TaskColumn kabararak gelen olayı
+ * yakalar.
+ */
+const EXPAND_SUBTASKS_EVENT = "projelio:expand-subtasks";
+
+/**
+ * Bir alt görev sürüklemesinin başladığını/bittiğini tüm sütunlara duyuran olay.
+ * Sürükleme tek bir sütunda başlar ama alt görev BAŞKA bir sütundaki karta
+ * bırakılabilir; boş alt görev listelerinin bırakma alanı kazanması (yüksekliği
+ * sıfır olan kutuya hiçbir şey bırakılamaz) bu yüzden panonun tamamında olmalı.
+ */
+const SUBTASK_DRAG_EVENT = "projelio:subtask-drag";
+
+/** Kapalı kartın kendiliğinden açılması için üzerinde beklenmesi gereken süre (ms). */
+const SUBTASK_HOVER_EXPAND_DELAY = 450;
 
 const columnLabel: Record<TaskStatus, string> = {
   todo: "Yapılacak",
@@ -117,6 +158,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   selectionMode,
   selectedIds,
   onToggleSelect,
+  onOpenSource,
 }, ref) {
   const c = colors.light;
   const [adding, setAdding] = useState(false);
@@ -166,6 +208,23 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
 
   // Bu kolonda gerçekten yaşayan üst görevler (kendi statüsü bu kolonla eşleşen).
   const realTopLevel = allTasks.filter((t) => t.status === status && !t.parentTaskId);
+
+  // Hızlı ekleme kutuları, her eklenen kayıtla bir kart boyu aşağı iner ve
+  // ekranın altından çıkardı; kullanıcı yazmayı bırakıp sayfayı kaydırmak
+  // zorunda kalıyordu. Kayıt sayısı değiştikçe VE metin uzayıp kutu büyüdükçe
+  // görünür alana geri çekiliyor (bkz. useKeepInView).
+  const addTaskFormRef = useKeepInView<HTMLFormElement>(adding, [title, realTopLevel.length]);
+  // Aynı anda yalnızca tek bir alt görev kutusu açık olabildiği için (subtaskParent
+  // tek bir kimlik) tek ref yetiyor; hangi kart açıksa ona bağlanıyor.
+  const addSubtaskFormRef = useKeepInView<HTMLFormElement>(subtaskParent !== null, [
+    subtaskParent,
+    subtaskTitle,
+    allTasks.length,
+  ]);
+  // Başlığa çift tıklayınca açılan yerinde düzenleme kutusu da aynı hizaya
+  // uyar. Aynı anda yalnızca bir kutu açık olabildiği için (renamingId tek bir
+  // kimlik) görev ve alt görev tek ref'i paylaşıyor.
+  const renameBoxRef = useKeepInView<HTMLDivElement>(renamingId !== null, [renamingId, renameValue]);
 
   // Bir üst görevin altında gösterilecek alt görevler.
   // Tamamlandı kolonunda üst görev zaten tamamlanmışsa tüm alt görevleri (durumu ne olursa olsun) gösteriyoruz.
@@ -239,33 +298,218 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     [group, Boolean(onReorderTasks), selectionMode]
   );
 
-  const attachSubtaskSortable = (parentId: string) => (el: HTMLDivElement | null) => {
-    const existing = subtaskSortables.current.get(parentId);
-    if (existing) {
-      existing.destroy();
-      subtaskSortables.current.delete(parentId);
+  // ------------------------------------------------- alt görev sürükle-bırak
+  // Alt görevler hem kendi listelerinde sıralanır hem de BAŞKA bir görev
+  // kartının altına taşınabilir. İki incelik var:
+  //
+  // 1) Ref geri çağrısı parentId başına SABİT olmalı. Satır içi bir arrow
+  //    kullanılsaydı her render'da kimliği değişir, React onu önce null ile
+  //    çağırır ve Sortable örneği YOK EDİLİRDİ — sürükleme sırasında olan bir
+  //    render (bkz. kapalı kartın kendiliğinden açılması) sürüklemeyi keserdi.
+  //    Bu yüzden açık/kapalı olma durumu artık `disabled` seçeneğiyle yönetiliyor.
+  // 2) Kapalı bir kartın alt görev listesi DOM'da yoktur; bırakılacak bir yer
+  //    doğsun diye kartın üzerinde bir süre durunca kart kendiliğinden açılır.
+  const [draggingSubtask, setDraggingSubtask] = useState(false);
+  const hoverExpandRef = useRef<{ id: string; timer: number } | null>(null);
+  // Sürüklenen alt görev ve kalktığı liste. Kartın kendiliğinden açılması
+  // (yani sürükleme ortasında bir React render'ı) yalnızca düğüm HÂLÂ kendi
+  // listesindeyken güvenli: Sortable onu başka bir listeye taşıdıktan sonra
+  // React eski listeyi güncellemeye çalışıp "removeChild" ile sayfayı düşürür.
+  const dragOriginRef = useRef<{ item: HTMLElement; from: HTMLElement } | null>(null);
+
+  // Sortable seçenekleri bir kez kuruluyor; içeriden okunan prop'lar bu yüzden
+  // ref üzerinden alınır, yoksa ilk render'ın değerlerine saplanırdı.
+  const latest = useRef({ onReorderTasks, onTaskRenamed, pushUndo });
+  useEffect(() => {
+    latest.current = { onReorderTasks, onTaskRenamed, pushUndo };
+  });
+
+  const subtaskDragDisabled = !onReorderTasks || Boolean(selectionMode);
+  const subtaskDragDisabledRef = useRef(subtaskDragDisabled);
+  useEffect(() => {
+    subtaskDragDisabledRef.current = subtaskDragDisabled;
+    for (const instance of subtaskSortables.current.values()) {
+      instance.option("disabled", subtaskDragDisabled);
     }
-    if (!el || !onReorderTasks || selectionMode) return;
-    const instance = Sortable.create(el, {
-      animation: 180,
-      delay: LONG_PRESS_DELAY,
-      delayOnTouchOnly: false,
-      touchStartThreshold: 5,
-      forceFallback: true,
-      fallbackTolerance: 3,
-      ghostClass: "sortable-ghost",
-      chosenClass: "sortable-chosen",
-      dragClass: "sortable-drag",
-      filter: "button",
-      preventOnFilter: false,
-      onEnd: () => {
-        const ids = Array.from(el.children)
-          .map((node) => (node as HTMLElement).dataset.id)
-          .filter((v): v is string => Boolean(v));
-        onReorderTasks(ids);
-      },
-    });
-    subtaskSortables.current.set(parentId, instance);
+  }, [subtaskDragDisabled]);
+
+  // Sürükleme hangi sütunda başlarsa başlasın tüm sütunlar haberdar olmalı
+  // (bkz. SUBTASK_DRAG_EVENT).
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setDraggingSubtask(Boolean((e as CustomEvent<{ active: boolean }>).detail?.active));
+    };
+    document.addEventListener(SUBTASK_DRAG_EVENT, handler);
+    return () => document.removeEventListener(SUBTASK_DRAG_EVENT, handler);
+  }, []);
+
+  // Başka bir sütunda başlamış bir sürükleme bu sütundaki bir kartın açılmasını
+  // isteyebilir; olay kartın üzerinde tetiklenip buraya kabararak geliyor.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<{ taskId: string }>).detail?.taskId;
+      if (!id) return;
+      setExpanded((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+    };
+    el.addEventListener(EXPAND_SUBTASKS_EVENT, handler);
+    return () => el.removeEventListener(EXPAND_SUBTASKS_EVENT, handler);
+  }, []);
+
+  // Aşağıdaki iki fonksiyon yalnızca ref ve DOM'a dokunuyor; kimlikleri sabit
+  // olmalı ki addEventListener/removeEventListener aynı referansı görsün.
+  const clearHoverExpand = useRef(() => {
+    if (!hoverExpandRef.current) return;
+    window.clearTimeout(hoverExpandRef.current.timer);
+    hoverExpandRef.current = null;
+  }).current;
+
+  const handleSubtaskDragMove = useRef((e: Event) => {
+    const source = e as MouseEvent & { touches?: TouchList };
+    const point = source.touches?.length
+      ? { x: source.touches[0].clientX, y: source.touches[0].clientY }
+      : typeof source.clientX === "number"
+      ? { x: source.clientX, y: source.clientY }
+      : null;
+    if (!point) return;
+
+    // Sürüklenen kopya imlecin altında durduğu için elementFromPoint onu
+    // döndürürdü; yığındaki İLK görev kartını arıyoruz.
+    let card: HTMLElement | null = null;
+    for (const el of document.elementsFromPoint(point.x, point.y)) {
+      const match = (el as HTMLElement).closest?.("[data-task-card-id]") as HTMLElement | null;
+      if (match) {
+        card = match;
+        break;
+      }
+    }
+    const id = card?.dataset.taskCardId;
+    const origin = dragOriginRef.current;
+    // Açık bir kartın alt görev listesi zaten DOM'da; açmaya gerek yok.
+    // Düğüm kendi listesinden çıktıysa artık açmıyoruz (bkz. dragOriginRef).
+    if (!card || !id || (origin && origin.item.parentElement !== origin.from) || document.querySelector(`[data-parent-id="${id}"]`)) {
+      clearHoverExpand();
+      return;
+    }
+    if (hoverExpandRef.current?.id === id) return;
+    clearHoverExpand();
+    const target = card;
+    hoverExpandRef.current = {
+      id,
+      timer: window.setTimeout(() => {
+        hoverExpandRef.current = null;
+        target.dispatchEvent(
+          new CustomEvent(EXPAND_SUBTASKS_EVENT, { bubbles: true, detail: { taskId: id } })
+        );
+      }, SUBTASK_HOVER_EXPAND_DELAY),
+    };
+  }).current;
+
+  const startSubtaskDrag = (evt: SortableEvent) => {
+    dragOriginRef.current = { item: evt.item, from: evt.from };
+    document.dispatchEvent(new CustomEvent(SUBTASK_DRAG_EVENT, { detail: { active: true } }));
+    document.addEventListener("pointermove", handleSubtaskDragMove, true);
+    document.addEventListener("touchmove", handleSubtaskDragMove, true);
+  };
+
+  const finishSubtaskDrag = () => {
+    dragOriginRef.current = null;
+    document.dispatchEvent(new CustomEvent(SUBTASK_DRAG_EVENT, { detail: { active: false } }));
+    clearHoverExpand();
+    document.removeEventListener("pointermove", handleSubtaskDragMove, true);
+    document.removeEventListener("touchmove", handleSubtaskDragMove, true);
+  };
+
+  const handleSubtaskDrop = async (evt: SortableEvent) => {
+    const { onReorderTasks: reorder, onTaskRenamed: taskUpdated, pushUndo: undo } = latest.current;
+    const toEl = evt.to;
+    const fromEl = evt.from;
+    const subtaskId = evt.item.dataset.id;
+    if (!subtaskId) return;
+    // Hedef listenin son sırası — DOM'u geri almadan ÖNCE okunmalı.
+    const ids = Array.from(toEl.children)
+      .map((node) => (node as HTMLElement).dataset.id)
+      .filter((v): v is string => Boolean(v));
+
+    if (toEl === fromEl) {
+      reorder?.(ids);
+      return;
+    }
+
+    // Sortable düğümü fiziksel olarak diğer listeye taşıdı; React bir sonraki
+    // render'da onu eski listeden kaldırmaya çalışıp "removeChild" hatasıyla
+    // sayfayı düşürürdü. Üst görev sütunlarındaki desenin aynısı: taşımayı hemen
+    // geri alıyoruz, alt görevin yeni yerinde görünmesini state güncellemesi sağlıyor.
+    try {
+      toEl.removeChild(evt.item);
+      const reference = fromEl.children[evt.oldIndex ?? fromEl.children.length] ?? null;
+      fromEl.insertBefore(evt.item, reference);
+    } catch {
+      // DOM zaten React tarafından güncellendiyse sorun yok
+    }
+
+    const newParentId = toEl.dataset.parentId;
+    const previousParentId = fromEl.dataset.parentId;
+    if (!newParentId || !previousParentId || newParentId === previousParentId || !taskUpdated) return;
+
+    const applyParent = async (parentId: string) => {
+      const updated = await api.patch<Task>(`/tasks/${subtaskId}/parent`, { parentTaskId: parentId });
+      taskUpdated(updated);
+    };
+
+    try {
+      await applyParent(newParentId);
+      // Geri alma sırası bilinçli: önce taşıma kaydedilir, SONRA sıralama.
+      // Cmd/Ctrl+Z önce sıralamayı (alt görev hâlâ hedefteyken), ikinci basışta
+      // taşımayı geri alır. Ters sırada olsaydı ikinci geri alma, artık başka bir
+      // üst görevin altında olan kayıtları tek liste sanıp sunucuda reddedilirdi.
+      undo({
+        label: "Alt görev taşıma",
+        run: () => applyParent(previousParentId),
+        redo: () => applyParent(newParentId),
+      });
+      reorder?.(ids);
+    } catch {
+      // taşınamadı, kullanıcı tekrar deneyebilir
+    }
+  };
+
+  // parentId başına sabit ref geri çağrısı (bkz. yukarıdaki 1. madde).
+  const subtaskListRefs = useRef<Map<string, (el: HTMLDivElement | null) => void>>(new Map());
+
+  const subtaskListRef = (parentId: string) => {
+    const cached = subtaskListRefs.current.get(parentId);
+    if (cached) return cached;
+    const cb = (el: HTMLDivElement | null) => {
+      const existing = subtaskSortables.current.get(parentId);
+      if (existing) {
+        existing.destroy();
+        subtaskSortables.current.delete(parentId);
+      }
+      if (!el) return;
+      subtaskSortables.current.set(
+        parentId,
+        Sortable.create(el, {
+          // Kenarda sayfayı kaydırma dahil ortak ayarlar (bkz. useSortableList).
+          ...SORTABLE_BASE_OPTIONS,
+          filter: "button",
+          preventOnFilter: false,
+          disabled: subtaskDragDisabledRef.current,
+          // Panodaki TÜM alt görev listeleri aynı grubu paylaşır; alt görev
+          // böylece başka bir görev kartının altına bırakılabiliyor. Üst görev
+          // sütunları ayrı bir grup adı kullandığı için alt görev oraya düşmez.
+          group: { name: `${group}-subtasks`, pull: true, put: true },
+          onStart: startSubtaskDrag,
+          onEnd: (evt) => {
+            finishSubtaskDrag();
+            void handleSubtaskDrop(evt);
+          },
+        })
+      );
+    };
+    subtaskListRefs.current.set(parentId, cb);
+    return cb;
   };
 
   const toggleExpand = (id: string) => {
@@ -321,29 +565,25 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   const renderTitle = (task: Task, fontSize: number, color: string) => {
     if (renamingId === task.id) {
       return (
-        <input
-          autoFocus
-          value={renameValue}
-          onChange={(e) => setRenameValue(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          onBlur={() => void commitRename(task)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              void commitRename(task);
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              setRenamingId(null);
-            }
-          }}
-          aria-label="Görev adı"
-          // fontSize en az 16: alt görevlerin okuma boyutu (15) bundan küçük —
-          // input o boyutta kalsaydı iOS Safari odaklanınca sayfayı otomatik
-          // yakınlaştırıyordu (bkz. aşağıdaki "Alt görev ekle" input'undaki
-          // aynı düzeltme). Görünüm boyutu (span) etkilenmiyor, yalnızca
-          // düzenleme sırasındaki input.
-          style={{ flex: 1, minWidth: 0, height: 30, fontSize: Math.max(fontSize, 16), padding: "0 8px" }}
-        />
+        // Sarmalayıcı, kutunun ekranın altında kalmaması içindir: AutoGrowTextarea
+        // ref almıyor, ölçülecek bir düğüm gerekiyor (bkz. useKeepInView).
+        <div ref={renameBoxRef} style={{ flex: 1, minWidth: 0, display: "flex" }}>
+          {/* Uzun başlıklar tek satırda yatay kayıp okunmaz hale gelmesin diye
+              sararak aşağı büyüyen alan (bkz. AutoGrowTextarea). */}
+          <AutoGrowTextarea
+            autoFocus
+            value={renameValue}
+            onChange={setRenameValue}
+            onClick={(e) => e.stopPropagation()}
+            onBlur={() => void commitRename(task)}
+            onSubmit={() => void commitRename(task)}
+            onCancel={() => setRenamingId(null)}
+            ariaLabel="Görev adı"
+            fontSize={fontSize}
+            minHeight={30}
+            style={{ flex: 1, minWidth: 0 }}
+          />
+        </div>
       );
     }
     return (
@@ -549,7 +789,23 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
             <div key={t.id} data-id={t.id} style={{ marginBottom: 8 }}>
               <div
                 className={`task-drag-handle${highlightTaskId === t.id ? " task-highlight-flash" : ""}`}
+                // Alt görev sürüklenirken imlecin altındaki kart bu işaretle
+                // bulunur ve kapalıysa kendiliğinden açılır (bkz. handleSubtaskDragMove).
+                data-task-card-id={subtasksEnabled ? t.id : undefined}
                 onClick={() => toggleExpand(t.id)}
+                // Çift tıklama görevin kaynağına gider. Tek tıklama alt görevleri
+                // açıp kapadığı için burada onu da geri alıyoruz: aksi halde
+                // kullanıcı çift tıkladığında liste bir açılıp bir kapanıyor.
+                onDoubleClick={
+                  onOpenSource
+                    ? (e) => {
+                        e.stopPropagation();
+                        toggleExpand(t.id);
+                        onOpenSource(t);
+                      }
+                    : undefined
+                }
+                title={onOpenSource ? "Çift tıkla: görevin bulunduğu sayfaya git" : undefined}
                 style={{
                   background: c.surface,
                   border: `1px solid ${c.border}`,
@@ -606,6 +862,11 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                   {(() => {
                     const avatar = getTaskAvatar?.(t);
                     if (!avatar) return null;
+                    // Kapak değeri her zaman bir URL değil: hazır kapaklar
+                    // "preset:<anahtar>" olarak saklanıyor (bkz. lib/covers).
+                    // <img src="preset:orman"> tarayıcıda kırık resim simgesi
+                    // basıyordu. coverBackground üç durumu da (fotoğraf, hazır
+                    // kapak, kapak yok) tek bir CSS arka planına çeviriyor.
                     return (
                       <span
                         title={avatar.label}
@@ -616,7 +877,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                           borderRadius: "50%",
                           overflow: "hidden",
                           flexShrink: 0,
-                          background: c.background,
+                          background: avatar.url ? coverBackground(avatar.url) : c.background,
                           border: `1px solid ${c.border}`,
                           display: "flex",
                           alignItems: "center",
@@ -626,19 +887,23 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                           color: c.textSecondary,
                         }}
                       >
-                        {avatar.url ? (
-                          <img
-                            src={avatar.url}
-                            alt=""
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          avatar.label.charAt(0).toLocaleUpperCase("tr")
-                        )}
+                        {!avatar.url && avatar.label.charAt(0).toLocaleUpperCase("tr")}
                       </span>
                     );
                   })()}
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, flex: 1, minWidth: 0 }}>
+                  {/* Ad değiştirilirken yanındaki düğmeler gizlenir: giriş alanı
+                      kartın tüm genişliğini alsın ve uzun başlık satır satır
+                      okunabilsin. Düğmeler o an zaten kullanılamıyor — alana
+                      tıklamaktan çıkmak (blur) değişikliği kaydediyor. */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      flex: 1,
+                      minWidth: 0,
+                    }}
+                  >
                     {renderTitle(
                       t,
                       16,
@@ -648,39 +913,51 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                         ? c.danger
                         : c.textPrimary
                     )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditTask(t);
-                      }}
-                      aria-label="Görevi düzenle"
-                      style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
-                    >
-                      <IconEdit size={13} color={c.textSecondary} />
-                    </button>
-                    {onToggleActive && (canToggleActive?.(t) ?? true) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleActive(t.id);
-                        }}
-                        aria-label={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
-                        title={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
-                        className={activeTaskId === t.id ? "active-task-pulse" : undefined}
-                        style={{
-                          background: activeTaskId === t.id ? `${c.accent}22` : "transparent",
-                          border: "none",
-                          borderRadius: "50%",
-                          padding: 3,
-                          display: "flex",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <IconActivity size={13} color={activeTaskId === t.id ? c.accentDark : c.textSecondary} filled={activeTaskId === t.id} />
-                      </button>
+                    {renamingId !== t.id && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditTask(t);
+                          }}
+                          aria-label="Görevi düzenle"
+                          style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
+                        >
+                          <IconEdit size={13} color={c.textSecondary} />
+                        </button>
+                        {onToggleActive && (canToggleActive?.(t) ?? true) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleActive(t.id);
+                            }}
+                            aria-label={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                            title={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                            className={activeTaskId === t.id ? "active-task-pulse" : undefined}
+                            style={{
+                              background: activeTaskId === t.id ? `${c.accent}22` : "transparent",
+                              border: "none",
+                              borderRadius: "50%",
+                              padding: 3,
+                              display: "flex",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <IconActivity size={13} color={activeTaskId === t.id ? c.accentDark : c.textSecondary} filled={activeTaskId === t.id} />
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
+                  <div
+                    style={{
+                      display: renamingId === t.id ? "none" : "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 3,
+                      flexShrink: 0,
+                    }}
+                  >
                     {subtasksEnabled && (
                       <span
                         style={{
@@ -720,15 +997,37 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                     {getTaskMeta(t)}
                   </div>
                 )}
+                {/* Kartta yalnızca TEK SATIR: uzun bir not kartı şişirip panodaki
+                    diğer görevleri ekrandan düşürüyordu. Tamamı düzenleme
+                    modalinde okunur — açıklamaya çift tıklamak oraya götürür.
+                    Tek tıklama burada durdurulur, yoksa çift tıklamanın ilk
+                    tıklaması alt görev listesini açıp kapatırdı. */}
                 {t.description && (
-                  <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 4, overflowWrap: "break-word", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      onEditTask(t);
+                    }}
+                    title={t.description}
+                    style={{
+                      fontSize: 13,
+                      color: c.textSecondary,
+                      marginTop: 4,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      cursor: "pointer",
+                    }}
+                  >
                     {t.description}
                   </div>
                 )}
-                {(t.assignedToName || formatTaskDuration(t.estimatedDurationValue, t.estimatedDurationUnit)) && (
+                {(assigneeLabels(t).length > 0 || formatTaskDuration(t.estimatedDurationValue, t.estimatedDurationUnit)) && (
                   <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    {t.assignedToName && (
+                    {assigneeLabels(t).map((name) => (
                       <span
+                        key={name}
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
@@ -741,9 +1040,9 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                           padding: "1px 8px",
                         }}
                       >
-                        {t.assignedToName}
+                        {name}
                       </span>
-                    )}
+                    ))}
                     {formatTaskDuration(t.estimatedDurationValue, t.estimatedDurationUnit) && (
                       <span
                         style={{
@@ -770,7 +1069,9 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                   const start = formatDay(t.startDate ?? t.createdAt);
                   // Yapılacaklar panosundaki kişisel görevlerin tarihi olmayabilir;
                   // "Invalid Date" basmak yerine o ucu boş bırakıyoruz.
-                  const due = formatDay(t.deadline);
+                  // Bitiş saati opsiyonel (bkz. migration 057); varsa tarihin
+                  // yanına eklenir, yoksa görünüm eskisiyle birebir aynı kalır.
+                  const due = formatDay(t.deadline) + (t.deadlineTime ? ` ${t.deadlineTime}` : "");
                   // İlerleme çubuğu alt görev tamamlanmasını gösterir. Alt görevi
                   // olmayan bir görevde hep boş durup "%0 bitti" gibi yanlış bir
                   // sinyal veriyordu; artık yalnızca gösterecek bir şey varken çıkıyor.
@@ -811,7 +1112,23 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                     gap: 6,
                   }}
                 >
-                  <div ref={attachSubtaskSortable(t.id)} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div
+                    ref={subtaskListRef(t.id)}
+                    // Hedef üst görevin kimliği: alt görev başka bir karta
+                    // bırakıldığında yeni üst görev buradan okunuyor.
+                    data-parent-id={t.id}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                      // Sürükleme sırasında boş listenin de bırakma alanı olması
+                      // gerekir; yüksekliği sıfır olan bir kutuya hiçbir şey
+                      // bırakılamıyordu.
+                      minHeight: draggingSubtask ? 34 : undefined,
+                      border: draggingSubtask ? `1px dashed ${c.border}` : undefined,
+                      borderRadius: draggingSubtask ? 7 : undefined,
+                    }}
+                  >
                     {subtasks.map((sub) => (
                       <div
                         key={sub.id}
@@ -876,13 +1193,38 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                         <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
                             {renderTitle(sub, 15, sub.status === "completed" ? c.textSecondary : c.textPrimary)}
+                            {/* Alt görevin açıklaması artık satırda görünür; rengi
+                                bilinçli olarak farklı, yoksa altındaki atanan/süre
+                                bilgisiyle aynı griye karışıyordu. Üst görev kartında
+                                olduğu gibi tek satır, tamamı için çift tıklama. */}
+                            {sub.description && (
+                              <span
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditTask(sub);
+                                }}
+                                title={sub.description}
+                                style={{
+                                  fontSize: 12,
+                                  color: SUBTASK_DESCRIPTION_COLOR,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {sub.description}
+                              </span>
+                            )}
                             {getTaskMeta?.(sub) && (
                               <span style={{ fontSize: 11, color: c.textSecondary }}>{getTaskMeta(sub)}</span>
                             )}
-                            {(sub.assignedToName || formatTaskDuration(sub.estimatedDurationValue, sub.estimatedDurationUnit)) && (
+                            {(assigneeLabels(sub).length > 0 || formatTaskDuration(sub.estimatedDurationValue, sub.estimatedDurationUnit)) && (
                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                {sub.assignedToName && (
-                                  <span style={{ fontSize: 11, color: c.accentDark }}>{sub.assignedToName}</span>
+                                {assigneeLabels(sub).length > 0 && (
+                                  <span style={{ fontSize: 11, color: c.accentDark }}>
+                                    {assigneeLabels(sub).join(", ")}
+                                  </span>
                                 )}
                                 {formatTaskDuration(sub.estimatedDurationValue, sub.estimatedDurationUnit) && (
                                   <span style={{ fontSize: 11, color: c.textSecondary }}>
@@ -892,36 +1234,42 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                               </div>
                             )}
                           </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEditTask(sub);
-                            }}
-                            aria-label="Alt görevi düzenle"
-                            style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
-                          >
-                            <IconEdit size={11} color={c.textSecondary} />
-                          </button>
-                          {onToggleActive && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onToggleActive(sub.id);
-                              }}
-                              aria-label={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
-                              title={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
-                              className={activeTaskId === sub.id ? "active-task-pulse" : undefined}
-                              style={{
-                                background: activeTaskId === sub.id ? `${c.accent}22` : "transparent",
-                                border: "none",
-                                borderRadius: "50%",
-                                padding: 2,
-                                display: "flex",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <IconActivity size={11} color={activeTaskId === sub.id ? c.accentDark : c.textSecondary} filled={activeTaskId === sub.id} />
-                            </button>
+                          {/* Ad değiştirilirken düğmeler gizlenir — giriş alanı
+                              satırın tamamını alsın (bkz. üst görev satırı). */}
+                          {renamingId !== sub.id && (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditTask(sub);
+                                }}
+                                aria-label="Alt görevi düzenle"
+                                style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
+                              >
+                                <IconEdit size={11} color={c.textSecondary} />
+                              </button>
+                              {onToggleActive && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleActive(sub.id);
+                                  }}
+                                  aria-label={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                                  title={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                                  className={activeTaskId === sub.id ? "active-task-pulse" : undefined}
+                                  style={{
+                                    background: activeTaskId === sub.id ? `${c.accent}22` : "transparent",
+                                    border: "none",
+                                    borderRadius: "50%",
+                                    padding: 2,
+                                    display: "flex",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <IconActivity size={11} color={activeTaskId === sub.id ? c.accentDark : c.textSecondary} filled={activeTaskId === sub.id} />
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -929,30 +1277,20 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                   </div>
 
                   {subtaskParent === t.id ? (
-                    <form onSubmit={(e) => handleAddSubtask(e, t.id)}>
-                      <input
+                    <form ref={addSubtaskFormRef} onSubmit={(e) => handleAddSubtask(e, t.id)}>
+                      <AutoGrowTextarea
                         autoFocus
                         value={subtaskTitle}
-                        onChange={(e) => setSubtaskTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") {
-                            setSubtaskParent(null);
-                            setSubtaskTitle("");
-                          }
-                          // Mobil klavyelerin onay/bitti tuşu her zaman form submit tetiklemiyor;
-                          // Enter'ı doğrudan yakalayıp kaydediyoruz.
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            commitAddSubtask(t.id);
-                          }
+                        onChange={setSubtaskTitle}
+                        onSubmit={() => commitAddSubtask(t.id)}
+                        onCancel={() => {
+                          setSubtaskParent(null);
+                          setSubtaskTitle("");
                         }}
                         onBlur={() => commitAddSubtask(t.id)}
                         placeholder="Alt görev başlığı, Enter'a bas"
                         maxLength={200}
-                        enterKeyHint="done"
-                        // fontSize 16: iOS Safari 16px altındaki input'lara odaklanınca sayfayı
-                        // otomatik yakınlaştırıyordu (alt görev eklerken zoom problemi).
-                        style={{ width: "100%", height: 32, fontSize: 16 }}
+                        minHeight={32}
                       />
                     </form>
                   ) : (
@@ -1072,26 +1410,20 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
 
       {onCreate &&
         (adding ? (
-          <form onSubmit={handleAdd} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <input
+          <form ref={addTaskFormRef} onSubmit={handleAdd} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <AutoGrowTextarea
               autoFocus
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  setAdding(false);
-                  setTitle("");
-                }
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  commitAddTask();
-                }
+              onChange={setTitle}
+              onSubmit={commitAddTask}
+              onCancel={() => {
+                setAdding(false);
+                setTitle("");
               }}
               onBlur={commitAddTask}
               placeholder="Görev başlığı yaz, Enter'a bas"
               maxLength={200}
-              enterKeyHint="done"
-              style={{ width: "100%", height: 34, fontSize: 16 }}
+              minHeight={34}
             />
           </form>
         ) : (

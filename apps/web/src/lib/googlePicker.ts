@@ -62,10 +62,20 @@ export interface PickedDriveFile {
  * pencereyi kapatırsa hiçbir şey olmaz.
  */
 export async function openGooglePicker(onPicked: (file: PickedDriveFile) => void): Promise<void> {
+  // Picker tarayıcıda çalışır ve doğrudan Google'a gider; backend'deki
+  // GOOGLE_CLIENT_ID/SECRET buraya yetmez, kendi tarayıcı anahtarını ister.
   const apiKey = import.meta.env.VITE_GOOGLE_PICKER_API_KEY as string | undefined;
   if (!apiKey) {
-    throw new Error("Google Picker yapılandırılmamış (VITE_GOOGLE_PICKER_API_KEY eksik).");
+    throw new Error(
+      "Drive'dan seçme özelliği yapılandırılmamış: apps/web/.env dosyasına " +
+        "VITE_GOOGLE_PICKER_API_KEY eklenmeli (bkz. docs/google-drive-kurulum.md). " +
+        "Dosya yükleme bundan etkilenmez."
+    );
   }
+  // Cloud proje numarası. `drive.file` scope'unda Picker'dan seçilen dosyaya
+  // kalıcı erişim bu numara üzerinden veriliyor — eksikse kullanıcı dosyayı
+  // seçebiliyor ama sonraki istekler 404 dönüyor.
+  const appId = import.meta.env.VITE_GOOGLE_PICKER_APP_ID as string | undefined;
 
   const [{ accessToken }] = await Promise.all([driveApi.pickerToken(), loadGapiScript()]);
   await loadPickerModule();
@@ -75,10 +85,13 @@ export async function openGooglePicker(onPicked: (file: PickedDriveFile) => void
     .setIncludeFolders(true)
     .setSelectFolderEnabled(false);
 
-  const picker = new google.picker.PickerBuilder()
+  const builder = new google.picker.PickerBuilder()
     .addView(view)
     .setOAuthToken(accessToken)
-    .setDeveloperKey(apiKey)
+    .setDeveloperKey(apiKey);
+  if (appId) builder.setAppId(appId);
+
+  const picker = builder
     .setCallback((data: any) => {
       if (data.action !== google.picker.Action.PICKED) return;
       const doc = data.docs?.[0];

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { coverBackground } from "../lib/covers";
 import type { Operation } from "@projelio/shared";
 import { colors } from "../theme/colors";
+import CardDescription from "./CardDescription";
 import OperationHealthBadge from "./OperationHealthBadge";
 
 interface Props {
@@ -41,9 +42,7 @@ export default function OperationCard({ operation }: Props) {
         </div>
 
         {operation.description && (
-          <p style={{ color: c.textSecondary, fontSize: 15, margin: "0 0 12px", lineHeight: 1.5 }}>
-            {operation.description}
-          </p>
+          <CardDescription text={operation.description} style={{ margin: "0 0 12px" }} />
         )}
 
         {/* Projedeki ilerleme çubuğunun yerini uyum oranı alır: rutinin sonu

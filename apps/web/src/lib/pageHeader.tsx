@@ -13,6 +13,14 @@ export interface PageHeaderRegistration {
    */
   coverRef: RefObject<HTMLElement>;
   /**
+   * Sayfanın "← Projeler / İşler / Departmanlar…" geri bağlantısı. Sayfanın kendi
+   * akışındaki kopyası kaydırınca yukarı kaybolduğu için sabit şeritte de
+   * gösterilir; aksi halde aşağı inildiğinde geri dönmenin tek yolu tarayıcı
+   * tuşu/sidebar kalıyordu. ReactNode yerine düz veri: her render'da yeni bir
+   * düğüm üretilip kaydın gereksiz yere değişmesini önlüyor.
+   */
+  back?: PageHeaderBack;
+  /**
    * Sabit başlık satırında gösterilecek isteğe bağlı ek kontroller (bkz.
    * OutputsPanel: Görevler/Çıktılar başlığın hemen yanında solda, Sırala/Seç
    * kişi kartının yanında sağda). Sayfanın kendi içeriğinde ayrıca da
@@ -30,6 +38,20 @@ export interface PageHeaderRegistration {
    * kendisi (üst bileşen) — ikisi aynı state'i paylaşırsa biri diğerini silerdi.
    */
   tabs?: PageHeaderTabs;
+}
+
+export interface PageHeaderBack {
+  /** react-router hedefi (ör. `/jobs/abc?tab=programs`). */
+  to: string;
+  /** Okun yanındaki metin (ör. "Projeler"). */
+  label: string;
+  /**
+   * Sayfanın akışındaki gerçek geri bağlantısının DOM öğesi. Şeritteki kopya
+   * ancak bu bağlantı yukarı kayıp gözden kaybolduktan sonra belirir; aksi halde
+   * ikisi bir süre aynı anda ekranda duruyor ve iki "← Projeler" görünüyordu
+   * (aynı sorun sekmelerde ve araç çubuğunda da yaşanmıştı, bkz. sourceRef).
+   */
+  sourceRef?: RefObject<HTMLElement>;
 }
 
 export interface PageHeaderTabs {
@@ -100,10 +122,16 @@ export function usePageHeaderState() {
  * App bu kayda bakarak kaydırma sırasında opak bir üst şerit + başlık satırı
  * gösterir (bkz. App.tsx).
  */
-export function usePageHeader(title: string | undefined, coverRef: RefObject<HTMLElement>, deps: DependencyList) {
+export function usePageHeader(
+  title: string | undefined,
+  coverRef: RefObject<HTMLElement>,
+  deps: DependencyList,
+  /** Şeritte gösterilecek geri bağlantısı (bkz. PageHeaderBack). */
+  back?: PageHeaderBack
+) {
   const { setRegistration } = useContext(PageHeaderContext);
   useEffect(() => {
-    setRegistration(title ? { title, coverRef } : null);
+    setRegistration(title ? { title, coverRef, back } : null);
     return () => setRegistration(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);

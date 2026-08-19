@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { MembersService } from "./members.service";
 
@@ -20,6 +20,13 @@ export class MembersController {
   @Post("projects/:projectId/members")
   addMember(@Param("projectId") projectId: string, @Body() body: { userId: string; role?: any; title?: string }, @Req() req: any) {
     return this.membersService.addMember(projectId, body.userId, body.role, body.title, req.user.userId);
+  }
+
+  // Projeden ayrılma. Yöneticinin üye çıkarmasından ayrı: yetki kuralı
+  // "yönetici olmak" değil "o üyelik benim olmak".
+  @Delete("projects/:projectId/members/me")
+  leaveProject(@Param("projectId") projectId: string, @Req() req: any) {
+    return this.membersService.leaveProject(projectId, req.user.userId);
   }
 
   @Patch("members/:id/budget-visibility")

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PersonalBoardItem, PersonalBoardSource, PersonalTodo, Task, TaskPriority, TaskStatus, User } from "@projelio/shared";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import TaskColumn, { TaskColumnHandle } from "../components/TaskColumn";
@@ -12,6 +13,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { useLatestRef, useRefreshOnUndo, useUndo } from "../lib/undo";
 import { useProjectFabAction } from "../lib/projectFab";
 import { useTaskSelection } from "../lib/useTaskSelection";
+import { usePageHeader, usePageHeaderActions, usePageHeaderTabs } from "../lib/pageHeader";
 import TaskSortMenu from "../components/TaskSortMenu";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 
@@ -21,11 +23,16 @@ const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
 
 type Filter = "all" | PersonalBoardSource;
 
-// Sıra dardan genişe: önce kullanıcının kendi listesi, sonra kendisine
-// atananlar, en sonda ikisinin birleşimi.
+// Sıra dardan genişe: önce kullanıcının kendi listesi, sonra iş görevleri, en
+// sonda ikisinin birleşimi.
+//
+// "Bana atananlar" yerine "İş görevlerim": bu kol artık yalnızca başkasının
+// atadığı görevleri değil, kullanıcının kendi açtığı (atama yapılmadığında
+// kendisine atanan, bkz. tasks.service createForProject) proje görevlerini de
+// içeriyor — eski etiket yanıltıcı kalıyordu.
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "personal", label: "Kişisel" },
-  { value: "assigned", label: "Bana atananlar" },
+  { value: "assigned", label: "İş görevlerim" },
   { value: "all", label: "Tümü" },
 ];
 
@@ -51,6 +58,7 @@ const DEFAULT_FILTER: Filter = "personal";
  */
 export default function TasksOverview() {
   const c = colors.light;
+  const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const [items, setItems] = useState<PersonalBoardItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +81,12 @@ export default function TasksOverview() {
   const [archiving, setArchiving] = useState(false);
   const [confirmingBulkAction, setConfirmingBulkAction] = useState<"archive" | "delete" | null>(null);
   const [movingOpen, setMovingOpen] = useState(false);
+  // Sabit şeridin ölçtüğü öğeler (bkz. lib/pageHeader): sayfanın başlık satırı
+  // "kapak" yerine geçer, filtreler ve araç çubuğu ise kendi kopyaları şeritte
+  // belirmeden önce gerçekten ekrandan çıkmış olmalı.
+  const headerRef = useRef<HTMLElement>(null);
+  const filtersRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {
     api
@@ -134,6 +148,8 @@ export default function TasksOverview() {
         priority: i.priority,
         // Kişisel görevin tarihi olmayabilir; TaskColumn boş tarihi tolere eder.
         deadline: i.effectiveDueDate ?? "",
+        // Bitiş saati (bkz. 057/058): kart tarihin yanında saati de gösterir.
+        deadlineTime: i.deadlineTime,
         createdAt: i.createdAt,
         completedAt: i.completedAt,
         budgetStatus: "pending" as const,
@@ -141,6 +157,27 @@ export default function TasksOverview() {
         departmentId: i.departmentId,
       })),
     [sortedItems]
+  );
+
+  /**
+   * Karta çift tıklandığında görevin yaşadığı sayfaya götürür ve orada kartı
+   * parlatır (bkz. ProjectDetail — location.state.highlightTaskId).
+   *
+   * Kişisel görevlerin gidilecek bir sayfası yok; onlarda hiçbir şey yapmaz.
+   */
+  const openTaskSource = useCallback(
+    (task: Task) => {
+      const item = items.find((i) => i.itemId === task.id);
+      if (!item || item.source === "personal") return;
+      if (item.projectId) {
+        navigate(`/projects/${item.projectId}`, { state: { highlightTaskId: task.id } });
+        return;
+      }
+      if (item.departmentId) {
+        navigate(`/departments/${item.departmentId}?tab=tasks`, { state: { highlightTaskId: task.id } });
+      }
+    },
+    [items, navigate]
   );
 
   /** Karta hangi işten geldiğini yazan alt satır. Kişisel kartlarda boş. */
@@ -469,60 +506,92 @@ export default function TasksOverview() {
       });
   }, []);
 
+  const filterButtons = (
+    <div role="group" aria-label="Kaynak filtresi" style={{ display: "flex", gap: 4 }}>
+      {FILTERS.map((f) => (
+        <button
+          key={f.value}
+          onClick={() => {
+            selection.clear();
+            setFilter(f.value);
+          }}
+          aria-pressed={filter === f.value}
+          style={{
+            padding: "8px 16px",
+            fontSize: 15,
+            borderRadius: 8,
+            whiteSpace: "nowrap",
+            border: `1px solid ${filter === f.value ? c.primary : c.border}`,
+            background: filter === f.value ? `${c.primary}12` : c.surface,
+            color: filter === f.value ? c.textPrimary : c.textSecondary,
+          }}
+        >
+          {f.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const sortAndSelect = (
+    <>
+      <TaskSortMenu value={sort} onChange={setSort} />
+      <TaskSelectionBar
+        inline
+        selectionMode={selection.selectionMode}
+        selectedCount={selection.selectedIds.size}
+        busy={archiving}
+        onEnable={selection.toggleSelectionMode}
+        onCancel={selection.clear}
+        onMove={movableSelectedIds.length > 0 ? () => setMovingOpen(true) : undefined}
+        onArchive={() => setConfirmingBulkAction("archive")}
+        onDelete={() => setConfirmingBulkAction("delete")}
+      />
+    </>
+  );
+
+  // Kaydırınca tepede beliren sabit şerit (bkz. App.tsx CoverStickyHeader).
+  // Kapaklı detay sayfalarındaki desenin aynısı: burada "kapak" rolünü sayfanın
+  // kendi başlık satırı üstleniyor — o satır yukarı kayınca filtreler ve
+  // Sırala/Seç şeritte yeniden beliriyor, aksi halde uzun bir panoda aşağı
+  // inildiğinde bu kontrollere hiç erişilemiyordu.
+  usePageHeader("Yapılacaklar", headerRef, []);
+  usePageHeaderTabs(filterButtons, [filter, selection.selectionMode], filtersRef);
+  usePageHeaderActions(
+    { right: sortAndSelect, sourceRef: toolbarRef },
+    [sort, selection.selectionMode, selection.selectedIds.size, archiving, movableSelectedIds.length]
+  );
+
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: "28px 28px 40px" }}>
-      <header style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
+      <header
+        ref={headerRef}
+        style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}
+      >
         <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Yapılacaklar</h1>
 
-        <div role="group" aria-label="Kaynak filtresi" style={{ display: "flex", gap: 4, marginLeft: 8 }}>
-          {FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => {
-                selection.clear();
-                setFilter(f.value);
-              }}
-              aria-pressed={filter === f.value}
-              style={{
-                padding: "8px 16px",
-                fontSize: 15,
-                borderRadius: 8,
-                border: `1px solid ${filter === f.value ? c.primary : c.border}`,
-                background: filter === f.value ? `${c.primary}12` : c.surface,
-                color: filter === f.value ? c.textPrimary : c.textSecondary,
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div ref={filtersRef} style={{ marginLeft: 8 }}>
+          {filterButtons}
         </div>
 
-        {/* Sıralama ölçütü. Filtrenin hemen yanında ama ayrı bir kontrol:
-            filtre neyin görüneceğini, bu ise hangi düzende görüneceğini seçer. */}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          <TaskSortMenu value={sort} onChange={setSort} />
+        {/* Sıralama ölçütü + toplu seçim. Filtrenin hemen yanında ama ayrı
+            kontroller: filtre neyin görüneceğini, bunlar hangi düzende
+            görüneceğini ve neye toplu işlem yapılacağını seçer. */}
+        <div ref={toolbarRef} style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          {sortAndSelect}
         </div>
-
-        <TaskSelectionBar
-          inline
-          selectionMode={selection.selectionMode}
-          selectedCount={selection.selectedIds.size}
-          busy={archiving}
-          onEnable={selection.toggleSelectionMode}
-          onCancel={selection.clear}
-          onMove={movableSelectedIds.length > 0 ? () => setMovingOpen(true) : undefined}
-          onArchive={() => setConfirmingBulkAction("archive")}
-          onDelete={() => setConfirmingBulkAction("delete")}
-        />
       </header>
 
-      <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 18px" }}>
-        {sort !== "manual"
-          ? "Kartlar seçtiğin ölçüte göre sıralı; kendi sıranı düzenlemek için “Kendi sıram”a dön."
-          : filter === "assigned"
-          ? "Sana atanmış görevler. Buradaki sıralama yalnızca sana görünür."
-          : "Kişisel görevlerini senden başkası görmez."}
-      </p>
+      {/* Açıklama satırı seçim modunda gizlenir: kullanıcı o an kart işaretlemeye
+          odaklanmış, satır yalnızca eylem çubuğunu aşağı itiyor. */}
+      {!selection.selectionMode && (
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 18px" }}>
+          {sort !== "manual"
+            ? "Kartlar seçtiğin ölçüte göre sıralı; kendi sıranı düzenlemek için “Kendi sıram”a dön."
+            : filter === "assigned"
+            ? "Sana atanmış görevler. Buradaki sıralama yalnızca sana görünür."
+            : "Kişisel görevlerini senden başkası görmez."}
+        </p>
+      )}
 
       {loading ? (
         <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
@@ -567,6 +636,7 @@ export default function TasksOverview() {
                 selectionMode={selection.selectionMode}
                 selectedIds={selection.selectedIds}
                 onToggleSelect={selection.toggleSelect}
+                onOpenSource={openTaskSource}
               />
             </div>
           ))}

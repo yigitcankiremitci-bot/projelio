@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
+import type { RefObject } from "react";
+import { Routes, Route, Link, useLocation, useParams, Navigate } from "react-router-dom";
 import type { User } from "@projelio/shared";
 import { api } from "./api/client";
 import OnboardingWizard from "./components/OnboardingWizard";
@@ -52,6 +53,72 @@ const HEADER_HEIGHT = 76;
 // geçerken karışıyordu); alt satır sayfanın adını taşır.
 const STICKY_TOP_ROW = 68;
 const STICKY_TITLE_ROW = 44;
+// Şeridin satırları hep aynı eşikte açılır: bir kaynak (kapak / sayfanın sekme
+// çubuğu / araç çubuğu) bu çizginin üstüne kayınca kendi satırı belirir. Eşiğin
+// sabit olması önemli — şeridin o anki yüksekliğine bağlansaydı satır açılınca
+// eşik de büyür, kaynak yeniden "görünür" sayılır ve satır açılıp kapanıp
+// titrerdi.
+const STICKY_REVEAL = STICKY_TOP_ROW + STICKY_TITLE_ROW;
+
+/**
+ * Proje detayını proje id'sine göre `key`ler.
+ *
+ * Aynı rotada yalnızca :id değişince (sidebar'dan başka bir projeye tıklamak)
+ * React bileşeni yeniden KULLANIR: state olduğu gibi kalır, efektler yeniden
+ * çalışmaz. Sonuç olarak Bütçe sekmesindeyken açılan yeni proje de Bütçe'de
+ * açılıyor, önceki projenin görev listesi bir an için yeni projenin başlığıyla
+ * görünüyordu. `key` değişince React eskisini söküp yenisini sıfırdan kurar —
+ * "yeni projeye geçtim" ile "sayfayı yeniden açtım" aynı şey olur.
+ */
+function KeyedProjectDetail() {
+  const { id } = useParams();
+  return <ProjectDetail key={id} />;
+}
+
+/** Sabit şeritteki kimlik göstergesi: fotoğraf + (yer varsa) ad. */
+function MiniProfile({ user, showName }: { user: User; showName: boolean }) {
+  const c = colors.light;
+  return (
+    <span
+      title={user.fullName}
+      style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, maxWidth: "45%" }}
+    >
+      <span
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: "50%",
+          overflow: "hidden",
+          flexShrink: 0,
+          background: c.background,
+          border: `1px solid ${c.border}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {user.avatarUrl ? (
+          <img src={user.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <IconUser size={14} color={c.textSecondary} />
+        )}
+      </span>
+      {showName && (
+        <span
+          style={{
+            fontSize: 14,
+            color: c.textSecondary,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {user.fullName}
+        </span>
+      )}
+    </span>
+  );
+}
 
 /**
  * Kapak sayfalarında aşağı kaydırınca beliren sabit başlık.
@@ -79,40 +146,58 @@ function CoverStickyHeader({
 }) {
   const c = colors.light;
   const registration = usePageHeaderState();
-  const [passed, setPassed] = useState(false);
+  // Şerit tek parça halinde değil, üç aşamada açılır (aksi halde en geç kaynak
+  // — genelde araç çubuğu — ekrandan çıkana kadar hiçbir şey belirmiyor, o arada
+  // sayfanın kendi sekmeleri de şeridin altında kalıp kayboluyordu):
+  //  1. kapak logonun altına kayınca  -> sayfa adı + kişi kartı satırı
+  //  2. sayfanın sekme çubuğu kayınca -> sekmeler
+  //  3. araç çubuğu kayınca           -> Görevler/Çıktılar + Sırala/Seç
+  //  4. hepsi açıldıktan sonra        -> geri bağlantısı (her zaman en altta,
+  //     her zaman en son: yukarıdaki satırların arasına girmesin)
+  const [stage, setStage] = useState({ title: false, tabs: false, actions: false, back: false });
   const isDesktop = useIsDesktop();
 
   const coverRef = registration?.coverRef;
+  const tabsSourceRef = registration?.tabs?.sourceRef;
+  const actionsSourceRef = registration?.actions?.sourceRef;
+  const backSourceRef = registration?.back?.sourceRef;
 
   useEffect(() => {
     if (!visibleOn || !coverRef) {
-      setPassed(false);
+      setStage({ title: false, tabs: false, actions: false, back: false });
       return;
     }
     // Kapak yükseklikleri sayfadan sayfaya değiştiği (ve projede kapak yoksa
-    // tamamen değişken olduğu) için sabit bir kaydırma eşiği yerine kapağın
-    // kendisi ölçülüyor.
-    //
-    // Sayfanın kendi araç çubuğu varsa (bkz. usePageHeaderActions sourceRef —
-    // ör. OutputsPanel'in Görevler/Çıktılar + Sırala/Seç satırı) kapak geçilir
-    // geçilmez değil, o satır da ekrandan çıkana kadar beklenir. Aksi halde
-    // araç çubuğu hâlâ görünürken sabit başlıktaki küçültülmüş kopyası da
-    // belirip aynı düğmeler bir an için iki kez görünüyordu.
+    // tamamen değişken olduğu) için sabit bir kaydırma eşiği yerine elemanların
+    // kendisi ölçülüyor. Kaynağı olmayan bir bölüm (sourceRef verilmemişse)
+    // beklenecek bir şey olmadığı için başlıkla birlikte açılır.
+    const scrolledPast = (ref?: RefObject<HTMLElement>) => {
+      const el = ref?.current;
+      if (!el) return true;
+      return el.getBoundingClientRect().bottom <= STICKY_REVEAL;
+    };
     const check = () => {
       const el = coverRef.current;
       if (!el) return;
-      // Şerit, ekranda hâlâ görünen HİÇBİR kaynağın altında kalmamalı: kapak,
-      // sayfanın araç çubuğu ve sayfanın kendi sekme çubuğu. Sekme çubuğu
-      // hesaba katılmadığında kapak geçilir geçilmez şerit beliriyor, ama
-      // sayfanın kendi sekmeleri hâlâ ekranda olduğu için her düğme bir alt
-      // satırda ikinci kez görünüyordu.
-      const sources = [
-        el,
-        registration?.actions?.sourceRef?.current,
-        registration?.tabs?.sourceRef?.current,
-      ].filter(Boolean) as HTMLElement[];
-      const bottom = Math.max(...sources.map((node) => node.getBoundingClientRect().bottom));
-      setPassed(bottom <= STICKY_TOP_ROW + STICKY_TITLE_ROW);
+      const title = el.getBoundingClientRect().bottom <= STICKY_REVEAL;
+      const tabs = title && scrolledPast(tabsSourceRef);
+      const actions = title && scrolledPast(actionsSourceRef);
+      const next = {
+        title,
+        tabs,
+        actions,
+        // Geri satırı en son açılır: sayfanın kendi bağlantısı kaybolmuş OLMALI
+        // (yoksa iki tane görünüyor) ve üstündeki tüm satırlar açılmış olmalı.
+        back: title && tabs && actions && scrolledPast(backSourceRef),
+      };
+      setStage((prev) =>
+        prev.title === next.title &&
+        prev.tabs === next.tabs &&
+        prev.actions === next.actions &&
+        prev.back === next.back
+          ? prev
+          : next
+      );
     };
     check();
     window.addEventListener("scroll", check, { passive: true });
@@ -121,9 +206,18 @@ function CoverStickyHeader({
       window.removeEventListener("scroll", check);
       window.removeEventListener("resize", check);
     };
-  }, [visibleOn, coverRef, registration?.actions?.sourceRef, registration?.tabs?.sourceRef]);
+  }, [visibleOn, coverRef, actionsSourceRef, tabsSourceRef, backSourceRef]);
 
   if (!visibleOn || !registration) return null;
+
+  const passed = stage.title;
+  const showTabs = stage.tabs && Boolean(registration.tabs);
+  // Mobilde de gösteriliyor: dar ekranda bu kontroller eskiden hiç kopyalanmıyor,
+  // sayfadaki asılları da şeridin altında kaldığı için kaydırınca tamamen
+  // erişilemez oluyordu. Masaüstünde başlık satırının içinde, mobilde kendi
+  // satırlarında dururlar.
+  const showActions = stage.actions && Boolean(registration.actions);
+  const showBack = stage.back && Boolean(registration.back);
 
   return (
     <div
@@ -134,8 +228,10 @@ function CoverStickyHeader({
         left,
         right: 0,
         // Logo ve bildirim çanı (zIndex 40) bu şeridin ÜSTÜNDE kalır; içerik
-        // (zIndex yok) altından geçer.
-        zIndex: 34,
+        // (zIndex yok) altından geçer. 36: kapağı olmayan sayfalardaki opak üst
+        // maskenin (zIndex 35) da üstünde kalmalı, yoksa şerit onun arkasında
+        // kaybolur (bkz. App.tsx isCoverPage maskesi).
+        zIndex: 36,
         background: c.surface,
         borderBottom: `1px solid ${c.border}`,
         boxShadow: "0 1px 6px rgba(26,31,41,0.06)",
@@ -146,130 +242,169 @@ function CoverStickyHeader({
         pointerEvents: passed ? "auto" : "none",
       }}
     >
-      {/* Üst satır: normalde yalnızca zemin (logo/çan zaten ayrı position:fixed
-          öğeler). Sayfa kendi sekme çubuğunu kaydettiyse (bkz. usePageHeaderTabs
-          — ör. ProjectDetail) burada gösterilir; aksi halde boş kalır. Yalnızca
-          masaüstünde: dar ekranda sekmeler zaten sayfanın kendi akışında kalıyor. */}
+      {/* Üst satır: logo/çan bandına zemin (ikisi de ayrı position:fixed öğeler).
+          Ortası boş kalmasın diye:
+          - masaüstünde sayfanın sekme çubuğu yukarı kayınca (2. aşama) sekmeler,
+          - mobilde ise sayfa adı + kişi göstergesi buraya yerleşir; böylece dar
+            ekranda ayrı bir başlık satırı açıp şeridi bir kat daha uzatmıyoruz. */}
       <div
         style={{
           height: STICKY_TOP_ROW,
           display: "flex",
           alignItems: "center",
+          gap: 8,
+          // Solda sidebar oku (14–54) + logo (62–110), sağda bildirim çanı
+          // (14–58) + tur düğmesi (62–106) sabit duruyor; ortadaki boşluk bu.
+          paddingLeft: sidebarOpen ? 28 : 118,
+          paddingRight: 112,
         }}
       >
-        {isDesktop && registration.tabs && (
+        {isDesktop && showTabs && (
           <div
+            className="sticky-row-in"
             style={{
               flex: 1,
               minWidth: 0,
-              padding: `0 28px 0 ${sidebarOpen ? 28 : 170}px`,
-              // Bildirim çanı (zIndex 40) sağda sabit duruyor; sekmeler onun
-              // altına girmesin diye sağda da yer bırakılır.
-              paddingRight: 70,
+              // Masaüstünde sidebar açıkken sol üstte yüzen logo/ok yok.
+              marginLeft: sidebarOpen ? 0 : 52,
             }}
           >
-            {registration.tabs.node}
+            {registration.tabs?.node}
           </div>
         )}
-      </div>
-      {/* Alt satır: solda sayfanın adı, ardından (varsa) sayfaya özgü ek kontroller
-          (bkz. usePageHeaderActions — ör. OutputsPanel'in Görevler/Çıktılar +
-          Sırala/Seç kontrolleri), sağda kişi kartının küçültülmüş hali.
-          Kapağın üstündeki büyük kişi kartı (bkz. ProfileCard) yukarı kayıp gözden
-          kaybolduğu için burada yalnızca kimlik göstergesi olarak fotoğraf + ad
-          kalıyor; satır yükselmesin diye unvan, açıklama ve düzenleme simgesi yok. */}
-      <div
-        style={{
-          height: STICKY_TITLE_ROW,
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "0 28px",
-          borderTop: `1px solid ${c.border}`,
-        }}
-      >
-        {(() => {
-          // Ek kontroller yalnızca masaüstünde gösterilir: dar ekranlarda bu satıra
-          // sığmıyorlar, mobilde kontroller sayfanın kendi (kaydırılabilen) akışında
-          // hâlâ erişilebilir durumda kalıyor.
-          const showActions = isDesktop && Boolean(registration.actions);
-          return (
-            <>
-              <span
-                title={registration.title}
-                style={{
-                  flex: showActions ? "0 1 auto" : 1,
-                  minWidth: 0,
-                  maxWidth: showActions ? 200 : undefined,
-                  fontSize: 16,
-                  fontWeight: 500,
-                  color: c.textPrimary,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {registration.title}
-              </span>
 
-              {showActions && registration.actions?.left && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                  {registration.actions.left}
-                </div>
-              )}
-
-              {showActions && <div style={{ flex: 1 }} />}
-
-              {showActions && registration.actions?.right && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                  {registration.actions.right}
-                </div>
-              )}
-            </>
-          );
-        })()}
-
-        {user && (
-          <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, maxWidth: "45%" }}>
+        {!isDesktop && (
+          <>
             <span
+              title={registration.title}
               style={{
-                width: 26,
-                height: 26,
-                borderRadius: "50%",
-                overflow: "hidden",
-                flexShrink: 0,
-                background: c.background,
-                border: `1px solid ${c.border}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {user.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt=""
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <IconUser size={14} color={c.textSecondary} />
-              )}
-            </span>
-            <span
-              title={user.fullName}
-              style={{
-                fontSize: 14,
-                color: c.textSecondary,
+                flex: 1,
+                minWidth: 0,
+                fontSize: 15,
+                fontWeight: 500,
+                color: c.textPrimary,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
               }}
             >
-              {user.fullName}
+              {registration.title}
             </span>
-          </span>
+            {/* Dar boşlukta yalnızca fotoğraf: ad da yazılınca proje adına
+                okunabilir yer kalmıyordu. */}
+            {user && <MiniProfile user={user} showName={false} />}
+          </>
         )}
       </div>
+      {/* Masaüstü alt satırı: solda sayfanın adı, ardından (varsa) sayfaya özgü ek
+          kontroller (bkz. usePageHeaderActions — ör. OutputsPanel'in Görevler/Çıktılar
+          + Sırala/Seç), sağda kişi kartının küçültülmüş hali. Kapağın üstündeki büyük
+          kişi kartı (bkz. ProfileCard) yukarı kayıp gözden kaybolduğu için burada
+          yalnızca kimlik göstergesi olarak fotoğraf + ad kalıyor.
+          Mobilde bu satır YOK: proje adı ve fotoğraf yukarıda logo ile çanın
+          arasındaki boşluğa yerleşiyor, şerit bir kat kısalıyor. */}
+      {isDesktop && (
+        <div
+          style={{
+            height: STICKY_TITLE_ROW,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "0 28px",
+            borderTop: `1px solid ${c.border}`,
+          }}
+        >
+          {/* Geri bağlantısı en son (4. aşamada) ve şeridin en alt satırında:
+              sayfanın kendi "← Projeler" bağlantısı yukarı kayıp kaybolduktan
+              sonra belirir, yoksa ikisi bir süre birlikte görünüyordu. */}
+          {showBack && registration.back && (
+            <Link
+              className="sticky-row-in"
+              to={registration.back.to}
+              style={{ fontSize: 14, color: c.textSecondary, whiteSpace: "nowrap", flexShrink: 0 }}
+            >
+              ← {registration.back.label}
+            </Link>
+          )}
+
+          <span
+            title={registration.title}
+            style={{
+              flex: showActions ? "0 1 auto" : 1,
+              minWidth: 0,
+              maxWidth: showActions ? 200 : undefined,
+              fontSize: 16,
+              fontWeight: 500,
+              color: c.textPrimary,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {registration.title}
+          </span>
+
+          {showActions && registration.actions?.left && (
+            <div className="sticky-row-in" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              {registration.actions.left}
+            </div>
+          )}
+
+          {showActions && <div style={{ flex: 1 }} />}
+
+          {showActions && registration.actions?.right && (
+            <div className="sticky-row-in" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              {registration.actions.right}
+            </div>
+          )}
+
+          {user && <MiniProfile user={user} showName />}
+        </div>
+      )}
+
+      {/* Mobil: sekmeler kendi satırında — tek satır, yana kaydırmalı (bkz. TabBar
+          `scrollable`). Sarmalı grid hâli iki satır alıp ekranın üçte birini
+          yiyordu. 2. aşamada açılır. */}
+      {!isDesktop && showTabs && (
+        <div className="sticky-row-in" style={{ padding: "6px 14px 8px", borderTop: `1px solid ${c.border}` }}>
+          {registration.tabs?.node}
+        </div>
+      )}
+
+      {/* Mobil: Görevler/Çıktılar + Sırala/Seç satırı. 3. aşamada açılır. */}
+      {!isDesktop && showActions && (
+        <div
+          className="sticky-row-in"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px",
+            borderTop: `1px solid ${c.border}`,
+            // overflowX: "auto" DEĞİL. Yatay taşmayı kaydırmalı yapmak, CSS
+            // gereği dikey taşmayı da kırpıyordu: Sırala düğmesinin satırın
+            // ALTINA açılan menüsü (bkz. TaskSortMenu, position:absolute)
+            // görünmez oluyor, düğme tıklanıyor ama hiçbir şey olmuyordu.
+            flexWrap: "wrap",
+          }}
+        >
+          {registration.actions?.left}
+          <div style={{ flex: 1 }} />
+          {registration.actions?.right}
+        </div>
+      )}
+
+      {/* Geri bağlantısı DAİMA şeridin en alt satırı: sekmelerle araç çubuğunun
+          arasına girdiğinde iki kontrol grubunu birbirinden koparıyordu. Sayfanın
+          kendi "← Projeler" bağlantısı yukarı kayıp kaybolduğu için burada
+          tekrarlanıyor. */}
+      {!isDesktop && showBack && registration.back && (
+        <div className="sticky-row-in" style={{ padding: "6px 14px 8px", borderTop: `1px solid ${c.border}` }}>
+          <Link to={registration.back.to} style={{ fontSize: 13, color: c.textSecondary }}>
+            ← {registration.back.label}
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
@@ -352,6 +487,13 @@ export default function App() {
     location.pathname
   );
 
+  // Kapağı olmayan ama sabit şeride ihtiyaç duyan sayfalar: Yapılacaklar panosu
+  // uzun, sekmeler ve Sırala/Seç ise yalnızca en tepedeki başlık satırında —
+  // aşağı inince erişilemez oluyorlardı. Orada "kapak" rolünü sayfanın kendi
+  // başlık satırı üstlenir (bkz. TasksOverview usePageHeader).
+  const hasStickyHeader =
+    isCoverPage || location.pathname === "/tasks" || location.pathname === "/";
+
   const c = colors.light;
 
   return (
@@ -395,7 +537,7 @@ export default function App() {
             Logo/çan ondan sonra render ediliyor ki (ve daha yüksek zIndex ile)
             şeridin üstünde kalsınlar. */}
         <CoverStickyHeader
-          visibleOn={isCoverPage}
+          visibleOn={hasStickyHeader}
           left={isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0}
           sidebarOpen={sidebarOpen}
           user={me}
@@ -455,7 +597,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/jobs/:id" element={<JobDetail />} />
-              <Route path="/projects/:id" element={<ProjectDetail />} />
+              <Route path="/projects/:id" element={<KeyedProjectDetail />} />
               <Route path="/operations/:id" element={<OperationDetail />} />
               <Route path="/organizations" element={<Organizations />} />
               <Route path="/organizations/:id" element={<OrganizationDetail />} />

@@ -30,9 +30,12 @@ export class DepartmentsController {
     return this.departmentsService.findAllForUser(req.user.userId);
   }
 
+  // Yalnızca isteyen kullanıcının görebildiği departmanlar döner: organizasyon
+  // sahibi/üyesi hepsini, kadro üyesi (çalışan/taşeron) yalnızca kendi
+  // departmanlarını (bkz. DepartmentsService.findByOrganization).
   @Get("organizations/:organizationId/departments")
-  findByOrganization(@Param("organizationId") organizationId: string) {
-    return this.departmentsService.findByOrganization(organizationId);
+  findByOrganization(@Param("organizationId") organizationId: string, @Req() req: any) {
+    return this.departmentsService.findByOrganization(organizationId, req.user.userId);
   }
 
   @Post("organizations/:organizationId/departments")
@@ -51,8 +54,8 @@ export class DepartmentsController {
   }
 
   @Get("departments/:id")
-  findOne(@Param("id") id: string) {
-    return this.departmentsService.findOne(id);
+  findOne(@Param("id") id: string, @Req() req: any) {
+    return this.departmentsService.findOne(id, req.user.userId);
   }
 
   @Patch("departments/:id")

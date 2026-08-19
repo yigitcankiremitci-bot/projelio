@@ -4,7 +4,9 @@ import type { Project } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { TasksService } from "../tasks/tasks.service";
 import { OutputsService } from "../outputs/outputs.service";
+import { AccessService } from "../../common/access/access.service";
 import { applyOrder } from "../../common/reorder.util";
+import { detectImageUpload } from "../../common/upload-image.util";
 
 const COVER_BUCKET = "project-covers";
 
@@ -31,7 +33,8 @@ export class ProjectsService {
   constructor(
     private supabase: SupabaseService,
     private tasksService: TasksService,
-    private outputsService: OutputsService
+    private outputsService: OutputsService,
+    private access: AccessService
   ) {}
 
   // Kullanıcının sahibi olduğu projeler + ekibine (üye/taşeron fark etmez, onaylanmış
@@ -86,21 +89,12 @@ export class ProjectsService {
     const projects = (data ?? []).map(mapProject);
     if (!requestingUserId) return projects;
 
-    // Görünürlük kısıtı: iş sahibi ve işe alınmış iş ekibi üyeleri tüm projeleri görür;
-    // bunun dışındakiler (ör. tek bir proje görevine eklenen taşeron) yalnızca sahibi
-    // oldukları ya da ekibinde bulundukları projeleri görebilir.
-    const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", jobId).maybeSingle();
-    if (job?.owner_id === requestingUserId) return projects;
-
-    const { data: jobMember } = await this.supabase.client
-      .from("job_members")
-      .select("id")
-      .eq("job_id", jobId)
-      .eq("user_id", requestingUserId)
-      // Yalnızca daveti kabul etmiş iş ekibi üyeleri: bekleyen davet erişim vermez.
-      .eq("status", "approved")
-      .maybeSingle();
-    if (jobMember) return projects;
+    // Görünürlük kısıtı: iş sahibi ve işe alınmış iş ekibi üyeleri tüm projeleri
+    // görür — TAŞERON HARİÇ. Taşeron işe alınmış olsa bile yalnızca açıkça
+    // atandığı projeleri görür ("sadece ekli olduğu projeyi ve işi görmeli").
+    // Karar AccessService.seesAllProjectsOfJob'da, saf kuralı
+    // common/access/subcontractor.ts içinde.
+    if (await this.access.seesAllProjectsOfJob(jobId, requestingUserId)) return projects;
 
     const { data: memberships } = await this.supabase.client
       .from("project_members")
@@ -159,33 +153,11 @@ export class ProjectsService {
     return mapProject(data);
   }
 
-  // Proje detayını kimler görebilir: proje sahibi, bağlı olduğu işin sahibi ya da
-  // ekibi, veya projenin onaylı üyeleri (bkz. findByJob'daki görünürlük kuralıyla
-  // aynı desen). requestingUserId verilmezse (dahili çağrılar) kontrol atlanır.
-  private async assertCanView(projectId: string, projectRow: { owner_id: string; job_id?: string | null }, userId?: string): Promise<void> {
-    if (!userId) return;
-    if (projectRow.owner_id === userId) return;
-    if (projectRow.job_id) {
-      const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", projectRow.job_id).maybeSingle();
-      if (job?.owner_id === userId) return;
-      const { data: jobMember } = await this.supabase.client
-        .from("job_members")
-        .select("id")
-        .eq("job_id", projectRow.job_id)
-        .eq("user_id", userId)
-        .eq("status", "approved")
-        .maybeSingle();
-      if (jobMember) return;
-    }
-    const { data: membership } = await this.supabase.client
-      .from("project_members")
-      .select("id")
-      .eq("project_id", projectId)
-      .eq("user_id", userId)
-      .eq("status", "approved")
-      .maybeSingle();
-    if (membership) return;
-    throw new ForbiddenException("Bu projeyi görüntüleme yetkiniz yok");
+  // Proje detayını kimler görebilir: proje sahibi, projenin onaylı üyeleri ve
+  // (taşeron olmayan) iş/organizasyon kademesi. Kural tek yerde:
+  // AccessService.canViewProject — findByJob'daki liste kuralıyla aynı kaynak.
+  private async assertCanView(projectId: string, _projectRow: unknown, userId?: string): Promise<void> {
+    await this.access.assertCanViewProject(projectId, userId);
   }
 
   async create(ownerId: string, data: Partial<Project>): Promise<Project> {
@@ -313,12 +285,14 @@ export class ProjectsService {
 
   async uploadCover(id: string, file: Express.Multer.File, requestingUserId?: string): Promise<Project> {
     await this.assertCanManage(id, requestingUserId);
-    const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
+    // Tur ve uzanti istemcinin sozune degil, dosyanin ilk baytlarindaki
+    // imzaya gore belirlenir (bkz. common/upload-image.util.ts).
+    const { contentType, ext } = detectImageUpload(file);
     const path = `${id}/${randomUUID()}.${ext}`;
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(COVER_BUCKET)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);

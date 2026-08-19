@@ -30,6 +30,9 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
   const [description, setDescription] = useState(item.description ?? "");
   const [priority, setPriority] = useState<TaskPriority>(item.priority);
   const [dueDate, setDueDate] = useState(toDateInputValue(item.effectiveDueDate));
+  // Bitiş saati + hatırlatma (bkz. 059): iş görevlerindeki alanların birebir aynısı.
+  const [dueTime, setDueTime] = useState(item.deadlineTime ?? "");
+  const [reminderLead, setReminderLead] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -44,6 +47,9 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
         description: description.trim() ? description : null,
         priority,
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+        dueTime: dueTime || null,
+        // Saat yoksa hatırlatma da yok — sunucu ve veritabanı aynı kuralda.
+        reminderLeadMinutes: dueTime && reminderLead !== "" ? Number(reminderLead) : null,
       });
       onChanged();
     } catch {
@@ -126,6 +132,37 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 160px" }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Tarih</label>
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: "100%" }} />
+          </div>
+        </div>
+
+        {/* Saat opsiyonel; girilince hatırlatma seçeneği açılır. */}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 140px" }}>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş saati (opsiyonel)</label>
+            <input
+              type="time"
+              value={dueTime}
+              onChange={(e) => {
+                setDueTime(e.target.value);
+                if (!e.target.value) setReminderLead("");
+              }}
+              style={{ width: "100%" }}
+            />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 140px" }}>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>Hatırlat</label>
+            <select
+              value={reminderLead}
+              onChange={(e) => setReminderLead(e.target.value)}
+              disabled={!dueTime}
+              style={{ width: "100%" }}
+            >
+              <option value="">Hatırlatma yok</option>
+              <option value="0">Tam saatinde</option>
+              <option value="15">15 dakika önce</option>
+              <option value="60">1 saat önce</option>
+              <option value="1440">1 gün önce</option>
+            </select>
           </div>
         </div>
 

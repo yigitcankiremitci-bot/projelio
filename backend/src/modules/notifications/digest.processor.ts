@@ -43,10 +43,12 @@ export class DigestProcessor {
   }
 
   private async sendDigestForRange(from: Date, to: Date, type: "daily_digest" | "weekly_digest", title: string) {
+    // Atama ayrı tabloda (bkz. migration 053): özet, görevin TÜM atananlarına
+    // gitmeli. assigned_to üzerinden okunsaydı yalnızca birincil atanan haber
+    // alır, göreve sonradan eklenenler hiçbir özet görmezdi.
     const { data, error } = await this.supabase.client
       .from("tasks")
-      .select("id, title, assigned_to, deadline, status")
-      .not("assigned_to", "is", null)
+      .select("id, title, deadline, status, task_assignees(user_id)")
       .neq("status", "completed")
       .gte("deadline", from.toISOString())
       .lt("deadline", to.toISOString());
@@ -59,9 +61,11 @@ export class DigestProcessor {
 
     const tasksByUser = new Map<string, string[]>();
     for (const task of data) {
-      const list = tasksByUser.get(task.assigned_to) ?? [];
-      list.push(task.title);
-      tasksByUser.set(task.assigned_to, list);
+      for (const assignee of (task as any).task_assignees ?? []) {
+        const list = tasksByUser.get(assignee.user_id) ?? [];
+        list.push(task.title);
+        tasksByUser.set(assignee.user_id, list);
+      }
     }
 
     await Promise.all(

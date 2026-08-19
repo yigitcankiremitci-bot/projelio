@@ -715,13 +715,23 @@ function BoardColumn({
     // ayarları SortableOptions olarak alıyor. Cast yalnızca tip katmanında —
     // seçenek nesnesi Sortable.create'e olduğu gibi geçiyor.
     ({
-      group: canDrag ? "module-board" : { name: "module-board", pull: false, put: false },
+      group: { name: "module-board", pull: canDrag, put: canDrag },
       // Sıra içi taşımanın bir anlamı yok (sıralama alan tanımından geliyor);
       // önemli olan kaydın HANGİ sütuna bırakıldığı.
       sort: false,
-      onAdd: (evt: { item: HTMLElement; to: HTMLElement }) => {
+      onAdd: (evt: { item: HTMLElement; to: HTMLElement; from: HTMLElement; oldIndex?: number }) => {
         const recordId = evt.item.dataset.id;
         const target = evt.to.dataset.column;
+
+        // KRİTİK: sortablejs kartı DOM'da fiziksel olarak taşıdı, ama React o
+        // düğümün hâlâ eski sütunun çocuğu olduğunu sanıyor. Durumu bu hâlde
+        // güncellersek React eski sütundan olmayan bir düğümü silmeye çalışıp
+        // "removeChild" hatasıyla patlıyor ve taşıma hiç gerçekleşmiyordu.
+        // Bu yüzden önce DOM eski hâline alınır, sonra taşımayı React yapar.
+        const from = evt.from;
+        const reference = from.children[evt.oldIndex ?? from.children.length] ?? null;
+        from.insertBefore(evt.item, reference);
+
         if (recordId && target !== undefined) onDrop(recordId, target);
       },
     } as unknown) as SortableOptions,

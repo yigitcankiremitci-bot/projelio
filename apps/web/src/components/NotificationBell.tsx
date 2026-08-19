@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
-import type { JobMember, NotificationPayload } from "@projelio/shared";
+import type { CreationRequest, JobMember, NotificationPayload } from "@projelio/shared";
 import { api, API_URL } from "../api/client";
 import { colors } from "../theme/colors";
 import { timeAgo } from "../lib/dates";
 import { tourAnchor } from "../lib/tour/types";
 import { fetchPendingJobInvites, onJobInvitesChanged, respondToJobInvite } from "../lib/jobInvites";
+import {
+  fetchPendingApprovals,
+  onCreationRequestsChanged,
+  respondToCreationRequest,
+} from "../lib/creationRequests";
 import { IconBell } from "./icons";
 
 export default function NotificationBell() {
@@ -18,12 +23,35 @@ export default function NotificationBell() {
   // Bekleyen iş davetleri bildirimlerden ayrı tutulur: bildirim okununca kaybolur,
   // davet ise yanıtlanana kadar durmalı. Rozet ikisinin toplamını gösterir.
   const [invites, setInvites] = useState<JobMember[]>([]);
+  // Karar vermem beklenen açma talepleri. Davetlerle aynı mantık: bildirim
+  // okununca kaybolur, talep ise yanıtlanana kadar durmalı.
+  const [approvals, setApprovals] = useState<CreationRequest[]>([]);
   const [answering, setAnswering] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
 
   const loadInvites = () => {
     fetchPendingJobInvites().then(setInvites);
+  };
+
+  const loadApprovals = () => {
+    fetchPendingApprovals().then(setApprovals);
+  };
+
+  // Onay/ret burada, listeden ayrılmadan verilir. Onaylandığı anda iş/proje
+  // doğar; olay yayını açık listeleri tazeler (bkz. lib/creationRequests.ts).
+  const answerApproval = async (request: CreationRequest, approve: boolean) => {
+    if (answering) return;
+    setAnswering(request.id);
+    try {
+      const note = approve
+        ? undefined
+        : window.prompt("Ret gerekçesi (isteğe bağlı) — talep sahibi görecek:") ?? undefined;
+      await respondToCreationRequest(request.id, approve, note);
+      setApprovals((prev) => prev.filter((r) => r.id !== request.id));
+    } finally {
+      setAnswering(null);
+    }
   };
 
   // Kabul/ret burada, listeden ayrılmadan verilir. Kabul edilen iş anında
@@ -82,6 +110,7 @@ export default function NotificationBell() {
           setUnreadCount((n) => n + 1);
           // Yeni bir iş daveti geldiyse kabul/ret satırı da anında belirsin.
           if (notification.type === "job_invite") loadInvites();
+          if (notification.type === "creation_request") loadApprovals();
         });
       })
       .catch(() => {});
@@ -99,6 +128,12 @@ export default function NotificationBell() {
     if (!localStorage.getItem("projelio_token")) return;
     loadInvites();
     return onJobInvitesChanged(loadInvites);
+  }, []);
+
+  useEffect(() => {
+    if (!localStorage.getItem("projelio_token")) return;
+    loadApprovals();
+    return onCreationRequestsChanged(loadApprovals);
   }, []);
 
   useEffect(() => {
@@ -130,7 +165,7 @@ export default function NotificationBell() {
   // Yanıt bekleyen davet, okunmamış bildirimden farklı: paneli açmak onu
   // "gördüm" saymaz, o yüzden rozet okundu işaretlendikten sonra da davet
   // sayısını göstermeye devam eder.
-  const badgeCount = unreadCount + invites.length;
+  const badgeCount = unreadCount + invites.length + approvals.length;
 
   const handleSelect = async (n: NotificationPayload) => {
     setOpen(false);
@@ -304,8 +339,82 @@ export default function NotificationBell() {
             </div>
           )}
 
+          {/* Onay bekleyen iş/proje açma talepleri: taşeron kayıt açamaz, yetkili
+              burada karar verir ve onaylandığı anda kayıt doğar
+              (bkz. lib/creationRequests.ts). */}
+          {approvals.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div
+                style={{
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: c.textSecondary,
+                  background: `${c.primary}12`,
+                }}
+              >
+                Onay bekleyen talepler
+              </div>
+              {approvals.map((request) => (
+                <div
+                  key={request.id}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    padding: "10px 14px",
+                    borderBottom: `1px solid ${c.border}`,
+                    background: `${c.primary}08`,
+                  }}
+                >
+                  <span style={{ fontSize: 15, color: c.textPrimary }}>
+                    <strong>{request.requesterName ?? "Bir taşeron"}</strong>,{" "}
+                    <strong>“{String(request.payload?.title ?? "başlıksız")}”</strong> adlı{" "}
+                    {request.kind === "job" ? "işi" : "projeyi"} açmak için izin istiyor
+                    {request.kind === "project" && request.jobTitle ? ` (${request.jobTitle})` : ""}
+                    {request.kind === "job" && request.organizationName ? ` (${request.organizationName})` : ""}.
+                  </span>
+                  <span style={{ fontSize: 12, color: c.textSecondary }}>{timeAgo(request.createdAt)}</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={() => answerApproval(request, true)}
+                      disabled={answering === request.id}
+                      style={{
+                        flex: 1,
+                        padding: "7px 10px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: c.primary,
+                        color: "#fff",
+                        fontSize: 14,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Onayla
+                    </button>
+                    <button
+                      onClick={() => answerApproval(request, false)}
+                      disabled={answering === request.id}
+                      style={{
+                        flex: 1,
+                        padding: "7px 10px",
+                        borderRadius: 8,
+                        border: `1px solid ${c.border}`,
+                        background: c.surface,
+                        color: c.textSecondary,
+                        fontSize: 14,
+                      }}
+                    >
+                      Reddet
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {notifications.length === 0 ? (
-            invites.length === 0 && (
+            invites.length === 0 && approvals.length === 0 && (
               <p style={{ fontSize: 15, color: c.textSecondary, padding: 16, textAlign: "center", margin: 0 }}>
                 Henüz bildirim yok.
               </p>

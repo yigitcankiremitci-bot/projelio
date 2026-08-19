@@ -46,7 +46,8 @@ export default function TaskFromRecordModal({
   const c = colors.light;
   const [title, setTitle] = useState(defaultTitle);
   const [description, setDescription] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
+  // Çoklu atama (bkz. migration 053).
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   // Kayıtta tarih varsa onu kullan; yoksa bugün. Boş bırakılan teslim tarihi
   // görevi "ne zaman" sorusu olmayan bir nota çevirirdi.
   const [deadline, setDeadline] = useState(defaultDeadline || todayISO());
@@ -65,7 +66,7 @@ export default function TaskFromRecordModal({
         title: title.trim(),
         description: description.trim() || `${moduleTitle} kaydından oluşturuldu.`,
         deadline,
-        assignedTo: assignedTo || undefined,
+        assignedToIds: assigneeIds,
         sourceModuleKey: moduleKey,
         sourceRecordId: recordId,
       });
@@ -107,7 +108,14 @@ export default function TaskFromRecordModal({
 
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={{ fontSize: 12, color: c.textSecondary }}>Kime</span>
-          <AssigneePicker departmentId={departmentId} value={assignedTo} onChange={(id) => setAssignedTo(id)} />
+          <AssigneePicker
+            departmentId={departmentId}
+            multiple
+            values={assigneeIds}
+            onChangeValues={setAssigneeIds}
+            value=""
+            onChange={() => {}}
+          />
         </label>
 
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>

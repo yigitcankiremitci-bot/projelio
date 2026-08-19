@@ -178,6 +178,62 @@ export class MembersService {
   // Proje yöneticisi ekibe doğrudan üye ekler (onay bekletmeden).
   // "title": proje yöneticisinin serbest yazdığı görev/unvan (örn. "Elektrik taşeronu");
   // yetkilendirmeyi etkilemez, sadece görüntüleme amaçlıdır.
+  /**
+   * Kullanıcının kendi isteğiyle projeden ayrılması.
+   *
+   * Yöneticinin birini çıkarmasından ayrı bir yol: burada yetki "yönetici olmak"
+   * değil "o kayıt benim olmak". Kullanıcı bir projeye eklendiği için orada
+   * kalmaya mahkûm olmamalı; bugün ayrılmanın tek yolu proje sahibine haber
+   * verip onun çıkarmasını beklemekti.
+   *
+   * Proje sahibi ayrılamaz: sahipsiz kalan bir projede kimse üye ekleyemez,
+   * bütçe göremez ve projeyi kapatamaz.
+   */
+  /** Bildirim metninde kullanılacak görünen ad. */
+  private async getUserName(userId?: string): Promise<string | undefined> {
+    if (!userId) return undefined;
+    const { data } = await this.supabase.client.from("users").select("full_name").eq("id", userId).maybeSingle();
+    return data?.full_name ?? undefined;
+  }
+
+  async leaveProject(projectId: string, userId: string): Promise<{ success: true }> {
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("owner_id, title")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!project) throw new NotFoundException("Proje bulunamadı");
+    if (project.owner_id === userId) {
+      throw new ForbiddenException("Proje sahibi kendi projesinden ayrılamaz");
+    }
+
+    const { data: membership } = await this.supabase.client
+      .from("project_members")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!membership) throw new NotFoundException("Bu projede bir üyeliğin yok");
+
+    const { error } = await this.supabase.client.from("project_members").delete().eq("id", membership.id);
+    if (error) throw error;
+
+    // Proje sahibi haberdar olsun: ekipten biri sessizce düşmesin.
+    if (project.owner_id) {
+      const name = await this.getUserName(userId);
+      void this.notificationsService.notifyUser(
+        project.owner_id,
+        "role_updated",
+        "Ekipten ayrılma",
+        name
+          ? `${name}, "${project.title}" projesinden ayrıldı.`
+          : `Bir ekip üyesi "${project.title}" projesinden ayrıldı.`,
+        `/projects/${projectId}`
+      );
+    }
+    return { success: true };
+  }
+
   async addMember(
     projectId: string,
     userId: string,

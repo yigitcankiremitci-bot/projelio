@@ -16,14 +16,22 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { AuthGuard } from "@nestjs/passport";
 import { memoryStorage } from "multer";
 import { ProductsService } from "./products.service";
+import { AccessService } from "../../common/access/access.service";
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
 export class ProductsController {
-  constructor(private productsService: ProductsService) {}
+  constructor(
+    private productsService: ProductsService,
+    private access: AccessService
+  ) {}
 
+  // Ürün/hizmet kataloğu şirketin ticari verisidir: organizasyonu görebilenlere
+  // açık, taşerona kapalı.
   @Get("organizations/:organizationId/products")
-  findByOrganization(@Param("organizationId") organizationId: string) {
+  async findByOrganization(@Param("organizationId") organizationId: string, @Req() req: any) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "products");
     return this.productsService.findByOrganization(organizationId);
   }
 

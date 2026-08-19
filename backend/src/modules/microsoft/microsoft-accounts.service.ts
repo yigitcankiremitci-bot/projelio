@@ -1,7 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { DriveNotConnectedError, DriveReauthRequiredError } from "../google/google-accounts.service";
-import { ONEDRIVE_SCOPE, MicrosoftOAuthService } from "./microsoft-oauth.service";
+import {
+  DRIVE_CONNECT_SCOPES,
+  MAIL_CONNECT_SCOPES,
+  MAIL_SCOPES,
+  ONEDRIVE_SCOPE,
+  MicrosoftOAuthService,
+} from "./microsoft-oauth.service";
 import { decryptMicrosoftToken, encryptMicrosoftToken } from "./microsoft-token-crypto.util";
 
 export interface MicrosoftAccount {
@@ -119,7 +125,7 @@ export class MicrosoftAccountsService {
         .select()
         .single();
       if (error) throw error;
-      this.accessTokenCache.delete(existing.id);
+      this.clearTokenCache(existing.id);
       return mapAccount(data);
     }
 
@@ -141,7 +147,7 @@ export class MicrosoftAccountsService {
   }
 
   async markRevoked(accountId: string): Promise<void> {
-    this.accessTokenCache.delete(accountId);
+    this.clearTokenCache(accountId);
     const { error } = await this.supabase.client
       .from("microsoft_accounts")
       .update({ drive_revoked_at: new Date().toISOString() })
@@ -149,26 +155,65 @@ export class MicrosoftAccountsService {
     if (error) throw error;
   }
 
-  /** OneDrive bağlantısını keser; kayıt tamamen silinmez (dosya kayıtları FK ile ona bağlı kalır). */
+  /**
+   * OneDrive bağlantısını keser; kayıt tamamen silinmez (dosya kayıtları FK ile
+   * ona bağlı kalır).
+   *
+   * POSTA HÂLÂ BAĞLIYSA refresh token KORUNUR. Aynı Microsoft hesabı iki ayrı
+   * şeye izin vermiş olabiliyor (depolama + posta); "OneDrive'ı kaldır" demek
+   * "gelen kutumu da kapat" demek değildir. Yalnızca depolamaya ait izinler ve
+   * kök klasör temizlenir.
+   */
   async disconnectDrive(userId: string): Promise<void> {
     const account = await this.findByUserId(userId);
     if (!account) return;
 
+    const mailStillConnected = this.isMailReady(account);
     const refreshToken = await this.readRefreshToken(account.id);
-    if (refreshToken) await this.oauth.revokeToken(refreshToken);
+    if (refreshToken && !mailStillConnected) await this.oauth.revokeToken(refreshToken);
 
-    this.accessTokenCache.delete(account.id);
+    this.clearTokenCache(account.id);
 
     const { error } = await this.supabase.client
       .from("microsoft_accounts")
       .update({
-        refresh_token_enc: null,
+        refresh_token_enc: mailStillConnected ? undefined : null,
         root_folder_id: null,
-        drive_revoked_at: new Date().toISOString(),
+        drive_revoked_at: mailStillConnected ? null : new Date().toISOString(),
         scopes: account.scopes.filter((s) => s !== ONEDRIVE_SCOPE),
       })
       .eq("id", account.id);
     if (error) throw error;
+  }
+
+  /**
+   * Posta bağlantısını keser.
+   *
+   * Simetrik: depolama hâlâ bağlıysa jeton korunur, yalnızca posta izinleri
+   * listeden düşer. İkisi de kalmadıysa jeton silinir.
+   */
+  async disconnectMail(accountId: string): Promise<void> {
+    const account = await this.findById(accountId);
+    if (!account) return;
+
+    const driveStillConnected = this.isDriveReady(account);
+    this.clearTokenCache(account.id);
+
+    const { error } = await this.supabase.client
+      .from("microsoft_accounts")
+      .update({
+        refresh_token_enc: driveStillConnected ? undefined : null,
+        scopes: account.scopes.filter((s) => !MAIL_SCOPES.includes(s)),
+      })
+      .eq("id", account.id);
+    if (error) throw error;
+  }
+
+  /** Bir hesabın bütün izin kümeleri için önbelleğini temizler. */
+  private clearTokenCache(accountId: string): void {
+    for (const key of this.accessTokenCache.keys()) {
+      if (key.startsWith(`${accountId}::`)) this.accessTokenCache.delete(key);
+    }
   }
 
   private async readRefreshToken(accountId: string): Promise<string | undefined> {
@@ -189,8 +234,18 @@ export class MicrosoftAccountsService {
     }
   }
 
-  async getAccessToken(accountId: string): Promise<string> {
-    const cached = this.accessTokenCache.get(accountId);
+  /**
+   * @param scopes Hangi izinler için jeton isteniyor. Verilmezse OneDrive
+   * kümesi — bu metot eskiden yalnızca depolama için çağrılıyordu ve mevcut
+   * çağrı yerleri değişmesin. Posta için MAIL_CONNECT_SCOPES geçilir.
+   */
+  async getAccessToken(accountId: string, scopes?: string[]): Promise<string> {
+    const requested = scopes ?? DRIVE_CONNECT_SCOPES;
+    // Önbellek anahtarına izin kümesi de girer: OneDrive için alınmış bir jeton
+    // posta uçlarında 403 döner, aynı kutuda tutulursa sessiz bir hata olur.
+    const cacheKey = `${accountId}::${requested.join(" ")}`;
+
+    const cached = this.accessTokenCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
 
     const account = await this.findById(accountId);
@@ -200,13 +255,13 @@ export class MicrosoftAccountsService {
     const refreshToken = await this.readRefreshToken(accountId);
     if (!refreshToken) throw new DriveNotConnectedError();
 
-    const result = await this.oauth.refreshAccessToken(refreshToken);
+    const result = await this.oauth.refreshAccessToken(refreshToken, requested);
     if ("invalidGrant" in result) {
       await this.markRevoked(accountId);
       throw new DriveReauthRequiredError();
     }
 
-    this.accessTokenCache.set(accountId, {
+    this.accessTokenCache.set(cacheKey, {
       token: result.accessToken,
       expiresAt: Date.now() + result.expiresIn * 1000,
     });
@@ -225,5 +280,20 @@ export class MicrosoftAccountsService {
     return Boolean(
       account && account.hasRefreshToken && !account.driveRevokedAt && account.scopes.includes(ONEDRIVE_SCOPE)
     );
+  }
+
+  /** Posta okuma/gönderme izinleri verilmiş mi? */
+  isMailReady(account: MicrosoftAccount | undefined): account is MicrosoftAccount {
+    return Boolean(
+      account &&
+        account.hasRefreshToken &&
+        !account.driveRevokedAt &&
+        MAIL_SCOPES.every((s) => account.scopes.includes(s))
+    );
+  }
+
+  /** Posta uçlarının kullanacağı erişim jetonu — doğru izin kümesiyle. */
+  mailAccessToken(accountId: string): Promise<string> {
+    return this.getAccessToken(accountId, MAIL_CONNECT_SCOPES);
   }
 }

@@ -11,6 +11,7 @@ import { useNavVisibility } from "../lib/useNavVisibility";
 import { onJobInvitesChanged } from "../lib/jobInvites";
 import { IconBuilding, IconLayers, IconChevronRight, IconFolder, IconActivity, IconFile, IconSparkle } from "../components/icons";
 import ProfileCard from "../components/ProfileCard";
+import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import BudgetPanel from "../components/BudgetPanel";
 import AllFilesPanel from "../components/AllFilesPanel";
 import DashboardModulesPanel from "../components/DashboardModulesPanel";
@@ -129,6 +130,10 @@ export default function Dashboard() {
   const c = colors.light;
   const gridRef = useRef<HTMLDivElement>(null);
   const joinedGridRef = useRef<HTMLDivElement>(null);
+  // Sabit şeridin ölçtüğü öğeler (bkz. lib/pageHeader): başlık satırı "kapak"
+  // yerine geçer, sekme çubuğunun kopyası ise ancak aslı ekrandan çıkınca belirir.
+  const headerRef = useRef<HTMLDivElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
   // Masaüstünde sol sidebar'da zaten Organizasyonlar/Gruplar linkleri var;
   // bu kısayol satırı sadece sidebar'ın kaybolduğu mobil görünümde gösterilir.
   const isDesktop = useIsDesktop();
@@ -195,38 +200,109 @@ export default function Dashboard() {
     return acc;
   }, {});
 
+  const pageTitle = openModuleTab
+    ? openModuleTab.name
+    : tab === "jobs"
+      ? "İşlerim"
+      : tab === "budget"
+        ? "Bütçem"
+        : tab === "files"
+          ? "Dosyalarım"
+          : "Modüller";
+
+  // Sekme düğmeleri tek yerde üretilir: hem sayfadaki çubuk hem kaydırınca beliren
+  // şerit aynı diziyi kullanır, böylece ikisi hiçbir zaman ayrışmaz.
+  const tabButtons = tabs.map((t) => {
+    const isActive = tab === t.key;
+    return (
+      <button
+        key={t.key}
+        type="button"
+        {...tourAnchor(`dashboard-tab-${t.key}`)}
+        onClick={() => setTab(t.key)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          padding: "9px 14px",
+          border: "none",
+          background: "transparent",
+          color: isActive ? c.textPrimary : c.textSecondary,
+          fontSize: 15,
+          fontWeight: 500,
+          // Etiket kelime ortasından bölünmesin; sığmıyorsa sekmenin tamamı
+          // alt satıra insin.
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+          borderBottom: `2px solid ${isActive ? c.accent : "transparent"}`,
+          marginBottom: -1,
+        }}
+      >
+        <t.icon size={15} color={isActive ? c.accentDark : c.textSecondary} />
+        {t.label}
+        {/* Terfi görünür olur, düşüş sessizdir: yeni gelen sekme tek
+            seferlik bir noktayla kendini tanıtır. */}
+        {t.isNew && (
+          <span
+            title="Sık kullandığın için üste alındı"
+            style={{ width: 6, height: 6, borderRadius: "50%", background: c.accent, flexShrink: 0 }}
+          />
+        )}
+      </button>
+    );
+  });
+
+  // Kaydırınca tepede beliren sabit şerit (bkz. App.tsx CoverStickyHeader).
+  // Anasayfanın kapağı yok; "kapak" rolünü başlık + kişi kartı satırı üstlenir.
+  // Taşeron hesabında anasayfa tek çalışma ekranı olduğu için sekmelerin aşağı
+  // inince kaybolması burada en çok hissedilen eksikti.
+  // Şerit kopyası sarmaz, yana kaydırılır: 68 px'lik bantta ikinci satır yeri yok.
+  usePageHeader(pageTitle, headerRef, [pageTitle]);
+  usePageHeaderTabs(
+    <div style={{ display: "flex", gap: 4, overflowX: "auto", scrollbarWidth: "none" }}>{tabButtons}</div>,
+    [tab, tabs.length],
+    tabsRef
+  );
+
   // Hesap tipi belirlenene kadar "İşlerim" görünümünü göstermeyelim (yanlış görünüm
   // bir an için parlayıp kaybolmasın); organizasyon/grup sahibiyse oraya yönlendir.
   if (redirectTo === undefined) return null;
   if (redirectTo) return <Navigate to={redirectTo} replace />;
 
   return (
-    <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
+    // Mobilde üst boşluk kısılıyor: App zaten HEADER_HEIGHT (76 px) kadar
+    // paddingTop veriyor ve yüzen logo 58 px'de bitiyor — üstüne 28 px daha
+    // eklenince logo ile "İşlerim" başlığı arasında boşluk kalıyordu.
+    // Masaüstünde yer sıkıntısı yok, orada 28 px korunuyor.
+    <div
+      style={{
+        minHeight: "100vh",
+        background: c.background,
+        padding: isDesktop ? 28 : "6px 16px 28px",
+        // Kişi kartının kapsülü sayfa dolgusunu aşıp ekran kenarına dayanıyor
+        // (bkz. ProfileCard bleedRight). Taşan kısım burada kırpılıyor: hem
+        // yatay kaydırma çubuğu doğmuyor hem de kapsül tam kenarda bitiyor.
+        overflowX: "hidden",
+      }}
+    >
       <div
+        ref={headerRef}
         style={{
           display: "flex",
           flexDirection: isDesktop ? "row" : "column",
           alignItems: isDesktop ? "center" : "stretch",
           justifyContent: "space-between",
-          gap: 16,
-          marginBottom: 20,
+          gap: isDesktop ? 16 : 8,
+          marginBottom: isDesktop ? 20 : 12,
         }}
       >
-        <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
-          {openModuleTab
-            ? openModuleTab.name
-            : tab === "jobs"
-              ? "İşlerim"
-              : tab === "budget"
-                ? "Bütçem"
-                : tab === "files"
-                  ? "Dosyalarım"
-                  : "Modüller"}
-        </h1>
-        {/* Masaüstünde sağa dayalı, mobilde ise kendi satırında ortalanmış görünür
-            (aksi halde dar ekranda satır kırılınca sola yapışık kalıyordu). */}
-        <div style={{ display: "flex", justifyContent: isDesktop ? "flex-end" : "center" }}>
-          <ProfileCard />
+        <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{pageTitle}</h1>
+        {/* Hem masaüstünde hem mobilde sağa dayalı: kartın kendi kompozisyonu
+            (sağa hizalı metin, sağdaki avatar, transformOrigin: right) sağ kenara
+            yaslandığında doğru duruyor. */}
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          {/* Tam sayfa dolgusu kadar: kart kenara dayanır ama avatar kırpılmaz. */}
+          <ProfileCard bleedRight={isDesktop ? 28 : 16} compact={!isDesktop} />
         </div>
       </div>
 
@@ -236,6 +312,7 @@ export default function Dashboard() {
           Ekran genişliğine göre değil, gerçekten yer kalmadığında kırıldığı için
           ayrı bir mobil/masaüstü dalına gerek yok. */}
       <div
+        ref={tabsRef}
         {...tourAnchor("dashboard-tabs")}
         style={{
           display: "flex",
@@ -245,45 +322,7 @@ export default function Dashboard() {
           borderBottom: `1px solid ${c.border}`,
         }}
       >
-        {tabs.map((t) => {
-          const isActive = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              {...tourAnchor(`dashboard-tab-${t.key}`)}
-              onClick={() => setTab(t.key)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-                padding: "9px 14px",
-                border: "none",
-                background: "transparent",
-                color: isActive ? c.textPrimary : c.textSecondary,
-                fontSize: 15,
-                fontWeight: 500,
-                // Etiket kelime ortasından bölünmesin; sığmıyorsa sekmenin tamamı
-                // alt satıra insin.
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-                borderBottom: `2px solid ${isActive ? c.accent : "transparent"}`,
-                marginBottom: -1,
-              }}
-            >
-              <t.icon size={15} color={isActive ? c.accentDark : c.textSecondary} />
-              {t.label}
-              {/* Terfi görünür olur, düşüş sessizdir: yeni gelen sekme tek
-                  seferlik bir noktayla kendini tanıtır. */}
-              {t.isNew && (
-                <span
-                  title="Sık kullandığın için üste alındı"
-                  style={{ width: 6, height: 6, borderRadius: "50%", background: c.accent, flexShrink: 0 }}
-                />
-              )}
-            </button>
-          );
-        })}
+        {tabButtons}
       </div>
 
       {/* Terfi etmiş modül: sekmenin içeriği modülün kendisi. jobId, modülün en

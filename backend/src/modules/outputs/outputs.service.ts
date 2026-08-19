@@ -73,7 +73,50 @@ export class OutputsService {
     throw new ForbiddenException("Bu departmanın çıktılarını yalnızca kadrosundaki kişiler yönetebilir");
   }
 
-  async reorder(ids: string[]): Promise<void> {
+  /**
+   * Çıktı düzenleme/silme yetkisi. Bir çıktı ya bir projeye ya bir departmana
+   * bağlıdır; kural bağlı olduğu şeyin kuralıdır:
+   *   proje    → proje sahibi ya da işin sahibi (bkz. ProjectsService.assertCanManage)
+   *   departman→ organizasyon sahibi ya da departman kadrosu
+   *
+   * Bu uçlar eskiden hiç yetki sormuyordu: çıktı id'sini bilen herkes başlığını
+   * değiştirebiliyor, silebiliyordu.
+   */
+  private async assertCanManageOutput(outputId: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    const { data: output } = await this.supabase.client
+      .from("outputs")
+      .select("project_id, department_id")
+      .eq("id", outputId)
+      .maybeSingle();
+    if (!output) throw new NotFoundException("Çıktı bulunamadı");
+    if (output.department_id) return this.assertDepartmentAccess(output.department_id, userId);
+    if (output.project_id) return this.assertCanManageProject(output.project_id, userId);
+    throw new ForbiddenException("Bu çıktıyı düzenleme yetkiniz yok");
+  }
+
+  // ProjectsService.assertCanManage ile aynı kural; modüller arası döngüsel
+  // bağımlılık yaratmamak için burada da ayrıca uygulanıyor (mevcut desen).
+  private async assertCanManageProject(projectId: string, userId: string): Promise<void> {
+    const { data: project } = await this.supabase.client
+      .from("projects")
+      .select("owner_id, job_id")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (!project) throw new NotFoundException("Proje bulunamadı");
+    if (project.owner_id === userId) return;
+    if (project.job_id) {
+      const { data: job } = await this.supabase.client
+        .from("jobs")
+        .select("owner_id")
+        .eq("id", project.job_id)
+        .maybeSingle();
+      if (job?.owner_id === userId) return;
+    }
+    throw new ForbiddenException("Bu çıktıyı yalnızca proje veya iş sahibi düzenleyebilir");
+  }
+
+  async reorder(ids: string[], requestingUserId?: string): Promise<void> {
     if (!ids?.length) return;
     const { data: rows, error } = await this.supabase.client
       .from("outputs")
@@ -83,6 +126,7 @@ export class OutputsService {
     if (!rows || rows.length !== ids.length) {
       throw new BadRequestException("Geçersiz sıralama isteği");
     }
+    for (const id of ids) await this.assertCanManageOutput(id, requestingUserId);
     const projectIds = new Set(rows.map((r: any) => r.project_id));
     const departmentIds = new Set(rows.map((r: any) => r.department_id));
     if (projectIds.size > 1 || departmentIds.size > 1) {
@@ -192,7 +236,8 @@ export class OutputsService {
     }
   }
 
-  async update(id: string, data: Partial<Output>): Promise<Output> {
+  async update(id: string, data: Partial<Output>, requestingUserId?: string): Promise<Output> {
+    await this.assertCanManageOutput(id, requestingUserId);
     const patch: Record<string, unknown> = {};
     if (data.title !== undefined) patch.title = data.title;
     if (data.description !== undefined) patch.description = data.description;
@@ -208,12 +253,14 @@ export class OutputsService {
     return mapOutput(row);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, requestingUserId?: string): Promise<void> {
+    await this.assertCanManageOutput(id, requestingUserId);
     const { error } = await this.supabase.client.from("outputs").delete().eq("id", id);
     if (error) throw error;
   }
 
-  async archive(id: string): Promise<Output> {
+  async archive(id: string, requestingUserId?: string): Promise<Output> {
+    await this.assertCanManageOutput(id, requestingUserId);
     const { data: row, error } = await this.supabase.client
       .from("outputs")
       .update({ archived_at: new Date().toISOString() })
@@ -225,7 +272,8 @@ export class OutputsService {
     return mapOutput(row);
   }
 
-  async restore(id: string): Promise<Output> {
+  async restore(id: string, requestingUserId?: string): Promise<Output> {
+    await this.assertCanManageOutput(id, requestingUserId);
     const { data: row, error } = await this.supabase.client
       .from("outputs")
       .update({ archived_at: null })

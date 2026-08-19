@@ -1,14 +1,19 @@
 import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { OrganizationModulesService } from "./organization-modules.service";
+import { AccessService } from "../../common/access/access.service";
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
 export class OrganizationModulesController {
-  constructor(private organizationModulesService: OrganizationModulesService) {}
+  constructor(
+    private organizationModulesService: OrganizationModulesService,
+    private access: AccessService
+  ) {}
 
   @Get("organizations/:organizationId/modules")
-  findByOrganization(@Param("organizationId") organizationId: string) {
+  async findByOrganization(@Param("organizationId") organizationId: string, @Req() req: any) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
     return this.organizationModulesService.findByOrganization(organizationId);
   }
 

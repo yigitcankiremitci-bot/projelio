@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import type { Output, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
-import { IconArchive, IconCheck, IconChevronRight, IconCopy, IconEdit, IconMove, IconTrash, IconX } from "./icons";
+import { IconChevronRight, IconEdit } from "./icons";
 import TaskColumn, { TaskColumnHandle } from "./TaskColumn";
 import CreateOutputModal from "./CreateOutputModal";
 import EditOutputModal from "./EditOutputModal";
@@ -319,8 +319,8 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   /**
    * Tek satırlık araç çubuğu: solda alt sekmeler, sağda sıralama ve seçim.
    * Üçü ayrı satırdayken kart panelleriyle sekmeler arasında geniş bir boşluk
-   * kalıyordu. Seçim modu açıldığında bar tam genişlik alıp alta kayar
-   * (bkz. TaskSelectionBar inline).
+   * kalıyordu. Seçim modu açıldığında da satır bölünmez: eylemler Sırala'nın
+   * yanında, ikon-only olarak yer alır (bkz. TaskSelectionBar inline).
    */
   const toolbar = (
     <div ref={toolbarRef} style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
@@ -379,9 +379,8 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
    * usePageHeaderActions) o satırda da gösterilir. Görevler/Çıktılar başlığın
    * hemen yanında solda kalır; Sırala/Seç ise kişi kartının yanında sağda
    * gösterilir. Aynı state'i kullandığı için toolbar ile birbiriyle senkron
-   * kalır; seçim modu açıkken satır taşmasın diye Çoğalt/Taşı/Vazgeç
-   * ikon-only düğmelere indirgenir (TaskSelectionBar'daki tam genişlikli bara
-   * burada yer yok).
+   * kalır; seçim modu açıkken satır taşmasın diye eylemler ikon-only düğmelere
+   * indirgenir (bkz. TaskSelectionBar inline).
    */
   const headerViewToggle = (
     <div role="group" aria-label="Görünüm" style={{ display: "flex", gap: 4 }}>
@@ -416,116 +415,24 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
     </div>
   );
 
+  // Sabit şeritteki Sırala + Seç. Araç çubuğundakiyle aynı bileşen (inline modu)
+  // kullanılıyor: ikisi ayrı ayrı elle yazıldığında biri değişip diğeri geride
+  // kalıyordu.
   const headerSortSelect = (
     <>
       <TaskSortMenu value={sort} onChange={setSort} />
-
-      {selection.selectionMode ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
-          <span style={{ fontSize: 14, color: c.textSecondary, whiteSpace: "nowrap" }}>
-            {selection.selectedIds.size > 0 ? `${selection.selectedIds.size} seçili` : "Görev seç"}
-          </span>
-          <button
-            type="button"
-            onClick={handleDuplicateSelected}
-            disabled={selection.selectedIds.size === 0 || duplicating}
-            aria-label="Seçilenleri çoğalt"
-            title="Çoğalt"
-            style={{
-              display: "flex",
-              padding: 8,
-              borderRadius: 7,
-              border: `1px solid ${c.border}`,
-              background: "transparent",
-              opacity: selection.selectedIds.size === 0 || duplicating ? 0.5 : 1,
-            }}
-          >
-            <IconCopy size={15} color={c.textSecondary} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setMovingOpen(true)}
-            disabled={selection.selectedIds.size === 0}
-            aria-label="Seçilenleri taşı"
-            title="Taşı"
-            style={{
-              display: "flex",
-              padding: 8,
-              borderRadius: 7,
-              border: `1px solid ${c.border}`,
-              background: "transparent",
-              opacity: selection.selectedIds.size === 0 ? 0.5 : 1,
-            }}
-          >
-            <IconMove size={15} color={c.textSecondary} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmingBulkAction("archive")}
-            disabled={selection.selectedIds.size === 0}
-            aria-label="Seçilenleri arşivle"
-            title="Arşivle"
-            style={{
-              display: "flex",
-              padding: 8,
-              borderRadius: 7,
-              border: `1px solid ${c.border}`,
-              background: "transparent",
-              opacity: selection.selectedIds.size === 0 ? 0.5 : 1,
-            }}
-          >
-            <IconArchive size={15} color={c.textSecondary} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmingBulkAction("delete")}
-            disabled={selection.selectedIds.size === 0}
-            aria-label="Seçilenleri sil"
-            title="Sil"
-            style={{
-              display: "flex",
-              padding: 8,
-              borderRadius: 7,
-              border: `1px solid ${c.danger}`,
-              background: "transparent",
-              opacity: selection.selectedIds.size === 0 ? 0.5 : 1,
-            }}
-          >
-            <IconTrash size={15} color={c.danger} />
-          </button>
-          <button
-            type="button"
-            onClick={selection.clear}
-            aria-label="Seçimi iptal et"
-            title="Vazgeç"
-            style={{ display: "flex", padding: 8, borderRadius: 7, border: "none", background: "transparent" }}
-          >
-            <IconX size={15} color={c.textSecondary} />
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={selection.toggleSelectionMode}
-          aria-label="Görev seçimini aç"
-          title="Seç"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "7px 13px",
-            borderRadius: 8,
-            border: `1px solid ${c.border}`,
-            background: c.surface,
-            color: c.textSecondary,
-            fontSize: 14,
-            whiteSpace: "nowrap",
-          }}
-        >
-          <IconCheck size={14} color={c.textSecondary} />
-          Seç
-        </button>
-      )}
+      <TaskSelectionBar
+        inline
+        selectionMode={selection.selectionMode}
+        selectedCount={selection.selectedIds.size}
+        busy={duplicating || archiving}
+        onEnable={selection.toggleSelectionMode}
+        onCancel={selection.clear}
+        onDuplicate={handleDuplicateSelected}
+        onMove={() => setMovingOpen(true)}
+        onArchive={() => setConfirmingBulkAction("archive")}
+        onDelete={() => setConfirmingBulkAction("delete")}
+      />
     </>
   );
 

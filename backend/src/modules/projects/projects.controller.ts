@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  Inject,
+  forwardRef,
   Body,
   Controller,
   Delete,
@@ -17,11 +19,16 @@ import { AuthGuard } from "@nestjs/passport";
 import { memoryStorage } from "multer";
 import { ProjectsService } from "./projects.service";
 import { CreateProjectDto, UpdateProjectDto } from "./dto/project.dto";
+import { CreationRequestsService } from "../creation-requests/creation-requests.service";
 
 @Controller("projects")
 @UseGuards(AuthGuard("jwt"))
 export class ProjectsController {
-  constructor(private projectsService: ProjectsService) {}
+  constructor(
+    private projectsService: ProjectsService,
+    @Inject(forwardRef(() => CreationRequestsService))
+    private creationRequests: CreationRequestsService
+  ) {}
 
   @Get()
   findAll(@Req() req: any) {
@@ -33,9 +40,33 @@ export class ProjectsController {
     return this.projectsService.findOne(id, req.user.userId);
   }
 
+  /**
+   * Taşeron, SAHİBİ OLMADIĞI bir işin altına proje açamaz: talep oluşur, işin
+   * sahibine bildirim (+push) gider, onaylanınca proje doğar. Kendi işinin
+   * altına ve taşeron olmayan kullanıcılar eskisi gibi doğrudan açar.
+   * Yanıt biçimi için bkz. shared CreateOrRequestResult.
+   */
   @Post()
-  create(@Req() req: any, @Body() body: CreateProjectDto) {
-    return this.projectsService.create(req.user.userId, body);
+  async create(@Req() req: any, @Body() body: CreateProjectDto) {
+    const userId = req.user.userId;
+    const needsApproval = await this.creationRequests.requiresApproval("project", userId, {
+      jobId: body?.jobId,
+    });
+    if (needsApproval) {
+      const request = await this.creationRequests.create(userId, {
+        kind: "project",
+        jobId: body.jobId,
+        payload: {
+          title: body?.title,
+          description: body?.description,
+          totalBudget: body?.totalBudget,
+          startDate: body?.startDate,
+          deadline: body?.deadline,
+        },
+      });
+      return { outcome: "pending", request };
+    }
+    return { outcome: "created", entity: await this.projectsService.create(userId, body) };
   }
 
   // NOT: bu route ":id" ile çakışmaması için ondan önce tanımlanmalı.

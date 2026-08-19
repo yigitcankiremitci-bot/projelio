@@ -3,7 +3,7 @@ import type { BudgetTransaction, BudgetTransactionType, Task, TaskBudgetStatus }
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { useUndo } from "../lib/undo";
-import { IconTrash } from "./icons";
+import { IconEdit, IconTrash } from "./icons";
 
 export interface DepartmentBudgetPanelHandle {
   openCreate: () => void;
@@ -78,7 +78,10 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
-  const { pushDestructive } = useUndo();
+  // Düzenlenen kaydın kendisi: aynı satır içi form hem ekleme hem düzenleme
+  // için kullanılıyor (ayrı bir modal açmak bu panelde gereksiz bir katman).
+  const [editing, setEditing] = useState<BudgetTransaction | null>(null);
+  const { pushUndo, pushDestructive } = useUndo();
 
   const load = () => {
     setLoading(true);
@@ -100,6 +103,31 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
     setAmount("");
     setDescription("");
     setOccurredAt("");
+    setEditing(null);
+  };
+
+  const startEdit = (t: BudgetTransaction) => {
+    setEditing(t);
+    setType(t.type);
+    setAmount(String(t.amount));
+    setDescription(t.description ?? "");
+    setOccurredAt(t.occurredAt ? t.occurredAt.slice(0, 10) : "");
+    setError("");
+    setAdding(true);
+  };
+
+  // Bir kaydın alanlarını sunucuda o hâle getirir. Geri/ileri alma da bunu
+  // kullanır: "eski değerlere dön" ile "yeni değerleri tekrar uygula" aynı işlem.
+  const applyValues = async (tx: BudgetTransaction) => {
+    await api
+      .patch(`/budget/transactions/${tx.id}`, {
+        type: tx.type,
+        amount: tx.amount,
+        description: tx.description ?? "",
+        occurredAt: tx.occurredAt,
+      })
+      .catch(() => {});
+    load();
   };
 
   const handleSave = async () => {
@@ -111,17 +139,51 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
     }
     setSaving(true);
     try {
-      await api.post(`/departments/${departmentId}/budget`, {
+      const payload = {
         type,
         amount: n,
         description: description || undefined,
         occurredAt: occurredAt || undefined,
-      });
+      };
+
+      if (editing) {
+        const previous = editing;
+        // Genel uç: yetki kaydın bağlamından (burada departman) türetilir.
+        const saved = await api.patch<BudgetTransaction>(`/budget/transactions/${editing.id}`, {
+          ...payload,
+          description: description || "",
+        });
+        pushUndo({
+          label: "Bütçe kaydı düzenlendi",
+          run: () => applyValues(previous),
+          redo: () => applyValues(saved),
+        });
+      } else {
+        const created = await api.post<BudgetTransaction>(`/departments/${departmentId}/budget`, payload);
+        // Ekleme de geri alınabilir olmalı: bütçe girerken en sık yapılan hata
+        // yanlış tutar yazmak ve Cmd/Ctrl+Z burada hiç çalışmıyordu.
+        pushUndo({
+          label: "Bütçe kaydı eklendi",
+          run: async () => {
+            await api.delete(`/budget/transactions/${created.id}`).catch(() => {});
+            load();
+          },
+          redo: async () => {
+            await api.post(`/departments/${departmentId}/budget`, payload);
+            load();
+          },
+        });
+      }
+
       resetForm();
       setAdding(false);
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kayıt eklenemedi. Bu işlem yalnızca organizasyon sahibi veya departman yöneticisine açık.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Kayıt kaydedilemedi. Bu işlem yalnızca organizasyon sahibi veya departman yöneticisine açık."
+      );
     } finally {
       setSaving(false);
     }
@@ -293,13 +355,28 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
               />
             </div>
             {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              style={{ padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14 }}
-            >
-              {saving ? "Kaydediliyor…" : "Kaydet"}
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14 }}
+              >
+                {saving ? "Kaydediliyor…" : editing ? "Değişikliği kaydet" : "Kaydet"}
+              </button>
+              {/* Düzenleme kipinden çıkış: aynı form ekleme için de kullanıldığı
+                  için kullanıcının "vazgeçtim" diyebileceği bir yol gerekiyor. */}
+              {editing && (
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setAdding(false);
+                  }}
+                  style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 14 }}
+                >
+                  Vazgeç
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -322,7 +399,18 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
                     {typeLabel[t.type]} · {new Date(t.occurredAt).toLocaleDateString("tr-TR")}
                   </div>
                 </div>
-                <button onClick={() => handleDelete(t.id)} aria-label="Kaydı sil" style={{ background: "transparent", border: "none" }}>
+                <button
+                  onClick={() => startEdit(t)}
+                  aria-label="Kaydı düzenle"
+                  style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", padding: 4 }}
+                >
+                  <IconEdit size={14} color={c.textSecondary} />
+                </button>
+                <button
+                  onClick={() => handleDelete(t.id)}
+                  aria-label="Kaydı sil"
+                  style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", padding: 4 }}
+                >
                   <IconTrash size={14} color={c.textSecondary} />
                 </button>
               </div>

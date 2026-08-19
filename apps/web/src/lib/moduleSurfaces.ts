@@ -28,7 +28,10 @@ export type ModuleArchetype =
   | "entity"
   | "unknown";
 
-/** Motorları henüz yazılmamış arketiplerin modülleri (bkz. docs 21/22/23). */
+/**
+ * Motorları henüz yazılmamış arketiplerin modülleri (bkz. docs 21/22/23).
+ * İstisna: pd_sosyal_medya kendi motorunu aldı, aşağıdaki nota bakınız.
+ */
 const A4_PIPELINE_KEYS = new Set([
   "spd_satis_planlama_b2b_b2c",
   "ik_ise_alim_oryantasyon",
@@ -41,6 +44,10 @@ const A4_PIPELINE_KEYS = new Set([
 ]);
 
 const A5_PLAN_KEYS = new Set([
+  // pd_sosyal_medya A5'in referans modülü ve motoru YAZILDI: kendi tabloları
+  // (054_social_media.sql) ve kendi takvim paneli (SocialMediaPanel) var.
+  // Arketip listesinde kalıyor çünkü arketip "ne yaptığını" anlatır — yüzeyi
+  // yine sayfa, ama artık bir motoru bekleyen modül değil.
   "pd_sosyal_medya",
   "pd_email",
   "icerik_takvimi",

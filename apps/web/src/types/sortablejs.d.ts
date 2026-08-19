@@ -12,6 +12,10 @@ declare module "sortablejs" {
   export interface SortableOptions {
     group?: string | { name: string; pull?: boolean | "clone"; put?: boolean };
     sort?: boolean;
+    // Sürükleme geçici olarak kapatılabilsin diye (bkz. TaskColumn'da seçim
+    // modu): Sortable örneğini yok edip yeniden kurmak, sürüklemenin tam
+    // ortasında olan bir render'da hareketi yarıda kesiyordu.
+    disabled?: boolean;
     delay?: number;
     delayOnTouchOnly?: boolean;
     touchStartThreshold?: number;
@@ -24,6 +28,13 @@ declare module "sortablejs" {
     filter?: string;
     preventOnFilter?: boolean;
     handle?: string;
+    // Kenara yaklaşınca sayfayı/kutuyu kaydırma (AutoScroll eklentisi; paketin
+    // varsayılan derlemesinde zaten bağlı). Bkz. lib/useSortableList.
+    scroll?: boolean | HTMLElement;
+    scrollSensitivity?: number;
+    scrollSpeed?: number;
+    bubbleScroll?: boolean;
+    forceAutoScrollFallback?: boolean;
     onEnd?: (event: SortableEvent) => void;
     onStart?: (event: SortableEvent) => void;
   }

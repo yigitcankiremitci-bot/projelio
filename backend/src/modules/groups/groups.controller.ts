@@ -18,6 +18,7 @@ import { memoryStorage } from "multer";
 import { GroupsService } from "./groups.service";
 import { JobsService } from "../jobs/jobs.service";
 import { OrganizationsService } from "../organizations/organizations.service";
+import { AccessService } from "../../common/access/access.service";
 
 @Controller("groups")
 @UseGuards(AuthGuard("jwt"))
@@ -25,7 +26,8 @@ export class GroupsController {
   constructor(
     private groupsService: GroupsService,
     private jobsService: JobsService,
-    private organizationsService: OrganizationsService
+    private organizationsService: OrganizationsService,
+    private access: AccessService
   ) {}
 
   @Get()
@@ -34,7 +36,8 @@ export class GroupsController {
   }
 
   @Get(":id")
-  findOne(@Param("id") id: string) {
+  async findOne(@Param("id") id: string, @Req() req: any) {
+    await this.access.assertCanViewGroup(id, req.user.userId);
     return this.groupsService.findOne(id);
   }
 
@@ -46,7 +49,8 @@ export class GroupsController {
 
   // Gruba bağlı organizasyonlar.
   @Get(":id/organizations")
-  findOrganizations(@Param("id") id: string) {
+  async findOrganizations(@Param("id") id: string, @Req() req: any) {
+    await this.access.assertCanViewGroup(id, req.user.userId);
     return this.organizationsService.findByGroupId(id);
   }
 
@@ -84,7 +88,7 @@ export class GroupsController {
   }
 
   @Patch(":id/restore")
-  restore(@Param("id") id: string) {
-    return this.groupsService.restore(id);
+  restore(@Param("id") id: string, @Req() req: any) {
+    return this.groupsService.restore(id, req.user.userId);
   }
 }

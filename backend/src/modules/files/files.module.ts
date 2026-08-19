@@ -5,6 +5,7 @@ import { CloudStorageModule } from "../cloud-storage/cloud-storage.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { FilesController } from "./files.controller";
 import { FilesService } from "./files.service";
+import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
 
 @Module({
   imports: [
@@ -16,8 +17,8 @@ import { FilesService } from "./files.service";
     NotificationsModule,
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET ?? "change-me",
-      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? "7d" },
+      secret: getJwtSecret(),
+      signOptions: { expiresIn: getJwtExpiresIn() },
     }),
   ],
   controllers: [FilesController],

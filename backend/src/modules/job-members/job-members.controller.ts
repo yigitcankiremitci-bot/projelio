@@ -1,11 +1,15 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { JobMembersService } from "./job-members.service";
+import { AccessService } from "../../common/access/access.service";
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
 export class JobMembersController {
-  constructor(private jobMembersService: JobMembersService) {}
+  constructor(
+    private jobMembersService: JobMembersService,
+    private access: AccessService
+  ) {}
 
   // NOT: bu uç "jobs/:jobId/members"tan bağımsız — giriş yapmış kullanıcının
   // TÜM işlerdeki bekleyen davetlerini döner (bildirim çanı bunu okur).
@@ -14,8 +18,12 @@ export class JobMembersController {
     return this.jobMembersService.findPendingForUser(req.user.userId);
   }
 
+  // İş ekibi listesi isim/e-posta içerir: işi görebilenlere açık, taşerona kapalı
+  // (dış kaynak, ekibin kim olduğunu bilmemeli).
   @Get("jobs/:jobId/members")
-  findByJob(@Param("jobId") jobId: string) {
+  async findByJob(@Param("jobId") jobId: string, @Req() req: any) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "team");
     return this.jobMembersService.findByJob(jobId);
   }
 
@@ -31,8 +39,9 @@ export class JobMembersController {
     return this.jobMembersService.respond(id, approve, req.user.userId);
   }
 
+  // Ekipten çıkarma: yalnızca işin sahibi (ya da kişinin kendisi — ayrılma).
   @Delete("job-members/:id")
-  remove(@Param("id") id: string) {
-    return this.jobMembersService.remove(id);
+  remove(@Param("id") id: string, @Req() req: any) {
+    return this.jobMembersService.remove(id, req.user.userId);
   }
 }

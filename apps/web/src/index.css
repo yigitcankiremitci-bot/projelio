@@ -79,8 +79,69 @@ textarea:focus {
   border-color: var(--color-primary);
 }
 
-input::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: var(--color-placeholder);
+}
+
+/*
+ * İçerik uzadıkça AŞAĞI BÜYÜYEN giriş alanı (bkz. components/AutoGrowTextarea).
+ *
+ * Sarmalayıcı bir ızgaradır ve tek gözünde iki şey üst üste durur: textarea ve
+ * aynı metnin GÖRÜNMEZ bir kopyası (::after). Gözün yüksekliğini kopya belirler,
+ * textarea da gözü doldurur — yani yükseklik metinle birlikte kendiliğinden
+ * büyür.
+ *
+ * Neden JS ile ölçmüyoruz: `scrollHeight` okuyup yükseklik yazmak, alan
+ * görünmezken bağlandığında, yazı tipi geç yüklendiğinde ya da kutu genişliği
+ * sonradan değiştiğinde yanlış kalıyor ve alan tek satırda takılıyordu. Burada
+ * ölçüm yok; tarayıcının kendi yerleşimi işi yapıyor.
+ *
+ * textarea ile kopyanın kutu ölçüleri (dolgu, kenarlık, yazı, satır yüksekliği,
+ * sarma kuralları) BİREBİR aynı olmak zorunda — biri diğerinden farklı sararsa
+ * yükseklik tutmaz. Bu yüzden ikisi tek bir kural bloğunda tanımlı.
+ */
+.autogrow {
+  display: grid;
+}
+
+.autogrow::after {
+  content: attr(data-replica) " ";
+  visibility: hidden;
+}
+
+.autogrow > textarea,
+.autogrow::after {
+  grid-area: 1 / 1 / 2 / 2;
+  width: 100%;
+  /* Genel input kuralındaki sabit 42px yüksekliği ve dikey dolgusuz padding
+     burada geçersiz kılınmalı, yoksa alan tek satırda kalır. */
+  height: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font: inherit;
+  line-height: 1.35;
+  text-align: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  box-sizing: border-box;
+}
+
+.autogrow > textarea {
+  resize: none;
+  overflow: hidden;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.autogrow > textarea:focus {
+  border-color: var(--color-primary);
 }
 
 button {
@@ -332,5 +393,33 @@ button:focus-visible {
   .entity-card-cover-add {
     opacity: 1;
     pointer-events: auto;
+  }
+}
+
+/*
+ * Kaydırınca tepede beliren sabit şeridin satırları (bkz. App.tsx
+ * CoverStickyHeader): sekmeler, araç çubuğu ve geri bağlantısı sırayla açılıyor.
+ * Satırlar koşullu render edildiği için CSS geçişi (transition) tetiklenmiyor —
+ * mount anında çalışan kısa bir keyframe kullanılıyor: yukarıdan hafifçe iniyor
+ * ve açılıyor, böylece satırın nereden geldiği anlaşılıyor.
+ */
+@keyframes sticky-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sticky-row-in {
+  animation: sticky-row-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sticky-row-in {
+    animation: none;
   }
 }

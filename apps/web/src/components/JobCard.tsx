@@ -5,6 +5,7 @@ import type { Job } from "@projelio/shared";
 import { api } from "../api/client";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import { colors } from "../theme/colors";
+import CardDescription from "./CardDescription";
 import { IconFolder, IconUser, IconCalendar, IconPlus } from "./icons";
 
 interface Props {
@@ -23,18 +24,10 @@ const CARD_HEIGHT = 296;
 
 export default function JobCard({ job, projectCount }: Props) {
   const c = colors.light;
-  const [expanded, setExpanded] = useState(false);
   const [coverUrl, setCoverUrl] = useState(job.coverImageUrl);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const toggleExpanded = (e: React.MouseEvent) => {
-    // İçindeyken Link'e tıklanmış gibi işe yönlendirmesin — sadece açıklamayı büyüt/küçült.
-    e.preventDefault();
-    e.stopPropagation();
-    setExpanded((prev) => !prev);
-  };
 
   const handleAddCoverClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -162,28 +155,7 @@ export default function JobCard({ job, projectCount }: Props) {
           {job.title}
         </h3>
         {job.description && (
-          <p
-            onClick={toggleExpanded}
-            title={expanded ? undefined : "Tamamını görmek için tıkla"}
-            style={{
-              color: c.textSecondary,
-              fontSize: 15,
-              margin: "0 0 10px",
-              lineHeight: 1.5,
-              cursor: "pointer",
-              minHeight: 0,
-              ...(expanded
-                ? { flex: 1, overflowY: "auto" as const }
-                : {
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical" as const,
-                    overflow: "hidden",
-                  }),
-            }}
-          >
-            {job.description}
-          </p>
+          <CardDescription text={job.description} />
         )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 15, color: c.textSecondary, marginBottom: 10 }}>

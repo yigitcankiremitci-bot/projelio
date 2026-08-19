@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Product } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { detectImageUpload } from "../../common/upload-image.util";
 
 const COVER_BUCKET = "product-covers";
 
@@ -161,12 +162,14 @@ export class ProductsService {
   async uploadCover(id: string, file: Express.Multer.File, requestingUserId?: string): Promise<Product> {
     const existing = await this.findOne(id);
     await this.assertCanManage(existing.organizationId, existing.departmentId, requestingUserId);
-    const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
+    // Tur ve uzanti istemcinin sozune degil, dosyanin ilk baytlarindaki
+    // imzaya gore belirlenir (bkz. common/upload-image.util.ts).
+    const { contentType, ext } = detectImageUpload(file);
     const path = `${id}/${randomUUID()}.${ext}`;
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(COVER_BUCKET)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);

@@ -11,3 +11,9 @@ coverage/
 # Yedek ve otomatik üretilen geçici dosyalar
 *.bak
 vite.config.ts.timestamp-*.mjs
+
+# Silinmek uzere kenara alinan dosyalar (bkz. sohbet notu) — repoya girmemeli
+_to_delete/
+
+# FUSE tabanli baglama noktalarinda acik dosya tutamaklari icin uretilen artiklar
+.fuse_hidden*

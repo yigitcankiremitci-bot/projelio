@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Output, Project, Task } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import Modal from "./Modal";
 import AssigneePicker from "./AssigneePicker";
+import AutoGrowTextarea from "./AutoGrowTextarea";
 
 interface Props {
   // Sabit bir proje verilirse proje seçimi gösterilmez (ör. proje sayfasından açılınca).
@@ -34,6 +35,7 @@ export default function CreateTaskModal({
   onCreated,
 }: Props) {
   const c = colors.light;
+  const formRef = useRef<HTMLFormElement>(null);
   const [projects, setProjects] = useState<Project[]>(projectsProp ?? []);
   const [projectId, setProjectId] = useState(fixedProjectId ?? "");
   const [loadingProjects, setLoadingProjects] = useState(!fixedProjectId && !projectsProp);
@@ -42,7 +44,9 @@ export default function CreateTaskModal({
   const [outputId, setOutputId] = useState("");
   const [loadingOutputs, setLoadingOutputs] = useState(false);
 
-  const [assignedTo, setAssignedTo] = useState(fixedAssignedTo ?? "");
+  // Çoklu atama (bkz. migration 053). "Şu kişi için görev" akışında (bkz.
+  // JobTeamPanel) liste o kişiyle başlar ve üzerine ekleme yapılabilir.
+  const [assigneeIds, setAssigneeIds] = useState<string[]>(fixedAssignedTo ? [fixedAssignedTo] : []);
 
   const [title, setTitle] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -104,7 +108,7 @@ export default function CreateTaskModal({
         status: "todo",
         // Çıktı seçmek zorunlu değil: seçilmezse doğrudan proje görevi olarak eklenir.
         outputId: outputId || undefined,
-        assignedTo: assignedTo || undefined,
+        assignedToIds: assigneeIds,
         // Tahmini süre opsiyonel: doldurulmadıysa hiç gönderilmez.
         estimatedDurationValue: trimmedDuration ? Number(trimmedDuration) : undefined,
         estimatedDurationUnit: trimmedDuration ? durationUnit : undefined,
@@ -134,7 +138,7 @@ export default function CreateTaskModal({
           Görev eklemek için önce bir proje oluşturman gerekiyor.
         </p>
       ) : (
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <form ref={formRef} onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {showProjectSelect && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 15, color: c.textSecondary }}>Proje</label>
@@ -168,7 +172,19 @@ export default function CreateTaskModal({
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 15, color: c.textSecondary }}>Görev başlığı</label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Örn. Logo revizyonu" maxLength={200} style={{ width: "100%" }} />
+                {/* Uzun başlık tek satırda yatay kayıp okunmaz hale gelmesin
+                    diye sararak büyüyen alan (bkz. AutoGrowTextarea). */}
+                <AutoGrowTextarea
+                  value={title}
+                  onChange={setTitle}
+                  onSubmit={() => formRef.current?.requestSubmit()}
+                  onCancel={onClose}
+                  ariaLabel="Görev başlığı"
+                  placeholder="Örn. Logo revizyonu"
+                  maxLength={200}
+                  required
+                  minHeight={42}
+                />
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -219,7 +235,14 @@ export default function CreateTaskModal({
                   </div>
                 ) : (
                   // Tüm kullanıcılar yerine yalnızca seçili projenin ekibi, arama ile
-                  <AssigneePicker projectId={projectId} value={assignedTo} onChange={(userId) => setAssignedTo(userId)} />
+                  <AssigneePicker
+                    projectId={projectId}
+                    multiple
+                    values={assigneeIds}
+                    onChangeValues={setAssigneeIds}
+                    value=""
+                    onChange={() => {}}
+                  />
                 )}
               </div>
 

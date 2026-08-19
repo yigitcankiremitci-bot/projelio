@@ -6,6 +6,7 @@ import { MicrosoftAccountsService } from "./microsoft-accounts.service";
 import { MicrosoftController } from "./microsoft.controller";
 import { MicrosoftOAuthService } from "./microsoft-oauth.service";
 import { OneDriveService } from "./onedrive.service";
+import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
 
 /**
  * "OneDrive'ı bağla" akışı (Ayarlar ekranı) + FilesModule'ün kullandığı
@@ -27,8 +28,8 @@ import { OneDriveService } from "./onedrive.service";
     PassportModule,
     // `state` parametresini imzalamak için; oturum token'ıyla aynı anahtar.
     JwtModule.register({
-      secret: process.env.JWT_SECRET ?? "change-me",
-      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? "7d" },
+      secret: getJwtSecret(),
+      signOptions: { expiresIn: getJwtExpiresIn() },
     }),
   ],
   controllers: [MicrosoftController],

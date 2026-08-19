@@ -163,6 +163,47 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
     onChanged();
   };
 
+  /**
+   * Kendi kadro kaydım — varsa "Kadrodan ayrıl" düğmesi gösterilir.
+   * Kullanıcı bir departmana eklendiği için orada kalmaya mahkûm olmamalı;
+   * bugüne kadar ayrılmanın tek yolu org sahibine haber verip çıkarılmayı
+   * beklemekti.
+   */
+  const myMembership = currentUserId
+    ? members.find((m) => m.userId === currentUserId && m.status === "approved")
+    : undefined;
+  const myLeavePending = currentUserId
+    ? members.find((m) => m.userId === currentUserId && m.status === "leave_pending")
+    : undefined;
+
+  const handleLeave = async () => {
+    if (!window.confirm("Bu departmanın kadrosundan ayrılmak istediğine emin misin?")) return;
+    // Son yönetici ayrılıyorsa sunucu ayrılmayı hemen uygulamaz, organizasyon
+    // sahibinin onayına düşürür (bkz. 061) — kullanıcı beklediğini sanmasın.
+    const result = await api
+      .patch<{ success: true; pendingApproval: boolean }>(`/departments/${departmentId}/members/me/leave`, {})
+      .catch(() => null);
+    if (result?.pendingApproval) {
+      window.alert(
+        "Bu departmanın son yöneticisisin. Ayrılma talebin şirket kurucusuna iletildi; onaylanana kadar yöneticiliğin sürüyor."
+      );
+    }
+    load();
+    onChanged();
+  };
+
+  /**
+   * Bekleyen ayrılma talepleri. Yalnızca organizasyon sahibi yanıtlayabilir;
+   * sunucu da aynı kuralı uyguluyor, buradaki liste yalnızca görünürlük için.
+   */
+  const leaveRequests = members.filter((m) => m.status === "leave_pending");
+
+  const respondToLeave = async (id: string, approve: boolean) => {
+    await api.patch(`/department-members/${id}/leave-request/respond`, { approve }).catch(() => {});
+    load();
+    onChanged();
+  };
+
   // Davet edilen kişi kendi hesabıyla bu sayfayı açtığında ("Kadro Daveti"
   // bildirimindeki link ile) kendi bekleyen davetini burada görüp onaylar/reddeder.
   const myPendingInvite = currentUserId
@@ -185,6 +226,68 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {myLeavePending && (
+        <div style={{ fontSize: 13, color: c.textSecondary, textAlign: "right" }}>
+          Ayrılma talebin şirket kurucusunun onayını bekliyor.
+        </div>
+      )}
+
+      {myMembership && (
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={handleLeave}
+            style={{
+              padding: "6px 12px",
+              fontSize: 13,
+              borderRadius: 8,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.danger,
+              cursor: "pointer",
+            }}
+          >
+            Kadrodan ayrıl
+          </button>
+        </div>
+      )}
+
+      {leaveRequests.map((m) => (
+        <div
+          key={m.id}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            background: `${c.danger}12`,
+            border: `1px solid ${c.danger}`,
+            borderRadius: 10,
+            padding: 12,
+          }}
+        >
+          <div style={{ fontSize: 15, color: c.textPrimary }}>
+            <strong>{m.fullName ?? m.inviteEmail ?? "Bir yönetici"}</strong> bu departmanın son yöneticisi ve
+            ayrılmak istiyor. Onaylarsan departman yöneticisiz kalır — önce yerine birini atamak isteyebilirsin.
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => respondToLeave(m.id, true)}
+              style={{ padding: "7px 14px", fontSize: 14, borderRadius: 8, border: "none", background: c.danger, color: "#fff", cursor: "pointer" }}
+            >
+              Ayrılmasını onayla
+            </button>
+            <button
+              type="button"
+              onClick={() => respondToLeave(m.id, false)}
+              style={{ padding: "7px 14px", fontSize: 14, borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, cursor: "pointer" }}
+            >
+              Reddet
+            </button>
+          </div>
+        </div>
+      ))}
+
       {myPendingInvite && (
         <div
           style={{

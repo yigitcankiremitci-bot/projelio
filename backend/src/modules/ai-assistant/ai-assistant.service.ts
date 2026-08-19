@@ -429,6 +429,56 @@ export class AiAssistantService {
    * Akış: bakiye kontrolü -> sohbeti bul/oluştur -> geçmişi yükle -> araç döngüsü ->
    * harcanan token'ları krediye çevirip düş -> mesajları kaydet.
    */
+  /**
+   * Tek seferlik metin üretimi — araçsız, sohbetsiz.
+   *
+   * `chat()` bir ajan döngüsü: araçları çağırır, sohbeti saklar, onay bekler.
+   * Bazı yerlerde ise yalnızca "şu metni yaz" gerekiyor (e-posta yanıt taslağı
+   * gibi). Onu chat üzerinden yaptırmak, kullanıcının sohbet geçmişine ilgisiz
+   * bir kayıt düşürür ve araç şemalarının maliyetini boşuna öder.
+   *
+   * Kredi muhasebesi aynı: bakiye önden kontrol edilir, token'lar sonunda
+   * ücretlendirilir — AI'ın hangi yüzeyden çağrıldığı faturayı değiştirmemeli.
+   */
+  async draftText(params: {
+    userId: string;
+    system: string;
+    prompt: string;
+    maxTokens?: number;
+  }): Promise<{ text: string }> {
+    await this.creditsService.assertCanStart(params.userId);
+    const anthropic = this.getClient();
+
+    const response = await this.callAnthropic(anthropic, {
+      model: this.model,
+      max_tokens: params.maxTokens ?? 1200,
+      system: params.system,
+      messages: [{ role: "user", content: params.prompt }],
+    });
+
+    const usage: any = response.usage ?? {};
+    await this.creditsService
+      .chargeUsage({
+        userId: params.userId,
+        model: this.model,
+        inputTokens: usage.input_tokens ?? 0,
+        outputTokens: usage.output_tokens ?? 0,
+        cacheWriteTokens: usage.cache_creation_input_tokens ?? 0,
+        cacheReadTokens: usage.cache_read_input_tokens ?? 0,
+      })
+      // Ücretlendirme hatası üretilen metni çöpe atmamalı; kayıt log'da kalır.
+      .catch((err) => this.logger.error(`Taslak ücretlendirilemedi: ${(err as Error).message}`));
+
+    const text = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .join("\n")
+      .trim();
+
+    if (!text) throw new BadRequestException("Taslak üretilemedi, tekrar deneyin.");
+    return { text };
+  }
+
   async chat(
     userId: string,
     userRole: string,
@@ -778,7 +828,11 @@ export class AiAssistantService {
       for (const task of tasks) {
         if (task.status === "completed") continue;
         const deadline = task.deadline ? new Date(task.deadline) : null;
-        if (task.assignedTo === userId) assignedOpen++;
+        // Çoklu atama (bkz. migration 053): birincil olmayan atananlar da sayılır.
+        const assignedToMe = task.assignees?.length
+          ? task.assignees.some((a) => a.userId === userId)
+          : task.assignedTo === userId;
+        if (assignedToMe) assignedOpen++;
         if (deadline && deadline < now) {
           overdue++;
           if (overdueSamples.length < 8) {

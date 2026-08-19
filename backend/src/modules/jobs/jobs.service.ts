@@ -5,7 +5,9 @@ import { SupabaseService } from "../../database/supabase.service";
 import { ProjectsService } from "../projects/projects.service";
 import { OperationsService } from "../operations/operations.service";
 import { FilesService } from "../files/files.service";
+import { AccessService } from "../../common/access/access.service";
 import { applyOrder } from "../../common/reorder.util";
+import { detectImageUpload } from "../../common/upload-image.util";
 
 const COVER_BUCKET = "job-covers";
 
@@ -35,7 +37,8 @@ export class JobsService {
     private supabase: SupabaseService,
     private projectsService: ProjectsService,
     private operationsService: OperationsService,
-    private filesService: FilesService
+    private filesService: FilesService,
+    private access: AccessService
   ) {}
 
   // Kullanıcının sahibi olduğu işler + doğrudan iş ekibine alındığı (job_members,
@@ -208,14 +211,20 @@ export class JobsService {
       .maybeSingle();
     if (org?.owner_id === requestingUserId) return jobs;
 
-    const { data: orgMember } = await this.supabase.client
-      .from("organization_members")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("user_id", requestingUserId)
-      .eq("status", "approved")
-      .maybeSingle();
-    if (orgMember) return jobs;
+    // Organizasyon üyeliği tüm işleri açar — TAŞERON HARİÇ. Taşeron dış
+    // kaynaktır: bir departmanın kadrosunda ya da bir işin ekibinde olması,
+    // şirketin diğer işlerini görmesini gerektirmez. Bu kısayol olmadığında
+    // aşağıdaki findAllForUser kapsamına düşer (yalnızca ekli olduğu işler).
+    if (!(await this.access.isSubcontractor(requestingUserId))) {
+      const { data: orgMember } = await this.supabase.client
+        .from("organization_members")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("user_id", requestingUserId)
+        .eq("status", "approved")
+        .maybeSingle();
+      if (orgMember) return jobs;
+    }
 
     const visibleJobs = await this.findAllForUser(requestingUserId);
     const visibleIds = new Set(visibleJobs.map((j) => j.id));
@@ -238,13 +247,16 @@ export class JobsService {
     const { data: group } = await this.supabase.client.from("groups").select("owner_id").eq("id", groupId).maybeSingle();
     if (group?.owner_id === requestingUserId) return jobs;
 
-    const { data: groupMember } = await this.supabase.client
-      .from("group_members")
-      .select("id")
-      .eq("group_id", groupId)
-      .eq("user_id", requestingUserId)
-      .maybeSingle();
-    if (groupMember) return jobs;
+    // Grup üyeliği de taşerona geniş erişim vermez (bkz. findByOrganization).
+    if (!(await this.access.isSubcontractor(requestingUserId))) {
+      const { data: groupMember } = await this.supabase.client
+        .from("group_members")
+        .select("id")
+        .eq("group_id", groupId)
+        .eq("user_id", requestingUserId)
+        .maybeSingle();
+      if (groupMember) return jobs;
+    }
 
     const visibleJobs = await this.findAllForUser(requestingUserId);
     const visibleIds = new Set(visibleJobs.map((j) => j.id));
@@ -334,7 +346,8 @@ export class JobsService {
     return mapJob(row);
   }
 
-  async restore(id: string): Promise<Job> {
+  async restore(id: string, requestingUserId?: string): Promise<Job> {
+    await this.assertOwner(id, requestingUserId);
     const { data: row, error } = await this.supabase.client
       .from("jobs")
       .update({ archived_at: null })
@@ -359,12 +372,14 @@ export class JobsService {
 
   async uploadCover(id: string, file: Express.Multer.File, requestingUserId?: string): Promise<Job> {
     await this.assertOwner(id, requestingUserId);
-    const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
+    // Tur ve uzanti istemcinin sozune degil, dosyanin ilk baytlarindaki
+    // imzaya gore belirlenir (bkz. common/upload-image.util.ts).
+    const { contentType, ext } = detectImageUpload(file);
     const path = `${id}/${randomUUID()}.${ext}`;
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(COVER_BUCKET)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);

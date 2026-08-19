@@ -8,14 +8,15 @@ import { PasswordResetService } from "./password-reset.service";
 import { EmailVerificationService } from "./email-verification.service";
 import { EmailService } from "./email.service";
 import { UsersModule } from "../users/users.module";
+import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET ?? "change-me",
-      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? "7d" },
+      secret: getJwtSecret(),
+      signOptions: { expiresIn: getJwtExpiresIn() },
     }),
   ],
   controllers: [AuthController],

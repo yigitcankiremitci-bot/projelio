@@ -15,6 +15,8 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { AuthGuard } from "@nestjs/passport";
 import { memoryStorage } from "multer";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { RolesGuard } from "../../common/guards/roles.guard";
 import { UsersService } from "./users.service";
 import type { AccountType } from "./users.service";
 import { OrganizationsService } from "../organizations/organizations.service";
@@ -29,7 +31,12 @@ export class UsersController {
     private groupsService: GroupsService
   ) {}
 
+  // Tüm kullanıcı dizini. Arayüzde kullanılmıyor (kişi eklerken /users/search
+  // çağrılır) ve herkese açık bir kullanıcı listesi vermek için sebep yok:
+  // admin paneli kendi uçunu kullanır (bkz. AdminController.getUsers).
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles("admin")
   findAll(@Query("limit") limit?: string) {
     return this.usersService.findAll(limit ? Number(limit) : undefined);
   }

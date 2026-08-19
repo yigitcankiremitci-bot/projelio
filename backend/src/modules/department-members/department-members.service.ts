@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import type { DepartmentMember } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { decideDepartmentAccess } from "../departments/department-access";
 
 function mapDepartmentMember(row: any): DepartmentMember {
   return {
@@ -62,7 +63,54 @@ export class DepartmentMembersService {
     return dept.organization_id;
   }
 
-  async findByDepartment(departmentId: string): Promise<DepartmentMember[]> {
+  /**
+   * Kadro listesini kim görebilir: organizasyon sahibi, departman yöneticisi,
+   * organizasyonun onaylı üyesi ve departmanın çalışanları. TAŞERON göremez —
+   * dış kaynak, organizasyonun kadrosunu (isim/e-posta) bilmemeli.
+   *
+   * Yetkisi olmayan kullanıcı boş liste değil, YALNIZCA kendi kaydını görür:
+   * bekleyen davetini onaylayabilmesi için o satıra ihtiyacı var
+   * (bkz. DepartmentMembersList — kendi pending davetinde Onayla/Reddet çıkar).
+   */
+  private async canViewRoster(departmentId: string, userId: string): Promise<boolean> {
+    const { data: dept } = await this.supabase.client
+      .from("departments")
+      .select("organization_id")
+      .eq("id", departmentId)
+      .maybeSingle();
+    if (!dept) throw new NotFoundException("Departman bulunamadı");
+
+    const { data: org } = await this.supabase.client
+      .from("organizations")
+      .select("owner_id")
+      .eq("id", dept.organization_id)
+      .maybeSingle();
+    if (org?.owner_id === userId) return true;
+
+    const { data: orgMember } = await this.supabase.client
+      .from("organization_members")
+      .select("id")
+      .eq("organization_id", dept.organization_id)
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .maybeSingle();
+
+    const { data: membership } = await this.supabase.client
+      .from("department_members")
+      .select("role")
+      .eq("department_id", departmentId)
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .maybeSingle();
+
+    return decideDepartmentAccess({
+      isOrgOwner: false,
+      isOrgMember: !!orgMember,
+      membershipRole: membership?.role as DepartmentMember["role"] | undefined,
+    }).canViewTeam;
+  }
+
+  async findByDepartment(departmentId: string, requestingUserId?: string): Promise<DepartmentMember[]> {
     const { data, error } = await this.supabase.client
       .from("department_members")
       // department_members'ın users'a iki ayrı FK'sı var (user_id, invited_by) —
@@ -74,7 +122,10 @@ export class DepartmentMembersService {
       .neq("status", "removed")
       .order("joined_at", { ascending: true });
     if (error) throw error;
-    return (data ?? []).map(mapDepartmentMember);
+    const members = (data ?? []).map(mapDepartmentMember);
+    if (!requestingUserId) return members;
+    if (await this.canViewRoster(departmentId, requestingUserId)) return members;
+    return members.filter((m) => m.userId === requestingUserId);
   }
 
   async invite(
@@ -208,6 +259,117 @@ export class DepartmentMembersService {
 
   // İşten çıkarma / kadrodan ayrılma. accessUntil verilirse belirtilen tarihe kadar
   // sınırlı görünürlük tanınır (Doküman 1, işten çıkarma bölümü).
+  /**
+   * Kullanıcının kendi isteğiyle departman kadrosundan ayrılması.
+   *
+   * `remove` yöneticinin birini çıkarmasıdır ve org sahipliği ister; burada
+   * yetki "o kayıt benim olmak". Kayıt silinmez, `status='removed'` olur —
+   * kadro geçmişi (ne zaman katıldı, ne zaman ayrıldı) korunmalı.
+   */
+  async leave(departmentId: string, userId: string): Promise<{ success: true; pendingApproval: boolean }> {
+    const { data: row } = await this.supabase.client
+      .from("department_members")
+      .select("id, status, role")
+      .eq("department_id", departmentId)
+      .eq("user_id", userId)
+      .neq("status", "removed")
+      .maybeSingle();
+    if (!row) throw new NotFoundException("Bu departmanda bir kadro kaydın yok");
+    if (row.status === "leave_pending") {
+      throw new BadRequestException("Ayrılma talebin zaten onay bekliyor");
+    }
+
+    // SON yönetici mi? Öyleyse ayrılma doğrudan gerçekleşmez; organizasyon
+    // sahibinin onayına düşer (bkz. 061). Departman yöneticisiz kalırsa kimse
+    // kadroya kişi davet edemez, bütçeye kayıt giremez, görev yönetemez.
+    const isLastManager = row.role === "manager" && (await this.countActiveManagers(departmentId)) <= 1;
+
+    const { error } = await this.supabase.client
+      .from("department_members")
+      .update({ status: isLastManager ? "leave_pending" : "removed" })
+      .eq("id", row.id);
+    if (error) throw error;
+
+    if (isLastManager) {
+      await this.notifyOwnerOfLeaveRequest(departmentId, userId);
+    }
+    return { success: true, pendingApproval: isLastManager };
+  }
+
+  /** Departmanda hâlâ yetkili sayılan yönetici sayısı (leave_pending dahil). */
+  private async countActiveManagers(departmentId: string): Promise<number> {
+    const { data } = await this.supabase.client
+      .from("department_members")
+      .select("id")
+      .eq("department_id", departmentId)
+      .eq("role", "manager")
+      .in("status", ["approved", "leave_pending"]);
+    return (data ?? []).length;
+  }
+
+  private async notifyOwnerOfLeaveRequest(departmentId: string, leavingUserId: string): Promise<void> {
+    const { data: dept } = await this.supabase.client
+      .from("departments")
+      .select("name, organization_id")
+      .eq("id", departmentId)
+      .maybeSingle();
+    if (!dept) return;
+    const { data: org } = await this.supabase.client
+      .from("organizations")
+      .select("owner_id")
+      .eq("id", dept.organization_id)
+      .maybeSingle();
+    if (!org?.owner_id) return;
+
+    const { data: user } = await this.supabase.client
+      .from("users")
+      .select("full_name")
+      .eq("id", leavingUserId)
+      .maybeSingle();
+
+    void this.notificationsService.notifyUser(
+      org.owner_id,
+      "role_updated",
+      "Ayrılma onayı bekliyor",
+      `${user?.full_name ?? "Bir yönetici"}, "${dept.name}" departmanının son yöneticisi ve ayrılmak istiyor. Onaylamadan ayrılamaz.`,
+      `/departments/${departmentId}?tab=team`
+    );
+  }
+
+  /**
+   * Organizasyon sahibinin ayrılma talebine yanıtı. Onaylanırsa kadro kaydı
+   * kapanır, reddedilirse kişi yöneticiliğine geri döner.
+   */
+  async respondToLeaveRequest(id: string, approve: boolean, requestingUserId?: string): Promise<DepartmentMember> {
+    const existing = await this.findById(id);
+    await this.assertOrgOwner(existing.departmentId, requestingUserId);
+    if (existing.status !== "leave_pending") {
+      throw new BadRequestException("Bu kayıt için bekleyen bir ayrılma talebi yok");
+    }
+
+    const { data: row, error } = await this.supabase.client
+      .from("department_members")
+      .update({ status: approve ? "removed" : "approved" })
+      .eq("id", id)
+      .select("*, users!department_members_user_id_fkey(full_name, email, username)")
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Kadro kaydı bulunamadı");
+
+    if (existing.userId) {
+      void this.notificationsService.notifyUser(
+        existing.userId,
+        "role_updated",
+        approve ? "Ayrılma onaylandı" : "Ayrılma reddedildi",
+        approve
+          ? "Departman kadrosundan ayrıldın."
+          : "Ayrılma talebin reddedildi; departman yöneticiliğin devam ediyor.",
+        `/departments/${existing.departmentId}?tab=team`
+      );
+    }
+    return mapDepartmentMember(row);
+  }
+
   async remove(id: string, accessUntil: string | undefined, requestingUserId?: string): Promise<DepartmentMember> {
     const existing = await this.findById(id);
     await this.assertOrgOwner(existing.departmentId, requestingUserId);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
+import { notifyCreationRequestsChanged, readCreateOutcome } from "../lib/creationRequests";
 import Modal from "./Modal";
 
 interface Props {
@@ -17,13 +18,25 @@ export default function CreateJobModal({ onClose, onCreated }: Props) {
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Taşeronun organizasyona bağlı iş talebi onaya düşer; kayıt o an açılmaz.
+  const [sentForApproval, setSentForApproval] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await api.post("/jobs", { title, description: description || undefined });
+      const result = readCreateOutcome(
+        await api.post("/jobs", { title, description: description || undefined })
+      );
+      if (result.pending) {
+        // Kayıt açılmadı: yetkiliye bildirim gitti. Modalı kapatmıyoruz —
+        // kullanıcı "oluştu" sanıp listede aramasın.
+        setSentForApproval(true);
+        setLoading(false);
+        notifyCreationRequestsChanged();
+        return;
+      }
       onClose();
       if (onCreated) onCreated();
       else window.location.reload();
@@ -32,6 +45,26 @@ export default function CreateJobModal({ onClose, onCreated }: Props) {
       setLoading(false);
     }
   };
+
+  if (sentForApproval) {
+    return (
+      <Modal title="Onaya gönderildi" onClose={onClose}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <p style={{ fontSize: 16, color: c.textPrimary, margin: 0, lineHeight: 1.5 }}>
+            <strong>{title}</strong> talebiniz yetkiliye iletildi. Onaylandığında bildirim alacak
+            ve iş listenizde göreceksiniz.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
+          >
+            Tamam
+          </button>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal title="Yeni iş" onClose={onClose}>

@@ -17,6 +17,7 @@ import {
 } from "../cloud-storage/cloud-storage.service";
 import type { CloudFile, StorageProvider } from "../cloud-storage/cloud-storage.types";
 import { NotificationsService } from "../notifications/notifications.service";
+import { decodeUploadFileName } from "../../common/upload-filename.util";
 
 export type { NativeFileKind };
 
@@ -1223,7 +1224,7 @@ export class FilesService {
       provider,
       accessToken,
       {
-        name: this.safeFileName(file.originalname),
+        name: this.safeFileName(decodeUploadFileName(file.originalname)),
         mimeType: file.mimetype || "application/octet-stream",
         parentId: target.driveFolderId,
       },
@@ -1281,7 +1282,7 @@ export class FilesService {
       provider,
       accessToken,
       {
-        name: this.safeFileName(file.originalname),
+        name: this.safeFileName(decodeUploadFileName(file.originalname)),
         mimeType: file.mimetype || "application/octet-stream",
         parentId: folderId,
       },

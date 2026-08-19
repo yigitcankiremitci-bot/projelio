@@ -7,6 +7,7 @@ import { colors } from "../theme/colors";
 import { IconPlus, IconChevronRight, IconCheck, IconActivity } from "./icons";
 import HireMemberModal from "./HireMemberModal";
 import CreateTaskModal from "./CreateTaskModal";
+import { isAssignedTo } from "../lib/taskAssignees";
 
 interface Props {
   jobId: string;
@@ -51,7 +52,7 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTasksR
   }, []);
 
   const taskCounts = (userId: string) => {
-    const assigned = tasks.filter((t) => t.assignedTo === userId);
+    const assigned = tasks.filter((t) => isAssignedTo(t, userId));
     const done = assigned.filter((t) => t.status === "completed").length;
     return { total: assigned.length, done };
   };
@@ -100,7 +101,7 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTasksR
             const activeTask = m.activeTaskId ? tasks.find((t) => t.id === m.activeTaskId) : undefined;
 
             const memberTasks = tasks
-              .filter((t) => t.assignedTo === m.userId)
+              .filter((t) => isAssignedTo(t, m.userId))
               .sort((a, b) => (a.status === "completed" ? 1 : 0) - (b.status === "completed" ? 1 : 0));
 
             return (

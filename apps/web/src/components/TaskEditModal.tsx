@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Task, TaskComment } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
@@ -6,9 +6,19 @@ import Modal from "./Modal";
 import AssigneePicker from "./AssigneePicker";
 import EntityDangerZone from "./EntityDangerZone";
 import FilesPanel from "./FilesPanel";
+import TaskAttachmentsPanel from "./TaskAttachmentsPanel";
+import AutoGrowTextarea from "./AutoGrowTextarea";
+import AutoGrowNotes from "./AutoGrowNotes";
+import { useCurrentUser } from "../lib/useCurrentUser";
 
 interface Props {
   task: Task;
+  /**
+   * Rutin tekrarlarının projesi yoktur ama rutinin bağlı olduğu İŞ vardır.
+   * Verilirse Dosyalar bölümü o iş bağlamıyla açılır — dosyalar Drive/OneDrive'da
+   * yaşadığı ve her dosya bir işe ait olduğu için (bkz. FilesPanel) bağlam şart.
+   */
+  fileJobId?: string;
   onClose: () => void;
   onSaved: (updated: Task) => void;
   onDeleted?: (deletedTaskId: string) => void;
@@ -19,14 +29,24 @@ function toDateInputValue(iso?: string) {
   return iso ? new Date(iso).toISOString().slice(0, 10) : "";
 }
 
-export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArchived }: Props) {
+export default function TaskEditModal({ task, fileJobId, onClose, onSaved, onDeleted, onArchived }: Props) {
   const c = colors.light;
+  const formRef = useRef<HTMLFormElement>(null);
   const isSubtask = Boolean(task.parentTaskId);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
   const [startDate, setStartDate] = useState(toDateInputValue(task.startDate));
   const [deadline, setDeadline] = useState(toDateInputValue(task.deadline));
-  const [assignedTo, setAssignedTo] = useState(task.assignedTo ?? "");
+  // Opsiyonel bitiş saati ve ona bağlı hatırlatma (bkz. migration 057).
+  const [deadlineTime, setDeadlineTime] = useState(task.deadlineTime ?? "");
+  const [reminderLead, setReminderLead] = useState<string>(
+    task.reminderLeadMinutes != null ? String(task.reminderLeadMinutes) : ""
+  );
+  // Çoklu atama (bkz. migration 053). İlk eleman birincil atanan sayılır;
+  // eski tek atamalı görevlerde `assignees` boş gelebilir, o zaman assignedTo'ya düşülür.
+  const [assigneeIds, setAssigneeIds] = useState<string[]>(
+    task.assignees?.length ? task.assignees.map((a) => a.userId) : task.assignedTo ? [task.assignedTo] : []
+  );
   const [budget, setBudget] = useState(String(task.budget ?? 0));
   const [durationValue, setDurationValue] = useState(
     task.estimatedDurationValue != null ? String(task.estimatedDurationValue) : ""
@@ -37,6 +57,25 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
+  const { user: currentUser } = useCurrentUser();
+
+  /**
+   * Görevden ayrılma: kullanıcı kendini atananlar listesinden çıkarır. Görev
+   * silinmez, başkalarının ataması bozulmaz. Son atanan da ayrılırsa görev
+   * "atanmamış" kalır — kimseye zorla bırakılmaktansa ekibin görüp yeniden
+   * ataması daha dürüst.
+   */
+  const amAssigned = assigneeIds.includes(currentUser?.id ?? "");
+
+  const handleLeaveTask = async () => {
+    if (!currentUser) return;
+    if (!window.confirm("Bu görevden ayrılmak istiyor musun? Görev silinmez, üzerinden düşersin.")) return;
+    const updated = await api.delete<Task>(`/tasks/${task.id}/assignees/me`).catch(() => null);
+    if (updated) {
+      setAssigneeIds(updated.assignees?.map((a) => a.userId) ?? []);
+      onSaved(updated);
+    }
+  };
 
   // DELETE isteğini EntityDangerZone geciktirmeli olarak atar (bkz. resourcePath);
   // burada yalnızca silme sonrası arayüz davranışı kalır.
@@ -67,7 +106,10 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
         description: description.trim() ? description : null,
         startDate: startDate ? new Date(startDate).toISOString() : undefined,
         deadline: deadline ? new Date(deadline).toISOString() : undefined,
-        assignedTo: assignedTo || null,
+        deadlineTime: deadlineTime || null,
+        // Saat yoksa hatırlatma da yok: sunucu ve veritabanı aynı kuralı uyguluyor.
+        reminderLeadMinutes: deadlineTime && reminderLead !== "" ? Number(reminderLead) : null,
+        assignedToIds: assigneeIds,
         budget: Number(budget) || 0,
         estimatedDurationValue: trimmedDuration ? Number(trimmedDuration) : null,
         estimatedDurationUnit: trimmedDuration ? durationUnit : null,
@@ -97,21 +139,35 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
 
   return (
     <Modal title="Görevi düzenle" onClose={onClose} maxWidth={1280}>
-      <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <form ref={formRef} onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} style={{ width: "100%" }} />
+          {/* Uzun başlık tek satırda yatay kayıp okunmaz hale gelmesin diye
+              sararak büyüyen alan; Enter yine kaydeder (bkz. AutoGrowTextarea). */}
+          <AutoGrowTextarea
+            value={title}
+            onChange={setTitle}
+            onSubmit={() => formRef.current?.requestSubmit()}
+            onCancel={onClose}
+            ariaLabel="Başlık"
+            maxLength={200}
+            required
+            minHeight={42}
+          />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Notlar</label>
-          <textarea
+          {/* Dört satır yüksekliğinde durur, not uzadıkça kendiliğinden büyür:
+              sabit yükseklikte uzun not kendi içinde kayan bir kutuya hapsoluyor
+              ve yazılanın tamamı görünmüyordu (bkz. AutoGrowNotes). */}
+          <AutoGrowNotes
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={setDescription}
             placeholder="Görevle ilgili notlar (opsiyonel)"
-            rows={5}
+            ariaLabel="Notlar"
             maxLength={2000}
-            style={{ width: "100%", fontSize: 16, resize: "vertical" }}
+            rows={4}
           />
         </div>
 
@@ -126,15 +182,54 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
           </div>
         </div>
 
+        {/* Bitiş saati opsiyonel: çoğu görevin saati yok, zorunlu kılmak her
+            görevde anlamsız bir seçim dayatırdı. Saat girilince hatırlatma
+            seçeneği açılır — saat yokken "ne kadar önce" sorusunun karşılığı yok. */}
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş saati (opsiyonel)</label>
+            <input
+              type="time"
+              value={deadlineTime}
+              onChange={(e) => {
+                setDeadlineTime(e.target.value);
+                // Saat silinince hatırlatma da düşer; kalırsa kaydedilmeyen bir
+                // seçim ekranda asılı kalıyordu.
+                if (!e.target.value) setReminderLead("");
+              }}
+              style={{ width: "100%" }}
+            />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>Hatırlat</label>
+            <select
+              value={reminderLead}
+              onChange={(e) => setReminderLead(e.target.value)}
+              disabled={!deadlineTime}
+              style={{ width: "100%" }}
+            >
+              <option value="">Hatırlatma yok</option>
+              <option value="0">Tam saatinde</option>
+              <option value="15">15 dakika önce</option>
+              <option value="60">1 saat önce</option>
+              <option value="1440">1 gün önce</option>
+            </select>
+          </div>
+        </div>
+
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Ekip</label>
-            {/* Tüm kullanıcılar yerine yalnızca proje ekibi/departman kadrosu, arama ile */}
+            {/* Tüm kullanıcılar yerine yalnızca proje ekibi/departman kadrosu, arama ile.
+                Çoklu: bir görevi birden fazla kişi birlikte yürütebilir. */}
             <AssigneePicker
               projectId={task.projectId}
               departmentId={task.departmentId}
-              value={assignedTo}
-              onChange={(userId) => setAssignedTo(userId)}
+              multiple
+              values={assigneeIds}
+              onChangeValues={setAssigneeIds}
+              value=""
+              onChange={() => {}}
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
@@ -177,11 +272,44 @@ export default function TaskEditModal({ task, onClose, onSaved, onDeleted, onArc
         </button>
       </form>
 
-      {/* Rutin (operations) görevlerinin projesi yoktur; dosya bağlamı kurulamaz. */}
-      {task.projectId && (
+      {amAssigned && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={handleLeaveTask}
+            style={{
+              padding: "6px 12px",
+              fontSize: 13,
+              borderRadius: 8,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.danger,
+              cursor: "pointer",
+            }}
+          >
+            Görevden ayrıl
+          </button>
+        </div>
+      )}
+
+      {/* Link/dosya ekleri her görevde çalışır — rutin tekrarları dahil (bkz. 060).
+          FilesPanel'den ayrı: o Drive/OneDrive klasör bağlamı kurar ve proje
+          gerektirir; bu ise göreve doğrudan bağlı, bağlamsız bir ek listesi. */}
+      <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
+        <TaskAttachmentsPanel taskId={task.id} />
+      </div>
+
+      {/* Dosyalar Drive/OneDrive'da yaşar; kendi veritabanımıza dosya yazılmaz.
+          Proje görevinde proje bağlamı, rutin tekrarında rutinin işi kullanılır —
+          ikisi de yoksa (departman görevi) bölüm hiç açılmaz. */}
+      {(task.projectId || fileJobId) && (
         <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
           <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Dosyalar</h3>
-          <FilesPanel projectId={task.projectId} taskId={task.id} compact />
+          {task.projectId ? (
+            <FilesPanel projectId={task.projectId} taskId={task.id} compact />
+          ) : (
+            <FilesPanel jobId={fileJobId} taskId={task.id} compact />
+          )}
         </div>
       )}
 

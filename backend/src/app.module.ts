@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ScheduleModule } from "@nestjs/schedule";
 import { DatabaseModule } from "./database/database.module";
+import { AccessModule } from "./common/access/access.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
@@ -37,11 +38,16 @@ import { PartyModule } from "./modules/party/party.module";
 import { ModuleRecordsModule } from "./modules/module-records/module-records.module";
 import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.module";
 import { PlanningModule } from "./modules/planning/planning.module";
+import { CreationRequestsModule } from "./modules/creation-requests/creation-requests.module";
+import { SocialMediaModule } from "./modules/social-media/social-media.module";
+import { MailboxModule } from "./modules/mailbox/mailbox.module";
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     DatabaseModule,
+    // Görünürlüğün tek kapısı (bkz. common/access/access.service.ts).
+    AccessModule,
     AuthModule,
     UsersModule,
     ProjectsModule,
@@ -78,6 +84,12 @@ import { PlanningModule } from "./modules/planning/planning.module";
     PartyModule,
     PersonalTodosModule,
     PlanningModule,
+    // Sosyal medya: kendi tablolarını kullanan ilk modül (bkz. 054_social_media.sql).
+    SocialMediaModule,
+    // E-posta modülünün gelen kutusu (Outlook/Graph, bkz. 064_mail_accounts.sql).
+    MailboxModule,
+    // Taşeronun iş/proje açma talepleri (onay akışı).
+    CreationRequestsModule,
   ],
 })
 export class AppModule {}

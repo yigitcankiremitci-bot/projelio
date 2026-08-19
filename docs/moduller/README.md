@@ -39,19 +39,22 @@ Her modül `00`'daki sözleşme formatında yazılır. Arketip başına bir **re
 | 10 | [Gelir-Gider](10-modul-fm_gelir_gider.md) | A2 — Kayıt Listesi | Referans modül, spec hazır |
 | 11 | [Müşteri (CRM)](11-modul-crm_musteri.md) | A2 — Kayıt Listesi | Referans modül, spec hazır |
 | 12 | [Kimlik ve Yön](12-modul-kimlik_ve_yon.md) | A1 — Form / Doküman | Referans modül, spec hazır (vizyon + misyon birleşimi) |
+| 13 | [Sosyal Medya](13-modul-sosyal-medya.md) | A5 — Takvim / Plan | **Uygulandı** — kendi tabloları (054) + takvim/composer/hesap paneli |
+| 14 | [Instagram entegrasyonu](14-instagram-entegrasyonu.md) | — (entegrasyon notu) | **Uygulandı** — bağlantı (058), doğrudan yayın, zamanlanmış kuyruk |
+| 15 | [E-posta gelen kutusu](15-eposta-gelen-kutusu.md) | — (entegrasyon notu) | **Uygulandı** — Outlook/Graph (064), okuma + yanıt + Lio taslağı |
 
-Sırada: `spd_satis_planlama` (A4) · `pd_sosyal_medya` (A5) · `oud_depo` (A3)
+Sırada: `spd_satis_planlama` (A4) · `oud_depo` (A3)
 
 ## Özet sayılar
 
 | | |
 |---|---|
 | Katalog kaydı | 57 |
-| Kayıt modülü (A2 motoru) | 38 |
+| Kayıt modülü (A2 motoru) | 37 |
 | Türev panel (A6 motoru) | 12 |
 | Varlık modülü (`party`) | 1 |
 | Çekirdek (modül değil) | 5 |
-| Kendi tablosunda (`products`) | 1 |
+| Kendi tablosunda (`products`, sosyal medya) | 2 |
 | **Çalışan modül** | **51 / 51** |
 | Arketip motoru: yazılan / toplam | **2 / 6** (A2 · A6) |
 | Arketip motoru: tasarımı hazır | **6 / 6** |

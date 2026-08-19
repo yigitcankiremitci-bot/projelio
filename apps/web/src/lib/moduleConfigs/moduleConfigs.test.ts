@@ -43,7 +43,9 @@ const CORE = [
   "yonetim_cikti_yonetimi", "yonetim_dosya_yonetimi",
 ];
 // Kendi tablosuna/varlığına yazan modüller — module_records kullanmazlar.
-const OWN_TABLE = ["uyd_urunler", ...ENTITY_MODULE_KEYS];
+// pd_sosyal_medya 054 ile buraya katıldı: hesaplar ve "içerik × kanal"
+// ilişkisi tek jsonb sütununa sığmıyordu (bkz. 054_social_media.sql).
+const OWN_TABLE = ["uyd_urunler", "pd_sosyal_medya", ...ENTITY_MODULE_KEYS];
 
 const entries = Object.entries(MODULE_RECORD_CONFIGS);
 
@@ -91,8 +93,8 @@ describe("katalog kapsama", () => {
     assert.deepEqual(beklenmeyen, [], "sessizce generic fallback'e düşen modül var");
   });
 
-  test("38 kayıt tanımı + 1 varlık modülü tanımlı", () => {
-    assert.equal(entries.length, 38);
+  test("37 kayıt tanımı + 1 varlık modülü tanımlı", () => {
+    assert.equal(entries.length, 37);
     assert.equal(ENTITY_MODULE_KEYS.length, 1);
   });
 

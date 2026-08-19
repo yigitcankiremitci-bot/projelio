@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { coverBackground } from "../lib/covers";
 import type { Organization } from "@projelio/shared";
 import { colors } from "../theme/colors";
+import CardDescription from "./CardDescription";
 import { IconFolder, IconLayers, IconBuilding } from "./icons";
 
 interface Props {
@@ -32,7 +33,7 @@ export default function OrganizationCard({ organization }: Props) {
       <div style={{ padding: 16 }}>
         <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{organization.name}</h3>
         {organization.description && (
-          <p style={{ color: c.textSecondary, fontSize: 15, margin: "0 0 10px", lineHeight: 1.5 }}>{organization.description}</p>
+          <CardDescription text={organization.description} />
         )}
 
         {organization.groupName && (

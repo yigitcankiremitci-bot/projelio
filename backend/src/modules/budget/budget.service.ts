@@ -122,7 +122,12 @@ export class BudgetService {
   // --- Departman bütçesi (Bütçe sekmesi) ---
   // Finansal veri hassas olduğu için yalnızca organizasyon sahibi ya da o
   // departmanın onaylı yöneticisi kayıt ekleyip silebilir (bkz. ModuleRecordsService
-  // ile aynı desen). Görüntüleme, kadrodaki herkese açıktır.
+  // ile aynı desen).
+  //
+  // GÖRÜNTÜLEME de aynı daire ile sınırlı. Eskiden findByDepartment hiç userId
+  // almıyordu: departman id'sini bilen HERHANGİ bir oturumlu kullanıcı — kadroda
+  // olmayan biri dahil — organizasyonun gelir/gider defterini okuyabiliyordu.
+  // Taşeron ve çalışan bu sekmeyi hiç görmemeli (bkz. department-access.ts).
   private async assertCanManageDepartment(departmentId: string, userId?: string): Promise<void> {
     if (!userId) return;
     const { data: dept } = await this.supabase.client
@@ -149,7 +154,23 @@ export class BudgetService {
     throw new ForbiddenException("Bu bütçeyi yalnızca organizasyon sahibi veya departman yöneticisi düzenleyebilir");
   }
 
-  async findByDepartment(departmentId: string): Promise<BudgetTransaction[]> {
+  // Görüntüleme yetkisi yönetme yetkisiyle aynı daire: organizasyon sahibi +
+  // departman yöneticisi. Ayrı bir mesajla 403 döner ki arayüz "bu sekmeyi
+  // göremezsin" ile "kayıt ekleyemezsin" durumlarını ayırt edebilsin.
+  private async assertCanViewDepartmentBudget(departmentId: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    try {
+      await this.assertCanManageDepartment(departmentId, userId);
+    } catch (err) {
+      if (err instanceof ForbiddenException) {
+        throw new ForbiddenException("Bu departmanın bütçesini görüntüleme yetkiniz yok");
+      }
+      throw err;
+    }
+  }
+
+  async findByDepartment(departmentId: string, requestingUserId?: string): Promise<BudgetTransaction[]> {
+    await this.assertCanViewDepartmentBudget(departmentId, requestingUserId);
     const { data, error } = await this.supabase.client
       .from("budget_transactions")
       .select("*")
@@ -334,6 +355,70 @@ export class BudgetService {
       .single();
     if (error) throw error;
     return mapTransaction(row);
+  }
+
+  // --- Tek kayıt üzerinde düzenleme/silme (defterin hangisi olduğundan bağımsız) ---
+  //
+  // Bir bütçe kaydı üç yerden birine ait olabilir: bir projeye, bir departmana ya
+  // da doğrudan kullanıcının kendi defterine. Yetki kuralı üçünde de zaten
+  // tanımlıydı ama yalnızca EKLEME ve SİLME yollarında kullanılıyordu; kaydı
+  // düzenlemenin hiçbir yolu yoktu (yanlış tutar giren kullanıcı silip yeniden
+  // yazmak zorundaydı). Buradaki tek kapı, kaydın bağlamına bakıp doğru kuralı
+  // uyguluyor; böylece proje, departman ve kişisel defter aynı uçtan yönetiliyor.
+  private async assertCanManageTransaction(id: string, userId?: string): Promise<any> {
+    const { data: row } = await this.supabase.client
+      .from("budget_transactions")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (!row) throw new NotFoundException("Kayıt bulunamadı");
+    if (row.project_id) {
+      await this.assertCanManageBudget(row.project_id, userId);
+      return row;
+    }
+    if (row.department_id) {
+      await this.assertCanManageDepartment(row.department_id, userId);
+      return row;
+    }
+    if (userId && row.owner_id !== userId) throw new ForbiddenException("Bu kaydı düzenleme yetkin yok");
+    return row;
+  }
+
+  async updateTransaction(
+    id: string,
+    data: Partial<BudgetTransaction>,
+    userId?: string
+  ): Promise<BudgetTransaction> {
+    await this.assertCanManageTransaction(id, userId);
+
+    const patch: Record<string, unknown> = {};
+    if (data.type !== undefined) patch.type = data.type;
+    if (data.amount !== undefined) patch.amount = data.amount;
+    // Boş açıklama "temizle" demektir; undefined ise alan hiç gönderilmemiştir.
+    if (data.description !== undefined) patch.description = data.description || null;
+    if (data.occurredAt !== undefined) patch.occurred_at = data.occurredAt.slice(0, 10);
+    // Kaydı başka bir projeye taşımak: hedef projenin de kullanıcıya ait olması şart.
+    if (data.projectId !== undefined) {
+      if (data.projectId && userId) await this.assertOwnsProject(data.projectId, userId);
+      patch.project_id = data.projectId || null;
+    }
+
+    const { data: row, error } = await this.supabase.client
+      .from("budget_transactions")
+      .update(patch)
+      .eq("id", id)
+      .select("*, projects(title)")
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Kayıt bulunamadı");
+    return mapTransaction(row);
+  }
+
+  async removeTransaction(id: string, userId?: string): Promise<{ success: true }> {
+    await this.assertCanManageTransaction(id, userId);
+    const { error } = await this.supabase.client.from("budget_transactions").delete().eq("id", id);
+    if (error) throw error;
+    return { success: true };
   }
 
   async removeForUser(id: string, userId: string): Promise<{ success: true }> {

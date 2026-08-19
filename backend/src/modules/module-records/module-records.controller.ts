@@ -1,15 +1,25 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { ModuleRecordsService } from "./module-records.service";
+import { AccessService } from "../../common/access/access.service";
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
 export class ModuleRecordsController {
-  constructor(private moduleRecordsService: ModuleRecordsService) {}
+  constructor(
+    private moduleRecordsService: ModuleRecordsService,
+    private access: AccessService
+  ) {}
 
+  // Yalnızca kullanıcının OKUYABİLDİĞİ modüllerin kayıtları döner
+  // (bkz. ModuleRecordsService.findByOrganization — modül/departman yetkisi).
   @Get("organizations/:organizationId/module-records")
-  findByOrganization(@Param("organizationId") organizationId: string, @Query("moduleKey") moduleKey?: string) {
-    return this.moduleRecordsService.findByOrganization(organizationId, moduleKey);
+  findByOrganization(
+    @Param("organizationId") organizationId: string,
+    @Req() req: any,
+    @Query("moduleKey") moduleKey?: string
+  ) {
+    return this.moduleRecordsService.findByOrganization(organizationId, moduleKey, req.user.userId);
   }
 
   @Post("organizations/:organizationId/module-records")
@@ -36,7 +46,8 @@ export class ModuleRecordsController {
 
   // Serbest çalışan tarafı: kayıtlar organizasyona değil, modülün atandığı işe bağlı.
   @Get("jobs/:jobId/module-records")
-  findByJob(@Param("jobId") jobId: string, @Query("moduleKey") moduleKey?: string) {
+  async findByJob(@Param("jobId") jobId: string, @Req() req: any, @Query("moduleKey") moduleKey?: string) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
     return this.moduleRecordsService.findByJob(jobId, moduleKey);
   }
 

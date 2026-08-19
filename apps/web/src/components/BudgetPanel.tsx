@@ -34,9 +34,10 @@ export default function BudgetPanel() {
   const [transactions, setTransactions] = useState<BudgetTransaction[]>([]);
   const [recurring, setRecurring] = useState<RecurringPayment[]>([]);
   const [addingEntry, setAddingEntry] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<BudgetTransaction | null>(null);
   const [addingRecurring, setAddingRecurring] = useState(false);
   const [editingRecurring, setEditingRecurring] = useState<RecurringPayment | null>(null);
-  const { pushDestructive } = useUndo();
+  const { pushUndo, pushDestructive } = useUndo();
 
   const reload = () => {
     api.get<BudgetOverview>("/budget/overview").then(setOverview).catch(() => setOverview(null));
@@ -57,6 +58,53 @@ export default function BudgetPanel() {
         reload();
       },
       restore: reload,
+    });
+  };
+
+  // Bir kaydın alanlarını sunucuda o hâle getirir; geri ve ileri alma aynı işlemi
+  // farklı değerlerle çağırır.
+  const applyValues = async (tx: BudgetTransaction) => {
+    await api
+      .patch(`/budget/transactions/${tx.id}`, {
+        type: tx.type,
+        amount: tx.amount,
+        description: tx.description ?? "",
+        projectId: tx.projectId ?? null,
+        occurredAt: tx.occurredAt,
+      })
+      .catch(() => {});
+    reload();
+  };
+
+  // Ekleme ve düzenleme de geri alınabilir: bütçe girerken en sık yapılan hata
+  // yanlış tutar yazmak ve Cmd/Ctrl+Z burada hiç çalışmıyordu.
+  const handleEntrySaved = (saved: BudgetTransaction, previous: BudgetTransaction | null) => {
+    reload();
+    if (previous) {
+      pushUndo({
+        label: "Bütçe kaydı düzenlendi",
+        run: () => applyValues(previous),
+        redo: () => applyValues(saved),
+      });
+      return;
+    }
+    const payload = {
+      type: saved.type,
+      amount: saved.amount,
+      description: saved.description,
+      projectId: saved.projectId,
+      occurredAt: saved.occurredAt,
+    };
+    pushUndo({
+      label: "Bütçe kaydı eklendi",
+      run: async () => {
+        await api.delete(`/budget/transactions/${saved.id}`).catch(() => {});
+        reload();
+      },
+      redo: async () => {
+        await api.post("/budget/transactions", payload);
+        reload();
+      },
     });
   };
 
@@ -296,6 +344,18 @@ export default function BudgetPanel() {
                   {formatMoney(t.amount)}
                 </span>
 
+                {/* Otomatik işlenen kayıt elle düzenlenmez: kaynağı düzenli
+                    ödeme kuralıdır, oradan yönetilir. */}
+                {!t.recurringPaymentId && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingTransaction(t)}
+                    aria-label="Düzenle"
+                    style={{ background: "transparent", border: "none", padding: 4, display: "flex" }}
+                  >
+                    <IconEdit size={15} color={c.textSecondary} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => deleteTransaction(t.id)}
@@ -310,7 +370,16 @@ export default function BudgetPanel() {
         )}
       </section>
 
-      {addingEntry && <AddBudgetEntryModal onClose={() => setAddingEntry(false)} onSaved={reload} />}
+      {editingTransaction && (
+        <AddBudgetEntryModal
+          transaction={editingTransaction}
+          onClose={() => setEditingTransaction(null)}
+          onSaved={(saved) => handleEntrySaved(saved, editingTransaction)}
+        />
+      )}
+      {addingEntry && (
+        <AddBudgetEntryModal onClose={() => setAddingEntry(false)} onSaved={(saved) => handleEntrySaved(saved, null)} />
+      )}
       {addingRecurring && <AddRecurringPaymentModal onClose={() => setAddingRecurring(false)} onSaved={reload} />}
       {editingRecurring && (
         <AddRecurringPaymentModal

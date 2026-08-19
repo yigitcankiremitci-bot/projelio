@@ -6,15 +6,18 @@ import Modal from "./Modal";
 
 interface Props {
   projectId: string;
+  /** Verilirse form düzenleme kipinde açılır; yoksa yeni kayıt eklenir. */
+  transaction?: BudgetTransaction;
   onClose: () => void;
-  onCreated: (transaction: BudgetTransaction) => void;
+  onSaved: (transaction: BudgetTransaction) => void;
 }
 
-export default function CreateBudgetTransactionModal({ projectId, onClose, onCreated }: Props) {
+export default function CreateBudgetTransactionModal({ projectId, transaction, onClose, onSaved }: Props) {
   const c = colors.light;
-  const [type, setType] = useState<BudgetTransactionType>("expense");
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
+  const editing = Boolean(transaction);
+  const [type, setType] = useState<BudgetTransactionType>(transaction?.type ?? "expense");
+  const [description, setDescription] = useState(transaction?.description ?? "");
+  const [amount, setAmount] = useState(transaction ? String(transaction.amount) : "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -28,21 +31,26 @@ export default function CreateBudgetTransactionModal({ projectId, onClose, onCre
     setError("");
     setLoading(true);
     try {
-      const created = await api.post<BudgetTransaction>(`/projects/${projectId}/budget`, {
-        type,
-        amount: parsedAmount,
-        description: description || undefined,
-      });
-      onCreated(created);
+      // Düzenleme, kaydın hangi deftere ait olduğundan bağımsız tek uçtan gider;
+      // yetki kontrolü sunucuda kaydın bağlamına bakılarak yapılır.
+      const payload = { type, amount: parsedAmount, description: description || undefined };
+      const saved = transaction
+        ? await api.patch<BudgetTransaction>(`/budget/transactions/${transaction.id}`, payload)
+        : await api.post<BudgetTransaction>(`/projects/${projectId}/budget`, payload);
+      onSaved(saved);
       onClose();
     } catch {
-      setError(`${type === "income" ? "Ödeme" : "Gider"} eklenemedi. Tekrar dene.`);
+      setError(
+        editing
+          ? "Kayıt güncellenemedi. Tekrar dene."
+          : `${type === "income" ? "Ödeme" : "Gider"} eklenemedi. Tekrar dene.`
+      );
       setLoading(false);
     }
   };
 
   return (
-    <Modal title="Ödeme / gider ekle" onClose={onClose}>
+    <Modal title={editing ? "Kaydı düzenle" : "Ödeme / gider ekle"} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -115,7 +123,15 @@ export default function CreateBudgetTransactionModal({ projectId, onClose, onCre
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Ekleniyor…" : type === "income" ? "Ödemeyi ekle" : "Gideri ekle"}
+          {loading
+            ? editing
+              ? "Kaydediliyor…"
+              : "Ekleniyor…"
+            : editing
+              ? "Kaydet"
+              : type === "income"
+                ? "Ödemeyi ekle"
+                : "Gideri ekle"}
         </button>
       </form>
     </Modal>

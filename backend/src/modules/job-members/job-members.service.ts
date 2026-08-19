@@ -224,13 +224,29 @@ export class JobMembersService {
     return member;
   }
 
-  async remove(id: string): Promise<void> {
+  // Ekipten çıkarma: yalnızca işin sahibi başkasını çıkarabilir; kişinin kendisi
+  // her zaman ayrılabilir. Eskiden hiç kontrol yoktu — üyelik id'sini bilen
+  // herhangi biri başkasını ekipten atabiliyordu.
+  async remove(id: string, requestingUserId?: string): Promise<void> {
     // İzin geri alınabilmesi için hangi işe ait olduğunu SİLMEDEN ÖNCE öğren.
     const { data: existing } = await this.supabase.client
       .from("job_members")
-      .select("job_id")
+      .select("job_id, user_id")
       .eq("id", id)
       .maybeSingle();
+
+    if (requestingUserId && existing) {
+      if (existing.user_id !== requestingUserId) {
+        const { data: job } = await this.supabase.client
+          .from("jobs")
+          .select("owner_id")
+          .eq("id", existing.job_id)
+          .maybeSingle();
+        if (job?.owner_id !== requestingUserId) {
+          throw new ForbiddenException("Ekipten çıkarma işlemini yalnızca iş sahibi yapabilir");
+        }
+      }
+    }
 
     const { error } = await this.supabase.client.from("job_members").delete().eq("id", id);
     if (error) throw error;

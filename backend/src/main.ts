@@ -20,19 +20,32 @@ if (envPath) {
   process.env.__PROJELIO_ENV_PATH = envPath;
 }
 
-import { NestFactory } from "@nestjs/core";
 import { Logger, ValidationPipe } from "@nestjs/common";
+import { assertRequiredEnv, getCorsOrigins, isProduction } from "./common/config/env";
+
+// Yapılandırma doğrulaması AppModule import edilmeden ÖNCE, burada çalışır.
+//
+// NEDEN BURADA: modül ağacı import edilirken JwtModule.register() gövdesi de
+// çalışır ve getJwtSecret()'ı çağırır. Doğrulamayı bootstrap() içine bıraksaydık
+// JWT_SECRET eksikken önce ham bir import hatası patlar, aşağıdaki toplu ve
+// okunur mesaj hiç görünmezdi. (TypeScript CommonJS çıktısında import'lar
+// kaynak sırasını korur — yukarıdaki dotenv yüklemesi de aynı kurala dayanıyor.)
+const bootstrapLogger = new Logger("Bootstrap");
+bootstrapLogger.log(envPath ? `Ortam değişkenleri yüklendi: ${envPath}` : "UYARI: .env dosyası bulunamadı!");
+
+try {
+  assertRequiredEnv();
+} catch (error) {
+  bootstrapLogger.error((error as Error).message);
+  process.exit(1);
+}
+
+import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
 async function bootstrap() {
-  const logger = new Logger("Bootstrap");
-  logger.log(envPath ? `Ortam değişkenleri yüklendi: ${envPath}` : "UYARI: .env dosyası bulunamadı!");
-
-  // Yapılandırma eksikse sorunu çalışma anında değil, açılışta görelim.
-  const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "JWT_SECRET"];
-  const missing = required.filter((key) => !process.env[key]?.trim());
-  if (missing.length) logger.error(`Eksik zorunlu ortam değişkenleri: ${missing.join(", ")}`);
+  const logger = bootstrapLogger;
 
   if (process.env.ANTHROPIC_API_KEY?.trim()) {
     logger.log(`Projelio AI etkin · model=${process.env.ANTHROPIC_MODEL?.trim() || "claude-haiku-4-5-20251001"}`);
@@ -45,17 +58,21 @@ async function bootstrap() {
   // CORS: geliştirmede her yere açık, üretimde yalnızca izin verilen alan adlarına.
   // CORS_ORIGINS virgülle ayrılmış liste alır, örn:
   //   CORS_ORIGINS=https://projelio.netlify.app,https://projelio.com
-  const corsOrigins = (process.env.CORS_ORIGINS ?? "")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  const corsOrigins = getCorsOrigins();
 
   if (corsOrigins.length) {
     app.enableCors({ origin: corsOrigins, credentials: true });
     logger.log(`CORS kısıtlı: ${corsOrigins.join(", ")}`);
   } else {
+    // Üretimde buraya hiç düşülmez: assertRequiredEnv() boş CORS_ORIGINS'i
+    // açılışta hata sayar. Yine de savunma amaçlı ikinci bir kontrol duruyor —
+    // "yapılandırma unutulursa herkese açıl" davranışı bir daha geri gelmesin.
+    if (isProduction()) {
+      logger.error("CORS_ORIGINS tanımlı değil. Üretimde API tüm kaynaklara açılamaz.");
+      process.exit(1);
+    }
     app.enableCors();
-    logger.warn("CORS tüm kaynaklara açık. Üretimde CORS_ORIGINS tanımlayın.");
+    logger.warn("CORS tüm kaynaklara açık (yalnızca geliştirme). Üretimde CORS_ORIGINS tanımlayın.");
   }
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

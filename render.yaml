@@ -72,6 +72,27 @@ services:
         sync: false
       - key: MICROSOFT_TOKEN_ENC_KEY
         sync: false
+      # E-posta modulunun gelen kutusu icin ayri donus adresi. Azure'daki
+      # uygulamaya Mail.ReadWrite + Mail.Send izinleri de eklenmeli.
+      # Bkz. docs/moduller/15-eposta-gelen-kutusu.md
+      - key: MICROSOFT_MAIL_REDIRECT_URI
+        sync: false
+
+      # Instagram'a dogrudan yayin (Business Login for Instagram).
+      # Meta uygulamasindaki "Instagram > API setup with Instagram login"
+      # bolumunden alinir; redirect URI olarak
+      # https://<backend>/social/instagram/callback eklenmeli.
+      # Bkz. docs/moduller/14-instagram-entegrasyonu.md
+      - key: INSTAGRAM_APP_ID
+        sync: false
+      - key: INSTAGRAM_APP_SECRET
+        sync: false
+      - key: INSTAGRAM_REDIRECT_URI
+        sync: false
+      # openssl rand -base64 32 ile uretin; kaybolursa tum Instagram
+      # baglantilari kopar ve hesaplar yeniden baglanmak zorunda kalir.
+      - key: SOCIAL_TOKEN_ENC_KEY
+        sync: false
 
       # Frontend'in adresi — CORS bu listeyle sınırlanır (virgülle çoğaltılabilir).
       - key: CORS_ORIGINS

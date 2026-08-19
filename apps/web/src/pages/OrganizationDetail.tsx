@@ -11,7 +11,7 @@ import ModulesPanel from "../components/ModulesPanel";
 import OrgBudgetPanel, { OrgBudgetPanelHandle } from "../components/OrgBudgetPanel";
 import AddModuleRecordModal from "../components/AddModuleRecordModal";
 import QuickFileUploadModal from "../components/QuickFileUploadModal";
-import OrgTabs, { CORE_ORG_TABS, OrgTab } from "../components/OrgTabs";
+import OrgTabs, { CORE_ORG_TABS, OrgTab, visibleOrgTabs } from "../components/OrgTabs";
 import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
 import ProfileCard from "../components/ProfileCard";
@@ -42,6 +42,7 @@ export default function OrganizationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const c = colors.light;
+  const isDesktop = useIsDesktop();
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [editing, setEditing] = useState(false);
   // Ürün/Hizmet panelinden doğrudan ürün/hizmet eklendiğinde de departman yöneticisinin
@@ -57,8 +58,17 @@ export default function OrganizationDetail() {
   // sekmeler + o anki modül sekmeleridir (bkz. lib/moduleLayout.ts).
   const moduleTabs = useModuleTabs(id);
   const openModuleTab = moduleTabs.find((m) => m.key === tabParam);
-  const activeTab: OrgTab =
+  // Bütçe sekmesi yalnızca finansal görünürlüğü olanlara açık (bkz. canViewOrgBudget);
+  // yetkisi olmayan ?tab=budget ile gelse bile Anasayfa'ya düşer.
+  // Sekme yetkileri sunucudan gelir (bkz. OrganizationAccess); istemci çıkarım yapmaz.
+  const access = organization?.viewerAccess;
+  const openCoreTabs = visibleOrgTabs(access).map((t) => t.key);
+  const requestedTab: OrgTab =
     CORE_ORG_TABS.includes(tabParam ?? "") || openModuleTab ? (tabParam as OrgTab) : "home";
+  // Kapalı bir çekirdek sekme istendiyse Anasayfa'ya düş (modül sekmeleri kendi
+  // yetkisini sunucuda kontrol eder).
+  const activeTab: OrgTab =
+    CORE_ORG_TABS.includes(requestedTab) && !openCoreTabs.includes(requestedTab) ? "home" : requestedTab;
   const setActiveTab = (next: OrgTab) => {
     setSearchParams(next === "home" ? {} : { tab: next }, { replace: true });
   };
@@ -97,8 +107,13 @@ export default function OrganizationDetail() {
 
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
   const coverRef = useRef<HTMLDivElement>(null);
-  usePageHeader(organization?.name, coverRef, [organization?.name]);
-  const isDesktop = useIsDesktop();
+  // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
+  const backRef = useRef<HTMLDivElement>(null);
+  usePageHeader(organization?.name, coverRef, [organization?.name], {
+    to: "/organizations",
+    label: "Organizasyonlar",
+    sourceRef: backRef,
+  });
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
   // (bkz. ProjectDetail'deki aynı desen).
   // Akıştaki sekme çubuğunun DOM öğesi: sabit şerit ancak bu çubuk yukarı kayıp
@@ -107,13 +122,17 @@ export default function OrganizationDetail() {
   const tabsRef = useRef<HTMLDivElement>(null);
 
   usePageHeaderTabs(
-    isDesktop ? <OrgTabs
-        active={activeTab}
-        onChange={setActiveTab}
-        moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
-        style={{ marginBottom: 0 }}
-      /> : null,
-    [activeTab, isDesktop],
+    // Mobilde de kaydediliyor: orada sayfanın kendi sekme çubuğu kaydırınca
+    // sabit şeridin altında kalıp erişilemez oluyordu (bkz. App.tsx).
+    <OrgTabs
+      active={activeTab}
+      onChange={setActiveTab}
+      moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
+      access={access}
+      style={{ marginBottom: 0 }}
+      scrollable
+    />,
+    [activeTab, moduleTabs, access],
     tabsRef
   );
 
@@ -164,7 +183,14 @@ export default function OrganizationDetail() {
             </>
           )
         }
-        aside={<ProfileCard />}
+        // Şirket sahibi giriş yapınca doğrudan buraya düşüyor (bkz. Dashboard
+        // redirectTo): burası onun anasayfası, kişi kartı dar ekranda da olmalı.
+        // Mobilde kart kapağın üstüne bindirilir (asideOnMobile) ve anasayfadaki
+        // gibi küçültülür — ekran kenarına dayamayı EntityCover üstleniyor.
+        // collapsible: mobilde yalnızca fotoğraf durur, kapsül dokununca yandan
+        // kayarak çıkar — kapak fotoğrafının köşesi sürekli kapalı kalmasın.
+        aside={<ProfileCard compact={!isDesktop} collapsible />}
+        asideOnMobile
         action={
           <button onClick={() => setEditing(true)} aria-label="Organizasyonu düzenle" style={coverActionButton(c)}>
             <IconSettings size={20} color={c.textSecondary} />
@@ -173,15 +199,18 @@ export default function OrganizationDetail() {
       />
 
       <div style={{ padding: "0 28px 28px" }}>
-        <Link to="/organizations" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
-          ← Organizasyonlar
-        </Link>
+        <div ref={backRef}>
+          <Link to="/organizations" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
+            ← Organizasyonlar
+          </Link>
+        </div>
 
         <div ref={tabsRef}>
           <OrgTabs
             active={activeTab}
             onChange={setActiveTab}
             moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
+            access={access}
           />
         </div>
 
@@ -222,8 +251,11 @@ export default function OrganizationDetail() {
           </>
         )}
         {activeTab === "departments" && <DepartmentsPanel organizationId={id} layout="grid" />}
-        {activeTab === "products" && <ProductsPanel organizationId={id} departmentId={productDepartmentId} />}
-        {activeTab === "budget" && (
+        {/* Sekme zaten gizli; ?tab= ile zorlansa da panel açılmasın (sunucu 403 döner). */}
+        {activeTab === "products" && access?.canViewCommercial !== false && (
+          <ProductsPanel organizationId={id} departmentId={productDepartmentId} />
+        )}
+        {activeTab === "budget" && access?.canViewBudget === true && (
           <>
             <BudgetFabRegistrar budgetRef={budgetRef} />
             <OrgBudgetPanel ref={budgetRef} organizationId={id} />

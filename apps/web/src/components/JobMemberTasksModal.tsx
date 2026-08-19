@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import Modal from "./Modal";
 import { IconCheck } from "./icons";
+import { isAssignedTo } from "../lib/taskAssignees";
 
 interface Props {
   member: JobMember;
@@ -35,8 +36,8 @@ export default function JobMemberTasksModal({ member, tasks, projects, onClose, 
   };
 
   const sorted = [...tasks].sort((a, b) => {
-    const aMine = a.assignedTo === member.userId ? 0 : 1;
-    const bMine = b.assignedTo === member.userId ? 0 : 1;
+    const aMine = isAssignedTo(a, member.userId) ? 0 : 1;
+    const bMine = isAssignedTo(b, member.userId) ? 0 : 1;
     return aMine - bMine;
   });
 
@@ -50,7 +51,7 @@ export default function JobMemberTasksModal({ member, tasks, projects, onClose, 
           <p style={{ fontSize: 15, color: c.textSecondary }}>Bu işte henüz görev yok.</p>
         ) : (
           sorted.map((t) => {
-            const mine = t.assignedTo === member.userId;
+            const mine = isAssignedTo(t, member.userId);
             const takenByOther = !!t.assignedTo && !mine;
             return (
               <button

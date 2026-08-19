@@ -11,9 +11,11 @@ import { BudgetService } from "./budget.service";
 export class DepartmentBudgetController {
   constructor(private budgetService: BudgetService) {}
 
+  // Görüntüleme de yazma ile aynı daireye kapalı: organizasyon sahibi +
+  // departman yöneticisi. Taşeron/çalışan 403 alır.
   @Get()
-  findAll(@Param("departmentId") departmentId: string) {
-    return this.budgetService.findByDepartment(departmentId);
+  findAll(@Param("departmentId") departmentId: string, @Req() req: any) {
+    return this.budgetService.findByDepartment(departmentId, req.user.userId);
   }
 
   @Post()

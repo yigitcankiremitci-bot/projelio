@@ -112,6 +112,9 @@ export interface Organization {
   sortOrder?: number;
   // Bu organizasyona bağlı İş sayısı.
   jobCount?: number;
+  // Sunucu tarafında eklenir: İSTEYEN kullanıcının bu organizasyondaki
+  // görünürlüğü. Arayüz sekmeleri buna göre gizler (bkz. OrgTabs).
+  viewerAccess?: OrganizationAccess;
 }
 
 // ============================================================ Departmanlar / Kadro
@@ -158,6 +161,43 @@ export interface Department {
   archivedAt?: string;
   // Sunucu tarafında eklenir: bu departmandaki (removed hariç) kadro sayısı.
   memberCount?: number;
+  // Sunucu tarafında eklenir: İSTEYEN kullanıcının bu departmandaki görünürlüğü.
+  // Arayüz sekmeleri buna göre gizler (bkz. DepartmentTabs) — asıl kısıt yine
+  // sunucudadır, bu alan yalnızca kullanıcıya boş/hatalı ekran göstermemek için.
+  viewerAccess?: DepartmentAccess;
+}
+
+// Organizasyonu isteyen kullanıcının o organizasyondaki görünürlüğü. Departman
+// listesinden ÇIKARIM YAPILMAZ — sunucu doğrudan söyler. (Çıkarım yapıldığında
+// hiç departmana bağlı olmayan bir taşeronun boş liste görmesi "kısıt yok"
+// gibi okunuyordu ve Bütçe sekmesi açık kalıyordu.)
+export interface OrganizationAccess {
+  role: "owner" | "member" | "department_manager" | "staff" | "subcontractor" | "none";
+  canView: boolean;
+  /** Şirket "Bütçe" sekmesi — sahibi ve departman yöneticileri. */
+  canViewBudget: boolean;
+  /** Ürün/Hizmet, iş ortakları gibi ticari yüzeyler. */
+  canViewCommercial: boolean;
+  /** Organizasyon ayarları, departman ekleme/silme. */
+  canManage: boolean;
+}
+
+// Departmanı isteyen kullanıcının o departmandaki rolü. "org_member" kadroda
+// olmayan ama organizasyonun onaylı üyesi olan kişidir; "none" hiç görememektir.
+export type DepartmentViewerRole = "owner" | "manager" | "org_member" | "employee" | "subcontractor" | "none";
+
+// Bir kullanıcının tek bir departmanda ne görebildiği. Karar mantığı
+// backend/src/modules/departments/department-access.ts içinde (saf fonksiyon).
+export interface DepartmentAccess {
+  role: DepartmentViewerRole;
+  /** Departman kaydının kendisi (adı, sayfası) görünür mü. */
+  canView: boolean;
+  /** "Ekip" sekmesi — kadro listesi isim/e-posta içerdiği için ayrı kural. */
+  canViewTeam: boolean;
+  /** "Bütçe" sekmesi — finansal defter. Taşeron ve çalışan göremez. */
+  canViewBudget: boolean;
+  /** Departman ayarları, kadro düzenleme, bütçeye kayıt ekleme. */
+  canManage: boolean;
 }
 
 // Ürün Yönetimi departmanından eklenen ürün/hizmet. Şirket anasayfasında
@@ -177,7 +217,18 @@ export interface Product {
 }
 
 export type DepartmentMemberRole = "manager" | "employee" | "subcontractor";
-export type DepartmentMemberStatus = "invited" | "pending" | "approved" | "rejected" | "removed";
+/**
+ * `leave_pending`: departmanın SON yöneticisi ayrılmak istedi, organizasyon
+ * sahibinin onayı bekleniyor (bkz. migration 061). Bu durumdaki kişi hâlâ
+ * yöneticidir — aksi halde talebi açtığı anda departman yöneticisiz kalırdı.
+ */
+export type DepartmentMemberStatus =
+  | "invited"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "removed"
+  | "leave_pending";
 
 // "Kadro": bir departmana bağlı kişi + rolü + pozisyon adı. userId boşsa henüz hesap
 // açmamış, davet bekleyen bir pozisyondur (inviteEmail ile tanımlanır).
@@ -470,7 +521,33 @@ export interface ModuleStatsResponse {
   modules: ModuleUsageStat[];
 }
 
-export type ProjectStatus = "active" | "completed" | "archived";
+/**
+ * Proje durumu.
+ *
+ * - `active` — üzerinde çalışılıyor
+ * - `on_hold` — geçici durdu, geri dönülecek (onay, ödeme, sezon…)
+ * - `passive` — artık çalışılmıyor ama gözden kaldırılmadı; arşivden farkı
+ *   listelerde durmaya devam etmesi
+ * - `completed` — bitti
+ * - `archived` — gözden kaldırıldı (bkz. `archivedAt` ve Arşiv sayfası)
+ *
+ * DB tarafındaki karşılığı: migration 063.
+ */
+export type ProjectStatus = "active" | "on_hold" | "passive" | "completed" | "archived";
+
+/**
+ * Durum seçicilerin ve rozetlerin ortak sırası. Tek kaynak: seçici ile rozet
+ * ayrı listeler tutarsa biri güncellenip diğeri unutuluyor.
+ */
+export const PROJECT_STATUSES: ProjectStatus[] = ["active", "on_hold", "passive", "completed", "archived"];
+
+export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
+  active: "Aktif",
+  on_hold: "Beklemede",
+  passive: "Pasif",
+  completed: "Tamamlandı",
+  archived: "Arşivlendi",
+};
 
 export interface Project {
   id: string;
@@ -601,6 +678,34 @@ export interface OperationOccurrence {
   completedBy?: string;
   skippedAt?: string;
   createdAt: string;
+  /**
+   * Bu tekrara bağlanmış link/dosya ekleri (bkz. 060). Tekrarın ÇIKTISI burada
+   * durur: yayınlanan gönderinin linki, teslim edilen dosya. Kurala değil
+   * tekrara bağlıdır — her hafta farklı bir çıktı olur.
+   */
+  attachments?: TaskAttachment[];
+  /** Göreve iliştirilmiş Drive/OneDrive dosyaları (bkz. files tablosu). */
+  files?: { id: string; name: string; webViewLink?: string }[];
+}
+
+/**
+ * Bir göreve eklenen link ya da dosya (bkz. 060).
+ *
+ * Rutin tekrarları da `tasks` satırı olduğu için aynı tipi kullanır — ayrı bir
+ * "tekrar eki" kavramı yok.
+ */
+export interface TaskAttachment {
+  id: string;
+  taskId: string;
+  kind: "link" | "file";
+  url: string;
+  /** Görünen ad; boşsa arayüz url'i ya da dosya adını gösterir. */
+  label?: string;
+  fileName?: string;
+  fileSize?: number;
+  createdBy?: string;
+  createdByName?: string;
+  createdAt: string;
 }
 
 export type MemberRole = "owner" | "member" | "subcontractor";
@@ -663,21 +768,56 @@ export interface Output {
 export type TaskStatus = "todo" | "in_progress" | "completed";
 export type TaskBudgetStatus = "pending" | "planned" | "paid";
 
+/** Bir görevin atananlarından biri (bkz. task_assignees). */
+export interface TaskAssignee {
+  userId: string;
+  fullName?: string;
+  avatarUrl?: string;
+  assignedAt?: string;
+}
+
 export interface Task {
   id: string;
   // Bir görev projeye, programa (operation) ya da departmana ait olabilir.
   projectId?: string;
   departmentId?: string;
   outputId?: string;
+  /**
+   * BİRİNCİL atanan. Bir görev birden fazla kişiye atanabilir (bkz. `assignees`);
+   * bu alan listelerde tek bir yüz göstermek ve eski sorguları bozmamak için
+   * korunur ve her zaman `assignees` dizisinin ilk üyesiyle eşittir.
+   */
   assignedTo?: string;
   // Atanan kişinin görünen adı (sunucu tarafında users tablosundan eklenir);
   // görev kartlarında kimin ilgilendiği herkes tarafından görülebilsin diye.
   assignedToName?: string;
+  /** Göreve atanmış TÜM kişiler (bkz. task_assignees). Sıra: atanma zamanı. */
+  assignees?: TaskAssignee[];
+  /**
+   * Yazma tarafı: atamaların tamamı bu dizi ile belirlenir (verilmezse atamalara
+   * dokunulmaz). İlk eleman birincil atanan olur.
+   */
+  assignedToIds?: string[];
   title: string;
   // Görev kartlarına eklenebilen serbest açıklama metni.
   description?: string;
   startDate?: string;
+  /** Göreve eklenen link/dosya ekleri (bkz. 060). */
+  attachments?: TaskAttachment[];
   deadline: string;
+  /**
+   * Opsiyonel bitiş saati ("HH:MM"). `deadline` günü, bu alan saati tutar —
+   * ikisi birlikte tam anı verir. `deadline`ın kendisi saatli yapılmadı: o alan
+   * takvim, gecikme hesabı ve özet bildirimlerinde gün olarak okunuyor.
+   */
+  deadlineTime?: string;
+  /**
+   * Hatırlatma bitiş saatinden kaç dakika önce gönderilsin. undefined =
+   * hatırlatma yok, 0 = tam saatinde. Yalnızca `deadlineTime` doluyken anlamlı.
+   */
+  reminderLeadMinutes?: number;
+  /** Hatırlatma gönderildiği an; aynı görev için tekrar gönderilmesini engeller. */
+  reminderSentAt?: string;
   status: TaskStatus;
   /** Öncelik yıldızı 0-5. Görevin özelliğidir, ekibin tamamına görünür. */
   priority: TaskPriority;
@@ -831,12 +971,65 @@ export interface BudgetOverview {
   projects: ProjectBudgetSummary[];
 }
 
+// ====================================================== Açma talepleri
+//
+// Taşeron dış kaynaktır: şirketin yapısına doğrudan iş/proje ekleyemez.
+// Kayıt açmak yerine talep oluşturur; yetkili onaylayınca gerçek kayıt
+// talebin payload'ından doğar (bkz. 053_creation_requests.sql).
+
+export type CreationRequestKind = "job" | "project";
+export type CreationRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export interface CreationRequest {
+  id: string;
+  kind: CreationRequestKind;
+  requesterId: string;
+  requesterName?: string;
+  /** kind='job' ise dolu: işin bağlanacağı organizasyon. */
+  organizationId?: string;
+  organizationName?: string;
+  /** kind='project' ise dolu: projenin açılacağı iş. */
+  jobId?: string;
+  jobTitle?: string;
+  /** Onaylanınca kaydın açılacağı alanlar (başlık, açıklama, tarihler…). */
+  payload: Record<string, unknown>;
+  status: CreationRequestStatus;
+  decidedBy?: string;
+  decidedByName?: string;
+  decidedAt?: string;
+  /** Ret gerekçesi — reddedilen talep silinmez, sebebi kalır. */
+  decisionNote?: string;
+  /** Onaylandığında doğan iş/proje kaydının id'si. */
+  createdEntityId?: string;
+  createdAt: string;
+}
+
+/** POST /creation-requests gövdesi. */
+export interface CreationRequestInput {
+  kind: CreationRequestKind;
+  organizationId?: string;
+  jobId?: string;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * Bir açma isteğinin sonucu. Yetkili kullanıcıda kayıt doğrudan açılır
+ * (created), taşeronda onaya düşer (pending) — istemci bu ayrımı tek bir
+ * yanıttan okur, iki ayrı uç çağırmak zorunda kalmaz.
+ */
+export type CreateOrRequestResult<T> =
+  | { outcome: "created"; entity: T }
+  | { outcome: "pending"; request: CreationRequest };
+
 export interface NotificationPayload {
   id: string;
   userId: string;
   type:
     | "task_due_24h"
     | "task_due_1h"
+    // Göreve bitiş saati + hatırlatma kurulmuşsa (bkz. 057) o an gönderilir.
+    // Ön süre göreve özeldir, bu yüzden 24h/1h tiplerinden ayrı bir tip.
+    | "task_reminder"
     | "project_deadline_24h"
     | "team_invite"
     // Bir işe (job) davet edildin — kabul/ret bekliyor. Bildirim çanı bu tipi
@@ -844,6 +1037,12 @@ export interface NotificationPayload {
     | "job_invite"
     // Davet yanıtlandı: iş sahibine "X daveti kabul etti/reddetti" der.
     | "job_invite_answered"
+    // Bir taşeron iş/proje açmak için onay istedi. Bildirim çanı bu tipi
+    // görünce satır içi "Onayla / Reddet" düğmelerini gösterir (job_invite ile
+    // aynı desen).
+    | "creation_request"
+    // Talep yanıtlandı: talebi açana "onaylandı/reddedildi" der.
+    | "creation_request_answered"
     | "role_updated"
     | "budget_changed"
     | "recurring_payment_due"
@@ -857,7 +1056,11 @@ export interface NotificationPayload {
     | "post_mention"
     | "post_comment"
     | "post_like"
-    | "comment_like";
+    | "comment_like"
+    // Zamanlanmış sosyal medya yayınının sonucu. Yalnızca OTOMATİK yayında
+    // gönderilir: kullanıcı "Şimdi paylaş" dediyse sonucu zaten ekranda görür.
+    | "social_post_published"
+    | "social_post_failed";
   title: string;
   body: string;
   link?: string;
@@ -1005,6 +1208,11 @@ export interface PersonalTodo {
   /** Kullanıcının karta verdiği opsiyonel etiket rengi (#RRGGBB). */
   color?: string;
   dueDate?: string;
+  /** Opsiyonel bitiş saati ("HH:MM"). Görev tarafındaki deadlineTime'ın karşılığı. */
+  dueTime?: string;
+  /** Hatırlatma kaç dakika önce gönderilsin. undefined = yok, 0 = tam saatinde. */
+  reminderLeadMinutes?: number;
+  reminderSentAt?: string;
   sortOrder: number;
   completedAt?: string;
   archivedAt?: string;
@@ -1039,6 +1247,8 @@ export interface PersonalBoardItem {
   color?: string;
   /** Gösterilecek tarih: kişisel tarih varsa o, yoksa görevin deadline'ı. */
   effectiveDueDate?: string;
+  /** Opsiyonel bitiş saati ("HH:MM"). Kişisel görevlerde saat kavramı yok. */
+  deadlineTime?: string;
   /** Yalnızca "assigned" kartlarda dolu: görevin projedeki gerçek deadline'ı. */
   projectDeadline?: string;
   sortOrder: number;
@@ -1353,4 +1563,248 @@ export interface PlanCalendarView {
   progress: PlanPeriodProgress;
   /** Bugün bekleyen ritüel varsa dolu. */
   ritual?: PlanRitualPrompt;
+}
+
+// ============================================================ Sosyal Medya
+//
+// pd_sosyal_medya modülünün veri modeli (bkz. 054_social_media.sql). Diğer
+// modüllerden farkı kendi tablolarını kullanması: hesap yönetimi ve "aynı
+// içerik birden çok kanalda" ilişkisi module_records'ın tek jsonb sütununa
+// sığmıyordu.
+
+export type SocialPlatform =
+  | "instagram"
+  | "facebook"
+  | "x"
+  | "linkedin"
+  | "tiktok"
+  | "youtube"
+  | "pinterest"
+  | "threads"
+  | "blog"
+  | "other";
+
+/**
+ * Hesabın otomatik paylaşıma hazırlık durumu.
+ *
+ * Bugün her hesap `manual`: Projelio planı ve metni tutar, yayını kullanıcı
+ * kendi yapar. Platform API'leri bağlandığında `connected` kullanılacak;
+ * `expired`/`revoked` jetonun yenilenmesi gerektiğini anlatır.
+ */
+export type SocialConnectionStatus = "manual" | "connected" | "expired" | "revoked";
+
+/**
+ * Hesap hangi yolla bağlandı.
+ *
+ * `instagram_login` = Business Login for Instagram (Facebook Sayfası
+ * gerektirmeyen yol, bkz. InstagramOAuthService). `manual` = bağlantı yok,
+ * yayını kullanıcı kendisi yapıyor.
+ */
+export type SocialAuthProvider = "manual" | "instagram_login" | "facebook_login";
+
+export type SocialContentType =
+  | "image"
+  | "video"
+  | "carousel"
+  | "story"
+  | "reel"
+  | "text"
+  | "article"
+  | "poll"
+  | "other";
+
+/**
+ * İçeriğin akıştaki yeri.
+ *
+ * idea → draft → ready (onaya hazır) → approved → scheduled → published.
+ * Akışın tamamı zorunlu değil; küçük ekipler doğrudan draft → published gider.
+ */
+export type SocialPostStatus =
+  | "idea"
+  | "draft"
+  | "ready"
+  | "approved"
+  | "scheduled"
+  | "published"
+  | "failed"
+  | "cancelled";
+
+export type SocialTargetStatus = "pending" | "scheduled" | "published" | "failed" | "skipped";
+
+export interface SocialAccount {
+  id: string;
+  /** Sahiplik: organizasyon ya da iş (tam olarak biri dolu). */
+  organizationId?: string;
+  jobId?: string;
+  departmentId?: string;
+  platform: SocialPlatform;
+  handle: string;
+  displayName?: string;
+  profileUrl?: string;
+  avatarUrl?: string;
+  followerCount?: number;
+  /** Kitle tanımı — "25-34, İstanbul, kahve meraklısı". */
+  audienceNote?: string;
+  /** Marka sesi: bu hesapta nasıl konuşuluyor. */
+  toneNote?: string;
+  postingFrequency?: string;
+  /** Takvimde hesabın rengi. */
+  color?: string;
+  ownerUserId?: string;
+  ownerName?: string;
+  provider: SocialAuthProvider;
+  connectionStatus: SocialConnectionStatus;
+  /** Bağlantı koptuğunda kullanıcıya gösterilecek cümle. */
+  connectionError?: string;
+  externalAccountId?: string;
+  tokenExpiresAt?: string;
+  lastSyncedAt?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  archivedAt?: string;
+}
+
+/** Gönderiye iliştirilmiş dosya. İçerik files tablosunda, burada referans. */
+export interface SocialPostMedia {
+  id: string;
+  postId: string;
+  fileId: string;
+  sortOrder: number;
+  altText?: string;
+  /** Dosya kaydından çözülen görüntüleme bilgileri. */
+  name?: string;
+  mimeType?: string;
+  webViewLink?: string;
+  iconLink?: string;
+}
+
+/** Bir içeriğin tek bir hesaptaki yayın hedefi. */
+export interface SocialPostTarget {
+  id: string;
+  postId: string;
+  accountId: string;
+  /** Kanala özel metin. Boşsa gönderinin ortak metni kullanılır. */
+  captionOverride?: string;
+  status: SocialTargetStatus;
+  externalPostId?: string;
+  externalUrl?: string;
+  errorMessage?: string;
+  publishedAt?: string;
+  attemptedAt?: string;
+}
+
+export interface SocialPost {
+  id: string;
+  organizationId?: string;
+  jobId?: string;
+  departmentId?: string;
+  /** İç başlık: takvimde görünen kısa ad, yayımlanan metin değil. */
+  title: string;
+  /** Yayımlanacak açıklama metni. */
+  caption?: string;
+  hashtags?: string;
+  linkUrl?: string;
+  firstComment?: string;
+  contentType: SocialContentType;
+  campaign?: string;
+  status: SocialPostStatus;
+  scheduledAt?: string;
+  publishedAt?: string;
+  assigneeId?: string;
+  assigneeName?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  taskId?: string;
+  reach?: number;
+  engagement?: number;
+  clicks?: number;
+  resultNote?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+  archivedAt?: string;
+  /** Hangi hesaplarda yayımlanacak. */
+  targets: SocialPostTarget[];
+  media: SocialPostMedia[];
+}
+
+/** Modül açılışında tek istekte dönen paket: liste + takvim + hesaplar. */
+export interface SocialMediaOverview {
+  accounts: SocialAccount[];
+  posts: SocialPost[];
+}
+
+// ============================================================ E-posta kutusu
+//
+// E-posta modülünün (pd_email) gelen kutusu tarafı. İletiler Projelio'da
+// SAKLANMAZ — Microsoft Graph üzerinden canlı okunur (bkz. 064_mail_accounts.sql).
+// Bu yüzden aşağıdaki tipler bir veritabanı satırının değil, bir Graph
+// yanıtının Projelio'ya çevrilmiş hâlidir.
+
+export type MailProvider = "microsoft" | "google";
+
+/** Modüle bağlı kutu. */
+export interface MailAccount {
+  id: string;
+  organizationId?: string;
+  jobId?: string;
+  departmentId?: string;
+  provider: MailProvider;
+  address: string;
+  displayName?: string;
+  /** Bağlayanın kendi kutusu değilse: paylaşılan kutunun adresi. */
+  sharedMailbox?: string;
+  signature?: string;
+  connectedBy?: string;
+  /** Kutuyu modüle açan kişinin adı — "bu kutu kimin bağlantısıyla okunuyor". */
+  connectedByName?: string;
+  active: boolean;
+  /** Bağlantı düştüyse kullanıcıya gösterilecek cümle. */
+  connectionError?: string;
+  createdAt: string;
+}
+
+export interface MailFolder {
+  id: string;
+  name: string;
+  unreadCount: number;
+  totalCount: number;
+}
+
+export interface MailAddress {
+  name?: string;
+  address: string;
+}
+
+/** Liste satırı — gövde taşımaz, yalnızca önizleme. */
+export interface MailMessage {
+  id: string;
+  conversationId?: string;
+  subject: string;
+  from?: MailAddress;
+  to: MailAddress[];
+  preview: string;
+  receivedAt: string;
+  isRead: boolean;
+  hasAttachments: boolean;
+  /** Graph'ın işaretlediği önem: yüksek olanlar listede belirginleşir. */
+  importance?: "low" | "normal" | "high";
+  webLink?: string;
+}
+
+/** Açılan ileti — gövdesiyle birlikte. */
+export interface MailMessageDetail extends MailMessage {
+  cc: MailAddress[];
+  /** HTML gövde. Ekranda sandbox'lı bir iframe içinde gösterilir. */
+  bodyHtml?: string;
+  /** Lio'ya ve önizlemeye giden düz metin karşılığı. */
+  bodyText: string;
+  attachments: { id: string; name: string; contentType: string; sizeBytes: number }[];
+}
+
+export interface MailListPage {
+  messages: MailMessage[];
+  /** Daha fazlası var mı — sayfalama için. */
+  hasMore: boolean;
 }

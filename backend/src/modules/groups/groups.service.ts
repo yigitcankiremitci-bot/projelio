@@ -5,6 +5,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { JobsService } from "../jobs/jobs.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { applyOrder } from "../../common/reorder.util";
+import { detectImageUpload } from "../../common/upload-image.util";
 
 const COVER_BUCKET = "group-covers";
 
@@ -193,7 +194,8 @@ export class GroupsService {
     return mapGroup(row);
   }
 
-  async restore(id: string): Promise<Group> {
+  async restore(id: string, requestingUserId?: string): Promise<Group> {
+    await this.assertOwner(id, requestingUserId);
     const { data: row, error } = await this.supabase.client
       .from("groups")
       .update({ archived_at: null })
@@ -213,12 +215,14 @@ export class GroupsService {
 
   async uploadCover(id: string, file: Express.Multer.File, requestingUserId?: string): Promise<Group> {
     await this.assertOwner(id, requestingUserId);
-    const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
+    // Tur ve uzanti istemcinin sozune degil, dosyanin ilk baytlarindaki
+    // imzaya gore belirlenir (bkz. common/upload-image.util.ts).
+    const { contentType, ext } = detectImageUpload(file);
     const path = `${id}/${randomUUID()}.${ext}`;
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(COVER_BUCKET)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);

@@ -18,6 +18,15 @@ interface Props {
   value: string; // seçili kullanıcı id'si ("" = atanmamış)
   onChange: (userId: string, name?: string) => void;
   placeholder?: string;
+  /**
+   * Çoklu atama kipi (bkz. migration 053). Açıkken `values`/`onChangeValues`
+   * kullanılır; `value`/`onChange` yok sayılır. Ayrı bir bileşen yazmak yerine
+   * aynı seçiciyi genişletiyoruz: ekip listesini çekme, arama ve dışarı tıklayınca
+   * kapanma davranışı ikisinde de birebir aynı olmalı.
+   */
+  multiple?: boolean;
+  values?: string[];
+  onChangeValues?: (userIds: string[]) => void;
 }
 
 /**
@@ -25,7 +34,16 @@ interface Props {
  * ilgili projenin ekibini (sahip + üyeler) ya da departmanın kadrosunu gösterir
  * ve ada/kullanıcı adına göre yazarak arama yapılmasını sağlar.
  */
-export default function AssigneePicker({ projectId, departmentId, value, onChange, placeholder = "İsim yazarak ara…" }: Props) {
+export default function AssigneePicker({
+  projectId,
+  departmentId,
+  value,
+  onChange,
+  placeholder = "İsim yazarak ara…",
+  multiple = false,
+  values = [],
+  onChangeValues,
+}: Props) {
   const c = colors.light;
   const [members, setMembers] = useState<PickableMember[]>([]);
   const [query, setQuery] = useState("");
@@ -73,13 +91,123 @@ export default function AssigneePicker({ projectId, departmentId, value, onChang
 
   const selected = members.find((m) => m.userId === value);
   const q = query.trim().toLocaleLowerCase("tr-TR");
-  const filtered = q
-    ? members.filter(
-        (m) =>
-          (m.fullName ?? "").toLocaleLowerCase("tr-TR").includes(q) ||
-          (m.username ?? "").toLocaleLowerCase("tr-TR").includes(q)
-      )
-    : members;
+  const matches = (m: PickableMember) =>
+    !q ||
+    (m.fullName ?? "").toLocaleLowerCase("tr-TR").includes(q) ||
+    (m.username ?? "").toLocaleLowerCase("tr-TR").includes(q);
+  // Çoklu kipte zaten seçilmiş olanlar listeden düşer: aynı kişiyi ikinci kez
+  // eklemek diye bir şey yok, listede durması yalnızca kafa karıştırır.
+  const filtered = members.filter((m) => matches(m) && !(multiple && values.includes(m.userId)));
+
+  const label = (m?: PickableMember) => m?.fullName ?? m?.username ?? "Seçili kişi";
+  const selectedMembers = multiple
+    ? values.map((id) => members.find((m) => m.userId === id) ?? { userId: id })
+    : [];
+
+  if (multiple) {
+    return (
+      <div ref={rootRef} style={{ position: "relative" }}>
+        {selectedMembers.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+            {selectedMembers.map((m, i) => (
+              <span
+                key={m.userId}
+                // İlk rozet birincil atanan: listelerde tek yüz gösterildiğinde
+                // görünen kişi bu (bkz. tasks.assigned_to).
+                title={i === 0 ? "Birincil atanan" : undefined}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "5px 8px 5px 10px",
+                  borderRadius: 999,
+                  fontSize: 14,
+                  color: c.textPrimary,
+                  background: i === 0 ? `${c.primary}14` : c.background,
+                  border: `1px solid ${i === 0 ? c.primary : c.border}`,
+                }}
+              >
+                {label(m as PickableMember)}
+                <button
+                  type="button"
+                  onClick={() => onChangeValues?.(values.filter((id) => id !== m.userId))}
+                  aria-label={`${label(m as PickableMember)} atamasını kaldır`}
+                  style={{ background: "transparent", border: "none", color: c.textSecondary, fontSize: 15, padding: 0, cursor: "pointer" }}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={
+            members.length === 0
+              ? departmentId
+                ? "Bu departmanda kadro üyesi yok"
+                : "Bu projede ekip üyesi yok"
+              : "Kişi eklemek için isim yaz…"
+          }
+          disabled={members.length === 0}
+          style={{ width: "100%", fontSize: 16 }}
+        />
+
+        {open && filtered.length > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              marginTop: 4,
+              maxHeight: 200,
+              overflowY: "auto",
+              background: c.surface,
+              border: `1px solid ${c.border}`,
+              borderRadius: 10,
+              boxShadow: "0 6px 20px rgba(26,31,41,0.14)",
+              zIndex: 20,
+            }}
+          >
+            {filtered.map((m) => (
+              <button
+                key={m.userId}
+                type="button"
+                onClick={() => {
+                  onChangeValues?.([...values, m.userId]);
+                  setQuery("");
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "9px 12px",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: `1px solid ${c.border}`,
+                  color: c.textPrimary,
+                  fontSize: 16,
+                  cursor: "pointer",
+                }}
+              >
+                {m.fullName ?? m.username}
+                {m.username && <span style={{ color: c.textSecondary, fontSize: 13 }}>@{m.username}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div ref={rootRef} style={{ position: "relative" }}>

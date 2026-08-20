@@ -422,6 +422,9 @@ export default function App() {
     location.pathname === "/verify-email" ||
     location.pathname === "/google/return" ||
     location.pathname === "/microsoft/return" ||
+    // Habie devir sayfası: token'ı okuyup Habie'ye yönlendiriyor, uygulama
+    // kabuğuna (kenar çubuğu, veri çekme) hiç ihtiyacı yok.
+    location.pathname === "/habie" ||
     // Gizlilik politikası herkese açık olmalı: Meta (WhatsApp Business Platform)
     // app'i yayınlarken giriş gerektirmeyen bir politika URL'i zorunlu tutuyor.
     location.pathname === "/privacy";

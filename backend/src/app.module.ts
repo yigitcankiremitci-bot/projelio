@@ -22,6 +22,7 @@ import { CalendarModule } from "./modules/calendar/calendar.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { ArchiveModule } from "./modules/archive/archive.module";
 import { AiAssistantModule } from "./modules/ai-assistant/ai-assistant.module";
+import { HabieModule } from "./modules/habie/habie.module";
 import { GoogleModule } from "./modules/google/google.module";
 import { MicrosoftModule } from "./modules/microsoft/microsoft.module";
 import { FilesModule } from "./modules/files/files.module";
@@ -68,6 +69,7 @@ import { MailboxModule } from "./modules/mailbox/mailbox.module";
     AdminModule,
     ArchiveModule,
     AiAssistantModule,
+    HabieModule,
     GoogleModule,
     MicrosoftModule,
     FilesModule,

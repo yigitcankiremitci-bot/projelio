@@ -33,6 +33,9 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      # Habie mesajlaşma modülü — Habie APP_SECRETS içindeki "projelio" değeriyle AYNI olmalı
+      - key: HABIE_APP_SECRET
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       # Admin panelindeki "Anthropic bakiyesi" kartının gerçek maliyet verisini

@@ -1,25 +1,27 @@
-import { Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
+import { Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { randomUUID } from "node:crypto";
 import { SupabaseService } from "../../database/supabase.service";
 
 /**
  * Habie köprüsü.
  *
  * Habie, Projelio'ya gömülen mesajlaşma modülü. Kendi kimlik sistemi var ve
- * Projelio'nun kullanıcılarını "iddia" (assertion) yoluyla tanıyor.
+ * Projelio kullanıcılarını "iddia" (assertion) yoluyla tanıyor.
  *
- * Bu servis tek bir oturum açılışında iki ayrı jeton üretir:
+ * İki giriş yolu var:
  *
- *  1) assertion  — HABIE_APP_SECRET ile imzalı. Habie gateway'i bunu doğrulayıp
- *                  Projelio kullanıcısını kendi kimliğiyle eşler. Kısa ömürlü,
- *                  çünkü tek işi oturum açmak.
+ *  1) createSession() — Habie zaten Projelio'nun içindeyse (asıl senaryo).
+ *     Tarayıcıda oturum var, doğrudan çağrılır.
  *
- *  2) agent.token — Projelio'nun KENDİ JWT'si, kısa ömürlü. Habie arayüzü
- *                  Lio ile konuşurken /ai/chat'e bunu taşır. Böylece tarayıcıda
- *                  7 günlük ana oturum jetonu dolaşmak zorunda kalmaz.
+ *  2) handoff → consumeHandoff() — Habie AYRI bir alan adındaysa. Farklı
+ *     origin olduğu için Habie, Projelio'nun localStorage'ını okuyamaz.
+ *     Projelio'daki /habie sayfası tek kullanımlık bir kod üretip Habie'ye
+ *     yönlendirir, Habie o kodu burada takas eder.
  *
- * Habie'nin ajan sohbeti bilerek Habie gateway'inden GEÇMEZ; tarayıcı doğrudan
- * bu API'ye konuşur. Sohbet geçmişi de burada, ai_conversations tablosunda kalır.
+ *     Bu yol Google ile kaydolmuş kullanıcılar için de çalışır — parola
+ *     bilmelerine gerek yok, Projelio'daki mevcut oturumları yeterli.
+ *     (Aynı desen auth/google/exchange'de zaten kullanılıyor.)
  */
 
 /** Habie tarafındaki uygulama kimliği. Habie'nin APP_SECRETS anahtarıyla aynı olmalı. */
@@ -30,6 +32,11 @@ const ASSERTION_TTL = "5m";
 
 /** Ajan jetonu tarayıcıda durur. Kısa tut, Habie süresi dolunca yeniler. */
 const AGENT_TOKEN_TTL_SECONDS = 30 * 60;
+
+/** Devir kodu ömrü — Google akışıyla aynı. */
+const HANDOFF_TTL_MS = 2 * 60 * 1000;
+
+type HandoffEntry = { userId: string; email: string; role: string; expiresAt: number };
 
 export interface HabieSession {
   assertion: string;
@@ -48,6 +55,12 @@ export interface HabieSession {
 export class HabieService {
   private readonly logger = new Logger(HabieService.name);
 
+  /**
+   * Devir kodları bellekte. Tek instance olduğu için bugün çalışıyor;
+   * yatay ölçeklenirse Redis'e taşınmalı. (google-auth.service.ts'te de böyle.)
+   */
+  private readonly handoffs = new Map<string, HandoffEntry>();
+
   constructor(
     private readonly jwt: JwtService,
     private readonly supabase: SupabaseService
@@ -62,6 +75,32 @@ export class HabieService {
       );
     }
     return secret;
+  }
+
+  /** Tek kullanımlık devir kodu üretir. Token URL'e KONMAZ — geçmişte ve Referer'da kalırdı. */
+  createHandoff(userId: string, email: string, role: string): string {
+    this.sweepHandoffs();
+    const code = randomUUID();
+    this.handoffs.set(code, { userId, email, role, expiresAt: Date.now() + HANDOFF_TTL_MS });
+    return code;
+  }
+
+  /** Kodu oturuma çevirir. Tek kullanımlık: bulunsa da bulunmasa da düşer. */
+  async consumeHandoff(code: string): Promise<HabieSession> {
+    const entry = this.handoffs.get(code);
+    this.handoffs.delete(code);
+
+    if (!entry || entry.expiresAt < Date.now()) {
+      throw new UnauthorizedException("Bağlantı kodu geçersiz veya süresi dolmuş. Tekrar dene.");
+    }
+    return this.createSession(entry.userId, entry.email, entry.role);
+  }
+
+  private sweepHandoffs() {
+    const now = Date.now();
+    for (const [code, entry] of this.handoffs) {
+      if (entry.expiresAt < now) this.handoffs.delete(code);
+    }
   }
 
   async createSession(userId: string, email: string, role: string): Promise<HabieSession> {

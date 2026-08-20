@@ -11,6 +11,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import GoogleReturn from "./pages/GoogleReturn";
+import HabieConnect from "./pages/HabieConnect";
 import MicrosoftReturn from "./pages/MicrosoftReturn";
 import Privacy from "./pages/Privacy";
 import JobDetail from "./pages/JobDetail";
@@ -463,6 +464,7 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/google/return" element={<GoogleReturn />} />
+        <Route path="/habie" element={<HabieConnect />} />
         <Route path="/microsoft/return" element={<MicrosoftReturn />} />
         <Route path="/privacy" element={<Privacy />} />
       </Routes>

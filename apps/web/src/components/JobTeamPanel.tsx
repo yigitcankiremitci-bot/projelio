@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import type { JobMember, Project, Task } from "@projelio/shared";
@@ -8,16 +8,31 @@ import { IconPlus, IconChevronRight, IconCheck, IconActivity } from "./icons";
 import HireMemberModal from "./HireMemberModal";
 import CreateTaskModal from "./CreateTaskModal";
 import { isAssignedTo } from "../lib/taskAssignees";
+import { backState } from "../lib/backTarget";
 
 interface Props {
   jobId: string;
+  /** Gidilen sayfanın geri bağlantısında yazacak ad (bkz. lib/backTarget.ts). */
+  jobTitle?: string;
   tasks: Task[];
   projects: Project[];
   ownerId?: string;
   onTasksReload: () => void;
 }
 
-export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTasksReload }: Props) {
+/**
+ * Ekleme eylemi panelin başlığında değil, sayfanın "+" düğmesinde.
+ * Panel yalnızca tetikleyiciyi dışa açar; FAB kaydını JobDetail yapar
+ * (bkz. lib/projectFab.ts — sayfa başına tek kayıt).
+ */
+export interface JobTeamPanelHandle {
+  openHire: () => void;
+}
+
+const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel(
+  { jobId, jobTitle, tasks, projects, ownerId, onTasksReload },
+  ref
+) {
   const c = colors.light;
   const navigate = useNavigate();
   const [members, setMembers] = useState<JobMember[]>([]);
@@ -36,6 +51,8 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTasksR
   };
 
   useEffect(load, [jobId]);
+
+  useImperativeHandle(ref, () => ({ openHire: () => setHiring(true) }));
 
   // Ekip üyelerinden biri "üzerinde çalışıyorum" durumunu değiştirdiğinde,
   // sayfa yenilenmeden bu panelde anlık görünmesi için soket üzerinden dinle.
@@ -62,37 +79,23 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTasksR
   // Göreve tıklanınca ilgili projenin "Çıktılar" sekmesine gidip doğru çıktıyı açıyor
   // ve görevi kısa süreliğine parlatarak fark edilir hale getiriyoruz.
   const goToTask = (task: Task) => {
-    navigate(`/projects/${task.projectId}`, { state: { highlightTaskId: task.id } });
+    navigate(`/projects/${task.projectId}`, {
+      state: {
+        highlightTaskId: task.id,
+        // Geri bağlantısı işin Ekip sekmesine dönsün (bkz. lib/backTarget.ts).
+        ...backState({ to: `/jobs/${jobId}?tab=team`, label: jobTitle || "Ekip" }),
+      },
+    });
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>İş ekibi</h4>
-        <button
-          onClick={() => setHiring(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "none",
-            background: c.primary,
-            color: "#fff",
-            fontSize: 15,
-            fontWeight: 500,
-          }}
-        >
-          <IconPlus size={13} color="#fff" />
-          İşe al
-        </button>
-      </div>
+      <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>İş ekibi</h4>
 
       {loading ? (
         <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
       ) : members.length === 0 ? (
-        <p style={{ fontSize: 15, color: c.textSecondary }}>Bu işte henüz kimse yok. "İşe al" ile birini ekleyebilirsin.</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>Bu işte henüz kimse yok. "+" düğmesiyle birini davet edebilirsin.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {members.map((m) => {
@@ -317,4 +320,6 @@ export default function JobTeamPanel({ jobId, tasks, projects, ownerId, onTasksR
       )}
     </div>
   );
-}
+});
+
+export default JobTeamPanel;

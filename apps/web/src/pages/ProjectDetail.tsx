@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { COVER_TEXT_VEIL, COVER_VEIL_HEIGHT, coverBackground, coverText } from "../lib/covers";
+import { CoverBackLink } from "../components/EntityCover";
+import { useBackTarget } from "../lib/backTarget";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import type { Project, ProjectMember, ProjectStatus, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
@@ -16,6 +18,7 @@ import OutputsPanel, { OutputsPanelHandle } from "../components/OutputsPanel";
 import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
 import ProcessPanel, { ProcessNavState, ViewMode, computeInitialProcessNavDates } from "../components/panels/ProcessPanel";
 import { colors } from "../theme/colors";
+import { pageGutter } from "../lib/layout";
 import { IconSettings } from "../components/icons";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
@@ -402,12 +405,21 @@ export default function ProjectDetail() {
   const coverRef = useRef<HTMLDivElement>(null);
   // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
   const backRef = useRef<HTMLDivElement>(null);
-  usePageHeader(project?.title, coverRef, [project?.title, project?.jobId], {
+  // Görev kartından çift tıklayarak gelindiyse geri bağlantısı TAM olarak
+  // gelinen yere (işin İşler sekmesine) döner; doğrudan girildiyse işin
+  // Projeler sekmesine (bkz. lib/backTarget.ts).
+  const back = useBackTarget({
     to: project ? `/jobs/${project.jobId}` : "/",
     label: "Projeler",
+  });
+
+  usePageHeader(project?.title, coverRef, [project?.title, project?.jobId, back.to, back.label], {
+    to: back.to,
+    label: back.label,
     sourceRef: backRef,
   });
   const isDesktop = useIsDesktop();
+  const gutter = pageGutter(isDesktop);
   // Kaydırılınca sabit şeritte de sekmeler görünsün diye (bkz. lib/pageHeader
   // usePageHeaderTabs, App.tsx). Mobilde de kaydediliyor: orada sayfanın kendi
   // sekme çubuğu şeridin altında kalıp erişilemez oluyordu.
@@ -479,6 +491,10 @@ export default function ProjectDetail() {
             {/* paddingRight kaldırıldı: sağ üstteki çan/tur düğmelerine yer açmak
                 içindi, artık bloğun tepesindeki boşluk (ya da kapaklı hâlde alta
                 yaslı düzen) o işi görüyor — burada daralmak başlığı erken kırıyordu. */}
+            <div ref={backRef} style={{ position: "relative", marginBottom: 10 }}>
+              <CoverBackLink to={back.to} label={back.label} />
+            </div>
+
             <div style={{ position: "relative", marginBottom: project.description ? 8 : 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{project.title}</h1>
@@ -571,7 +587,7 @@ export default function ProjectDetail() {
       })()}
 
       {project && id && (
-        <div style={{ padding: "0 28px 28px" }}>
+        <div style={{ padding: `0 ${gutter}px 28px` }}>
           {/* Bu çubuk eskiden position:sticky idi; ama kaydırınca beliren üst şerit
               (zIndex 34) onun üstüne bindiği için sekmeler ekranda duruyor gözükmesine
               rağmen görünmez oluyordu. Artık normal akışta kalıp yukarı kayıyor ve
@@ -579,18 +595,10 @@ export default function ProjectDetail() {
           <div
             style={{
               background: c.background,
-              margin: "0 -28px",
-              padding: "10px 28px 8px",
+              margin: `0 -${gutter}px`,
+              padding: `8px ${gutter}px 8px`,
             }}
           >
-            <div ref={backRef}>
-              <Link
-                to={`/jobs/${project.jobId}`}
-                style={{ fontSize: 14, color: c.textSecondary, display: "inline-block", marginBottom: 6 }}
-              >
-                ← Projeler
-              </Link>
-            </div>
             <div ref={tabsRef}>
               <ProjectTabs
                 active={activeTab}
@@ -703,6 +711,8 @@ export default function ProjectDetail() {
         <TaskEditModal
           task={editingTask}
           onClose={() => setEditingTask(null)}
+          // Ek eklendiğinde modal kapanmadan kart güncellensin (rozet).
+          onTaskPatched={updateTask}
           onSaved={(updated) => {
             updateTask(updated);
             setEditingTask(null);

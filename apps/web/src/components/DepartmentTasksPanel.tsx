@@ -377,6 +377,8 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
         <TaskEditModal
           task={editingTask}
           onClose={() => setEditingTask(null)}
+          // Ek eklendiğinde modal kapanmadan kart güncellensin (rozet).
+          onTaskPatched={updateTask}
           onSaved={(updated) => {
             updateTask(updated);
             setEditingTask(null);

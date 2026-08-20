@@ -15,13 +15,14 @@ import OrgTabs, { CORE_ORG_TABS, OrgTab, visibleOrgTabs } from "../components/Or
 import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
 import ProfileCard from "../components/ProfileCard";
-import EntityCover, { coverActionButton } from "../components/EntityCover";
+import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
 import { coverText } from "../lib/covers";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { colors } from "../theme/colors";
+import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings, IconLayers } from "../components/icons";
 
 // Şirket akışında görev/tamamlanan-görev karışımı yok — organizasyon seviyesinde
@@ -43,6 +44,7 @@ export default function OrganizationDetail() {
   const navigate = useNavigate();
   const c = colors.light;
   const isDesktop = useIsDesktop();
+  const gutter = pageGutter(isDesktop);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [editing, setEditing] = useState(false);
   // Ürün/Hizmet panelinden doğrudan ürün/hizmet eklendiğinde de departman yöneticisinin
@@ -142,6 +144,11 @@ export default function OrganizationDetail() {
     <div style={{ minHeight: "100vh", background: c.background }}>
       <EntityCover
         coverRef={coverRef}
+        back={
+          <div ref={backRef}>
+            <CoverBackLink to="/organizations" label="Organizasyonlar" />
+          </div>
+        }
         coverImageUrl={organization?.coverImageUrl}
         height={270}
         title={organization?.name ?? "…"}
@@ -198,13 +205,7 @@ export default function OrganizationDetail() {
         }
       />
 
-      <div style={{ padding: "0 28px 28px" }}>
-        <div ref={backRef}>
-          <Link to="/organizations" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
-            ← Organizasyonlar
-          </Link>
-        </div>
-
+      <div style={{ padding: `8px ${gutter}px 28px` }}>
         <div ref={tabsRef}>
           <OrgTabs
             active={activeTab}

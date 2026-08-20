@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Job, Operation, Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import ProjectCard from "../components/ProjectCard";
@@ -8,9 +8,9 @@ import CreateOperationModal from "../components/CreateOperationModal";
 import EditJobModal from "../components/EditJobModal";
 import JobTabs, { JobTab, visibleJobTabs } from "../components/JobTabs";
 import { useCurrentUser, useIsSubcontractor } from "../lib/useCurrentUser";
-import JobModulesPanel from "../components/JobModulesPanel";
-import JobTeamPanel from "../components/JobTeamPanel";
-import EntityCover, { coverActionButton } from "../components/EntityCover";
+import JobModulesPanel, { JobModulesPanelHandle } from "../components/JobModulesPanel";
+import JobTeamPanel, { JobTeamPanelHandle } from "../components/JobTeamPanel";
+import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
 import { coverText } from "../lib/covers";
 import JobInviteBanner from "../components/JobInviteBanner";
 import JobTasksPanel, { JobTasksPanelHandle } from "../components/JobTasksPanel";
@@ -24,11 +24,18 @@ import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { pageGutter } from "../lib/layout";
+import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
 
 export default function JobDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const c = colors.light;
+  const isDesktop = useIsDesktop();
+  // Sayfanın yan boşluğu tek bir yerden: aşağıdaki negatif kenar boşluklu
+  // şerit de bu değeri kullanmalı, yoksa dar ekranda hizalar kayar.
+  const gutter = pageGutter(isDesktop);
   const [job, setJob] = useState<Job | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
@@ -63,26 +70,47 @@ export default function JobDetail() {
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
   const tasksPanelRef = useRef<JobTasksPanelHandle>(null);
   const filesRef = useRef<FilesPanelHandle>(null);
+  const teamRef = useRef<JobTeamPanelHandle>(null);
+  const modulesRef = useRef<JobModulesPanelHandle>(null);
+  // "+" menüsündeki "Drive'dan seç" seçeneğinin etiketi bağlı sağlayıcıya göre
+  // değişiyor ve o bilgi FilesPanel'in içinde hesaplanıyor; panel yukarı
+  // bildiriyor. Hiçbir sağlayıcı bağlı değilse seçenek hiç gösterilmez.
+  const [filesProvider, setFilesProvider] = useState<"google" | "microsoft" | undefined>(undefined);
 
-  // "İşler" sekmesindeyken alt navigasyondaki "+" butonu doğrudan görev ekleme,
-  // "Rutinler" sekmesindeyken doğrudan rutin ekleme formunu açsın, "Dosyalar"
-  // sekmesindeyken dosya yükleme/oluşturma seçimini açsın (diğer sekmelerde eski
-  // proje/rutin/görev seçim menüsü geçerli kalır).
+  // Sekmeye göre alt navigasyondaki "+" butonunun ne yapacağı.
+  //
+  // Panellerin kendi başlıklarındaki ekleme düğmeleri (İşe al / Modül ekle /
+  // Dosya yükle…) kaldırıldı: her sekmenin ekleme eylemi tek ve aynı yerde,
+  // "+" düğmesinde toplanıyor. Panel yalnızca tetikleyici metodu dışa açıyor;
+  // kaydı SAYFA yapıyor, çünkü useProjectFabAction sayfa başına tek yerden
+  // çağrılmalı (bkz. lib/projectFab.ts).
   useProjectFabAction(
     activeTab === "tasks"
       ? { label: "Görev ekle", onClick: () => tasksPanelRef.current?.openCreate() }
       : activeTab === "programs"
       ? { label: "Yeni rutin", onClick: () => setCreatingOperation(true) }
+      : activeTab === "team"
+      ? { label: "İşe al", onClick: () => teamRef.current?.openHire() }
+      : activeTab === "modules"
+      ? { label: "Modül ekle", onClick: () => modulesRef.current?.openAdd() }
       : activeTab === "files"
       ? {
           label: "Dosya ekle",
           options: [
             { label: "Dosya yükle", onClick: () => filesRef.current?.openUpload() },
             { label: "Yeni dosya oluştur", onClick: () => filesRef.current?.openCreateNative() },
+            ...(filesProvider
+              ? [
+                  {
+                    label: filesProvider === "microsoft" ? "OneDrive'dan seç" : "Drive'dan seç",
+                    onClick: () => filesRef.current?.openBrowseDrive(),
+                  },
+                ]
+              : []),
           ],
         }
       : null,
-    [activeTab]
+    [activeTab, filesProvider]
   );
 
   const reload = () => {
@@ -318,12 +346,28 @@ export default function JobDetail() {
   const pendingTasksCount = tasks.filter((t) => t.status !== "completed").length;
   const completedTasksCount = tasks.filter((t) => t.status === "completed").length;
 
+  // Tek dizi, iki yerleşim: geniş ekranda kapağın içinde, dar ekranda akışta
+  // (bkz. StatGrid — hangisinin çizileceğine bileşenler karar veriyor).
+  const stats: StatItem[] = [
+    { label: "Proje", value: activeProjects.length },
+    { label: "Rutin", value: activeOperations.length },
+    { label: "Bekleyen", value: pendingTasksCount },
+    { label: "Biten", value: completedTasksCount },
+  ];
+
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
       <EntityCover
         coverRef={coverRef}
+        back={
+          <div ref={backRef}>
+            <CoverBackLink to="/" label="İşler" />
+          </div>
+        }
         coverImageUrl={job?.coverImageUrl}
-        height={330}
+        // Masaüstünde 330 idi; özet kapağın içine girince o boşluk zaten doldu
+        // ve fazlası sayfayı aşağı itiyordu. Dar ekran tavanı EntityCover'da.
+        height={260}
         title={job?.title ?? "…"}
         description={job?.description}
         meta={
@@ -342,6 +386,7 @@ export default function JobDetail() {
             </>
           )
         }
+        stats={<CoverStats items={stats} />}
         action={
           job && currentUser?.id === job.ownerId ? (
             <button
@@ -355,13 +400,9 @@ export default function JobDetail() {
         }
       />
 
-      <div style={{ padding: "0 28px 28px" }}>
-        <div ref={backRef}>
-          <Link to="/" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
-            ← İşler
-          </Link>
-        </div>
-
+      {/* Kapağın hemen altı: geri bağlantısı artık kapağın içinde olduğu için
+          sekme çubuğu yukarı çekildi (bkz. CoverBackLink). */}
+      <div style={{ padding: `8px ${gutter}px 28px` }}>
         {/* Bildirimdeki davetten gelindiyse kararı burada da verebilsin; bekleyen
             davet yoksa bileşen hiçbir şey çizmez. */}
         <JobInviteBanner jobId={id} />
@@ -373,24 +414,24 @@ export default function JobDetail() {
         <div
           style={{
             background: c.background,
-            margin: "0 -28px",
-            padding: "10px 28px 8px",
+            margin: `0 -${gutter}px`,
+            padding: `0 ${gutter}px 8px`,
           }}
         >
           <div ref={tabsRef}>
-            <JobTabs active={activeTab} onChange={setActiveTab} isSubcontractor={isSubcontractor} />
+            {/* marginBottom 0: sekmelerle proje kartları arasındaki boşluk
+                şeridin alt dolgusundan (8px) ibaret kalsın. */}
+            <JobTabs
+              active={activeTab}
+              onChange={setActiveTab}
+              isSubcontractor={isSubcontractor}
+              style={{ marginBottom: 0 }}
+            />
           </div>
         </div>
 
-        <div style={{ marginTop: 6 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
-            <SummaryCard label="Aktif proje" value={activeProjects.length} />
-            <SummaryCard label="Çalışan rutin" value={activeOperations.length} />
-            <SummaryCard label="Bekleyen görev" value={pendingTasksCount} />
-            <SummaryCard label="Tamamlanmış görev" value={completedTasksCount} />
-          </div>
-
-          <TodayCompletedPanel tasks={tasks} />
+        <div>
+          <StatSummary items={stats} />
 
           {activeTab === "projects" && (
             projects.length === 0 ? (
@@ -507,7 +548,9 @@ export default function JobDetail() {
 
           {activeTab === "team" && (
             <JobTeamPanel
+              ref={teamRef}
               jobId={id}
+              jobTitle={job?.title}
               tasks={tasks}
               projects={projects}
               ownerId={job?.ownerId}
@@ -515,16 +558,24 @@ export default function JobDetail() {
             />
           )}
 
-          {activeTab === "files" && <FilesPanel ref={filesRef} jobId={id} />}
+          {activeTab === "files" && (
+            <FilesPanel ref={filesRef} jobId={id} actionsInFab onProviderChange={setFilesProvider} />
+          )}
 
           {/* Modüller işin içinde de görünür: anasayfadan atanan modüle
               ulaşmak için kullanıcıyı anasayfaya geri göndermek gerekmiyor. */}
-          {activeTab === "modules" && id && <JobModulesPanel jobId={id} />}
+          {activeTab === "modules" && id && <JobModulesPanel ref={modulesRef} jobId={id} />}
+
+          {/* "Bugün yapılanlar" görev listesinin başında: bugün neyin bittiği,
+              sıradaki işe bakarken anlam taşıyor — proje kartlarının üstünde
+              değil. */}
+          {activeTab === "tasks" && <TodayCompletedPanel tasks={tasks} />}
 
           {activeTab === "tasks" && (
             <JobTasksPanel
               ref={tasksPanelRef}
               jobId={id}
+              jobTitle={job?.title}
               projects={projects}
               tasks={tasks}
               onCreateSubtask={handleCreateSubtask}
@@ -594,6 +645,8 @@ export default function JobDetail() {
         <TaskEditModal
           task={editingTask}
           onClose={() => setEditingTask(null)}
+          // Ek eklendiğinde modal kapanmadan kart güncellensin (rozet).
+          onTaskPatched={updateTaskInState}
           onSaved={(updated) => {
             updateTaskInState(updated);
             setEditingTask(null);
@@ -612,12 +665,3 @@ export default function JobDetail() {
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string | number }) {
-  const c = colors.light;
-  return (
-    <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: "14px 16px" }}>
-      <div style={{ color: c.textSecondary, fontSize: 15, marginBottom: 6 }}>{label}</div>
-      <div style={{ color: c.textPrimary, fontSize: 27, fontWeight: 600 }}>{value}</div>
-    </div>
-  );
-}

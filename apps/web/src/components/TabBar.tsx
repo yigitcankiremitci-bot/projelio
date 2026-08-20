@@ -49,8 +49,18 @@ export default function TabBar({ tabs, active, onChange, style, scrollable }: Pr
   // satıra sarıyor ve ekranın üçte birini yiyordu. Masaüstünde sarma sorunu yok,
   // orada sekmeler genişliği paylaşan ızgara olarak daha okunaklı — tek istisna,
   // sabit şeritteki kopya (`scrollable`), çünkü o bandın yüksekliği sabit.
-  if (scrollable || !isDesktop) {
+  // Mobilde her zaman tek satır + yana kaydırma.
+  if (!isDesktop) {
     return <ScrollableTabBar tabs={tabs} active={active} onChange={onChange} style={style} />;
+  }
+
+  // Masaüstünde sabit şeritteki kopya (`scrollable`): satır yüksekliği sabit
+  // olduğu için sarmamalı, ama yana kaydırmalı da olmamalı. Şeridin ortasındaki
+  // bant (sidebar ile bildirim çanı arasında ~970px) altı sekmeyi rahat
+  // taşıyor; kaydırmalı hâl o genişliği kullanmayıp sekmeleri sola sıkıştırıyor,
+  // kalanı da ok düğmesinin arkasına saklıyordu.
+  if (scrollable) {
+    return <FittedTabBar tabs={tabs} active={active} onChange={onChange} style={style} />;
   }
 
   return (
@@ -95,6 +105,75 @@ export default function TabBar({ tabs, active, onChange, style, scrollable }: Pr
           }}
         >
           {t.label}
+          {t.isNew && (
+            <span
+              title="Sık kullandığın için üste alındı"
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                flexShrink: 0,
+                background: active === t.key ? "#fff" : c.accent,
+              }}
+            />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Tek satır, kaydırmasız: sekmeler mevcut genişliği eşit paylaşır.
+ *
+ * Izgara hâlinden farkı sarmaması (`auto-fit` sığmayanı alt satıra indiriyor,
+ * sabit yükseklikli şeritte bu taşma demek), ScrollableTabBar'dan farkı da
+ * genişliği sonuna kadar kullanması. Çok dar bir bantta etiketler kesilir —
+ * kaybolmaktansa kısalsınlar.
+ */
+function FittedTabBar({ tabs, active, onChange, style }: Props) {
+  const c = colors.light;
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 4,
+        background: c.surface,
+        border: `1px solid ${c.border}`,
+        borderRadius: 10,
+        padding: 4,
+        marginBottom: 16,
+        ...style,
+      }}
+    >
+      {tabs.map((t) => (
+        <button
+          key={t.key}
+          onClick={() => onChange(t.key)}
+          title={t.label}
+          style={{
+            flex: "1 1 0",
+            // Varsayılan `min-width: auto` uzun etiketin düğmeyi germesine izin
+            // verir; o da satırı taşırır (bkz. StatGrid'deki aynı tuzak).
+            minWidth: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 5,
+            padding: "8px 6px",
+            borderRadius: 7,
+            border: "none",
+            background: active === t.key ? c.primary : "transparent",
+            color: active === t.key ? "#fff" : c.textSecondary,
+            fontSize: 15,
+            fontWeight: 500,
+            cursor: "pointer",
+            transition: "background 0.12s ease, color 0.12s ease",
+          }}
+        >
+          <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {t.label}
+          </span>
           {t.isNew && (
             <span
               title="Sık kullandığın için üste alındı"

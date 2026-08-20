@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Department, Task } from "@projelio/shared";
 import { api } from "../api/client";
 import DepartmentMembersList, { DepartmentMembersListHandle } from "../components/DepartmentMembersList";
@@ -12,10 +12,14 @@ import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
 import DepartmentSettingsModal from "../components/DepartmentSettingsModal";
 import ProfileCard from "../components/ProfileCard";
+import { CoverBackLink } from "../components/EntityCover";
+import { useBackTarget } from "../lib/backTarget";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { colors } from "../theme/colors";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { pageGutter } from "../lib/layout";
 import { IconLayers, IconSettings } from "../components/icons";
 
 // Bir departmanın kendi sayfası: iç dinamikler üstteki sekmelerle ayrılır —
@@ -28,6 +32,8 @@ export default function DepartmentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const c = colors.light;
+  const isDesktop = useIsDesktop();
+  const gutter = pageGutter(isDesktop);
   const [department, setDepartment] = useState<Department | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -110,9 +116,15 @@ export default function DepartmentDetail() {
   const coverRef = useRef<HTMLDivElement>(null);
   // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
   const backRef = useRef<HTMLDivElement>(null);
-  usePageHeader(department?.name, coverRef, [department?.name, department?.organizationId], {
+  // bkz. ProjectDetail — görev kartından gelindiyse geri, gelinen yere döner.
+  const back = useBackTarget({
     to: department ? `/organizations/${department.organizationId}?tab=departments` : "/organizations",
     label: "Departmanlar",
+  });
+
+  usePageHeader(department?.name, coverRef, [department?.name, department?.organizationId, back.to, back.label], {
+    to: back.to,
+    label: back.label,
     sourceRef: backRef,
   });
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
@@ -164,6 +176,9 @@ export default function DepartmentDetail() {
         </div>
 
         <div style={{ paddingRight: 90 }}>
+          <div ref={backRef} style={{ marginBottom: 10 }}>
+            <CoverBackLink to={back.to} label={back.label} onDark />
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <IconLayers size={16} color="#fff" />
             <h1 style={{ fontSize: 20, fontWeight: 500, color: "#fff", margin: 0 }}>{department?.name ?? "…"}</h1>
@@ -199,16 +214,7 @@ export default function DepartmentDetail() {
         )}
       </div>
 
-      <div style={{ padding: "0 28px 28px" }}>
-        <div ref={backRef}>
-          <Link
-            to={department ? `/organizations/${department.organizationId}?tab=departments` : "/organizations"}
-            style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}
-          >
-            ← Departmanlar
-          </Link>
-        </div>
-
+      <div style={{ padding: `12px ${gutter}px 28px` }}>
         {department && (
           <>
             <div ref={tabsRef}>

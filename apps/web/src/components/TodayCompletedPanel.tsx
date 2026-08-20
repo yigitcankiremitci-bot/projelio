@@ -31,7 +31,8 @@ export default function TodayCompletedPanel({ tasks }: Props) {
         background: c.surface,
         border: `1px solid ${c.border}`,
         borderRadius: 12,
-        marginBottom: 20,
+        // 20 idi: altındaki "İşler" başlığı bu karttan kopuk duruyordu.
+        marginBottom: 10,
         overflow: "hidden",
       }}
     >

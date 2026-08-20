@@ -802,8 +802,15 @@ export interface Task {
   // Görev kartlarına eklenebilen serbest açıklama metni.
   description?: string;
   startDate?: string;
-  /** Göreve eklenen link/dosya ekleri (bkz. 060). */
+  /** Göreve eklenen link ekleri (bkz. 060). Kart rozetinin kaynağı. */
   attachments?: TaskAttachment[];
+  /**
+   * Göreve iliştirilmiş Drive/OneDrive dosyaları (bkz. files tablosu,
+   * `files.task_id`). Ekler iki ayrı tabloda yaşıyor: link `task_attachments`,
+   * dosya `files`. Kart iki rozeti de gösterebilsin diye ikisi de görevle
+   * birlikte geliyor — OperationOccurrence'daki alanların birebir aynısı.
+   */
+  files?: { id: string; name: string; webViewLink?: string }[];
   deadline: string;
   /**
    * Opsiyonel bitiş saati ("HH:MM"). `deadline` günü, bu alan saati tutar —

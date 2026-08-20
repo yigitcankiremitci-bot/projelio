@@ -1,14 +1,16 @@
 import { useRef, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import type { Group, Organization } from "@projelio/shared";
 import { api } from "../api/client";
 import OrganizationCard from "../components/OrganizationCard";
 import EditGroupModal from "../components/EditGroupModal";
 import FilesPanel from "../components/FilesPanel";
 import ProfileCard from "../components/ProfileCard";
-import EntityCover, { coverActionButton } from "../components/EntityCover";
+import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
 import { coverText } from "../lib/covers";
 import { colors } from "../theme/colors";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { usePageHeader } from "../lib/pageHeader";
 
@@ -18,6 +20,8 @@ export default function GroupDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const c = colors.light;
+  const isDesktop = useIsDesktop();
+  const gutter = pageGutter(isDesktop);
   const [group, setGroup] = useState<Group | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [editing, setEditing] = useState(false);
@@ -49,6 +53,11 @@ export default function GroupDetail() {
     <div style={{ minHeight: "100vh", background: c.background }}>
       <EntityCover
         coverRef={coverRef}
+        back={
+          <div ref={backRef}>
+            <CoverBackLink to="/groups" label="Gruplar" />
+          </div>
+        }
         coverImageUrl={group?.coverImageUrl}
         height={270}
         title={group?.name ?? "…"}
@@ -77,13 +86,7 @@ export default function GroupDetail() {
         }
       />
 
-      <div style={{ padding: "0 28px 28px" }}>
-        <div ref={backRef}>
-          <Link to="/groups" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}>
-            ← Gruplar
-          </Link>
-        </div>
-
+      <div style={{ padding: `14px ${gutter}px 28px` }}>
         <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 14px" }}>Organizasyonlar</h2>
 
         {organizations.length === 0 ? (

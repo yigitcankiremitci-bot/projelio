@@ -24,3 +24,29 @@ export function useIsDesktop(): boolean {
 
   return isDesktop;
 }
+
+/**
+ * "Kapağın içine bir şey daha sığar mı?" eşiği.
+ *
+ * `useIsDesktop` (880px) alt menü mü sidebar mı sorusunu cevaplıyor; kapağın
+ * yatayda kaç blok taşıyabileceği ayrı bir soru. Sidebar açıkken 328px gidiyor,
+ * yani 880px'lik bir pencerede kapağa kalan 496px: başlık bloğunun yanına özet
+ * şeridi konursa başlık 140px'e sıkışıyor. 1180px'in altında özet akışta kalır.
+ */
+const WIDE_QUERY = "(min-width: 1180px)";
+
+export function useIsWide(): boolean {
+  const [isWide, setIsWide] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(WIDE_QUERY).matches
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia(WIDE_QUERY);
+    const onChange = () => setIsWide(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  return isWide;
+}

@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode, RefObject } from "react";
+import { Link } from "react-router-dom";
 import {
   COVER_TEXT_PRIMARY,
   COVER_TEXT_SECONDARY,
@@ -7,6 +8,9 @@ import {
   coverBackground,
 } from "../lib/covers";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { pageGutter } from "../lib/layout";
+import { colors } from "../theme/colors";
+import { IconChevronLeft } from "./icons";
 
 /**
  * Kapağın sağ alt köşesindeki düzenleme düğmesinin ortak stili — beş sayfada
@@ -46,6 +50,69 @@ const ASIDE_TOP_CLEARANCE = BELL_BAND_BOTTOM - COVER_PADDING;
  * altına girmesin diye sağda bu kadar yer ayrılır (katlıyken kart = fotoğraf).
  */
 const MOBILE_ASIDE_RESERVE = 104;
+/**
+ * Dar ekranda kapağın tavanı.
+ *
+ * Sayfalar kapak yüksekliğini masaüstü için seçiyor (iş 330, rutin 290, şirket
+ * 270). Telefonda 330 px, 850 px'lik bir ekranın %39'u demek: kullanıcı sayfayı
+ * açtığında sekmeleri bile göremiyordu. Yazı bloğu kapağın dibine yaslı olduğu
+ * için yüksekliği kısmak yalnızca fotoğrafın üst kısmını kırpar, hiçbir metni
+ * kaybetmez.
+ */
+const MOBILE_MAX_HEIGHT = 220;
+
+/**
+ * "← İşler" bağlantısının kapak içindeki hâli.
+ *
+ * Eskiden kapağın ALTINDA, kendi satırında duruyordu (`margin: 14px 0`) ve
+ * sekme çubuğunu 43px aşağı itiyordu — telefonda bu, ilk ekranın onda birine
+ * denk geliyor. Kapağın içinde başlığın hemen üstünde, sayfanın kimliğiyle
+ * aynı blokta duruyor: "hangi listeden geldim" bilgisi başlığın yanında daha
+ * doğru bir yer zaten.
+ *
+ * Çip görünümü (yarı saydam beyaz zemin) şart, süs değil: kapak fotoğrafı
+ * koyu da olabilir. Perde (bkz. lib/covers.ts) kapağın alt bandını açıyor ama
+ * bağlantı bandın üst sınırına yakın duruyor; kendi zemini olmadan bazı
+ * fotoğraflarda okunmuyordu.
+ */
+export function CoverBackLink({
+  to,
+  label,
+  onDark = false,
+}: {
+  to: string;
+  label: string;
+  /**
+   * Departman kapağı gibi koyu perdeli, beyaz yazılı kapaklar için. Oradaki
+   * yazı rengi kuralı EntityCover'ınkinden farklı (bkz. DepartmentDetail);
+   * açık çip o zeminde göz alıyordu.
+   */
+  onDark?: boolean;
+}) {
+  const c = colors.light;
+  const fg = onDark ? "rgba(255,255,255,0.92)" : c.textSecondary;
+  return (
+    <Link
+      to={to}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        padding: "4px 12px 4px 7px",
+        borderRadius: 999,
+        background: onDark ? "rgba(26,31,41,0.42)" : "rgba(255,255,255,0.62)",
+        border: `1px solid ${onDark ? "rgba(255,255,255,0.22)" : "rgba(26,31,41,0.08)"}`,
+        fontSize: 13,
+        color: fg,
+        whiteSpace: "nowrap",
+        textDecoration: "none",
+      }}
+    >
+      <IconChevronLeft size={14} color={fg} />
+      {label}
+    </Link>
+  );
+}
 
 interface Props {
   /** Kaydırınca beliren sabit başlık bunu ölçer (bkz. lib/pageHeader). */
@@ -74,6 +141,17 @@ interface Props {
    * ise sayfanın parçası.
    */
   asideOnMobile?: boolean;
+  /**
+   * Başlığın üstündeki geri bağlantısı (bkz. CoverBackLink). Sayfalar bunu
+   * `usePageHeader`in sourceRef'i için bir sarmalayıcıyla veriyor.
+   */
+  back?: ReactNode;
+  /**
+   * Kapağın sağ alt bandına, düzenleme düğmesinin üstüne giren blok
+   * (bkz. StatGrid CoverStats). Dar ekranda kendisi null döndüğü için burada
+   * ayrıca eşiğe bakılmıyor.
+   */
+  stats?: ReactNode;
   /** Sağ alttaki düzenleme düğmesi. */
   action?: ReactNode;
 }
@@ -95,14 +173,20 @@ export default function EntityCover({
   coverRef,
   coverImageUrl,
   height = 290,
+  back,
   title,
   description,
   meta,
   aside,
   asideOnMobile = false,
+  stats,
   action,
 }: Props) {
   const isDesktop = useIsDesktop();
+  const gutter = pageGutter(isDesktop);
+  // Dar ekranda kapak kısalır; sayfanın kendi yan boşluğuyla da aynı hizaya
+  // gelir ki başlık, altındaki sekme çubuğuyla aynı dikey çizgide başlasın.
+  const coverHeight = isDesktop ? height : Math.min(height, MOBILE_MAX_HEIGHT);
   const showAside = Boolean(aside) && isDesktop;
   const showAsideOverlay = Boolean(aside) && !isDesktop && asideOnMobile;
 
@@ -111,9 +195,9 @@ export default function EntityCover({
       ref={coverRef}
       style={{
         position: "relative",
-        height,
+        height: coverHeight,
         background: coverBackground(coverImageUrl),
-        padding: "20px 28px",
+        padding: `${isDesktop ? 20 : 16}px ${gutter}px`,
         display: "flex",
         overflow: "hidden",
       }}
@@ -156,11 +240,23 @@ export default function EntityCover({
             paddingRight: showAsideOverlay ? MOBILE_ASIDE_RESERVE : 0,
           }}
         >
-          <h1 style={{ fontSize: 22, fontWeight: 500, color: COVER_TEXT_PRIMARY, margin: "0 0 4px" }}>{title}</h1>
+          {back && <div style={{ marginBottom: 10 }}>{back}</div>}
+          <h1
+            style={{
+              // Dar ekranda 22 px başlık iki satıra taşıp künyeyi aşağı itiyordu.
+              fontSize: isDesktop ? 22 : 20,
+              fontWeight: 500,
+              color: COVER_TEXT_PRIMARY,
+              margin: "0 0 4px",
+              lineHeight: 1.25,
+            }}
+          >
+            {title}
+          </h1>
           {description && (
             <p
               style={{
-                fontSize: 16,
+                fontSize: isDesktop ? 16 : 14,
                 color: COVER_TEXT_SECONDARY,
                 margin: "0 0 8px",
                 // Uzun açıklama kapağı taşırmasın: iki satırda kırpılır.
@@ -175,13 +271,13 @@ export default function EntityCover({
             </p>
           )}
           {meta && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 15, color: COVER_TEXT_SECONDARY }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: isDesktop ? 14 : 10, fontSize: isDesktop ? 15 : 13, color: COVER_TEXT_SECONDARY }}>
               {meta}
             </div>
           )}
         </div>
 
-        {(showAside || action) && (
+        {(showAside || action || stats) && (
           <div
             style={{
               flexShrink: 0,
@@ -196,6 +292,7 @@ export default function EntityCover({
             }}
           >
             {showAside && <div style={{ flex: 1, display: "flex", alignItems: "center" }}>{aside}</div>}
+            {stats}
             {action}
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { JobModule, ModuleCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
@@ -25,7 +25,16 @@ interface Props {
  * Departman panelindeki ile aynı davranış: kart ızgarası, sayfa yüzeyli modül
  * kendi adresinde, modal yüzeyli olan yerinde açılır.
  */
-export default function JobModulesPanel({ jobId }: Props) {
+/**
+ * Ekleme eylemi panelin başlığında değil, sayfanın "+" düğmesinde.
+ * Panel yalnızca tetikleyiciyi dışa açar; FAB kaydını JobDetail yapar
+ * (bkz. lib/projectFab.ts — sayfa başına tek kayıt).
+ */
+export interface JobModulesPanelHandle {
+  openAdd: () => void;
+}
+
+const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobModulesPanel({ jobId }, ref) {
   const c = colors.light;
   const navigate = useNavigate();
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
@@ -99,6 +108,10 @@ export default function JobModulesPanel({ jobId }: Props) {
     }
   };
 
+  // Aç/kapat: "+" ikinci kez basıldığında eklenebilir modül listesi kapanır.
+  // Tek yönlü açma, listeyi kapatmanın tek yolunu "Vazgeç" bağlantısı yapıyordu.
+  useImperativeHandle(ref, () => ({ openAdd: () => setAdding((v) => !v) }));
+
   if (loading) return <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>;
 
   const activeEntries = catalog.filter((e) => isAssigned(e.key));
@@ -107,22 +120,21 @@ export default function JobModulesPanel({ jobId }: Props) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* Ekleme düğmesi panelin kendi başlığında: alttaki global "+" bu sayfada
-          zaten proje/rutin/görev menüsünü yönetiyor (bkz. JobDetail
-          useProjectFabAction) ve iki bileşen aynı düğmeye yazamaz. */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: c.textPrimary }}>Modüller</h3>
-        <button
-          onClick={() => setAdding((v) => !v)}
-          style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
-        >
-          {adding ? "Vazgeç" : "+ Modül ekle"}
-        </button>
-      </div>
+      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: c.textPrimary }}>Modüller</h3>
 
       {adding && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, background: c.background, borderRadius: 12, padding: 12 }}>
-          <span style={{ fontSize: 13, color: c.textSecondary }}>Bu işe eklenebilecek modüller</span>
+          {/* Kapatma düğmesi listenin kendi başlığında: açan düğme artık burada
+              değil, sayfanın "+" düğmesinde. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ flex: 1, fontSize: 13, color: c.textSecondary }}>Bu işe eklenebilecek modüller</span>
+            <button
+              onClick={() => setAdding(false)}
+              style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+            >
+              Vazgeç
+            </button>
+          </div>
           {availableEntries.length === 0 ? (
             <span style={{ fontSize: 13, color: c.textSecondary }}>Eklenebilecek başka modül yok.</span>
           ) : (
@@ -162,7 +174,7 @@ export default function JobModulesPanel({ jobId }: Props) {
             fontSize: 15,
           }}
         >
-          Bu işe henüz modül eklenmedi. Yukarıdaki "+ Modül ekle" ile başlayabilirsin.
+          Bu işe henüz modül eklenmedi. "+" düğmesiyle başlayabilirsin.
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
@@ -194,4 +206,6 @@ export default function JobModulesPanel({ jobId }: Props) {
       )}
     </div>
   );
-}
+});
+
+export default JobModulesPanel;

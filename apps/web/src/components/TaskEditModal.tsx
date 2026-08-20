@@ -21,6 +21,15 @@ interface Props {
   fileJobId?: string;
   onClose: () => void;
   onSaved: (updated: Task) => void;
+  /**
+   * Görevin listedeki kaydını MODALI KAPATMADAN günceller.
+   *
+   * `onSaved` bunun için kullanılamaz: çağıran sayfaların hepsi orada modalı
+   * kapatıyor. Ek eklemek ise kaydetmeyi beklemiyor (bkz. TaskAttachmentsPanel)
+   * — kullanıcı link bırakıp yorum yazmaya devam edebilmeli, ama karttaki ek
+   * rozeti de hemen belirmeli.
+   */
+  onTaskPatched?: (updated: Task) => void;
   onDeleted?: (deletedTaskId: string) => void;
   onArchived?: (archivedTaskId: string) => void;
 }
@@ -29,9 +38,31 @@ function toDateInputValue(iso?: string) {
   return iso ? new Date(iso).toISOString().slice(0, 10) : "";
 }
 
-export default function TaskEditModal({ task, fileJobId, onClose, onSaved, onDeleted, onArchived }: Props) {
+export default function TaskEditModal({
+  task,
+  fileJobId,
+  onClose,
+  onSaved,
+  onTaskPatched,
+  onDeleted,
+  onArchived,
+}: Props) {
   const c = colors.light;
   const formRef = useRef<HTMLFormElement>(null);
+  /**
+   * Ekler iki AYRI panelden geliyor (link ve dosya) ve ikisi de birbirinden
+   * habersiz. Yamayı `task` prop'undan türetseydik ikinci panel birincinin
+   * değişikliğini ezerdi: `task` sayfada ayrı bir state'te (editingTask)
+   * duruyor ve yama sonrası tazelenmiyor. Bu yüzden ikisi burada biriktiriliyor.
+   */
+  const attachmentPatch = useRef<Pick<Task, "attachments" | "files">>({
+    attachments: task.attachments,
+    files: task.files,
+  });
+  const patchAttachments = (part: Partial<Pick<Task, "attachments" | "files">>) => {
+    attachmentPatch.current = { ...attachmentPatch.current, ...part };
+    onTaskPatched?.({ ...task, ...attachmentPatch.current });
+  };
   const isSubtask = Boolean(task.parentTaskId);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
@@ -296,7 +327,7 @@ export default function TaskEditModal({ task, fileJobId, onClose, onSaved, onDel
           FilesPanel'den ayrı: o Drive/OneDrive klasör bağlamı kurar ve proje
           gerektirir; bu ise göreve doğrudan bağlı, bağlamsız bir ek listesi. */}
       <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
-        <TaskAttachmentsPanel taskId={task.id} />
+        <TaskAttachmentsPanel taskId={task.id} onChanged={(attachments) => patchAttachments({ attachments })} />
       </div>
 
       {/* Dosyalar Drive/OneDrive'da yaşar; kendi veritabanımıza dosya yazılmaz.
@@ -306,9 +337,19 @@ export default function TaskEditModal({ task, fileJobId, onClose, onSaved, onDel
         <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
           <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Dosyalar</h3>
           {task.projectId ? (
-            <FilesPanel projectId={task.projectId} taskId={task.id} compact />
+            <FilesPanel
+              projectId={task.projectId}
+              taskId={task.id}
+              compact
+              onFilesChange={(files) => patchAttachments({ files })}
+            />
           ) : (
-            <FilesPanel jobId={fileJobId} taskId={task.id} compact />
+            <FilesPanel
+              jobId={fileJobId}
+              taskId={task.id}
+              compact
+              onFilesChange={(files) => patchAttachments({ files })}
+            />
           )}
         </div>
       )}

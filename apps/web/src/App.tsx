@@ -48,17 +48,25 @@ import { IconChevronRight, IconUser } from "./components/icons";
 const HEADER_HEIGHT = 76;
 
 // Kapak sayfalarında aşağı kaydırırken beliren sabit başlığın iki satırı.
-// Üst satır logonun/bildirim çanının arkasına opak bir zemin koyar (kapak
-// sayfalarında normalde böyle bir zemin yok, bu yüzden içerik onların altından
-// geçerken karışıyordu); alt satır sayfanın adını taşır.
+//
+// ÜST satır logonun/bildirim çanının arkasına opak bir zemin koyar (kapak
+// sayfalarında normalde böyle bir zemin yok, içerik onların altından geçerken
+// karışıyordu) ve sayfanın kimliğini taşır: geri bağlantısı, ad, araç çubuğu ve
+// en sağda kişi göstergesi. Kişi göstergesi bilerek burada — bildirim çanı ile
+// yardım düğmesinin hemen yanına düşüyor ve kendisi için ayrı bir satır
+// açılmasına gerek kalmıyor.
+//
+// ALT satır sekmelere ayrıldı. Sekmeler eskiden üst satırdaydı: orası solda
+// logo, sağda çan/tur düğmeleri arasında sıkışan dar bir bant. Alt satır
+// kenardan kenara olduğu için sekmeler bandın tamamını kullanıyor.
 const STICKY_TOP_ROW = 68;
-const STICKY_TITLE_ROW = 44;
+const STICKY_TABS_ROW = 48;
 // Şeridin satırları hep aynı eşikte açılır: bir kaynak (kapak / sayfanın sekme
 // çubuğu / araç çubuğu) bu çizginin üstüne kayınca kendi satırı belirir. Eşiğin
 // sabit olması önemli — şeridin o anki yüksekliğine bağlansaydı satır açılınca
 // eşik de büyür, kaynak yeniden "görünür" sayılır ve satır açılıp kapanıp
 // titrerdi.
-const STICKY_REVEAL = STICKY_TOP_ROW + STICKY_TITLE_ROW;
+const STICKY_REVEAL = STICKY_TOP_ROW + STICKY_TABS_ROW;
 
 /**
  * Proje detayını proje id'sine göre `key`ler.
@@ -247,33 +255,69 @@ function CoverStickyHeader({
           - masaüstünde sayfanın sekme çubuğu yukarı kayınca (2. aşama) sekmeler,
           - mobilde ise sayfa adı + kişi göstergesi buraya yerleşir; böylece dar
             ekranda ayrı bir başlık satırı açıp şeridi bir kat daha uzatmıyoruz. */}
+      {/* ÜST SATIR — sayfanın kimliği. Solda sidebar oku (14–54) + logo (62–110),
+          sağda bildirim çanı (14–58) + tur düğmesi (62–106) position:fixed
+          duruyor; bu satırın dolgusu tam o boşluğu bırakıyor ve kişi göstergesi
+          sağ uçta, çanın hemen yanına düşüyor. */}
       <div
         style={{
           height: STICKY_TOP_ROW,
           display: "flex",
           alignItems: "center",
-          gap: 8,
-          // Solda sidebar oku (14–54) + logo (62–110), sağda bildirim çanı
-          // (14–58) + tur düğmesi (62–106) sabit duruyor; ortadaki boşluk bu.
+          gap: 12,
           paddingLeft: sidebarOpen ? 28 : 118,
           paddingRight: 112,
         }}
       >
-        {isDesktop && showTabs && (
-          <div
-            className="sticky-row-in"
-            style={{
-              flex: 1,
-              minWidth: 0,
-              // Masaüstünde sidebar açıkken sol üstte yüzen logo/ok yok.
-              marginLeft: sidebarOpen ? 0 : 52,
-            }}
-          >
-            {registration.tabs?.node}
-          </div>
-        )}
+        {isDesktop ? (
+          <>
+            {/* Geri bağlantısı en son (4. aşamada) açılır: sayfanın kendi
+                bağlantısı (artık kapağın içinde, bkz. CoverBackLink) kaybolmuş
+                olmalı, yoksa ikisi bir süre birlikte görünüyordu. */}
+            {showBack && registration.back && (
+              <Link
+                className="sticky-row-in"
+                to={registration.back.to}
+                style={{ fontSize: 14, color: c.textSecondary, whiteSpace: "nowrap", flexShrink: 0 }}
+              >
+                ← {registration.back.label}
+              </Link>
+            )}
 
-        {!isDesktop && (
+            <span
+              title={registration.title}
+              style={{
+                flex: showActions ? "0 1 auto" : 1,
+                minWidth: 0,
+                maxWidth: showActions ? 200 : undefined,
+                fontSize: 16,
+                fontWeight: 500,
+                color: c.textPrimary,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {registration.title}
+            </span>
+
+            {showActions && registration.actions?.left && (
+              <div className="sticky-row-in" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                {registration.actions.left}
+              </div>
+            )}
+
+            {showActions && <div style={{ flex: 1 }} />}
+
+            {showActions && registration.actions?.right && (
+              <div className="sticky-row-in" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                {registration.actions.right}
+              </div>
+            )}
+
+            {user && <MiniProfile user={user} showName />}
+          </>
+        ) : (
           <>
             <span
               title={registration.title}
@@ -296,69 +340,22 @@ function CoverStickyHeader({
           </>
         )}
       </div>
-      {/* Masaüstü alt satırı: solda sayfanın adı, ardından (varsa) sayfaya özgü ek
-          kontroller (bkz. usePageHeaderActions — ör. OutputsPanel'in Görevler/Çıktılar
-          + Sırala/Seç), sağda kişi kartının küçültülmüş hali. Kapağın üstündeki büyük
-          kişi kartı (bkz. ProfileCard) yukarı kayıp gözden kaybolduğu için burada
-          yalnızca kimlik göstergesi olarak fotoğraf + ad kalıyor.
-          Mobilde bu satır YOK: proje adı ve fotoğraf yukarıda logo ile çanın
-          arasındaki boşluğa yerleşiyor, şerit bir kat kısalıyor. */}
-      {isDesktop && (
+
+      {/* ALT SATIR — sekmeler. Kenardan kenara: üst satırın dar bandına
+          sıkıştıklarında sola yığılıp kalan genişliği boş bırakıyorlardı
+          (bkz. TabBar FittedTabBar). */}
+      {isDesktop && showTabs && (
         <div
+          className="sticky-row-in"
           style={{
-            height: STICKY_TITLE_ROW,
+            height: STICKY_TABS_ROW,
             display: "flex",
             alignItems: "center",
-            gap: 12,
             padding: "0 28px",
             borderTop: `1px solid ${c.border}`,
           }}
         >
-          {/* Geri bağlantısı en son (4. aşamada) ve şeridin en alt satırında:
-              sayfanın kendi "← Projeler" bağlantısı yukarı kayıp kaybolduktan
-              sonra belirir, yoksa ikisi bir süre birlikte görünüyordu. */}
-          {showBack && registration.back && (
-            <Link
-              className="sticky-row-in"
-              to={registration.back.to}
-              style={{ fontSize: 14, color: c.textSecondary, whiteSpace: "nowrap", flexShrink: 0 }}
-            >
-              ← {registration.back.label}
-            </Link>
-          )}
-
-          <span
-            title={registration.title}
-            style={{
-              flex: showActions ? "0 1 auto" : 1,
-              minWidth: 0,
-              maxWidth: showActions ? 200 : undefined,
-              fontSize: 16,
-              fontWeight: 500,
-              color: c.textPrimary,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {registration.title}
-          </span>
-
-          {showActions && registration.actions?.left && (
-            <div className="sticky-row-in" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-              {registration.actions.left}
-            </div>
-          )}
-
-          {showActions && <div style={{ flex: 1 }} />}
-
-          {showActions && registration.actions?.right && (
-            <div className="sticky-row-in" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-              {registration.actions.right}
-            </div>
-          )}
-
-          {user && <MiniProfile user={user} showName />}
+          <div style={{ flex: 1, minWidth: 0 }}>{registration.tabs?.node}</div>
         </div>
       )}
 
@@ -593,7 +590,17 @@ export default function App() {
         <TourOverlay />
         <AiLauncher />
         <ProjectFabContext.Provider value={{ action: fabAction, setAction: setFabAction }}>
-          <div style={{ paddingTop: isCoverPage ? 0 : HEADER_HEIGHT, paddingBottom: isDesktop ? 28 : 84 }}>
+          <div
+            style={{
+              paddingTop: isCoverPage ? 0 : HEADER_HEIGHT,
+              // Mobilde sayfanın altında üç şey üst üste duruyor: alt menü
+              // (68 px + safe-area), onun üstüne taşan yuvarlak FAB (bottom 24 +
+              // 64 = tepesi 88 px) ve Lio balonu (bottom 96). Eski 84 px bunların
+              // hiçbirine yetmiyordu; listenin son kartı FAB'ın altında kalıyor,
+              // çentikli telefonlarda safe-area kadar daha da kayboluyordu.
+              paddingBottom: isDesktop ? 28 : "calc(104px + env(safe-area-inset-bottom))",
+            }}
+          >
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/jobs/:id" element={<JobDetail />} />

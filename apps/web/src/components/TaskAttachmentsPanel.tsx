@@ -2,10 +2,18 @@ import { useEffect, useState } from "react";
 import type { TaskAttachment } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
+import { publishTaskAttachments } from "../lib/taskAttachmentEvents";
 import { IconPlus, IconTrash } from "./icons";
 
 interface Props {
   taskId: string;
+  /**
+   * Liste her değiştiğinde çağrılır. Görev kartındaki ek rozeti (bkz.
+   * TaskAttachmentBadges) pano listesinden besleniyor; panel kendi state'ini
+   * tuttuğu için haber vermezse rozet ancak bir sonraki tazelemede belirirdi —
+   * kullanıcı linki ekliyor, modalı kapatıyor, kartta hiçbir şey görmüyordu.
+   */
+  onChanged?: (attachments: TaskAttachment[]) => void;
 }
 
 /**
@@ -23,7 +31,7 @@ interface Props {
  * Liste kendi isteğini atar ve kendi state'ini tutar: ek eklemek görevi
  * kaydetmeyi beklemez — kullanıcı modalı kapatmadan dosyasını bırakıp gider.
  */
-export default function TaskAttachmentsPanel({ taskId }: Props) {
+export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
   const c = colors.light;
   const [items, setItems] = useState<TaskAttachment[]>([]);
   const [addingLink, setAddingLink] = useState(false);
@@ -35,7 +43,12 @@ export default function TaskAttachmentsPanel({ taskId }: Props) {
   const load = () => {
     api
       .get<TaskAttachment[]>(`/tasks/${taskId}/attachments`)
-      .then((data) => setItems(data ?? []))
+      .then((data) => {
+        setItems(data ?? []);
+        onChanged?.(data ?? []);
+        // Karttaki rozet buradan besleniyor (bkz. lib/taskAttachmentEvents.ts).
+        publishTaskAttachments(taskId, { attachments: data ?? [] });
+      })
       .catch(() => setItems([]));
   };
 
@@ -63,7 +76,12 @@ export default function TaskAttachmentsPanel({ taskId }: Props) {
   };
 
   const remove = async (id: string) => {
-    setItems((prev) => prev.filter((a) => a.id !== id));
+    setItems((prev) => {
+      const next = prev.filter((a) => a.id !== id);
+      onChanged?.(next);
+      publishTaskAttachments(taskId, { attachments: next });
+      return next;
+    });
     await api.delete(`/task-attachments/${id}`).catch(load);
   };
 

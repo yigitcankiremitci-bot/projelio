@@ -1,5 +1,5 @@
 import { useRef, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import type { Operation, OperationOccurrence, OperationRoutine, OperationStatus, Task } from "@projelio/shared";
 import { api } from "../api/client";
 import Modal from "../components/Modal";
@@ -7,13 +7,17 @@ import RoutineModal from "../components/RoutineModal";
 import EditOperationModal from "../components/EditOperationModal";
 import TaskEditModal from "../components/TaskEditModal";
 import OperationHealthBadge, { AdherenceDots } from "../components/OperationHealthBadge";
-import EntityCover, { coverActionButton } from "../components/EntityCover";
+import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
 import { coverText } from "../lib/covers";
+import TaskAttachmentBadges from "../components/TaskAttachmentBadges";
 import { colors } from "../theme/colors";
-import { IconCalendar, IconCheck, IconEdit, IconExternalLink, IconFile, IconSettings, IconUser } from "../components/icons";
+import { IconCalendar, IconCheck, IconEdit, IconSettings, IconUser } from "../components/icons";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader } from "../lib/pageHeader";
 import { useCurrentUser } from "../lib/useCurrentUser";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { pageGutter } from "../lib/layout";
+import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
 
 const periodLabel: Record<string, string> = { weekly: "hafta", monthly: "ay", yearly: "yıl" };
 
@@ -33,6 +37,8 @@ export default function OperationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const c = colors.light;
+  const isDesktop = useIsDesktop();
+  const gutter = pageGutter(isDesktop);
 
   const [operation, setOperation] = useState<Operation | null>(null);
   const { user: currentUser } = useCurrentUser();
@@ -160,12 +166,29 @@ export default function OperationDetail() {
 
   if (!id) return null;
 
+  // Tek dizi, iki yerleşim: geniş ekranda kapağın içinde, dar ekranda akışta
+  // (bkz. StatGrid).
+  const stats: StatItem[] = [
+    { label: "Uyum", value: operation?.adherencePct != null ? `%${operation.adherencePct}` : "—" },
+    { label: "Rutin", value: operation?.activeRoutineCount ?? 0 },
+    { label: "Kaçırılan", value: overdue.length, tone: overdue.length > 0 ? c.danger : undefined },
+    { label: "Yaklaşan", value: upcoming.length },
+  ];
+
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
       <EntityCover
         coverRef={coverRef}
+        // ?tab=programs: geri dönünce işin varsayılan sekmesi (Projeler) değil,
+        // geldiğimiz Rutinler sekmesi açılsın (bkz. JobTabs "programs").
+        back={
+          <div ref={backRef}>
+            <CoverBackLink to={operation ? `/jobs/${operation.jobId}?tab=programs` : "/"} label="Rutinler" />
+          </div>
+        }
         coverImageUrl={operation?.coverImageUrl}
-        height={290}
+        // Masaüstünde 290 idi; özet kapağın içine girince o boşluk doldu.
+        height={260}
         title={
           <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
             {operation?.title ?? "…"}
@@ -188,6 +211,7 @@ export default function OperationDetail() {
             </>
           )
         }
+        stats={<CoverStats items={stats} />}
         action={
           // Rutini yalnızca kuran kişi düzenleyebilir (OperationsService.assertCanManage).
           operation && currentUser?.id === operation.ownerId ? (
@@ -198,25 +222,9 @@ export default function OperationDetail() {
         }
       />
 
-      <div style={{ padding: "0 28px 28px" }}>
-        {/* ?tab=programs: geri dönünce işin varsayılan sekmesi (Projeler) değil,
-            geldiğimiz Rutinler sekmesi açılsın (bkz. JobTabs "programs"). */}
-        <div ref={backRef}>
-          <Link
-            to={operation ? `/jobs/${operation.jobId}?tab=programs` : "/"}
-            style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", margin: "14px 0" }}
-          >
-            ← Rutinler
-          </Link>
-        </div>
-
+      <div style={{ padding: `12px ${gutter}px 28px` }}>
         {/* Rutinde ilerleme yüzdesi yerine düzen ölçülür. */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
-          <SummaryCard label="Uyum oranı" value={operation?.adherencePct != null ? `%${operation.adherencePct}` : "—"} />
-          <SummaryCard label="Aktif rutin" value={operation?.activeRoutineCount ?? 0} />
-          <SummaryCard label="Kaçırılan" value={overdue.length} tone={overdue.length > 0 ? c.danger : undefined} />
-          <SummaryCard label="Yaklaşan" value={upcoming.length} />
-        </div>
+        <StatSummary items={stats} />
 
         {operation && (
           <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
@@ -385,6 +393,15 @@ export default function OperationDetail() {
           // Tekrarın projesi yok; dosya bağlamı rutinin bağlı olduğu iştir.
           fileJobId={operation?.jobId}
           onClose={() => setOpenOccurrence(null)}
+          // Ek eklendiğinde satırdaki rozet modal kapanmadan belirsin. Tekrar
+          // bir görev satırı olduğu için gelen yama doğrudan uygulanabiliyor.
+          onTaskPatched={(updated) =>
+            setOccurrences((prev) =>
+              prev.map((o) =>
+                o.id === updated.id ? { ...o, attachments: updated.attachments, files: updated.files } : o
+              )
+            )
+          }
           onSaved={() => {
             setOpenOccurrence(null);
             reload();
@@ -486,34 +503,9 @@ function OccurrenceRow({
         </div>
       </div>
 
-      {/* Ek rozetleri: tekrarın çıktısına listeden tek tıkla gidilebilsin.
-          Tek ek varsa doğrudan açılır; birden fazlaysa hangisine gidileceğine
-          kullanıcı karar vermeli, o yüzden modal açılır. */}
-      {links.length > 0 && (
-        <button
-          onClick={() => (links.length === 1 ? window.open(links[0].url, "_blank", "noreferrer") : onOpen?.())}
-          aria-label={links.length === 1 ? "Bağlantıyı aç" : `${links.length} bağlantı`}
-          title={links.length === 1 ? links[0].label || links[0].url : `${links.length} bağlantı — açmak için tıkla`}
-          style={{ background: "transparent", border: "none", padding: 4, display: "flex", cursor: "pointer", flexShrink: 0 }}
-        >
-          <IconExternalLink size={15} color={c.primary} />
-        </button>
-      )}
-
-      {files.length > 0 && (
-        <button
-          onClick={() =>
-            files.length === 1 && files[0].webViewLink
-              ? window.open(files[0].webViewLink, "_blank", "noreferrer")
-              : onOpen?.()
-          }
-          aria-label={files.length === 1 ? "Dosyayı aç" : `${files.length} dosya`}
-          title={files.length === 1 ? files[0].name : `${files.length} dosya — açmak için tıkla`}
-          style={{ background: "transparent", border: "none", padding: 4, display: "flex", cursor: "pointer", flexShrink: 0 }}
-        >
-          <IconFile size={15} color={c.primary} />
-        </button>
-      )}
+      {/* Ek rozetleri görev kartlarıyla ORTAK bileşende: tekrarlar da birer
+          görev ve iki yerde iki farklı tıklama davranışı oluşmasın. */}
+      <TaskAttachmentBadges taskId={occurrence.id} links={links} files={files} onOpenDetail={onOpen} />
 
       {/* Düzenleme kalemi: modal yalnızca başlığa tıklayarak açılıyordu ve
           kimse fark etmiyordu. Rutin kartlarındaki kalemle aynı simge —
@@ -609,15 +601,6 @@ function EmptyBox({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: string | number; tone?: string }) {
-  const c = colors.light;
-  return (
-    <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: "14px 16px" }}>
-      <div style={{ color: c.textSecondary, fontSize: 15, marginBottom: 6 }}>{label}</div>
-      <div style={{ color: tone ?? c.textPrimary, fontSize: 27, fontWeight: 600 }}>{value}</div>
-    </div>
-  );
-}
 
 const primaryButton = (c: typeof colors.light) => ({
   padding: "8px 14px",

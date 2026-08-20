@@ -17,6 +17,15 @@ interface Props {
   outputId?: string;
   /** Hangi sağlayıcı bağlı: seçenek listesi buna göre değişir (bkz. backend NativeFileKind). */
   provider: "google" | "microsoft";
+  /**
+   * Tetikleyici düğmeyi çizme; menü yalnızca dışarıdan (openMenu) açılsın.
+   * Dosyalar sekmesinde ekleme eylemleri sayfanın "+" düğmesinde toplandığı
+   * için kullanılıyor (bkz. FilesPanel actionsInFab). Bu hâlde tür listesi
+   * açılır menü olarak DEĞİL, modal olarak gösterilir: açılır menü düğmeye
+   * göre konumlanıyor, düğme yokken sarmalayıcı sıfır boyutlu kalıyor ve liste
+   * başlığın içinde tuhaf bir yere düşüyordu.
+   */
+  hideTrigger?: boolean;
   onCreated: (file: ProjectFile) => void;
 }
 
@@ -44,7 +53,7 @@ const MICROSOFT_KINDS: { kind: NativeFileKind; label: string }[] = [
  * edilir, ayrılmak tamamen kullanıcının tercihi olur.
  */
 const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(function CreateNativeFileMenu(
-  { target, taskId, outputId, provider, onCreated },
+  { target, taskId, outputId, provider, hideTrigger = false, onCreated },
   ref
 ) {
   const c = colors.light;
@@ -90,6 +99,82 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
     }
   };
 
+  /** Ad sorma adımı; hem açılır menü hem modal yolunda aynı. */
+  const pendingModal = pendingKind && (
+    <Modal title={pendingKind.label} onClose={() => (saving ? undefined : setPendingKind(null))} maxWidth={380}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>Dosya adı</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Örn. Toplantı Notları"
+            autoFocus
+            disabled={saving}
+            onKeyDown={(e) => e.key === "Enter" && void handleCreate()}
+            style={{ width: "100%" }}
+          />
+        </div>
+        {error && <p style={{ color: c.danger, fontSize: 14, margin: 0 }}>{error}</p>}
+        <button
+          onClick={handleCreate}
+          disabled={saving || !name.trim()}
+          style={{
+            padding: "10px 0",
+            borderRadius: 9,
+            border: "none",
+            background: c.primary,
+            color: "#fff",
+            fontSize: 15,
+            fontWeight: 500,
+            cursor: saving || !name.trim() ? "not-allowed" : "pointer",
+          }}
+        >
+          {saving ? "Oluşturuluyor…" : "Oluştur"}
+        </button>
+      </div>
+    </Modal>
+  );
+
+  const kindList = (inModal: boolean) =>
+    kinds.map((item) => (
+      <button
+        key={item.kind}
+        onClick={() => pick(item)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+          width: "100%",
+          padding: inModal ? "12px 13px" : "10px 13px",
+          border: "none",
+          background: "transparent",
+          textAlign: "left",
+          fontSize: 15,
+          color: c.textPrimary,
+          cursor: "pointer",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = c.background)}
+        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      >
+        <IconFile size={16} color={c.textSecondary} />
+        {item.label}
+      </button>
+    ));
+
+  if (hideTrigger) {
+    return (
+      <>
+        {open && (
+          <Modal title="Yeni dosya" onClose={() => setOpen(false)} maxWidth={340}>
+            <div style={{ display: "flex", flexDirection: "column" }}>{kindList(true)}</div>
+          </Modal>
+        )}
+        {pendingModal}
+      </>
+    );
+  }
+
   return (
     <div ref={wrapperRef} style={{ position: "relative" }}>
       <button
@@ -129,68 +214,11 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
             overflow: "hidden",
           }}
         >
-          {kinds.map((item) => (
-            <button
-              key={item.kind}
-              onClick={() => pick(item)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 9,
-                width: "100%",
-                padding: "10px 13px",
-                border: "none",
-                background: "transparent",
-                textAlign: "left",
-                fontSize: 15,
-                color: c.textPrimary,
-                cursor: "pointer",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = c.background)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              <IconFile size={16} color={c.textSecondary} />
-              {item.label}
-            </button>
-          ))}
+          {kindList(false)}
         </div>
       )}
 
-      {pendingKind && (
-        <Modal title={pendingKind.label} onClose={() => (saving ? undefined : setPendingKind(null))} maxWidth={380}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 15, color: c.textSecondary }}>Dosya adı</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Örn. Toplantı Notları"
-                autoFocus
-                disabled={saving}
-                onKeyDown={(e) => e.key === "Enter" && void handleCreate()}
-                style={{ width: "100%" }}
-              />
-            </div>
-            {error && <p style={{ color: c.danger, fontSize: 14, margin: 0 }}>{error}</p>}
-            <button
-              onClick={handleCreate}
-              disabled={saving || !name.trim()}
-              style={{
-                padding: "10px 0",
-                borderRadius: 9,
-                border: "none",
-                background: c.primary,
-                color: "#fff",
-                fontSize: 15,
-                fontWeight: 500,
-                cursor: saving || !name.trim() ? "not-allowed" : "pointer",
-              }}
-            >
-              {saving ? "Oluşturuluyor…" : "Oluştur"}
-            </button>
-          </div>
-        </Modal>
-      )}
+      {pendingModal}
     </div>
   );
 });

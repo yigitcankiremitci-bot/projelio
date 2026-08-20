@@ -5,6 +5,7 @@ import { MAX_TASK_PRIORITY } from "@projelio/shared";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import { IconPlus, IconChevronRight, IconCheck, IconEdit, IconActivity, IconStar } from "./icons";
+import TaskAttachmentBadges from "./TaskAttachmentBadges";
 import Modal from "./Modal";
 import AutoGrowTextarea from "./AutoGrowTextarea";
 import { useSortableList, SORTABLE_BASE_OPTIONS } from "../lib/useSortableList";
@@ -189,11 +190,27 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   }, [highlightTaskId, allTasks]);
 
   // Hedef görev DOM'da render olduğunda (gerekirse üst görev açıldıktan sonra) görünüre kaydır.
+  //
+  // `allTasks` bilerek bağımlılıkta: hedef, listeden ÖNCE belli olabiliyor —
+  // başka bir sayfadan "şu göreve git" diye gelindiğinde vurgu daha ilk
+  // render'da biliniyor ama kartlar sunucudan birkaç yüz ms sonra düşüyor.
+  // Eski hâlde efekt boş DOM'da bir kez çalışıp susuyordu, yani kaydırma
+  // sessizce gerçekleşmiyordu.
+  //
+  // `scrolledFor` tek seferlik yapıyor: liste her tazelendiğinde (canlı
+  // yenileme, sürükleme) sayfayı yeniden zıplatmasın.
+  const scrolledFor = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!highlightTaskId) return;
+    if (!highlightTaskId) {
+      scrolledFor.current = undefined;
+      return;
+    }
+    if (scrolledFor.current === highlightTaskId) return;
     const el = rootRef.current?.querySelector(`[data-id="${highlightTaskId}"]`) as HTMLElement | null;
-    el?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [highlightTaskId, expanded]);
+    if (!el) return; // henüz render edilmedi; liste gelince tekrar denenir
+    scrolledFor.current = highlightTaskId;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightTaskId, expanded, allTasks]);
   const subtaskSortables = useRef<Map<string, Sortable>>(new Map());
 
   const isCompletedColumn = status === "completed";
@@ -915,6 +932,15 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                     )}
                     {renamingId !== t.id && (
                       <>
+                        {/* Ek rozetleri: tek ek doğrudan açılır, birden fazlaysa
+                            görev modalı (Bağlantılar + Dosyalar bölümleri). */}
+                        <TaskAttachmentBadges
+                          taskId={t.id}
+                          links={t.attachments}
+                          files={t.files}
+                          onOpenDetail={() => onEditTask(t)}
+                          size={13}
+                        />
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1238,6 +1264,13 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                               satırın tamamını alsın (bkz. üst görev satırı). */}
                           {renamingId !== sub.id && (
                             <>
+                              <TaskAttachmentBadges
+                                taskId={sub.id}
+                                links={sub.attachments}
+                                files={sub.files}
+                                onOpenDetail={() => onEditTask(sub)}
+                                size={11}
+                              />
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();

@@ -5,6 +5,7 @@ import type { FileScope } from "../api/files";
 import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
 import { openGooglePicker } from "../lib/googlePicker";
 import { colors } from "../theme/colors";
+import { publishTaskAttachments } from "../lib/taskAttachmentEvents";
 import BrowseDriveModal from "./BrowseDriveModal";
 import ConfirmDialog from "./ConfirmDialog";
 import CreateNativeFileMenu from "./CreateNativeFileMenu";
@@ -46,6 +47,24 @@ interface Props {
   scope?: FileScope;
   /** Modal içinde başlık ve büyük yükleme alanı gösterilmez. */
   compact?: boolean;
+  /**
+   * Başlıktaki üç ekleme düğmesini (Drive'dan seç / Yeni dosya / Dosya yükle)
+   * gizler; eylemler sayfanın "+" düğmesine taşınmıştır (bkz. JobDetail).
+   * Varsayılan kapalı — diğer sayfalarda düğmeler yerinde kalıyor.
+   */
+  actionsInFab?: boolean;
+  /**
+   * Bağlı bulut sağlayıcısını yukarı bildirir. "+" menüsündeki "Drive'dan seç"
+   * seçeneğinin etiketi (ve gösterilip gösterilmeyeceği) buna bağlı, ama bilgi
+   * yalnızca burada hesaplanıyor.
+   */
+  onProviderChange?: (provider: "google" | "microsoft" | undefined) => void;
+  /**
+   * Listelenen dosyalar değiştiğinde çağrılır. Görev modalında kullanılıyor:
+   * karttaki dosya rozeti pano listesinden besleniyor, panel haber vermezse
+   * yeni dosya ancak bir sonraki tazelemede rozete dönüşürdü.
+   */
+  onFilesChange?: (files: { id: string; name: string; webViewLink?: string }[]) => void;
 }
 
 interface UploadingItem {
@@ -67,6 +86,8 @@ export interface FilesPanelHandle {
   openUpload: () => void;
   /** Sağlayıcı henüz bağlı/hazır değilse sessizce başarısız olmak yerine kullanıcıya açıklayıcı bir hata gösterir. */
   openCreateNative: () => void;
+  /** Drive/OneDrive dosya seçici. */
+  openBrowseDrive: () => void;
 }
 
 const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
@@ -80,6 +101,9 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     departmentId,
     scope,
     compact = false,
+    actionsInFab = false,
+    onProviderChange,
+    onFilesChange,
   },
   ref
 ) {
@@ -208,6 +232,21 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   // Yeni oluşturulan/içe aktarılan dosya listeye eklenir VE hemen geniş önizleme
   // modalında açılır — kullanıcı Projelio'dan hiç ayrılmadan görür; ayrılmak
   // (Xda düzenle) tamamen kendi tercihi olur (bkz. CreateNativeFileMenu üstündeki not).
+  useEffect(() => {
+    const list = files.map((f) => ({ id: f.id, name: f.name, webViewLink: f.webViewLink }));
+    onFilesChange?.(list);
+    // Görev bağlamında açıldıysa karttaki dosya rozetini de tazele.
+    if (taskId) publishTaskAttachments(taskId, { files: list });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files]);
+
+  useEffect(() => {
+    onProviderChange?.(connectedProvider);
+    // Panel kapanınca (sekme değişince) seçenek de kalksın.
+    return () => onProviderChange?.(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectedProvider]);
+
   const handleFileAdded = (file: ProjectFile) => {
     setFiles((prev) => [file, ...prev]);
     setPreview(file);
@@ -235,6 +274,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
   useImperativeHandle(ref, () => ({
     openUpload: () => inputRef.current?.click(),
+    openBrowseDrive: () => handleBrowseDriveClick(),
     openCreateNative: () => {
       if (createMenuRef.current) {
         createMenuRef.current.openMenu();
@@ -251,8 +291,12 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           <h3 style={{ fontSize: 19, fontWeight: 500, color: c.textPrimary, margin: 0, flex: 1 }}>
             Dosyalar
           </h3>
+          {/* CreateNativeFileMenu, düğmeler "+"a taşınsa da MONTE KALMALI:
+              "Yeni dosya oluştur" seçeneği onun imperatif metodunu çağırıyor.
+              Yalnızca tetikleyici düğmesi gizleniyor. */}
           {!readOnly && !driveMissing && connectedProvider && (
             <>
+              {!actionsInFab && (
               <button
                 onClick={handleBrowseDriveClick}
                 style={{
@@ -272,17 +316,19 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 <IconFolder size={16} color={c.textPrimary} />
                 {connectedProvider === "microsoft" ? "OneDrive'dan seç" : "Drive'dan seç"}
               </button>
+              )}
               <CreateNativeFileMenu
                 ref={createMenuRef}
                 target={target}
                 taskId={taskId}
                 outputId={outputId}
                 provider={connectedProvider}
+                hideTrigger={actionsInFab}
                 onCreated={handleFileAdded}
               />
             </>
           )}
-          {!readOnly && (
+          {!readOnly && !actionsInFab && (
           <button
             onClick={() => inputRef.current?.click()}
             disabled={driveMissing}

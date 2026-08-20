@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PersonalBoardItem, PersonalBoardSource, PersonalTodo, Task, TaskPriority, TaskStatus, User } from "@projelio/shared";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { colors } from "../theme/colors";
 import TaskColumn, { TaskColumnHandle } from "../components/TaskColumn";
@@ -16,6 +16,7 @@ import { useTaskSelection } from "../lib/useTaskSelection";
 import { usePageHeader, usePageHeaderActions, usePageHeaderTabs } from "../lib/pageHeader";
 import TaskSortMenu from "../components/TaskSortMenu";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
+import { backState } from "../lib/backTarget";
 
 // Sıra, uygulamadaki diğer tüm kanbanlarla aynı: önce üzerinde çalışılan işler.
 // (bkz. DepartmentTasksPanel, JobTasksPanel, OutputsPanel, ProcessPanel)
@@ -62,7 +63,35 @@ export default function TasksOverview() {
   const isDesktop = useIsDesktop();
   const [items, setItems] = useState<PersonalBoardItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<Filter>(DEFAULT_FILTER);
+  // Filtre URL'de tutuluyor — ama HATIRLANMIYOR.
+  //
+  // Ayrım önemli: sayfaya çıplak `/tasks` ile gelen herkes yine "Kişisel"
+  // görüyor (yukarıdaki karar değişmedi). Yalnızca bir görev kartından çıkıp
+  // geri dönen kullanıcı, çıktığı sekmeye geri düşüyor; çünkü geri bağlantısı
+  // adresi de yanında taşıyor (bkz. openTaskSource / lib/backTarget.ts).
+  // Yerel state'te tutulduğunda dönüş her seferinde "Kişisel"e çakılıyordu.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterParam = searchParams.get("filter");
+  const filter: Filter = FILTERS.some((f) => f.value === filterParam) ? (filterParam as Filter) : DEFAULT_FILTER;
+  const setFilter = useCallback(
+    (next: Filter) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          if (next === DEFAULT_FILTER) params.delete("filter");
+          else params.set("filter", next);
+          // Sekme elle değiştirildiyse "şu göreve odaklan" isteği geçersiz.
+          params.delete("focus");
+          return params;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  // Geri dönüşte çıkılan kartı bul, ona kaydır ve parlat (bkz. TaskColumn).
+  const [highlightTaskId, setHighlightTaskId] = useState<string | undefined>(undefined);
   const [sort, setSort] = useState<TaskSortMode>("manual");
   const [editingPersonal, setEditingPersonal] = useState<PersonalBoardItem | null>(null);
   // Atanan kart düzenlenirken görevin TAM kaydı sunucudan çekilir: panodaki
@@ -169,15 +198,26 @@ export default function TasksOverview() {
     (task: Task) => {
       const item = items.find((i) => i.itemId === task.id);
       if (!item || item.source === "personal") return;
+      // Geri bağlantısı SADECE sayfaya değil, tam olarak bulunduğumuz yere
+      // dönsün: açık sekme ve çıkılan kart adreste taşınıyor (bkz.
+      // lib/backTarget.ts, yukarıdaki focus efekti).
+      const params = new URLSearchParams();
+      if (filter !== DEFAULT_FILTER) params.set("filter", filter);
+      params.set("focus", task.id);
+      const from = { to: `/tasks?${params.toString()}`, label: "Yapılacaklar" };
       if (item.projectId) {
-        navigate(`/projects/${item.projectId}`, { state: { highlightTaskId: task.id } });
+        navigate(`/projects/${item.projectId}`, {
+          state: { highlightTaskId: task.id, ...backState(from) },
+        });
         return;
       }
       if (item.departmentId) {
-        navigate(`/departments/${item.departmentId}?tab=tasks`, { state: { highlightTaskId: task.id } });
+        navigate(`/departments/${item.departmentId}?tab=tasks`, {
+          state: { highlightTaskId: task.id, ...backState(from) },
+        });
       }
     },
-    [items, navigate]
+    [items, navigate, filter]
   );
 
   /** Karta hangi işten geldiğini yazan alt satır. Kişisel kartlarda boş. */
@@ -506,6 +546,29 @@ export default function TasksOverview() {
       });
   }, []);
 
+  useEffect(() => {
+    const focus = searchParams.get("focus");
+    if (!focus) return;
+    setHighlightTaskId(focus);
+    // Adresten hemen siliniyor: yenilemede ya da ileri/geri gezinmede aynı
+    // karta tekrar zıplamasın. Vurgu state'te yaşamaya devam ediyor, kartlar
+    // sunucudan sonra düşse bile kaydırma çalışıyor.
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete("focus");
+        return params;
+      },
+      { replace: true }
+    );
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!highlightTaskId) return;
+    const timer = setTimeout(() => setHighlightTaskId(undefined), 3500);
+    return () => clearTimeout(timer);
+  }, [highlightTaskId]);
+
   const filterButtons = (
     <div role="group" aria-label="Kaynak filtresi" style={{ display: "flex", gap: 4 }}>
       {FILTERS.map((f) => (
@@ -636,6 +699,7 @@ export default function TasksOverview() {
                 selectionMode={selection.selectionMode}
                 selectedIds={selection.selectedIds}
                 onToggleSelect={selection.toggleSelect}
+                highlightTaskId={highlightTaskId}
                 onOpenSource={openTaskSource}
               />
             </div>

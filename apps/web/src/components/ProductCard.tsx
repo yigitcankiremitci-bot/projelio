@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import type { Product } from "@projelio/shared";
 import { api } from "../api/client";
 import { resizeCoverImage } from "../lib/imageProcessing";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
 import { IconFolder, IconCalendar, IconPlus } from "./icons";
 
@@ -30,7 +30,7 @@ function formatPrice(price?: number, currency?: string): string | null {
 }
 
 export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [coverUrl, setCoverUrl] = useState(product.coverImageUrl);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { BudgetTransaction, BudgetTransactionType, Project } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
@@ -24,7 +24,7 @@ function todayString() {
 }
 
 export default function AddBudgetEntryModal({ transaction, onClose, onSaved }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const editing = Boolean(transaction);
   const [type, setType] = useState<BudgetTransactionType>(transaction?.type ?? "expense");
   const [amount, setAmount] = useState(transaction ? String(transaction.amount) : "");

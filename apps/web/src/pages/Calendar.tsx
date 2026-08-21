@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PlanCalendarView, PlanPeriodKind, PlanTimeBlock } from "@projelio/shared";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { planning, type PlanSuggestionResult } from "../api/planning";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useSwipeNavigate } from "../lib/useSwipeNavigate";
 import { askLio } from "../lib/askLio";
 import {
   addDays,
@@ -45,11 +46,13 @@ const VIEW_LABELS: Record<ViewMode, string> = { day: "Günlük", week: "Haftalı
  * sütunundan takvime çekilir, ama kimin ne zaman çalıştığı burada paylaşılmaz.
  */
 export default function CalendarView() {
-  const c = colors.light;
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
 
   const [view, setView] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<string>(() => todayStr());
+  /** Son gezinmenin yönü — kayma animasyonunu hangi taraftan oynatacağımız. */
+  const [slideDir, setSlideDir] = useState<0 | 1 | -1>(0);
   const [data, setData] = useState<PlanCalendarView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +89,7 @@ export default function CalendarView() {
   // Görünüm değişince çapa o görünümün başına çekilir. Aksi halde aydan haftaya
   // geçerken ayın 23'ünde kalınıp "hangi haftadayım" sorusu doğuyordu.
   const changeView = (next: ViewMode) => {
+    setSlideDir(0);
     setView(next);
     setAnchor((current) =>
       next === "week" ? startOfWeek(current) : next === "month" ? startOfMonth(current) : current
@@ -93,12 +97,22 @@ export default function CalendarView() {
   };
 
   const step = (direction: 1 | -1) => {
+    setSlideDir(direction);
     setAnchor((current) => {
       if (view === "day") return addDays(current, direction);
       if (view === "week") return addDays(current, 7 * direction);
       return addMonths(startOfMonth(current), direction);
     });
   };
+
+  // İleri giderken yeni dönem sağdan, geri giderken soldan süzülür. 0 =
+  // animasyon yok: "Bugün" ve görünüm değişimi bir yöne gitmek değil, sıçramak.
+  const slideClass =
+    slideDir === 1 ? "plan-slide-next" : slideDir === -1 ? "plan-slide-prev" : undefined;
+
+  // Yana kaydırarak dönem değiştirme: dokunmatikte parmakla, trackpad'de iki
+  // parmakla, klavyede ← / → ile (bkz. lib/useSwipeNavigate.ts).
+  const swipe = useSwipeNavigate(step);
 
   const periodLabel = useMemo(() => {
     if (!data) return "";
@@ -189,45 +203,11 @@ export default function CalendarView() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
         <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 500, margin: 0, marginRight: 6 }}>Takvim</h1>
 
-        <div style={{ display: "flex", gap: 4 }}>
-          {(["day", "week", "month"] as ViewMode[]).map((v) => (
-            <button
-              key={v}
-              onClick={() => changeView(v)}
-              style={{
-                padding: "6px 13px",
-                borderRadius: 8,
-                fontSize: 14,
-                border: `1px solid ${view === v ? c.primary : c.border}`,
-                background: view === v ? c.primary : c.surface,
-                color: view === v ? "#fff" : c.textPrimary,
-                cursor: "pointer",
-              }}
-            >
-              {VIEW_LABELS[v]}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: isDesktop ? 8 : 0 }}>
-          <NavButton label="‹" onClick={() => step(-1)} />
-          <button
-            onClick={() => setAnchor(todayStr())}
-            style={{
-              padding: "6px 11px",
-              borderRadius: 8,
-              fontSize: 13,
-              border: `1px solid ${c.border}`,
-              background: c.surface,
-              color: c.textPrimary,
-              cursor: "pointer",
-            }}
-          >
-            Bugün
-          </button>
-          <NavButton label="›" onClick={() => step(1)} />
-          <span style={{ fontSize: 14, color: c.textSecondary, marginLeft: 8 }}>{periodLabel}</span>
-        </div>
+        {/* Görünüm seçici ve dönem gezinmesi bu satırda DEĞİL: ikisi de
+            takvimin hemen üstünde, ortalanmış kendi şeridinde duruyor
+            (bkz. aşağıdaki "Takvim kontrol şeridi"). Kontrolün baktığı
+            ızgaraya yakın olması, sayfanın en üstündeki başlık satırına
+            karışmasından daha okunur. */}
 
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <button
@@ -342,7 +322,79 @@ export default function CalendarView() {
 
       {/* ------------------------------------------------------------ Gövde */}
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexDirection: isDesktop ? "row" : "column" }}>
+        {/* Kaydırma yalnızca ızgaranın üstünde: sağdaki ilerleme sütununda
+            yatay kaydırma bir şey ifade etmiyor, orada da yakalarsak
+            kullanıcı listeyi kaydırırken dönem değişirdi. */}
         <div style={{ flex: 1, minWidth: 0, width: "100%" }}>
+          {/* ------------------------------------------ Takvim kontrol şeridi */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              marginBottom: 12,
+            }}
+          >
+            <div style={{ display: "flex", gap: 4 }}>
+              {(["day", "week", "month"] as ViewMode[]).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => changeView(v)}
+                  style={{
+                    padding: "6px 13px",
+                    borderRadius: 8,
+                    fontSize: 14,
+                    border: `1px solid ${view === v ? c.primary : c.border}`,
+                    background: view === v ? c.primary : c.surface,
+                    color: view === v ? "#fff" : c.textPrimary,
+                    cursor: "pointer",
+                  }}
+                >
+                  {VIEW_LABELS[v]}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <NavButton label="‹" onClick={() => step(-1)} />
+              <button
+                onClick={() => {
+                  setSlideDir(0);
+                  setAnchor(todayStr());
+                }}
+                style={{
+                  padding: "6px 11px",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  border: `1px solid ${c.border}`,
+                  background: c.surface,
+                  color: c.textPrimary,
+                  cursor: "pointer",
+                }}
+              >
+                Bugün
+              </button>
+              <NavButton label="›" onClick={() => step(1)} />
+            </div>
+
+            {/* Hangi dönemdeyiz sorusu kaydırmalı gezinmede daha da önemli:
+                okla değil parmakla ilerleyince "kaç hafta gittim" bilgisi
+                yalnızca bu etikette kalıyor. */}
+            <span style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary }}>{periodLabel}</span>
+          </div>
+
+          {/* Kaydırma animasyonu: yeni dönem, gidilen yönün tersinden içeri
+              süzülür. Sarmalayıcının overflow'u gizli — animasyon sırasında
+              ızgara kenardan taşıp sayfayı yatay kaydırılabilir yapmasın.
+              `key` VERİNİN dönemine bağlı, çapaya değil: veri asenkron
+              geliyor, çapaya bağlasaydık animasyon eski içerikle oynar,
+              yeni veri gelince de içerik yerinde "zıplardı". */}
+          {/* Tutup kaydırma yalnızca ızgaranın üstünde: sağdaki ilerleme
+              sütununda yatay sürükleme bir şey ifade etmiyor. */}
+          <div {...swipe.handlers} style={{ overflowX: "hidden", ...swipe.handlers.style }}>
+            <div ref={swipe.contentRef} key={data ? `${view}-${data.from}` : "bos"} className={slideClass}>
           {data && view === "month" && (
             <PlanMonthGrid
               from={data.from}
@@ -375,6 +427,8 @@ export default function CalendarView() {
               onDropItem={dropItem}
             />
           )}
+            </div>
+          </div>
         </div>
 
         <div style={{ width: isDesktop ? 320 : "100%", flexShrink: 0, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -417,7 +471,7 @@ export default function CalendarView() {
 }
 
 function NavButton({ label, onClick }: { label: string; onClick: () => void }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <button
       onClick={onClick}
@@ -459,7 +513,7 @@ function SuggestionPreview({
   onApply: () => void;
   onDismiss: () => void;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div
       style={{

@@ -2,7 +2,7 @@ import { useState } from "react";
 import CoverPicker from "./CoverPicker";
 import type { Group } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
@@ -16,7 +16,7 @@ interface Props {
 }
 
 export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onArchived }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [name, setName] = useState(group.name);
   const [description, setDescription] = useState(group.description ?? "");
   // Seçili kapak: yüklenmiş bir URL, "preset:<key>" ya da kapak yok.

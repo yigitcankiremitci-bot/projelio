@@ -6,7 +6,7 @@
  *   <label>Tutar <TourHelpDot tour="butce-nasil-calisir" step="kayit-ekle" /></label>
  */
 
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import { useTour } from "../../lib/tour/TourContext";
 import { getTour } from "../../lib/tour/tours";
 
@@ -18,7 +18,7 @@ interface Props {
 }
 
 export default function TourHelpDot({ tour, step, size = 17, label }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const { start } = useTour();
   const target = getTour(tour);
   if (!target) return null;

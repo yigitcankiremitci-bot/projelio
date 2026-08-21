@@ -20,7 +20,7 @@ import {
   postDay,
   postTime,
 } from "../lib/socialMedia";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import SocialAccountModal from "./SocialAccountModal";
 import SocialPostComposer from "./SocialPostComposer";
 import { IconChevronLeft, IconChevronRight, IconEdit, IconExternalLink, IconTrash } from "./icons";
@@ -49,7 +49,7 @@ type View = "calendar" | "list" | "accounts";
  * Veri kendi tablolarında (bkz. 054_social_media.sql), tek istekte gelir.
  */
 export default function SocialMediaPanel({ organizationId, departmentId, jobId, canWrite = true }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [members, setMembers] = useState<{ id: string; label: string }[]>([]);

@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { coverBackground } from "../lib/covers";
 import type { Organization } from "@projelio/shared";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
 import { IconFolder, IconLayers, IconBuilding } from "./icons";
 
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function OrganizationCard({ organization }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <Link
       to={`/organizations/${organization.id}`}

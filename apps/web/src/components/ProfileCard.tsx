@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@projelio/shared";
-import { resolveUserTitle } from "@projelio/shared";
+import { colors, resolveUserTitle } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import CardDescription from "./CardDescription";
 import { IconUser, IconSettings } from "./icons";
@@ -71,7 +71,7 @@ interface Props {
 }
 
 export default function ProfileCard({ bleedRight = 0, compact = false, collapsible = false }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const rootRef = useRef<HTMLDivElement>(null);
   const capsuleRef = useRef<HTMLDivElement>(null);
@@ -168,7 +168,10 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
           alignItems: "flex-end",
           textAlign: "right",
           gap: compact ? 4 : 3,
-          background: `linear-gradient(120deg, ${c.primary}, ${c.primaryDark})`,
+          // Kapsüldeki ad her zaman sabit beyaz (aşağıda "#fff"), o yüzden zemin de
+          // sabit koyu kalmalı — dinamik c.primary karanlık modda açık bir tona
+          // döndüğü için (bkz. ThemeProvider) beyaz yazıyla kontrastı bozar.
+          background: `linear-gradient(120deg, ${colors.light.primary}, ${colors.light.primaryDark})`,
           borderRadius: "999px 22px 22px 999px",
           // Sağ dolgu = avatarın kapsülün içinde kalan kısmı + boşluk + taşma.
           // Kapsül sağa taşmıyorsa (bleedRight = 0) eski davranış korunur:

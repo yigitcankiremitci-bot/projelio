@@ -4,9 +4,10 @@ import type { Department } from "@projelio/shared";
 import { api } from "../api/client";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
 import { IconLayers, IconUser, IconEdit } from "./icons";
+import AskLioButton from "./AskLioButton";
 
 interface Props {
   department: Department;
@@ -31,7 +32,7 @@ const COVER_HEIGHT = 146;
 const CARD_HEIGHT = 338;
 
 export default function DepartmentCard({ department, onCoverUpdated }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [coverUrl, setCoverUrl] = useState(getDepartmentCoverUrl(department));
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
@@ -145,19 +146,24 @@ export default function DepartmentCard({ department, onCoverUpdated }: Props) {
       </div>
 
       <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-        <h3
-          style={{
-            margin: "0 0 6px",
-            fontSize: 17,
-            fontWeight: 500,
-            color: c.textPrimary,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {department.name}
-        </h3>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, margin: "0 0 6px" }}>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 17,
+              fontWeight: 500,
+              color: c.textPrimary,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            {department.name}
+          </h3>
+          <AskLioButton subject={{ kind: "departman", title: department.name, id: department.id }} size={24} />
+        </div>
         {department.description && (
           <CardDescription text={department.description} lines={3} />
         )}

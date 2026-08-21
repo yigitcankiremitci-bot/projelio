@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Task, TaskComment, ProjectPost, ProjectMember, DepartmentMember, PostComment, Department } from "@projelio/shared";
 import { api } from "../../api/client";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import { formatDateTime } from "../../lib/dates";
 import { IconCheck, IconHeart, IconMessageCircle } from "../icons";
 
@@ -74,7 +74,7 @@ function getMentionQuery(text: string, cursor: number): { start: number; query: 
 }
 
 const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projectId, departmentId, organizationId, tasks }, ref) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [comments, setComments] = useState<FeedComment[]>([]);
   const [posts, setPosts] = useState<ProjectPost[]>([]);
   const [members, setMembers] = useState<FeedMember[]>([]);
@@ -380,7 +380,7 @@ interface PostCardProps {
 }
 
 function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [expanded, setExpanded] = useState(false);
   const [postComments, setPostComments] = useState<PostComment[] | null>(null);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -535,7 +535,7 @@ interface CommentRowProps {
 }
 
 function CommentRow({ comment, onLikeToggled }: CommentRowProps) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [liking, setLiking] = useState(false);
 
   const handleLike = async () => {

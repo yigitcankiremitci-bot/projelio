@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { CURRENCY_OPTIONS, type ModuleFieldConfig } from "../lib/moduleConfigs";
 import { referenceOptionsFor, type ReferenceSource } from "../lib/moduleReferences";
 import { isReferenceValue } from "../lib/moduleConfigs";
@@ -22,7 +22,7 @@ interface Props {
  * yalnızca bu dosyaya dokunmayı gerektiriyor.
  */
 export default function ModuleFieldInput({ field, form, setValue, references, createPartyPath }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const value = form[field.key] ?? "";
   const inputStyle = { width: "100%" } as const;
 
@@ -176,7 +176,7 @@ function TagsInput({
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [draft, setDraft] = useState("");
   const tags = value.split(",").map((t) => t.trim()).filter(Boolean);
 
@@ -265,7 +265,7 @@ function ReferencePicker({
   references: ReferenceSource;
   createPartyPath?: string;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const options = referenceOptionsFor(field, references);

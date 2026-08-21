@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { Task, TaskComment } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import AssigneePicker from "./AssigneePicker";
 import EntityDangerZone from "./EntityDangerZone";
@@ -38,6 +39,36 @@ function toDateInputValue(iso?: string) {
   return iso ? new Date(iso).toISOString().slice(0, 10) : "";
 }
 
+/**
+ * İki sütunlu form satırı (tarihler, saat/hatırlatma, ekip/bütçe).
+ *
+ * NEDEN sabit bir kırılma noktası (useIsDesktop) değil: bu satırların
+ * genişliğini pencere değil MODALİN kendisi belirliyor — dar ekranda tam ekran,
+ * geniş ekranda 1280 px'e kadar. Sarma (wrap) modalin o anki genişliğine göre
+ * kendiliğinden karar verir; iki göz yan yana sığmadığı anda alt alta geçerler.
+ */
+const twoColumnRow: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 10 };
+
+/**
+ * O satırların tek bir gözü.
+ *
+ * `minWidth: 0` ŞART: flex gözleri varsayılan olarak `min-width: auto` alır,
+ * yani içindeki alanın asgari genişliğinin altına inemezler. Telefonda tarih
+ * alanının asgari genişliği (177 px) gözün payına düşenden büyük olduğu için
+ * satır dışarı taşıyor, modal yatay kaydırılır hale geliyor ve alanlar üst üste
+ * binmiş gibi görünüyordu.
+ *
+ * 190 px'lik taban ölçü de bu asgari genişliklerden geliyor: iki tarih alanı
+ * ancak bu kadar yer bulunca yan yana durabiliyor, bulamayınca satır sarıyor.
+ */
+const halfField: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+  flex: "1 1 190px",
+  minWidth: 0,
+};
+
 export default function TaskEditModal({
   task,
   fileJobId,
@@ -47,8 +78,11 @@ export default function TaskEditModal({
   onDeleted,
   onArchived,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const formRef = useRef<HTMLFormElement>(null);
+  // Kaydet butonu formun dışında, alttaki yapışkan çubukta duruyor; forma bu
+  // kimlikle bağlanır (bkz. Modal'ın footer prop'u).
+  const formId = useId();
   /**
    * Ekler iki AYRI panelden geliyor (link ve dosya) ve ikisi de birbirinden
    * habersiz. Yamayı `task` prop'undan türetseydik ikinci panel birincinin
@@ -169,8 +203,24 @@ export default function TaskEditModal({
   };
 
   return (
-    <Modal title="Görevi düzenle" onClose={onClose} maxWidth={1280}>
-      <form ref={formRef} onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <Modal
+      title="Görevi düzenle"
+      onClose={onClose}
+      maxWidth={1280}
+      // Kaydet, modalin alt kenarına yapışır: altında ekler, dosyalar, yorumlar
+      // ve arşivle/sil bölümleri var, buton içeriğin ortasında kaybolmasın.
+      footer={
+        <button
+          type="submit"
+          form={formId}
+          disabled={saving}
+          style={{ width: "100%", background: c.primary, color: "#fff", padding: "10px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
+        >
+          {saving ? "Kaydediliyor…" : "Kaydet"}
+        </button>
+      }
+    >
+      <form id={formId} ref={formRef} onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
           {/* Uzun başlık tek satırda yatay kayıp okunmaz hale gelmesin diye
@@ -202,12 +252,12 @@ export default function TaskEditModal({
           />
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+        <div style={twoColumnRow}>
+          <div style={halfField}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Başlangıç tarihi</label>
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ width: "100%" }} />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+          <div style={halfField}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş tarihi</label>
             <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} required style={{ width: "100%" }} />
           </div>
@@ -216,8 +266,8 @@ export default function TaskEditModal({
         {/* Bitiş saati opsiyonel: çoğu görevin saati yok, zorunlu kılmak her
             görevde anlamsız bir seçim dayatırdı. Saat girilince hatırlatma
             seçeneği açılır — saat yokken "ne kadar önce" sorusunun karşılığı yok. */}
-        <div style={{ display: "flex", gap: 10 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+        <div style={twoColumnRow}>
+          <div style={halfField}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş saati (opsiyonel)</label>
             <input
               type="time"
@@ -231,7 +281,7 @@ export default function TaskEditModal({
               style={{ width: "100%" }}
             />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+          <div style={halfField}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Hatırlat</label>
             <select
               value={reminderLead}
@@ -248,8 +298,8 @@ export default function TaskEditModal({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+        <div style={twoColumnRow}>
+          <div style={halfField}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Ekip</label>
             {/* Tüm kullanıcılar yerine yalnızca proje ekibi/departman kadrosu, arama ile.
                 Çoklu: bir görevi birden fazla kişi birlikte yürütebilir. */}
@@ -263,7 +313,7 @@ export default function TaskEditModal({
               onChange={() => {}}
             />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+          <div style={halfField}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Bütçe (₺)</label>
             <input type="number" min={0} value={budget} onChange={(e) => setBudget(e.target.value)} style={{ width: "100%" }} />
           </div>
@@ -271,6 +321,9 @@ export default function TaskEditModal({
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Tahmini süre (opsiyonel)</label>
+          {/* Süre ve birimi tek bir alanın iki parçası; sarmalarına izin verilmez.
+              Birim kutusu yalnızca "Saat"/"Gün" kadar yer tutar (eskiden yarım
+              satır kaplıyor, dar ekranda sayı alanını dışarı itiyordu). */}
           <div style={{ display: "flex", gap: 8 }}>
             <input
               type="number"
@@ -279,12 +332,12 @@ export default function TaskEditModal({
               value={durationValue}
               onChange={(e) => setDurationValue(e.target.value)}
               placeholder="Örn. 4"
-              style={{ flex: 1 }}
+              style={{ flex: "1 1 0", minWidth: 0 }}
             />
             <select
               value={durationUnit}
               onChange={(e) => setDurationUnit(e.target.value as "hours" | "days")}
-              style={{ flex: 1 }}
+              style={{ flex: "0 0 auto" }}
             >
               <option value="hours">Saat</option>
               <option value="days">Gün</option>
@@ -293,14 +346,6 @@ export default function TaskEditModal({
         </div>
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
-
-        <button
-          type="submit"
-          disabled={saving}
-          style={{ background: c.primary, color: "#fff", padding: "10px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
-        >
-          {saving ? "Kaydediliyor…" : "Kaydet"}
-        </button>
       </form>
 
       {amAssigned && (
@@ -376,16 +421,18 @@ export default function TaskEditModal({
         )}
 
         <form onSubmit={handleAddComment} style={{ display: "flex", gap: 8 }}>
+          {/* minWidth: 0 — yoksa kutunun asgari genişliği Gönder'i dar ekranda
+              modalin dışına itiyordu (bkz. halfField'daki aynı gerekçe). */}
           <input
             value={commentBody}
             onChange={(e) => setCommentBody(e.target.value)}
             placeholder="Yorum yaz…"
-            style={{ flex: 1 }}
+            style={{ flex: "1 1 0", minWidth: 0 }}
           />
           <button
             type="submit"
             disabled={postingComment || !commentBody.trim()}
-            style={{ padding: "0 16px", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 16, fontWeight: 500 }}
+            style={{ flexShrink: 0, padding: "0 16px", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 16, fontWeight: 500 }}
           >
             Gönder
           </button>

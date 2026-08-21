@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
@@ -21,7 +21,7 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -58,6 +58,9 @@ export default function ConfirmDialog({
           {cancelLabel}
         </button>
         <button
+          // Enter bu butona basar (bkz. Modal). Silme onayı da dahil: kullanıcı
+          // pencereyi okuyup zaten bilerek açtı, ikinci onay için fare aramasın.
+          data-primary
           onClick={handleConfirm}
           disabled={loading}
           style={{

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { GoogleDriveStatus } from "@projelio/shared";
 import { oneDriveApi } from "../api/files";
 import { formatFileSize } from "../lib/driveLinks";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { notifyCloudStorageChanged, onCloudStorageChanged } from "../lib/cloudStorageEvents";
 import ConfirmDialog from "./ConfirmDialog";
 import { IconOneDrive } from "./icons";
@@ -15,7 +15,7 @@ import { IconOneDrive } from "./icons";
  * noktalar ve metinler OneDrive'a göre değişir.
  */
 export default function OneDriveCard() {
-  const c = colors.light;
+  const c = useThemeColors();
   const [status, setStatus] = useState<GoogleDriveStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

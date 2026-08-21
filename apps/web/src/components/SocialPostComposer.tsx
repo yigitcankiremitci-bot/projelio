@@ -18,7 +18,7 @@ import {
   tightestLimit,
   toDateTimeLocal,
 } from "../lib/socialMedia";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconExternalLink, IconTrash, IconUpload } from "./icons";
 
@@ -89,7 +89,7 @@ export default function SocialPostComposer({
   onClose,
   onSaved,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [form, setForm] = useState<FormState>(() => initialForm(post, defaultDate));
   const [selected, setSelected] = useState<string[]>(() => (post?.targets ?? []).map((t) => t.accountId));
   const [overrides, setOverrides] = useState<Record<string, string>>(() =>
@@ -668,6 +668,7 @@ export default function SocialPostComposer({
             Vazgeç
           </button>
           <button
+            data-primary
             onClick={save}
             disabled={saving || uploading}
             style={{

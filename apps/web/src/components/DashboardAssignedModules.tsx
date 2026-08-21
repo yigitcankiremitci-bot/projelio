@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Job, JobModule, ModuleCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { moduleModalWidth } from "../lib/moduleSurfaces";
 import ModuleSurface from "./ModuleSurface";
 import ModuleTeamPanel from "./ModuleTeamPanel";
@@ -31,7 +31,7 @@ interface AssignedModule {
  * Hiç modül atanmamışsa bölüm hiç render edilmez.
  */
 export default function DashboardAssignedModules({ jobs }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [assigned, setAssigned] = useState<AssignedModule[]>([]);
   const [loading, setLoading] = useState(true);
   const [openKey, setOpenKey] = useState<string | null>(null);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { colors } from "../theme/colors";
+import type { ThemeColors } from "@projelio/shared";
+import { useThemeColors } from "../theme/useThemeColors";
 import { api } from "../api/client";
 import { aiChat, type AiProviderBalance, type AiUserBalanceRow } from "../api/aiChat";
 import { IconSparkle } from "./icons";
@@ -29,7 +30,7 @@ interface MarginReport {
  * Ödeme sağlayıcısı entegre edilene kadar bakiye yüklemenin tek yolu burasıdır.
  */
 export default function AiCreditAdminPanel() {
-  const c = colors.light;
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
 
   const [query, setQuery] = useState("");
@@ -656,7 +657,7 @@ export default function AiCreditAdminPanel() {
 }
 
 function Metric({ label, value, highlight }: { label: string; value: string; highlight?: string }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div>
       <div style={{ fontSize: 11.5, color: c.textSecondary }}>{label}</div>
@@ -665,11 +666,11 @@ function Metric({ label, value, highlight }: { label: string; value: string; hig
   );
 }
 
-function labelStyle(c: typeof colors.light): React.CSSProperties {
+function labelStyle(c: ThemeColors): React.CSSProperties {
   return { display: "block", fontSize: 13, color: c.textSecondary, marginBottom: 5 };
 }
 
-function thStyle(c: typeof colors.light, align: "left" | "right" = "left"): React.CSSProperties {
+function thStyle(c: ThemeColors, align: "left" | "right" = "left"): React.CSSProperties {
   return {
     textAlign: align,
     padding: "8px 12px",
@@ -680,11 +681,11 @@ function thStyle(c: typeof colors.light, align: "left" | "right" = "left"): Reac
   };
 }
 
-function tdStyle(c: typeof colors.light): React.CSSProperties {
+function tdStyle(c: ThemeColors): React.CSSProperties {
   return { padding: "8px 12px", color: c.textPrimary, verticalAlign: "middle" };
 }
 
-function inputStyle(c: typeof colors.light): React.CSSProperties {
+function inputStyle(c: ThemeColors): React.CSSProperties {
   return {
     width: "100%",
     padding: "9px 12px",

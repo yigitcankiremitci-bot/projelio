@@ -1,8 +1,9 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Department, DepartmentCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useProjectFabAction } from "../lib/projectFab";
+import { onEnter } from "../lib/enterAction";
 import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo } from "../lib/undo";
 import DepartmentCard from "./DepartmentCard";
@@ -35,7 +36,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
   { organizationId, useFab = true, layout = "scroll" },
   ref
 ) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [catalog, setCatalog] = useState<DepartmentCatalogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -188,7 +189,7 @@ function AddDepartmentForm({
   onClose: () => void;
   onAdded: () => void;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [customName, setCustomName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -260,6 +261,7 @@ function AddDepartmentForm({
         <input
           value={customName}
           onChange={(e) => setCustomName(e.target.value)}
+          onKeyDown={onEnter(() => void handleSave())}
           placeholder="Örn. Ar-Ge"
           style={{ width: "100%", marginTop: 4 }}
         />

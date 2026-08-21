@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import CoverPicker from "./CoverPicker";
 import type { Job } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
@@ -20,7 +20,9 @@ interface Props {
 // "İş" (job) yalnızca serbest çalışan/taşeron çalışma biçimine özgüdür — bir
 // organizasyona/gruba bağlanamaz (bkz. CreateJobModal).
 export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchived }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
+  // Kaydet formun dışında, alttaki yapışkan çubukta (bkz. Modal footer).
+  const formId = useId();
   const [title, setTitle] = useState(job.title);
   const [description, setDescription] = useState(job.description ?? "");
   // Seçili kapak: yüklenmiş bir URL, "preset:<key>" ya da kapak yok.
@@ -74,8 +76,23 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
   };
 
   return (
-    <Modal title="İşi düzenle" onClose={onClose}>
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <Modal
+      title="İşi düzenle"
+      onClose={onClose}
+      // Kaydet alta yapışır: altında "İşe al" ve arşivle/sil bölümleri var
+      // (bkz. TaskEditModal, aynı düzen).
+      footer={
+        <button
+          type="submit"
+          form={formId}
+          disabled={loading}
+          style={{ width: "100%", background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
+        >
+          {loading ? "Kaydediliyor…" : "Kaydet"}
+        </button>
+      }
+    >
+      <form id={formId} onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required style={{ width: "100%" }} />
@@ -99,14 +116,6 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
         />
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
-        >
-          {loading ? "Kaydediliyor…" : "Kaydet"}
-        </button>
       </form>
 
       <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 16, paddingTop: 16 }}>

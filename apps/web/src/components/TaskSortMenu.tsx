@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { TASK_SORTS, type TaskSortMode } from "../lib/taskSort";
 import { IconCheck, IconSortDescending } from "./icons";
 
@@ -17,7 +17,7 @@ interface Props {
  * bir şeyin bozulduğunu sanıyor.
  */
 export default function TaskSortMenu({ value, onChange }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const active = TASK_SORTS.find((s) => s.value === value)!;

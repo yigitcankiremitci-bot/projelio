@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import type { ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
 import type { NativeFileKind } from "../api/files";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconChevronDown, IconFile, IconPlus } from "./icons";
 
@@ -56,7 +56,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
   { target, taskId, outputId, provider, hideTrigger = false, onCreated },
   ref
 ) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [open, setOpen] = useState(false);
   const [pendingKind, setPendingKind] = useState<{ kind: NativeFileKind; label: string } | null>(null);
   const [name, setName] = useState("");
@@ -117,6 +117,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
         </div>
         {error && <p style={{ color: c.danger, fontSize: 14, margin: 0 }}>{error}</p>}
         <button
+          data-primary
           onClick={handleCreate}
           disabled={saving || !name.trim()}
           style={{

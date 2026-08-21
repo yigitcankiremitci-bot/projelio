@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ModuleRecord, OrganizationModule, Party } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleConfigs";
 import {
   PERIOD_KEYS,
@@ -29,7 +29,7 @@ interface Props {
  * yeni bağımlılık eklemeye değecek bir kazanç yok.
  */
 export default function ModulePanelView({ config, organizationId, jobId }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [periodKey, setPeriodKey] = useState<PeriodKey>("this_month");
   const [allRecords, setAllRecords] = useState<ModuleRecord[]>([]);
   const [enabled, setEnabled] = useState<Set<string>>(new Set());

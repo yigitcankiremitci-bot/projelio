@@ -28,7 +28,8 @@ body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
   background: var(--color-background);
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
@@ -142,6 +143,45 @@ textarea::placeholder {
 
 .autogrow > textarea:focus {
   border-color: var(--color-primary);
+}
+
+/*
+ * Lio'nun yazma kutusu (bkz. AiAssistantPanel).
+ *
+ * Aynı "görünmez kopya" tekniği, farklı ölçüler: burası bir BAŞLIK alanı değil
+ * bir mesaj kutusu — üç satır boyunda başlar, yazdıkça büyür, bir yerden sonra
+ * büyümeyi bırakıp kendi içinde kaydırır.
+ *
+ * AutoGrowTextarea bileşeni burada kullanılamıyor: o, satır sonlarını siliyor
+ * ve Enter'ı her zaman "gönder" sayıyor (başlık için doğru). Lio'da Shift+Enter
+ * yeni satır açmalı, o yüzden textarea'nın kendi tuş mantığı korunuyor ve
+ * yalnızca büyüme tekniği paylaşılıyor.
+ */
+.autogrow-chat {
+  /* Üç satır: 3 × (14px × 1.45) + dikey dolgu (2 × 11) + kenarlık ≈ 85 */
+  min-height: 85px;
+  max-height: 180px;
+  /* Görünmez kopya tavanı aşınca ızgara satırı da büyüyor; kırpılmazsa
+     textarea kutunun dışına taşıyordu. */
+  overflow: hidden;
+}
+
+.autogrow-chat > textarea,
+.autogrow-chat::after {
+  padding: 11px 13px;
+  border-radius: 12px;
+  line-height: 1.45;
+}
+
+.autogrow-chat > textarea {
+  /* Tavan textarea'nın KENDİSİNE de verilmeli: yalnızca sarmalayıcıya
+     verildiğinde ızgara satırı içeriğin tamamı kadar uzuyor, textarea da
+     onunla birlikte uzayıp kutudan taşıyordu (ölçüldü). Kendi tavanı olunca
+     büyümeyi bırakıp içeride kaydırıyor. */
+  max-height: 180px;
+  /* Üst kuraldaki `hidden` burada geçersiz: yoksa yazının sonu kaybolurdu. */
+  overflow-y: auto;
+  background: var(--color-background);
 }
 
 button {
@@ -298,6 +338,66 @@ button:focus-visible {
 }
 
 /*
+ * Takvimde dönem değiştirirken kayma animasyonu (bkz. pages/Calendar.tsx).
+ *
+ * Yalnızca YENİ dönem oynatılır, eskisi çıkarken oynatılmaz: veri asenkron
+ * geliyor, iki paneli birlikte oynatmak için eski içeriği elde tutmak
+ * gerekirdi ve o sırada ızgara iki kez çizilip ağırlaşırdı. Tek yönlü süzülme
+ * de "içerik yana kaydı" hissini veriyor.
+ *
+ * Süre kısa (200 ms): takvimde arka arkaya birkaç hafta ilerlemek yaygın,
+ * uzun animasyon hızlı gezinmeyi engeller. "Hareketi azalt" açıksa aşağıdaki
+ * kural bunu zaten 0.01 ms'ye indiriyor.
+ */
+@keyframes plan-slide-next {
+  from {
+    transform: translateX(26px);
+    opacity: 0.35;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes plan-slide-prev {
+  from {
+    transform: translateX(-26px);
+    opacity: 0.35;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.plan-slide-next {
+  animation: plan-slide-next 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.plan-slide-prev {
+  animation: plan-slide-prev 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * Ayarlar > Görünüm > "Hareketi azalt". İşletim sistemindeki tercihi (yukarıdaki
+ * prefers-reduced-motion) beklemeden, uygulama içinden kapatılabilen sürüm —
+ * bkz. lib/appPrefs.tsx, <html data-reduce-motion="1"> koyuyor.
+ *
+ * Süreler sıfır DEĞİL çok kısa: 0 verildiğinde transitionend/animationend
+ * bekleyen kodlar olayı hiç almayabiliyor.
+ */
+[data-reduce-motion="1"],
+[data-reduce-motion="1"] *,
+[data-reduce-motion="1"] *::before,
+[data-reduce-motion="1"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/*
  * Basılı tutup sürükleyerek sıralama (SortableJS). Basılı tutulduğunda öğe
  * "yerinden kalkmış" gibi hafifçe büyüyüp gölge kazanır; bırakılacağı yer
  * soluk bir yer tutucu ile gösterilir.
@@ -416,6 +516,32 @@ button:focus-visible {
 
 .sticky-row-in {
   animation: sticky-row-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * Geri hapının devir teslimi (bkz. App.tsx CoverStickyHeader, EntityCover
+ * CoverBackLink floating).
+ *
+ * Şeridin satırları YUKARIDAN düşerek gelir (sticky-row-in) çünkü onlar yeni
+ * açılan bantlardır. Hap ise yeni bir şey değil: kapaktaki hapın devraldığı
+ * kopya ve tam onun bıraktığı çizgide beliriyor. Bu yüzden aşağıdan düşmez,
+ * OLDUĞU YERDEN kalkar: hafifçe küçük ve zemine yapışık başlar, büyüyüp
+ * yerine oturur — gölgesi de o an devreye girdiği için "kâğıttan ayrıldı"
+ * hissi verir.
+ */
+@keyframes pill-liftoff {
+  from {
+    opacity: 0;
+    transform: translateY(3px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pill-liftoff {
+  animation: pill-liftoff 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {

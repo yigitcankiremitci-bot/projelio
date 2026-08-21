@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MailMessageDetail } from "@projelio/shared";
 import { mailboxApi } from "../api/mailbox";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconExternalLink, IconSparkle } from "./icons";
 
@@ -38,7 +38,7 @@ const MODE_LABELS: Record<ReplyMode, string> = {
  * sayfaya koymak gönderene script çalıştırma imkânı verirdi.
  */
 export default function MailMessageModal({ accountId, message, canWrite, onClose, onSent }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [replyMode, setReplyMode] = useState<ReplyMode | null>(null);
   const [replyText, setReplyText] = useState("");
   const [forwardTo, setForwardTo] = useState("");

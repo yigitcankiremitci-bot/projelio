@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import type { PlanFocusArea, PlanPeriod, PlanTarget } from "@projelio/shared";
+import type { PlanFocusArea, PlanPeriod, PlanTarget, ThemeColors } from "@projelio/shared";
 import Modal from "../Modal";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import { planning, type PlanTargetInput } from "../../api/planning";
 
 interface Props {
@@ -33,7 +33,7 @@ interface Row {
  * durumların sunucuya yazılması gereksiz.
  */
 export default function PlanTargetsModal({ period, targets, focusAreas, onClose, onSaved }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
 
   const [theme, setTheme] = useState(period.theme ?? "");
   const [rows, setRows] = useState<Row[]>(() =>
@@ -192,6 +192,7 @@ export default function PlanTargetsModal({ period, targets, focusAreas, onClose,
           Vazgeç
         </button>
         <button onClick={save} disabled={saving} style={primaryButton(c, saving)}>
+          data-primary
           {saving ? "Kaydediliyor…" : "Kaydet"}
         </button>
       </div>
@@ -219,7 +220,7 @@ function AreaPicker({
   customName?: string;
   onChange: (focusAreaId?: string, newAreaName?: string) => void;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const listId = "plan-focus-areas";
 
   const text = value ? (focusAreas.find((a) => a.id === value)?.name ?? "") : (customName ?? "");
@@ -262,7 +263,7 @@ function NumberField({
   width: number;
   placeholder?: string;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div style={{ position: "relative", width, flexShrink: 0 }}>
       <input
@@ -283,7 +284,7 @@ function NumberField({
 
 // --------------------------------------------------------------- Ortak stiller
 
-type Palette = typeof colors.light;
+type Palette = ThemeColors;
 
 export function labelStyle(c: Palette): React.CSSProperties {
   return { display: "block", fontSize: 13, color: c.textSecondary, marginBottom: 5 };

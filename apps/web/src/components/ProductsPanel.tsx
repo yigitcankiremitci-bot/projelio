@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { Product } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useProjectFabAction } from "../lib/projectFab";
 import ProductCard from "./ProductCard";
 import AddEditProductModal from "./AddEditProductModal";
@@ -38,7 +38,7 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
   { organizationId, departmentId, useFab = true, showAddButton = true },
   ref
 ) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);

@@ -144,6 +144,16 @@ export const COVER_TEXT_VEIL =
   "linear-gradient(to top, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.90) 28%, " +
   "rgba(255,255,255,0.86) 45%, rgba(255,255,255,0.55) 65%, rgba(255,255,255,0.20) 84%, rgba(255,255,255,0) 100%)";
 
+/**
+ * Karanlık moddaki perde — aynı alfa kademeleri, beyaz yerine temanın koyu
+ * zemin rengi (colors.dark.background). Aydınlık moddaki perde hep beyaza
+ * açıldığı için karanlık modda sayfanın geri kalanıyla çarpışan parlak bir
+ * leke gibi duruyordu.
+ */
+export const COVER_TEXT_VEIL_DARK =
+  "linear-gradient(to top, rgba(18,21,27,0.95) 0%, rgba(18,21,27,0.90) 28%, " +
+  "rgba(18,21,27,0.86) 45%, rgba(18,21,27,0.55) 65%, rgba(18,21,27,0.20) 84%, rgba(18,21,27,0) 100%)";
+
 /** Perdenin kapladığı yükseklik oranı (kapağın alt %72'si). */
 export const COVER_VEIL_HEIGHT = "72%";
 
@@ -151,7 +161,7 @@ export const COVER_VEIL_HEIGHT = "72%";
 export const COVER_VEIL_MIN_ALPHA = 0.86;
 
 /**
- * Kapak üstündeki yazı renkleri.
+ * Kapak üstündeki yazı renkleri (aydınlık mod / beyaz perde).
  *
  * Tema paletindeki textSecondary (#66707F) düz beyaz zeminde yeterli ama perdeli
  * bir kapağın üstünde 4.5:1'i tutturamıyor (koyu kapaklarda 4.1'e düşüyordu).
@@ -161,8 +171,12 @@ export const COVER_VEIL_MIN_ALPHA = 0.86;
 export const COVER_TEXT_PRIMARY = "#1A1F29";
 export const COVER_TEXT_SECONDARY = "#566070";
 
-/** Kapak üstüne yazan bileşenlerin kısayolu (ikon renkleri vb. için). */
-export const coverText = { primary: COVER_TEXT_PRIMARY, secondary: COVER_TEXT_SECONDARY } as const;
+/**
+ * Karanlık moddaki (koyu perde) karşılıkları — aynı mantıkla, normal karanlık
+ * mod textSecondary'sinden (#9AA2B0) bir tık daha açık.
+ */
+export const COVER_TEXT_PRIMARY_DARK = "#F5F6F8";
+export const COVER_TEXT_SECONDARY_DARK = "#B7BEC9";
 
 export function isCoverPreset(value?: string | null): boolean {
   return typeof value === "string" && value.startsWith(PRESET_PREFIX);

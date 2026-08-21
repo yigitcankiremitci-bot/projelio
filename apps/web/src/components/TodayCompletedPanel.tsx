@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Task } from "@projelio/shared";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconCheck, IconChevronRight } from "./icons";
 
 interface Props {
@@ -18,7 +18,7 @@ function isToday(iso?: string): boolean {
 // hangi projeye ait olduğu, kim tarafından bitirildiği ve saatiyle birlikte listelenir.
 // Liste uzayabildiği için başlık her zaman görünür, gövde ise açılır/kapanır.
 export default function TodayCompletedPanel({ tasks }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [open, setOpen] = useState(false);
 
   const completedToday = tasks

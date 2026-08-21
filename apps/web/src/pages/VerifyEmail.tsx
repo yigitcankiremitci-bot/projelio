@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 
 type Status = "checking" | "success" | "error";
 
@@ -10,7 +10,7 @@ export default function VerifyEmail() {
   const token = searchParams.get("token") ?? "";
   const [status, setStatus] = useState<Status>("checking");
   const [message, setMessage] = useState("");
-  const c = colors.light;
+  const c = useThemeColors();
 
   // React StrictMode geliştirmede effect'leri iki kez çalıştırıyor; doğrulama
   // isteği iki kez giderse ikincisi "token kullanılmış" hatası alabilir.

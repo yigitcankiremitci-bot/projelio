@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Task } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { todayISO } from "../lib/moduleConfigs";
 import AssigneePicker from "./AssigneePicker";
 import Modal from "./Modal";
@@ -43,7 +43,7 @@ export default function TaskFromRecordModal({
   onClose,
   onCreated,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [title, setTitle] = useState(defaultTitle);
   const [description, setDescription] = useState("");
   // Çoklu atama (bkz. migration 053).
@@ -127,6 +127,7 @@ export default function TaskFromRecordModal({
 
         <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
           <button
+            data-primary
             onClick={save}
             disabled={saving}
             style={{

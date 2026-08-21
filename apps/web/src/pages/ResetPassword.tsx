@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -11,7 +11,7 @@ export default function ResetPassword() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const c = colors.light;
+  const c = useThemeColors();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

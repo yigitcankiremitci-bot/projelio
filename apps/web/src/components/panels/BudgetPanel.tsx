@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { BudgetTransaction, Project, ProjectMember, Task } from "@projelio/shared";
 import { api } from "../../api/client";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import { IconPlus, IconX, IconEdit, IconTrash } from "../icons";
 import CreateBudgetTransactionModal from "../CreateBudgetTransactionModal";
 import { useUndo, useWithoutPendingDeletes } from "../../lib/undo";
@@ -20,7 +20,7 @@ interface Props {
 }
 
 function SummaryCard({ label, amount, color }: { label: string; amount: number; color: string }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div style={{ flex: 1, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "12px 14px" }}>
       <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{label}</p>
@@ -33,7 +33,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
   { project, tasks, projectId, currentUserId, isOwner, onTaskUpdated },
   ref
 ) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [approvingId, setApprovingId] = useState<string | null>(null);

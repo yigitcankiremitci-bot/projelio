@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Department, ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import ModuleCard from "./ModuleCard";
 
 interface Props {
@@ -17,7 +17,7 @@ interface Props {
 const SINGLE_ROW_LIMIT = 4;
 
 export default function ModulesPanel({ organizationId }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [enabled, setEnabled] = useState<OrganizationModule[]>([]);
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);

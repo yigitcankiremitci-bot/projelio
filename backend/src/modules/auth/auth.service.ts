@@ -85,6 +85,10 @@ export class AuthService {
       avatarUrl: user.avatarUrl,
       title: user.title,
       bio: user.bio,
+      // Ayarlar > Hesap, şifre kartında "mevcut şifreni gir" alanını yalnızca
+      // şifresi olan hesaplara gösterir (Google ile açılanlarda null olabiliyor).
+      // Hash'in kendisi DEĞİL, yalnızca varlığı dışarı çıkar.
+      hasPassword: Boolean(user.passwordHash),
     };
   }
 }

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { Group } from "@projelio/shared";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconFolder, IconLayers, IconBuilding } from "./icons";
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function GroupCard({ group }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <Link
       to={`/groups/${group.id}`}

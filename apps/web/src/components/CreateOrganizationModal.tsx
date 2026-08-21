@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Group, OrgType } from "@projelio/shared";
 import { ORG_TYPE_LABEL } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default function CreateOrganizationModal({ onClose, onCreated, fixedGroupId }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [orgType, setOrgType] = useState<OrgType>("sirket");

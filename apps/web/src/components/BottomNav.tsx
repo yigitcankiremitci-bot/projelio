@@ -1,6 +1,6 @@
 import { useContext, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus, IconFolder, IconActivity } from "./icons";
 import CreateJobModal from "./CreateJobModal";
 import CreateProjectModal from "./CreateProjectModal";
@@ -21,8 +21,14 @@ const rightItems = [
 
 type ModalKind = "job" | "project" | "operation" | "task" | "organization" | "group" | "organization-in-group";
 
-export default function BottomNav() {
-  const c = colors.light;
+interface Props {
+  /** Masaüstünde "+" butonunun ortalanacağı alanı belirler — sidebar kapalıyken
+   * tüm sayfa genişliğine göre, açıkken içerik sütununa göre ortalanır. */
+  sidebarOpen: boolean;
+}
+
+export default function BottomNav({ sidebarOpen }: Props) {
+  const c = useThemeColors();
   const location = useLocation();
   const isDesktop = useIsDesktop();
   const [modal, setModal] = useState<ModalKind | null>(null);
@@ -225,7 +231,10 @@ export default function BottomNav() {
           style={{
             position: "fixed",
             bottom: 24,
-            left: `calc(50% + ${SIDEBAR_WIDTH / 2}px)`,
+            // Sidebar kapalıyken içerik sütunu tüm genişliği kaplar (bkz. App.tsx
+            // marginLeft mantığı) — buton da sayfanın tam ortasına düşmeli, sidebar
+            // açıkken olduğu gibi sağa kaymamalı.
+            left: sidebarOpen ? `calc(50% + ${SIDEBAR_WIDTH / 2}px)` : "50%",
             transform: "translateX(-50%)",
             zIndex: 32,
           }}

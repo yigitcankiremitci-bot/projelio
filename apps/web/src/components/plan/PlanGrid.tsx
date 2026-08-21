@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { PlanTimeBlock } from "@projelio/shared";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import {
   DRAG_BLOCK,
   DRAG_ITEM,
@@ -57,7 +57,7 @@ export default function PlanGrid({
   onMoveBlock,
   onDropItem,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const days = useMemo(() => eachDay(from, to), [from, to]);
   const { startHour, endHour } = useMemo(() => gridRange(blocks, dayStart, dayEnd), [blocks, dayStart, dayEnd]);
   const hours = useMemo(
@@ -172,7 +172,7 @@ function DayColumn({
   onMoveBlock,
   onDropItem,
 }: ColumnProps) {
-  const c = colors.light;
+  const c = useThemeColors();
   const bodyRef = useRef<HTMLDivElement>(null);
   const layout = useMemo(() => layoutColumns(blocks), [blocks]);
 
@@ -319,7 +319,7 @@ function DayColumn({
 
 /** "Şu an" çizgisi — bugünün sütununda nerede olduğunu gösterir. */
 function NowLine({ startHour, hours }: { startHour: number; hours: number[] }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const now = new Date();
   const minutes = now.getHours() * 60 + now.getMinutes();
   const top = ((minutes - startHour * 60) / 60) * HOUR_HEIGHT;
@@ -356,7 +356,7 @@ function BlockCard({
   onOpen: () => void;
   onToggleDone: () => void;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const { top, height } = blockGeometry(block, startHour);
   const accent = block.focusAreaColor ?? block.color ?? c.primary;
   const done = block.status === "done";

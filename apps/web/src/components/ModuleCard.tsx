@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { ModuleCatalogEntry } from "@projelio/shared";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconSparkle, IconX } from "./icons";
 
 interface Props {
@@ -23,7 +23,7 @@ interface Props {
 const CARD_HEIGHT = 128;
 
 export default function ModuleCard({ entry, departmentId, to, onClick, onRemove, removeDisabled }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const content = (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>

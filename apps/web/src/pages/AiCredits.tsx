@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { aiChat } from "../api/aiChat";
 import type { AiCredits as AiCreditsData, AiCreditTransaction } from "../api/aiChat";
 import { IconSparkle } from "../components/icons";
@@ -13,7 +13,7 @@ const TYPE_LABELS: Record<AiCreditTransaction["type"], string> = {
 };
 
 export default function AiCreditsPage() {
-  const c = colors.light;
+  const c = useThemeColors();
   const [credits, setCredits] = useState<AiCreditsData | null>(null);
   const [transactions, setTransactions] = useState<AiCreditTransaction[]>([]);
   const [loading, setLoading] = useState(true);

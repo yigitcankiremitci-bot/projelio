@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { DepartmentMember, JobMember, ModuleAccess, ModuleMember, ModuleMemberRole } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconX } from "./icons";
 
 // Kayıtların sahibi module_records ile aynı desende iki türlü olabilir: bir
@@ -40,7 +40,7 @@ function displayName(m: { fullName?: string; username?: string; email?: string; 
  * Bkz. database/migrations/042_module_members.sql
  */
 export default function ModuleTeamPanel({ organizationId, departmentId, jobId, moduleKey, access }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [members, setMembers] = useState<ModuleMember[]>([]);
   const [resolved, setResolved] = useState<ModuleAccess | undefined>(access);
   const [candidates, setCandidates] = useState<{ userId: string; label: string }[]>([]);

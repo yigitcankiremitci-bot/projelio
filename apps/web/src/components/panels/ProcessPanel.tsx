@@ -2,13 +2,14 @@ import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../../api/client";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import TaskColumn from "../TaskColumn";
 import TaskSelectionBar from "../TaskSelectionBar";
 import TaskSortMenu from "../TaskSortMenu";
 import MoveTaskModal from "../MoveTaskModal";
 import ConfirmDialog from "../ConfirmDialog";
 import { useTaskSelection } from "../../lib/useTaskSelection";
+import { selectedLioTasks } from "../../lib/askLio";
 import { sortTasks, type TaskSortMode } from "../../lib/taskSort";
 import { useUndo } from "../../lib/undo";
 
@@ -118,7 +119,7 @@ export default function ProcessPanel({
   onTasksArchived,
   onTasksDeleted,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const selection = useTaskSelection();
   const { pushUndo, pushDestructive } = useUndo();
   const [sort, setSort] = useState<TaskSortMode>("manual");
@@ -734,6 +735,7 @@ export default function ProcessPanel({
               onMove={() => setMovingOpen(true)}
               onArchive={() => setConfirmingBulkAction("archive")}
               onDelete={() => setConfirmingBulkAction("delete")}
+              lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
             />
           </div>
 

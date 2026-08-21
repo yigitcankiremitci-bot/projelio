@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Task, TaskStatus, User } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import TaskColumn, { TaskColumnHandle } from "./TaskColumn";
 import TaskEditModal from "./TaskEditModal";
 import TaskSelectionBar from "./TaskSelectionBar";
@@ -11,6 +11,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useTaskSelection } from "../lib/useTaskSelection";
+import { selectedLioTasks } from "../lib/askLio";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 
@@ -33,7 +34,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
   { departmentId },
   ref
 ) {
-  const c = colors.light;
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -302,6 +303,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
           onMove={() => setMovingOpen(true)}
           onArchive={() => setConfirmingBulkAction("archive")}
           onDelete={() => setConfirmingBulkAction("delete")}
+          lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
         />
       </div>
 
@@ -361,6 +363,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
               Hayır
             </button>
             <button
+              data-primary
               onClick={() => {
                 handleToggleComplete(parentCompletePrompt.id);
                 setParentCompletePrompt(null);

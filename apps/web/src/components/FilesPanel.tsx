@@ -1,10 +1,11 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { GoogleDriveStatus, ProjectFile } from "@projelio/shared";
 import { driveApi, filesApi, oneDriveApi, uploadFile } from "../api/files";
+import { useRefreshOnUndo } from "../lib/undo";
 import type { FileScope } from "../api/files";
 import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
 import { openGooglePicker } from "../lib/googlePicker";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { publishTaskAttachments } from "../lib/taskAttachmentEvents";
 import BrowseDriveModal from "./BrowseDriveModal";
 import ConfirmDialog from "./ConfirmDialog";
@@ -107,7 +108,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   },
   ref
 ) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [googleStatus, setGoogleStatus] = useState<GoogleDriveStatus | null>(null);
   const [msStatus, setMsStatus] = useState<GoogleDriveStatus | null>(null);
@@ -162,6 +163,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Aynı sayfadaki başka biri dosya eklediğinde/sildiğinde de tazelenir
+  // (bkz. lib/liveRoom.ts).
+  useRefreshOnUndo(load);
 
   // Kullanıcı iki sağlayıcıdan yalnızca birini bağlamış olabilir; yükleme
   // engeli ikisi de hazır değilse devreye girmeli (bkz. driveMissing).
@@ -566,7 +571,7 @@ function IconButton({
   onClick: () => void;
   children: React.ReactNode;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <button
       title={title}
@@ -591,7 +596,7 @@ function IconButton({
 }
 
 function DriveNotice({ google, microsoft }: { google: GoogleDriveStatus | null; microsoft: GoogleDriveStatus | null }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const needsReconnect = Boolean(google?.needsReconnect || microsoft?.needsReconnect);
   const message = needsReconnect
     ? "Bulut depolama erişiminiz sona ermiş. Dosya yüklemek için yeniden bağlanın."
@@ -602,6 +607,10 @@ function DriveNotice({ google, microsoft }: { google: GoogleDriveStatus | null; 
       style={{
         display: "flex",
         alignItems: "center",
+        // Dar ekranda (görev düzenleme modali telefonda) metin, iki ikon ile
+        // bağlantının arasında ~140 px'e sıkışıp dört satıra bölünüyordu.
+        // Sarma sayesinde bağlantı kendi satırına iner, metin genişler.
+        flexWrap: "wrap",
         gap: 10,
         padding: "12px 14px",
         borderRadius: 10,
@@ -612,7 +621,8 @@ function DriveNotice({ google, microsoft }: { google: GoogleDriveStatus | null; 
     >
       <IconGoogleDrive size={18} />
       <IconOneDrive size={18} />
-      <div style={{ flex: 1, fontSize: 15, color: c.textPrimary }}>{message}</div>
+      {/* 200 px'lik taban ölçü: metne bu kadar yer kalmıyorsa satır sarar. */}
+      <div style={{ flex: "1 1 200px", minWidth: 0, fontSize: 15, color: c.textPrimary }}>{message}</div>
       <a
         href="/settings"
         style={{ fontSize: 15, fontWeight: 500, color: c.primary, textDecoration: "none", whiteSpace: "nowrap" }}

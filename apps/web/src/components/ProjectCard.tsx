@@ -4,10 +4,11 @@ import { Link } from "react-router-dom";
 import type { Project, ProjectStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { resizeCoverImage } from "../lib/imageProcessing";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
 import { IconFolder, IconPlus } from "./icons";
 import StatusBadge from "./StatusBadge";
+import AskLioButton from "./AskLioButton";
 
 interface Props {
   project: Project;
@@ -35,7 +36,7 @@ const COVER_HEIGHT = 104;
 const CARD_HEIGHT = 280;
 
 export default function ProjectCard({ project, canManage, onStatusChanged }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [coverUrl, setCoverUrl] = useState(project.coverImageUrl);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
@@ -173,7 +174,10 @@ export default function ProjectCard({ project, canManage, onStatusChanged }: Pro
           >
             {project.title}
           </h3>
-          <StatusBadge status={project.status} onChange={canManage ? handleStatusChange : undefined} />
+          <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <StatusBadge status={project.status} onChange={canManage ? handleStatusChange : undefined} />
+            <AskLioButton subject={{ kind: "proje", title: project.title, id: project.id }} size={24} />
+          </span>
         </div>
         {project.description && (
           <CardDescription text={project.description} />

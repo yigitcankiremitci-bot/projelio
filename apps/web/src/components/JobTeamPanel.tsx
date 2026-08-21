@@ -1,9 +1,10 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { io } from "socket.io-client";
+
 import type { JobMember, Project, Task } from "@projelio/shared";
-import { api, API_URL } from "../api/client";
-import { colors } from "../theme/colors";
+import { api } from "../api/client";
+import { getSocket } from "../lib/liveRoom";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconPlus, IconChevronRight, IconCheck, IconActivity } from "./icons";
 import HireMemberModal from "./HireMemberModal";
 import CreateTaskModal from "./CreateTaskModal";
@@ -33,7 +34,7 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
   { jobId, jobTitle, tasks, projects, ownerId, onTasksReload },
   ref
 ) {
-  const c = colors.light;
+  const c = useThemeColors();
   const navigate = useNavigate();
   const [members, setMembers] = useState<JobMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,14 +58,17 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
   // Ekip üyelerinden biri "üzerinde çalışıyorum" durumunu değiştirdiğinde,
   // sayfa yenilenmeden bu panelde anlık görünmesi için soket üzerinden dinle.
   useEffect(() => {
-    const socket = io(API_URL, { transports: ["websocket"] });
-    socket.on("active-worker-changed", (payload: { userId: string; activeTaskId: string | null }) => {
+    // Uygulamanın tek soketi (bkz. lib/liveRoom.ts); kapatılmaz, dinleyici kalkar.
+    const socket = getSocket();
+    if (!socket) return;
+    const onChange = (payload: { userId: string; activeTaskId: string | null }) => {
       setMembers((prev) =>
         prev.map((m) => (m.userId === payload.userId ? { ...m, activeTaskId: payload.activeTaskId ?? undefined } : m))
       );
-    });
+    };
+    socket.on("active-worker-changed", onChange);
     return () => {
-      socket.disconnect();
+      socket.off("active-worker-changed", onChange);
     };
   }, []);
 

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ProjectStatus } from "@projelio/shared";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconCheck, IconChevronRight } from "./icons";
 // Etiketler, sıra ve renkler React'ten bağımsız bir dosyada: kontrastları test
 // edilebilsin diye (bkz. lib/projectStatus.test.ts).
@@ -30,7 +30,7 @@ const badgeStyle = (s: { bg: string; text: string }) => ({
 });
 
 export default function StatusBadge({ status, onChange }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const s = PROJECT_STATUS_STYLE[status];
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);

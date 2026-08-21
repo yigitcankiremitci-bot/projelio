@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { useSidebarHierarchy } from "../lib/useSidebarHierarchy";
 import { DEFAULT_HOME_TARGET, setHomeTarget, useHomeTarget, type HomeTarget } from "../lib/homeTarget";
@@ -46,7 +46,7 @@ interface Props {
  * (grup / şirket / departman / iş) kayıtlarıdır — yani sidebar ağacının aynısı.
  */
 export default function HomeTargetModal({ onClose }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const current = useHomeTarget();
   const { groups, standaloneOrgs, standaloneJobs, loading } = useSidebarHierarchy();
   const [query, setQuery] = useState("");

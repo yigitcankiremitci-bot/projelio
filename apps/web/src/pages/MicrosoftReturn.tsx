@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 
 /**
  * Microsoft/OneDrive akışından dönüş ekranı.
@@ -12,7 +12,7 @@ import { colors } from "../theme/colors";
  */
 export default function MicrosoftReturn() {
   const [params] = useSearchParams();
-  const c = colors.light;
+  const c = useThemeColors();
   const [error, setError] = useState("");
   // React 18 StrictMode geliştirmede effect'i iki kez çalıştırabilir.
   const handled = useRef(false);

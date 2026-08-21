@@ -1,5 +1,5 @@
 import type { OperationHealth, OperationStatus } from "@projelio/shared";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 
 // Rutinde "% tamamlandı" anlamsızdır (bitiş yok, payda sonsuz). Onun yerine
 // uyum oranından türeyen bir sağlık durumu gösterilir.
@@ -51,7 +51,7 @@ export function AdherenceDots({
   results: ("done" | "missed" | "skipped" | "pending")[];
   size?: number;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const tone: Record<string, string> = {
     done: c.accentDark,
     missed: c.danger,

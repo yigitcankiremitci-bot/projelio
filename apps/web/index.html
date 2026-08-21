@@ -9,6 +9,12 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
     <title>Projelio — Freelance Proje & Görev Yönetimi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600&display=swap"
+    />
     <script>
       // Ayarlar > Erişilebilirlik'te seçilen yazı boyutunu, sayfa boyanmadan
       // önce uygula (aksi halde küçük boyutla açılıp sonra büyüyen bir titreme
@@ -20,6 +26,25 @@
             v === "xsmall" ? 0.85 : v === "small" ? 0.92 : v === "large" ? 1.15 : v === "xlarge" ? 1.3 : 1;
           if (scale !== 1) {
             document.documentElement.style.zoom = String(scale);
+          }
+        } catch (e) {}
+      })();
+      // Karanlık mod seçiliyse temel yüzey renklerini boyamadan önce uygula
+      // (aksi halde açık zeminle açılıp sonra kararan bir titreme olur).
+      // Değerler packages/shared/src/theme.ts (colors.dark) ile senkron
+      // tutulmalı; anahtar adı src/theme/preferences.ts (THEME_MODE_KEY) ile.
+      (function () {
+        try {
+          if (localStorage.getItem("projelio_theme_mode") === "dark") {
+            var root = document.documentElement.style;
+            root.setProperty("--color-primary", "#8593A8");
+            root.setProperty("--color-primary-dark", "#3E4858");
+            root.setProperty("--color-background", "#12151B");
+            root.setProperty("--color-surface", "#1B2028");
+            root.setProperty("--color-text-primary", "#F1F3F5");
+            root.setProperty("--color-text-secondary", "#9AA2B0");
+            root.setProperty("--color-placeholder", "#9AA2B0");
+            root.setProperty("--color-border", "#2A3140");
           }
         } catch (e) {}
       })();

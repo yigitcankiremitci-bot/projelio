@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
+import { onRoomChanged } from "./liveRoom";
 
 /**
  * Uygulama geneli "geri al" (Cmd+Z / Ctrl+Z) ve "ileri al" (Shift+Cmd+Z / Ctrl+Y)
@@ -220,6 +221,41 @@ export function UndoProvider({ children }: { children: ReactNode }) {
   // Sunucu çağrısı bittikten SONRA tetiklenir: aksi halde listeler henüz geri
   // alınmamış veriyi çeker.
   const bumpRefresh = useCallback(() => setRefreshToken((v) => v + 1), []);
+
+  /**
+   * Aynı sayfadaki BAŞKA bir kullanıcı bir şey değiştirdiğinde de listeler
+   * tazelenir (bkz. lib/liveRoom.ts).
+   *
+   * Neden bu sayaç: "açık listeler kendini yenilesin" mekanizması uygulamada
+   * zaten vardı, geri/ileri alma için. Canlı sinyali de aynı yere bağlamak,
+   * useRefreshOnUndo kullanan her yüzeyi (görev panoları, çıktılar, departman
+   * listeleri, arşiv…) tek dokunuşla canlı hale getiriyor; her sayfaya ayrı bir
+   * abonelik yazmak yerine.
+   *
+   * Sinyaller kısa süre biriktirilir: bir kullanıcının sürükleyip bıraktığı
+   * görev arka arkaya birkaç istek üretiyor, karşı taraf tek sefer tazelesin.
+   */
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refreshWhenIdle = () => {
+      // Kullanıcı tam o sırada bir kartı sürüklüyorsa liste altından
+      // değiştirilmez: sürükleme yarıda kopar, bırakılan kart yanlış yere
+      // düşerdi. Bırakana kadar beklenir (bkz. lib/useSortableList.ts sınıfları).
+      if (document.querySelector(".sortable-drag, .sortable-ghost, .sortable-chosen")) {
+        timer = setTimeout(refreshWhenIdle, 500);
+        return;
+      }
+      bumpRefresh();
+    };
+    const off = onRoomChanged(() => {
+      clearTimeout(timer);
+      timer = setTimeout(refreshWhenIdle, 250);
+    });
+    return () => {
+      clearTimeout(timer);
+      off();
+    };
+  }, [bumpRefresh]);
 
   const clearToastTimers = useCallback(() => {
     if (toastTimer.current) {

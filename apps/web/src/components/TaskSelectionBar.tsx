@@ -1,6 +1,10 @@
 import type { CSSProperties, ReactNode } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconArchive, IconCheck, IconCopy, IconMove, IconTrash, IconX } from "./icons";
+import { LioMascotIcon } from "./AskLioButton";
+import { askLioAboutMany } from "../lib/askLio";
+import type { LioSubject } from "../lib/askLio";
+import { useAppPrefs } from "../lib/appPrefs";
 
 interface Props {
   selectionMode: boolean;
@@ -19,6 +23,15 @@ interface Props {
   onMove?: () => void;
   onArchive?: () => void;
   onDelete?: () => void;
+  /**
+   * O an seçili görevler. Verilirse eylemlerin arasına "Lio'ya sor" düğmesi
+   * girer ve seçilenlerin tamamı tek mesajda Lio'ya aktarılır
+   * (bkz. lib/askLio.ts selectedLioTasks / askLioAboutMany).
+   *
+   * Diğer eylemlerin aksine burada onay modalı yok: sohbet kutusuna bir taslak
+   * yazılır, hiçbir şey değişmez — göndermeye kullanıcı karar verir.
+   */
+  lioTasks?: LioSubject[];
   /**
    * Panolardaki tek satırlık araç çubuğunun (ve kaydırınca beliren sabit
    * şeridin) içine yerleşmek için.
@@ -50,9 +63,11 @@ export default function TaskSelectionBar({
   onMove,
   onArchive,
   onDelete,
+  lioTasks,
   inline,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
+  const { showLio } = useAppPrefs();
 
   if (!selectionMode) {
     const enableButton = (
@@ -130,6 +145,17 @@ export default function TaskSelectionBar({
 
   const iconSize = inline ? 15 : 14;
   const actions = [
+    // Lio ilk sırada: tek "okuma" eylemi, geri kalanların hepsi veriyi değiştiriyor.
+    // Lio gizliyken çizilmez (bkz. AskLioButton — dinleyen panel mount edilmiyor).
+    showLio &&
+      lioTasks &&
+      actionButton(
+        "lio",
+        "Lio'ya sor",
+        "Seçilenleri Lio'ya sor",
+        <LioMascotIcon size={iconSize + 2} />,
+        () => askLioAboutMany(lioTasks)
+      ),
     onDuplicate &&
       actionButton("dup", "Çoğalt", "Seçilenleri çoğalt", <IconCopy size={iconSize} color={c.textSecondary} />, onDuplicate),
     onMove &&

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { BudgetOverview, BudgetTransaction, RecurringPayment } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useRefreshOnUndo } from "../lib/undo";
+import { useThemeColors } from "../theme/useThemeColors";
 import AddBudgetEntryModal from "./AddBudgetEntryModal";
 import AddRecurringPaymentModal from "./AddRecurringPaymentModal";
 import { useUndo } from "../lib/undo";
@@ -29,7 +30,7 @@ const typeLabels: Record<string, string> = {
 };
 
 export default function BudgetPanel() {
-  const c = colors.light;
+  const c = useThemeColors();
   const [overview, setOverview] = useState<BudgetOverview | null>(null);
   const [transactions, setTransactions] = useState<BudgetTransaction[]>([]);
   const [recurring, setRecurring] = useState<RecurringPayment[]>([]);
@@ -46,6 +47,8 @@ export default function BudgetPanel() {
   };
 
   useEffect(reload, []);
+  // Aynı sayfadaki başka biri değiştirdiğinde de tazelenir (bkz. lib/liveRoom.ts).
+  useRefreshOnUndo(reload);
 
   // Silme hemen sunucuya gitmez: satır listeden düşürülür, gerçek DELETE birkaç
   // saniye sonra atılır; bu pencerede Cmd/Ctrl+Z basılırsa istek hiç gönderilmez.
@@ -403,7 +406,7 @@ function SummaryCard({
   color: string;
   hint?: string;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: "14px 16px" }}>
       <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 6 }}>{label}</div>

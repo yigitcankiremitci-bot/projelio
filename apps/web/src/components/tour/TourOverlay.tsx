@@ -9,7 +9,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { useTour } from "../../lib/tour/TourContext";
 import type { TourPlacement } from "../../lib/tour/types";
@@ -100,7 +100,7 @@ function placeBubble(
 }
 
 export default function TourOverlay() {
-  const c = colors.light;
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const {
     tour,

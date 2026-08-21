@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Job, Operation, Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
+import { useLiveRoom } from "../lib/liveRoom";
 import ProjectCard from "../components/ProjectCard";
 import OperationCard from "../components/OperationCard";
 import CreateOperationModal from "../components/CreateOperationModal";
@@ -11,14 +12,14 @@ import { useCurrentUser, useIsSubcontractor } from "../lib/useCurrentUser";
 import JobModulesPanel, { JobModulesPanelHandle } from "../components/JobModulesPanel";
 import JobTeamPanel, { JobTeamPanelHandle } from "../components/JobTeamPanel";
 import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
-import { coverText } from "../lib/covers";
+import { useCoverTheme } from "../theme/useCoverTheme";
 import JobInviteBanner from "../components/JobInviteBanner";
 import JobTasksPanel, { JobTasksPanelHandle } from "../components/JobTasksPanel";
 import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
 import TodayCompletedPanel from "../components/TodayCompletedPanel";
 import TaskEditModal from "../components/TaskEditModal";
 import Modal from "../components/Modal";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
@@ -30,8 +31,11 @@ import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
 
 export default function JobDetail() {
   const { id } = useParams();
+  // Aynı sayfadaki kullanıcılar: canlı tazeleme + "kim burada" (bkz. lib/liveRoom.ts).
+  useLiveRoom(id ? `job:${id}` : null);
   const navigate = useNavigate();
-  const c = colors.light;
+  const c = useThemeColors();
+  const cover = useCoverTheme();
   const isDesktop = useIsDesktop();
   // Sayfanın yan boşluğu tek bir yerden: aşağıdaki negatif kenar boşluklu
   // şerit de bu değeri kullanmalı, yoksa dar ekranda hizalar kayar.
@@ -369,18 +373,19 @@ export default function JobDetail() {
         // ve fazlası sayfayı aşağı itiyordu. Dar ekran tavanı EntityCover'da.
         height={260}
         title={job?.title ?? "…"}
+        lioSubject={job ? { kind: "is", title: job.title, id: job.id } : undefined}
         description={job?.description}
         meta={
           job && (
             <>
               {job.ownerName && (
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <IconUser size={12} color={coverText.secondary} />
+                  <IconUser size={12} color={cover.secondary} />
                   {job.ownerName}
                 </span>
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <IconCalendar size={12} color={coverText.secondary} />
+                <IconCalendar size={12} color={cover.secondary} />
                 {new Date(job.createdAt).toLocaleDateString("tr-TR")} kuruldu
               </span>
             </>
@@ -629,6 +634,7 @@ export default function JobDetail() {
               Hayır
             </button>
             <button
+              data-primary
               onClick={() => {
                 handleToggleComplete(parentCompletePrompt.id);
                 setParentCompletePrompt(null);

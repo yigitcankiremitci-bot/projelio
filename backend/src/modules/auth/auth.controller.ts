@@ -39,6 +39,23 @@ export class AuthController {
     return this.authService.me(req.user.userId);
   }
 
+  /**
+   * Oturumu uzatır: geçerli bir token'ı, ömrü baştan başlayan yenisiyle değiştirir.
+   *
+   * Ön yüz bunu uygulama her açıldığında çağırır (bkz. apps/web/src/lib/session.ts).
+   * Böylece token "kayan" hale gelir — uygulamayı JWT_EXPIRES_IN aralığında bir kez
+   * bile açan kullanıcı bir daha giriş ekranına düşmez; yalnızca o süre boyunca hiç
+   * açmayan birinin oturumu kapanır.
+   *
+   * Guard'lı olduğu için süresi DOLMUŞ token'la çağrılırsa 401 döner; ön yüz de
+   * normal oturum sonlanma akışına girer (bkz. client.ts handleExpiredSession).
+   */
+  @Post("refresh")
+  @UseGuards(AuthGuard("jwt"))
+  refresh(@Req() req: any) {
+    return this.authService.signToken(req.user.userId, req.user.email, req.user.role);
+  }
+
   // Yanıt her zaman aynı genel mesajdır — hesabın var olup olmadığını sızdırmamak
   // için (bkz. PasswordResetService.requestReset).
   @Post("forgot-password")

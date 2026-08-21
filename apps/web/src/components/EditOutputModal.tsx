@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Output } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 
@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function EditOutputModal({ output, onClose, onSaved, onDeleted, onArchived }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [title, setTitle] = useState(output.title);
   const [description, setDescription] = useState(output.description ?? "");
   const [error, setError] = useState("");

@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import * as bcrypt from "bcrypt";
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { detectImageUpload } from "../../common/upload-image.util";
@@ -298,6 +299,52 @@ export class UsersService {
     if (error) throw error;
     if (!row) throw new ConflictException("Kullanıcı bulunamadı");
     return toPublicUser(mapUser(row));
+  }
+
+  /**
+   * Ayarlar > Hesap'tan şifre değiştirme.
+   *
+   * İki durum var ve ikisi de geçerli:
+   *  1. Şifresi olan hesap — mevcut şifre doğrulanmadan değişiklik yapılmaz.
+   *     (Oturum çalınmışsa saldırgan şifreyi tek başına değiştirip hesabı
+   *     ele geçirmesin diye; JWT'ye sahip olmak yetmez.)
+   *  2. Google ile açılmış, password_hash'i null hesap — burada "mevcut şifre"
+   *     diye bir şey yok, kullanıcı ilk kez şifre belirler ve böylece
+   *     e-posta+şifre ile de girebilir hale gelir.
+   *
+   * Şifre sıfırlama (unutanlar) ayrı bir akış: bkz. password-reset.service.ts.
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string | undefined,
+    newPassword: string
+  ): Promise<{ ok: true; hasPassword: true }> {
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      throw new BadRequestException("Yeni şifre en az 8 karakter olmalı.");
+    }
+
+    const user = await this.findById(userId);
+    if (!user) throw new ConflictException("Kullanıcı bulunamadı");
+
+    if (user.passwordHash) {
+      if (!currentPassword) throw new BadRequestException("Mevcut şifreni gir.");
+      if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+        throw new BadRequestException("Mevcut şifre hatalı.");
+      }
+      if (await bcrypt.compare(newPassword, user.passwordHash)) {
+        throw new BadRequestException("Yeni şifre eskisiyle aynı olamaz.");
+      }
+    }
+
+    // Tur sayısı kayıt akışıyla aynı olmalı (bkz. auth.service register).
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const { error } = await this.supabase.client
+      .from("users")
+      .update({ password_hash: passwordHash })
+      .eq("id", userId);
+    if (error) throw error;
+
+    return { ok: true, hasPassword: true };
   }
 
   async uploadAvatar(userId: string, file: Express.Multer.File): Promise<PublicUser> {

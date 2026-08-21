@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { PlanRitualPrompt } from "@projelio/shared";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import { planning } from "../../api/planning";
 import { askLio } from "../../lib/askLio";
 
@@ -34,7 +34,7 @@ const KIND_INTRO: Record<string, string> = {
  * ancak reddedilebilir olduğunda kurulur.
  */
 export default function RitualCard({ ritual, onDone }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [busy, setBusy] = useState(false);
 
   const skip = async () => {

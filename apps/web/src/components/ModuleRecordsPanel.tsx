@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ModuleRecord, Task } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import type { ModuleFieldConfig, ModuleRecordConfig } from "../lib/moduleRecordConfigs";
 import { isReferenceValue } from "../lib/moduleRecordConfigs";
 import { hasDynamicFields, toDisplayData, useModuleReferences } from "../lib/moduleReferences";
@@ -91,7 +91,7 @@ export default function ModuleRecordsPanel({
   config,
   canWrite = true,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [records, setRecords] = useState<ModuleRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [formMode, setFormMode] = useState<FormMode>(null);
@@ -586,6 +586,7 @@ export default function ModuleRecordsPanel({
           {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             <button
+              data-primary
               onClick={handleSave}
               disabled={saving}
               style={{
@@ -706,7 +707,7 @@ function BoardColumn({
   onDrop: (recordId: string, value: string) => void;
   children: React.ReactNode;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const listRef = useRef<HTMLDivElement>(null);
 
   useSortableList(

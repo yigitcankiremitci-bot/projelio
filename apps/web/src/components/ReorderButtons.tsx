@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconChevronUp, IconChevronDown } from "./icons";
 
 interface Props {
@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default function ReorderButtons({ isFirst, isLast, onMoveUp, onMoveDown, background, iconColor }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const color = iconColor ?? c.textPrimary;
 
   const btnStyle = (disabled: boolean): CSSProperties => ({

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { getModuleRecordConfig } from "../lib/moduleRecordConfigs";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import MailboxPanel from "./MailboxPanel";
 import ModuleRecordsPanel from "./ModuleRecordsPanel";
 
@@ -40,7 +40,7 @@ export default function EmailModulePanel({
   moduleName,
   canWrite = true,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [tab, setTab] = useState<Tab>("inbox");
 
   const tabButton = (value: Tab, label: string) => (

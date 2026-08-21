@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Product } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 
@@ -26,7 +26,7 @@ export default function AddEditProductModal({
   onArchived,
   onDeleted,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const isEdit = !!product;
   const [name, setName] = useState(product?.name ?? "");
   const [description, setDescription] = useState(product?.description ?? "");

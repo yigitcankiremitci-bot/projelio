@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Department, ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
@@ -16,7 +16,7 @@ interface Props {
 // olmayan modülleri listelenir — DepartmentModulesPanel.AddModulesForm ile aynı
 // ekleme mantığı, tek farkla: departman seçimi burada ek bir adım.
 export default function AddModuleModal({ organizationId, onClose, onAdded }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [enabledKeys, setEnabledKeys] = useState<Set<string>>(new Set());
   const [loadingDepts, setLoadingDepts] = useState(true);
@@ -135,6 +135,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded }: Pro
         {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
 
         <button
+          data-primary
           onClick={handleSave}
           disabled={saving || !departmentId || selectedKeys.length === 0}
           style={{

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { ArchiveSummary, ArchivedTaskEntry } from "@projelio/shared";
+import type { ArchiveSummary, ArchivedTaskEntry, ThemeColors } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useRefreshOnUndo, useUndo } from "../lib/undo";
 import { IconArchive, IconRestore, IconTrash } from "../components/icons";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -97,7 +97,7 @@ function buildGroups(data: ArchiveSummary): JobGroup[] {
 }
 
 export default function Archive() {
-  const c = colors.light;
+  const c = useThemeColors();
   const [data, setData] = useState<ArchiveSummary | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ kind: EntityKind; id: string; title: string } | null>(null);
@@ -318,7 +318,7 @@ function Row({
   restoring: boolean;
   onRestore?: () => void;
   onRequestDelete?: () => void;
-  c: (typeof colors)["light"];
+  c: ThemeColors;
   titleSize?: number;
 }) {
   return (

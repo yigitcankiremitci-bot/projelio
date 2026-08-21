@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ProjectMember, Task } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconCheck } from "./icons";
 import { isAssignedTo } from "../lib/taskAssignees";
@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function TeamMemberModal({ member, tasks, onClose, onTaskUpdated }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const toggle = async (task: Task) => {

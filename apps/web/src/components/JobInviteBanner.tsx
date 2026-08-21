@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { JobMember } from "@projelio/shared";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { fetchPendingJobInvites, onJobInvitesChanged, respondToJobInvite } from "../lib/jobInvites";
 
 /**
@@ -11,7 +11,7 @@ import { fetchPendingJobInvites, onJobInvitesChanged, respondToJobInvite } from 
  * Bekleyen daveti yoksa hiçbir şey render etmez.
  */
 export default function JobInviteBanner({ jobId }: { jobId: string }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [invite, setInvite] = useState<JobMember | null>(null);
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState<"approved" | "rejected" | null>(null);

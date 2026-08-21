@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { PlanFocusArea, PlanTimeBlock } from "@projelio/shared";
 import Modal from "../Modal";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import { planning, type PlanBlockInput } from "../../api/planning";
 import { formatDuration, timeToMinutes } from "../../lib/planGrid";
 import { inputStyle, labelStyle, primaryButton, secondaryButton } from "./PlanTargetsModal";
@@ -24,7 +24,7 @@ interface Props {
  * kutuyu kaldırırken "işim de gitti mi?" diye tereddüt etmemeli.
  */
 export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSaved }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const editing = Boolean(block);
 
   const [blockDate, setBlockDate] = useState(block?.blockDate ?? draft?.blockDate ?? "");
@@ -161,6 +161,7 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
             Vazgeç
           </button>
           <button onClick={save} disabled={saving} style={primaryButton(c, saving)}>
+            data-primary
             {saving ? "Kaydediliyor…" : "Kaydet"}
           </button>
         </div>

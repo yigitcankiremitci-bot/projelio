@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { AccountType, DepartmentCatalogEntry, OrgType } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
+import { onEnter } from "../lib/enterAction";
 import { IconUser, IconBuilding, IconLayers, IconCheck, IconShield, IconChevronRight } from "./icons";
 
 interface Props {
@@ -54,7 +55,7 @@ const ORG_TYPE_OPTIONS: { type: OrgType; title: string; description: string }[] 
 // "Bir şirket/işletme yönetiyorum" seçilirse ikinci bir adıma geçilir: şirket kurulurken
 // departmanlar da doğrudan burada seçilebilir (Doküman 1'deki kurulum sihirbazı akışı).
 export default function OnboardingWizard({ onCompleted }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2>(1);
   const [selected, setSelected] = useState<AccountType | null>(null);
@@ -219,6 +220,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  onKeyDown={onEnter(() => selected && !loading && void handleContinue())}
                   placeholder={selected === "organization_owner" ? "Örn. Acme Yazılım A.Ş." : "Örn. Acme Holding"}
                   style={{ width: "100%" }}
                   autoFocus
@@ -316,6 +318,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
               <input
                 value={customDept}
                 onChange={(e) => setCustomDept(e.target.value)}
+                onKeyDown={onEnter(() => !loading && void finish())}
                 placeholder="Örn. Ar-Ge"
                 style={{ width: "100%" }}
               />

@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { JobModule, ModuleCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { isOpenableModule } from "../lib/entityModules";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
 import { moduleSurface } from "../lib/moduleSurfaces";
@@ -35,7 +35,7 @@ export interface JobModulesPanelHandle {
 }
 
 const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobModulesPanel({ jobId }, ref) {
-  const c = colors.light;
+  const c = useThemeColors();
   const navigate = useNavigate();
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
   const [assigned, setAssigned] = useState<JobModule[]>([]);

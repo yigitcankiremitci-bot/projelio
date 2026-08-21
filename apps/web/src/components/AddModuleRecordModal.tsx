@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Department } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
 import Modal from "./Modal";
 
@@ -38,7 +38,7 @@ export default function AddModuleRecordModal({
   onClose,
   onSaved,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const config = MODULE_RECORD_CONFIGS[moduleKey];
   const [departmentId, setDepartmentId] = useState("");
   const [form, setForm] = useState<Record<string, string>>(() => {
@@ -142,6 +142,7 @@ export default function AddModuleRecordModal({
         {error && <p style={{ color: c.danger, fontSize: 15, margin: 0 }}>{error}</p>}
 
         <button
+          data-primary
           onClick={handleSave}
           disabled={saving}
           style={{

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function CreateGroupModal({ onClose, onCreated }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");

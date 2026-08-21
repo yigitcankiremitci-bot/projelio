@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PersonalBoardItem, SchedulableTask } from "@projelio/shared";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import { planning } from "../../api/planning";
 import { DRAG_ITEM, shortDayLabel, type DraggedItem } from "../../lib/planGrid";
 
@@ -28,7 +28,7 @@ type Tab = "mine" | "projects";
  * cevaplıyor.
  */
 export default function SchedulePickerPanel({ unscheduled }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [tab, setTab] = useState<Tab>("mine");
   const [query, setQuery] = useState("");
   const [tasks, setTasks] = useState<SchedulableTask[] | null>(null);
@@ -97,7 +97,7 @@ function TabButton({
   label: string;
   count?: number;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <button
       onClick={onClick}
@@ -119,7 +119,7 @@ function TabButton({
 }
 
 function MineList({ items }: { items: PersonalBoardItem[] }) {
-  const c = colors.light;
+  const c = useThemeColors();
 
   if (items.length === 0) {
     return (
@@ -165,7 +165,7 @@ function ProjectTaskList({
   query: string;
   onQueryChange: (v: string) => void;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Görevler işe göre gruplanıyor: "Pist Prodüksiyon" altında hangi projelerin
@@ -266,7 +266,7 @@ function DraggableCard({
   title: string;
   meta: (string | undefined)[];
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const line = meta.filter(Boolean).join(" · ");
 
   return (

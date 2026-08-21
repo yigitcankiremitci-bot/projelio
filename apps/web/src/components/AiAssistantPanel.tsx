@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconSparkle, IconX, IconPlus, IconTrash, IconSend } from "./icons";
 import { aiChat } from "../api/aiChat";
 import type { AiConversation, AiCredits, AiStoredMessage } from "../api/aiChat";
@@ -15,7 +15,13 @@ interface Props {
    * başlatır; kullanıcı ayrıca "gönder"e basmak zorunda kalmaz.
    */
   initialMessage?: string | null;
-  /** Mesaj gönderildikten sonra çağrılır; aksi halde her açılışta tekrar giderdi. */
+  /**
+   * false ise mesaj gönderilmez, yalnızca yazı kutusuna yazılır ve odak oraya
+   * gider — kullanıcı okuyup düzenleyebilsin, göndermeye kendisi karar versin
+   * (bkz. lib/askLio.ts askLioDraft). Kartlardaki Lio simgeleri böyle çalışır.
+   */
+  initialAutoSend?: boolean;
+  /** Mesaj işlendikten sonra çağrılır; aksi halde her açılışta tekrar gelirdi. */
   onInitialMessageSent?: () => void;
 }
 
@@ -42,8 +48,14 @@ const SUGGESTIONS = [
 const GREETING =
   "Merhaba! Ben Lio. Projelerini, görevlerini ve bütçeni buradan yönetebilirsin — yazman yeterli.";
 
-export default function AiAssistantPanel({ open, onClose, initialMessage, onInitialMessageSent }: Props) {
-  const c = colors.light;
+export default function AiAssistantPanel({
+  open,
+  onClose,
+  initialMessage,
+  initialAutoSend = true,
+  onInitialMessageSent,
+}: Props) {
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
 
   const [conversations, setConversations] = useState<AiConversation[]>([]);
@@ -73,7 +85,20 @@ export default function AiAssistantPanel({ open, onClose, initialMessage, onInit
     refreshCredits();
     aiChat
       .listConversations()
-      .then(setConversations)
+      .then((list) => {
+        setConversations(list);
+        // KALDIĞI YERDEN DEVAM. Panel her açılışta boş bir sohbetle başlıyordu;
+        // mesajlar veritabanında duruyor olsa da kullanıcı için Lio "her şeyi
+        // unutmuş" görünüyordu (özellikle sayfa yenilendikten sonra, çünkü
+        // panelin state'i bellekte).
+        //
+        // Yalnızca ortada bir şey YOKKEN yapılır: açık bir sohbet ya da
+        // yazılmış mesajlar varsa onların üstüne yazmak, kullanıcının o an
+        // baktığı konuşmayı elinden almak olurdu. Bekleyen bir açılış mesajı
+        // varsa da karışılmaz — o akış sohbeti kendisi kuruyor (aşağıya bkz.).
+        if (activeId || messages.length > 0 || initialMessage || list.length === 0) return;
+        void openConversation(list[0].id);
+      })
       .catch(() => {});
     setTimeout(() => inputRef.current?.focus(), 80);
   }, [open, refreshCredits]);
@@ -176,7 +201,11 @@ export default function AiAssistantPanel({ open, onClose, initialMessage, onInit
   };
 
   /**
-   * Dışarıdan gelen açılış mesajını gönderir (bkz. lib/askLio.ts).
+   * Dışarıdan gelen açılış mesajını işler (bkz. lib/askLio.ts).
+   *
+   * İki kip var: gönder (Takvim'in "Lio ile planla"sı gibi niyeti net düğmeler)
+   * ve taslak (kartlardaki Lio simgeleri — cümle kutuya yazılır, kullanıcı
+   * düzenleyip gönderir).
    *
    * `sentInitialRef` React 18'in geliştirme modundaki çift render'ına karşı:
    * o olmadan aynı mesaj iki kez gidip kullanıcıdan iki kez kredi düşerdi.
@@ -186,14 +215,30 @@ export default function AiAssistantPanel({ open, onClose, initialMessage, onInit
     if (!open || !initialMessage || sending) return;
     if (sentInitialRef.current === initialMessage) return;
     sentInitialRef.current = initialMessage;
-    // Yeni bir soru her zaman temiz bir sohbette başlar: takvim planlaması,
-    // yarım kalmış bir bütçe konuşmasının altına eklenmemeli.
-    setActiveId(null);
-    setMessages([]);
-    void send(initialMessage);
+    if (initialAutoSend) {
+      // GÖNDER kipi temiz bir sohbette başlar: takvim planlaması, yarım kalmış
+      // bir bütçe konuşmasının altına eklenmemeli.
+      setActiveId(null);
+      setMessages([]);
+      void send(initialMessage);
+    } else {
+      // TASLAK kipinde sohbet SIFIRLANMAZ. Burada henüz bir şey gönderilmiyor,
+      // yalnızca kutuya cümle yazılıyor; açık konuşmayı silmek, kullanıcının
+      // bir karttaki Lio simgesine dokunmasının bedelini "o ana kadarki
+      // sohbeti kaybetmek" yapardı. Konu değiştirmek isteyen zaten "Yeni
+      // sohbet"e basabiliyor.
+      setInput(initialMessage);
+      // Odak kutuya: kullanıcı cümleyi hemen düzenlemeye başlayabilsin. Panel
+      // açılış animasyonu bitmeden odaklamak bazı tarayıcılarda çalışmıyor.
+      setTimeout(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      }, 80);
+    }
     onInitialMessageSent?.();
     // `send` her render'da yeniden oluşuyor; bağımlılığa eklemek döngü yapar.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialMessage]);
 
   const handleConfirmAction = async () => {
@@ -422,33 +467,29 @@ export default function AiAssistantPanel({ open, onClose, initialMessage, onInit
         {/* Yazma alanı */}
         <div style={{ padding: 14, borderTop: `1px solid ${c.border}`, flexShrink: 0 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void send(input);
-                }
-              }}
-              rows={1}
-              placeholder="Ne yapmak istersin?"
-              disabled={sending}
-              style={{
-                flex: 1,
-                resize: "none",
-                maxHeight: 120,
-                padding: "11px 13px",
-                borderRadius: 12,
-                border: `1px solid ${c.border}`,
-                fontSize: 14,
-                fontFamily: "inherit",
-                lineHeight: 1.45,
-                color: c.textPrimary,
-                background: c.background,
-              }}
-            />
+            {/* Yükseklik JS ile ölçülmüyor: sarmalayıcı bir ızgara ve metnin
+                görünmez bir kopyası textarea ile aynı gözü paylaşıyor
+                (bkz. index.css .autogrow / .autogrow-chat). Kutu üç satır
+                yüksekliğinde başlar, yazdıkça büyür, tavana varınca kaydırır. */}
+            <div className="autogrow autogrow-chat" data-replica={input} style={{ flex: 1, minWidth: 0, fontSize: 14 }}>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter gönderir, Shift+Enter yeni satır açar — mesaj kutusu
+                  // olduğu için satır atlamak gerçekten gerekiyor.
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void send(input);
+                  }
+                }}
+                rows={1}
+                placeholder="Ne yapmak istersin?"
+                disabled={sending}
+                style={{ color: c.textPrimary }}
+              />
+            </div>
             <button
               onClick={() => void send(input)}
               disabled={sending || !input.trim()}
@@ -547,7 +588,7 @@ function Bubble({
   text: string;
   credits?: number;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const isUser = role === "user";
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start" }}>

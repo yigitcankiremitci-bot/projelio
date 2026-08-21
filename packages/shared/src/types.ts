@@ -54,6 +54,11 @@ export interface User {
   // Kullanıcının kendi profilinde gösterdiği görev/unvan (örn. "Serbest Grafik Tasarımcı").
   title?: string;
   bio?: string;
+  // Hesabın bir şifresi var mı. Google ile açılan hesaplarda password_hash null
+  // kalabiliyor (bkz. users.service createFromGoogle); Ayarlar > Hesap orada
+  // "mevcut şifre" sormak yerine ilk kez şifre belirletir. Şifrenin kendisi
+  // hiçbir zaman istemciye gitmez, yalnızca bu bayrak.
+  hasPassword?: boolean;
 }
 
 export interface Job {
@@ -1067,7 +1072,10 @@ export interface NotificationPayload {
     // Zamanlanmış sosyal medya yayınının sonucu. Yalnızca OTOMATİK yayında
     // gönderilir: kullanıcı "Şimdi paylaş" dediyse sonucu zaten ekranda görür.
     | "social_post_published"
-    | "social_post_failed";
+    | "social_post_failed"
+    // Destek talebi yanıtlandı. Bildirim çanı bu tipi görünce sayfaya
+    // yönlendirmek yerine yanıtı bir modalda açar (bkz. NotificationBell).
+    | "support_reply";
   title: string;
   body: string;
   link?: string;
@@ -1814,4 +1822,59 @@ export interface MailListPage {
   messages: MailMessage[];
   /** Daha fazlası var mı — sayfalama için. */
   hasMore: boolean;
+}
+
+// ---------------------------------------------------------------- Canlı işbirliği
+
+/**
+ * Aynı sayfada (odada) bulunan bir kişi. Sunucu tarafında oda üyeliğinden
+ * türetilir (bkz. backend realtime.gateway.ts); aynı kişinin iki sekmesi tek
+ * kayıt olarak gelir.
+ */
+export interface PresenceUser {
+  userId: string;
+  fullName?: string;
+  avatarUrl?: string;
+}
+
+/** Odadaki kişilerin güncel listesi; her katılma/ayrılmada yeniden yayılır. */
+export interface RoomPresencePayload {
+  room: string;
+  users: PresenceUser[];
+}
+
+/**
+ * "Bu sayfada bir şey değişti" sinyali. Neyin değiştiği KASITLI olarak
+ * taşınmıyor: sayfa kendi verisini yeniden çekiyor, böylece sunucunun kaynak
+ * türünü bilmesi gerekmiyor (bkz. RealtimeChangeInterceptor). `method`/`path`
+ * yalnızca teşhis ve ileride ince ayar için.
+ */
+export interface RoomChangedPayload {
+  room: string;
+  /** Değişikliği yapan kullanıcı; kendi sekmesine sinyal gitmez. */
+  actorId: string;
+  method: string;
+  path: string;
+}
+
+/**
+ * Destek talebi — Ayarlar > Destek'ten bırakılır, admin panosunda yanıtlanır
+ * (bkz. 065_destek_talepleri.sql).
+ *
+ * Sohbet değil: bir talep, bir yanıt. `reply` doluysa talep yanıtlanmıştır.
+ */
+export interface SupportRequest {
+  id: string;
+  userId: string;
+  /** Formda yazılan ad — kimin yazdığının kaynağı user_id'dir, bu alan değil. */
+  name: string;
+  subject: string;
+  message: string;
+  status: "open" | "answered";
+  reply?: string;
+  repliedAt?: string;
+  createdAt: string;
+  /** Panoda gösterilir: talebi bırakanın hesabı (sunucu ekler). */
+  userFullName?: string;
+  userEmail?: string;
 }

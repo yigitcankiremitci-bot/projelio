@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MailAccount, MailFolder, MailMessage, MailMessageDetail } from "@projelio/shared";
 import { mailboxApi, type MailScope } from "../api/mailbox";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import MailMessageModal from "./MailMessageModal";
 import { IconTrash } from "./icons";
 
@@ -38,7 +38,7 @@ function formatDate(iso: string): string {
  * sekmede açılır.
  */
 export default function MailboxPanel({ organizationId, departmentId, jobId, canWrite = true }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const scope: MailScope = useMemo(
     () => (jobId ? { jobId } : { organizationId: organizationId as string, departmentId }),
     [jobId, organizationId, departmentId]
@@ -469,7 +469,7 @@ function Banner({
   banner: { kind: "ok" | "error"; text: string };
   onClose: () => void;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div
       style={{

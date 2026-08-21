@@ -1,7 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { BudgetTransaction, BudgetTransactionType, Task, TaskBudgetStatus } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useRefreshOnUndo } from "../lib/undo";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useUndo } from "../lib/undo";
 import { IconEdit, IconTrash } from "./icons";
 
@@ -30,7 +31,7 @@ function fmtMoney(amount: number): string {
 }
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div
       style={{
@@ -62,7 +63,7 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
   { departmentId },
   ref
 ) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [transactions, setTransactions] = useState<BudgetTransaction[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +98,8 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
   };
 
   useEffect(load, [departmentId]);
+  // Aynı sayfadaki başka biri değiştirdiğinde de tazelenir (bkz. lib/liveRoom.ts).
+  useRefreshOnUndo(load);
 
   const resetForm = () => {
     setType("expense");

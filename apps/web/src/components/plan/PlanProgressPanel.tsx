@@ -1,5 +1,5 @@
 import type { PlanPeriodProgress } from "@projelio/shared";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import { formatDuration } from "../../lib/planGrid";
 
 interface Props {
@@ -20,7 +20,7 @@ interface Props {
  * çok planlayıp yarısını yapan biri aynı skoru alırdı ve rakam anlamsızlaşırdı.
  */
 export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const rows = progress.rows;
   const hasTargets = rows.some((r) => r.sharePct != null || r.targetMinutes != null || r.targetCount != null);
 
@@ -133,7 +133,7 @@ export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount
 }
 
 function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div
       style={{
@@ -169,7 +169,7 @@ function Bar({
   color: string;
   muted?: boolean;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 3 }}>
       <span style={{ fontSize: 10, color: c.textSecondary, width: 52, flexShrink: 0 }}>{label}</span>
@@ -206,7 +206,7 @@ function Bar({
 }
 
 function CountButton({ onClick, label }: { onClick: () => void; label: string }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <button
       onClick={onClick}

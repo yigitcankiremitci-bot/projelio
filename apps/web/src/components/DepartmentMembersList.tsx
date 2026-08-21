@@ -1,8 +1,9 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { io, Socket } from "socket.io-client";
+
 import type { DepartmentMember, DepartmentMemberRole, NotificationPayload, User } from "@projelio/shared";
-import { api, API_URL } from "../api/client";
-import { colors } from "../theme/colors";
+import { api } from "../api/client";
+import { getSocket } from "../lib/liveRoom";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconTrash } from "./icons";
 
 export interface DepartmentMembersListHandle {
@@ -37,7 +38,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
   { departmentId, onChanged },
   ref
 ) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [members, setMembers] = useState<DepartmentMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState(false);
@@ -74,15 +75,16 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
     if (!currentUserId) return;
     const token = localStorage.getItem("projelio_token");
     if (!token) return;
-    const socket: Socket = io(API_URL, { transports: ["websocket"] });
-    // Sunucu artık ham bir userId değil, doğrulanmış bir JWT bekliyor (bkz.
-    // notifications.gateway.ts).
-    socket.emit("register", token);
-    socket.on("notification", (notification: NotificationPayload) => {
+    // Uygulamanın tek soketi (bkz. lib/liveRoom.ts): kimlik doğrulaması orada
+    // bir kez yapılıyor, bağlantı kapatılmaz, yalnızca dinleyici kalkar.
+    const socket = getSocket();
+    if (!socket) return;
+    const onNotification = (notification: NotificationPayload) => {
       if (notification.link === `/departments/${departmentId}`) load();
-    });
+    };
+    socket.on("notification", onNotification);
     return () => {
-      socket.disconnect();
+      socket.off("notification", onNotification);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId, departmentId]);

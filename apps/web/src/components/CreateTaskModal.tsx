@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Output, Project, Task } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import AssigneePicker from "./AssigneePicker";
 import AutoGrowTextarea from "./AutoGrowTextarea";
@@ -34,7 +34,7 @@ export default function CreateTaskModal({
   onClose,
   onCreated,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const formRef = useRef<HTMLFormElement>(null);
   const [projects, setProjects] = useState<Project[]>(projectsProp ?? []);
   const [projectId, setProjectId] = useState(fixedProjectId ?? "");

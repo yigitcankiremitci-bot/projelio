@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { SocialAccount, SocialPlatform } from "@projelio/shared";
 import { socialMediaApi, type SocialAccountInput, type SocialScope } from "../api/socialMedia";
 import { PLATFORM_ORDER, SOCIAL_PLATFORMS, accountColor } from "../lib/socialMedia";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
@@ -54,7 +54,7 @@ function initialForm(account?: SocialAccount | null): FormState {
  * her devirde yeniden keşfediliyor.
  */
 export default function SocialAccountModal({ scope, account, members, onClose, onSaved }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [form, setForm] = useState<FormState>(() => initialForm(account));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -285,6 +285,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
             Vazgeç
           </button>
           <button
+            data-primary
             onClick={save}
             disabled={saving}
             style={{

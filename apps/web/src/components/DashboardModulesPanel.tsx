@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Job, JobModule, ModuleCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useUndo } from "../lib/undo";
 import { IconSparkle, IconX } from "./icons";
 
@@ -14,7 +14,7 @@ interface Props {
 // Bir şirket/işletme kurduğunda bu sekme yerini departman modüllerine bırakır
 // (bkz. OrganizationDetail > Departmanlar).
 export default function DashboardModulesPanel({ jobs }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
   const [byJob, setByJob] = useState<Record<string, JobModule[]>>({});
   const [loading, setLoading] = useState(true);

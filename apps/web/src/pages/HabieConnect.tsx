@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 
 /**
  * Habie'ye bağlanma köprüsü.
@@ -22,7 +22,7 @@ const HABIE_URL =
   "https://habiechat.netlify.app";
 
 export default function HabieConnect() {
-  const c = colors.light;
+  const c = useThemeColors();
   const [error, setError] = useState("");
   // React 18 StrictMode effect'i iki kez çalıştırır; kod tek kullanımlık.
   const handled = useRef(false);

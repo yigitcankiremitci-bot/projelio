@@ -58,6 +58,13 @@ export class UsersController {
     return this.usersService.updateProfile(req.user.userId, body);
   }
 
+  // Ayarlar > Hesap. Şifresini UNUTANLAR buradan geçmez — o akış giriş ekranındaki
+  // /auth/forgot-password (bkz. password-reset.service.ts).
+  @Patch("me/password")
+  changePassword(@Req() req: any, @Body() body: { currentPassword?: string; newPassword: string }) {
+    return this.usersService.changePassword(req.user.userId, body.currentPassword, body.newPassword);
+  }
+
   @Post("me/avatar")
   @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }))
   uploadAvatar(@Req() req: any, @UploadedFile() file?: Express.Multer.File) {

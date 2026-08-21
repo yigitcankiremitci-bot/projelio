@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import type { PlanPreferences } from "@projelio/shared";
-import { colors } from "../../theme/colors";
+import type { PlanPreferences, ThemeColors } from "@projelio/shared";
+import { useThemeColors } from "../../theme/useThemeColors";
 import { planning } from "../../api/planning";
 
 /** 0 = Pazar … 6 = Cumartesi (JS getDay() ile aynı ölçek, sunucu da öyle bekliyor). */
@@ -27,7 +27,7 @@ const DAYS: { value: number; label: string }[] = [
  * sayfasından çıkarken bir şeyi değiştirdiğinden şüphe etmesin.
  */
 export default function WorkRhythmSettings() {
-  const c = colors.light;
+  const c = useThemeColors();
   const [saved, setSaved] = useState<PlanPreferences | null>(null);
   const [draft, setDraft] = useState<PlanPreferences | null>(null);
   const [saving, setSaving] = useState(false);
@@ -273,7 +273,7 @@ function Field({
   hint: string;
   children: React.ReactNode;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div style={{ marginBottom: 18 }}>
       <div style={{ fontSize: 15, color: c.textPrimary, marginBottom: 2 }}>{label}</div>
@@ -298,7 +298,7 @@ function NumberInput({
   min: number;
   max: number;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
       <input
@@ -320,7 +320,7 @@ function NumberInput({
   );
 }
 
-type Palette = typeof colors.light;
+type Palette = ThemeColors;
 
 function cardStyle(c: Palette): React.CSSProperties {
   return {
@@ -328,7 +328,6 @@ function cardStyle(c: Palette): React.CSSProperties {
     border: `1px solid ${c.border}`,
     borderRadius: 12,
     padding: 16,
-    maxWidth: 420,
   };
 }
 

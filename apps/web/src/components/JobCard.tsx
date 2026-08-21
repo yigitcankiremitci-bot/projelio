@@ -4,9 +4,10 @@ import { Link } from "react-router-dom";
 import type { Job } from "@projelio/shared";
 import { api } from "../api/client";
 import { resizeCoverImage } from "../lib/imageProcessing";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
 import { IconFolder, IconUser, IconCalendar, IconPlus } from "./icons";
+import AskLioButton from "./AskLioButton";
 
 interface Props {
   job: Job;
@@ -23,7 +24,7 @@ const COVER_HEIGHT = 104;
 const CARD_HEIGHT = 296;
 
 export default function JobCard({ job, projectCount }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [coverUrl, setCoverUrl] = useState(job.coverImageUrl);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
@@ -141,19 +142,24 @@ export default function JobCard({ job, projectCount }: Props) {
       </div>
 
       <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-        <h3
-          style={{
-            margin: "0 0 6px",
-            fontSize: 17,
-            fontWeight: 500,
-            color: c.textPrimary,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {job.title}
-        </h3>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, margin: "0 0 6px" }}>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 17,
+              fontWeight: 500,
+              color: c.textPrimary,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            {job.title}
+          </h3>
+          <AskLioButton subject={{ kind: "is", title: job.title, id: job.id }} size={24} />
+        </div>
         {job.description && (
           <CardDescription text={job.description} />
         )}

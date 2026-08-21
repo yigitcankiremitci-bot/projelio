@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { ModuleRecord } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import AddModuleRecordModal from "./AddModuleRecordModal";
 import { useUndo } from "../lib/undo";
 import { IconTrash } from "./icons";
@@ -45,7 +45,7 @@ function sumByCurrency(records: ModuleRecord[]): Map<string, number> {
 }
 
 function SummaryCard({ label, value, tone }: { label: string; value: string; tone?: "positive" | "negative" }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div
       style={{
@@ -85,7 +85,7 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
  * fm_gelir_gider / fm_alacak_borc) — yeni bir tablo/migration gerekmedi.
  */
 const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudgetPanel({ organizationId }, ref) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [ledger, setLedger] = useState<ModuleRecord[]>([]);
   const [rp, setRp] = useState<ModuleRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -319,7 +319,7 @@ function LedgerColumn({
   onDelete: (id: string) => void;
   borderRight?: boolean;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div style={{ borderRight: borderRight ? `1px solid ${c.border}` : undefined }}>
       <div

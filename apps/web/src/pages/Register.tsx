@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { backState } from "../lib/backTarget";
 import GoogleSignInButton from "../components/GoogleSignInButton";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 
 export default function Register() {
   const [fullName, setFullName] = useState("");
@@ -15,7 +16,9 @@ export default function Register() {
   // tıklamadan giriş yapamıyor (bkz. AuthService.register/login).
   const [registered, setRegistered] = useState(false);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
-  const c = colors.light;
+  const c = useThemeColors();
+  // Yasal metinlerin geri bağlantısı buraya dönsün (bkz. lib/backTarget.ts).
+  const registerBack = { to: "/register", label: "Kayıt sayfası" };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,6 +233,29 @@ export default function Register() {
         </form>
 
         <GoogleSignInButton label="Google ile kayıt ol" />
+
+        {/* Kayıt ekranında politikaya bağlantı vermek hem KVKK aydınlatma
+            yükümlülüğü hem de Meta/Google uygulama incelemeleri için gerekli. */}
+        <p
+          style={{
+            textAlign: "center",
+            marginTop: 20,
+            marginBottom: 0,
+            fontSize: 14,
+            lineHeight: 1.5,
+            color: c.textSecondary,
+          }}
+        >
+          Kayıt olarak{" "}
+          <Link to="/terms" state={backState(registerBack)} style={{ color: c.primary }}>
+            Kullanıcı Sözleşmesi
+          </Link>
+          'ni ve{" "}
+          <Link to="/privacy" state={backState(registerBack)} style={{ color: c.primary }}>
+            Gizlilik Politikası
+          </Link>
+          'nı okuduğunu ve kabul ettiğini beyan etmiş olursun.
+        </p>
       </div>
     </div>
   );

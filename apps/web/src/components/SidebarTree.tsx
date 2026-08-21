@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { findCoverPreset } from "../lib/covers";
 import { Link, useLocation } from "react-router-dom";
 import type { Department, Job } from "@projelio/shared";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useSidebarHierarchy, SidebarGroupNode, SidebarOrgNode } from "../lib/useSidebarHierarchy";
 import {
   IconBuilding,
@@ -476,6 +476,7 @@ function Row({
   // "şirket başlığı" org satırı, "İşlerim" düğümü).
   onLabelDoubleClick?: () => void;
 }) {
+  const c = useThemeColors();
   const [imageFailed, setImageFailed] = useState(false);
   // Hazır kapaklar (preset:...) bir dosya değil CSS gradyanıdır; <img> ile
   // gösterilemez, küçük renkli bir kare olarak çizilir.
@@ -504,7 +505,7 @@ function Row({
             borderRadius: 4,
             flexShrink: 0,
             background: presetCover.background,
-            border: active ? `1px solid ${colors.light.accent}` : "1px solid rgba(255,255,255,0.15)",
+            border: active ? `1px solid ${c.accent}` : "1px solid rgba(255,255,255,0.15)",
           }}
         />
       ) : showImage ? (
@@ -518,11 +519,11 @@ function Row({
             borderRadius: 4,
             objectFit: "cover",
             flexShrink: 0,
-            border: active ? `1px solid ${colors.light.accent}` : "1px solid rgba(255,255,255,0.15)",
+            border: active ? `1px solid ${c.accent}` : "1px solid rgba(255,255,255,0.15)",
           }}
         />
       ) : (
-        <Icon size={15} color={active ? colors.light.accent : INACTIVE_ICON} />
+        <Icon size={15} color={active ? c.accent : INACTIVE_ICON} />
       )}
       <span
         style={{
@@ -600,6 +601,7 @@ function LeafRow({
   depth: number;
   active: boolean;
 }) {
+  const c = useThemeColors();
   return (
     <div style={{ display: "flex", alignItems: "center" }}>
       <span style={{ width: 20, marginLeft: depth * 14, flexShrink: 0 }} />
@@ -615,10 +617,10 @@ function LeafRow({
           padding: "5px 8px",
           borderRadius: 7,
           background: active ? "rgba(255,255,255,0.08)" : "transparent",
-          borderLeft: active ? `2px solid ${colors.light.accent}` : "2px solid transparent",
+          borderLeft: active ? `2px solid ${c.accent}` : "2px solid transparent",
         }}
       >
-        {Icon && <Icon size={15} color={active ? colors.light.accent : INACTIVE_ICON} />}
+        {Icon && <Icon size={15} color={active ? c.accent : INACTIVE_ICON} />}
         <span
           style={{
             fontSize: 16,

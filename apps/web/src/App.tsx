@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { Routes, Route, Link, useLocation, useParams, Navigate } from "react-router-dom";
 import type { User } from "@projelio/shared";
@@ -14,6 +14,7 @@ import GoogleReturn from "./pages/GoogleReturn";
 import HabieConnect from "./pages/HabieConnect";
 import MicrosoftReturn from "./pages/MicrosoftReturn";
 import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import JobDetail from "./pages/JobDetail";
 import ProjectDetail from "./pages/ProjectDetail";
 import OperationDetail from "./pages/OperationDetail";
@@ -31,10 +32,11 @@ import TasksOverview from "./pages/TasksOverview";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
 import NotificationBell from "./components/NotificationBell";
+import PresenceStrip from "./components/PresenceStrip";
 import AiLauncher from "./components/AiLauncher";
 import AiCreditsPage from "./pages/AiCredits";
 import { initPush } from "./push";
-import { colors } from "./theme/colors";
+import { useThemeColors } from "./theme/useThemeColors";
 import { ProjectFabContext } from "./lib/projectFab";
 import { PageHeaderProvider, usePageHeaderState } from "./lib/pageHeader";
 import { UndoProvider } from "./lib/undo";
@@ -43,7 +45,10 @@ import TourOverlay from "./components/tour/TourOverlay";
 import TourLauncher from "./components/tour/TourLauncher";
 import type { ProjectFabAction } from "./lib/projectFab";
 import { useIsDesktop } from "./lib/useIsDesktop";
-import { SIDEBAR_WIDTH } from "./lib/layout";
+import { getSidebarDefaultOpen, useAppPrefs } from "./lib/appPrefs";
+import { refreshSession } from "./lib/session";
+import { SIDEBAR_WIDTH, pageGutter } from "./lib/layout";
+import { CoverBackLink } from "./components/EntityCover";
 import { IconChevronRight, IconUser } from "./components/icons";
 
 const HEADER_HEIGHT = 76;
@@ -86,7 +91,7 @@ function KeyedProjectDetail() {
 
 /** Sabit şeritteki kimlik göstergesi: fotoğraf + (yer varsa) ad. */
 function MiniProfile({ user, showName }: { user: User; showName: boolean }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <span
       title={user.fullName}
@@ -153,7 +158,7 @@ function CoverStickyHeader({
   sidebarOpen: boolean;
   user: User | null;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const registration = usePageHeaderState();
   // Şerit tek parça halinde değil, üç aşamada açılır (aksi halde en geç kaynak
   // — genelde araç çubuğu — ekrandan çıkana kadar hiçbir şey belirmiyor, o arada
@@ -161,15 +166,38 @@ function CoverStickyHeader({
   //  1. kapak logonun altına kayınca  -> sayfa adı + kişi kartı satırı
   //  2. sayfanın sekme çubuğu kayınca -> sekmeler
   //  3. araç çubuğu kayınca           -> Görevler/Çıktılar + Sırala/Seç
-  //  4. hepsi açıldıktan sonra        -> geri bağlantısı (her zaman en altta,
-  //     her zaman en son: yukarıdaki satırların arasına girmesin)
+  //
+  // GERİ HAPI şeridin bir satırı DEĞİL: şeridin altında yüzen, kendi zemini
+  // olmayan ayrı bir bant. Şeridin GERÇEK yüksekliğine göre konumlanır (bkz.
+  // barHeight) — sabit bir sayı değil, çünkü sekmeler/araç çubuğu açılınca
+  // şerit büyür. Bu sayede sol üstteki yüzen logoyla (yalnızca üst satırın
+  // hizasında) hiçbir zaman aynı bandı paylaşmaz.
+  //
+  // Hap, yukarıdaki üç aşamanın DIŞINDA, kendi eşiğiyle açılır (bkz. check).
   const [stage, setStage] = useState({ title: false, tabs: false, actions: false, back: false });
+  const barRef = useRef<HTMLDivElement>(null);
+  const [barHeight, setBarHeight] = useState(STICKY_TOP_ROW);
   const isDesktop = useIsDesktop();
 
   const coverRef = registration?.coverRef;
   const tabsSourceRef = registration?.tabs?.sourceRef;
   const actionsSourceRef = registration?.actions?.sourceRef;
   const backSourceRef = registration?.back?.sourceRef;
+
+  // Şeridin yüksekliği HER render'dan sonra doğrulanır (bilerek bağımlılık
+  // dizisi yok): satırlar açılıp kapandıkça, mobil/masaüstü arasında geçildikçe
+  // ve yazı ölçeği değiştikçe değişiyor, hap da tam altına oturmalı.
+  //
+  // ResizeObserver'a bırakılmıyordu: ölçümü boyanmadan önce değil, React
+  // render'ından SONRA ayrı bir turda geldiği için şerit büyüdüğünde hap bir
+  // süre eski yerinde — yani şeridin İÇİNDE — kalıyordu. useLayoutEffect ölçüyü
+  // aynı kare içinde, ekrana çizilmeden önce günceller.
+  useLayoutEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const h = el.offsetHeight;
+    setBarHeight((prev) => (prev === h ? prev : h));
+  });
 
   useEffect(() => {
     if (!visibleOn || !coverRef) {
@@ -189,15 +217,30 @@ function CoverStickyHeader({
       const el = coverRef.current;
       if (!el) return;
       const title = el.getBoundingClientRect().bottom <= STICKY_REVEAL;
-      const tabs = title && scrolledPast(tabsSourceRef);
-      const actions = title && scrolledPast(actionsSourceRef);
+      const backEl = backSourceRef?.current;
       const next = {
         title,
-        tabs,
-        actions,
-        // Geri satırı en son açılır: sayfanın kendi bağlantısı kaybolmuş OLMALI
-        // (yoksa iki tane görünüyor) ve üstündeki tüm satırlar açılmış olmalı.
-        back: title && tabs && actions && scrolledPast(backSourceRef),
+        tabs: title && scrolledPast(tabsSourceRef),
+        actions: title && scrolledPast(actionsSourceRef),
+        // Hap, sayfanın KENDİ geri bağlantısı hapın oturacağı çizgiye gelir
+        // gelmez belirir — şeridin açılmasını BEKLEMEZ. Beklediğinde, bağlantı
+        // sol üstteki yüzen logonun (position:fixed, 10–58 px) altına girip
+        // gömülüyor, şerit ise ancak kapak tamamen yukarı kayınca açıldığı için
+        // arada geri düğmesinin görünmediği bir aralık kalıyordu.
+        //
+        // Eşik, hapın şerit KAPALIYKEN oturduğu çizgi (STICKY_TOP_ROW): devir
+        // teslim tam da iki hapın aynı hizaya geldiği anda olur, yani göz bir
+        // sıçrama görmez. Çizgi logo bandının (10–58) altında kaldığı için de
+        // hap hiçbir zaman logoyla çakışmaz.
+        //
+        // Şeridin O ANKİ yüksekliği KULLANILMAZ: sekmeler açılınca şerit büyüyor,
+        // yukarı geri kaydırıldığında ise küçülme ölçümü kaydırma olayından sonra
+        // geldiği için eşik bayat kalıyor ve hap sayfanın en tepesinde de açık
+        // kalıyordu.
+        //
+        // (sourceRef vermeden kaydeden bir sayfa olursa eski davranış: şeridin
+        // başlık satırıyla birlikte açılır.)
+        back: backEl ? backEl.getBoundingClientRect().top <= STICKY_TOP_ROW : title,
       };
       setStage((prev) =>
         prev.title === next.title &&
@@ -217,6 +260,29 @@ function CoverStickyHeader({
     };
   }, [visibleOn, coverRef, actionsSourceRef, tabsSourceRef, backSourceRef]);
 
+  // Hap devredeyken sayfanın KAPAKTAKİ kendi geri bağlantısı gizlenir; böylece
+  // ekranda her an tek bir geri hapı olur. Yoksa ikisi bir süre yan yana duruyor,
+  // hemen ardından kapaktaki logonun altına girip "gömülmüş" gibi görünüyordu.
+  //
+  // Gizleme neden burada: altı detay sayfasının dördü kapak bağlantısını
+  // EntityCover'ın `back` prop'una veriyor, ikisi (proje, departman) kendi
+  // işaretlemesine koyuyor. Hepsinin ORTAK noktası usePageHeader'a verdikleri
+  // sourceRef — şeridin zaten her kaydırmada ölçtüğü öğe.
+  //
+  // `visibility`, `display` DEĞİL: öğe yerini korumalı. Hem sayfa zıplamamalı,
+  // hem de eşiği hesaplayan getBoundingClientRect geçerli kalmalı; display:none
+  // ile rect sıfırlanır, eşik (top <= STICKY_TOP_ROW) kalıcı olarak sağlanır ve
+  // yukarı geri kaydırıldığında kapaktaki bağlantı bir daha geri gelmezdi.
+  const backActive = visibleOn && stage.back && Boolean(registration?.back);
+  useEffect(() => {
+    const el = backSourceRef?.current;
+    if (!el) return;
+    el.style.visibility = backActive ? "hidden" : "";
+    return () => {
+      el.style.visibility = "";
+    };
+  }, [backActive, backSourceRef]);
+
   if (!visibleOn || !registration) return null;
 
   const passed = stage.title;
@@ -226,10 +292,12 @@ function CoverStickyHeader({
   // erişilemez oluyordu. Masaüstünde başlık satırının içinde, mobilde kendi
   // satırlarında dururlar.
   const showActions = stage.actions && Boolean(registration.actions);
-  const showBack = stage.back && Boolean(registration.back);
+  const showBack = backActive;
 
   return (
+    <>
     <div
+      ref={barRef}
       aria-hidden={!passed}
       style={{
         position: "fixed",
@@ -272,19 +340,6 @@ function CoverStickyHeader({
       >
         {isDesktop ? (
           <>
-            {/* Geri bağlantısı en son (4. aşamada) açılır: sayfanın kendi
-                bağlantısı (artık kapağın içinde, bkz. CoverBackLink) kaybolmuş
-                olmalı, yoksa ikisi bir süre birlikte görünüyordu. */}
-            {showBack && registration.back && (
-              <Link
-                className="sticky-row-in"
-                to={registration.back.to}
-                style={{ fontSize: 14, color: c.textSecondary, whiteSpace: "nowrap", flexShrink: 0 }}
-              >
-                ← {registration.back.label}
-              </Link>
-            )}
-
             <span
               title={registration.title}
               style={{
@@ -391,19 +446,37 @@ function CoverStickyHeader({
           {registration.actions?.right}
         </div>
       )}
+    </div>
 
-      {/* Geri bağlantısı DAİMA şeridin en alt satırı: sekmelerle araç çubuğunun
-          arasına girdiğinde iki kontrol grubunu birbirinden koparıyordu. Sayfanın
-          kendi "← Projeler" bağlantısı yukarı kayıp kaybolduğu için burada
-          tekrarlanıyor. */}
-      {!isDesktop && showBack && registration.back && (
-        <div className="sticky-row-in" style={{ padding: "6px 14px 8px", borderTop: `1px solid ${c.border}` }}>
-          <Link to={registration.back.to} style={{ fontSize: 13, color: c.textSecondary }}>
-            ← {registration.back.label}
-          </Link>
+      {/* GERİ HAPI — şeridin ALTINDA yüzen, kendi zemini olmayan bant: bandın
+          kendisi şeffaf (tıklama da geçer, pointerEvents "none"), yalnızca
+          hapın kendisi görünür ve tıklanabilir. Şeridin gerçek yüksekliğine
+          göre konumlandığı (barHeight) için soldaki yüzen logoyla (yalnızca
+          üst satırın hizasında) asla çakışmaz — her sayfada aynı yere, aynı
+          şekilde oturur. */}
+      {showBack && registration.back && (
+        <div
+          style={{
+            position: "fixed",
+            top: barHeight,
+            left,
+            right: 0,
+            zIndex: 36,
+            // Yatay boşluk kapağınkiyle AYNI olmalı (bkz. lib/layout.ts): iki
+            // hap devir teslimde aynı dikey çizgide buluşuyor, farklı olursa
+            // hap yana zıplıyordu.
+            padding: `${isDesktop ? 10 : 8}px ${pageGutter(isDesktop)}px`,
+            pointerEvents: "none",
+          }}
+        >
+          {/* Kapaktakiyle AYNI bileşen: tasarımın iki yerde ayrı ayrı yazılması
+              karanlık modda iki farklı hap görünmesine yol açıyordu. */}
+          <span style={{ pointerEvents: "auto", display: "inline-flex" }}>
+            <CoverBackLink to={registration.back.to} label={registration.back.label} floating />
+          </span>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -425,9 +498,12 @@ export default function App() {
     // Habie devir sayfası: token'ı okuyup Habie'ye yönlendiriyor, uygulama
     // kabuğuna (kenar çubuğu, veri çekme) hiç ihtiyacı yok.
     location.pathname === "/habie" ||
-    // Gizlilik politikası herkese açık olmalı: Meta (WhatsApp Business Platform)
-    // app'i yayınlarken giriş gerektirmeyen bir politika URL'i zorunlu tutuyor.
-    location.pathname === "/privacy";
+    // Gizlilik politikası ve kullanıcı sözleşmesi herkese açık olmalı: Meta
+    // (WhatsApp Business Platform) app'i yayınlarken giriş gerektirmeyen bir
+    // politika URL'i zorunlu tutuyor; sözleşmeye de kayıt olmadan bakılabilmeli
+    // (kabul ettiği metni okumak için hesap açmak zorunda kalmasın).
+    location.pathname === "/privacy" ||
+    location.pathname === "/terms";
   const hasToken = !!localStorage.getItem("projelio_token");
   const [fabAction, setFabAction] = useState<ProjectFabAction | null>(null);
   // Bilgisayarda (geniş ekran) sol sidebar + üstte tam genişlik header;
@@ -438,10 +514,15 @@ export default function App() {
   // varsayılan açık (eski davranış), mobilde varsayılan kapalı (üstteki oka
   // basılınca bir çekmece gibi açılır). Ekran genişliği eşiği aşıldığında
   // (masaüstü <-> mobil geçişinde) varsayılana geri dönülür.
-  const [sidebarOpen, setSidebarOpen] = useState(isDesktop);
+  //
+  // Masaüstündeki varsayılan Ayarlar > Gezinme'den değiştirilebilir; mobilde
+  // çekmece her zaman kapalı başlar (açık başlasa içeriğin üstünü örterdi).
+  const prefs = useAppPrefs();
+  const sidebarDefault = isDesktop && getSidebarDefaultOpen(true);
+  const [sidebarOpen, setSidebarOpen] = useState(sidebarDefault);
   useEffect(() => {
-    setSidebarOpen(isDesktop);
-  }, [isDesktop]);
+    setSidebarOpen(sidebarDefault);
+  }, [sidebarDefault]);
   // Giriş yapmış her kullanıcı için bir kez kontrol edilir: onboardingCompletedAt
   // boşsa (yeni kayıt ya da bu özellik eklenmeden önce kaydolmuş mevcut kullanıcı)
   // sihirbaz gösterilir, tamamlanana kadar uygulamanın geri kalanı erişilemez.
@@ -453,6 +534,14 @@ export default function App() {
   };
 
   useEffect(reloadMe, [hasToken, isAuthScreen]);
+
+  // Oturumu her açılışta tazele ki süre "son kullanımdan itibaren" işlesin —
+  // düzenli kullanan biri token ömrü dolduğu için giriş ekranına düşmesin
+  // (bkz. lib/session.ts). Bilerek yalnızca bir kez: sayfa gezinmeleri App'i
+  // yeniden mount etmiyor.
+  useEffect(() => {
+    if (hasToken && !isAuthScreen) void refreshSession();
+  }, []);
 
   useEffect(() => {
     if (!isAuthScreen) void initPush();
@@ -470,6 +559,7 @@ export default function App() {
         <Route path="/habie" element={<HabieConnect />} />
         <Route path="/microsoft/return" element={<MicrosoftReturn />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
       </Routes>
     );
   }
@@ -496,7 +586,7 @@ export default function App() {
   const hasStickyHeader =
     isCoverPage || location.pathname === "/tasks" || location.pathname === "/";
 
-  const c = colors.light;
+  const c = useThemeColors();
 
   return (
     // Geri alma (Cmd/Ctrl+Z) tüm sayfaları kapsadığı için sağlayıcı en dışta;
@@ -593,7 +683,12 @@ export default function App() {
         <NotificationBell />
         {me?.onboardingCompletedAt && <TourLauncher />}
         <TourOverlay />
-        <AiLauncher />
+        {/* Lio balonu ve kişi şeridi ekranda sürekli duran öğeler; ikisi de
+            Ayarlar > Yardımcılar'dan gizlenebilir (bkz. lib/appPrefs.tsx). */}
+        {prefs.showLio && <AiLauncher />}
+        {/* Aynı sayfada başka kim çalışıyor — sol altta ince şerit
+            (bkz. lib/liveRoom.ts). Kenar çubuğu açıkken içerik sütununa hizalanır. */}
+        {prefs.showPresence && <PresenceStrip left={isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0} />}
         <ProjectFabContext.Provider value={{ action: fabAction, setAction: setFabAction }}>
           <div
             style={{
@@ -629,7 +724,7 @@ export default function App() {
           </div>
           {/* Mobilde tam alt menü, masaüstünde ise sadece ortadaki "+" butonu olarak
               render edilir — karar BottomNav içinde isDesktop'a göre veriliyor. */}
-          <BottomNav />
+          <BottomNav sidebarOpen={isDesktop && sidebarOpen} />
         </ProjectFabContext.Provider>
       </div>
     </div>

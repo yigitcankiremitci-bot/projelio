@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { ModuleAccess, ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useProjectFabAction } from "../lib/projectFab";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
 import { isOpenableModule } from "../lib/entityModules";
@@ -29,7 +29,7 @@ interface Props {
 // Etkinleştirme durumu organizasyon genelinde tutulur (organization_modules) —
 // burada yalnızca bu departmana ait olanlar gösterilir.
 export default function DepartmentModulesPanel({ organizationId, departmentId, departmentKey }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
   const [enabled, setEnabled] = useState<OrganizationModule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -279,7 +279,7 @@ function AddModulesForm({
   onClose: () => void;
   onAdded: () => void;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");

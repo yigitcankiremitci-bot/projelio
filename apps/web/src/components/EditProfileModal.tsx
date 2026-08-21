@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { User } from "@projelio/shared";
 import { DEFAULT_TITLE_BY_ACCOUNT_TYPE } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { cropAvatarImage } from "../lib/imageProcessing";
 import type { CropArea } from "../lib/imageProcessing";
 import Modal from "./Modal";
@@ -16,7 +16,7 @@ interface Props {
 }
 
 export default function EditProfileModal({ user, onClose, onSaved }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [fullName, setFullName] = useState(user.fullName);
   const [title, setTitle] = useState(user.title ?? "");
   const [bio, setBio] = useState(user.bio ?? "");

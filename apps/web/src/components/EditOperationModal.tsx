@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Operation, OperationBudgetPeriod } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import CoverPicker from "./CoverPicker";
 import Modal from "./Modal";
@@ -29,7 +29,7 @@ const periods: { value: OperationBudgetPeriod; label: string }[] = [
  * bitiş tarihi sorduğu için ayrı bir akış.
  */
 export default function EditOperationModal({ operation, onClose }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const navigate = useNavigate();
   const [title, setTitle] = useState(operation.title);
   const [description, setDescription] = useState(operation.description ?? "");

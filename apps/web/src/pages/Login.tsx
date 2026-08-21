@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
+import { backState } from "../lib/backTarget";
 import GoogleSignInButton from "../components/GoogleSignInButton";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -13,11 +14,13 @@ export default function Login() {
   // kullanıcıya çıkışsız bir hata değil, "tekrar gönder" seçeneği sunmalıyız.
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
-  const c = colors.light;
+  const c = useThemeColors();
   // Oturumu geçersizleşen kullanıcı buraya sebepsizce fırlatılmasın: neden
   // çıkarıldığını bilmezse "verilerim silindi" sanıyor (bkz. api/client.ts
   // handleExpiredSession).
   const sessionExpired = new URLSearchParams(window.location.search).get("session") === "expired";
+  // Yasal metinlerin geri bağlantısı buraya dönsün (bkz. lib/backTarget.ts).
+  const loginBack = { to: "/login", label: "Giriş sayfası" };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,18 +177,25 @@ export default function Login() {
 
         <GoogleSignInButton label="Google ile giriş yap" />
 
-        <Link
-          to="/privacy"
+        <div
           style={{
-            display: "block",
-            textAlign: "center",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 10,
             marginTop: 20,
             fontSize: 14,
             color: c.textSecondary,
           }}
         >
-          Gizlilik Politikası
-        </Link>
+          <Link to="/terms" state={backState(loginBack)} style={{ color: c.textSecondary }}>
+            Kullanıcı Sözleşmesi
+          </Link>
+          <span aria-hidden>·</span>
+          <Link to="/privacy" state={backState(loginBack)} style={{ color: c.textSecondary }}>
+            Gizlilik Politikası
+          </Link>
+        </div>
       </div>
     </div>
   );

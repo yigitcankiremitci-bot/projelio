@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { driveApi } from "../api/files";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 
 /**
  * Google akışından dönüş ekranı.
@@ -13,7 +13,7 @@ import { colors } from "../theme/colors";
  */
 export default function GoogleReturn() {
   const [params] = useSearchParams();
-  const c = colors.light;
+  const c = useThemeColors();
   const [error, setError] = useState("");
   // React 18 StrictMode geliştirmede effect'i iki kez çalıştırır; kod tek
   // kullanımlık olduğu için ikinci çağrı "geçersiz kod" hatası verirdi.

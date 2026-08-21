@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import type { Group } from "@projelio/shared";
 import { api } from "../api/client";
 import GroupCard from "../components/GroupCard";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useWithoutPendingDeletes } from "../lib/undo";
 
 export default function Groups() {
   const [groups, setGroups] = useState<Group[]>([]);
-  const c = colors.light;
+  const c = useThemeColors();
   const gridRef = useRef<HTMLDivElement>(null);
   const registerReorderUndo = useReorderUndo();
   const groupsRef = useLatestRef(groups);

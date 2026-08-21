@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Project } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
@@ -15,7 +15,7 @@ function toDateInputValue(iso: string) {
 }
 
 export default function ExtendDeadlineModal({ project, onClose, onSaved }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [deadline, setDeadline] = useState(toDateInputValue(project.deadline));
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);

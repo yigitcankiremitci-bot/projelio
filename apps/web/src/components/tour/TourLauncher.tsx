@@ -7,13 +7,13 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import { useTour } from "../../lib/tour/TourContext";
 import { AREA_LABELS, tourAnchor } from "../../lib/tour/types";
 import { IconCheck, IconX } from "../icons";
 
 export default function TourLauncher() {
-  const c = colors.light;
+  const c = useThemeColors();
   const { toursHere, allTours, seen, start, tour, voiceEnabled, setVoiceEnabled } = useTour();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);

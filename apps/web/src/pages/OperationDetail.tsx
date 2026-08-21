@@ -1,16 +1,17 @@
 import { useRef, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import type { Operation, OperationOccurrence, OperationRoutine, OperationStatus, Task } from "@projelio/shared";
+import type { Operation, OperationOccurrence, OperationRoutine, OperationStatus, Task, ThemeColors } from "@projelio/shared";
 import { api } from "../api/client";
+import { useLiveRoom } from "../lib/liveRoom";
 import Modal from "../components/Modal";
 import RoutineModal from "../components/RoutineModal";
 import EditOperationModal from "../components/EditOperationModal";
 import TaskEditModal from "../components/TaskEditModal";
 import OperationHealthBadge, { AdherenceDots } from "../components/OperationHealthBadge";
 import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
-import { coverText } from "../lib/covers";
+import { useCoverTheme } from "../theme/useCoverTheme";
 import TaskAttachmentBadges from "../components/TaskAttachmentBadges";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconCalendar, IconCheck, IconEdit, IconSettings, IconUser } from "../components/icons";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader } from "../lib/pageHeader";
@@ -35,8 +36,11 @@ function occurrenceState(o: OperationOccurrence, graceDays: number): OccurrenceS
 
 export default function OperationDetail() {
   const { id } = useParams();
+  // Aynı sayfadaki kullanıcılar: canlı tazeleme + "kim burada" (bkz. lib/liveRoom.ts).
+  useLiveRoom(id ? `operation:${id}` : null);
   const navigate = useNavigate();
-  const c = colors.light;
+  const c = useThemeColors();
+  const cover = useCoverTheme();
   const isDesktop = useIsDesktop();
   const gutter = pageGutter(isDesktop);
 
@@ -195,12 +199,13 @@ export default function OperationDetail() {
             {operation && <OperationHealthBadge status={operation.status} health={operation.health} />}
           </span>
         }
+        lioSubject={operation ? { kind: "rutin", title: operation.title, id: operation.id } : undefined}
         description={operation?.description}
         meta={
           operation && (
             <>
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <IconCalendar size={12} color={coverText.secondary} />
+                <IconCalendar size={12} color={cover.secondary} />
                 {new Date(operation.startedOn).toLocaleDateString("tr-TR")} başladı
                 {/* Rutinin bitiş tarihi yoktur; kapatılana kadar çalışır. */}
                 {operation.endedOn && ` · ${new Date(operation.endedOn).toLocaleDateString("tr-TR")} kapandı`}
@@ -423,7 +428,7 @@ export default function OperationDetail() {
             <button onClick={() => setStatusPrompt(null)} style={ghostButton(c)}>
               Vazgeç
             </button>
-            <button onClick={() => changeStatus(statusPrompt)} style={primaryButton(c)}>
+            <button data-primary onClick={() => changeStatus(statusPrompt)} style={primaryButton(c)}>
               {statusPrompt === "paused" ? "Duraklat" : "Kapat"}
             </button>
           </div>
@@ -447,7 +452,7 @@ function OccurrenceRow({
   /** Verilirse satır başlığı tıklanabilir olur ve tekrarın detay modalını açar. */
   onOpen?: () => void;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const links = occurrence.attachments ?? [];
   const files = occurrence.files ?? [];
   return (
@@ -575,14 +580,14 @@ function describeRoutine(r: OperationRoutine): string {
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <h2 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 12px" }}>{children}</h2>
   );
 }
 
 function EmptyBox({ children }: { children: React.ReactNode }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div
       style={{
@@ -602,7 +607,7 @@ function EmptyBox({ children }: { children: React.ReactNode }) {
 }
 
 
-const primaryButton = (c: typeof colors.light) => ({
+const primaryButton = (c: ThemeColors) => ({
   padding: "8px 14px",
   borderRadius: 8,
   border: "none",
@@ -613,7 +618,7 @@ const primaryButton = (c: typeof colors.light) => ({
   cursor: "pointer",
 });
 
-const ghostButton = (c: typeof colors.light) => ({
+const ghostButton = (c: ThemeColors) => ({
   padding: "8px 14px",
   borderRadius: 8,
   border: `1px solid ${c.border}`,

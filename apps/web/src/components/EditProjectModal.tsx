@@ -3,7 +3,7 @@ import CoverPicker from "./CoverPicker";
 import { useNavigate } from "react-router-dom";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, type Project, type ProjectStatus } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
@@ -18,7 +18,7 @@ function toDateInputValue(iso: string) {
 }
 
 export default function EditProjectModal({ project, onClose }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const navigate = useNavigate();
   const [title, setTitle] = useState(project.title);
   const [description, setDescription] = useState(project.description ?? "");

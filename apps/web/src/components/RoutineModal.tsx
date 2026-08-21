@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { OperationRoutine, RoutineFreq } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useUndo } from "../lib/undo";
 import Modal from "./Modal";
 
@@ -42,7 +42,7 @@ const setPosOptions = [
 type MonthlyMode = "day-of-month" | "nth-weekday";
 
 export default function RoutineModal({ operationId, routine, onClose, onSaved, onDeleted }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const editing = !!routine;
 
   const [title, setTitle] = useState(routine?.title ?? "");

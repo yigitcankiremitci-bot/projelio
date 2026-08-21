@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Department, Project, Task } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 type TargetType = "project" | "department";
@@ -17,7 +17,7 @@ interface Props {
 // seçilir — GET /projects ve GET /departments kullanıcının erişebildiği TÜM
 // projeler/departmanlar (iş/organizasyon sınırı olmadan) döner.
 export default function MoveTaskModal({ taskIds, onClose, onMoved }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [targetType, setTargetType] = useState<TargetType>("project");
   const [projects, setProjects] = useState<Project[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -133,6 +133,7 @@ export default function MoveTaskModal({ taskIds, onClose, onMoved }: Props) {
         {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
 
         <button
+          data-primary
           onClick={handleSave}
           disabled={saving || !targetId}
           style={{

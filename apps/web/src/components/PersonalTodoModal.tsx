@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { PersonalBoardItem, TaskPriority } from "@projelio/shared";
 import { MAX_TASK_PRIORITY } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconStar } from "./icons";
 import { useUndo } from "../lib/undo";
@@ -24,7 +24,7 @@ interface Props {
  * yok — bunlar kişisel bir yapılacakta anlamsız.
  */
 export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const { pushUndo } = useUndo();
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description ?? "");

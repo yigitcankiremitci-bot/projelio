@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from "react-router-dom";
 import type { Job, Organization, Group, Project, User } from "@projelio/shared";
 import { api } from "../api/client";
 import JobCard from "../components/JobCard";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useSortableList } from "../lib/useSortableList";
 import { useRefreshOnUndo, useReorderUndo, useWithoutPendingDeletes } from "../lib/undo";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -52,7 +52,7 @@ function SectionHeading({
   count: number;
   style?: React.CSSProperties;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div style={{ marginBottom: 12, ...style }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -127,7 +127,7 @@ export default function Dashboard() {
   ];
   const [jobs, setJobs] = useState<Job[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const c = colors.light;
+  const c = useThemeColors();
   const gridRef = useRef<HTMLDivElement>(null);
   const joinedGridRef = useRef<HTMLDivElement>(null);
   // Sabit şeridin ölçtüğü öğeler (bkz. lib/pageHeader): başlık satırı "kapak"

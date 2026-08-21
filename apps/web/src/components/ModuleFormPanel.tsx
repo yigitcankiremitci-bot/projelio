@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ModuleRecord, ModuleRecordVersion, Product } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import {
   changedFields,
   missingForApproval,
@@ -80,7 +80,7 @@ export default function ModuleFormPanel({
   canWrite = true,
   canApprove = false,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const basePath = jobId ? `/jobs/${jobId}/module-records` : `/organizations/${organizationId}/module-records`;
 
   const [records, setRecords] = useState<ModuleRecord[]>([]);
@@ -402,7 +402,7 @@ export default function ModuleFormPanel({
           })}
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={handleSave} disabled={busy} style={{ fontSize: 13 }}>
+            <button data-primary onClick={handleSave} disabled={busy} style={{ fontSize: 13 }}>
               Kaydet
             </button>
             {canApprove && (

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { Department } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import { getDepartmentCoverUrl, hasCustomDepartmentCover } from "../lib/departmentCovers";
 import Modal from "./Modal";
@@ -41,7 +41,7 @@ export default function DepartmentSettingsModal({
   onDeleted,
   onArchived,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [defaultTab, setDefaultTab] = useState<DepartmentTab>((department.defaultTab as DepartmentTab) || "tasks");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

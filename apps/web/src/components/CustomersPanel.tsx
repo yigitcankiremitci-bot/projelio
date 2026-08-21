@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Party, PartyActivity, PartyContact, PartyDuplicate, PartyRole } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { ALL_ROLES, ROLE_COLORS, ROLE_LABELS, STATUS_LABELS, profileFor } from "../lib/partyProfiles";
 import { useUndo } from "../lib/undo";
 import { IconTrash, IconX } from "./icons";
@@ -47,7 +47,7 @@ export default function CustomersPanel({
   jobId,
   canWrite = true,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const profile = profileFor(departmentKey);
 
   const [parties, setParties] = useState<Party[]>([]);
@@ -494,7 +494,7 @@ function Field({
   children: React.ReactNode;
   style?: React.CSSProperties;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, ...style }}>
       <label style={{ fontSize: 12, color: c.textSecondary }}>{label}</label>
@@ -510,7 +510,7 @@ function Field({
  * açıldı) — "modüller birbirini besliyor" tezinin görünür yüzü burasıdır.
  */
 function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boolean; profile: string }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [tab, setTab] = useState<"activity" | "contacts">("activity");
   const [activities, setActivities] = useState<PartyActivity[]>([]);
   const [contacts, setContacts] = useState<PartyContact[]>([]);

@@ -3,8 +3,9 @@ import Sortable, { type SortableEvent } from "sortablejs";
 import type { Task, TaskPriority, TaskStatus } from "@projelio/shared";
 import { MAX_TASK_PRIORITY } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconPlus, IconChevronRight, IconCheck, IconEdit, IconActivity, IconStar } from "./icons";
+import AskLioButton from "./AskLioButton";
 import TaskAttachmentBadges from "./TaskAttachmentBadges";
 import Modal from "./Modal";
 import AutoGrowTextarea from "./AutoGrowTextarea";
@@ -101,6 +102,21 @@ interface Props {
 const SUBTASK_DESCRIPTION_COLOR = "#5A6B8C";
 
 /**
+ * Kartın sağ ucundaki alt görev sütununun (açma oku + "1/10" rozeti) sabit
+ * genişliği. Sabit olması şart: içeriği karta göre değişiyor ve içeriğe göre
+ * boyutlanınca solundaki eylem ikonları kartlar arasında farklı hizalara
+ * düşüyordu.
+ *
+ * 34 px, 12 punto rozetin iki basamaklı hâlini ("10/10") taşır. Daha büyük
+ * sayılarda rozet kutusundan biraz taşar ama YERLEŞİMİ değiştirmez — hizanın
+ * bozulmaması, çok nadir bir durumda birkaç pikselin taşmasından önemli.
+ *
+ * Alt görev satırlarında da aynı genişlikte boşluk bırakılır ki alt görevlerin
+ * ikonları üst görevlerinkiyle aynı dikey çizgide dursun.
+ */
+const SUBTASK_COL_WIDTH = 34;
+
+/**
  * Bir görev kartının alt görev listesini açmasını isteyen olay. Alt görev
  * sürüklenirken kapalı bir kartın üzerinde beklenince tetiklenir; sürükleme
  * BAŞKA bir sütunda başlamış olabileceği için doğrudan state'e yazamıyoruz —
@@ -161,7 +177,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   onToggleSelect,
   onOpenSource,
 }, ref) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
 
@@ -934,6 +950,8 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                       <>
                         {/* Ek rozetleri: tek ek doğrudan açılır, birden fazlaysa
                             görev modalı (Bağlantılar + Dosyalar bölümleri). */}
+                        {/* Ek rozetleri başlığın YANINDA kalır: görevi
+                            tanımlayan bilgi, ona uygulanan bir eylem değil. */}
                         <TaskAttachmentBadges
                           taskId={t.id}
                           links={t.attachments}
@@ -941,40 +959,63 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                           onOpenDetail={() => onEditTask(t)}
                           size={13}
                         />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEditTask(t);
+                        {/* Eylem düğmeleri her kartta AYNI hizada dursun diye
+                            sağa itiliyor (marginLeft: auto). Başlığın hemen
+                            ardına bırakıldıklarında yerleri başlığın uzunluğuna
+                            göre kayıyor, uzun başlıklarda da sağdaki alt görev
+                            okuna dayanıyorlardı. */}
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            flexShrink: 0,
                           }}
-                          aria-label="Görevi düzenle"
-                          style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
                         >
-                          <IconEdit size={13} color={c.textSecondary} />
-                        </button>
-                        {onToggleActive && (canToggleActive?.(t) ?? true) && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onToggleActive(t.id);
+                              onEditTask(t);
                             }}
-                            aria-label={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
-                            title={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
-                            className={activeTaskId === t.id ? "active-task-pulse" : undefined}
-                            style={{
-                              background: activeTaskId === t.id ? `${c.accent}22` : "transparent",
-                              border: "none",
-                              borderRadius: "50%",
-                              padding: 3,
-                              display: "flex",
-                              flexShrink: 0,
-                            }}
+                            aria-label="Görevi düzenle"
+                            style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
                           >
-                            <IconActivity size={13} color={activeTaskId === t.id ? c.accentDark : c.textSecondary} filled={activeTaskId === t.id} />
+                            <IconEdit size={13} color={c.textSecondary} />
                           </button>
-                        )}
+                          {onToggleActive && (canToggleActive?.(t) ?? true) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleActive(t.id);
+                              }}
+                              aria-label={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                              title={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                              className={activeTaskId === t.id ? "active-task-pulse" : undefined}
+                              style={{
+                                background: activeTaskId === t.id ? `${c.accent}22` : "transparent",
+                                border: "none",
+                                borderRadius: "50%",
+                                padding: 3,
+                                display: "flex",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <IconActivity size={13} color={activeTaskId === t.id ? c.accentDark : c.textSecondary} filled={activeTaskId === t.id} />
+                            </button>
+                          )}
+                          <AskLioButton subject={{ kind: "gorev", title: t.title, id: t.id }} size={20} />
+                        </span>
                       </>
                     )}
                   </div>
+                  {/* SABİT GENİŞLİK — hizalamanın anahtarı.
+                      İçindekiler karta göre değişiyor: ok yalnızca alt görev
+                      açıkken, "1/10" rozeti yalnızca alt görev VARSA çiziliyor
+                      ve rozetin genişliği sayıya göre oynuyor. Sütun içeriğe
+                      göre daralıp genişleyince, solundaki eylem ikonları da
+                      kartlar arasında kayıyordu. Genişliği sabitleyince her
+                      kart "alt görevi varmış gibi" aynı yeri ayırıyor. */}
                   <div
                     style={{
                       display: renamingId === t.id ? "none" : "flex",
@@ -982,6 +1023,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                       alignItems: "center",
                       gap: 3,
                       flexShrink: 0,
+                      width: subtasksEnabled ? SUBTASK_COL_WIDTH : undefined,
                     }}
                   >
                     {subtasksEnabled && (
@@ -1271,38 +1313,58 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                                 onOpenDetail={() => onEditTask(sub)}
                                 size={11}
                               />
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onEditTask(sub);
+                              {/* Üst görev satırındaki kuralın aynısı: eylemler
+                                  sağa dayalı, böylece alt görevlerin düğmeleri
+                                  de üsttekilerle aynı dikey çizgide durur. */}
+                              <span
+                                style={{
+                                  marginLeft: "auto",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  flexShrink: 0,
                                 }}
-                                aria-label="Alt görevi düzenle"
-                                style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
                               >
-                                <IconEdit size={11} color={c.textSecondary} />
-                              </button>
-                              {onToggleActive && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onToggleActive(sub.id);
+                                    onEditTask(sub);
                                   }}
-                                  aria-label={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
-                                  title={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
-                                  className={activeTaskId === sub.id ? "active-task-pulse" : undefined}
-                                  style={{
-                                    background: activeTaskId === sub.id ? `${c.accent}22` : "transparent",
-                                    border: "none",
-                                    borderRadius: "50%",
-                                    padding: 2,
-                                    display: "flex",
-                                    flexShrink: 0,
-                                  }}
+                                  aria-label="Alt görevi düzenle"
+                                  style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
                                 >
-                                  <IconActivity size={11} color={activeTaskId === sub.id ? c.accentDark : c.textSecondary} filled={activeTaskId === sub.id} />
+                                  <IconEdit size={11} color={c.textSecondary} />
                                 </button>
-                              )}
+                                {onToggleActive && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onToggleActive(sub.id);
+                                    }}
+                                    aria-label={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                                    title={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                                    className={activeTaskId === sub.id ? "active-task-pulse" : undefined}
+                                    style={{
+                                      background: activeTaskId === sub.id ? `${c.accent}22` : "transparent",
+                                      border: "none",
+                                      borderRadius: "50%",
+                                      padding: 2,
+                                      display: "flex",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    <IconActivity size={11} color={activeTaskId === sub.id ? c.accentDark : c.textSecondary} filled={activeTaskId === sub.id} />
+                                  </button>
+                                )}
+                                <AskLioButton subject={{ kind: "altgorev", title: sub.title, id: sub.id }} size={18} />
+                              </span>
                             </>
+                          )}
+                          {/* Üst görevdeki alt görev sütunu kadar boşluk: alt
+                              görevin kendi oku/rozeti yok ama ikonları
+                              üsttekilerle aynı dikey çizgide durmalı. */}
+                          {subtasksEnabled && renamingId !== sub.id && (
+                            <span aria-hidden style={{ width: SUBTASK_COL_WIDTH, flexShrink: 0 }} />
                           )}
                         </div>
                       </div>

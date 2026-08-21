@@ -1,8 +1,9 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Output, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconChevronRight, IconEdit } from "./icons";
+import AskLioButton from "./AskLioButton";
 import TaskColumn, { TaskColumnHandle } from "./TaskColumn";
 import CreateOutputModal from "./CreateOutputModal";
 import EditOutputModal from "./EditOutputModal";
@@ -14,6 +15,7 @@ import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useTaskSelection } from "../lib/useTaskSelection";
+import { selectedLioTasks } from "../lib/askLio";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { usePageHeaderActions } from "../lib/pageHeader";
 
@@ -87,7 +89,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   onTasksArchived,
   onTasksDeleted,
 }, ref) {
-  const c = colors.light;
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const [outputs, setOutputs] = useState<Output[]>([]);
   const [selectedOutputId, setSelectedOutputId] = useState<string | null>(null);
@@ -369,6 +371,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
         onMove={() => setMovingOpen(true)}
         onArchive={() => setConfirmingBulkAction("archive")}
         onDelete={() => setConfirmingBulkAction("delete")}
+        lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
       />
     </div>
   );
@@ -432,6 +435,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
         onMove={() => setMovingOpen(true)}
         onArchive={() => setConfirmingBulkAction("archive")}
         onDelete={() => setConfirmingBulkAction("delete")}
+        lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
       />
     </>
   );
@@ -538,6 +542,10 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
               <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>{selectedOutput.description}</p>
             )}
           </div>
+          <AskLioButton
+            subject={{ kind: "cikti", title: selectedOutput.title, id: selectedOutput.id }}
+            size={26}
+          />
           <button
             onClick={() => setEditingOutput(selectedOutput)}
             aria-label="Çıktıyı düzenle"

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Department, Task } from "@projelio/shared";
 import { api } from "../api/client";
+import { useLiveRoom } from "../lib/liveRoom";
 import DepartmentMembersList, { DepartmentMembersListHandle } from "../components/DepartmentMembersList";
 import DepartmentModulesPanel from "../components/DepartmentModulesPanel";
 import DepartmentTasksPanel, { DepartmentTasksPanelHandle } from "../components/DepartmentTasksPanel";
@@ -13,11 +14,13 @@ import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
 import DepartmentSettingsModal from "../components/DepartmentSettingsModal";
 import ProfileCard from "../components/ProfileCard";
 import { CoverBackLink } from "../components/EntityCover";
+import AskLioButton from "../components/AskLioButton";
 import { useBackTarget } from "../lib/backTarget";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
-import { colors } from "../theme/colors";
+import { colors } from "@projelio/shared";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { IconLayers, IconSettings } from "../components/icons";
@@ -30,8 +33,10 @@ import { IconLayers, IconSettings } from "../components/icons";
 // birebir aynı desen; sekmeler ?tab= sorgu parametresiyle tutulur.
 export default function DepartmentDetail() {
   const { id } = useParams();
+  // Aynı sayfadaki kullanıcılar: canlı tazeleme + "kim burada" (bkz. lib/liveRoom.ts).
+  useLiveRoom(id ? `department:${id}` : null);
   const navigate = useNavigate();
-  const c = colors.light;
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const gutter = pageGutter(isDesktop);
   const [department, setDepartment] = useState<Department | null>(null);
@@ -160,9 +165,13 @@ export default function DepartmentDetail() {
         style={{
           position: "relative",
           height: 320,
+          // Bu bant her zaman sabit beyaz yazı taşıyor (bkz. "#fff" aşağıda), o yüzden
+          // arka planı da her zaman sabit koyu olmalı — temanın "primary"si karanlık
+          // modda açık bir tona döndüğü için (bkz. ThemeProvider) dinamik c.primary
+          // kullanılırsa karanlık modda beyaz yazı kapakla karışır.
           background: coverUrl
             ? `linear-gradient(rgba(26,31,41,0.15), rgba(26,31,41,0.6)), center/cover url(${coverUrl})`
-            : `linear-gradient(135deg, ${c.primary}, ${c.primaryDark})`,
+            : `linear-gradient(135deg, ${colors.light.primary}, ${colors.light.primaryDark})`,
           padding: "20px 28px",
           display: "flex",
           flexDirection: "column",
@@ -182,6 +191,13 @@ export default function DepartmentDetail() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <IconLayers size={16} color="#fff" />
             <h1 style={{ fontSize: 20, fontWeight: 500, color: "#fff", margin: 0 }}>{department?.name ?? "…"}</h1>
+            {department && (
+              <AskLioButton
+                subject={{ kind: "departman", title: department.name, id: department.id }}
+                size={26}
+                withBackground
+              />
+            )}
           </div>
           {department?.description && (
             <p style={{ fontSize: 15, color: "rgba(255,255,255,0.85)", margin: 0 }}>{department.description}</p>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { IconChevronLeft, IconChevronRight } from "./icons";
 
@@ -38,7 +38,7 @@ interface Props {
  * çubuk yana kaydırılır (bkz. ScrollableTabBar).
  */
 export default function TabBar({ tabs, active, onChange, style, scrollable }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
   // Masaüstünde daha geniş bir taban: sekmeler tek satırda kalmayı denesin ama
   // sıkışıp okunmaz hale gelmesin. Mobilde eşik düşük, çünkü orada iki-üç satır
@@ -132,7 +132,7 @@ export default function TabBar({ tabs, active, onChange, style, scrollable }: Pr
  * kaybolmaktansa kısalsınlar.
  */
 function FittedTabBar({ tabs, active, onChange, style }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div
       style={{
@@ -201,7 +201,7 @@ function FittedTabBar({ tabs, active, onChange, style }: Props) {
  * — kaydırma çubuğu gizli, taşan sekmeler de ekran dışında kalıyor.
  */
 function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ atStart: true, atEnd: true });
 
@@ -219,10 +219,17 @@ function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
     };
     update();
     el.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
+    // Çubuğun genişliği pencere boyutlanmadan da değişiyor (kenar çubuğu açılıp
+    // kapanıyor, sekme ekleniyor, yazı ölçeği değişiyor). Yalnızca window
+    // "resize"ına bakıldığında "uçtayım" durumu bayat kalıp uçlardaki ok payını
+    // (30px) sekmeler sığdığı halde ayrılı bırakıyor, sağda ölü boşluk oluyordu.
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    if (!ro) window.addEventListener("resize", update);
     return () => {
       el.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
+      ro?.disconnect();
+      if (!ro) window.removeEventListener("resize", update);
     };
   }, [tabs.length]);
 
@@ -260,7 +267,12 @@ function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
             data-active={active === t.key}
             onClick={() => onChange(t.key)}
             style={{
-              flexShrink: 0,
+              // Sekmeler sığıyorsa artan yeri EŞİT paylaşıp satırı doldurur
+              // (grow: 1); sığmıyorsa kendi genişliklerinde kalıp çubuğu
+              // kaydırılabilir bırakır (shrink: 0). Eskiden yalnızca
+              // `flexShrink: 0` vardı: sekmeler sola yığılıp sağda ölü boşluk
+              // bırakıyordu.
+              flex: "1 0 auto",
               display: "flex",
               alignItems: "center",
               gap: 5,

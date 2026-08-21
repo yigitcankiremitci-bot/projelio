@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import type { Department, Organization, Task } from "@projelio/shared";
 import { ORG_TYPE_LABEL } from "@projelio/shared";
 import { api } from "../api/client";
+import { useLiveRoom } from "../lib/liveRoom";
 import EditOrganizationModal from "../components/EditOrganizationModal";
 import FilesPanel from "../components/FilesPanel";
 import DepartmentsPanel, { DepartmentsPanelHandle } from "../components/DepartmentsPanel";
@@ -16,12 +17,12 @@ import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
 import ProfileCard from "../components/ProfileCard";
 import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
-import { coverText } from "../lib/covers";
+import { useCoverTheme } from "../theme/useCoverTheme";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings, IconLayers } from "../components/icons";
 
@@ -41,8 +42,11 @@ const NO_TASKS: Task[] = [];
 // sekmesi ise yalnızca departman yönetimi içindir.
 export default function OrganizationDetail() {
   const { id } = useParams();
+  // Aynı sayfadaki kullanıcılar: canlı tazeleme + "kim burada" (bkz. lib/liveRoom.ts).
+  useLiveRoom(id ? `organization:${id}` : null);
   const navigate = useNavigate();
-  const c = colors.light;
+  const c = useThemeColors();
+  const cover = useCoverTheme();
   const isDesktop = useIsDesktop();
   const gutter = pageGutter(isDesktop);
   const [organization, setOrganization] = useState<Organization | null>(null);
@@ -152,6 +156,9 @@ export default function OrganizationDetail() {
         coverImageUrl={organization?.coverImageUrl}
         height={270}
         title={organization?.name ?? "…"}
+        lioSubject={
+          organization ? { kind: "organizasyon", title: organization.name, id: organization.id } : undefined
+        }
         description={organization?.description}
         meta={
           organization && (
@@ -170,21 +177,21 @@ export default function OrganizationDetail() {
               </span>
               {organization.ownerName && (
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <IconUser size={12} color={coverText.secondary} />
+                  <IconUser size={12} color={cover.secondary} />
                   {organization.ownerName}
                 </span>
               )}
               {organization.groupName && (
                 <Link
                   to={`/groups/${organization.groupId}`}
-                  style={{ display: "flex", alignItems: "center", gap: 5, color: coverText.secondary }}
+                  style={{ display: "flex", alignItems: "center", gap: 5, color: cover.secondary }}
                 >
-                  <IconLayers size={12} color={coverText.secondary} />
+                  <IconLayers size={12} color={cover.secondary} />
                   {organization.groupName}
                 </Link>
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <IconCalendar size={12} color={coverText.secondary} />
+                <IconCalendar size={12} color={cover.secondary} />
                 {new Date(organization.createdAt).toLocaleDateString("tr-TR")} kuruldu
               </span>
             </>

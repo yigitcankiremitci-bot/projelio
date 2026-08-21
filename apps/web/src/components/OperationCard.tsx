@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 import { coverBackground } from "../lib/covers";
 import type { Operation } from "@projelio/shared";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
 import OperationHealthBadge from "./OperationHealthBadge";
+import AskLioButton from "./AskLioButton";
 
 interface Props {
   operation: Operation;
@@ -16,7 +17,7 @@ const periodLabel: Record<string, string> = {
 };
 
 export default function OperationCard({ operation }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const adherence = operation.adherencePct;
   const missed = operation.missedCount ?? 0;
 
@@ -38,7 +39,10 @@ export default function OperationCard({ operation }: Props) {
       <div style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{operation.title}</h3>
-          <OperationHealthBadge status={operation.status} health={operation.health} />
+          <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <OperationHealthBadge status={operation.status} health={operation.health} />
+            <AskLioButton subject={{ kind: "rutin", title: operation.title, id: operation.id }} size={24} />
+          </span>
         </div>
 
         {operation.description && (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { notifyCreationRequestsChanged, readCreateOutcome } from "../lib/creationRequests";
 import Modal from "./Modal";
 
@@ -13,7 +13,7 @@ interface Props {
 // organizasyona/gruba bağlanamaz. Şirket/işletme/holding içi çalışma Departmanlar
 // üzerinden yürütülür (bkz. DepartmentsPanel).
 export default function CreateJobModal({ onClose, onCreated }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");

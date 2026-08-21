@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { TaskAttachment } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { publishTaskAttachments } from "../lib/taskAttachmentEvents";
 import { IconPlus, IconTrash } from "./icons";
 
@@ -32,7 +32,7 @@ interface Props {
  * kaydetmeyi beklemez — kullanıcı modalı kapatmadan dosyasını bırakıp gider.
  */
 export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [items, setItems] = useState<TaskAttachment[]>([]);
   const [addingLink, setAddingLink] = useState(false);
   const [url, setUrl] = useState("");
@@ -111,7 +111,16 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
       </div>
 
       {addingLink && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        // Kendi formu: Enter bağlantıyı EKLESİN, görevi kaydetmesin. Panel,
+        // görev modalinin kaydet formunun dışında duruyor (bkz. TaskEditModal);
+        // formsuz bırakılırsa Enter modalin genel onayına düşerdi.
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void addLink();
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: 6 }}
+        >
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -127,8 +136,7 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
           />
           <div style={{ display: "flex", gap: 6 }}>
             <button
-              type="button"
-              onClick={addLink}
+              type="submit"
               disabled={busy || !url.trim()}
               style={{
                 padding: "7px 14px",
@@ -162,7 +170,7 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
               Vazgeç
             </button>
           </div>
-        </div>
+        </form>
       )}
 
       {error && <p style={{ fontSize: 13, color: c.danger, margin: 0 }}>{error}</p>}

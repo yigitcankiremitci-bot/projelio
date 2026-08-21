@@ -1,3 +1,5 @@
+import { getSocketId } from "../lib/socketId";
+
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 /**
@@ -57,11 +59,17 @@ async function parseResponse<T>(res: Response): Promise<T> {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("projelio_token");
+  // Açık soketin kimliği: sunucu bundan isteğin HANGİ SAYFADAN geldiğini bulup
+  // değişikliği o sayfadaki diğer kullanıcılara duyuruyor (bkz. lib/liveRoom.ts
+  // ve backend realtime.interceptor.ts). Yoksa (soket kapalı) sinyal gitmez,
+  // istek normal çalışır.
+  const socketId = getSocketId();
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(socketId ? { "X-Socket-Id": socketId } : {}),
       ...options.headers,
     },
   });

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { JobMember, User } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function HireMemberModal({ jobId, existingUserIds, onClose, onHired }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);

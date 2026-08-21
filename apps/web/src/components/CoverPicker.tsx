@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { COVER_PRESETS, coverBackground, coverPresetValue, findCoverPreset } from "../lib/covers";
 import { IconCheck, IconX } from "./icons";
 
@@ -20,7 +20,7 @@ interface Props {
  * istemeyen kullanıcı da sayfasını boş bırakmak zorunda kalmıyor.
  */
 export default function CoverPicker({ value, filePreview, onSelectPreset, onFile }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const fileRef = useRef<HTMLInputElement>(null);
   const selectedPreset = findCoverPreset(value);
   const previewBackground = filePreview ? `center/cover no-repeat url(${filePreview})` : coverBackground(value);

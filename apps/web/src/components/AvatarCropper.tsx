@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import type { CropArea } from "../lib/imageProcessing";
 
 interface Props {
@@ -15,7 +15,7 @@ const MAX_ZOOM = 3;
 // yakınlaştırılır. Çerçeve sabit (FRAME px), fotoğraf onun altında hareket eder.
 // Seçilen alan kaynak görselin piksel koordinatlarına çevrilip onChange ile bildirilir.
 export default function AvatarCropper({ file, onChange }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [zoom, setZoom] = useState(1);

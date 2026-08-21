@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { io, Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
 import type { CreationRequest, JobMember, NotificationPayload } from "@projelio/shared";
-import { api, API_URL } from "../api/client";
-import { colors } from "../theme/colors";
+import { api } from "../api/client";
+import { getSocket } from "../lib/liveRoom";
+import { useThemeColors } from "../theme/useThemeColors";
 import { timeAgo } from "../lib/dates";
 import { tourAnchor } from "../lib/tour/types";
 import { fetchPendingJobInvites, onJobInvitesChanged, respondToJobInvite } from "../lib/jobInvites";
@@ -13,13 +14,18 @@ import {
   respondToCreationRequest,
 } from "../lib/creationRequests";
 import { IconBell } from "./icons";
+import Modal from "./Modal";
 
 export default function NotificationBell() {
-  const c = colors.light;
+  const c = useThemeColors();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationPayload[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+  // Destek yanıtı: sayfaya yönlendirmek yerine yanıtı burada, modalda gösteririz
+  // (bkz. handleSelect). Yanıt metni bildirimin gövdesinde geldiği için ayrıca
+  // sunucuya sorulmuyor.
+  const [supportReply, setSupportReply] = useState<NotificationPayload | null>(null);
   // Bekleyen iş davetleri bildirimlerden ayrı tutulur: bildirim okununca kaybolur,
   // davet ise yanıtlanana kadar durmalı. Rozet ikisinin toplamını gösterir.
   const [invites, setInvites] = useState<JobMember[]>([]);
@@ -99,12 +105,14 @@ export default function NotificationBell() {
         if (cancelled || !me) return;
         const token = localStorage.getItem("projelio_token");
         if (!token) return;
-        const socket = io(API_URL, { transports: ["websocket"] });
+        // Uygulamanın TEK soketi (bkz. lib/liveRoom.ts). Eskiden burası kendi
+        // bağlantısını açıyordu; canlı sayfa odaları geldiğinde aynı sekmede
+        // ikinci bir bağlantı olurdu ve sunucu "bu istek hangi sayfadan geldi"
+        // sorusunu yanlış sokete sorardı. Kimlik doğrulaması (register) tek
+        // yerde, bağlantı kurulurken yapılıyor.
+        const socket = getSocket();
+        if (!socket) return;
         socketRef.current = socket;
-        // Sunucu artık ham bir userId değil, doğrulanmış bir JWT bekliyor
-        // (bkz. notifications.gateway.ts) — başka bir kullanıcının bildirim
-        // odasına kimliksiz katılmayı engellemek için.
-        socket.emit("register", token);
         socket.on("notification", (notification: NotificationPayload) => {
           setNotifications((prev) => [notification, ...prev].slice(0, 50));
           setUnreadCount((n) => n + 1);
@@ -117,7 +125,8 @@ export default function NotificationBell() {
 
     return () => {
       cancelled = true;
-      socketRef.current?.disconnect();
+      // Soket paylaşımlı: kapatılmaz, yalnızca bu bileşenin dinleyicisi kalkar.
+      socketRef.current?.off("notification");
       socketRef.current = null;
     };
   }, []);
@@ -173,6 +182,10 @@ export default function NotificationBell() {
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
       setUnreadCount((count) => Math.max(0, count - 1));
       api.patch(`/notifications/${n.id}/read`, {}).catch(() => {});
+    }
+    if (n.type === "support_reply") {
+      setSupportReply(n);
+      return;
     }
     if (n.link) navigate(n.link);
   };
@@ -444,6 +457,35 @@ export default function NotificationBell() {
             </div>
           )}
         </div>
+      )}
+
+      {supportReply && (
+        <Modal title="Destek talebin yanıtlandı" onClose={() => setSupportReply(null)} maxWidth={520}>
+          <p style={{ fontSize: 15, color: c.textPrimary, margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+            {supportReply.body}
+          </p>
+          <p style={{ fontSize: 12, color: c.textSecondary, margin: "12px 0 0" }}>
+            {timeAgo(supportReply.createdAt)}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSupportReply(null);
+              navigate("/settings?sekme=destek");
+            }}
+            style={{
+              marginTop: 14,
+              background: "transparent",
+              color: c.textPrimary,
+              padding: "8px 15px",
+              borderRadius: 8,
+              border: `1px solid ${c.border}`,
+              fontSize: 14,
+            }}
+          >
+            Tüm taleplerim
+          </button>
+        </Modal>
       )}
     </div>
   );

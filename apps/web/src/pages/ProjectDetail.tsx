@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { COVER_TEXT_VEIL, COVER_VEIL_HEIGHT, coverBackground, coverText } from "../lib/covers";
+import { COVER_VEIL_HEIGHT, coverBackground } from "../lib/covers";
+import { useLiveRoom } from "../lib/liveRoom";
 import { CoverBackLink } from "../components/EntityCover";
+import AskLioButton from "../components/AskLioButton";
+import { useCoverTheme } from "../theme/useCoverTheme";
 import { useBackTarget } from "../lib/backTarget";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import type { Project, ProjectMember, ProjectStatus, Task, TaskStatus } from "@projelio/shared";
@@ -17,7 +20,7 @@ import BudgetPanel, { BudgetPanelHandle } from "../components/panels/BudgetPanel
 import OutputsPanel, { OutputsPanelHandle } from "../components/OutputsPanel";
 import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
 import ProcessPanel, { ProcessNavState, ViewMode, computeInitialProcessNavDates } from "../components/panels/ProcessPanel";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
 import { IconSettings } from "../components/icons";
 import { useProjectFabAction } from "../lib/projectFab";
@@ -28,6 +31,8 @@ import { useIsSubcontractor } from "../lib/useCurrentUser";
 
 export default function ProjectDetail() {
   const { id } = useParams();
+  // Aynı sayfadaki kullanıcılar: canlı tazeleme + "kim burada" (bkz. lib/liveRoom.ts).
+  useLiveRoom(id ? `project:${id}` : null);
   const location = useLocation();
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -64,7 +69,8 @@ export default function ProjectDetail() {
   const [activeTaskId, setActiveTaskId] = useState<string | undefined>(undefined);
   const [extendingDeadline, setExtendingDeadline] = useState(false);
   const [highlightTaskId, setHighlightTaskId] = useState<string | undefined>(undefined);
-  const c = colors.light;
+  const c = useThemeColors();
+  const cover = useCoverTheme();
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
   const outputsRef = useRef<OutputsPanelHandle>(null);
   const feedRef = useRef<FeedPanelHandle>(null);
@@ -482,7 +488,7 @@ export default function ProjectDetail() {
                   right: 0,
                   bottom: 0,
                   height: COVER_VEIL_HEIGHT,
-                  background: COVER_TEXT_VEIL,
+                  background: cover.veil,
                   pointerEvents: "none",
                 }}
               />
@@ -498,6 +504,11 @@ export default function ProjectDetail() {
             <div style={{ position: "relative", marginBottom: project.description ? 8 : 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{project.title}</h1>
+                <AskLioButton
+                  subject={{ kind: "proje", title: project.title, id: project.id }}
+                  size={28}
+                  withBackground={hasCover}
+                />
                 <StatusBadge
                   status={project.status}
                   onChange={currentUserId === project.ownerId ? handleStatusChange : undefined}
@@ -510,7 +521,7 @@ export default function ProjectDetail() {
                 style={{
                   position: "relative",
                   fontSize: 16,
-                  color: hasCover ? coverText.secondary : c.textSecondary,
+                  color: hasCover ? cover.secondary : c.textSecondary,
                   margin: "0 0 14px",
                 }}
               >
@@ -542,7 +553,7 @@ export default function ProjectDetail() {
                   rowGap: 6,
                   // Mobilde yazı ekran genişliğiyle ölçekleniyor ki iki tarih tek satıra sığsın.
                   fontSize: isDesktop ? 15 : "clamp(11px, 3.2vw, 13px)",
-                  color: hasCover ? coverText.secondary : c.textSecondary,
+                  color: hasCover ? cover.secondary : c.textSecondary,
                 }}
               >
                 <span style={{ whiteSpace: "nowrap" }}>
@@ -695,6 +706,7 @@ export default function ProjectDetail() {
               Hayır
             </button>
             <button
+              data-primary
               onClick={() => {
                 handleToggleComplete(parentCompletePrompt.id);
                 setParentCompletePrompt(null);

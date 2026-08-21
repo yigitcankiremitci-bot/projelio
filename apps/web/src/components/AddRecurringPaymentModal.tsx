@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Project, RecurrenceInterval, RecurringPayment } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
@@ -30,7 +30,7 @@ function todayString() {
 }
 
 export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [type, setType] = useState<"income" | "expense">(payment?.type ?? "expense");
   const [amount, setAmount] = useState(payment ? String(payment.amount) : "");
   const [description, setDescription] = useState(payment?.description ?? "");

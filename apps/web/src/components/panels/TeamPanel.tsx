@@ -1,7 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { ProjectMember, Task } from "@projelio/shared";
 import { api } from "../../api/client";
-import { colors } from "../../theme/colors";
+import { useRefreshOnUndo } from "../../lib/undo";
+import { useThemeColors } from "../../theme/useThemeColors";
 import AddMemberModal from "../AddMemberModal";
 import TeamMemberModal from "../TeamMemberModal";
 import { isAssignedTo } from "../../lib/taskAssignees";
@@ -25,7 +26,7 @@ const roleLabel: Record<string, string> = {
 };
 
 const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }, ref) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -46,6 +47,8 @@ const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projec
   };
 
   useEffect(load, [projectId]);
+  // Aynı sayfadaki başka biri değiştirdiğinde de tazelenir (bkz. lib/liveRoom.ts).
+  useRefreshOnUndo(load);
 
   const taskCounts = (userId: string) => {
     const assigned = tasks.filter((t) => isAssignedTo(t, userId));

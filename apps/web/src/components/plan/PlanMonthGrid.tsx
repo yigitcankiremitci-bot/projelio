@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { PlanTimeBlock } from "@projelio/shared";
-import { colors } from "../../theme/colors";
+import { useThemeColors } from "../../theme/useThemeColors";
 import {
   DRAG_ITEM,
   addDays,
@@ -44,7 +44,7 @@ export default function PlanMonthGrid({
   onSelectDay,
   onDropItem,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const today = todayStr();
 
   // Ay, tam haftalar hâlinde çizilir: ilk satır ayın 1'inden önceki

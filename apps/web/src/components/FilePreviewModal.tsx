@@ -10,7 +10,7 @@ import {
   fileKindLabel,
   formatFileSize,
 } from "../lib/driveLinks";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconDownload, IconExternalLink, IconX } from "./icons";
 
 interface Props {
@@ -21,7 +21,7 @@ interface Props {
 }
 
 export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState("");
   const [openedEditor, setOpenedEditor] = useState(false);
@@ -259,7 +259,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
 }
 
 function EmptyState({ title, detail }: { title: string; detail: string }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <div
       style={{

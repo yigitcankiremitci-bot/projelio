@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DepartmentMember, ProjectMember } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 
 // Hem proje ekibi hem departman kadrosu için ortak, minimal görüntü şekli.
 interface PickableMember {
@@ -44,7 +44,7 @@ export default function AssigneePicker({
   values = [],
   onChangeValues,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [members, setMembers] = useState<PickableMember[]>([]);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);

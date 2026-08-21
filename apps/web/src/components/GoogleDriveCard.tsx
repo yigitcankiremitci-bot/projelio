@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import type { GoogleDriveStatus } from "@projelio/shared";
 import { driveApi } from "../api/files";
 import { formatFileSize } from "../lib/driveLinks";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { notifyCloudStorageChanged, onCloudStorageChanged } from "../lib/cloudStorageEvents";
 import ConfirmDialog from "./ConfirmDialog";
 import { IconGoogleDrive } from "./icons";
 
 /** Ayarlar ekranındaki Google Drive bağlantı kartı. */
 export default function GoogleDriveCard() {
-  const c = colors.light;
+  const c = useThemeColors();
   const [status, setStatus] = useState<GoogleDriveStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

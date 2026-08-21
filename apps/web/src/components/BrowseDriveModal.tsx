@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
 import type { DriveBrowseEntry } from "../api/files";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconChevronRight, IconFile, IconFolder } from "./icons";
 
@@ -26,7 +26,7 @@ interface Crumb {
  * "microsoft" olduğunda açılır (bkz. FilesPanel.tsx).
  */
 export default function BrowseDriveModal({ target, taskId, outputId, onClose, onImported }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [crumbs, setCrumbs] = useState<Crumb[]>([{ id: undefined, name: "OneDrive" }]);
   const [entries, setEntries] = useState<DriveBrowseEntry[]>([]);
   const [loading, setLoading] = useState(true);

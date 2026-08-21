@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { onAskLio } from "../lib/askLio";
+import type { AskLioRequest } from "../lib/askLio";
 import { tourAnchor } from "../lib/tour/types";
 import AiAssistantPanel from "./AiAssistantPanel";
 
@@ -28,10 +29,10 @@ export default function AiLauncher() {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [eyesClosed, setEyesClosed] = useState(false);
-  // Başka bir sayfadan (ör. Takvim'deki "Lio ile planla") gelen açılış mesajı.
-  // Panel bunu gönderdikten sonra sıfırlar, aksi halde panel her açıldığında
-  // aynı mesaj tekrar gider.
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  // Başka bir sayfadan (ör. Takvim'deki "Lio ile planla", kartlardaki Lio
+  // simgesi) gelen açılış isteği. Panel bunu işledikten sonra sıfırlar, aksi
+  // halde panel her açıldığında aynı mesaj tekrar gelirdi.
+  const [pendingRequest, setPendingRequest] = useState<AskLioRequest | null>(null);
   const hoveredRef = useRef(hovered);
 
   useEffect(() => {
@@ -51,8 +52,8 @@ export default function AiLauncher() {
 
   useEffect(
     () =>
-      onAskLio((message) => {
-        setPendingMessage(message);
+      onAskLio((request) => {
+        setPendingRequest(request);
         setOpen(true);
       }),
     []
@@ -156,8 +157,9 @@ export default function AiLauncher() {
       <AiAssistantPanel
         open={open}
         onClose={() => setOpen(false)}
-        initialMessage={pendingMessage}
-        onInitialMessageSent={() => setPendingMessage(null)}
+        initialMessage={pendingRequest?.message ?? null}
+        initialAutoSend={pendingRequest?.autoSend ?? true}
+        onInitialMessageSent={() => setPendingRequest(null)}
       />
     </>
   );

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Job, ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
 import { driveEditUrl, fileKindLabel, formatFileSize } from "../lib/driveLinks";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import FilePreviewModal from "./FilePreviewModal";
 import { IconDownload, IconExternalLink, IconFile } from "./icons";
 
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default function AllFilesPanel({ jobs }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -161,7 +161,7 @@ function IconButton({
   onClick: () => void;
   children: React.ReactNode;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <button
       title={title}

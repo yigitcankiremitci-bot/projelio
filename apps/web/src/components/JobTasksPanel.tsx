@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Output, Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import TaskColumn from "./TaskColumn";
 import TaskSortMenu from "./TaskSortMenu";
 import CreateTaskModal from "./CreateTaskModal";
@@ -13,6 +13,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { IconChevronDown, IconChevronUp } from "./icons";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { useTaskSelection } from "../lib/useTaskSelection";
+import { selectedLioTasks } from "../lib/askLio";
 import { useUndo } from "../lib/undo";
 import { backState } from "../lib/backTarget";
 import { focusParams, resolveTaskFocus, type FocusWhere, type TaskFocus } from "../lib/taskFocus";
@@ -81,7 +82,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
   },
   ref
 ) {
-  const c = colors.light;
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -380,6 +381,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
             onMove={() => setMovingOpen(true)}
             onArchive={() => setConfirmingBulkAction("archive")}
             onDelete={() => setConfirmingBulkAction("delete")}
+            lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
           />
           </>
         )}

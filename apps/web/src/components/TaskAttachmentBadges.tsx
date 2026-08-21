@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { TaskAttachment } from "@projelio/shared";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconExternalLink, IconFile } from "./icons";
 import Modal from "./Modal";
 import { useTaskAttachmentSnapshot, type AttachedFile } from "../lib/taskAttachmentEvents";
@@ -35,7 +35,7 @@ export default function TaskAttachmentBadges({
   onOpenDetail?: () => void;
   size?: number;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [picker, setPicker] = useState<"links" | "files" | null>(null);
   // Pano listesi sunucudan geldiği gibi duruyor; bu oturumda ek eklendiyse
   // defterdeki taze liste onun yerine geçer. Böylece rozet, modalı hangi
@@ -160,7 +160,7 @@ function AttachmentRow({
   disabled?: boolean;
   onOpen: () => void;
 }) {
-  const c = colors.light;
+  const c = useThemeColors();
   return (
     <button
       type="button"

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 
 interface Props {
   text: string;
@@ -26,7 +26,7 @@ interface Props {
  * sığıyor.
  */
 export default function CardDescription({ text, lines = 2, style }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [expanded, setExpanded] = useState(false);
   const [clamped, setClamped] = useState(false);
   const ref = useRef<HTMLParagraphElement>(null);

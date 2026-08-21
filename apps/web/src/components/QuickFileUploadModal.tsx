@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Department, GoogleDriveStatus } from "@projelio/shared";
 import { driveApi, oneDriveApi, uploadFile } from "../api/files";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconUpload } from "./icons";
 
@@ -19,7 +19,7 @@ interface Props {
  * yeri yok — kullanıcı önce hangi departmana yükleyeceğini seçmeli.
  */
 export default function QuickFileUploadModal({ departments, onClose, onUploaded }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [departmentId, setDepartmentId] = useState(departments[0]?.id ?? "");
   const [googleStatus, setGoogleStatus] = useState<GoogleDriveStatus | null>(null);
   const [msStatus, setMsStatus] = useState<GoogleDriveStatus | null>(null);

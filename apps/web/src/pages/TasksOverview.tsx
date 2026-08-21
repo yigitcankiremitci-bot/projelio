@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PersonalBoardItem, PersonalBoardSource, PersonalTodo, Task, TaskPriority, TaskStatus, User } from "@projelio/shared";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import TaskColumn, { TaskColumnHandle } from "../components/TaskColumn";
 import TaskEditModal from "../components/TaskEditModal";
 import PersonalTodoModal from "../components/PersonalTodoModal";
@@ -13,6 +13,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { useLatestRef, useRefreshOnUndo, useUndo } from "../lib/undo";
 import { useProjectFabAction } from "../lib/projectFab";
 import { useTaskSelection } from "../lib/useTaskSelection";
+import { selectedLioTasks } from "../lib/askLio";
 import { usePageHeader, usePageHeaderActions, usePageHeaderTabs } from "../lib/pageHeader";
 import TaskSortMenu from "../components/TaskSortMenu";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
@@ -58,7 +59,7 @@ const DEFAULT_FILTER: Filter = "personal";
  * atanan görevlerin alt görevleri ise kendi projelerinde yaşar).
  */
 export default function TasksOverview() {
-  const c = colors.light;
+  const c = useThemeColors();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const [items, setItems] = useState<PersonalBoardItem[]>([]);
@@ -608,6 +609,7 @@ export default function TasksOverview() {
         onMove={movableSelectedIds.length > 0 ? () => setMovingOpen(true) : undefined}
         onArchive={() => setConfirmingBulkAction("archive")}
         onDelete={() => setConfirmingBulkAction("delete")}
+        lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
       />
     </>
   );

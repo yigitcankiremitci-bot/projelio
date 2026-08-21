@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Operation, OperationBudgetPeriod } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
@@ -17,7 +17,7 @@ const periods: { value: OperationBudgetPeriod; label: string }[] = [
 ];
 
 export default function CreateOperationModal({ jobId, onClose, onCreated }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [budgetPerPeriod, setBudgetPerPeriod] = useState("");

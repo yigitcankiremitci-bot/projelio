@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconDashboard, IconCalendar, IconShield, IconLogout, IconCheck } from "./icons";
 
 const navItems = [
@@ -9,7 +9,7 @@ const navItems = [
 ];
 
 export default function Navbar() {
-  const c = colors.light;
+  const c = useThemeColors();
   const location = useLocation();
   const navigate = useNavigate();
 

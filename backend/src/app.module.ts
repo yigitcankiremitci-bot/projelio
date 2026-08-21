@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { APP_INTERCEPTOR } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
 import { DatabaseModule } from "./database/database.module";
 import { AccessModule } from "./common/access/access.module";
@@ -20,6 +21,7 @@ import { BudgetModule } from "./modules/budget/budget.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { CalendarModule } from "./modules/calendar/calendar.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { SupportModule } from "./modules/support/support.module";
 import { ArchiveModule } from "./modules/archive/archive.module";
 import { AiAssistantModule } from "./modules/ai-assistant/ai-assistant.module";
 import { HabieModule } from "./modules/habie/habie.module";
@@ -42,6 +44,8 @@ import { PlanningModule } from "./modules/planning/planning.module";
 import { CreationRequestsModule } from "./modules/creation-requests/creation-requests.module";
 import { SocialMediaModule } from "./modules/social-media/social-media.module";
 import { MailboxModule } from "./modules/mailbox/mailbox.module";
+import { RealtimeModule } from "./modules/realtime/realtime.module";
+import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.interceptor";
 
 @Module({
   imports: [
@@ -67,6 +71,7 @@ import { MailboxModule } from "./modules/mailbox/mailbox.module";
     NotificationsModule,
     CalendarModule,
     AdminModule,
+    SupportModule,
     ArchiveModule,
     AiAssistantModule,
     HabieModule,
@@ -92,6 +97,15 @@ import { MailboxModule } from "./modules/mailbox/mailbox.module";
     MailboxModule,
     // Taşeronun iş/proje açma talepleri (onay akışı).
     CreationRequestsModule,
+    // Aynı sayfadaki kullanıcıların birbirini görmesi ve değişikliklerin anında
+    // yansıması (bkz. realtime.gateway.ts).
+    RealtimeModule,
+  ],
+  providers: [
+    // Her başarılı değiştirme isteğinden sonra, isteği yapanın bulunduğu sayfaya
+    // "değişti" sinyali gönderir. Servislere tek tek yayın çağrısı eklemek
+    // yerine tek kapı (bkz. realtime.interceptor.ts).
+    { provide: APP_INTERCEPTOR, useClass: RealtimeChangeInterceptor },
   ],
 })
 export class AppModule {}

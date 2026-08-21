@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
+import { useCoverTheme } from "../theme/useCoverTheme";
 import { useIsDesktop, useIsWide } from "../lib/useIsDesktop";
 import { IconChevronDown, IconChevronUp } from "./icons";
 
@@ -55,7 +56,7 @@ function readOpen(): boolean {
  * (bkz. CoverStats).
  */
 export function StatSummary({ items }: { items: StatItem[] }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const isWide = useIsWide();
   const [open, setOpen] = useState(readOpen);
@@ -154,7 +155,8 @@ export function StatSummary({ items }: { items: StatItem[] }) {
  * şerit ise üst bandın içine taşabiliyor.
  */
 export function CoverStats({ items }: { items: StatItem[] }) {
-  const c = colors.light;
+  const c = useThemeColors();
+  const cover = useCoverTheme();
   const isWide = useIsWide();
   if (!isWide) return null;
 
@@ -166,8 +168,12 @@ export function CoverStats({ items }: { items: StatItem[] }) {
         padding: "12px 18px",
         marginBottom: 16,
         borderRadius: 12,
-        background: "rgba(255,255,255,0.72)",
-        border: "1px solid rgba(26,31,41,0.08)",
+        // Kapak fotoğrafı koyu da olabilir açık da, bu yüzden zemin kapağın
+        // KENDİ renginden değil app'in temasından geliyor (bkz. useCoverTheme) —
+        // karanlık modda beyaz kalırsa üstündeki (de karanlık modda açık renge
+        // dönen) yazılar okunmaz olurdu.
+        background: cover.dark ? "rgba(18,21,27,0.72)" : "rgba(255,255,255,0.72)",
+        border: cover.dark ? "1px solid rgba(255,255,255,0.14)" : "1px solid rgba(26,31,41,0.08)",
         backdropFilter: "blur(2px)",
       }}
     >
@@ -191,7 +197,7 @@ export function CoverStats({ items }: { items: StatItem[] }) {
  * Dışa açık değil: kutular her zaman StatSummary üzerinden diziliyor.
  */
 function StatCard({ label, value, tone }: StatItem) {
-  const c = colors.light;
+  const c = useThemeColors();
   const isDesktop = useIsDesktop();
   return (
     <div

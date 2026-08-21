@@ -2,13 +2,14 @@ import { useRef, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Group, Organization } from "@projelio/shared";
 import { api } from "../api/client";
+import { useLiveRoom } from "../lib/liveRoom";
 import OrganizationCard from "../components/OrganizationCard";
 import EditGroupModal from "../components/EditGroupModal";
 import FilesPanel from "../components/FilesPanel";
 import ProfileCard from "../components/ProfileCard";
 import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
-import { coverText } from "../lib/covers";
-import { colors } from "../theme/colors";
+import { useCoverTheme } from "../theme/useCoverTheme";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
@@ -18,8 +19,11 @@ import { usePageHeader } from "../lib/pageHeader";
 // bir holding doğrudan iş değil, organizasyon (ve onların departmanlarını) yönetir.
 export default function GroupDetail() {
   const { id } = useParams();
+  // Aynı sayfadaki kullanıcılar: canlı tazeleme + "kim burada" (bkz. lib/liveRoom.ts).
+  useLiveRoom(id ? `group:${id}` : null);
   const navigate = useNavigate();
-  const c = colors.light;
+  const c = useThemeColors();
+  const cover = useCoverTheme();
   const isDesktop = useIsDesktop();
   const gutter = pageGutter(isDesktop);
   const [group, setGroup] = useState<Group | null>(null);
@@ -61,18 +65,19 @@ export default function GroupDetail() {
         coverImageUrl={group?.coverImageUrl}
         height={270}
         title={group?.name ?? "…"}
+        lioSubject={group ? { kind: "grup", title: group.name, id: group.id } : undefined}
         description={group?.description}
         meta={
           group && (
             <>
               {group.ownerName && (
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <IconUser size={12} color={coverText.secondary} />
+                  <IconUser size={12} color={cover.secondary} />
                   {group.ownerName}
                 </span>
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <IconCalendar size={12} color={coverText.secondary} />
+                <IconCalendar size={12} color={cover.secondary} />
                 {new Date(group.createdAt).toLocaleDateString("tr-TR")} kuruldu
               </span>
             </>

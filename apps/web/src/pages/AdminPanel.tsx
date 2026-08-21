@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import type { User } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { IconShield } from "../components/icons";
 import AiCreditAdminPanel from "../components/AiCreditAdminPanel";
+import SupportAdminPanel from "../components/SupportAdminPanel";
 
 /**
  * Bu sayfa yalnızca role === "admin" olan kullanıcılara açılır.
@@ -14,7 +15,7 @@ import AiCreditAdminPanel from "../components/AiCreditAdminPanel";
  * takibi) req.user.role === "admin" olmadan 403 döner.
  */
 export default function AdminPanel() {
-  const c = colors.light;
+  const c = useThemeColors();
   const [me, setMe] = useState<User | null | undefined>(undefined);
 
   useEffect(() => {
@@ -82,6 +83,10 @@ export default function AdminPanel() {
       </p>
 
       <AiCreditAdminPanel />
+
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
+        <SupportAdminPanel />
+      </div>
     </div>
   );
 }

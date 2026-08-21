@@ -5,6 +5,23 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { applyOrder } from "../../common/reorder.util";
 import { assertSubtaskMoveAllowed, assertSubtaskMoveRequest, subtaskScopePatch } from "./subtask-move";
 
+/**
+ * Görev satırının standart sütun listesi — görevi döndüren HER uç bunu kullanır.
+ *
+ * NEDEN TEK SABİT: istemci, güncellenen görevi listedeki eskisinin YERİNE
+ * yazıyor (`prev.map(t => t.id === updated.id ? updated : t)`, bkz. web'de
+ * ProjectDetail / JobDetail / DepartmentTasksPanel). Uçlardan biri dar bir
+ * select kullanırsa o alan yanıtta gelmez ve ekranda kaybolur: durum
+ * değiştirdiğinde ek rozeti sönen kart bunun tipik belirtisiydi. Sütunları
+ * çoğaltmak yerine tek yerde tutmak bu sınıf hatayı baştan siliyor.
+ *
+ * Ekler iki tabloda yaşıyor: link `task_attachments`, dosya `files`
+ * (`files.task_id`). İkisi de görevle BİRLİKTE geliyor — ayrı uçtan çekmek
+ * pano başına görev sayısı kadar istek demekti (bkz. operations.service.ts).
+ */
+const TASK_SELECT =
+  "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title), task_attachments(id, kind, url, label, created_at), files(id, name, web_view_link)";
+
 function mapAttachment(row: any): TaskAttachment {
   return {
     id: row.id,
@@ -76,6 +93,22 @@ function mapTask(row: any): Task {
     projectTitle: row.projects?.title ?? undefined,
     sourceModuleKey: row.source_module_key ?? undefined,
     sourceRecordId: row.source_record_id ?? undefined,
+    // Ekler TASK_SELECT ile her görev yanıtında gelir. Dizi değilse alan
+    // undefined kalır ("bilgi çekilmedi"), boş dizi ise "ek yok" — ikisi
+    // arayüzde aynı görünse de karıştırılmasın.
+    attachments: Array.isArray(row.task_attachments)
+      ? row.task_attachments.map((a: any) => ({
+          id: a.id,
+          taskId: row.id,
+          kind: a.kind,
+          url: a.url,
+          label: a.label ?? undefined,
+          createdAt: a.created_at ?? row.created_at,
+        }))
+      : undefined,
+    files: Array.isArray(row.files)
+      ? row.files.map((f: any) => ({ id: f.id, name: f.name, webViewLink: f.web_view_link ?? undefined }))
+      : undefined,
   };
 }
 
@@ -101,9 +134,7 @@ export class TasksService {
 
     const { data, error } = await this.supabase.client
       .from("tasks")
-      .select(
-        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
-      )
+      .select(TASK_SELECT)
       .eq("project_id", projectId)
       .is("archived_at", null)
       .order("sort_order", { ascending: true })
@@ -122,9 +153,7 @@ export class TasksService {
 
     const { data, error } = await this.supabase.client
       .from("tasks")
-      .select(
-        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url))"
-      )
+      .select(TASK_SELECT)
       .eq("department_id", departmentId)
       .is("archived_at", null)
       .order("sort_order", { ascending: true })
@@ -328,9 +357,7 @@ export class TasksService {
   private async reloadTask(id: string): Promise<Task> {
     const { data: row } = await this.supabase.client
       .from("tasks")
-      .select(
-        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
-      )
+      .select(TASK_SELECT)
       .eq("id", id)
       .maybeSingle();
     if (!row) throw new NotFoundException("Görev bulunamadı");
@@ -661,9 +688,7 @@ export class TasksService {
       .from("tasks")
       .update(patch)
       .eq("id", id)
-      .select(
-        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
-      )
+      .select(TASK_SELECT)
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Görev bulunamadı");
@@ -753,9 +778,7 @@ export class TasksService {
       .from("tasks")
       .update(patch)
       .eq("id", id)
-      .select(
-        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
-      )
+      .select(TASK_SELECT)
       .maybeSingle();
     if (error) throw error;
     if (!updatedRow) throw new NotFoundException("Görev bulunamadı");
@@ -791,9 +814,7 @@ export class TasksService {
       .from("tasks")
       .update(patch)
       .eq("id", id)
-      .select(
-        "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
-      )
+      .select(TASK_SELECT)
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Görev bulunamadı");
@@ -823,6 +844,18 @@ export class TasksService {
         this.getScopeRecipientsAndLink(task),
         this.getUserName(completedBy),
       ]);
+
+      // GÖREV ORTAKLARI AYRICA EKLENİR. Yukarıdaki kapsam listesi yalnızca
+      // proje/departman ÜYELİĞİNDEN geliyor; göreve atanmış biri o listede
+      // olmayabiliyor (ör. iş ekibinden ya da taşeron olarak atanmış kişi).
+      // Atama anında bildirim alıp (bkz. task_assigned) görev bitince haber
+      // alamamak en çok o kişiyi ilgilendiren olayı kaçırmak demekti.
+      for (const assignee of task.assignees ?? []) recipients.add(assignee.userId);
+      if (task.assignedTo) recipients.add(task.assignedTo);
+
+      // Tamamlayan en sona: yukarıdaki eklemeler onu geri getirmiş olabilir
+      // (kişi hem atanan hem tamamlayan olabiliyor) ve kimse kendi yaptığı iş
+      // için kendine bildirim almamalı.
       if (completedBy) recipients.delete(completedBy);
 
       const body = completerName
@@ -929,8 +962,6 @@ export class TasksService {
 
     const idSet = new Set(rows.map((r: any) => r.id as string));
     const archivedAt = new Date().toISOString();
-    const selectCols =
-      "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)";
     const archived: Task[] = [];
 
     for (const row of rows) {
@@ -941,7 +972,7 @@ export class TasksService {
         .from("tasks")
         .update({ archived_at: archivedAt })
         .eq("id", row.id)
-        .select(selectCols)
+        .select(TASK_SELECT)
         .maybeSingle();
       if (updateError) throw updateError;
       if (updatedRow) archived.push(mapTask(updatedRow));
@@ -952,7 +983,7 @@ export class TasksService {
         .update({ archived_at: archivedAt })
         .eq("parent_task_id", row.id)
         .is("archived_at", null)
-        .select(selectCols);
+        .select(TASK_SELECT);
       if (childError) throw childError;
       for (const child of childRows ?? []) archived.push(mapTask(child));
     }
@@ -1070,9 +1101,7 @@ export class TasksService {
           estimated_duration_unit: row.estimated_duration_unit,
           sort_order: sortOrder,
         })
-        .select(
-          "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
-        )
+        .select(TASK_SELECT)
         .single();
       if (insertError) throw insertError;
       // Kopyaya atamalar da taşınır; yoksa kopya hiçbir panoda görünmez
@@ -1187,9 +1216,7 @@ export class TasksService {
         .from("tasks")
         .update(patch)
         .eq("id", id)
-        .select(
-          "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title)"
-        )
+        .select(TASK_SELECT)
         .maybeSingle();
       if (updateError) throw updateError;
       if (row) moved.push(mapTask(row));

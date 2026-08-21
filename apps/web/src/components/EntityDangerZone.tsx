@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import { useUndo } from "../lib/undo";
 import ConfirmDialog from "./ConfirmDialog";
 import { IconArchive, IconTrash } from "./icons";
@@ -36,7 +36,7 @@ export default function EntityDangerZone({
   onArchive,
   onDelete,
 }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const { pushUndo, pushDestructive } = useUndo();
   const [confirming, setConfirming] = useState<"archive" | "delete" | null>(null);
 

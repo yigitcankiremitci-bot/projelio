@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { driveApi } from "../api/files";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 
 /**
  * "Google ile devam et" düğmesi.
@@ -9,7 +9,7 @@ import { colors } from "../theme/colors";
  * kullanıcıya tıklandığında hata veren bir düğme göstermek yerine.
  */
 export default function GoogleSignInButton({ label = "Google ile devam et" }: { label?: string }) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

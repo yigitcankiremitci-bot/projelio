@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function CreateOutputModal({ projectId, departmentId, onClose, onCreated }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");

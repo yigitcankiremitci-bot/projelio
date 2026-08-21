@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { colors } from "../theme/colors";
+import { Link, useLocation } from "react-router-dom";
+import { useThemeColors } from "../theme/useThemeColors";
+import { useSidebarStyle } from "../theme/useSidebarStyle";
 import { IconChevronLeft, IconSettings } from "./icons";
 import { SIDEBAR_WIDTH } from "../lib/layout";
 import SidebarTree from "./SidebarTree";
@@ -25,9 +26,9 @@ interface Props {
 }
 
 export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
-  const c = colors.light;
+  const c = useThemeColors();
+  const sidebarStyle = useSidebarStyle();
   const location = useLocation();
-  const navigate = useNavigate();
   // Bütçe ve Dosyalar, Ana Sayfa'nın kendi sekmeleridir (bkz. Dashboard.tsx ?tab=);
   // buradan doğrudan o sekmeyle açılacak şekilde bağlanır.
   const searchTab = new URLSearchParams(location.search).get("tab");
@@ -52,13 +53,12 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
     // Mobilde BottomNav'da olan "Yapılacaklar" (/tasks) masaüstünde hiçbir yerden
     // erişilebilir değildi; aynı sayfa buraya da bağlandı.
     { to: "/tasks", label: "Yapılacaklar", active: location.pathname.startsWith("/tasks") },
+    // Ayarlar diğer sayfalarla aynı listede, Yapılacaklar'ın hemen altında.
+    // Önceden en altta, gezinme ağacından sonra, "Çıkış yap" ile birlikte ayrı
+    // bir öbekteydi; orada bir sayfa değil bir "kapanış" gibi duruyordu.
+    { to: "/settings", label: "Ayarlar", active: location.pathname.startsWith("/settings") },
     ...(isAdmin ? [{ to: "/admin", label: "Admin", active: location.pathname.startsWith("/admin") }] : []),
   ];
-
-  const handleLogout = () => {
-    localStorage.removeItem("projelio_token");
-    navigate("/login");
-  };
 
   if (!open) return null;
 
@@ -93,7 +93,9 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
           bottom: 0,
           overflowY: "auto",
           zIndex: overlay ? 38 : 36,
-          background: c.primaryDark,
+          background: sidebarStyle.background,
+          backgroundImage: sidebarStyle.backgroundImage,
+          backgroundSize: sidebarStyle.backgroundSize,
           boxShadow: overlay ? "2px 0 18px rgba(15,18,25,0.3)" : "none",
           padding: "20px 14px",
           display: "flex",
@@ -189,18 +191,10 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
         <SidebarTree />
       </div>
 
-      <div style={{ marginTop: "auto", paddingTop: 10 }}>
-        <Link
-          to="/settings"
-          className={`sidebar-nav-btn${location.pathname.startsWith("/settings") ? " is-active" : ""}`}
-          aria-current={location.pathname.startsWith("/settings") ? "page" : undefined}
-        >
-          Ayarlar
-        </Link>
-        <button type="button" onClick={handleLogout} className="sidebar-nav-btn is-muted">
-          Çıkış yap
-        </button>
-      </div>
+      {/* Buradaki alt öbek kaldırıldı: "Ayarlar" yukarıdaki gezinme listesine
+          taşındı, "Çıkış yap" ise yalnızca Ayarlar > Hesap'ta duruyor. Çıkışın
+          gezinmenin dibinde, ağacın hemen altında durması onu yanlışlıkla
+          tıklanabilecek bir komşu yapıyordu. */}
     </aside>
 
     {homeTargetModalOpen && <HomeTargetModal onClose={() => setHomeTargetModalOpen(false)} />}

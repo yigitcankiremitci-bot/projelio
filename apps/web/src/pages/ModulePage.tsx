@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { Department, Job, ModuleAccess, ModuleCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
-import { colors } from "../theme/colors";
+import { useLiveRoom } from "../lib/liveRoom";
+import { useThemeColors } from "../theme/useThemeColors";
 import ModuleSurface from "../components/ModuleSurface";
 import ModuleTeamPanel from "../components/ModuleTeamPanel";
 import { IconChevronLeft } from "../components/icons";
@@ -21,7 +22,18 @@ export default function ModulePage() {
   // altında. Modülün kendisi ikisinde de aynı; değişen yalnızca sahiplik ve
   // "geri" bağlantısı.
   const { departmentId, jobId, moduleKey } = useParams();
-  const c = colors.light;
+  const c = useThemeColors();
+
+  // Modül sayfası kendi odası: aynı departmanın iki farklı modülünde çalışan iki
+  // kişi birbirinin sayfasında sayılmasın (yetki kontrolü kök kapsam üzerinden,
+  // bkz. backend realtime.gateway.ts).
+  useLiveRoom(
+    moduleKey && departmentId
+      ? `department:${departmentId}/module/${moduleKey}`
+      : moduleKey && jobId
+      ? `job:${jobId}/module/${moduleKey}`
+      : null
+  );
   const [department, setDepartment] = useState<Department | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [entry, setEntry] = useState<ModuleCatalogEntry | null>(null);
@@ -85,6 +97,8 @@ export default function ModulePage() {
           <IconChevronLeft size={14} color={c.textSecondary} />
           {parent.label}
         </Link>
+        {/* Lio simgesi burada DEĞİL: modülün kendi yüzeyi (ModuleSurface) onu
+            zaten çiziyor, buraya da koyarsak sayfada iki tane olurdu. */}
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: c.textPrimary }}>{title}</h1>
         {/* Katalog açıklaması BİLEREK gösterilmiyor.
             O cümle "bu modülü açarsam ne göreceğim" sorusunu yanıtlamak için

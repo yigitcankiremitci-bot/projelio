@@ -12,6 +12,7 @@ import ModuleFormPanel from "./ModuleFormPanel";
 import ModulePanelView from "./ModulePanelView";
 import ModuleRecordsPanel from "./ModuleRecordsPanel";
 import SocialMediaPanel from "./SocialMediaPanel";
+import AskLioButton from "./AskLioButton";
 
 /**
  * Bir modülün içeriği — hangi motor olduğuna bakmadan.
@@ -36,7 +37,26 @@ export interface ModuleSurfaceProps {
   access?: ModuleAccess | null;
 }
 
-export default function ModuleSurface({
+/**
+ * Modülün üstündeki "Lio'ya sor" şeridi + içerik.
+ *
+ * Şerit burada, tek yerde: modül beş ayrı yüzeyden açılabiliyor (modül sayfası,
+ * organizasyon sekmesi, modal, anasayfa kartı, atanan modüller listesi) ve
+ * hepsi bu bileşenden geçiyor. Simgeyi tek tek yüzeylere koymak beşe bölünmüş
+ * bir kural demekti.
+ */
+export default function ModuleSurface(props: ModuleSurfaceProps) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <AskLioButton subject={{ kind: "modul", title: props.moduleName }} size={24} />
+      </div>
+      <ModuleSurfaceContent {...props} />
+    </div>
+  );
+}
+
+function ModuleSurfaceContent({
   moduleKey,
   moduleName,
   organizationId,

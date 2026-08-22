@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { Task, TaskComment } from "@projelio/shared";
+import type { Output, Task, TaskComment } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
@@ -11,6 +11,8 @@ import TaskAttachmentsPanel from "./TaskAttachmentsPanel";
 import AutoGrowTextarea from "./AutoGrowTextarea";
 import AutoGrowNotes from "./AutoGrowNotes";
 import { useCurrentUser } from "../lib/useCurrentUser";
+import { IconIndent, IconOutdent } from "./icons";
+import { useUndo } from "../lib/undo";
 
 interface Props {
   task: Task;
@@ -79,6 +81,7 @@ export default function TaskEditModal({
   onArchived,
 }: Props) {
   const c = useThemeColors();
+  const { pushUndo } = useUndo();
   const formRef = useRef<HTMLFormElement>(null);
   // Kaydet butonu formun dışında, alttaki yapışkan çubukta duruyor; forma bu
   // kimlikle bağlanır (bkz. Modal'ın footer prop'u).
@@ -119,6 +122,29 @@ export default function TaskEditModal({
   const [durationUnit, setDurationUnit] = useState<"hours" | "days">(task.estimatedDurationUnit ?? "hours");
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [commentBody, setCommentBody] = useState("");
+  /**
+   * Seviye dönüşümü (görev ↔ alt görev).
+   *
+   * Aday üst görevler yalnızca kullanıcı "Alt göreve dönüştür"e bastığında
+   * çekiliyor: modal her açıldığında liste indirmek, dönüşüm nadir bir işlem
+   * olduğu için boşuna istek olurdu.
+   */
+  /**
+   * Görevin bağlı olduğu çıktı.
+   *
+   * Liste modal açılınca çekiliyor (seviye dönüşümündeki tembel yükleme gibi
+   * değil): çıktı, görevin günlük olarak değiştirilen bir alanı — açılır kutu
+   * boş görünüp sonra dolmasın.
+   */
+  const [outputs, setOutputs] = useState<Output[] | null>(null);
+  const [outputId, setOutputId] = useState<string>(task.outputId ?? "");
+  const [savingOutput, setSavingOutput] = useState(false);
+
+  const [pickingParent, setPickingParent] = useState(false);
+  const [siblings, setSiblings] = useState<Task[] | null>(null);
+  const [converting, setConverting] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
+
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
@@ -199,6 +225,96 @@ export default function TaskEditModal({
       // yorum gönderilemedi, kullanıcı tekrar deneyebilir
     } finally {
       setPostingComment(false);
+    }
+  };
+
+  // Görevin kapsamındaki çıktılar. Kapsamı yoksa (ör. rutin tekrarı) bölüm hiç açılmaz.
+  useEffect(() => {
+    const path = task.projectId
+      ? `/projects/${task.projectId}/outputs`
+      : task.departmentId
+        ? `/departments/${task.departmentId}/outputs`
+        : null;
+    if (!path) return;
+    api
+      .get<Output[]>(path)
+      .then(setOutputs)
+      .catch(() => setOutputs([]));
+  }, [task.projectId, task.departmentId]);
+
+  const changeOutput = async (nextId: string) => {
+    const previous = outputId;
+    setOutputId(nextId);
+    setSavingOutput(true);
+    try {
+      const updated = await api.patch<Task>(`/tasks/${task.id}`, { outputId: nextId || null });
+      onTaskPatched?.(updated);
+      pushUndo({
+        label: "Görevin çıktısı değişti",
+        run: async () => {
+          const reverted = await api.patch<Task>(`/tasks/${task.id}`, { outputId: previous || null });
+          onTaskPatched?.(reverted);
+          setOutputId(previous);
+        },
+        redo: async () => {
+          const redone = await api.patch<Task>(`/tasks/${task.id}`, { outputId: nextId || null });
+          onTaskPatched?.(redone);
+          setOutputId(nextId);
+        },
+      });
+    } catch {
+      // Kaydedilemedi: seçimi geri al, kullanıcı yanlış bilgiyle kalmasın.
+      setOutputId(previous);
+    } finally {
+      setSavingOutput(false);
+    }
+  };
+
+  /** Seviye değiştirir: parentId doluysa alt göreve iner, null ise göreve çıkar. */
+  const convertHierarchy = async (parentId: string | null) => {
+    setConverting(true);
+    setConvertError(null);
+    // Eski üst görev işlemden ÖNCE saklanır; geri alma buna dönecek.
+    const previousParent = task.parentTaskId ?? null;
+    try {
+      const updated = await api.patch<Task>(`/tasks/${task.id}/hierarchy`, { parentTaskId: parentId });
+      pushUndo({
+        label: parentId ? "Alt göreve dönüştürüldü" : "Göreve dönüştürüldü",
+        run: async () => {
+          await api.patch(`/tasks/${task.id}/hierarchy`, { parentTaskId: previousParent });
+        },
+        redo: async () => {
+          await api.patch(`/tasks/${task.id}/hierarchy`, { parentTaskId: parentId });
+        },
+      });
+      // onSaved çağıran sayfayı da tazeleyip modali kapatıyor; kart yeni
+      // seviyesinde yeniden çizilsin diye burada kapanması doğru.
+      onSaved(updated);
+    } catch (err: any) {
+      setConvertError(err?.message ?? "Dönüştürme başarısız oldu.");
+      setConverting(false);
+    }
+  };
+
+  const openParentPicker = async () => {
+    setPickingParent(true);
+    setConvertError(null);
+    if (siblings) return;
+
+    // Görev ya bir projeye ya bir departmana ait; aday listesi o kapsamdan gelir.
+    const path = task.projectId
+      ? `/projects/${task.projectId}/tasks`
+      : task.departmentId
+        ? `/departments/${task.departmentId}/tasks`
+        : null;
+    if (!path) {
+      setConvertError("Bu görevin bağlı olduğu bir proje ya da departman yok.");
+      return;
+    }
+    try {
+      setSiblings(await api.get<Task[]>(path));
+    } catch (err: any) {
+      setConvertError(err?.message ?? "Görev listesi alınamadı.");
     }
   };
 
@@ -368,6 +484,104 @@ export default function TaskEditModal({
         </div>
       )}
 
+      {/* Çıktı: görevin projenin hangi teslim parçasına ait olduğu. Değişiklik
+          anında kaydedilir — açılır kutuda "kaydet"i beklemek doğal değil. */}
+      {outputs !== null && outputs.length > 0 && (
+        <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Çıktı</h3>
+          <select
+            value={outputId}
+            onChange={(e) => void changeOutput(e.target.value)}
+            disabled={savingOutput}
+            style={{
+              width: "100%",
+              fontSize: 15,
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: `1px solid ${c.border}`,
+              background: c.surface,
+              color: c.textPrimary,
+            }}
+          >
+            <option value="">Çıktı yok</option>
+            {outputs.map((output) => (
+              <option key={output.id} value={output.id}>
+                {output.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Seviye: görev ↔ alt görev dönüşümü.
+          Kartların üstünde değil burada: satırdaki eylem şeridi zaten kalabalıktı
+          ve bu, günlük değil ara sıra yapılan bir işlem. */}
+      <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Seviye</h3>
+
+        {task.parentTaskId ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, color: c.textSecondary }}>Bu kayıt bir alt görev.</span>
+            <button
+              type="button"
+              onClick={() => void convertHierarchy(null)}
+              disabled={converting}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                fontSize: 13,
+                borderRadius: 8,
+                border: `1px solid ${c.border}`,
+                background: "transparent",
+                color: c.textPrimary,
+                cursor: converting ? "default" : "pointer",
+                opacity: converting ? 0.6 : 1,
+              }}
+            >
+              <IconOutdent size={14} color={c.textSecondary} />
+              {converting ? "Dönüştürülüyor…" : "Göreve dönüştür"}
+            </button>
+          </div>
+        ) : !pickingParent ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, color: c.textSecondary }}>Bu kayıt bir görev.</span>
+            <button
+              type="button"
+              onClick={() => void openParentPicker()}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                fontSize: 13,
+                borderRadius: 8,
+                border: `1px solid ${c.border}`,
+                background: "transparent",
+                color: c.textPrimary,
+                cursor: "pointer",
+              }}
+            >
+              <IconIndent size={14} color={c.textSecondary} />
+              Alt göreve dönüştür
+            </button>
+          </div>
+        ) : (
+          <ParentPicker
+            task={task}
+            siblings={siblings}
+            converting={converting}
+            onPick={(parentId) => void convertHierarchy(parentId)}
+            onCancel={() => setPickingParent(false)}
+          />
+        )}
+
+        {convertError && (
+          <p style={{ color: c.danger, fontSize: 13, margin: "10px 0 0" }}>{convertError}</p>
+        )}
+      </div>
+
       {/* Link/dosya ekleri her görevde çalışır — rutin tekrarları dahil (bkz. 060).
           FilesPanel'den ayrı: o Drive/OneDrive klasör bağlamı kurar ve proje
           gerektirir; bu ise göreve doğrudan bağlı, bağlamsız bir ek listesi. */}
@@ -456,5 +670,104 @@ export default function TaskEditModal({
         }
       />
     </Modal>
+  );
+}
+
+/**
+ * "Hangi görevin altına girsin?" listesi.
+ *
+ * Ayrı bileşen: aday süzme kuralları (kendisi hariç, yalnızca üst görevler) ve
+ * "bu görevin kendi alt görevleri var" durumu bir arada okunabilir kalsın.
+ * Aynı liste hem adayları hem de engeli tespit etmeye yarıyor, ikinci bir istek
+ * gerekmiyor.
+ */
+function ParentPicker({
+  task,
+  siblings,
+  converting,
+  onPick,
+  onCancel,
+}: {
+  task: Task;
+  siblings: Task[] | null;
+  converting: boolean;
+  onPick: (parentId: string) => void;
+  onCancel: () => void;
+}) {
+  const c = useThemeColors();
+
+  if (!siblings) {
+    return <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Görevler yükleniyor…</p>;
+  }
+
+  // Alt görevleri olan bir görev indirilemez: sonuç üçüncü bir seviye olurdu
+  // (sunucu da reddeder, ama sebebi burada peşinen söylemek daha anlaşılır).
+  const hasSubtasks = siblings.some((candidate) => candidate.parentTaskId === task.id);
+  if (hasSubtasks) {
+    return (
+      <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
+        Bu görevin kendi alt görevleri var, bu yüzden alt göreve dönüştürülemez. Önce alt görevlerini
+        başka bir göreve taşı ya da üst seviyeye çıkar.
+      </p>
+    );
+  }
+
+  const candidates = siblings.filter(
+    (candidate) => !candidate.parentTaskId && candidate.id !== task.id
+  );
+  if (candidates.length === 0) {
+    return (
+      <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
+        Alt görev yapılabileceği başka bir görev yok.
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 14, color: c.textSecondary }}>Hangi görevin altına girsin?</span>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            marginLeft: "auto",
+            background: "transparent",
+            border: "none",
+            color: c.textSecondary,
+            fontSize: 13,
+            textDecoration: "underline",
+            cursor: "pointer",
+          }}
+        >
+          Vazgeç
+        </button>
+      </div>
+
+      <div style={{ maxHeight: 260, overflowY: "auto", border: `1px solid ${c.border}`, borderRadius: 10 }}>
+        {candidates.map((candidate) => (
+          <button
+            key={candidate.id}
+            type="button"
+            onClick={() => onPick(candidate.id)}
+            disabled={converting}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              background: "transparent",
+              border: "none",
+              borderBottom: `1px solid ${c.border}`,
+              textAlign: "left",
+              fontSize: 14,
+              color: c.textPrimary,
+              cursor: converting ? "default" : "pointer",
+              opacity: converting ? 0.6 : 1,
+            }}
+          >
+            {candidate.title}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -3,7 +3,13 @@ import type { Task, TaskAssignee, TaskAttachment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { applyOrder } from "../../common/reorder.util";
-import { assertSubtaskMoveAllowed, assertSubtaskMoveRequest, subtaskScopePatch } from "./subtask-move";
+import {
+  assertConvertToSubtaskAllowed,
+  assertConvertToTaskAllowed,
+  assertSubtaskMoveAllowed,
+  assertSubtaskMoveRequest,
+  subtaskScopePatch,
+} from "./subtask-move";
 
 /**
  * Görev satırının standart sütun listesi — görevi döndüren HER uç bunu kullanır.
@@ -785,6 +791,179 @@ export class TasksService {
     return mapTask(updatedRow);
   }
 
+  /**
+   * Bir GÖREVİ alt göreve, bir ALT GÖREVİ göreve dönüştürür.
+   *
+   * `updateParent`'tan ayrı duruyor çünkü yön farklı: orası zaten alt görev olan
+   * bir kaydı başka bir üst görevin altına TAŞIR, burada kaydın SEVİYESİ değişir.
+   * Kurallar `subtask-move.ts` içinde saf fonksiyonlar olarak duruyor; asıl
+   * kırılgan olan yer orası ve sınanabilir olması gerekiyor.
+   *
+   * `parentTaskId` null ise yükseltme (alt görev → görev), doluysa indirme
+   * (görev → alt görev) yapılır.
+   */
+  async convertHierarchy(
+    id: string,
+    parentTaskId: string | null,
+    requestingUserId?: string,
+    anchorId?: string
+  ): Promise<Task> {
+    const { data: row } = await this.supabase.client.from("tasks").select().eq("id", id).maybeSingle();
+    if (!row) throw new NotFoundException("Görev bulunamadı");
+    const task = mapTask(row);
+    await this.assertTaskAccess(task, requestingUserId);
+
+    // --- Alt görev → görev ---------------------------------------------
+    if (!parentTaskId) {
+      assertConvertToTaskAllowed(task);
+      // Kayıt, AYRILDIĞI görevin hemen altında belirmeli. Çapa normalde eski üst
+      // görev; toplu işlemde önceki yükseltilen kayıt oluyor ki kardeşlerin kendi
+      // sırası korunsun (bkz. convertHierarchyMany).
+      const anchor = anchorId ?? task.parentTaskId ?? null;
+
+      // Önce üst seviyenin SONUNA alınır; asıl yeri aşağıdaki yerleştirme
+      // belirliyor. Bu adım yine de gerekli: çapa yoksa (eski üst görev silinmişse)
+      // kayıt geçerli bir sıra numarasıyla kalmalı. Sıra numarası proje/departman
+      // kapsamında tutuluyor; yanlış kapsamdan okumak kartı listenin ortasına düşürürdü.
+      let query = this.supabase.client
+        .from("tasks")
+        .select("sort_order")
+        .is("parent_task_id", null);
+      query = row.project_id ? query.eq("project_id", row.project_id) : query.is("project_id", null);
+      query = row.department_id
+        ? query.eq("department_id", row.department_id)
+        : query.is("department_id", null);
+      const { data: maxRows } = await query.order("sort_order", { ascending: false }).limit(1);
+
+      const { data: promoted, error: promoteError } = await this.supabase.client
+        .from("tasks")
+        .update({
+          parent_task_id: null,
+          sort_order: ((maxRows?.[0]?.sort_order as number | undefined) ?? -1) + 1,
+        })
+        .eq("id", id)
+        .select(TASK_SELECT)
+        .maybeSingle();
+      if (promoteError) throw promoteError;
+      if (!promoted) throw new NotFoundException("Görev bulunamadı");
+
+      // Sıraya sokma ayrı bir adım: araya girmek altındaki tüm kardeşleri
+      // kaydırmayı gerektiriyor, o da tek bir SQL ifadesiyle yapılıyor
+      // (bkz. migration 069). Başarısız olursa kayıt listenin sonunda kalır —
+      // yeri yanlış olur ama dönüşümün kendisi bozulmaz.
+      if (anchor) {
+        const { error: placeError } = await this.supabase.client.rpc("task_place_after", {
+          p_task_id: id,
+          p_anchor_id: anchor,
+        });
+        if (placeError) {
+          // Yerleştirme başarısız olsa bile dönüşüm geçerli; yalnızca kaydın
+          // yeri listenin sonunda kalır. Sessiz kalmamak için loglanır.
+          console.warn(`Görev çapaya göre yerleştirilemedi: ${placeError.message}`);
+        } else {
+          return this.reloadTask(id);
+        }
+      }
+      return mapTask(promoted);
+    }
+
+    // --- Görev → alt görev ---------------------------------------------
+    const { data: parentRow } = await this.supabase.client
+      .from("tasks")
+      .select()
+      .eq("id", parentTaskId)
+      .maybeSingle();
+    if (!parentRow) throw new NotFoundException("Hedef üst görev bulunamadı");
+    const parent = mapTask(parentRow);
+    await this.assertTaskAccess(parent, requestingUserId);
+
+    // Kendi alt görevi olan bir kayıt indirilemez; sonuç üçüncü bir seviye olurdu.
+    const { data: childRows } = await this.supabase.client
+      .from("tasks")
+      .select("id")
+      .eq("parent_task_id", id)
+      .limit(1);
+    assertConvertToSubtaskAllowed(task, parent, Boolean(childRows?.length));
+
+    const { data: maxRows } = await this.supabase.client
+      .from("tasks")
+      .select("sort_order")
+      .eq("parent_task_id", parentTaskId)
+      .order("sort_order", { ascending: false })
+      .limit(1);
+
+    const { data: demoted, error: demoteError } = await this.supabase.client
+      .from("tasks")
+      .update({
+        parent_task_id: parentTaskId,
+        sort_order: ((maxRows?.[0]?.sort_order as number | undefined) ?? -1) + 1,
+        // Alt görev üst göreviyle aynı yerde yaşamalı (bkz. subtaskScopePatch).
+        ...subtaskScopePatch(row, parentRow),
+      })
+      .eq("id", id)
+      .select(TASK_SELECT)
+      .maybeSingle();
+    if (demoteError) throw demoteError;
+    if (!demoted) throw new NotFoundException("Görev bulunamadı");
+    return mapTask(demoted);
+  }
+
+  /**
+   * Seçili görevleri/alt görevleri TOPLU dönüştürür.
+   *
+   * Tek tek istek atmak yerine tek uç nokta: seçim onlarca kayıt olabiliyor.
+   * Kurallara takılan kayıt tüm işlemi düşürmez, ATLANIR ve sebebi geri döner —
+   * karışık bir seçimde (bazıları zaten alt görev, bazısının alt görevi var)
+   * kullanıcı ne olduğunu ancak böyle görebiliyor. Sessizce atlamak, "bir kısmı
+   * yapılmış ama hangisi belli değil" durumunu doğururdu.
+   */
+  async convertHierarchyMany(
+    ids: string[],
+    parentTaskId: string | null,
+    requestingUserId?: string
+  ): Promise<{ updated: Task[]; skipped: { id: string; title: string; reason: string }[] }> {
+    const updated: Task[] = [];
+    const skipped: { id: string; title: string; reason: string }[] = [];
+
+    // Yükseltmede kardeşlerin KENDİ SIRASI korunmalı: ilki eski üst görevin
+    // hemen altına, ikincisi ilkinin altına… Aksi halde her biri aynı yere
+    // sokulduğu için seçim ters sırada diziliyordu.
+    const anchorByParent = new Map<string, string>();
+
+    for (const id of ids) {
+      try {
+        let anchor: string | undefined;
+        if (!parentTaskId) {
+          const { data: current } = await this.supabase.client
+            .from("tasks")
+            .select("parent_task_id")
+            .eq("id", id)
+            .maybeSingle();
+          const formerParent = (current?.parent_task_id as string | null) ?? null;
+          if (formerParent) anchor = anchorByParent.get(formerParent) ?? formerParent;
+          const task = await this.convertHierarchy(id, parentTaskId, requestingUserId, anchor);
+          if (formerParent) anchorByParent.set(formerParent, id);
+          updated.push(task);
+          continue;
+        }
+        updated.push(await this.convertHierarchy(id, parentTaskId, requestingUserId));
+      } catch (err: any) {
+        const { data } = await this.supabase.client
+          .from("tasks")
+          .select("title")
+          .eq("id", id)
+          .maybeSingle();
+        skipped.push({
+          id,
+          title: (data?.title as string | undefined) ?? "(bilinmeyen görev)",
+          reason: err?.message ?? "bilinmeyen hata",
+        });
+      }
+    }
+
+    return { updated, skipped };
+  }
+
   async updateBudgetStatus(id: string, budgetStatus: Task["budgetStatus"], requestingUserId?: string): Promise<Task> {
     await this.assertTaskAccess(await this.getTaskScope(id), requestingUserId);
 
@@ -1147,6 +1326,71 @@ export class TasksService {
   // Seçili görev(ler)i başka bir projeye/departmana taşır. Üst seviye bir görev
   // taşınırsa tüm alt görevleri de onunla birlikte taşınır; tek başına seçilen bir
   // alt görev (üst görevi seçili değilse) hedefte üst seviye bir göreve dönüşür.
+  /**
+   * Seçili görevleri bir ÇIKTIYA bağlar ya da çıktıdan çıkarır (outputId null).
+   *
+   * `move()`den ayrı: orası görevin projesini/departmanını değiştiriyor, burada
+   * yalnızca çıktı bağı kuruluyor. Alt görevler de kabul edilir; pano onları
+   * üst göreviyle birlikte gösterir.
+   *
+   * Kapsam kontrolü şart: çıktı bir projeye/departmana ait ve başka bir projedeki
+   * göreve bağlanırsa pano onu hiçbir yerde gösteremez — kayıt görünmez olur.
+   */
+  async assignOutput(
+    ids: string[],
+    outputId: string | null,
+    requestingUserId?: string
+  ): Promise<Task[]> {
+    if (!ids?.length) return [];
+
+    const { data: rows, error } = await this.supabase.client
+      .from("tasks")
+      .select("id, project_id, department_id")
+      .in("id", ids);
+    if (error) throw error;
+    if (!rows?.length) throw new NotFoundException("Görev bulunamadı");
+
+    // Tek tek yetki denetimi: seçim farklı projelerden gelebilir.
+    for (const row of rows) {
+      await this.assertTaskAccess(
+        { projectId: row.project_id ?? undefined, departmentId: row.department_id ?? undefined },
+        requestingUserId
+      );
+    }
+
+    if (outputId) {
+      const { data: output } = await this.supabase.client
+        .from("outputs")
+        .select("project_id, department_id")
+        .eq("id", outputId)
+        .maybeSingle();
+      if (!output) throw new NotFoundException("Çıktı bulunamadı");
+
+      // Yalnızca çıktının KENDİ kapsamı karşılaştırılır. İkisini birden eşitlemek
+      // yanlıştı: bir departmanın altındaki projede görevin department_id'si de
+      // dolu olabiliyor, çıktı ise yalnızca project_id taşıyor — aynı projedeki
+      // görevler bile "kapsam uyuşmuyor" diye reddediliyordu.
+      const mismatched = output.project_id
+        ? rows.find((row: any) => (row.project_id ?? null) !== output.project_id)
+        : rows.find((row: any) => (row.department_id ?? null) !== (output.department_id ?? null));
+      if (mismatched) {
+        throw new BadRequestException(
+          output.project_id
+            ? "Görevler çıktının bağlı olduğu projede olmalı"
+            : "Görevler çıktının bağlı olduğu departmanda olmalı"
+        );
+      }
+    }
+
+    const { data: updated, error: updateError } = await this.supabase.client
+      .from("tasks")
+      .update({ output_id: outputId })
+      .in("id", ids)
+      .select(TASK_SELECT);
+    if (updateError) throw updateError;
+    return (updated ?? []).map(mapTask);
+  }
+
   async move(
     ids: string[],
     target: { projectId?: string; departmentId?: string },

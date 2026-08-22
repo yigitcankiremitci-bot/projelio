@@ -642,6 +642,7 @@ export default function ProjectDetail() {
               onTasksDuplicated={handleTasksDuplicated}
               onTasksMoved={handleTasksMoved}
               onTasksArchived={removeTasksFromState}
+              onTasksReload={reloadAll}
               onTasksDeleted={removeTasksFromState}
             />
           )}
@@ -673,6 +674,7 @@ export default function ProjectDetail() {
               onTasksDuplicated={handleTasksDuplicated}
               onTasksMoved={handleTasksMoved}
               onTasksArchived={removeTasksFromState}
+              onTasksReload={reloadAll}
               onTasksDeleted={removeTasksFromState}
             />
           )}

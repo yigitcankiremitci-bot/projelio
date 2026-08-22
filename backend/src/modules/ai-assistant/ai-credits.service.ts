@@ -1,6 +1,9 @@
 import { BadRequestException, HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import {
+  HOLD_TTL_SECONDS,
+  calculateSpeechCost,
+  calculateTranscriptionCost,
   calculateUsageCost,
   COMMISSION_RATE,
   CREDIT_UNIT_USD,
@@ -104,14 +107,100 @@ export class AiCreditsService {
     };
   }
 
-  /** Yeni bir isteğe başlamadan önce yeterli bakiye var mı? */
-  async assertCanStart(userId: string): Promise<void> {
-    const { balance } = await this.getBalance(userId);
+  /**
+   * Harcanabilir bakiye: bakiye eksi açık tutmalar.
+   *
+   * Aynı kullanıcının paralel istekleri birbirinin tutmasını görsün diye tüm
+   * kontroller bu sayı üzerinden yapılır; ham `balance` yalnızca gösterim içindir.
+   */
+  async getAvailable(userId: string): Promise<number> {
+    const { data, error } = await this.supabase.client.rpc("ai_available_credits", {
+      p_user_id: userId,
+      p_ttl_seconds: HOLD_TTL_SECONDS,
+    });
+    if (error) {
+      // Tutma altyapısı yoksa (migration uygulanmadıysa) sistemi durdurmak yerine
+      // ham bakiyeye düşülür: koruma zayıflar ama asistan çalışmaya devam eder.
+      this.logger.warn(`Kullanılabilir bakiye okunamadı, ham bakiyeye düşülüyor: ${error.message}`);
+      return (await this.getBalance(userId)).balance;
+    }
+    return Number(data ?? 0);
+  }
+
+  /**
+   * Bir turun bedelini ATOMİK olarak tutar (rezerve eder) ve tutma kimliği döner.
+   *
+   * Neden veritabanında: "oku, karar ver, sonra harca" akışında aynı kullanıcının
+   * iki isteği aynı bakiyeyi görüp ikisi de "yeter" diyebiliyordu; sonuç eksi
+   * bakiyeydi. Tutma, bakiye satırı kilitliyken açılır, dolayısıyla ikinci istek
+   * birincinin tutmasını görerek karar verir.
+   *
+   * Tutma bakiyeyi DÜŞÜRMEZ — yalnızca kullanılabilir bakiyeden düşer. Böylece
+   * defter ve ömür boyu toplamlar yalnızca gerçek tüketimi yansıtmaya devam eder.
+   */
+  async reserve(userId: string, credits: number): Promise<string | null> {
+    const amount = Math.ceil(credits);
+    if (amount <= 0) return null;
+
+    const { data, error } = await this.supabase.client.rpc("ai_reserve_credits", {
+      p_user_id: userId,
+      p_credits: amount,
+      p_ttl_seconds: HOLD_TTL_SECONDS,
+    });
+
+    if (error) {
+      if (error.message?.includes("INSUFFICIENT_CREDITS")) {
+        const balance = await this.getAvailable(userId);
+        this.assertBalanceCovers(balance, amount);
+        // assertBalanceCovers zaten fırlatır; buraya düşülürse yarışta bakiye
+        // yeniden yeterli hâle gelmiş demektir, o zaman da net bir hata verilir.
+        throw new InsufficientCreditsException("AI kredin bu işlem için yeterli değil.");
+      }
+      this.logger.warn(`Kredi tutulamadı, koruma bu istek için atlanıyor: ${error.message}`);
+      return null;
+    }
+    return String(data);
+  }
+
+  /** Tutmayı kaldırır. Başarısız olsa bile akışı bozmaz; süresi dolunca kendiliğinden düşer. */
+  async release(holdId: string | null): Promise<void> {
+    if (!holdId) return;
+    const { error } = await this.supabase.client.rpc("ai_release_credits", { p_hold_id: holdId });
+    if (error) this.logger.warn(`Kredi tutması kaldırılamadı (${holdId}): ${error.message}`);
+  }
+
+  /**
+   * Yeni bir isteğe başlamadan önceki taban kontrolü. Kullanılabilir bakiyeyi döner
+   * ki çağıran taraf isteğe özel rezervasyonu (bkz. assertBalanceCovers) aynı okuma
+   * üzerinden yapabilsin — ikinci bir sorgu hem gereksiz hem de yarış açar.
+   */
+  async assertCanStart(userId: string): Promise<number> {
+    const balance = await this.getAvailable(userId);
     if (balance < MIN_BALANCE_TO_START) {
       throw new InsufficientCreditsException(
-        `AI kredin yetersiz (${balance.toFixed(0)} kredi). Devam etmek için kredi yüklemen gerekiyor.`
+        balance <= 0
+          ? "AI kredin bitti. Devam etmek için kredi yüklemen gerekiyor."
+          : `AI kredin yetersiz (${Math.floor(balance)} kredi). Devam etmek için kredi yüklemen gerekiyor.`
       );
     }
+    return balance;
+  }
+
+  /**
+   * Bakiyenin bu isteğin EN PAHALI hâlini karşılayıp karşılamadığını denetler.
+   *
+   * Neden en pahalı hâl: iyimser bir tahminle başlanırsa tur ortasında bakiye
+   * tükenip eksiye düşebiliyordu. Kullanıcı borç bakiyesi görmemeli; bu yüzden
+   * yetmeyeceği belli olan iş HİÇ BAŞLATILMAZ, kullanıcı önden uyarılır.
+   */
+  assertBalanceCovers(balance: number, requiredCredits: number): void {
+    const required = Math.ceil(requiredCredits);
+    if (balance >= required) return;
+    throw new InsufficientCreditsException(
+      `Bu işlem için yeterli AI kredin yok. Bakiyen ${Math.floor(balance)} kredi, ` +
+        `bu isteğin karşılanması için en az ${required} kredi gerekiyor. ` +
+        "Ayarlar > AI Kredileri sayfasından kredi yükleyebilirsin."
+    );
   }
 
   /** Bakiye ekler (yükleme / hoş geldin / iade / düzeltme). */
@@ -183,6 +272,85 @@ export class AiCreditsService {
       charged_usd: chargedUsd,
     });
     if (error) this.logger.error(`Kredi hareketi kaydedilemedi: ${error.message}`);
+
+    return { credits, balanceAfter };
+  }
+
+  /**
+   * Ses çözümleme bedelini düşer.
+   *
+   * chargeUsage'dan ayrı durmasının sebebi birimin farklı olması: burada token
+   * yok, SÜRE var ve sağlayıcı Anthropic değil. Deftere ayrı bir model adıyla
+   * yazılır ki marj raporunda hangi kalemin ne tuttuğu ayrıştırılabilsin.
+   *
+   * Ücret, ek hazırlanırken (sohbet turundan ÖNCE) düşülür: transkripsiyon o anda
+   * yapılıyor ve maliyeti orada oluşuyor. Kullanıcı mesajı hiç göndermese bile
+   * çözümleme yapılmış olur.
+   */
+  async chargeTranscription(params: {
+    userId: string;
+    durationSeconds: number;
+    fileName?: string;
+    conversationId?: string;
+  }): Promise<{ credits: number; balanceAfter: number }> {
+    const { userId, durationSeconds, fileName, conversationId } = params;
+    const { costUsd, chargedUsd, credits } = calculateTranscriptionCost(durationSeconds);
+
+    if (credits <= 0) return { credits: 0, balanceAfter: (await this.getBalance(userId)).balance };
+
+    const balanceAfter = await this.applyChange(userId, -credits, true);
+
+    const { error } = await this.supabase.client.from("ai_credit_transactions").insert({
+      user_id: userId,
+      type: "usage",
+      credits: -credits,
+      balance_after: balanceAfter,
+      description: `Ses çözümleme${fileName ? ` · ${fileName}` : ""} (${Math.round(durationSeconds)} sn)`,
+      conversation_id: conversationId ?? null,
+      model: process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || "whisper-1",
+      input_tokens: 0,
+      output_tokens: 0,
+      cost_usd: costUsd,
+      charged_usd: chargedUsd,
+    });
+    if (error) this.logger.error(`Transkripsiyon kredi hareketi kaydedilemedi: ${error.message}`);
+
+    return { credits, balanceAfter };
+  }
+
+  /**
+   * Seslendirme bedelini düşer.
+   *
+   * Karakterle fiyatlandığı için ücret ÖNDEN kesin biliniyor; bu yüzden burada
+   * tahmin yok. Deftere ayrı bir model adıyla yazılır ki marj raporunda ses
+   * kalemleri metin kalemlerinden ayrılabilsin.
+   */
+  async chargeSpeech(params: {
+    userId: string;
+    chars: number;
+    conversationId?: string;
+  }): Promise<{ credits: number; balanceAfter: number }> {
+    const { userId, chars, conversationId } = params;
+    const { costUsd, chargedUsd, credits } = calculateSpeechCost(chars);
+
+    if (credits <= 0) return { credits: 0, balanceAfter: (await this.getBalance(userId)).balance };
+
+    const balanceAfter = await this.applyChange(userId, -credits, true);
+
+    const { error } = await this.supabase.client.from("ai_credit_transactions").insert({
+      user_id: userId,
+      type: "usage",
+      credits: -credits,
+      balance_after: balanceAfter,
+      description: `Sesli yanıt (${chars} karakter)`,
+      conversation_id: conversationId ?? null,
+      model: process.env.OPENAI_TTS_MODEL?.trim() || "tts-1",
+      input_tokens: 0,
+      output_tokens: 0,
+      cost_usd: costUsd,
+      charged_usd: chargedUsd,
+    });
+    if (error) this.logger.error(`Seslendirme kredi hareketi kaydedilemedi: ${error.message}`);
 
     return { credits, balanceAfter };
   }

@@ -7,6 +7,7 @@ import TaskColumn from "../TaskColumn";
 import TaskSelectionBar from "../TaskSelectionBar";
 import TaskSortMenu from "../TaskSortMenu";
 import MoveTaskModal from "../MoveTaskModal";
+import BulkConvertHierarchyModal from "../BulkConvertHierarchyModal";
 import ConfirmDialog from "../ConfirmDialog";
 import { useTaskSelection } from "../../lib/useTaskSelection";
 import { selectedLioTasks } from "../../lib/askLio";
@@ -50,6 +51,14 @@ interface Props {
   nav: ProcessNavState;
   activeTaskId?: string;
   onToggleActive?: (taskId: string) => void;
+  /**
+   * Görev listesini sunucudan yeniden çeker.
+   *
+   * Seviye dönüştürme sonrası şart: yükseltilen kayıt eski üst görevinin altına
+   * sokulurken altındaki kardeşlerin sıra numaraları da kayıyor (bkz. migration
+   * 069) ve doğru sıra yalnızca sunucuda biliniyor.
+   */
+  onTasksReload?: () => void;
   onTasksDuplicated?: (created: Task[]) => void;
   onTasksMoved?: (moved: Task[]) => void;
   onTasksArchived?: (ids: string[]) => void;
@@ -114,6 +123,7 @@ export default function ProcessPanel({
   nav,
   activeTaskId,
   onToggleActive,
+  onTasksReload,
   onTasksDuplicated,
   onTasksMoved,
   onTasksArchived,
@@ -127,6 +137,9 @@ export default function ProcessPanel({
   const [archiving, setArchiving] = useState(false);
   const [confirmingBulkAction, setConfirmingBulkAction] = useState<"archive" | "delete" | null>(null);
   const [movingOpen, setMovingOpen] = useState(false);
+
+  /** Toplu seviye dönüştürme penceresi (bkz. BulkConvertHierarchyModal). */
+  const [convertOpen, setConvertOpen] = useState(false);
 
   const handleDuplicateSelected = async () => {
     if (selection.selectedIds.size === 0) return;
@@ -733,6 +746,7 @@ export default function ProcessPanel({
               onCancel={selection.clear}
               onDuplicate={handleDuplicateSelected}
               onMove={() => setMovingOpen(true)}
+              onConvert={() => setConvertOpen(true)}
               onArchive={() => setConfirmingBulkAction("archive")}
               onDelete={() => setConfirmingBulkAction("delete")}
               lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
@@ -747,6 +761,7 @@ export default function ProcessPanel({
                 allTasks={sortTasks(filteredTasks, sort)}
                 onCreate={(s, title) => onCreateTask(s, title, createOptions)}
                 onCreateSubtask={onCreateSubtask}
+                onTasksReload={onTasksReload}
                 onMove={onMoveTask}
                 onToggleComplete={onToggleComplete}
                 onEditTask={onEditTask}
@@ -761,12 +776,31 @@ export default function ProcessPanel({
             ))}
           </div>
 
+          {convertOpen && (
+            <BulkConvertHierarchyModal
+              tasks={tasks}
+              selectedIds={selection.selectedIds}
+              onClose={() => setConvertOpen(false)}
+              onDone={() => {
+                // Yerel yama yetmez: kardeşlerin sıra numaraları da değişiyor,
+                // doğru sıra ancak sunucudan gelir.
+                onTasksReload?.();
+                selection.clear();
+                setConvertOpen(false);
+              }}
+            />
+          )}
+
           {movingOpen && (
             <MoveTaskModal
               taskIds={Array.from(selection.selectedIds)}
+              // Çıktı hedefinin listelenebilmesi için seçimin kapsamı.
+              scopeTasks={tasks.filter((task) => selection.selectedIds.has(task.id))}
               onClose={() => setMovingOpen(false)}
-              onMoved={(moved) => {
-                onTasksMoved?.(moved);
+              onMoved={(moved, target) => {
+                // Çıktıya taşımada görevler bu projede KALIR (bkz. OutputsPanel).
+                if (target === "output") onTasksReload?.();
+                else onTasksMoved?.(moved);
                 selection.clear();
               }}
             />

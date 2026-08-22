@@ -7,6 +7,7 @@ import TaskColumn, { TaskColumnHandle } from "../components/TaskColumn";
 import TaskEditModal from "../components/TaskEditModal";
 import PersonalTodoModal from "../components/PersonalTodoModal";
 import TaskSelectionBar from "../components/TaskSelectionBar";
+import BulkConvertHierarchyModal from "../components/BulkConvertHierarchyModal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import MoveTaskModal from "../components/MoveTaskModal";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -151,6 +152,9 @@ export default function TasksOverview() {
   // "Taşı" yalnızca atanan (gerçek) görevler için anlamlı: kişisel görevlerin
   // bağlı olacağı bir proje/departman kavramı yok. Seçim kişisel+atanan
   // karışık olabileceği için taşınabilir alt küme burada ayrıca hesaplanır.
+  /** Toplu seviye dönüştürme penceresi (bkz. BulkConvertHierarchyModal). */
+  const [convertOpen, setConvertOpen] = useState(false);
+
   const movableSelectedIds = useMemo(
     () => Array.from(selection.selectedIds).filter((taskId) => sourceById.get(taskId) === "assigned"),
     [selection.selectedIds, sourceById]
@@ -185,6 +189,9 @@ export default function TasksOverview() {
         budgetStatus: "pending" as const,
         projectId: i.projectId,
         departmentId: i.departmentId,
+        // Seviye dönüştürme alt görevi üst görevden ayırt edebilsin diye
+        // (bkz. migration 068 — panoya bu kolon oradan geliyor).
+        parentTaskId: i.parentTaskId,
       })),
     [sortedItems]
   );
@@ -607,6 +614,9 @@ export default function TasksOverview() {
         onEnable={selection.toggleSelectionMode}
         onCancel={selection.clear}
         onMove={movableSelectedIds.length > 0 ? () => setMovingOpen(true) : undefined}
+        // Kişisel yapılacaklar görev değil; seviye kavramı yok. Düğme yalnızca
+        // seçimde gerçek görev varsa çıkar.
+        onConvert={movableSelectedIds.length > 0 ? () => setConvertOpen(true) : undefined}
         onArchive={() => setConfirmingBulkAction("archive")}
         onDelete={() => setConfirmingBulkAction("delete")}
         lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
@@ -737,6 +747,21 @@ export default function TasksOverview() {
           onChanged={() => {
             setEditingPersonal(null);
             load();
+          }}
+        />
+      )}
+
+      {convertOpen && (
+        <BulkConvertHierarchyModal
+          // Yalnızca gerçek görevler: kişisel kartlar dönüştürülemez, listeye
+          // girerlerse "atlandı" satırlarıyla kullanıcıyı yanıltırlardı.
+          tasks={tasks.filter((task) => sourceById.get(task.id) === "assigned")}
+          selectedIds={new Set(movableSelectedIds)}
+          onClose={() => setConvertOpen(false)}
+          onDone={() => {
+            load();
+            selection.clear();
+            setConvertOpen(false);
           }}
         />
       )}

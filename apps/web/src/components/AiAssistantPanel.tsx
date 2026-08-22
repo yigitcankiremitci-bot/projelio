@@ -1,9 +1,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconSparkle, IconX, IconPlus, IconTrash, IconSend } from "./icons";
+import { IconSparkle, IconX, IconPlus, IconTrash, IconSend, IconPaperclip, IconFile } from "./icons";
 import { aiChat } from "../api/aiChat";
-import type { AiConversation, AiCredits, AiStoredMessage } from "../api/aiChat";
+import type {
+  AiActiveFile,
+  AiAttachment,
+  AiChatResult,
+  AiContinuation,
+  AiConversation,
+  AiCredits,
+  AiModelTier,
+  AiMessageAttachment,
+  AiModelTierInfo,
+  AiStoredMessage,
+} from "../api/aiChat";
 import ConfirmDialog from "./ConfirmDialog";
+import AiContinueDialog from "./AiContinueDialog";
+import AiCloudPickerModal from "./AiCloudPickerModal";
+import { openGooglePicker } from "../lib/googlePicker";
+import { useVoiceRecorder } from "../lib/useVoiceRecorder";
+// Sesli yanıt için tur anlatıcısının motoru yeniden kullanılıyor: Türkçe ses
+// seçimi, uzun metni parçalama ve Chrome'un konuşma sentezi hatasına karşı
+// "canlı tutma" numarası orada zaten çözülmüş (bkz. lib/tour/narrator.ts).
+import {
+  hasTurkishVoice,
+  narrationAvailable,
+  play as speak,
+  sanitizeForSpeech,
+  setPreferredVoice,
+  stop as stopSpeaking,
+  turkishVoices,
+} from "../lib/tour/narrator";
+import { IconMic, IconSpeaker } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
 
 interface Props {
@@ -36,7 +65,33 @@ interface ViewMessage {
   content: string;
   creditsCharged?: number;
   pending?: boolean;
+  attachments?: AiMessageAttachment[];
+  /**
+   * Mesaj BU OTURUMDA mı geldi?
+   *
+   * Sesli yanıt yalnızca yeni gelen cevapları okur. Bu işaret olmadan, sohbet
+   * geçmişinden eski bir konuşma açıldığında Lio en son yazdığı cümleyi
+   * kendiliğinden okumaya başlıyordu.
+   */
+  fresh?: boolean;
 }
+
+/**
+ * Yalnızca dosya gönderilip hiçbir şey yazılmadığında kullanılan istek.
+ * Sunucudaki karşılığıyla (EMPTY_MESSAGE_WITH_FILE) aynı olmalı: yeniden
+ * yüklendiğinde balonun metni değişmesin.
+ */
+const EMPTY_MESSAGE_WITH_FILE = "Bu dosyayı incele ve ne olduğunu özetle.";
+
+/** Ek türlerinin balonda ve çipte gösterilen kısa adı. */
+const ATTACHMENT_LABELS: Record<string, string> = {
+  image: "Görsel",
+  pdf: "PDF",
+  document: "Word",
+  sheet: "Tablo",
+  text: "Metin",
+  audio: "Ses",
+};
 
 const SUGGESTIONS = [
   "Durumumu özetle",
@@ -44,6 +99,40 @@ const SUGGESTIONS = [
   "Bu hafta neler teslim edilecek?",
   "Bana atanmış açık işleri listele",
 ];
+
+/** Seçilen model kademesi oturumlar arasında hatırlanır. */
+const TIER_STORAGE_KEY = "projelio.lio.tier";
+/** Sesli yanıt tercihi de hatırlanır; her açılışta yeniden açmak zorunda kalınmasın. */
+const VOICE_STORAGE_KEY = "projelio.lio.voice";
+/** Seçilen ses adı; cihazda birden fazla Türkçe ses olabiliyor. */
+const VOICE_NAME_KEY = "projelio.lio.voiceName";
+/** Hangi ses motoru: ücretsiz tarayıcı sentezi mi, ücretli doğal ses mi. */
+const VOICE_ENGINE_KEY = "projelio.lio.voiceEngine";
+
+type VoiceEngine = "browser" | "server";
+
+/**
+ * Doğal sesin kaba bedeli (100 karakter başına kredi).
+ *
+ * Sunucudaki fiyatla (TTS_USD_PER_MILLION_CHARS = 15 USD/1M karakter, +%20 komisyon)
+ * aynı hesap: 100 × 15 / 1e6 × 1,2 / 0,0001 = 18. Yalnızca kullanıcıya önden bir
+ * fikir vermek için; gerçek tutar her zaman sunucudan dönen sayıdır.
+ */
+const SERVER_VOICE_CREDITS_PER_100_CHARS = 18;
+/** Seçilen doğal sesin adı. */
+const SERVER_VOICE_KEY = "projelio.lio.serverVoice";
+/**
+ * Ses denemesinde okunan cümle.
+ *
+ * Kısa tutuldu çünkü deneme de ücretli: 46 karakter ≈ 9 kredi. Yine de gerekli,
+ * altı sesi mesajları tekrar tekrar okutarak denemek çok daha pahalı olurdu.
+ */
+const VOICE_SAMPLE = "Merhaba, ben Lio. Sesim böyle duyuluyor.";
+
+function readStoredTier(): AiModelTier {
+  const raw = typeof localStorage !== "undefined" ? localStorage.getItem(TIER_STORAGE_KEY) : null;
+  return raw === "smart" || raw === "max" ? raw : "fast";
+}
 
 const GREETING =
   "Merhaba! Ben Lio. Projelerini, görevlerini ve bütçeni buradan yönetebilirsin — yazman yeterli.";
@@ -57,6 +146,7 @@ export default function AiAssistantPanel({
 }: Props) {
   const c = useThemeColors();
   const isDesktop = useIsDesktop();
+  const navigate = useNavigate();
 
   const [conversations, setConversations] = useState<AiConversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -66,7 +156,175 @@ export default function AiAssistantPanel({
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [credits, setCredits] = useState<AiCredits | null>(null);
   const [confirmation, setConfirmation] = useState<PendingConfirmation | null>(null);
+  const [continuation, setContinuation] = useState<AiContinuation | null>(null);
+  const [tiers, setTiers] = useState<AiModelTierInfo[]>([]);
+  const [tier, setTier] = useState<AiModelTier>(readStoredTier);
+  const [attachments, setAttachments] = useState<AiAttachment[]>([]);
+  /** Okunmayı bekleyen dosya adları — yükleme sürerken çip olarak görünür. */
+  const [attaching, setAttaching] = useState<string[]>([]);
+  const [attachMenu, setAttachMenu] = useState(false);
+  const [cloudPicker, setCloudPicker] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Hata kredi yetersizliğinden mi kaynaklandı (HTTP 402)?
+   *
+   * Ayrı tutuluyor çünkü bu hatada kullanıcıya yapacak bir şey sunulmalı:
+   * uyarının içine kredi sayfasına giden düğme konuyor. Diğer hatalarda
+   * gösterilecek bir eylem yok.
+   */
+  const [creditsBlocked, setCreditsBlocked] = useState(false);
+  /**
+   * Sohbette açık duran dosyalar.
+   *
+   * Görünür olmaları önemli: sabit dosya her turda modele gidiyor, yani her tur
+   * kredi yakıyor. Kullanıcı neyin taşındığını bilmeli ve iş bitince kaldırabilmeli.
+   */
+  const [activeFiles, setActiveFiles] = useState<AiActiveFile[]>([]);
+
+  /**
+   * Sesli yanıt açık mı?
+   *
+   * Tarayıcının konuşma sentezi kullanılıyor — kredi harcamıyor. Tercih
+   * saklanıyor ama tarayıcı desteklemiyorsa düğme hiç gösterilmiyor.
+   */
+  /**
+   * Yeni yanıtları kendiliğinden okusun mu?
+   *
+   * Artık ana etkileşim bu DEĞİL: her yanıtın yanında kendi hoparlörü var ve
+   * kullanıcı hangisini duymak istiyorsa ona basıyor. Bu yalnızca "hepsini
+   * otomatik oku" isteyenler için, varsayılanı kapalı — özellikle doğal seste
+   * her yanıt kredi harcadığı için sessiz varsayılan doğru olan.
+   */
+  const [autoSpeak, setAutoSpeak] = useState(() => {
+    try {
+      return localStorage.getItem(VOICE_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  /** Ses ayarları penceresi (motor, ses, otomatik okuma). */
+  const [voiceMenu, setVoiceMenu] = useState(false);
+  /** Şu an okunan mesaj — düğme "durdur"a döner. */
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  /** Doğal seste ses üretilirken bekleyen mesaj. */
+  const [preparingId, setPreparingId] = useState<string | null>(null);
+  const voiceSupported = useMemo(() => narrationAvailable(), []);
+  // Cihazda Türkçe ses yoksa okunuş bozuk olur; düğmenin ipucunda söylenir.
+  const turkishVoiceMissing = useMemo(() => voiceSupported && !hasTurkishVoice(), [voiceSupported]);
+
+  /**
+   * Cihazdaki Türkçe sesler.
+   *
+   * Chrome sesleri eşzamansız yüklüyor: ilk okumada liste boş dönebiliyor, bu
+   * yüzden panel açıldığında bir kez daha bakılıyor. Seçim yapılmamışsa
+   * narrator'ın kendi otomatik seçimi geçerli kalır.
+   */
+  const [voiceList, setVoiceList] = useState<{ name: string; lang: string }[]>([]);
+  const [voiceEngine, setVoiceEngine] = useState<VoiceEngine>(() => {
+    try {
+      return localStorage.getItem(VOICE_ENGINE_KEY) === "server" ? "server" : "browser";
+    } catch {
+      return "browser";
+    }
+  });
+
+  const chooseVoiceEngine = (engine: VoiceEngine) => {
+    setVoiceEngine(engine);
+    silence();
+    try {
+      localStorage.setItem(VOICE_ENGINE_KEY, engine);
+    } catch {
+      // Depolama kapalıysa seçim yalnızca bu oturumda geçerli olur.
+    }
+  };
+
+  /** Doğal ses seçenekleri sunucudan gelir (hangi seslerin geçerli olduğu orada tanımlı). */
+  const [serverVoices, setServerVoices] = useState<
+    { id: string; label: string; description: string }[]
+  >([]);
+  const [serverVoice, setServerVoice] = useState<string>(() => {
+    try {
+      return localStorage.getItem(SERVER_VOICE_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  /** Ses denemesi sürerken düğme beklemeye geçer. */
+  const [samplingVoice, setSamplingVoice] = useState(false);
+
+  useEffect(() => {
+    if (!voiceMenu || serverVoices.length > 0) return;
+    aiChat
+      .getVoices()
+      .then((res) => {
+        setServerVoices(res.voices);
+        setServerVoice((prev) => prev || res.defaultVoice);
+      })
+      .catch(() => {});
+  }, [voiceMenu, serverVoices.length]);
+
+  const chooseServerVoice = (id: string) => {
+    setServerVoice(id);
+    silence();
+    try {
+      localStorage.setItem(SERVER_VOICE_KEY, id);
+    } catch {
+      // Depolama kapalıysa seçim yalnızca bu oturumda geçerli olur.
+    }
+  };
+
+  /** Seçili sesi kısa bir cümleyle dinletir. */
+  const sampleVoice = async () => {
+    silence();
+    setSamplingVoice(true);
+    setError(null);
+    try {
+      const res = await aiChat.speak(VOICE_SAMPLE, activeId ?? undefined, serverVoice);
+      setCredits((prev) => (prev ? { ...prev, balance: res.balance } : prev));
+      speak({ text: VOICE_SAMPLE, audioUrl: `data:${res.mimeType};base64,${res.audioBase64}` });
+    } catch (err: any) {
+      if (err?.status === 402) setCreditsBlocked(true);
+      setError(String(err?.message ?? "Ses denemesi yapılamadı."));
+    } finally {
+      setSamplingVoice(false);
+    }
+  };
+
+  const [voiceName, setVoiceName] = useState<string>(() => {
+    try {
+      return localStorage.getItem(VOICE_NAME_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+
+  useEffect(() => {
+    if (!open || !voiceSupported) return;
+    const read = () => setVoiceList(turkishVoices());
+    read();
+    // Liste boş geldiyse sesler henüz yüklenmemiştir; kısa bir süre sonra tekrar bak.
+    const timer = setTimeout(read, 600);
+    return () => clearTimeout(timer);
+  }, [open, voiceSupported]);
+
+  useEffect(() => {
+    if (voiceName) setPreferredVoice(voiceName);
+  }, [voiceName]);
+
+  const chooseVoiceName = (name: string) => {
+    setVoiceName(name);
+    setPreferredVoice(name || null);
+    try {
+      localStorage.setItem(VOICE_NAME_KEY, name);
+    } catch {
+      // Depolama kapalıysa seçim yalnızca bu oturumda geçerli olur.
+    }
+  };
+  const recorder = useVoiceRecorder();
+  /** Sesli komut çözümlenirken düğme beklemeye geçer. */
+  const [transcribing, setTranscribing] = useState(false);
+
   const [showHistory, setShowHistory] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -103,9 +361,27 @@ export default function AiAssistantPanel({
     setTimeout(() => inputRef.current?.focus(), 80);
   }, [open, refreshCredits]);
 
+  // Model kademeleri sunucudan gelir (fiyat çarpanı orada tanımlı); bir kez yeter.
+  useEffect(() => {
+    if (!open || tiers.length > 0) return;
+    aiChat
+      .getModels()
+      .then((res) => setTiers(res.tiers))
+      .catch(() => {});
+  }, [open, tiers.length]);
+
+  const chooseTier = (next: AiModelTier) => {
+    setTier(next);
+    try {
+      localStorage.setItem(TIER_STORAGE_KEY, next);
+    } catch {
+      // Depolama kapalıysa (gizli sekme) seçim yalnızca bu oturumda geçerli olur.
+    }
+  };
+
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, sending, confirmation]);
+  }, [messages, sending, confirmation, continuation]);
 
   useEffect(() => {
     if (!open) return;
@@ -121,6 +397,10 @@ export default function AiAssistantPanel({
     setShowHistory(false);
     setLoadingHistory(true);
     setError(null);
+    aiChat
+      .getActiveFiles(id)
+      .then((res) => setActiveFiles(res.files))
+      .catch(() => setActiveFiles([]));
     try {
       const stored: AiStoredMessage[] = await aiChat.getMessages(id);
       setMessages(
@@ -129,6 +409,7 @@ export default function AiAssistantPanel({
           role: m.role,
           content: m.content,
           creditsCharged: m.creditsCharged || undefined,
+          attachments: m.attachments,
         }))
       );
     } catch {
@@ -141,6 +422,7 @@ export default function AiAssistantPanel({
   const startNewConversation = () => {
     setActiveId(null);
     setMessages([]);
+    setActiveFiles([]);
     setError(null);
     setShowHistory(false);
     setTimeout(() => inputRef.current?.focus(), 50);
@@ -157,43 +439,273 @@ export default function AiAssistantPanel({
     }
   };
 
+  /**
+   * Dosyayı mesajdan ÖNCE okutur.
+   *
+   * Neden hemen: ses çözümleme ücretli bir işlem ve kullanıcı göndermeye karar
+   * vermeden önce dosyadan ne okunduğunu (kaç sayfa, kaç satır) ve varsa ne kadar
+   * kredi gittiğini görmeli. Sunucu okunan içeriği kısa süre bellekte tutar;
+   * mesajla birlikte yalnızca ek kimliği gider.
+   */
+  const addAttachment = async (label: string, run: () => Promise<AiAttachment>) => {
+    setError(null);
+    setAttaching((prev) => [...prev, label]);
+    try {
+      const attachment = await run();
+      setAttachments((prev) => [...prev, attachment]);
+      // Ses çözümleme bakiyeyi hemen düşürür; başlıktaki sayı yanlış kalmasın.
+      if (attachment.creditsCharged > 0) refreshCredits();
+    } catch (err: any) {
+      // Ses çözümleme ücretli; bakiye yetmiyorsa buradan da 402 gelebilir.
+      if (err?.status === 402) setCreditsBlocked(true);
+      setError(String(err?.message ?? "Dosya okunamadı."));
+    } finally {
+      setAttaching((prev) => {
+        const index = prev.indexOf(label);
+        if (index < 0) return prev;
+        const next = [...prev];
+        next.splice(index, 1);
+        return next;
+      });
+    }
+  };
+
+  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    // Aynı dosya arka arkaya seçilebilsin diye alan sıfırlanır.
+    e.target.value = "";
+    setAttachMenu(false);
+    for (const file of files) {
+      await addAttachment(file.name, () => aiChat.uploadAttachment(file, activeId ?? undefined));
+    }
+  };
+
+  /**
+   * Bulut seçici. Google'da tarayıcıdaki resmi Picker açılır (dar `drive.file`
+   * kapsamı Drive'ın tamamını listelemeye izin vermiyor), OneDrive'da ise kendi
+   * gezinme penceremiz.
+   */
+  const handleCloudPick = async () => {
+    setAttachMenu(false);
+    setError(null);
+    try {
+      const { provider } = await aiChat.attachmentSource();
+      if (!provider) {
+        setError("Bağlı bir Google Drive ya da OneDrive hesabın yok. Ayarlardan bir hesap bağlayabilirsin.");
+        return;
+      }
+      if (provider === "microsoft") {
+        setCloudPicker(true);
+        return;
+      }
+      await openGooglePicker((picked) => {
+        void addAttachment(picked.name, () => aiChat.attachCloudFile(picked.id, activeId ?? undefined));
+      });
+    } catch (err: any) {
+      setError(String(err?.message ?? "Drive açılamadı."));
+    }
+  };
+
+  /** Kredi yükleme henüz ayrı bir sayfa değil; bakiye ve hareketler burada. */
+  const goToCredits = () => {
+    onClose();
+    navigate("/settings/ai-credits");
+  };
+
+  /**
+   * Lio'nun son yanıtını seslendirir.
+   *
+   * `applyResult` içinden değil buradan çağrılıyor: seslendirilecek şey ekrana
+   * BASILAN metin, dolayısıyla tek kaynak mesaj listesinin sonu. Onay/duraklatma
+   * gibi ara durumlarda da doğru cümle okunmuş olur.
+   */
+  const silence = useCallback(() => {
+    stopSpeaking();
+    setSpeakingId(null);
+    setPreparingId(null);
+  }, []);
+
+  /**
+   * Tek bir mesajı seslendirir; aynı mesaja tekrar basılırsa durdurur.
+   *
+   * Neden mesaj bazlı: tek bir genel aç/kapa, kullanıcıyı ya her yanıtı dinlemeye
+   * ya da hiçbirini dinlememeye zorluyordu. Oysa istenen genelde tek bir cevabı
+   * duymak — üstelik doğal seste her okuma kredi harcadığı için "hangisini
+   * duyacağıma ben karar vereyim" doğru olan.
+   */
+  const playMessage = useCallback(
+    async (message: ViewMessage) => {
+      if (speakingId === message.id || preparingId === message.id) {
+        silence();
+        return;
+      }
+      silence();
+
+      // Markdown/emoji temizliği her iki motorda da yapılır. Doğal seste ayrıca
+      // PARA kazandırıyor: ücret karakter başına, temizlenen her işaret eksi bedel.
+      const text = sanitizeForSpeech(message.content);
+      if (!text) return;
+
+      const startBrowser = () => {
+        setSpeakingId(message.id);
+        speak({ text, onEnd: () => setSpeakingId(null) });
+      };
+
+      if (voiceEngine === "browser") {
+        startBrowser();
+        return;
+      }
+
+      setPreparingId(message.id);
+      try {
+        const res = await aiChat.speak(text, activeId ?? undefined, serverVoice);
+        setCredits((prev) => (prev ? { ...prev, balance: res.balance } : prev));
+        setPreparingId(null);
+        setSpeakingId(message.id);
+        // Ses `audioUrl` olarak veriliyor: anlatıcı çalamazsa kendiliğinden
+        // tarayıcı sentezine düşüyor, kullanıcı sessiz kalmıyor.
+        speak({
+          text,
+          audioUrl: `data:${res.mimeType};base64,${res.audioBase64}`,
+          onEnd: () => setSpeakingId(null),
+        });
+      } catch (err: any) {
+        setPreparingId(null);
+        if (err?.status === 402) setCreditsBlocked(true);
+        setError(String(err?.message ?? "Doğal ses üretilemedi, tarayıcı sesine düşüldü."));
+        startBrowser();
+      }
+    },
+    [speakingId, preparingId, silence, voiceEngine, activeId, serverVoice]
+  );
+
+  // "Hepsini otomatik oku" açıksa yeni gelen yanıt kendiliğinden okunur.
+  const lastSpokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!autoSpeak || !open) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant" || !last.content || !last.fresh) return;
+    if (lastSpokenRef.current === last.id) return;
+    lastSpokenRef.current = last.id;
+    void playMessage(last);
+    // playMessage her render'da yeniden oluşuyor; bağımlılığa eklemek döngü yapar.
+  }, [messages, autoSpeak, open]);
+
+  // Panel kapanınca konuşma kesilir; arka planda devam eden bir ses kullanıcıyı
+  // en çok rahatsız eden şey olurdu.
+  useEffect(() => {
+    if (!open) silence();
+  }, [open, silence]);
+
+  const toggleAutoSpeak = () => {
+    setAutoSpeak((prev) => {
+      const next = !prev;
+      if (!next) silence();
+      try {
+        localStorage.setItem(VOICE_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        // Depolama kapalıysa tercih yalnızca bu oturumda geçerli olur.
+      }
+      return next;
+    });
+  };
+
+  /**
+   * Mikrofon düğmesi: basınca kaydı başlatır, tekrar basınca bitirip yazıya çevirir.
+   *
+   * Çözümlenen metin DOĞRUDAN GÖNDERİLMEZ, yazı kutusuna konur. Sesli tanıma
+   * hata yapabiliyor ve yanlış anlaşılmış bir komut hem kredi harcar hem yanlış
+   * kayıt oluşturur; kullanıcı göndermeden önce görsün.
+   */
+  const toggleRecording = async () => {
+    if (transcribing) return;
+
+    if (!recorder.recording) {
+      silence();
+      await recorder.start();
+      return;
+    }
+
+    const file = await recorder.stop();
+    if (!file) {
+      setError("Kayıt çok kısa, bir şey duyamadım.");
+      return;
+    }
+
+    setTranscribing(true);
+    setError(null);
+    try {
+      const result = await aiChat.transcribe(file, activeId ?? undefined);
+      setInput((prev) => (prev ? `${prev} ${result.text}` : result.text));
+      setCredits((prev) => (prev ? { ...prev, balance: result.balance } : prev));
+      inputRef.current?.focus();
+    } catch (err: any) {
+      if (err?.status === 402) setCreditsBlocked(true);
+      setError(String(err?.message ?? "Ses çözümlenemedi."));
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
+  /** Sohbetteki sabit dosyaları bırakır: bundan sonra modele gönderilmezler. */
+  const clearActiveFiles = () => {
+    if (!activeId) return;
+    setActiveFiles([]);
+    aiChat.clearActiveFiles(activeId).catch(() => {});
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+    aiChat.removeAttachment(id).catch(() => {});
+  };
+
   const send = async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed || sending) return;
+    const sentAttachments = attachments;
+    // Yalnızca dosya göndermek geçerli bir istek: sunucu o durumda varsayılan
+    // bir soru koyuyor ("bu dosyayı incele ve özetle").
+    if ((!trimmed && sentAttachments.length === 0) || sending) return;
 
+    // Kullanıcı yeni bir şey söylüyorsa önceki cevabı okumayı bırak.
+    silence();
     setError(null);
+    setCreditsBlocked(false);
     setInput("");
-    setMessages((prev) => [...prev, { id: `local-${Date.now()}`, role: "user", content: trimmed }]);
+    setAttachments([]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `local-${Date.now()}`,
+        role: "user",
+        content: trimmed || EMPTY_MESSAGE_WITH_FILE,
+        attachments: sentAttachments.map((a) => ({ name: a.name, kind: a.kind, detail: a.detail })),
+      },
+    ]);
     setSending(true);
 
     try {
-      const result = await aiChat.send(trimmed, activeId ?? undefined);
+      const result = await aiChat.send(
+        trimmed,
+        activeId ?? undefined,
+        tier,
+        sentAttachments.map((a) => a.id)
+      );
 
       // Yeni sohbet açıldıysa listeyi tazele ki başlık görünsün.
       if (!activeId) {
         setActiveId(result.conversationId);
         aiChat.listConversations().then(setConversations).catch(() => {});
       }
-      setCredits((prev) => (prev ? { ...prev, balance: result.usage.balance } : prev));
 
-      if (result.type === "confirmation") {
-        if (result.text) {
-          setMessages((prev) => [
-            ...prev,
-            { id: `a-${Date.now()}`, role: "assistant", content: result.text!, creditsCharged: result.usage.creditsCharged },
-          ]);
-        }
-        setConfirmation({ actionId: result.actionId, summary: result.summary });
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          { id: `a-${Date.now()}`, role: "assistant", content: result.text, creditsCharged: result.usage.creditsCharged },
-        ]);
-      }
+      applyResult(result);
     } catch (err: any) {
       const message = String(err?.message ?? "bilinmeyen hata");
       // 402: kredi yetersiz — kullanıcıyı bilgilendir, hata balonu yerine uyarı göster.
+      if (err?.status === 402) setCreditsBlocked(true);
       setError(message);
+      // Ekler sunucuda hâlâ duruyor (kısa ömürlü). Geri konmazsa kullanıcı aynı
+      // dosyayı yeniden yüklemek zorunda kalır — sesli dosyada bu ikinci kez ücret demek.
+      setAttachments(sentAttachments);
       refreshCredits();
     } finally {
       setSending(false);
@@ -241,21 +753,106 @@ export default function AiAssistantPanel({
     // `send` her render'da yeniden oluşuyor; bağımlılığa eklemek döngü yapar.
   }, [open, initialMessage]);
 
+  /**
+   * Duraklatılmış koşuyu sürdürür. Sonuç yine duraklatma olabilir (iş hâlâ
+   * bitmediyse) — o yüzden akış aynı yerden yeniden kurulur.
+   */
+  /**
+   * Sunucudan gelen her sohbet sonucunu ekrana yansıtır.
+   *
+   * Gönderme, "devam et" ve onay akışlarının üçü de aynı sonuç tipini döndürüyor —
+   * onay verildikten sonra istek kaldığı yerden sürdüğü için oradan da yeni bir
+   * onay, duraklatma ya da kredi uyarısı gelebiliyor. Üç yerde ayrı ayrı ele almak
+   * bu durumların birinde eksik kalmayı garanti ederdi.
+   */
+  const applyResult = (result: AiChatResult) => {
+    setCredits((prev) => (prev ? { ...prev, balance: result.usage.balance } : prev));
+    setActiveFiles(result.activeFiles ?? []);
+
+    const pushBubble = (text: string) =>
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `a-${Date.now()}-${prev.length}`,
+          role: "assistant",
+          content: text,
+          creditsCharged: result.usage.creditsCharged,
+          fresh: true,
+        },
+      ]);
+
+    if (result.type === "confirmation") {
+      if (result.text) pushBubble(result.text);
+      setConfirmation({ actionId: result.actionId, summary: result.summary });
+      return;
+    }
+
+    pushBubble(result.text);
+    if (result.type === "continuation") setContinuation(result);
+    if (result.type === "out_of_credits") setCreditsBlocked(true);
+  };
+
+  const handleContinueRun = async (nextTier: AiModelTier, approveAll: boolean) => {
+    const pending = continuation;
+    if (!pending) return;
+    setContinuation(null);
+    if (nextTier !== tier) chooseTier(nextTier);
+    setSending(true);
+    setError(null);
+    try {
+      applyResult(await aiChat.continueRun(pending.runId, true, nextTier, approveAll));
+    } catch (err: any) {
+      if (err?.status === 402) setCreditsBlocked(true);
+      setError(String(err?.message ?? "Devam edilemedi."));
+      refreshCredits();
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleStopRun = () => {
+    const pending = continuation;
+    setContinuation(null);
+    if (!pending) return;
+    aiChat
+      .continueRun(pending.runId, false)
+      .then((res) =>
+        setMessages((prev) => [
+          ...prev,
+          // Durdurma her zaman düz bir mesajla döner; tip birleşimi yüzünden yine de daraltılıyor.
+          { id: `c-${Date.now()}`, role: "assistant", content: res.type === "message" ? res.text : "Durduruldu." },
+        ])
+      )
+      .catch(() => {});
+  };
+
+  /**
+   * Onay verildikten sonra istek KALDIĞI YERDEN devam ediyor; bu yüzden yanıt
+   * gelene kadar "düşünüyor" durumunda kalınır ve sonuç normal akıştan geçer.
+   */
+  const runConfirmation = async (actionId: string, confirmed: boolean) => {
+    setConfirmation(null);
+    setSending(true);
+    setError(null);
+    try {
+      applyResult(await aiChat.confirm(actionId, confirmed));
+    } catch (err: any) {
+      if (err?.status === 402) setCreditsBlocked(true);
+      setError(String(err?.message ?? "İşlem tamamlanamadı."));
+      refreshCredits();
+    } finally {
+      setSending(false);
+    }
+  };
+
   const handleConfirmAction = async () => {
     if (!confirmation) return;
-    const res = await aiChat.confirm(confirmation.actionId, true);
-    setMessages((prev) => [...prev, { id: `c-${Date.now()}`, role: "assistant", content: res.text }]);
-    setConfirmation(null);
+    await runConfirmation(confirmation.actionId, true);
   };
 
   const handleCancelAction = () => {
-    const pending = confirmation;
-    setConfirmation(null);
-    if (!pending) return;
-    aiChat
-      .confirm(pending.actionId, false)
-      .then((res) => setMessages((prev) => [...prev, { id: `c-${Date.now()}`, role: "assistant", content: res.text }]))
-      .catch(() => {});
+    if (!confirmation) return;
+    void runConfirmation(confirmation.actionId, false);
   };
 
   const lowBalance = useMemo(
@@ -264,6 +861,27 @@ export default function AiAssistantPanel({
   );
 
   const panelWidth = isDesktop ? 460 : undefined;
+
+  /**
+   * Yazma kutusunun içine oturan yuvarlak düğmeler.
+   *
+   * Alta hizalı: kutu yazdıkça büyüyor, düğmeler ortada dursaydı metinle
+   * birlikte kayarlardı. Kenarlıksız duruyorlar — kutunun kendi çerçevesi
+   * zaten bir sınır çiziyor, ikinci bir çerçeve kalabalık görünüyordu.
+   */
+  const boxIconStyle: React.CSSProperties = {
+    position: "absolute",
+    bottom: 7,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    border: "none",
+    background: "transparent",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+  };
 
   return (
     <>
@@ -335,6 +953,11 @@ export default function AiAssistantPanel({
             </div>
           </div>
 
+          {voiceSupported && (
+            <HeaderButton title="Ses ayarları" onClick={() => setVoiceMenu((v) => !v)} active={voiceMenu}>
+              <IconSpeaker size={17} color="#fff" muted={!autoSpeak} />
+            </HeaderButton>
+          )}
           <HeaderButton title="Sohbet geçmişi" onClick={() => setShowHistory((v) => !v)} active={showHistory}>
             <IconMessagesGlyph color="#fff" />
           </HeaderButton>
@@ -345,6 +968,142 @@ export default function AiAssistantPanel({
             <IconX size={17} color="#fff" />
           </HeaderButton>
         </header>
+
+        {/* Ses ayarları. Başlıktaki hoparlöre basınca açılır; asıl seslendirme
+            artık buradan değil, her yanıtın kendi düğmesinden yapılıyor. */}
+        {voiceMenu && (
+          <div
+            style={{
+              borderBottom: `1px solid ${c.border}`,
+              background: c.background,
+              padding: "12px 16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ fontSize: 12, color: c.textSecondary }}>
+              Her yanıtın yanındaki hoparlöre basarak dinleyebilirsin.
+            </div>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: c.textSecondary }}>
+              Ses kaynağı
+              <select
+                value={voiceEngine}
+                onChange={(e) => chooseVoiceEngine(e.target.value as VoiceEngine)}
+                style={{
+                  fontSize: 13,
+                  padding: "6px 8px",
+                  borderRadius: 8,
+                  border: `1px solid ${voiceEngine === "server" ? c.warning : c.border}`,
+                  background: c.surface,
+                  color: c.textPrimary,
+                }}
+              >
+                <option value="browser">Tarayıcı sesi · ücretsiz</option>
+                <option value="server">
+                  Doğal ses · ~{SERVER_VOICE_CREDITS_PER_100_CHARS} kredi/100 karakter
+                </option>
+              </select>
+            </label>
+
+            {/* Doğal sesin hangi ses olacağı. Seçenekler sunucudan geliyor:
+                hangi seslerin geçerli olduğu kullanılan TTS modeline bağlı ve
+                bu bilgi orada duruyor. */}
+            {voiceEngine === "server" && serverVoices.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: c.textSecondary }}>
+                  Doğal ses
+                  <select
+                    value={serverVoice}
+                    onChange={(e) => chooseServerVoice(e.target.value)}
+                    style={{
+                      fontSize: 13,
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      border: `1px solid ${c.border}`,
+                      background: c.surface,
+                      color: c.textPrimary,
+                    }}
+                  >
+                    {serverVoices.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label} — {v.description}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {/* Denemeden seçmek zor; kısa bir örnek cümle okutuluyor.
+                    Bedeli etikette yazılı, çünkü deneme de ücretli. */}
+                <button
+                  type="button"
+                  onClick={() => void sampleVoice()}
+                  disabled={samplingVoice}
+                  style={{
+                    alignSelf: "flex-start",
+                    padding: "5px 10px",
+                    borderRadius: 8,
+                    border: `1px solid ${c.border}`,
+                    background: "transparent",
+                    color: c.textPrimary,
+                    fontSize: 12,
+                    cursor: samplingVoice ? "default" : "pointer",
+                    opacity: samplingVoice ? 0.6 : 1,
+                  }}
+                >
+                  {samplingVoice
+                    ? "Hazırlanıyor…"
+                    : `Bu sesi dene (~${Math.ceil(
+                        (VOICE_SAMPLE.length / 100) * SERVER_VOICE_CREDITS_PER_100_CHARS
+                      )} kredi)`}
+                </button>
+              </div>
+            )}
+
+            {/* Ses adı yalnızca tarayıcı sentezinde anlamlı. */}
+            {voiceEngine === "browser" && voiceList.length > 1 && (
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: c.textSecondary }}>
+                Okuma sesi
+                <select
+                  value={voiceName}
+                  onChange={(e) => chooseVoiceName(e.target.value)}
+                  style={{
+                    fontSize: 13,
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    border: `1px solid ${c.border}`,
+                    background: c.surface,
+                    color: c.textPrimary,
+                  }}
+                >
+                  <option value="">Otomatik</option>
+                  {voiceList.map((v) => (
+                    <option key={v.name} value={v.name}>
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {voiceEngine === "browser" && turkishVoiceMissing && (
+              <div style={{ fontSize: 11.5, color: c.warning, lineHeight: 1.4 }}>
+                Cihazında Türkçe ses yok; okunuş bozuk olabilir. Sistem ayarlarından Türkçe bir ses
+                yükleyebilir ya da "Doğal ses"e geçebilirsin.
+              </div>
+            )}
+
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: c.textPrimary, cursor: "pointer" }}>
+              <input type="checkbox" checked={autoSpeak} onChange={toggleAutoSpeak} />
+              Yeni yanıtları kendiliğinden oku
+              {voiceEngine === "server" && (
+                <span style={{ color: c.warning, fontSize: 11 }}>(her yanıt kredi harcar)</span>
+              )}
+            </label>
+          </div>
+        )}
 
         {/* Sohbet geçmişi çekmecesi */}
         {showHistory && (
@@ -399,6 +1158,63 @@ export default function AiAssistantPanel({
           </div>
         )}
 
+        {/* Sohbette açık dosyalar. Her turda modele gittikleri için görünür
+            olmaları gerekiyor: kullanıcı neyin ücretlendirildiğini bilmeli. */}
+        {activeFiles.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 14px",
+              borderBottom: `1px solid ${c.border}`,
+              background: c.background,
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: 11.5, color: c.textSecondary, flexShrink: 0 }}>Sohbette açık:</span>
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+              {activeFiles.map((file) => (
+                <span
+                  key={file.id}
+                  title={`${file.detail} — iş bitene kadar her turda Lio'ya gönderiliyor`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "3px 8px",
+                    borderRadius: 999,
+                    border: `1px solid ${c.accent}`,
+                    fontSize: 11.5,
+                    color: c.textPrimary,
+                    maxWidth: 180,
+                  }}
+                >
+                  <IconFile size={12} color={c.accent} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {file.name}
+                  </span>
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={clearActiveFiles}
+              title="Dosyaları bırak"
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: 4,
+                display: "flex",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <IconX size={13} color={c.textSecondary} />
+            </button>
+          </div>
+        )}
+
         {/* Mesajlar */}
         <div
           ref={scrollRef}
@@ -433,7 +1249,17 @@ export default function AiAssistantPanel({
           {loadingHistory && <p style={{ fontSize: 13, color: c.textSecondary }}>Sohbet yükleniyor…</p>}
 
           {messages.map((m) => (
-            <Bubble key={m.id} role={m.role} text={m.content} credits={m.creditsCharged} />
+            <Bubble
+              key={m.id}
+              role={m.role}
+              text={m.content}
+              credits={m.creditsCharged}
+              attachments={m.attachments}
+              canSpeak={voiceSupported && m.role === "assistant" && !!m.content}
+              speaking={speakingId === m.id}
+              preparing={preparingId === m.id}
+              onSpeak={() => void playMessage(m)}
+            />
           ))}
 
           {sending && (
@@ -446,8 +1272,8 @@ export default function AiAssistantPanel({
           )}
         </div>
 
-        {/* Hata / düşük bakiye uyarısı */}
-        {(error || lowBalance) && (
+        {/* Hata / kredi uyarısı */}
+        {(error || lowBalance || creditsBlocked) && (
           <div
             style={{
               margin: "0 14px 10px",
@@ -460,39 +1286,250 @@ export default function AiAssistantPanel({
               lineHeight: 1.45,
             }}
           >
-            {error ?? "AI krediniz azaldı. Kesintisiz kullanım için kredi yükleyin."}
+            {error ??
+              (creditsBlocked
+                ? "AI kredin bu isteği tamamlamaya yetmedi."
+                : "AI krediniz azaldı. Kesintisiz kullanım için kredi yükleyin.")}
+            {(creditsBlocked || lowBalance) && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={goToCredits}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: c.accent,
+                    color: "#fff",
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Kredi yükle
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {/* Yazma alanı */}
-        <div style={{ padding: 14, borderTop: `1px solid ${c.border}`, flexShrink: 0 }}>
+        <div style={{ padding: 14, borderTop: `1px solid ${c.border}`, flexShrink: 0, position: "relative" }}>
+          {/* İliştirilmiş dosyalar. Okunanlar dökümüyle, okunmayı bekleyenler soluk görünür. */}
+          {(attachments.length > 0 || attaching.length > 0) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+              {attachments.map((attachment) => (
+                <span
+                  key={attachment.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 8px",
+                    borderRadius: 8,
+                    border: `1px solid ${c.border}`,
+                    background: c.background,
+                    fontSize: 12,
+                    maxWidth: "100%",
+                  }}
+                >
+                  <IconFile size={13} color={c.accent} />
+                  <span
+                    style={{
+                      color: c.textPrimary,
+                      maxWidth: 150,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {attachment.name}
+                  </span>
+                  <span style={{ color: c.textSecondary }}>{attachment.detail}</span>
+                  {attachment.creditsCharged > 0 && (
+                    <span style={{ color: c.warning }}>−{Math.round(attachment.creditsCharged)} kredi</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(attachment.id)}
+                    aria-label="Dosyayı çıkar"
+                    style={{ background: "transparent", border: "none", padding: 0, display: "flex", cursor: "pointer" }}
+                  >
+                    <IconX size={12} color={c.textSecondary} />
+                  </button>
+                </span>
+              ))}
+              {attaching.map((name, index) => (
+                <span
+                  key={`${name}-${index}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 8px",
+                    borderRadius: 8,
+                    border: `1px dashed ${c.border}`,
+                    fontSize: 12,
+                    color: c.textSecondary,
+                  }}
+                >
+                  {name} · okunuyor…
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Ataç menüsü */}
+          {attachMenu && (
+            <>
+              <div onClick={() => setAttachMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 1 }} />
+              <div
+                style={{
+                  // Ataç artık kutunun içinde ve altta; menü tam onun üstünde
+                  // açılıyor: 14 (dolgu) + 30 (kademe şeridi) + 7 (düğme boşluğu)
+                  // + 32 (düğme) + 9 (aralık).
+                  position: "absolute",
+                  bottom: 92,
+                  left: 14,
+                  zIndex: 2,
+                  background: c.surface,
+                  border: `1px solid ${c.border}`,
+                  borderRadius: 10,
+                  boxShadow: "0 8px 24px rgba(26,31,41,0.16)",
+                  overflow: "hidden",
+                  minWidth: 190,
+                }}
+              >
+                <MenuItem onClick={() => fileInputRef.current?.click()}>Bilgisayardan yükle</MenuItem>
+                <MenuItem onClick={() => void handleCloudPick()}>Drive / OneDrive'dan seç</MenuItem>
+              </div>
+            </>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            hidden
+            accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md,.json,image/*,audio/*"
+            onChange={(e) => void handleFileInput(e)}
+          />
+
+          {(recorder.recording || transcribing || recorder.error) && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 8,
+                fontSize: 12,
+                color: recorder.error ? c.danger : c.textSecondary,
+              }}
+            >
+              {recorder.error ? (
+                recorder.error
+              ) : recorder.recording ? (
+                <>
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: c.danger,
+                      animation: "projelioAiPulse 1.2s ease infinite",
+                    }}
+                  />
+                  Dinliyorum… {recorder.seconds} sn — bitirmek için mikrofona tekrar bas
+                  <button
+                    type="button"
+                    onClick={recorder.cancel}
+                    style={{
+                      marginLeft: "auto",
+                      background: "transparent",
+                      border: "none",
+                      color: c.textSecondary,
+                      fontSize: 12,
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Vazgeç
+                  </button>
+                </>
+              ) : (
+                "Ses yazıya çevriliyor…"
+              )}
+            </div>
+          )}
+
+
+
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
             {/* Yükseklik JS ile ölçülmüyor: sarmalayıcı bir ızgara ve metnin
                 görünmez bir kopyası textarea ile aynı gözü paylaşıyor
                 (bkz. index.css .autogrow / .autogrow-chat). Kutu üç satır
                 yüksekliğinde başlar, yazdıkça büyür, tavana varınca kaydırır. */}
-            <div className="autogrow autogrow-chat" data-replica={input} style={{ flex: 1, minWidth: 0, fontSize: 14 }}>
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  // Enter gönderir, Shift+Enter yeni satır açar — mesaj kutusu
-                  // olduğu için satır atlamak gerçekten gerekiyor.
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void send(input);
-                  }
-                }}
-                rows={1}
-                placeholder="Ne yapmak istersin?"
+            {/* Ataç ve mikrofon kutunun İÇİNDE: solda ekleme, sağda ses.
+                Sarmalayıcı .autogrow'un DIŞINDA duruyor — o ızgara bir
+                `overflow: hidden` taşıyor ve içine konan mutlak konumlu
+                düğmeler kırpılabilirdi. */}
+            <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+              <div className="autogrow autogrow-chat autogrow-chat--icons" data-replica={input} style={{ fontSize: 14 }}>
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter gönderir, Shift+Enter yeni satır açar — mesaj kutusu
+                    // olduğu için satır atlamak gerçekten gerekiyor.
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void send(input);
+                    }
+                  }}
+                  rows={1}
+                  placeholder="Ne yapmak istersin?"
+                  disabled={sending}
+                  style={{ color: c.textPrimary }}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setAttachMenu((v) => !v)}
                 disabled={sending}
-                style={{ color: c.textPrimary }}
-              />
+                aria-label="Dosya ekle"
+                title="Dosya ekle"
+                style={{ ...boxIconStyle, left: 7, opacity: sending ? 0.4 : 1 }}
+              >
+                <IconPaperclip size={18} color={c.textSecondary} />
+              </button>
+
+              {recorder.supported && (
+                <button
+                  type="button"
+                  onClick={() => void toggleRecording()}
+                  disabled={sending || transcribing}
+                  aria-label={recorder.recording ? "Kaydı bitir" : "Sesli komut"}
+                  title={
+                    recorder.recording
+                      ? "Kaydı bitir ve yazıya çevir"
+                      : "Sesli komut ver (ses çözümleme kredi harcar)"
+                  }
+                  style={{
+                    ...boxIconStyle,
+                    right: 7,
+                    background: recorder.recording ? "rgba(193,52,52,0.12)" : "transparent",
+                    opacity: sending || transcribing ? 0.4 : 1,
+                  }}
+                >
+                  <IconMic size={18} color={recorder.recording ? c.danger : c.textSecondary} />
+                </button>
+              )}
             </div>
             <button
               onClick={() => void send(input)}
-              disabled={sending || !input.trim()}
+              disabled={sending || (!input.trim() && attachments.length === 0)}
               aria-label="Gönder"
               style={{
                 width: 42,
@@ -504,18 +1541,59 @@ export default function AiAssistantPanel({
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
-                cursor: sending || !input.trim() ? "default" : "pointer",
-                opacity: sending || !input.trim() ? 0.5 : 1,
+                cursor: sending || (!input.trim() && attachments.length === 0) ? "default" : "pointer",
+                opacity: sending || (!input.trim() && attachments.length === 0) ? 0.5 : 1,
               }}
             >
               <IconSend size={19} color="#fff" />
             </button>
           </div>
-          <p style={{ margin: "8px 2px 0", fontSize: 11, color: c.textSecondary }}>
-            Lio hata yapabilir; önemli işlemleri kontrol edin.
-          </p>
+          {/* Model seçici: zor işlerde kademe yükseltmek adım sayısını düşürür,
+              ama adım başına kredi bedelini artırır — kararı kullanıcı verir. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "8px 2px 0", flexWrap: "wrap" }}>
+            {tiers.map((t) => (
+              <button
+                key={t.tier}
+                type="button"
+                onClick={() => chooseTier(t.tier)}
+                title={`${t.description} (yaklaşık ${t.costMultiplier}× kredi)`}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  cursor: "pointer",
+                  border: `1px solid ${t.tier === tier ? c.accent : c.border}`,
+                  background: t.tier === tier ? c.accent : "transparent",
+                  color: t.tier === tier ? "#fff" : c.textSecondary,
+                }}
+              >
+                {t.label}
+                {t.costMultiplier > 1 && <span style={{ opacity: 0.8 }}> ×{t.costMultiplier}</span>}
+              </button>
+            ))}
+            <span style={{ marginLeft: "auto", fontSize: 11, color: c.textSecondary }}>
+              Lio hata yapabilir.
+            </span>
+          </div>
         </div>
       </aside>
+
+      {cloudPicker && (
+        <AiCloudPickerModal
+          conversationId={activeId ?? undefined}
+          onClose={() => setCloudPicker(false)}
+          onPicked={(attachment) => setAttachments((prev) => [...prev, attachment])}
+        />
+      )}
+
+      {continuation && (
+        <AiContinueDialog
+          continuation={continuation}
+          tiers={tiers}
+          onContinue={handleContinueRun}
+          onStop={handleStopRun}
+        />
+      )}
 
       {confirmation && (
         <ConfirmDialog
@@ -579,40 +1657,152 @@ function IconMessagesGlyph({ color = "currentColor" }: { color?: string }) {
   );
 }
 
+function MenuItem({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  const c = useThemeColors();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "block",
+        width: "100%",
+        padding: "10px 14px",
+        background: "transparent",
+        border: "none",
+        borderBottom: `1px solid ${c.border}`,
+        color: c.textPrimary,
+        fontSize: 13,
+        textAlign: "left",
+        cursor: "pointer",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function Bubble({
   role,
   text,
   credits,
+  attachments,
+  canSpeak,
+  speaking,
+  preparing,
+  onSpeak,
 }: {
   role: "user" | "assistant";
   text: string;
   credits?: number;
+  attachments?: AiMessageAttachment[];
+  canSpeak?: boolean;
+  speaking?: boolean;
+  preparing?: boolean;
+  onSpeak?: () => void;
 }) {
   const c = useThemeColors();
   const isUser = role === "user";
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start" }}>
-      <div
-        style={{
-          maxWidth: "88%",
-          padding: "10px 13px",
-          borderRadius: 14,
-          borderBottomRightRadius: isUser ? 4 : 14,
-          borderBottomLeftRadius: isUser ? 14 : 4,
-          background: isUser ? c.primaryDark : c.background,
-          color: isUser ? "#fff" : c.textPrimary,
-          fontSize: 14,
-          lineHeight: 1.5,
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-        }}
-      >
-        {text}
-      </div>
-      {!isUser && !!credits && (
-        <span style={{ fontSize: 10.5, color: c.textSecondary, margin: "3px 4px 0" }}>
-          {Math.round(credits)} kredi
-        </span>
+      {/* Dosya künyeleri balonun üstünde durur: içeriğin tamamı burada gösterilmez,
+          yalnızca ne gönderildiği görünür (çıkarılan metin arayüze hiç gelmiyor). */}
+      {!!attachments?.length && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 5,
+            marginBottom: 5,
+            justifyContent: isUser ? "flex-end" : "flex-start",
+            maxWidth: "88%",
+          }}
+        >
+          {attachments.map((attachment, index) => (
+            <span
+              key={`${attachment.name}-${index}`}
+              title={attachment.detail}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "4px 8px",
+                borderRadius: 8,
+                border: `1px solid ${c.border}`,
+                background: c.surface,
+                fontSize: 11.5,
+                color: c.textSecondary,
+              }}
+            >
+              <IconFile size={12} color={c.accent} />
+              <span
+                style={{
+                  color: c.textPrimary,
+                  maxWidth: 140,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {attachment.name}
+              </span>
+              <span>{ATTACHMENT_LABELS[attachment.kind] ?? "Dosya"}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {!!text && (
+        <div
+          style={{
+            maxWidth: "88%",
+            padding: "10px 13px",
+            borderRadius: 14,
+            borderBottomRightRadius: isUser ? 4 : 14,
+            borderBottomLeftRadius: isUser ? 14 : 4,
+            background: isUser ? c.primaryDark : c.background,
+            color: isUser ? "#fff" : c.textPrimary,
+            fontSize: 14,
+            lineHeight: 1.5,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {text}
+        </div>
+      )}
+      {/* Alt satır: kredi bilgisi ve bu yanıtı dinleme düğmesi. Hoparlör her
+          yanıtın kendi altında duruyor — kullanıcı hangisini duymak istiyorsa
+          ona basıyor, hepsini birden açmak zorunda kalmıyor. */}
+      {!isUser && (canSpeak || !!credits) && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "3px 4px 0" }}>
+          {!!credits && (
+            <span style={{ fontSize: 10.5, color: c.textSecondary }}>{Math.round(credits)} kredi</span>
+          )}
+          {canSpeak && (
+            <button
+              type="button"
+              onClick={onSpeak}
+              disabled={preparing}
+              aria-label={speaking ? "Okumayı durdur" : "Bu yanıtı dinle"}
+              title={preparing ? "Ses hazırlanıyor…" : speaking ? "Okumayı durdur" : "Bu yanıtı dinle"}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                fontSize: 10.5,
+                color: speaking ? c.accent : c.textSecondary,
+                cursor: preparing ? "default" : "pointer",
+                opacity: preparing ? 0.6 : 1,
+              }}
+            >
+              <IconSpeaker size={13} color={speaking ? c.accent : c.textSecondary} muted={false} />
+              {preparing ? "hazırlanıyor…" : speaking ? "durdur" : "dinle"}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

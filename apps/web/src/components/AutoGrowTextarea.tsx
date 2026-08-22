@@ -20,7 +20,18 @@ interface Props {
   fontSize?: number;
   /** Sarmalayıcıya (ızgaraya) uygulanır: yerleşimde asıl kutu odur. */
   style?: CSSProperties;
+  /** Ek sınıf — ölçüleri değiştiren varyantlar için (bkz. .autogrow-inline). */
+  className?: string;
 }
+
+/**
+ * iOS Safari, yazı boyu 16px'in altındaki bir alana odaklanınca sayfayı
+ * otomatik yakınlaştırıyor; bu yüzden dokunmatik cihazlarda taban 16'ya
+ * çekiliyor. Masaüstünde ise böyle bir sorun yok ve tabanı orada da zorlamak,
+ * yerinde düzenleme kutusunu yerini aldığı metinden BÜYÜK gösteriyordu.
+ */
+const COARSE_POINTER =
+  typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
 
 /**
  * Görev/alt görev başlığı yazarken kullanılan, içerik uzadıkça AŞAĞI BÜYÜYEN
@@ -55,18 +66,17 @@ export default function AutoGrowTextarea({
   minHeight = 34,
   fontSize = 16,
   style,
+  className,
 }: Props) {
   return (
     <div
-      className="autogrow"
+      className={className ? `autogrow ${className}` : "autogrow"}
       // Görünmez kopyanın metni. Yükseklik bundan doğuyor.
       data-replica={value}
       style={{
         // Yazı ölçüleri sarmalayıcıda: textarea ve kopya ikisini de `inherit`
         // ile alıyor, böylece ikisi kesinlikle aynı sarıyor.
-        // fontSize en az 16: iOS Safari daha küçük alanlara odaklanınca sayfayı
-        // otomatik yakınlaştırıyor.
-        fontSize: Math.max(fontSize, 16),
+        fontSize: COARSE_POINTER ? Math.max(fontSize, 16) : fontSize,
         minHeight,
         ...style,
       }}

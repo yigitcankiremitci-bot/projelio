@@ -395,3 +395,105 @@ export function IconStar({ size = 18, color = "currentColor", filled = false }: 
     </svg>
   );
 }
+
+// Ataç — Lio sohbetinde dosya iliştirme düğmesi.
+export function IconPaperclip({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 11.5l-8.8 8.8a5 5 0 0 1-7.1-7.1l8.8-8.8a3.4 3.4 0 0 1 4.8 4.8l-8.8 8.8a1.7 1.7 0 0 1-2.4-2.4l8.1-8.1" />
+    </svg>
+  );
+}
+
+// Mikrofon — Lio'ya sesli komut vermek için.
+export function IconMic({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="9" y="2.5" width="6" height="11" rx="3" />
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0" />
+      <path d="M12 17.5V21" />
+    </svg>
+  );
+}
+
+// Hoparlör — sesli yanıt açık/kapalı. muted=true ise üzeri çizilir.
+export function IconSpeaker({ size = 18, color = "currentColor", muted = false }: IconProps & { muted?: boolean }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z" />
+      {muted ? (
+        <path d="M16.5 9.5l4 5m0-5l-4 5" />
+      ) : (
+        <>
+          <path d="M15.8 9.2a4 4 0 0 1 0 5.6" />
+          <path d="M18.4 6.8a7.5 7.5 0 0 1 0 10.4" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// Seviye indir: görevi alt göreve dönüştürmek için (sağa girinti).
+export function IconIndent({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 6h16M10 12h10M10 18h10" />
+      <path d="M4 10.5l2.5 1.5L4 13.5z" fill={color} />
+    </svg>
+  );
+}
+
+// Seviye yükselt: alt görevi göreve dönüştürmek için (sola girinti).
+export function IconOutdent({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 6h16M10 12h10M10 18h10" />
+      <path d="M6.5 10.5L4 12l2.5 1.5z" fill={color} />
+    </svg>
+  );
+}

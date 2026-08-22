@@ -44,6 +44,12 @@ services:
       # ANTHROPIC_API_KEY'den farklıdır. Yoksa özellik sessizce kendi tahminine düşer.
       - key: ANTHROPIC_ADMIN_API_KEY
         sync: false
+      # Lio'ya iliştirilen SES dosyalarını yazıya çevirmek için (bkz.
+      # AiTranscriptionService). Anthropic modelleri ses kabul etmiyor, o yüzden
+      # yalnızca bu iş için ayrı bir sağlayıcı kullanılıyor. Yoksa ses ekleri
+      # net bir hata döner, asistanın geri kalanı etkilenmez.
+      - key: OPENAI_API_KEY
+        sync: false
       - key: VAPID_PUBLIC_KEY
         sync: false
       - key: VAPID_PRIVATE_KEY

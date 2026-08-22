@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconArchive, IconCheck, IconCopy, IconMove, IconTrash, IconX } from "./icons";
+import { IconArchive, IconCheck, IconCopy, IconIndent, IconMove, IconTrash, IconX } from "./icons";
 import { LioMascotIcon } from "./AskLioButton";
 import { askLioAboutMany } from "../lib/askLio";
 import type { LioSubject } from "../lib/askLio";
@@ -21,6 +21,12 @@ interface Props {
    */
   onDuplicate?: () => void;
   onMove?: () => void;
+  /**
+   * Seçilenleri bir seviye yukarı/aşağı alır (görev ↔ alt görev).
+   * Yalnızca hiyerarşisi olan panolarda verilir; kişisel yapılacaklarla karışan
+   * listelerde (bkz. TasksOverview) karşılığı yok.
+   */
+  onConvert?: () => void;
   onArchive?: () => void;
   onDelete?: () => void;
   /**
@@ -61,6 +67,7 @@ export default function TaskSelectionBar({
   onCancel,
   onDuplicate,
   onMove,
+  onConvert,
   onArchive,
   onDelete,
   lioTasks,
@@ -160,6 +167,14 @@ export default function TaskSelectionBar({
       actionButton("dup", "Çoğalt", "Seçilenleri çoğalt", <IconCopy size={iconSize} color={c.textSecondary} />, onDuplicate),
     onMove &&
       actionButton("move", "Taşı", "Seçilenleri taşı", <IconMove size={iconSize} color={c.textSecondary} />, onMove),
+    onConvert &&
+      actionButton(
+        "conv",
+        "Seviye",
+        "Seçilenleri göreve / alt göreve dönüştür",
+        <IconIndent size={iconSize} color={c.textSecondary} />,
+        onConvert
+      ),
     onArchive &&
       actionButton(
         "arch",

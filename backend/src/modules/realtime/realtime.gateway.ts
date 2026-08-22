@@ -172,6 +172,20 @@ export class RealtimeGateway implements OnGatewayDisconnect, OnModuleDestroy {
     }
   }
 
+  /**
+   * Tek bir KULLANICIYA (tüm sekmelerine) olay gönderir.
+   *
+   * Oda yayınından farkı hedefin sayfa değil kişi olması: Lio'nun yaptığı işi
+   * kullanıcının ekranına taşımak için kullanılıyor (bkz. LioActivityPayload).
+   * Kullanıcı odasına katılma bildirim ağ geçidinde yapılıyor
+   * (notifications.gateway.ts, `user:<id>`); ikisi de aynı Socket.IO sunucusunu
+   * paylaştığı için burada ayrıca katılım gerekmiyor.
+   */
+  emitToUser(userId: string, event: string, payload: unknown): void {
+    if (!userId || !this.server) return;
+    this.server.to(`user:${userId}`).emit(event, payload);
+  }
+
   /** Belirli bir odaya doğrudan haber vermek isteyen servisler için. */
   notifyRoom(room: string, meta: { method: string; path: string; actorId?: string }): void {
     if (!this.rooms.has(room)) return;

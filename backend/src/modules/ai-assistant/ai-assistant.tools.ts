@@ -3,6 +3,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 // Kullanıcının onayı olmadan ASLA doğrudan çalıştırılmaması gereken araçlar.
 // (Silme, arşivleme ve bütçe/para hareketi gibi geri alınması zor işlemler.)
 export const CRITICAL_TOOLS = new Set<string>([
+  "delete_output",
+  "archive_output",
   "delete_task",
   "archive_task",
   "delete_project",
@@ -13,6 +15,19 @@ export const CRITICAL_TOOLS = new Set<string>([
 ]);
 
 export const AI_TOOLS: Anthropic.Tool[] = [
+  // --- Sohbete sabitlenmiş dosyalar ------------------------------------
+  {
+    name: "release_files",
+    description:
+      "Sohbete iliştirilmiş dosyalarla İŞ BİTTİĞİNDE çağır. Dosyalar bırakılır ve sonraki " +
+      "turlarda modele gönderilmez; böylece kullanıcı aynı içeriği tur tur ödemeye devam etmez. " +
+      "İş gerçekten bitmeden çağırma: bıraktıktan sonra dosyanın içeriğini bir daha göremezsin " +
+      "ve kullanıcıdan tekrar göndermesini istemek zorunda kalırsın.",
+    input_schema: {
+      type: "object",
+      properties: {},
+    },
+  },
   // --- Okuma araçları -------------------------------------------------
   {
     name: "list_jobs",
@@ -191,13 +206,16 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         assignedTo: { type: "string", description: "Atanacak kullanıcının id'si (opsiyonel)" },
         budget: { type: "number" },
         parentTaskId: { type: "string", description: "Alt görev oluşturmak için üst görev id'si (opsiyonel)" },
+        outputId: { type: "string", description: "Görevi bir çıktıya bağlar (opsiyonel)" },
       },
       required: ["projectId", "title", "deadline"],
     },
   },
   {
     name: "update_task",
-    description: "Bir görevin başlık/açıklama/tarih/atanan kişi/bütçe bilgilerini günceller.",
+    description:
+      "Bir görevin başlık/açıklama/tarih/atanan kişi/bütçe bilgilerini günceller. " +
+      "Görevi bir çıktıya taşımak için outputId ver; çıktıdan çıkarmak için boş dize gönder.",
     input_schema: {
       type: "object",
       properties: {
@@ -208,6 +226,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         startDate: { type: "string" },
         assignedTo: { type: "string" },
         budget: { type: "number" },
+        outputId: { type: "string", description: "Görevi bu çıktıya taşır; boş dize çıktıdan çıkarır" },
       },
       required: ["taskId"],
     },
@@ -247,7 +266,14 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         projectId: { type: "string" },
         tasks: {
           type: "array",
-          description: "Oluşturulacak görevlerin listesi.",
+          // maxItems ŞEMADA zorunlu tutuluyor, yalnızca promptta öğütlenmiyor:
+          // model 30 kalemlik tek bir çağrı yazmaya kalktığında JSON yanıt uzunluk
+          // sınırında kesiliyor, tur tamamen boşa gidiyor ve kullanıcı hiçbir iş
+          // yapılmadan yüzlerce kredi ödüyordu.
+          maxItems: 10,
+          description:
+            "Oluşturulacak görevlerin listesi. Tek çağrıda EN FAZLA 10 kalem; " +
+            "daha fazlası varsa aracı arka arkaya birkaç kez çağır.",
           items: {
             type: "object",
             properties: {
@@ -258,12 +284,72 @@ export const AI_TOOLS: Anthropic.Tool[] = [
               assignedTo: { type: "string", description: "Atanacak kullanıcının id'si (opsiyonel)" },
               budget: { type: "number" },
               parentTaskId: { type: "string" },
+              outputId: { type: "string", description: "Görevi bir çıktıya bağlar (opsiyonel)" },
             },
             required: ["title", "deadline"],
           },
         },
       },
       required: ["projectId", "tasks"],
+    },
+  },
+
+  // --- Çıktılar -------------------------------------------------------------
+  // Çıktı = projenin/departmanın teslim edilecek parçası ("Logo tasarımı",
+  // "Ana sayfa"). Görevler bir çıktıya bağlanabilir; pano onları o başlık
+  // altında gruplar.
+  {
+    name: "list_outputs",
+    description: "Bir projenin çıktılarını listeler.",
+    input_schema: {
+      type: "object",
+      properties: { projectId: { type: "string" } },
+      required: ["projectId"],
+    },
+  },
+  {
+    name: "create_output",
+    description:
+      "Projeye yeni bir çıktı ekler. Görevleri çıktıya bağlamak için create_task/create_tasks'a outputId ver.",
+    input_schema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        title: { type: "string" },
+        description: { type: "string" },
+      },
+      required: ["projectId", "title"],
+    },
+  },
+  {
+    name: "update_output",
+    description: "Çıktının adını ya da açıklamasını değiştirir.",
+    input_schema: {
+      type: "object",
+      properties: {
+        outputId: { type: "string" },
+        title: { type: "string" },
+        description: { type: "string" },
+      },
+      required: ["outputId"],
+    },
+  },
+  {
+    name: "archive_output",
+    description: "Çıktıyı arşivler. Kullanıcıya onaylatılır.",
+    input_schema: {
+      type: "object",
+      properties: { outputId: { type: "string" } },
+      required: ["outputId"],
+    },
+  },
+  {
+    name: "delete_output",
+    description: "Çıktıyı siler. Kullanıcıya onaylatılır.",
+    input_schema: {
+      type: "object",
+      properties: { outputId: { type: "string" } },
+      required: ["outputId"],
     },
   },
 

@@ -15,8 +15,25 @@ export const LONG_PRESS_DELAY = 180;
  * listeden listeye değişmemeli. Bu hook'u kullanmayan yerler de (bkz.
  * TaskColumn'daki alt görev listeleri) buradan almalı.
  */
+/**
+ * Sürüklemeyi BAŞLATMAYACAK öğeler.
+ *
+ * Metin alanları listede olmak zorunda: bir görev başlığı yerinde düzenlenirken
+ * kullanıcı metnin üstünde basılı tutup sürüklediğinde beklediği şey METNİ
+ * SEÇMEK, kartı taşımak değil. Sortable her ikisini de aynı basılı-tutma
+ * hareketinden okuduğu için seçim hiç yapılamıyordu.
+ *
+ * `preventOnFilter: false` ile birlikte çalışır: o olmadan Sortable filtrelenen
+ * öğede de preventDefault çağırıp tarayıcının kendi seçim davranışını iptal
+ * ediyor — yani sürükleme durur ama seçim yine olmaz.
+ */
+export const SORTABLE_FILTER =
+  "button, a, input, textarea, select, [contenteditable='true'], .no-drag";
+
 export const SORTABLE_BASE_OPTIONS: SortableOptions = {
   animation: 180,
+  filter: SORTABLE_FILTER,
+  preventOnFilter: false,
   delay: LONG_PRESS_DELAY,
   delayOnTouchOnly: false,
   touchStartThreshold: 5,

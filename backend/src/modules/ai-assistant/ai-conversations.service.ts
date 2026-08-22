@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 
 export interface AiConversationSummary {
@@ -8,12 +8,45 @@ export interface AiConversationSummary {
   updatedAt: string;
 }
 
+/**
+ * Bir mesaja iliştirilmiş dosyanın kaydı.
+ *
+ * `text` yalnızca metne çevrilebilen türlerde (Word, Excel, düz metin, ses) dolu
+ * olur ve modele geçmiş beslenirken kullanılır. Görsel/PDF'te yoktur: onların
+ * içeriği modele yalnızca gönderildikleri turda ikili olarak gider.
+ */
+export interface StoredAttachment {
+  name: string;
+  kind: string;
+  detail: string;
+}
+
+/**
+ * Sohbete SABİTLENMİŞ dosya.
+ *
+ * Eskiden dosya tek bir mesaja bağlıydı ve geçmiş penceresi (son 8 mesaj) dolunca
+ * bağlamdan düşüyordu; iş birkaç turdan uzun sürdüğünde Lio "dosyayı göremiyorum"
+ * deyip aynı soruları tekrarlıyor, kullanıcı hem sonuç alamıyor hem yüzlerce kredi
+ * ödüyordu. Artık dosya sohbette DURUR ve iş bitene kadar her turda gönderilir.
+ *
+ * `text` metne çevrilebilen türlerde dolu olur. Görsel ve PDF'te yoktur: onların
+ * ikili içeriği sunucu belleğinde `id` ile tutulur (bkz. AiAttachmentsService).
+ */
+export interface ActiveFile {
+  id: string;
+  name: string;
+  kind: string;
+  detail: string;
+  text?: string;
+}
+
 export interface AiStoredMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   creditsCharged: number;
   createdAt: string;
+  attachments?: StoredAttachment[];
 }
 
 const MAX_TITLE_LENGTH = 60;
@@ -35,12 +68,52 @@ function mapMessage(row: any): AiStoredMessage {
     content: row.content,
     creditsCharged: Number(row.credits_charged ?? 0),
     createdAt: row.created_at,
+    attachments: Array.isArray(row.attachments) ? row.attachments : undefined,
+  };
+}
+
+/**
+ * Arayüze giden hâl.
+ *
+ * Eski kayıtlarda `attachments` içinde çıkarılmış metin de vardı (bkz. migration 066);
+ * artık metin sohbete sabitlenen dosyada duruyor. Bu ayıklama, eski satırların
+ * balonda 20.000 karakterlik döküm göstermesini engeller.
+ */
+function stripAttachmentText(message: AiStoredMessage): AiStoredMessage {
+  if (!message.attachments?.length) return message;
+  return {
+    ...message,
+    attachments: message.attachments.map(({ name, kind, detail }) => ({ name, kind, detail })),
   };
 }
 
 @Injectable()
 export class AiConversationsService {
+  private readonly logger = new Logger(AiConversationsService.name);
+
   constructor(private supabase: SupabaseService) {}
+
+  /** Sohbete sabitlenmiş dosyalar (modele her turda bunlar gönderilir). */
+  async getActiveFiles(conversationId: string): Promise<ActiveFile[]> {
+    const { data, error } = await this.supabase.client
+      .from("ai_conversations")
+      .select("active_files")
+      .eq("id", conversationId)
+      .maybeSingle();
+    if (error) {
+      this.logger.warn(`Aktif dosyalar okunamadı: ${error.message}`);
+      return [];
+    }
+    return Array.isArray(data?.active_files) ? data!.active_files : [];
+  }
+
+  async setActiveFiles(conversationId: string, files: ActiveFile[]): Promise<void> {
+    const { error } = await this.supabase.client
+      .from("ai_conversations")
+      .update({ active_files: files.length ? files : null })
+      .eq("id", conversationId);
+    if (error) this.logger.warn(`Aktif dosyalar yazılamadı: ${error.message}`);
+  }
 
   async list(userId: string): Promise<AiConversationSummary[]> {
     const { data, error } = await this.supabase.client
@@ -80,30 +153,33 @@ export class AiConversationsService {
     await this.assertOwner(conversationId, userId);
     const { data, error } = await this.supabase.client
       .from("ai_messages")
-      .select("id, role, content, credits_charged, created_at")
+      .select("id, role, content, credits_charged, created_at, attachments")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
     if (error) throw error;
-    return (data ?? []).map(mapMessage);
+    return (data ?? []).map(mapMessage).map(stripAttachmentText);
   }
 
   /** Modele geri beslenecek son N mesaj (eskiden yeniye sıralı). */
   async getRecentMessages(conversationId: string, limit = HISTORY_WINDOW): Promise<AiStoredMessage[]> {
     const { data, error } = await this.supabase.client
       .from("ai_messages")
-      .select("id, role, content, credits_charged, created_at")
+      .select("id, role, content, credits_charged, created_at, attachments")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return (data ?? []).map(mapMessage).reverse();
+    // Metin ayıklanır: dosya içeriği modele geçmişten DEĞİL, sohbete sabitlenmiş
+    // dosyadan gidiyor. İkisini birden göndermek aynı içeriği iki kez ödemek olurdu.
+    return (data ?? []).map(mapMessage).map(stripAttachmentText).reverse();
   }
 
   async addMessage(
     conversationId: string,
     role: "user" | "assistant",
     content: string,
-    usage?: { inputTokens: number; outputTokens: number; creditsCharged: number }
+    usage?: { inputTokens: number; outputTokens: number; creditsCharged: number },
+    attachments?: StoredAttachment[]
   ): Promise<AiStoredMessage> {
     const { data, error } = await this.supabase.client
       .from("ai_messages")
@@ -114,8 +190,9 @@ export class AiConversationsService {
         input_tokens: usage?.inputTokens ?? 0,
         output_tokens: usage?.outputTokens ?? 0,
         credits_charged: usage?.creditsCharged ?? 0,
+        attachments: attachments?.length ? attachments : null,
       })
-      .select("id, role, content, credits_charged, created_at")
+      .select("id, role, content, credits_charged, created_at, attachments")
       .single();
     if (error) throw error;
 

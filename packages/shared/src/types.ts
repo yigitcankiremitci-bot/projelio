@@ -1283,6 +1283,13 @@ export interface PersonalBoardItem {
    * kartlarda boştur — arayüz orada kullanıcının profil fotoğrafını gösterir.
    */
   coverImageUrl?: string;
+  /**
+   * Yalnızca "assigned" kartlarda: görev bir ALT GÖREVSE üst görevinin kimliği.
+   *
+   * Pano düz bir liste ama seviye dönüştürme (görev ↔ alt görev) için arayüzün
+   * hangi kartın alt görev olduğunu bilmesi gerekiyor.
+   */
+  parentTaskId?: string;
   completedAt?: string;
   createdAt: string;
 }
@@ -1849,6 +1856,31 @@ export interface RoomPresencePayload {
  * türünü bilmesi gerekmiyor (bkz. RealtimeChangeInterceptor). `method`/`path`
  * yalnızca teşhis ve ileride ince ayar için.
  */
+/**
+ * Lio bir kayıt oluşturduğunda/değiştirdiğinde kullanıcının KENDİ ekranına giden
+ * canlı sinyal.
+ *
+ * Amaç: yapılan işi anında görmek. Sohbet paneli sağda açıkken soldaki sayfa
+ * ilgili yere gider ve kayıt orada belirir — kullanıcı "yaptım" cümlesine
+ * güvenmek zorunda kalmaz, sonucu görür.
+ *
+ * `room-changed` sinyalinden farkı: o SAYFAYA (odaya) gider ve yalnızca
+ * "tazele" der; bu ise KİŞİYE gider ve nereye bakması gerektiğini söyler.
+ */
+export interface LioActivityPayload {
+  /** Çalışan araç (create_task, create_project…). */
+  tool: string;
+  /** Tek cümlelik açıklama: "Görev oluşturuldu: Ana sayfa tasarımı". */
+  label: string;
+  /** Web'de gidilecek yol. Yoksa yalnızca tazeleme yapılır. */
+  path?: string;
+  /** Etkilenen canlı odası (ör. "project:9f1c…") — o sayfadakiler tazelensin. */
+  room?: string;
+  /** Yeni/etkilenen kaydın kimliği. */
+  entityId?: string;
+  createdAt: string;
+}
+
 export interface RoomChangedPayload {
   room: string;
   /** Değişikliği yapan kullanıcı; kendi sekmesine sinyal gitmez. */

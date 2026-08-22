@@ -7,6 +7,7 @@ import TaskEditModal from "./TaskEditModal";
 import TaskSelectionBar from "./TaskSelectionBar";
 import TaskSortMenu from "./TaskSortMenu";
 import MoveTaskModal from "./MoveTaskModal";
+import BulkConvertHierarchyModal from "./BulkConvertHierarchyModal";
 import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -219,6 +220,9 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
     }
   };
 
+  /** Toplu seviye dönüştürme penceresi (bkz. BulkConvertHierarchyModal). */
+  const [convertOpen, setConvertOpen] = useState(false);
+
   const handleDuplicateSelected = async () => {
     if (selection.selectedIds.size === 0) return;
     setDuplicating(true);
@@ -301,6 +305,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
           onCancel={selection.clear}
           onDuplicate={handleDuplicateSelected}
           onMove={() => setMovingOpen(true)}
+          onConvert={() => setConvertOpen(true)}
           onArchive={() => setConfirmingBulkAction("archive")}
           onDelete={() => setConfirmingBulkAction("delete")}
           lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
@@ -331,6 +336,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
               allTasks={sortTasks(tasks, sort)}
               onCreate={handleCreateTask}
               onCreateSubtask={handleCreateSubtask}
+              onTasksReload={load}
               onMove={handleMoveTask}
               onToggleComplete={handleToggleComplete}
               onEditTask={setEditingTask}
@@ -397,9 +403,27 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
         />
       )}
 
+      {convertOpen && (
+        <BulkConvertHierarchyModal
+          tasks={tasks}
+          selectedIds={selection.selectedIds}
+          onClose={() => setConvertOpen(false)}
+          onDone={() => {
+            // Yerel yama YETMEZ: yükseltilen kayıt eski üst görevinin altına
+            // sokulurken altındaki kardeşlerin sıra numaraları da kayıyor
+            // (bkz. migration 069). Doğru sıra ancak sunucudan gelir.
+            load();
+            selection.clear();
+            setConvertOpen(false);
+          }}
+        />
+      )}
+
       {movingOpen && (
         <MoveTaskModal
           taskIds={Array.from(selection.selectedIds)}
+          // Çıktı hedefinin listelenebilmesi için seçimin kapsamı.
+          scopeTasks={tasks.filter((task) => selection.selectedIds.has(task.id))}
           onClose={() => setMovingOpen(false)}
           onMoved={() => {
             selection.clear();

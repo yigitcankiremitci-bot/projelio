@@ -51,6 +51,17 @@ export class TasksController {
     return this.tasksService.duplicate(ids, req.user.userId);
   }
 
+  // Toplu çıktı ataması. "tasks/:id" ile çakışmasın diye ondan önce tanımlı
+  // (diğer toplu rotalarla aynı gerekçe).
+  @Patch("tasks/bulk-output")
+  assignOutput(
+    @Body("ids") ids: string[],
+    @Body("outputId") outputId: string | null,
+    @Req() req: any
+  ) {
+    return this.tasksService.assignOutput(ids ?? [], outputId ?? null, req.user.userId);
+  }
+
   @Patch("tasks/move")
   move(@Body() body: { ids: string[]; projectId?: string; departmentId?: string }, @Req() req: any) {
     return this.tasksService.move(body.ids, { projectId: body.projectId, departmentId: body.departmentId }, req.user.userId);
@@ -69,6 +80,20 @@ export class TasksController {
     return this.tasksService.bulkArchive(ids, req.user.userId);
   }
 
+  // Toplu seviye değiştirme (bkz. seçim çubuğu). Kurallara takılan kayıtlar
+  // işlemi düşürmez, sebebiyle birlikte "skipped" içinde döner.
+  //
+  // SIRA ÖNEMLİ: "tasks/:id" bu satırın altında ve "tasks/bulk-hierarchy"yi de
+  // eşleştirir (id = "bulk-hierarchy"). Diğer toplu rotalar da bu yüzden burada.
+  @Patch("tasks/bulk-hierarchy")
+  convertHierarchyMany(
+    @Body("ids") ids: string[],
+    @Body("parentTaskId") parentTaskId: string | null,
+    @Req() req: any
+  ) {
+    return this.tasksService.convertHierarchyMany(ids ?? [], parentTaskId ?? null, req.user.userId);
+  }
+
   @Patch("tasks/:id")
   update(@Param("id") id: string, @Body() body: UpdateTaskDto, @Req() req: any) {
     return this.tasksService.update(id, body, req.user.userId);
@@ -78,6 +103,18 @@ export class TasksController {
   // görev sürükle-bırakı). "tasks/:id" gövdesinden parent_task_id yazdırmak yerine
   // ayrı bir uç: taşımanın kendine ait kuralları var (iki seviye korunur, hedefin
   // proje/departman kapsamı devralınır).
+  // Seviye değiştirme: görev → alt görev (parentTaskId dolu) ya da
+  // alt görev → görev (parentTaskId null). Taşımadan ayrı bir uç nokta çünkü
+  // kuralları farklı (bkz. TasksService.convertHierarchy).
+  @Patch("tasks/:id/hierarchy")
+  convertHierarchy(
+    @Param("id") id: string,
+    @Body("parentTaskId") parentTaskId: string | null,
+    @Req() req: any
+  ) {
+    return this.tasksService.convertHierarchy(id, parentTaskId ?? null, req.user.userId);
+  }
+
   @Patch("tasks/:id/parent")
   updateParent(@Param("id") id: string, @Body("parentTaskId") parentTaskId: string, @Req() req: any) {
     return this.tasksService.updateParent(id, parentTaskId, req.user.userId);

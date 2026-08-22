@@ -484,6 +484,7 @@ function mapBoardItem(row: any): PersonalBoardItem {
     operationTitle: row.operation_title ?? undefined,
     departmentId: row.department_id ?? undefined,
     departmentName: row.department_name ?? undefined,
+    parentTaskId: row.parent_task_id ?? undefined,
     coverImageUrl: row.cover_image_url ?? undefined,
     completedAt: row.completed_at ?? undefined,
     createdAt: row.created_at,

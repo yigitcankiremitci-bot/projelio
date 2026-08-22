@@ -8,6 +8,7 @@ import TaskSortMenu from "./TaskSortMenu";
 import CreateTaskModal from "./CreateTaskModal";
 import TaskSelectionBar from "./TaskSelectionBar";
 import MoveTaskModal from "./MoveTaskModal";
+import BulkConvertHierarchyModal from "./BulkConvertHierarchyModal";
 import ConfirmDialog from "./ConfirmDialog";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { IconChevronDown, IconChevronUp } from "./icons";
@@ -113,6 +114,9 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
   useImperativeHandle(ref, () => ({
     openCreate: () => setCreating(true),
   }));
+
+  /** Toplu seviye dönüştürme penceresi (bkz. BulkConvertHierarchyModal). */
+  const [convertOpen, setConvertOpen] = useState(false);
 
   const handleDuplicateSelected = async () => {
     if (selection.selectedIds.size === 0) return;
@@ -379,6 +383,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
             onCancel={selection.clear}
             onDuplicate={handleDuplicateSelected}
             onMove={() => setMovingOpen(true)}
+            onConvert={() => setConvertOpen(true)}
             onArchive={() => setConfirmingBulkAction("archive")}
             onDelete={() => setConfirmingBulkAction("delete")}
             lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
@@ -526,6 +531,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
                   onToggleComplete={onToggleComplete}
                   onEditTask={onEditTask}
                   onTaskRenamed={onTaskRenamed}
+                  onTasksReload={onTasksReload}
                   group={`tasks-job-${jobId}`}
                   activeTaskId={activeTaskId}
                   onToggleActive={onToggleActive}
@@ -555,9 +561,26 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
         />
       )}
 
+      {convertOpen && (
+        <BulkConvertHierarchyModal
+          tasks={tasks}
+          selectedIds={selection.selectedIds}
+          onClose={() => setConvertOpen(false)}
+          onDone={() => {
+            // Bu pano tam yeniden yükleme yapıyor: hiyerarşi değişince kart
+            // başka bir listeye geçtiği için yerel yama yetmez.
+            onTasksReload();
+            selection.clear();
+            setConvertOpen(false);
+          }}
+        />
+      )}
+
       {movingOpen && (
         <MoveTaskModal
           taskIds={Array.from(selection.selectedIds)}
+          // Çıktı hedefinin listelenebilmesi için seçimin kapsamı.
+          scopeTasks={tasks.filter((task) => selection.selectedIds.has(task.id))}
           onClose={() => setMovingOpen(false)}
           onMoved={() => {
             selection.clear();

@@ -67,8 +67,34 @@ export const COMMISSION_RATE = Number(process.env.AI_COMMISSION_RATE ?? 0.2);
  */
 export const CREDIT_UNIT_USD = Number(process.env.AI_CREDIT_UNIT_USD ?? 0.0001);
 
-/** Bir istek başlatılabilmesi için gereken asgari bakiye (tur ortasında kesilmeyi azaltır). */
+/**
+ * Bir kredi tutmasının (hold) yaşam süresi.
+ *
+ * Süreç tur ortasında çökerse tutma açık kalır ve kullanıcının kredisi bloke olurdu;
+ * bu süreyi geçen tutmalar bir sonraki rezervasyonda silinir. Değer, en uzun makul
+ * asistan koşusundan (duraklatma + devam dahil) uzun tutulmalı.
+ */
+export const HOLD_TTL_SECONDS = Number(process.env.AI_HOLD_TTL_SECONDS ?? 900);
+
+/** Bakiye bunun altındayken hiçbir istek başlatılmaz (mutlak taban). */
 export const MIN_BALANCE_TO_START = Number(process.env.AI_MIN_BALANCE_TO_START ?? 20);
+
+/**
+ * Sistem promptu + araç şemaları + günlük bağlamın kabaca token karşılığı.
+ *
+ * Bir turun bedelini ÖNDEN kestirmek için kullanılır (bkz. AiAssistantService.reserveFor).
+ * Ölçüm (2026-08, çıktı araçları eklendikten sonra): araç şemaları JSON olarak
+ * ~17.500 karakter (≈5.000 token), statik sistem promptu ~10.300 karakter
+ * (≈2.950 token), günlük bağlam ~800 token → ≈8.750. Varsayılan bunun biraz
+ * üstünde tutuldu ki yeni bir araç eklendiğinde pay hemen erimesin.
+ * Prompt/araç listesi belirgin şekilde büyürse burayı yeniden ölçün.
+ *
+ * Önbellek indirimi KASITLI olarak yok sayılır: önbellek ıskalayabilir ve o zaman gerçek
+ * bedel bu sayıya yaklaşır. Kullanıcıya eksi bakiye göstermektense ihtiyatlı davranıp
+ * "yeterli kredin yok" demeyi tercih ediyoruz. Eşik fazla katı gelirse AI_BASE_PROMPT_TOKENS
+ * ile düşürülebilir — karşılığında küçük bir eksi bakiye riski kabul edilmiş olur.
+ */
+export const BASE_PROMPT_TOKENS = Number(process.env.AI_BASE_PROMPT_TOKENS ?? 10_000);
 
 /**
  * Yeni kullanıcılara ilk kullanımda tanımlanan deneme kredisi (0 = kapalı).
@@ -115,6 +141,121 @@ export function calculateUsageCost(model: string, usage: TokenUsage): UsageCost 
   const chargedUsd = costUsd * (1 + COMMISSION_RATE);
   const credits = Math.ceil((chargedUsd / CREDIT_UNIT_USD) * 100) / 100;
 
+  return {
+    costUsd: Number(costUsd.toFixed(6)),
+    chargedUsd: Number(chargedUsd.toFixed(6)),
+    credits,
+  };
+}
+
+// --- Model kademeleri ----------------------------------------------------
+/**
+ * Lio her işi en ucuz modelle yapmaya çalışır; ama bazı işler (çok adımlı planlama,
+ * belirsiz bir isteği doğru yorumlama, uzun analiz) küçük modelde ya yarım kalır ya
+ * da defalarca tur atarak sonunda DAHA pahalıya gelir. Bu yüzden kademe seçimi
+ * kullanıcıya bırakılır: kredi bedelini o ödüyor, kararı da o versin.
+ *
+ * `costMultiplier` yalnızca arayüzde gösterilen kaba bir orandır — gerçek ücret
+ * her zaman MODEL_PRICING üzerinden token'lardan hesaplanır.
+ */
+export type ModelTier = "fast" | "smart" | "max";
+
+export interface ModelTierInfo {
+  tier: ModelTier;
+  model: string;
+  label: string;
+  description: string;
+  costMultiplier: number;
+}
+
+export const MODEL_TIERS: Record<ModelTier, ModelTierInfo> = {
+  fast: {
+    tier: "fast",
+    model: "claude-haiku-4-5-20251001",
+    label: "Hızlı",
+    description: "Günlük işler: listeleme, görev ekleme, durum güncelleme.",
+    costMultiplier: 1,
+  },
+  smart: {
+    tier: "smart",
+    model: "claude-sonnet-5",
+    label: "Dengeli",
+    description: "Çok adımlı planlama, analiz ve belirsiz isteklerin yorumlanması.",
+    costMultiplier: 3,
+  },
+  max: {
+    tier: "max",
+    model: "claude-opus-5",
+    label: "Güçlü",
+    description: "En zor işler. Belirgin şekilde pahalıdır; yalnızca gerektiğinde seçin.",
+    costMultiplier: 15,
+  },
+};
+
+export const DEFAULT_TIER: ModelTier = "fast";
+
+export function resolveTier(value?: string | null): ModelTierInfo {
+  const key = (value ?? "").trim() as ModelTier;
+  return MODEL_TIERS[key] ?? MODEL_TIERS[DEFAULT_TIER];
+}
+
+/**
+ * Bir istek bu kredi eşiğini aşacaksa Lio durur ve kullanıcıya "devam edeyim mi?"
+ * diye sorar. Amaç, kullanıcının haberi olmadan tek bir mesajın yüzlerce kredi
+ * yakmasını engellemek: eşiğe kadar harcanan zaten faturalanır, ötesi onaya bağlıdır.
+ */
+export const CREDIT_CONFIRM_THRESHOLD = Number(process.env.AI_CREDIT_CONFIRM_THRESHOLD ?? 600);
+
+// --- Ses çözümleme -------------------------------------------------------
+/**
+ * Transkripsiyonun dakika başına liste fiyatı (USD).
+ *
+ * Anthropic token fiyatlarından ayrı durur: sağlayıcı farklı (bkz.
+ * AiTranscriptionService) ve birim token değil SÜREdir. Komisyon oranı ve kredi
+ * birimi ortaktır — kullanıcı yine tek bir "kredi" görür.
+ */
+export const TRANSCRIPTION_USD_PER_MINUTE = Number(process.env.AI_TRANSCRIPTION_USD_PER_MINUTE ?? 0.006);
+
+/**
+ * Ses dosyasının saniyesi başına kaç bayt düştüğüne dair varsayım (≈96 kbps).
+ *
+ * Süreyi çözümlemeden önce bilmenin tek yolu bu: dosyanın gerçek süresi ancak
+ * transkripsiyondan SONRA öğreniliyor, oysa bakiye kontrolü ÖNCE yapılmalı.
+ * Değer, tipik sesli notların (mp3/m4a) altında tutuldu; böylece tahmin gerçek
+ * süreyi biraz AŞAR ve kullanıcı borç bakiyesine düşmez.
+ */
+export const AUDIO_BYTES_PER_SECOND = Number(process.env.AI_AUDIO_BYTES_PER_SECOND ?? 12_000);
+
+/** Dosya boyutundan çözümleme bedelinin ihtiyatlı tahmini. */
+export function estimateTranscriptionCredits(sizeBytes: number): number {
+  return calculateTranscriptionCost(sizeBytes / AUDIO_BYTES_PER_SECOND).credits;
+}
+
+/**
+ * Seslendirmenin (TTS) milyon karakter başına liste fiyatı.
+ *
+ * Çözümlemeden farkı birim: orada SÜRE, burada KARAKTER. Karakter sayısı istekten
+ * önce tam olarak bilindiği için bedel tahmin değil, KESİN hesaplanabiliyor —
+ * kullanıcıya "bu yanıt şu kadar tutacak" demek mümkün.
+ */
+export const TTS_USD_PER_MILLION_CHARS = Number(process.env.AI_TTS_USD_PER_MILLION_CHARS ?? 15);
+
+export function calculateSpeechCost(chars: number): UsageCost {
+  const costUsd = (Math.max(chars, 0) / 1_000_000) * TTS_USD_PER_MILLION_CHARS;
+  const chargedUsd = costUsd * (1 + COMMISSION_RATE);
+  const credits = Math.ceil((chargedUsd / CREDIT_UNIT_USD) * 100) / 100;
+  return {
+    costUsd: Number(costUsd.toFixed(6)),
+    chargedUsd: Number(chargedUsd.toFixed(6)),
+    credits,
+  };
+}
+
+export function calculateTranscriptionCost(durationSeconds: number): UsageCost {
+  const minutes = Math.max(durationSeconds, 0) / 60;
+  const costUsd = minutes * TRANSCRIPTION_USD_PER_MINUTE;
+  const chargedUsd = costUsd * (1 + COMMISSION_RATE);
+  const credits = Math.ceil((chargedUsd / CREDIT_UNIT_USD) * 100) / 100;
   return {
     costUsd: Number(costUsd.toFixed(6)),
     chargedUsd: Number(chargedUsd.toFixed(6)),

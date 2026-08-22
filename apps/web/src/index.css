@@ -146,6 +146,37 @@ textarea::placeholder {
 }
 
 /*
+ * Yerinde düzenleme (görev / alt görev başlığı).
+ *
+ * Çift tıklayınca açılan kutu, yerini aldığı METNİN ölçülerinde durmalı.
+ * Varsayılan dolgu, kenarlık ve köşe yarıçapı yüzünden kutu metinden belirgin
+ * biçimde büyük açılıyor, satır yerinden oynuyor ve "başka bir yere taşındı"
+ * hissi veriyordu.
+ *
+ * Yazı ayarları çevreden miras alınır. Kural hem textarea'ya hem GÖRÜNMEZ
+ * KOPYAYA verilir — ikisi ayrışırsa büyüme hesabı şaşar ve kutu yanlış anda
+ * uzar (bkz. .autogrow).
+ */
+.autogrow-inline > textarea,
+.autogrow-inline::after {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  line-height: inherit;
+  background: transparent;
+}
+
+/* Düzenlenebilir olduğu görünsün diye tek çizgi. Kopyaya da aynı kalınlıkta
+   ama saydam veriliyor ki yükseklik ikisinde eşit kalsın. */
+.autogrow-inline > textarea {
+  border-bottom: 1px solid var(--color-accent);
+}
+
+.autogrow-inline::after {
+  border-bottom: 1px solid transparent;
+}
+
+/*
  * Lio'nun yazma kutusu (bkz. AiAssistantPanel).
  *
  * Aynı "görünmez kopya" tekniği, farklı ölçüler: burası bir BAŞLIK alanı değil
@@ -171,6 +202,21 @@ textarea::placeholder {
   padding: 11px 13px;
   border-radius: 12px;
   line-height: 1.45;
+}
+
+/*
+ * Ataç ve mikrofon düğmeleri kutunun İÇİNDE duruyor (bkz. AiAssistantPanel).
+ * Dışarıda yan yana dizildiklerinde yazma alanının genişliğinden ~100px
+ * çalıyorlar ve dengesiz görünüyorlardı.
+ *
+ * Yanlardaki dolgu, düğmelerin altına yazı girmesini engelliyor. Dolgunun
+ * GÖRÜNMEZ KOPYAYA da verilmesi şart: yükseklik hesabı o kopyanın sarmasına
+ * dayanıyor, dolgular ayrışırsa kutu yanlış anda büyür.
+ */
+.autogrow-chat--icons > textarea,
+.autogrow-chat--icons::after {
+  padding-left: 46px;
+  padding-right: 46px;
 }
 
 .autogrow-chat > textarea {

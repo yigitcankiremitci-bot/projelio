@@ -17,19 +17,92 @@ import { MembersService } from "../members/members.service";
 import { TaskCommentsService } from "../task-comments/task-comments.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PlanningService } from "../planning/planning.service";
+import { OutputsService } from "../outputs/outputs.service";
 import { AI_TOOLS, CRITICAL_TOOLS } from "./ai-assistant.tools";
-import { AiCreditsService } from "./ai-credits.service";
-import { AiConversationsService } from "./ai-conversations.service";
+import { AiCreditsService, InsufficientCreditsException } from "./ai-credits.service";
+import {
+  AiConversationsService,
+  type ActiveFile,
+  type AiStoredMessage,
+  type StoredAttachment,
+} from "./ai-conversations.service";
+import { AiAttachmentsService, type PreparedAttachment } from "./ai-attachments.service";
+import { AiTranscriptionService } from "./ai-transcription.service";
+import { RealtimeGateway } from "../realtime/realtime.gateway";
+import type { LioActivityPayload } from "@projelio/shared";
+import {
+  BASE_PROMPT_TOKENS,
+  CREDIT_CONFIRM_THRESHOLD,
+  MODEL_TIERS,
+  calculateUsageCost,
+  resolveTier,
+  type ModelTier,
+} from "./ai-credits.config";
 
-const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+const DEFAULT_MODEL = MODEL_TIERS.fast.model;
 const PENDING_ACTION_TTL_MS = 10 * 60 * 1000; // 10 dakika
+/** Duraklatılmış bir koşunun devam onayı için bekleme süresi. */
+const PENDING_RUN_TTL_MS = 15 * 60 * 1000;
+/**
+ * Devam onaylarıyla birlikte tek bir isteğin çıkabileceği azami tur sayısı.
+ * Kullanıcı "devam et" dedikçe koşu uzayabilir, ama sonsuza kadar değil: modelin
+ * kendi kuyruğunu kovaladığı patolojik durumlarda bu tavan devreye girer.
+ */
+const MAX_TOTAL_ITERATIONS = Number(process.env.AI_MAX_TOTAL_ITERATIONS ?? 24);
+
+// --- Bakiye rezervasyonu -------------------------------------------------
+// Bir turun bedelini ÖNDEN kestirmek için kullanılan kaba dönüşümler. Hepsi
+// ihtiyatlı tarafta: fazla tahmin "biraz erken durdum", az tahmin "kullanıcı
+// eksi bakiyede kaldı" demek. İkincisi kabul edilemez.
+
+/** Türkçe metinde bir token kabaca 3 karakter. */
+const CHARS_PER_TOKEN = 3;
+/** Bir görselin yaklaşık token bedeli (Anthropic'in tek görsel üst sınırına yakın). */
+const IMAGE_TOKENS = 2_000;
+/** PDF'te kabaca kaç bayta bir token düştüğü — metin yoğun belgelere göre. */
+const PDF_BYTES_PER_TOKEN = 50;
+/** Tek bir PDF için tahminin tavanı; ötesi zaten bağlam sınırına takılır. */
+const MAX_PDF_TOKENS = 150_000;
+/**
+ * Bir tura izin verilecek en küçük çıktı sınırı.
+ *
+ * Bakiye azaldığında isteği tamamen reddetmek yerine çıktı sınırı KISILIR
+ * (bkz. planTurn): kullanıcı "yeterli kredin yok" duvarına ancak bu asgari yanıtı
+ * bile karşılayamadığında çarpar. Daha aşağısı anlamlı bir cümle bile kurdurmaz.
+ */
+const MIN_OUTPUT_TOKENS = 400;
+/**
+ * "Bu tur ne tutar?" tahmininde varsayılan çıktı uzunluğu.
+ *
+ * Rezervasyon en kötü hâli (MAX_TOKENS) kullanır; kullanıcıya "devam edeyim mi?"
+ * diye sorup sormamaya karar verirken ise GERÇEKÇİ bir sayı gerekiyor. En kötü
+ * hâlle sorulsaydı her Dengeli sohbette gereksiz onay penceresi çıkardı.
+ */
+const TYPICAL_OUTPUT_TOKENS = 600;
+/**
+ * Anthropic önbelleğinin ömrü 5 dakika. Bu süreye yaklaşmış bir sohbette önbelleğin
+ * hâlâ sıcak olduğunu varsaymak, turun bedelini 10 kat düşük tahmin etmek demek —
+ * "600 kredi üstünde sor" kuralının ilk kaçırdığı şey tam olarak buydu. Pay
+ * bırakılarak 4 dakika kullanılıyor.
+ */
+const CACHE_WARM_WINDOW_MS = 4 * 60 * 1000;
 
 // --- Maliyet sınırlayıcıları --------------------------------------------
 // Bu değerlerin her biri doğrudan kullanıcının kredi harcamasını etkiler.
 // Yükseltmeden önce maliyet etkisini hesaplayın.
 
-/** Modelin tek yanıtta üretebileceği azami token. Asistan yanıtları kısa olmalı. */
-const MAX_TOKENS = Number(process.env.AI_MAX_TOKENS ?? 800);
+/**
+ * Modelin tek yanıtta üretebileceği azami token.
+ *
+ * 800'DEN 2000'E ÇIKARILDI. 800, sohbet cümleleri için bol ama TOPLU ARAÇ ÇAĞRISI
+ * için değildi: "şu Excel'deki 20 kalemi görev/alt görev olarak ekle" isteğinde
+ * create_tasks çağrısının JSON'u sınıra çarpıp yarıda kesiliyor, model her turda
+ * yeniden deniyor ve istek hiçbir şey yapmadan yüzlerce kredi harcayarak bitiyordu.
+ *
+ * Maliyeti artırmaz: bu bir TAVANDIR, üretilmeyen token ücretlendirilmez. Yalnızca
+ * bakiye rezervasyonunu yükseltir (bkz. reserveFor) — orada en kötü hâl hesaplanıyor.
+ */
+const MAX_TOKENS = Number(process.env.AI_MAX_TOKENS ?? 2000);
 /**
  * Bir istek için azami araç turu. Her tur ayrı bir API çağrısıdır.
  * 4'ten 8'e çıkarıldı: çok adımlı istekler (ör. "3 görev ekle, birini ata, özet ver")
@@ -59,6 +132,13 @@ interface TokenTotals {
   cacheRead: number;
 }
 
+/**
+ * SDK 0.32 birleşik bir "içerik bloğu" tipi dışa açmıyor; MessageParam'ın content
+ * dizisinden türetiliyor. PDF (document) bloğu bu sürümde hiç tipli değil, o yüzden
+ * gönderilirken ayrıca zorlanıyor (bkz. activeFileBlock).
+ */
+type ContentBlockParam = Extract<Anthropic.MessageParam["content"], any[]>[number];
+
 type ChatRole = "user" | "assistant";
 export interface ChatMessageInput {
   role: ChatRole;
@@ -71,13 +151,62 @@ export interface ChatUsageInfo {
   balance: number;
 }
 
+/**
+ * Uzayan bir isteğin duraklatılma sebebi.
+ * - `estimate`: HENÜZ HİÇBİR ŞEY HARCANMADAN, isteğin tahmini bedeli eşiği aşıyor.
+ * - `budget`: harcama sürerken CREDIT_CONFIRM_THRESHOLD'u aşmak üzere.
+ * - `iterations`: tur sınırına gelindi, iş hâlâ bitmedi.
+ */
+export type ContinuationReason = "estimate" | "budget" | "iterations";
+
 export type ChatResult = (
   | { type: "message"; text: string }
   | { type: "confirmation"; actionId: string; summary: string; toolName: string; text?: string }
+  | {
+      /**
+       * Kredi tükendiği için iş yarıda kesildi. Duraklatmadan (continuation) farkı:
+       * bu durumda "devam edeyim mi?" diye sormanın anlamı yok — kredi yüklenmeden
+       * devam edilemez.
+       */
+      type: "out_of_credits";
+      text: string;
+      balance: number;
+      requiredCredits: number;
+      doneSummary: string;
+    }
+  | {
+      type: "continuation";
+      runId: string;
+      reason: ContinuationReason;
+      text: string;
+      /** Bu istek için şimdiye kadar düşülen toplam kredi. */
+      spentCredits: number;
+      /** Devam edilirse bir sonraki turun yaklaşık bedeli. */
+      estimatedNextCredits: number;
+      /** Şimdiye kadar gerçekten yapılan kalıcı değişiklikler. */
+      doneSummary: string;
+      tier: ModelTier;
+    }
 ) & {
   conversationId: string;
   usage: ChatUsageInfo;
+  /**
+   * Sohbette hâlâ açık olan dosyaların künyesi.
+   *
+   * Her yanıtla dönmesinin sebebi arayüzün bunu görünür kılması: kullanıcı hangi
+   * dosyanın "hâlâ taşındığını" (ve dolayısıyla her turda ödendiğini) görebilmeli,
+   * gerekirse kendisi kaldırabilmeli.
+   */
+  activeFiles: ActiveFileInfo[];
 };
+
+/** Aktif dosyanın arayüze giden hâli — çıkarılmış metin dışarı çıkmaz. */
+export interface ActiveFileInfo {
+  id: string;
+  name: string;
+  kind: string;
+  detail: string;
+}
 
 type ProjectMembershipRole = "owner" | "member" | "subcontractor";
 
@@ -88,6 +217,87 @@ interface PendingAction {
   toolName: string;
   input: Record<string, any>;
   conversationId: string;
+  createdAt: number;
+  /**
+   * Onayın kesintiye uğrattığı koşu.
+   *
+   * Eskiden onay istendiğinde isteğin GERİ KALANI düşüyordu: "eski görevleri sil,
+   * sonra şunları ekle" dendiğinde silme onaylanıyor, ekleme hiç yapılmıyordu.
+   * Kullanıcı işin bittiğini sanıyor, aslında yarısı yapılmış oluyordu. Artık koşu
+   * dondurulur ve onaydan sonra kaldığı yerden sürer.
+   */
+  runId: string;
+  /** Onay bekleyen turun tam asistan içeriği — devam ederken aynen geri beslenir. */
+  assistantContent: any[];
+  /** Onaya düşen tool_use bloğunun kimliği (aynı turda başka araçlar da olabilir). */
+  criticalUseId: string;
+}
+
+/**
+ * Duraklatılmış bir asistan koşusu.
+ *
+ * Kredi eşiğine ya da tur sınırına gelindiğinde koşu SİLİNMEZ, dondurulur: o ana
+ * kadarki mesaj yığını burada durur, kullanıcı onay verirse aynı yerden devam edilir.
+ * Sıfırdan başlatmak, o ana kadar ödenen kredinin çöpe gitmesi demek olurdu.
+ */
+interface PendingRun {
+  id: string;
+  userId: string;
+  userRole: string;
+  conversationId: string;
+  tier: ModelTier;
+  messages: Anthropic.MessageParam[];
+  /**
+   * Bağlamın dosyadan BAĞIMSIZ kısmı (tarih, rol, iş/proje özeti).
+   *
+   * Açık dosya bildirimi buraya gömülmez, her turda ayrıca eklenir: dosya
+   * koşunun ortasında bırakılabiliyor (release_files) ve o andan sonra
+   * "şu dosyalar elinde" demeye devam etmek modeli yanıltırdı.
+   */
+  baseContext: string;
+  /** Bu koşuda çalıştırılan araçlar — "ne yapıldı" özetini kurmak için. */
+  executed: string[];
+  /** Bu koşuda şimdiye kadar düşülen kredi (segmentler arası taşınır). */
+  spentCredits: number;
+  /** Toplam tur sayısı (segmentler arası taşınır). */
+  iterationsUsed: number;
+  /**
+   * Kullanıcının bu koşu için onayladığı harcama tavanı. Her "devam et" bir eşik
+   * daha ekler; aksi halde onaydan hemen sonra tekrar sormak zorunda kalırdık.
+   */
+  creditCeiling: number;
+  /**
+   * Bu segmentin başındaki bakiye. Segment içinde henüz tahsilat yapılmadığı için
+   * (ücret tur sonunda tek seferde düşülür) kalan kredi bu sayıdan hesaplanır.
+   */
+  startingBalance: number;
+  /** Sohbete sabitlenmiş dosyalar — her turda modele bunlar gönderilir. */
+  activeFiles: ActiveFile[];
+  /** Sabit dosya bloğunun token karşılığı — önbelleğe alınan kısmın büyüklüğü. */
+  pinnedTokens: number;
+  /**
+   * Bu isteğin ilk turu önbelleği YAZACAK mı (okumak yerine)?
+   *
+   * Yazmak girdinin 1,25 katı, okumak 0,10 katı — arada 12 kat var. Üç durumda
+   * yazma beklenir: sohbet yeni, yeni dosya eklendi (önek değişti) ya da son
+   * mesajın üzerinden önbellek ömrü kadar zaman geçti. Üçüncüsü ilk sürümde
+   * atlanmıştı ve tek bir turun 1.070 krediye çıkmasına rağmen eşiğin
+   * tetiklenmemesine yol açtı.
+   */
+  expectsCacheWrite: boolean;
+  /** Duraklatma anındaki tur tahmini — devam onayında tavanı buna göre açmak için. */
+  pausedEstimate: number;
+  /**
+   * Bu istek için tekrar onay sorulsun mu?
+   *
+   * Kullanıcı "bir daha sorma" dediğinde kapanır. Uzun bir toplu işte üç ayrı
+   * pencereyle karşılaşmak (tahmin, bütçe, adım sınırı) işi bitirmekten çok
+   * kesintiye uğratıyordu; onay bir kez alınıp iş sonuna kadar götürülebilmeli.
+   * Bakiye koruması bundan BAĞIMSIZ çalışmaya devam eder.
+   */
+  askAgain: boolean;
+  /** Bu segmentte açılmış kredi tutmaları; segment biterken hepsi kaldırılır. */
+  holds: string[];
   createdAt: number;
 }
 
@@ -140,7 +350,82 @@ const RESULT_LABELS: Record<string, string> = {
   delete_job: "İş silindi.",
   archive_job: "İş arşivlendi.",
   add_budget_transaction: "Bütçe hareketi eklendi.",
+  archive_output: "Çıktı arşivlendi.",
+  delete_output: "Çıktı silindi.",
 };
+
+/**
+ * Duraklatma mesajlarında "şimdiye kadar ne yapıldı" özetini kurmak için kullanılır.
+ * Yalnızca KALICI değişiklik yapan araçlar burada listelenir; okuma araçları özete
+ * girmemeli, yoksa hiçbir şey değişmediği halde iş yapılmış gibi görünür.
+ */
+/** Ek türlerinin modele ve kullanıcıya gösterilen Türkçe adı. */
+const ATTACHMENT_LABELS: Record<string, string> = {
+  image: "Görsel",
+  pdf: "PDF",
+  document: "Word belgesi",
+  sheet: "Tablo",
+  text: "Metin dosyası",
+  audio: "Ses kaydı (yazıya çevrildi)",
+};
+
+/**
+ * Bir sohbette aynı anda sabit tutulabilecek azami dosya.
+ *
+ * Sabit dosyalar HER TURDA gönderiliyor; sayı arttıkça sohbetin tur başına bedeli
+ * de artar. Beş dosya pratikte yeterli, fazlası kullanıcıyı farkında olmadan
+ * pahalı bir sohbete kilitler.
+ */
+const MAX_ACTIVE_FILES = 5;
+
+/** Yalnızca dosya gönderilip hiçbir şey yazılmadığında kullanılan varsayılan istek. */
+const EMPTY_MESSAGE_WITH_FILE = "Bu dosyayı incele ve ne olduğunu özetle.";
+
+const ACTION_LABELS: Record<string, string> = {
+  create_job: "iş oluşturuldu",
+  update_job: "iş güncellendi",
+  create_project: "proje oluşturuldu",
+  update_project: "proje güncellendi",
+  create_task: "görev oluşturuldu",
+  create_tasks: "toplu görev eklendi",
+  // (sayı almayanlar için bkz. COUNTLESS_ACTIONS)
+  update_task: "görev güncellendi",
+  update_task_status: "görev durumu değiştirildi",
+  add_task_comment: "yorum eklendi",
+  set_period_plan: "dönem planı kaydedildi",
+  create_time_blocks: "zaman bloğu eklendi",
+  update_time_block_status: "zaman bloğu güncellendi",
+  complete_ritual: "planlama oturumu kapatıldı",
+  create_output: "çıktı oluşturuldu",
+  update_output: "çıktı güncellendi",
+};
+
+export function toActiveFileInfo(files: { id: string; name: string; kind: string; detail: string }[]) {
+  return files.map(({ id, name, kind, detail }) => ({ id, name, kind, detail }));
+}
+
+/**
+ * Sayı ÖNEKİ almayan eylemler.
+ *
+ * Sayaç araç ÇAĞRISINI sayıyor, kaydı değil. Tek kayıt oluşturan araçlarda ikisi
+ * aynı şey ("2 görev oluşturuldu" doğru), ama toplu araçta değil: iki create_tasks
+ * çağrısı yirmi görev demek olabilir. "2 toplu görev eklendi" hem yanlış hem de
+ * Türkçe olarak tuhaf; o yüzden bu etiketler sayısız yazılır.
+ */
+const COUNTLESS_ACTIONS = new Set(["toplu görev eklendi"]);
+
+function summarizeExecuted(executed: string[]): string {
+  const counts = new Map<string, number>();
+  for (const name of executed) {
+    const label = ACTION_LABELS[name];
+    if (!label) continue;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  if (counts.size === 0) return "Henüz kalıcı bir değişiklik yapılmadı";
+  return [...counts.entries()]
+    .map(([label, n]) => (n > 1 && !COUNTLESS_ACTIONS.has(label) ? `${n} ${label}` : label))
+    .join(", ");
+}
 
 @Injectable()
 export class AiAssistantService {
@@ -149,6 +434,8 @@ export class AiAssistantService {
   // MVP: onay bekleyen kritik işlemler bellekte tutulur. Tek instance için yeterlidir;
   // çoklu instance / restart senaryosu için ileride Redis'e (proje zaten ioredis kullanıyor) taşınabilir.
   private readonly pendingActions = new Map<string, PendingAction>();
+  /** Kullanıcının "devam edeyim mi?" sorusuna cevabını bekleyen koşular. */
+  private readonly pendingRuns = new Map<string, PendingRun>();
 
   constructor(
     private supabase: SupabaseService,
@@ -160,12 +447,29 @@ export class AiAssistantService {
     private taskCommentsService: TaskCommentsService,
     private notificationsService: NotificationsService,
     private planningService: PlanningService,
+    private outputsService: OutputsService,
     private creditsService: AiCreditsService,
-    private conversationsService: AiConversationsService
+    private conversationsService: AiConversationsService,
+    private attachmentsService: AiAttachmentsService,
+    private transcriptionService: AiTranscriptionService,
+    private realtime: RealtimeGateway
   ) {}
 
+  /** Kademe belirtilmeyen yerler (ör. draftText) için varsayılan model. */
   private get model(): string {
-    return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
+    return this.modelForTier("fast");
+  }
+
+  /**
+   * Kademeden gerçek model adına çevirir.
+   *
+   * ANTHROPIC_MODEL yalnızca "hızlı" kademeyi ezer: o değişken zaten "ucuz modeli
+   * değiştir" için konmuştu. Kullanıcı bilerek üst kademe seçtiyse env'in onu geri
+   * ucuz modele düşürmesi, ödediği kredinin karşılığını vermemek olurdu.
+   */
+  private modelForTier(tier: ModelTier): string {
+    if (tier === "fast") return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
+    return MODEL_TIERS[tier]?.model ?? DEFAULT_MODEL;
   }
 
   private getClient(): Anthropic {
@@ -287,6 +591,9 @@ export class AiAssistantService {
       model: this.model,
       nodeVersion: process.version,
       proxyEnv: process.env.HTTPS_PROXY ?? process.env.https_proxy ?? null,
+      // Ses ekleri ayrı bir sağlayıcıya gidiyor; anahtarı yoksa yalnızca ses çalışmaz,
+      // asistanın geri kalanı etkilenmez. Teşhiste bu ayrım görünsün.
+      transcriptionConfigured: this.transcriptionService.configured,
     };
 
     if (!apiKey) {
@@ -368,21 +675,121 @@ export class AiAssistantService {
       "",
       "## Davranış kuralları",
       "- Her zaman Türkçe yaz. Kısa, net ve doğal konuş; gereksiz dolgu cümlesi kurma.",
-      "- Elindeki araçları kullanmadan asla \"yapamıyorum\" deme. Önce ilgili list_*/get_*/search_* aracını dene; " +
-        "gerekli id'yi bilmiyorsan önce onunla bul. Kullanıcıya asla id sorma; isimden eşleştir.",
+      "",
+      "### Türkçe kuralları",
+      "Yazdığın Türkçe, İngilizceden çevrilmiş gibi DEĞİL, Türkçe düşünen birinin yazdığı gibi olmalı.",
+      "- SEN diye hitap et, siz değil. Tek bir yanıtın içinde ikisini karıştırma: " +
+        "\"ekledim, istersen bakabilirsin\" evet; \"ekledim, isterseniz bakabilirsiniz\" hayır.",
+      "- Özel ada ve yabancı sözcüğe gelen ek kesme işaretiyle ve ünlü uyumuna göre yazılır: " +
+        "\"Rundeer'e\", \"Excel'den\", \"Lio'ya\", \"API'ye\". \"Rundeer'ye\", \"Excel'dan\" yanlış.",
+      "- Sayıdan sonra çoğul eki gelmez: \"3 görev\" doğru, \"3 görevler\" yanlış.",
+      "- Edilgen çatıyı azalt: \"görev oluşturuldu\" yerine \"görevi ekledim\". Ne yaptığını birinci tekil kişiyle söyle.",
+      "- İngilizce kalıpları çevirme: \"Bu size yardımcı olur mu?\", \"Şunu yapmama izin ver\", " +
+        "\"Harika bir soru\", \"Umarım bu yardımcı olur\" gibi cümleler kurma.",
+      "- Yüklem sonda: \"Ekledim üç görevi projeye\" değil, \"Projeye üç görev ekledim\".",
+      "- Teknik terimi Türkçesi yerleşmişse Türkçe yaz (görev, alt görev, çıktı, bütçe); " +
+        "yerleşmemişse olduğu gibi bırak. Uydurma karşılık türetme.",
+      "- Ünlem ve emoji kullanma. Övgü cümlesiyle başlama, doğrudan işe gir.",
+      "- KAPSAMINDAKİ bir iş için araçları denemeden \"yapamıyorum\" deme. Önce ilgili list_*/get_*/search_* aracını dene; " +
+        "gerekli id'yi bilmiyorsan önce onunla bul. Kullanıcıya asla id sorma; isimden eşleştir. " +
+        "(Kapsam dışı alanlar için bunun tersi geçerli: aşağıdaki \"Sınırların\" bölümüne bak.)",
       "- Aynı isimde birden fazla kayıt varsa hangisini kastettiğini sor.",
       "- Çok adımlı isteklerde (ör. \"şu projeye 3 görev ekle\") adımları arka arkaya kendin yürüt, her adım için kullanıcıya dönme. " +
         "Birden fazla görev eklerken create_task'ı tekrar tekrar çağırmak yerine create_tasks ile tek seferde ekle.",
       "- Bir işlemi tamamladıktan sonra ne yaptığını tek cümleyle özetle. Uzun listeler yerine önemli olanı öne çıkar.",
       "- Silme, arşivleme ve bütçe hareketi işlemleri sistem tarafından otomatik olarak kullanıcıya onaylatılır. Sen sadece aracı doğru parametrelerle çağır; \"onaylıyor musun?\" diye ayrıca sorma.",
       "- Bir araç yetki hatası dönerse bunu kullanıcıya nazikçe açıkla ve aynı işlemi tekrar deneme.",
-      "- Araçlardan dönen veriye sadık kal; bilmediğin bir şeyi uydurma.",
-      "- Kullanıcının istediği şey elindeki araçlarla KESİNLİKLE yapılamıyorsa (örn. dosya/departman/katalog gibi " +
-        "henüz araç kapsamına girmeyen bir alan), bunu açıkça ve kısaca söyle; asla varmış gibi yanıt uydurma ya da " +
-        "ilgisiz bir araca zorlama.",
-      "- Kullanıcı belirsiz konuşursa (ör. \"şunu hallet\") en olası yorumu yap ve ne yaptığını söyle; tamamen anlaşılmazsa tek bir netleştirici soru sor.",
+      "- Araçlardan dönen veriye sadık kal: bilmediğin bir şeyi uydurma, kapsam dışı bir alan için " +
+        "varmış gibi yanıt verme, ilgisiz bir araca zorlama.",
       "- Tarih ifadelerini çöz: \"yarın\", \"haftaya\", \"ayın 15'i\" gibi ifadeleri bugünün tarihine göre gerçek tarihe dönüştür.",
       "- Aynı bilgiyi iki kez sorgulama; bir araçtan aldığın sonucu hatırla ve tekrar çağırma.",
+      "",
+      "## Sınırların",
+      "Araçların YALNIZCA şu alanları kapsar: işler (job), projeler, çıktılar (output), görevler ve alt görevler, " +
+        "görev yorumları, proje ekibi ve rolleri, bütçe hareketleri, bildirim özeti ve Takvim planlaması " +
+        "(dönem planı, odak alanları, zaman blokları, ritüeller).",
+      "Şu alanlar için HİÇBİR aracın yok: e-posta/mailbox, organizasyonlar, departmanlar, " +
+        "gruplar, operasyonlar, modüller ve modül kayıtları, katalog/ürünler, iş ortakları ve cari hesaplar, sosyal medya, " +
+        "proje gönderileri ve yorumları, kişisel yapılacaklar, destek talepleri, kullanıcı/yetki yönetimi, " +
+        "ödeme ve abonelik işlemleri, uygulama ayarları, dosya/rapor indirme veya dışa aktarma.",
+      "Dosyalar özel bir durumdur: kullanıcının sohbete İLİŞTİRDİĞİ dosyayı okuyabilirsin (bkz. Dosyalar), " +
+        "ama Projelio'nun dosya kitaplığında arama yapma, oraya dosya yükleme, taşıma ya da silme aracın yok.",
+      "İstek bu ikinci listedeki bir alana giriyorsa HİÇBİR ARAÇ ÇAĞIRMA. Tek cümleyle \"bunu şu an yapamıyorum\" de, " +
+        "kullanıcının bunu uygulamada nereden yapabileceğini söyle ve dur. \"Acaba bir aracım var mı\" diye deneme " +
+        "yapma — her deneme kullanıcının kredisinden düşer.",
+      "",
+      "## İşe başlamadan önce",
+      "Her istekte önce şunu belirle: bu iş elimdeki araçlarla TAM olarak yapılabilir mi?",
+      "- TAM yapılabiliyorsa: soru sorma, yap.",
+      "- KISMEN yapılabiliyorsa: hiç başlama. Hangi kısmını yapabileceğini, hangi kısmını yapamayacağını tek mesajda " +
+        "söyle ve \"yapabildiğim kısmı yapayım mı?\" diye sor. İşin yarısını yapıp sonra \"anlamadım\" demek en kötü sonuçtur.",
+      "- HİÇ yapılamıyorsa: yukarıdaki gibi, araç çağırmadan söyle.",
+      "- İstek belirsizse ve yanlış anlamanın bedeli yüksekse (toplu ekleme/güncelleme, planlama, birden çok proje, " +
+        "geri alınması zor değişiklikler), araç çağırmadan ÖNCE eksik bilgilerin HEPSİNİ tek mesajda sor. " +
+        "Soruları tek tek sormak hem yavaş hem pahalıdır.",
+      "- Küçük ve tek adımlı işlerde soru sorma; en olası yorumu yap ve ne yaptığını söyle.",
+      "",
+      "## Çıktılar",
+      "Çıktı, bir projenin teslim edilecek parçasıdır (\"Logo tasarımı\", \"Ana sayfa\"). Görevler bir çıktıya " +
+        "bağlanabilir ve pano onları o başlık altında gruplar.",
+      "- Kullanıcı \"şu çıktının altına\" derse önce list_outputs ile çıktıyı bul; adı geçen çıktı yoksa " +
+        "uydurma, oluşturmayı öner.",
+      "- Görevleri çıktıya bağlamak için ayrı bir araç yok: yeni görevde create_task/create_tasks'a, " +
+        "MEVCUT bir görevi taşımak için update_task'a outputId ver. Çıktıdan çıkarmak için boş dize gönder.",
+      "- Çıktı silme ve arşivleme onaya tabidir; sen yalnızca aracı doğru çağır.",
+      "",
+      "## Dosyalar",
+      "Kullanıcı sohbete dosya iliştirebilir: görsel, PDF, Word, Excel/CSV, düz metin ve ses kaydı. " +
+        "Metne çevrilebilen dosyalar sana <dosya ad=\"…\"> blokları içinde gelir; görsel ve PDF'i doğrudan görürsün.",
+      "İliştirilen dosya SOHBETE SABİTLENİR: iş bitene kadar HER TURDA elindedir, isteğin en başında " +
+        "sana yeniden verilir. \"Dosyayı bu turda göremiyorum\" ya da \"sadece adı kaldı\" DEME — bak, oradadır.",
+      "- Dosya geldiğinde önce NE olduğunu bir iki cümleyle söyle: türü, konusu, kaç kalem/satır/sayfa içerdiği.",
+      "- Kullanıcı ne yapılacağını söylemediyse kendiliğinden kayıt OLUŞTURMA. Özetle ve " +
+        "\"bunları sisteme işleyeyim mi?\" diye sor.",
+      "- \"Sisteme işle\" dendiğinde önce ne oluşturacağını maddeler hâlinde listele (kaç görev, hangi projeye, " +
+        "hangi tarihlerle) ve onay al. Onay gelince create_tasks gibi TOPLU araçlarla tek seferde yaz; " +
+        "satır satır tek tek ekleme.",
+      "- Dosyada olmayan bir alanı (tarih, tutar, sorumlu) UYDURMA. Eksikse boş bırak ya da kullanıcıya sor.",
+      "- \"Hepsi eklendi mi?\", \"eksik kaldı mı?\" gibi bir DOĞRULAMA istendiğinde kullanıcıya soru " +
+        "SORMA — kontrolü sen yap: dosyadaki kalemleri say, sonra list_tasks/search_tasks ile projedeki " +
+        "kayıtları çek ve iki listeyi karşılaştır. Sonucu net ver: \"dosyada 23 kalem var, 20'si eklenmiş, " +
+        "şu 3'ü eksik: …\". Kaç satır olduğunu kullanıcıya sormak, elindeki dosyayı okumamak demektir.",
+      "- İŞLEYEMEDİĞİN SATIRLARI MUTLAKA SÖYLE. Bir satırı anlamadıysan, eşleştiremediysen ya da " +
+        "atladıysan sonunda tek tek yaz: \"şu 2 satırı çözemedim: …\". Sessizce atlama — kullanıcı eksiği " +
+        "ancak dosyayı elle karşılaştırarak fark eder ve bu güveni bitirir.",
+      "- TOPLU EKLEMEYİ YARIM BIRAKMA. Tek çağrıya en fazla 10 kalem sığdığı için 23 kalemlik bir " +
+        "dosya ÜÇ çağrı ister. Her çağrıdan sonra \"dosyada kaç kalem vardı, kaçını ekledim, kaç kaldı\" " +
+        "diye say; kalan sıfırlanmadan işi bitmiş sayma. İki çağrı yapıp durmak, kullanıcının son " +
+        "kalemlerini sessizce kaybetmesi demektir.",
+      "- İş bittiğinde kendi kendini denetle: eklediğin kalem sayısını dosyadaki kalem sayısıyla " +
+        "karşılaştır ve farkı SÖYLE. Kullanıcı sormadan.",
+      "- İş bittiğinde tek cümlelik kapanış yap: kaç kalem oluşturuldu, kaçı atlandı, hangi yapıya oturdu.",
+      "- Tablo işlerken sütun başlıklarını kullan ve hangi sütunu neye eşlediğini kısaca söyle; " +
+        "yanlış eşlemeyi ancak kullanıcı görebilir.",
+      "- Ses kayıtları sana zaten yazıya çevrilmiş gelir; \"sesi dinleyemiyorum\" deme.",
+      "- release_files'ı YALNIZCA kullanıcı dosyayla işinin bittiğini açıkça söylediğinde çağır " +
+        "(\"dosyayı bırakabilirsin\", \"bu konu kapandı\" gibi). Kayıtları oluşturmuş olman işin bittiği " +
+        "anlamına GELMEZ: kullanıcı çoğu zaman sonuçları dosyayla karşılaştırmak ister. Erken bırakmak, " +
+        "kullanıcının dosyayı yeniden yüklemesine ve her şeyi ikinci kez ödemesine yol açar.",
+      "- Bir dosyanın yerinde \"içeriği artık elimde değil\" notu görürsen (görsel/PDF'te olabilir), " +
+        "uydurma: kullanıcıdan dosyayı tekrar göndermesini iste.",
+      "- Dosyadan görev/kalem çıkarırken kullanıcıya SORU sormadan önce dosyaya bir kez daha bak. " +
+        "Cevap dosyada varsa sormak hem yavaş hem pahalıdır.",
+      "- İçerikte \"kısaltıldı\" notu varsa dosyanın tamamını görmediğini söyle; eksik veriye dayanarak " +
+        "\"hepsi bu kadar\" deme.",
+      "",
+      "## Kredi disiplini",
+      "Kullanıcı her turun ve her araç çağrısının bedelini kredi olarak öder. Bu yüzden:",
+      "- Aynı veriyi iki kez çekme; bir araçtan aldığın sonucu hatırla.",
+      "- Geniş listeler yerine dar filtre kullan (search_tasks'a proje/durum/tarih ver).",
+      "- Birden çok görev eklerken create_task'ı tekrarlamak yerine create_tasks ile tek çağrıda ekle. " +
+        "Ama tek çağrıya EN FAZLA 10 kalem koy: daha uzun bir çağrı yanıt uzunluk sınırında kesilir, " +
+        "hiç çalışmaz ve o tur boşa gider. 30 kalem varsa 3 çağrı yap.",
+      "- Silme/arşivleme gibi onay isteyen bir işlemden sonra istek KENDİLİĞİNDEN devam eder; " +
+        "kullanıcı onayladıktan sonra kalan adımları yapmayı unutma.",
+      "- Bir yaklaşım iki kez başarısız olduysa üçüncüyü deneme; dur ve durumu kullanıcıya anlat.",
+      "- İş uzarsa sistem seni durdurup kullanıcıya \"devam edeyim mi?\" diye sorar. Bu yüzden en önemli adımı önce yap; " +
+        "kullanıcı yarıda durdurursa elinde işe yarar bir sonuç kalsın.",
       "",
       "## Planlama sihirbazı (Takvim)",
       "Projelio'nun takvimi kullanıcının gününü, haftasını ve ayını planladığı yerdir. Burada rolün değişir:",
@@ -420,6 +827,35 @@ export class AiAssistantService {
       `- Bugünün tarihi: ${today}`,
       `- Kullanıcının rolü: ${userRole === "admin" ? "admin (yönetici)" : "freelancer"}`,
       context,
+    ].join("\n");
+  }
+
+  /**
+   * "Şu an hangi dosyalar açık" bildirimi — sistem promptunun ÖNBELLEKLENMEYEN
+   * kısmında durur ve her turda yeniden yazılır.
+   *
+   * NEDEN GEREKLİ: dosya içeriği, önbelleğe alınabilmesi için konuşmanın en
+   * BAŞINA konuyor. Model ise kronolojik okuyor — araya giren eski mesajlarda
+   * kendi ağzından çıkmış "dosya elimde değil" cümlesi, en baştaki içerikten
+   * DAHA YENİ olduğu için ona inanıyordu. Kullanıcı dosyayı yeniden yüklese bile
+   * aynı cümleyi tekrarlıyordu. Buradaki satır o çelişkiyi kesip atıyor: güncel
+   * gerçek her turda ve en yetkili yerde yazılı.
+   */
+  private activeFileStatus(activeFiles: ActiveFile[]): string {
+    if (!activeFiles.length) {
+      return [
+        "## Şu an açık dosya",
+        "Sohbette açık dosya YOK. Bir dosya içeriği sorulursa kullanıcıdan tekrar göndermesini iste.",
+      ].join("\n");
+    }
+
+    return [
+      "## Şu an açık dosyalar",
+      ...activeFiles.map((file) => `- ${file.name} (${file.detail})`),
+      "Bu dosyaların içeriği bu isteğin EN BAŞINDA sana verildi; elindeler.",
+      "Geçmiş mesajlarda \"dosya elimde değil\", \"sohbetten kaldırıldı\" ya da benzeri bir şey",
+      "söylemiş olsan bile o cümleler ARTIK GEÇERSİZ. Kullanıcıdan dosyayı tekrar istemeden önce",
+      "yukarıdaki içeriğe bak.",
     ].join("\n");
   }
 
@@ -483,16 +919,28 @@ export class AiAssistantService {
     userId: string,
     userRole: string,
     userMessage: string,
-    conversationId?: string
+    conversationId?: string,
+    tierInput?: string,
+    attachmentIds?: string[]
   ): Promise<ChatResult> {
-    const trimmed = userMessage?.trim();
+    // Ekler mesajdan önce çözülür: süresi dolmuş bir ek varsa hiç API çağrısı yapmadan hata verilir.
+    const attachments = this.attachmentsService.take(userId, attachmentIds ?? []);
+
+    // Yalnızca dosya gönderip hiçbir şey yazmamak geçerli bir istektir; o durumda
+    // varsayılan bir istek konur, aksi halde model ne yapacağını bilemez.
+    const trimmed = userMessage?.trim() || (attachments.length ? EMPTY_MESSAGE_WITH_FILE : "");
     if (!trimmed) throw new BadRequestException("Mesaj boş olamaz.");
 
-    // Teşhis izi: bu satır görünmüyorsa istek bu backend'e hiç ulaşmamıştır.
-    this.logger.log(`AI isteği alındı · kullanıcı=${userId.slice(0, 8)}… uzunluk=${trimmed.length}`);
+    const tier = resolveTier(tierInput).tier;
 
-    // Bakiye yetersizse hiç API çağrısı yapma.
-    await this.creditsService.assertCanStart(userId);
+    // Teşhis izi: bu satır görünmüyorsa istek bu backend'e hiç ulaşmamıştır.
+    this.logger.log(
+      `AI isteği alındı · kullanıcı=${userId.slice(0, 8)}… kademe=${tier} uzunluk=${trimmed.length}` +
+        (attachments.length ? ` ek=${attachments.map((a) => a.kind).join(",")}` : "")
+    );
+
+    // Taban kontrol: bakiye sıfır/çok düşükse buradan öteye hiç gitme.
+    const balance = await this.creditsService.assertCanStart(userId);
 
     // Sohbeti hazırla.
     let convId = conversationId;
@@ -503,41 +951,333 @@ export class AiAssistantService {
     }
 
     const history = await this.conversationsService.getRecentMessages(convId);
-    await this.conversationsService.addMessage(convId, "user", trimmed);
-    await this.conversationsService.ensureTitle(convId, trimmed);
 
-    const anthropic = this.getClient();
-    const dynamicContext = await this.buildDynamicSystemPrompt(userId, userRole);
-    const workingMessages: Anthropic.MessageParam[] = [
-      ...history.map((m) => ({ role: m.role, content: m.content })),
+    // Yeni ekler sohbete SABİTLENİR: iş bitene kadar her turda gönderilecekler.
+    // Eskiden ek yalnızca gönderildiği mesajda duruyordu ve geçmiş penceresi
+    // dolunca kayboluyordu — Lio "dosyayı bu turda göremiyorum" deyip aynı soruları
+    // tekrarlıyor, kullanıcı hem sonuç alamıyor hem yüzlerce kredi ödüyordu.
+    const activeFiles = this.mergeActiveFiles(
+      await this.conversationsService.getActiveFiles(convId),
+      attachments
+    );
+    if (attachments.length) {
+      await this.conversationsService.setActiveFiles(convId, activeFiles);
+      // Metin taşıyanların içeriği artık veritabanında; bellekte yalnızca görsel/PDF kalır.
+      this.attachmentsService.retain(userId, attachments.map((a) => a.id));
+    }
+
+    const messages: Anthropic.MessageParam[] = [
+      ...this.activeFileMessages(userId, activeFiles),
+      ...this.trimLeadingAssistant(history).map((m) => ({
+        role: m.role,
+        content: this.storedMessageContent(m),
+      })),
       { role: "user" as const, content: trimmed },
     ];
 
-    // Tüm turlar boyunca harcanan token'lar biriktirilir; tek seferde ücretlendirilir.
-    const totals: TokenTotals = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
+    // Bakiye bu isteğin en pahalı hâlini karşılamıyorsa HİÇ BAŞLAMA. Kontrol
+    // mesaj kaydedilmeden önce yapılır: yanıtlanmayacak bir mesaj sohbete düşmesin.
+    this.creditsService.assertBalanceCovers(balance, this.minimumTurnCredits(this.modelForTier(tier), messages));
 
-    const finish = async (
-      result: { type: "message"; text: string } | Omit<Extract<ChatResult, { type: "confirmation" }>, "conversationId" | "usage">,
-      assistantText: string
-    ): Promise<ChatResult> => {
-      const { credits, balanceAfter } = await this.creditsService.chargeUsage({
-        userId,
-        model: this.model,
+    // Çıkarılan metin mesaj kaydına yazılır: sonraki turlarda geçmiş buradan kurulur.
+    // Dosyanın kendisi saklanmaz (bkz. AiAttachmentsService).
+    // Mesaj kaydına yalnızca KÜNYE yazılır. İçerik sohbete sabitlenmiş dosyada
+    // duruyor; ikisine birden yazmak aynı metni iki yerde saklamak olurdu.
+    const storedAttachments: StoredAttachment[] = attachments.map((a) => ({
+      name: a.name,
+      kind: a.kind,
+      detail: a.detail,
+    }));
+    await this.conversationsService.addMessage(convId, "user", trimmed, undefined, storedAttachments);
+    // Kullanıcı hiçbir şey yazmadıysa başlık varsayılan cümleden değil dosya adından
+    // türetilir; sohbet listesinde "Bu dosyayı incele…" satırları birbirinden ayırt edilemezdi.
+    await this.conversationsService.ensureTitle(
+      convId,
+      userMessage?.trim() || attachments[0]?.name || trimmed
+    );
+
+    const run: PendingRun = {
+      id: randomUUID(),
+      userId,
+      userRole,
+      conversationId: convId,
+      tier,
+      messages,
+      baseContext: await this.buildDynamicSystemPrompt(userId, userRole),
+      executed: [],
+      spentCredits: 0,
+      iterationsUsed: 0,
+      creditCeiling: CREDIT_CONFIRM_THRESHOLD,
+      startingBalance: balance,
+      activeFiles,
+      pinnedTokens: this.estimateInputTokens(this.activeFileMessages(userId, activeFiles)),
+      expectsCacheWrite: this.expectsCacheWrite(history, attachments.length > 0),
+      pausedEstimate: 0,
+      askAgain: true,
+      holds: [],
+      createdAt: Date.now(),
+    };
+
+    return this.runWithHolds(run);
+  }
+
+  /**
+   * Koşuyu çalıştırır ve ne olursa olsun açık kredi tutmalarını kaldırır.
+   *
+   * Tutmalar bakiyeyi düşürmüyor, KULLANILABİLİR bakiyeden düşüyor; bırakılmazsa
+   * kullanıcının kredisi süre dolana kadar bloke kalırdı (bkz. HOLD_TTL_SECONDS).
+   */
+  private async runWithHolds(run: PendingRun): Promise<ChatResult> {
+    try {
+      return await this.runLoop(run);
+    } finally {
+      const holds = run.holds;
+      run.holds = [];
+      for (const hold of holds) await this.creditsService.release(hold);
+    }
+  }
+
+  /**
+   * Yeni ekleri sohbetin sabit dosyalarına ekler.
+   *
+   * Sınır aşılırsa en ESKİ dosya düşer: kullanıcı yeni bir dosya yüklediyse ilgisi
+   * ona kaymıştır ve her turda beş dosyanın tamamını göndermek hızla pahalanır.
+   */
+  private mergeActiveFiles(existing: ActiveFile[], attachments: PreparedAttachment[]): ActiveFile[] {
+    if (!attachments.length) return existing;
+    const incoming: ActiveFile[] = attachments.map((a) => ({
+      id: a.id,
+      name: a.name,
+      kind: a.kind,
+      detail: a.detail,
+      text: a.text,
+    }));
+    const merged = [...existing.filter((f) => !incoming.some((i) => i.id === f.id)), ...incoming];
+    return merged.slice(-MAX_ACTIVE_FILES);
+  }
+
+  /**
+   * Sohbete sabitlenmiş dosyaları, isteğin EN BAŞINA konan yapay bir alışverişe çevirir.
+   *
+   * Neden en başa: bu blok her turda birebir aynı, dolayısıyla önbelleğe alınabilir
+   * bir önek oluşturuyor. Son bloğa konan `cache_control` sayesinde dosya içeriği
+   * ilk turdan sonra %90 ucuza okunuyor — dosyayı her turda göndermenin bedeli
+   * böylece katlanılabilir kalıyor. Geçmiş mesajların arasına serpiştirilseydi
+   * önek her turda değişir ve önbellek hiç tutmazdı.
+   */
+  private activeFileMessages(userId: string, files: ActiveFile[]): Anthropic.MessageParam[] {
+    if (!files.length) return [];
+
+    const blocks = files.map((file) => this.activeFileBlock(userId, file));
+    // Önbellek işareti son bloğa: önek buraya kadar önbelleğe alınır.
+    (blocks[blocks.length - 1] as any).cache_control = CACHING_ENABLED ? { type: "ephemeral" } : undefined;
+
+    return [
+      { role: "user", content: blocks },
+      {
+        role: "assistant",
+        content:
+          "Bu dosyalar sohbet boyunca elimde; iş bitince release_files ile bırakacağım.",
+      },
+    ];
+  }
+
+  /**
+   * Tek bir sabit dosyanın içerik bloğu.
+   *
+   * Görsel ve PDF ikili olarak gider (model onları doğrudan "görür"), geri kalanı
+   * etiketli metin bloğu olur — modelin dosya içeriğini kullanıcının cümlesinden
+   * ayırt etmesi gerekiyor. İkili içerik bellekte tutuluyor ve süresi dolabiliyor;
+   * o durumda sessizce kaybolmak yerine ne olduğu açıkça yazılır.
+   */
+  private activeFileBlock(userId: string, file: ActiveFile): ContentBlockParam {
+    const label = ATTACHMENT_LABELS[file.kind] ?? "Dosya";
+
+    if (file.kind === "image" || file.kind === "pdf") {
+      const base64 = this.attachmentsService.getBinary(userId, file.id);
+      if (!base64) {
+        return {
+          type: "text",
+          text:
+            `[${label}: "${file.name}" · ${file.detail} — içeriği artık elimde değil. ` +
+            "Bu dosyayla ilgili bir şey sorulursa kullanıcıdan tekrar göndermesini iste.]",
+        };
+      }
+      if (file.kind === "image") {
+        return {
+          type: "image",
+          source: { type: "base64", media_type: this.imageMediaType(file.name), data: base64 },
+        } as ContentBlockParam;
+      }
+      // SDK 0.32 "document" bloğunu yalnızca beta ad alanında tipliyor; API tarafında
+      // PDF desteği artık genel kullanımda. Blok gövdede JSON'a çevrildiği için tip
+      // zorlaması yeterli — beta istemciye geçmek tüm döngüyü ikiye bölerdi.
+      return {
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: base64 },
+      } as unknown as ContentBlockParam;
+    }
+
+    return {
+      type: "text",
+      text: `<dosya ad="${file.name}" tur="${label}">\n${file.text ?? ""}\n</dosya>`,
+    };
+  }
+
+  /** Görselin MIME'ı sabit dosya kaydında tutulmuyor; uzantıdan yeter. */
+  private imageMediaType(name: string): any {
+    const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
+    if (ext === "png") return "image/png";
+    if (ext === "gif") return "image/gif";
+    if (ext === "webp") return "image/webp";
+    return "image/jpeg";
+  }
+
+  /**
+   * Kayıtlı bir mesajı modele geri beslenecek içeriğe çevirir.
+   *
+   * Ek İÇERİĞİ buraya girmez — o, sohbete sabitlenmiş dosyadan (activeFileMessages)
+   * bir kez ve önbellekli olarak gidiyor. Geçmişte yalnızca "bu mesajda şu dosya
+   * gönderilmişti" bilgisi kalır; ikisini birden göndermek aynı içeriği iki kez
+   * ödemek olurdu.
+   */
+  private storedMessageContent(message: AiStoredMessage): string {
+    if (!message.attachments?.length) return message.content;
+    const names = message.attachments
+      .map((a) => `${ATTACHMENT_LABELS[a.kind] ?? "Dosya"}: ${a.name}`)
+      .join(", ");
+    return `[Gönderilen dosya(lar): ${names}]\n${message.content}`;
+  }
+
+  /**
+   * Duraklatılmış bir koşuyu kullanıcının kararına göre sonuçlandırır.
+   *
+   * `tierInput` verilirse koşu o kademeyle devam eder: küçük modelin tıkandığı bir
+   * işte kullanıcı "devam et ama daha güçlü modelle" diyebilsin. Mesaj yığını
+   * modelden bağımsız olduğu için kademe koşunun ortasında değişebilir.
+   */
+  async continueRun(
+    runId: string,
+    userId: string,
+    confirmed: boolean,
+    tierInput?: string,
+    approveAll?: boolean
+  ): Promise<ChatResult> {
+    this.sweepExpiredRuns();
+    const run = this.pendingRuns.get(runId);
+    if (!run || run.userId !== userId) {
+      throw new NotFoundException("Devam edilecek işlem bulunamadı ya da süresi doldu. Lütfen isteği tekrar yaz.");
+    }
+    this.pendingRuns.delete(runId);
+
+    if (!confirmed) {
+      // Durdurmak kredi harcamaz; yapılanın ne olduğunu söylemek ise şart —
+      // kullanıcı yarım kalan işi elle tamamlayacaksa nereden devam edeceğini bilmeli.
+      const text =
+        `Durdurdum. ${summarizeExecuted(run.executed)}. ` +
+        `Bu istek toplam ${this.formatCredits(run.spentCredits)} kredi harcadı.`;
+      await this.safeRecord(run.conversationId, text);
+      const { balance } = await this.creditsService.getBalance(userId);
+      return {
+        type: "message",
+        text,
+        conversationId: run.conversationId,
+        usage: { creditsCharged: 0, balance },
+        activeFiles: toActiveFileInfo(run.activeFiles),
+      };
+    }
+
+    const balance = await this.creditsService.assertCanStart(userId);
+    if (tierInput) run.tier = resolveTier(tierInput).tier;
+    // Devam ederken de aynı rezervasyon geçerli: kredi yetmiyorsa sürdürmek,
+    // kullanıcıyı yarım işle borç bakiyesine sokmak olurdu.
+    this.creditsService.assertBalanceCovers(balance, this.minimumTurnCredits(this.modelForTier(run.tier), run.messages));
+    run.startingBalance = balance;
+    // Her onay bir eşik daha harcama izni verir. Tavan, duraklatmaya sebep olan
+    // TAHMİNİ de kapsamalı: 868 kredilik bir tur için onay alıp tavanı yalnızca
+    // 600 açmak, onaydan hemen sonra aynı soruyu tekrar sormak olurdu.
+    run.creditCeiling =
+      run.spentCredits + Math.max(CREDIT_CONFIRM_THRESHOLD, run.pausedEstimate + CREDIT_CONFIRM_THRESHOLD);
+    run.pausedEstimate = 0;
+    // Kullanıcı "bu istek boyunca tekrar sorma" dediyse kalan adımlar sorulmadan
+    // yürür. Kredi bittiğinde yine durulur — o koruma onaya bağlı değil.
+    if (approveAll) run.askAgain = false;
+    return this.runWithHolds(run);
+  }
+
+  /**
+   * Asistanın araç döngüsü.
+   *
+   * `chat()` ve `continueRun()` aynı döngüyü kullanır; fark yalnızca koşunun
+   * sıfırdan mı yoksa dondurulmuş bir noktadan mı başladığıdır. Döngü dört yerde
+   * biter: model araç çağırmayı bıraktığında, kritik bir işlem onay beklediğinde,
+   * harcama eşiğine gelindiğinde ve tur sınırına gelindiğinde.
+   */
+  private async runLoop(run: PendingRun): Promise<ChatResult> {
+    const anthropic = this.getClient();
+    const model = this.modelForTier(run.tier);
+    const totals: TokenTotals = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
+    /** Son turun kredi bedeli — "devam edersem ne kadar tutar" tahmini bundan çıkar. */
+    let lastStepCredits = 0;
+    /**
+     * Uzunluk sınırında boş dönen tur sayısı.
+     *
+     * Bir kez oluyorsa modele "çıktın kesildi, işi küçült" deyip tekrar denemeye
+     * değer: o turun bedeli zaten ödendi, pes etmek parayı çöpe atmak olur. İkinci
+     * kez olduysa artık toparlanmıyor demektir; ısrar etmek katlanan bir zarar.
+     */
+    let truncatedRetries = 0;
+    /** Son tur önbelleği yazdı mı? Sonraki turun tahmini buna göre değişiyor. */
+    let lastTurnWroteCache = false;
+
+    const segmentCredits = (): number =>
+      calculateUsageCost(model, {
         inputTokens: totals.input,
         outputTokens: totals.output,
         cacheWriteTokens: totals.cacheWrite,
         cacheReadTokens: totals.cacheRead,
-        conversationId: convId,
-      });
+      }).credits;
 
-      // Maliyet denetimi için her isteğin gerçek token dökümü loglanır.
+    const finish = async (
+      result:
+        | { type: "message"; text: string }
+        | Omit<Extract<ChatResult, { type: "confirmation" }>, "conversationId" | "usage" | "activeFiles">
+        | Omit<Extract<ChatResult, { type: "continuation" }>, "conversationId" | "usage" | "activeFiles">
+        | Omit<Extract<ChatResult, { type: "out_of_credits" }>, "conversationId" | "usage" | "activeFiles">,
+      assistantText: string
+    ): Promise<ChatResult> => {
+      // assistantText yeniden atanabiliyor (toplam kredi notu eklenirken).
+      const { credits, balanceAfter } = await this.creditsService.chargeUsage({
+        userId: run.userId,
+        model,
+        inputTokens: totals.input,
+        outputTokens: totals.output,
+        cacheWriteTokens: totals.cacheWrite,
+        cacheReadTokens: totals.cacheRead,
+        conversationId: run.conversationId,
+      });
+      run.spentCredits += credits;
+
+      // Çok segmentli isteklerde (onay/duraklatma yaşanmışsa) kullanıcı tek tek
+      // balonlardaki sayıları toplamak zorunda kalmasın: son cümleye isteğin
+      // TOPLAM bedeli eklenir. Tek segmentli isteklerde balondaki sayı zaten aynı
+      // olduğu için eklenmez, gereksiz tekrar olurdu.
+      const multiSegment = run.spentCredits - credits > 0;
+      if (multiSegment && (result as any).text) {
+        const note = ` (Bu isteğin toplam bedeli: ${this.formatCredits(run.spentCredits)} kredi.)`;
+        (result as any).text = `${(result as any).text}${note}`;
+        assistantText = `${assistantText}${note}`;
+      }
+
+      // Maliyet denetimi için her segmentin gerçek token dökümü loglanır.
       this.logger.log(
-        `AI kullanım · model=${this.model} in=${totals.input} out=${totals.output} ` +
-          `cacheWrite=${totals.cacheWrite} cacheRead=${totals.cacheRead} → ${credits} kredi`
+        `AI kullanım · model=${model} in=${totals.input} out=${totals.output} ` +
+          `cacheWrite=${totals.cacheWrite} cacheRead=${totals.cacheRead} → ${credits} kredi ` +
+          `(koşu toplamı ${run.spentCredits}, tur ${run.iterationsUsed})`
       );
 
       if (assistantText) {
-        await this.conversationsService.addMessage(convId!, "assistant", assistantText, {
+        await this.conversationsService.addMessage(run.conversationId, "assistant", assistantText, {
           inputTokens: totals.input + totals.cacheWrite + totals.cacheRead,
           outputTokens: totals.output,
           creditsCharged: credits,
@@ -545,15 +1285,152 @@ export class AiAssistantService {
       }
       return {
         ...(result as any),
-        conversationId: convId!,
+        conversationId: run.conversationId,
         usage: { creditsCharged: credits, balance: balanceAfter },
+        activeFiles: toActiveFileInfo(run.activeFiles),
       };
     };
 
-    for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+    /**
+     * Koşuyu dondurup kullanıcıya "devam edeyim mi?" diye sorar.
+     *
+     * Duraklatma noktası kasıtlı olarak araç sonuçlarının modele geri beslenmesinden
+     * SONRA: mesaj yığını orada tutarlıdır (her tool_use'un bir tool_result'ı vardır),
+     * dolayısıyla onay gelirse hiçbir tur tekrarlanmadan devam edilebilir.
+     */
+    const pause = async (reason: ContinuationReason, estimateOverride?: number): Promise<ChatResult> => {
+      run.createdAt = Date.now();
+      this.pendingRuns.set(run.id, run);
+
+      const done = summarizeExecuted(run.executed);
+      const spent = run.spentCredits + segmentCredits();
+      const estimate = Math.max(
+        1,
+        Math.round(estimateOverride ?? this.nextTurnEstimate(model, run, lastStepCredits, lastTurnWroteCache))
+      );
+
+      // Üç farklı durum, üç farklı cümle: hiç başlamadan uyarı, yarıda bütçe
+      // uyarısı ve adım sınırı. Aynı metni kullanmak kullanıcıyı yanıltıyordu.
+      const text =
+        reason === "estimate"
+          ? [
+              `Bu istek tahminen ${this.formatCredits(estimate)} kredi tutacak — bu, tek seferde harcanması için`,
+              `yüksek bir tutar (eşik ${this.formatCredits(run.creditCeiling)} kredi).`,
+              "Henüz hiçbir kredi harcamadım. Devam edeyim mi?",
+            ].join(" ")
+          : reason === "budget"
+            ? [
+                `Bu istek şu ana kadar ${this.formatCredits(spent)} kredi harcadı ve henüz bitmedi.`,
+                `Şimdiye kadar: ${done}.`,
+                `Devam edersem her adım yaklaşık ${this.formatCredits(estimate)} kredi daha götürür.`,
+                "Devam edeyim mi?",
+              ].join(" ")
+            : [
+                `Bu istek ${run.iterationsUsed} adım sürdü ve hâlâ bitmedi (${this.formatCredits(spent)} kredi).`,
+                `Şimdiye kadar: ${done}.`,
+                `Devam edersem her adım yaklaşık ${this.formatCredits(estimate)} kredi daha götürür.`,
+                "Devam edeyim mi?",
+              ].join(" ");
+
+      return finish(
+        {
+          type: "continuation",
+          runId: run.id,
+          reason,
+          text,
+          spentCredits: spent,
+          estimatedNextCredits: estimate,
+          doneSummary: done,
+          tier: run.tier,
+        },
+        text
+      );
+    };
+
+    /**
+     * Kredi tükendi: iş yarıda kesilir, o ana kadar harcanan düşülür.
+     *
+     * Duraklatmadan (pause) farkı, kullanıcıya sorulacak bir şey olmaması —
+     * kredi yüklenmeden devam edilemez. Yapılanların özeti yine verilir ki
+     * kullanıcı nerede kaldığını bilsin.
+     */
+    const outOfCredits = async (required: number, remaining: number): Promise<ChatResult> => {
+      const done = summarizeExecuted(run.executed);
+      const text =
+        `AI kredin bu isteği sürdürmeye yetmiyor, bu yüzden burada durdum. ${done}. ` +
+        `Kalan kredin ${this.formatCredits(Math.max(0, remaining))}, devam etmek için ` +
+        `en az ${this.formatCredits(required)} gerekiyor. ` +
+        "Ayarlar > AI Kredileri sayfasından kredi yükleyip tekrar yazabilirsin.";
+      return finish(
+        {
+          type: "out_of_credits",
+          text,
+          balance: Math.max(0, remaining),
+          requiredCredits: Math.ceil(required),
+          doneSummary: done,
+        },
+        text
+      );
+    };
+
+    // "Bir daha sorma" denmiş bir işte segmentlere bölmenin anlamı yok: bölmenin
+    // tek sebebi kullanıcıya soru sormaktı. O durumda tek sınır mutlak tavandır.
+    // (Döngüyü sonlandırıp yeniden çağırmak tahsilatı atlardı — ücret yalnızca
+    // finish() içinde işleniyor.)
+    const stepLimit = run.askAgain ? MAX_TOOL_ITERATIONS : MAX_TOTAL_ITERATIONS;
+
+    for (let step = 0; step < stepLimit; step++) {
+      // Kredi koruması bütçe kontrolünden ÖNCE gelir: biri "kullanıcı izin verdi mi",
+      // diğeri "kullanıcının parası var mı" sorusudur ve ikincisi tartışmaya kapalıdır.
+      //
+      // Kontrol veritabanında ATOMİK yapılır: turun en pahalı hâli kadar kredi
+      // tutulur (hold). Aynı kullanıcının paralel isteği bu tutmayı gördüğü için
+      // ikisi birden aynı bakiyeyi harcayamaz. Tutma bakiyeyi düşürmez; segment
+      // biterken kaldırılır ve gerçek tüketim normal yoldan işlenir.
+      // Tutulan miktar KÜMÜLATİFTİR: "şu ana kadar borçlandığım" + "bir sonraki turun
+      // en pahalı hâli". Her tura ayrı tutma açıp biriktirmek, gerçekte 20 kredi harcanan
+      // bir sohbette 8 turun en kötü hâlini (yüzlerce kredi) bloke ederdi; kullanıcı
+      // parası dururken "kredin yetmiyor" duyardı. Yeni tutma açıldıktan SONRA eskisi
+      // bırakılır — sıra tersine dönerse aradaki boşlukta paralel bir istek sızabilirdi.
+      const remaining = run.startingBalance - segmentCredits();
+      const plan = this.planTurn(model, run.messages, remaining);
+      if (!plan) return outOfCredits(this.minimumTurnCredits(model, run.messages), remaining);
+
+      const previousHolds = [...run.holds];
+      try {
+        const hold = await this.creditsService.reserve(run.userId, segmentCredits() + plan.required);
+        if (hold) run.holds.push(hold);
+      } catch (err) {
+        if (err instanceof InsufficientCreditsException) {
+          return outOfCredits(this.minimumTurnCredits(model, run.messages), remaining);
+        }
+        throw err;
+      }
+      for (const stale of previousHolds) {
+        run.holds = run.holds.filter((id) => id !== stale);
+        await this.creditsService.release(stale);
+      }
+
+      // Bütçe kontrolü bir sonraki API çağrısından ÖNCE yapılır: token'lar orada
+      // harcanacak, dolayısıyla durulacak yer burasıdır.
+      //
+      // İLK TUR DA KONTROL EDİLİR. Eskiden "önceki turun bedeli" ölçüt olduğu için
+      // ilk tur hiç denetlenmiyordu; oysa sabit dosyalı bir Dengeli/Güçlü isteğinde
+      // TEK BİR TUR 1100 krediyi bulabiliyor. Kullanıcı hiçbir şey sorulmadan o
+      // parayı harcamış oluyordu — üstelik iş de bitmemiş olabiliyordu.
+      const nextEstimate = this.nextTurnEstimate(model, run, lastStepCredits, lastTurnWroteCache);
+      if (run.askAgain && run.spentCredits + segmentCredits() + nextEstimate > run.creditCeiling) {
+        run.pausedEstimate = nextEstimate;
+        // Henüz hiçbir şey harcanmadıysa bu bir ÖN uyarıdır, yarıda kesme değil.
+        return pause(run.spentCredits + segmentCredits() > 0 ? "budget" : "estimate", nextEstimate);
+      }
+      if (run.iterationsUsed >= MAX_TOTAL_ITERATIONS) break;
+
+      const creditsBefore = segmentCredits();
       const response = await this.callAnthropic(anthropic, {
-        model: this.model,
-        max_tokens: MAX_TOKENS,
+        model,
+        // Çıktı sınırı kalan krediye göre kısılabilir (bkz. planTurn).
+        max_tokens: plan.maxTokens,
         // Sistem promptu iki bloğa ayrılır: statik blok (araç şemalarıyla birlikte)
         // önbelleğe alınır, dinamik bağlam her istekte yeniden gönderilir.
         system: [
@@ -562,17 +1439,22 @@ export class AiAssistantService {
             text: AiAssistantService.STATIC_SYSTEM_PROMPT,
             ...(CACHING_ENABLED ? { cache_control: { type: "ephemeral" } } : {}),
           },
-          { type: "text", text: dynamicContext },
+          // Açık dosya bildirimi HER TURDA yeniden yazılır: koşunun ortasında
+          // release_files çağrılırsa bir sonraki tur doğru durumu görmeli.
+          { type: "text", text: `${run.baseContext}\n\n${this.activeFileStatus(run.activeFiles)}` },
         ] as any,
         tools: AI_TOOLS,
-        messages: workingMessages,
+        messages: run.messages,
       });
+      run.iterationsUsed += 1;
 
       const usage: any = response.usage ?? {};
       totals.input += usage.input_tokens ?? 0;
       totals.output += usage.output_tokens ?? 0;
       totals.cacheWrite += usage.cache_creation_input_tokens ?? 0;
       totals.cacheRead += usage.cache_read_input_tokens ?? 0;
+      lastTurnWroteCache = (usage.cache_creation_input_tokens ?? 0) > 0;
+      lastStepCredits = Math.max(0, segmentCredits() - creditsBefore);
 
       const toolUses = response.content.filter(
         (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
@@ -583,23 +1465,90 @@ export class AiAssistantService {
         .join("\n")
         .trim();
 
+      // Yanıt uzunluk sınırına takıldı mı? Bu bilgi kritik: yarım kalmış bir araç
+      // çağrısının parametreleri eksiktir ve çalıştırılırsa yanlış veri yazar.
+      const truncated = response.stop_reason === "max_tokens";
+
       if (toolUses.length === 0) {
-        const finalText = text || "Tamam.";
-        return finish({ type: "message", text: finalText }, finalText);
+        if (text) return finish({ type: "message", text }, text);
+
+        this.logger.warn(
+          `Model boş yanıt döndü · sohbet=${run.conversationId} kesildi=${truncated} tur=${run.iterationsUsed}`
+        );
+
+        // Uzunluk sınırında boş dönmek, modelin çok büyük bir araç çağrısı yazmaya
+        // kalkışıp yarıda kesilmesi demek (API yarım kalan bloğu hiç döndürmüyor).
+        // O turun bedeli zaten ödendi; pes etmek yerine bir kez daha, işi küçültmesi
+        // söylenerek denenir. Aksi halde kullanıcı yüzlerce kredi ödeyip elinde
+        // hiçbir şey olmadan kalıyordu.
+        if (truncated && truncatedRetries < 1) {
+          truncatedRetries += 1;
+          run.messages.push({
+            role: "user",
+            content:
+              "Yanıtın uzunluk sınırında kesildi ve bana hiçbir şey ulaşmadı. " +
+              "Aynı işi ÇOK DAHA KÜÇÜK parçalara böl: tek araç çağrısında en fazla 10 kalem gönder, " +
+              "gerekiyorsa aracı arka arkaya çağır. Uzun açıklama yazma, doğrudan aracı çağır.",
+          });
+          continue;
+        }
+
+        // Model hiçbir şey üretmedi. Ne söyleneceği YAPILAN İŞE bağlı:
+        //
+        // - Hiçbir değişiklik yoksa bu gerçek bir başarısızlıktır (eskiden buraya
+        //   "Tamam." yazılıyordu; kullanıcı işin yapıldığını sanıp gidiyordu).
+        // - Ama işler yapıldıysa "yanıt üretemedim" demek YANLIŞ olur: kullanıcı
+        //   işin başarısız olduğunu sanıp aynı isteği tekrar yazar ve iki kez öder.
+        //   Bu durumda son cümlenin eksikliği yalnızca bir özet eksikliğidir.
+        const done = summarizeExecuted(run.executed);
+        const didWork = run.executed.some((name) => ACTION_LABELS[name]);
+        const failText = didWork
+          ? `Son adımda özet cümlesi üretemedim, ama yapılanlar duruyor: ${done}. ` +
+            "Eksik kalan bir şey varsa söyle, tamamlayayım."
+          : truncated
+            ? `Yanıtım uzunluk sınırına takıldığı için isteği tamamlayamadım. ${done}. ` +
+              "İsteği daha küçük parçalara bölerek tekrar yazar mısın?"
+            : `Bu isteğe yanıt üretemedim. ${done}. Ne yapmamı istediğini biraz daha açık yazar mısın?`;
+        return finish({ type: "message", text: failText }, failText);
+      }
+
+      if (truncated) {
+        // Kesilmiş araç çağrısı ÇALIŞTIRILMAZ. Modele ne olduğu söylenip işi
+        // küçültmesi istenir; körlemesine tekrar denemek aynı duvara toslamaktı.
+        run.messages.push({ role: "assistant", content: response.content });
+        run.messages.push({
+          role: "user",
+          content: toolUses.map((use) => ({
+            type: "tool_result" as const,
+            tool_use_id: use.id,
+            content:
+              "Bu çağrı uzunluk sınırında yarıda kesildi, bu yüzden çalıştırılmadı. " +
+              "Aynı işi daha KÜÇÜK parçalara bölerek tekrar çağır (ör. create_tasks'a bir seferde en fazla 10 kalem ver).",
+            is_error: true,
+          })),
+        });
+        this.logger.warn(`Araç çağrısı uzunluk sınırında kesildi · araç=${toolUses.map((u) => u.name).join(",")}`);
+        continue;
       }
 
       const criticalUse = toolUses.find((use) => CRITICAL_TOOLS.has(use.name));
       if (criticalUse) {
         const actionId = randomUUID();
         const input = (criticalUse.input as Record<string, any>) ?? {};
+        // Koşu dondurulur: onaydan sonra buradan devam edilecek.
+        run.createdAt = Date.now();
+        this.pendingRuns.set(run.id, run);
         this.pendingActions.set(actionId, {
           id: actionId,
-          userId,
-          userRole,
+          userId: run.userId,
+          userRole: run.userRole,
           toolName: criticalUse.name,
           input,
-          conversationId: convId,
+          conversationId: run.conversationId,
           createdAt: Date.now(),
+          runId: run.id,
+          assistantContent: response.content as any[],
+          criticalUseId: criticalUse.id,
         });
         const summary = await this.summarizeAction(criticalUse.name, input);
         return finish(
@@ -609,11 +1558,30 @@ export class AiAssistantService {
       }
 
       // Kritik olmayan araçları çalıştır, sonuçları modele geri besle ve devam et.
-      workingMessages.push({ role: "assistant", content: response.content });
+      run.messages.push({ role: "assistant", content: response.content });
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
       for (const use of toolUses) {
+        // release_files sohbetin durumunu değiştiriyor, veriyi değil; bu yüzden
+        // executeTool'a değil buraya ait — orada conversationId bilgisi yok.
+        if (use.name === "release_files") {
+          await this.releaseActiveFiles(run);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: use.id,
+            content: "Dosyalar bırakıldı; bundan sonra içerikleri sana gönderilmeyecek.",
+          });
+          continue;
+        }
         try {
-          const result = await this.executeTool(use.name, (use.input as Record<string, any>) ?? {}, userId, userRole);
+          const result = await this.executeTool(
+            use.name,
+            (use.input as Record<string, any>) ?? {},
+            run.userId,
+            run.userRole
+          );
+          // Yalnızca BAŞARILI çağrılar özete girer; hata alan bir araç iş yapmadı.
+          run.executed.push(use.name);
+          await this.emitActivity(run.userId, use.name, (use.input as Record<string, any>) ?? {}, result);
           toolResults.push({
             type: "tool_result",
             tool_use_id: use.id,
@@ -629,11 +1597,362 @@ export class AiAssistantService {
           });
         }
       }
-      workingMessages.push({ role: "user", content: toolResults });
+      run.messages.push({ role: "user", content: toolResults });
     }
 
-    const fallback = "İsteğini tamamlayamadım. Daha spesifik bir şekilde tekrar eder misin?";
+    // Tur sınırına gelindi ve iş bitmedi. Eskiden burada "İsteğini tamamlayamadım"
+    // deyip her şey çöpe gidiyordu: yapılan değişiklikler duruyor ama kullanıcı ne
+    // olduğunu bilmiyor, aynı isteği baştan yazıyor ve krediyi iki kez ödüyordu.
+    if (run.iterationsUsed < MAX_TOTAL_ITERATIONS) return pause("iterations");
+
+    const fallback =
+      `Bu isteği tamamlayamadım, adım sınırına takıldım. ${summarizeExecuted(run.executed)}. ` +
+      "Kalan kısmı için isteği daha küçük parçalara bölerek yazar mısın?";
     return finish({ type: "message", text: fallback }, fallback);
+  }
+
+  /**
+   * Bir turun çıktı sınırını ve rezerve edilecek krediyi birlikte belirler.
+   *
+   * Rezerv "en pahalı hâl" üzerinden hesaplanır: tüm girdi önbelleksiz gitmiş ve
+   * model çıktı sınırını sonuna kadar kullanmış gibi. Gerçek bedel neredeyse her
+   * zaman bunun altında kalır — kasıt da bu, çünkü az tahmin kullanıcıyı eksi
+   * bakiyede bırakır.
+   *
+   * Fakat sabit bir tavanla hesaplamak, bakiyesi azalan kullanıcıyı gereğinden
+   * erken reddediyordu. Bunun yerine ÇIKTI SINIRI kalan krediye göre kısılır:
+   * kredi azaldıkça Lio kısa konuşur, tamamen susmaz. Duvar ancak asgari yanıt
+   * bile karşılanamadığında çıkar.
+   *
+   * `null` dönmesi "bu tur hiç yapılamaz" demektir.
+   */
+  private planTurn(
+    model: string,
+    messages: Anthropic.MessageParam[],
+    remaining: number
+  ): { maxTokens: number; required: number } | null {
+    const inputTokens = BASE_PROMPT_TOKENS + this.estimateInputTokens(messages);
+    const costFor = (outputTokens: number) =>
+      calculateUsageCost(model, { inputTokens, outputTokens }).credits;
+
+    const full = costFor(MAX_TOKENS);
+    if (full <= remaining) return { maxTokens: MAX_TOKENS, required: full };
+
+    // Maliyet çıktı token'ında doğrusal; kalan krediyle alınabilecek çıktı
+    // doğrudan hesaplanır (ikili aramaya gerek yok).
+    const inputOnly = costFor(0);
+    const perThousand = costFor(1000) - inputOnly;
+    const affordable = perThousand > 0 ? Math.floor(((remaining - inputOnly) / perThousand) * 1000) : 0;
+
+    let maxTokens = Math.max(MIN_OUTPUT_TOKENS, Math.min(MAX_TOKENS, affordable));
+    let required = costFor(maxTokens);
+    if (required > remaining) {
+      // Yuvarlama payı: asgariye in, o da tutmuyorsa tur yapılamaz.
+      maxTokens = MIN_OUTPUT_TOKENS;
+      required = costFor(maxTokens);
+    }
+    return required <= remaining ? { maxTokens, required } : null;
+  }
+
+  /**
+   * Bir sonraki turun GERÇEKÇİ kredi tahmini.
+   *
+   * Rezervasyondan (planTurn) farkı, en kötü hâli değil beklenen hâli hesaplaması:
+   * bu sayı "kullanıcıya devam edeyim mi diye sorayım mı?" kararında kullanılıyor
+   * ve en kötü hâlle sorulsaydı her sohbette gereksiz onay penceresi çıkardı.
+   *
+   * Kritik nokta ÖNBELLEK: sabit dosyalı bir sohbette önbelleği YAZMAK ile OKUMAK
+   * arasında 10 kata varan fark var. Bunu hesaba katmayan eski kontrol, tek bir
+   * turda 1100 kredi harcanmasına rağmen 600 eşiğini hiç tetiklemiyordu.
+   */
+  private estimateTurnCredits(model: string, run: PendingRun, writesCache: boolean): number {
+    const cachedTokens = BASE_PROMPT_TOKENS + run.pinnedTokens;
+    const freshTokens = Math.max(0, this.estimateInputTokens(run.messages) - run.pinnedTokens);
+
+    if (!CACHING_ENABLED) {
+      return calculateUsageCost(model, {
+        inputTokens: cachedTokens + freshTokens,
+        outputTokens: TYPICAL_OUTPUT_TOKENS,
+      }).credits;
+    }
+
+    return calculateUsageCost(model, {
+      inputTokens: freshTokens,
+      ...(writesCache ? { cacheWriteTokens: cachedTokens } : { cacheReadTokens: cachedTokens }),
+      outputTokens: TYPICAL_OUTPUT_TOKENS,
+    }).credits;
+  }
+
+  /**
+   * İlk turun önbelleği yazıp yazmayacağı.
+   *
+   * Kesin bilinemez (önbellek Anthropic tarafında), ama üç işaret güvenilir:
+   * sohbet yeni, önek değişti ya da son mesajın üzerinden önbellek ömrü geçti.
+   * Şüphede kalınca YAZAR varsayılır — düşük tahmin kullanıcıyı habersiz yüksek
+   * harcamaya sokar, yüksek tahmin en fazla gereksiz bir onay penceresi açar.
+   */
+  private expectsCacheWrite(history: AiStoredMessage[], prefixChanged: boolean): boolean {
+    if (prefixChanged || history.length === 0) return true;
+    const last = history[history.length - 1]?.createdAt;
+    if (!last) return true;
+    const age = Date.now() - new Date(last).getTime();
+    return !Number.isFinite(age) || age > CACHE_WARM_WINDOW_MS;
+  }
+
+  /**
+   * "Bir sonraki tur ne tutar?" — duraklatma kararında ve mesajında kullanılır.
+   *
+   * Ölçülen son tur varsa ondan gidilir; ama o tur önbelleği YAZDIYSA ondan
+   * gitmek yanıltıcı olur: sonraki tur artık okuyacak ve 10 kat ucuz olacaktır.
+   * Kullanıcıya "her adım ~1.070 kredi" deyip ardından 190 kredilik adımlar
+   * atmak, verilen sayıyı da güveni de anlamsızlaştırıyordu.
+   */
+  private nextTurnEstimate(
+    model: string,
+    run: PendingRun,
+    lastStepCredits: number,
+    lastTurnWroteCache: boolean
+  ): number {
+    if (lastStepCredits > 0 && !lastTurnWroteCache) return lastStepCredits;
+    if (lastStepCredits > 0) return this.estimateTurnCredits(model, run, false);
+    return this.estimateTurnCredits(model, run, run.expectsCacheWrite);
+  }
+
+  /** Bir turun asgari bedeli — "başlamak için en az ne gerekiyor" mesajları için. */
+  private minimumTurnCredits(model: string, messages: Anthropic.MessageParam[]): number {
+    return calculateUsageCost(model, {
+      inputTokens: BASE_PROMPT_TOKENS + this.estimateInputTokens(messages),
+      outputTokens: MIN_OUTPUT_TOKENS,
+    }).credits;
+  }
+
+  /**
+   * Mesaj yığınının kaba token karşılığı.
+   *
+   * Blok blok yürünmesinin sebebi görsel ve PDF: ikisi de gövdede base64 olarak
+   * duruyor ama token bedelleri karakter sayısıyla ORANTILI DEĞİL. Ham uzunluğu
+   * bölmek 5 MB'lık bir görseli iki milyon token gibi gösterip her isteği
+   * "kredin yetmiyor" ile reddettirirdi.
+   */
+  private estimateInputTokens(messages: Anthropic.MessageParam[]): number {
+    let tokens = 0;
+    for (const message of messages) {
+      if (typeof message.content === "string") {
+        tokens += Math.ceil(message.content.length / CHARS_PER_TOKEN);
+        continue;
+      }
+      for (const block of (message.content ?? []) as any[]) {
+        if (block?.type === "text") {
+          tokens += Math.ceil(String(block.text ?? "").length / CHARS_PER_TOKEN);
+        } else if (block?.type === "image") {
+          tokens += IMAGE_TOKENS;
+        } else if (block?.type === "document") {
+          const base64Length = String(block?.source?.data ?? "").length;
+          const bytes = Math.ceil(base64Length * 0.75);
+          tokens += Math.min(Math.ceil(bytes / PDF_BYTES_PER_TOKEN), MAX_PDF_TOKENS);
+        } else {
+          // tool_use / tool_result: gövdesi neyse JSON uzunluğundan gidilir.
+          tokens += Math.ceil(JSON.stringify(block ?? {}).length / CHARS_PER_TOKEN);
+        }
+      }
+    }
+    return tokens;
+  }
+
+  /**
+   * Sohbete sabitlenmiş dosyaları bırakır.
+   *
+   * Bırakıldıktan sonra içerik bir daha modele gönderilmez — asıl kazanç bu:
+   * biten bir işin dosyası her turda tekrar tekrar ödenmeye devam etmemeli.
+   */
+  private async releaseActiveFiles(run: PendingRun): Promise<void> {
+    if (!run.activeFiles.length) return;
+    this.attachmentsService.releaseMany(run.userId, run.activeFiles.map((f) => f.id));
+    run.activeFiles = [];
+    await this.conversationsService.setActiveFiles(run.conversationId, []);
+  }
+
+  /**
+   * Geçmişin başındaki asistan mesajlarını atar.
+   *
+   * Pencere son N mesajı aldığı için geçmiş bir asistan yanıtıyla başlayabiliyor.
+   * Sabit dosya bloğu da bir asistan cümlesiyle bittiği için ikisi arka arkaya
+   * gelirdi; ayrıca bir konuşmanın kullanıcı sözüyle başlaması modelin sırayı
+   * doğru okuması için daha güvenli.
+   */
+  private trimLeadingAssistant(history: AiStoredMessage[]): AiStoredMessage[] {
+    let start = 0;
+    while (start < history.length && history[start].role === "assistant") start += 1;
+    return history.slice(start);
+  }
+
+  /**
+   * Lio bir kayıt oluşturduğunda/değiştirdiğinde kullanıcının ekranını oraya taşır.
+   *
+   * İki sinyal birden gider:
+   *  1. Kişiye ("lio-activity") — arayüz soldaki sayfayı ilgili yere götürür.
+   *  2. Etkilenen sayfaya ("room-changed") — o sayfayı açık tutan herkes tazelenir.
+   *
+   * Hiçbir hata asıl işi bozmamalı: bildirim gönderilemezse iş yine yapılmıştır,
+   * yalnızca kullanıcı sonucu canlı görmez.
+   */
+  private async emitActivity(
+    userId: string,
+    toolName: string,
+    input: Record<string, any>,
+    result: unknown
+  ): Promise<void> {
+    try {
+      const activity = await this.describeActivity(toolName, input ?? {}, result);
+      if (!activity) return;
+
+      this.realtime.emitToUser(userId, "lio-activity", activity);
+      if (activity.room) {
+        this.realtime.notifyRoom(activity.room, {
+          method: "AI",
+          path: activity.path ?? "",
+          actorId: userId,
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(`Lio canlı bildirimi gönderilemedi (${toolName}): ${err?.message}`);
+    }
+  }
+
+  /**
+   * Araç çağrısını "kullanıcı nereye baksın?" bilgisine çevirir.
+   *
+   * SİLME araçları bilerek dışarıda: kayıt artık yok, oraya gitmek boş sayfa
+   * açardı. Oluşturma ve güncelleme ise hedefi belli olduğu için taşınabilir.
+   */
+  private async describeActivity(
+    toolName: string,
+    input: Record<string, any>,
+    result: any
+  ): Promise<LioActivityPayload | null> {
+    const at = new Date().toISOString();
+    const make = (
+      label: string,
+      path?: string,
+      room?: string,
+      entityId?: string
+    ): LioActivityPayload => ({ tool: toolName, label, path, room, entityId, createdAt: at });
+
+    const projectActivity = (label: string, projectId?: string, entityId?: string) =>
+      projectId ? make(label, `/projects/${projectId}`, `project:${projectId}`, entityId) : null;
+
+    switch (toolName) {
+      case "create_job":
+      case "update_job":
+      case "archive_job": {
+        const id = result?.id ?? input.jobId;
+        if (!id) return null;
+        const title = result?.title ? `: ${result.title}` : "";
+        const label =
+          toolName === "create_job"
+            ? `İş oluşturuldu${title}`
+            : toolName === "update_job"
+              ? `İş güncellendi${title}`
+              : `İş arşivlendi${title}`;
+        return make(label, `/jobs/${id}`, `job:${id}`, id);
+      }
+
+      case "create_project":
+      case "update_project":
+      case "archive_project": {
+        const id = result?.id ?? input.projectId;
+        if (!id) return null;
+        const title = result?.title ? `: ${result.title}` : "";
+        const label =
+          toolName === "create_project"
+            ? `Proje oluşturuldu${title}`
+            : toolName === "update_project"
+              ? `Proje güncellendi${title}`
+              : `Proje arşivlendi${title}`;
+        return make(label, `/projects/${id}`, `project:${id}`, id);
+      }
+
+      case "create_task":
+        return projectActivity(
+          `Görev oluşturuldu${result?.title ? `: ${result.title}` : ""}`,
+          input.projectId,
+          result?.id
+        );
+
+      case "create_tasks": {
+        const count = Number(result?.createdCount ?? 0);
+        if (!count) return null;
+        return projectActivity(`${count} görev eklendi`, input.projectId);
+      }
+
+      case "add_budget_transaction":
+        return projectActivity("Bütçe hareketi eklendi", input.projectId);
+
+      case "create_output":
+        return projectActivity(
+          `Çıktı oluşturuldu${result?.title ? `: ${result.title}` : ""}`,
+          input.projectId,
+          result?.id
+        );
+
+      case "update_output":
+        // Çıktının projesi girdide yok; sonuçtan okunuyor.
+        return projectActivity("Çıktı güncellendi", result?.projectId, input.outputId);
+
+      case "update_task":
+      case "update_task_status":
+      case "add_task_comment": {
+        // Görevin hangi projede olduğu girdide yok; tek satırlık bir okuma ile
+        // bulunur. Model çağrısının yanında bu maliyet ihmal edilebilir.
+        const projectId = result?.projectId ?? (await this.getTaskOrThrow(input.taskId)).projectId;
+        const label =
+          toolName === "add_task_comment"
+            ? "Göreve yorum eklendi"
+            : toolName === "update_task_status"
+              ? "Görev durumu değişti"
+              : "Görev güncellendi";
+        return projectActivity(label, projectId, input.taskId);
+      }
+
+      case "set_period_plan":
+      case "create_time_blocks":
+      case "update_time_block_status":
+      case "complete_ritual": {
+        const label =
+          toolName === "set_period_plan"
+            ? "Dönem planı kaydedildi"
+            : toolName === "create_time_blocks"
+              ? "Takvime zaman bloğu eklendi"
+              : toolName === "update_time_block_status"
+                ? "Zaman bloğu güncellendi"
+                : "Planlama oturumu tamamlandı";
+        return make(label, "/calendar");
+      }
+
+      default:
+        return null;
+    }
+  }
+
+  /** Kullanıcıya gösterilen kredi sayısı: küsurat kimsenin işine yaramıyor. */
+  private formatCredits(value: number): string {
+    return Math.round(value).toLocaleString("tr-TR");
+  }
+
+  /** Sohbete not düşmek asıl işi bozmamalı; kayıt başarısız olursa yalnızca loglanır. */
+  private async safeRecord(conversationId: string, text: string): Promise<void> {
+    try {
+      await this.conversationsService.addMessage(conversationId, "assistant", text);
+    } catch (err: any) {
+      this.logger.warn(`Mesaj sohbete kaydedilemedi: ${err?.message}`);
+    }
+  }
+
+  private sweepExpiredRuns(): void {
+    const now = Date.now();
+    for (const [id, run] of this.pendingRuns) {
+      if (now - run.createdAt > PENDING_RUN_TTL_MS) this.pendingRuns.delete(id);
+    }
   }
 
   /**
@@ -646,32 +1965,124 @@ export class AiAssistantService {
     return `${json.slice(0, MAX_TOOL_RESULT_CHARS)}… [sonuç kısaltıldı: çok fazla kayıt var, gerekirse daha dar bir filtreyle tekrar sorgula]`;
   }
 
-  async confirmAction(
-    actionId: string,
-    userId: string,
-    confirmed: boolean
-  ): Promise<{ type: "message"; text: string; conversationId?: string }> {
+  /**
+   * Kritik bir işlemi kullanıcının kararına göre sonuçlandırır ve İSTEĞİN GERİ
+   * KALANINI sürdürür.
+   *
+   * Eskiden onay istendiğinde koşu bitiyordu: "eski görevleri sil, sonra şunları
+   * ekle" dendiğinde silme onaylanıyor, ekleme hiç yapılmıyordu — kullanıcı işin
+   * bittiğini sanıyor, aslında yarısı yapılmış oluyordu. Artık onay bir ara
+   * duraktır: sonuç modele araç çıktısı olarak beslenir ve döngü kaldığı yerden
+   * devam eder.
+   */
+  async confirmAction(actionId: string, userId: string, confirmed: boolean): Promise<ChatResult> {
     this.sweepExpiredActions();
+    this.sweepExpiredRuns();
+
     const pending = this.pendingActions.get(actionId);
     if (!pending || pending.userId !== userId) {
       throw new NotFoundException("Onay bekleyen işlem bulunamadı ya da süresi doldu. Lütfen isteği tekrar yaz.");
     }
     this.pendingActions.delete(actionId);
 
-    const record = async (text: string) => {
-      try {
-        await this.conversationsService.addMessage(pending.conversationId, "assistant", text);
-      } catch (err: any) {
-        this.logger.warn(`Onay sonucu sohbete kaydedilemedi: ${err?.message}`);
+    const run = this.pendingRuns.get(pending.runId);
+    if (!run) {
+      // Koşu düşmüş (süre doldu ya da sunucu yeniden başladı): en azından onaylanan
+      // işlemi yap. İsteğin geri kalanı sürdürülemez, bu açıkça söylenir.
+      return this.confirmWithoutRun(pending, confirmed);
+    }
+    this.pendingRuns.delete(pending.runId);
+
+    // Devam etmek yeni turlar demek; bakiye yine önden denetlenir.
+    const balance = await this.creditsService.assertCanStart(userId);
+    run.startingBalance = balance;
+    run.holds = [];
+
+    const toolUses = (pending.assistantContent ?? []).filter((block: any) => block?.type === "tool_use");
+    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+    for (const use of toolUses) {
+      if (use.id === pending.criticalUseId) {
+        if (!confirmed) {
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: use.id,
+            content:
+              "Kullanıcı bu işlemi ONAYLAMADI. Bu işlemi yapma ve tekrar deneme; " +
+              "isteğin geri kalanına devam et ya da neyin eksik kaldığını söyle.",
+          });
+          continue;
+        }
+        try {
+          const critical = await this.executeTool(
+            pending.toolName,
+            pending.input,
+            pending.userId,
+            pending.userRole
+          );
+          run.executed.push(pending.toolName);
+          await this.emitActivity(pending.userId, pending.toolName, pending.input, critical);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: use.id,
+            content: RESULT_LABELS[pending.toolName] ?? "İşlem tamamlandı.",
+          });
+        } catch (err: any) {
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: use.id,
+            content: `Hata: ${err?.message ?? "bilinmeyen hata"}`,
+            is_error: true,
+          });
+        }
+        continue;
       }
-      return { type: "message" as const, text, conversationId: pending.conversationId };
+
+      // Aynı turda kritik olmayan başka araçlar da çağrılmış olabilir; onlar
+      // onay beklerken bekletilmişti, şimdi çalıştırılır.
+      try {
+        const result = await this.executeTool(use.name, use.input ?? {}, run.userId, run.userRole);
+        run.executed.push(use.name);
+        await this.emitActivity(run.userId, use.name, use.input ?? {}, result);
+        toolResults.push({ type: "tool_result", tool_use_id: use.id, content: this.serializeToolResult(result) });
+      } catch (err: any) {
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: use.id,
+          content: `Hata: ${err?.message ?? "bilinmeyen hata"}`,
+          is_error: true,
+        });
+      }
+    }
+
+    run.messages.push({ role: "assistant", content: pending.assistantContent as any });
+    run.messages.push({ role: "user", content: toolResults });
+
+    return this.runWithHolds(run);
+  }
+
+  /** Koşu düşmüşse yalnızca onaylanan işlemi yapar; devam edilemediği söylenir. */
+  private async confirmWithoutRun(pending: PendingAction, confirmed: boolean): Promise<ChatResult> {
+    const record = async (text: string): Promise<ChatResult> => {
+      await this.safeRecord(pending.conversationId, text);
+      const { balance } = await this.creditsService.getBalance(pending.userId);
+      return {
+        type: "message",
+        text,
+        conversationId: pending.conversationId,
+        usage: { creditsCharged: 0, balance },
+        activeFiles: [],
+      };
     };
 
     if (!confirmed) return record("İşlem iptal edildi.");
 
     try {
       await this.executeTool(pending.toolName, pending.input, pending.userId, pending.userRole);
-      return record(`✅ ${RESULT_LABELS[pending.toolName] ?? "İşlem tamamlandı."}`);
+      return record(
+        `✅ ${RESULT_LABELS[pending.toolName] ?? "İşlem tamamlandı."} ` +
+          "(Bu isteğin geri kalanına devam edemedim, süresi dolmuştu — kalan kısmı tekrar yazar mısın?)"
+      );
     } catch (err: any) {
       return record(`İşlem başarısız oldu: ${err?.message ?? "bilinmeyen hata"}`);
     }
@@ -752,6 +2163,23 @@ export class AiAssistantService {
         const title = await this.safeLabel(() => this.jobsService.findOne(input.jobId).then((j) => j.title));
         return `"${title}" işini arşivlemek üzeresin.`;
       }
+      case "archive_output":
+      case "delete_output": {
+        const title = await this.safeLabel(async () => {
+          // Çıktının adını göstermek için tek satırlık okuma; onay penceresinde
+          // "şu çıktı silinecek" demek "bir çıktı silinecek"ten çok daha güvenli.
+          const { data } = await this.supabase.client
+            .from("outputs")
+            .select("title")
+            .eq("id", input.outputId)
+            .maybeSingle();
+          return (data?.title as string | undefined) ?? "";
+        });
+        return name === "delete_output"
+          ? `"${title}" çıktısı silinecek. Onaylıyor musun?`
+          : `"${title}" çıktısı arşivlenecek. Onaylıyor musun?`;
+      }
+
       case "add_budget_transaction": {
         const typeLabel = input.type === "income" ? "gelir" : input.type === "payout" ? "ödeme" : "gider";
         return `Projeye ${input.amount} ₺ tutarında "${typeLabel}" kaydı eklemek üzeresin${
@@ -1000,6 +2428,7 @@ export class AiAssistantService {
             assignedTo: input.assignedTo,
             budget: input.budget,
             parentTaskId: input.parentTaskId,
+            outputId: input.outputId,
           },
           userId
         );
@@ -1011,6 +2440,8 @@ export class AiAssistantService {
         return this.tasksService.update(
           input.taskId,
           {
+            // Boş dize "çıktıdan çıkar" demek; undefined ise alan hiç yazılmaz.
+            ...(input.outputId !== undefined ? { outputId: input.outputId || null } : {}),
             title: input.title,
             description: input.description,
             deadline: input.deadline,
@@ -1058,6 +2489,7 @@ export class AiAssistantService {
                 assignedTo: item.assignedTo,
                 budget: item.budget,
                 parentTaskId: item.parentTaskId,
+                outputId: item.outputId,
               },
               userId
             );
@@ -1068,6 +2500,39 @@ export class AiAssistantService {
         }
         return { createdCount: created.length, created, failed: failed.length ? failed : undefined };
       }
+
+      // --- Çıktılar ---------------------------------------------------
+      // Görünürlük projeden devralınıyor; okuma için üyelik yeterli, yazma
+      // işlemleri OutputsService içinde ayrıca yetki denetiminden geçiyor.
+      case "list_outputs": {
+        await this.requireProjectRole(input.projectId, userId, userRole, ["owner", "member", "subcontractor"]);
+        const outputs = await this.outputsService.findByProject(input.projectId);
+        return outputs.map((output) =>
+          pruneEmpty({ id: output.id, title: output.title, description: output.description })
+        );
+      }
+
+      case "create_output":
+        await this.requireProjectRole(input.projectId, userId, userRole, ["owner", "member"]);
+        return this.outputsService.create(
+          input.projectId,
+          { title: input.title, description: input.description },
+          userId
+        );
+
+      case "update_output":
+        return this.outputsService.update(
+          input.outputId,
+          { title: input.title, description: input.description },
+          userId
+        );
+
+      case "archive_output":
+        return this.outputsService.archive(input.outputId, userId);
+
+      case "delete_output":
+        await this.outputsService.remove(input.outputId, userId);
+        return { deleted: true };
 
       case "list_task_comments": {
         const task = await this.getTaskOrThrow(input.taskId);

@@ -29,6 +29,44 @@ export function speechTextOf(step: TourStep): string {
 }
 
 /**
+ * Metni SESLENDİRİLEBİLİR hâle getirir.
+ *
+ * Tur metinleri düz yazı ama Lio'nun cevapları öyle değil: markdown yıldızları,
+ * başlık işaretleri ve emoji içeriyorlar. Tarayıcının konuşma sentezi bunları
+ * harfiyen okuyor — "yıldız yıldız Tamamlandı yıldız yıldız", "onay işareti" —
+ * ve sesi kullanılamaz hâle getiriyordu. Temizlik burada yapılıyor ki hem Lio
+ * hem tur aynı davranışı görsün.
+ *
+ * Noktalama KORUNUR: konuşma sentezi duraklamalarını ondan çıkarıyor.
+ */
+export function sanitizeForSpeech(raw: string): string {
+  return (
+    raw
+      // Kod blokları ve satır içi kod: içerik okunur, ters tırnak okunmaz.
+      .replace(/```[a-zA-Z]*\n?/g, "")
+      .replace(/`([^`]+)`/g, "$1")
+      // Bağlantılar: yalnızca görünen metin okunur, adres okunmaz.
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      // Kalın/italik işaretleri.
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|[.,;:!?]|$)/g, "$1$2")
+      // Satır başındaki başlık ve liste işaretleri.
+      .replace(/^\s*#{1,6}\s*/gm, "")
+      .replace(/^\s*[-*•]\s+/gm, "")
+      .replace(/^\s*\d+[.)]\s+/gm, "")
+      // Ayraç olarak kullanılan orta nokta ve tire, cümle içinde virgül gibi okunsun.
+      .replace(/\s+[·—–]\s+/g, ", ")
+      // Emoji ve simgeler: adları okunuyor ("onay işareti"), atılıyorlar.
+      .replace(
+        /[\u2190-\u21FF\u2300-\u27BF\u2B00-\u2BFF\uFE0F\u{1F000}-\u{1FAFF}]/gu,
+        " "
+      )
+      .replace(/\s{2,}/g, " ")
+      .trim()
+  );
+}
+
+/**
  * 404 veren ses yolları burada tutulur: aynı adım tekrar oynatıldığında
  * boşuna bir istek daha atılmasın, doğrudan TTS'e düşülsün.
  */
@@ -42,16 +80,48 @@ const ttsSupported = (): boolean =>
   typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined";
 
 let cachedVoice: SpeechSynthesisVoice | null = null;
+/** Kullanıcının elle seçtiği ses adı; otomatik seçimi ezer. */
+let preferredVoiceName: string | null = null;
+
+/** Cihazdaki Türkçe sesler — kullanıcıya seçtirmek için. */
+export function turkishVoices(): { name: string; lang: string }[] {
+  if (!ttsSupported()) return [];
+  return window.speechSynthesis
+    .getVoices()
+    .filter((v) => v.lang?.toLowerCase().startsWith("tr"))
+    .map((v) => ({ name: v.name, lang: v.lang }));
+}
+
+/**
+ * Sesi elle seçer.
+ *
+ * Otomatik seçim her cihazda isabet etmiyor: aynı dilde üç ses varken hangisinin
+ * doğal duyulduğu kişiden kişiye değişiyor ve "gelişmiş" sözcüğü her üründe
+ * geçmiyor. Kullanıcı bir kez seçsin, biz ona uyalım.
+ */
+export function setPreferredVoice(name: string | null): void {
+  preferredVoiceName = name;
+  cachedVoice = null;
+  pickVoice();
+}
 
 function pickVoice(): SpeechSynthesisVoice | null {
   if (!ttsSupported()) return null;
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
   const turkish = voices.filter((v) => v.lang?.toLowerCase().startsWith("tr"));
+
+  const chosen = preferredVoiceName
+    ? turkish.find((v) => v.name === preferredVoiceName)
+    : undefined;
+
   // Aynı dilde birden çok ses varsa "gelişmiş" olanlar belirgin biçimde daha
   // doğal okuyor; adlarında genelde bu sözcükler geçiyor.
   cachedVoice =
-    turkish.find((v) => /google|natural|premium|enhanced|siri/i.test(v.name)) ?? turkish[0] ?? null;
+    chosen ??
+    turkish.find((v) => /google|natural|premium|enhanced|gelişmiş|siri/i.test(v.name)) ??
+    turkish[0] ??
+    null;
   return cachedVoice;
 }
 
@@ -227,7 +297,8 @@ export function play({ text, audioUrl, rate = 1, onSource, onEnd }: PlayArgs): v
       return;
     }
     onSource?.("tts");
-    speak(text, myToken);
+    // Sentez motoruna markdown/emoji gitmemeli (bkz. sanitizeForSpeech).
+    speak(sanitizeForSpeech(text), myToken);
   };
 
   if (!audioUrl || missingAudio.has(audioUrl)) {
@@ -242,7 +313,9 @@ export function play({ text, audioUrl, rate = 1, onSource, onEnd }: PlayArgs): v
 
   const fallback = () => {
     if (myToken !== token) return;
-    missingAudio.add(audioUrl);
+    // data: adresleri her seferinde farklı ve tek kullanımlık; listeye
+    // yazmak belleği şişirir, tekrar denenmeyecekleri için de gereksiz.
+    if (!audioUrl.startsWith("data:")) missingAudio.add(audioUrl);
     if (audioEl === el) audioEl = null;
     useTts();
   };

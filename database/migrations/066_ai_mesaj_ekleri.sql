@@ -1,0 +1,15 @@
+-- Lio'ya iliştirilen dosyalar.
+--
+-- Dosyanın KENDİSİ saklanmaz (bkz. AiAttachmentsService): sohbete eklenen dosya bir
+-- proje dosyası değildir, Drive kotasını şişirmesi ve "bu hangi işe ait?" sorusunu
+-- zorunlu kılması istenmedi. Saklanan şey, dosyadan ÇIKARILAN metin ve ekin künyesi.
+--
+-- Neden ayrı kolon, content'in içine gömmek yerine:
+--   1. Sohbet balonunda kullanıcının kendi cümlesi görünmeli; 20.000 karakterlik
+--      Excel dökümü değil.
+--   2. Modele geçmiş yeniden beslenirken metin gerekiyor ama arayüzde gereksiz.
+-- Biçim: [{ "name": "rapor.xlsx", "kind": "sheet", "detail": "Excel · 2 sayfa · 40 satır",
+--          "text": "…çıkarılan içerik…" }]
+-- Görsel ve PDF'te "text" yoktur: onların içeriği modele yalnızca gönderildikleri
+-- turda ikili olarak gider, geçmişte künye olarak kalır.
+ALTER TABLE ai_messages ADD COLUMN IF NOT EXISTS attachments JSONB;

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,13 +10,33 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { memoryStorage } from "multer";
 import { AiAssistantService } from "./ai-assistant.service";
 import { AiCreditsService } from "./ai-credits.service";
 import { AiConversationsService } from "./ai-conversations.service";
-import { COMMISSION_RATE, CREDIT_UNIT_USD, MIN_BALANCE_TO_START } from "./ai-credits.config";
+import { toActiveFileInfo } from "./ai-assistant.service";
+import { AiSpeechService } from "./ai-speech.service";
+import { calculateSpeechCost } from "./ai-credits.config";
+import {
+  AiAttachmentsService,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MAX_ATTACHMENT_UPLOAD_BYTES,
+} from "./ai-attachments.service";
+import { DEFAULT_TTS_VOICE, MAX_SPEECH_CHARS, TTS_VOICES } from "./ai-speech.service";
+import {
+  COMMISSION_RATE,
+  CREDIT_CONFIRM_THRESHOLD,
+  CREDIT_UNIT_USD,
+  DEFAULT_TIER,
+  MIN_BALANCE_TO_START,
+  MODEL_TIERS,
+} from "./ai-credits.config";
 
 @Controller("ai")
 @UseGuards(AuthGuard("jwt"))
@@ -23,7 +44,9 @@ export class AiAssistantController {
   constructor(
     private aiAssistantService: AiAssistantService,
     private creditsService: AiCreditsService,
-    private conversationsService: AiConversationsService
+    private conversationsService: AiConversationsService,
+    private attachmentsService: AiAttachmentsService,
+    private speechService: AiSpeechService
   ) {}
 
   // --- Sohbet ------------------------------------------------------------
@@ -31,14 +54,171 @@ export class AiAssistantController {
   // Kullanıcının mesajını işler. conversationId verilmezse yeni sohbet açılır.
   // Kritik bir işlem tetiklenirse çalıştırmadan önce { type: "confirmation", ... } döner.
   @Post("chat")
-  chat(@Req() req: any, @Body() body: { message: string; conversationId?: string }) {
-    return this.aiAssistantService.chat(req.user.userId, req.user.role, body.message, body.conversationId);
+  chat(
+    @Req() req: any,
+    @Body()
+    body: { message: string; conversationId?: string; tier?: string; attachmentIds?: string[] }
+  ) {
+    return this.aiAssistantService.chat(
+      req.user.userId,
+      req.user.role,
+      body.message,
+      body.conversationId,
+      body.tier,
+      body.attachmentIds
+    );
   }
 
   // Kritik bir işlemi kullanıcı onayından sonra (ya da vazgeçildiğinde) sonuçlandırır.
   @Post("confirm")
   confirm(@Req() req: any, @Body() body: { actionId: string; confirmed: boolean }) {
     return this.aiAssistantService.confirmAction(body.actionId, req.user.userId, !!body.confirmed);
+  }
+
+  // Uzayan bir isteği (kredi eşiği ya da adım sınırı nedeniyle duraklatılmış)
+  // sürdürür veya durdurur. `tier` verilirse koşu o modelle devam eder.
+  @Post("continue")
+  continueRun(
+    @Req() req: any,
+    @Body() body: { runId: string; confirmed: boolean; tier?: string; approveAll?: boolean }
+  ) {
+    return this.aiAssistantService.continueRun(
+      body.runId,
+      req.user.userId,
+      !!body.confirmed,
+      body.tier,
+      !!body.approveAll
+    );
+  }
+
+  // Kullanıcının seçebileceği model kademeleri (arayüzdeki model seçici bunu okur).
+  @Get("models")
+  models() {
+    return {
+      defaultTier: DEFAULT_TIER,
+      tiers: Object.values(MODEL_TIERS),
+      maxAttachments: MAX_ATTACHMENTS_PER_MESSAGE,
+    };
+  }
+
+  // --- Dosya ekleri -------------------------------------------------------
+  // Ekler sohbetten AYRI hazırlanır: dosya bir kez okunur (ses çözümleme gibi
+  // ücretli işler bir kez yapılır), arayüz sonucu hemen gösterir, kullanıcı
+  // mesajını yazıp gönderirken yalnızca ek kimliklerini iletir.
+
+  @Post("attachments")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_ATTACHMENT_UPLOAD_BYTES, files: 1 },
+    })
+  )
+  uploadAttachment(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { conversationId?: string }
+  ) {
+    return this.attachmentsService.prepareFromUpload(req.user.userId, file, body?.conversationId);
+  }
+
+  // Sesli komut: kayıt yazıya çevrilir ve metin döner. Ek olarak İLİŞTİRİLMEZ —
+  // kullanıcı metni görüp düzeltebilsin diye yazı kutusuna konur.
+  @Post("transcribe")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_ATTACHMENT_UPLOAD_BYTES, files: 1 },
+    })
+  )
+  transcribe(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { conversationId?: string }
+  ) {
+    return this.attachmentsService.transcribeCommand(req.user.userId, file, body?.conversationId);
+  }
+
+  /**
+   * Metni doğal sese çevirir (isteğe bağlı, ücretli).
+   *
+   * Tarayıcının ücretsiz sentezine ALTERNATİF: kullanıcı arayüzden seçtiyse
+   * buraya gelinir. Bedel karakterle orantılı ve önden kesin biliniyor, o yüzden
+   * bakiye kontrolü tahminle değil gerçek tutarla yapılır.
+   */
+  @Post("speak")
+  async speak(
+    @Req() req: any,
+    @Body() body: { text: string; conversationId?: string; voice?: string }
+  ) {
+    const text = (body?.text ?? "").trim();
+    if (!text) throw new BadRequestException("Seslendirilecek metin boş.");
+
+    const chars = Math.min(text.length, MAX_SPEECH_CHARS);
+    const balance = await this.creditsService.assertCanStart(req.user.userId);
+    this.creditsService.assertBalanceCovers(balance, calculateSpeechCost(chars).credits);
+
+    const result = await this.speechService.synthesize(text, body?.voice);
+    const { credits, balanceAfter } = await this.creditsService.chargeSpeech({
+      userId: req.user.userId,
+      chars: result.chars,
+      conversationId: body?.conversationId,
+    });
+
+    return { ...result, creditsCharged: credits, balance: balanceAfter };
+  }
+
+  // Doğal ses seçenekleri (arayüzdeki ses seçici bunu okur).
+  @Get("voices")
+  voices() {
+    return { defaultVoice: DEFAULT_TTS_VOICE, voices: TTS_VOICES };
+  }
+
+  // Projelio'da zaten kayıtlı bir dosyayı okur (yetki kontrolü FilesService'te).
+  @Post("attachments/from-file")
+  attachProjelioFile(@Req() req: any, @Body() body: { fileId: string; conversationId?: string }) {
+    return this.attachmentsService.prepareFromProjelioFile(req.user.userId, body?.fileId, body?.conversationId);
+  }
+
+  // Kullanıcının Drive/OneDrive'ındaki, Projelio'ya aktarılmamış bir dosyayı okur.
+  @Post("attachments/from-cloud")
+  attachCloudFile(@Req() req: any, @Body() body: { sourceFileId: string; conversationId?: string }) {
+    return this.attachmentsService.prepareFromCloud(req.user.userId, body?.sourceFileId, body?.conversationId);
+  }
+
+  // OneDrive gezinmesi. Google'da bunun yerine tarayıcıdaki resmi Picker açılır.
+  @Get("attachments/browse")
+  browseCloud(@Req() req: any, @Query("folderId") folderId?: string) {
+    return this.attachmentsService.browseCloud(req.user.userId, folderId);
+  }
+
+  // Arayüz hangi seçiciyi açacağını buradan öğrenir.
+  @Get("attachments/source")
+  attachmentSource(@Req() req: any) {
+    return this.attachmentsService.connectedProvider(req.user.userId);
+  }
+
+  // Sohbete sabitlenmiş dosyalar: iş bitene kadar her turda modele gönderiliyorlar,
+  // dolayısıyla her tur ücretlendiriliyorlar. Kullanıcı hangilerinin açık olduğunu
+  // görebilmeli ve istediğinde kaldırabilmeli.
+  @Get("conversations/:id/files")
+  async activeFiles(@Req() req: any, @Param("id") id: string) {
+    await this.conversationsService.assertOwner(id, req.user.userId);
+    return { files: toActiveFileInfo(await this.conversationsService.getActiveFiles(id)) };
+  }
+
+  @Delete("conversations/:id/files")
+  async clearActiveFiles(@Req() req: any, @Param("id") id: string) {
+    await this.conversationsService.assertOwner(id, req.user.userId);
+    const files = await this.conversationsService.getActiveFiles(id);
+    this.attachmentsService.releaseMany(req.user.userId, files.map((f) => f.id));
+    await this.conversationsService.setActiveFiles(id, []);
+    return { files: [] };
+  }
+
+  @Delete("attachments/:id")
+  removeAttachment(@Req() req: any, @Param("id") id: string) {
+    this.attachmentsService.discard(req.user.userId, id);
+    return { ok: true };
   }
 
   // --- Sohbet geçmişi ----------------------------------------------------
@@ -73,7 +253,11 @@ export class AiAssistantController {
   @Get("credits")
   async credits(@Req() req: any) {
     const balance = await this.creditsService.getBalance(req.user.userId);
-    return { ...balance, minBalanceToStart: MIN_BALANCE_TO_START };
+    return {
+      ...balance,
+      minBalanceToStart: MIN_BALANCE_TO_START,
+      confirmThreshold: CREDIT_CONFIRM_THRESHOLD,
+    };
   }
 
   @Get("credits/transactions")
@@ -145,6 +329,7 @@ export class AiAssistantController {
       commissionRate: COMMISSION_RATE,
       creditUnitUsd: CREDIT_UNIT_USD,
       minBalanceToStart: MIN_BALANCE_TO_START,
+      confirmThreshold: CREDIT_CONFIRM_THRESHOLD,
       creditsPerUsd: Math.round(1 / CREDIT_UNIT_USD),
     };
   }

@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import type { PresenceUser, RoomChangedPayload, RoomPresencePayload } from "@projelio/shared";
+import type {
+  LioActivityPayload,
+  PresenceUser,
+  RoomChangedPayload,
+  RoomPresencePayload,
+} from "@projelio/shared";
 import { API_URL } from "../api/client";
 import { setSocketId } from "./socketId";
 
@@ -34,6 +39,15 @@ const presenceListeners = new Set<() => void>();
 
 /** "Sayfadaki veri değişti" dinleyicileri (bkz. UndoProvider). */
 const changeListeners = new Set<(payload: RoomChangedPayload) => void>();
+
+/**
+ * "Lio bir şey yaptı" dinleyicileri.
+ *
+ * Oda sinyalinden ayrı bir kanal: o SAYFAYA gidip "tazele" der, bu ise KİŞİYE
+ * gidip "şuraya bak" der. Kullanıcı Lio'nun yaptığı işi anlatıldığı için değil,
+ * ekranda olduğu için görsün (bkz. AiLiveActivity).
+ */
+const lioActivityListeners = new Set<(payload: LioActivityPayload) => void>();
 
 function token(): string | null {
   return localStorage.getItem("projelio_token");
@@ -85,7 +99,22 @@ export function getSocket(): Socket | null {
   socket.on("room-changed", (payload: RoomChangedPayload) => {
     changeListeners.forEach((fn) => fn(payload));
   });
+  socket.on("lio-activity", (payload: LioActivityPayload) => {
+    debug("lio", payload?.tool, payload?.path);
+    lioActivityListeners.forEach((fn) => fn(payload));
+  });
   return socket;
+}
+
+/** Lio'nun yaptığı işleri dinler. Dönen fonksiyon aboneliği bırakır. */
+export function onLioActivity(fn: (payload: LioActivityPayload) => void): () => void {
+  // Soket henüz açılmamış olabilir (kullanıcı hiçbir canlı sayfaya girmediyse);
+  // dinleyici eklerken bağlantıyı da kurarız, aksi halde sinyal hiç gelmez.
+  getSocket();
+  lioActivityListeners.add(fn);
+  return () => {
+    lioActivityListeners.delete(fn);
+  };
 }
 
 export function onRoomChanged(fn: (payload: RoomChangedPayload) => void): () => void {

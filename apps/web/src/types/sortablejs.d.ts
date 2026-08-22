@@ -10,7 +10,10 @@ declare module "sortablejs" {
   }
 
   export interface SortableOptions {
-    group?: string | { name: string; pull?: boolean | "clone"; put?: boolean };
+    // `put` bir grup adı dizisi de olabilir: "bu listeye şu gruplardan öğe
+    // bırakılabilir" demek (bkz. TaskColumn — görev kartının alt görev
+    // listesine bırakılması).
+    group?: string | { name: string; pull?: boolean | "clone"; put?: boolean | string[] };
     sort?: boolean;
     // Sürükleme geçici olarak kapatılabilsin diye (bkz. TaskColumn'da seçim
     // modu): Sortable örneğini yok edip yeniden kurmak, sürüklemenin tam

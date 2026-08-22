@@ -34,6 +34,7 @@ import BottomNav from "./components/BottomNav";
 import NotificationBell from "./components/NotificationBell";
 import PresenceStrip from "./components/PresenceStrip";
 import AiLauncher from "./components/AiLauncher";
+import AiLiveActivity from "./components/AiLiveActivity";
 import AiCreditsPage from "./pages/AiCredits";
 import { initPush } from "./push";
 import { useThemeColors } from "./theme/useThemeColors";
@@ -686,6 +687,10 @@ export default function App() {
         {/* Lio balonu ve kişi şeridi ekranda sürekli duran öğeler; ikisi de
             Ayarlar > Yardımcılar'dan gizlenebilir (bkz. lib/appPrefs.tsx). */}
         {prefs.showLio && <AiLauncher />}
+        {/* Lio bir kayıt oluşturduğunda sayfayı oraya taşır ve ne yaptığını
+            kısa bir şeritle söyler (bkz. AiLiveActivity). Lio gizlenmiş olsa
+            bile duruyor: sinyal ancak Lio çalışıyorsa geliyor zaten. */}
+        <AiLiveActivity />
         {/* Aynı sayfada başka kim çalışıyor — sol altta ince şerit
             (bkz. lib/liveRoom.ts). Kenar çubuğu açıkken içerik sütununa hizalanır. */}
         {prefs.showPresence && <PresenceStrip left={isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0} />}

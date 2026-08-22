@@ -99,7 +99,20 @@ async function uploadFile<T>(path: string, formData: FormData): Promise<T> {
   });
   if (!res.ok) {
     if (res.status === 401 && token) handleExpiredSession();
-    throw new Error(`API error ${res.status}: ${await res.text()}`);
+    // request() ile aynı ayıklama: eskiden ham gövde fırlatılıyordu ve kullanıcı
+    // ekranda `API error 400: {"message":"…","statusCode":400}` görüyordu.
+    // Hata metni doğrudan arayüzde gösteriliyor, okunabilir olmalı. ApiError
+    // dönmesi de önemli: çağrı yerleri 402'yi (kredi yetersiz) durum koduna
+    // bakarak ayırıyor.
+    const text = await res.text();
+    let message = `API error ${res.status}`;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed?.message) message = Array.isArray(parsed.message) ? parsed.message.join(", ") : parsed.message;
+    } catch {
+      if (text) message = text;
+    }
+    throw new ApiError(message, res.status);
   }
   return parseResponse<T>(res);
 }

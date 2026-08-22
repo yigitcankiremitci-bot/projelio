@@ -1,10 +1,17 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import Sortable, { type SortableEvent } from "sortablejs";
 import type { Task, TaskPriority, TaskStatus } from "@projelio/shared";
 import { MAX_TASK_PRIORITY } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconPlus, IconChevronRight, IconCheck, IconEdit, IconActivity, IconStar } from "./icons";
+import {
+  IconPlus,
+  IconChevronRight,
+  IconCheck,
+  IconEdit,
+  IconActivity,
+  IconStar,
+} from "./icons";
 import AskLioButton from "./AskLioButton";
 import TaskAttachmentBadges from "./TaskAttachmentBadges";
 import Modal from "./Modal";
@@ -43,6 +50,14 @@ interface Props {
   // Aynı sütun içinde ya da sütunlar arasında (durum değişikliğiyle) basılı-tutup-sürükleme
   // ile sıralama yapıldığında son sırayı kalıcı hale getirmek için çağrılır.
   onReorderTasks?: (ids: string[]) => void;
+  /**
+   * Görev listesini sunucudan yeniden çeker.
+   *
+   * Seviye değiştiren sürüklemeler için şart: kayıt yeni yerine sunucuda
+   * ekleniyor (hedefin alt görevlerinin SONUNA) ve doğru sırayı yalnızca
+   * sunucu biliyor. Verilmezse üst görevi alt göreve sürükleme kapalı kalır.
+   */
+  onTasksReload?: () => void;
   // Sütunlar arası sürüklemenin çalışabilmesi için aynı görünümdeki tüm TaskColumn
   // örnekleri aynı group değerini paylaşmalı.
   group: string;
@@ -163,6 +178,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   onEditTask,
   onTaskRenamed,
   onReorderTasks,
+  onTasksReload,
   group,
   activeTaskId,
   onToggleActive,
@@ -295,16 +311,47 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   useSortableList(
     topListRef,
     {
-      group: { name: group, pull: !selectionMode, put: !selectionMode },
+      // Seçim kipinde de sürükleme AÇIK: birden fazla kart seçip hepsini birden
+      // bir görevin altına taşımak isteniyordu. Tıklama hâlâ seçim yapıyor —
+      // sürükleme 180 ms basılı tutmak istiyor, ikisi çakışmıyor.
+      group: { name: group, pull: true, put: true },
       sort: Boolean(onReorderTasks) && !selectionMode,
       handle: ".task-drag-handle",
-      filter: "button",
-      preventOnFilter: false,
+      // Alt görev sürüklemesiyle AYNI yardımcılar: boş alt görev listeleri
+      // bırakılabilir hale gelir ve kartın üzerinde beklenince liste açılır
+      // (bkz. handleSubtaskDragMove). Ok işlevleri TDZ içindir — bu satırlar
+      // render sırasında değerlendiriliyor, yardımcılar aşağıda tanımlı.
+      onStart: (evt) => startSubtaskDrag(evt),
       onEnd: (evt) => {
+        finishSubtaskDrag();
         const toEl = evt.to;
         const fromEl = evt.from;
         const taskId = evt.item.dataset.id;
         if (!taskId) return;
+
+        // Hedef bir ALT GÖREV listesiyse bu bir seviye dönüşümüdür.
+        const dropParentId = toEl.dataset.parentId;
+        if (dropParentId) {
+          // Hedef listenin BIRAKMADAN SONRAKİ sırası; DOM geri alınmadan önce
+          // okunmalı. Kartın listenin neresine bırakıldığı buradan çıkıyor —
+          // sona eklemek yerine kullanıcının bıraktığı yere konsun diye.
+          const droppedOrder = Array.from(toEl.children)
+            .map((node) => (node as HTMLElement).dataset.id)
+            .filter((v): v is string => Boolean(v));
+
+          // Sortable düğümü fiziksel olarak taşıdı; React bir sonraki render'da
+          // aynı düğümü eski yerinden kaldırmaya çalışıp "removeChild" hatası
+          // verirdi. Taşımayı hemen geri alıyoruz (aynı önlem aşağıda da var).
+          try {
+            toEl.removeChild(evt.item);
+            const referenceNode = fromEl.children[evt.oldIndex ?? fromEl.children.length] ?? null;
+            fromEl.insertBefore(evt.item, referenceNode);
+          } catch {
+            // DOM zaten React tarafından güncellendiyse sorun yok
+          }
+          void convertToSubtaskByDrop(taskId, dropParentId, droppedOrder);
+          return;
+        }
         const ids = Array.from(toEl.children)
           .map((node) => (node as HTMLElement).dataset.id)
           .filter((v): v is string => Boolean(v));
@@ -322,7 +369,19 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
             // DOM zaten React tarafından güncellendiyse sorun yok
           }
           const toStatus = toEl.dataset.status as TaskStatus | undefined;
-          if (toStatus) onMove(taskId, toStatus);
+          if (toStatus) {
+            // Sürüklenen kart seçiliyse seçimin tamamı taşınır — alt göreve
+            // dönüştürmedeki davranışın aynısı, aksi halde seçim kipinde
+            // sürüklemek yalnızca bir kartı taşıyıp kafa karıştırırdı.
+            const selection = latest.current.selectedIds;
+            const movingIds =
+              selection?.has(taskId) && selection.size > 1
+                ? latest.current.allTasks
+                    .filter((t) => selection.has(t.id) && !t.parentTaskId)
+                    .map((t) => t.id)
+                : [taskId];
+            for (const id of movingIds) onMove(id, toStatus);
+          }
         }
         if (!onReorderTasks) return;
         onReorderTasks(ids);
@@ -352,12 +411,27 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
 
   // Sortable seçenekleri bir kez kuruluyor; içeriden okunan prop'lar bu yüzden
   // ref üzerinden alınır, yoksa ilk render'ın değerlerine saplanırdı.
-  const latest = useRef({ onReorderTasks, onTaskRenamed, pushUndo });
+  const latest = useRef({ onReorderTasks, onTaskRenamed, pushUndo, onTasksReload, selectedIds, allTasks });
   useEffect(() => {
-    latest.current = { onReorderTasks, onTaskRenamed, pushUndo };
+    latest.current = { onReorderTasks, onTaskRenamed, pushUndo, onTasksReload, selectedIds, allTasks };
   });
 
-  const subtaskDragDisabled = !onReorderTasks || Boolean(selectionMode);
+  /**
+   * Görev kartı, alt görev listesine bırakılarak dönüştürülebilir mi?
+   *
+   * Yeniden yükleme geri çağrısı olmadan kapalı: dönüşüm sunucuda olur ama
+   * ekran eski sırayı gösterir ve kullanıcı işlemin çalışmadığını sanar.
+   * Ref üzerinden okunuyor çünkü Sortable örnekleri bir kez kuruluyor.
+   */
+  const canConvertByDrop = Boolean(onTasksReload) && subtasksEnabled;
+  const canConvertByDropRef = useRef(canConvertByDrop);
+  useEffect(() => {
+    canConvertByDropRef.current = canConvertByDrop;
+  }, [canConvertByDrop]);
+
+  // Seçim kipinde de açık: çoklu seçimin BIRAKILACAĞI liste bu ve kapalıyken
+  // hedef hiçbir şeyi kabul etmiyordu.
+  const subtaskDragDisabled = !onReorderTasks;
   const subtaskDragDisabledRef = useRef(subtaskDragDisabled);
   useEffect(() => {
     subtaskDragDisabledRef.current = subtaskDragDisabled;
@@ -439,6 +513,93 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     };
   }).current;
 
+  /**
+   * Bir GÖREVİN başka bir görevin alt görev listesine bırakılması.
+   *
+   * Listeden üst görev seçmeye göre daha doğrudan: kullanıcı zaten kartı
+   * görüyor. Kayıt hedefin alt görevlerinin SONUNA ekleniyor (sunucu öyle
+   * yerleştiriyor), o yüzden yerel yama yerine liste yeniden çekiliyor —
+   * doğru sırayı yalnızca sunucu biliyor.
+   */
+  const convertToSubtaskByDrop = async (
+    taskId: string,
+    parentId: string,
+    droppedOrder: string[]
+  ) => {
+    const {
+      onTasksReload: reload,
+      pushUndo: undo,
+      selectedIds: selection,
+      allTasks: tasksNow,
+    } = latest.current;
+
+    // Sürüklenen kart seçiliyse SEÇİMİN TAMAMI taşınır. Sortable tek bir düğüm
+    // sürüklüyor; ötekilerin de gelmesi kullanıcının beklentisi (çoklu seçip
+    // sürükleme). Sıraları panodaki sıralarıyla korunur.
+    const movingIds =
+      selection?.has(taskId) && selection.size > 1
+        ? tasksNow.filter((t) => selection.has(t.id) && !t.parentTaskId).map((t) => t.id)
+        : [taskId];
+
+    // Eski üst görevler geri alma için işlemden ÖNCE saklanır.
+    const previousParents = new Map<string, string | null>(
+      movingIds.map((id) => [id, tasksNow.find((t) => t.id === id)?.parentTaskId ?? null])
+    );
+
+    // Hedef listenin son sırası: sürüklenen kartın bırakıldığı yere, birlikte
+    // gelenler de onun hemen ardına yerleşir.
+    const finalOrder = [...droppedOrder];
+    const at = finalOrder.indexOf(taskId);
+    const others = movingIds.filter((id) => id !== taskId);
+    finalOrder.splice(at < 0 ? finalOrder.length : at + 1, 0, ...others);
+
+    const apply = async (ids: string[], parent: string | null) => {
+      if (ids.length === 1) {
+        await api.patch(`/tasks/${ids[0]}/hierarchy`, { parentTaskId: parent });
+        return;
+      }
+      await api.patch("/tasks/bulk-hierarchy", { ids, parentTaskId: parent });
+    };
+
+    // Sıralama isteği BEKLENMELİ. `onReorderTasks` isteği ateşleyip dönüyor;
+    // hemen ardından yeniden yükleme yapılınca GET, sıralama PATCH'inden önce
+    // cevap dönüyor ve kart listenin sonunda görünüyordu (sunucu dönüşümde
+    // kaydı sona ekliyor). O yüzden burada doğrudan ve await ile çağrılıyor.
+    const writeOrder = async (ids: string[]) => {
+      await api.patch("/tasks/reorder", { ids });
+    };
+
+    try {
+      await apply(movingIds, parentId);
+      // Sıra dönüşümden SONRA yazılır: sunucu kaydı listenin sonuna ekliyor,
+      // kullanıcının bıraktığı yeri ancak bu çağrı sabitliyor.
+      await writeOrder(finalOrder);
+
+      undo?.({
+        label: movingIds.length > 1 ? `${movingIds.length} görev alt göreve alındı` : "Alt göreve dönüştürüldü",
+        // Geri alırken her kayıt KENDİ eski üst görevine döner; birlikte taşınan
+        // kartlar farklı yerlerden gelmiş olabilir.
+        run: async () => {
+          const groups = new Map<string | null, string[]>();
+          for (const id of movingIds) {
+            const previous = previousParents.get(id) ?? null;
+            groups.set(previous, [...(groups.get(previous) ?? []), id]);
+          }
+          for (const [previous, ids] of groups) await apply(ids, previous);
+        },
+        redo: async () => {
+          await apply(movingIds, parentId);
+          await writeOrder(finalOrder);
+        },
+      });
+      reload?.();
+    } catch (err: any) {
+      // Sunucu kuralı reddedebilir (ör. kaydın kendi alt görevleri var).
+      window.alert(err?.message ?? "Alt göreve dönüştürülemedi.");
+      reload?.();
+    }
+  };
+
   const startSubtaskDrag = (evt: SortableEvent) => {
     dragOriginRef.current = { item: evt.item, from: evt.from };
     document.dispatchEvent(new CustomEvent(SUBTASK_DRAG_EVENT, { detail: { active: true } }));
@@ -480,6 +641,40 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
       fromEl.insertBefore(evt.item, reference);
     } catch {
       // DOM zaten React tarafından güncellendiyse sorun yok
+    }
+
+    // Hedef bir SÜTUNSA alt görev üst seviyeye çıkar. Eskiden bu bırakma
+    // sessizce hiçbir şey yapmıyordu: kart eski yerine dönüyor, kullanıcı
+    // sürüklemenin çalışmadığını sanıyordu.
+    const toStatus = toEl.dataset.status as TaskStatus | undefined;
+    if (toStatus) {
+      const { onTasksReload: reload } = latest.current;
+      const previousParent = fromEl.dataset.parentId ?? null;
+      if (!reload) return;
+      try {
+        await api.patch(`/tasks/${subtaskId}/hierarchy`, { parentTaskId: null });
+        // Bırakıldığı sütunun durumu devralınır ve bırakıldığı sıraya yerleşir.
+        await api.patch(`/tasks/${subtaskId}/status`, { status: toStatus });
+        // Sıralama da beklenmeli; yoksa hemen sonraki yeniden yükleme eski
+        // sırayı çekiyor (bkz. convertToSubtaskByDrop'taki aynı gerekçe).
+        await api.patch("/tasks/reorder", { ids });
+        undo?.({
+          label: "Göreve dönüştürüldü",
+          run: async () => {
+            if (previousParent) {
+              await api.patch(`/tasks/${subtaskId}/hierarchy`, { parentTaskId: previousParent });
+            }
+          },
+          redo: async () => {
+            await api.patch(`/tasks/${subtaskId}/hierarchy`, { parentTaskId: null });
+            await api.patch(`/tasks/${subtaskId}/status`, { status: toStatus });
+          },
+        });
+      } catch (err: any) {
+        window.alert(err?.message ?? "Göreve dönüştürülemedi.");
+      }
+      reload();
+      return;
     }
 
     const newParentId = toEl.dataset.parentId;
@@ -526,13 +721,24 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
         Sortable.create(el, {
           // Kenarda sayfayı kaydırma dahil ortak ayarlar (bkz. useSortableList).
           ...SORTABLE_BASE_OPTIONS,
-          filter: "button",
-          preventOnFilter: false,
           disabled: subtaskDragDisabledRef.current,
           // Panodaki TÜM alt görev listeleri aynı grubu paylaşır; alt görev
           // böylece başka bir görev kartının altına bırakılabiliyor. Üst görev
           // sütunları ayrı bir grup adı kullandığı için alt görev oraya düşmez.
-          group: { name: `${group}-subtasks`, pull: true, put: true },
+          // `put` içine ÜST GÖREV grubu da alınıyor: bir görev kartı bir başka
+          // görevin alt görev listesine bırakılabilsin diye. Bırakma sonucu
+          // seviye dönüşümüdür (bkz. üst görev listesinin onEnd'i); alt görevin
+          // alt görevi oluşmaz çünkü hedef her zaman bir üst görevin listesi.
+          group: {
+            name: `${group}-subtasks`,
+            pull: true,
+            // `put` içine ÜST GÖREV grubu da alınabiliyor: bir görev kartı bir
+            // başka görevin alt görev listesine bırakılabilsin diye. Sonuç
+            // seviye dönüşümüdür (bkz. üst görev listesinin onEnd'i).
+            put: canConvertByDropRef.current
+              ? [`${group}-subtasks`, group]
+              : [`${group}-subtasks`],
+          },
           onStart: startSubtaskDrag,
           onEnd: (evt) => {
             finishSubtaskDrag();
@@ -594,6 +800,32 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     }
   };
 
+  /**
+   * Düzenleme kutusundaki olayların satıra ULAŞMASINI engelleyen ref.
+   *
+   * İki ayrı sorunu birden kapatıyor:
+   *  - basma olayları (pointerdown/mousedown/touchstart) satıra ulaşırsa
+   *    SortableJS metin seçmek yerine kartı sürüklemeye başlıyor;
+   *  - çift tıklama satıra ulaşırsa düzenleme modali açılıyor — oysa kullanıcı
+   *    kutunun içinde KELİME SEÇMEYE çalışıyor.
+   *
+   * NEDEN React'in kendi işleyicileri yetmiyor: React olayları kök kapsayıcıda
+   * dinliyor, SortableJS ise liste kapsayıcısına DOĞRUDAN yerel dinleyici
+   * bağlıyor. Yerel olay React'e ulaşmadan önce oradan geçtiği için React
+   * tarafında stopPropagation demek geç kalıyor. Buradaki dinleyiciler hedefin
+   * kendisinde durduğu için hangi katman dinlerse dinlesin olay en baştan kesilir.
+   *
+   * preventDefault ÇAĞRILMIYOR: metin seçme ve kelime seçme davranışı tamamen
+   * tarayıcıda kalmalı.
+   */
+  const stopPressRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const stop = (e: Event) => e.stopPropagation();
+    for (const name of ["pointerdown", "mousedown", "touchstart", "click", "dblclick"]) {
+      node.addEventListener(name, stop);
+    }
+  }, []);
+
   /** Görev/alt görev başlığı: normalde metin, çift tıklanınca düzenlenebilir input. */
   const renderTitle = (task: Task, fontSize: number, color: string) => {
     if (renamingId === task.id) {
@@ -601,21 +833,30 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
         // Sarmalayıcı, kutunun ekranın altında kalmaması içindir: AutoGrowTextarea
         // ref almıyor, ölçülecek bir düğüm gerekiyor (bkz. useKeepInView).
         <div ref={renameBoxRef} style={{ flex: 1, minWidth: 0, display: "flex" }}>
-          {/* Uzun başlıklar tek satırda yatay kayıp okunmaz hale gelmesin diye
-              sararak aşağı büyüyen alan (bkz. AutoGrowTextarea). */}
-          <AutoGrowTextarea
-            autoFocus
-            value={renameValue}
-            onChange={setRenameValue}
-            onClick={(e) => e.stopPropagation()}
-            onBlur={() => void commitRename(task)}
-            onSubmit={() => void commitRename(task)}
-            onCancel={() => setRenamingId(null)}
-            ariaLabel="Görev adı"
-            fontSize={fontSize}
-            minHeight={30}
-            style={{ flex: 1, minWidth: 0 }}
-          />
+          {/* İç sarmalayıcı yalnızca basma olaylarını kesmek için: tut-taşı
+              listeleri bu satırı kapsıyor ve olay onlara ulaşırsa metin seçmek
+              yerine kart sürüklenmeye başlıyor (bkz. stopPressRef). */}
+          <div ref={stopPressRef} className="no-drag" style={{ flex: 1, minWidth: 0, display: "flex" }}>
+            {/* Uzun başlıklar tek satırda yatay kayıp okunmaz hale gelmesin diye
+                sararak aşağı büyüyen alan (bkz. AutoGrowTextarea). */}
+            <AutoGrowTextarea
+              autoFocus
+              value={renameValue}
+              onChange={setRenameValue}
+              onClick={(e) => e.stopPropagation()}
+              onBlur={() => void commitRename(task)}
+              onSubmit={() => void commitRename(task)}
+              onCancel={() => setRenamingId(null)}
+              ariaLabel="Görev adı"
+              fontSize={fontSize}
+              // Ölçüler yerini aldığı metinle aynı olsun diye: kutu görünümü
+              // .autogrow-inline ile sıfırlanıyor, asgari yükseklik de satırın
+              // kendi yüksekliğine bırakılıyor (bkz. index.css).
+              minHeight={0}
+              className="autogrow-inline"
+              style={{ flex: 1, minWidth: 0 }}
+            />
+          </div>
         </div>
       );
     }
@@ -946,7 +1187,10 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                         ? c.danger
                         : c.textPrimary
                     )}
-                    {renamingId !== t.id && (
+                      {/* Ad düzenlenirken de görünür kalırlar: satırın görünümü
+                          değişmezse kullanıcı "olduğu yerde düzenliyorum" hissini
+                          kaybetmiyor. Kutu artık satırın tamamını istemiyor
+                          (bkz. .autogrow-inline), dolayısıyla yer açmaya gerek yok. */}
                       <>
                         {/* Ek rozetleri: tek ek doğrudan açılır, birden fazlaysa
                             görev modalı (Bağlantılar + Dosyalar bölümleri). */}
@@ -1007,7 +1251,6 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                           <AskLioButton subject={{ kind: "gorev", title: t.title, id: t.id }} size={20} />
                         </span>
                       </>
-                    )}
                   </div>
                   {/* SABİT GENİŞLİK — hizalamanın anahtarı.
                       İçindekiler karta göre değişiyor: ok yalnızca alt görev
@@ -1018,7 +1261,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                       kart "alt görevi varmış gibi" aynı yeri ayırıyor. */}
                   <div
                     style={{
-                      display: renamingId === t.id ? "none" : "flex",
+                      display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
                       gap: 3,
@@ -1202,6 +1445,21 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                         key={sub.id}
                         data-id={sub.id}
                         className={highlightTaskId === sub.id ? "task-highlight-flash" : undefined}
+                        // Tek tıklama burada durdurulur: üst karta ulaşırsa alt
+                        // görev listesini açıp kapatıyor ve çift tıklamanın ilk
+                        // tıklaması listeyi kapatıp modali görünmez kılıyordu
+                        // (aynı önlem üst görevin açıklamasında da var).
+                        onClick={(e) => e.stopPropagation()}
+                        // Çift tıklama alt görevin düzenleme modalini açar — üst
+                        // görev kartındaki davranışın karşılığı. Başlık ve açıklama
+                        // kendi çift tıklamalarını (ada düzenleme / modal) zaten
+                        // durduruyor, bu yüzden burası yalnızca satırın geri
+                        // kalanında devreye giriyor.
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          onEditTask(sub);
+                        }}
+                        title="Çift tıkla: alt görevi düzenle"
                         style={{
                           display: "flex",
                           alignItems: "center",
@@ -1302,9 +1560,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                               </div>
                             )}
                           </div>
-                          {/* Ad değiştirilirken düğmeler gizlenir — giriş alanı
-                              satırın tamamını alsın (bkz. üst görev satırı). */}
-                          {renamingId !== sub.id && (
+                          {/* Ad düzenlenirken de görünür kalırlar (bkz. üst görev satırı). */}
                             <>
                               <TaskAttachmentBadges
                                 taskId={sub.id}
@@ -1359,11 +1615,10 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                                 <AskLioButton subject={{ kind: "altgorev", title: sub.title, id: sub.id }} size={18} />
                               </span>
                             </>
-                          )}
                           {/* Üst görevdeki alt görev sütunu kadar boşluk: alt
                               görevin kendi oku/rozeti yok ama ikonları
                               üsttekilerle aynı dikey çizgide durmalı. */}
-                          {subtasksEnabled && renamingId !== sub.id && (
+                          {subtasksEnabled && (
                             <span aria-hidden style={{ width: SUBTASK_COL_WIDTH, flexShrink: 0 }} />
                           )}
                         </div>
@@ -1564,6 +1819,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
           </div>
         </Modal>
       )}
+
     </div>
   );
 });

@@ -8,6 +8,7 @@ import TaskColumn, { TaskColumnHandle } from "./TaskColumn";
 import CreateOutputModal from "./CreateOutputModal";
 import EditOutputModal from "./EditOutputModal";
 import TaskSelectionBar from "./TaskSelectionBar";
+import BulkConvertHierarchyModal from "./BulkConvertHierarchyModal";
 import TaskSortMenu from "./TaskSortMenu";
 import MoveTaskModal from "./MoveTaskModal";
 import ConfirmDialog from "./ConfirmDialog";
@@ -64,6 +65,14 @@ interface Props {
   // useTaskSelection). Arşivleme ve silme, seçilen üst seviye görevin varsa tüm alt
   // görevlerini de kapsar; verilen id listesi yalnızca üst seviye (kullanıcının
   // doğrudan seçtiği) id'leri içerir, çağıran taraf alt görevleri de temizlemelidir.
+  /**
+   * Görev listesini sunucudan yeniden çeker.
+   *
+   * Seviye dönüştürme sonrası şart: yükseltilen kayıt eski üst görevinin altına
+   * sokulurken altındaki kardeşlerin sıra numaraları da kayıyor (bkz. migration
+   * 069) ve doğru sıra yalnızca sunucuda biliniyor.
+   */
+  onTasksReload?: () => void;
   onTasksDuplicated?: (created: Task[]) => void;
   onTasksMoved?: (moved: Task[]) => void;
   onTasksArchived?: (ids: string[]) => void;
@@ -84,6 +93,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   activeTaskId,
   onToggleActive,
   highlightTaskId,
+  onTasksReload,
   onTasksDuplicated,
   onTasksMoved,
   onTasksArchived,
@@ -110,6 +120,8 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   const pendingCreateTaskRef = useRef(false);
   const [duplicating, setDuplicating] = useState(false);
   const [movingOpen, setMovingOpen] = useState(false);
+  /** Toplu seviye dönüştürme penceresi (bkz. BulkConvertHierarchyModal). */
+  const [convertOpen, setConvertOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [confirmingBulkAction, setConfirmingBulkAction] = useState<"archive" | "delete" | null>(null);
 
@@ -233,8 +245,6 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   useSortableList(
     listRef,
     {
-      filter: "button",
-      preventOnFilter: false,
       onEnd: () => {
         const el = listRef.current;
         if (!el) return;
@@ -295,6 +305,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
               allTasks={sortTasks(list, sort)}
               onCreate={(st, title) => onCreateTask(st, title, opts.outputId ? { outputId: opts.outputId } : undefined)}
               onCreateSubtask={onCreateSubtask}
+              onTasksReload={onTasksReload}
               onMove={onMoveTask}
               onToggleComplete={onToggleComplete}
               onEditTask={onEditTask}
@@ -369,6 +380,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
         onCancel={selection.clear}
         onDuplicate={handleDuplicateSelected}
         onMove={() => setMovingOpen(true)}
+        onConvert={() => setConvertOpen(true)}
         onArchive={() => setConfirmingBulkAction("archive")}
         onDelete={() => setConfirmingBulkAction("delete")}
         lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
@@ -433,6 +445,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
         onCancel={selection.clear}
         onDuplicate={handleDuplicateSelected}
         onMove={() => setMovingOpen(true)}
+        onConvert={() => setConvertOpen(true)}
         onArchive={() => setConfirmingBulkAction("archive")}
         onDelete={() => setConfirmingBulkAction("delete")}
         lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
@@ -447,12 +460,32 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
 
   const sharedModals = (
     <>
+      {convertOpen && (
+        <BulkConvertHierarchyModal
+          tasks={tasks}
+          selectedIds={selection.selectedIds}
+          onClose={() => setConvertOpen(false)}
+          onDone={() => {
+            // Yerel yama yetmez: kardeşlerin sıra numaraları da değişiyor,
+            // doğru sıra ancak sunucudan gelir.
+            onTasksReload?.();
+            selection.clear();
+            setConvertOpen(false);
+          }}
+        />
+      )}
+
       {movingOpen && (
         <MoveTaskModal
           taskIds={Array.from(selection.selectedIds)}
+          // Çıktı hedefinin listelenebilmesi için seçimin kapsamı.
+          scopeTasks={tasks.filter((task) => selection.selectedIds.has(task.id))}
           onClose={() => setMovingOpen(false)}
-          onMoved={(moved) => {
-            onTasksMoved?.(moved);
+          onMoved={(moved, target) => {
+            // Çıktıya taşımada görevler bu projede KALIR: onTasksMoved onları
+            // listeden düşürüyor, o yüzden orada yeniden yükleme yapılır.
+            if (target === "output") onTasksReload?.();
+            else onTasksMoved?.(moved);
             selection.clear();
           }}
         />

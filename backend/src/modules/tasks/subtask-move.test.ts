@@ -2,7 +2,13 @@
 // gereği), bu yüzden namespace import kullanılıyor.
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertSubtaskMoveRequest, assertSubtaskMoveAllowed, subtaskScopePatch } from "./subtask-move";
+import {
+  assertConvertToSubtaskAllowed,
+  assertConvertToTaskAllowed,
+  assertSubtaskMoveRequest,
+  assertSubtaskMoveAllowed,
+  subtaskScopePatch,
+} from "./subtask-move";
 
 test("alt görev taşıma — istek kuralları", async (t) => {
   await t.test("hedef üst görev zorunlu", () => {
@@ -65,5 +71,47 @@ test("alt görev taşıma — kapsam devri", async (t) => {
       project_id: "p1",
       department_id: "d2",
     });
+  });
+});
+
+test("görev ↔ alt görev dönüşümü", async (t) => {
+  await t.test("görev kendi altına alınamaz", () => {
+    assert.throws(
+      () => assertConvertToSubtaskAllowed({ id: "a" }, { id: "a" }, false),
+      /kendi alt görevi/
+    );
+  });
+
+  await t.test("zaten alt görev olan tekrar indirilemez", () => {
+    assert.throws(
+      () => assertConvertToSubtaskAllowed({ id: "a", parentTaskId: "p" }, { id: "b" }, false),
+      /zaten bir alt görev/
+    );
+  });
+
+  await t.test("hedef alt görevse reddedilir (iki seviye korunur)", () => {
+    assert.throws(
+      () => assertConvertToSubtaskAllowed({ id: "a" }, { id: "b", parentTaskId: "q" }, false),
+      /alt görevin altına/
+    );
+  });
+
+  await t.test("alt görevi olan görev indirilemez", () => {
+    assert.throws(
+      () => assertConvertToSubtaskAllowed({ id: "a" }, { id: "b" }, true),
+      /Alt görevleri olan/
+    );
+  });
+
+  await t.test("geçerli indirme geçer", () => {
+    assert.doesNotThrow(() => assertConvertToSubtaskAllowed({ id: "a" }, { id: "b" }, false));
+  });
+
+  await t.test("üst görev zaten üst görevse yükseltilemez", () => {
+    assert.throws(() => assertConvertToTaskAllowed({ id: "a" }), /zaten bir üst görev/);
+  });
+
+  await t.test("alt görev yükseltilebilir", () => {
+    assert.doesNotThrow(() => assertConvertToTaskAllowed({ id: "a", parentTaskId: "p" }));
   });
 });

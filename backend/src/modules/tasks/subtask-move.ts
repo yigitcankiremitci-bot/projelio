@@ -58,3 +58,31 @@ export function subtaskScopePatch(task: TaskScopeRow, parent: TaskScopeRow): Rec
   if (!sameProject) patch.output_id = null;
   return patch;
 }
+
+/**
+ * Görev ↔ alt görev DÖNÜŞÜMÜNÜN kuralları.
+ *
+ * Taşımadan (assertSubtaskMoveAllowed) farkı yön: orada zaten alt görev olan bir
+ * kayıt başka bir üst görevin altına taşınıyor, burada kaydın SEVİYESİ değişiyor.
+ * Uygulamanın her yerindeki iki seviyelik yapı (görev → alt görev) yine korunur.
+ */
+export function assertConvertToSubtaskAllowed(
+  task: TaskLike,
+  parent: TaskLike,
+  taskHasSubtasks: boolean
+): void {
+  if (task.id === parent.id) throw new BadRequestException("Bir görev kendi alt görevi olamaz");
+  if (task.parentTaskId) throw new BadRequestException("Bu kayıt zaten bir alt görev");
+  if (parent.parentTaskId) throw new BadRequestException("Bir görev, alt görevin altına alınamaz");
+  // Üçüncü seviyeyi doğurur: alt görevleri olan bir görev alt göreve inerse
+  // onun alt görevleri "alt görevin alt görevi" olurdu.
+  if (taskHasSubtasks) {
+    throw new BadRequestException(
+      "Alt görevleri olan bir görev alt göreve dönüştürülemez; önce alt görevlerini başka bir göreve taşı"
+    );
+  }
+}
+
+export function assertConvertToTaskAllowed(task: TaskLike): void {
+  if (!task.parentTaskId) throw new BadRequestException("Bu kayıt zaten bir üst görev");
+}

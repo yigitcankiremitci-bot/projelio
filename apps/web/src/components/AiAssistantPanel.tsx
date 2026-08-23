@@ -20,6 +20,7 @@ import AiContinueDialog from "./AiContinueDialog";
 import AiCloudPickerModal from "./AiCloudPickerModal";
 import { openGooglePicker } from "../lib/googlePicker";
 import { useVoiceRecorder } from "../lib/useVoiceRecorder";
+import { downscaleImage } from "../lib/downscaleImage";
 // Sesli yanıt için tur anlatıcısının motoru yeniden kullanılıyor: Türkçe ses
 // seçimi, uzun metni parçalama ve Chrome'un konuşma sentezi hatasına karşı
 // "canlı tutma" numarası orada zaten çözülmüş (bkz. lib/tour/narrator.ts).
@@ -165,6 +166,15 @@ export default function AiAssistantPanel({
   const [attachMenu, setAttachMenu] = useState(false);
   const [cloudPicker, setCloudPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /**
+   * Kamera için AYRI bir alan.
+   *
+   * `capture` özniteliği telefonda dosya seçici yerine doğrudan kamerayı açıyor;
+   * aynı alana koyup her seferinde değiştirmek yerine ikinci bir alan tutmak
+   * daha basit. Masaüstünde tarayıcılar `capture`'ı yok sayıp dosya seçici
+   * açtığı için menü öğesi orada hiç gösterilmiyor (bkz. cameraSupported).
+   */
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   /**
    * Hata kredi yetersizliğinden mi kaynaklandı (HTTP 402)?
@@ -210,6 +220,12 @@ export default function AiAssistantPanel({
   /** Doğal seste ses üretilirken bekleyen mesaj. */
   const [preparingId, setPreparingId] = useState<string | null>(null);
   const voiceSupported = useMemo(() => narrationAvailable(), []);
+  // Dokunmatik cihazlarda `capture` gerçekten kamerayı açıyor; masaüstünde
+  // yalnızca dosya seçici çıkacağı için "Fotoğraf çek" sözü yalan olurdu.
+  const cameraSupported = useMemo(
+    () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true,
+    []
+  );
   // Cihazda Türkçe ses yoksa okunuş bozuk olur; düğmenin ipucunda söylenir.
   const turkishVoiceMissing = useMemo(() => voiceSupported && !hasTurkishVoice(), [voiceSupported]);
 
@@ -476,7 +492,10 @@ export default function AiAssistantPanel({
     e.target.value = "";
     setAttachMenu(false);
     for (const file of files) {
-      await addAttachment(file.name, () => aiChat.uploadAttachment(file, activeId ?? undefined));
+      // Fotoğraflar yüklemeden önce küçültülür: telefon kamerası sunucudaki
+      // 5 MB sınırını rahat aşıyor (bkz. downscaleImage).
+      const prepared = await downscaleImage(file);
+      await addAttachment(prepared.name, () => aiChat.uploadAttachment(prepared, activeId ?? undefined));
     }
   };
 
@@ -1400,6 +1419,9 @@ export default function AiAssistantPanel({
                   minWidth: 190,
                 }}
               >
+                {cameraSupported && (
+                  <MenuItem onClick={() => cameraInputRef.current?.click()}>Fotoğraf çek</MenuItem>
+                )}
                 <MenuItem onClick={() => fileInputRef.current?.click()}>Bilgisayardan yükle</MenuItem>
                 <MenuItem onClick={() => void handleCloudPick()}>Drive / OneDrive'dan seç</MenuItem>
               </div>
@@ -1412,6 +1434,17 @@ export default function AiAssistantPanel({
             multiple
             hidden
             accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md,.json,image/*,audio/*"
+            onChange={(e) => void handleFileInput(e)}
+          />
+
+          {/* Kamera: elle yazılmış not/liste fotoğrafını doğrudan çekmek için.
+              `environment` arka kamerayı seçer — ön kamera kâğıt okumaya uygun değil. */}
+          <input
+            ref={cameraInputRef}
+            type="file"
+            hidden
+            accept="image/*"
+            capture="environment"
             onChange={(e) => void handleFileInput(e)}
           />
 

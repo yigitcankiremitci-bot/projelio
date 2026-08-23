@@ -403,4 +403,37 @@ export class AccessService {
     if (task.department_id) return this.assertCanViewDepartment(task.department_id, userId);
     throw new ForbiddenException("Bu görevi görüntüleme yetkiniz yok");
   }
+
+  // ------------------------------------------------------------ Paylaşım
+
+  /**
+   * Paylaşım (post), yapıldığı proje/departman/organizasyonun görünürlüğünü
+   * devralır. Sosyal akış uçları uzun süre yalnızca oturum kontrolü yapıyordu;
+   * ID'yi bilen herkes başka bir şirketin akışını okuyup oraya yazabiliyordu.
+   */
+  async assertCanViewPost(postId: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    const { data: post } = await this.supabase.client
+      .from("project_posts")
+      .select("project_id, department_id, organization_id")
+      .eq("id", postId)
+      .maybeSingle();
+    if (!post) throw new NotFoundException("Paylaşım bulunamadı");
+    if (post.project_id) return this.assertCanViewProject(post.project_id, userId);
+    if (post.department_id) return this.assertCanViewDepartment(post.department_id, userId);
+    if (post.organization_id) return this.assertCanViewOrganization(post.organization_id, userId);
+    throw new ForbiddenException("Bu paylaşımı görüntüleme yetkiniz yok");
+  }
+
+  /** Paylaşım yorumu, bağlı olduğu paylaşımın görünürlüğünü devralır. */
+  async assertCanViewPostComment(commentId: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    const { data: comment } = await this.supabase.client
+      .from("post_comments")
+      .select("post_id")
+      .eq("id", commentId)
+      .maybeSingle();
+    if (!comment) throw new NotFoundException("Yorum bulunamadı");
+    return this.assertCanViewPost(comment.post_id, userId);
+  }
 }

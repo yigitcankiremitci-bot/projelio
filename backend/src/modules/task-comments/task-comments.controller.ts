@@ -18,13 +18,17 @@ export class TaskCommentsController {
     return this.taskCommentsService.findByTask(taskId);
   }
 
+  // Servisteki taşeron filtresi yetki kontrolü DEĞİL: projeyle hiç ilgisi olmayan
+  // kullanıcı için null döner, yani filtre uygulanmaz. Kapıyı burada tutuyoruz.
   @Get("projects/:projectId/comments")
-  findByProject(@Param("projectId") projectId: string, @Req() req: any) {
+  async findByProject(@Param("projectId") projectId: string, @Req() req: any) {
+    await this.access.assertCanViewProject(projectId, req.user.userId);
     return this.taskCommentsService.findByProject(projectId, req.user.userId);
   }
 
   @Post("tasks/:taskId/comments")
-  create(@Param("taskId") taskId: string, @Req() req: any, @Body("body") body: string) {
+  async create(@Param("taskId") taskId: string, @Req() req: any, @Body("body") body: string) {
+    await this.access.assertCanViewTask(taskId, req.user.userId);
     return this.taskCommentsService.create(taskId, req.user.userId, body);
   }
 }

@@ -1,8 +1,9 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Task, TaskComment, ProjectPost, ProjectMember, DepartmentMember, PostComment, Department } from "@projelio/shared";
 import { api } from "../../api/client";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { formatDateTime } from "../../lib/dates";
+import { useRefreshOnUndo } from "../../lib/undo";
 import { IconCheck, IconHeart, IconMessageCircle } from "../icons";
 
 export interface FeedPanelHandle {
@@ -98,8 +99,15 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
     },
   }));
 
-  useEffect(() => {
-    setLoading(true);
+  /**
+   * Akışı çeker.
+   *
+   * `silent`: aynı sayfadaki başka birinin yaptığı değişiklik sonrası tazelemede
+   * yükleme göstergesi açılmaz — aksi halde biri her paylaşım yaptığında akış
+   * karşı tarafta bir an boşalır, okunan yer kaybolurdu.
+   */
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
 
     // @etiketleme önerileri: organizasyon akışında organizasyona bağlı TÜM
     // departmanların kadrosu birleştirilir (N+1 ama departman sayısı küçük);
@@ -139,19 +147,28 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
         .catch(() => []);
     };
 
-    Promise.all([
+    const [cm, p, m] = await Promise.all([
       // Görev yorumlarını akışa karıştırma özelliği şimdilik yalnızca projelerde var
       // (departman/organizasyon akışları için henüz toplu bir yorum uç noktası yok).
       projectId ? api.get<FeedComment[]>(`/projects/${projectId}/comments`).catch(() => []) : Promise.resolve([]),
       api.get<ProjectPost[]>(postsPath).catch(() => []),
       loadMembers(),
-    ]).then(([cm, p, m]) => {
-      setComments(cm);
-      setPosts(p);
-      setMembers(m);
-      setLoading(false);
-    });
-  }, [projectId, departmentId, organizationId]);
+    ]);
+    setComments(cm);
+    setPosts(p);
+    setMembers(m);
+    setLoading(false);
+  }, [projectId, departmentId, organizationId, postsPath, membersPath]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Sayfadaki başka biri paylaşım/yorum yaptığında akış kendini tazeler: sunucu
+  // odaya "değişti" sinyali yolluyor (bkz. lib/liveRoom.ts), sinyal uygulamanın
+  // tazeleme sayacına bağlı (bkz. lib/undo.tsx). Bu kancayı çağırmadığı için
+  // sosyal sayfalar canlı altyapı varken bile elle yenilenmeyi bekliyordu.
+  useRefreshOnUndo(() => void load(true));
 
   const mentionResults = mentionQuery
     ? members
@@ -387,6 +404,19 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
   const [commentDraft, setCommentDraft] = useState("");
   const [commentPosting, setCommentPosting] = useState(false);
   const [liking, setLiking] = useState(false);
+
+  // Açık duran yorum başlığı da canlı kalmalı: aynı sayfadaki başka biri bu
+  // paylaşıma yorum yazdığında liste tazelenir. Akışın kendi tazelemesi yalnızca
+  // paylaşımları getiriyor; yorumlar açıldığında ayrı çekiliyor (bkz. toggleExpanded).
+  useRefreshOnUndo(() => {
+    if (!expanded) return;
+    api
+      .get<PostComment[]>(`/posts/${post.id}/comments`)
+      .then(setPostComments)
+      .catch(() => {
+        // Tazeleme başarısızsa mevcut liste kalsın; kullanıcı zaten bir şey istemedi.
+      });
+  });
 
   const toggleExpanded = async () => {
     const next = !expanded;

@@ -1,7 +1,14 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { BudgetOverview, BudgetTransaction, ProjectBudgetSummary, RecurringPayment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { requireAmount, requireOneOf, optionalOneOf } from "../../common/validation/input";
 import { NotificationsService } from "../notifications/notifications.service";
+
+/**
+ * budget_transactions.type için izin verilen değerler. 001_init_schema.sql'deki
+ * CHECK kısıtıyla BİREBİR aynı olmalı — biri değişirse diğeri de değişmeli.
+ */
+const TRANSACTION_TYPES = ["income", "expense", "payout"] as const;
 
 function mapTransaction(row: any): BudgetTransaction {
   return {
@@ -99,8 +106,8 @@ export class BudgetService {
         project_id: projectId,
         owner_id: project?.owner_id ?? null,
         user_id: data.userId ?? null,
-        type: data.type ?? "expense",
-        amount: data.amount ?? 0,
+        type: requireOneOf(data.type ?? "expense", TRANSACTION_TYPES, "İşlem türü"),
+        amount: requireAmount(data.amount ?? 0),
         description: data.description ?? null,
         occurred_at: data.occurredAt ?? new Date().toISOString().slice(0, 10),
       })
@@ -187,8 +194,8 @@ export class BudgetService {
       .from("budget_transactions")
       .insert({
         department_id: departmentId,
-        type: data.type ?? "expense",
-        amount: data.amount ?? 0,
+        type: requireOneOf(data.type ?? "expense", TRANSACTION_TYPES, "İşlem türü"),
+        amount: requireAmount(data.amount ?? 0),
         description: data.description ?? null,
         occurred_at: data.occurredAt ?? new Date().toISOString().slice(0, 10),
       })
@@ -327,8 +334,8 @@ export class BudgetService {
         project_id: data.projectId ?? null,
         owner_id: userId,
         user_id: data.userId ?? null,
-        type: data.type ?? "expense",
-        amount: data.amount ?? 0,
+        type: requireOneOf(data.type ?? "expense", TRANSACTION_TYPES, "İşlem türü"),
+        amount: requireAmount(data.amount ?? 0),
         description: data.description ?? null,
         occurred_at: data.occurredAt ?? new Date().toISOString().slice(0, 10),
       })
@@ -392,8 +399,8 @@ export class BudgetService {
     await this.assertCanManageTransaction(id, userId);
 
     const patch: Record<string, unknown> = {};
-    if (data.type !== undefined) patch.type = data.type;
-    if (data.amount !== undefined) patch.amount = data.amount;
+    if (data.type !== undefined) patch.type = optionalOneOf(data.type, TRANSACTION_TYPES, "İşlem türü");
+    if (data.amount !== undefined) patch.amount = requireAmount(data.amount);
     // Boş açıklama "temizle" demektir; undefined ise alan hiç gönderilmemiştir.
     if (data.description !== undefined) patch.description = data.description || null;
     if (data.occurredAt !== undefined) patch.occurred_at = data.occurredAt.slice(0, 10);

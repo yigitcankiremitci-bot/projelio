@@ -1,9 +1,28 @@
 import { useState } from "react";
 import type { TaskAttachment } from "@projelio/shared";
+import { safeExternalUrl } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconExternalLink, IconFile } from "./icons";
 import Modal from "./Modal";
 import { useTaskAttachmentSnapshot, type AttachedFile } from "../lib/taskAttachmentEvents";
+
+/**
+ * Bağlantı ekleri kullanıcı tarafından yazılıyor. `javascript:` ile başlayan bir
+ * adres window.open ile açıldığında bu sayfanın kökeninde kod çalıştırır — yani
+ * bağlantıyı ekleyen kişi, ona tıklayan ekip arkadaşının oturumunu ele geçirebilir.
+ *
+ * Sunucu artık yeni kayıtlarda bunu engelliyor (bkz. tasks.service addLinkAttachment),
+ * ama bu kural eklenmeden ÖNCE kaydedilmiş adresler veritabanında olabilir; burası
+ * onlara karşı ikinci katman.
+ */
+function openLink(url: string): void {
+  const safe = safeExternalUrl(url);
+  if (!safe) {
+    alert("Bu bağlantı açılamıyor: adres geçerli bir web adresi değil.");
+    return;
+  }
+  window.open(safe, "_blank", "noreferrer");
+}
 
 /**
  * Görev/tekrar kartındaki "link var" ve "dosya var" rozetleri.
@@ -64,7 +83,7 @@ export default function TaskAttachmentBadges({
         <button
           onClick={(e) => {
             stop(e);
-            if (linkList.length === 1) window.open(linkList[0].url, "_blank", "noreferrer");
+            if (linkList.length === 1) openLink(linkList[0].url);
             else setPicker("links");
           }}
           onDoubleClick={stop}
@@ -120,7 +139,7 @@ export default function TaskAttachmentBadges({
                       title={a.label || a.url}
                       subtitle={a.label ? a.url : undefined}
                       onOpen={() => {
-                        window.open(a.url, "_blank", "noreferrer");
+                        openLink(a.url);
                         setPicker(null);
                       }}
                     />

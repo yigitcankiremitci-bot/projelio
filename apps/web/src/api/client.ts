@@ -14,7 +14,13 @@ export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 export class ApiError extends Error {
   constructor(
     message: string,
-    public readonly status: number
+    public readonly status: number,
+    /**
+     * 429 yanıtlarında sunucunun bildirdiği bekleme süresi (saniye).
+     * Giriş ekranı bununla canlı geri sayım gösteriyor — kullanıcıya "biraz sonra"
+     * demek yerine ne kadar kaldığını söylemek için.
+     */
+    public readonly retryAfterSeconds?: number
   ) {
     super(message);
     this.name = "ApiError";
@@ -76,26 +82,31 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const text = await res.text();
     let message = `API error ${res.status}`;
+    let retryAfterSeconds: number | undefined;
     try {
       const parsed = JSON.parse(text);
       if (parsed?.message) message = Array.isArray(parsed.message) ? parsed.message.join(", ") : parsed.message;
+      if (typeof parsed?.retryAfterSeconds === "number") retryAfterSeconds = parsed.retryAfterSeconds;
     } catch {
       if (text) message = text;
     }
     // Token'la gidip 401 aldıysak token artık geçersizdir. Giriş denemesinin
     // kendisi (henüz token yok) bu yola girmez; oradaki 401 "şifre yanlış"tır.
     if (res.status === 401 && token) handleExpiredSession();
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, retryAfterSeconds);
   }
   return parseResponse<T>(res);
 }
 
-async function uploadFile<T>(path: string, formData: FormData): Promise<T> {
+async function uploadFile<T>(path: string, formData: FormData, signal?: AbortSignal): Promise<T> {
   const token = localStorage.getItem("projelio_token");
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: formData,
+    // İptal edilebilsin diye: kullanıcı yanlış dosya seçtiğinde yüklemenin
+    // bitmesini beklemek zorunda kalmasın (bkz. FilesPanel iptal düğmesi).
+    signal,
   });
   if (!res.ok) {
     if (res.status === 401 && token) handleExpiredSession();
@@ -106,13 +117,15 @@ async function uploadFile<T>(path: string, formData: FormData): Promise<T> {
     // bakarak ayırıyor.
     const text = await res.text();
     let message = `API error ${res.status}`;
+    let retryAfterSeconds: number | undefined;
     try {
       const parsed = JSON.parse(text);
       if (parsed?.message) message = Array.isArray(parsed.message) ? parsed.message.join(", ") : parsed.message;
+      if (typeof parsed?.retryAfterSeconds === "number") retryAfterSeconds = parsed.retryAfterSeconds;
     } catch {
       if (text) message = text;
     }
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, retryAfterSeconds);
   }
   return parseResponse<T>(res);
 }
@@ -128,6 +141,12 @@ export const api = {
   // beforeunload sırasında attığı "flush" isteği için kritik: keepalive olmadan
   // tarayıcı bu isteği sayfa kapanırken iptal edebilir, kayıt "silinmiş" görünüp
   // sunucuda hâlâ durabilir.
-  delete: <T>(path: string) => request<T>(path, { method: "DELETE", keepalive: true }),
-  uploadFile: <T>(path: string, formData: FormData) => uploadFile<T>(path, formData),
+  // Gövde isteğe bağlı: hesap silme şifre doğrulaması istiyor (bkz. DeleteAccountModal).
+  delete: <T>(path: string, body?: unknown) =>
+    request<T>(path, {
+      method: "DELETE",
+      keepalive: true,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    }),
+  uploadFile: <T>(path: string, formData: FormData, signal?: AbortSignal) => uploadFile<T>(path, formData, signal),
 };

@@ -1075,7 +1075,10 @@ export interface NotificationPayload {
     | "social_post_failed"
     // Destek talebi yanıtlandı. Bildirim çanı bu tipi görünce sayfaya
     // yönlendirmek yerine yanıtı bir modalda açar (bkz. NotificationBell).
-    | "support_reply";
+    | "support_reply"
+    // Yalnızca YÖNETİCİLERE gider: Anthropic bakiyesi azaldı ya da günlük harcama
+    // ani sıçradı (bkz. ai-spend-alert.processor.ts). Kullanıcıya gösterilmez.
+    | "ai_spend_alert";
   title: string;
   body: string;
   link?: string;

@@ -2,7 +2,15 @@
 // gereği), bu yüzden namespace import kullanılıyor.
 import * as assert from "node:assert/strict";
 import { afterEach, describe, test } from "node:test";
-import { assertRequiredEnv, getCorsOrigins, getJwtExpiresIn, getJwtSecret, isProduction } from "./env";
+import {
+  assertRequiredEnv,
+  getCorsOrigins,
+  getGatewayCorsOrigin,
+  getJwtExpiresIn,
+  getJwtSecret,
+  getWebAppUrl,
+  isProduction,
+} from "./env";
 
 // Bu testler bir güvenlik regresyonunu kilitliyor. Eskiden JWT_SECRET yedi ayrı
 // dosyada `process.env.JWT_SECRET ?? "change-me"` diye okunuyordu; değişken
@@ -15,7 +23,16 @@ import { assertRequiredEnv, getCorsOrigins, getJwtExpiresIn, getJwtSecret, isPro
 
 const GECERLI_SIR = "kEo3n2Yb7pQxV1sLdA9fRtUwZmCgHjNi"; // 32 karakter, örnek değil
 
-const KORUNAN = ["NODE_ENV", "JWT_SECRET", "JWT_EXPIRES_IN", "CORS_ORIGINS", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
+const KORUNAN = [
+  "NODE_ENV",
+  "JWT_SECRET",
+  "JWT_EXPIRES_IN",
+  "CORS_ORIGINS",
+  "SUPABASE_URL",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "WEB_APP_URL",
+  "BACKEND_URL",
+];
 const ILK_HAL = new Map(KORUNAN.map((k) => [k, process.env[k]]));
 
 afterEach(() => {
@@ -32,6 +49,8 @@ function uretimTabani() {
   process.env.SUPABASE_SERVICE_ROLE_KEY = "servis-anahtari";
   process.env.CORS_ORIGINS = "https://projelio.netlify.app";
   process.env.JWT_SECRET = GECERLI_SIR;
+  process.env.WEB_APP_URL = "https://projelio.netlify.app";
+  delete process.env.BACKEND_URL;
 }
 
 describe("JWT_SECRET okuması varsayılana düşmez", () => {
@@ -155,5 +174,119 @@ describe("sır olmayan ayarlar varsayılan alabilir", () => {
     assert.equal(isProduction(), false);
     delete process.env.NODE_ENV;
     assert.equal(isProduction(), false);
+  });
+});
+
+// CORS: sessiz yanlış yapılandırma, açık bir hatadan daha tehlikeli. Sondaki
+// eğik çizgi ya da büyük harf yüzünden hiçbir zaman eşleşmeyen bir kural,
+// "CORS'u kilitledim" sanan ama aslında kendi ön yüzünü dışarıda bırakan bir
+// yapılandırma üretir — ve bunu çözmeye çalışan kişi genelde "*" yazar.
+describe("CORS kaynak listesi", () => {
+  test("sondaki eğik çizgi atılır ve küçük harfe çevrilir", () => {
+    process.env.CORS_ORIGINS = "https://Projelio.com/, HTTPS://APP.projelio.com//";
+    assert.deepEqual(getCorsOrigins(), ["https://projelio.com", "https://app.projelio.com"]);
+  });
+
+  test("port korunur", () => {
+    process.env.CORS_ORIGINS = "http://localhost:5173/";
+    assert.deepEqual(getCorsOrigins(), ["http://localhost:5173"]);
+  });
+
+  test('üretimde "*" açılışta reddedilir — joker değil, ölü kural üretir', () => {
+    uretimTabani();
+    process.env.CORS_ORIGINS = "*";
+    assert.throws(() => assertRequiredEnv(), /joker değil/);
+  });
+
+  test("şemasız değer açılışta reddedilir", () => {
+    uretimTabani();
+    process.env.CORS_ORIGINS = "projelio.com";
+    assert.throws(() => assertRequiredEnv(), /geçerli bir origin değil/);
+  });
+
+  test("yol içeren değer açılışta reddedilir", () => {
+    uretimTabani();
+    process.env.CORS_ORIGINS = "https://projelio.com/uygulama";
+    assert.throws(() => assertRequiredEnv(), /geçerli bir origin değil/);
+  });
+
+  test("geçerli liste açılışı engellemez", () => {
+    uretimTabani();
+    process.env.CORS_ORIGINS = "https://projelio.com,https://app.projelio.com";
+    assert.doesNotThrow(() => assertRequiredEnv());
+  });
+});
+
+describe("gateway CORS kaynağı", () => {
+  test("HTTP ile aynı listeyi kullanır", () => {
+    process.env.CORS_ORIGINS = "https://projelio.com/";
+    assert.deepEqual(getGatewayCorsOrigin(), ["https://projelio.com"]);
+  });
+
+  test('üretimde liste boşsa "*" DÖNMEZ — soketler HTTP kilitliyken açılmasın', () => {
+    process.env.NODE_ENV = "production";
+    delete process.env.CORS_ORIGINS;
+    assert.deepEqual(getGatewayCorsOrigin(), []);
+  });
+
+  test('geliştirmede liste boşsa "*" döner', () => {
+    process.env.NODE_ENV = "development";
+    delete process.env.CORS_ORIGINS;
+    assert.equal(getGatewayCorsOrigin(), "*");
+  });
+});
+
+// WEB_APP_URL yalnızca bir yönlendirme adresi değil: şifre sıfırlama bağlantısı
+// bu adresle kurulup e-postayla gönderiliyor. Tanımsız kalırsa kod sessizce
+// "http://localhost:5173"e düşüyordu — kullanıcıya kendi bilgisayarını gösteren,
+// işe yaramaz bir bağlantı gider ve kimse hatayı fark etmez.
+describe("WEB_APP_URL", () => {
+  test("sondaki eğik çizgi atılır — bağlantıda '//reset-password' çıkmasın", () => {
+    process.env.WEB_APP_URL = "https://projelio.com//";
+    assert.equal(getWebAppUrl(), "https://projelio.com");
+  });
+
+  test("tanımsızsa yerel varsayılana düşer (geliştirmede doğrusu bu)", () => {
+    delete process.env.WEB_APP_URL;
+    assert.equal(getWebAppUrl(), "http://localhost:5173");
+  });
+
+  test("üretimde tanımsızsa açılış durur", () => {
+    uretimTabani();
+    delete process.env.WEB_APP_URL;
+    assert.throws(() => assertRequiredEnv(), /WEB_APP_URL tanımlı değil/);
+  });
+
+  test("üretimde http:// reddedilir — sıfırlama bağlantısı yolda okunabilir", () => {
+    uretimTabani();
+    process.env.WEB_APP_URL = "http://projelio.com";
+    assert.throws(() => assertRequiredEnv(), /HTTPS değil/);
+  });
+
+  test("üretimde yerel adres reddedilir", () => {
+    uretimTabani();
+    process.env.WEB_APP_URL = "http://localhost:5173";
+    assert.throws(() => assertRequiredEnv(), /yerel adrese/);
+  });
+
+  test("geliştirmede yerel adres sorun değil", () => {
+    uretimTabani(); // sırlar/bağlantılar kurulsun, sonra ortamı geliştirmeye çevir
+    process.env.NODE_ENV = "development";
+    process.env.WEB_APP_URL = "http://localhost:5173";
+    assert.doesNotThrow(() => assertRequiredEnv());
+  });
+});
+
+describe("BACKEND_URL", () => {
+  test("tanımlı değilse sorun sayılmaz (GOOGLE_REDIRECT_URI elle verilmiş olabilir)", () => {
+    uretimTabani();
+    delete process.env.BACKEND_URL;
+    assert.doesNotThrow(() => assertRequiredEnv());
+  });
+
+  test("tanımlıysa üretimde https olmalı", () => {
+    uretimTabani();
+    process.env.BACKEND_URL = "http://projelio-api.onrender.com";
+    assert.throws(() => assertRequiredEnv(), /HTTPS değil/);
   });
 });

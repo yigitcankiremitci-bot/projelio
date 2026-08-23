@@ -6,6 +6,7 @@ import type {
   OperationRoutine,
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { applyOrder } from "../../common/reorder.util";
 import { detectImageUpload } from "../../common/upload-image.util";
 
@@ -383,7 +384,13 @@ export class OperationsService {
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);
-    return this.update(id, { coverImageUrl: publicUrlData.publicUrl });
+    const updated = await this.update(id, { coverImageUrl: publicUrlData.publicUrl });
+
+    // Kayıt güncellendikten SONRA temizle: güncelleme başarısız olursa eski görsel
+    // yerinde kalsın, kayıt silinmiş bir dosyaya işaret etmesin.
+    await removeStaleUploadsInFolder(this.supabase.client, COVER_BUCKET, path);
+
+    return updated;
   }
 
   // ------------------------------------------------------------------ rutinler

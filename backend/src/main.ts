@@ -41,6 +41,8 @@ try {
 }
 
 import { NestFactory } from "@nestjs/core";
+import { NestExpressApplication } from "@nestjs/platform-express";
+import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
@@ -53,7 +55,52 @@ async function bootstrap() {
     logger.warn("Projelio AI devre dışı: ANTHROPIC_API_KEY tanımlı değil (backend/.env).");
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Render (ve benzeri PaaS) uygulamayı bir ters vekil sunucunun arkasında çalıştırır.
+  // Bu ayar yapılmazsa Express, req.ip olarak istemcinin değil vekil sunucunun iç
+  // IP'sini döndürür — o da her kullanıcı için AYNIDIR. Sonuç: IP başına çalışan
+  // hız sınırlayıcı (bkz. AuthRateLimitGuard) tüm kullanıcıları tek kovaya koyar;
+  // meşru kullanıcılar birbirinin kotasını yer ve tek bir saldırgan dakikada 10
+  // istekle giriş ekranını herkese kapatabilir.
+  //
+  // Neden 1, neden `true` değil: `true` tüm X-Forwarded-For zincirine güvenir;
+  // saldırgan bu başlığı kendi uydurduğu IP'lerle doldurup her istekte "farklı
+  // IP"den gelmiş gibi görünür ve sınırı tamamen atlar. 1 = "önümde tek bir
+  // güvenilir vekil var" demektir: XFF'in sondan bir önceki girdisi, yani
+  // Render'ın yazdığı gerçek istemci IP'si alınır, saldırganın baştan eklediği
+  // sahte girdiler yok sayılır. Vekil zinciri değişirse bu sayı da güncellenmeli.
+  app.set("trust proxy", 1);
+
+  // Güvenlik başlıkları.
+  //
+  // NE İŞE YARAR, NE İŞE YARAMAZ: burası HTML değil JSON servis eden bir API.
+  // Bu yüzden CSP, COOP gibi başlıkların çoğu burada FİİLEN ETKİSİZDİR — onlar
+  // belgeyi (document) yükleyen origin için anlamlıdır, ki o Netlify'daki ön
+  // yüzdür (bkz. netlify.toml). Buradaki asıl kazanç üç başlık:
+  //
+  //   * nosniff — tarayıcı Content-Type'a uymayıp içeriği "koklayarak" HTML
+  //     sanmasın. Dosya indirme ucu (files.controller content) kullanıcının
+  //     yüklediği içeriği kendi alan adımızdan servis ediyor; sniffing açıkken
+  //     PDF diye kaydedilmiş bir HTML dosyası tarayıcıda çalışabilirdi.
+  //   * HSTS — API'ye bir daha asla http:// ile gidilmesin.
+  //   * X-Powered-By'ın kaldırılması — Express sürümünü bedavaya duyurmayalım.
+  //
+  // İki varsayılan bilerek değiştirildi:
+  //   * crossOriginResourcePolicy: helmet varsayılanı "same-origin". Bu API
+  //     başka bir origin'den (Netlify) tüketiliyor; "cross-origin" olmazsa
+  //     tarayıcı bazı kaynak yüklemelerini engellerdi.
+  //   * contentSecurityPolicy: kapalı. JSON yanıtlarında hiçbir şey yapmıyor;
+  //     gerçekten gerektiği tek yer dosya içeriği ucu ve orada uca özel,
+  //     çok daha sıkı bir CSP veriliyor (bkz. files.controller.ts).
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+      hsts: { maxAge: 31536000, includeSubDomains: true, preload: false },
+    })
+  );
+  app.disable("x-powered-by");
 
   // CORS: geliştirmede her yere açık, üretimde yalnızca izin verilen alan adlarına.
   // CORS_ORIGINS virgülle ayrılmış liste alır, örn:

@@ -262,3 +262,28 @@ export function calculateTranscriptionCost(durationSeconds: number): UsageCost {
     credits,
   };
 }
+
+/**
+ * HARCAMA UYARISI EŞİKLERİ.
+ *
+ * Bunlar kullanıcıyı değil, İŞLETMEYİ (yöneticiyi) uyarır. Kullanıcı tarafındaki
+ * eşik ayrı: CREDIT_CONFIRM_THRESHOLD, pahalı bir Lio koşusundan önce kullanıcıya
+ * "devam edeyim mi" diye sorar. Buradakiler ise Anthropic hesabındaki gerçek
+ * paranın bitmesini önceden haber verir — bakiye biterse Lio TÜM kullanıcılar
+ * için durur.
+ */
+
+/** Bu tutarın altına inince "azalıyor" uyarısı (USD). */
+export const BALANCE_WARNING_USD = Number(process.env.AI_BALANCE_WARNING_USD ?? 15);
+
+/** Bu tutarın altına inince "kritik" uyarısı (USD). */
+export const BALANCE_CRITICAL_USD = Number(process.env.AI_BALANCE_CRITICAL_USD ?? 5);
+
+/** Günlük harcama, önceki 7 günün ortalamasının bu katına çıkarsa sıçrama uyarısı. */
+export const SPEND_SPIKE_MULTIPLIER = Number(process.env.AI_SPEND_SPIKE_MULTIPLIER ?? 3);
+
+/**
+ * Sıçrama uyarısı için günlük harcama tabanı (USD).
+ * Küçük sayılarda oran yanıltıcı: 0,02'den 0,10'a çıkmak "5 kat" ama önemsiz.
+ */
+export const SPEND_SPIKE_FLOOR_USD = Number(process.env.AI_SPEND_SPIKE_FLOOR_USD ?? 1);

@@ -73,6 +73,8 @@ interface UploadingItem {
   name: string;
   ratio: number;
   error?: string;
+  /** Bu yüklemeyi durdurmak için. Satırdaki "Vazgeç" düğmesi bunu tetikler. */
+  controller?: AbortController;
 }
 
 /**
@@ -89,6 +91,19 @@ export interface FilesPanelHandle {
   openCreateNative: () => void;
   /** Drive/OneDrive dosya seçici. */
   openBrowseDrive: () => void;
+}
+
+/**
+ * "Failed to fetch" kullanıcıya hiçbir şey anlatmıyor. Büyük dosyalar tarayıcıdan
+ * DOĞRUDAN Drive/OneDrive'a yükleniyor (bkz. api/files.ts uploadFile); o istek
+ * koptuğunda tarayıcının verdiği ham metin bu oluyor. Ne olduğunu söyleyelim.
+ */
+function uploadHatasi(e: any): string {
+  const mesaj = e?.message ?? "Yüklenemedi";
+  if (/failed to fetch|networkerror|load failed/i.test(mesaj)) {
+    return "Bağlantı koptu, dosya yüklenemedi. İnternetini kontrol edip tekrar dene.";
+  }
+  return mesaj;
 }
 
 const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
@@ -183,19 +198,47 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
     for (const file of Array.from(selected)) {
       const uploadId = `${file.name}-${Date.now()}-${Math.random()}`;
-      setUploads((prev) => [...prev, { id: uploadId, name: file.name, ratio: 0 }]);
+      const controller = new AbortController();
+      setUploads((prev) => [...prev, { id: uploadId, name: file.name, ratio: 0, controller }]);
 
       try {
-        const created = await uploadFile(target, file, { taskId, outputId }, (ratio) =>
-          setUploads((prev) => prev.map((u) => (u.id === uploadId ? { ...u, ratio } : u)))
+        const created = await uploadFile(
+          target,
+          file,
+          { taskId, outputId },
+          (ratio) => setUploads((prev) => prev.map((u) => (u.id === uploadId ? { ...u, ratio } : u))),
+          controller.signal
         );
         setFiles((prev) => [created, ...prev]);
         setUploads((prev) => prev.filter((u) => u.id !== uploadId));
       } catch (e: any) {
+        // İptal bir HATA DEĞİL: kullanıcı bilerek durdurdu. Satırı sessizce
+        // kaldırıp sıradaki dosyaya geçiyoruz; kırmızı bir uyarı göstermek
+        // "bir şey ters gitti" izlenimi verirdi.
+        if (e?.name === "AbortError") {
+          setUploads((prev) => prev.filter((u) => u.id !== uploadId));
+          continue;
+        }
+
         // Başarısız yükleme listeden hemen kaybolmasın; kullanıcı nedenini görsün.
         setUploads((prev) =>
-          prev.map((u) => (u.id === uploadId ? { ...u, error: e?.message ?? "Yüklenemedi" } : u))
+          prev.map((u) => (u.id === uploadId ? { ...u, error: uploadHatasi(e) } : u))
         );
+
+        // Hız sınırına takıldıysak KUYRUĞU DURDUR. Devam etmenin anlamı yok:
+        // kalan dosyaların hepsi aynı hatayı alır ve kullanıcı onlarca kırmızı
+        // satır görür. Kalanları "beklemede" diye işaretleyip çıkıyoruz.
+        if (e?.status === 429) {
+          const kalan = Array.from(selected).slice(Array.from(selected).indexOf(file) + 1);
+          if (kalan.length) {
+            setError(
+              `${e?.message ?? "Çok fazla dosya yüklendi."} Kalan ${kalan.length} dosya yüklenmedi, biraz sonra tekrar dene.`
+            );
+          } else {
+            setError(e?.message ?? "Çok fazla dosya yüklendi.");
+          }
+          return;
+        }
       }
     }
   };
@@ -428,12 +471,22 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             <span style={{ fontSize: 14, color: u.error ? c.danger : c.textSecondary }}>
               {u.error ? u.error : `%${Math.round(u.ratio * 100)}`}
             </span>
-            {u.error && (
+            {u.error ? (
               <button
                 onClick={() => setUploads((prev) => prev.filter((x) => x.id !== u.id))}
                 style={{ background: "transparent", border: "none", color: c.textSecondary, cursor: "pointer" }}
               >
                 Kapat
+              </button>
+            ) : (
+              // Yükleme sürerken vazgeçilebilir: yanlış dosya seçildiğinde
+              // bitmesini beklemek gerekiyordu.
+              <button
+                type="button"
+                onClick={() => u.controller?.abort()}
+                style={{ background: "transparent", border: "none", color: c.textSecondary, cursor: "pointer", fontSize: 14 }}
+              >
+                Vazgeç
               </button>
             )}
           </div>

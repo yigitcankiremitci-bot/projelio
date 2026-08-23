@@ -2,7 +2,12 @@
 // gereği), bu yüzden namespace import kullanılıyor.
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { isSubcontractorAccount, seesAllProjectsOfJob, type ProjectScopeFacts } from "./subcontractor";
+import {
+  isSubcontractorAccount,
+  seesAllProjectsOfJob,
+  visibleTaskIdsForSubcontractor,
+  type ProjectScopeFacts,
+} from "./subcontractor";
 
 // Şikayetin tam hali: bir işe taşeron olarak alınan kullanıcı, o işin BÜTÜN
 // projelerini görebiliyordu. Kural artık hesap tipine bağlı ve burada sabit.
@@ -55,5 +60,49 @@ describe("seesAllProjectsOfJob", () => {
     for (const f of [facts({ isJobOwner: true }), facts({ isApprovedJobMember: true })]) {
       assert.equal(seesAllProjectsOfJob(f), true);
     }
+  });
+});
+
+// Şikayetin tam hali: taşeron, KENDİSİNE ATANMIŞ görevi bile göremiyordu.
+// Sebebi, atamanın iki yere birden yazılması ama görünürlüğün yalnızca eski
+// tek-atama sütununa bakması: `tasks.assigned_to` sadece BİRİNCİ atananı tutuyor.
+describe("visibleTaskIdsForSubcontractor", () => {
+  test("çoklu atamada ikinci atanan da kendi görevini görür", () => {
+    const gorunur = visibleTaskIdsForSubcontractor(
+      [{ id: "t1", assignedTo: "baskasi", assigneeIds: ["baskasi", "taseron"] }],
+      "taseron"
+    );
+    assert.deepEqual([...gorunur], ["t1"]);
+  });
+
+  test("eski kayıtlar için tek-atama sütunu hâlâ geçerli", () => {
+    const gorunur = visibleTaskIdsForSubcontractor([{ id: "t1", assignedTo: "taseron" }], "taseron");
+    assert.deepEqual([...gorunur], ["t1"]);
+  });
+
+  test("atanmadığı görevleri görmez", () => {
+    const gorunur = visibleTaskIdsForSubcontractor(
+      [
+        { id: "t1", assignedTo: "baskasi", assigneeIds: ["baskasi"] },
+        { id: "t2", assigneeIds: ["taseron"] },
+      ],
+      "taseron"
+    );
+    assert.deepEqual([...gorunur], ["t2"]);
+  });
+
+  test("alt görevi atanmışsa üst görev de görünür — yoksa liste kopuk görünür", () => {
+    const gorunur = visibleTaskIdsForSubcontractor(
+      [
+        { id: "ust", assigneeIds: ["baskasi"] },
+        { id: "alt", assigneeIds: ["taseron"], parentTaskId: "ust" },
+      ],
+      "taseron"
+    );
+    assert.deepEqual([...gorunur].sort(), ["alt", "ust"]);
+  });
+
+  test("hiç atama yoksa boş küme", () => {
+    assert.equal(visibleTaskIdsForSubcontractor([{ id: "t1", assigneeIds: [] }], "taseron").size, 0);
   });
 });

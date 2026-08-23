@@ -1,9 +1,10 @@
 import { randomBytes, createHash } from "crypto";
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
-import * as bcrypt from "bcrypt";
+import { hashPassword } from "../../common/password.util";
 import { SupabaseService } from "../../database/supabase.service";
 import { UsersService, normalizeEmail } from "../users/users.service";
 import { EmailService } from "./email.service";
+import { getWebAppUrl } from "../../common/config/env";
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 saat
 
@@ -60,7 +61,7 @@ export class PasswordResetService {
     });
     if (error) throw error;
 
-    const webAppUrl = process.env.WEB_APP_URL ?? "http://localhost:5173";
+    const webAppUrl = getWebAppUrl();
     const resetUrl = `${webAppUrl}/reset-password?token=${token}`;
     await this.emailService.sendPasswordResetEmail(user.email, resetUrl);
   }
@@ -93,7 +94,7 @@ export class PasswordResetService {
       throw new BadRequestException("Sıfırlama bağlantısı geçersiz ya da süresi dolmuş. Yeniden isteyin.");
     }
 
-    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const passwordHash = await hashPassword(newPassword);
     const { error: updateError } = await this.supabase.client
       .from("users")
       .update({ password_hash: passwordHash })

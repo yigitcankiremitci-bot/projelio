@@ -1,4 +1,4 @@
-import { IsEmail, IsString, Matches, MinLength } from "class-validator";
+import { IsEmail, IsString, Matches, MaxLength, MinLength } from "class-validator";
 
 export class RegisterDto {
   @IsString()
@@ -9,6 +9,9 @@ export class RegisterDto {
 
   @IsString()
   @MinLength(8)
+  // bcrypt girdiyi 72 BAYTTA keser (bkz. common/password.util.ts). Buradaki sınır
+  // karakter sayısıdır ve ilk savunmadır; asıl bayt kontrolü hashPassword'de.
+  @MaxLength(72)
   password!: string;
 
   // Başında "@" olsun ya da olmasın kabul edilir, servis katmanında normalize edilir.
@@ -38,6 +41,9 @@ export class ResetPasswordDto {
 
   @IsString()
   @MinLength(8)
+  // bcrypt girdiyi 72 BAYTTA keser (bkz. common/password.util.ts). Buradaki sınır
+  // karakter sayısıdır ve ilk savunmadır; asıl bayt kontrolü hashPassword'de.
+  @MaxLength(72)
   password!: string;
 }
 

@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import type { Department, DepartmentAccess, DepartmentMemberRole } from "@projelio/shared";
 import { applyOrder } from "../../common/reorder.util";
 import { SupabaseService } from "../../database/supabase.service";
+import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { decideDepartmentAccess } from "./department-access";
 import { detectImageUpload } from "../../common/upload-image.util";
 
@@ -375,6 +376,11 @@ export class DepartmentsService {
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Departman bulunamadı");
+
+    // Kayıt güncellendikten SONRA temizle: güncelleme başarısız olursa eski görsel
+    // yerinde kalsın, kayıt silinmiş bir dosyaya işaret etmesin.
+    await removeStaleUploadsInFolder(this.supabase.client, COVER_BUCKET, path);
+
     return mapDepartment(row);
   }
 

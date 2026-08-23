@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "concurrently -n backend,web -c blue,green \"npm run start:dev --workspace=backend\" \"npm run dev --workspace=@projelio/web\"",
     "test": "node scripts/run-tests.mjs",
+    "check-env": "node --no-warnings scripts/check-env.mjs",
     "typecheck": "tsc --noEmit -p backend/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json"
   },
   "devDependencies": {

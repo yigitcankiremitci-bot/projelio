@@ -46,6 +46,8 @@ export default function QuickFileUploadModal({
   const [msStatus, setMsStatus] = useState<GoogleDriveStatus | null>(null);
   const [uploading, setUploading] = useState(false);
   const [ratio, setRatio] = useState(0);
+  // Süren yüklemeyi durdurabilmek için (bkz. FilesPanel'deki aynı desen).
+  const [controller, setController] = useState<AbortController | null>(null);
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -66,15 +68,25 @@ export default function QuickFileUploadModal({
     setFileName(file.name);
     setUploading(true);
     setRatio(0);
+    const iptal = new AbortController();
+    setController(iptal);
     try {
-      await uploadFile(selected.target, file, {}, setRatio);
+      await uploadFile(selected.target, file, {}, setRatio, iptal.signal);
       onUploaded();
       onClose();
     } catch (e: any) {
+      // İptal hata değil: kullanıcı bilerek durdurdu, uyarı göstermiyoruz.
+      if (e?.name === "AbortError") {
+        setUploading(false);
+        setFileName("");
+        setController(null);
+        return;
+      }
       // Sunucu yetki hatasını Türkçe ve anlaşılır döndürüyor (örn. "İşin geneline
       // dosya eklemek için iş ekibinde olmanız gerekir"); olduğu gibi gösteriyoruz.
       setError(e?.message ?? "Dosya yüklenemedi");
       setUploading(false);
+      setController(null);
     }
   };
 
@@ -150,6 +162,24 @@ export default function QuickFileUploadModal({
                   <IconUpload size={18} color={c.textSecondary} />
                   {uploading ? `Yükleniyor… ${fileName} (${Math.round(ratio * 100)}%)` : "Dosya seç"}
                 </button>
+
+                {/* Yanlış dosya seçildiyse bitmesini beklemek gerekmesin. */}
+                {uploading && (
+                  <button
+                    type="button"
+                    onClick={() => controller?.abort()}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: c.textSecondary,
+                      fontSize: 14,
+                      cursor: "pointer",
+                      alignSelf: "center",
+                    }}
+                  >
+                    Vazgeç
+                  </button>
+                )}
               </>
             )}
 

@@ -5,6 +5,7 @@ import { CloudStorageModule } from "../cloud-storage/cloud-storage.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { FilesController } from "./files.controller";
 import { FilesService } from "./files.service";
+import { FilesCleanupProcessor } from "./files-cleanup.processor";
 import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
 
 @Module({
@@ -22,7 +23,7 @@ import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
     }),
   ],
   controllers: [FilesController],
-  providers: [FilesService],
+  providers: [FilesService, FilesCleanupProcessor],
   exports: [FilesService],
 })
 export class FilesModule {}

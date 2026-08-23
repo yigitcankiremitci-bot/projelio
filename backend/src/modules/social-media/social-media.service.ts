@@ -6,6 +6,7 @@ import type {
   SocialPostMedia,
   SocialPostTarget,
 } from "@projelio/shared";
+import { requireSafeUrl } from "../../common/safe-url";
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 
@@ -199,6 +200,21 @@ function mapPost(row: any, assigneeName?: string): SocialPost {
 }
 
 /** Boş metni null'a çevirir: veritabanında "" ile NULL aynı şey sayılmasın. */
+/**
+ * Adres alanları için nullable'ın güvenli hâli.
+ *
+ * profile_url ve avatar_url kullanıcıdan geliyor ve arayüzde <a href> / <img src>
+ * olarak kullanılıyor. `javascript:` şemalı bir adres kaydedilirse, hesabı gören
+ * başka bir ekip üyesi tıkladığında kod onun tarayıcısında çalışır
+ * (bkz. @projelio/shared safeUrl).
+ */
+function nullableUrl(value: string | undefined | null, field: string): string | null | undefined {
+  const trimmed = nullable(value);
+  if (trimmed === undefined || trimmed === null) return trimmed;
+
+  return requireSafeUrl(trimmed, field);
+}
+
 function nullable(value: string | undefined | null): string | null | undefined {
   if (value === undefined) return undefined;
   if (value === null) return null;
@@ -363,8 +379,8 @@ export class SocialMediaService {
         // Kullanıcı "@" ile de yazabilir; tek biçimde saklıyoruz.
         handle: input.handle.trim().replace(/^@/, ""),
         display_name: nullable(input.displayName) ?? null,
-        profile_url: nullable(input.profileUrl) ?? null,
-        avatar_url: nullable(input.avatarUrl) ?? null,
+        profile_url: nullableUrl(input.profileUrl, "Profil adresi") ?? null,
+        avatar_url: nullableUrl(input.avatarUrl, "Görsel adresi") ?? null,
         follower_count: input.followerCount ?? null,
         audience_note: nullable(input.audienceNote) ?? null,
         tone_note: nullable(input.toneNote) ?? null,
@@ -393,8 +409,8 @@ export class SocialMediaService {
       patch.handle = input.handle.trim().replace(/^@/, "");
     }
     if (input.displayName !== undefined) patch.display_name = nullable(input.displayName);
-    if (input.profileUrl !== undefined) patch.profile_url = nullable(input.profileUrl);
-    if (input.avatarUrl !== undefined) patch.avatar_url = nullable(input.avatarUrl);
+    if (input.profileUrl !== undefined) patch.profile_url = nullableUrl(input.profileUrl, "Profil adresi");
+    if (input.avatarUrl !== undefined) patch.avatar_url = nullableUrl(input.avatarUrl, "Görsel adresi");
     if (input.followerCount !== undefined) patch.follower_count = input.followerCount;
     if (input.audienceNote !== undefined) patch.audience_note = nullable(input.audienceNote);
     if (input.toneNote !== undefined) patch.tone_note = nullable(input.toneNote);

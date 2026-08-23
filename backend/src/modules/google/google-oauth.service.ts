@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { isTokenCryptoConfigured } from "./token-crypto.util";
+import { getWebAppUrl } from "../../common/config/env";
 
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
@@ -68,7 +69,7 @@ export class GoogleOAuthService {
   }
 
   get webAppUrl(): string {
-    return process.env.WEB_APP_URL?.trim() || "http://localhost:5173";
+    return getWebAppUrl();
   }
 
   /** Google giriş/Drive özellikleri kullanılabilir mi? */

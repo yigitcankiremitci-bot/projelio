@@ -6,6 +6,8 @@ import { accentPresets, sidebarColorPresets, sidebarPatterns } from "@projelio/s
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useTheme } from "../theme/ThemeProvider";
+import { useCurrentUser } from "../lib/useCurrentUser";
+import DeleteAccountModal from "../components/DeleteAccountModal";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { backState } from "../lib/backTarget";
@@ -173,6 +175,9 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (on: boolea
 export default function Settings() {
   const c = useThemeColors();
   const theme = useTheme();
+  // Admin paneli bağlantısını yalnızca yöneticiye göstermek için.
+  const { user: currentUser } = useCurrentUser();
+  const [hesapSiliniyor, setHesapSiliniyor] = useState(false);
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const gutter = pageGutter(isDesktop);
@@ -324,7 +329,14 @@ export default function Settings() {
               }}
             >
               {me?.avatarUrl ? (
-                <img src={me.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <img
+                  src={me.avatarUrl}
+                  alt=""
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
               ) : (
                 <IconUser size={15} color={c.textSecondary} />
               )}
@@ -469,15 +481,26 @@ export default function Settings() {
 
       <CardGroup label="Hesabına bağlı sayfalar">
         <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, overflow: "hidden" }}>
-          <button onClick={() => navigate("/admin")} style={linkRowStyle}>
-            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <IconShield size={17} color={c.textSecondary} />
-              <span style={{ fontSize: 17, color: c.textPrimary }}>Admin paneli</span>
-            </span>
-            <IconChevronRight size={16} color={c.textSecondary} />
-          </button>
+          {/*
+            Yalnızca yöneticiye gösterilir. Arka uç zaten rol denetimi yapıyor
+            (bkz. AdminController @Roles("admin")), yani bağlantı görünse de
+            normal kullanıcı veri alamıyordu; ama herkese "Admin paneli" satırı
+            göstermek hem kafa karıştırıyor hem de olmayan bir yetki varmış
+            izlenimi veriyor. Sidebar bunu zaten doğru yapıyordu (bkz. Sidebar.tsx).
+          */}
+          {currentUser?.role === "admin" && (
+            <>
+              <button onClick={() => navigate("/admin")} style={linkRowStyle}>
+                <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <IconShield size={17} color={c.textSecondary} />
+                  <span style={{ fontSize: 17, color: c.textPrimary }}>Admin paneli</span>
+                </span>
+                <IconChevronRight size={16} color={c.textSecondary} />
+              </button>
 
-          <div style={{ borderTop: `1px solid ${c.border}` }} />
+              <div style={{ borderTop: `1px solid ${c.border}` }} />
+            </>
+          )}
 
           <button onClick={() => navigate("/settings/ai-credits")} style={linkRowStyle}>
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -498,6 +521,26 @@ export default function Settings() {
           </button>
         </div>
       </CardGroup>
+
+      {/*
+        Hesap silme en sonda ve ayrı: yanlışlıkla basılmasın diye diğer
+        ayarlarla aynı öbekte değil. Onay ve sonuç önizlemesi modalde
+        (bkz. DeleteAccountModal) — buradaki düğme yalnızca kapıyı açıyor.
+      */}
+      <CardGroup label="Tehlikeli bölge">
+        <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <button onClick={() => setHesapSiliniyor(true)} style={linkRowStyle}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 17, color: c.danger }}>Hesabımı sil</span>
+            </span>
+            <IconChevronRight size={16} color={c.textSecondary} />
+          </button>
+        </div>
+      </CardGroup>
+
+      {hesapSiliniyor && (
+        <DeleteAccountModal hasPassword={hasPassword} onClose={() => setHesapSiliniyor(false)} />
+      )}
 
       {/* Yasal metinler giriş ekranından da açılabiliyor ama oturum açmış
           kullanıcının politikaya ulaşabileceği tek yer burası. */}

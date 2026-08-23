@@ -2,22 +2,28 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { AuthGuard } from "@nestjs/passport";
+import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guard";
 import { memoryStorage } from "multer";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { UsersService } from "./users.service";
+import { AccountDeletionService } from "./account-deletion.service";
+import { AccountExportService } from "./account-export.service";
+import type { Response } from "express";
 import type { AccountType } from "./users.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { GroupsService } from "../groups/groups.service";
@@ -28,7 +34,9 @@ export class UsersController {
   constructor(
     private usersService: UsersService,
     private organizationsService: OrganizationsService,
-    private groupsService: GroupsService
+    private groupsService: GroupsService,
+    private accountDeletion: AccountDeletionService,
+    private accountExport: AccountExportService
   ) {}
 
   // Tüm kullanıcı dizini. Arayüzde kullanılmıyor (kişi eklerken /users/search
@@ -65,7 +73,42 @@ export class UsersController {
     return this.usersService.changePassword(req.user.userId, body.currentPassword, body.newPassword);
   }
 
+  /**
+   * Hesap silinmeden önce ne olacağını gösterir: engel var mı, hangi işler
+   * silinecek. Onay ekranı bunu gösteriyor — kullanıcı neyi kaybedeceğini
+   * görmeden silme kararı vermemeli.
+   */
+  @Get("me/deletion-preview")
+  deletionPreview(@Req() req: any) {
+    return this.accountDeletion.previewDeletion(req.user.userId);
+  }
+
+  /**
+   * Hesap silme TALEBİ. Hemen silmez: 30 günlük bekleme başlatır ve girişi
+   * kapatır (bkz. AccountDeletionService). Şifre doğrulaması ister — oturumu
+   * ele geçiren biri hesabı silemesin; Google ile açılmış hesaplarda atlanır.
+   */
+  /**
+   * Kullanıcının kendi verisinin Excel çıktısı (KVKK m.11 / GDPR Art. 20).
+   * Hesap silme ekranından da sunuluyor: kişi elinde bir dökümanla ayrılsın.
+   */
+  @Get("me/export")
+  async exportMe(@Req() req: any, @Res() res: Response) {
+    const { buffer, fileName } = await this.accountExport.buildWorkbook(req.user.userId);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+    // Kişisel veri: ara sunucular önbelleğe almamalı.
+    res.setHeader("Cache-Control", "private, no-store");
+    res.end(buffer);
+  }
+
+  @Delete("me")
+  deleteMe(@Req() req: any, @Body() body: { password?: string }) {
+    return this.accountDeletion.requestDeletion(req.user.userId, body?.password);
+  }
+
   @Post("me/avatar")
+  @UseGuards(UploadRateLimitGuard)
   @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }))
   uploadAvatar(@Req() req: any, @UploadedFile() file?: Express.Multer.File) {
     if (!file) throw new BadRequestException("Dosya bulunamadı");

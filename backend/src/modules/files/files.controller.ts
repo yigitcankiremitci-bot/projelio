@@ -18,9 +18,11 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { AuthGuard } from "@nestjs/passport";
+import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guard";
 import { JwtService } from "@nestjs/jwt";
 import type { Response } from "express";
 import { memoryStorage } from "multer";
+import { getCorsOrigins } from "../../common/config/env";
 import { FilesService, INLINE_UPLOAD_LIMIT, type NativeFileKind } from "./files.service";
 
 interface FileAccessClaims {
@@ -50,7 +52,7 @@ export class FilesController {
   }
 
   @Post("departments/:departmentId/files")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard("jwt"), UploadRateLimitGuard)
   @UseInterceptors(
     FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: INLINE_UPLOAD_LIMIT } })
   )
@@ -63,7 +65,7 @@ export class FilesController {
   }
 
   @Post("departments/:departmentId/files/upload-session")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard("jwt"), UploadRateLimitGuard)
   createDepartmentUploadSession(
     @Param("departmentId") departmentId: string,
     @Body() body: { name: string; mimeType: string; sizeBytes?: number },
@@ -155,7 +157,7 @@ export class FilesController {
   // --------------------------------------------------------------- yükleme
 
   @Post("jobs/:jobId/files")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard("jwt"), UploadRateLimitGuard)
   @UseInterceptors(
     FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: INLINE_UPLOAD_LIMIT } })
   )
@@ -172,9 +174,16 @@ export class FilesController {
     });
   }
 
-  /** Büyük dosyalar: tarayıcı doğrudan Drive'a yükleyebilsin diye adres üretir. */
+  /**
+   * Büyük dosyalar: tarayıcı doğrudan Drive'a yükleyebilsin diye adres üretir.
+   *
+   * BURASI DA HIZ SINIRINA TABİ. Baytlar bizim üzerimizden geçmiyor ama oturum
+   * açmak da bir kaynak: sınır yalnızca satır içi yükleme ucundayken 8 MB üstü
+   * dosyalar sayaca hiç dokunmuyordu — kullanıcı 40 dosya yükleyip sınırın neden
+   * devreye girmediğini soruyordu. İki yol da aynı kotayı harcamalı.
+   */
   @Post("jobs/:jobId/files/upload-session")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard("jwt"), UploadRateLimitGuard)
   createUploadSession(
     @Param("jobId") jobId: string,
     @Body()
@@ -188,7 +197,7 @@ export class FilesController {
   // gerek kalmasın diye iş, projeden türetilir.
 
   @Post("projects/:projectId/files")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard("jwt"), UploadRateLimitGuard)
   @UseInterceptors(
     FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: INLINE_UPLOAD_LIMIT } })
   )
@@ -205,7 +214,7 @@ export class FilesController {
   }
 
   @Post("projects/:projectId/files/upload-session")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard("jwt"), UploadRateLimitGuard)
   createProjectUploadSession(
     @Param("projectId") projectId: string,
     @Body() body: { name: string; mimeType: string; sizeBytes?: number; taskId?: string; outputId?: string },
@@ -333,15 +342,51 @@ export class FilesController {
     const claims = this.verifyAccessToken(accessToken, id);
     const { response, fileName, mimeType } = await this.filesService.openDownload(id, claims.sub);
 
+    // GÜVENLİK — bu uç, KULLANICININ YÜKLEDİĞİ içeriği BİZİM alan adımızdan
+    // servis ediyor ve Content-Type, yükleme sırasında istemcinin bildirdiği
+    // değerden geliyor (bkz. FilesService.uploadInline: file.mimetype). Yani
+    // içeriği HTML olan bir dosya "text/html" diye yüklenip, çıkan bağlantı
+    // paylaşılarak API alan adımızın altında saldırganın sayfası çalıştırılabilirdi
+    // — oltalama için hazır zemin. Ön yüz bu adresi önizleme için <iframe>'e de
+    // koyuyor (FilePreviewModal), yani sayfa uygulamanın içinde görünürdü.
     res.setHeader("Content-Type", mimeType);
     const length = response.headers.get("content-length");
     if (length) res.setHeader("Content-Length", length);
 
-    // İndirme mi, gömülü önizleme mi? RFC 5987 ile Türkçe karakterli adlar da doğru gider.
-    const disposition = download === "1" ? "attachment" : "inline";
+    // Tarayıcı Content-Type'a uymayıp içeriği "koklayarak" HTML sanmasın.
+    res.setHeader("X-Content-Type-Options", "nosniff");
+
+    // Asıl savunma başlık değil, DAVRANIŞ: yalnızca tarayıcıda güvenle
+    // gösterilebilen türler satır içi (inline) açılır; geri kalan HER ŞEY
+    // indirmeye zorlanır ve indirilen dosya çalışmaz. Böylece saldırganın
+    // Content-Type'ı seçebiliyor olması bir işe yaramıyor.
+    //
+    // Ön yüzü bozmuyor: önizleme zaten yalnızca görsel ve PDF için açılıyor
+    // (bkz. apps/web/src/lib/driveLinks.ts canRenderLocally), diğer türlerde
+    // ya Drive önizleyicisi kullanılıyor ya da indirme.
+    const inlineSafe = mimeType.startsWith("image/") || mimeType === "application/pdf";
+    const disposition = download === "1" || !inlineSafe ? "attachment" : "inline";
+    // RFC 5987 ile Türkçe karakterli adlar da doğru gider.
     res.setHeader(
       "Content-Disposition",
       `${disposition}; filename*=UTF-8''${encodeURIComponent(fileName)}`
+    );
+
+    // Yine de bir HTML bir şekilde satır içi açılırsa script çalışmasın.
+    // `sandbox` YERİNE `default-src 'none'` seçildi: sandbox yanıtı opak bir
+    // origin'e alıyor ve Chrome'un yerleşik PDF görüntüleyicisini bozabiliyor,
+    // oysa default-src 'none' script/alt kaynak yüklemesini engellerken PDF
+    // görüntülemeye dokunmuyor.
+    //
+    // frame-ancestors gerekiyor çünkü helmet global olarak X-Frame-Options:
+    // SAMEORIGIN koyuyor; ön yüz BAŞKA bir origin'de (Netlify) olduğu için o
+    // başlık önizleme iframe'ini engellerdi. Onun yerine çerçevelemeye yalnızca
+    // kendi alan adlarımıza izin veriyoruz.
+    const allowedAncestors = getCorsOrigins();
+    res.removeHeader("X-Frame-Options");
+    res.setHeader(
+      "Content-Security-Policy",
+      `default-src 'none'; frame-ancestors ${allowedAncestors.length ? allowedAncestors.join(" ") : "*"}`
     );
     // İçerik kullanıcıya özel; ara sunucular önbelleğe almamalı.
     res.setHeader("Cache-Control", "private, no-store");

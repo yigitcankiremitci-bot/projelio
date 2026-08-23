@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { ProjectMember } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { requireOneOf } from "../../common/validation/input";
 import { FilesService } from "../files/files.service";
 import { NotificationsService } from "../notifications/notifications.service";
 
@@ -20,6 +21,13 @@ function mapMember(row: any): ProjectMember {
     username: row.users?.username ?? undefined,
   };
 }
+
+/**
+ * project_members.role için izin verilen değerler — 001_init_schema.sql'deki CHECK
+ * kısıtıyla birebir aynı. MemberRole yalnızca bir TypeScript tipi olduğu için
+ * gövdeden gelen rol çalışma anında denetlenmiyordu (controller'da `role?: any`).
+ */
+const PROJECT_MEMBER_ROLES = ["owner", "member", "subcontractor"] as const;
 
 @Injectable()
 export class MembersService {
@@ -154,7 +162,7 @@ export class MembersService {
 
     const { data: row, error } = await this.supabase.client
       .from("project_members")
-      .insert({ project_id: projectId, user_id: userId, role })
+      .insert({ project_id: projectId, user_id: userId, role: requireOneOf(role, PROJECT_MEMBER_ROLES, "Rol") })
       .select()
       .single();
     if (error) throw error;
@@ -245,7 +253,13 @@ export class MembersService {
 
     const { data: row, error } = await this.supabase.client
       .from("project_members")
-      .insert({ project_id: projectId, user_id: userId, role, title: title?.trim() || null, status: "approved" })
+      .insert({
+        project_id: projectId,
+        user_id: userId,
+        role: requireOneOf(role, PROJECT_MEMBER_ROLES, "Rol"),
+        title: title?.trim() || null,
+        status: "approved",
+      })
       .select("*, users(full_name, email, username)")
       .single();
     if (error) throw error;

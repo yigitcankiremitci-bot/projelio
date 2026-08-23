@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Task, TaskAssignee, TaskAttachment } from "@projelio/shared";
+import { requireSafeUrl } from "../../common/safe-url";
+import { visibleTaskIdsForSubcontractor } from "../../common/access/subcontractor";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { applyOrder } from "../../common/reorder.util";
@@ -285,8 +287,13 @@ export class TasksService {
     requestingUserId?: string
   ): Promise<TaskAttachment> {
     await this.assertTaskAccess(await this.getTaskScope(taskId), requestingUserId);
-    const url = (body.url ?? "").trim();
-    if (!url) throw new BadRequestException("Bağlantı adresi boş olamaz");
+    const raw = (body.url ?? "").trim();
+    if (!raw) throw new BadRequestException("Bağlantı adresi boş olamaz");
+
+    // Şema doğrulanmadan kaydedilirse `javascript:...` bir adres olarak saklanır
+    // ve göreve bakan DİĞER ekip üyesine bağlantı diye gösterilir; tıklayanın
+    // tarayıcısında kod çalışır (bkz. @projelio/shared safeUrl).
+    const url = requireSafeUrl(raw, "Bağlantı adresi");
 
     const { data, error } = await this.supabase.client
       .from("task_attachments")
@@ -437,20 +444,24 @@ export class TasksService {
     const role = await this.getMembershipRole(projectId, userId);
     if (role !== "subcontractor") return null;
 
+    // task_assignees DE okunuyor: atama iki yere yazılıyor ve `assigned_to`
+    // yalnızca BİRİNCİ atananı tutuyor (bkz. syncAssignees). Yalnızca o sütuna
+    // bakmak, ikinci atanan taşeronun kendi görevini görememesine yol açıyordu.
     const { data, error } = await this.supabase.client
       .from("tasks")
-      .select("id, assigned_to, parent_task_id")
+      .select("id, assigned_to, parent_task_id, task_assignees(user_id)")
       .eq("project_id", projectId);
     if (error) throw error;
-    const rows = data ?? [];
 
-    const assignedIds = new Set(rows.filter((r: any) => r.assigned_to === userId).map((r: any) => r.id as string));
-    const parentIds = new Set(
-      rows
-        .filter((r: any) => assignedIds.has(r.id) && r.parent_task_id)
-        .map((r: any) => r.parent_task_id as string)
+    return visibleTaskIdsForSubcontractor(
+      (data ?? []).map((r: any) => ({
+        id: r.id as string,
+        assignedTo: r.assigned_to ?? null,
+        assigneeIds: (r.task_assignees ?? []).map((a: any) => a.user_id as string),
+        parentTaskId: r.parent_task_id ?? null,
+      })),
+      userId
     );
-    return new Set([...assignedIds, ...parentIds]);
   }
 
   // Bildirimlerde "atayan" kişinin adı da görünsün diye kullanıcı adını çeker.

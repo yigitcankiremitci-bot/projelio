@@ -432,7 +432,8 @@ export class AiAssistantService {
   private readonly logger = new Logger(AiAssistantService.name);
   private anthropic: Anthropic | null = null;
   // MVP: onay bekleyen kritik işlemler bellekte tutulur. Tek instance için yeterlidir;
-  // çoklu instance / restart senaryosu için ileride Redis'e (proje zaten ioredis kullanıyor) taşınabilir.
+  // çoklu instance / restart senaryosu için ileride paylaşımlı bir depoya taşınabilir.
+  // (ioredis bağımlılıkta duruyor ama kullanılmıyor; Redis servisi de sağlanmış değil.)
   private readonly pendingActions = new Map<string, PendingAction>();
   /** Kullanıcının "devam edeyim mi?" sorusuna cevabını bekleyen koşular. */
   private readonly pendingRuns = new Map<string, PendingRun>();
@@ -564,7 +565,13 @@ export class AiAssistantService {
             "Anthropic hesabınızda API kredisi kalmamış. console.anthropic.com > Plans & Billing üzerinden kredi yükleyin."
           );
         }
-        throw new BadRequestException(`Anthropic isteği reddetti: ${err?.message ?? "geçersiz istek"}`);
+        // Ham sağlayıcı metni kullanıcıya GİTMEZ: Anthropic'in 400 mesajları isteğin
+        // iç yapısını anlatır ("messages.0.content.0.text: field required", model adı,
+        // jeton sınırı…). Kullanıcı için anlamsız, bizim uygulama detayımızı dışarı
+        // veriyor. Teşhis için gereken metin bir satır yukarıda zaten loglanıyor.
+        throw new BadRequestException(
+          "Bu istek işlenemedi. Mesajı kısaltıp ya da ekleri azaltıp tekrar dener misin?"
+        );
       }
       if (status === 429) {
         throw new ServiceUnavailableException(

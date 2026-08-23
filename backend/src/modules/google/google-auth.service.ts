@@ -4,6 +4,7 @@ import { JwtService } from "@nestjs/jwt";
 import { UsersService } from "../users/users.service";
 import { GoogleAccountsService } from "./google-accounts.service";
 import { GoogleIdentity } from "./google-oauth.service";
+import { nowInSeconds } from "../auth/session-payload";
 
 /**
  * Tek kullanımlık devir kodları.
@@ -14,8 +15,10 @@ import { GoogleIdentity } from "./google-oauth.service";
  * veriyoruz; ön yüz onu POST ile gerçek token'la takas ediyor.
  *
  * Bellekte tutuluyor: kod yalnızca saniyeler yaşıyor ve tek istekte harcanıyor.
- * (Backend birden fazla örnekte çalıştırılırsa buranın Redis'e taşınması gerekir —
- * projede zaten ioredis var.)
+ * (Backend birden fazla örnekte çalıştırılırsa buranın paylaşımlı bir depoya
+ * taşınması gerekir. `ioredis` package.json'da bağımlılık olarak duruyor ama kodda
+ * hiçbir yerde kullanılmıyor ve render.yaml'da Redis servisi tanımlı değil — yani
+ * "zaten var" değil, önce sağlanması gerekiyor.)
  */
 interface HandoffEntry {
   token: string;
@@ -104,7 +107,14 @@ export class GoogleAuthService {
     const user = await this.usersService.findById(userId);
     if (!user) throw new UnauthorizedException("Kullanıcı bulunamadı.");
 
-    const token = this.jwtService.sign({ sub: user.id, email: user.email, role: user.role });
+    // loginAt: Google ile giriş de yeni bir oturumdur, mutlak ömür saati burada başlar
+    // (bkz. modules/auth/session-payload.ts).
+    const token = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      loginAt: nowInSeconds(),
+    });
     return { token, isNewUser };
   }
 

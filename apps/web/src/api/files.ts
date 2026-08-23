@@ -154,7 +154,9 @@ export async function uploadFile(
   target: { jobId: string } | { projectId: string } | { departmentId: string },
   file: File,
   context: Omit<FileContext, "projectId"> = {},
-  onProgress?: (ratio: number) => void
+  onProgress?: (ratio: number) => void,
+  /** Verilirse yükleme iptal edilebilir; iptalde AbortError fırlar. */
+  signal?: AbortSignal
 ): Promise<ProjectFile> {
   // Proje ekranından yüklerken işi backend türetir; ön yüzün bilmesine gerek yok.
   const base = targetBase(target);
@@ -168,7 +170,7 @@ export async function uploadFile(
     if (!isDepartment && context.taskId) form.append("taskId", context.taskId);
     if (!isDepartment && context.outputId) form.append("outputId", context.outputId);
     onProgress?.(0.1);
-    const result = await api.uploadFile<ProjectFile>(`${base}/files`, form);
+    const result = await api.uploadFile<ProjectFile>(`${base}/files`, form, signal);
     onProgress?.(1);
     return result;
   }
@@ -184,7 +186,7 @@ export async function uploadFile(
     }
   );
 
-  const driveFileId = await uploadInChunks(session.uploadUrl, file, onProgress);
+  const driveFileId = await uploadInChunks(session.uploadUrl, file, onProgress, signal);
   return api.post<ProjectFile>(`/files/sessions/${session.sessionId}/complete`, { driveFileId });
 }
 
@@ -202,11 +204,17 @@ export async function uploadFile(
 async function uploadInChunks(
   uploadUrl: string,
   file: File,
-  onProgress?: (ratio: number) => void
+  onProgress?: (ratio: number) => void,
+  signal?: AbortSignal
 ): Promise<string> {
   let offset = 0;
 
   while (offset < file.size) {
+    // Parçalar arasında da bakılıyor: fetch'e verilen signal yalnızca UÇUŞTAKİ
+    // isteği kesiyor, döngünün kendisini durdurmuyor. İkisi olmadan iptal,
+    // sıradaki parçayla sessizce devam ederdi.
+    if (signal?.aborted) throw new DOMException("Yükleme iptal edildi", "AbortError");
+
     const end = Math.min(offset + CHUNK_SIZE, file.size);
     const chunk = file.slice(offset, end);
 
@@ -214,6 +222,7 @@ async function uploadInChunks(
       method: "PUT",
       headers: { "Content-Range": `bytes ${offset}-${end - 1}/${file.size}` },
       body: chunk,
+      signal,
     });
 
     // Google: parça alındı, sonraki parça bekleniyor.

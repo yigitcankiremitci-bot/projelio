@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { ModuleAccess, ModuleMember, ModuleMemberRole } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { requireOneOf, optionalOneOf, requireUuid } from "../../common/validation/input";
 import { NotificationsService } from "../notifications/notifications.service";
 import { NO_ACCESS, decideAccess } from "./module-access";
 
@@ -35,6 +36,18 @@ function mapModuleMember(row: any): ModuleMember {
  *
  * Bkz. database/migrations/042_module_members.sql
  */
+/**
+ * module_members.role için izin verilen değerler — 042_module_members.sql'deki
+ * CHECK kısıtıyla birebir aynı olmalı.
+ *
+ * NEDEN KODDA DA VAR: ModuleMemberRole bir TypeScript tipi, derlemede siliniyor.
+ * Gövdeden gelen `role` çalışma anında herhangi bir metin olabiliyordu; kısıtı
+ * yalnızca veritabanı yakalıyor ve kullanıcıya sebebi anlaşılmayan bir 500
+ * dönüyordu. Rol bir yetki kararı (bkz. aşağıdaki `row.role === "manager"`),
+ * o yüzden son çare veritabanı olmalı, tek çare değil.
+ */
+const MODULE_MEMBER_ROLES = ["manager", "employee", "subcontractor"] as const;
+
 @Injectable()
 export class ModuleMembersService {
   constructor(
@@ -113,7 +126,12 @@ export class ModuleMembersService {
       .is("removed_at", null);
     // Departman bağlamındaki atamalar kadar organizasyon geneli (department_id
     // boş) atamalar da geçerlidir — org geneli atanan kişi her departmanda yazabilir.
-    if (departmentId) memberQuery = memberQuery.or(`department_id.eq.${departmentId},department_id.is.null`);
+    if (departmentId) {
+      // departmentId istemciden geliyor ve aşağıda filtre METNİNE gömülüyor;
+      // doğrulanmazsa virgülle yeni koşul eklenebilirdi (bkz. requireUuid).
+      const deptId = requireUuid(departmentId, "Departman kimliği");
+      memberQuery = memberQuery.or(`department_id.eq.${deptId},department_id.is.null`);
+    }
 
     const { data: memberRows } = await memberQuery;
 
@@ -218,7 +236,10 @@ export class ModuleMembersService {
       .is("removed_at", null)
       .order("created_at", { ascending: true });
     // Organizasyon geneli atamalar (department_id boş) her departmanın ekibinde görünür.
-    if (departmentId) query = query.or(`department_id.eq.${departmentId},department_id.is.null`);
+    if (departmentId) {
+      const deptId = requireUuid(departmentId, "Departman kimliği");
+      query = query.or(`department_id.eq.${deptId},department_id.is.null`);
+    }
 
     const { data, error } = await query;
     if (error) throw error;
@@ -280,7 +301,7 @@ export class ModuleMembersService {
         module_key: payload.moduleKey,
         user_id: payload.userId ?? null,
         invite_email: payload.inviteEmail ?? null,
-        role: payload.role ?? "employee",
+        role: requireOneOf(payload.role ?? "employee", MODULE_MEMBER_ROLES, "Rol"),
         // Hesabı olan kişi doğrudan aktif üye olur; e-posta ile davet edilen
         // kişi hesap açana kadar davet durumunda bekler.
         status: payload.userId ? "approved" : "invited",
@@ -332,6 +353,7 @@ export class ModuleMembersService {
   }
 
   async updateRole(id: string, role: ModuleMemberRole, requestingUserId?: string): Promise<ModuleMember> {
+    requireOneOf(role, MODULE_MEMBER_ROLES, "Rol");
     const existing = await this.findOne(id);
     await this.assertCanManageTeam(
       { organizationId: existing.organizationId, jobId: existing.jobId, departmentId: existing.departmentId },

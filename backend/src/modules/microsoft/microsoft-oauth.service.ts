@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { isMicrosoftTokenCryptoConfigured } from "./microsoft-token-crypto.util";
+import { getWebAppUrl } from "../../common/config/env";
 
 // "common" tenant: hem kişisel (outlook.com/hotmail.com) hem iş/okul hesapları
 // aynı uç noktadan geçer. Projelio kimin hangi organizasyona ait olduğuyla
@@ -136,7 +137,7 @@ export class MicrosoftOAuthService {
   }
 
   get webAppUrl(): string {
-    return process.env.WEB_APP_URL?.trim() || "http://localhost:5173";
+    return getWebAppUrl();
   }
 
   /** OneDrive özellikleri kullanılabilir mi? (istemci kimlikleri + token şifreleme anahtarı) */

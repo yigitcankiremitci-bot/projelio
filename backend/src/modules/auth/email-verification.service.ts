@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { UsersService, normalizeEmail } from "../users/users.service";
 import { EmailService } from "./email.service";
+import { getWebAppUrl } from "../../common/config/env";
 
 // Şifre sıfırlamadan (1 saat) bilinçli olarak daha uzun: kullanıcı kaydolduktan
 // sonra e-postasını hemen açmayabilir, ertesi gün dönebilir.
@@ -52,7 +53,7 @@ export class EmailVerificationService {
     });
     if (error) throw error;
 
-    const webAppUrl = process.env.WEB_APP_URL ?? "http://localhost:5173";
+    const webAppUrl = getWebAppUrl();
     await this.emailService.sendVerificationEmail(email, `${webAppUrl}/verify-email?token=${token}`);
   }
 

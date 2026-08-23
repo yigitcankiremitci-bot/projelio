@@ -16,6 +16,7 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { AuthGuard } from "@nestjs/passport";
+import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guard";
 import { memoryStorage } from "multer";
 import { JobsService } from "./jobs.service";
 import { ProjectsService } from "../projects/projects.service";
@@ -97,6 +98,7 @@ export class JobsController {
   }
 
   @Post(":id/cover")
+  @UseGuards(UploadRateLimitGuard)
   @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }))
   uploadCover(@Param("id") id: string, @Req() req: any, @UploadedFile() file?: Express.Multer.File) {
     if (!file) throw new BadRequestException("Dosya bulunamadı");

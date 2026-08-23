@@ -390,7 +390,9 @@ export default function OperationDetail() {
         />
       )}
 
-      {editing && operation && <EditOperationModal operation={operation} onClose={() => setEditing(false)} />}
+      {editing && operation && (
+        <EditOperationModal operation={operation} onClose={() => setEditing(false)} onSaved={reload} />
+      )}
 
       {openOccurrence && (
         <TaskEditModal

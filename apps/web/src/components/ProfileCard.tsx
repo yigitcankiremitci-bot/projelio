@@ -317,7 +317,18 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
           }}
         >
           {user.avatarUrl ? (
-            <img src={user.avatarUrl} alt={user.fullName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img
+              src={user.avatarUrl}
+              // alt BİLEREK BOŞ: görsel yüklenemezse tarayıcı alt metnini yazar ve
+              // yuvarlak avatar alanında taşan bir isim/e-posta görünür. Burada
+              // isim zaten kartın içinde ayrıca yazıyor, alt metnin bilgi değeri yok.
+              alt=""
+              // Kırık görselde <img> gizlenir; arkadaki simge yer tutucu görünür.
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
           ) : (
             <IconUser size={compact ? 30 : 44} color={c.textSecondary} />
           )}

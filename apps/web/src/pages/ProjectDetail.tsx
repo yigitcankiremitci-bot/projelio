@@ -681,7 +681,9 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      {editing && project && <EditProjectModal project={project} onClose={() => setEditing(false)} />}
+      {editing && project && (
+        <EditProjectModal project={project} onClose={() => setEditing(false)} onSaved={reloadAll} />
+      )}
 
       {extendingDeadline && project && (
         <ExtendDeadlineModal

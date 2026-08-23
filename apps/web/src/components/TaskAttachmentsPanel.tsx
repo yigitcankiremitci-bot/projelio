@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { TaskAttachment } from "@projelio/shared";
+import { safeExternalUrl } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { publishTaskAttachments } from "../lib/taskAttachmentEvents";
@@ -196,7 +197,9 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
               }}
             >
               <a
-                href={a.url}
+                // Kullanıcının yazdığı adres. `javascript:` şemasını React
+                // kaçırmaz; güvenli değilse bağlantı hiç kurulmaz.
+                href={safeExternalUrl(a.url) ?? undefined}
                 target="_blank"
                 rel="noreferrer"
                 style={{

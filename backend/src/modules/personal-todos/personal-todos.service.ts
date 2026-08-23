@@ -316,7 +316,9 @@ export class PersonalTodosService {
       p_items: payload,
     });
     if (error) {
-      if (error.code === "22023") throw new BadRequestException(error.message);
+      // 22023, SQL fonksiyonunun kendi doğrulaması ("p_items bir dizi olmali").
+      // Metin iç parametre adını içeriyor; kullanıcıya bunu göstermenin anlamı yok.
+      if (error.code === "22023") throw new BadRequestException("Sıralama isteği geçersiz.");
       throw error;
     }
     return { ok: true };

@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
-import * as bcrypt from "bcrypt";
+import { hashPassword, verifyPassword } from "../../common/password.util";
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
+import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { detectImageUpload } from "../../common/upload-image.util";
 
 const AVATAR_BUCKET = "avatars";
@@ -17,6 +18,8 @@ export interface UserRecord {
   username: string;
   // Google ile kayıt olan kullanıcılarda şifre yoktur.
   passwordHash?: string;
+  /** Dolu ise hesap silinmiş: giriş kapalı, kimlik alanları anonimleştirilmiş. */
+  deletedAt?: string;
   role: "admin" | "freelancer";
   accountType: AccountType;
   activeTaskId?: string;
@@ -55,6 +58,7 @@ function mapUser(row: any): UserRecord {
     email: row.email,
     username: row.username,
     passwordHash: row.password_hash ?? undefined,
+    deletedAt: row.deleted_at ?? undefined,
     role: row.role,
     accountType: row.account_type,
     activeTaskId: row.active_task_id ?? undefined,
@@ -97,6 +101,26 @@ export function assertValidUsername(username: string): void {
 export class UsersService {
   constructor(private supabase: SupabaseService) {}
 
+  /**
+   * Kullanıcı adı alınmış mı?
+   *
+   * Kayıtta e-posta ve kullanıcı adı çakışması AYRI ele alınmak zorunda: kullanıcı
+   * adı uygulamada zaten herkese görünen bir tanımlayıcı, "alınmış" demek bir şey
+   * sızdırmaz. E-posta ise sızdırır (bkz. AuthService.register). Tek bir 23505
+   * hatasından hangisinin çakıştığı anlaşılmadığı için kullanıcı adı burada
+   * önceden kontrol ediliyor.
+   */
+  async isUsernameTaken(rawUsername: string): Promise<boolean> {
+    const username = normalizeUsername(rawUsername);
+    const { data, error } = await this.supabase.client
+      .from("users")
+      .select("id")
+      .eq("username", username)
+      .maybeSingle();
+    if (error) throw error;
+    return Boolean(data);
+  }
+
   async create(data: { fullName: string; email: string; passwordHash: string; username: string }): Promise<UserRecord> {
     const username = normalizeUsername(data.username);
     assertValidUsername(username);
@@ -113,7 +137,10 @@ export class UsersService {
       .select()
       .single();
     if (error) {
-      if ((error as any).code === "23505") throw new ConflictException("Bu kullanıcı adı veya e-posta zaten kullanılıyor.");
+      // Buraya normalde düşülmez: AuthService.register hem kullanıcı adını hem
+      // e-postayı önceden kontrol ediyor. Kalan tek durum yarış (aynı anda iki
+      // kayıt) — mesaj bilerek hangi alanın çakıştığını söylemiyor.
+      if ((error as any).code === "23505") throw new ConflictException("Bu bilgilerle kayıt oluşturulamadı, tekrar deneyin.");
       throw error;
     }
     return mapUser(row);
@@ -225,20 +252,65 @@ export class UsersService {
     return user ? toPublicUser(user) : undefined;
   }
 
-  // Ekip üyesi ekleme modalindeki arama kutusu için: kullanıcı adı (@handle'sız da
-  // yazılabilir), e-posta veya ad soyada göre kısıtlı sayıda sonuç döner.
+  /**
+   * Ekip üyesi ekleme modalindeki arama kutusu için: kullanıcı adı (@handle'sız da
+   * yazılabilir), e-posta veya ad soyada göre kısıtlı sayıda sonuç döner.
+   *
+   * ÜÇ AYRI SORGU, TEK BİR `.or(...)` YERİNE — güvenlik gerekçesiyle.
+   *
+   * Eskiden şöyleydi:
+   *   .or(`username.ilike.%${term}%,email.ilike.%${term}%,full_name.ilike.%${term}%`)
+   *
+   * `.or()` argümanı PostgREST'e METİN olarak gidiyor ve orada ayrıştırılıyor;
+   * yani arama terimi filtrenin SÖZDİZİMİNİN içine giriyordu. Terimdeki bir virgül
+   * yeni bir koşul açıyordu. Eski kod yalnızca `%` ve `_` kaçırıyordu (LIKE joker
+   * karakterleri), virgülü değil — ve PostgREST'te joker olarak `*` de kullanılabildiği
+   * için o kaçış bir engel oluşturmuyordu.
+   *
+   * Sonuç: giriş yapmış herhangi biri `q` alanına virgülle yeni bir koşul ekleyip
+   * İSTEDİĞİ SÜTUNA göre sorgu yapabiliyordu — `password_hash.like.$2b$12$a*` gibi
+   * bir koşulla, sonucun boş dönüp dönmediğine bakarak başka kullanıcıların şifre
+   * hash'ini karakter karakter çıkarmak mümkündü. (SQL injection değil, PostgREST
+   * filtre injection'ı; etkisi kör SQL injection'la aynı kapıya çıkıyor.)
+   *
+   * `.ilike(sütun, desen)` ise deseni PARAMETRE olarak geçiriyor: metin filtre
+   * sözdizimi olarak ayrıştırılmıyor, dolayısıyla enjeksiyon yapısal olarak
+   * imkânsız. Aynı yaklaşım planning.service.ts'te de tercih edilmişti.
+   */
   async search(query: string, limit = 8): Promise<PublicUser[]> {
     const term = normalizeUsername(query || "");
     if (!term) return [];
-    const escaped = term.replace(/[%_]/g, (m) => `\\${m}`);
 
-    const { data, error } = await this.supabase.client
-      .from("users")
-      .select()
-      .or(`username.ilike.%${escaped}%,email.ilike.%${escaped}%,full_name.ilike.%${escaped}%`)
-      .limit(limit);
-    if (error) throw error;
-    return (data ?? []).map((row: any) => toPublicUser(mapUser(row)));
+    // LIKE joker karakterleri hâlâ kaçırılıyor: "%" yazan biri tüm kullanıcıları
+    // listelememeli. Ters bölü de kaçırılmalı, yoksa kaçış karakterinin kendisi
+    // desene sızar.
+    const pattern = `%${term.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+    const columns = ["username", "email", "full_name"] as const;
+
+    const results = await Promise.all(
+      columns.map(async (column) => {
+        const { data, error } = await this.supabase.client
+          .from("users")
+          .select()
+          .ilike(column, pattern)
+          .limit(limit);
+        if (error) throw error;
+        return data ?? [];
+      })
+    );
+
+    // Sütun sırası korunur (önce kullanıcı adı eşleşmeleri), aynı kişi tekrarlanmaz.
+    const seen = new Set<string>();
+    const merged: PublicUser[] = [];
+    for (const rows of results) {
+      for (const row of rows) {
+        if (seen.has(row.id)) continue;
+        seen.add(row.id);
+        merged.push(toPublicUser(mapUser(row)));
+        if (merged.length >= limit) return merged;
+      }
+    }
+    return merged;
   }
 
   // İlk giriş onboarding sihirbazını tamamlar: hesap tipini kaydeder. Organizasyon/Grup
@@ -328,23 +400,31 @@ export class UsersService {
 
     if (user.passwordHash) {
       if (!currentPassword) throw new BadRequestException("Mevcut şifreni gir.");
-      if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      if (!(await verifyPassword(currentPassword, user.passwordHash))) {
         throw new BadRequestException("Mevcut şifre hatalı.");
       }
-      if (await bcrypt.compare(newPassword, user.passwordHash)) {
+      if (await verifyPassword(newPassword, user.passwordHash)) {
         throw new BadRequestException("Yeni şifre eskisiyle aynı olamaz.");
       }
     }
 
-    // Tur sayısı kayıt akışıyla aynı olmalı (bkz. auth.service register).
-    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.updatePasswordHash(userId, await hashPassword(newPassword));
+    return { ok: true, hasPassword: true };
+  }
+
+  /**
+   * Yalnızca hash sütununu günceller.
+   *
+   * changePassword ile aynı işi yapan tek satır burada duruyor çünkü giriş akışı
+   * da buna ihtiyaç duyuyor: bcrypt maliyeti yükseltildiğinde eski hash'ler
+   * başarılı girişte sessizce tazeleniyor (bkz. auth.service.ts login).
+   */
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
     const { error } = await this.supabase.client
       .from("users")
       .update({ password_hash: passwordHash })
       .eq("id", userId);
     if (error) throw error;
-
-    return { ok: true, hasPassword: true };
   }
 
   async uploadAvatar(userId: string, file: Express.Multer.File): Promise<PublicUser> {
@@ -368,6 +448,11 @@ export class UsersService {
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new ConflictException("Kullanıcı bulunamadı");
+
+    // Kayıt güncellendikten SONRA temizle: güncelleme başarısız olursa eski görsel
+    // yerinde kalsın, kayıt silinmiş bir dosyaya işaret etmesin.
+    await removeStaleUploadsInFolder(this.supabase.client, AVATAR_BUCKET, path);
+
     return toPublicUser(mapUser(row));
   }
 }

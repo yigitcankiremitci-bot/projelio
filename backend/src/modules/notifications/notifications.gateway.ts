@@ -8,16 +8,13 @@ import {
 } from "@nestjs/websockets";
 import { JwtService } from "@nestjs/jwt";
 import { Server, Socket } from "socket.io";
+import { getGatewayCorsOrigin } from "../../common/config/env";
 import type { NotificationPayload } from "@projelio/shared";
 
-// CORS_ORIGINS tanımlıysa yalnızca o alan adlarına izin verilir (main.ts'teki HTTP
-// CORS ayarıyla aynı desen); tanımlı değilse (yerel geliştirme) her yere açık kalır.
-const corsOrigins = (process.env.CORS_ORIGINS ?? "")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
-
-@WebSocketGateway({ cors: { origin: corsOrigins.length ? corsOrigins : "*" } })
+// CORS kaynağı main.ts'teki HTTP ayarıyla AYNI listeden gelir (bkz.
+// common/config/env.ts getGatewayCorsOrigin) — burada ayrıca ayrıştırılmıyor,
+// yoksa oradaki normalleştirme bu tarafa hiç ulaşmazdı.
+@WebSocketGateway({ cors: { origin: getGatewayCorsOrigin() } })
 export class NotificationsGateway {
   private readonly logger = new Logger(NotificationsGateway.name);
 

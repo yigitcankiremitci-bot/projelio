@@ -44,6 +44,17 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
   const [members, setMembers] = useState<ModuleMember[]>([]);
   const [resolved, setResolved] = useState<ModuleAccess | undefined>(access);
   const [candidates, setCandidates] = useState<{ userId: string; label: string }[]>([]);
+  /**
+   * Aday listesi neden boş? Üç ayrı sebep var ve kullanıcıya hepsi "kimse yok"
+   * diye görünüyordu:
+   *   - istek başarısız oldu (eskiden sessizce yutuluyordu),
+   *   - kadro gerçekten boş,
+   *   - kadro dolu ama kimse ATANABİLİR değil (daveti kabul etmemiş, hesabı yok,
+   *     ya da zaten bu modüle atanmış).
+   * Üçü için üç ayrı cümle gerekiyor; yoksa kullanıcı "kadroda kişi var, neden
+   * yok diyor" diye takılıp kalıyor.
+   */
+  const [candidateState, setCandidateState] = useState<{ toplam: number; hata: boolean }>({ toplam: 0, hata: false });
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -77,17 +88,21 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
     if (jobId) {
       api
         .get<JobMember[]>(`/jobs/${jobId}/members`)
-        .then((list) =>
+        .then((list) => {
+          // Yanıt bekleyen / reddetmiş davetler ekipten sayılmaz — modüle
+          // atanacak kişiler yalnızca daveti kabul etmiş olanlardır
+          // (departman tarafındaki status === "approved" kuralıyla aynı).
           setCandidates(
-            // Yanıt bekleyen / reddetmiş davetler ekipten sayılmaz — modüle
-            // atanacak kişiler yalnızca daveti kabul etmiş olanlardır
-            // (departman tarafındaki status === "approved" kuralıyla aynı).
             list
               .filter((m) => m.status === "approved" && !assigned.has(m.userId))
               .map((m) => ({ userId: m.userId, label: displayName(m) }))
-          )
-        )
-        .catch(() => setCandidates([]));
+          );
+          setCandidateState({ toplam: list.length, hata: false });
+        })
+        .catch(() => {
+          setCandidates([]);
+          setCandidateState({ toplam: 0, hata: true });
+        });
       return;
     }
     if (!departmentId) {
@@ -96,14 +111,18 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
     }
     api
       .get<DepartmentMember[]>(`/departments/${departmentId}/members`)
-      .then((list) =>
+      .then((list) => {
         setCandidates(
           list
             .filter((m) => m.userId && m.status === "approved" && !assigned.has(m.userId))
             .map((m) => ({ userId: m.userId as string, label: `${displayName(m)}${m.title ? ` · ${m.title}` : ""}` }))
-        )
-      )
-      .catch(() => setCandidates([]));
+        );
+        setCandidateState({ toplam: list.length, hata: false });
+      })
+      .catch(() => {
+        setCandidates([]);
+        setCandidateState({ toplam: 0, hata: true });
+      });
   }, [adding, jobId, departmentId, members]);
 
   const canManage = resolved?.canManageTeam ?? false;
@@ -276,10 +295,15 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
           }}
         >
           {candidates.length === 0 ? (
-            <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
-              {jobId
-                ? "Bu işte atanabilecek başka kişi yok."
-                : "Bu departmanın kadrosunda atanabilecek başka kişi yok. Önce kadroya kişi ekle."}
+            <p style={{ fontSize: 13, color: candidateState.hata ? c.danger : c.textSecondary, margin: 0 }}>
+              {candidateState.hata
+                ? "Kadro listesi yüklenemedi. Sayfayı yenileyip tekrar dene."
+                : candidateState.toplam === 0
+                  ? jobId
+                    ? "Bu işin ekibi henüz boş. Önce ekibe kişi ekle."
+                    : "Bu departmanın kadrosu henüz boş. Önce kadroya kişi ekle."
+                  : "Kadrodaki herkes ya bu modüle zaten atanmış ya da daveti henüz kabul etmemiş. " +
+                    "Daveti bekleyenler kabul edince burada görünür."}
             </p>
           ) : (
             candidates.map((p) => (

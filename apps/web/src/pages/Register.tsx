@@ -28,7 +28,11 @@ export default function Register() {
       await api.post("/auth/register", { fullName, email, password, username });
       setRegistered(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kayıt oluşturulamadı. E-posta zaten kullanılıyor olabilir.");
+      // "E-posta zaten kullanılıyor" ARTIK BİR HATA DEĞİL: adres kayıtlıysa sunucu
+      // yeni kayıtla aynı yanıtı döndürüp gerçek sahibine bildirim e-postası atıyor
+      // (hesap varlığını sızdırmamak için, bkz. backend AuthService.register).
+      // Buraya düşen tek beklenen durum kullanıcı adı çakışması.
+      setError(err instanceof Error ? err.message : "Kayıt oluşturulamadı, tekrar dener misin?");
     } finally {
       setLoading(false);
     }
@@ -75,8 +79,20 @@ export default function Register() {
             <strong style={{ color: c.textPrimary }}>{email}</strong> adresine bir doğrulama bağlantısı gönderdik.
             Bağlantıya tıkladıktan sonra giriş yapabilirsin.
           </p>
-          <p style={{ color: c.textSecondary, fontSize: 13, margin: "0 0 22px", lineHeight: 1.6 }}>
+          <p style={{ color: c.textSecondary, fontSize: 13, margin: "0 0 6px", lineHeight: 1.6 }}>
             Bağlantı 24 saat geçerli. E-posta birkaç dakika içinde gelmezse spam klasörüne de bak.
+          </p>
+          {/*
+            Bu cümle, kayıt ucunun bilerek sessiz kalmasının karşılığı: adres ZATEN
+            kayıtlıysa sunucu yeni kayıtla birebir aynı yanıtı döndürüyor (hesap
+            varlığını sızdırmamak için, bkz. backend AuthService.register). O zaman
+            kullanıcı "kayıt oldum sandım" diye kalıyordu. Burada ne olduğunu
+            anlatıyoruz ama HER İKİ durumda da aynı metni gösteriyoruz — saldırgan
+            ayırt edemesin, gerçek kullanıcı da şaşırmasın.
+          */}
+          <p style={{ color: c.textSecondary, fontSize: 13, margin: "0 0 22px", lineHeight: 1.6 }}>
+            Bu adresle zaten bir hesabın varsa yeni hesap açılmadı; onun yerine giriş
+            yapmanı hatırlatan bir e-posta gönderdik.
           </p>
 
           {resendState === "sent" ? (

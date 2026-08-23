@@ -1,6 +1,7 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from "@nestjs/common";
 import { Observable, tap } from "rxjs";
 import { RealtimeGateway } from "./realtime.gateway";
+import { redactUrl } from "../../common/redact-url";
 
 /**
  * Her başarılı değiştirme isteğinden sonra, isteği yapan kullanıcının bulunduğu
@@ -34,7 +35,11 @@ export class RealtimeChangeInterceptor implements NestInterceptor {
         if (!socketId || !userId) return;
         this.gateway.broadcastChange(String(socketId), String(userId), {
           method,
-          path: String(req.originalUrl ?? req.url ?? ""),
+          // Bu adres AYNI ODADAKİ DİĞER KULLANICILARA gönderiliyor
+          // (gateway.broadcastChange). Query string'inde bir kimlik bilgisi
+          // olursa başkasının tarayıcısına ulaşırdı; bugün böyle bir uç yok ama
+          // temizlik yeni uç eklendiğinde de korusun diye burada duruyor.
+          path: redactUrl(String(req.originalUrl ?? req.url ?? "")),
         });
       })
     );

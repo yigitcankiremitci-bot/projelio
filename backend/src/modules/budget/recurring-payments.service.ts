@@ -1,8 +1,16 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { RecurrenceInterval, RecurringPayment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { requireAmount, requireOneOf, optionalOneOf } from "../../common/validation/input";
 
 const INTERVALS: RecurrenceInterval[] = ["weekly", "monthly", "yearly"];
+
+/**
+ * recurring_payments.type için izin verilen değerler — 020_budget_ledger_and_recurring.sql
+ * içindeki CHECK kısıtıyla birebir aynı. (budget_transactions'tan farklı: burada
+ * "payout" yok.)
+ */
+const RECURRING_TYPES = ["income", "expense"] as const;
 
 function mapPayment(row: any): RecurringPayment {
   return {
@@ -81,8 +89,8 @@ export class RecurringPaymentsService {
       .insert({
         owner_id: userId,
         project_id: data.projectId ?? null,
-        type: data.type ?? "expense",
-        amount: data.amount ?? 0,
+        type: requireOneOf(data.type ?? "expense", RECURRING_TYPES, "Ödeme türü"),
+        amount: requireAmount(data.amount ?? 0),
         description: data.description ?? null,
         interval: data.interval,
         next_due_date: data.nextDueDate,
@@ -102,8 +110,10 @@ export class RecurringPaymentsService {
     if (data.projectId) await this.assertOwnsProject(data.projectId, userId);
 
     const patch: Record<string, any> = {};
-    if (data.type !== undefined) patch.type = data.type;
-    if (data.amount !== undefined) patch.amount = data.amount;
+    // Bu iki alan create()'te assertValid()'ten geçiyordu ama update() yolunda hiç
+    // kontrol edilmiyordu: mevcut bir düzenli ödemenin tutarı negatife çekilebiliyordu.
+    if (data.type !== undefined) patch.type = optionalOneOf(data.type, RECURRING_TYPES, "Ödeme türü");
+    if (data.amount !== undefined) patch.amount = this.assertPositiveAmount(data.amount);
     if (data.description !== undefined) patch.description = data.description || null;
     if (data.interval !== undefined) {
       if (!INTERVALS.includes(data.interval)) throw new BadRequestException("Geçersiz tekrar aralığı");
@@ -169,7 +179,18 @@ export class RecurringPaymentsService {
       throw new BadRequestException("Geçersiz tekrar aralığı");
     }
     if (!data.nextDueDate) throw new BadRequestException("İlk ödeme tarihi gerekli");
-    if (!data.amount || data.amount <= 0) throw new BadRequestException("Tutar sıfırdan büyük olmalı");
+    this.assertPositiveAmount(data.amount);
+  }
+
+  /**
+   * Düzenli ödemede tutar sıfır olamaz (sıfırlık bir ödemeyi tekrarlamanın anlamı yok),
+   * bu yüzden requireAmount'un ">= 0" kuralının üstüne "> 0" ekleniyor. Üst sınır ve
+   * sayı/metin çevrimi requireAmount'tan geliyor.
+   */
+  private assertPositiveAmount(value: unknown): number {
+    const amount = requireAmount(value);
+    if (amount <= 0) throw new BadRequestException("Tutar sıfırdan büyük olmalı");
+    return amount;
   }
 
   private async assertOwner(id: string, userId: string): Promise<void> {

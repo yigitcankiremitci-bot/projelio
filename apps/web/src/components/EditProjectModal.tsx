@@ -9,6 +9,15 @@ import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 
 interface Props {
+  /**
+   * Kaydetme bittiğinde çağrılır. Verilmezse sayfa BAŞTAN YÜKLENİR.
+   *
+   * Eskiden tek yol yeniden yüklemekti: kapak yükledikten sonra tüm sayfa
+   * sıfırlanıyor, kullanıcı kaydırma konumunu ve açık sekmesini kaybediyordu —
+   * dosya yükledikten sonraki o sarsıntının sebebi buydu. Ebeveyn kendi
+   * verisini tazeleyebiliyorsa yenilemeye gerek yok.
+   */
+  onSaved?: () => void;
   project: Project;
   onClose: () => void;
 }
@@ -17,7 +26,7 @@ function toDateInputValue(iso: string) {
   return new Date(iso).toISOString().slice(0, 10);
 }
 
-export default function EditProjectModal({ project, onClose }: Props) {
+export default function EditProjectModal({ project, onClose, onSaved }: Props) {
   const c = useThemeColors();
   const navigate = useNavigate();
   const [title, setTitle] = useState(project.title);
@@ -71,7 +80,12 @@ export default function EditProjectModal({ project, onClose }: Props) {
         formData.append("file", resized);
         await api.uploadFile(`/projects/${project.id}/cover`, formData);
       }
-      window.location.reload();
+      if (onSaved) {
+        onSaved();
+        onClose();
+      } else {
+        window.location.reload();
+      }
     } catch {
       setError("Proje güncellenemedi. Tekrar dene.");
       setLoading(false);

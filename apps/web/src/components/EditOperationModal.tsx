@@ -9,6 +9,12 @@ import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 
 interface Props {
+  /**
+   * Kaydetme bittiğinde çağrılır. Verilmezse sayfa baştan yüklenir.
+   * (Gerekçesi EditProjectModal'daki aynı alanla ortak: kapak yükledikten sonra
+   * tüm sayfanın sıfırlanması kaydırma konumunu ve açık sekmeyi kaybettiriyordu.)
+   */
+  onSaved?: () => void;
   operation: Operation;
   onClose: () => void;
 }
@@ -28,7 +34,7 @@ const periods: { value: OperationBudgetPeriod; label: string }[] = [
  * Durum (aktif/duraklat/kapat) burada değil, sayfadaki düğmelerde kalır — kapatma
  * bitiş tarihi sorduğu için ayrı bir akış.
  */
-export default function EditOperationModal({ operation, onClose }: Props) {
+export default function EditOperationModal({ operation, onClose, onSaved}: Props) {
   const c = useThemeColors();
   const navigate = useNavigate();
   const [title, setTitle] = useState(operation.title);
@@ -80,7 +86,12 @@ export default function EditOperationModal({ operation, onClose }: Props) {
         formData.append("file", resized);
         await api.uploadFile(`/operations/${operation.id}/cover`, formData);
       }
-      window.location.reload();
+      if (onSaved) {
+        onSaved();
+        onClose();
+      } else {
+        window.location.reload();
+      }
     } catch {
       setError("Rutin güncellenemedi. Tekrar dene.");
       setLoading(false);

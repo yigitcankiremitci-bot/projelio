@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Group } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { JobsService } from "../jobs/jobs.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { applyOrder } from "../../common/reorder.util";
@@ -227,6 +228,12 @@ export class GroupsService {
 
     const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);
 
-    return this.update(id, { coverImageUrl: publicUrlData.publicUrl });
+    const updated = await this.update(id, { coverImageUrl: publicUrlData.publicUrl });
+
+    // Kayıt güncellendikten SONRA temizle: güncelleme başarısız olursa eski görsel
+    // yerinde kalsın, kayıt silinmiş bir dosyaya işaret etmesin.
+    await removeStaleUploadsInFolder(this.supabase.client, COVER_BUCKET, path);
+
+    return updated;
   }
 }

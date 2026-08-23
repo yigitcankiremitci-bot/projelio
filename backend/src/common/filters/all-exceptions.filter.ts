@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { describeCause, describeError, isNetworkFailure } from "../network-errors";
+import { redactUrl } from "../redact-url";
 
 /**
  * Global hata filtresi.
@@ -22,7 +23,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const where = `${request.method} ${request.originalUrl ?? request.url}`;
+    // Adres HAM hâlde yazılmaz: query string'inde dosya erişim jetonu (?t=),
+    // OAuth kodu ve state jetonu dolaşıyor (bkz. common/redact-url.ts).
+    const where = `${request.method} ${redactUrl(request.originalUrl ?? request.url)}`;
 
     // Beklenen (iş kuralı) hataları olduğu gibi geçir; bunlar zaten anlamlı:
     // yetki reddi, doğrulama, bulunamadı.

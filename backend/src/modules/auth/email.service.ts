@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { getWebAppUrl, isProduction } from "../../common/config/env";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -22,11 +23,7 @@ export class EmailService {
 
   async sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
     if (!this.apiKey) {
-      this.logger.warn(
-        `E-posta sağlayıcısı yapılandırılmadı (RESEND_API_KEY yok) — ` +
-          `şifre sıfırlama bağlantısı gönderilemedi, buraya loglanıyor.\n` +
-          `Alıcı: ${to}\nBağlantı: ${resetUrl}`
-      );
+      this.logUndeliverable("şifre sıfırlama", to, resetUrl);
       return;
     }
 
@@ -40,11 +37,7 @@ export class EmailService {
 
   async sendVerificationEmail(to: string, verifyUrl: string): Promise<void> {
     if (!this.apiKey) {
-      this.logger.warn(
-        `E-posta sağlayıcısı yapılandırılmadı (RESEND_API_KEY yok) — ` +
-          `doğrulama bağlantısı gönderilemedi, buraya loglanıyor.\n` +
-          `Alıcı: ${to}\nBağlantı: ${verifyUrl}`
-      );
+      this.logUndeliverable("e-posta doğrulama", to, verifyUrl);
       return;
     }
 
@@ -65,6 +58,71 @@ export class EmailService {
    * düşer ve "bu adres kayıtlı" bilgisi dolaylı olarak sızar. Bu yüzden hata
    * yalnızca (yüksek görünürlükte) loglanır.
    */
+  /**
+   * "Bu adresle zaten bir hesap var" bildirimi.
+   *
+   * NEDEN VAR: kayıt uç noktası, e-posta zaten kayıtlıyken de yeni kayıtla AYNI
+   * yanıtı döndürüyor (hesap varlığını sızdırmamak için, bkz. AuthService.register).
+   * O zaman gerçek sahibi bilgilendirmenin tek yolu bu e-posta. Aynı zamanda
+   * kullanıcıya faydalı: adresini unutup tekrar kayıt olmaya çalışan kişi
+   * "zaten hesabın var, giriş yap" bilgisini alıyor.
+   */
+  async sendExistingAccountNotice(to: string, loginUrl: string): Promise<void> {
+    if (!this.apiKey) {
+      this.logger.warn(
+        `E-posta sağlayıcısı yapılandırılmadı (RESEND_API_KEY yok) — ` +
+          `"hesabın zaten var" bildirimi gönderilemedi. Alıcı: ${to}`
+      );
+      return;
+    }
+
+    await this.send({
+      to,
+      subject: "Projelio hesabın zaten var",
+      html: existingAccountHtml(loginUrl),
+      text: existingAccountText(loginUrl),
+    });
+  }
+
+  /**
+   * E-posta sağlayıcısı yapılandırılmadığında ne olduğunu bildirir.
+   *
+   * BAĞLANTI YALNIZCA GELİŞTİRMEDE YAZILIR. Bu bağlantılar tek kullanımlık
+   * jeton taşıyor: şifre sıfırlama bağlantısını ele geçiren, hesabı ele geçirir.
+   * Yerelde e-posta sağlayıcısı olmadan akışı denemenin tek yolu bu olduğu için
+   * geliştirmede yazılıyor; üretimde log'lar Render arayüzünde durur ve oraya
+   * bir hesap kurtarma jetonu düşmemeli.
+   *
+   * Üretimde bu satırı görüyorsan asıl sorun RESEND_API_KEY'in eksik olması:
+   * kullanıcılar kayıt olamıyor (doğrulama şart) ve şifrelerini sıfırlayamıyor.
+   */
+  private logUndeliverable(kind: string, to: string, url: string): void {
+    const base = `E-posta sağlayıcısı yapılandırılmadı (RESEND_API_KEY yok) — ${kind} bağlantısı gönderilemedi. Alıcı: ${to}`;
+    this.logger.warn(isProduction() ? base : `${base}\nBağlantı: ${url}`);
+  }
+
+  /**
+   * "Hesabın silinecek" bildirimi.
+   *
+   * Silme talebi alındığında gider. İki şey söylemesi şart: ne zaman kalıcı
+   * olacağı ve nasıl geri dönüleceği. Kullanıcı bu e-postayı sakladığı sürece
+   * fikrini değiştirme imkânı elinde kalıyor.
+   */
+  async sendAccountDeletionScheduled(to: string, purgeAt: Date, graceDays: number): Promise<void> {
+    const tarih = purgeAt.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+    if (!this.apiKey) {
+      this.logger.warn(`E-posta sağlayıcısı yapılandırılmadı — hesap silme bildirimi gönderilemedi. Alıcı: ${to}`);
+      return;
+    }
+
+    await this.send({
+      to,
+      subject: "Projelio hesabın silinmek üzere",
+      html: accountDeletionHtml(tarih, graceDays, getWebAppUrl()),
+      text: accountDeletionText(tarih, graceDays, getWebAppUrl()),
+    });
+  }
+
   private async send(params: { to: string; subject: string; html: string; text: string }): Promise<void> {
     try {
       const response = await fetch(RESEND_ENDPOINT, {
@@ -186,5 +244,67 @@ function verificationText(verifyUrl: string): string {
     "",
     "Bu bağlantı 24 saat boyunca geçerlidir.",
     "Bu hesabı sen açmadıysan bu e-postayı yok sayabilirsin.",
+  ].join("\n");
+}
+
+
+function existingAccountHtml(loginUrl: string): string {
+  return emailLayout({
+    heading: "Bu adresle zaten bir hesabın var",
+    intro:
+      "Az önce bu e-posta adresiyle Projelio'da yeni bir hesap açılmaya çalışıldı. " +
+      "Adres zaten kayıtlı olduğu için <strong>yeni bir hesap oluşturulmadı</strong> ve " +
+      "mevcut hesabında hiçbir şey değişmedi.",
+    ctaLabel: "Giriş yap",
+    url: loginUrl,
+    footer:
+      "Şifreni hatırlamıyorsan giriş ekranındaki \"Şifremi unuttum\" ile sıfırlayabilirsin. " +
+      "Bunu sen yapmadıysan bu e-postayı yok sayabilirsin.",
+  });
+}
+
+function existingAccountText(loginUrl: string): string {
+  return [
+    "Bu adresle zaten bir hesabın var",
+    "",
+    "Az önce bu e-posta adresiyle Projelio'da yeni bir hesap açılmaya çalışıldı.",
+    "Adres zaten kayıtlı olduğu için yeni bir hesap oluşturulmadı ve mevcut hesabında hiçbir şey değişmedi.",
+    "",
+    "Giriş yapmak için:",
+    loginUrl,
+    "",
+    'Şifreni hatırlamıyorsan giriş ekranındaki "Şifremi unuttum" ile sıfırlayabilirsin.',
+    "Bunu sen yapmadıysan bu e-postayı yok sayabilirsin.",
+  ].join("\n");
+}
+
+
+function accountDeletionHtml(tarih: string, graceDays: number, loginUrl: string): string {
+  return emailLayout({
+    heading: "Hesabın silinmek üzere",
+    intro:
+      `Hesabını silme talebini aldık. Verilerin <strong>${graceDays} gün</strong> daha duracak ve ` +
+      `<strong>${tarih}</strong> tarihinde kalıcı olarak silinecek.<br><br>` +
+      "Fikrin değişirse bir şey yapmana gerek yok: bu tarihe kadar aynı e-posta ve şifreyle giriş yapman " +
+      "yeterli, hesabın olduğu gibi geri açılır.",
+    ctaLabel: "Giriş yap ve hesabımı geri al",
+    url: `${loginUrl}/login`,
+    footer:
+      "Bu talebi sen yapmadıysan hemen giriş yap — girişin kendisi silme talebini iptal eder. " +
+      "Tarih geçtikten sonra veriler geri getirilemez.",
+  });
+}
+
+function accountDeletionText(tarih: string, graceDays: number, loginUrl: string): string {
+  return [
+    "Hesabın silinmek üzere",
+    "",
+    `Hesabını silme talebini aldık. Verilerin ${graceDays} gün daha duracak ve ${tarih} tarihinde kalıcı olarak silinecek.`,
+    "",
+    "Fikrin değişirse bir şey yapmana gerek yok: bu tarihe kadar aynı e-posta ve şifreyle giriş yapman yeterli.",
+    `${loginUrl}/login`,
+    "",
+    "Bu talebi sen yapmadıysan hemen giriş yap — girişin kendisi silme talebini iptal eder.",
+    "Tarih geçtikten sonra veriler geri getirilemez.",
   ].join("\n");
 }

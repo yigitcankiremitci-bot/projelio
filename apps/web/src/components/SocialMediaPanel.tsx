@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DepartmentMember, JobMember, SocialAccount, SocialPost } from "@projelio/shared";
+import { safeExternalUrl } from "@projelio/shared";
 import { api } from "../api/client";
 import { socialMediaApi, type SocialScope } from "../api/socialMedia";
 import {
@@ -506,7 +507,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           return t.externalUrl ? (
             <a
               key={t.id}
-              href={t.externalUrl}
+              href={safeExternalUrl(t.externalUrl) ?? undefined}
               target="_blank"
               rel="noreferrer"
               style={{ fontSize: 10, color: TARGET_STATUS.published.color, display: "flex", alignItems: "center", gap: 3 }}
@@ -691,7 +692,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               </span>
               {!a.active && <span style={{ fontSize: 11, color: c.textSecondary }}>· pasif</span>}
               {a.profileUrl && (
-                <a href={a.profileUrl} target="_blank" rel="noreferrer" style={{ display: "flex" }}>
+                <a href={safeExternalUrl(a.profileUrl) ?? undefined} target="_blank" rel="noreferrer" style={{ display: "flex" }}>
                   <IconExternalLink size={12} color={c.textSecondary} />
                 </a>
               )}

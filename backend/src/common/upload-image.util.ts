@@ -100,16 +100,45 @@ export function detectImageUpload(file: { buffer?: Buffer; size?: number; origin
   const match = SIGNATURES.find((signature) => signature.matches(buffer));
 
   if (!match) {
-    // Sık yapılan hatayı ayırt edip anlaşılır bir mesaj verelim: SVG yükleyen
-    // kullanıcı "dosyam bozuk mu?" diye düşünmesin.
+    // Sık yapılan hataları ayırt edip anlaşılır mesaj verelim: kullanıcı
+    // "dosyam bozuk mu?" diye düşünmesin.
     const basi = buffer.subarray(0, 512).toString("utf8").trimStart().toLowerCase();
     if (basi.startsWith("<svg") || basi.startsWith("<?xml")) {
       throw new BadRequestException(
         `SVG kabul edilmiyor (içine çalıştırılabilir kod gömülebildiği için). ${ACCEPTED_LABEL} yükleyin.`
       );
     }
+    if (isHeic(buffer)) {
+      throw new BadRequestException(
+        "HEIC/HEIF dosyaları desteklenmiyor — iPhone'un varsayılan formatı bu, ama tarayıcıların çoğu " +
+          "gösteremiyor. Fotoğrafı JPEG olarak paylaşıp tekrar yükleyin " +
+          "(iPhone: Ayarlar > Kamera > Formatlar > En Uyumlu)."
+      );
+    }
     throw new BadRequestException(`Dosya bir görsel değil. ${ACCEPTED_LABEL} yükleyin.`);
   }
 
   return { contentType: match.contentType, ext: match.ext };
+}
+
+
+/**
+ * HEIC/HEIF mi?
+ *
+ * NEDEN AYRI ELE ALINIYOR: iPhone'un varsayılan fotoğraf formatı bu, yani
+ * kullanıcının seçtiği dosya çoğu zaman HEIC oluyor ve işletim sistemi onu
+ * "fotoğraf" diye gösterdiği için dosya seçicide de normal görünüyor. Genel
+ * "dosya bir görsel değil" mesajı bu durumda yanıltıcı — kullanıcı fotoğraf
+ * seçtiğine emin, mesaj ise seçmediğini söylüyor.
+ *
+ * Kabul de edilmiyor: tarayıcıların çoğu HEIC göstermiyor, yani yüklense bile
+ * kapak boş görünürdü. Sunucuda dönüştürmek ayrı bir bağımlılık demek.
+ *
+ * Biçim: ISO temel medya konteyneri — 4..8. baytlarda "ftyp", ardından marka.
+ */
+function isHeic(buffer: Buffer): boolean {
+  if (buffer.length < 12) return false;
+  if (buffer.subarray(4, 8).toString("ascii") !== "ftyp") return false;
+  const marka = buffer.subarray(8, 12).toString("ascii").toLowerCase();
+  return ["heic", "heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs", "mif1", "msf1"].includes(marka);
 }

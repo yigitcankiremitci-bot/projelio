@@ -6,3 +6,51 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Güvenlik başlıkları.
+#
+# NEDEN BURASI ÖNEMLİ: kullanıcının tarayıcısına HTML'i Netlify veriyor, Render
+# değil. CSP, X-Frame-Options gibi başlıklar BELGEYİ veren origin için anlamlıdır;
+# backend'e helmet eklemek (bkz. backend/src/main.ts) API yanıtlarını korur ama
+# uygulamanın kendisini korumaz. İkisi ayrı işler.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Tıklama hırsızlığı (clickjacking): Projelio bir iş paneli — başka bir sitenin
+    # görünmez iframe'i içine alınıp kullanıcıya farkında olmadan tıklatılabilirdi.
+    # X-Frame-Options eski tarayıcılar için; güncel karşılığı olan frame-ancestors
+    # artık tam CSP'nin içinde (aşağıdaki nota bak), burada tekrarlanmıyor —
+    # iki ayrı CSP başlığı tanımlamak ikisinin de uygulanmasına yol açar ve
+    # hangisinin kazandığı okunmaz hale gelir.
+    X-Frame-Options = "DENY"
+
+    # Content-Type'a uymayan "koklama" davranışını kapatır.
+    X-Content-Type-Options = "nosniff"
+
+    # Dış sitelere giderken tam adresi sızdırma; yalnızca alan adını gönder.
+    # Uygulama içi adreslerde proje/görev kimlikleri var, bunlar Referer ile
+    # üçüncü taraflara (ör. Google Fonts) gitmemeli.
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+    # Bir yıl boyunca yalnızca HTTPS. preload BİLEREK yok: preload listesine
+    # girmek geri alması çok zor bir taahhüt, alan adı yapısı netleşmeden girilmez.
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+    # Kullanılmayan cihaz izinleri kapatılır. MİKROFON AÇIK KALMALI — Lio'nun sesli
+    # komut özelliği getUserMedia kullanıyor (bkz. apps/web/src/lib/useVoiceRecorder.ts).
+    Permissions-Policy = "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)"
+
+# TAM CSP BURADA DEĞİL — derleme anında üretiliyor.
+#
+# Politikanın `connect-src` kısmı API adresini içermek zorunda, o da ortama göre
+# değişen bir derleme değişkeni (VITE_API_URL). Buraya elle yazmak, adres
+# değiştiğinde sessizce yanlış kalması demekti. Bunun yerine apps/web/vite.config.ts
+# içindeki cspPlugin her derlemede `dist/_headers` dosyasını üretiyor ve Netlify
+# onu okuyor.
+#
+# ŞU AN RAPOR MODUNDA (Content-Security-Policy-Report-Only): hiçbir şey
+# engellenmiyor, ihlaller yalnızca tarayıcı konsoluna düşüyor. Sebebi büyük
+# dosyaların tarayıcıdan DOĞRUDAN Drive/OneDrive'a yüklenmesi — o adreslerin tam
+# listesi sağlayıcıya ve hesaba göre değişiyor. Uygulama bir süre kullanılıp
+# konsolda ihlal çıkmadığı görüldükten sonra vite.config.ts içindeki
+# CSP_ZORLAYICI bayrağı true yapılarak zorlayıcı hale getirilir.

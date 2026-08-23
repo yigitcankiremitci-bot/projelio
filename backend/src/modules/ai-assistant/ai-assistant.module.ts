@@ -6,6 +6,7 @@ import { AiConversationsService } from "./ai-conversations.service";
 import { AiAttachmentsService } from "./ai-attachments.service";
 import { AiTranscriptionService } from "./ai-transcription.service";
 import { AiSpeechService } from "./ai-speech.service";
+import { AiSpendAlertProcessor } from "./ai-spend-alert.processor";
 import { TasksModule } from "../tasks/tasks.module";
 import { ProjectsModule } from "../projects/projects.module";
 import { JobsModule } from "../jobs/jobs.module";
@@ -50,6 +51,7 @@ import { RealtimeModule } from "../realtime/realtime.module";
     AiAttachmentsService,
     AiTranscriptionService,
     AiSpeechService,
+    AiSpendAlertProcessor,
   ],
   // AiAssistantService dışarı açık: e-posta modülü yanıt taslağı üretmek için
   // draftText() çağırıyor (bkz. MailboxService.draftReply). Kredi muhasebesi ve

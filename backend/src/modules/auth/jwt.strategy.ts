@@ -21,6 +21,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException("Bu jeton oturum için geçerli değil");
     }
 
-    return { userId: payload.sub, email: payload.email, role: payload.role };
+    return { userId: payload.sub, email: payload.email, role: payload.role, loginAt: payload.loginAt, agent: payload.agent };
   }
 }

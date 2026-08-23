@@ -15,6 +15,7 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guard";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
 import { AiAssistantService } from "./ai-assistant.service";
@@ -107,6 +108,7 @@ export class AiAssistantController {
   // mesajını yazıp gönderirken yalnızca ek kimliklerini iletir.
 
   @Post("attachments")
+  @UseGuards(UploadRateLimitGuard)
   @UseInterceptors(
     FileInterceptor("file", {
       storage: memoryStorage(),
@@ -124,6 +126,7 @@ export class AiAssistantController {
   // Sesli komut: kayıt yazıya çevrilir ve metin döner. Ek olarak İLİŞTİRİLMEZ —
   // kullanıcı metni görüp düzeltebilsin diye yazı kutusuna konur.
   @Post("transcribe")
+  @UseGuards(UploadRateLimitGuard)
   @UseInterceptors(
     FileInterceptor("file", {
       storage: memoryStorage(),

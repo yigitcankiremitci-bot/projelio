@@ -6,13 +6,15 @@ import { AuthService } from "./auth.service";
 import { JwtStrategy } from "./jwt.strategy";
 import { PasswordResetService } from "./password-reset.service";
 import { EmailVerificationService } from "./email-verification.service";
-import { EmailService } from "./email.service";
+import { LoginAttemptService } from "./login-attempt.service";
+import { EmailModule } from "./email.module";
 import { UsersModule } from "../users/users.module";
 import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
 
 @Module({
   imports: [
     UsersModule,
+    EmailModule,
     PassportModule,
     JwtModule.register({
       secret: getJwtSecret(),
@@ -20,7 +22,7 @@ import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, PasswordResetService, EmailVerificationService, EmailService],
+  providers: [AuthService, JwtStrategy, PasswordResetService, EmailVerificationService, LoginAttemptService],
   exports: [AuthService],
 })
 export class AuthModule {}

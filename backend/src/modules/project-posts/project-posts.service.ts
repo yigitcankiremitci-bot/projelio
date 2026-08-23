@@ -5,6 +5,7 @@ import { MembersService } from "../members/members.service";
 import { DepartmentMembersService } from "../department-members/department-members.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { extractMentionHandles } from "../../common/mentions.util";
+import { requireUuid } from "../../common/validation/input";
 
 function mapPost(
   row: any,
@@ -85,7 +86,11 @@ export class ProjectPostsService {
     let query = this.supabase.client.from("project_posts").select("*, users(full_name)").order("created_at", { ascending: false });
     query =
       deptIds.length > 0
-        ? query.or(`organization_id.eq.${organizationId},department_id.in.(${deptIds.join(",")})`)
+        // organizationId filtre metnine gömülüyor. Buraya gelmeden önce
+        // assertCanViewOrganization'dan geçiyor (uydurma bir değer eşleşmez), ama
+        // o kontrole bel bağlamayalım — gömülen değer her hâlükârda doğrulanır.
+        // deptIds veritabanından geldiği için zaten güvenli.
+        ? query.or(`organization_id.eq.${requireUuid(organizationId, "Organizasyon kimliği")},department_id.in.(${deptIds.join(",")})`)
         : query.eq("organization_id", organizationId);
     const { data, error } = await query;
     if (error) throw error;

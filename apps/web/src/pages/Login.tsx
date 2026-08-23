@@ -1,9 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { backState } from "../lib/backTarget";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import { useThemeColors } from "../theme/useThemeColors";
+
+/** 905 -> "15:05". Geri sayım dakika:saniye okunması en kolay biçim. */
+function formatSure(saniye: number): string {
+  const dk = Math.floor(saniye / 60);
+  const sn = saniye % 60;
+  return `${dk}:${String(sn).padStart(2, "0")}`;
+}
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -14,6 +21,12 @@ export default function Login() {
   // kullanıcıya çıkışsız bir hata değil, "tekrar gönder" seçeneği sunmalıyız.
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
+  /**
+   * Hesap kilidinde (429) kalan saniye. Sunucu kaç saniye kaldığını söylüyor
+   * (bkz. LoginAttemptService); burada saniye saniye eritiyoruz ki kullanıcı
+   * "biraz sonra" gibi belirsiz bir cümle yerine sayacı görsün.
+   */
+  const [lockSeconds, setLockSeconds] = useState(0);
   const c = useThemeColors();
   // Oturumu geçersizleşen kullanıcı buraya sebepsizce fırlatılmasın: neden
   // çıkarıldığını bilmezse "verilerim silindi" sanıyor (bkz. api/client.ts
@@ -21,6 +34,12 @@ export default function Login() {
   const sessionExpired = new URLSearchParams(window.location.search).get("session") === "expired";
   // Yasal metinlerin geri bağlantısı buraya dönsün (bkz. lib/backTarget.ts).
   const loginBack = { to: "/login", label: "Giriş sayfası" };
+
+  useEffect(() => {
+    if (lockSeconds <= 0) return;
+    const t = setTimeout(() => setLockSeconds((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [lockSeconds]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +57,7 @@ export default function Login() {
       // mesajıyla ezmeyip onu göstermeliyiz.
       setError(err instanceof Error ? err.message : "E-posta veya şifre hatalı.");
       if (err instanceof ApiError && err.status === 403) setNeedsVerification(true);
+      if (err instanceof ApiError && err.status === 429) setLockSeconds(err.retryAfterSeconds ?? 0);
     } finally {
       setLoading(false);
     }
@@ -127,7 +147,17 @@ export default function Login() {
           </div>
 
           {error && (
-            <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>
+            <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>
+              {error}
+              {lockSeconds > 0 && (
+                <>
+                  {" "}
+                  <strong style={{ fontVariantNumeric: "tabular-nums" }}>
+                    Kalan süre {formatSure(lockSeconds)}.
+                  </strong>
+                </>
+              )}
+            </p>
           )}
 
           {needsVerification &&

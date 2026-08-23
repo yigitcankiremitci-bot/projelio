@@ -122,10 +122,17 @@ export class HabieService {
       { secret: this.appSecret(), expiresIn: ASSERTION_TTL }
     );
 
-    // Modülün varsayılan secret'ı = Projelio JWT secret'ı. Burada yalnızca
-    // ömrü kısaltıyoruz; yükü jwt.strategy.ts'in beklediğiyle birebir aynı.
+    // Modülün varsayılan secret'ı = Projelio JWT secret'ı. Yükü jwt.strategy.ts'in
+    // beklediğiyle aynı; tek fark kısa ömür ve `agent` işareti.
+    //
+    // `agent: true` NEDEN GEREKLİ: bu jeton Projelio'nun DIŞINDAKİ bir uygulamaya
+    // (Habie) veriliyor ve 30 dakikayla sınırlı olması amaçlanıyor. Ama normal bir
+    // oturum jetonu olduğu için sahibi /auth/refresh çağırıp onu tam ömürlü
+    // (JWT_EXPIRES_IN, varsayılan 7 gün) bir oturuma çevirebiliyordu — yani kısa
+    // ömür fiilen bir sınır değildi. İşaret sayesinde yenileme reddediliyor;
+    // Habie süre dolunca yeni bir devir kodu almak zorunda.
     const agentToken = await this.jwt.signAsync(
-      { sub: userId, email, role },
+      { sub: userId, email, role, agent: true },
       { expiresIn: AGENT_TOKEN_TTL_SECONDS }
     );
 

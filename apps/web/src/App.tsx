@@ -113,7 +113,14 @@ function MiniProfile({ user, showName }: { user: User; showName: boolean }) {
         }}
       >
         {user.avatarUrl ? (
-          <img src={user.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img
+            src={user.avatarUrl}
+            alt=""
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
         ) : (
           <IconUser size={14} color={c.textSecondary} />
         )}

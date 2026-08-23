@@ -10,6 +10,9 @@ coverage/
 
 # Yedek ve otomatik üretilen geçici dosyalar
 *.bak
+# Veritabanı yedekleri — ASLA commit edilmemeli (şifre hash'leri, Drive jetonları)
+yedek/
+*.sql.gz
 vite.config.ts.timestamp-*.mjs
 
 # Silinmek uzere kenara alinan dosyalar (bkz. sohbet notu) — repoya girmemeli

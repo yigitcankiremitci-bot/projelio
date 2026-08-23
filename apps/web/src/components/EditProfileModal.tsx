@@ -75,7 +75,14 @@ export default function EditProfileModal({ user, onClose, onSaved }: Props) {
               }}
             >
               {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt={fullName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <img
+                  src={user.avatarUrl}
+                  alt=""
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
               ) : (
                 <IconUser size={32} color={c.textSecondary} />
               )}

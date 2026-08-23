@@ -2,6 +2,7 @@ import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { createTokenCrypto } from "../../common/crypto/token-crypto";
 import { extractMetaError } from "./publish-format";
+import { getWebAppUrl } from "../../common/config/env";
 
 /**
  * Instagram bağlantısı — "Instagram API with Instagram Login" yolu.
@@ -94,7 +95,7 @@ export class InstagramOAuthService {
   }
 
   get webAppUrl(): string {
-    return process.env.WEB_APP_URL?.trim() || "http://localhost:5173";
+    return getWebAppUrl();
   }
 
   /**

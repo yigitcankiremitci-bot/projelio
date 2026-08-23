@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { BudgetOverview, BudgetTransaction, RecurringPayment } from "@projelio/shared";
 import { api } from "../api/client";
 import { useRefreshOnUndo } from "../lib/undo";
+import { useProjectFabAction } from "../lib/projectFab";
 import { useThemeColors } from "../theme/useThemeColors";
 import AddBudgetEntryModal from "./AddBudgetEntryModal";
 import AddRecurringPaymentModal from "./AddRecurringPaymentModal";
@@ -29,16 +30,53 @@ const typeLabels: Record<string, string> = {
   payout: "Hakediş ödemesi",
 };
 
+/**
+ * Silinen bir kaydı özet toplamlarından düşer (iyimser güncelleme).
+ *
+ * Sunucudaki hesabın birebir aynısını burada tekrarlamıyoruz — yalnızca silinen
+ * kaydın etkisini geri alıyoruz. Kalıcı doğruluk commit sonrası gelen
+ * /budget/overview yanıtından geliyor; buradaki iş yalnızca aradaki birkaç
+ * saniyede ekranın yalan söylememesi.
+ */
+function ozettenDus(ozet: BudgetOverview, tx: BudgetTransaction): BudgetOverview {
+  const tutar = Number(tx.amount) || 0;
+  const genel = !tx.projectId;
+
+  if (tx.type === "income") {
+    return {
+      ...ozet,
+      totalReceived: ozet.totalReceived - tutar,
+      netEarned: ozet.netEarned - tutar,
+      generalIncome: genel ? ozet.generalIncome - tutar : ozet.generalIncome,
+    };
+  }
+
+  // expense ve payout, ikisi de gider tarafında.
+  return {
+    ...ozet,
+    totalExpense: ozet.totalExpense - tutar,
+    netEarned: ozet.netEarned + tutar,
+    generalExpense: genel ? ozet.generalExpense - tutar : ozet.generalExpense,
+  };
+}
+
 export default function BudgetPanel() {
   const c = useThemeColors();
   const [overview, setOverview] = useState<BudgetOverview | null>(null);
   const [transactions, setTransactions] = useState<BudgetTransaction[]>([]);
   const [recurring, setRecurring] = useState<RecurringPayment[]>([]);
   const [addingEntry, setAddingEntry] = useState(false);
+
   const [editingTransaction, setEditingTransaction] = useState<BudgetTransaction | null>(null);
   const [addingRecurring, setAddingRecurring] = useState(false);
   const [editingRecurring, setEditingRecurring] = useState<RecurringPayment | null>(null);
   const { pushUndo, pushDestructive } = useUndo();
+  // Anasayfadaki "+" düğmesi, sayfa kendi eylemini KAYDETMEZSE varsayılana —
+  // "Yeni iş"e — düşüyor (bkz. BottomNav.tsx). Bütçe sekmesi bunu kaydetmediği
+  // için gelir/gider eklemek isteyen kullanıcıya iş oluşturma ekranı açılıyordu.
+  // BottomNav'daki yorumda aynı hatanın Yapılacaklar sayfasında yaşandığı yazıyor;
+  // desen bu: yeni bir sekme eklerken kendi "+" eylemini de kaydet.
+  useProjectFabAction({ label: "Gelir / gider ekle", onClick: () => setAddingEntry(true) }, []);
 
   const reload = () => {
     api.get<BudgetOverview>("/budget/overview").then(setOverview).catch(() => setOverview(null));
@@ -53,7 +91,15 @@ export default function BudgetPanel() {
   // Silme hemen sunucuya gitmez: satır listeden düşürülür, gerçek DELETE birkaç
   // saniye sonra atılır; bu pencerede Cmd/Ctrl+Z basılırsa istek hiç gönderilmez.
   const deleteTransaction = async (id: string) => {
+    const silinen = transactions.find((t) => t.id === id);
     setTransactions((prev) => prev.filter((t) => t.id !== id));
+    // Satır anında listeden düşüyordu ama ÜSTTEKİ TOPLAMLAR eski kalıyordu:
+    // özet ayrı bir uçtan (/budget/overview) geliyor ve yalnızca reload() ile
+    // tazeleniyor — o da geri alma penceresi dolduktan saniyeler sonra çalışıyor.
+    // Kullanıcı "sildim ama düşmedi" diye sayfayı yeniliyordu. Toplamı burada
+    // aynı iyimser mantıkla düşüyoruz; commit sonrası gelen reload zaten
+    // sunucudaki gerçek değerle üzerine yazacak.
+    if (silinen) setOverview((prev) => (prev ? ozettenDus(prev, silinen) : prev));
     pushDestructive({
       label: "Kayıt silme",
       commit: async () => {

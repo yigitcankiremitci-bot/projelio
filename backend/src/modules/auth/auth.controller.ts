@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, Req, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { AuthRateLimitGuard } from "../../common/guards/auth-rate-limit.guard";
 import { AuthService } from "./auth.service";
@@ -12,6 +12,7 @@ import {
 } from "./dto/auth.dto";
 import { PasswordResetService } from "./password-reset.service";
 import { EmailVerificationService } from "./email-verification.service";
+import { absoluteSessionExpired } from "./session-payload";
 
 @Controller("auth")
 export class AuthController {
@@ -53,7 +54,20 @@ export class AuthController {
   @Post("refresh")
   @UseGuards(AuthGuard("jwt"))
   refresh(@Req() req: any) {
-    return this.authService.signToken(req.user.userId, req.user.email, req.user.role);
+    // Kayan oturumun üst sınırı: ilk girişin üzerinden çok geçtiyse yenileme
+    // reddedilir ve kullanıcı yeniden giriş yapar. Bu olmadan, jetonu çalan biri
+    // bu ucu düzenli çağırarak oturumu sonsuza kadar uzatabiliyordu
+    // (gerekçenin tamamı session-payload.ts'te).
+    // Dış uygulamaya verilmiş devir jetonu uzatılamaz — kısa ömrü aksi halde
+    // anlamını kaybederdi (bkz. session-payload.ts, `agent`).
+    if (req.user.agent) {
+      throw new UnauthorizedException("Bu oturum uzatılamaz, yeniden bağlanman gerekiyor.");
+    }
+    if (absoluteSessionExpired(req.user.loginAt)) {
+      throw new UnauthorizedException("Oturum süresi doldu, lütfen yeniden giriş yapın.");
+    }
+    // loginAt AYNEN aktarılır — yenileme saati sıfırlamaz, yoksa sınır hiç dolmazdı.
+    return this.authService.signToken(req.user.userId, req.user.email, req.user.role, req.user.loginAt);
   }
 
   // Yanıt her zaman aynı genel mesajdır — hesabın var olup olmadığını sızdırmamak

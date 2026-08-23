@@ -144,6 +144,20 @@ export default function Modal({
     action.click();
   };
 
+  // Modal açıkken arkadaki sayfanın kaydırması kilitlenir.
+  //
+  // overscroll-behavior modalin İÇİNDEN çıkan kaydırmayı durduruyor, ama
+  // kullanıcı fareyi modalin DIŞINDAKİ karartmaya götürüp kaydırırsa arka sayfa
+  // yine kayıyor. İkisi birlikte gerekiyor. Eski değeri saklayıp geri koyuyoruz:
+  // üst üste iki modal açılıp kapandığında sayfa kilitli kalmasın.
+  useEffect(() => {
+    const oncekiOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = oncekiOverflow;
+    };
+  }, []);
+
   // Modal her zaman body'ye taşınır (portal). Aksi halde CSS "transform" ya da
   // "will-change" uygulanmış bir üst öğenin içinde kalırsa (örn. hover'da büyüyen
   // kişi kartı) o öğe position:fixed için içeren blok haline gelir; modal ekranın
@@ -179,6 +193,12 @@ export default function Modal({
           maxHeight: fullScreen ? "none" : "85vh",
           height: fullScreen ? "100%" : undefined,
           overflowY: "auto",
+          // Modalin sonuna gelince tekerlek ARKADAKİ sayfayı kaydırmaya devam
+          // ediyordu ("scroll chaining"). Kullanıcı modalde çalışırken arkadaki
+          // liste kayıyor, modali kapatınca bambaşka bir yerde buluyordu kendini.
+          // `contain` kaydırmayı bu kutuda bitirir; `overscroll-behavior` tam da
+          // bunun için var, tekerlek olayını elle yakalamaya gerek yok.
+          overscrollBehavior: "contain",
           background: c.surface,
           border: fullScreen ? "none" : `1px solid ${c.border}`,
           borderRadius: fullScreen ? 0 : 14,

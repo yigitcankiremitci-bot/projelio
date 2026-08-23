@@ -110,6 +110,21 @@ export class PartyService {
         );
   }
 
+  /**
+   * Okuma yetkisi. assertCanWrite'in aksine FAIL-CLOSED: userId yoksa reddeder.
+   *
+   * NEDEN: by-id okuma uçları (findOne/contacts/activities) eskiden HİÇBİR yetki
+   * kontrolü yapmıyordu — giriş yapmış herhangi biri, hatta partner verisine
+   * erişimi olmaması gereken bir taşeron bile, UUID'yi bilen herkes başka bir
+   * organizasyonun müşteri/tedarikçi kaydını (ve kişilerini, PII) okuyabiliyordu.
+   * Liste uçları zaten kontrol ediyordu; by-id uçları atlanmıştı (bkz. controller).
+   */
+  private async assertCanRead(scope: PartyScope, userId?: string): Promise<void> {
+    if (!userId) throw new ForbiddenException("Bu kaydı görme yetkin yok");
+    const a = await this.access(scope, userId);
+    if (!a.canRead) throw new ForbiddenException("Bu kaydı görme yetkin yok");
+  }
+
   private async assertCanWrite(scope: PartyScope, userId?: string): Promise<void> {
     if (!userId) return;
     const a = await this.access(scope, userId);
@@ -142,6 +157,13 @@ export class PartyService {
     const { data, error } = await query;
     if (error) throw error;
     return (data ?? []).map(mapParty);
+  }
+
+  /** GET /party/:id için: yükler VE okuma yetkisini doğrular. */
+  async viewOne(id: string, userId?: string): Promise<Party> {
+    const party = await this.findOne(id);
+    await this.assertCanRead(this.scopeOf(party), userId);
+    return party;
   }
 
   async findOne(id: string): Promise<Party> {
@@ -364,7 +386,8 @@ export class PartyService {
 
   // ============================================================ Kişiler
 
-  async findContacts(partyId: string): Promise<PartyContact[]> {
+  async findContacts(partyId: string, userId?: string): Promise<PartyContact[]> {
+    await this.assertCanRead(this.scopeOf(await this.findOne(partyId)), userId);
     const { data, error } = await this.supabase.client
       .from("party_contact")
       .select("*")
@@ -426,7 +449,8 @@ export class PartyService {
 
   // ============================================================ Aktivite
 
-  async findActivities(partyId: string): Promise<PartyActivity[]> {
+  async findActivities(partyId: string, userId?: string): Promise<PartyActivity[]> {
+    await this.assertCanRead(this.scopeOf(await this.findOne(partyId)), userId);
     const { data, error } = await this.supabase.client
       .from("party_activity")
       .select("*, users!party_activity_user_id_fkey(full_name)")

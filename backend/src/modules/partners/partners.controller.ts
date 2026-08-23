@@ -60,8 +60,8 @@ export class PartnersController {
   }
 
   @Get("partners/:id/module-grants")
-  findGrants(@Param("id") id: string) {
-    return this.partnersService.findGrants(id);
+  findGrants(@Param("id") id: string, @Req() req: any) {
+    return this.partnersService.findGrants(id, req.user.userId);
   }
 
   @Post("partners/:id/module-grants")

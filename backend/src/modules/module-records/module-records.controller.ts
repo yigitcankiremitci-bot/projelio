@@ -96,8 +96,8 @@ export class ModuleRecordsController {
   }
 
   @Get("module-records/:id/versions")
-  listVersions(@Param("id") id: string) {
-    return this.moduleRecordsService.listVersions(id);
+  listVersions(@Param("id") id: string, @Req() req: any) {
+    return this.moduleRecordsService.listVersions(id, req.user.userId);
   }
 
   // Sürüme dönüş taslağa yükler, yayımlamaz — kullanıcı okuyup onaylar.

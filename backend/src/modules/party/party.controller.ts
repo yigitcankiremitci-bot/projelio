@@ -72,8 +72,8 @@ export class PartyController {
   // ============================================================ Tekil kayıt
 
   @Get("party/:id")
-  findOne(@Param("id") id: string) {
-    return this.partyService.findOne(id);
+  findOne(@Param("id") id: string, @Req() req: any) {
+    return this.partyService.viewOne(id, req.user.userId);
   }
 
   @Patch("party/:id")
@@ -105,8 +105,8 @@ export class PartyController {
   // ============================================================ Kişiler
 
   @Get("party/:id/contacts")
-  findContacts(@Param("id") id: string) {
-    return this.partyService.findContacts(id);
+  findContacts(@Param("id") id: string, @Req() req: any) {
+    return this.partyService.findContacts(id, req.user.userId);
   }
 
   @Post("party/:id/contacts")
@@ -122,8 +122,8 @@ export class PartyController {
   // ============================================================ Aktivite
 
   @Get("party/:id/activities")
-  findActivities(@Param("id") id: string) {
-    return this.partyService.findActivities(id);
+  findActivities(@Param("id") id: string, @Req() req: any) {
+    return this.partyService.findActivities(id, req.user.userId);
   }
 
   @Post("party/:id/activities")

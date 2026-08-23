@@ -46,8 +46,14 @@ export class ProductsController {
   }
 
   @Get("products/:id")
-  findOne(@Param("id") id: string) {
-    return this.productsService.findOne(id);
+  async findOne(@Param("id") id: string, @Req() req: any) {
+    // by-id okuma da liste ucuyla AYNI yetkiye tabi olmalı: eskiden hiçbir
+    // kontrol yoktu, giriş yapan herkes UUID ile başka organizasyonun ürününü
+    // (ve fiyatını) okuyabiliyordu.
+    const product = await this.productsService.findOne(id);
+    await this.access.assertCanViewOrganization(product.organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "products");
+    return product;
   }
 
   @Patch("products/:id")

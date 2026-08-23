@@ -204,6 +204,20 @@ export class ModuleRecordsService {
   }
 
   /** Kaydın sahibine (organizasyon ya da iş) göre doğru yetki kontrolünü seçer. */
+  /** Okuma yetkisi (canRead). Sürüm geçmişi gibi by-id okuma uçları için. */
+  private async assertCanViewRecord(record: ModuleRecord, userId?: string): Promise<void> {
+    if (!userId) throw new ForbiddenException("Bu kaydı görme yetkin yok");
+    const access = record.jobId
+      ? await this.moduleMembers.resolveJobAccess(record.jobId, record.moduleKey, userId)
+      : await this.moduleMembers.resolveOrganizationAccess(
+          record.organizationId!,
+          record.moduleKey,
+          userId,
+          record.departmentId
+        );
+    if (!access.canRead) throw new ForbiddenException("Bu kaydı görme yetkin yok");
+  }
+
   private async assertCanManageRecord(record: ModuleRecord, userId?: string): Promise<void> {
     if (record.jobId) return this.assertCanManageJob(record.jobId, record.moduleKey, userId);
     if (record.organizationId) {
@@ -483,7 +497,8 @@ export class ModuleRecordsService {
   }
 
   /** Sürüm geçmişi — yeniden eskiye. */
-  async listVersions(id: string): Promise<ModuleRecordVersion[]> {
+  async listVersions(id: string, userId?: string): Promise<ModuleRecordVersion[]> {
+    await this.assertCanViewRecord(await this.findOne(id), userId);
     const { data, error } = await this.supabase.client
       .from("module_record_versions")
       .select("*")

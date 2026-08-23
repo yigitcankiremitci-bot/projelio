@@ -188,7 +188,11 @@ export class PartnersService {
     if (error) throw error;
   }
 
-  async findGrants(partnerId: string): Promise<PartnerModuleGrant[]> {
+  async findGrants(partnerId: string, userId?: string): Promise<PartnerModuleGrant[]> {
+    // Bir ortağın modül izinlerini görmek sahiplik düzeyinde bir bilgi; eskiden
+    // hiçbir kontrol yoktu, UUID'yi bilen herkes okuyabiliyordu.
+    const partner = await this.findById(partnerId);
+    await this.assertOwner({ organizationId: partner.organizationId, groupId: partner.groupId }, userId);
     const { data, error } = await this.supabase.client.from("partner_module_grants").select("*").eq("partner_id", partnerId);
     if (error) throw error;
     return (data ?? []).map(mapGrant);

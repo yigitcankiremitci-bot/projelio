@@ -1,27 +1,64 @@
-import { useEffect, useState } from "react";
-import type { Job, ProjectFile } from "@projelio/shared";
+import { useEffect, useMemo, useState } from "react";
+import type { Job, Project, ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
 import { driveEditUrl, fileKindLabel, formatFileSize } from "../lib/driveLinks";
+import { useProjectFabAction } from "../lib/projectFab";
 import { useThemeColors } from "../theme/useThemeColors";
 import FilePreviewModal from "./FilePreviewModal";
+import QuickFileUploadModal, { type UploadTargetOption } from "./QuickFileUploadModal";
 import { IconDownload, IconExternalLink, IconFile } from "./icons";
 
 /**
  * İşlerim sayfasındaki "Dosyalar" sekmesi: kullanıcının erişebildiği TÜM işlerin
- * dosyalarını tek listede gösterir. Dosyalar her zaman bir işe ait olduğu için
- * (bkz. files.ts) burada yükleme/silme yok, salt okunur bir genel bakış — tıpkı
- * organizasyon/grup ekranlarındaki dosya listesi gibi.
+ * dosyalarını tek listede gösterir.
+ *
+ * Liste birden fazla işi birleştirdiği için tek bir yükleme bağlamı yok; bu yüzden
+ * uzun süre salt okunurdu ve "+" düğmesi anasayfanın varsayılanı olan "Yeni iş"i
+ * açıyordu. Yalnızca proje düzeyinde erişimi olan kullanıcı (örn. taşeron) buradan
+ * hiç dosya ekleyemiyordu. Artık "+" bir hedef seçtiren yükleme modalini açıyor.
  */
 interface Props {
   jobs: Job[];
+  /** Kullanıcının erişebildiği projeler — yükleme hedefi listesi için. */
+  projects: Project[];
+  myUserId: string | null;
 }
 
-export default function AllFilesPanel({ jobs }: Props) {
+export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   const c = useThemeColors();
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<ProjectFile | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // İşin geneline yükleme yalnızca iş ekibine açık (bkz. backend files.service.ts
+  // assertContextAllowed). İş sahibi her zaman iş düzeyindedir; diğerleri için
+  // seçeneği göstermiyoruz ki tıklayınca 403 almasınlar — asıl kısıt yine sunucuda.
+  const uploadTargets = useMemo<UploadTargetOption[]>(() => {
+    const out: UploadTargetOption[] = [];
+    const listed = new Set<string>();
+
+    for (const job of jobs) {
+      listed.add(job.id);
+      if (myUserId && job.ownerId === myUserId) {
+        out.push({ id: `job:${job.id}`, label: "İş geneli", group: job.title, target: { jobId: job.id } });
+      }
+      for (const p of projects.filter((pr) => pr.jobId === job.id)) {
+        out.push({ id: `project:${p.id}`, label: p.title, group: job.title, target: { projectId: p.id } });
+      }
+    }
+
+    // İşi listede olmayan projeler (örn. iş kartı gizlenmiş) kaybolmasın.
+    for (const p of projects.filter((pr) => !listed.has(pr.jobId))) {
+      out.push({ id: `project:${p.id}`, label: p.title, group: "Diğer", target: { projectId: p.id } });
+    }
+
+    return out;
+  }, [jobs, projects, myUserId]);
+
+  useProjectFabAction({ label: "Dosya ekle", onClick: () => setAdding(true) }, []);
 
   useEffect(() => {
     if (jobs.length === 0) {
@@ -54,7 +91,7 @@ export default function AllFilesPanel({ jobs }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [jobs]);
+  }, [jobs, reloadKey]);
 
   const handleDownload = async (file: ProjectFile) => {
     try {
@@ -64,32 +101,26 @@ export default function AllFilesPanel({ jobs }: Props) {
     }
   };
 
-  if (loading) {
-    return <div style={{ color: c.textSecondary, fontSize: 15 }}>Yükleniyor…</div>;
-  }
-
-  if (error) {
-    return <div style={{ color: c.danger, fontSize: 15 }}>{error}</div>;
-  }
-
-  if (files.length === 0) {
-    return (
-      <div
-        style={{
-          border: `1px dashed ${c.border}`,
-          borderRadius: 12,
-          padding: 40,
-          textAlign: "center",
-          color: c.textSecondary,
-          fontSize: 16,
-        }}
-      >
-        Henüz dosya yok.
-      </div>
-    );
-  }
-
-  return (
+  // Modal her durumda render edilmeli: dosya yokken de "+" ile yükleme yapılabilsin.
+  // (Eskiden boş durumda erken return vardı; taşeronun gördüğü ekran tam da buydu.)
+  const body = loading ? (
+    <div style={{ color: c.textSecondary, fontSize: 15 }}>Yükleniyor…</div>
+  ) : error ? (
+    <div style={{ color: c.danger, fontSize: 15 }}>{error}</div>
+  ) : files.length === 0 ? (
+    <div
+      style={{
+        border: `1px dashed ${c.border}`,
+        borderRadius: 12,
+        padding: 40,
+        textAlign: "center",
+        color: c.textSecondary,
+        fontSize: 16,
+      }}
+    >
+      Henüz dosya yok.
+    </div>
+  ) : (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {files.map((file) => (
         <div
@@ -149,6 +180,24 @@ export default function AllFilesPanel({ jobs }: Props) {
 
       {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} />}
     </div>
+  );
+
+  return (
+    <>
+      {body}
+      {adding && (
+        <QuickFileUploadModal
+          targets={uploadTargets}
+          pickerLabel="Nereye"
+          emptyMessage="Dosya yükleyebilmek için önce bir işe ya da projeye eklenmen gerekiyor."
+          onClose={() => setAdding(false)}
+          onUploaded={() => {
+            setAdding(false);
+            setReloadKey((k) => k + 1);
+          }}
+        />
+      )}
+    </>
   );
 }
 

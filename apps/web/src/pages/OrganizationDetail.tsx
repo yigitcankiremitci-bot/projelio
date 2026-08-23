@@ -294,7 +294,9 @@ export default function OrganizationDetail() {
 
       {addingFile && (
         <QuickFileUploadModal
-          departments={departments}
+          targets={departments.map((d) => ({ id: d.id, label: d.name, target: { departmentId: d.id } }))}
+          pickerLabel="Departman"
+          emptyMessage="Dosya yükleyebilmek için önce en az bir departman kurman gerekiyor."
           onClose={() => setAddingFile(false)}
           onUploaded={() => setAddingFile(false)}
         />

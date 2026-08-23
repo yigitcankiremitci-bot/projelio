@@ -1,26 +1,47 @@
 import { useEffect, useRef, useState } from "react";
-import type { Department, GoogleDriveStatus } from "@projelio/shared";
+import type { GoogleDriveStatus } from "@projelio/shared";
 import { driveApi, oneDriveApi, uploadFile } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconUpload } from "./icons";
 
+/** Yüklemenin gideceği yer. uploadFile'ın kabul ettiği hedeflerle birebir aynı. */
+export interface UploadTargetOption {
+  /** select'in değeri; hedef türünden bağımsız benzersiz bir anahtar. */
+  id: string;
+  label: string;
+  /** Verilirse seçenekler optgroup altında toplanır (örn. iş adı). */
+  group?: string;
+  target: { jobId: string } | { projectId: string } | { departmentId: string };
+}
+
 interface Props {
-  departments: Department[];
+  targets: UploadTargetOption[];
+  /** Seçim kutusunun etiketi — "Departman", "Nereye" gibi. */
+  pickerLabel: string;
+  /** Hiç hedef yoksa gösterilecek açıklama. */
+  emptyMessage: string;
   onClose: () => void;
   onUploaded: () => void;
 }
 
 /**
- * Anasayfadaki birleşik "+" menüsünden "Dosya ekle" ile açılır.
+ * "+" menüsünden "Dosya ekle" ile açılır.
  *
- * Dosyalar her zaman bir İŞE ya da DEPARTMANA ait olduğu için (bkz.
- * FilesPanel.tsx üstündeki not), organizasyon seviyesinde "genel" bir yükleme
- * yeri yok — kullanıcı önce hangi departmana yükleyeceğini seçmeli.
+ * Dosyalar her zaman bir İŞE, PROJEYE ya da DEPARTMANA ait olduğu için (bkz.
+ * FilesPanel.tsx üstündeki not) "genel" bir yükleme yeri yok — kullanıcı önce
+ * nereye yükleyeceğini seçmeli. Hedef listesini çağıran ekran belirler:
+ * organizasyonda departmanlar, anasayfada erişilebilen işler/projeler.
  */
-export default function QuickFileUploadModal({ departments, onClose, onUploaded }: Props) {
+export default function QuickFileUploadModal({
+  targets,
+  pickerLabel,
+  emptyMessage,
+  onClose,
+  onUploaded,
+}: Props) {
   const c = useThemeColors();
-  const [departmentId, setDepartmentId] = useState(departments[0]?.id ?? "");
+  const [targetId, setTargetId] = useState(targets[0]?.id ?? "");
   const [googleStatus, setGoogleStatus] = useState<GoogleDriveStatus | null>(null);
   const [msStatus, setMsStatus] = useState<GoogleDriveStatus | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -39,42 +60,55 @@ export default function QuickFileUploadModal({ departments, onClose, onUploaded 
   const driveMissing = anyConfigured && !anyReady;
 
   const handleFile = async (file: File | null) => {
-    if (!file || !departmentId) return;
+    const selected = targets.find((t) => t.id === targetId);
+    if (!file || !selected) return;
     setError("");
     setFileName(file.name);
     setUploading(true);
     setRatio(0);
     try {
-      await uploadFile({ departmentId }, file, {}, setRatio);
+      await uploadFile(selected.target, file, {}, setRatio);
       onUploaded();
       onClose();
     } catch (e: any) {
+      // Sunucu yetki hatasını Türkçe ve anlaşılır döndürüyor (örn. "İşin geneline
+      // dosya eklemek için iş ekibinde olmanız gerekir"); olduğu gibi gösteriyoruz.
       setError(e?.message ?? "Dosya yüklenemedi");
       setUploading(false);
     }
   };
 
+  // Gruplar ilk görüldükleri sırayı korur: seçenek listesi çağıranın verdiği
+  // sırayla aynı kalsın (işler anasayfadaki sırasıyla gelir).
+  const groupNames = Array.from(new Set(targets.map((t) => t.group).filter(Boolean) as string[]));
+  const ungrouped = targets.filter((t) => !t.group);
+
+  const optionEl = (t: UploadTargetOption) => (
+    <option key={t.id} value={t.id}>
+      {t.label}
+    </option>
+  );
+
   return (
     <Modal title="Dosya ekle" onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {departments.length === 0 ? (
-          <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>
-            Dosya yükleyebilmek için önce en az bir departman kurman gerekiyor.
-          </p>
+        {targets.length === 0 ? (
+          <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>{emptyMessage}</p>
         ) : (
           <>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 15, color: c.textSecondary }}>Departman</label>
+              <label style={{ fontSize: 15, color: c.textSecondary }}>{pickerLabel}</label>
               <select
-                value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
+                value={targetId}
+                onChange={(e) => setTargetId(e.target.value)}
                 disabled={uploading}
                 style={{ width: "100%" }}
               >
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
+                {ungrouped.map(optionEl)}
+                {groupNames.map((g) => (
+                  <optgroup key={g} label={g}>
+                    {targets.filter((t) => t.group === g).map(optionEl)}
+                  </optgroup>
                 ))}
               </select>
             </div>

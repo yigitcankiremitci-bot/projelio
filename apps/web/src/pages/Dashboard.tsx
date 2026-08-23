@@ -337,7 +337,7 @@ export default function Dashboard() {
 
       {tab === "budget" && <BudgetPanel />}
 
-      {tab === "files" && <AllFilesPanel jobs={visibleJobs} />}
+      {tab === "files" && <AllFilesPanel jobs={visibleJobs} projects={projects} myUserId={myUserId} />}
 
       {tab === "modules" && <DashboardModulesPanel jobs={visibleJobs} />}
 

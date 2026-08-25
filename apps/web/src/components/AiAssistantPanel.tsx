@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useThemeColors } from "../theme/useThemeColors";
+import { parseMessageLinks } from "../lib/messageLinks";
 import { IconSparkle, IconX, IconPlus, IconTrash, IconSend, IconPaperclip, IconFile } from "./icons";
 import { aiChat } from "../api/aiChat";
 import type {
@@ -1800,7 +1801,29 @@ function Bubble({
             wordBreak: "break-word",
           }}
         >
-          {text}
+          {/* Bağlantılar tıklanabilir çizilir; gerisi düz metin kalır
+              (bkz. lib/messageLinks — markdown motoru yok, HTML üretilmiyor). */}
+          {parseMessageLinks(text).map((segment, i) =>
+            segment.type === "link" ? (
+              <a
+                key={i}
+                href={segment.href}
+                target="_blank"
+                rel="noreferrer"
+                // Dosya adı bağlantı olunca satırın geri kalanından ayırt
+                // edilebilmeli: renk tek başına yetmiyor, altı da çizili.
+                style={{
+                  color: isUser ? "#fff" : c.accentDark,
+                  textDecoration: "underline",
+                  fontWeight: 500,
+                }}
+              >
+                {segment.label}
+              </a>
+            ) : (
+              <span key={i}>{segment.value}</span>
+            )
+          )}
         </div>
       )}
       {/* Alt satır: kredi bilgisi ve bu yanıtı dinleme düğmesi. Hoparlör her

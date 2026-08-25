@@ -38,6 +38,21 @@ export interface ActiveFile {
   kind: string;
   detail: string;
   text?: string;
+  /**
+   * Dosya Projelio'dan getirildiyse (Lio'nun open_file aracı) kaynak dosyanın
+   * kimliği. Aynı dosyayı ikinci kez açıp içeriğini iki kez ödememek için tutulur.
+   */
+  sourceFileId?: string;
+  /**
+   * Bu dosya bir koşunun ORTASINDA mı sabitlendi?
+   *
+   * Sabit dosyalar isteğin en başına konan önbellek önekini oluşturuyor. Koşu
+   * ortasında eklenen dosya o öneğe giremez — önek bir SONRAKİ istekte yeniden
+   * yazılır ve o istek önbelleği okumak yerine YAZAR (arada 10 kata varan fark
+   * var). İşaret bunun için: sonraki istek pahalı ilk turu önceden görebilsin.
+   * Okunduğu istekte temizlenir.
+   */
+  addedMidRun?: boolean;
 }
 
 export interface AiStoredMessage {

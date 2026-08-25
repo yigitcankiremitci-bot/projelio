@@ -28,6 +28,43 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       properties: {},
     },
   },
+  {
+    name: "search_files",
+    description:
+      "Projelio'ya yüklenmiş dosyaları ADINA göre arar (işlerin ve projelerin dosyaları). " +
+      "Dosyanın kimliğini, adını, türünü, boyutunu ve hangi iş/projede durduğunu döndürür — " +
+      "İÇERİĞİNİ DÖNDÜRMEZ. Kullanıcı \"şu dosyayı getir\", \"şu sözleşmeye bak\", " +
+      "\"projede hangi dosyalar var\" gibi bir şey dediğinde önce bunu çağır; " +
+      "içeriği gerekiyorsa dönen fileId ile open_file'ı çağır. " +
+      "query boş bırakılırsa en son yüklenen dosyalar döner.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Dosya adında aranacak metin (opsiyonel)." },
+        projectId: { type: "string", description: "Yalnızca bu projenin dosyalarında ara (opsiyonel)." },
+        limit: { type: "number", description: "En fazla kaç sonuç (varsayılan 20, en çok 50)." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "open_file",
+    description:
+      "Projelio'daki bir dosyayı SOHBETE GETİRİR: içeriği okunur ve sohbete sabitlenir, yani bu " +
+      "turdan itibaren elinde olur. Word/Excel/CSV/metin dosyaları metne çevrilir; görsel ve PDF'i " +
+      "doğrudan görürsün. Dosya kimliğini search_files'tan al. " +
+      "PAHALIDIR: sabitlenen dosya iş bitene kadar HER TURDA yeniden gönderilir ve kullanıcı her " +
+      "turda öder. Bu yüzden yalnızca kullanıcı bir dosyanın getirilmesini/incelenmesini istediğinde " +
+      "çağır; hangisi olduğundan emin değilsen açmadan önce sor, doğru olanı bulmak için birkaç " +
+      "dosyayı arka arkaya AÇMA. İşin bitince release_files ile bırak.",
+    input_schema: {
+      type: "object",
+      properties: {
+        fileId: { type: "string", description: "search_files'ın döndürdüğü dosya kimliği." },
+      },
+      required: ["fileId"],
+    },
+  },
   // --- Okuma araçları -------------------------------------------------
   {
     name: "list_jobs",

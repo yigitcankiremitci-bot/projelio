@@ -27,6 +27,7 @@ import {
   type StoredAttachment,
 } from "./ai-conversations.service";
 import { AiAttachmentsService, type PreparedAttachment } from "./ai-attachments.service";
+import { FilesService } from "../files/files.service";
 import { AiTranscriptionService } from "./ai-transcription.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 import type { LioActivityPayload } from "@projelio/shared";
@@ -404,6 +405,28 @@ export function toActiveFileInfo(files: { id: string; name: string; kind: string
   return files.map(({ id, name, kind, detail }) => ({ id, name, kind, detail }));
 }
 
+/** Hazırlanmış eki sohbete sabitlenecek kayda çevirir. */
+function toActiveFile(
+  attachment: PreparedAttachment,
+  extra: { sourceFileId?: string; addedMidRun?: boolean } = {}
+): ActiveFile {
+  return {
+    id: attachment.id,
+    name: attachment.name,
+    kind: attachment.kind,
+    detail: attachment.detail,
+    text: attachment.text,
+    ...extra,
+  };
+}
+
+/** Koşu-ortası işaretini düşürür: işaret yalnızca bir sonraki isteğe kadar yaşar. */
+function clearMidRunFlag(file: ActiveFile): ActiveFile {
+  if (!file.addedMidRun) return file;
+  const { addedMidRun, ...rest } = file;
+  return rest;
+}
+
 /**
  * Sayı ÖNEKİ almayan eylemler.
  *
@@ -453,6 +476,9 @@ export class AiAssistantService {
     private conversationsService: AiConversationsService,
     private attachmentsService: AiAttachmentsService,
     private transcriptionService: AiTranscriptionService,
+    // Lio'nun search_files/open_file araçları için: dosya arama ve indirme
+    // yetkisi tek yerde, FilesService'te duruyor.
+    private filesService: FilesService,
     private realtime: RealtimeGateway
   ) {}
 
@@ -785,6 +811,23 @@ export class AiAssistantService {
       "- İçerikte \"kısaltıldı\" notu varsa dosyanın tamamını görmediğini söyle; eksik veriye dayanarak " +
         "\"hepsi bu kadar\" deme.",
       "",
+      "### Projelio'daki dosyalar",
+      "Kullanıcının işlerine ve projelerine yüklenmiş dosyaları SEN de getirebilirsin; kullanıcının " +
+        "dosyayı elle iliştirmesini beklemene gerek yok.",
+      "- Akış: search_files ile dosyayı bul, doğru olduğundan eminsen open_file ile sohbete getir.",
+      "- \"Şu sözleşmeyi getir\", \"projedeki teklife bak\", \"bu projede hangi dosyalar var\" gibi " +
+        "isteklerde kullanıcıdan dosya İSTEME — önce ara.",
+      "- Arama yalnızca dosya ADINDA eşleşir, içerikte değil. Bulamazsan projectId ile daraltıp ya da " +
+        "daha kısa bir terimle bir kez daha dene; yine çıkmazsa kullanıcıya sor.",
+      "- Birden çok dosya eşleşiyorsa AÇMADAN önce listeyi göster ve hangisi olduğunu sor. Doğrusunu " +
+        "bulmak için sırayla birkaç dosya açmak, kullanıcıya her birinin bedelini tur tur ödetir.",
+      "- Getirdiğin dosya da sohbete sabitlenir: yukarıdaki bütün kurallar (önce ne olduğunu söyle, " +
+        "uydurma, iş bitince release_files ile bırak) onun için de geçerli.",
+      "- Dosya getirmek dosyaya DOKUNMAZ. Projelio'daki bir dosyayı düzenleyemez, silemez, yeniden " +
+        "adlandıramazsın; kullanıcı bunu isterse dosya ekranından yapması gerektiğini söyle.",
+      "- Çok büyük dosyalar ya da desteklenmeyen türler açılamaz. Hata dönerse ne olduğunu kullanıcıya " +
+        "olduğu gibi söyle; dosyanın içeriğini tahmin etmeye ÇALIŞMA.",
+      "",
       "### El yazısı fotoğrafları",
       "Kullanıcı bir kâğıda yazdığı görev listesini kameradan çekip gönderebilir. Bu görselleri okumak " +
         "diğerlerinden farklı bir dikkat ister:",
@@ -870,10 +913,21 @@ export class AiAssistantService {
       ].join("\n");
     }
 
+    // open_file ile bu koşunun ORTASINDA getirilen dosya, en baştaki önbelleklenmiş
+    // öneğe giremiyor; içeriği açıldığı turun sonunda duruyor. Nerede olduğunu
+    // yazmazsak model onu en başta arar, bulamaz ve "dosya elimde değil" der.
+    const midRun = activeFiles.filter((file) => file.addedMidRun);
+
     return [
       "## Şu an açık dosyalar",
       ...activeFiles.map((file) => `- ${file.name} (${file.detail})`),
       "Bu dosyaların içeriği bu isteğin EN BAŞINDA sana verildi; elindeler.",
+      ...(midRun.length
+        ? [
+            `Şunlar istisna — bu isteğin ORTASINDA getirildi ve içerikleri en başta değil, ` +
+              `open_file sonucunun hemen ardında duruyor: ${midRun.map((f) => f.name).join(", ")}.`,
+          ]
+        : []),
       "Geçmiş mesajlarda \"dosya elimde değil\", \"sohbetten kaldırıldı\" ya da benzeri bir şey",
       "söylemiş olsan bile o cümleler ARTIK GEÇERSİZ. Kullanıcıdan dosyayı tekrar istemeden önce",
       "yukarıdaki içeriğe bak.",
@@ -977,12 +1031,18 @@ export class AiAssistantService {
     // Eskiden ek yalnızca gönderildiği mesajda duruyordu ve geçmiş penceresi
     // dolunca kayboluyordu — Lio "dosyayı bu turda göremiyorum" deyip aynı soruları
     // tekrarlıyor, kullanıcı hem sonuç alamıyor hem yüzlerce kredi ödüyordu.
-    const activeFiles = this.mergeActiveFiles(
-      await this.conversationsService.getActiveFiles(convId),
-      attachments
+    const stored = await this.conversationsService.getActiveFiles(convId);
+    // Bir önceki koşunun ORTASINDA açılmış dosya (open_file) önbellek önekini
+    // değiştirdi ama bedelini bu istek ödeyecek: önek burada yeniden yazılıyor.
+    // İşaret okunup temizlenmezse pahalı ilk tur, ucuz sanılıp uyarısız geçerdi.
+    const midRunPinned = stored.some((f) => f.addedMidRun);
+    const activeFiles = this.mergeActiveFiles(stored, attachments.map((a) => toActiveFile(a))).map(
+      (f) => clearMidRunFlag(f)
     );
-    if (attachments.length) {
+    if (attachments.length || midRunPinned) {
       await this.conversationsService.setActiveFiles(convId, activeFiles);
+    }
+    if (attachments.length) {
       // Metin taşıyanların içeriği artık veritabanında; bellekte yalnızca görsel/PDF kalır.
       this.attachmentsService.retain(userId, attachments.map((a) => a.id));
     }
@@ -1032,7 +1092,7 @@ export class AiAssistantService {
       startingBalance: balance,
       activeFiles,
       pinnedTokens: this.estimateInputTokens(this.activeFileMessages(userId, activeFiles)),
-      expectsCacheWrite: this.expectsCacheWrite(history, attachments.length > 0),
+      expectsCacheWrite: this.expectsCacheWrite(history, attachments.length > 0 || midRunPinned),
       pausedEstimate: 0,
       askAgain: true,
       holds: [],
@@ -1064,15 +1124,8 @@ export class AiAssistantService {
    * Sınır aşılırsa en ESKİ dosya düşer: kullanıcı yeni bir dosya yüklediyse ilgisi
    * ona kaymıştır ve her turda beş dosyanın tamamını göndermek hızla pahalanır.
    */
-  private mergeActiveFiles(existing: ActiveFile[], attachments: PreparedAttachment[]): ActiveFile[] {
-    if (!attachments.length) return existing;
-    const incoming: ActiveFile[] = attachments.map((a) => ({
-      id: a.id,
-      name: a.name,
-      kind: a.kind,
-      detail: a.detail,
-      text: a.text,
-    }));
+  private mergeActiveFiles(existing: ActiveFile[], incoming: ActiveFile[]): ActiveFile[] {
+    if (!incoming.length) return existing;
     const merged = [...existing.filter((f) => !incoming.some((i) => i.id === f.id)), ...incoming];
     return merged.slice(-MAX_ACTIVE_FILES);
   }
@@ -1581,6 +1634,9 @@ export class AiAssistantService {
       // Kritik olmayan araçları çalıştır, sonuçları modele geri besle ve devam et.
       run.messages.push({ role: "assistant", content: response.content });
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
+      // open_file ile getirilen dosyaların içerik blokları. Araç sonuçlarının
+      // ARDINA konuyorlar (bkz. openProjelioFile).
+      const openedBlocks: ContentBlockParam[] = [];
       for (const use of toolUses) {
         // release_files sohbetin durumunu değiştiriyor, veriyi değil; bu yüzden
         // executeTool'a değil buraya ait — orada conversationId bilgisi yok.
@@ -1591,6 +1647,25 @@ export class AiAssistantService {
             tool_use_id: use.id,
             content: "Dosyalar bırakıldı; bundan sonra içerikleri sana gönderilmeyecek.",
           });
+          continue;
+        }
+        // open_file de sohbetin durumunu değiştiriyor (dosyayı sabitliyor);
+        // release_files ile aynı sebeple executeTool'un dışında duruyor.
+        if (use.name === "open_file") {
+          try {
+            const opened = await this.openProjelioFile(run, String((use.input as any)?.fileId ?? ""));
+            run.executed.push(use.name);
+            toolResults.push({ type: "tool_result", tool_use_id: use.id, content: opened.note });
+            openedBlocks.push(...opened.blocks);
+          } catch (err: any) {
+            this.logger.warn(`open_file başarısız: ${err?.message}`);
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: use.id,
+              content: `Dosya getirilemedi: ${err?.message ?? "bilinmeyen hata"}`,
+              is_error: true,
+            });
+          }
           continue;
         }
         try {
@@ -1618,7 +1693,9 @@ export class AiAssistantService {
           });
         }
       }
-      run.messages.push({ role: "user", content: toolResults });
+      // Getirilen dosyaların içeriği araç sonuçlarının ARDINA eklenir; tool_result
+      // blokları kullanıcı turunun başında olmak zorunda.
+      run.messages.push({ role: "user", content: [...toolResults, ...openedBlocks] });
     }
 
     // Tur sınırına gelindi ve iş bitmedi. Eskiden burada "İsteğini tamamlayamadım"
@@ -1778,6 +1855,88 @@ export class AiAssistantService {
       }
     }
     return tokens;
+  }
+
+  /**
+   * Projelio'daki bir dosyayı sohbete getirir (open_file).
+   *
+   * İçerik İKİ YERE birden konur ve bu bilinçli:
+   *
+   *  1. Sohbete SABİTLENİR — sonraki isteklerde içerik yine isteğin en başına
+   *     konur ve önbellekten ucuza okunur (bkz. activeFileMessages).
+   *  2. Bu koşuya araç sonucunun ardından eklenir. Sabit dosya bloğu isteğin en
+   *     BAŞINDA duruyor ve koşu ortasında oraya bir şey eklenemez: eklenseydi o
+   *     ana kadar yazılmış önbellek öneki bozulur, turun tamamı yeniden ödenirdi.
+   *     Bu yüzden dosya, açıldığı turda mesaj yığınının SONUNA iliştirilir —
+   *     model dosyayı hemen görür, kullanıcı da aynı içeriği iki kez ödemez.
+   */
+  private async openProjelioFile(
+    run: PendingRun,
+    fileId: string
+  ): Promise<{ note: string; blocks: ContentBlockParam[] }> {
+    if (!fileId) throw new BadRequestException("fileId gerekli.");
+
+    // Aynı dosyayı ikinci kez açmak, indirme + çıkarma bedelini ve her turdaki
+    // token bedelini boşuna ikiye katlardı.
+    const already = run.activeFiles.find((f) => f.sourceFileId === fileId);
+    if (already) {
+      // Görsel ve PDF'in ikili içeriği bellekte SÜRELİ duruyor. Süresi dolduysa
+      // dosya listede görünmeye devam eder ama model onu artık göremez; "zaten
+      // açık" demek, olmayan bir içeriği var saymak olurdu. O durumda kayıt
+      // düşürülür ve dosya yeniden getirilir.
+      const stillReadable =
+        already.kind === "image" || already.kind === "pdf"
+          ? Boolean(this.attachmentsService.getBinary(run.userId, already.id))
+          : true;
+      if (stillReadable) {
+        return {
+          note: `"${already.name}" zaten bu sohbette açık ve içeriği elinde; tekrar açmana gerek yok.`,
+          blocks: [],
+        };
+      }
+      run.activeFiles = run.activeFiles.filter((f) => f.id !== already.id);
+      this.attachmentsService.releaseMany(run.userId, [already.id]);
+    }
+
+    const summary = await this.attachmentsService.prepareFromProjelioFile(
+      run.userId,
+      fileId,
+      run.conversationId
+    );
+    const [prepared] = this.attachmentsService.take(run.userId, [summary.id]);
+
+    // Blok, retain()'den ÖNCE kurulur: retain metin sürümünü bellekten düşürüyor.
+    const blocks = [this.activeFileBlock(run.userId, toActiveFile(prepared))];
+
+    const before = run.activeFiles;
+    run.activeFiles = this.mergeActiveFiles(before, [
+      toActiveFile(prepared, { sourceFileId: fileId, addedMidRun: true }),
+    ]);
+    await this.conversationsService.setActiveFiles(run.conversationId, run.activeFiles);
+    this.attachmentsService.retain(run.userId, [prepared.id]);
+
+    // Sınıra takılıp düşen dosya olduysa modele SÖYLENİR; yoksa bir sonraki turda
+    // artık gönderilmeyen bir dosyayı elinde sanıp içeriğini uydurmaya çalışır.
+    const dropped = before.filter((f) => !run.activeFiles.some((k) => k.id === f.id));
+    if (dropped.length) {
+      this.attachmentsService.releaseMany(run.userId, dropped.map((f) => f.id));
+    }
+
+    this.logger.log(
+      `Lio dosya getirdi · kullanıcı=${run.userId.slice(0, 8)}… dosya=${prepared.name} tür=${prepared.kind}`
+    );
+
+    return {
+      note:
+        `"${prepared.name}" (${prepared.detail}) sohbete getirildi; içeriği bu mesajın devamında. ` +
+        (dropped.length
+          ? `Aynı anda en fazla ${MAX_ACTIVE_FILES} dosya taşınabildiği için şunlar sohbetten düştü: ` +
+            `${dropped.map((f) => f.name).join(", ")}. `
+          : "") +
+        (prepared.creditsCharged ? `Hazırlama bedeli ${prepared.creditsCharged} kredi. ` : "") +
+        "Dosya iş bitene kadar her turda elinde olacak; bittiğinde release_files ile bırak.",
+      blocks,
+    };
   }
 
   /**
@@ -2384,6 +2543,18 @@ export class AiAssistantService {
           role: m.role,
           title: m.title,
         }));
+      }
+
+      case "search_files": {
+        // Aramanın kapsamı Lio'nun list_jobs'ta gördüğü işlerle AYNI olsun diye
+        // iş listesi oradan alınıyor. Erişim ayrıca FilesService'te tekrar
+        // denetlenir — bu liste bir kolaylık, yetki kaynağı değil.
+        const jobs = await this.jobsService.findAllForUser(userId);
+        return this.filesService.searchInJobs(
+          jobs.map((j) => j.id),
+          userId,
+          { query: input.query, projectId: input.projectId, limit: input.limit }
+        );
       }
 
       case "search_tasks":

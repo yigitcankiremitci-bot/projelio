@@ -77,6 +77,38 @@ export interface FileContext {
 }
 
 /**
+ * Lio'nun dosya aramasında dönen tek satır.
+ *
+ * Ekranlara giden `ProjectFile` yerine daha dar bir şekil dönülüyor: modele
+ * gönderilen her alan tur başına token demek, ve `canEditInDrive` satır başına
+ * ayrı bir sorgu istiyor — Lio dosyayı Drive'da düzenlemediği için o bilgiyi
+ * hesaplamak boşuna maliyet olurdu.
+ */
+export interface FileSearchHit {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes?: number;
+  jobId?: string;
+  jobTitle?: string;
+  projectId?: string;
+  projectTitle?: string;
+  status: "pending" | "ready" | "missing";
+  createdAt: string;
+}
+
+/**
+ * Arama terimini PostgREST filtresine konulabilir hâle getirir.
+ *
+ * `ilike` değerinde virgül ve parantez AYRAÇ sayılıyor, `%` ve `_` ise joker:
+ * kullanıcının yazdığı metin olduğu gibi konursa sorgu ya bozulur ya da hiç
+ * beklenmedik dosyalar eşleşir.
+ */
+function likeTerm(raw: string): string {
+  return raw.replace(/[%_,()"\\]/g, " ").trim();
+}
+
+/**
  * Kullanıcının bir işteki erişim düzeyi.
  *
  *  job     -> iş sahibi ya da işe alınmış üye: işin BÜTÜN dosyalarını görür
@@ -1169,6 +1201,98 @@ export class FilesService {
   async listByProject(projectId: string, userId: string, filter: FileContext = {}): Promise<ProjectFile[]> {
     const jobId = await this.jobIdOfProject(projectId);
     return this.listByJob(jobId, userId, { ...filter, projectId: filter.taskId || filter.outputId ? undefined : projectId });
+  }
+
+  /**
+   * Verilen işlerin dosyalarında ada göre arar (Lio'nun `search_files` aracı).
+   *
+   * İş listesi DIŞARIDAN veriliyor: çağıran taraf kullanıcının hangi işleri
+   * gördüğünü zaten biliyor ve aynı listeyi burada ikinci kez kurmak, iki yerde
+   * ayrışabilecek iki erişim tanımı demek olurdu. Yine de gelen listeye
+   * GÜVENİLMEZ — her iş için erişim burada tekrar çözülür ve proje düzeyindeki
+   * kullanıcıya işin geneline ait dosyalar gösterilmez (bkz. listByJob).
+   */
+  async searchInJobs(
+    jobIds: string[],
+    userId: string,
+    filter: { query?: string; projectId?: string; limit?: number } = {}
+  ): Promise<FileSearchHit[]> {
+    let scope = jobIds.filter(Boolean);
+
+    if (filter.projectId) {
+      const jobId = await this.jobIdOfProject(filter.projectId);
+      if (!scope.includes(jobId)) throw new ForbiddenException("Bu projenin dosyalarına erişim yetkiniz yok");
+      scope = [jobId];
+    }
+    if (!scope.length) return [];
+
+    const limit = Math.min(Math.max(Number(filter.limit) || 20, 1), 50);
+
+    let query = this.supabase.client
+      .from("files")
+      .select()
+      .in("job_id", scope)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      // Yetki elemesi sorgudan SONRA yapıldığı için ham liste daha geniş çekilir;
+      // doğrudan `limit` ile çekilseydi elenen satırlar yüzünden sonuç sayısı
+      // sebepsiz yere azalırdı.
+      .limit(limit * 4);
+
+    if (filter.projectId) query = query.eq("project_id", filter.projectId);
+
+    const term = filter.query ? likeTerm(filter.query) : "";
+    if (term) query = query.ilike("name", `%${term}%`);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    const rows = data ?? [];
+    if (!rows.length) return [];
+
+    // Erişim İŞ BAŞINA bir kez çözülür: satır başına çözmek aynı sorguyu
+    // onlarca kez çalıştırmak olurdu.
+    const accessByJob = new Map<string, JobAccess>();
+    for (const jobId of new Set<string>(rows.map((r: any) => r.job_id).filter(Boolean))) {
+      accessByJob.set(jobId, await this.resolveAccess(jobId, userId));
+    }
+
+    const allowed = rows
+      .filter((row: any) => {
+        const access = accessByJob.get(row.job_id);
+        if (!access || access.level === "none") return false;
+        if (access.level === "job") return true;
+        return Boolean(row.project_id) && access.projectIds.includes(row.project_id);
+      })
+      .slice(0, limit);
+    if (!allowed.length) return [];
+
+    // Başlıklar tek sorguda toplanır; model "hangi işin/projenin dosyası"
+    // bilgisini görmeden doğru dosyayı seçemiyor.
+    const foundJobIds = [...new Set<string>(allowed.map((r: any) => r.job_id).filter(Boolean))];
+    const foundProjectIds = [...new Set<string>(allowed.map((r: any) => r.project_id).filter(Boolean))];
+    const [{ data: jobRows }, { data: projectRows }] = await Promise.all([
+      foundJobIds.length
+        ? this.supabase.client.from("jobs").select("id, title").in("id", foundJobIds)
+        : Promise.resolve({ data: [] as any[] }),
+      foundProjectIds.length
+        ? this.supabase.client.from("projects").select("id, title").in("id", foundProjectIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const jobTitles = new Map((jobRows ?? []).map((j: any) => [j.id, j.title as string]));
+    const projectTitles = new Map((projectRows ?? []).map((p: any) => [p.id, p.title as string]));
+
+    return allowed.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      mimeType: row.mime_type,
+      sizeBytes: row.size_bytes !== null && row.size_bytes !== undefined ? Number(row.size_bytes) : undefined,
+      jobId: row.job_id ?? undefined,
+      jobTitle: row.job_id ? jobTitles.get(row.job_id) : undefined,
+      projectId: row.project_id ?? undefined,
+      projectTitle: row.project_id ? projectTitles.get(row.project_id) : undefined,
+      status: row.status,
+      createdAt: row.created_at,
+    }));
   }
 
   async findById(fileId: string, userId: string): Promise<{ row: any; file: ProjectFile }> {

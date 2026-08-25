@@ -105,20 +105,24 @@ export class HabieService {
 
   async createSession(userId: string, email: string, role: string): Promise<HabieSession> {
     let displayName = email;
+    let avatarUrl: string | null = null;
     try {
       const { data } = await this.supabase.client
         .from("users")
-        .select("full_name")
+        .select("full_name, avatar_url")
         .eq("id", userId)
         .single();
       if (data?.full_name) displayName = data.full_name;
+      // Profil fotoğrafı iddiayla Habie'ye geçiyor: Habie'nin kendi
+      // fotoğraf deposu yok ve olmasına gerek de yok, kaynak burası.
+      if (data?.avatar_url) avatarUrl = data.avatar_url;
     } catch (err: any) {
       // İsim kozmetik — alınamazsa e-posta ile devam et, oturumu düşürme.
       this.logger.warn(`Kullanıcı adı okunamadı (${userId}): ${err?.message ?? err}`);
     }
 
     const assertion = await this.jwt.signAsync(
-      { iss: HABIE_APP_ID, sub: userId, name: displayName, role },
+      { iss: HABIE_APP_ID, sub: userId, name: displayName, avatar: avatarUrl, role },
       { secret: this.appSecret(), expiresIn: ASSERTION_TTL }
     );
 

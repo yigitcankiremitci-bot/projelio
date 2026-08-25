@@ -6,6 +6,13 @@ import { IconCheck, IconX } from "./icons";
 interface Props {
   /** Kayıtlı kapak değeri: bir URL, "preset:<key>" ya da boş. */
   value?: string;
+  /**
+   * Kaydın kimliği. Kapak seçilmemişken önizlemenin, kullanıcının SAYFADA
+   * gördüğü türetilmiş kapağı göstermesi için gerekiyor (bkz. lib/covers);
+   * yoksa önizleme düz gri çıkar ve "kaldır"a basan kullanıcı yanlış bir
+   * sonuç bekler.
+   */
+  seed?: string;
   /** Henüz yüklenmemiş, kullanıcının az önce seçtiği dosya (önizleme için). */
   filePreview?: string | null;
   onSelectPreset: (value: string | undefined) => void;
@@ -19,11 +26,13 @@ interface Props {
  * beklemesi ve boyut sıkıştırma yok — seçim anında görünür. Fotoğraf yüklemek
  * istemeyen kullanıcı da sayfasını boş bırakmak zorunda kalmıyor.
  */
-export default function CoverPicker({ value, filePreview, onSelectPreset, onFile }: Props) {
+export default function CoverPicker({ value, seed, filePreview, onSelectPreset, onFile }: Props) {
   const c = useThemeColors();
   const fileRef = useRef<HTMLInputElement>(null);
   const selectedPreset = findCoverPreset(value);
-  const previewBackground = filePreview ? `center/cover no-repeat url(${filePreview})` : coverBackground(value);
+  const previewBackground = filePreview
+    ? `center/cover no-repeat url(${filePreview})`
+    : coverBackground(value, seed);
   const hasSomething = Boolean(filePreview || value);
 
   return (
@@ -90,6 +99,14 @@ export default function CoverPicker({ value, filePreview, onSelectPreset, onFile
         }}
         style={{ display: "none" }}
       />
+
+      {/* Kapak seçilmemişken kayıt boş görünmüyor, türetilmiş bir kapak taşıyor;
+          bunu yazmazsak kullanıcı yukarıdaki önizlemenin nereden geldiğini anlamıyor. */}
+      {!hasSomething && (
+        <span style={{ fontSize: 13, color: c.textSecondary }}>
+          Kapak seçmezsen bu kayda özel, kendiliğinden atanmış bir kapak gösterilir.
+        </span>
+      )}
 
       <span style={{ fontSize: 13, color: c.textSecondary }}>ya da hazır bir kapak seç</span>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 6 }}>

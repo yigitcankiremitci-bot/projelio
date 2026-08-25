@@ -5,7 +5,9 @@
  *
  *  1. Kullanıcının yüklediği fotoğraf (coverImageUrl bir URL)
  *  2. Hazır kapak kütüphanesinden bir seçim (coverImageUrl "preset:<key>")
- *  3. Hiçbiri (coverImageUrl boş)
+ *  3. Hiçbiri (coverImageUrl boş) — bu durumda kaydın KİMLİĞİNDEN türetilen bir
+ *     hazır kapak gösterilir (bkz. presetForSeed). Boş gri bir dikdörtgen,
+ *     rastgele bir gradyandan her zaman daha kötü duruyordu.
  *
  * Ayıklanan hata: 3. durumda arka plan koyu lacivert bir gradyandı ama başlık ve
  * açıklama koyu renkte (textPrimary/textSecondary) yazılıyordu — yani kapağı
@@ -178,6 +180,30 @@ export const COVER_TEXT_SECONDARY = "#566070";
 export const COVER_TEXT_PRIMARY_DARK = "#F5F6F8";
 export const COVER_TEXT_SECONDARY_DARK = "#B7BEC9";
 
+/**
+ * Kapağı olmayan bir kayda hazır kapaklardan birini seçer.
+ *
+ * Neden kayda YAZILMIYOR da kimlikten türetiliyor:
+ *  - Mevcut binlerce kayıt için migration ve toplu güncelleme gerekmiyor;
+ *    kural konduğu an her yerde geçerli oluyor.
+ *  - Seçim her yüzeyde AYNI çıkıyor: kart, sayfa başlığı ve düzenleme
+ *    önizlemesi aynı kapağı gösterir.
+ *  - Her çizimde gerçekten rastgele seçilseydi kapak sayfa yenilendikçe
+ *    değişirdi; kullanıcı bir kaydı rengiyle tanıyamaz, üstelik listede
+ *    kaydırdıkça renkler oynardı.
+ *
+ * Kullanıcı bir kapak seçtiği anda coverImageUrl dolar ve buranın hükmü kalkar.
+ */
+export function presetForSeed(seed: string): CoverPreset {
+  // FNV-1a: bağımlılıksız, kısa ve aynı girdi için her yerde aynı sonucu verir.
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return COVER_PRESETS[(hash >>> 0) % COVER_PRESETS.length];
+}
+
 export function isCoverPreset(value?: string | null): boolean {
   return typeof value === "string" && value.startsWith(PRESET_PREFIX);
 }
@@ -200,14 +226,22 @@ export function findCoverPreset(value?: string | null): CoverPreset | undefined 
  * Silinmiş/bozuk bir preset anahtarı gelirse varsayılana düşer; kırık bir
  * arka plan yerine düzgün bir kapak görünür.
  */
-export function coverBackground(coverImageUrl?: string | null): string {
+export function coverBackground(coverImageUrl?: string | null, seed?: string): string {
   const preset = findCoverPreset(coverImageUrl);
   if (preset) return preset.background;
   if (coverImageUrl && !isCoverPreset(coverImageUrl)) return `center/cover no-repeat url(${coverImageUrl})`;
-  return DEFAULT_COVER.background;
+  // Kapak seçilmemiş: kaydın kimliğinden türetilmiş bir hazır kapak. Tohum
+  // verilmediyse (henüz kimliği olmayan bir önizleme) düz varsayılana düşülür.
+  return seed ? presetForSeed(seed).background : DEFAULT_COVER.background;
 }
 
-/** Kullanıcının gerçekten bir kapak seçip seçmediği (kart/rozet kararları için). */
+/**
+ * Kullanıcının gerçekten bir kapak SEÇİP seçmediği.
+ *
+ * Türetilmiş kapak (presetForSeed) bunu doldurmaz — bu ayrım "kapak ekle"
+ * düğmesinin görünüp görünmeyeceğine karar verirken gerekiyor: kayıt renkli
+ * görünüyor olsa da kullanıcı henüz kendi kapağını koymamış olabilir.
+ */
 export function hasCover(coverImageUrl?: string | null): boolean {
   return Boolean(coverImageUrl);
 }

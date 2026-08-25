@@ -69,20 +69,16 @@ export default function JobCard({ job, projectCount }: Props) {
         height: CARD_HEIGHT,
       }}
     >
-      {/* Kapak: fotoğraf yoksa bile aynı yükseklikte, açık renkli bir yer tutucu ile gösterilir. */}
+      {/* Kapak: kullanıcı bir kapak koymadıysa kaydın kimliğinden türetilmiş hazır
+          bir kapak çizilir — boş gri bir alan kartı ölü gösteriyordu (bkz. lib/covers). */}
       <div
         style={{
           position: "relative",
           height: COVER_HEIGHT,
           flexShrink: 0,
-          background: coverUrl ? coverBackground(coverUrl) : c.background,
-          display: coverUrl ? undefined : "flex",
-          alignItems: coverUrl ? undefined : "center",
-          justifyContent: coverUrl ? undefined : "center",
+          background: coverBackground(coverUrl, job.id),
         }}
       >
-        {!coverUrl && <IconFolder size={26} color={c.border} />}
-
         {/* Hızlı fotoğraf ekleme yalnızca kapak yokken gösterilir; kapak varsa
             değiştirmek için "İşi düzenle" ekranı kullanılır. */}
         {!coverUrl && (

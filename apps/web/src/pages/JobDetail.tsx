@@ -369,6 +369,7 @@ export default function JobDetail() {
           </div>
         }
         coverImageUrl={job?.coverImageUrl}
+        seed={job?.id}
         // Masaüstünde 330 idi; özet kapağın içine girince o boşluk zaten doldu
         // ve fazlası sayfayı aşağı itiyordu. Dar ekran tavanı EntityCover'da.
         height={260}

@@ -154,6 +154,7 @@ export default function OrganizationDetail() {
           </div>
         }
         coverImageUrl={organization?.coverImageUrl}
+        seed={organization?.id}
         height={270}
         title={organization?.name ?? "…"}
         lioSubject={

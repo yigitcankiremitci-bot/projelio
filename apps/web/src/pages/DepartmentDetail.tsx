@@ -17,6 +17,7 @@ import { CoverBackLink } from "../components/EntityCover";
 import AskLioButton from "../components/AskLioButton";
 import { useBackTarget } from "../lib/backTarget";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
+import { presetForSeed } from "../lib/covers";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { colors } from "@projelio/shared";
@@ -169,8 +170,15 @@ export default function DepartmentDetail() {
           // arka planı da her zaman sabit koyu olmalı — temanın "primary"si karanlık
           // modda açık bir tona döndüğü için (bkz. ThemeProvider) dinamik c.primary
           // kullanılırsa karanlık modda beyaz yazı kapakla karışır.
+          // Kapak fotoğrafı yoksa (katalog dışı departman) kartla AYNI türetilmiş
+          // hazır kapak kullanılır — kartta renkli, sayfada lacivert görünmesi
+          // aynı departmanı iki farklı yer gibi gösteriyordu. Koyu perde hazır
+          // kapağın üstüne de serilir: açık tonlu kapaklarda beyaz yazı ancak
+          // onunla okunur kalıyor.
           background: coverUrl
             ? `linear-gradient(rgba(26,31,41,0.15), rgba(26,31,41,0.6)), center/cover url(${coverUrl})`
+            : department
+            ? `linear-gradient(rgba(26,31,41,0.15), rgba(26,31,41,0.6)), ${presetForSeed(department.id).background}`
             : `linear-gradient(135deg, ${colors.light.primary}, ${colors.light.primaryDark})`,
           padding: "20px 28px",
           display: "flex",

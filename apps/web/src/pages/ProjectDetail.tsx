@@ -458,41 +458,36 @@ export default function ProjectDetail() {
       )}
 
       {project && (() => {
-        const hasCover = Boolean(project.coverImageUrl);
+        // Kapak artık HER ZAMAN var: kullanıcı bir kapak koymadıysa proje
+        // kimliğinden türetilmiş hazır kapak çizilir (bkz. lib/covers). Bu yüzden
+        // eski "kapaksız" düzen dalı — tepeden 76px boşluk, perdesiz zemin, koyu
+        // yazı — tamamen kalktı; okunurluk perdeyle sağlanıyor.
         return (
           <div
             ref={coverRef}
             style={{
               position: "relative",
-              background: hasCover ? coverBackground(project.coverImageUrl) : c.surface,
-              overflow: hasCover ? "hidden" : undefined,
-              borderBottom: hasCover ? "none" : `1px solid ${c.border}`,
-              // Kapak yokken içerik bloğun ÜSTÜNDEN başlıyor ve sol üstte yüzen
-              // logo/sidebar oku ile sağ üstteki bildirim çanı (hepsi
-              // position:fixed) proje adının üstüne biniyordu. O bandın yüksekliği
-              // kadar (68px + pay) tepeden boşluk bırakılıyor. Kapak varsa içerik
-              // zaten alta yaslı olduğu için gerekmiyor.
-              padding: hasCover ? "20px 28px" : "76px 28px 18px",
-              minHeight: hasCover ? 330 : undefined,
-              display: hasCover ? "flex" : undefined,
-              flexDirection: hasCover ? "column" : undefined,
-              justifyContent: hasCover ? "flex-end" : undefined,
+              background: coverBackground(project.coverImageUrl, project.id),
+              overflow: "hidden",
+              padding: "20px 28px",
+              minHeight: 330,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "flex-end",
             }}
           >
-            {hasCover && (
-              <div
-                aria-hidden
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: COVER_VEIL_HEIGHT,
-                  background: cover.veil,
-                  pointerEvents: "none",
-                }}
-              />
-            )}
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: COVER_VEIL_HEIGHT,
+                background: cover.veil,
+                pointerEvents: "none",
+              }}
+            />
 
             {/* paddingRight kaldırıldı: sağ üstteki çan/tur düğmelerine yer açmak
                 içindi, artık bloğun tepesindeki boşluk (ya da kapaklı hâlde alta
@@ -507,7 +502,7 @@ export default function ProjectDetail() {
                 <AskLioButton
                   subject={{ kind: "proje", title: project.title, id: project.id }}
                   size={28}
-                  withBackground={hasCover}
+                  withBackground
                 />
                 <StatusBadge
                   status={project.status}
@@ -521,7 +516,7 @@ export default function ProjectDetail() {
                 style={{
                   position: "relative",
                   fontSize: 16,
-                  color: hasCover ? cover.secondary : c.textSecondary,
+                  color: cover.secondary,
                   margin: "0 0 14px",
                 }}
               >
@@ -539,7 +534,7 @@ export default function ProjectDetail() {
                 display: "flex",
                 alignItems: "center",
                 gap: 16,
-                borderTop: hasCover ? "1px solid rgba(26,31,41,0.2)" : `1px solid ${c.border}`,
+                borderTop: "1px solid rgba(26,31,41,0.2)",
                 paddingTop: 12,
               }}
             >
@@ -553,7 +548,7 @@ export default function ProjectDetail() {
                   rowGap: 6,
                   // Mobilde yazı ekran genişliğiyle ölçekleniyor ki iki tarih tek satıra sığsın.
                   fontSize: isDesktop ? 15 : "clamp(11px, 3.2vw, 13px)",
-                  color: hasCover ? cover.secondary : c.textSecondary,
+                  color: cover.secondary,
                 }}
               >
                 <span style={{ whiteSpace: "nowrap" }}>
@@ -584,8 +579,8 @@ export default function ProjectDetail() {
                     width: 40,
                     height: 40,
                     borderRadius: 10,
-                    border: hasCover ? `1px solid rgba(26,31,41,0.2)` : `1px solid ${c.border}`,
-                    background: hasCover ? "rgba(255,255,255,0.7)" : c.surface,
+                    border: "1px solid rgba(26,31,41,0.2)",
+                    background: "rgba(255,255,255,0.7)",
                     boxShadow: "0 2px 8px rgba(26,31,41,0.12)",
                   }}
                 >

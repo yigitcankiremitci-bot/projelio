@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import type { Group } from "@projelio/shared";
+import { coverBackground } from "../lib/covers";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconFolder, IconLayers, IconBuilding } from "./icons";
+import { IconFolder, IconBuilding } from "./icons";
 
 interface Props {
   group: Group;
@@ -21,13 +22,10 @@ export default function GroupCard({ group }: Props) {
         background: c.surface,
       }}
     >
-      {group.coverImageUrl ? (
-        <div style={{ aspectRatio: "3 / 1", background: `center/cover url(${group.coverImageUrl})` }} />
-      ) : (
-        <div style={{ aspectRatio: "3 / 1", background: c.background, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <IconLayers size={22} color={c.textSecondary} />
-        </div>
-      )}
+      {/* Kapak seçilmemişse kimlikten türetilmiş hazır kapak (bkz. lib/covers).
+          Burası eskiden coverBackground'dan geçmiyordu: hazır kapak seçilmiş bir
+          grupta "url(preset:mor)" yazılıp arka plan hiç çizilmiyordu. */}
+      <div style={{ aspectRatio: "3 / 1", background: coverBackground(group.coverImageUrl, group.id) }} />
       <div style={{ padding: 16 }}>
         <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{group.name}</h3>
         {group.description && (

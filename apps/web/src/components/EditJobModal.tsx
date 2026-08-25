@@ -110,6 +110,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
 
         <CoverPicker
           value={coverValue}
+          seed={job.id}
           filePreview={coverPreview}
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}

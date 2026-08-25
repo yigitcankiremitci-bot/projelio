@@ -33,9 +33,10 @@ export default function OperationCard({ operation }: Props) {
         background: c.surface,
       }}
     >
-      {operation.coverImageUrl && (
-        <div style={{ aspectRatio: "3 / 1", background: coverBackground(operation.coverImageUrl) }} />
-      )}
+      {/* Kapak seçilmemişse kimlikten türetilmiş hazır kapak (bkz. lib/covers).
+          Eskiden kapaksız rutinlerde bu şerit hiç çizilmiyordu; aynı listede
+          kimi kartın kapağı var kimininki yok gibi duruyordu. */}
+      <div style={{ aspectRatio: "3 / 1", background: coverBackground(operation.coverImageUrl, operation.id) }} />
       <div style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{operation.title}</h3>

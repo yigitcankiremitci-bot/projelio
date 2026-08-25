@@ -4,7 +4,8 @@ import { api } from "../api/client";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
-import { IconFolder, IconCalendar, IconPlus } from "./icons";
+import { coverBackground } from "../lib/covers";
+import { IconCalendar, IconPlus } from "./icons";
 
 interface Props {
   product: Product;
@@ -79,19 +80,16 @@ export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) 
         height: CARD_HEIGHT,
       }}
     >
+      {/* Kapak: kullanıcı bir kapak koymadıysa kaydın kimliğinden türetilmiş hazır
+          bir kapak çizilir — boş gri bir alan kartı ölü gösteriyordu (bkz. lib/covers). */}
       <div
         style={{
           position: "relative",
           height: COVER_HEIGHT,
           flexShrink: 0,
-          background: coverUrl ? `center/cover url(${coverUrl})` : c.background,
-          display: coverUrl ? undefined : "flex",
-          alignItems: coverUrl ? undefined : "center",
-          justifyContent: coverUrl ? undefined : "center",
+          background: coverBackground(coverUrl, product.id),
         }}
       >
-        {!coverUrl && <IconFolder size={26} color={c.border} />}
-
         {!coverUrl && (
           <button
             type="button"

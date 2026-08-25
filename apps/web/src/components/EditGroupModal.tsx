@@ -86,6 +86,7 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
 
         <CoverPicker
           value={coverValue}
+          seed={group.id}
           filePreview={coverPreview}
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}

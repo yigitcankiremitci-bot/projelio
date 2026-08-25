@@ -3,7 +3,7 @@ import { coverBackground } from "../lib/covers";
 import type { Organization } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
-import { IconFolder, IconLayers, IconBuilding } from "./icons";
+import { IconFolder, IconLayers } from "./icons";
 
 interface Props {
   organization: Organization;
@@ -23,13 +23,8 @@ export default function OrganizationCard({ organization }: Props) {
         background: c.surface,
       }}
     >
-      {organization.coverImageUrl ? (
-        <div style={{ aspectRatio: "3 / 1", background: coverBackground(organization.coverImageUrl) }} />
-      ) : (
-        <div style={{ aspectRatio: "3 / 1", background: c.background, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <IconBuilding size={22} color={c.textSecondary} />
-        </div>
-      )}
+      {/* Kapak seçilmemişse kimlikten türetilmiş hazır kapak (bkz. lib/covers). */}
+      <div style={{ aspectRatio: "3 / 1", background: coverBackground(organization.coverImageUrl, organization.id) }} />
       <div style={{ padding: 16 }}>
         <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{organization.name}</h3>
         {organization.description && (

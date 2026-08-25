@@ -139,6 +139,7 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
 
         <CoverPicker
           value={coverValue}
+          seed={project.id}
           filePreview={coverPreview}
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}

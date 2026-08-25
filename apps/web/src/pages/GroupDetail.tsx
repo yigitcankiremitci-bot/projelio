@@ -63,6 +63,7 @@ export default function GroupDetail() {
           </div>
         }
         coverImageUrl={group?.coverImageUrl}
+        seed={group?.id}
         height={270}
         title={group?.name ?? "…"}
         lioSubject={group ? { kind: "grup", title: group.name, id: group.id } : undefined}

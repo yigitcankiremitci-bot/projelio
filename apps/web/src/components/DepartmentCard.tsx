@@ -6,7 +6,8 @@ import { resizeCoverImage } from "../lib/imageProcessing";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
 import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
-import { IconLayers, IconUser, IconEdit } from "./icons";
+import { coverBackground } from "../lib/covers";
+import { IconUser, IconEdit } from "./icons";
 import AskLioButton from "./AskLioButton";
 
 interface Props {
@@ -78,19 +79,17 @@ export default function DepartmentCard({ department, onCoverUpdated }: Props) {
         height: CARD_HEIGHT,
       }}
     >
+      {/* Kapak sırası: kullanıcının yüklediği fotoğraf > katalog departmanının
+          hazır fotoğrafı > kimlikten türetilmiş hazır kapak. Sonuncusu katalog
+          dışı (özel) departmanlar için: eskiden boş gri bir alan kalıyordu. */}
       <div
         style={{
           position: "relative",
           height: COVER_HEIGHT,
           flexShrink: 0,
-          background: coverUrl ? `center/cover url(${coverUrl})` : c.background,
-          display: coverUrl ? undefined : "flex",
-          alignItems: coverUrl ? undefined : "center",
-          justifyContent: coverUrl ? undefined : "center",
+          background: coverBackground(coverUrl, department.id),
         }}
       >
-        {!coverUrl && <IconLayers size={26} color={c.border} />}
-
         <button
           type="button"
           onClick={handleChangeCoverClick}

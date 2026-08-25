@@ -121,6 +121,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
 
         <CoverPicker
           value={coverValue}
+          seed={organization.id}
           filePreview={coverPreview}
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}

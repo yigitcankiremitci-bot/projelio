@@ -6,7 +6,7 @@ import { api } from "../api/client";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
-import { IconFolder, IconPlus } from "./icons";
+import { IconPlus } from "./icons";
 import StatusBadge from "./StatusBadge";
 import AskLioButton from "./AskLioButton";
 
@@ -86,20 +86,16 @@ export default function ProjectCard({ project, canManage, onStatusChanged }: Pro
         height: CARD_HEIGHT,
       }}
     >
-      {/* Kapak: fotoğraf yoksa bile aynı yükseklikte, açık renkli bir yer tutucu ile gösterilir. */}
+      {/* Kapak: kullanıcı bir kapak koymadıysa kaydın kimliğinden türetilmiş hazır
+          bir kapak çizilir — boş gri bir alan kartı ölü gösteriyordu (bkz. lib/covers). */}
       <div
         style={{
           position: "relative",
           height: COVER_HEIGHT,
           flexShrink: 0,
-          background: coverUrl ? coverBackground(coverUrl) : c.background,
-          display: coverUrl ? undefined : "flex",
-          alignItems: coverUrl ? undefined : "center",
-          justifyContent: coverUrl ? undefined : "center",
+          background: coverBackground(coverUrl, project.id),
         }}
       >
-        {!coverUrl && <IconFolder size={26} color={c.border} />}
-
         {/* Hızlı fotoğraf ekleme yalnızca kapak yokken gösterilir; kapak varsa
             değiştirmek için "Projeyi düzenle" ekranı kullanılır. */}
         {!coverUrl && (

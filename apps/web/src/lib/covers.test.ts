@@ -10,6 +10,7 @@ import {
   coverPresetValue,
   findCoverPreset,
   isCoverPreset,
+  presetForSeed,
 } from "./covers";
 
 // Ayıklanan hata: kapağı olmayan iş/şirket sayfalarında arka plan koyu, yazı da
@@ -79,6 +80,37 @@ describe("coverBackground — üç durum tek yerden", () => {
 
   test("silinmiş bir preset anahtarı kırık arka plan bırakmaz", () => {
     assert.equal(coverBackground("preset:artik-yok"), DEFAULT_COVER.background);
+  });
+});
+
+describe("türetilmiş kapak — kapağı olmayan kayıtlar", () => {
+  test("aynı kimlik her zaman aynı kapağı verir", () => {
+    // Asıl kural bu: her çizimde rastgele seçilseydi kapak sayfa yenilendikçe
+    // değişir, kullanıcı bir kaydı renginden tanıyamazdı.
+    const id = "8f2c1b40-0000-4000-8000-000000000001";
+    assert.equal(presetForSeed(id).key, presetForSeed(id).key);
+    assert.equal(coverBackground(undefined, id), presetForSeed(id).background);
+  });
+
+  test("her hazır kapak seçilebiliyor — hiçbiri ulaşılmaz kalmıyor", () => {
+    // 200 kimlik 12 kapağa dağıldığında hepsi kullanılıyor. Bu test kırılırsa iki
+    // ihtimal var: karma bozulmuş (kapaklar birkaç kovaya yığılıyor) ya da yeni
+    // eklenen bir kapak bu örneklemde hiç seçilmiyor — ikisi de bakılmalı.
+    const keys = new Set(Array.from({ length: 200 }, (_, i) => presetForSeed(`kayit-${i}`).key));
+    assert.equal(keys.size, COVER_PRESETS.length);
+  });
+
+  test("kullanıcının seçtiği kapak tohumu ezer", () => {
+    const id = "8f2c1b40-0000-4000-8000-000000000002";
+    assert.equal(coverBackground("preset:bronz", id), findCoverPreset("preset:bronz")!.background);
+    assert.equal(
+      coverBackground("https://cdn.example.com/a.jpg", id),
+      "center/cover no-repeat url(https://cdn.example.com/a.jpg)"
+    );
+  });
+
+  test("tohum verilmezse eski davranış korunur", () => {
+    assert.equal(coverBackground(undefined), DEFAULT_COVER.background);
   });
 });
 

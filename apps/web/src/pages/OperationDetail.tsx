@@ -191,6 +191,7 @@ export default function OperationDetail() {
           </div>
         }
         coverImageUrl={operation?.coverImageUrl}
+        seed={operation?.id}
         // Masaüstünde 290 idi; özet kapağın içine girince o boşluk doldu.
         height={260}
         title={

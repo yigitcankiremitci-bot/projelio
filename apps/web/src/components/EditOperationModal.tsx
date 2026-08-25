@@ -156,6 +156,7 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
 
         <CoverPicker
           value={coverValue}
+          seed={operation.id}
           filePreview={coverPreview}
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}

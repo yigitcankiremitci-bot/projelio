@@ -146,6 +146,11 @@ interface Props {
   /** Kaydırınca beliren sabit başlık bunu ölçer (bkz. lib/pageHeader). */
   coverRef?: RefObject<HTMLDivElement>;
   coverImageUrl?: string;
+  /**
+   * Kapak seçilmemişse hazır kapağın türetileceği tohum — kaydın kimliği
+   * (bkz. lib/covers presetForSeed). Verilmezse düz varsayılan kapak çizilir.
+   */
+  seed?: string;
   height?: number;
   title: ReactNode;
   description?: string;
@@ -206,6 +211,7 @@ interface Props {
 export default function EntityCover({
   coverRef,
   coverImageUrl,
+  seed,
   height = 290,
   back,
   title,
@@ -232,7 +238,7 @@ export default function EntityCover({
       style={{
         position: "relative",
         height: coverHeight,
-        background: coverBackground(coverImageUrl),
+        background: coverBackground(coverImageUrl, seed),
         padding: `${isDesktop ? 20 : 16}px ${gutter}px`,
         display: "flex",
         overflow: "hidden",

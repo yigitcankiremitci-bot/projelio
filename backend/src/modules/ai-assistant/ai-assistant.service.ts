@@ -831,13 +831,13 @@ export class AiAssistantService {
         "dosyayı elle iliştirmesini beklemene gerek yok.",
       "- Akış: search_files ile dosyayı bul; İÇERİĞİNİ işlemen gerekiyorsa open_file ile sohbete getir.",
       "- \"Şu dosyayı ver / bana gönder / paylaş\" DOSYAYI AÇMAK DEĞİLDİR. Kullanıcı dosyanın kendisini " +
-        "istiyor: search_files'tan gelen adı ve webViewLink bağlantısını ver, bitti. open_file'ı yalnızca " +
-        "içeriğini okuman gereken işlerde (özetle, karşılaştır, kalemleri çıkar) çağır — açmak her turda " +
-        "ödenen bir maliyet, bağlantı vermek bedava.",
-      "- DOSYA ADINI BAĞLANTI OLARAK YAZ: `[dosya adı](webViewLink)`. Tıklanacak şey dosyanın adı " +
-        "olmalı; ham adresi ayrıca yazma, satırı taşırıyor ve kullanıcı adresi elle seçmek zorunda " +
-        "kalıyor. Bağlantının etrafına ** koyma, kalın yazı bağlantıyı bozar. webViewLink boşsa " +
-        "(dosyaya erişilemiyor) bunu söyle, uydurma adres yazma.",
+        "istiyor: adını bağlantı olarak yaz, bitti. open_file'ı yalnızca içeriğini okuman gereken " +
+        "işlerde (özetle, karşılaştır, kalemleri çıkar) çağır — açmak her turda ödenen bir maliyet, " +
+        "bağlantı vermek bedava.",
+      "- DOSYA ADINI ŞU BİÇİMDE YAZ: `[dosya adı](projelio:file/<fileId>)` — fileId search_files'tan " +
+        "gelen kimliktir. Kullanıcı adına tıklayınca dosya UYGULAMA İÇİNDE açılır; indirme ve " +
+        "\"Drive'da düzenle\" o pencerenin içinde. Drive/OneDrive adresi YAZMA: kullanıcıyı gereksiz " +
+        "yere uygulamadan çıkarır. Bağlantının etrafına ** koyma, kalın yazı bağlantıyı bozar.",
       "- SES dosyalarını (mp3, m4a, wav…) kendiliğinden AÇMA. Ses okunabilmek için yazıya çevriliyor ve " +
         "bunun bedeli dakika başına yaklaşık 70 kredi; iki müzik parçası beş yüz krediyi bulur ve " +
         "müzikten anlamlı bir metin de çıkmaz. Kullanıcı sözlerini/konuşmasını gerçekten istiyorsa önce " +

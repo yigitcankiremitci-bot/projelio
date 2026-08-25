@@ -106,15 +106,6 @@ export interface FileSearchHit {
    * listeden doğru dosyayı seçemiyordu.
    */
   uploadedByName?: string;
-  /**
-   * Dosyanın Drive/OneDrive'daki görüntüleme adresi.
-   *
-   * "Şu dosyayı ver" isteğinin çoğu zaman DOĞRU cevabı bu: dosyayı sohbete
-   * getirip içeriğini işlemek gerekmiyor, kullanıcı bağlantıyı açıp dinlemek/
-   * okumak istiyor. Bağlantı olmadan Lio'nun elinde sunacak bir şey kalmıyor
-   * ve gereksiz yere open_file'a gidiyor.
-   */
-  webViewLink?: string;
   jobId?: string;
   jobTitle?: string;
   projectId?: string;
@@ -1335,7 +1326,6 @@ export class FilesService {
       mimeType: row.mime_type,
       sizeBytes: row.size_bytes !== null && row.size_bytes !== undefined ? Number(row.size_bytes) : undefined,
       uploadedByName: uploaderNames.get(row.uploaded_by),
-      webViewLink: row.web_view_link ?? undefined,
       jobId: row.job_id ?? undefined,
       jobTitle: row.job_id ? jobTitles.get(row.job_id) : undefined,
       projectId: row.project_id ?? undefined,

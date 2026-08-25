@@ -20,7 +20,13 @@ import { safeExternalUrl } from "@projelio/shared";
  */
 export type MessageSegment =
   | { type: "text"; value: string }
-  | { type: "link"; label: string; href: string };
+  | { type: "link"; label: string; href: string }
+  /**
+   * Projelio'daki bir dosya. Yeni sekmeye GİTMEZ, uygulama içinde önizleme
+   * penceresini açar (bkz. FilePreviewModal) — pencerede indirme ve
+   * "Drive'da düzenle" zaten var, düzenleme yeni sekmeye oradan gidiyor.
+   */
+  | { type: "file"; label: string; fileId: string };
 
 /**
  * Hem `[ad](adres)` hem de çıplak `https://…` yakalanır: modele "adı bağlantı
@@ -28,6 +34,17 @@ export type MessageSegment =
  * ediyor; onu da tıklanabilir yapmak kullanıcı için aynı kazanç.
  */
 const LINK_PATTERN = /\[([^\]\n]+)\]\(([^()\s]+)\)|(https?:\/\/[^\s<>[\]()]+)/g;
+
+/**
+ * Uygulama içi dosya bağlantısı: `projelio:file/<kimlik>`.
+ *
+ * Modele Drive adresi yazdırmak yerine kendi şemamızı yazdırıyoruz; böylece
+ * tıklama uygulamadan ÇIKMIYOR. Şema hiçbir zaman bir href'e konmuyor — bu
+ * parçalar bağlantı değil düğme olarak çiziliyor — yani gezinme yüzeyi de
+ * açmıyor. Kimlik UUID biçiminde değilse eşleşme sayılmaz: modelin uydurduğu
+ * bir metin, var olmayan bir dosyaya tıklanabilir bir düğme üretmesin.
+ */
+const FILE_LINK = /^projelio:file\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 
 /**
  * Çıplak adresin sonuna yapışan noktalama.
@@ -47,8 +64,10 @@ export function parseMessageLinks(text: string): MessageSegment[] {
     const bare = match[3];
     const rawHref = bare ? bare.replace(TRAILING_PUNCTUATION, "") : match[2];
     const label = bare ? rawHref : match[1];
-    const href = safeExternalUrl(rawHref);
-    if (!href) continue;
+
+    const internal = bare ? null : FILE_LINK.exec(rawHref);
+    const href = internal ? null : safeExternalUrl(rawHref);
+    if (!internal && !href) continue;
 
     const start = match.index;
     // Çıplak adreste kırpılan noktalama METNE geri döner, bu yüzden bitiş
@@ -56,7 +75,11 @@ export function parseMessageLinks(text: string): MessageSegment[] {
     const end = bare ? start + rawHref.length : start + match[0].length;
 
     if (start > cursor) segments.push({ type: "text", value: text.slice(cursor, start) });
-    segments.push({ type: "link", label, href });
+    segments.push(
+      internal
+        ? { type: "file", label, fileId: internal[1] }
+        : { type: "link", label, href: href! }
+    );
     cursor = end;
     LINK_PATTERN.lastIndex = end;
   }

@@ -63,7 +63,8 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       "turdan itibaren elinde olur. Word/Excel/CSV/metin dosyaları metne çevrilir; görsel ve PDF'i " +
       "doğrudan görürsün. Dosya kimliğini search_files'tan al. " +
       "KULLANICI DOSYANIN KENDİSİNİ İSTİYORSA BUNU ÇAĞIRMA (\"şu dosyayı ver\", \"bana gönder\"): " +
-      "search_files'tan gelen adı ve webViewLink bağlantısını vermen yeter ve hiçbir şeye mal olmaz. " +
+      "dosya adını `[ad](projelio:file/<fileId>)` biçiminde yazman yeter — kullanıcı tıklayınca dosya " +
+      "uygulamada açılır. Bu hiçbir şeye mal olmaz. " +
       "Bunu yalnızca dosyanın İÇİNDEKİNİ işlemen gerektiğinde çağır (özetle, karşılaştır, kalemleri çıkar). " +
       "PAHALIDIR: sabitlenen dosya iş bitene kadar HER TURDA yeniden gönderilir ve kullanıcı her " +
       "turda öder. Bu yüzden yalnızca kullanıcı bir dosyanın getirilmesini/incelenmesini istediğinde " +

@@ -96,6 +96,9 @@ export const filesApi = {
     body: { kind: NativeFileKind; name: string; taskId?: string; outputId?: string }
   ) => api.post<ProjectFile>(`${targetBase(target)}/files/create-native`, body),
 
+  /** Tek dosyanın künyesi — önizleme penceresini elde yalnızca kimlik varken açmak için. */
+  getById: (fileId: string) => api.get<ProjectFile>(`/files/${fileId}`),
+
   /**
    * İçerik adresi üretir.
    *

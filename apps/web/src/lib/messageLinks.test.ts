@@ -26,6 +26,20 @@ describe("Lio yanıtındaki bağlantılar", () => {
     assert.ok(segments.every((s) => s.type === "text"));
   });
 
+  test("Projelio dosyası dış bağlantı değil, uygulama içi parça olur", () => {
+    // Yeni sekmeye gitmemeli: tıklayınca önizleme penceresi açılıyor.
+    const id = "0f9a1c22-4b3d-4e77-9a11-5c6d7e8f9012";
+    const segments = parseMessageLinks(`[yorma-5.mp3](projelio:file/${id})`);
+    assert.deepEqual(segments, [{ type: "file", label: "yorma-5.mp3", fileId: id }]);
+  });
+
+  test("uydurma dosya kimliği tıklanabilir yapılmaz", () => {
+    // Model kimliği uydurabilir; UUID biçiminde değilse var olmayan bir dosyaya
+    // götüren bir düğme çizmektense metin bırakmak doğrusu.
+    const segments = parseMessageLinks("[rapor.pdf](projelio:file/olmayan-dosya)");
+    assert.ok(segments.every((s) => s.type === "text"));
+  });
+
   test("bağlantısız metin tek parça kalır", () => {
     assert.deepEqual(parseMessageLinks("Bugün üç görev tamamlandı."), [
       { type: "text", value: "Bugün üç görev tamamlandı." },

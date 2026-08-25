@@ -4,6 +4,9 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { parseMessageLinks } from "../lib/messageLinks";
 import { IconSparkle, IconX, IconPlus, IconTrash, IconSend, IconPaperclip, IconFile } from "./icons";
 import { aiChat } from "../api/aiChat";
+import { filesApi } from "../api/files";
+import type { ProjectFile } from "@projelio/shared";
+import FilePreviewModal from "./FilePreviewModal";
 import type {
   AiActiveFile,
   AiAttachment,
@@ -177,6 +180,8 @@ export default function AiAssistantPanel({
    */
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Lio'nun verdiği bir dosya adına tıklanınca açılan önizleme. */
+  const [filePreview, setFilePreview] = useState<ProjectFile | null>(null);
   /**
    * Hata kredi yetersizliğinden mi kaynaklandı (HTTP 402)?
    *
@@ -453,6 +458,22 @@ export default function AiAssistantPanel({
       if (activeId === id) startNewConversation();
     } catch {
       setError("Sohbet silinemedi.");
+    }
+  };
+
+  /**
+   * Lio'nun verdiği dosya adına tıklandığında önizlemeyi açar.
+   *
+   * Sohbette yalnızca dosya KİMLİĞİ taşınıyor (bkz. lib/messageLinks); pencerenin
+   * ihtiyaç duyduğu künye buradan çekiliyor. Yetki sunucuda: kullanıcının
+   * göremeyeceği bir dosyanın kimliği elinde olsa bile istek 403 döner.
+   */
+  const openFilePreview = async (fileId: string) => {
+    setError(null);
+    try {
+      setFilePreview(await filesApi.getById(fileId));
+    } catch (err: any) {
+      setError(String(err?.message ?? "Dosya açılamadı."));
     }
   };
 
@@ -1279,6 +1300,7 @@ export default function AiAssistantPanel({
               speaking={speakingId === m.id}
               preparing={preparingId === m.id}
               onSpeak={() => void playMessage(m)}
+              onOpenFile={(fileId) => void openFilePreview(fileId)}
             />
           ))}
 
@@ -1640,6 +1662,12 @@ export default function AiAssistantPanel({
           onCancel={handleCancelAction}
         />
       )}
+
+      {/* Dosya önizlemesi: kendi portalını kuruyor ve zIndex'i (110) sohbet
+          panelinin (61) üstünde, yani panel açıkken de görünüyor. Dosya
+          ekranlarındakiyle AYNI pencere — indirme ve "Drive'da düzenle"
+          düğmeleri onun içinde. */}
+      {filePreview && <FilePreviewModal file={filePreview} onClose={() => setFilePreview(null)} />}
     </>
   );
 }
@@ -1724,6 +1752,7 @@ function Bubble({
   speaking,
   preparing,
   onSpeak,
+  onOpenFile,
 }: {
   role: "user" | "assistant";
   text: string;
@@ -1733,6 +1762,8 @@ function Bubble({
   speaking?: boolean;
   preparing?: boolean;
   onSpeak?: () => void;
+  /** Lio'nun verdiği dosya adına tıklanınca önizleme penceresini açar. */
+  onOpenFile?: (fileId: string) => void;
 }) {
   const c = useThemeColors();
   const isUser = role === "user";
@@ -1803,27 +1834,49 @@ function Bubble({
         >
           {/* Bağlantılar tıklanabilir çizilir; gerisi düz metin kalır
               (bkz. lib/messageLinks — markdown motoru yok, HTML üretilmiyor). */}
-          {parseMessageLinks(text).map((segment, i) =>
-            segment.type === "link" ? (
-              <a
-                key={i}
-                href={segment.href}
-                target="_blank"
-                rel="noreferrer"
-                // Dosya adı bağlantı olunca satırın geri kalanından ayırt
-                // edilebilmeli: renk tek başına yetmiyor, altı da çizili.
-                style={{
-                  color: isUser ? "#fff" : c.accentDark,
-                  textDecoration: "underline",
-                  fontWeight: 500,
-                }}
-              >
-                {segment.label}
-              </a>
-            ) : (
-              <span key={i}>{segment.value}</span>
-            )
-          )}
+          {parseMessageLinks(text).map((segment, i) => {
+            // Bağlantı da dosya da aynı görünür: satırın geri kalanından ayırt
+            // edilebilmeli, renk tek başına yetmiyor — altı da çizili.
+            const linkStyle = {
+              color: isUser ? "#fff" : c.accentDark,
+              textDecoration: "underline",
+              fontWeight: 500,
+            } as const;
+
+            if (segment.type === "file") {
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => onOpenFile?.(segment.fileId)}
+                  title="Dosyayı önizle"
+                  style={{
+                    ...linkStyle,
+                    // Balonun içinde metnin AKIŞINDA durmalı: varsayılan düğme
+                    // kutusu satırı bozuyor ve kendi yazı tipini getiriyordu.
+                    display: "inline",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    font: "inherit",
+                    cursor: "pointer",
+                  }}
+                >
+                  {segment.label}
+                </button>
+              );
+            }
+
+            if (segment.type === "link") {
+              return (
+                <a key={i} href={segment.href} target="_blank" rel="noreferrer" style={linkStyle}>
+                  {segment.label}
+                </a>
+              );
+            }
+
+            return <span key={i}>{segment.value}</span>;
+          })}
         </div>
       )}
       {/* Alt satır: kredi bilgisi ve bu yanıtı dinleme düğmesi. Hoparlör her

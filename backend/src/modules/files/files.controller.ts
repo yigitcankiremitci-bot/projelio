@@ -414,6 +414,21 @@ export class FilesController {
     return claims;
   }
 
+  /**
+   * Tek bir dosyanın künyesi.
+   *
+   * Lio sohbetinde dosya adı bağlantı olarak veriliyor ve tıklanınca önizleme
+   * penceresi açılıyor (bkz. AiAssistantPanel). Pencerenin ihtiyaç duyduğu
+   * alanlar (sağlayıcı, drive kimliği, tür, düzenleme yetkisi) elde yok:
+   * sohbette yalnızca dosya kimliği taşınıyor. Yetki findById'de çözülüyor.
+   */
+  @Get("files/:id")
+  @UseGuards(AuthGuard("jwt"))
+  async findOne(@Param("id") id: string, @Req() req: any) {
+    const { file } = await this.filesService.findById(id, req.user.userId);
+    return file;
+  }
+
   // ------------------------------------------------------------ düzenle/sil
 
   @Patch("files/:id")

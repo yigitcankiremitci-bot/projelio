@@ -27,6 +27,7 @@ import {
   type StoredAttachment,
 } from "./ai-conversations.service";
 import { AiAttachmentsService, type PreparedAttachment } from "./ai-attachments.service";
+import { estimateTranscriptionCredits } from "./ai-credits.config";
 import { FilesService } from "../files/files.service";
 import { AiTranscriptionService } from "./ai-transcription.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
@@ -403,6 +404,20 @@ const ACTION_LABELS: Record<string, string> = {
 
 export function toActiveFileInfo(files: { id: string; name: string; kind: string; detail: string }[]) {
   return files.map(({ id, name, kind, detail }) => ({ id, name, kind, detail }));
+}
+
+/**
+ * Dosya ses mi?
+ *
+ * MIME'a tek başına güvenilmiyor: Drive ve OneDrive bazı dosyaları
+ * "application/octet-stream" olarak bildiriyor ve o durumda tek ipucu uzantı
+ * kalıyor (bkz. ai-attachments.service.ts EXTENSION_MIMES). Buradaki kontrol
+ * ücretli bir çözümlemeyi engellediği için ihtiyatlı davranır.
+ */
+function isAudioFile(mimeType: string, name: string): boolean {
+  if (mimeType?.startsWith("audio/") || mimeType === "video/mp4" || mimeType === "video/webm") return true;
+  const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
+  return ["mp3", "m4a", "wav", "ogg", "webm", "mp4", "aac", "flac", "aiff", "wma"].includes(ext);
 }
 
 /** Hazırlanmış eki sohbete sabitlenecek kayda çevirir. */
@@ -814,11 +829,27 @@ export class AiAssistantService {
       "### Projelio'daki dosyalar",
       "Kullanıcının işlerine ve projelerine yüklenmiş dosyaları SEN de getirebilirsin; kullanıcının " +
         "dosyayı elle iliştirmesini beklemene gerek yok.",
-      "- Akış: search_files ile dosyayı bul, doğru olduğundan eminsen open_file ile sohbete getir.",
+      "- Akış: search_files ile dosyayı bul; İÇERİĞİNİ işlemen gerekiyorsa open_file ile sohbete getir.",
+      "- \"Şu dosyayı ver / bana gönder / paylaş\" DOSYAYI AÇMAK DEĞİLDİR. Kullanıcı dosyanın kendisini " +
+        "istiyor: search_files'tan gelen adı ve webViewLink bağlantısını ver, bitti. open_file'ı yalnızca " +
+        "içeriğini okuman gereken işlerde (özetle, karşılaştır, kalemleri çıkar) çağır — açmak her turda " +
+        "ödenen bir maliyet, bağlantı vermek bedava.",
+      "- SES dosyalarını (mp3, m4a, wav…) kendiliğinden AÇMA. Ses okunabilmek için yazıya çevriliyor ve " +
+        "bunun bedeli dakika başına yaklaşık 70 kredi; iki müzik parçası beş yüz krediyi bulur ve " +
+        "müzikten anlamlı bir metin de çıkmaz. Kullanıcı sözlerini/konuşmasını gerçekten istiyorsa önce " +
+        "tahmini bedeli söyle ve onay al.",
       "- \"Şu sözleşmeyi getir\", \"projedeki teklife bak\", \"bu projede hangi dosyalar var\" gibi " +
         "isteklerde kullanıcıdan dosya İSTEME — önce ara.",
-      "- Arama yalnızca dosya ADINDA eşleşir, içerikte değil. Bulamazsan projectId ile daraltıp ya da " +
+      "- query yalnızca dosya ADINDA eşleşir, içerikte değil. Bulamazsan projectId ile daraltıp ya da " +
         "daha kısa bir terimle bir kez daha dene; yine çıkmazsa kullanıcıya sor.",
+      "- Kullanıcı dosyayı KİŞİYLE tarif ediyorsa (\"Arda'nın gönderdiği dosyalar\") kişinin adını " +
+        "query'ye YAZMA — orası dosya adında arar ve hiçbir şey bulamaz. uploader parametresini kullan, " +
+        "ya da hiç filtre vermeden son yüklenenleri çekip sonuçtaki uploadedByName alanına bak.",
+      "- \"Müzik dosyası\", \"tablo\", \"sözleşme\" gibi TÜR tarifleri de dosya adında aranmaz. " +
+        "Filtresiz arayıp dönen mimeType alanına bak (audio/* = ses, image/* = görsel…).",
+      "- Aradığın dosya Projelio'da yoksa gerçekten yok demektir; kullanıcı onu e-posta ya da başka bir " +
+        "kanaldan almış olabilir. \"Sohbete yükle\" demeden önce bunu söyle: Lio e-posta eklerini " +
+        "GÖREMİYOR, dosyanın önce Projelio'ya yüklenmesi gerekir.",
       "- Birden çok dosya eşleşiyorsa AÇMADAN önce listeyi göster ve hangisi olduğunu sor. Doğrusunu " +
         "bulmak için sırayla birkaç dosya açmak, kullanıcıya her birinin bedelini tur tur ödetir.",
       "- Getirdiğin dosya da sohbete sabitlenir: yukarıdaki bütün kurallar (önce ne olduğunu söyle, " +
@@ -1653,7 +1684,11 @@ export class AiAssistantService {
         // release_files ile aynı sebeple executeTool'un dışında duruyor.
         if (use.name === "open_file") {
           try {
-            const opened = await this.openProjelioFile(run, String((use.input as any)?.fileId ?? ""));
+            const opened = await this.openProjelioFile(
+              run,
+              String((use.input as any)?.fileId ?? ""),
+              (use.input as any)?.transcribe === true
+            );
             run.executed.push(use.name);
             toolResults.push({ type: "tool_result", tool_use_id: use.id, content: opened.note });
             openedBlocks.push(...opened.blocks);
@@ -1872,7 +1907,8 @@ export class AiAssistantService {
    */
   private async openProjelioFile(
     run: PendingRun,
-    fileId: string
+    fileId: string,
+    transcribe: boolean
   ): Promise<{ note: string; blocks: ContentBlockParam[] }> {
     if (!fileId) throw new BadRequestException("fileId gerekli.");
 
@@ -1896,6 +1932,27 @@ export class AiAssistantService {
       }
       run.activeFiles = run.activeFiles.filter((f) => f.id !== already.id);
       this.attachmentsService.releaseMany(run.userId, [already.id]);
+    }
+
+    // SES DOSYASI KORUMASI. Ses ekleri modele metin olarak verilebilmek için
+    // önce yazıya çevriliyor ve bu ÜCRETLİ: dakikası ~72 kredi, dört dakikalık
+    // bir parça ~290. "Arda'nın gönderdiği iki müzik dosyasını ver" gibi bir
+    // istekte kullanıcının istediği şey dosyanın KENDİSİ — sözleri değil; iki
+    // parçayı çözümlemek beş yüz krediyi hiçbir karşılık vermeden yakardı.
+    // Bu yüzden ses, ancak model bilerek transcribe=true derse açılır. Kontrol
+    // indirmeden ÖNCE yapılır; findById yetkiyi de doğruluyor.
+    const { file: meta } = await this.filesService.findById(fileId, run.userId);
+    if (!transcribe && isAudioFile(meta.mimeType, meta.name)) {
+      const estimate = meta.sizeBytes ? Math.round(estimateTranscriptionCredits(meta.sizeBytes)) : undefined;
+      return {
+        note:
+          `"${meta.name}" bir ses dosyası. İçeriğini okuyabilmem için önce yazıya çevrilmesi gerekiyor ` +
+          `ve bu ücretli${estimate ? ` — bu dosya için tahminen ${estimate} kredi` : ""}. ` +
+          "Kullanıcı dosyanın KENDİSİNİ istiyorsa açma: adını ve search_files'tan gelen webViewLink " +
+          "bağlantısını ver, yeter. Sözlerini/içeriğini gerçekten istiyorsa önce bedeli söyleyip onay al, " +
+          "sonra open_file'ı transcribe=true ile çağır.",
+        blocks: [],
+      };
     }
 
     const summary = await this.attachmentsService.prepareFromProjelioFile(
@@ -2553,7 +2610,7 @@ export class AiAssistantService {
         return this.filesService.searchInJobs(
           jobs.map((j) => j.id),
           userId,
-          { query: input.query, projectId: input.projectId, limit: input.limit }
+          { query: input.query, uploader: input.uploader, projectId: input.projectId, limit: input.limit }
         );
       }
 

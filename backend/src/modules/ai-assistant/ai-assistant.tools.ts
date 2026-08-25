@@ -31,16 +31,25 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "search_files",
     description:
-      "Projelio'ya yüklenmiş dosyaları ADINA göre arar (işlerin ve projelerin dosyaları). " +
-      "Dosyanın kimliğini, adını, türünü, boyutunu ve hangi iş/projede durduğunu döndürür — " +
-      "İÇERİĞİNİ DÖNDÜRMEZ. Kullanıcı \"şu dosyayı getir\", \"şu sözleşmeye bak\", " +
-      "\"projede hangi dosyalar var\" gibi bir şey dediğinde önce bunu çağır; " +
-      "içeriği gerekiyorsa dönen fileId ile open_file'ı çağır. " +
-      "query boş bırakılırsa en son yüklenen dosyalar döner.",
+      "Projelio'ya yüklenmiş dosyaları arar (işlerin ve projelerin dosyaları). Dosyanın " +
+      "kimliğini, adını, türünü, boyutunu, YÜKLEYEN KİŞİYİ ve hangi iş/projede durduğunu " +
+      "döndürür — İÇERİĞİNİ DÖNDÜRMEZ. Kullanıcı \"şu dosyayı getir\", \"şu sözleşmeye bak\", " +
+      "\"Arda'nın gönderdiği dosyalar\", \"projede hangi dosyalar var\" gibi bir şey dediğinde " +
+      "önce bunu çağır; içeriği gerekiyorsa dönen fileId ile open_file'ı çağır. " +
+      "Kullanıcı dosyayı ADIYLA değil KİŞİYLE ya da TÜRÜYLE tarif ediyorsa (\"Arda'nın attığı " +
+      "iki müzik dosyası\") query'yi BOŞ bırak: uploader ver ya da hiç filtre vermeden son " +
+      "yüklenenleri çek, sonra dönen listeden mimeType'a bakarak doğru olanları seç. " +
+      "Kişi adını query'ye yazmak yanlıştır — query dosya ADINDA arar.",
     input_schema: {
       type: "object",
       properties: {
-        query: { type: "string", description: "Dosya adında aranacak metin (opsiyonel)." },
+        query: { type: "string", description: "Dosya ADINDA aranacak metin (opsiyonel). Kişi adı buraya YAZILMAZ." },
+        uploader: {
+          type: "string",
+          description:
+            "Yalnızca bu kişinin yüklediği dosyalar (opsiyonel). Kişinin adının bir parçası yeter, " +
+            "ör. \"Arda\". Yalnızca kullanıcının görebildiği dosyaların yükleyenleri arasında eşleşir.",
+        },
         projectId: { type: "string", description: "Yalnızca bu projenin dosyalarında ara (opsiyonel)." },
         limit: { type: "number", description: "En fazla kaç sonuç (varsayılan 20, en çok 50)." },
       },
@@ -50,9 +59,12 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "open_file",
     description:
-      "Projelio'daki bir dosyayı SOHBETE GETİRİR: içeriği okunur ve sohbete sabitlenir, yani bu " +
+      "Projelio'daki bir dosyanın İÇERİĞİNİ sohbete getirir: okunur ve sohbete sabitlenir, yani bu " +
       "turdan itibaren elinde olur. Word/Excel/CSV/metin dosyaları metne çevrilir; görsel ve PDF'i " +
       "doğrudan görürsün. Dosya kimliğini search_files'tan al. " +
+      "KULLANICI DOSYANIN KENDİSİNİ İSTİYORSA BUNU ÇAĞIRMA (\"şu dosyayı ver\", \"bana gönder\"): " +
+      "search_files'tan gelen adı ve webViewLink bağlantısını vermen yeter ve hiçbir şeye mal olmaz. " +
+      "Bunu yalnızca dosyanın İÇİNDEKİNİ işlemen gerektiğinde çağır (özetle, karşılaştır, kalemleri çıkar). " +
       "PAHALIDIR: sabitlenen dosya iş bitene kadar HER TURDA yeniden gönderilir ve kullanıcı her " +
       "turda öder. Bu yüzden yalnızca kullanıcı bir dosyanın getirilmesini/incelenmesini istediğinde " +
       "çağır; hangisi olduğundan emin değilsen açmadan önce sor, doğru olanı bulmak için birkaç " +
@@ -61,6 +73,14 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: {
         fileId: { type: "string", description: "search_files'ın döndürdüğü dosya kimliği." },
+        transcribe: {
+          type: "boolean",
+          description:
+            "Yalnızca SES dosyaları için. Ses, okunabilmesi için yazıya çevrilmek zorunda ve bu ÜCRETLİ " +
+            "(dakikası kabaca 70 kredi; dört dakikalık bir parça ~290). Bu yüzden ses dosyaları varsayılan " +
+            "olarak AÇILMAZ. Kullanıcı gerçekten içeriğini istiyorsa önce tahmini bedeli söyle, onay al, " +
+            "sonra true ver. Kullanıcı sadece dosyayı istiyorsa hiç açma, bağlantısını ver.",
+        },
       },
       required: ["fileId"],
     },

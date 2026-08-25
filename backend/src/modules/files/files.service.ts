@@ -42,6 +42,15 @@ function toBrowseEntry(f: CloudFile): DriveBrowseEntry {
   };
 }
 
+/**
+ * Yükleyene göre süzerken taranacak azami satır.
+ *
+ * Ad eşlemesi veritabanında değil bellekte yapılıyor (bkz. searchInJobs); bu
+ * yüzden pencere geniş tutulur, ama sınırsız değil — tek bir arama isteğinin
+ * bütün dosya tablosunu çekmesi gerekmiyor.
+ */
+const UPLOADER_SCAN_LIMIT = 300;
+
 /** Backend belleğinden geçirmeye razı olduğumuz üst sınır. Üstü resumable akışa gider. */
 export const INLINE_UPLOAD_LIMIT = 8 * 1024 * 1024;
 
@@ -89,6 +98,23 @@ export interface FileSearchHit {
   name: string;
   mimeType: string;
   sizeBytes?: number;
+  /**
+   * Dosyayı yükleyen kişinin adı.
+   *
+   * Model için ADIN kendisi gerekli, kimliği değil: kullanıcı dosyayı "Arda'nın
+   * gönderdiği dosya" diye tarif ediyor, adıyla arıyor. Ad olmadan Lio elindeki
+   * listeden doğru dosyayı seçemiyordu.
+   */
+  uploadedByName?: string;
+  /**
+   * Dosyanın Drive/OneDrive'daki görüntüleme adresi.
+   *
+   * "Şu dosyayı ver" isteğinin çoğu zaman DOĞRU cevabı bu: dosyayı sohbete
+   * getirip içeriğini işlemek gerekmiyor, kullanıcı bağlantıyı açıp dinlemek/
+   * okumak istiyor. Bağlantı olmadan Lio'nun elinde sunacak bir şey kalmıyor
+   * ve gereksiz yere open_file'a gidiyor.
+   */
+  webViewLink?: string;
   jobId?: string;
   jobTitle?: string;
   projectId?: string;
@@ -1215,7 +1241,7 @@ export class FilesService {
   async searchInJobs(
     jobIds: string[],
     userId: string,
-    filter: { query?: string; projectId?: string; limit?: number } = {}
+    filter: { query?: string; projectId?: string; uploader?: string; limit?: number } = {}
   ): Promise<FileSearchHit[]> {
     let scope = jobIds.filter(Boolean);
 
@@ -1227,6 +1253,7 @@ export class FilesService {
     if (!scope.length) return [];
 
     const limit = Math.min(Math.max(Number(filter.limit) || 20, 1), 50);
+    const uploaderTerm = filter.uploader?.trim().toLocaleLowerCase("tr") ?? "";
 
     let query = this.supabase.client
       .from("files")
@@ -1236,8 +1263,10 @@ export class FilesService {
       .order("created_at", { ascending: false })
       // Yetki elemesi sorgudan SONRA yapıldığı için ham liste daha geniş çekilir;
       // doğrudan `limit` ile çekilseydi elenen satırlar yüzünden sonuç sayısı
-      // sebepsiz yere azalırdı.
-      .limit(limit * 4);
+      // sebepsiz yere azalırdı. Yükleyene göre süzülüyorsa pencere iyice
+      // genişler: aranan kişinin dosyaları eski olabilir ve dar bir pencerede
+      // "bulunamadı" demek, olmayan bir şeyi yok saymak olurdu.
+      .limit(uploaderTerm ? UPLOADER_SCAN_LIMIT : limit * 4);
 
     if (filter.projectId) query = query.eq("project_id", filter.projectId);
 
@@ -1256,14 +1285,33 @@ export class FilesService {
       accessByJob.set(jobId, await this.resolveAccess(jobId, userId));
     }
 
-    const allowed = rows
-      .filter((row: any) => {
-        const access = accessByJob.get(row.job_id);
-        if (!access || access.level === "none") return false;
-        if (access.level === "job") return true;
-        return Boolean(row.project_id) && access.projectIds.includes(row.project_id);
-      })
-      .slice(0, limit);
+    const visible = rows.filter((row: any) => {
+      const access = accessByJob.get(row.job_id);
+      if (!access || access.level === "none") return false;
+      if (access.level === "job") return true;
+      return Boolean(row.project_id) && access.projectIds.includes(row.project_id);
+    });
+    if (!visible.length) return [];
+
+    // Yükleyen adları YALNIZCA kullanıcının zaten görebildiği dosyalardan
+    // toplanır. Adı doğrudan `users` tablosunda aramak daha kolay olurdu ama o,
+    // dosyayla hiç ilgisi olmayan kişilerin varlığını sızdıran bir arama ucu
+    // açardı.
+    const uploaderIds = [...new Set<string>(visible.map((r: any) => r.uploaded_by).filter(Boolean))];
+    const { data: uploaderRows } = uploaderIds.length
+      ? await this.supabase.client.from("users").select("id, full_name").in("id", uploaderIds)
+      : { data: [] as any[] };
+    const uploaderNames = new Map<string, string>(
+      (uploaderRows ?? []).map((u: any) => [u.id, u.full_name as string])
+    );
+
+    const allowed = (
+      uploaderTerm
+        ? visible.filter((row: any) =>
+            (uploaderNames.get(row.uploaded_by) ?? "").toLocaleLowerCase("tr").includes(uploaderTerm)
+          )
+        : visible
+    ).slice(0, limit);
     if (!allowed.length) return [];
 
     // Başlıklar tek sorguda toplanır; model "hangi işin/projenin dosyası"
@@ -1286,6 +1334,8 @@ export class FilesService {
       name: row.name,
       mimeType: row.mime_type,
       sizeBytes: row.size_bytes !== null && row.size_bytes !== undefined ? Number(row.size_bytes) : undefined,
+      uploadedByName: uploaderNames.get(row.uploaded_by),
+      webViewLink: row.web_view_link ?? undefined,
       jobId: row.job_id ?? undefined,
       jobTitle: row.job_id ? jobTitles.get(row.job_id) : undefined,
       projectId: row.project_id ?? undefined,

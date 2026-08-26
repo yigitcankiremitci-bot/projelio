@@ -12,6 +12,10 @@ export const CRITICAL_TOOLS = new Set<string>([
   "delete_job",
   "archive_job",
   "add_budget_transaction",
+  // Kişisel yapılacak arşivlemek restore_todo ile geri alınabiliyor ama yine de
+  // onaya tabi: kullanıcının kendi listesinden kayıt eksiltmek, sildiğini fark
+  // edene kadar sessiz kalan bir kayıp.
+  "archive_todo",
 ]);
 
 export const AI_TOOLS: Anthropic.Tool[] = [
@@ -86,6 +90,206 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       required: ["fileId"],
     },
   },
+  // --- Yapılacaklar sayfası (kişisel pano) -----------------------------
+  // Pano iki kaynağı tek akışta taşır: kullanıcının kendi yazdığı kartlar
+  // ("personal") ve kendisine ATANMIŞ proje görevleri ("assigned"). İkisi
+  // farklı tablolarda yaşıyor, bu yüzden hangi kartı hangi araçla
+  // değiştireceğin source alanına bağlı.
+  {
+    name: "get_todo_board",
+    description:
+      "Kullanıcının Yapılacaklar sayfasını (kişisel kanban panosu) okur. Kartlar iki kaynaktan gelir: " +
+      "kullanıcının kendi yazdığı kişisel görevler (source=\"personal\") ve kendisine atanmış proje " +
+      "görevleri (source=\"assigned\"). \"Yapılacaklarım\", \"listemde ne var\", \"bugün ne yapmalıyım\" " +
+      "gibi sorularda bunu çağır. Bir kartı değiştirmeden önce DAİMA buradan oku: diğer araçlar " +
+      "itemId ve source istiyor.",
+    input_schema: {
+      type: "object",
+      properties: {
+        source: {
+          type: "string",
+          enum: ["all", "personal", "assigned"],
+          description: "Varsayılan \"all\": ikisi birden.",
+        },
+        includeHidden: {
+          type: "boolean",
+          description: "Kullanıcının panosundan gizlediği atanmış görevler de gelsin mi (varsayılan hayır).",
+        },
+        completedWithinDays: {
+          type: "number",
+          description: "Tamamlananlardan son kaç günlük gösterilsin (varsayılan 14).",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "create_todo",
+    description:
+      "Kullanıcının Yapılacaklar sayfasına KİŞİSEL bir görev ekler. Bu kayıt hiçbir projeye bağlı " +
+      "değildir ve kimseyle paylaşılmaz — kullanıcının kendi listesidir. \"Bunu listeme ekle\", " +
+      "\"unutmayayım\", \"kendime not\" gibi isteklerde kullan. Bir PROJEYE görev eklemek istiyorsa " +
+      "bunu değil create_task'ı çağır.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        status: { type: "string", enum: ["todo", "in_progress", "completed"], description: "Varsayılan todo." },
+        priority: { type: "number", description: "Öncelik yıldızı 0-5. 0 = belirtilmemiş." },
+        color: { type: "string", description: "Kart etiket rengi (#RRGGBB), opsiyonel." },
+        dueDate: { type: "string", description: "Bitiş tarihi (YYYY-MM-DD)." },
+        dueTime: { type: "string", description: "Bitiş saati (HH:MM). Hatırlatma için ŞART." },
+        reminderLeadMinutes: {
+          type: "number",
+          description:
+            "Hatırlatma kaç dakika önce gönderilsin (0 = tam saatinde). Yalnızca dueTime verildiyse " +
+            "işler; saat yoksa sunucu bunu yok sayar.",
+        },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "create_todos",
+    description:
+      "Yapılacaklar sayfasına BİRDEN FAZLA kişisel görevi tek seferde ekler. Kullanıcı bir liste " +
+      "söylediğinde create_todo'yu tekrar tekrar çağırmak yerine bunu bir kez çağır (daha az tur = daha az kredi).",
+    input_schema: {
+      type: "object",
+      properties: {
+        todos: {
+          type: "array",
+          // create_tasks ile aynı sebep: daha uzun bir çağrı yanıt uzunluk
+          // sınırında kesilir, hiç çalışmaz ve tur boşa gider.
+          maxItems: 10,
+          description: "Tek çağrıda EN FAZLA 10 kalem; fazlası varsa aracı arka arkaya çağır.",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              description: { type: "string" },
+              priority: { type: "number", description: "0-5" },
+              dueDate: { type: "string", description: "YYYY-MM-DD" },
+              dueTime: { type: "string", description: "HH:MM" },
+            },
+            required: ["title"],
+          },
+        },
+      },
+      required: ["todos"],
+    },
+  },
+  {
+    name: "update_todo",
+    description:
+      "Bir KİŞİSEL yapılacağı düzenler (başlık, açıklama, öncelik, tarih, saat, hatırlatma, renk, durum). " +
+      "Yalnızca source=\"personal\" kartlarda çalışır — atanmış bir proje görevini değiştirmek için " +
+      "update_task'ı, yalnızca kullanıcıya görünen alanları için update_assigned_todo_prefs'i kullan. " +
+      "Vermediğin alanlar olduğu gibi kalır; bir alanı TEMİZLEMEK için boş dize gönder.",
+    input_schema: {
+      type: "object",
+      properties: {
+        todoId: { type: "string", description: "get_todo_board'daki itemId (source=personal olan kart)." },
+        title: { type: "string" },
+        description: { type: "string" },
+        status: { type: "string", enum: ["todo", "in_progress", "completed"] },
+        priority: { type: "number", description: "0-5" },
+        color: { type: "string" },
+        dueDate: { type: "string", description: "YYYY-MM-DD, temizlemek için boş dize." },
+        dueTime: { type: "string", description: "HH:MM, temizlemek için boş dize. Saat silinirse hatırlatma da düşer." },
+        reminderLeadMinutes: { type: "number" },
+      },
+      required: ["todoId"],
+    },
+  },
+  {
+    name: "set_todo_status",
+    description:
+      "Panodaki bir kartı kolonlar arasında taşır (yapılacak / yapılıyor / tamamlandı). Kart kişisel de " +
+      "olabilir atanmış bir proje görevi de — source'u get_todo_board'dan aldığın gibi ver. " +
+      "\"Şunu bitirdim\", \"buna başladım\" gibi cümlelerin doğru aracı budur.",
+    input_schema: {
+      type: "object",
+      properties: {
+        source: { type: "string", enum: ["personal", "assigned"] },
+        itemId: { type: "string", description: "get_todo_board'daki itemId." },
+        status: { type: "string", enum: ["todo", "in_progress", "completed"] },
+      },
+      required: ["source", "itemId", "status"],
+    },
+  },
+  {
+    name: "update_assigned_todo_prefs",
+    description:
+      "ATANMIŞ bir görevin yalnızca kullanıcıya görünen katmanını değiştirir: kişisel not, kendine " +
+      "koyduğu iç hedef tarihi, panoya sabitleme ve panodan gizleme. Görevin KENDİSİ (projedeki " +
+      "başlığı, gerçek teslim tarihi, atananı) DEĞİŞMEZ ve ekip bunların hiçbirini görmez. " +
+      "\"Bunu panomdan kaldır\", \"üste sabitle\", \"kendime şu tarihi koy\" istekleri buraya gider.",
+    input_schema: {
+      type: "object",
+      properties: {
+        taskId: { type: "string", description: "Atanmış kartın itemId'si (görev kimliği)." },
+        personalNote: { type: "string", description: "Yalnızca kullanıcının gördüğü not; temizlemek için boş dize." },
+        personalDueDate: {
+          type: "string",
+          description: "Kullanıcının kendine koyduğu tarih (YYYY-MM-DD). Projedeki teslim tarihi DEĞİŞMEZ.",
+        },
+        isPinned: { type: "boolean", description: "Kartı panonun üstüne sabitle." },
+        isHidden: { type: "boolean", description: "Kartı panodan gizle. Görev projede aynen durur." },
+      },
+      required: ["taskId"],
+    },
+  },
+  {
+    name: "reorder_todos",
+    description:
+      "Bir kolondaki kartların sırasını yeniden yazar (\"listemi önem sırasına diz\" gibi). " +
+      "Önce get_todo_board ile o kolonu oku ve kolondaki KARTLARIN TAMAMINI istediğin sırayla gönder: " +
+      "listeye koymadığın bir kart eski sırasında kalır ve karışık bir yere düşer. " +
+      "Kullanıcı sırayla ilgili bir şey istemediyse bunu ÇAĞIRMA — panosunu kendi eliyle dizmiştir.",
+    input_schema: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          maxItems: 50,
+          description: "Kartlar, istenen sırayla.",
+          items: {
+            type: "object",
+            properties: {
+              source: { type: "string", enum: ["personal", "assigned"] },
+              itemId: { type: "string" },
+            },
+            required: ["source", "itemId"],
+          },
+        },
+      },
+      required: ["items"],
+    },
+  },
+  {
+    name: "archive_todo",
+    description:
+      "Bir KİŞİSEL yapılacağı listeden kaldırır. Kalıcı silmez, arşivler — restore_todo ile geri " +
+      "alınabilir. Atanmış bir proje görevi için çalışmaz; kullanıcı onu panosunda görmek " +
+      "istemiyorsa update_assigned_todo_prefs ile isHidden=true yap.",
+    input_schema: {
+      type: "object",
+      properties: { todoId: { type: "string" } },
+      required: ["todoId"],
+    },
+  },
+  {
+    name: "restore_todo",
+    description: "Arşivlenmiş bir kişisel yapılacağı listeye geri getirir.",
+    input_schema: {
+      type: "object",
+      properties: { todoId: { type: "string" } },
+      required: ["todoId"],
+    },
+  },
+
   // --- Okuma araçları -------------------------------------------------
   {
     name: "list_jobs",
@@ -162,7 +366,8 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_workspace_summary",
     description:
-      "Kullanıcının genel durumunu özetler: aktif proje sayısı, geciken görevler, bu hafta teslim edilecekler, kendisine atanmış açık işler. " +
+      "Kullanıcının genel durumunu özetler: aktif proje sayısı, geciken görevler, bu hafta teslim edilecekler, " +
+      "kendisine atanmış açık işler ve Yapılacaklar sayfasındaki kişisel kartları. " +
       "\"Durumum ne\", \"neler yapmam lazım\", \"özet ver\" gibi sorular için kullan.",
     input_schema: { type: "object", properties: {}, required: [] },
   },

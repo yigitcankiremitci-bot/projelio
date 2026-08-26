@@ -29,6 +29,7 @@ import {
 import { AiAttachmentsService, type PreparedAttachment } from "./ai-attachments.service";
 import { estimateTranscriptionCredits } from "./ai-credits.config";
 import { FilesService } from "../files/files.service";
+import { PersonalTodosService } from "../personal-todos/personal-todos.service";
 import { AiTranscriptionService } from "./ai-transcription.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 import type { LioActivityPayload } from "@projelio/shared";
@@ -400,6 +401,14 @@ const ACTION_LABELS: Record<string, string> = {
   complete_ritual: "planlama oturumu kapatıldı",
   create_output: "çıktı oluşturuldu",
   update_output: "çıktı güncellendi",
+  create_todo: "yapılacak eklendi",
+  create_todos: "toplu yapılacak eklendi",
+  update_todo: "yapılacak güncellendi",
+  set_todo_status: "yapılacak durumu değiştirildi",
+  update_assigned_todo_prefs: "pano kartı güncellendi",
+  reorder_todos: "yapılacaklar sıralandı",
+  archive_todo: "yapılacak kaldırıldı",
+  restore_todo: "yapılacak geri alındı",
 };
 
 export function toActiveFileInfo(files: { id: string; name: string; kind: string; detail: string }[]) {
@@ -450,7 +459,7 @@ function clearMidRunFlag(file: ActiveFile): ActiveFile {
  * çağrısı yirmi görev demek olabilir. "2 toplu görev eklendi" hem yanlış hem de
  * Türkçe olarak tuhaf; o yüzden bu etiketler sayısız yazılır.
  */
-const COUNTLESS_ACTIONS = new Set(["toplu görev eklendi"]);
+const COUNTLESS_ACTIONS = new Set(["toplu görev eklendi", "toplu yapılacak eklendi", "yapılacaklar sıralandı"]);
 
 function summarizeExecuted(executed: string[]): string {
   const counts = new Map<string, number>();
@@ -494,6 +503,8 @@ export class AiAssistantService {
     // Lio'nun search_files/open_file araçları için: dosya arama ve indirme
     // yetkisi tek yerde, FilesService'te duruyor.
     private filesService: FilesService,
+    // Yapılacaklar sayfası (kişisel pano) araçları için.
+    private personalTodosService: PersonalTodosService,
     private realtime: RealtimeGateway
   ) {}
 
@@ -876,6 +887,30 @@ export class AiAssistantService {
       "- Kâğıtta tarih, kişi adı ya da öncelik yazıyorsa eşleştir; yazmıyorsa o alanları boş bırak, uydurma.",
       "- Kayıtları oluşturmadan önce okuduğun listeyi madde madde göster ve hangi projeye/çıktıya " +
         "ekleyeceğini söyleyip onay al. Kâğıttan okunan bir liste yanlış anlaşılmaya en açık girdi türüdür.",
+      "",
+      "## Yapılacaklar sayfası (kişisel pano)",
+      "Kullanıcının kendi kanban panosu. Projelerden AYRI bir yer: buradaki kayıtları kimse görmez, " +
+        "hiçbir ekibe düşmez. İki tür kart var ve karıştırılması en sık yapılan hata:",
+      "- \"personal\" kartlar kullanıcının kendi yazdığı yapılacaklardır. create_todo/update_todo/" +
+        "archive_todo yalnızca bunlarda çalışır.",
+      "- \"assigned\" kartlar kullanıcıya ATANMIŞ proje görevleridir. Bunların kendisini değiştirmek " +
+        "projeyi değiştirmektir; update_task/update_task_status kullan. Panodaki KİŞİSEL katmanı " +
+        "(not, kendine koyduğu tarih, sabitleme, gizleme) için update_assigned_todo_prefs var — " +
+        "oradaki hiçbir alan ekibe yansımaz.",
+      "- Kart taşımak (yapılacak/yapılıyor/tamamlandı) her iki türde de set_todo_status ile olur; " +
+        "source'u get_todo_board'dan aldığın gibi ver.",
+      "- Bir kartı değiştirmeden önce get_todo_board ile OKU. itemId ve source elinde olmadan " +
+        "hiçbir şey yapamazsın, tahmin etme.",
+      "- \"Bunu listeme ekle\", \"unutmayayım\", \"kendime not\" -> create_todo. \"Şu projeye görev " +
+        "ekle\" -> create_task. İkisini karıştırmak, kullanıcının kişisel notunu ekibin panosuna " +
+        "düşürmek demek; tersi de işi görünmez kılar.",
+      "- Birden çok madde söylendiğinde create_todos ile TEK çağrıda ekle (en fazla 10 kalem).",
+      "- Hatırlatma yalnızca SAAT verildiyse kurulur: reminderLeadMinutes'i dueTime olmadan " +
+        "göndermek sessizce hiçbir şey yapmaz. Kullanıcı \"sabah 9'da hatırlat\" diyorsa ikisini birlikte ver.",
+      "- Panonun SIRASINI kullanıcı eliyle dizmiştir. reorder_todos'u yalnızca sırayla ilgili açık bir " +
+        "istek varsa çağır, çağırırken de o kolondaki kartların tamamını gönder.",
+      "- \"Şunu panomdan kaldır\" atanmış bir görevde SİLMEK değildir: isHidden=true yap, görev " +
+        "projede aynen kalsın. Kişisel bir kartta ise archive_todo (onaya tabi, geri alınabilir).",
       "",
       "## Kredi disiplini",
       "Kullanıcı her turun ve her araç çağrısının bedelini kredi olarak öder. Bu yüzden:",
@@ -1659,7 +1694,7 @@ export class AiAssistantService {
           assistantContent: response.content as any[],
           criticalUseId: criticalUse.id,
         });
-        const summary = await this.summarizeAction(criticalUse.name, input);
+        const summary = await this.summarizeAction(criticalUse.name, input, run.userId);
         return finish(
           { type: "confirmation", actionId, toolName: criticalUse.name, summary, text: text || undefined },
           text || summary
@@ -2083,6 +2118,21 @@ export class AiAssistantService {
       projectId ? make(label, `/projects/${projectId}`, `project:${projectId}`, entityId) : null;
 
     switch (toolName) {
+      // Yapılacaklar sayfasının canlı odası yok (pano kişisel, kimseyle
+      // paylaşılmıyor); bildirim yalnızca kullanıcıyı sayfaya götürüyor.
+      case "create_todo":
+      case "create_todos":
+      case "update_todo":
+      case "set_todo_status":
+      case "update_assigned_todo_prefs":
+      case "reorder_todos":
+      case "archive_todo":
+      case "restore_todo": {
+        const label = ACTION_LABELS[toolName];
+        if (!label) return null;
+        return make(`${label[0].toLocaleUpperCase("tr")}${label.slice(1)}`, "/tasks");
+      }
+
       case "create_job":
       case "update_job":
       case "archive_job": {
@@ -2378,7 +2428,7 @@ export class AiAssistantService {
     }
   }
 
-  private async summarizeAction(name: string, input: Record<string, any>): Promise<string> {
+  private async summarizeAction(name: string, input: Record<string, any>, userId: string): Promise<string> {
     switch (name) {
       case "delete_task": {
         const title = await this.safeLabel(() => this.getTaskOrThrow(input.taskId).then((t) => t.title));
@@ -2419,6 +2469,16 @@ export class AiAssistantService {
         return name === "delete_output"
           ? `"${title}" çıktısı silinecek. Onaylıyor musun?`
           : `"${title}" çıktısı arşivlenecek. Onaylıyor musun?`;
+      }
+
+      case "archive_todo": {
+        // Başlık kullanıcının KENDİ kaydından okunuyor (findOne sahipliği
+        // doğruluyor): başkasının kimliği verilse onay metninde o kaydın
+        // başlığı görünürdü.
+        const title = await this.safeLabel(() =>
+          this.personalTodosService.findOne(userId, input.todoId).then((t) => t.title)
+        );
+        return `"${title}" yapılacağını listenden kaldırmak üzeresin. (Geri alınabilir.)`;
       }
 
       case "add_budget_transaction": {
@@ -2521,6 +2581,15 @@ export class AiAssistantService {
       }
     }
 
+    // Kişisel pano da özete girer. Girmeseydi "bugün ne yapmalıyım" sorusu
+    // kullanıcının kendi yazdığı yapılacakları hiç görmeden yanıtlanır ve
+    // eksik bir tabloya bakıp "işin yok" demiş olurduk.
+    const personal = await this.personalTodosService
+      .getBoard(userId, { source: "personal" })
+      .catch(() => []);
+    const openTodos = personal.filter((t) => t.status !== "completed");
+    const today = new Date().toISOString().slice(0, 10);
+
     return {
       projectCount: projects.length,
       activeProjectCount: projects.filter((p) => p.status === "active").length,
@@ -2528,6 +2597,13 @@ export class AiAssistantService {
       dueThisWeekCount: dueThisWeek,
       assignedToMeOpenCount: assignedOpen,
       overdueSamples,
+      personalTodoOpenCount: openTodos.length,
+      // Bugüne ve geçmişe ait kişisel yapılacaklar; kullanıcı "bugün" derken
+      // çoğu zaman bunları kastediyor.
+      personalTodosDueToday: openTodos
+        .filter((t) => t.effectiveDueDate && shortDate(t.effectiveDueDate)! <= today)
+        .slice(0, 10)
+        .map((t) => ({ itemId: t.itemId, title: t.title, dueDate: shortDate(t.effectiveDueDate) })),
     };
   }
 
@@ -2605,6 +2681,96 @@ export class AiAssistantService {
           title: m.title,
         }));
       }
+
+      // --- Yapılacaklar sayfası (kişisel pano) ---------------------------
+      // Yetki bu servisin İÇİNDE ve tek kural: kayıt istekte bulunanın olmalı.
+      // Her çağrıda userId geçiliyor, hiçbir yerde gövdeden kimlik alınmıyor.
+      case "get_todo_board": {
+        const board = await this.personalTodosService.getBoard(userId, {
+          source: input.source ?? "all",
+          includeHidden: input.includeHidden === true,
+          completedWithinDays: input.completedWithinDays,
+        });
+        // Modele kartın YALNIZCA karar için gereken alanları verilir; pano
+        // kaydı kapak görseli, sıra numarası gibi arayüze ait alanlar da
+        // taşıyor ve bunlar her turda token olarak ödenirdi.
+        return board.map((item) => ({
+          itemId: item.itemId,
+          source: item.source,
+          title: item.title,
+          status: item.status,
+          priority: item.priority,
+          dueDate: shortDate(item.effectiveDueDate),
+          dueTime: item.deadlineTime,
+          isPinned: item.isPinned || undefined,
+          isHidden: item.isHidden || undefined,
+          personalNote: item.personalNote,
+          project: item.projectTitle,
+          // Atanan kartlarda kullanıcının kendine koyduğu tarih ile projedeki
+          // gerçek teslim tarihi farklı olabilir; ikisini karıştırmasın.
+          projectDeadline: shortDate(item.projectDeadline),
+        }));
+      }
+
+      case "create_todo":
+        return this.personalTodosService.create(userId, {
+          title: input.title,
+          description: input.description,
+          status: input.status,
+          priority: input.priority,
+          color: input.color,
+          dueDate: input.dueDate,
+          dueTime: input.dueTime,
+          reminderLeadMinutes: input.reminderLeadMinutes,
+        });
+
+      case "create_todos": {
+        const items: any[] = Array.isArray(input.todos) ? input.todos : [];
+        if (!items.length) throw new BadRequestException("En az bir yapılacak gerekli.");
+        // Sırayla ekleniyor: her kart kolonun sonuna gireceği için sıra
+        // numarası bir öncekine bakıyor (bkz. PersonalTodosService.create).
+        const created: any[] = [];
+        for (const item of items) {
+          created.push(await this.personalTodosService.create(userId, item));
+        }
+        return { created: created.length, todos: created.map((t) => ({ id: t.id, title: t.title })) };
+      }
+
+      case "update_todo":
+        return this.personalTodosService.update(userId, input.todoId, {
+          title: input.title,
+          description: input.description,
+          status: input.status,
+          priority: input.priority,
+          color: input.color,
+          dueDate: input.dueDate,
+          dueTime: input.dueTime,
+          reminderLeadMinutes: input.reminderLeadMinutes,
+        });
+
+      case "set_todo_status":
+        return this.personalTodosService.setStatus(userId, {
+          source: input.source,
+          itemId: input.itemId,
+          status: input.status,
+        });
+
+      case "update_assigned_todo_prefs":
+        return this.personalTodosService.updateAssignedPrefs(userId, input.taskId, {
+          personalNote: input.personalNote,
+          personalDueDate: input.personalDueDate,
+          isPinned: input.isPinned,
+          isHidden: input.isHidden,
+        });
+
+      case "reorder_todos":
+        return this.personalTodosService.reorder(userId, input.items ?? []);
+
+      case "archive_todo":
+        return this.personalTodosService.archive(userId, input.todoId);
+
+      case "restore_todo":
+        return this.personalTodosService.restore(userId, input.todoId);
 
       case "search_files": {
         // Aramanın kapsamı Lio'nun list_jobs'ta gördüğü işlerle AYNI olsun diye

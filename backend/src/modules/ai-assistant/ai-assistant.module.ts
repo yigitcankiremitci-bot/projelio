@@ -17,6 +17,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { PlanningModule } from "../planning/planning.module";
 import { OutputsModule } from "../outputs/outputs.module";
 import { FilesModule } from "../files/files.module";
+import { PersonalTodosModule } from "../personal-todos/personal-todos.module";
 import { CloudStorageModule } from "../cloud-storage/cloud-storage.module";
 import { RealtimeModule } from "../realtime/realtime.module";
 
@@ -34,6 +35,10 @@ import { RealtimeModule } from "../realtime/realtime.module";
     // Çıktılar: proje/departmanın teslim edilecek parçaları. Lio görevleri
     // çıktılara bağlayabilsin ve çıktı oluşturabilsin diye.
     OutputsModule,
+    // Yapılacaklar sayfası: kullanıcının kişisel panosu. Proje görevlerinden
+    // (TasksModule) ayrı bir modül çünkü kayıtlar ayrı tabloda ve kimseyle
+    // paylaşılmıyor; yetki kuralı da tek: kayıt istekte bulunanın olmalı.
+    PersonalTodosModule,
     // Sohbete iliştirilen dosyalar için: FilesModule mevcut bir Projelio dosyasını
     // indirmeye, CloudStorageModule ise kullanıcının Drive/OneDrive'ındaki dosyaya
     // erişmeye yarıyor. İkisi de yalnızca OKUMA için kullanılıyor.

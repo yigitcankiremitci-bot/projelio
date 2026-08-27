@@ -96,6 +96,19 @@ export const filesApi = {
     body: { kind: NativeFileKind; name: string; taskId?: string; outputId?: string }
   ) => api.post<ProjectFile>(`${targetBase(target)}/files/create-native`, body),
 
+  /**
+   * Yarım kalan bir yüklemeyi kapatır.
+   *
+   * Dosya sağlayıcıda oluşmuşsa Projelio kaydı yaratılır — "bağlantı koptu"
+   * diye biten bir yükleme aslında başarılı olmuş olabilir. `cancel` verilirse
+   * oluşmuş dosya da çöpe atılır.
+   */
+  reconcileSession: (sessionId: string, cancel: boolean) =>
+    api.post<{ status: "completed"; file: ProjectFile } | { status: "discarded" }>(
+      `/files/sessions/${sessionId}/reconcile`,
+      { cancel }
+    ),
+
   /** Tek dosyanın künyesi — önizleme penceresini elde yalnızca kimlik varken açmak için. */
   getById: (fileId: string) => api.get<ProjectFile>(`/files/${fileId}`),
 
@@ -162,7 +175,15 @@ export async function uploadFile(
   context: Omit<FileContext, "projectId"> = {},
   onProgress?: (ratio: number) => void,
   /** Verilirse yükleme iptal edilebilir; iptalde AbortError fırlar. */
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /**
+   * Parçalı yüklemede oturum açılır açılmaz çağrılır.
+   *
+   * Çağıranın bunu bilmesi ŞART: yükleme yarıda kalırsa (iptal, kopan bağlantı)
+   * oturumun kapatılması gerekiyor, yoksa dosya sağlayıcıda oluşup Projelio'da
+   * hiç görünmeyebiliyor (bkz. filesApi.reconcileSession).
+   */
+  onSession?: (sessionId: string) => void
 ): Promise<ProjectFile> {
   // Proje ekranından yüklerken işi backend türetir; ön yüzün bilmesine gerek yok.
   const base = targetBase(target);
@@ -191,6 +212,8 @@ export async function uploadFile(
       outputId: isDepartment ? undefined : context.outputId,
     }
   );
+
+  onSession?.(session.sessionId);
 
   const driveFileId = await uploadInChunks(session.uploadUrl, file, onProgress, signal);
   return api.post<ProjectFile>(`/files/sessions/${session.sessionId}/complete`, { driveFileId });

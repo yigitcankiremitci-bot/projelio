@@ -1542,6 +1542,96 @@ export class FilesService {
    * driveFileId istemciden geliyor, bu yüzden ona güvenilmez: dosya bulut
    * deposundan gerçekten okunur ve bizim depolama hesabımızda olduğu doğrulanır.
    */
+  /**
+   * Yarım kalmış bir yükleme oturumunu KAPATIR: ya dosyayı Projelio'ya kazandırır
+   * ya da sağlayıcıdan temizler.
+   *
+   * SORUN. Büyük dosya tarayıcıdan doğrudan Drive/OneDrive'a gidiyor ve son parça
+   * ulaştığı anda dosya ORADA OLUŞUYOR. Projelio ise ancak tarayıcı
+   * `/complete` çağrısını yapabilirse haberdar oluyor. Aradaki pencerede
+   * bağlantı koparsa (ya da sekme arka planda uyutulup istek düşerse) sonuç
+   * şu oluyordu: Drive'da dosya var, Projelio'da yok, kullanıcının elinde
+   * düzeltecek hiçbir şey yok. "Vazgeç" de aynı pencereye denk gelirse dosya
+   * iptal edilmiş görünüp yine Drive'da beliriyordu — oturum iptal edilmediği
+   * için Drive onu bir hafta boyunca tamamlanabilir tutuyor.
+   *
+   * ÇÖZÜM. Yükleme nasıl biterse bitsin oturum burada kapatılıyor:
+   *  - Sağlayıcı "dosya oluştu" diyorsa ve kullanıcı vazgeçmediyse kayıt
+   *    yaratılır — koptuğu sanılan yükleme aslında başarılıdır.
+   *  - Kullanıcı vazgeçtiyse ve dosya oluşmuşsa dosya ÇÖPE atılır; "vazgeçtim"
+   *    demek Drive'da bir kopya bırakmamalı.
+   *  - Dosya oluşmamışsa oturum sağlayıcı tarafında iptal edilir.
+   *
+   * Oturum satırı her hâlükârda silinir: iş bitti, açık kalması yalnızca gece
+   * temizliğine iş çıkarır.
+   */
+  async reconcileUploadSession(
+    sessionId: string,
+    userId: string,
+    opts: { cancel?: boolean } = {}
+  ): Promise<{ status: "completed"; file: ProjectFile } | { status: "discarded" }> {
+    const { data: session, error } = await this.supabase.client
+      .from("file_upload_sessions")
+      .select()
+      .eq("id", sessionId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!session) throw new NotFoundException("Yükleme oturumu bulunamadı");
+    if (session.user_id !== userId) throw new ForbiddenException("Bu yükleme oturumu size ait değil");
+    // Zaten tamamlanmışsa yapacak bir şey yok; bunu hata saymak, tarayıcının
+    // hem complete hem reconcile çağırdığı yarış durumunda kullanıcıya sebepsiz
+    // bir hata göstermek olurdu.
+    if (session.completed_at) return { status: "discarded" };
+
+    const storage = session.department_id
+      ? (
+          await this.supabase.client
+            .from("department_storage")
+            .select()
+            .eq("department_id", session.department_id)
+            .maybeSingle()
+        ).data
+      : (
+          await this.supabase.client.from("job_storage").select().eq("job_id", session.job_id).maybeSingle()
+        ).data;
+    if (!storage) throw new BadRequestException("Depolama bulunamadı");
+
+    const { provider, accountId } = storageOwner(storage);
+    const status = await this.cloudStorage.resumableStatus(
+      provider,
+      session.resumable_uri,
+      session.size_bytes ?? undefined
+    );
+
+    const dropSession = async () => {
+      await this.supabase.client.from("file_upload_sessions").delete().eq("id", sessionId);
+    };
+
+    if (status.state === "complete") {
+      if (opts.cancel) {
+        // Kullanıcı vazgeçti ama dosya yine de oluşmuş: Drive'da bırakmak,
+        // kullanıcının "iptal ettim" bilgisiyle çelişen bir kopya demek.
+        const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+        await this.cloudStorage.trashFile(provider, accessToken, status.fileId).catch((err) => {
+          this.logger.warn(`İptal edilen yüklemenin dosyası çöpe atılamadı: ${err?.message}`);
+        });
+        await dropSession();
+        return { status: "discarded" };
+      }
+
+      // Kopmuş sanılan yükleme aslında başarılı: kaydı yarat, dosya Projelio'da
+      // görünsün. completeUploadSession aynı işi yapıyor, tekrar yazmıyoruz.
+      const file = await this.completeUploadSession(sessionId, userId, status.fileId);
+      return { status: "completed", file };
+    }
+
+    // Yarım ya da kayıp: sağlayıcı tarafındaki oturumu kapat. İptal edilmezse
+    // oturum bir süre daha tamamlanabilir durumda kalıyor.
+    await this.cloudStorage.cancelResumable(provider, session.resumable_uri).catch(() => undefined);
+    await dropSession();
+    return { status: "discarded" };
+  }
+
   async completeUploadSession(
     sessionId: string,
     userId: string,

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { SupabaseService } from "../../database/supabase.service";
+import { FilesService } from "./files.service";
 
 /**
  * Yarım kalan parçalı yükleme oturumlarını temizler.
@@ -22,12 +23,67 @@ import { SupabaseService } from "../../database/supabase.service";
 export class FilesCleanupProcessor {
   private readonly logger = new Logger(FilesCleanupProcessor.name);
 
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private filesService: FilesService
+  ) {}
+
+  /**
+   * Tek koşuda en fazla kaç oturum mutabakata sokulur.
+   *
+   * Her biri sağlayıcıya en az bir istek demek; gece işi diye sınırsız
+   * bırakmak, birikmiş bir kuyrukta Drive kotasını yemek olurdu. Kalanlar
+   * ertesi gece ele alınır.
+   */
+  private static readonly RECONCILE_BATCH = 50;
+
+  /**
+   * Sahipsiz kalmış yüklemeleri sağlayıcıyla karşılaştırır.
+   *
+   * NEDEN GEREKLİ: dosya, son parça Drive/OneDrive'a ulaştığı anda ORADA
+   * oluşuyor; Projelio ise ancak tarayıcı tamamlama isteğini yapabilirse
+   * haberdar oluyor. Tarayıcı bunu yapamadan sekme kapanırsa (kullanıcının
+   * yaşadığı durum tam buydu) dosya Drive'da kalıyor, Projelio'da hiç
+   * görünmüyor ve kullanıcının elinde düzeltecek bir şey olmuyor.
+   *
+   * reconcileUploadSession dosyayı bulursa kaydı yaratıyor, bulamazsa oturumu
+   * sağlayıcı tarafında iptal ediyor. İkisi de eski davranıştan (satırı sessizce
+   * silmek) iyi: o, Drive'daki dosyayı sonsuza kadar yetim bırakıyordu.
+   */
+  private async reconcileAbandonedSessions(): Promise<void> {
+    const { data, error } = await this.supabase.client
+      .from("file_upload_sessions")
+      .select("id, user_id")
+      .is("completed_at", null)
+      .lt("expires_at", new Date().toISOString())
+      .limit(FilesCleanupProcessor.RECONCILE_BATCH);
+    if (error) throw error;
+
+    let kazanilan = 0;
+    for (const session of data ?? []) {
+      try {
+        const sonuc = await this.filesService.reconcileUploadSession(session.id, session.user_id);
+        if (sonuc.status === "completed") kazanilan += 1;
+      } catch (err) {
+        // Tek bir oturumun çuvallaması diğerlerini durdurmasın; satır yerinde
+        // kalır ve ertesi gece yeniden denenir.
+        this.logger.warn(`Yükleme oturumu (${session.id}) mutabakatı başarısız: ${(err as Error).message}`);
+      }
+    }
+
+    if (kazanilan > 0) {
+      this.logger.log(`${kazanilan} yarım kalmış yükleme tamamlanıp dosya listesine eklendi.`);
+    }
+  }
 
   // Her gün 04:15 — diğer gece işlerinin (04:00, 04:30) arasına denk gelmesin diye.
   @Cron("15 4 * * *")
   async purgeStaleUploadSessions(): Promise<void> {
     try {
+      // ÖNCE mutabakat, SONRA silme: sıra tersine dönerse satır silinir ve
+      // Drive'daki dosyayı bir daha kimse bulamaz.
+      await this.reconcileAbandonedSessions();
+
       const { data, error } = await this.supabase.client.rpc("purge_stale_upload_sessions");
       if (error) throw error;
 

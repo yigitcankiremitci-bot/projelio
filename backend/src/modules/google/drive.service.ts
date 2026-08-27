@@ -280,6 +280,61 @@ export class DriveService {
     return location;
   }
 
+  /**
+   * Yarım kalan bir resumable oturumun DURUMU.
+   *
+   * NEDEN GEREKLİ: dosya, son parça Drive'a ulaştığı anda Drive'da OLUŞUYOR;
+   * Projelio ise ancak tarayıcı `/complete` çağrısını yapabilirse haberdar
+   * oluyor. Arada bağlantı koparsa (ya da sekme arka planda uyutulursa) dosya
+   * Drive'da kalıyor, Projelio'da hiç görünmüyor — kullanıcı iki yerde iki
+   * farklı gerçek görüyor ve elinde düzeltecek bir şey yok.
+   *
+   * Bu sorgu resumable protokolün kendi kurtarma yolu: gövdesiz bir PUT ile
+   * "nerede kalmıştık" diye soruluyor. 308 = yarım, 200/201 = dosya oluşmuş.
+   */
+  async resumableStatus(
+    uploadUrl: string,
+    sizeBytes?: number
+  ): Promise<
+    | { state: "complete"; fileId: string }
+    | { state: "incomplete"; receivedBytes: number }
+    | { state: "gone" }
+  > {
+    const res = await fetch(uploadUrl, {
+      method: "PUT",
+      // "*" = gövde göndermiyorum, yalnızca durumu soruyorum. Toplam boyut
+      // bilinmiyorsa da "*" geçerli.
+      headers: { "Content-Range": `bytes */${sizeBytes ?? "*"}` },
+    });
+
+    if (res.status === 308) {
+      const range = res.headers.get("range");
+      return { state: "incomplete", receivedBytes: range ? Number(range.split("-")[1]) + 1 : 0 };
+    }
+
+    if (res.ok) {
+      const json = await res.json().catch(() => null);
+      if (json?.id) return { state: "complete", fileId: json.id as string };
+      // Dosya oluştu ama kimliğini alamadık; yarım saymak yanlış olur.
+      return { state: "gone" };
+    }
+
+    // 404/410: oturumun süresi dolmuş ya da iptal edilmiş.
+    return { state: "gone" };
+  }
+
+  /**
+   * Resumable oturumu iptal eder.
+   *
+   * Yalnızca satırı silmek yetmiyor: iptal edilmeyen oturum Drive tarafında
+   * bir hafta boyunca yaşıyor ve o süre içinde tamamlanabiliyor. Kullanıcı
+   * "vazgeç" dedikten sonra dosyanın Drive'da belirmesi tam olarak buydu.
+   */
+  async cancelResumable(uploadUrl: string): Promise<void> {
+    // Google iptalde standart dışı 499 dönüyor; hata saymıyoruz.
+    await fetch(uploadUrl, { method: "DELETE", headers: { "Content-Length": "0" } }).catch(() => undefined);
+  }
+
   // ------------------------------------------------------------------- okuma
 
   async getFile(accessToken: string, fileId: string): Promise<DriveFile> {

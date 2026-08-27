@@ -210,6 +210,31 @@ export class OneDriveService {
     return json.uploadUrl as string;
   }
 
+  /**
+   * Yarım kalan bir yükleme oturumunun durumu (bkz. DriveService.resumableStatus
+   * — aynı sorun, farklı protokol).
+   *
+   * Graph'ta oturum GET ile sorgulanıyor. Dosya tamamlandığında oturum ARTIK
+   * YOKTUR, yani 404 iki anlama gelir: "süresi doldu" ya da "bitti". Bu ayrımı
+   * burada yapamıyoruz; çağıran taraf hedef klasöre bakarak karar veriyor
+   * (bkz. FilesService.reconcileUploadSession).
+   */
+  async resumableStatus(
+    uploadUrl: string
+  ): Promise<{ state: "incomplete"; receivedBytes: number } | { state: "gone" }> {
+    const res = await fetch(uploadUrl, { method: "GET" }).catch(() => null);
+    if (!res || !res.ok) return { state: "gone" };
+
+    const json = await res.json().catch(() => null);
+    const next: string | undefined = json?.nextExpectedRanges?.[0];
+    return { state: "incomplete", receivedBytes: next ? Number(next.split("-")[0]) : 0 };
+  }
+
+  /** Yükleme oturumunu iptal eder; iptal edilmezse oturum bir süre daha yaşar. */
+  async cancelResumable(uploadUrl: string): Promise<void> {
+    await fetch(uploadUrl, { method: "DELETE" }).catch(() => undefined);
+  }
+
   // ------------------------------------------------------------------- okuma
 
   async getFile(accessToken: string, itemId: string): Promise<DriveFile> {

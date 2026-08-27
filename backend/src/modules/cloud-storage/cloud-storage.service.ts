@@ -126,6 +126,35 @@ export class CloudStorageService {
       : this.oneDrive.createResumableSession(accessToken, meta);
   }
 
+  /**
+   * Yarım kalan bir resumable oturumun durumu.
+   *
+   * İki sağlayıcı farklı cevap veriyor ve fark ÖNEMLİ: Google "dosya oluştu"
+   * diyebiliyor ve kimliğini veriyor; OneDrive'da tamamlanmış oturum artık
+   * yoktur, yani "gone" hem "bitti" hem "süresi doldu" olabilir. Çağıran taraf
+   * bunu bilmek zorunda (bkz. FilesService.reconcileUploadSession).
+   */
+  async resumableStatus(
+    provider: StorageProvider,
+    uploadUrl: string,
+    sizeBytes?: number
+  ): Promise<
+    | { state: "complete"; fileId: string }
+    | { state: "incomplete"; receivedBytes: number }
+    | { state: "gone" }
+  > {
+    return provider === "google"
+      ? this.googleDrive.resumableStatus(uploadUrl, sizeBytes)
+      : this.oneDrive.resumableStatus(uploadUrl);
+  }
+
+  /** Resumable oturumu sağlayıcı tarafında iptal eder. */
+  async cancelResumable(provider: StorageProvider, uploadUrl: string): Promise<void> {
+    return provider === "google"
+      ? this.googleDrive.cancelResumable(uploadUrl)
+      : this.oneDrive.cancelResumable(uploadUrl);
+  }
+
   async getFile(provider: StorageProvider, accessToken: string, fileId: string): Promise<CloudFile> {
     return provider === "google"
       ? this.googleDrive.getFile(accessToken, fileId)

@@ -223,6 +223,22 @@ export class FilesController {
     return this.filesService.createUploadSessionForProject(projectId, req.user.userId, body);
   }
 
+  /**
+   * Yarım kalan yüklemeyi kapatır: dosya sağlayıcıda oluştuysa Projelio'ya
+   * kazandırır, oluşmadıysa oturumu iptal eder (bkz. reconcileUploadSession).
+   * `cancel` kullanıcının vazgeçtiği durumda gelir — o zaman oluşmuş dosya da
+   * çöpe atılır.
+   */
+  @Post("files/sessions/:sessionId/reconcile")
+  @UseGuards(AuthGuard("jwt"))
+  reconcileSession(
+    @Param("sessionId") sessionId: string,
+    @Req() req: any,
+    @Body("cancel") cancel?: boolean
+  ) {
+    return this.filesService.reconcileUploadSession(sessionId, req.user.userId, { cancel: cancel === true });
+  }
+
   @Post("files/sessions/:sessionId/complete")
   @UseGuards(AuthGuard("jwt"))
   completeUploadSession(

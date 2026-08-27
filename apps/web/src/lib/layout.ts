@@ -62,6 +62,11 @@ export const Z = {
   stickyHeader: 36,
   /** Sol alttaki "bu sayfada kim var" şeridi. */
   presenceStrip: 39,
+  /**
+   * Süren yüklemelerin köşedeki göstergesi. Kişi şeridinin ÜSTÜNDE: şerit
+   * yalnızca bilgi (pointerEvents: none), tepside ise "vazgeç" düğmesi var.
+   */
+  uploadTray: 41,
   /** Sağ üstteki bildirim çanı ve tur düğmesi, sol üstteki sidebar oku ve logo. */
   topChrome: 40,
   /** Sağ alttaki Lio balonu. */

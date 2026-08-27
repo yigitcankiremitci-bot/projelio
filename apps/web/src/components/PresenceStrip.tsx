@@ -16,7 +16,14 @@ import { useIsDesktop } from "../lib/useIsDesktop";
  * Kimse yoksa hiç çizilmez; tek başına çalışan kullanıcının ekranında fazladan
  * bir şey durmasın.
  */
-export default function PresenceStrip({ left = 0 }: { left?: number }) {
+export default function PresenceStrip({
+  left = 0,
+  /** Köşedeki yükleme tepsisi görünürken şerit onun üstüne çıkar. */
+  lift = 0,
+}: {
+  left?: number;
+  lift?: number;
+}) {
   const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const users = usePresence();
@@ -41,7 +48,11 @@ export default function PresenceStrip({ left = 0 }: { left?: number }) {
         position: "fixed",
         left: left + 16,
         // Telefonda alt menü (68 px) + çentik boşluğunun üstünde kalmalı.
-        bottom: isDesktop ? 16 : "calc(84px + env(safe-area-inset-bottom))",
+        // `lift`: süren yükleme varken köşedeki tepsi buraya oturuyor, şerit
+        // onun üstüne çıkıyor (bkz. App.tsx, UploadTray).
+        bottom: isDesktop
+          ? 16 + lift
+          : `calc(84px + env(safe-area-inset-bottom) + ${lift}px)`,
         zIndex: Z.presenceStrip,
         display: "flex",
         alignItems: "center",

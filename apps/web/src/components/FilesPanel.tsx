@@ -1,9 +1,17 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { GoogleDriveStatus, ProjectFile } from "@projelio/shared";
-import { driveApi, filesApi, oneDriveApi, uploadFile } from "../api/files";
+import { driveApi, filesApi, oneDriveApi } from "../api/files";
 import { useRefreshOnUndo } from "../lib/undo";
 import type { FileScope } from "../api/files";
 import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
+import {
+  cancelUpload,
+  dismissUpload,
+  enqueueUploads,
+  subscribeUploadDone,
+  uploadScope,
+  useUploads,
+} from "../lib/uploadQueue";
 import { openGooglePicker } from "../lib/googlePicker";
 import { useThemeColors } from "../theme/useThemeColors";
 import { publishTaskAttachments } from "../lib/taskAttachmentEvents";
@@ -68,15 +76,6 @@ interface Props {
   onFilesChange?: (files: { id: string; name: string; webViewLink?: string }[]) => void;
 }
 
-interface UploadingItem {
-  id: string;
-  name: string;
-  ratio: number;
-  error?: string;
-  /** Bu yüklemeyi durdurmak için. Satırdaki "Vazgeç" düğmesi bunu tetikler. */
-  controller?: AbortController;
-}
-
 /**
  * Sayfa (ProjectDetail/JobDetail/DepartmentDetail) alt navigasyondaki "+"
  * düğmesini bu sekmedeyken buraya bağlamak için kullanır — TeamPanelHandle/
@@ -93,17 +92,9 @@ export interface FilesPanelHandle {
   openBrowseDrive: () => void;
 }
 
-/**
- * "Failed to fetch" kullanıcıya hiçbir şey anlatmıyor. Büyük dosyalar tarayıcıdan
- * DOĞRUDAN Drive/OneDrive'a yükleniyor (bkz. api/files.ts uploadFile); o istek
- * koptuğunda tarayıcının verdiği ham metin bu oluyor. Ne olduğunu söyleyelim.
- */
-function uploadHatasi(e: any): string {
-  const mesaj = e?.message ?? "Yüklenemedi";
-  if (/failed to fetch|networkerror|load failed/i.test(mesaj)) {
-    return "Bağlantı koptu, dosya yüklenemedi. İnternetini kontrol edip tekrar dene.";
-  }
-  return mesaj;
+/** Yüzde, satırda iki yerde (yazı ve çubuk) kullanılıyor. */
+function ratioPct(u: { uploadedBytes: number; sizeBytes: number }): number {
+  return u.sizeBytes > 0 ? Math.min(100, Math.round((u.uploadedBytes / u.sizeBytes) * 100)) : 0;
 }
 
 const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
@@ -129,7 +120,6 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const [msStatus, setMsStatus] = useState<GoogleDriveStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [uploads, setUploads] = useState<UploadingItem[]>([]);
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<ProjectFile | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ProjectFile | null>(null);
@@ -155,6 +145,23 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
         ? ({ jobId } as const)
         : ({ projectId: projectId! } as const),
     [departmentId, jobId, projectId]
+  );
+
+  // Yükleme durumu bu bileşende TUTULMUYOR: kullanıcı yükleme sürerken başka
+  // bir sayfaya geçtiğinde panel sökülüyor ve ilerleme ekrandan kayboluyordu
+  // (bkz. lib/uploadQueue). Panel yalnızca kendi hedefine ait satırları okur.
+  // Ad "queueScope": `scope` bu bileşende zaten bir prop (iş dosyalarının hangi
+  // kısmı listelensin).
+  const queueScope = useMemo(() => uploadScope(target, { taskId, outputId }), [target, taskId, outputId]);
+  const uploads = useUploads(queueScope);
+
+  // Kuyruk panelin dışında olduğu için biten dosyayı listeye o haber veriyor.
+  useEffect(
+    () =>
+      subscribeUploadDone((doneScope, created) => {
+        if (doneScope === queueScope) setFiles((prev) => [created, ...prev]);
+      }),
+    [queueScope]
   );
 
   const load = useCallback(() => {
@@ -193,54 +200,11 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     ]).finally(() => setStatusLoading(false));
   }, []);
 
-  const handleFiles = async (selected: FileList | null) => {
+  const handleFiles = (selected: FileList | null) => {
     if (!selected?.length) return;
-
-    for (const file of Array.from(selected)) {
-      const uploadId = `${file.name}-${Date.now()}-${Math.random()}`;
-      const controller = new AbortController();
-      setUploads((prev) => [...prev, { id: uploadId, name: file.name, ratio: 0, controller }]);
-
-      try {
-        const created = await uploadFile(
-          target,
-          file,
-          { taskId, outputId },
-          (ratio) => setUploads((prev) => prev.map((u) => (u.id === uploadId ? { ...u, ratio } : u))),
-          controller.signal
-        );
-        setFiles((prev) => [created, ...prev]);
-        setUploads((prev) => prev.filter((u) => u.id !== uploadId));
-      } catch (e: any) {
-        // İptal bir HATA DEĞİL: kullanıcı bilerek durdurdu. Satırı sessizce
-        // kaldırıp sıradaki dosyaya geçiyoruz; kırmızı bir uyarı göstermek
-        // "bir şey ters gitti" izlenimi verirdi.
-        if (e?.name === "AbortError") {
-          setUploads((prev) => prev.filter((u) => u.id !== uploadId));
-          continue;
-        }
-
-        // Başarısız yükleme listeden hemen kaybolmasın; kullanıcı nedenini görsün.
-        setUploads((prev) =>
-          prev.map((u) => (u.id === uploadId ? { ...u, error: uploadHatasi(e) } : u))
-        );
-
-        // Hız sınırına takıldıysak KUYRUĞU DURDUR. Devam etmenin anlamı yok:
-        // kalan dosyaların hepsi aynı hatayı alır ve kullanıcı onlarca kırmızı
-        // satır görür. Kalanları "beklemede" diye işaretleyip çıkıyoruz.
-        if (e?.status === 429) {
-          const kalan = Array.from(selected).slice(Array.from(selected).indexOf(file) + 1);
-          if (kalan.length) {
-            setError(
-              `${e?.message ?? "Çok fazla dosya yüklendi."} Kalan ${kalan.length} dosya yüklenmedi, biraz sonra tekrar dene.`
-            );
-          } else {
-            setError(e?.message ?? "Çok fazla dosya yüklendi.");
-          }
-          return;
-        }
-      }
-    }
+    // Kuyruk sıralı ilerliyor, hız sınırını ve hataları da o yönetiyor
+    // (bkz. lib/uploadQueue). Panel yalnızca işi teslim ediyor.
+    enqueueUploads({ target, files: Array.from(selected), context: { taskId, outputId } });
   };
 
   const handleDelete = async () => {
@@ -468,12 +432,16 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {u.name}
             </span>
+            {/* Boyut hem yüklenen hem toplam olarak yazılıyor: yalnızca yüzde
+                göstermek büyük bir dosyada "takıldı mı?" sorusunu cevaplamıyordu. */}
             <span style={{ fontSize: 14, color: u.error ? c.danger : c.textSecondary }}>
-              {u.error ? u.error : `%${Math.round(u.ratio * 100)}`}
+              {u.error
+                ? u.error
+                : `${formatFileSize(u.uploadedBytes)} / ${formatFileSize(u.sizeBytes)} · %${ratioPct(u)}`}
             </span>
             {u.error ? (
               <button
-                onClick={() => setUploads((prev) => prev.filter((x) => x.id !== u.id))}
+                onClick={() => dismissUpload(u.id)}
                 style={{ background: "transparent", border: "none", color: c.textSecondary, cursor: "pointer" }}
               >
                 Kapat
@@ -483,7 +451,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               // bitmesini beklemek gerekiyordu.
               <button
                 type="button"
-                onClick={() => u.controller?.abort()}
+                onClick={() => cancelUpload(u.id)}
                 style={{ background: "transparent", border: "none", color: c.textSecondary, cursor: "pointer", fontSize: 14 }}
               >
                 Vazgeç
@@ -494,7 +462,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             <div style={{ height: 4, background: c.border, borderRadius: 2, marginTop: 8, overflow: "hidden" }}>
               <div
                 style={{
-                  width: `${Math.round(u.ratio * 100)}%`,
+                  width: `${ratioPct(u)}%`,
                   height: "100%",
                   background: c.accent,
                   transition: "width 0.2s ease",

@@ -49,6 +49,8 @@ import { useIsDesktop } from "./lib/useIsDesktop";
 import { getSidebarDefaultOpen, useAppPrefs } from "./lib/appPrefs";
 import { refreshSession } from "./lib/session";
 import { SIDEBAR_WIDTH, pageGutter, Z, TOP_CHROME } from "./lib/layout";
+import UploadTray, { UPLOAD_TRAY_HEIGHT } from "./components/UploadTray";
+import { useUploads } from "./lib/uploadQueue";
 import { CoverBackLink } from "./components/EntityCover";
 import { IconChevronRight, IconUser } from "./components/icons";
 
@@ -526,6 +528,9 @@ export default function App() {
   // Masaüstündeki varsayılan Ayarlar > Gezinme'den değiştirilebilir; mobilde
   // çekmece her zaman kapalı başlar (açık başlasa içeriğin üstünü örterdi).
   const prefs = useAppPrefs();
+  // Yükleme tepsisi görünürken kişi şeridi onun üstüne çıkar; sayı buradan
+  // geliyor ki iki bileşen aynı gerçeği ayrı ayrı hesaplamasın.
+  const uploadCount = useUploads().length;
   const sidebarDefault = isDesktop && getSidebarDefaultOpen(true);
   const [sidebarOpen, setSidebarOpen] = useState(sidebarDefault);
   useEffect(() => {
@@ -700,7 +705,15 @@ export default function App() {
         <AiLiveActivity />
         {/* Aynı sayfada başka kim çalışıyor — sol altta ince şerit
             (bkz. lib/liveRoom.ts). Kenar çubuğu açıkken içerik sütununa hizalanır. */}
-        {prefs.showPresence && <PresenceStrip left={isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0} />}
+        {/* Süren yüklemeler: sayfa değişse de görünmeye devam etsin diye
+            burada, akıştan bağımsız duruyor (bkz. lib/uploadQueue). */}
+        <UploadTray left={isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0} />
+        {prefs.showPresence && (
+          <PresenceStrip
+            left={isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0}
+            lift={uploadCount > 0 ? UPLOAD_TRAY_HEIGHT + 8 : 0}
+          />
+        )}
         <ProjectFabContext.Provider value={{ action: fabAction, setAction: setFabAction }}>
           <div
             style={{

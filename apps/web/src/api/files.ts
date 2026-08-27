@@ -153,8 +153,11 @@ export const oneDriveApi = {
  * DOĞRUDAN bulut sağlayıcısına gönderir — içerik backend'in belleğinden ve bant
  * genişliğinden geçmez, bağlantı koparsa kaldığı yerden devam edebilir.
  */
+/** Dosyanın yükleneceği yer. Kuyruk da aynı tipi taşıyor (bkz. lib/uploadQueue). */
+export type UploadTarget = { jobId: string } | { projectId: string } | { departmentId: string };
+
 export async function uploadFile(
-  target: { jobId: string } | { projectId: string } | { departmentId: string },
+  target: UploadTarget,
   file: File,
   context: Omit<FileContext, "projectId"> = {},
   onProgress?: (ratio: number) => void,

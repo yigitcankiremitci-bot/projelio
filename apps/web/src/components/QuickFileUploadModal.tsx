@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { GoogleDriveStatus } from "@projelio/shared";
-import { driveApi, oneDriveApi, uploadFile } from "../api/files";
+import { driveApi, oneDriveApi, type UploadTarget } from "../api/files";
+import { enqueueUploads } from "../lib/uploadQueue";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconUpload } from "./icons";
@@ -12,7 +13,7 @@ export interface UploadTargetOption {
   label: string;
   /** Verilirse seçenekler optgroup altında toplanır (örn. iş adı). */
   group?: string;
-  target: { jobId: string } | { projectId: string } | { departmentId: string };
+  target: UploadTarget;
 }
 
 interface Props {
@@ -44,11 +45,6 @@ export default function QuickFileUploadModal({
   const [targetId, setTargetId] = useState(targets[0]?.id ?? "");
   const [googleStatus, setGoogleStatus] = useState<GoogleDriveStatus | null>(null);
   const [msStatus, setMsStatus] = useState<GoogleDriveStatus | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [ratio, setRatio] = useState(0);
-  // Süren yüklemeyi durdurabilmek için (bkz. FilesPanel'deki aynı desen).
-  const [controller, setController] = useState<AbortController | null>(null);
-  const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -61,33 +57,21 @@ export default function QuickFileUploadModal({
   const anyConfigured = Boolean(googleStatus?.configured || msStatus?.configured);
   const driveMissing = anyConfigured && !anyReady;
 
-  const handleFile = async (file: File | null) => {
+  /**
+   * Yükleme KUYRUĞA veriliyor ve pencere hemen kapanıyor.
+   *
+   * Eskiden yükleme bu pencerenin içinde bekleniyordu: kullanıcı bitene kadar
+   * ekranda tutulmak zorundaydı ve pencereyi kapatıp gezinirse ilerlemeyi bir
+   * daha göremiyordu. Artık ilerleme köşedeki tepside (bkz. UploadTray) ve
+   * sayfa değiştirmek onu etkilemiyor.
+   */
+  const handleFile = (file: File | null) => {
     const selected = targets.find((t) => t.id === targetId);
     if (!file || !selected) return;
     setError("");
-    setFileName(file.name);
-    setUploading(true);
-    setRatio(0);
-    const iptal = new AbortController();
-    setController(iptal);
-    try {
-      await uploadFile(selected.target, file, {}, setRatio, iptal.signal);
-      onUploaded();
-      onClose();
-    } catch (e: any) {
-      // İptal hata değil: kullanıcı bilerek durdurdu, uyarı göstermiyoruz.
-      if (e?.name === "AbortError") {
-        setUploading(false);
-        setFileName("");
-        setController(null);
-        return;
-      }
-      // Sunucu yetki hatasını Türkçe ve anlaşılır döndürüyor (örn. "İşin geneline
-      // dosya eklemek için iş ekibinde olmanız gerekir"); olduğu gibi gösteriyoruz.
-      setError(e?.message ?? "Dosya yüklenemedi");
-      setUploading(false);
-      setController(null);
-    }
+    enqueueUploads({ target: selected.target, files: [file] });
+    onUploaded();
+    onClose();
   };
 
   // Gruplar ilk görüldükleri sırayı korur: seçenek listesi çağıranın verdiği
@@ -113,7 +97,6 @@ export default function QuickFileUploadModal({
               <select
                 value={targetId}
                 onChange={(e) => setTargetId(e.target.value)}
-                disabled={uploading}
                 style={{ width: "100%" }}
               >
                 {ungrouped.map(optionEl)}
@@ -136,7 +119,7 @@ export default function QuickFileUploadModal({
                   ref={inputRef}
                   type="file"
                   onChange={(e) => {
-                    void handleFile(e.target.files?.[0] ?? null);
+                    handleFile(e.target.files?.[0] ?? null);
                     e.target.value = "";
                   }}
                   style={{ display: "none" }}
@@ -144,7 +127,6 @@ export default function QuickFileUploadModal({
                 <button
                   type="button"
                   onClick={() => inputRef.current?.click()}
-                  disabled={uploading}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -156,30 +138,15 @@ export default function QuickFileUploadModal({
                     background: "transparent",
                     color: c.textSecondary,
                     fontSize: 15,
-                    cursor: uploading ? "wait" : "pointer",
+                    cursor: "pointer",
                   }}
                 >
                   <IconUpload size={18} color={c.textSecondary} />
-                  {uploading ? `Yükleniyor… ${fileName} (${Math.round(ratio * 100)}%)` : "Dosya seç"}
+                  Dosya seç
                 </button>
 
-                {/* Yanlış dosya seçildiyse bitmesini beklemek gerekmesin. */}
-                {uploading && (
-                  <button
-                    type="button"
-                    onClick={() => controller?.abort()}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: c.textSecondary,
-                      fontSize: 14,
-                      cursor: "pointer",
-                      alignSelf: "center",
-                    }}
-                  >
-                    Vazgeç
-                  </button>
-                )}
+                {/* İlerleme ve "vazgeç" artık burada değil: pencere kapansa da
+                    görünsün diye köşedeki tepside (bkz. UploadTray). */}
               </>
             )}
 

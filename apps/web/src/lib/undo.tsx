@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Z } from "./layout";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
 import { onRoomChanged } from "./liveRoom";
@@ -549,7 +550,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
             left: "50%",
             bottom: 96,
             transform: "translateX(-50%)",
-            zIndex: 120,
+            zIndex: Z.undoToast,
             maxWidth: "calc(100vw - 32px)",
             padding: "10px 16px",
             borderRadius: 10,

@@ -48,7 +48,7 @@ import type { ProjectFabAction } from "./lib/projectFab";
 import { useIsDesktop } from "./lib/useIsDesktop";
 import { getSidebarDefaultOpen, useAppPrefs } from "./lib/appPrefs";
 import { refreshSession } from "./lib/session";
-import { SIDEBAR_WIDTH, pageGutter } from "./lib/layout";
+import { SIDEBAR_WIDTH, pageGutter, Z, TOP_CHROME } from "./lib/layout";
 import { CoverBackLink } from "./components/EntityCover";
 import { IconChevronRight, IconUser } from "./components/icons";
 
@@ -316,7 +316,7 @@ function CoverStickyHeader({
         // (zIndex yok) altından geçer. 36: kapağı olmayan sayfalardaki opak üst
         // maskenin (zIndex 35) da üstünde kalmalı, yoksa şerit onun arkasında
         // kaybolur (bkz. App.tsx isCoverPage maskesi).
-        zIndex: 36,
+        zIndex: Z.stickyHeader,
         background: c.surface,
         borderBottom: `1px solid ${c.border}`,
         boxShadow: "0 1px 6px rgba(26,31,41,0.06)",
@@ -469,7 +469,7 @@ function CoverStickyHeader({
             top: barHeight,
             left,
             right: 0,
-            zIndex: 36,
+            zIndex: Z.stickyHeader,
             // Yatay boşluk kapağınkiyle AYNI olmalı (bkz. lib/layout.ts): iki
             // hap devir teslimde aynı dikey çizgide buluşuyor, farklı olursa
             // hap yana zıplıyordu.
@@ -629,7 +629,7 @@ export default function App() {
               // görünmesini engelleyen bir maske. Beyaz olduğunda sayfanın üstünde
               // sırıtan bir bant gibi duruyordu; çerçeve ve gölge de bu yüzden yok.
               background: c.background,
-              zIndex: 35,
+              zIndex: Z.headerMask,
             }}
           />
         )}
@@ -656,9 +656,9 @@ export default function App() {
               title="Sidebar'ı aç"
               style={{
                 position: "fixed",
-                top: 14,
-                left: 14,
-                zIndex: 40,
+                top: TOP_CHROME.top,
+                left: TOP_CHROME.gutter,
+                zIndex: Z.topChrome,
                 width: 40,
                 height: 40,
                 borderRadius: "50%",
@@ -679,7 +679,7 @@ export default function App() {
                 position: "fixed",
                 top: 10,
                 left: 62,
-                zIndex: 40,
+                zIndex: Z.topChrome,
                 display: "flex",
                 alignItems: "center",
               }}

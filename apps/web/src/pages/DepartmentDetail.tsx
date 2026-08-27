@@ -18,6 +18,7 @@ import AskLioButton from "../components/AskLioButton";
 import { useBackTarget } from "../lib/backTarget";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
 import { presetForSeed } from "../lib/covers";
+import { TOP_CHROME_BOTTOM } from "../lib/layout";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { colors } from "@projelio/shared";
@@ -188,7 +189,9 @@ export default function DepartmentDetail() {
       >
         {/* Kişi kartı: diğer anasayfalarla aynı bileşen, kapak görselinin üstüne bindirilmiş —
             sağ üstteki kapak düzenleme ikonlarının altında, yer kaplamadan. */}
-        <div style={{ position: "absolute", top: 76, right: 14, zIndex: 3 }}>
+        {/* Kişi kartı sağ üstteki sabit düğmelerin ALTINDAN başlar; bandı
+            elle yazmak yerine tek kaynaktan türetiyoruz (bkz. lib/layout). */}
+        <div style={{ position: "absolute", top: TOP_CHROME_BOTTOM + 14, right: 14, zIndex: 3 }}>
           <ProfileCard />
         </div>
 

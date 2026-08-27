@@ -4,7 +4,7 @@ import { COVER_VEIL_HEIGHT, coverBackground } from "../lib/covers";
 import type { LioSubject } from "../lib/askLio";
 import AskLioButton from "./AskLioButton";
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { pageGutter } from "../lib/layout";
+import { pageGutter, TOP_CHROME_BOTTOM } from "../lib/layout";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import { IconChevronLeft } from "./icons";
@@ -31,13 +31,14 @@ export function coverActionButton(c: { border: string; surface: string }): CSSPr
  * Kişi kartı, üstteki bildirim çanı ile alttaki düzenleme düğmesi arasında
  * kalan boşluğun TAM ORTASINA oturur — köşeye yapışmaz.
  *
- * Üst sınır: bildirim çanı ve yardım/tur düğmesi (bkz. App.tsx — ikisi de
- * `position: fixed; top: 14`, 40 px) kapağın 14–54 px bandını kaplıyor; kart
- * 54'ün altından başlamalı, üstüne 8 px nefes payı.
+ * Üst sınır sabit düğmelerin kapladığı banttan TÜRETİLİR (bkz. lib/layout
+ * TOP_CHROME_BOTTOM). Eskiden buraya elle 62 yazılıydı: düğme boyutu ya da
+ * üstten uzaklığı değiştiğinde yalnızca App.tsx düzeliyor, kapaklar eski bandı
+ * kullanmaya devam ediyordu.
  * Alt sınır: kapağın sağ altındaki 48 px'lik düzenleme düğmesi + 20 px kapak
- * dolgusu, yine 8 px pay.
+ * dolgusu, 8 px pay.
  */
-const BELL_BAND_BOTTOM = 62;
+const BELL_BAND_BOTTOM = TOP_CHROME_BOTTOM;
 const COVER_PADDING = 20;
 const ACTION_BAND = 48 + 8;
 /** Masaüstünde kart akıştaki sütunda: dolgu zaten 20 px, kalanı burada eklenir. */

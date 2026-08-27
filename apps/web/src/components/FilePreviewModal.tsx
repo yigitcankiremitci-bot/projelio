@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Z } from "../lib/layout";
 import { createPortal } from "react-dom";
 import type { ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
@@ -86,7 +87,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
         alignItems: "center",
         justifyContent: "center",
         padding: 20,
-        zIndex: 110,
+        zIndex: Z.filePreview,
       }}
     >
       <div

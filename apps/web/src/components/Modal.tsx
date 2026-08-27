@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Z } from "../lib/layout";
 import { createPortal } from "react-dom";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -173,7 +174,7 @@ export default function Modal({
         alignItems: "center",
         justifyContent: "center",
         padding: fullScreen ? 0 : 20,
-        zIndex: 100,
+        zIndex: Z.modal,
       }}
     >
       <div

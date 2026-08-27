@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Z } from "../lib/layout";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { onAskLio } from "../lib/askLio";
 import type { AskLioRequest } from "../lib/askLio";
@@ -108,7 +109,7 @@ export default function AiLauncher() {
             border: "none",
             background: "transparent",
             overflow: "visible",
-            zIndex: 45,
+            zIndex: Z.aiLauncher,
             cursor: "pointer",
           }}
         >

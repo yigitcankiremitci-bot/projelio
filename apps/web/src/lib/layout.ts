@@ -22,3 +22,104 @@ export const PAGE_GUTTER_MOBILE = 16;
 export function pageGutter(isDesktop: boolean): number {
   return isDesktop ? PAGE_GUTTER_DESKTOP : PAGE_GUTTER_MOBILE;
 }
+
+/**
+ * SABİT KATMAN SIRASI — tek kaynak.
+ *
+ * Ekranda sürekli duran çok sayıda `position: fixed` öğe var: alt menü, üst
+ * maske, kenar çubuğu, çekmece karartması, kişi şeridi, sağ üst düğmeler, Lio
+ * balonu, paneller, pencereler. Her biri kendi dosyasında elle yazılmış bir
+ * sayı taşıdığı sürece "hangisi hangisinin üstünde" sorusunun cevabı hiçbir
+ * yerde yazılı olmuyor ve çakışmalar ancak belirli bir ekran genişliğinde,
+ * kullanıcının ekran görüntüsüyle ortaya çıkıyor.
+ *
+ * AYIKLANAN HATA. Telefonda kenar çubuğu ÇEKMECE olarak açılıyor (38) ama
+ * bildirim çanı ve tur düğmesi 40'ta, Lio balonu 45'te duruyordu. Sonuç: dar
+ * bir telefonda çekmecenin kendi kapatma düğmesi çanın ARKASINDA kaldı, Lio
+ * balonu da çekmecenin menü satırlarının üstüne bindi. Oysa çekmece açıkken
+ * ekranda görünmesi gereken tek şey çekmecedir; onun üstünde kalması gereken
+ * hiçbir uygulama süsü yok.
+ *
+ * KURAL: yeni bir `position: fixed` öğe eklerken zIndex'i buraya bir satır
+ * ekleyerek al, sayıyı bileşenin içine yazma. Sıralama değişmezleri
+ * layout.test.ts'te sabitlenmiştir; oradaki testler kırılıyorsa katman sırası
+ * bozulmuştur.
+ *
+ * Bu ölçek yalnızca UYGULAMA GENELİNDEKİ sabit katmanları kapsar. Bir bileşenin
+ * kendi içindeki küçük yığınlar (açılır menü, kapak perdesi üstündeki başlık
+ * bloğu vb.) kendi yığın bağlamlarında yaşar ve buraya girmez.
+ */
+export const Z = {
+  /** Alt menüdeki seçim menüsünü kapatmak için ekranı kaplayan görünmez katman. */
+  bottomNavBackdrop: 29,
+  bottomNavFab: 30,
+  bottomNav: 31,
+  bottomNavMenu: 32,
+  /** Kapaksız sayfalarda sabit düğmelerin altından geçen içeriği gizleyen üst maske. */
+  headerMask: 35,
+  /** Masaüstünde yerinde duran kenar çubuğu ve kaydırınca beliren üst şerit. */
+  sidebarDocked: 36,
+  stickyHeader: 36,
+  /** Sol alttaki "bu sayfada kim var" şeridi. */
+  presenceStrip: 39,
+  /** Sağ üstteki bildirim çanı ve tur düğmesi, sol üstteki sidebar oku ve logo. */
+  topChrome: 40,
+  /** Sağ alttaki Lio balonu. */
+  aiLauncher: 45,
+  /**
+   * Telefondaki çekmece ve karartması. BÜTÜN uygulama süslerinin ÜSTÜNDE:
+   * çekmece açıkken çan, tur düğmesi, kişi şeridi ve Lio balonu onun arkasında
+   * kalmalı — yoksa dar ekranlarda üst üste binerler.
+   */
+  drawerScrim: 48,
+  drawer: 49,
+  /** Lio sohbet paneli ve karartması — çekmecenin de üstünde: en son açılan yüzey. */
+  aiPanelScrim: 60,
+  aiPanel: 61,
+  /** Lio bir kayıt oluşturduğunda beliren şerit. */
+  aiActivity: 62,
+  /** Ortada açılan pencereler. */
+  modal: 100,
+  filePreview: 110,
+  /** "Geri al" bildirimi ve ilk kurulum sihirbazı: her şeyin üstünde. */
+  undoToast: 120,
+  onboarding: 200,
+} as const;
+
+/**
+ * Sağ üstteki sabit düğmelerin (bildirim çanı, tur düğmesi) kapladığı bant.
+ *
+ * Sayfa içeriği bu banda giremez. Kapak başlığındaki kişi kartı, kapak
+ * yüksekliği, üstten bırakılan boşluk — hepsi bu değerden türetilmeli;
+ * her ekranın kendi 62'sini yazması, düğme boyutu değiştiğinde yalnızca bazı
+ * sayfaların düzelmesi demekti.
+ */
+export const TOP_CHROME = {
+  /** Düğmelerin üstten uzaklığı. */
+  top: 14,
+  /** En büyük düğmenin çapı (bildirim çanı). */
+  size: 44,
+  /** Ekran kenarından uzaklık. */
+  gutter: 14,
+} as const;
+
+/** Sağ üst düğme bandının alt sınırı: altına konan her şey bu değerden sonra başlamalı. */
+export const TOP_CHROME_BOTTOM = TOP_CHROME.top + TOP_CHROME.size + 4;
+
+/**
+ * Telefondaki çekmecenin genişliği.
+ *
+ * İki sınır birlikte: sabit bir üst sınır (geniş telefonda gereksiz yayılmasın)
+ * ve ekran genişliğine bağlı bir tavan — arkada karartmadan en az bu kadar bir
+ * şerit KALMALI, çünkü çekmeceyi kapatmanın en doğal yolu dışarı dokunmak.
+ * Dar bir telefonda eski sabit 352 px, 393 px'lik ekranda 41 px'lik bir şerit
+ * bırakıyordu; kullanıcı çekmeceyi kapatmak için nişan almak zorundaydı.
+ *
+ * `100vw` bilerek kullanılıyor: Ayarlar'daki yazı boyutu <html> üzerinde CSS
+ * "zoom" uyguladığı için görünüm birimleri birkaç piksel kayabiliyor (bkz.
+ * Sidebar'daki yükseklik notu). Burada bunun bir zararı yok — genişlikte birkaç
+ * piksellik sapma çekmeceyi biraz dar/geniş yapar, kırılan bir düzen olmaz.
+ */
+export const DRAWER_MAX_WIDTH = SIDEBAR_WIDTH + 24;
+export const DRAWER_MIN_SCRIM = 56;
+export const DRAWER_WIDTH_CSS = `min(${DRAWER_MAX_WIDTH}px, calc(100vw - ${DRAWER_MIN_SCRIM}px))`;

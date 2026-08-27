@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Z } from "../lib/layout";
 import { useNavigate } from "react-router-dom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { parseMessageLinks } from "../lib/messageLinks";
@@ -934,7 +935,7 @@ export default function AiAssistantPanel({
             position: "fixed",
             inset: 0,
             background: "rgba(26,31,41,0.35)",
-            zIndex: 60,
+            zIndex: Z.aiPanelScrim,
             animation: "projelioAiFade .18s ease",
           }}
         />
@@ -958,7 +959,7 @@ export default function AiAssistantPanel({
           background: c.surface,
           borderLeft: `1px solid ${c.border}`,
           boxShadow: "-8px 0 32px rgba(26,31,41,0.16)",
-          zIndex: 61,
+          zIndex: Z.aiPanel,
           display: open ? "flex" : "none",
           flexDirection: "column",
           animation: "projelioAiSlide .22s ease",

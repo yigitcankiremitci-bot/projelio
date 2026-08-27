@@ -11,7 +11,7 @@ import CreateGroupModal from "./CreateGroupModal";
 import { ProjectFabContext } from "../lib/projectFab";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { tourAnchor } from "../lib/tour/types";
-import { SIDEBAR_WIDTH } from "../lib/layout";
+import { SIDEBAR_WIDTH, Z } from "../lib/layout";
 import { useHomeTarget } from "../lib/homeTarget";
 
 const rightItems = [
@@ -178,7 +178,7 @@ export default function BottomNav({ sidebarOpen }: Props) {
         borderRadius: 12,
         padding: 8,
         boxShadow: "0 4px 16px rgba(26,31,41,0.18)",
-        zIndex: 31,
+        zIndex: Z.bottomNav,
       }}
     >
       {choiceMenuItems.map((item) => (
@@ -236,14 +236,14 @@ export default function BottomNav({ sidebarOpen }: Props) {
             // açıkken olduğu gibi sağa kaymamalı.
             left: sidebarOpen ? `calc(50% + ${SIDEBAR_WIDTH / 2}px)` : "50%",
             transform: "translateX(-50%)",
-            zIndex: 32,
+            zIndex: Z.bottomNavMenu,
           }}
         >
           {choosingMenu}
           {createAction && fabButton}
         </div>
 
-        {choosing && <div onClick={() => setChoosing(false)} style={{ position: "fixed", inset: 0, zIndex: 29 }} />}
+        {choosing && <div onClick={() => setChoosing(false)} style={{ position: "fixed", inset: 0, zIndex: Z.bottomNavBackdrop }} />}
 
         {modals}
       </>
@@ -267,7 +267,7 @@ export default function BottomNav({ sidebarOpen }: Props) {
           alignItems: "flex-start",
           padding: "0 4px",
           paddingBottom: "env(safe-area-inset-bottom)",
-          zIndex: 30,
+          zIndex: Z.bottomNavFab,
         }}
       >
         {leftItems.map((item) => {
@@ -332,7 +332,7 @@ export default function BottomNav({ sidebarOpen }: Props) {
         })}
       </nav>
 
-      {choosing && <div onClick={() => setChoosing(false)} style={{ position: "fixed", inset: 0, zIndex: 29 }} />}
+      {choosing && <div onClick={() => setChoosing(false)} style={{ position: "fixed", inset: 0, zIndex: Z.bottomNavBackdrop }} />}
 
       {modals}
     </>

@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useSidebarStyle } from "../theme/useSidebarStyle";
 import { IconChevronLeft, IconSettings } from "./icons";
-import { SIDEBAR_WIDTH } from "../lib/layout";
+import { SIDEBAR_WIDTH, DRAWER_WIDTH_CSS, Z } from "../lib/layout";
 import SidebarTree from "./SidebarTree";
 import HomeTargetModal from "./HomeTargetModal";
 import { useHomeTarget, DEFAULT_HOME_TARGET } from "../lib/homeTarget";
@@ -70,14 +70,16 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
       {overlay && (
         <div
           onClick={onClose}
-          style={{ position: "fixed", inset: 0, background: "rgba(15,18,25,0.45)", zIndex: 37 }}
+          style={{ position: "fixed", inset: 0, background: "rgba(15,18,25,0.45)", zIndex: Z.drawerScrim }}
         />
       )}
       <aside
         className="app-sidebar"
         {...tourAnchor("sidebar")}
         style={{
-          width: overlay ? Math.min(SIDEBAR_WIDTH + 24, 360) : SIDEBAR_WIDTH,
+          // Çekmece genişliği ekran genişliğine de bağlı: arkada dokunulabilir
+          // bir karartma şeridi kalmalı (bkz. lib/layout DRAWER_WIDTH_CSS).
+          width: overlay ? DRAWER_WIDTH_CSS : SIDEBAR_WIDTH,
           flexShrink: 0,
           // Sidebar'ı akıştan tamamen çıkarıp viewport'a sabitliyoruz (position: fixed).
           // Kasıtlı olarak "height: 100vh" KULLANMIYORUZ: bu uygulamada Ayarlar >
@@ -92,7 +94,9 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
           left: 0,
           bottom: 0,
           overflowY: "auto",
-          zIndex: overlay ? 38 : 36,
+          // Çekmece hâlindeyken çan, tur düğmesi ve Lio balonu dahil bütün sabit
+          // öğelerin ÜSTÜNDE; yerinde dururken (masaüstü) onların altında.
+          zIndex: overlay ? Z.drawer : Z.sidebarDocked,
           background: sidebarStyle.background,
           backgroundImage: sidebarStyle.backgroundImage,
           backgroundSize: sidebarStyle.backgroundSize,

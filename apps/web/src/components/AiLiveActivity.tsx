@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Z } from "../lib/layout";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { LioActivityPayload } from "@projelio/shared";
 import { onLioActivity } from "../lib/liveRoom";
@@ -67,7 +68,7 @@ export default function AiLiveActivity() {
         top: 72,
         left: "50%",
         transform: "translateX(-50%)",
-        zIndex: 62,
+        zIndex: Z.aiActivity,
         display: "flex",
         alignItems: "center",
         gap: 8,

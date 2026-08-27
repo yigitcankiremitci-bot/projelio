@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Z } from "../lib/layout";
 import { useNavigate } from "react-router-dom";
 import type { AccountType, DepartmentCatalogEntry, OrgType } from "@projelio/shared";
 import { api } from "../api/client";
@@ -134,7 +135,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
         position: "fixed",
         inset: 0,
         background: c.background,
-        zIndex: 200,
+        zIndex: Z.onboarding,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

@@ -1,4 +1,5 @@
 import { useThemeColors } from "../theme/useThemeColors";
+import { Z } from "../lib/layout";
 import { usePresence } from "../lib/liveRoom";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -41,7 +42,7 @@ export default function PresenceStrip({ left = 0 }: { left?: number }) {
         left: left + 16,
         // Telefonda alt menü (68 px) + çentik boşluğunun üstünde kalmalı.
         bottom: isDesktop ? 16 : "calc(84px + env(safe-area-inset-bottom))",
-        zIndex: 39,
+        zIndex: Z.presenceStrip,
         display: "flex",
         alignItems: "center",
         gap: 7,

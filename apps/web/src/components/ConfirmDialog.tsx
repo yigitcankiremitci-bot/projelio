@@ -1,10 +1,18 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 
 interface Props {
   title: string;
   message: string;
+  /**
+   * Mesajın altına giren ek içerik (ör. "Drive'dan da kaldır" onay kutusu).
+   *
+   * Onay penceresinin kendisi seçenek taşıyabilmeli: silmenin NEREYE kadar
+   * gideceği kullanıcıya sorulacak bir şeyse, bunu ayrı bir pencereye taşımak
+   * ya da varsayılana gömmek ikisi de kötü.
+   */
+  extra?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
@@ -15,6 +23,7 @@ interface Props {
 export default function ConfirmDialog({
   title,
   message,
+  extra,
   confirmLabel = "Sil",
   cancelLabel = "Vazgeç",
   danger = true,
@@ -38,7 +47,11 @@ export default function ConfirmDialog({
 
   return (
     <Modal title={title} onClose={onCancel} maxWidth={380}>
-      <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>{message}</p>
+      <p style={{ fontSize: 16, color: c.textSecondary, margin: `0 0 ${extra ? 12 : 18}px`, lineHeight: 1.5 }}>
+        {message}
+      </p>
+
+      {extra && <div style={{ margin: "0 0 18px" }}>{extra}</div>}
 
       {error && <p style={{ color: c.danger, fontSize: 16, margin: "0 0 12px" }}>{error}</p>}
 

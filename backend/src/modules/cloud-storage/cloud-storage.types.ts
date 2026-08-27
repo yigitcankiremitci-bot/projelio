@@ -11,6 +11,14 @@ export interface CloudFile {
   iconLink?: string;
   md5Checksum?: string;
   trashed?: boolean;
+  /**
+   * Dosyanın içinde bulunduğu klasör(ler).
+   *
+   * "Drive'dan ekle" akışı bunu okuyor: seçilen dosya ZATEN hedef klasördeyse
+   * kopyalamak, aynı dosyadan ikinci bir kopya yaratıp kullanıcının Drive
+   * kotasını yemek olur (bkz. FilesService.importForJob).
+   */
+  parentIds?: string[];
 }
 
 /** Google GoogleAccount ile Microsoft MicrosoftAccount'ın ortak alanları. */

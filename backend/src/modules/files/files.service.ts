@@ -1837,6 +1837,38 @@ export class FilesService {
     return { provider, entries: files.map(toBrowseEntry) };
   }
 
+  /**
+   * "Drive'dan ekle" akışında dosya ZATEN Projelio'da kayıtlı mı?
+   *
+   * Kayıtlıysa ikinci bir satır yaratmak da dosyayı yeniden kopyalamak da
+   * yanlış: kullanıcı aynı dosyayı listede iki kez görür ve Drive'da ikinci bir
+   * kopya belirir. Arşivlenmiş bir kayıt bulunursa geri getiriliyor — kullanıcı
+   * kaldırdığı dosyayı yeniden eklemek istemiştir.
+   */
+  private async existingImport(
+    scope: { jobId?: string; departmentId?: string },
+    driveFileId: string
+  ): Promise<any | null> {
+    let query = this.supabase.client.from("files").select().eq("drive_file_id", driveFileId);
+    query = scope.departmentId
+      ? query.eq("department_id", scope.departmentId)
+      : query.eq("job_id", scope.jobId!);
+
+    const { data, error } = await query.limit(1).maybeSingle();
+    if (error || !data) return null;
+
+    if (data.archived_at) {
+      const { data: restored } = await this.supabase.client
+        .from("files")
+        .update({ archived_at: null })
+        .eq("id", data.id)
+        .select()
+        .maybeSingle();
+      return restored ?? data;
+    }
+    return data;
+  }
+
   async importForJob(
     jobId: string,
     userId: string,
@@ -1854,16 +1886,31 @@ export class FilesService {
       resolvedProjectId,
     });
 
-    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
-    const copied = await this.cloudStorage.copyFile(
-      provider,
-      accessToken,
-      sourceFileId,
-      target.driveFolderId,
-      opts.name ? this.safeFileName(opts.name) : undefined
-    );
+    // Aynı dosya bu işe daha önce eklendiyse ikinci bir kayıt (ve ikinci bir
+    // Drive kopyası) yaratma; var olanı döndür.
+    const existing = await this.existingImport({ jobId }, sourceFileId);
+    if (existing) {
+      return mapFile(existing, await this.canEditInDrive(jobId, userId, existing.project_id ?? undefined));
+    }
 
-    return this.persist(jobId, userId, provider, accountId, copied, opts, resolvedProjectId, target.folderRowId);
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    const source = await this.cloudStorage.getFile(provider, accessToken, sourceFileId);
+
+    // Dosya ZATEN hedef klasörün içindeyse kopyalamak, kullanıcının Drive
+    // kotasında aynı dosyadan ikinci bir kopya demek — kullanıcı bunu "korkunç"
+    // diye bildirdi ve haklı. Bu durumda yalnızca kaydını oluşturuyoruz.
+    const alreadyInFolder = source.parentIds?.includes(target.driveFolderId) ?? false;
+    const stored = alreadyInFolder
+      ? source
+      : await this.cloudStorage.copyFile(
+          provider,
+          accessToken,
+          sourceFileId,
+          target.driveFolderId,
+          opts.name ? this.safeFileName(opts.name) : undefined
+        );
+
+    return this.persist(jobId, userId, provider, accountId, stored, opts, resolvedProjectId, target.folderRowId);
   }
 
   async importForProject(
@@ -1885,17 +1932,27 @@ export class FilesService {
     if (!sourceFileId) throw new BadRequestException("sourceFileId gerekli");
     await this.assertDepartmentAccess(departmentId, userId);
 
+    const existing = await this.existingImport({ departmentId }, sourceFileId);
+    if (existing) {
+      return mapFile(existing, await this.canEditInDriveForDepartment(departmentId, userId));
+    }
+
     const { provider, accountId, folderId } = await this.ensureDepartmentStorage(departmentId, userId);
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
-    const copied = await this.cloudStorage.copyFile(
-      provider,
-      accessToken,
-      sourceFileId,
-      folderId,
-      name ? this.safeFileName(name) : undefined
-    );
+    const source = await this.cloudStorage.getFile(provider, accessToken, sourceFileId);
 
-    return this.persistDepartmentFile(departmentId, userId, provider, accountId, copied);
+    // Dosya zaten departman klasöründeyse kopyalanmıyor (bkz. importForJob).
+    const stored = source.parentIds?.includes(folderId)
+      ? source
+      : await this.cloudStorage.copyFile(
+          provider,
+          accessToken,
+          sourceFileId,
+          folderId,
+          name ? this.safeFileName(name) : undefined
+        );
+
+    return this.persistDepartmentFile(departmentId, userId, provider, accountId, stored);
   }
 
   async createNativeForJob(

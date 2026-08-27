@@ -123,6 +123,9 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<ProjectFile | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ProjectFile | null>(null);
+  // Varsayılan AÇIK: "Projelio'dan kaldırdım ama Drive'da hâlâ duruyor" en çok
+  // şaşırtan davranıştı. Çöp kutusuna taşındığı için geri alınabilir.
+  const [alsoTrash, setAlsoTrash] = useState(true);
   const [browsing, setBrowsing] = useState(false);
   const [pickerError, setPickerError] = useState("");
   // Google ve Microsoft durumu iki AYRI istekle gelir; biri diğerinden önce
@@ -212,7 +215,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     const victim = pendingDelete;
     setPendingDelete(null);
     try {
-      await filesApi.remove(victim.id);
+      await filesApi.remove(victim.id, alsoTrash);
       setFiles((prev) => prev.filter((f) => f.id !== victim.id));
     } catch (e: any) {
       setError(e?.message ?? "Dosya kaldırılamadı");
@@ -571,7 +574,17 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       {pendingDelete && (
         <ConfirmDialog
           title="Dosyayı kaldır"
-          message={`"${pendingDelete.name}" Projelio'dan kaldırılacak. Dosya ${driveProviderLabel(pendingDelete)}'da kalmaya devam eder.`}
+          message={`"${pendingDelete.name}" Projelio'dan kaldırılacak.`}
+          extra={
+            // Eskiden dosya Drive'da OLDUĞU GİBİ kalıyordu ve pencere bunu
+            // yazıyordu; kullanıcı için sonuç, sildiğini sandığı dosyanın
+            // Drive'da durmaya devam etmesiydi. Artık varsayılan "orada da
+            // kaldır" — çöp kutusuna taşındığı için geri alınabilir.
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, color: c.textSecondary }}>
+              <input type="checkbox" checked={alsoTrash} onChange={(e) => setAlsoTrash(e.target.checked)} />
+              {driveProviderLabel(pendingDelete)}'da da çöp kutusuna taşı
+            </label>
+          }
           confirmLabel="Kaldır"
           onConfirm={handleDelete}
           onCancel={() => setPendingDelete(null)}

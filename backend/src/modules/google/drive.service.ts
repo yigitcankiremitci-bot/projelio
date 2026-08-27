@@ -39,6 +39,8 @@ export interface DriveFile {
   iconLink?: string;
   md5Checksum?: string;
   trashed?: boolean;
+  /** Dosyanın içinde bulunduğu klasör(ler) — bkz. CloudFile.parentIds. */
+  parentIds?: string[];
 }
 
 export interface DriveQuota {
@@ -62,7 +64,7 @@ export const GOOGLE_NATIVE_MIME: Record<"gdoc" | "gsheet" | "gslide", string> = 
   gslide: "application/vnd.google-apps.presentation",
 };
 
-const FILE_FIELDS = "id,name,mimeType,size,webViewLink,iconLink,md5Checksum,trashed";
+const FILE_FIELDS = "id,name,mimeType,size,webViewLink,iconLink,md5Checksum,trashed,parents";
 
 function mapFile(json: any): DriveFile {
   return {
@@ -74,6 +76,7 @@ function mapFile(json: any): DriveFile {
     iconLink: json.iconLink ?? undefined,
     md5Checksum: json.md5Checksum ?? undefined,
     trashed: json.trashed ?? undefined,
+    parentIds: Array.isArray(json.parents) ? json.parents : undefined,
   };
 }
 

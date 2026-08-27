@@ -34,6 +34,8 @@ export interface DriveFile {
   iconLink?: string;
   md5Checksum?: string;
   trashed?: boolean;
+  /** Dosyanın içinde bulunduğu klasör(ler) — bkz. CloudFile.parentIds. */
+  parentIds?: string[];
 }
 
 export interface DriveQuota {
@@ -62,6 +64,8 @@ function mapItem(json: any): DriveFile {
     iconLink: json.thumbnails?.[0]?.small?.url ?? undefined,
     md5Checksum: json.file?.hashes?.quickXorHash ?? undefined,
     trashed: json.deleted !== undefined,
+    // Graph'ta tek ebeveyn var; Google ile aynı şekli taşısın diye diziye alınıyor.
+    parentIds: json.parentReference?.id ? [json.parentReference.id as string] : undefined,
   };
 }
 

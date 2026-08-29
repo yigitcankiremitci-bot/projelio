@@ -179,6 +179,21 @@ export class ProjectsService {
     return mapProject(row);
   }
 
+  /**
+   * "Bu projeyi yönetebilir mi?" — dışarıya açık hâli.
+   *
+   * Paylaşım linkleri de aynı kuralı kullanıyor (bkz. project-shares.service.ts):
+   * projeyi kim düzenleyebiliyorsa, dışarıya link verme yetkisi de onda.
+   *
+   * userId BURADA ZORUNLU. Aşağıdaki assertCanManage `!userId` durumunda sessizce
+   * geçiriyor (eski çağrı yerlerinin bazıları kimliksiz çağırıyordu); bir paylaşım
+   * linki için bu "kimliksiz istek her şeyi yapabilir" demek olurdu.
+   */
+  async assertCanManageProject(id: string, userId: string): Promise<void> {
+    if (!userId) throw new ForbiddenException("Bu işlem için giriş yapmalısınız");
+    await this.assertCanManage(id, userId);
+  }
+
   // Proje detaylarını yalnızca projenin sahibi ya da bağlı olduğu işin sahibi
   // değiştirebilir. (Önceden işe/projeye eklenen herkes değiştirebiliyordu.)
   private async assertCanManage(id: string, userId?: string): Promise<void> {

@@ -18,11 +18,12 @@ import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import TeamPanel, { TeamPanelHandle } from "../components/panels/TeamPanel";
 import BudgetPanel, { BudgetPanelHandle } from "../components/panels/BudgetPanel";
 import OutputsPanel, { OutputsPanelHandle } from "../components/OutputsPanel";
-import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
+import FilesPanel from "../components/FilesPanel";
 import ProcessPanel, { ProcessNavState, ViewMode, computeInitialProcessNavDates } from "../components/panels/ProcessPanel";
 import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
-import { IconSettings } from "../components/icons";
+import { IconExternalLink, IconSettings } from "../components/icons";
+import ShareProjectModal from "../components/ShareProjectModal";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -40,6 +41,7 @@ export default function ProjectDetail() {
   const registerReorderUndo = useReorderUndo();
   const tasksRef = useLatestRef(tasks);
   const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [parentCompletePrompt, setParentCompletePrompt] = useState<Task | null>(null);
   // Taşeron: bütçe ve ekip yüzeyleri hiç açılmaz (bkz. lib/useCurrentUser).
@@ -76,7 +78,6 @@ export default function ProjectDetail() {
   const feedRef = useRef<FeedPanelHandle>(null);
   const teamRef = useRef<TeamPanelHandle>(null);
   const budgetRef = useRef<BudgetPanelHandle>(null);
-  const filesRef = useRef<FilesPanelHandle>(null);
 
   // Alt navigasyondaki "+" butonu, proje detayında hangi sekmedeysek ona uygun eylemi
   // tetiklesin diye ProjectFabContext üzerinden kayıt yapılır (sekme değiştikçe güncellenir).
@@ -100,13 +101,8 @@ export default function ProjectDetail() {
       : activeTab === "budget"
       ? { label: "Ödeme / gider ekle", onClick: () => budgetRef.current?.openCreate() }
       : activeTab === "files"
-      ? {
-          label: "Dosya ekle",
-          options: [
-            { label: "Dosya yükle", onClick: () => filesRef.current?.openUpload() },
-            { label: "Yeni dosya oluştur", onClick: () => filesRef.current?.openCreateNative() },
-          ],
-        }
+      ? // Dosyalar sekmesinin "+" eylemi panelin kendisinde (bkz. FilesPanel).
+        null
       : { label: "Deadline'ı değiştir", onClick: () => setExtendingDeadline(true) },
     [activeTab, project, id]
   );
@@ -567,6 +563,31 @@ export default function ProjectDetail() {
                   sahibi — sunucu tarafında ProjectsService.assertCanManage) değiştirir.
                   Kimlik henüz yüklenmediyse düğme gizli: "yüklenirken göster" hâli
                   taşerona bir an için düzenleme sunuyordu. */}
+              {/* Takip linki: projeyi hesabı olmayan kişilere gösteren salt okunur
+                  bağlantı (bkz. components/ShareProjectModal.tsx). Düzenleme
+                  düğmesiyle aynı koşul — dışarıya ne gösterileceğine karar vermek
+                  de projeyi yönetmenin bir parçası. */}
+              {currentUserId && currentUserId === project.ownerId && (
+                <button
+                  onClick={() => setSharing(true)}
+                  aria-label="Takip linki oluştur"
+                  title="Takip linki"
+                  style={{
+                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    border: "1px solid rgba(26,31,41,0.2)",
+                    background: "rgba(255,255,255,0.7)",
+                    boxShadow: "0 2px 8px rgba(26,31,41,0.12)",
+                  }}
+                >
+                  <IconExternalLink size={17} color={c.textSecondary} />
+                </button>
+              )}
               {currentUserId && currentUserId === project.ownerId && (
                 <button
                   onClick={() => setEditing(true)}
@@ -652,7 +673,7 @@ export default function ProjectDetail() {
               onTaskUpdated={updateTask}
             />
           )}
-          {activeTab === "files" && <FilesPanel ref={filesRef} projectId={id} />}
+          {activeTab === "files" && <FilesPanel projectId={id} />}
           {activeTab === "process" && (
             <ProcessPanel
               project={project}
@@ -678,6 +699,10 @@ export default function ProjectDetail() {
 
       {editing && project && (
         <EditProjectModal project={project} onClose={() => setEditing(false)} onSaved={reloadAll} />
+      )}
+
+      {sharing && project && id && (
+        <ShareProjectModal projectId={id} projectTitle={project.title} onClose={() => setSharing(false)} />
       )}
 
       {extendingDeadline && project && (

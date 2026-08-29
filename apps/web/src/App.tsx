@@ -6,6 +6,7 @@ import { api } from "./api/client";
 import OnboardingWizard from "./components/OnboardingWizard";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import PublicProject from "./pages/PublicProject";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -38,13 +39,12 @@ import AiLiveActivity from "./components/AiLiveActivity";
 import AiCreditsPage from "./pages/AiCredits";
 import { initPush } from "./push";
 import { useThemeColors } from "./theme/useThemeColors";
-import { ProjectFabContext } from "./lib/projectFab";
+import { ProjectFabProvider } from "./lib/projectFab";
 import { PageHeaderProvider, usePageHeaderState } from "./lib/pageHeader";
 import { UndoProvider } from "./lib/undo";
 import { TourProvider } from "./lib/tour/TourContext";
 import TourOverlay from "./components/tour/TourOverlay";
 import TourLauncher from "./components/tour/TourLauncher";
-import type { ProjectFabAction } from "./lib/projectFab";
 import { useIsDesktop } from "./lib/useIsDesktop";
 import { getSidebarDefaultOpen, useAppPrefs } from "./lib/appPrefs";
 import { refreshSession } from "./lib/session";
@@ -513,9 +513,12 @@ export default function App() {
     // politika URL'i zorunlu tutuyor; sözleşmeye de kayıt olmadan bakılabilmeli
     // (kabul ettiği metni okumak için hesap açmak zorunda kalmasın).
     location.pathname === "/privacy" ||
-    location.pathname === "/terms";
+    location.pathname === "/terms" ||
+    // Proje takip linki (bkz. pages/PublicProject.tsx). Buraya gelen kişinin
+    // hesabı YOK: uygulama kabuğu kurulmamalı, /login'e de atılmamalı. Diğerleri
+    // gibi tam eşleşme değil, çünkü adres token taşıyor.
+    location.pathname.startsWith("/takip/");
   const hasToken = !!localStorage.getItem("projelio_token");
-  const [fabAction, setFabAction] = useState<ProjectFabAction | null>(null);
   // Bilgisayarda (geniş ekran) sol sidebar + üstte tam genişlik header;
   // telefonda (dar ekran) sidebar kaybolur, alt menü (BottomNav) ve
   // sol üstte yüzen logo geri gelir. Pencere yeniden boyutlandırıldığında canlı güncellenir.
@@ -573,6 +576,7 @@ export default function App() {
         <Route path="/microsoft/return" element={<MicrosoftReturn />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/takip/:token" element={<PublicProject />} />
       </Routes>
     );
   }
@@ -714,7 +718,7 @@ export default function App() {
             lift={uploadCount > 0 ? UPLOAD_TRAY_HEIGHT + 8 : 0}
           />
         )}
-        <ProjectFabContext.Provider value={{ action: fabAction, setAction: setFabAction }}>
+        <ProjectFabProvider>
           <div
             style={{
               paddingTop: isCoverPage ? 0 : HEADER_HEIGHT,
@@ -750,7 +754,7 @@ export default function App() {
           {/* Mobilde tam alt menü, masaüstünde ise sadece ortadaki "+" butonu olarak
               render edilir — karar BottomNav içinde isDesktop'a göre veriliyor. */}
           <BottomNav sidebarOpen={isDesktop && sidebarOpen} />
-        </ProjectFabContext.Provider>
+        </ProjectFabProvider>
       </div>
     </div>
     </TourProvider>

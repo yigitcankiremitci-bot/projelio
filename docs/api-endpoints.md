@@ -16,10 +16,20 @@ Yanıt: `{ token: string }`
 
 ## Kullanıcılar (`/users`)
 
-| Method | Path | Açıklama |
-|---|---|---|
-| GET | `/users` | Tüm kullanıcıları listele |
-| GET | `/users/:id` | Tek kullanıcı detayı |
+| Method | Path | Açıklama | Body |
+|---|---|---|---|
+| GET | `/users` | Tüm kullanıcıları listele | — |
+| GET | `/users/:id` | Tek kullanıcı detayı | — |
+| PATCH | `/users/me/onboarding` | Kurulum sihirbazını tamamlar | `{ accountType, organizationName?, orgType?, groupName?, title?, bio?, phone?, sector?, teamSize?, useCases?, onboardingModules? }` |
+
+`accountType` dışındaki tüm alanlar opsiyoneldir (sihirbazın adımları atlanabiliyor).
+`sector`/`teamSize`/`useCases` için geçerli değerler `packages/shared/src/types.ts`
+içindeki `SECTORS`, `TEAM_SIZES`, `USE_CASES` listelerinde; geçersiz değer hata
+üretmez, sessizce düşürülür.
+
+`phone`, `sector`, `teamSize`, `useCases` ve `onboardingModules` **yalnızca**
+`GET /auth/me` ile kişinin kendisine döner — `/users/:id` ve `/users/search`
+yanıtlarında bilerek yer almaz.
 
 ## Projeler (`/projects`)
 
@@ -30,6 +40,40 @@ Yanıt: `{ token: string }`
 | POST | `/projects` | Yeni proje oluştur | `{ title, description?, totalBudget?, startDate?, deadline? }` |
 | PATCH | `/projects/:id` | Proje güncelle | Kısmi `Project` alanları |
 | DELETE | `/projects/:id` | Proje sil | — |
+
+## Proje Takip Linkleri (`/projects/:projectId/share-links`, `/project-share-links/:id`)
+
+Projeyi Projelio hesabı OLMAYAN kişilere gösteren salt okunur bağlantılar
+(bkz. migration 073, `modules/project-shares/`). Link oluşturma/kapatma yetkisi
+proje düzenleme yetkisiyle aynıdır: proje sahibi ya da bağlı olduğu işin sahibi.
+
+| Method | Path | Açıklama | Body |
+|---|---|---|---|
+| GET | `/projects/:projectId/share-links` | Projenin linklerini listele | — |
+| POST | `/projects/:projectId/share-links` | Yeni link üret | `{ label?, visibility, expiresInDays? }` |
+| PATCH | `/project-share-links/:id` | Görünürlük/etiket/süre değiştir (token AYNI kalır) | `{ label?, visibility?, expiresInDays? }` |
+| DELETE | `/project-share-links/:id` | Linki kapat (satır silinmez, `revoked_at` damgalanır) | — |
+
+`visibility`: `{ tasks, outputs, team, feed, files, budget }` — hepsi boolean ve
+**varsayılan `false`**. Gövdede açıkça `true` yazmayan bölüm kapalı sayılır
+(bkz. `normalizeShareVisibility`); özet (ad, durum, tarihler, ilerleme yüzdesi)
+her linkte vardır ve kapatılamaz.
+
+### Kimlik doğrulaması gerektirmeyen uç
+
+| Method | Path | Açıklama | Body |
+|---|---|---|---|
+| GET | `/public/projects/:token` | Linkin açtığı görünüm (`PublicProjectView`) | — |
+
+Uygulamadaki **tek** kimliksiz uç budur. `Authorization` header'ı beklemez,
+gönderilirse yok sayar. Token yok / link kapatılmış / süresi dolmuş / proje
+arşivlenmiş durumlarının hepsi ayrımsız **404** döner — farklı yanıtlar linkin
+bir zamanlar var olduğunu sızdırırdı. IP başına dakikada 60 istekle sınırlıdır
+(`ShareRateLimitGuard`).
+
+Yanıtta kapalı bölümler alan olarak **hiç bulunmaz** (boş dizi değil). E-posta,
+kullanıcı adı, ücret, kullanıcı kimlikleri ve dosya indirme bağlantıları hiçbir
+koşulda dönmez.
 
 ## Görevler (`/projects/:projectId/tasks`, `/tasks/:id`)
 
@@ -65,6 +109,29 @@ Yanıt: `{ token: string }`
 | Method | Path | Açıklama | Query |
 |---|---|---|---|
 | GET | `/calendar` | Filtrelenmiş görev listesi | `?projectId=<id>&scope=mine\|team` |
+
+## AI Kredileri (`/ai`)
+
+| Method | Path | Açıklama | Body |
+|---|---|---|---|
+| GET | `/ai/credits` | Kendi bakiyen | — |
+| GET | `/ai/credits/transactions` | Kendi kredi hareketlerin | — |
+| GET | `/ai/credit-packages` | Satılan paketler + `paymentConfigured` | — |
+| GET | `/ai/credit-orders` | Kendi kredi siparişlerin | — |
+| POST | `/ai/credit-orders` | Sipariş açar (**kredi YÜKLEMEZ**) | `{ packageKey }` |
+| POST | `/ai/credit-orders/:id/cancel` | Kendi bekleyen siparişini iptal eder | — |
+| GET | `/ai/admin/credit-orders` | Tüm siparişler (`?status=`) | — |
+| POST | `/ai/admin/credit-orders/:id/mark-paid` | Ödemeyi onaylar → krediyi yükler | `{ reference?, note? }` |
+| POST | `/ai/admin/credit-orders/:id/retry-credit` | "Ödendi ama yüklenmedi" durumunu yeniden dener | — |
+
+Sipariş fiyatı ve kredi miktarı **istemciden alınmaz**; yalnızca `packageKey`
+gönderilir ve değerler sunucudaki katalogdan (`ai-credits.config.ts`
+`CREDIT_PACKAGES`) yazılır.
+
+**Ödeme sağlayıcısı henüz bağlı değil** (bkz. `ai-payment.provider.ts`). Sipariş
+`pending_payment` doğar; krediyi bakiyeye geçiren tek yol `mark-paid`'dir ve o da
+admin'e kapalıdır. Sipariş kaydının varlığı ödeme sayılmaz — tek geçerli kanıt
+`status = paid` **ve** `creditedAt` dolu olmasıdır.
 
 ## Admin (`/admin`) — sadece `role: admin`
 

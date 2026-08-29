@@ -6,6 +6,7 @@ import { AccessModule } from "./common/access/access.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
+import { ProjectSharesModule } from "./modules/project-shares/project-shares.module";
 import { OperationsModule } from "./modules/operations/operations.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
@@ -56,6 +57,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     AuthModule,
     UsersModule,
     ProjectsModule,
+    ProjectSharesModule,
     OperationsModule,
     JobsModule,
     OrganizationsModule,

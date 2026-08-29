@@ -1,7 +1,7 @@
 /**
  * Gizlilik politikasının tam metni — Türkçe ve İngilizce.
  *
- * Aynı metin tanıtım sitesinde de yayımlanıyor (../projelio-site,
+ * Aynı metin tanıtım sitesinde de yayımlanıyor (landing/,
  * src/i18n/legal.ts). Birini değiştirirsen diğerini de güncelle; iki yerde
  * farklı yasal metin yayımlamak hukuki risktir.
  *

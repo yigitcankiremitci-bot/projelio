@@ -20,3 +20,11 @@ _to_delete/
 
 # FUSE tabanli baglama noktalarinda acik dosya tutamaklari icin uretilen artiklar
 .fuse_hidden*
+
+# Next.js tanıtım sitesi (landing/). landing/.gitignore de aynı kuralları
+# taşıyor; buradakiler yedek: o dosya silinir ya da kök dizinden bir derleme
+# çalıştırılırsa 450 MB'lık çıktı sessizce repoya girer.
+.next/
+out/
+.vercel/
+*.tsbuildinfo

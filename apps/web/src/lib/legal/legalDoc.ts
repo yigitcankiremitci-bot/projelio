@@ -5,7 +5,7 @@
  * tarafından çiziliyor; buradaki tipler ikisinin de uyduğu kalıp. Yeni bir
  * yasal metin eklemek = yeni bir `LegalDoc` yazıp `index.ts`e kaydetmek.
  *
- * Metinler tanıtım sitesinde de yayımlanıyor (../projelio-site,
+ * Metinler tanıtım sitesinde de yayımlanıyor (landing/,
  * src/i18n/legal.ts) ve orada da aynı `{ h, p[] }` yapısı kullanılıyor —
  * birini değiştiren diğerini de güncellemeli.
  */

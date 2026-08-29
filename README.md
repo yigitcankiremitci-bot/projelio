@@ -15,6 +15,7 @@ projelio/
 ├── backend/        NestJS REST API + WebSocket (Socket.io)
 ├── database/
 │   └── migrations/ PostgreSQL şema migration'ları (Supabase'e uygulanmış hâli)
+├── landing/        Next.js tanıtım sitesi (projelio.app) — ayrı derlenir
 ├── packages/
 │   └── shared/     Web + mobil + backend arasında paylaşılan TS tipleri
 └── docs/

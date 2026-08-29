@@ -20,6 +20,7 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | Web+mobil+backend ortak tipler | `packages/shared/src/types.ts` |
 | SQL migration'lar | `database/migrations/NNN_ad.sql` |
 | API referansı | `docs/api-endpoints.md` |
+| Tanıtım sitesi (Next.js) | `landing/` |
 
 Backend'de 42 modül var (`backend/src/modules/` altında listelenir). Lio =
 `modules/ai-assistant/`; araç tanımları `ai-assistant.tools.ts`, kredi sistemi
@@ -27,8 +28,12 @@ Backend'de 42 modül var (`backend/src/modules/` altında listelenir). Lio =
 
 `apps/mobile` (Expo) neredeyse boş — asıl istemci `apps/web`.
 
-Kardeş klasörler ayrı projelerdir, bu repoya dahil değil: `../projelio-site`
-(Next.js tanıtım sitesi), `../projelio-whatsapp`.
+`landing/` = Next.js tanıtım sitesi (projelio.app). Bu repoda ama npm
+workspace'i DEĞİL: kendi `package.json` ve `package-lock.json`'ı var, kök
+`npm install` ona dokunmaz. Vercel'de ayrı bir proje olarak, Root Directory
+`landing` verilerek yayımlanır.
+
+Kardeş klasör `../projelio-whatsapp` ayrı bir projedir, bu repoya dahil değil.
 
 ## Komutlar
 

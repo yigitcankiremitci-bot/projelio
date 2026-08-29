@@ -9,7 +9,7 @@
  * ŞİFRE DEĞİŞİRSE üç yeri birlikte güncelle:
  *   1. Veritabanındaki users.password_hash (bcrypt, 12 tur — bkz. password.util.ts)
  *   2. Burası
- *   3. ../../../projelio-site/src/lib/site.ts içindeki `site.demo`
+ *   3. landing/src/lib/site.ts (depo kokunden) içindeki `site.demo`
  */
 export const demoHesap = {
   email: "ceo@celikhan.test",

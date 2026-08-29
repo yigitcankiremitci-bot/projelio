@@ -276,7 +276,11 @@ export default function SocialPostComposer({
       title={post ? "İçeriği düzenle" : "Yeni içerik"}
       subtitle="Metin, görsel ve yayın planı. Kanal seçtikçe karakter sınırı ona göre uyarır."
       onClose={onClose}
-      maxWidth={720}
+      // 720 dardı: kanal rozetleri, etiket + bağlantı satırı ve kanala özel
+      // metin kutuları alt alta kırılıyordu. Masaüstünde daha geniş bir kutu
+      // hepsini yan yana tutuyor; dar ekranda zaten tam ekrana geçiyor
+      // (mobileFullScreen), yani bu sayı yalnızca webi etkiler.
+      maxWidth={960}
       mobileFullScreen
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -378,7 +382,10 @@ export default function SocialPostComposer({
             value={form.caption}
             onChange={(e) => set("caption", e.target.value)}
             placeholder="Yayımlanacak metin…"
-            rows={6}
+            // Asıl yazılan alan burası: 6 satırda uzun bir gönderi metni
+            // kutuya sığmıyor, kullanıcı kendi yazdığını görmek için kutunun
+            // içinde kaydırmak zorunda kalıyordu.
+            rows={10}
             style={{ ...field, resize: "vertical", lineHeight: 1.5, borderColor: overLimit ? c.danger : undefined }}
           />
         </div>

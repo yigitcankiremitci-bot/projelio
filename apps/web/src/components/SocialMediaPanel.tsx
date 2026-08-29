@@ -3,6 +3,7 @@ import type { DepartmentMember, JobMember, SocialAccount, SocialPost } from "@pr
 import { safeExternalUrl } from "@projelio/shared";
 import { api } from "../api/client";
 import { socialMediaApi, type SocialScope } from "../api/socialMedia";
+import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import {
   ACTIVE_STATUSES,
   CONNECTION_STATUS,
@@ -21,6 +22,7 @@ import {
   postDay,
   postTime,
 } from "../lib/socialMedia";
+import { parseServerDate } from "../lib/dates";
 import { useThemeColors } from "../theme/useThemeColors";
 import SocialAccountModal from "./SocialAccountModal";
 import SocialPostComposer from "./SocialPostComposer";
@@ -73,6 +75,23 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   const scope: SocialScope = useMemo(
     () => (jobId ? { jobId } : { organizationId: organizationId as string, departmentId }),
     [jobId, organizationId, departmentId]
+  );
+
+  // İki ekleme eylemi de sayfanın "+" düğmesinde toplanıyor: başlıkta iki ayrı
+  // düğme dururken kullanıcı hangisinin "asıl" ekleme olduğunu ayırt edemiyordu.
+  const fabAvailable = useFabAvailable();
+  useProjectFabAction(
+    canWrite && fabAvailable
+      ? {
+          label: "Ekle",
+          options: [
+            { label: "İçerik ekle", onClick: () => setComposer({}) },
+            { label: "Hesap ekle", onClick: () => setAccountModal({}) },
+          ],
+        }
+      : null,
+    [canWrite, fabAvailable, scope],
+    FAB_PRIORITY.panel
   );
 
   const load = () => {
@@ -166,7 +185,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     const year = cursor.getFullYear();
     const inMonth = posts.filter((p) => {
       if (!p.scheduledAt) return false;
-      const d = new Date(p.scheduledAt);
+      const d = parseServerDate(p.scheduledAt);
       return d.getMonth() === month && d.getFullYear() === year;
     });
     const published = inMonth.filter((p) => p.status === "published").length;
@@ -283,7 +302,10 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   const moveTo = async (postId: string, day: string) => {
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
-    const previous = post.scheduledAt ? new Date(post.scheduledAt) : null;
+    // Sunucudan gelen damga dilimsiz geliyor: düz new Date saati 3 saat geriye
+    // kaydırır ve kart başka güne sürüklenince o yanlış saat kaydedilirdi
+    // (bkz. lib/socialMedia.ts'teki tarih notu).
+    const previous = post.scheduledAt ? parseServerDate(post.scheduledAt) : null;
     const next = new Date(`${day}T${previous ? String(previous.getHours()).padStart(2, "0") : "10"}:${previous ? String(previous.getMinutes()).padStart(2, "0") : "00"}`);
     const iso = next.toISOString();
     if (post.scheduledAt === iso) return;
@@ -799,23 +821,26 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Sosyal Medya</h5>
-        {canWrite ? (
-          <div style={{ display: "flex", gap: 12 }}>
-            <button
-              onClick={() => setAccountModal({})}
-              style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
-            >
-              + Hesap ekle
-            </button>
-            <button
-              onClick={() => setComposer({})}
-              style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
-            >
-              + İçerik ekle
-            </button>
-          </div>
-        ) : (
+        {!canWrite ? (
           <span style={{ fontSize: 12, color: c.textSecondary }}>Salt görüntüleme</span>
+        ) : (
+          // Satır içi düğmeler yalnızca "+"ın ulaşılamadığı yerde (modal içi).
+          !fabAvailable && (
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                onClick={() => setAccountModal({})}
+                style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+              >
+                + Hesap ekle
+              </button>
+              <button
+                onClick={() => setComposer({})}
+                style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+              >
+                + İçerik ekle
+              </button>
+            </div>
+          )
         )}
       </div>
 
@@ -926,23 +951,28 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
             Her hesabın kitlesi, tonu ve yayın ritmi kayıtlı olur; içerik yazarken karakter sınırı ve kanal
             listesi buradan gelir. Sonra takvime içerik ekleyip görsellerini yükleyebilirsiniz.
           </span>
-          {canWrite && (
-            <button
-              onClick={() => setAccountModal({})}
-              style={{
-                alignSelf: "flex-start",
-                fontSize: 13,
-                padding: "6px 14px",
-                background: c.primary,
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                cursor: "pointer",
-              }}
-            >
-              Hesap ekle
-            </button>
-          )}
+          {canWrite &&
+            (fabAvailable ? (
+              <span style={{ fontSize: 13, color: c.textSecondary }}>
+                Hesap eklemek için sayfadaki "+" düğmesini kullan.
+              </span>
+            ) : (
+              <button
+                onClick={() => setAccountModal({})}
+                style={{
+                  alignSelf: "flex-start",
+                  fontSize: 13,
+                  padding: "6px 14px",
+                  background: c.primary,
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                }}
+              >
+                Hesap ekle
+              </button>
+            ))}
         </div>
       ) : view === "calendar" ? (
         calendar()

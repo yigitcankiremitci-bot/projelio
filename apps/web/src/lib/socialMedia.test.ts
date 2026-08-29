@@ -125,6 +125,21 @@ describe("takvim hesapları", () => {
     assert.equal(fromDateTimeLocal(""), null);
   });
 
+  test("sunucunun DİLİMSİZ damgası UTC okunur — seçilen saat 3 saat geriye kaymaz", () => {
+    // AYIKLANAN HATA: kullanıcı 12:00 seçiyor, kart ve düzenleme kutusu 09:00
+    // gösteriyordu. `scheduled_at` kolonu "timestamp without time zone" (UTC
+    // tutuyor) ve Supabase saat dilimi eki olmadan geri veriyor; düz new Date
+    // bunu yerel saat sanıyordu.
+    const secilen = "2026-08-12T12:00";
+    const kaydedilen = fromDateTimeLocal(secilen);
+    assert.ok(kaydedilen);
+    // Sunucunun geri verdiği biçim: aynı an, ama "Z" yok.
+    const sunucudanGelen = kaydedilen.replace(/\.\d{3}Z$/, "");
+    assert.equal(toDateTimeLocal(sunucudanGelen), secilen);
+    assert.equal(postTime(post({ scheduledAt: sunucudanGelen })), "12:00");
+    assert.equal(postDay(post({ scheduledAt: sunucudanGelen })), "2026-08-12");
+  });
+
   test("ay ızgarası pazartesi başlar ve 42 hücredir", () => {
     // Ağustos 2026'nın 1'i cumartesi; ızgara 27 Temmuz pazartesiyle başlamalı.
     const grid = monthGrid(2026, 7);

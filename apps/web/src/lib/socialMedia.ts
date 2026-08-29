@@ -7,6 +7,7 @@ import type {
   SocialPostStatus,
   SocialTargetStatus,
 } from "@projelio/shared";
+import { parseServerDate } from "./dates";
 
 /**
  * Sosyal Medya modülünün sözlüğü ve küçük hesapları.
@@ -209,6 +210,15 @@ export function hashtagCount(hashtags?: string): number {
 }
 
 // ============================================================ Tarih yardımcıları
+//
+// AYIKLANAN HATA — kullanıcı saati 12:00 yapıyor, kart 09:00 gösteriyordu.
+// `scheduled_at` Postgres'te "timestamp without time zone" (bkz. migration 054)
+// ve içinde UTC duruyor; Supabase bunu saat dilimi EKİ OLMADAN geri veriyor
+// ("2026-08-30T09:00:00"). Düz `new Date(...)` bu metni YEREL saat sanıyor,
+// dolayısıyla Türkiye'de her saat 3 saat geriye kayıyordu. Sunucudan gelen her
+// zaman damgası bu yüzden parseServerDate ile okunur (bkz. lib/dates.ts) —
+// kullanıcının GİRDİĞİ değerler (datetime-local, takvim ızgarası) yereldir,
+// onlar düz new Date ile parse edilmeye devam eder.
 
 /** Yerel takvim günü (YYYY-MM-DD). toISOString UTC'ye kaydırır, kullanılmaz. */
 export function localDay(date: Date): string {
@@ -218,13 +228,13 @@ export function localDay(date: Date): string {
 /** Gönderinin düştüğü takvim günü. Tarihi olmayanlar "planlanmamış" kutusunda. */
 export function postDay(post: SocialPost): string | undefined {
   if (!post.scheduledAt) return undefined;
-  return localDay(new Date(post.scheduledAt));
+  return localDay(parseServerDate(post.scheduledAt));
 }
 
 /** "14:30" — takvim kartında saat, gün zaten belli. */
 export function postTime(post: SocialPost): string | undefined {
   if (!post.scheduledAt) return undefined;
-  const d = new Date(post.scheduledAt);
+  const d = parseServerDate(post.scheduledAt);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
@@ -236,7 +246,7 @@ export function postTime(post: SocialPost): string | undefined {
  */
 export function toDateTimeLocal(iso?: string): string {
   if (!iso) return "";
-  const d = new Date(iso);
+  const d = parseServerDate(iso);
   return `${localDay(d)}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 

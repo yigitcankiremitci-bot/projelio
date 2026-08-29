@@ -1,4 +1,4 @@
-import { opts } from "../moduleConfigs/shared";
+import { opts } from "../moduleConfigs";
 import type { ModuleFormConfig } from "./types";
 
 // ============================================================ Kimlik ve Yön

@@ -1,4 +1,4 @@
-import type { ModuleFieldConfig } from "../moduleConfigs/shared";
+import type { ModuleFieldConfig } from "../moduleConfigs";
 
 /**
  * A1 — Form / Doküman arketipi.

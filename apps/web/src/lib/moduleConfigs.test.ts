@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { ENTITY_MODULE_KEYS, isEntityModule } from "../entityModules";
-import { MODULE_RECORD_CONFIGS, getModuleRecordConfig } from "./index";
-import type { ModuleFieldConfig, ModuleRecordConfig } from "./shared";
+import { ENTITY_MODULE_KEYS, isEntityModule } from "./entityModules";
+import { MODULE_RECORD_CONFIGS, getModuleRecordConfig } from "./moduleConfigs";
+import type { ModuleFieldConfig, ModuleRecordConfig } from "./moduleConfigs";
 
 // 40 modül tanımının tamamı aynı sözleşmeye uymalı: alanlar tutarlı, özet ve
 // gösterge fonksiyonları hiçbir veri kombinasyonunda patlamamalı.

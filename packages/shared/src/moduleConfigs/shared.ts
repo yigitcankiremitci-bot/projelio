@@ -1,4 +1,4 @@
-import type { ModuleRecord } from "@projelio/shared";
+import type { ModuleRecord } from "../types";
 
 // Modül alan tanımlarının ortak tipleri ve yardımcıları.
 //

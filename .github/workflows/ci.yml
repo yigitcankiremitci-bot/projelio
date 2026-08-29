@@ -26,9 +26,15 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: Landing bağımlılıklarını ve buildini doğrula
+        working-directory: landing
+        run: |
+          npm ci
+          npm run build
       - name: Docker imajlarını doğrula
         run: |
           docker build -f Dockerfile.backend -t projelio-backend:ci .
           docker build -f Dockerfile.web \
             --build-arg VITE_API_URL=http://api.193.111.77.252.sslip.io \
             -t projelio-web:ci .
+          docker build -f Dockerfile.landing -t projelio-landing:ci .

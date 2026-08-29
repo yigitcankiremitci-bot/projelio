@@ -56,14 +56,17 @@ sync_source() {
 
 deploy_and_check() {
   docker compose -f "$COMPOSE" config --quiet
-  docker compose -f "$COMPOSE" build backend caddy
+  docker compose -f "$COMPOSE" build backend caddy landing
   docker compose -f "$COMPOSE" up -d --remove-orphans
   docker compose -f "$COMPOSE" ps --status running --services | grep -qx backend
+  docker compose -f "$COMPOSE" ps --status running --services | grep -qx landing
   curl --fail --silent --show-error --retry 12 --retry-delay 5 \
     --retry-connrefused http://127.0.0.1/ >/dev/null
   curl --fail --silent --show-error --retry 12 --retry-delay 5 \
     --retry-connrefused -H 'Host: api.193.111.77.252.sslip.io' \
     http://127.0.0.1/health >/dev/null
+  curl --fail --silent --show-error --retry 12 --retry-delay 5 \
+    --retry-connrefused http://127.0.0.1:3001/ >/dev/null
 }
 
 sync_source

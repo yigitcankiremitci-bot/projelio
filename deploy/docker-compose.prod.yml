@@ -1,5 +1,5 @@
 # Projelio production stack.
-# Postgres, Supabase Storage, PostgREST, backend ve web/Caddy yığını.
+# Postgres, Supabase Storage, PostgREST, backend, web/Caddy ve landing yığını.
 
 name: projelio
 
@@ -262,6 +262,34 @@ services:
       backend:
         condition: service_healthy
     ports: ["80:80"]
+    networks: [projelio]
+
+  landing:
+    build:
+      context: ..
+      dockerfile: Dockerfile.landing
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://193.111.77.252:3001}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://193.111.77.252}
+        NEXT_PUBLIC_WHATSAPP: ${NEXT_PUBLIC_WHATSAPP:-}
+    image: projelio-landing:local
+    container_name: projelio-landing
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOSTNAME: 0.0.0.0
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      CONTACT_TO: ${CONTACT_TO:-info@projelio.app}
+      CONTACT_FROM: ${CONTACT_FROM:-Projelio <onboarding@resend.dev>}
+    ports: ["3001:3001"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks: [projelio]
 
 networks:

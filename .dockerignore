@@ -1,0 +1,10 @@
+.git
+.github
+**/node_modules
+**/.next
+data
+logs
+deploy/.env
+deploy/.env.prod
+deploy/canli-*
+*.log

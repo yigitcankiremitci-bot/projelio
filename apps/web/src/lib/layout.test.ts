@@ -1,6 +1,15 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { DRAWER_MAX_WIDTH, DRAWER_MIN_SCRIM, TOP_CHROME, TOP_CHROME_BOTTOM, Z } from "./layout";
+import {
+  AI_PANEL_WIDTH,
+  DRAWER_MAX_WIDTH,
+  DRAWER_MIN_SCRIM,
+  LIO_LAUNCHER,
+  lioActivityAnchor,
+  TOP_CHROME,
+  TOP_CHROME_BOTTOM,
+  Z,
+} from "./layout";
 
 // Bu testler görünüşü değil KATMAN SIRASINI sabitler. Sıra bozulduğunda ortaya
 // çıkan hata her ekranda görünmüyor: telefonda çekmece açıkken bildirim çanının
@@ -56,5 +65,35 @@ describe("dar ekran ölçüleri", () => {
     // Kapak bileşenleri bu değere göre yer bırakıyor; elle yazılmış bir 62
     // kalırsa düğme büyüdüğünde yalnızca bazı sayfalar düzelir.
     assert.ok(TOP_CHROME_BOTTOM > TOP_CHROME.top + TOP_CHROME.size);
+  });
+});
+
+describe("Lio bildirim şeridinin yeri", () => {
+  test("balon görünürken şerit onun üstünde durur, içine girmez", () => {
+    for (const isDesktop of [true, false]) {
+      const anchor = lioActivityAnchor({ isDesktop, panelOpen: false, launcherVisible: true });
+      const bottom = isDesktop ? LIO_LAUNCHER.bottomDesktop : LIO_LAUNCHER.bottomMobile;
+      const size = isDesktop ? LIO_LAUNCHER.sizeDesktop : LIO_LAUNCHER.sizeMobile;
+      assert.ok(
+        (anchor.bottom ?? 0) >= bottom + size,
+        `şerit balonun üstünde başlamalı (isDesktop: ${isDesktop})`
+      );
+    }
+  });
+
+  test("Lio gizliyken şerit boşluğa asılı kalmaz", () => {
+    const gizli = lioActivityAnchor({ isDesktop: true, panelOpen: false, launcherVisible: false });
+    assert.equal(gizli.bottom, LIO_LAUNCHER.bottomDesktop);
+  });
+
+  test("panel açıkken masaüstünde panelin soluna geçer", () => {
+    const anchor = lioActivityAnchor({ isDesktop: true, panelOpen: true, launcherVisible: true });
+    assert.ok(anchor.right >= AI_PANEL_WIDTH, "şerit panelin altında kalmamalı");
+  });
+
+  test("panel açıkken telefonda üste çıkar — altta yazı kutusu var", () => {
+    const anchor = lioActivityAnchor({ isDesktop: false, panelOpen: true, launcherVisible: true });
+    assert.equal(anchor.bottom, undefined);
+    assert.ok((anchor.top ?? 0) > 0);
   });
 });

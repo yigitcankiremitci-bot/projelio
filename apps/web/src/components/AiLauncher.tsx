@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Z } from "../lib/layout";
+import { LIO_LAUNCHER, Z } from "../lib/layout";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { onAskLio } from "../lib/askLio";
+import { setLioPanelOpen } from "../lib/lioPanel";
 import type { AskLioRequest } from "../lib/askLio";
 import { tourAnchor } from "../lib/tour/types";
 import AiAssistantPanel from "./AiAssistantPanel";
 
-// Lio'nun düğme boyutu. Dar ekranda hem ekranın çok büyük bir kısmını kaplıyor
-// hem de alt menüye ve içeriğe fazla yaklaşıyordu; masaüstünde olduğu gibi kalıyor.
-const BASE_SIZE_DESKTOP = 132;
-const BASE_SIZE_MOBILE = 88;
+// Lio'nun düğme boyutu ve ekrandaki yeri artık layout.ts'te (bkz. LIO_LAUNCHER):
+// bildirim şeridi balonun ÜSTÜNE konumlanmak için aynı ölçüleri okuyor.
 const HOVER_SCALE = 1.28;
 const EYES_CLOSED_DURATION = 300;
 const IDLE_BLINK_RANGE: [number, number] = [10000, 12000];
@@ -51,6 +50,13 @@ export default function AiLauncher() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
+  // Panelin açık olduğunu uygulamanın geri kalanına duyur: Lio'nun iş bildirimi
+  // şeridi yerini buna göre seçiyor (bkz. lib/lioPanel.ts, AiLiveActivity).
+  useEffect(() => {
+    setLioPanelOpen(open);
+    return () => setLioPanelOpen(false);
+  }, [open]);
+
   useEffect(
     () =>
       onAskLio((request) => {
@@ -86,8 +92,8 @@ export default function AiLauncher() {
   }, []);
 
   // Mobilde alt menünün üstünde kalsın; masaüstünde ekranın sağ altına otursun.
-  const bottom = isDesktop ? 22 : 96;
-  const size = isDesktop ? BASE_SIZE_DESKTOP : BASE_SIZE_MOBILE;
+  const bottom = isDesktop ? LIO_LAUNCHER.bottomDesktop : LIO_LAUNCHER.bottomMobile;
+  const size = isDesktop ? LIO_LAUNCHER.sizeDesktop : LIO_LAUNCHER.sizeMobile;
 
   return (
     <>
@@ -101,7 +107,7 @@ export default function AiLauncher() {
           title="Lio (⌘K)"
           style={{
             position: "fixed",
-            right: 18,
+            right: LIO_LAUNCHER.right,
             bottom,
             width: size,
             height: size,

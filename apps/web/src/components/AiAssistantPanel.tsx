@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Z } from "../lib/layout";
+import { AI_PANEL_WIDTH, Z } from "../lib/layout";
 import { useNavigate } from "react-router-dom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { parseMessageLinks } from "../lib/messageLinks";
@@ -902,7 +902,9 @@ export default function AiAssistantPanel({
     [credits]
   );
 
-  const panelWidth = isDesktop ? 460 : undefined;
+  // Genişlik layout.ts'ten: Lio'nun bildirim şeridi panel açıkken bu değerin
+  // soluna konumlanıyor (bkz. lioActivityAnchor).
+  const panelWidth = isDesktop ? AI_PANEL_WIDTH : undefined;
 
   /**
    * Yazma kutusunun içine oturan yuvarlak düğmeler.

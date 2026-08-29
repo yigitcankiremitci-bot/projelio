@@ -112,6 +112,67 @@ export const TOP_CHROME = {
 export const TOP_CHROME_BOTTOM = TOP_CHROME.top + TOP_CHROME.size + 4;
 
 /**
+ * Sağ alttaki Lio balonunun ölçüleri ve ekran kenarlarına uzaklığı.
+ *
+ * Balonun kendi dosyasında (AiLauncher) durduğu sürece, onun ÜSTÜNE konması
+ * gereken şeyler (Lio'nun iş bildirimi şeridi) sayıyı elle kopyalamak zorunda
+ * kalıyordu; balon büyüdüğünde şerit balonun içine giriyordu. Ölçü artık burada.
+ */
+export const LIO_LAUNCHER = {
+  /** Ekranın sağ kenarına uzaklık. */
+  right: 18,
+  /** Masaüstünde ekranın dibine oturur; telefonda alt menünün üstünde durur. */
+  bottomDesktop: 22,
+  bottomMobile: 96,
+  /** Dar ekranda balon küçülüyor: 132 px telefonun genişliğinin üçte birini yiyordu. */
+  sizeDesktop: 132,
+  sizeMobile: 88,
+} as const;
+
+/** Lio sohbet panelinin masaüstü genişliği (telefonda tüm ekranı kaplar). */
+export const AI_PANEL_WIDTH = 460;
+
+/** Panelin renkli başlık şeridinin yüksekliği: 16 (dolgu) + 36 (avatar) + 16. */
+export const AI_PANEL_HEADER_HEIGHT = 68;
+
+/** Şerit ile balon arasındaki boşluk. */
+const LIO_ACTIVITY_GAP = 10;
+
+/**
+ * Lio'nun "şunu yaptım" şeridinin (bkz. AiLiveActivity) ekrandaki yeri.
+ *
+ * NEDEN BURADA: şerit önce üst ortada duruyordu; sayfa başlığının, bildirim
+ * çanının ve kaydırma şeridinin bulunduğu banda giriyor, üstelik Lio'nun kendi
+ * işini haber verdiği hâlde Lio'dan uzakta beliriyordu. Artık haberin kaynağının
+ * yanında — balonun hemen üstünde — çıkıyor.
+ *
+ * Panel açıkken balon zaten gizleniyor (bkz. AiLauncher): şerit masaüstünde
+ * panelin soluna geçer, telefonda ise panel tüm ekranı kapladığı için başlığın
+ * hemen altına oturur (altta yazı kutusu var, orası kapatılmamalı).
+ */
+export function lioActivityAnchor(opts: {
+  isDesktop: boolean;
+  panelOpen: boolean;
+  /** Lio Ayarlar > Yardımcılar'dan gizlenmişse üstünde durulacak bir balon yok. */
+  launcherVisible: boolean;
+}): { right: number; top?: number; bottom?: number } {
+  const { isDesktop, panelOpen, launcherVisible } = opts;
+
+  if (panelOpen) {
+    return isDesktop
+      ? { right: AI_PANEL_WIDTH + LIO_LAUNCHER.right, bottom: LIO_LAUNCHER.bottomDesktop }
+      : { right: LIO_LAUNCHER.right, top: AI_PANEL_HEADER_HEIGHT + 8 };
+  }
+
+  const bottom = isDesktop ? LIO_LAUNCHER.bottomDesktop : LIO_LAUNCHER.bottomMobile;
+  const size = isDesktop ? LIO_LAUNCHER.sizeDesktop : LIO_LAUNCHER.sizeMobile;
+  return {
+    right: LIO_LAUNCHER.right,
+    bottom: launcherVisible ? bottom + size + LIO_ACTIVITY_GAP : bottom,
+  };
+}
+
+/**
  * Telefondaki çekmecenin genişliği.
  *
  * İki sınır birlikte: sabit bir üst sınır (geniş telefonda gereksiz yayılmasın)

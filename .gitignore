@@ -3,13 +3,23 @@ dist/
 build/
 .env
 .env.local
+# Sır içeren tüm .env türevleri (.env.dump gibi) — örnek dosyalar hariç
+.env.*
+!.env.*.example
 *.log
 .expo/
 .DS_Store
 coverage/
+deploy/__pycache__/
+*.pyc
 
 # Yedek ve otomatik üretilen geçici dosyalar
 *.bak
+# Canlı veritabanından üretilen geçici şema çıktıları
+deploy/canli-sema*.sql
+deploy/canli-*.dump
+deploy/canli-*.sql.gz
+deploy/canli-cron.*
 # Veritabanı yedekleri — ASLA commit edilmemeli (şifre hash'leri, Drive jetonları)
 yedek/
 *.sql.gz

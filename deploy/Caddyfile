@@ -1,0 +1,48 @@
+{
+	auto_https off
+}
+
+# Geçici IP/HTTP provası. Kalıcı alan adı gelince gerçek alan adları ve TLS kullanılacak.
+193.111.77.252:80 {
+	root * /srv/web
+	encode zstd gzip
+	try_files {path} /index.html
+	file_server
+	header {
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)"
+		-Strict-Transport-Security
+	}
+}
+
+# SPA ve API rotaları çakıştığı için geçici API adresini ücretsiz DNS adı ayırır.
+http://api.193.111.77.252.sslip.io {
+	encode zstd gzip
+	handle_path /rest/v1/* {
+		reverse_proxy postgrest:3000
+	}
+	handle_path /storage/v1/* {
+		reverse_proxy storage:5000
+	}
+	handle {
+		reverse_proxy backend:3000
+	}
+	header {
+		-Strict-Transport-Security
+	}
+}
+
+# Backend supabase-js istemcisi de aynı URL düzenini Docker ağı içinden kullanır.
+http://caddy {
+	handle_path /rest/v1/* {
+		reverse_proxy postgrest:3000
+	}
+	handle_path /storage/v1/* {
+		reverse_proxy storage:5000
+	}
+	handle {
+		reverse_proxy backend:3000
+	}
+}

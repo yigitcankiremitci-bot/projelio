@@ -1,0 +1,270 @@
+# Projelio production stack.
+# Postgres, Supabase Storage, PostgREST, backend ve web/Caddy yığını.
+
+name: projelio
+
+services:
+  postgres:
+    # Canlı Supabase PostgreSQL 17.6 çalıştırıyor. Aynı ana sürüm dump/restore
+    # davranışını ve extension ABI'larını korur; PG15 veri diziniyle kullanma.
+    # supabase/postgres already compiles in pg_cron and pgcrypto and preloads
+    # pg_cron in its shipped postgresql.conf. shared_preload_libraries only
+    # takes effect at server start, so having it baked into the image is the
+    # whole reason for choosing this over plain postgres:16.
+    image: supabase/postgres:17.6.1.166
+    container_name: projelio-postgres
+    restart: unless-stopped
+    shm_size: 512mb
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      # PG17 image initdb'yi supabase_admin ile başlatıp sonra postgres rolünü
+      # kendi migration'ında oluşturur. POSTGRES_USER=postgres vermek bu sırayı
+      # kırar ve migration daha başlamadan "role supabase_admin does not exist"
+      # hatası üretir.
+      POSTGRES_USER: supabase_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Tuning is passed as -c flags rather than by replacing postgresql.conf:
+    # the image own config include-chains wal-g.conf, read-replica.conf and
+    # supautils.conf, and swapping the file out breaks that chain. Command-line
+    # settings are read last, so these win. The documented rationale for each
+    # value lives in postgres.conf next to this file.
+    # shared_preload_libraries is deliberately NOT overridden - the image
+    # already preloads pg_cron plus the rest of the Supabase extension set.
+    command:
+      - postgres
+      # Point at the image own config explicitly. Without this the entrypoint
+      # writes a stock postgresql.conf into the data directory and the image
+      # pg_cron preload line is silently lost - CREATE EXTENSION pg_cron then
+      # fails with "can only be loaded via shared_preload_libraries".
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - max_connections=200
+      - -c
+      - superuser_reserved_connections=5
+      - -c
+      - shared_buffers=2GB
+      - -c
+      - effective_cache_size=4GB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=512MB
+      - -c
+      - temp_buffers=16MB
+      - -c
+      - max_wal_size=2GB
+      - -c
+      - min_wal_size=256MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - wal_compression=on
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - default_statistics_target=100
+      - -c
+      - max_parallel_workers=4
+      - -c
+      - max_parallel_workers_per_gather=2
+      - -c
+      - max_parallel_maintenance_workers=2
+      - -c
+      - autovacuum=on
+      - -c
+      - autovacuum_max_workers=3
+      - -c
+      - autovacuum_naptime=30s
+      - -c
+      - log_min_duration_statement=1000
+      - -c
+      - log_checkpoints=on
+      - -c
+      - log_connections=off
+      - -c
+      - log_disconnections=off
+      - -c
+      - cron.database_name=postgres
+      - -c
+      - timezone=Europe/Istanbul
+      - -c
+      - log_timezone=Europe/Istanbul
+    volumes:
+      - /srv/projelio/data/postgres:/var/lib/postgresql/data
+      # Reference copy of the tuning rationale; not read by the server.
+      - /srv/projelio/deploy/postgres.conf:/etc/postgresql-custom/projelio-overrides.conf:ro
+    # Loopback only. Postgres is never reachable from the internet; sibling
+    # services will connect over the internal network using the host "postgres".
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - projelio
+
+  storage:
+    # Pinned, not :latest. The image carries the storage schema migrations, so
+    # bumping the tag silently migrates the database on the next boot.
+    # v1.28.4 ships tenant migration 0013-add-bucket-custom-limits (adds
+    # max_file_size_kb + allowed_mime_types) and 0014-use-bytes-for-max-size
+    # (renames it to file_size_limit, bigint). Both columns are what
+    # 063_storage_kova_sinirlari.sql updates in stage D.
+    image: supabase/storage-api:v1.28.4
+    container_name: projelio-storage
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # --- Database ---
+      # Owns and migrates the storage schema. The role is created by hand in
+      # stage C, not by this container.
+      DATABASE_URL: postgres://supabase_storage_admin:${STORAGE_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DB_SUPER_USER: ${POSTGRES_USER}
+      # anon / authenticated / service_role already exist from stage B. Left at
+      # the default "false" the bundled migration 0002-storage-schema skips its
+      # CREATE ROLE block; flipping this to "true" makes it try to create them
+      # again and the whole migration run aborts with "role already exists".
+      DB_INSTALL_ROLES: "false"
+      DB_MIGRATIONS_STRATEGY: on_request
+
+      # --- Auth ---
+      # storage-api has no user table: it only verifies that the Bearer token is
+      # HMAC-signed with this secret and reads the "role" claim from it. The
+      # backend sends a service_role token signed with SUPABASE_JWT_SECRET.
+      AUTH_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      AUTH_JWT_ALGORITHM: HS256
+      # Left unset on purpose: with no SERVICE_KEY/ANON_KEY the image self-signs
+      # both from AUTH_JWT_SECRET at boot, so there is no second copy to keep in
+      # sync. The backend mints its own token from the same secret.
+
+      # --- File backend ---
+      # Local disk, not S3. Objects land in /srv/projelio/data/storage on the host.
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      # Used as the first path segment even by the file backend. Unset it and
+      # every object is stored under a literal "undefined/" directory.
+      STORAGE_S3_BUCKET: projelio
+      # mtime instead of md5: the default hashes every file on each request to
+      # build an ETag, which on a 4-vCPU box is wasted work for cover images.
+      STORAGE_FILE_ETAG_ALGORITHM: mtime
+
+      # --- Limits ---
+      # Global ceiling. Per-bucket limits are tighter (8 MB, set by migration
+      # 063 in stage D); this only has to be above the largest of them. The
+      # backend streams anything over 8 MB to Drive/OneDrive, not here.
+      FILE_SIZE_LIMIT: 52428800
+      TENANT_ID: projelio
+      REGION: local
+
+      # --- Disabled subsystems ---
+      # No imgproxy container, so image transformation must stay off or every
+      # transform request fails at runtime instead of at boot.
+      IMAGE_TRANSFORMATION_ENABLED: "false"
+      # The S3-compatible protocol surface is a second, separately authenticated
+      # entry point Projelio never calls. Off by default here.
+      S3_PROTOCOL_ENABLED: "false"
+      # pg_boss queue tables are only needed for webhooks / background jobs we
+      # do not run; leaving it off keeps the storage schema smaller.
+      PG_QUEUE_ENABLE: "false"
+    volumes:
+      - /srv/projelio/data/storage:/var/lib/storage
+    # Loopback only, same rule as Postgres. Public access arrives in stage F
+    # through Caddy, which is the only process that gets to listen on 0.0.0.0.
+    ports:
+      - "127.0.0.1:5000:5000"
+    healthcheck:
+      # 127.0.0.1, not localhost: inside this image localhost resolves to ::1
+      # first, the server only binds IPv4, and wget fails with "connection
+      # refused" while the service is in fact healthy.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - projelio
+
+  postgrest:
+    image: postgrest/postgrest:v14.16
+    container_name: projelio-postgrest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: [.env]
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${AUTHENTICATOR_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      PGRST_SERVER_PORT: 3000
+    healthcheck:
+      test: ["CMD", "postgrest", "--version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [projelio]
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile.backend
+    image: projelio-backend:local
+    container_name: projelio-backend
+    restart: unless-stopped
+    depends_on:
+      postgrest:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    env_file: [.env]
+    environment:
+      NODE_ENV: staging
+      PORT: 3000
+      JWT_SECRET: ${APP_JWT_SECRET}
+      SUPABASE_URL: http://caddy
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      CORS_ORIGINS: http://193.111.77.252
+      WEB_APP_URL: http://193.111.77.252
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [projelio]
+
+  caddy:
+    build:
+      context: ..
+      dockerfile: Dockerfile.web
+      args:
+        VITE_API_URL: http://api.193.111.77.252.sslip.io
+        VITE_GOOGLE_PICKER_API_KEY: ${VITE_GOOGLE_PICKER_API_KEY:-}
+        VITE_GOOGLE_PICKER_APP_ID: ${VITE_GOOGLE_PICKER_APP_ID:-}
+        VITE_HABIE_URL: ${VITE_HABIE_URL:-}
+    image: projelio-web:local
+    container_name: projelio-caddy
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports: ["80:80"]
+    networks: [projelio]
+
+networks:
+  projelio:
+    name: projelio
+    driver: bridge

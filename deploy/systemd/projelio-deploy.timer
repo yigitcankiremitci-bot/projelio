@@ -1,0 +1,11 @@
+[Unit]
+Description=Projelio CI/CD kontrolü
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+RandomizedDelaySec=15s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

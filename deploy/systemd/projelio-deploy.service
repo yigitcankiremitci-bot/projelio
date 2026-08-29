@@ -1,0 +1,14 @@
+[Unit]
+Description=Projelio başarılı main commitini canlıya al
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/srv/projelio/deploy/cicd-deploy.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+[Install]
+WantedBy=multi-user.target

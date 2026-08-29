@@ -26,6 +26,7 @@ import {
 import { parseServerDate } from "../lib/dates";
 import { useThemeColors } from "../theme/useThemeColors";
 import SocialAccountModal from "./SocialAccountModal";
+import SocialCredentialsModal from "./SocialCredentialsModal";
 import SocialPostComposer from "./SocialPostComposer";
 import { IconChevronLeft, IconChevronRight, IconEdit, IconExternalLink, IconTrash } from "./icons";
 import { useDragScroll } from "../lib/useDragScroll";
@@ -65,6 +66,9 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   const [cursor, setCursor] = useState(() => new Date());
   const [composer, setComposer] = useState<{ post?: SocialPost | null; date?: string } | null>(null);
   const [accountModal, setAccountModal] = useState<{ account?: SocialAccount | null } | null>(null);
+  // Giriş bilgileri ayrı bir modalde: şifre hesap formunun bir alanı DEĞİL.
+  // Hesabı düzenleyen herkes şifreyi görmüyor (bkz. SocialCredentialsModal).
+  const [credentialsFor, setCredentialsFor] = useState<SocialAccount | null>(null);
   const [platformFilter, setPlatformFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [error, setError] = useState("");
@@ -972,6 +976,23 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                 <span style={{ fontSize: 11, color: c.danger }}>{a.connectionError}</span>
               )}
 
+              {/* Şifreler herkese görünür bir düğme ama içerik yetkiye bağlı:
+                  modülü okuyabilen "kayıt var mı" görür, şifreyi yalnızca
+                  yönetici, giren kişi ve izinliler açabilir. */}
+              <button
+                onClick={() => setCredentialsFor(a)}
+                style={{
+                  fontSize: 11,
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  color: c.textSecondary,
+                }}
+              >
+                Giriş bilgileri
+              </button>
+
               {canWrite && igConfigured && a.platform === "instagram" && (
                 <button
                   onClick={() => (a.connectionStatus === "connected" ? disconnectInstagram(a) : connectInstagram())}
@@ -1208,6 +1229,14 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           onClose={() => setComposer(null)}
           onSaved={upsertPost}
           onDeleted={(postId) => setPosts((ps) => ps.filter((p) => p.id !== postId))}
+        />
+      )}
+
+      {credentialsFor && (
+        <SocialCredentialsModal
+          scope={scope}
+          account={credentialsFor}
+          onClose={() => setCredentialsFor(null)}
         />
       )}
 

@@ -2037,6 +2037,84 @@ export interface SocialMediaOverview {
   posts: SocialPost[];
 }
 
+// ---------------------------------------------------------- Hesap şifreleri
+//
+// Sosyal hesabın giriş bilgileri. Değerler veritabanında şifreli durur ve
+// LİSTEDE ASLA dönmez: aşağıdaki SocialCredential yalnızca "böyle bir kayıt
+// var" bilgisidir. Şifrenin kendisi ayrı bir uçtan, ayrı bir yetki kontrolüyle
+// ve kaydı tutularak istenir (bkz. 076_sosyal_hesap_kimlik_bilgileri.sql).
+
+/** Şifrenin neden gösterilebildiği — arayüzde gerekçeyi yazmak için. */
+export type SocialCredentialReason = "admin" | "creator" | "grant";
+
+/** Kimlik bilgisinin sırsız hâli. Modülü okuyabilen herkes bunu görür. */
+export interface SocialCredential {
+  id: string;
+  accountId: string;
+  /** "Ana giriş", "Meta Business Suite" — birden çok giriş varken ayırt eder. */
+  label: string;
+  /** Not alanı dolu mu. İçeriği değil, varlığı. */
+  hasNote: boolean;
+  createdBy?: string;
+  createdByName?: string;
+  createdAt: string;
+  updatedAt?: string;
+  passwordChangedAt: string;
+  /** Bu kullanıcı şifreyi görebilir mi — "Göster" düğmesi buna bakar. */
+  canReveal: boolean;
+  /** Görebiliyorsa hangi haktan. */
+  revealReason?: SocialCredentialReason;
+  /** Bu kullanıcı kaydı düzenleyip silebilir mi (yönetici ya da giren kişi). */
+  canEdit: boolean;
+  /** İzin verilmiş kişi sayısı — yalnızca yöneticiye doldurulur. */
+  grantCount?: number;
+}
+
+/** Yalnızca "göster" ucundan dönen sır. Hiçbir listeye, hiçbir log'a girmez. */
+export interface SocialCredentialSecret {
+  id: string;
+  username?: string;
+  password: string;
+  note?: string;
+  reason: SocialCredentialReason;
+}
+
+/** Bir kişiye verilmiş görme izni. */
+export interface SocialCredentialGrant {
+  id: string;
+  credentialId: string;
+  userId: string;
+  userName?: string;
+  grantedBy?: string;
+  grantedByName?: string;
+  grantedAt: string;
+  /** Süreli izin. Boşsa süresiz. */
+  expiresAt?: string;
+  revokedAt?: string;
+  /** Şu an geçerli mi (geri alınmamış ve süresi geçmemiş). */
+  active: boolean;
+}
+
+/** Şifrenin gösterildiği an — denetim izi, yalnızca yöneticiye açık. */
+export interface SocialCredentialView {
+  id: string;
+  credentialId: string;
+  userId?: string;
+  userName?: string;
+  reason: SocialCredentialReason;
+  viewedAt: string;
+}
+
+/** Bir hesabın şifre listesi. `canManage` izin panelini açan bayrak. */
+export interface SocialCredentialList {
+  accountId: string;
+  /** Kullanıcı yönetici mi — izin verebilir, denetim izini okuyabilir. */
+  canManage: boolean;
+  /** Yeni giriş ekleyebilir mi. */
+  canCreate: boolean;
+  credentials: SocialCredential[];
+}
+
 // ============================================================ E-posta kutusu
 //
 // E-posta modülünün (pd_email) gelen kutusu tarafı. İletiler Projelio'da

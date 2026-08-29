@@ -7,6 +7,8 @@ import { InstagramController } from "./instagram.controller";
 import { InstagramOAuthService } from "./instagram-oauth.service";
 import { InstagramPublishService } from "./instagram-publish.service";
 import { InstagramService } from "./instagram.service";
+import { SocialCredentialsController } from "./social-credentials.controller";
+import { SocialCredentialsService } from "./social-credentials.service";
 import { SocialMediaController } from "./social-media.controller";
 import { SocialMediaService } from "./social-media.service";
 import { SocialPublishProcessor } from "./social-publish.processor";
@@ -30,10 +32,11 @@ import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
       signOptions: { expiresIn: getJwtExpiresIn() },
     }),
   ],
-  controllers: [SocialMediaController, InstagramController],
+  controllers: [SocialMediaController, InstagramController, SocialCredentialsController],
   providers: [
     SocialMediaService,
     SocialTokensService,
+    SocialCredentialsService,
     InstagramOAuthService,
     InstagramService,
     InstagramPublishService,

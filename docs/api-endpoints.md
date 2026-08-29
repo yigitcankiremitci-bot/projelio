@@ -133,6 +133,34 @@ gönderilir ve değerler sunucudaki katalogdan (`ai-credits.config.ts`
 admin'e kapalıdır. Sipariş kaydının varlığı ödeme sayılmaz — tek geçerli kanıt
 `status = paid` **ve** `creditedAt` dolu olmasıdır.
 
+## Sosyal medya hesap şifreleri (`/social-credentials`)
+
+Sosyal hesapların giriş bilgileri. Değerler veritabanında AES-256-GCM ile şifreli
+durur (anahtar: `SOCIAL_CREDENTIAL_ENC_KEY`, jeton anahtarından ayrı) ve
+**yalnızca** `reveal` ucundan çözülmüş olarak çıkar — listeleme uçları sır
+döndürmez.
+
+Görme hakkı sırası (bkz. `social-credential-access.ts`): yönetici (organizasyon
+sahibi / departman yöneticisi / modül yöneticisi) → şifreyi giren kişi → yönetici
+tarafından izin verilmiş modül üyesi. Modülü okuyabilen diğer herkes yalnızca
+kaydın *varlığını* görür.
+
+| Method | Path | Açıklama | Body |
+|---|---|---|---|
+| GET | `/social-accounts/:accountId/credentials` | Hesabın giriş kayıtları (sırsız) + `canManage`/`canCreate` | — |
+| POST | `/social-accounts/:accountId/credentials` | Yeni giriş ekler | `{ label?, username?, password, note? }` |
+| PATCH | `/social-credentials/:id` | Günceller; `password` boşsa şifreye dokunulmaz | `{ label?, username?, password?, note? }` |
+| DELETE | `/social-credentials/:id` | Kaydı siler (arşivlemez) | — |
+| POST | `/social-credentials/:id/reveal` | Şifreyi çözer, `Cache-Control: no-store` döner ve **denetim izine yazar** | `{}` |
+| GET | `/social-credentials/:id/grants` | İzin listesi (yalnızca yönetici) | — |
+| POST | `/social-credentials/:id/grants` | Modül ekibindeki bir kişiye izin verir | `{ userId, expiresAt? }` |
+| DELETE | `/social-credential-grants/:id` | İzni geri alır (satır silinmez) | — |
+| GET | `/social-credentials/:id/views` | Şifreyi kim, ne zaman gördü (yalnızca yönetici) | — |
+
+İzin yalnızca **modül ekibine** (`module_members`, `pd_sosyal_medya`, `approved`)
+verilebilir; departmanı görebildiği için modülü okuyabilen ama modüle atanmamış
+kişiye izin verilmez.
+
 ## Admin (`/admin`) — sadece `role: admin`
 
 | Method | Path | Açıklama |

@@ -8,13 +8,23 @@ SOURCE="$ROOT/.cicd/source"
 STATE="$ROOT/.cicd/state"
 LOCK="$ROOT/.cicd/deploy.lock"
 COMPOSE="$ROOT/deploy/docker-compose.prod.yml"
+GITHUB_TOKEN_FILE="/etc/projelio/github-actions-token"
+GIT_REMOTE="https://github.com/$REPO.git"
 
 mkdir -p "$ROOT/.cicd"
 exec 9>"$LOCK"
 flock -n 9 || exit 0
 
+[[ -r "$GITHUB_TOKEN_FILE" ]] || exit 0
+GITHUB_TOKEN="$(<"$GITHUB_TOKEN_FILE")"
+export GITHUB_TOKEN
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS="/etc/projelio/github-git-askpass"
+
 if ! api_json="$(curl --fail --silent \
   -H 'Accept: application/vnd.github+json' \
+  -H 'X-GitHub-Api-Version: 2022-11-28' \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
   "https://api.github.com/repos/$REPO/actions/workflows/ci.yml/runs?branch=$BRANCH&event=push&per_page=1")"; then
   # Workflow repoya ilk kez gönderilmeden önce GitHub 404 döndürür.
   exit 0
@@ -33,8 +43,10 @@ print(run["head_sha"], run.get("conclusion") or "pending")
 [[ "$(cat "$STATE" 2>/dev/null || true)" != "$candidate" ]] || exit 0
 
 if [[ ! -d "$SOURCE/.git" ]]; then
-  git clone --filter=blob:none --branch "$BRANCH" "https://github.com/$REPO.git" "$SOURCE"
+  git clone --filter=blob:none --branch "$BRANCH" "$GIT_REMOTE" "$SOURCE"
 fi
+
+git -C "$SOURCE" remote set-url origin "$GIT_REMOTE"
 
 git -C "$SOURCE" fetch --quiet origin "$BRANCH"
 [[ "$(git -C "$SOURCE" rev-parse "origin/$BRANCH")" == "$candidate" ]] || exit 0

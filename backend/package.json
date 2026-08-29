@@ -6,8 +6,12 @@
     "node": ">=20"
   },
   "scripts": {
+    "build:shared": "tsc -p ../packages/shared/tsconfig.build.json",
+    "prebuild": "npm run build:shared",
     "build": "nest build",
+    "prestart": "npm run build:shared",
     "start": "nest start",
+    "prestart:dev": "npm run build:shared",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main"
   },

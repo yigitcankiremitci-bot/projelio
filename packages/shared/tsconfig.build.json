@@ -1,0 +1,26 @@
+{
+  // Bu paket depoda ham `.ts` olarak duruyor ve web/mobil tarafında paketleyici
+  // (Vite/Metro) doğrudan kaynağı okuyor. Backend ise `node dist/main` ile
+  // çalışıyor: oradaki `require("@projelio/shared")` çağrısını Node'un kendisi
+  // çözmek zorunda ve Node ham `.ts` kaynağı çözemiyor (bkz. package.json
+  // içindeki "exports" notu). Bu derleme SADECE o Node tarafı için CommonJS
+  // çıktısı üretiyor; paketleyicilerin gördüğü yol değişmiyor.
+  //
+  // Tipler `src`ten okunmaya devam ettiği için burada `declaration` üretilmiyor:
+  // typecheck bu derlemeye bağımlı değil, yani dist yokken de `npm run typecheck`
+  // çalışır.
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2021",
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

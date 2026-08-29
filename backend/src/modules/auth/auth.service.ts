@@ -7,6 +7,8 @@ import { LoginAttemptService } from "./login-attempt.service";
 import { nowInSeconds } from "./session-payload";
 import { EmailService } from "./email.service";
 import { AccountDeletionService } from "../users/account-deletion.service";
+import { DemoSifirlamaService } from "../demo/demo-sifirlama.service";
+import { demoEpostasiMi } from "../../common/demo-hesap";
 import { getWebAppUrl } from "../../common/config/env";
 
 @Injectable()
@@ -19,7 +21,8 @@ export class AuthService {
     private emailVerificationService: EmailVerificationService,
     private loginAttemptService: LoginAttemptService,
     private emailService: EmailService,
-    private accountDeletionService: AccountDeletionService
+    private accountDeletionService: AccountDeletionService,
+    private demoSifirlamaService: DemoSifirlamaService
   ) {}
 
   /**
@@ -132,6 +135,16 @@ export class AuthService {
       );
     }
 
+    // DEMO HESABI: içeriyi görmeden önce veri ilk haline döner.
+    //
+    // Sıfırlama BEKLENİR (arka plana atılmaz): ziyaretçi panel açıldığında bir
+    // önceki ziyaretçinin sildiği görevleri, "test test" kayıtlarını değil
+    // hazırladığımız örnek şirketi görmeli. Birkaç saniye sürebilir, yalnızca
+    // bu hesapta. Hata fırlatmaz — bkz. DemoSifirlamaService.sifirla.
+    if (demoEpostasiMi(user.email)) {
+      await this.demoSifirlamaService.sifirla();
+    }
+
     // Maliyet katsayısı yükseltildiyse hash'i sessizce tazele. Kullanıcı bunu
     // fark etmez ve şifresini değiştirmesi gerekmez; eski hesaplar zamanla
     // güncel maliyete taşınmış olur. Başarısız olursa giriş yine de tamamlanır —
@@ -186,6 +199,14 @@ export class AuthService {
       avatarUrl: user.avatarUrl,
       title: user.title,
       bio: user.bio,
+      // Kurulum sihirbazında toplanan kişisel/tercih alanları. Yalnızca BURADA
+      // (kişinin kendi görünümünde) dönüyor; /users/:id gibi başkalarına açılan
+      // uçlarda bilerek yok (bkz. users.service.ts PublicUser).
+      phone: user.phone,
+      sector: user.sector,
+      teamSize: user.teamSize,
+      useCases: user.useCases,
+      onboardingModules: user.onboardingModules,
       // Ayarlar > Hesap, şifre kartında "mevcut şifreni gir" alanını yalnızca
       // şifresi olan hesaplara gösterir (Google ile açılanlarda null olabiliyor).
       // Hash'in kendisi DEĞİL, yalnızca varlığı dışarı çıkar.

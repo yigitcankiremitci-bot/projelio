@@ -9,11 +9,13 @@ import { EmailVerificationService } from "./email-verification.service";
 import { LoginAttemptService } from "./login-attempt.service";
 import { EmailModule } from "./email.module";
 import { UsersModule } from "../users/users.module";
+import { DemoModule } from "../demo/demo.module";
 import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
 
 @Module({
   imports: [
     UsersModule,
+    DemoModule,
     EmailModule,
     PassportModule,
     JwtModule.register({

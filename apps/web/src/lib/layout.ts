@@ -112,6 +112,36 @@ export const TOP_CHROME = {
 export const TOP_CHROME_BOTTOM = TOP_CHROME.top + TOP_CHROME.size + 4;
 
 /**
+ * Kaydırınca beliren sabit şeridin üst satırının yüksekliği.
+ *
+ * App.tsx'ten buraya taşındı: yalnızca şeridin kendi ölçüsü değil, kapağın
+ * üstünde bırakılması gereken boşluğun da dayanağı (bkz. COVER_TOP_CLEARANCE).
+ */
+export const STICKY_TOP_ROW = 68;
+
+/**
+ * DAR EKRANDA KAPAĞIN ÜSTÜNDE BIRAKILAN BOŞLUK.
+ *
+ * AYIKLANAN HATA. Kapak sayfalarında sayfa gövdesi bilerek üst şeridin altından
+ * başlıyor (App.tsx `paddingTop: isCoverPage ? 0 : HEADER_HEIGHT`): kapak
+ * dekoratif bir bant, yüzen düğmeler onun üstünde durabilir. Ama kapağın YAZI
+ * bloğu dibe yaslı ve içerik uzadıkça yukarı doğru büyüyor. Şirket kapağında
+ * (geri bağlantısı + iki satır başlık + açıklama + künye) blok 188 px'e çıkıp
+ * bandın içine girdi: "‹ Organizasyonlar" bağlantısı yüzen logonun altında
+ * kayboldu, başlık sol üstteki kenar çubuğu okuyla üst üste bindi.
+ *
+ * İKİ SINIR birden sağlanmalı:
+ *   1. TOP_CHROME_BOTTOM — logo, kenar çubuğu oku, çan ve yardım düğmesinin bandı.
+ *   2. STICKY_TOP_ROW — sayfanın kendi geri bağlantısı bu çizgiyi geçtiği anda
+ *      yüzen "geri hapı" devralıyor (bkz. App.tsx stage.back). Kapak bağlantısı
+ *      en baştan bu çizginin ÜSTÜNDE doğarsa hap sayfa hiç kaydırılmadan açılır
+ *      ve hemen altındaki başlığın üzerine oturur.
+ *
+ * Bu yüzden değer ikisinin de üstünde: şeridin devir çizgisinden bir tık aşağı.
+ */
+export const COVER_TOP_CLEARANCE = STICKY_TOP_ROW + 12;
+
+/**
  * Sağ alttaki Lio balonunun ölçüleri ve ekran kenarlarına uzaklığı.
  *
  * Balonun kendi dosyasında (AiLauncher) durduğu sürece, onun ÜSTÜNE konması
@@ -123,11 +153,40 @@ export const LIO_LAUNCHER = {
   right: 18,
   /** Masaüstünde ekranın dibine oturur; telefonda alt menünün üstünde durur. */
   bottomDesktop: 22,
+  /**
+   * Telefonda alt menünün ÜSTÜNDE durması gereken mesafe.
+   *
+   * Alt menünün yüksekliği `68px + env(safe-area-inset-bottom)`: çentikli
+   * telefonlarda ana ekran çubuğu için ~34 px daha büyüyor. Balon düz 96 px'te
+   * dururken menü 102 px'e çıkıyor ve balon menünün üstüne biniyordu — bu
+   * yüzden ölçü CSS'te hesaplanıyor, sayı olarak değil (bkz. lioBottomCss).
+   */
   bottomMobile: 96,
   /** Dar ekranda balon küçülüyor: 132 px telefonun genişliğinin üçte birini yiyordu. */
   sizeDesktop: 132,
   sizeMobile: 88,
 } as const;
+
+/**
+ * Telefondaki alt menünün yüksekliği (güvenli alan HARİÇ).
+ *
+ * Menü ekranın dibine sabitli ve gerçek yüksekliği
+ * `BOTTOM_NAV_HEIGHT + env(safe-area-inset-bottom)`. Üstünde durması gereken
+ * her şey (Lio balonu) bu değeri aşmak zorunda — sabit bir sayı yazmak,
+ * çentikli telefonlarda menünün büyüdüğünü görmemek demekti.
+ */
+export const BOTTOM_NAV_HEIGHT = 68;
+
+/**
+ * Balonun (ve üstüne konan şeridin) alt kenar mesafesi.
+ *
+ * Telefonda güvenli alan eklenir; masaüstünde böyle bir şey yok. Sayı değil
+ * CSS dizesi döner: `env()` yalnızca CSS'te çözülebiliyor.
+ */
+export function lioBottomCss(isDesktop: boolean, ek = 0): string {
+  if (isDesktop) return `${LIO_LAUNCHER.bottomDesktop + ek}px`;
+  return `calc(${LIO_LAUNCHER.bottomMobile + ek}px + env(safe-area-inset-bottom))`;
+}
 
 /** Lio sohbet panelinin masaüstü genişliği (telefonda tüm ekranı kaplar). */
 export const AI_PANEL_WIDTH = 460;
@@ -155,20 +214,19 @@ export function lioActivityAnchor(opts: {
   panelOpen: boolean;
   /** Lio Ayarlar > Yardımcılar'dan gizlenmişse üstünde durulacak bir balon yok. */
   launcherVisible: boolean;
-}): { right: number; top?: number; bottom?: number } {
+}): { right: number; top?: number; bottom?: string } {
   const { isDesktop, panelOpen, launcherVisible } = opts;
 
   if (panelOpen) {
     return isDesktop
-      ? { right: AI_PANEL_WIDTH + LIO_LAUNCHER.right, bottom: LIO_LAUNCHER.bottomDesktop }
+      ? { right: AI_PANEL_WIDTH + LIO_LAUNCHER.right, bottom: lioBottomCss(true) }
       : { right: LIO_LAUNCHER.right, top: AI_PANEL_HEADER_HEIGHT + 8 };
   }
 
-  const bottom = isDesktop ? LIO_LAUNCHER.bottomDesktop : LIO_LAUNCHER.bottomMobile;
   const size = isDesktop ? LIO_LAUNCHER.sizeDesktop : LIO_LAUNCHER.sizeMobile;
   return {
     right: LIO_LAUNCHER.right,
-    bottom: launcherVisible ? bottom + size + LIO_ACTIVITY_GAP : bottom,
+    bottom: lioBottomCss(isDesktop, launcherVisible ? size + LIO_ACTIVITY_GAP : 0),
   };
 }
 

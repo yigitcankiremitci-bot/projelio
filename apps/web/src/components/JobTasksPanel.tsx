@@ -19,6 +19,7 @@ import { useUndo } from "../lib/undo";
 import { useClickIntent } from "../lib/clickIntent";
 import { backState } from "../lib/backTarget";
 import { focusParams, resolveTaskFocus, type FocusWhere, type TaskFocus } from "../lib/taskFocus";
+import { useDragScroll } from "../lib/useDragScroll";
 
 const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
 
@@ -86,6 +87,8 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
 ) {
   const c = useThemeColors();
   const isDesktop = useIsDesktop();
+  // Pano yalnızca masaüstünde yana kayıyor; dar ekranda sütunlar alt alta.
+  const boardScrollRef = useDragScroll<HTMLDivElement>(isDesktop);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [boardOpen, setBoardOpen] = useState(readBoardOpen);
@@ -499,6 +502,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
           {/* Masaüstünde üç sütun yan yana, dar ekranda alt alta. */}
           {boardOpen && (
           <div
+            ref={boardScrollRef}
             style={{
               display: "flex",
               flexDirection: isDesktop ? "row" : "column",

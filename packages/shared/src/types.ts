@@ -282,15 +282,88 @@ export interface DepartmentAccess {
 
 // Ürün Yönetimi departmanından eklenen ürün/hizmet. Şirket anasayfasında
 // (OrganizationDetail "Ürünler" sekmesi) iş kartlarıyla aynı görünümde listelenir.
+/**
+ * Ürünün ölçü birimi. Kapalı uçlu: serbest metin olsaydı aynı birim "adet",
+ * "Adet", "ad." diye üç farklı değere dağılır ve stok toplanamazdı.
+ */
+export type ProductUnit = "adet" | "kg" | "gram" | "litre" | "metre" | "m2" | "m3" | "paket" | "kutu" | "saat" | "gun" | "ay";
+export const PRODUCT_UNIT_LABEL: Record<ProductUnit, string> = {
+  adet: "Adet",
+  kg: "Kilogram",
+  gram: "Gram",
+  litre: "Litre",
+  metre: "Metre",
+  m2: "Metrekare",
+  m3: "Metreküp",
+  paket: "Paket",
+  kutu: "Kutu",
+  saat: "Saat",
+  gun: "Gün",
+  ay: "Ay",
+};
+export const PRODUCT_UNITS = Object.keys(PRODUCT_UNIT_LABEL) as ProductUnit[];
+
+/**
+ * `active` = satışta, `inactive` = katalogda görünür ama satış dışı.
+ * `archivedAt` ile KARIŞTIRILMAMALI: arşiv ürünü listeden kaldırır, status ise
+ * ürün listede dururken satışa kapalı olduğunu söyler.
+ */
+export type ProductStatus = "active" | "inactive";
+export const PRODUCT_STATUS_LABEL: Record<ProductStatus, string> = {
+  active: "Satışta",
+  inactive: "Satış dışı",
+};
+
+/** Ürünün fotoğraflarından biri. `sortOrder` 0 olan vitrin görselidir. */
+export interface ProductImage {
+  id: string;
+  productId: string;
+  url: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export interface Product {
   id: string;
   organizationId: string;
   departmentId?: string;
   name: string;
   description?: string;
+  /**
+   * Vitrin görseli — `images[0].url` ile aynı değerdir, kart bileşenlerinin
+   * galeriyi yüklemek zorunda kalmaması için denormalize tutulur (bkz.
+   * migration 074).
+   */
   coverImageUrl?: string;
+  /**
+   * Ürünün tüm fotoğrafları, sırayla. Liste ucu bunu doldurur; eski kayıtlarda
+   * boş dizi olabilir.
+   */
+  images?: ProductImage[];
+
+  // --- Kimlik / sınıflandırma ---
+  sku?: string;
+  barcode?: string;
+  brand?: string;
+  category?: string;
+
+  // --- Ölçü ve stok ---
+  unit?: ProductUnit;
+  stockQuantity?: number;
+
+  // --- Para ---
   price?: number;
   currency?: string;
+  costPrice?: number;
+  /** KDV oranı YÜZDE olarak (20 = %20), tutar değil. */
+  taxRate?: number;
+
+  status: ProductStatus;
+  /** Tanıtım/satış sayfası. Sunucuda güvenlik süzgecinden geçer. */
+  productUrl?: string;
+  /** Yalnızca şirket içi görünen serbest not. */
+  notes?: string;
+
   sortOrder: number;
   createdAt: string;
   archivedAt?: string;

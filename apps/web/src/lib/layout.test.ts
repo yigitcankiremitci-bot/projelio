@@ -9,6 +9,10 @@ import {
   TOP_CHROME,
   TOP_CHROME_BOTTOM,
   Z,
+  COVER_TOP_CLEARANCE,
+  STICKY_TOP_ROW,
+  BOTTOM_NAV_HEIGHT,
+  lioBottomCss,
 } from "./layout";
 
 // Bu testler görünüşü değil KATMAN SIRASINI sabitler. Sıra bozulduğunda ortaya
@@ -53,6 +57,16 @@ describe("sabit katman sırası", () => {
   });
 });
 
+/**
+ * Ölçüler artık CSS dizesi olabiliyor ("calc(184px + env(safe-area-inset-bottom))"):
+ * `env()` yalnızca tarayıcıda çözülür, testte baştaki px değerine bakılır.
+ */
+function pxDegeri(css?: string | number): number {
+  if (typeof css === "number") return css;
+  const m = String(css ?? "").match(/(-?\d+(?:\.\d+)?)px/);
+  return m ? Number(m[1]) : NaN;
+}
+
 describe("dar ekran ölçüleri", () => {
   test("en dar telefonda bile çekmecenin yanında dokunulabilir bir şerit kalır", () => {
     // 320 px, hâlâ karşılaşılan en dar ekran (küçük Android / eski iPhone SE).
@@ -66,6 +80,34 @@ describe("dar ekran ölçüleri", () => {
     // kalırsa düğme büyüdüğünde yalnızca bazı sayfalar düzelir.
     assert.ok(TOP_CHROME_BOTTOM > TOP_CHROME.top + TOP_CHROME.size);
   });
+
+  test("kapak, yüzen düğmelerin ve geri hapının bandını boş bırakır", () => {
+    // 1. Sol üstteki logo/kenar çubuğu oku ile çakışmamalı.
+    assert.ok(
+      COVER_TOP_CLEARANCE >= TOP_CHROME_BOTTOM,
+      "kapak yazısı sağ/sol üstteki sabit düğmelerin bandına giriyor"
+    );
+    // 2. Sayfanın kendi geri bağlantısı, yüzen hapın devraldığı çizginin ALTINDA
+    //    doğmalı; yoksa hap sayfa hiç kaydırılmadan açılıp başlığın üstüne oturur.
+    assert.ok(
+      COVER_TOP_CLEARANCE > STICKY_TOP_ROW,
+      "kapak bağlantısı devir çizgisinin üstünde doğuyor: hap en tepede de açık kalır"
+    );
+  });
+
+  test("telefonda Lio balonu alt menünün üstünde kalır", () => {
+    // Menünün gerçek yüksekliği BOTTOM_NAV_HEIGHT + güvenli alan; balonun ölçüsü
+    // de aynı güvenli alanı içerdiği için px kısımlarını karşılaştırmak yeterli.
+    assert.ok(
+      pxDegeri(lioBottomCss(false)) > BOTTOM_NAV_HEIGHT,
+      "balon alt menünün üstüne biniyor"
+    );
+    assert.ok(
+      lioBottomCss(false).includes("safe-area-inset-bottom"),
+      "çentikli telefonlarda menü büyüyor: balon güvenli alanı hesaba katmalı"
+    );
+    assert.ok(!lioBottomCss(true).includes("env("), "masaüstünde güvenli alan yok");
+  });
 });
 
 describe("Lio bildirim şeridinin yeri", () => {
@@ -75,7 +117,7 @@ describe("Lio bildirim şeridinin yeri", () => {
       const bottom = isDesktop ? LIO_LAUNCHER.bottomDesktop : LIO_LAUNCHER.bottomMobile;
       const size = isDesktop ? LIO_LAUNCHER.sizeDesktop : LIO_LAUNCHER.sizeMobile;
       assert.ok(
-        (anchor.bottom ?? 0) >= bottom + size,
+        pxDegeri(anchor.bottom) >= bottom + size,
         `şerit balonun üstünde başlamalı (isDesktop: ${isDesktop})`
       );
     }
@@ -83,7 +125,7 @@ describe("Lio bildirim şeridinin yeri", () => {
 
   test("Lio gizliyken şerit boşluğa asılı kalmaz", () => {
     const gizli = lioActivityAnchor({ isDesktop: true, panelOpen: false, launcherVisible: false });
-    assert.equal(gizli.bottom, LIO_LAUNCHER.bottomDesktop);
+    assert.equal(pxDegeri(gizli.bottom), LIO_LAUNCHER.bottomDesktop);
   });
 
   test("panel açıkken masaüstünde panelin soluna geçer", () => {

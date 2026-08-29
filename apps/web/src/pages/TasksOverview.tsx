@@ -19,6 +19,7 @@ import { usePageHeader, usePageHeaderActions, usePageHeaderTabs } from "../lib/p
 import TaskSortMenu from "../components/TaskSortMenu";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { backState } from "../lib/backTarget";
+import { useDragScroll } from "../lib/useDragScroll";
 
 // Sıra, uygulamadaki diğer tüm kanbanlarla aynı: önce üzerinde çalışılan işler.
 // (bkz. DepartmentTasksPanel, JobTasksPanel, OutputsPanel, ProcessPanel)
@@ -63,6 +64,8 @@ export default function TasksOverview() {
   const c = useThemeColors();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
+  // Pano yalnızca masaüstünde yana kayıyor; dar ekranda sütunlar alt alta.
+  const boardScrollRef = useDragScroll<HTMLDivElement>(isDesktop);
   const [items, setItems] = useState<PersonalBoardItem[]>([]);
   const [loading, setLoading] = useState(true);
   // Filtre URL'de tutuluyor — ama HATIRLANMIYOR.
@@ -674,6 +677,7 @@ export default function TasksOverview() {
         // Masaüstünde üç sütun yan yana, dar ekranda alt alta — diğer kanbanlarla
         // aynı yerleşim (bkz. DepartmentTasksPanel).
         <div
+          ref={boardScrollRef}
           style={{
             display: "flex",
             flexDirection: isDesktop ? "row" : "column",

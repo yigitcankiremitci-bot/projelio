@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { IconShield } from "../components/icons";
 import AiCreditAdminPanel from "../components/AiCreditAdminPanel";
 import SupportAdminPanel from "../components/SupportAdminPanel";
+import DemoAdminPanel from "../components/DemoAdminPanel";
 
 /**
  * Bu sayfa yalnızca role === "admin" olan kullanıcılara açılır.
@@ -86,6 +87,10 @@ export default function AdminPanel() {
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
         <SupportAdminPanel />
+      </div>
+
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
+        <DemoAdminPanel />
       </div>
     </div>
   );

@@ -10,6 +10,8 @@ import {
   MIN_BALANCE_TO_START,
   WELCOME_CREDITS,
 } from "./ai-credits.config";
+import { demoKullanicisiMi } from "../../common/demo-hesap";
+import { DemoAiKotasi, DEMO_SAATLIK_KREDI } from "./demo-ai-kotasi";
 
 /**
  * Bakiye yetersizliğini HTTP 402 (Payment Required) ile bildirir; istemci bu kodu
@@ -76,6 +78,11 @@ export class AiCreditsService {
   private readonly logger = new Logger(AiCreditsService.name);
   private realCostCache: RealCostCacheEntry | null = null;
   private realCostBlockedUntil = 0;
+  /**
+   * Demo hesabının saatlik Lio tavanı. Ziyaretçiden kredi düşülmüyor; bunun
+   * yerine harcama burada birikiyor (bkz. demo-ai-kotasi.ts).
+   */
+  private readonly demoKotasi = new DemoAiKotasi();
 
   constructor(private supabase: SupabaseService) {}
 
@@ -84,6 +91,13 @@ export class AiCreditsService {
    * kredisini bir defaya mahsus tanımlar.
    */
   async getBalance(userId: string): Promise<CreditBalance> {
+    // Demo hesabının defterde bakiyesi yok: gösterilen sayı saatlik demo
+    // tavanından kalan kısım. Böylece arayüzdeki kredi rozeti de doğruyu söyler.
+    if (demoKullanicisiMi(userId)) {
+      const kalan = this.demoKotasi.kalan();
+      return { balance: kalan, lifetimePurchased: DEMO_SAATLIK_KREDI, lifetimeSpent: DEMO_SAATLIK_KREDI - kalan };
+    }
+
     const { data, error } = await this.supabase.client
       .from("ai_credit_balances")
       .select("balance, lifetime_purchased, lifetime_spent")
@@ -114,6 +128,8 @@ export class AiCreditsService {
    * kontroller bu sayı üzerinden yapılır; ham `balance` yalnızca gösterim içindir.
    */
   async getAvailable(userId: string): Promise<number> {
+    if (demoKullanicisiMi(userId)) return this.demoKotasi.kalan();
+
     const { data, error } = await this.supabase.client.rpc("ai_available_credits", {
       p_user_id: userId,
       p_ttl_seconds: HOLD_TTL_SECONDS,
@@ -141,6 +157,9 @@ export class AiCreditsService {
   async reserve(userId: string, credits: number): Promise<string | null> {
     const amount = Math.ceil(credits);
     if (amount <= 0) return null;
+    // Demo hesabında tutma yok: düşülecek bir bakiye olmadığı için tutulacak
+    // bir şey de yok. Tavan denetimi assertCanStart'ta yapılıyor.
+    if (demoKullanicisiMi(userId)) return null;
 
     const { data, error } = await this.supabase.client.rpc("ai_reserve_credits", {
       p_user_id: userId,
@@ -175,6 +194,8 @@ export class AiCreditsService {
    * üzerinden yapabilsin — ikinci bir sorgu hem gereksiz hem de yarış açar.
    */
   async assertCanStart(userId: string): Promise<number> {
+    if (demoKullanicisiMi(userId)) return this.demoTavaniniDenetle();
+
     const balance = await this.getAvailable(userId);
     if (balance < MIN_BALANCE_TO_START) {
       throw new InsufficientCreditsException(
@@ -282,6 +303,8 @@ export class AiCreditsService {
       cacheReadTokens,
     });
 
+    if (demoKullanicisiMi(userId)) return this.demoHarcamasiniYaz(credits);
+
     if (credits <= 0) return { credits: 0, balanceAfter: (await this.getBalance(userId)).balance };
 
     const balanceAfter = await this.applyChange(userId, -credits, true);
@@ -325,6 +348,8 @@ export class AiCreditsService {
     const { userId, durationSeconds, fileName, conversationId } = params;
     const { costUsd, chargedUsd, credits } = calculateTranscriptionCost(durationSeconds);
 
+    if (demoKullanicisiMi(userId)) return this.demoHarcamasiniYaz(credits);
+
     if (credits <= 0) return { credits: 0, balanceAfter: (await this.getBalance(userId)).balance };
 
     const balanceAfter = await this.applyChange(userId, -credits, true);
@@ -361,6 +386,8 @@ export class AiCreditsService {
   }): Promise<{ credits: number; balanceAfter: number }> {
     const { userId, chars, conversationId } = params;
     const { costUsd, chargedUsd, credits } = calculateSpeechCost(chars);
+
+    if (demoKullanicisiMi(userId)) return this.demoHarcamasiniYaz(credits);
 
     if (credits <= 0) return { credits: 0, balanceAfter: (await this.getBalance(userId)).balance };
 
@@ -722,6 +749,35 @@ export class AiCreditsService {
   }
 
   /** Atomik bakiye değişimi (Postgres tarafında satır kilidiyle). */
+  /**
+   * Demo hesabı için tur başlangıcı denetimi.
+   *
+   * Bakiye yerine saatlik tavandan kalan kredi döner; çağıran taraf bu sayıyı
+   * assertBalanceCovers'a verdiği için pahalı bir istek tavanı aşacaksa zaten
+   * başlamadan durur. Mesaj bilerek "kredin bitti" demiyor: ziyaretçinin
+   * yükleyeceği bir kredi yok, beklemesi ya da kendi hesabını açması gerekiyor.
+   */
+  private demoTavaniniDenetle(): number {
+    const kalan = this.demoKotasi.kalan();
+    if (kalan < MIN_BALANCE_TO_START) {
+      throw new InsufficientCreditsException(
+        `Demo hesabında Lio saatlik deneme sınırına ulaştı. ` +
+          `Yaklaşık ${this.demoKotasi.acilmayaKalanDakika()} dakika sonra yeniden denenebilir — ` +
+          "kendi hesabında böyle bir sınır yok."
+      );
+    }
+    return kalan;
+  }
+
+  /**
+   * Demo harcamasını yalnızca saatlik tavana yazar: defterde satır açılmaz,
+   * bakiye düşülmez. Dönen `balanceAfter` tavandan kalan kredi.
+   */
+  private demoHarcamasiniYaz(credits: number): { credits: number; balanceAfter: number } {
+    this.demoKotasi.harca(credits);
+    return { credits: 0, balanceAfter: this.demoKotasi.kalan() };
+  }
+
   private async applyChange(userId: string, credits: number, allowNegative: boolean): Promise<number> {
     const { data, error } = await this.supabase.client.rpc("ai_apply_credit_change", {
       p_user_id: userId,

@@ -19,6 +19,7 @@ import {
   toDateTimeLocal,
 } from "../lib/socialMedia";
 import { useThemeColors } from "../theme/useThemeColors";
+import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
 import { IconExternalLink, IconTrash, IconUpload } from "./icons";
 
@@ -32,6 +33,8 @@ interface Props {
   members: { id: string; label: string }[];
   onClose: () => void;
   onSaved: (post: SocialPost) => void;
+  /** İçerik arşivlendi — panel listeden düşürsün. */
+  onDeleted?: (postId: string) => void;
 }
 
 interface FormState {
@@ -88,6 +91,7 @@ export default function SocialPostComposer({
   members,
   onClose,
   onSaved,
+  onDeleted,
 }: Props) {
   const c = useThemeColors();
   const [form, setForm] = useState<FormState>(() => initialForm(post, defaultDate));
@@ -105,6 +109,7 @@ export default function SocialPostComposer({
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [silinecek, setSilinecek] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
@@ -263,12 +268,43 @@ export default function SocialPostComposer({
     [saved]
   );
 
+  /**
+   * İçeriği kaldırır.
+   *
+   * NEDEN BURADA: silme düğmesi yalnızca "Liste" görünümündeki kartlarda vardı.
+   * Takvimden ya da fikir havuzundan bir içeriği açan kullanıcının onu silmek
+   * için önce görünüm değiştirmesi gerekiyordu — "içerik silinmiyor" diye
+   * bildirilen şey buydu. İçeriği açan yerde kaldırabilmeli.
+   *
+   * Sunucuda ARŞİVLEME: satır durmaya devam ediyor (archived_at damgalanıyor,
+   * bkz. SocialMediaService.archivePost), yanlışlıkla silinen içerik geri
+   * alınabilsin. Kullanıcıya "sil" demiyoruz, "kaldır" diyoruz.
+   */
+  const remove = async () => {
+    if (!post) return;
+    await socialMediaApi.archivePost(post.id);
+    onDeleted?.(post.id);
+    onClose();
+  };
+
   const publishableAccounts = accounts.filter(
     (a) => selected.includes(a.id) && canAutoPublish(a) && targetByAccount.get(a.id)?.status !== "published"
   );
 
   const label = (text: string) => <label style={{ fontSize: 12, color: c.textSecondary }}>{text}</label>;
   const field = { fontSize: 13, padding: "6px 8px", width: "100%" } as const;
+
+  /**
+   * Çok satırlı alanların ortak stili.
+   *
+   * AYIKLANAN HATA — `rows` HİÇBİR ŞEY YAPMIYORDU. index.css'teki genel kural
+   * `input, select, textarea` için `height: 42px` veriyor; sabit bir yükseklik
+   * varken tarayıcı `rows` özniteliğine bakmıyor, yani kutu kaç satır yazarsak
+   * yazalım tek satır boyunda kalıyordu. `height: auto` bunu geri alır ve
+   * satır sayısı yeniden anlam kazanır (aynı geçersiz kılma .autogrow
+   * kuralında da var, bkz. index.css).
+   */
+  const cokSatirli = { ...field, height: "auto", resize: "vertical", lineHeight: 1.5 } as const;
   const media = saved?.media ?? [];
 
   return (
@@ -276,11 +312,11 @@ export default function SocialPostComposer({
       title={post ? "İçeriği düzenle" : "Yeni içerik"}
       subtitle="Metin, görsel ve yayın planı. Kanal seçtikçe karakter sınırı ona göre uyarır."
       onClose={onClose}
-      // 720 dardı: kanal rozetleri, etiket + bağlantı satırı ve kanala özel
-      // metin kutuları alt alta kırılıyordu. Masaüstünde daha geniş bir kutu
-      // hepsini yan yana tutuyor; dar ekranda zaten tam ekrana geçiyor
-      // (mobileFullScreen), yani bu sayı yalnızca webi etkiler.
-      maxWidth={960}
+      // Bu pencere bir form değil bir çalışma alanı: metin, etiketler, kanal
+      // başına ayrı metinler ve medya aynı anda görünmeli. Dar ekranda zaten
+      // tam ekrana geçiyor (mobileFullScreen), yani bu sayı yalnızca webi
+      // etkiler.
+      maxWidth={1100}
       mobileFullScreen
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -386,7 +422,7 @@ export default function SocialPostComposer({
             // kutuya sığmıyor, kullanıcı kendi yazdığını görmek için kutunun
             // içinde kaydırmak zorunda kalıyordu.
             rows={10}
-            style={{ ...field, resize: "vertical", lineHeight: 1.5, borderColor: overLimit ? c.danger : undefined }}
+            style={{ ...cokSatirli, borderColor: overLimit ? c.danger : undefined }}
           />
         </div>
 
@@ -422,8 +458,8 @@ export default function SocialPostComposer({
             value={form.firstComment}
             onChange={(e) => set("firstComment", e.target.value)}
             placeholder="Etiketler ya da ek bilgi — gönderiden hemen sonra yorum olarak eklenir"
-            rows={2}
-            style={{ ...field, resize: "vertical" }}
+            rows={3}
+            style={cokSatirli}
           />
         </div>
 
@@ -467,8 +503,8 @@ export default function SocialPostComposer({
                         placeholder={
                           platformLimit ? `${SOCIAL_PLATFORMS[a.platform].label} için (en fazla ${platformLimit})` : "Bu kanal için metin"
                         }
-                        rows={4}
-                        style={{ ...field, marginTop: 6, resize: "vertical" }}
+                        rows={5}
+                        style={{ ...cokSatirli, marginTop: 6 }}
                       />
                     )}
                   </div>
@@ -639,6 +675,25 @@ export default function SocialPostComposer({
         {notice && <span style={{ fontSize: 12, color: c.success }}>{notice}</span>}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+          {/* Kaldırma yalnızca KAYITLI içerikte: yeni içerikte kaldıracak bir
+              şey yok, "Vazgeç" zaten aynı işi görüyor. */}
+          {post && (
+            <button
+              onClick={() => setSilinecek(true)}
+              style={{
+                marginRight: publishableAccounts.length > 0 ? 0 : "auto",
+                fontSize: 13,
+                padding: "6px 12px",
+                background: "transparent",
+                border: `1px solid ${c.border}`,
+                borderRadius: 8,
+                cursor: "pointer",
+                color: c.danger,
+              }}
+            >
+              Kaldır
+            </button>
+          )}
           {/* Doğrudan yayın yalnızca bağlı kanal varken görünür; elle yönetilen
               hesaplarda düğme olsaydı basınca hiçbir şey olmayacaktı. */}
           {publishableAccounts.length > 0 && (
@@ -647,6 +702,7 @@ export default function SocialPostComposer({
               disabled={publishing || saving || uploading}
               style={{
                 marginRight: "auto",
+                order: -1,
                 fontSize: 13,
                 padding: "6px 14px",
                 background: SOCIAL_PLATFORMS.instagram.color,
@@ -693,6 +749,16 @@ export default function SocialPostComposer({
           </button>
         </div>
       </div>
+
+      {silinecek && post && (
+        <ConfirmDialog
+          title="İçerik kaldırılsın mı?"
+          message={`"${post.title}" listeden kaldırılacak. Kayıt siliniyor değil arşivleniyor; gerekirse geri alınabilir.`}
+          confirmLabel="Kaldır"
+          onConfirm={remove}
+          onCancel={() => setSilinecek(false)}
+        />
+      )}
     </Modal>
   );
 }

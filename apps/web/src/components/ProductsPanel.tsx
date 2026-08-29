@@ -3,6 +3,7 @@ import type { Product } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
+import { useDragScroll } from "../lib/useDragScroll";
 import ProductCard from "./ProductCard";
 import AddEditProductModal from "./AddEditProductModal";
 
@@ -20,6 +21,12 @@ interface Props {
   // taşıyan tek bir menü açıyor (bkz. OrganizationDetail HomeAddFabRegistrar) ve
   // "Ürün ekle" orada zaten var — ikinci kez kaydedilirse menüde iki kere çıkardı.
   useFab?: boolean;
+  // "scroll" (varsayılan): Anasayfa özetindeki gibi TEK SATIR, yana kaydırmalı.
+  // "grid": ayrı Ürün/Hizmet sekmesindeki gibi satıra sığdığı kadar yan yana
+  // dizilip taşınca alt satıra geçen ızgara. DepartmentsPanel'deki aynı prop ile
+  // birebir aynı anlamda — ikisi anasayfada alt alta duruyor, davranışları da
+  // aynı adla anlatılsın.
+  layout?: "scroll" | "grid";
 }
 
 // Ürün Yönetimi departmanından eklenen ürün/hizmetler; hem departman detayında hem de
@@ -27,10 +34,11 @@ interface Props {
 // OrganizationDetail) ve ayrı "Ürün/Hizmet" sekmesinde iş kartlarıyla aynı
 // görünümde (bkz. ProductCard) listelenir.
 const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPanel(
-  { organizationId, departmentId, useFab = true },
+  { organizationId, departmentId, useFab = true, layout = "scroll" },
   ref
 ) {
   const c = useThemeColors();
+  const scrollRef = useDragScroll<HTMLDivElement>(layout === "scroll");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -76,9 +84,28 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
           {'Henüz ürün/hizmet yok. Sayfadaki "+" ile Ürün Yönetimi departmanına ürün/hizmet ekleyebilirsin.'}
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+        <div
+          ref={scrollRef}
+          style={
+            layout === "grid"
+              ? { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }
+              : {
+                  display: "flex",
+                  flexWrap: "nowrap",
+                  gap: 14,
+                  overflowX: "auto",
+                  paddingBottom: 6,
+                  WebkitOverflowScrolling: "touch",
+                }
+          }
+        >
           {products.map((p) => (
-            <ProductCard key={p.id} product={p} onEdit={() => setEditing(p)} onCoverUpdated={() => load()} />
+            // Kaydırmalı satırda kart genişliği SABİT: flex öğeleri varsayılan
+            // olarak büzülüyor ve otuz ürün eklendiğinde hepsi satıra sıkışıp
+            // okunamaz hale geliyordu (bkz. DepartmentsPanel'deki aynı ölçü).
+            <div key={p.id} style={layout === "grid" ? undefined : { flex: "0 0 260px", width: 260 }}>
+              <ProductCard product={p} onEdit={() => setEditing(p)} onCoverUpdated={() => load()} />
+            </div>
           ))}
         </div>
       )}

@@ -8,6 +8,7 @@ import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo } from "../lib/undo";
 import DepartmentCard from "./DepartmentCard";
 import { IconX } from "./icons";
+import { useDragScroll } from "../lib/useDragScroll";
 
 export interface DepartmentsPanelHandle {
   openAdd: () => void;
@@ -42,6 +43,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useDragScroll<HTMLDivElement>(layout === "scroll");
   const registerReorderUndo = useReorderUndo();
   const departmentsRef = useLatestRef(departments);
 
@@ -133,7 +135,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
         </div>
       ) : (
         <div
-          ref={layout === "grid" ? listRef : undefined}
+          ref={layout === "grid" ? listRef : scrollRef}
           style={
             layout === "grid"
               ? { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }

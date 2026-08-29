@@ -270,7 +270,7 @@ export default function DepartmentDetail() {
                     {/* "+" hem modül hem ürün ekleyebiliyor: iki panel de kendi
                         eylemini kaydeder, BottomNav ikisini tek menüde birleştirir
                         (bkz. lib/projectFab.tsx mergeActions). */}
-                    <ProductsPanel organizationId={department.organizationId} departmentId={department.id} />
+                    <ProductsPanel organizationId={department.organizationId} departmentId={department.id} layout="grid" />
                   </div>
                 )}
               </>

@@ -4,6 +4,8 @@ import { aiChat } from "../api/aiChat";
 import type { AiCredits as AiCreditsData, AiCreditTransaction } from "../api/aiChat";
 import { IconSparkle } from "../components/icons";
 import AiCreditTopUp from "../components/AiCreditTopUp";
+import { useCurrentUser } from "../lib/useCurrentUser";
+import { demoHesap } from "../lib/demoHesap";
 
 const TYPE_LABELS: Record<AiCreditTransaction["type"], string> = {
   topup: "Kredi yüklemesi",
@@ -18,6 +20,11 @@ export default function AiCreditsPage() {
   const [credits, setCredits] = useState<AiCreditsData | null>(null);
   const [transactions, setTransactions] = useState<AiCreditTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  // Demo hesabında Lio ücretsiz: bakiye diye görünen sayı aslında saatlik
+  // deneme tavanından kalan kısım (bkz. backend demo-ai-kotasi.ts). Kredi
+  // yükleme arka uçta da kapalı, düğmeyi göstermek boşuna hataya çıkarırdı.
+  const { user: me } = useCurrentUser();
+  const demoHesabi = me?.email?.toLowerCase() === demoHesap.email;
 
   // Sipariş oluşturulunca da çağrılır: ödeme entegrasyonu bağlandığında kredi
   // anında yükleneceği için bakiyenin tazelenmesi gerekir.
@@ -69,7 +76,27 @@ export default function AiCreditsPage() {
         )}
       </div>
 
-      {isLow && (
+      {demoHesabi && (
+        <div
+          style={{
+            maxWidth: 480,
+            marginBottom: 22,
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: "rgba(192,129,63,0.10)",
+            border: `1px solid ${c.accent}`,
+            color: c.textPrimary,
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}
+        >
+          Demo hesabındasın: Lio ücretsiz, krediden düşmüyor. Yukarıdaki sayı, bütün ziyaretçilerin
+          paylaştığı saatlik deneme hakkından kalan kısım — dolarsa bir süre sonra kendiliğinden
+          yenileniyor. Kendi hesabında böyle bir sınır yok.
+        </div>
+      )}
+
+      {!demoHesabi && isLow && (
         <div
           style={{
             maxWidth: 480,
@@ -87,7 +114,7 @@ export default function AiCreditsPage() {
         </div>
       )}
 
-      <AiCreditTopUp onChanged={reload} />
+      {!demoHesabi && <AiCreditTopUp onChanged={reload} />}
 
       <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 10px", maxWidth: 480 }}>
         Hareketler

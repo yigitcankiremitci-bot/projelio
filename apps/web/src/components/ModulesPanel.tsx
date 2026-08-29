@@ -3,6 +3,7 @@ import type { Department, ModuleCatalogEntry, OrganizationModule } from "@projel
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import ModuleCard from "./ModuleCard";
+import { useDragScroll } from "../lib/useDragScroll";
 
 interface Props {
   organizationId: string;
@@ -18,6 +19,7 @@ const SINGLE_ROW_LIMIT = 4;
 
 export default function ModulesPanel({ organizationId }: Props) {
   const c = useThemeColors();
+  const scrollRef = useDragScroll<HTMLDivElement>();
   const [enabled, setEnabled] = useState<OrganizationModule[]>([]);
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -72,6 +74,7 @@ export default function ModulesPanel({ organizationId }: Props) {
         // Az sayıda modülde iki satır tuhaf duruyor (üç modül 2+1 diye
         // bölünürdü), o yüzden eşik altında tek satır kalıyor.
         <div
+          ref={scrollRef}
           style={{
             display: "grid",
             gridAutoFlow: "column",

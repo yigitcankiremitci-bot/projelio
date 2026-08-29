@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import type { DepartmentMember, JobMember, SocialAccount, SocialPost } from "@projelio/shared";
+import type { DepartmentMember, JobMember, SocialAccount, SocialPost, SocialPostStatus } from "@projelio/shared";
 import { safeExternalUrl } from "@projelio/shared";
 import { api } from "../api/client";
 import { socialMediaApi, type SocialScope } from "../api/socialMedia";
+import { filesApi } from "../api/files";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import {
   ACTIVE_STATUSES,
@@ -27,6 +28,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import SocialAccountModal from "./SocialAccountModal";
 import SocialPostComposer from "./SocialPostComposer";
 import { IconChevronLeft, IconChevronRight, IconEdit, IconExternalLink, IconTrash } from "./icons";
+import { useDragScroll } from "../lib/useDragScroll";
 
 interface Props {
   organizationId?: string;
@@ -53,6 +55,8 @@ type View = "calendar" | "list" | "accounts";
  */
 export default function SocialMediaPanel({ organizationId, departmentId, jobId, canWrite = true }: Props) {
   const c = useThemeColors();
+  const havuzScrollRef = useDragScroll<HTMLDivElement>();
+  const panoScrollRef = useDragScroll<HTMLDivElement>();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [members, setMembers] = useState<{ id: string; label: string }[]>([]);
@@ -210,7 +214,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   };
 
   const archivePost = async (post: SocialPost) => {
-    if (!window.confirm(`"${post.title}" arşivlensin mi?`)) return;
+    if (!window.confirm(`"${post.title}" kaldırılsın mı? Kayıt arşivlenir, gerekirse geri alınabilir.`)) return;
     setPosts((ps) => ps.filter((p) => p.id !== post.id));
     await socialMediaApi.archivePost(post.id).catch(() => load());
   };
@@ -348,6 +352,108 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     </span>
   );
 
+  /**
+   * Kart üzerindeki küçük medya önizlemesi.
+   *
+   * NEDEN: içerikte görsel/video olup olmadığı yalnızca pencere açılınca
+   * görünüyordu; "bu içerik hazır mı" sorusunu cevaplamak için her kartı tek tek
+   * açmak gerekiyordu. Kapak görseli kartta durursa cevap bakışta veriliyor.
+   *
+   * YALNIZCA KAPAK (ilk medya) çekiliyor. Her görselin imzalı adresi ayrı bir
+   * istek demek (bkz. filesApi.contentUrl); bir aylık takvimde 40 içerik varsa
+   * hepsinin tüm görsellerini istemek onlarca gereksiz çağrı olurdu. Kapak,
+   * "içinde ne var" sorusuna zaten yetiyor.
+   */
+  const kapakMedya = (post: SocialPost) => (post.media ?? [])[0];
+
+  const [kapakAdresleri, setKapakAdresleri] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let iptal = false;
+    const gorseller = posts
+      .map(kapakMedya)
+      .filter((m): m is NonNullable<typeof m> => !!m && (m.mimeType ?? "").startsWith("image/"))
+      // Zaten çekilmiş adresi tekrar isteme: panel her tazelendiğinde (oda
+      // sinyali, sürükleme) bu efekt yeniden koşuyor.
+      .filter((m) => !kapakAdresleri[m.fileId]);
+    if (gorseller.length === 0) return;
+
+    Promise.all(
+      gorseller.map(async (m) => {
+        try {
+          return [m.fileId, await filesApi.contentUrl(m.fileId)] as const;
+        } catch {
+          // Dosya Drive'dan silinmiş ya da erişim yok: kart yazısız kutuyla
+          // devam etsin, panel hata vermesin.
+          return null;
+        }
+      })
+    ).then((ciftler) => {
+      if (iptal) return;
+      const yeni = Object.fromEntries(ciftler.filter(Boolean) as (readonly [string, string])[]);
+      if (Object.keys(yeni).length) setKapakAdresleri((o) => ({ ...o, ...yeni }));
+    });
+
+    return () => {
+      iptal = true;
+    };
+  }, [posts]);
+
+  /** Kartın solundaki kare önizleme. Medyası olmayan içerikte hiç çizilmez. */
+  const kapakKutusu = (post: SocialPost, compact: boolean) => {
+    const medya = kapakMedya(post);
+    if (!medya) return null;
+    const boy = compact ? 18 : 30;
+    const adres = kapakAdresleri[medya.fileId];
+    const video = (medya.mimeType ?? "").startsWith("video/");
+    const adet = (post.media ?? []).length;
+    return (
+      <span
+        title={adet > 1 ? `${adet} medya` : (medya.name ?? "medya")}
+        style={{
+          position: "relative",
+          flexShrink: 0,
+          width: boy,
+          height: boy,
+          borderRadius: 4,
+          overflow: "hidden",
+          background: "#0000000F",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: compact ? 9 : 11,
+          color: c.textSecondary,
+        }}
+      >
+        {adres ? (
+          <img src={adres} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          // Video'nun karesi yok, görselin adresi de henüz gelmemiş olabilir.
+          // İkisinde de kutu YİNE çizilir: "medya var" bilgisi tek başına değerli.
+          <span>{video ? "▶" : "🖼"}</span>
+        )}
+        {/* Birden fazla medya varsa sayısı köşede: kapak tek başına yanıltmasın. */}
+        {adet > 1 && (
+          <span
+            style={{
+              position: "absolute",
+              right: 0,
+              bottom: 0,
+              padding: "0 3px",
+              borderTopLeftRadius: 4,
+              background: "rgba(26,31,41,0.72)",
+              color: "#fff",
+              fontSize: compact ? 8 : 9,
+              lineHeight: 1.4,
+            }}
+          >
+            {adet}
+          </span>
+        )}
+      </span>
+    );
+  };
+
   const postCard = (post: SocialPost, compact: boolean) => (
     <div
       key={post.id}
@@ -357,8 +463,8 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       title={post.caption ?? post.title}
       style={{
         display: "flex",
-        flexDirection: "column",
-        gap: 2,
+        alignItems: compact ? "center" : "flex-start",
+        gap: 6,
         padding: compact ? "3px 6px" : "6px 8px",
         borderRadius: 6,
         cursor: "pointer",
@@ -368,26 +474,93 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         color: c.textPrimary,
       }}
     >
-      <span
-        style={{
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          fontWeight: 500,
-          textDecoration: post.status === "cancelled" ? "line-through" : undefined,
-        }}
-      >
-        {postTime(post) ? `${postTime(post)} · ` : ""}
-        {post.title}
-      </span>
-      {!compact && (
-        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {channelDots(post)}
-          {statusBadge(post)}
+      {kapakKutusu(post, compact)}
+      {/* minWidth: 0 — yazı sütununun taşmak yerine kısalması için (flex
+          çocuğu varsayılan olarak içeriğinden küçülmüyor). */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
+        <span
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontWeight: 500,
+            textDecoration: post.status === "cancelled" ? "line-through" : undefined,
+          }}
+        >
+          {postTime(post) ? `${postTime(post)} · ` : ""}
+          {post.title}
         </span>
-      )}
+        {!compact && (
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {channelDots(post)}
+            {statusBadge(post)}
+          </span>
+        )}
+      </div>
     </div>
   );
+
+  /**
+   * Fikir havuzunun sütunları — takvime girmeden önceki hazırlık yolu.
+   *
+   * Etiketler uydurulmadı, modülün KENDİ durum sözlüğünden geliyor
+   * (bkz. lib/socialMedia.ts SOCIAL_STATUS): aynı içerik listede ve takvimde de
+   * durumuyla etiketleniyor, havuzda başka bir ad taşısaydı tek bir durum için
+   * iki sözcük dolaşırdı.
+   *
+   * "Diğer" sütunu yalnızca DOLUYSA çizilir. Onaylanmış ama tarihi olmayan bir
+   * içerik üç sütuna da girmiyor; sütun olmasaydı kart ekrandan kaybolurdu —
+   * kullanıcı onu sildiğimizi sanardı.
+   */
+  const HAVUZ_STATUSLERI: SocialPostStatus[] = ["idea", "draft", "ready"];
+
+  const havuzSutunlari: {
+    anahtar: string;
+    baslik: string;
+    renk: string;
+    status: SocialPostStatus | null;
+    tutar: (s: SocialPostStatus) => boolean;
+  }[] = [
+    ...HAVUZ_STATUSLERI.map((status) => ({
+      anahtar: status,
+      baslik: SOCIAL_STATUS[status].label,
+      renk: SOCIAL_STATUS[status].color,
+      status,
+      tutar: (s: SocialPostStatus) => s === status,
+    })),
+    ...(visiblePosts.some((p) => !p.scheduledAt && !HAVUZ_STATUSLERI.includes(p.status))
+      ? [
+          {
+            anahtar: "diger",
+            baslik: "Diğer",
+            renk: c.textSecondary,
+            // Bırakılamaz: "Diğer" bir aşama değil, artakalanların yeri.
+            status: null,
+            tutar: (s: SocialPostStatus) => !HAVUZ_STATUSLERI.includes(s),
+          },
+        ]
+      : []),
+  ];
+
+  /**
+   * Kartı havuzun bir sütununa bırakmak: durumu değiştirir VE tarihi kaldırır.
+   *
+   * İkisi tek istekte gidiyor; takvimden sürüklenen bir kart için "önce tarihi
+   * sil, sonra durumu değiştir" iki ayrı yazma demekti ve ilki başarılıp
+   * ikincisi düşerse içerik yarım bir durumda kalırdı.
+   */
+  const havuzaTasi = async (postId: string, status: SocialPostStatus | null) => {
+    if (!status) return;
+    const post = posts.find((p) => p.id === postId);
+    if (!post) return;
+    if (post.status === status && !post.scheduledAt) return;
+    setPosts((ps) => ps.map((p) => (p.id === postId ? { ...p, status, scheduledAt: undefined } : p)));
+    try {
+      upsertPost(await socialMediaApi.updatePost(postId, { status, scheduledAt: null }));
+    } catch {
+      load();
+    }
+  };
 
   // ============================================================ Takvim
   const calendar = () => {
@@ -473,33 +646,76 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           })}
         </div>
 
-        {/* Tarihsiz içerikler: fikir havuzu. Takvimden ayrı durur ama görünür
-            kalır — "sonra planlarım" dediği içerik kaybolmasın. */}
+        {/* Fikir havuzu: tarihi olmayan içerikler.
+            Eskiden tek bir yığındı ve "burada bekliyor" demekten başka bir şey
+            söylemiyordu; hangi içeriğin yazılmayı beklediği, hangisinin
+            gönderilmeye hazır olduğu ancak kartlar tek tek açılarak
+            anlaşılıyordu. Artık hazırlık aşamasına göre üç sütun — takvime
+            girmeden önceki yol. */}
         <div
-          onDragOver={(e) => canWrite && e.preventDefault()}
-          onDrop={(e) => {
-            if (!canWrite) return;
-            const id = e.dataTransfer.getData("text/plain");
-            if (id) socialMediaApi.reschedule(id, null).then(load).catch(() => load());
-          }}
           style={{
             border: `1px dashed ${c.border}`,
             borderRadius: 8,
             padding: 8,
             display: "flex",
             flexDirection: "column",
-            gap: 6,
+            gap: 8,
           }}
         >
           <span style={{ fontSize: 12, color: c.textSecondary }}>
-            Tarihsiz fikirler ({unscheduled.length}) — buraya sürükleyerek takvimden çıkarabilirsiniz
+            Fikir havuzu ({unscheduled.length}) — takvimden buraya sürükleyerek tarihi kaldırır,
+            sütunlar arasında sürükleyerek durumunu değiştirirsin
           </span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {unscheduled.map((p) => (
-              <div key={p.id} style={{ minWidth: 160 }}>
-                {postCard(p, false)}
-              </div>
-            ))}
+          <div ref={havuzScrollRef} style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
+            {havuzSutunlari.map((sutun) => {
+              const items = unscheduled.filter((p) => sutun.tutar(p.status));
+              return (
+                <div
+                  key={sutun.anahtar}
+                  onDragOver={(e) => canWrite && e.preventDefault()}
+                  onDrop={(e) => {
+                    if (!canWrite) return;
+                    e.stopPropagation();
+                    const id = e.dataTransfer.getData("text/plain");
+                    if (id) havuzaTasi(id, sutun.status);
+                  }}
+                  style={{
+                    minWidth: 190,
+                    flex: "1 1 190px",
+                    background: c.background,
+                    border: `1px solid ${c.border}`,
+                    borderRadius: 8,
+                    padding: 8,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: sutun.renk }}>{sutun.baslik}</span>
+                    <span style={{ fontSize: 11, color: c.textSecondary }}>{items.length}</span>
+                  </div>
+                  {items.length === 0 && (
+                    <span style={{ fontSize: 11, color: c.textSecondary }}>Buraya sürükle</span>
+                  )}
+                  {items.map((p) => (
+                    <div key={p.id} style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>{postCard(p, false)}</div>
+                      {canWrite && (
+                        <button
+                          onClick={() => archivePost(p)}
+                          aria-label="Kaldır"
+                          title="Kaldır"
+                          style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
+                        >
+                          <IconTrash size={12} color={c.textSecondary} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -577,7 +793,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       (s) => ACTIVE_STATUSES.includes(s) || visiblePosts.some((p) => p.status === s)
     );
     return (
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+      <div ref={panoScrollRef} style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
         {columns.map((status) => {
           const items = visiblePosts.filter((p) => p.status === status);
           return (
@@ -991,6 +1207,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           members={members}
           onClose={() => setComposer(null)}
           onSaved={upsertPost}
+          onDeleted={(postId) => setPosts((ps) => ps.filter((p) => p.id !== postId))}
         />
       )}
 

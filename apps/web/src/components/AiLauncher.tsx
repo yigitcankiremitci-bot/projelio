@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { LIO_LAUNCHER, Z } from "../lib/layout";
+import { LIO_LAUNCHER, Z, lioBottomCss } from "../lib/layout";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { onAskLio } from "../lib/askLio";
 import { setLioPanelOpen } from "../lib/lioPanel";
@@ -92,7 +92,9 @@ export default function AiLauncher() {
   }, []);
 
   // Mobilde alt menünün üstünde kalsın; masaüstünde ekranın sağ altına otursun.
-  const bottom = isDesktop ? LIO_LAUNCHER.bottomDesktop : LIO_LAUNCHER.bottomMobile;
+  // Sayı değil CSS: çentikli telefonlarda menü güvenli alan kadar büyüyor ve
+  // düz 96 px'te duran balon menünün üstüne biniyordu (bkz. lioBottomCss).
+  const bottom = lioBottomCss(isDesktop);
   const size = isDesktop ? LIO_LAUNCHER.sizeDesktop : LIO_LAUNCHER.sizeMobile;
 
   return (

@@ -5,11 +5,17 @@
  *   node scripts/demo-anlik-goruntu-al.mjs          # yazar
  *   node scripts/demo-anlik-goruntu-al.mjs --rapor  # yalnızca sayar, dosyaya dokunmaz
  *
- * NE İŞE YARAR: `ceo@celikhan.test` herkese açık bir demo hesabı ve her girişte
- * verisi bu dosyadan geri yükleniyor (bkz.
- * backend/src/modules/demo/demo-sifirlama.service.ts). Yani bu dosya "demonun
- * ilk hali"dir. Demo verisini elle güzelleştirdikten sonra bu scripti bir kez
- * çalıştır; o andaki hal yeni "ilk hal" olur.
+ * DİKKAT — ARTIK BİRİNCİL YOL DEĞİL. Demonun geri yüklenen "ilk hali" migration
+ * 075'ten sonra veritabanındaki `demo_anlik_goruntu` tablosunda tutuluyor ve
+ * Admin paneli > Demo hesabı bölümünden güncelleniyor. Bu dosya FABRİKA AYARI:
+ * yalnızca o tablo boşken (ör. migration henüz uygulanmadıysa) kullanılıyor.
+ *
+ * Yani bu scripti çalıştırmak için bir sebebin olması gerekir: depoya taze bir
+ * yedek koymak ya da tabloyu tamamen sıfırdan kurmak. Günlük düzenleme için
+ * panelden düzenleme kipini kullan.
+ *
+ * NOT: buradaki tablo/kapsam listesi backend'deki demo-kapsam.ts ile aynı
+ * olmalı; birini değiştirirsen diğerini de güncelle.
  *
  * NEYİ ALIR: demo şirketine ait, id'si demo aralığında (`ce11...`) olan satırlar.
  * Uygulamanın kendi ürettiği kayıtlar (rutin motorunun açtığı görevler,

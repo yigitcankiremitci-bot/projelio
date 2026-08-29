@@ -13,7 +13,7 @@ import { useProjectFab } from "../lib/projectFab";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { tourAnchor } from "../lib/tour/types";
-import { SIDEBAR_WIDTH, Z } from "../lib/layout";
+import { SIDEBAR_WIDTH, Z, BOTTOM_NAV_HEIGHT } from "../lib/layout";
 import { useHomeTarget } from "../lib/homeTarget";
 
 const rightItems = [
@@ -313,7 +313,7 @@ export default function BottomNav({ sidebarOpen }: Props) {
           right: 0,
           // Safe-area (çentikli telefonlar) yüksekliğe eklenir. Yükseklik ve üst padding,
           // simge + etiketin bara sığması ve üstten taşmaması için 58px'ten 68px'e çıkarıldı.
-          height: "calc(68px + env(safe-area-inset-bottom))",
+          height: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))`,
           background: c.surface,
           borderTop: `1px solid ${c.border}`,
           display: "flex",

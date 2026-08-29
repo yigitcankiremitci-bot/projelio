@@ -17,6 +17,7 @@ import { AuthGuard } from "@nestjs/passport";
 import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guard";
 import { memoryStorage } from "multer";
 import { ProductsService } from "./products.service";
+import type { ProductWriteInput } from "./products.service";
 import { AccessService } from "../../common/access/access.service";
 
 @Controller()
@@ -37,11 +38,7 @@ export class ProductsController {
   }
 
   @Post("organizations/:organizationId/products")
-  create(
-    @Param("organizationId") organizationId: string,
-    @Body() body: { departmentId?: string; name: string; description?: string; price?: number; currency?: string },
-    @Req() req: any
-  ) {
+  create(@Param("organizationId") organizationId: string, @Body() body: ProductWriteInput, @Req() req: any) {
     return this.productsService.create(organizationId, body, req.user.userId);
   }
 
@@ -57,20 +54,40 @@ export class ProductsController {
   }
 
   @Patch("products/:id")
-  update(
-    @Param("id") id: string,
-    @Body() body: { name?: string; description?: string; price?: number; currency?: string },
-    @Req() req: any
-  ) {
+  update(@Param("id") id: string, @Body() body: ProductWriteInput, @Req() req: any) {
     return this.productsService.update(id, body, req.user.userId);
   }
 
+  // Galeriye bir fotoğraf ekler. İlk fotoğraf aynı zamanda vitrin görseli olur
+  // (bkz. ProductsService.syncCoverFromImages).
+  @Post("products/:id/images")
+  @UseGuards(UploadRateLimitGuard)
+  @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }))
+  addImage(@Param("id") id: string, @Req() req: any, @UploadedFile() file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException("Dosya bulunamadı");
+    return this.productsService.addImage(id, file, req.user.userId);
+  }
+
+  // Ürünün tek kapağı olduğu dönemden kalan uç. Açık duran eski bir sekme hâlâ
+  // buraya yükleyebilir; davranışı artık "galeriye ekle" ile aynı.
   @Post("products/:id/cover")
   @UseGuards(UploadRateLimitGuard)
   @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }))
   uploadCover(@Param("id") id: string, @Req() req: any, @UploadedFile() file?: Express.Multer.File) {
     if (!file) throw new BadRequestException("Dosya bulunamadı");
-    return this.productsService.uploadCover(id, file, req.user.userId);
+    return this.productsService.addImage(id, file, req.user.userId);
+  }
+
+  @Delete("products/:id/images/:imageId")
+  removeImage(@Param("id") id: string, @Param("imageId") imageId: string, @Req() req: any) {
+    return this.productsService.removeImage(id, imageId, req.user.userId);
+  }
+
+  // Sıralama: listenin ilk elemanı vitrin görseli olur.
+  @Patch("products/:id/images/order")
+  reorderImages(@Param("id") id: string, @Body() body: { imageIds?: string[] }, @Req() req: any) {
+    if (!Array.isArray(body?.imageIds)) throw new BadRequestException("imageIds listesi gerekli");
+    return this.productsService.reorderImages(id, body.imageIds, req.user.userId);
   }
 
   @Delete("products/:id")

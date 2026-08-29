@@ -13,6 +13,7 @@ import Modal from "./Modal";
 import TaskFromRecordModal from "./TaskFromRecordModal";
 import ModuleFieldInput from "./ModuleFieldInput";
 import { IconEdit, IconListCheck, IconTrash } from "./icons";
+import { useDragScroll } from "../lib/useDragScroll";
 
 // Kayıtların sahibi iki türlü olabilir (bkz. 037_freelancer_modules.sql):
 // bir organizasyon (şirket/işletme departman modülleri) ya da bir iş (serbest
@@ -93,6 +94,7 @@ export default function ModuleRecordsPanel({
   canWrite = true,
 }: Props) {
   const c = useThemeColors();
+  const sutunScrollRef = useDragScroll<HTMLDivElement>();
   const [records, setRecords] = useState<ModuleRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [formMode, setFormMode] = useState<FormMode>(null);
@@ -644,6 +646,7 @@ export default function ModuleRecordsPanel({
 
           {view === "board" && boardField && (
             <div
+              ref={sutunScrollRef}
               style={{
                 display: "grid",
                 // Sütun sayısı sabit değil: ekrana sığdığı kadar sütun, kalanı

@@ -4,7 +4,7 @@ import { COVER_VEIL_HEIGHT, coverBackground } from "../lib/covers";
 import type { LioSubject } from "../lib/askLio";
 import AskLioButton from "./AskLioButton";
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { pageGutter, TOP_CHROME_BOTTOM } from "../lib/layout";
+import { COVER_TOP_CLEARANCE, pageGutter, TOP_CHROME_BOTTOM } from "../lib/layout";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import { IconChevronLeft } from "./icons";
@@ -48,6 +48,12 @@ const ASIDE_TOP_CLEARANCE = BELL_BAND_BOTTOM - COVER_PADDING;
  * altına girmesin diye sağda bu kadar yer ayrılır (katlıyken kart = fotoğraf).
  */
 const MOBILE_ASIDE_RESERVE = 104;
+/**
+ * Dar ekranda bindirilen kartın (fotoğraf + altındaki Lio rozeti) kapladığı
+ * yükseklik. Kapak bundan kısa kalırsa kart bandına sığmıyor ve ortalanırken
+ * iki uçtan da taşıyor: üstte çanın, altta düzenleme düğmesinin üstüne biner.
+ */
+const MOBILE_ASIDE_BAND = 160;
 /**
  * Dar ekranda kapağın tavanı.
  *
@@ -232,15 +238,35 @@ export default function EntityCover({
   const coverHeight = isDesktop ? height : Math.min(height, MOBILE_MAX_HEIGHT);
   const showAside = Boolean(aside) && isDesktop;
   const showAsideOverlay = Boolean(aside) && !isDesktop && asideOnMobile;
+  /**
+   * Dar ekranda kapağın alt sınırı: yazı bloğu kadar (minHeight ile kendiliğinden
+   * uzar) ama bindirilen kart varsa onun bandını da karşılamalı.
+   */
+  const mobileMinHeight = showAsideOverlay
+    ? Math.max(coverHeight, BELL_BAND_BOTTOM + MOBILE_ASIDE_BAND + COVER_PADDING + (action ? ACTION_BAND : 0))
+    : coverHeight;
 
   return (
     <div
       ref={coverRef}
       style={{
         position: "relative",
-        height: coverHeight,
+        // Telefonda SABİT yükseklik değil, ALT SINIR.
+        //
+        // Yazı bloğu (geri bağlantısı + başlık + açıklama + künye) uzun bir
+        // şirket adında 190 px'i buluyor; sabit 220 px'lik kapakta üstteki
+        // yüzen düğmelerin bandına giriyor, `overflow: hidden` de taşan kısmı
+        // kırpıyordu. Şirket sayfasında sonuç şuydu: geri bağlantısı logonun
+        // altında kayboluyor, başlık kenar çubuğu okuyla üst üste biniyordu.
+        // Artık kapak gerektiği kadar uzuyor; kısa içerikte yine 220'de kalır.
+        ...(isDesktop ? { height: coverHeight } : { minHeight: mobileMinHeight }),
         background: coverBackground(coverImageUrl, seed),
-        padding: `${isDesktop ? 20 : 16}px ${gutter}px`,
+        // Dar ekranda üst boşluk sabit düğmelerin bandından TÜRETİLİR
+        // (bkz. lib/layout COVER_TOP_CLEARANCE); masaüstünde kapak zaten
+        // şeridin altında başladığı için gerekmiyor.
+        padding: isDesktop
+          ? `20px ${gutter}px`
+          : `${COVER_TOP_CLEARANCE}px ${gutter}px 16px`,
         display: "flex",
         overflow: "hidden",
       }}

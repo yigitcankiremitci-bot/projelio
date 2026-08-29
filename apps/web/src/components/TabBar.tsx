@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { IconChevronLeft, IconChevronRight } from "./icons";
+import { useDragScroll } from "../lib/useDragScroll";
 
 export interface TabBarItem {
   key: string;
@@ -203,6 +204,9 @@ function FittedTabBar({ tabs, active, onChange, style }: Props) {
 function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
   const c = useThemeColors();
   const scrollerRef = useRef<HTMLDivElement>(null);
+  // Aynı düğüm: çubuk zaten kendi kaydırma konumunu ölçüyor (ok düğmeleri
+  // için), kanca da onu fareyle sürüklenebilir yapıyor.
+  useDragScroll<HTMLDivElement>(true, scrollerRef);
   const [edges, setEdges] = useState({ atStart: true, atEnd: true });
 
   useEffect(() => {

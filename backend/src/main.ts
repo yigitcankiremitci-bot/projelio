@@ -128,10 +128,23 @@ async function bootstrap() {
   // filtre "TypeError: fetch failed" deyip asıl sebebi (error.cause) yutuyordu.
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  // Render gibi platformlar dinlenen adresi 0.0.0.0 bekler; yalnızca localhost'a
-  // bağlanılırsa dışarıdan erişilemez ve sağlık kontrolü başarısız olur.
+  // Adres BİLEREK verilmiyor. İki ayrı gereksinim var ve ikisini de karşılayan
+  // tek seçenek bu:
+  //
+  // 1. Render gibi platformlar dışarıdan erişilebilir bir adres bekler; yalnızca
+  //    localhost'a bağlanılırsa sağlık kontrolü başarısız olur.
+  // 2. Ama "0.0.0.0" YALNIZCA IPv4 demek. macOS'ta `localhost` önce ::1'e
+  //    (IPv6) çözülüyor ve Vite geliştirme sunucusu da yalnızca [::1]'e
+  //    bağlanıyor. Backend IPv4'te, sayfa IPv6'da kalınca tarayıcıdaki her
+  //    istek "Failed to fetch" ile düşüyordu — sunucu ayakta olmasına ve
+  //    curl 127.0.0.1 ile 200 dönmesine rağmen.
+  //
+  // Adres verilmediğinde Node çift yığın (::) dinler, yani hem IPv4 hem IPv6
+  // bağlantılarını kabul eder; IPv6'nın olmadığı ortamlarda kendisi 0.0.0.0'a
+  // düşer. Buraya tekrar sabit bir adres yazılacaksa ikisi de sınanmalı:
+  // `curl http://127.0.0.1:3000/health` VE `curl "http://[::1]:3000/health"`.
   const port = Number(process.env.PORT ?? 3000);
-  await app.listen(port, "0.0.0.0");
+  await app.listen(port);
   logger.log(`Backend hazır · port ${port}`);
 }
 bootstrap();

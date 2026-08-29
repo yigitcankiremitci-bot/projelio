@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { SupabaseService } from "../../database/supabase.service";
 import { AiCreditsService } from "./ai-credits.service";
 import { CREDIT_PACKAGES, findCreditPackage } from "./ai-credits.config";
+import { demoHesabindaYasak } from "../../common/demo-hesap";
 import type { CreditPackage } from "./ai-credits.config";
 
 export type CreditOrderStatus = "pending_payment" | "paid" | "cancelled" | "failed";
@@ -82,6 +83,11 @@ export class AiCreditOrdersService {
    * "500.000 kredi, 1 ₺" diye bir sipariş uydurabilirdi.
    */
   async create(userId: string, packageKey: string): Promise<CreditOrder> {
+    // Demo hesabında kredi satın alınmaz: Lio zaten ücretsiz ve saatlik tavanla
+    // sınırlı (bkz. demo-ai-kotasi.ts). Ziyaretçinin açtığı sipariş kayıtları
+    // demo sıfırlamasının kapsamı dışında kalır, yani kalıcı çöp bırakırdı.
+    demoHesabindaYasak(userId, "kredi satın alma");
+
     const pkg = findCreditPackage(packageKey);
     if (!pkg) throw new BadRequestException("Geçersiz kredi paketi.");
 

@@ -19,6 +19,7 @@ import { useTaskSelection } from "../lib/useTaskSelection";
 import { selectedLioTasks } from "../lib/askLio";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { usePageHeaderActions } from "../lib/pageHeader";
+import { useDragScroll } from "../lib/useDragScroll";
 
 const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
 
@@ -101,6 +102,8 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
 }, ref) {
   const c = useThemeColors();
   const isDesktop = useIsDesktop();
+  // Pano yalnızca masaüstünde yana kayıyor; dar ekranda sütunlar alt alta.
+  const boardScrollRef = useDragScroll<HTMLDivElement>(isDesktop);
   const [outputs, setOutputs] = useState<Output[]>([]);
   const [selectedOutputId, setSelectedOutputId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -283,6 +286,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
     <>
       {/* Masaüstünde üç sütun yan yana, dar ekranda alt alta. */}
       <div
+        ref={boardScrollRef}
         style={{
           display: "flex",
           flexDirection: isDesktop ? "row" : "column",

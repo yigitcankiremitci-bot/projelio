@@ -15,6 +15,7 @@ import { useTaskSelection } from "../lib/useTaskSelection";
 import { selectedLioTasks } from "../lib/askLio";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
+import { useDragScroll } from "../lib/useDragScroll";
 
 export interface DepartmentTasksPanelHandle {
   openCreate: () => void;
@@ -37,6 +38,8 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
 ) {
   const c = useThemeColors();
   const isDesktop = useIsDesktop();
+  // Pano yalnızca masaüstünde yana kayıyor; dar ekranda sütunlar alt alta.
+  const boardScrollRef = useDragScroll<HTMLDivElement>(isDesktop);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -315,6 +318,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
       {/* Masaüstünde üç sütun (Devam eden/Yapılacak/Tamamlandı) yan yana, dar ekranda
           (mobil) alt alta — bkz. useIsDesktop. */}
       <div
+        ref={boardScrollRef}
         style={{
           display: "flex",
           flexDirection: isDesktop ? "row" : "column",

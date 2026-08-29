@@ -208,11 +208,25 @@ export default function OrganizationDetail() {
         // collapsible: mobilde yalnızca fotoğraf durur, kapsül dokununca yandan
         // kayarak çıkar — kapak fotoğrafının köşesi sürekli kapalı kalmasın.
         aside={
-          // Lio kredisi rozeti kişi kartının solunda: kart sağa dayanmak üzere
-          // kurulu (bkz. ProfileCard), sağına bir şey konulamaz.
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
+          // Masaüstünde rozet kartın SOLUNDA: kart sağa dayanmak üzere kurulu
+          // (bkz. ProfileCard), sağına bir şey konulamaz.
+          //
+          // TELEFONDA ALTINDA. Kart katlıyken bile kendi açılır kapsülü kadar
+          // yer kaplıyor (yalnızca görünmüyor, kayıp duruyor); yan yana dizilen
+          // satır 375 px'lik ekranda 412 px'e çıkıp rozeti ekranın SOLUNA,
+          // başlığın üstüne itiyordu. Anasayfa aynı sebeple sütun kullanıyor
+          // (bkz. Dashboard) — burada da öyle.
+          <div
+            style={{
+              display: "flex",
+              flexDirection: isDesktop ? "row" : "column",
+              alignItems: isDesktop ? "center" : "flex-end",
+              gap: 8,
+            }}
+          >
+            {isDesktop && prefs.showLio && <AiCreditsChip />}
             <ProfileCard compact={!isDesktop} collapsible />
+            {!isDesktop && prefs.showLio && <AiCreditsChip compact />}
           </div>
         }
         asideOnMobile
@@ -266,7 +280,7 @@ export default function OrganizationDetail() {
         {activeTab === "departments" && <DepartmentsPanel organizationId={id} layout="grid" />}
         {/* Sekme zaten gizli; ?tab= ile zorlansa da panel açılmasın (sunucu 403 döner). */}
         {activeTab === "products" && access?.canViewCommercial !== false && (
-          <ProductsPanel organizationId={id} departmentId={productDepartmentId} />
+          <ProductsPanel organizationId={id} departmentId={productDepartmentId} layout="grid" />
         )}
         {activeTab === "budget" && access?.canViewBudget === true && (
           <>

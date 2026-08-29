@@ -21,6 +21,7 @@ import DashboardAssignedModules from "../components/DashboardAssignedModules";
 import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
 import { tourAnchor } from "../lib/tour/types";
+import { useDragScroll } from "../lib/useDragScroll";
 
 // Sabit sekmeler + (varsa) terfi etmiş modül sekmeleri. Modül sekmeleri
 // "Modüller"in soluna girer: kullanıcı en sık kullandığı modülü çekirdek
@@ -136,6 +137,8 @@ export default function Dashboard() {
   // yerine geçer, sekme çubuğunun kopyası ise ancak aslı ekrandan çıkınca belirir.
   const headerRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
+  // Sabit şeritteki sekme KOPYASI yana kayıyor (akıştaki çubuk sarıyor, kaymıyor).
+  const stickyTabsRef = useDragScroll<HTMLDivElement>();
   // Masaüstünde sol sidebar'da zaten Organizasyonlar/Gruplar linkleri var;
   // bu kısayol satırı sadece sidebar'ın kaybolduğu mobil görünümde gösterilir.
   const isDesktop = useIsDesktop();
@@ -262,7 +265,7 @@ export default function Dashboard() {
   // Şerit kopyası sarmaz, yana kaydırılır: 68 px'lik bantta ikinci satır yeri yok.
   usePageHeader(pageTitle, headerRef, [pageTitle]);
   usePageHeaderTabs(
-    <div style={{ display: "flex", gap: 4, overflowX: "auto", scrollbarWidth: "none" }}>{tabButtons}</div>,
+    <div ref={stickyTabsRef} style={{ display: "flex", gap: 4, overflowX: "auto", scrollbarWidth: "none" }}>{tabButtons}</div>,
     [tab, tabs.length],
     tabsRef
   );
@@ -303,14 +306,30 @@ export default function Dashboard() {
         {/* Hem masaüstünde hem mobilde sağa dayalı: kartın kendi kompozisyonu
             (sağa hizalı metin, sağdaki avatar, transformOrigin: right) sağ kenara
             yaslandığında doğru duruyor. */}
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: isDesktop ? 12 : 8 }}>
-          {/* Lio kredisi rozeti kişi kartının SOLUNDA: kart sağ kenara dayanmak
-              (bleedRight) üzerine kurulu, sağına bir şey konulamaz. Lio gizlenmişse
-              (Ayarlar > Yardımcılar) rozet de görünmez — kullanmadığı bir aracın
-              bakiyesi anasayfada yer kaplamasın. */}
-          {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
+        <div
+          style={{
+            display: "flex",
+            // Lio kredisi rozeti kartın ALTINDA, sütun olarak. Yanına konamıyor:
+            // kart sağ kenara dayanmak (bleedRight) üzerine kurulu, yani sağında
+            // yer yok; solunda ise başlık ile kart arasına sıkışıp ikisinden de
+            // kopuk duruyordu.
+            flexDirection: "column",
+            // Kart sağa dayalı olduğu için rozet de sağa hizalı. Rozet BİLEREK
+            // taşmıyor: sayfanın geri kalanı (başlık, sekmeler) gibi normal
+            // dolgu kenarında bitiyor, taşan tek şey kartın kendisi.
+            alignItems: "flex-end",
+            // Kart üstte hover'da scale(1.15) ile büyüyor (bkz. ProfileCard,
+            // transformOrigin: right center) — aşağı doğru ~5 px taşıyor.
+            // Boşluk bunu karşılayacak kadar, yoksa büyüyen kart rozetin
+            // üstüne biniyor.
+            gap: isDesktop ? 12 : 8,
+          }}
+        >
           {/* Tam sayfa dolgusu kadar: kart kenara dayanır ama avatar kırpılmaz. */}
           <ProfileCard bleedRight={isDesktop ? 28 : 16} compact={!isDesktop} />
+          {/* Lio gizlenmişse (Ayarlar > Yardımcılar) rozet de görünmez —
+              kullanmadığı bir aracın bakiyesi anasayfada yer kaplamasın. */}
+          {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
         </div>
       </div>
 

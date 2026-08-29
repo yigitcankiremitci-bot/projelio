@@ -3,34 +3,28 @@ import { BadRequestException } from "@nestjs/common";
 /**
  * Adres güvenlik kuralının SUNUCU tarafındaki kopyası.
  *
- * NEDEN KOPYA — iki kez kırıldıktan sonra buraya yazıldı:
+ * NEDEN KOPYA:
  *
- * 1. `@projelio/shared`'dan DEĞER import edilemiyor. Paket derlenmeden, ham `.ts`
- *    olarak yayınlanıyor (`main: "src/index.ts"`). Web tarafında sorun değil,
- *    Vite paketliyor. Ama backend `node dist/main` ile çalışıyor ve oradaki
- *    `require("@projelio/shared")` çağrısını Node'un kendisi çözmek zorunda:
- *    `src/index.ts`'i önce CommonJS diye ayrıştırıyor, `export *` yüzünden
- *    başarısız oluyor, ES modülü olarak yeniden ayrıştırıyor — ve ES modüllerinde
- *    `./types` gibi uzantısız göreli importlar çözülmüyor:
- *
- *        Error [ERR_MODULE_NOT_FOUND]: Cannot find module
- *        .../packages/shared/src/types imported from .../packages/shared/src/index.ts
- *
- *    Bu yüzden repodaki TÜM backend importları `import type` — derlemede
- *    silindikleri için paket çalışma anında hiç yüklenmiyor. Yazılı olmayan ama
- *    gerçek bir kural.
- *
- * 2. `packages/shared/src/safeUrl` dosyasını göreli yolla almak da olmuyor:
- *    import `backend/src` dışına çıkınca tsc'nin çıkarımsal rootDir'i depo köküne
- *    kayıyor ve `nest build` çıktıyı `dist/backend/src/main.js` altına taşıyor.
- *    `render.yaml` ise `node backend/dist/main` çalıştırıyor — yani üretim kırılır.
+ * `packages/shared/src/safeUrl` dosyasını GÖRELİ yolla almak olmuyor: import
+ * `backend/src` dışına çıkınca tsc'nin çıkarımsal rootDir'i depo köküne kayıyor
+ * ve `nest build` çıktıyı `dist/backend/src/main.js` altına taşıyor.
+ * `render.yaml` ise `node backend/dist/main` çalıştırıyor — yani üretim kırılır.
  *
  * KURAL BU YÜZDEN İKİ YERDE: burada (sunucu) ve `packages/shared/src/safeUrl.ts`
  * (web). İkisinin ayrışmaması `safe-url.test.ts` ile sabitleniyor — o test iki
  * uygulamayı aynı girdilerle karşılaştırıyor ve biri değişirse kırılır.
  *
- * Kalıcı çözüm `packages/shared`'a bir derleme adımı eklemek (dist + CommonJS),
- * ama o monorepo iş akışını değiştiren ayrı bir iş.
+ * ESKİMİŞ NOT (2026-08-29'da düzeltildi): burada eskiden "`@projelio/shared`'dan
+ * DEĞER import edilemez, hepsi `import type` olmalı" yazıyordu. Sebebi paketin
+ * derlenmeden ham `.ts` olarak yayınlanmasıydı; `node dist/main` içindeki
+ * `require("@projelio/shared")` çağrısını Node çözemiyor, `ERR_MODULE_NOT_FOUND:
+ * .../packages/shared/src/types` ile backend açılışta çöküyordu. Yazılı olmayan
+ * bu kural zamanla üç yerde sessizce kırıldı (kurulum sihirbazı, Lio'nun modül
+ * tanımları, proje takip linki). Artık paketin bir derleme adımı var
+ * (`packages/shared/tsconfig.build.json` + `package.json` içindeki "exports":
+ * Node CommonJS `dist`i, paketleyiciler kaynağı okuyor) ve backend değer de
+ * import edebiliyor. Buradaki kopya yine de duruyor — sebebi yukarıdaki rootDir
+ * meselesi, o değişmedi.
  *
  * ---
  *

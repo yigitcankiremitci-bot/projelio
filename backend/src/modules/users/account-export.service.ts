@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import * as ExcelJS from "exceljs";
 import { SupabaseService } from "../../database/supabase.service";
 import { UsersService } from "./users.service";
+import { SECTOR_LABEL, TEAM_SIZE_LABEL, USE_CASE_LABEL } from "@projelio/shared";
 
 /**
  * Kullanıcının kendi verisinin Excel çıktısı.
@@ -46,9 +47,21 @@ export class AccountExportService {
       ["Projelio veri çıktısı", ""],
       ["Hesap", user?.email ?? ""],
       ["Ad soyad", user?.fullName ?? ""],
+      ["Kullanıcı adı", user?.username ?? ""],
       ["Oluşturulma", new Date().toLocaleString("tr-TR")],
       ["", ""],
-      ["Bu dosyada ne var", "Sana atanmış görevler, sahibi olduğun işler ve projeler, kendi bütçe kayıtların, kişisel yapılacakların."],
+      // Profil/sihirbaz alanları da kişisel veri; KVKK çıktısı bunları da içermeli.
+      // Boş olanlar da satır olarak kalıyor: kullanıcı neyin TUTULMADIĞINI da görsün.
+      ["Profil bilgilerim", ""],
+      ["Unvan", user?.title ?? ""],
+      ["Kısa tanıtım", user?.bio ?? ""],
+      ["Telefon", user?.phone ?? ""],
+      ["Sektör", user?.sector ? SECTOR_LABEL[user.sector] : ""],
+      ["Ekip büyüklüğü", user?.teamSize ? TEAM_SIZE_LABEL[user.teamSize] : ""],
+      ["Kullanım amacı", (user?.useCases ?? []).map((u) => USE_CASE_LABEL[u]).join(", ")],
+      ["Seçtiğim modüller", (user?.onboardingModules ?? []).join(", ")],
+      ["", ""],
+      ["Bu dosyada ne var", "Profil bilgilerin, sana atanmış görevler, sahibi olduğun işler ve projeler, kendi bütçe kayıtların, kişisel yapılacakların."],
       ["Bu dosyada ne YOK", "Ekip arkadaşlarının verisi, Drive/OneDrive'daki dosyaların (onlar kendi bulut hesabında duruyor), Lio sohbet geçmişi."],
     ]);
     kapak.getRow(1).font = { bold: true, size: 14 };

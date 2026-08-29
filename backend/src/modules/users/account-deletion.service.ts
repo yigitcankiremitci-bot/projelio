@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { verifyPassword } from "../../common/password.util";
+import { demoHesabindaYasak } from "../../common/demo-hesap";
 import { UsersService } from "./users.service";
 import { EmailService } from "../auth/email.service";
 import {
@@ -72,6 +73,9 @@ export class AccountDeletionService {
    *                 atlanır — orada şifre diye bir şey yok.
    */
   async requestDeletion(userId: string, password?: string): Promise<{ ok: true; purgeAt: string }> {
+    // DEMO HESABI silinemez — herkese açık, ortak bir hesap (bkz. demo-hesap.ts).
+    demoHesabindaYasak(userId, "hesap silme");
+
     const user = await this.usersService.findById(userId);
     if (!user) throw new BadRequestException("Kullanıcı bulunamadı.");
     if (user.deletedAt) throw new BadRequestException("Bu hesap zaten silinmiş.");
@@ -374,6 +378,14 @@ export class AccountDeletionService {
         avatar_url: null,
         title: null,
         bio: null,
+        // Kurulum sihirbazında toplanan kişisel veri de burada silinmeli — yeni bir
+        // profil sütunu eklendiğinde bu listeye eklemeyi unutma, yoksa "silinmiş"
+        // satırda kişisel bilgi kalır.
+        phone: null,
+        sector: null,
+        team_size: null,
+        use_cases: null,
+        onboarding_modules: null,
         deleted_at: new Date().toISOString(),
       })
       .eq("id", userId);

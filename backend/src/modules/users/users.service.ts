@@ -4,6 +4,9 @@ import { BadRequestException, ConflictException, Injectable } from "@nestjs/comm
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { detectImageUpload } from "../../common/upload-image.util";
+import { demoHesabindaYasak } from "../../common/demo-hesap";
+import type { Sector, TeamSize, UseCase } from "@projelio/shared";
+import { SECTORS, TEAM_SIZES, USE_CASES } from "@projelio/shared";
 
 const AVATAR_BUCKET = "avatars";
 
@@ -30,6 +33,12 @@ export interface UserRecord {
   avatarUrl?: string;
   title?: string;
   bio?: string;
+  // Kurulum sihirbazında toplanan opsiyonel profil/tercih alanları.
+  phone?: string;
+  sector?: Sector;
+  teamSize?: TeamSize;
+  useCases?: UseCase[];
+  onboardingModules?: string[];
 }
 
 // Dışarıya (frontend'e) dönülen güvenli kullanıcı görünümü - şifre hash'i içermez.
@@ -46,10 +55,27 @@ export interface PublicUser {
   avatarUrl?: string;
   title?: string;
   bio?: string;
+  // DİKKAT: phone/sector/teamSize/useCases/onboardingModules bilerek BURADA YOK.
+  // Bu tip /users/:id ve /users/search ile BAŞKA kullanıcılara dönüyor; sihirbazda
+  // toplanan telefon ve tercih bilgisi kişiseldir, yalnızca kişinin kendisine
+  // (/auth/me) gösterilir. Buraya alan eklemeden önce "bunu herkes görebilir mi?"
+  // sorusunu sor.
 }
 
 const USERNAME_PATTERN = /^[a-z0-9_.]{3,30}$/;
 const ACCOUNT_TYPES: AccountType[] = ["freelancer", "organization_owner", "group_owner", "employee", "subcontractor"];
+
+// Kurulum sihirbazının "Seni tanıyalım" + "Kullanacağın modüller" adımlarından gelen,
+// tamamı opsiyonel yük. Hesap tipinden ayrı tutuluyor çünkü hesap tipi zorunlu.
+export interface OnboardingProfile {
+  title?: string;
+  bio?: string;
+  phone?: string;
+  sector?: Sector;
+  teamSize?: TeamSize;
+  useCases?: UseCase[];
+  onboardingModules?: string[];
+}
 
 function mapUser(row: any): UserRecord {
   return {
@@ -67,11 +93,25 @@ function mapUser(row: any): UserRecord {
     avatarUrl: row.avatar_url ?? undefined,
     title: row.title ?? undefined,
     bio: row.bio ?? undefined,
+    phone: row.phone ?? undefined,
+    sector: row.sector ?? undefined,
+    teamSize: row.team_size ?? undefined,
+    useCases: row.use_cases ?? undefined,
+    onboardingModules: row.onboarding_modules ?? undefined,
   };
 }
 
 function toPublicUser(user: UserRecord): PublicUser {
-  const { passwordHash: _passwordHash, ...publicUser } = user;
+  // Şifre hash'inin yanında kişisel/tercih alanları da düşürülür — bkz. PublicUser.
+  const {
+    passwordHash: _passwordHash,
+    phone: _phone,
+    sector: _sector,
+    teamSize: _teamSize,
+    useCases: _useCases,
+    onboardingModules: _onboardingModules,
+    ...publicUser
+  } = user;
   return publicUser;
 }
 
@@ -313,16 +353,53 @@ export class UsersService {
     return merged;
   }
 
-  // İlk giriş onboarding sihirbazını tamamlar: hesap tipini kaydeder. Organizasyon/Grup
-  // oluşturma işi (varsa) çağıran taraf (UsersController) tarafından ayrıca yapılır —
-  // bu metod sadece users satırını günceller.
-  async completeOnboarding(userId: string, accountType: AccountType): Promise<PublicUser> {
+  // İlk giriş onboarding sihirbazını tamamlar: hesap tipini ve sihirbazda toplanan
+  // opsiyonel profil/tercih alanlarını kaydeder. Organizasyon/Grup oluşturma işi
+  // (varsa) çağıran taraf (UsersController) tarafından ayrıca yapılır — bu metod
+  // sadece users satırını günceller.
+  //
+  // Profil alanlarının hiçbiri zorunlu değil: sihirbazın "Seni tanıyalım" adımı
+  // atlanabiliyor. Geçersiz bir seçenek gelirse hata atmak yerine SESSİZCE düşürülür —
+  // kullanıcı, katalogdan kalkmış bir sektör anahtarı yüzünden kurulumu tamamlayamaz
+  // duruma düşmemeli (sihirbaz kapatılamıyor, o kişi uygulamaya hiç giremezdi).
+  async completeOnboarding(
+    userId: string,
+    accountType: AccountType,
+    profile: OnboardingProfile = {}
+  ): Promise<PublicUser> {
     if (!ACCOUNT_TYPES.includes(accountType)) {
       throw new BadRequestException("Geçersiz hesap tipi");
     }
+
+    const patch: Record<string, unknown> = {
+      account_type: accountType,
+      onboarding_completed_at: new Date().toISOString(),
+    };
+
+    const title = profile.title?.trim();
+    if (title) patch.title = title.slice(0, 80);
+    const bio = profile.bio?.trim();
+    if (bio) patch.bio = bio.slice(0, 280);
+    const phone = profile.phone?.trim();
+    if (phone) patch.phone = phone.slice(0, 30);
+    if (profile.sector && SECTORS.includes(profile.sector)) patch.sector = profile.sector;
+    if (profile.teamSize && TEAM_SIZES.includes(profile.teamSize)) patch.team_size = profile.teamSize;
+    if (Array.isArray(profile.useCases)) {
+      const clean = [...new Set(profile.useCases.filter((u) => USE_CASES.includes(u)))];
+      if (clean.length) patch.use_cases = clean;
+    }
+    if (Array.isArray(profile.onboardingModules)) {
+      // Modül anahtarları katalogdan geliyor; burada yalnızca boyut/biçim sınırı
+      // koyuyoruz. Bu sütun yetki taşımıyor, erişim departman üyeliğinden geliyor.
+      const clean = [...new Set(profile.onboardingModules.filter((k) => typeof k === "string" && k.trim()))]
+        .map((k) => k.trim().slice(0, 60))
+        .slice(0, 100);
+      if (clean.length) patch.onboarding_modules = clean;
+    }
+
     const { data: row, error } = await this.supabase.client
       .from("users")
-      .update({ account_type: accountType, onboarding_completed_at: new Date().toISOString() })
+      .update(patch)
       .eq("id", userId)
       .select()
       .maybeSingle();
@@ -391,6 +468,11 @@ export class UsersService {
     currentPassword: string | undefined,
     newPassword: string
   ): Promise<{ ok: true; hasPassword: true }> {
+    // DEMO HESABI: şifre değiştirilemez. Şifresi tanıtım sitesinde yazan ortak
+    // bir hesap bu; değiştiren ilk ziyaretçi demoyu herkese kapatırdı ve geri
+    // dönüşü olmazdı (sıfırlama e-postası @celikhan.test adresine gidemez).
+    demoHesabindaYasak(userId, "şifre değiştirme");
+
     if (typeof newPassword !== "string" || newPassword.length < 8) {
       throw new BadRequestException("Yeni şifre en az 8 karakter olmalı.");
     }

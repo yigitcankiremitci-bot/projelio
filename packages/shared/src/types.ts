@@ -21,6 +21,72 @@ export const DEFAULT_TITLE_BY_ACCOUNT_TYPE: Record<AccountType, string> = {
   subcontractor: "Taşeron",
 };
 
+// ---------------------------------------------------------- Onboarding profili
+
+// Kurulum sihirbazının "Seni tanıyalım" adımında sorulan alanların seçenekleri.
+// Sabit listeler burada duruyor ki backend doğrulaması ile arayüzdeki etiketler
+// ayrışmasın — serbest metin olsaydı aynı sektör on farklı yazımla kaydedilirdi.
+
+export type TeamSize = "tek_kisi" | "2_5" | "6_20" | "21_50" | "50_plus";
+export const TEAM_SIZE_LABEL: Record<TeamSize, string> = {
+  tek_kisi: "Yalnızca ben",
+  "2_5": "2-5 kişi",
+  "6_20": "6-20 kişi",
+  "21_50": "21-50 kişi",
+  "50_plus": "50+ kişi",
+};
+export const TEAM_SIZES = Object.keys(TEAM_SIZE_LABEL) as TeamSize[];
+
+// Sektör listesi kapalı uçlu: "diger" seçilirse kullanıcı serbest metin yazmaz,
+// yalnızca bu değer kaydedilir. Yeni sektör gerekirse buraya eklenir.
+export type Sector =
+  | "yazilim"
+  | "insaat"
+  | "danismanlik"
+  | "uretim"
+  | "perakende"
+  | "saglik"
+  | "egitim"
+  | "reklam_medya"
+  | "lojistik"
+  | "finans"
+  | "diger";
+export const SECTOR_LABEL: Record<Sector, string> = {
+  yazilim: "Yazılım / Teknoloji",
+  insaat: "İnşaat / Mimarlık",
+  danismanlik: "Danışmanlık",
+  uretim: "Üretim / Sanayi",
+  perakende: "Perakende / E-ticaret",
+  saglik: "Sağlık",
+  egitim: "Eğitim",
+  reklam_medya: "Reklam / Medya",
+  lojistik: "Lojistik / Nakliye",
+  finans: "Finans / Muhasebe",
+  diger: "Diğer",
+};
+export const SECTORS = Object.keys(SECTOR_LABEL) as Sector[];
+
+// Kullanıcının Projelio'yu ne için kullanacağı — çoklu seçim. Arayüzü kişiselleştirmek
+// (hangi sekmenin öne çıkacağı) ve hangi modüllerin önerileceği için kullanılır.
+export type UseCase =
+  | "gorev_takibi"
+  | "proje_yonetimi"
+  | "ekip_koordinasyonu"
+  | "musteri_takibi"
+  | "butce_finans"
+  | "dosya_dokuman"
+  | "planlama_takvim";
+export const USE_CASE_LABEL: Record<UseCase, string> = {
+  gorev_takibi: "Görev takibi",
+  proje_yonetimi: "Proje yönetimi",
+  ekip_koordinasyonu: "Ekip koordinasyonu",
+  musteri_takibi: "Müşteri / cari takibi",
+  butce_finans: "Bütçe ve finans",
+  dosya_dokuman: "Dosya ve doküman yönetimi",
+  planlama_takvim: "Planlama ve takvim",
+};
+export const USE_CASES = Object.keys(USE_CASE_LABEL) as UseCase[];
+
 // Organizasyonun ölçeği. Aynı şema, ölçek farkı — sihirbazda kullanıcı seçer.
 export type OrgType = "sirket" | "isletme";
 export const ORG_TYPE_LABEL: Record<OrgType, string> = {
@@ -54,6 +120,15 @@ export interface User {
   // Kullanıcının kendi profilinde gösterdiği görev/unvan (örn. "Serbest Grafik Tasarımcı").
   title?: string;
   bio?: string;
+  // Kurulum sihirbazının "Seni tanıyalım" adımında toplanan alanlar — hepsi opsiyonel,
+  // adım atlanabiliyor. Sektör/ekip/kullanım amacı arayüzü kişiselleştirmek için.
+  phone?: string;
+  sector?: Sector;
+  teamSize?: TeamSize;
+  useCases?: UseCase[];
+  // Sihirbazda "şunları kullanacağım" diye işaretlenen module_catalog anahtarları.
+  // Yetki DEĞİLDİR, yalnızca tercih/öneri: modüle erişim departman üyeliğinden gelir.
+  onboardingModules?: string[];
   // Hesabın bir şifresi var mı. Google ile açılan hesaplarda password_hash null
   // kalabiliyor (bkz. users.service createFromGoogle); Ayarlar > Hesap orada
   // "mevcut şifre" sormak yerine ilk kez şifre belirletir. Şifrenin kendisi
@@ -568,6 +643,135 @@ export interface Project {
   createdAt: string;
   archivedAt?: string;
   sortOrder?: number;
+}
+
+// --- Proje paylaşım linki (üyelik gerektirmeyen takip) -----------------------
+// Proje sahibi, hesabı olmayan kişilere (müşteri, yatırımcı, danışman) projeyi
+// takip ettirmek için salt okunur bir link üretir. Ne görüneceği link
+// oluşturulurken seçilir; bkz. migration 073.
+
+/**
+ * Linkte NELERİN görüneceği.
+ *
+ * Alan adları proje sayfasının sekmeleriyle aynı (bkz. ProjectTabs): sahibin
+ * "neyi paylaşıyorum" kararı, uygulamada gördüğü şeyle aynı isimde olsun.
+ *
+ * Özet (başlık, durum, tarihler, ilerleme) her linkte var, o yüzden burada yok:
+ * kapatılabilseydi geriye boş bir sayfa kalırdı.
+ */
+export interface ProjectShareVisibility {
+  tasks: boolean;
+  outputs: boolean;
+  /** Ekip adları ve unvanları. Kapalıyken görevlerdeki atanan adları da gizlenir. */
+  team: boolean;
+  feed: boolean;
+  /** Yalnızca dosya ADLARI. İndirme bağlantısı hiçbir koşulda paylaşılmaz. */
+  files: boolean;
+  budget: boolean;
+}
+
+export const PROJECT_SHARE_VISIBILITY_KEYS: (keyof ProjectShareVisibility)[] = [
+  "tasks",
+  "outputs",
+  "team",
+  "feed",
+  "files",
+  "budget",
+];
+
+/** Sahibin gördüğü link kaydı. `token` yalnızca linki YÖNETEN kişiye döner. */
+export interface ProjectShareLink {
+  id: string;
+  projectId: string;
+  token: string;
+  /** Kopyalanmaya hazır tam adres; sunucu WEB_APP_URL'den üretir. */
+  url: string;
+  label?: string;
+  visibility: ProjectShareVisibility;
+  expiresAt?: string;
+  revokedAt?: string;
+  viewCount: number;
+  lastViewedAt?: string;
+  createdAt: string;
+  /** Sunucunun kararı: süresi dolmuş ya da iptal edilmiş link artık açılmıyor. */
+  active: boolean;
+}
+
+export interface CreateProjectShareLinkInput {
+  label?: string;
+  visibility: ProjectShareVisibility;
+  /** Gün cinsinden ömür. Verilmezse süresiz. */
+  expiresInDays?: number;
+}
+
+/** Linki açan kişinin gördüğü görev — atanan adı yalnızca ekip açıksa gelir. */
+export interface PublicProjectTask {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  startDate?: string;
+  /** Görevin bitiş tarihi (tasks.deadline). */
+  deadline?: string;
+  completedAt?: string;
+  outputId?: string;
+  assigneeName?: string;
+}
+
+export interface PublicProjectOutput {
+  id: string;
+  title: string;
+  description?: string;
+}
+
+export interface PublicProjectMember {
+  /** Ad ve unvan yeter: e-posta, kullanıcı adı ve ücret hiçbir koşulda gitmez. */
+  fullName: string;
+  title?: string;
+}
+
+export interface PublicProjectPost {
+  id: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface PublicProjectFile {
+  id: string;
+  name: string;
+  createdAt?: string;
+}
+
+export interface PublicProjectBudget {
+  total: number;
+  spent: number;
+}
+
+/**
+ * Linki açan kişiye giden TÜM veri.
+ *
+ * Kapalı bölümler alan olarak HİÇ GELMEZ (undefined), boş dizi olarak değil:
+ * "kapalı" ile "boş" arasındaki farkı ön yüzün tahmin etmesi gerekmesin.
+ */
+export interface PublicProjectView {
+  title: string;
+  description?: string;
+  status: ProjectStatus;
+  startDate: string;
+  deadline: string;
+  coverImageUrl?: string;
+  /** Tamamlanan görev / toplam görev. Görev yoksa undefined. */
+  progressPercent?: number;
+  taskCounts?: { total: number; completed: number; inProgress: number; todo: number };
+  /** Projenin bağlı olduğu işin adı — "kim paylaştı" sorusunun cevabı. */
+  ownerName?: string;
+  updatedAt: string;
+  tasks?: PublicProjectTask[];
+  outputs?: PublicProjectOutput[];
+  team?: PublicProjectMember[];
+  feed?: PublicProjectPost[];
+  files?: PublicProjectFile[];
+  budget?: PublicProjectBudget;
 }
 
 // --- Program (kodda "operation") ---------------------------------------------

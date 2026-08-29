@@ -11,6 +11,7 @@ import DeleteAccountModal from "../components/DeleteAccountModal";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { backState } from "../lib/backTarget";
+import { demoHesap } from "../lib/demoHesap";
 import TabBar from "../components/TabBar";
 import GoogleDriveCard from "../components/GoogleDriveCard";
 import OneDriveCard from "../components/OneDriveCard";
@@ -253,6 +254,10 @@ export default function Settings() {
   // Şifresi olmayan hesaplar da var (Google ile açılanlar): orada "mevcut şifre"
   // sorulmaz, kullanıcı ilk şifresini belirler (bkz. users.service changePassword).
   const hasPassword = me?.hasPassword !== false;
+  // Herkese açık demo hesabında şifre değiştirme ve hesap silme kapalı: arka uç
+  // zaten reddediyor (bkz. backend/src/common/demo-hesap.ts), burada da formu
+  // hiç göstermiyoruz ki ziyaretçi doldurup hataya çarpmasın.
+  const demoHesabi = me?.email?.toLowerCase() === demoHesap.email;
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -407,6 +412,14 @@ export default function Settings() {
         )}
       </SettingCard>
 
+      {demoHesabi ? (
+        <SettingCard
+          title="Demo hesabı"
+          description="Bu hesap üye olmadan gezmek isteyenler için herkese açık. Şifresi değiştirilemez, hesap silinemez ve içeride yaptığın her değişiklik bir sonraki girişte geri alınır — istediğin gibi kurcalayabilirsin."
+        >
+          <span />
+        </SettingCard>
+      ) : (
       <SettingCard
         title={hasPassword ? "Şifre değiştir" : "Şifre belirle"}
         description={
@@ -478,6 +491,7 @@ export default function Settings() {
           <p style={{ color: c.success, fontSize: 14, margin: "8px 0 0" }}>Şifren güncellendi.</p>
         )}
       </SettingCard>
+      )}
 
       <CardGroup label="Hesabına bağlı sayfalar">
         <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, overflow: "hidden" }}>
@@ -527,16 +541,18 @@ export default function Settings() {
         ayarlarla aynı öbekte değil. Onay ve sonuç önizlemesi modalde
         (bkz. DeleteAccountModal) — buradaki düğme yalnızca kapıyı açıyor.
       */}
-      <CardGroup label="Tehlikeli bölge">
-        <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, overflow: "hidden" }}>
-          <button onClick={() => setHesapSiliniyor(true)} style={linkRowStyle}>
-            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 17, color: c.danger }}>Hesabımı sil</span>
-            </span>
-            <IconChevronRight size={16} color={c.textSecondary} />
-          </button>
-        </div>
-      </CardGroup>
+      {!demoHesabi && (
+        <CardGroup label="Tehlikeli bölge">
+          <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <button onClick={() => setHesapSiliniyor(true)} style={linkRowStyle}>
+              <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 17, color: c.danger }}>Hesabımı sil</span>
+              </span>
+              <IconChevronRight size={16} color={c.textSecondary} />
+            </button>
+          </div>
+        </CardGroup>
+      )}
 
       {hesapSiliniyor && (
         <DeleteAccountModal hasPassword={hasPassword} onClose={() => setHesapSiliniyor(false)} />

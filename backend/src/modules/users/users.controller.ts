@@ -25,6 +25,7 @@ import { AccountDeletionService } from "./account-deletion.service";
 import { AccountExportService } from "./account-export.service";
 import type { Response } from "express";
 import type { AccountType } from "./users.service";
+import type { Sector, TeamSize, UseCase } from "@projelio/shared";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { GroupsService } from "../groups/groups.service";
 
@@ -129,6 +130,15 @@ export class UsersController {
       // "sirket" (büyük ölçek) ya da "isletme" (küçük ölçek) — verilmezse "sirket" varsayılır.
       orgType?: "sirket" | "isletme";
       groupName?: string;
+      // "Seni tanıyalım" adımı — tamamı opsiyonel, adım atlanabiliyor.
+      title?: string;
+      bio?: string;
+      phone?: string;
+      sector?: Sector;
+      teamSize?: TeamSize;
+      useCases?: UseCase[];
+      // Sihirbazda işaretlenen modül anahtarları (tercih kaydı, yetki değil).
+      onboardingModules?: string[];
     }
   ) {
     const userId = req.user.userId;
@@ -147,7 +157,15 @@ export class UsersController {
       const group = await this.groupsService.create(userId, { name: body.groupName.trim() });
       groupId = group.id;
     }
-    const user = await this.usersService.completeOnboarding(userId, body.accountType);
+    const user = await this.usersService.completeOnboarding(userId, body.accountType, {
+      title: body.title,
+      bio: body.bio,
+      phone: body.phone,
+      sector: body.sector,
+      teamSize: body.teamSize,
+      useCases: body.useCases,
+      onboardingModules: body.onboardingModules,
+    });
     // Frontend, sihirbaz kapanınca kullanıcıyı doğrudan oluşturulan organizasyona/gruba
     // yönlendirebilsin diye kimlikleri de döneriz (departman seçimine hemen başlasın diye).
     return { ...user, organizationId, groupId };

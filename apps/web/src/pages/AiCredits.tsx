@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
 import { aiChat } from "../api/aiChat";
 import type { AiCredits as AiCreditsData, AiCreditTransaction } from "../api/aiChat";
 import { IconSparkle } from "../components/icons";
+import AiCreditTopUp from "../components/AiCreditTopUp";
 
 const TYPE_LABELS: Record<AiCreditTransaction["type"], string> = {
   topup: "Kredi yüklemesi",
@@ -18,7 +19,9 @@ export default function AiCreditsPage() {
   const [transactions, setTransactions] = useState<AiCreditTransaction[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  // Sipariş oluşturulunca da çağrılır: ödeme entegrasyonu bağlandığında kredi
+  // anında yükleneceği için bakiyenin tazelenmesi gerekir.
+  const reload = useCallback(() => {
     Promise.all([aiChat.getCredits(), aiChat.getTransactions(100)])
       .then(([balance, txs]) => {
         setCredits(balance);
@@ -27,6 +30,10 @@ export default function AiCreditsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   const isLow = !!credits && credits.balance < (credits.minBalanceToStart || 20);
 
@@ -76,9 +83,11 @@ export default function AiCreditsPage() {
             lineHeight: 1.5,
           }}
         >
-          Krediniz azaldı. Asistanı kullanmaya devam etmek için yönetici ile iletişime geçip kredi yükletebilirsiniz.
+          Krediniz azaldı. Asistanı kesintisiz kullanmak için aşağıdan kredi yükleyebilirsiniz.
         </div>
       )}
+
+      <AiCreditTopUp onChanged={reload} />
 
       <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 10px", maxWidth: 480 }}>
         Hareketler

@@ -2,6 +2,8 @@ import { Module } from "@nestjs/common";
 import { AiAssistantController } from "./ai-assistant.controller";
 import { AiAssistantService } from "./ai-assistant.service";
 import { AiCreditsService } from "./ai-credits.service";
+import { AiCreditOrdersService } from "./ai-credit-orders.service";
+import { AiPaymentProvider } from "./ai-payment.provider";
 import { AiConversationsService } from "./ai-conversations.service";
 import { AiAttachmentsService } from "./ai-attachments.service";
 import { AiTranscriptionService } from "./ai-transcription.service";
@@ -20,6 +22,11 @@ import { FilesModule } from "../files/files.module";
 import { PersonalTodosModule } from "../personal-todos/personal-todos.module";
 import { CloudStorageModule } from "../cloud-storage/cloud-storage.module";
 import { RealtimeModule } from "../realtime/realtime.module";
+import { CatalogModule } from "../catalog/catalog.module";
+import { OrganizationsModule } from "../organizations/organizations.module";
+import { OrganizationModulesModule } from "../organization-modules/organization-modules.module";
+import { JobModulesModule } from "../job-modules/job-modules.module";
+import { ModuleRecordsModule } from "../module-records/module-records.module";
 
 @Module({
   imports: [
@@ -47,6 +54,16 @@ import { RealtimeModule } from "../realtime/realtime.module";
     // Lio'nun yaptığı değişikliği kullanıcının ekranına anında taşımak için
     // (bkz. AiAssistantService.emitActivity). Yalnızca yayın yapılıyor.
     RealtimeModule,
+    // Modül araçları. Modül = departmanın (serbest çalışanda işin) defteri:
+    // Gelir-Gider, Fatura, Sözleşme… Lio hem defterin içeriğini (ModuleRecords)
+    // hem de hangi modüllerin açık olduğunu (OrganizationModules/JobModules)
+    // yönetebilsin diye. Katalog hangi modüllerin var olduğunu, Organizations
+    // ise kullanıcının hangi organizasyonlarda olduğunu söylüyor.
+    CatalogModule,
+    OrganizationsModule,
+    OrganizationModulesModule,
+    JobModulesModule,
+    ModuleRecordsModule,
   ],
   controllers: [AiAssistantController],
   providers: [
@@ -57,6 +74,8 @@ import { RealtimeModule } from "../realtime/realtime.module";
     AiTranscriptionService,
     AiSpeechService,
     AiSpendAlertProcessor,
+    AiCreditOrdersService,
+    AiPaymentProvider,
   ],
   // AiAssistantService dışarı açık: e-posta modülü yanıt taslağı üretmek için
   // draftText() çağırıyor (bkz. MailboxService.draftReply). Kredi muhasebesi ve

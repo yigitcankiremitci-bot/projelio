@@ -149,6 +149,33 @@ export interface AiCreditTransaction {
   createdAt: string;
 }
 
+export interface AiCreditPackage {
+  key: string;
+  label: string;
+  credits: number;
+  priceTry: number;
+  description: string;
+}
+
+export type AiCreditOrderStatus = "pending_payment" | "paid" | "cancelled" | "failed";
+
+export interface AiCreditOrder {
+  id: string;
+  userId: string;
+  packageKey: string;
+  credits: number;
+  priceAmount: number;
+  currency: string;
+  status: AiCreditOrderStatus;
+  paidAt?: string;
+  /** Dolu ise kredi bakiyeye geçmiştir; "paid" tek başına yeterli değil. */
+  creditedAt?: string;
+  note?: string;
+  createdAt: string;
+  userFullName?: string;
+  userEmail?: string;
+}
+
 export interface AiUserBalanceRow {
   userId: string;
   fullName: string;
@@ -253,7 +280,22 @@ export const aiChat = {
   getCredits: () => api.get<AiCredits>("/ai/credits"),
   getTransactions: (limit = 50) => api.get<AiCreditTransaction[]>(`/ai/credits/transactions?limit=${limit}`),
 
+  // Kredi yükleme (self-servis). Sipariş oluşturmak krediyi YÜKLEMEZ; ödeme
+  // doğrulanana kadar sipariş "ödeme bekliyor" durumunda kalır.
+  getCreditPackages: () =>
+    api.get<{ packages: AiCreditPackage[]; paymentConfigured: boolean }>("/ai/credit-packages"),
+  getCreditOrders: () => api.get<AiCreditOrder[]>("/ai/credit-orders"),
+  createCreditOrder: (packageKey: string) =>
+    api.post<{ order: AiCreditOrder; checkoutUrl: string | null }>("/ai/credit-orders", { packageKey }),
+  cancelCreditOrder: (id: string) => api.post<AiCreditOrder>(`/ai/credit-orders/${id}/cancel`, {}),
+
   // Yönetim
+  getAllCreditOrders: (status?: AiCreditOrderStatus) =>
+    api.get<AiCreditOrder[]>(`/ai/admin/credit-orders${status ? `?status=${status}` : ""}`),
+  markCreditOrderPaid: (id: string, reference?: string, note?: string) =>
+    api.post<AiCreditOrder>(`/ai/admin/credit-orders/${id}/mark-paid`, { reference, note }),
+  retryCreditOrder: (id: string) => api.post<AiCreditOrder>(`/ai/admin/credit-orders/${id}/retry-credit`, {}),
+
   topUp: (userId: string, credits: number, description?: string) =>
     api.post<AiCredits>("/ai/admin/credits/topup", { userId, credits, description }),
   getMarginReport: (days = 30) => api.get<Record<string, unknown>>(`/ai/admin/margin?days=${days}`),

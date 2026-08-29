@@ -20,6 +20,8 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
 import { AiAssistantService } from "./ai-assistant.service";
 import { AiCreditsService } from "./ai-credits.service";
+import { AiCreditOrdersService } from "./ai-credit-orders.service";
+import { AiPaymentProvider } from "./ai-payment.provider";
 import { AiConversationsService } from "./ai-conversations.service";
 import { toActiveFileInfo } from "./ai-assistant.service";
 import { AiSpeechService } from "./ai-speech.service";
@@ -47,7 +49,9 @@ export class AiAssistantController {
     private creditsService: AiCreditsService,
     private conversationsService: AiConversationsService,
     private attachmentsService: AiAttachmentsService,
-    private speechService: AiSpeechService
+    private speechService: AiSpeechService,
+    private creditOrders: AiCreditOrdersService,
+    private payment: AiPaymentProvider
   ) {}
 
   // --- Sohbet ------------------------------------------------------------
@@ -268,7 +272,70 @@ export class AiAssistantController {
     return this.creditsService.listTransactions(req.user.userId, Number(limit) || 50);
   }
 
+  // --- Kredi yükleme (self-servis) ----------------------------------------
+
+  // Satılan paketler. Fiyat sunucuda hesaplanır (bkz. ai-credits.config
+  // CREDIT_PACKAGES); istemci fiyat göndermez, yalnızca paket anahtarı seçer.
+  @Get("credit-packages")
+  creditPackages() {
+    return {
+      packages: this.creditOrders.listPackages(),
+      // Arayüz, ödeme otomatik alınamıyorsa havale yönergesi gösterir.
+      paymentConfigured: this.payment.isConfigured(),
+    };
+  }
+
+  @Get("credit-orders")
+  myCreditOrders(@Req() req: any) {
+    return this.creditOrders.listMine(req.user.userId);
+  }
+
+  /**
+   * Sipariş açar. DİKKAT: bu uç krediyi YÜKLEMEZ, yalnızca ödeme bekleyen bir
+   * kayıt oluşturur. Kredi ancak ödeme doğrulandıktan sonra yüklenir.
+   */
+  @Post("credit-orders")
+  async createCreditOrder(@Req() req: any, @Body() body: { packageKey: string }) {
+    const order = await this.creditOrders.create(req.user.userId, body?.packageKey);
+    // Ödeme sağlayıcısı bağlıysa kullanıcı oraya yönlendirilir; değilse null döner
+    // ve arayüz elle ödeme yönergesini gösterir (bkz. AiPaymentProvider).
+    const checkout = await this.payment.createCheckout(order);
+    return { order, checkoutUrl: checkout?.redirectUrl ?? null };
+  }
+
+  @Post("credit-orders/:id/cancel")
+  cancelCreditOrder(@Req() req: any, @Param("id") id: string) {
+    return this.creditOrders.cancel(req.user.userId, id);
+  }
+
   // --- Yönetim ------------------------------------------------------------
+
+  // Kredi siparişleri (yönetici). Ödeme bekleyenleri süzmek için ?status= verilir.
+  @Get("admin/credit-orders")
+  adminCreditOrders(@Req() req: any, @Query("status") status?: string) {
+    this.assertAdmin(req);
+    return this.creditOrders.listAll(status as any);
+  }
+
+  /**
+   * Yönetici ödemeyi doğrular ve kredi yüklenir.
+   *
+   * Ödeme sağlayıcısı bağlanana kadar krediyi yüklemenin self-servis akıştaki tek
+   * yolu budur — sipariş açmak tek başına kredi kazandırmaz. Entegrasyon geldiğinde
+   * sağlayıcının webhook'u da aynı servis metodunu çağıracak.
+   */
+  @Post("admin/credit-orders/:id/mark-paid")
+  markCreditOrderPaid(@Req() req: any, @Param("id") id: string, @Body() body: { reference?: string; note?: string }) {
+    this.assertAdmin(req);
+    return this.creditOrders.markPaid(id, req.user.userId, { reference: body?.reference, note: body?.note });
+  }
+
+  // "Ödendi ama kredi yüklenemedi" durumunda yeniden dener (bkz. retryCredit).
+  @Post("admin/credit-orders/:id/retry-credit")
+  retryCreditOrder(@Req() req: any, @Param("id") id: string) {
+    this.assertAdmin(req);
+    return this.creditOrders.retryCredit(id, req.user.userId);
+  }
 
   // Tüm kullanıcıların AI kredi bakiyesini tek listede döner (admin paneli için).
   @Get("admin/users-credits")

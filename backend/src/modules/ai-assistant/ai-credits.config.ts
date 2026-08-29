@@ -287,3 +287,57 @@ export const SPEND_SPIKE_MULTIPLIER = Number(process.env.AI_SPEND_SPIKE_MULTIPLI
  * Küçük sayılarda oran yanıltıcı: 0,02'den 0,10'a çıkmak "5 kat" ama önemsiz.
  */
 export const SPEND_SPIKE_FLOOR_USD = Number(process.env.AI_SPEND_SPIKE_FLOOR_USD ?? 1);
+
+// --- Kredi paketleri (self-servis yükleme) -------------------------------
+/**
+ * USD -> TRY kuru.
+ *
+ * DİKKAT: sabit bir sayıdır, canlı kur ÇEKİLMEZ. Kredi ekonomisinin tamamı USD
+ * üzerine kurulu (bkz. CREDIT_UNIT_USD), oysa kullanıcı ₺ ödüyor. Kur düştüğünde
+ * Projelio zarar eder — bu yüzden değer, ödeme entegrasyonu bağlanırken gözden
+ * geçirilmeli ve düzenli güncellenmeli (ya da AI_USD_TRY_RATE ile dışarıdan
+ * verilmeli). Buradaki varsayılan bir PLACEHOLDER'dır, fiyat politikası değildir.
+ */
+export const USD_TRY_RATE = Number(process.env.AI_USD_TRY_RATE ?? 42);
+
+export interface CreditPackage {
+  key: string;
+  label: string;
+  credits: number;
+  /** Sipariş anında dondurulan ₺ fiyat (bkz. ai_credit_orders.price_amount). */
+  priceTry: number;
+  description: string;
+}
+
+/**
+ * Satılan paketler.
+ *
+ * Fiyat UYDURULMAZ, mevcut ekonomiden türetilir: kredi × CREDIT_UNIT_USD zaten
+ * komisyon EKLENMİŞ satış bedelidir (bkz. calculateUsageCost), o da kurla ₺'ye
+ * çevrilir. Böylece paket fiyatı ile Lio'nun kredi düşme mantığı aynı tek kaynaktan
+ * beslenir; birinin değişip diğerinin unutulması mümkün olmaz.
+ *
+ * Kademeli indirim (çok alana ucuz) BİLEREK yok: o bir fiyat politikası kararıdır,
+ * teknik bir varsayılan değil. Gerekirse pakete bir `discountRate` eklenip burada
+ * uygulanmalı.
+ */
+const PACKAGE_SIZES: { key: string; label: string; credits: number; description: string }[] = [
+  { key: "mini", label: "Mini", credits: 25_000, description: "Ara sıra kullanım için." },
+  { key: "standart", label: "Standart", credits: 50_000, description: "Günlük düzenli kullanım." },
+  { key: "profesyonel", label: "Profesyonel", credits: 150_000, description: "Yoğun kullanan ekipler." },
+  { key: "kurumsal", label: "Kurumsal", credits: 500_000, description: "Çok kullanıcılı yoğun kullanım." },
+];
+
+/** Bir kredi miktarının ₺ karşılığı (2 ondalığa yuvarlanır). */
+export function creditsToTry(credits: number): number {
+  return Math.round(credits * CREDIT_UNIT_USD * USD_TRY_RATE * 100) / 100;
+}
+
+export const CREDIT_PACKAGES: CreditPackage[] = PACKAGE_SIZES.map((p) => ({
+  ...p,
+  priceTry: creditsToTry(p.credits),
+}));
+
+export function findCreditPackage(key: string): CreditPackage | undefined {
+  return CREDIT_PACKAGES.find((p) => p.key === key);
+}

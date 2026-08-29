@@ -19,6 +19,13 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { PlanningService } from "../planning/planning.service";
 import { OutputsService } from "../outputs/outputs.service";
 import { AI_TOOLS, CRITICAL_TOOLS } from "./ai-assistant.tools";
+import { describeModuleFields, hasRecordConfig, normalizeModuleData } from "./ai-modules";
+import { getModuleRecordConfig } from "@projelio/shared";
+import { CatalogService } from "../catalog/catalog.service";
+import { OrganizationsService } from "../organizations/organizations.service";
+import { OrganizationModulesService } from "../organization-modules/organization-modules.service";
+import { JobModulesService } from "../job-modules/job-modules.service";
+import { ModuleRecordsService } from "../module-records/module-records.service";
 import { AiCreditsService, InsufficientCreditsException } from "./ai-credits.service";
 import {
   AiConversationsService,
@@ -355,6 +362,8 @@ const RESULT_LABELS: Record<string, string> = {
   add_budget_transaction: "Bütçe hareketi eklendi.",
   archive_output: "Çıktı arşivlendi.",
   delete_output: "Çıktı silindi.",
+  archive_module_record: "Modül kaydı arşivlendi.",
+  disable_module: "Modül kapatıldı.",
 };
 
 /**
@@ -409,6 +418,11 @@ const ACTION_LABELS: Record<string, string> = {
   reorder_todos: "yapılacaklar sıralandı",
   archive_todo: "yapılacak kaldırıldı",
   restore_todo: "yapılacak geri alındı",
+  create_module_record: "modül kaydı eklendi",
+  update_module_record: "modül kaydı güncellendi",
+  archive_module_record: "modül kaydı arşivlendi",
+  enable_module: "modül açıldı",
+  disable_module: "modül kapatıldı",
 };
 
 export function toActiveFileInfo(files: { id: string; name: string; kind: string; detail: string }[]) {
@@ -505,6 +519,15 @@ export class AiAssistantService {
     private filesService: FilesService,
     // Yapılacaklar sayfası (kişisel pano) araçları için.
     private personalTodosService: PersonalTodosService,
+    // Modül araçları: katalog (hangi modüller var), organizasyon/iş modülleri
+    // (hangileri açık) ve kayıtlar (modülün defteri). Yetki kontrolleri bu
+    // servislerin İÇİNDE — Lio ayrı bir yol açmıyor, kullanıcının kendi
+    // yetkisiyle aynı kapıdan geçiyor.
+    private catalogService: CatalogService,
+    private organizationsService: OrganizationsService,
+    private organizationModulesService: OrganizationModulesService,
+    private jobModulesService: JobModulesService,
+    private moduleRecordsService: ModuleRecordsService,
     private realtime: RealtimeGateway
   ) {}
 
@@ -765,11 +788,12 @@ export class AiAssistantService {
       "",
       "## Sınırların",
       "Araçların YALNIZCA şu alanları kapsar: işler (job), projeler, çıktılar (output), görevler ve alt görevler, " +
-        "görev yorumları, proje ekibi ve rolleri, bütçe hareketleri, bildirim özeti ve Takvim planlaması " +
-        "(dönem planı, odak alanları, zaman blokları, ritüeller).",
-      "Şu alanlar için HİÇBİR aracın yok: e-posta/mailbox, organizasyonlar, departmanlar, " +
-        "gruplar, operasyonlar, modüller ve modül kayıtları, katalog/ürünler, iş ortakları ve cari hesaplar, sosyal medya, " +
-        "proje gönderileri ve yorumları, kişisel yapılacaklar, destek talepleri, kullanıcı/yetki yönetimi, " +
+        "görev yorumları, proje ekibi ve rolleri, bütçe hareketleri, bildirim özeti, Takvim planlaması " +
+        "(dönem planı, odak alanları, zaman blokları, ritüeller), kişisel yapılacaklar panosu " +
+        "ve MODÜLLER (modül açma/kapatma ve modül kayıtları — bkz. Modüller bölümü).",
+      "Şu alanlar için HİÇBİR aracın yok: e-posta/mailbox, organizasyon ve departman kurma/düzenleme, " +
+        "gruplar, operasyonlar, ürünler, iş ortakları ve cari hesaplar, sosyal medya, " +
+        "proje gönderileri ve yorumları, destek talepleri, kullanıcı/yetki yönetimi, " +
         "ödeme ve abonelik işlemleri, uygulama ayarları, dosya/rapor indirme veya dışa aktarma.",
       "Dosyalar özel bir durumdur: kullanıcının sohbete İLİŞTİRDİĞİ dosyayı okuyabilirsin (bkz. Dosyalar), " +
         "ama Projelio'nun dosya kitaplığında arama yapma, oraya dosya yükleme, taşıma ya da silme aracın yok.",
@@ -911,6 +935,26 @@ export class AiAssistantService {
         "istek varsa çağır, çağırırken de o kolondaki kartların tamamını gönder.",
       "- \"Şunu panomdan kaldır\" atanmış bir görevde SİLMEK değildir: isHidden=true yap, görev " +
         "projede aynen kalsın. Kişisel bir kartta ise archive_todo (onaya tabi, geri alınabilir).",
+      "",
+      "## Modüller",
+      "Modül, bir departmanın (serbest çalışanda bir İŞİN) defteridir: Gelir-Gider, Fatura, Sözleşme, " +
+        "İşe Alım, Tedarik… Her modülün kendi alanları vardır ve bu alanlar modülden modüle DEĞİŞİR.",
+      "- Akış her zaman aynı: list_modules ile nerede hangi modül açık onu gör, describe_module ile " +
+        "o modülün ALANLARINI öğren, sonra list_module_records/create_module_record/update_module_record.",
+      "- describe_module'ü ATLAMA. Alan adlarını tahmin etme; tanımda olmayan bir anahtar yok sayılır ve " +
+        "kayıt kullanıcının ekranında boş görünür. Kullanıcı \"kategoriyi Kira yap\" dediğinde etiketten " +
+        "doğru alan anahtarına sen eşle.",
+      "- Kayıt bir organizasyona ya da bir İŞE aittir, ikisine birden değil: organizationId ya da jobId ver. " +
+        "İkisini de list_modules'tan alırsın, kullanıcıya id sorma.",
+      "- update_module_record'da yalnızca DEĞİŞEN alanları gönder; vermediklerin olduğu gibi kalır.",
+      "- Modül açmak/kapatmak (enable_module/disable_module) organizasyonun tamamını ilgilendirir: " +
+        "yalnızca kullanıcı açıkça isterse yap, kayıt eklemek için modülü kendiliğinden açma. " +
+        "Açılabilecekleri görmek için list_modules'u includeAvailable:true ile çağır.",
+      "- Modül kapatmak kayıtları silmez ama modülü ekiplerin ekranlarından kaldırır; bunu kullanıcıya söyle.",
+      "- Her modül kayıt defteri DEĞİLDİR: müşteri, ürünler ve sosyal medya kendi ekranlarına yazar, " +
+        "analiz/raporlama/denetim gibi türev paneller ise veriyi başka modüllerden üretir. " +
+        "describe_module bunlara \"kayitDefteriMi: false\" der — kayıt eklemeye çalışma, " +
+        "kullanıcıyı modülün kendi sayfasına yönlendir.",
       "",
       "## Kredi disiplini",
       "Kullanıcı her turun ve her araç çağrısının bedelini kredi olarak öder. Bu yüzden:",
@@ -2205,6 +2249,39 @@ export class AiAssistantService {
         return projectActivity(label, projectId, input.taskId);
       }
 
+      // Modül kaydı. Modül sayfasının yolu departman ya da iş üzerinden geçiyor
+      // (bkz. App.tsx /departments/:id/modules/:key, /jobs/:id/modules/:key);
+      // ikisi de yoksa götürülecek bir sayfa yok, bildirim atlanır.
+      case "create_module_record":
+      case "update_module_record": {
+        const moduleKey = input.moduleKey ?? result?.moduleKey;
+        if (!moduleKey) return null;
+        const label = toolName === "create_module_record" ? "Modüle kayıt eklendi" : "Modül kaydı güncellendi";
+        // Güncellemede hedef girdide yok (yalnızca recordId var); kaydın
+        // kendisinden okunuyor — bkz. update_task'taki aynı desen.
+        let jobId = input.jobId as string | undefined;
+        let departmentId = input.departmentId as string | undefined;
+        if (!jobId && !departmentId && result?.id) {
+          const record = await this.moduleRecordsService.findOne(result.id);
+          jobId = record.jobId;
+          departmentId = record.departmentId;
+        }
+        if (jobId) {
+          return make(label, `/jobs/${jobId}/modules/${moduleKey}`, `job:${jobId}/module/${moduleKey}`, result?.id);
+        }
+        // Organizasyon kaydının departmanı yoksa götürülecek bir modül sayfası
+        // yok: modül yolu departmandan geçiyor (bkz. App.tsx).
+        if (departmentId) {
+          return make(
+            label,
+            `/departments/${departmentId}/modules/${moduleKey}`,
+            `department:${departmentId}/module/${moduleKey}`,
+            result?.id
+          );
+        }
+        return null;
+      }
+
       case "set_period_plan":
       case "create_time_blocks":
       case "update_time_block_status":
@@ -2479,6 +2556,27 @@ export class AiAssistantService {
           this.personalTodosService.findOne(userId, input.todoId).then((t) => t.title)
         );
         return `"${title}" yapılacağını listenden kaldırmak üzeresin. (Geri alınabilir.)`;
+      }
+
+      case "archive_module_record": {
+        // Onay metninde kaydın KENDİSİ görünmeli: "bir kayıt arşivlenecek"
+        // kullanıcıya neyi onayladığını söylemez.
+        const label = await this.safeLabel(async () => {
+          const record = await this.moduleRecordsService.findOne(input.recordId);
+          const moduleName = await this.moduleDisplayName(record.moduleKey);
+          const config = getModuleRecordConfig(record.moduleKey, moduleName);
+          const summary = config.summary(record.data);
+          return summary ? `${moduleName} · ${summary}` : moduleName;
+        });
+        return `"${label}" kaydını arşivlemek üzeresin. Listeden düşer, veritabanında kalır (geri alınabilir).`;
+      }
+
+      case "disable_module": {
+        const label = await this.safeLabel(() => this.moduleDisplayName(input.moduleKey));
+        return (
+          `"${label}" modülünü kapatmak üzeresin. Kayıtlar silinmez ama modül ` +
+          `${input.jobId ? "işin" : "organizasyonun"} ekranlarından kaldırılır.`
+        );
       }
 
       case "add_budget_transaction": {
@@ -3163,9 +3261,262 @@ export class AiAssistantService {
         return { tur: ritual.kind, tarih: ritual.occurredOn, durum: ritual.status };
       }
 
+      // --- Modüller ---------------------------------------------------------
+      //
+      // Modül = departmanın (serbest çalışanda işin) defteri. Yetki kontrolleri
+      // ilgili servislerin İÇİNDE duruyor ve her çağrıda userId geçiliyor:
+      // Lio ayrı bir yol açmıyor, kullanıcının arayüzde geçtiği kapıdan geçiyor.
+
+      case "list_modules":
+        return this.listModulesForUser(userId, input);
+
+      case "describe_module": {
+        const moduleName = await this.moduleDisplayName(input.moduleKey);
+        const described = describeModuleFields(input.moduleKey, moduleName);
+        if (hasRecordConfig(input.moduleKey)) return described;
+        // Kayıt defteri OLMAYAN modüller: türev panel (kendi verisi yok, başka
+        // modülleri okur), ortak varlık (müşteri -> party), ürünler ve sosyal
+        // medya kendi tablolarına yazar. Bunlara module_record yazmak, hiçbir
+        // ekranda görünmeyen kayıt üretir — o yüzden alan listesi verilmiyor.
+        return {
+          moduleKey: input.moduleKey,
+          kayitDefteriMi: false,
+          not:
+            "Bu modül bir kayıt defteri değil: kendi ekranı var ya da verisini başka modüllerden üretiyor. " +
+            "Buraya kayıt EKLEYEMEZSİN. Kullanıcıyı modülün kendi sayfasına yönlendir.",
+        };
+      }
+
+      case "list_module_records": {
+        const limit = Math.min(Number(input.limit) || 25, 100);
+        const records = input.jobId
+          ? await this.moduleRecordsService.findByJob(
+              await this.requireOwnJob(userId, input.jobId),
+              input.moduleKey
+            )
+          : await this.moduleRecordsService.findByOrganization(
+              await this.requireOwnOrganization(userId, input.organizationId),
+              input.moduleKey,
+              userId
+            );
+        return records.slice(0, limit).map((r) =>
+          pruneEmpty({ id: r.id, olusturuldu: shortDate(r.createdAt), veri: r.data })
+        );
+      }
+
+      case "create_module_record": {
+        const moduleName = await this.moduleDisplayName(input.moduleKey);
+        if (!hasRecordConfig(input.moduleKey)) {
+          // Bkz. describe_module: bu modüller module_records kullanmıyor.
+          throw new BadRequestException(
+            `"${moduleName}" bir kayıt defteri değil; buraya kayıt eklenemez. ` +
+              "Modülün kendi sayfasından girilmesi gerekiyor."
+          );
+        }
+        const { data, warnings } = normalizeModuleData(input.moduleKey, moduleName, input.data, {
+          requireMandatory: true,
+        });
+        const record = input.jobId
+          ? await this.moduleRecordsService.createForJob(
+              await this.requireOwnJob(userId, input.jobId),
+              { moduleKey: input.moduleKey, data },
+              userId
+            )
+          : await this.moduleRecordsService.create(
+              await this.requireOwnOrganization(userId, input.organizationId),
+              { moduleKey: input.moduleKey, departmentId: input.departmentId, data },
+              userId
+            );
+        return pruneEmpty({
+          id: record.id,
+          moduleKey: record.moduleKey,
+          veri: record.data,
+          uyarilar: warnings.length ? warnings : undefined,
+        });
+      }
+
+      case "update_module_record": {
+        const existing = await this.moduleRecordsService.findOne(input.recordId);
+        const moduleName = await this.moduleDisplayName(existing.moduleKey);
+        if (!hasRecordConfig(existing.moduleKey)) {
+          // Alan tanımı olmadan her anahtar "tanımsız" sayılır ve düşerdi:
+          // güncelleme sessizce hiçbir şey yapmaz, model ise yaptı sanır.
+          throw new BadRequestException(
+            `"${moduleName}" bir kayıt defteri değil; kayıtları buradan düzenlenemez.`
+          );
+        }
+        const { data: patch, warnings } = normalizeModuleData(existing.moduleKey, moduleName, input.data);
+        // Kısmi güncelleme burada birleştiriliyor: servis `data`yı bütün olarak
+        // değiştiriyor, ham gönderilse verilmeyen alanlar sessizce silinirdi.
+        const record = await this.moduleRecordsService.update(
+          input.recordId,
+          { ...existing.data, ...patch },
+          userId
+        );
+        return pruneEmpty({
+          id: record.id,
+          moduleKey: record.moduleKey,
+          veri: record.data,
+          uyarilar: warnings.length ? warnings : undefined,
+        });
+      }
+
+      case "archive_module_record":
+        await this.moduleRecordsService.remove(input.recordId, userId);
+        return { success: true };
+
+      case "enable_module": {
+        // Katalogda olmayan bir anahtar organizasyon tarafında sessizce
+        // eklenebiliyordu (job_modules doğruluyor, organization_modules değil).
+        await this.moduleDisplayName(input.moduleKey);
+        if (input.jobId) {
+          const assigned = await this.jobModulesService.assign(
+            await this.requireOwnJob(userId, input.jobId),
+            input.moduleKey,
+            userId
+          );
+          return { moduleKey: assigned.moduleKey, isKimligi: assigned.jobId };
+        }
+        const enabled = await this.organizationModulesService.enable(
+          await this.requireOwnOrganization(userId, input.organizationId),
+          input.moduleKey,
+          userId
+        );
+        return { moduleKey: enabled.moduleKey, organizationId: enabled.organizationId };
+      }
+
+      case "disable_module": {
+        if (input.jobId) {
+          await this.jobModulesService.unassign(
+            await this.requireOwnJob(userId, input.jobId),
+            input.moduleKey,
+            userId
+          );
+          return { success: true };
+        }
+        await this.organizationModulesService.disable(
+          await this.requireOwnOrganization(userId, input.organizationId),
+          input.moduleKey,
+          userId
+        );
+        return { success: true };
+      }
+
       default:
         throw new BadRequestException(`Bilinmeyen araç: ${name}`);
     }
+  }
+
+  // --- Modül araçlarının yardımcıları --------------------------------------
+
+  /**
+   * Modülün katalogdaki adı. Aynı zamanda anahtarın GERÇEK olduğunu doğrular:
+   * model anahtar uydurursa kayıt açılmadan burada durur.
+   */
+  private async moduleDisplayName(moduleKey: string): Promise<string> {
+    if (!moduleKey) throw new BadRequestException("moduleKey gerekli");
+    const modules = await this.catalogService.findModules();
+    const found = modules.find((m) => m.key === moduleKey);
+    if (!found) throw new BadRequestException(`Bilinmeyen modül: ${moduleKey}`);
+    return found.name;
+  }
+
+  /**
+   * Organizasyon erişimi. Modül servislerinin bir kısmı (findByJob,
+   * organizationModuleStats) yetkiyi kendisi kontrol etmiyor — denetim
+   * controller'da duruyordu. Lio controller'dan geçmediği için kapıyı burada
+   * kuruyoruz: kullanıcının erişebildiği organizasyonlar dışına çıkılamaz.
+   */
+  private async requireOwnOrganization(userId: string, organizationId?: string): Promise<string> {
+    if (!organizationId) {
+      throw new BadRequestException("organizationId ya da jobId vermelisin (list_modules ile bulabilirsin).");
+    }
+    const orgs = await this.organizationsService.findAllForUser(userId);
+    if (!orgs.some((o) => o.id === organizationId)) {
+      throw new ForbiddenException("Bu organizasyona erişimin yok.");
+    }
+    return organizationId;
+  }
+
+  /** İş erişimi — bkz. requireOwnOrganization. */
+  private async requireOwnJob(userId: string, jobId: string): Promise<string> {
+    const jobs = await this.jobsService.findAllForUser(userId);
+    if (!jobs.some((j) => j.id === jobId)) throw new ForbiddenException("Bu işe erişimin yok.");
+    return jobId;
+  }
+
+  /**
+   * "Nerede hangi modül var" tablosu. Modelin modül işlerine buradan başlaması
+   * bekleniyor: organizationId/jobId ve moduleKey değerlerinin tek kaynağı bu.
+   */
+  private async listModulesForUser(userId: string, input: Record<string, any>): Promise<unknown> {
+    const wantAvailable = input.includeAvailable === true;
+    const catalog = await this.catalogService.findModules();
+    const nameOf = (key: string) => catalog.find((m) => m.key === key)?.name ?? key;
+
+    if (input.jobId) {
+      const jobId = await this.requireOwnJob(userId, input.jobId);
+      const assigned = await this.jobModulesService.findByJob(jobId);
+      return pruneEmpty({
+        isKimligi: jobId,
+        acikModuller: assigned.map((m) => ({ moduleKey: m.moduleKey, ad: nameOf(m.moduleKey) })),
+        acilabilirModuller: wantAvailable
+          ? catalog
+              .filter((m) => m.appliesToFreelancer && !assigned.some((a) => a.moduleKey === m.key))
+              .map((m) => ({ moduleKey: m.key, ad: m.name }))
+          : undefined,
+      });
+    }
+
+    const orgs = await this.organizationsService.findAllForUser(userId);
+    const targets = input.organizationId ? orgs.filter((o) => o.id === input.organizationId) : orgs;
+    if (input.organizationId && targets.length === 0) {
+      throw new ForbiddenException("Bu organizasyona erişimin yok.");
+    }
+
+    const organizasyonlar = [];
+    for (const org of targets) {
+      const stats = await this.moduleRecordsService.organizationModuleStats(org.id, userId);
+      organizasyonlar.push(
+        pruneEmpty({
+          organizationId: org.id,
+          ad: org.name,
+          acikModuller: stats.modules.map((m) =>
+            pruneEmpty({
+              moduleKey: m.moduleKey,
+              ad: m.moduleName,
+              kayitSayisi: m.recordCount,
+              sonHareket: shortDate(m.lastActivityAt),
+              banaAtanmis: m.assignedToMe || undefined,
+            })
+          ),
+          acilabilirModuller: wantAvailable
+            ? catalog
+                .filter((m) => !stats.modules.some((s) => s.moduleKey === m.key))
+                .map((m) => ({ moduleKey: m.key, ad: m.name }))
+            : undefined,
+        })
+      );
+    }
+
+    // Organizasyon süzgeci varsa serbest çalışan tarafı istenmiyordur.
+    const jobStats = input.organizationId
+      ? { modules: [] }
+      : await this.moduleRecordsService.myJobModuleStats(userId);
+
+    return pruneEmpty({
+      organizasyonlar: organizasyonlar.length ? organizasyonlar : undefined,
+      isModulleri: jobStats.modules.length
+        ? jobStats.modules.map((m) =>
+            pruneEmpty({
+              moduleKey: m.moduleKey,
+              ad: m.moduleName,
+              isKimligi: m.jobId,
+              kayitSayisi: m.recordCount,
+            })
+          )
+        : undefined,
+    });
   }
 
   /**

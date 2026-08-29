@@ -16,6 +16,12 @@ export const CRITICAL_TOOLS = new Set<string>([
   // onaya tabi: kullanıcının kendi listesinden kayıt eksiltmek, sildiğini fark
   // edene kadar sessiz kalan bir kayıp.
   "archive_todo",
+  // Modül kaydı arşivlemek geri alınabilir ama kullanıcı fark edene kadar
+  // sessiz bir kayıp: defterden satır eksilir.
+  "archive_module_record",
+  // Modül kapatmak kayıtları silmez ama modülü ekiplerin ekranlarından
+  // tamamen kaldırır — organizasyon çapında görünür bir etki.
+  "disable_module",
 ]);
 
 export const AI_TOOLS: Anthropic.Tool[] = [
@@ -830,6 +836,149 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         status: { type: "string", enum: ["done", "skipped"], description: "Kullanıcı planlamak istemediyse skipped." },
       },
       required: ["kind"],
+    },
+  },
+
+  // --- Modüller ---------------------------------------------------------
+  //
+  // Modül = departmanın (ya da serbest çalışanda işin) bir defteri: Gelir-Gider,
+  // Fatura, Sözleşme, İşe Alım… Kayıtların alanları modülden modüle değiştiği
+  // için önce describe_module ile alanları öğren, sonra yaz.
+  {
+    name: "list_modules",
+    description:
+      "Kullanıcının erişebildiği modülleri listeler: hangi organizasyonda/işte hangi modüller açık, " +
+      "her birinde kaç kayıt var ve son ne zaman çalışılmış. Modülle ilgili HER İŞTE önce bunu çağır — " +
+      "organizationId/jobId ve moduleKey değerlerini buradan alırsın. " +
+      "Parametresiz çağrılırsa kullanıcının tüm organizasyonlarını ve serbest çalışan işlerini tarar.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string", description: "Yalnızca bu organizasyonun modülleri (opsiyonel)." },
+        jobId: { type: "string", description: "Yalnızca bu işe atanmış modüller (opsiyonel, serbest çalışan tarafı)." },
+        includeAvailable: {
+          type: "boolean",
+          description:
+            "true ise HENÜZ AÇILMAMIŞ ama katalogta olan modüller de listelenir. " +
+            "Kullanıcı yeni bir modül açmak istediğinde kullan.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "describe_module",
+    description:
+      "Bir modülün kayıt alanlarını verir: anahtar, etiket, tip, zorunluluk ve seçenekler. " +
+      "create_module_record ya da update_module_record ÇAĞIRMADAN ÖNCE MUTLAKA bunu çağır — " +
+      "alan adlarını tahmin etme, tanımda olmayan anahtarlar yok sayılır ve kayıt boş görünür.",
+    input_schema: {
+      type: "object",
+      properties: {
+        moduleKey: { type: "string", description: "Modül anahtarı (list_modules'tan)." },
+      },
+      required: ["moduleKey"],
+    },
+  },
+  {
+    name: "list_module_records",
+    description:
+      "Bir modüldeki kayıtları listeler (arşivlenmişler hariç). Kayıt kimliklerini buradan alırsın; " +
+      "update_module_record ve archive_module_record bu kimlikleri ister. " +
+      "organizationId ya da jobId'den biri verilmeli.",
+    input_schema: {
+      type: "object",
+      properties: {
+        moduleKey: { type: "string", description: "Modül anahtarı." },
+        organizationId: { type: "string", description: "Şirket tarafı: organizasyon kimliği." },
+        jobId: { type: "string", description: "Serbest çalışan tarafı: iş kimliği." },
+        limit: { type: "number", description: "En fazla kaç kayıt (varsayılan 25, en çok 100)." },
+      },
+      required: ["moduleKey"],
+    },
+  },
+  {
+    name: "create_module_record",
+    description:
+      "Modüle yeni bir kayıt ekler (ör. Gelir-Gider'e bir gider satırı, Fatura'ya bir fatura). " +
+      "ÖNCE describe_module ile alanları öğren. organizationId ya da jobId'den biri verilmeli. " +
+      "Yetki: organizasyon sahibi, departman yöneticisi ya da modüle atanmış kişi.",
+    input_schema: {
+      type: "object",
+      properties: {
+        moduleKey: { type: "string", description: "Modül anahtarı." },
+        organizationId: { type: "string", description: "Şirket tarafı: organizasyon kimliği." },
+        jobId: { type: "string", description: "Serbest çalışan tarafı: iş kimliği." },
+        departmentId: {
+          type: "string",
+          description:
+            "Kaydın hangi departmana yazılacağı (opsiyonel). Aynı modül birden fazla departmanda " +
+            "açık olabilir; kullanıcı departman belirttiyse ver.",
+        },
+        data: {
+          type: "object",
+          description: "Alan anahtarı -> değer eşlemesi. Anahtarlar describe_module'ün verdiği alan anahtarları olmalı.",
+        },
+      },
+      required: ["moduleKey", "data"],
+    },
+  },
+  {
+    name: "update_module_record",
+    description:
+      "Mevcut bir modül kaydının alanlarını günceller. Yalnızca DEĞİŞTİRMEK İSTEDİĞİN alanları ver — " +
+      "verdiklerin mevcut kaydın üstüne yazılır, vermediklerin olduğu gibi kalır. " +
+      "Kayıt kimliğini list_module_records'tan al.",
+    input_schema: {
+      type: "object",
+      properties: {
+        recordId: { type: "string", description: "Kayıt kimliği." },
+        data: { type: "object", description: "Değişecek alan anahtarı -> yeni değer." },
+      },
+      required: ["recordId", "data"],
+    },
+  },
+  {
+    name: "archive_module_record",
+    description:
+      "Bir modül kaydını arşivler: listeden düşer ama veritabanında kalır (silme değildir, geri alınabilir).",
+    input_schema: {
+      type: "object",
+      properties: {
+        recordId: { type: "string", description: "Kayıt kimliği." },
+      },
+      required: ["recordId"],
+    },
+  },
+  {
+    name: "enable_module",
+    description:
+      "Bir modülü açar: organizasyona etkinleştirir ya da serbest çalışanın işine atar. " +
+      "Açılabilecek modülleri list_modules'u includeAvailable:true ile çağırarak gör. " +
+      "Yetki: organizasyon tarafında yalnızca organizasyon sahibi, iş tarafında iş sahibi.",
+    input_schema: {
+      type: "object",
+      properties: {
+        moduleKey: { type: "string", description: "Katalogdaki modül anahtarı." },
+        organizationId: { type: "string", description: "Organizasyona açmak için." },
+        jobId: { type: "string", description: "İşe atamak için (serbest çalışan tarafı)." },
+      },
+      required: ["moduleKey"],
+    },
+  },
+  {
+    name: "disable_module",
+    description:
+      "Bir modülü kapatır: organizasyondan kaldırır ya da işten çıkarır. " +
+      "Kayıtlar SİLİNMEZ, modül yeniden açılırsa geri gelir — ama modül ekranlardan kaybolur.",
+    input_schema: {
+      type: "object",
+      properties: {
+        moduleKey: { type: "string", description: "Modül anahtarı." },
+        organizationId: { type: "string", description: "Organizasyondan kaldırmak için." },
+        jobId: { type: "string", description: "İşten çıkarmak için." },
+      },
+      required: ["moduleKey"],
     },
   },
 ];

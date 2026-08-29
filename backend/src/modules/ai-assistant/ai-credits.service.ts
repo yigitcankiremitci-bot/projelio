@@ -203,27 +203,56 @@ export class AiCreditsService {
     );
   }
 
-  /** Bakiye ekler (yükleme / hoş geldin / iade / düzeltme). */
+  /**
+   * Bakiye ekler (yükleme / hoş geldin / iade / düzeltme).
+   *
+   * `orderId` verilirse defter satırı o siparişe bağlanır. Sipariş başına en fazla
+   * bir yükleme satırı olmasını veritabanındaki tekil indeks garanti eder
+   * (uniq_ai_credit_tx_order, bkz. 072_ai_kredi_siparisleri.sql) — aynı siparişi
+   * ikinci kez yüklemeye çalışan bir yarış, bakiye değişmeden orada kırılır.
+   */
   async grant(
     userId: string,
     credits: number,
     type: "topup" | "welcome" | "refund" | "adjustment",
     description?: string,
-    createdBy?: string
+    createdBy?: string,
+    orderId?: string
   ): Promise<CreditBalance> {
     if (!Number.isFinite(credits) || credits <= 0) {
       throw new BadRequestException("Kredi miktarı pozitif bir sayı olmalı.");
     }
 
     const balanceAfter = await this.applyChange(userId, credits, true);
-    await this.supabase.client.from("ai_credit_transactions").insert({
+    const { error: txError } = await this.supabase.client.from("ai_credit_transactions").insert({
       user_id: userId,
       type,
       credits,
       balance_after: balanceAfter,
       description: description ?? null,
       created_by: createdBy ?? null,
+      order_id: orderId ?? null,
     });
+    if (txError) {
+      // Bakiye ARTTI ama defter satırı yazılamadı. Supabase istemcisinde çok
+      // ifadeli işlem (transaction) yok, bu yüzden telafi elle yapılıyor: eklenen
+      // kredi geri alınır. Aksi halde en tehlikeli sonuç doğardı — sipariş başına
+      // tek satıra izin veren tekil indeks ikinci yüklemeyi reddederken bakiye
+      // yine de İKİ KEZ artmış olurdu (ödenmemiş kredi).
+      this.logger.error(
+        `Kredi defteri satırı yazılamadı (user=${userId}, order=${orderId ?? "-"}): ${txError.message}. Bakiye geri alınıyor.`
+      );
+      try {
+        await this.applyChange(userId, -credits, true);
+      } catch (rollbackError) {
+        // Telafi de başarısızsa sessiz kalınamaz: bakiye artık defterle uyumsuz.
+        this.logger.error(
+          `KRİTİK: kredi geri alınamadı (user=${userId}, credits=${credits}). Bakiye defterle uyumsuz, elle düzeltilmeli.`,
+          rollbackError as Error
+        );
+      }
+      throw txError;
+    }
 
     return this.getBalance(userId);
   }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ThemeColors } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
+import AiCreditOrdersAdmin from "./AiCreditOrdersAdmin";
 import { api } from "../api/client";
 import { aiChat, type AiProviderBalance, type AiUserBalanceRow } from "../api/aiChat";
 import { IconSparkle } from "./icons";
@@ -409,6 +410,10 @@ export default function AiCreditAdminPanel() {
       </div>
 
       <div style={{ height: isDesktop ? 18 : 0 }} />
+
+      {/* Self-servis kredi siparişleri: ödemesi alınanları onaylayıp krediyi yükler.
+          Onay sonrası kullanıcı bakiyeleri listesi de tazelenmeli. */}
+      <AiCreditOrdersAdmin onCredited={loadUserBalances} />
 
       {/* Kullanıcılar (geniş) + kredi yükleme formu (yan panel): masaüstünde yan yana. */}
       <div

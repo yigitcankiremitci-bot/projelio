@@ -7,6 +7,14 @@ COPY packages/shared/package.json packages/shared/package.json
 RUN npm ci
 COPY backend backend
 COPY packages/shared packages/shared
+RUN ./node_modules/.bin/tsc \
+    --target ES2021 \
+    --module commonjs \
+    --moduleResolution node \
+    --esModuleInterop \
+    --skipLibCheck \
+    --outDir packages/shared/dist \
+    packages/shared/src/index.ts
 RUN npm run build --workspace=backend
 
 FROM node:22-bookworm-slim AS runtime
@@ -18,7 +26,8 @@ COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/backend/dist backend/dist
-COPY packages/shared packages/shared
+COPY --from=build /app/packages/shared packages/shared
+RUN node -e "const fs=require('fs'); const path='packages/shared/package.json'; const pkg=JSON.parse(fs.readFileSync(path)); pkg.main='dist/index.js'; fs.writeFileSync(path, JSON.stringify(pkg, null, 2)+'\n')"
 USER node
 EXPOSE 3000
 CMD ["node", "backend/dist/main"]

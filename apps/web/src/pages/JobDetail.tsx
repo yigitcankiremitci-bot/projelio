@@ -15,7 +15,7 @@ import EntityCover, { CoverBackLink, coverActionButton } from "../components/Ent
 import { useCoverTheme } from "../theme/useCoverTheme";
 import JobInviteBanner from "../components/JobInviteBanner";
 import JobTasksPanel, { JobTasksPanelHandle } from "../components/JobTasksPanel";
-import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
+import FilesPanel from "../components/FilesPanel";
 import TodayCompletedPanel from "../components/TodayCompletedPanel";
 import TaskEditModal from "../components/TaskEditModal";
 import Modal from "../components/Modal";
@@ -73,13 +73,8 @@ export default function JobDetail() {
   const tasksRef = useLatestRef(tasks);
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
   const tasksPanelRef = useRef<JobTasksPanelHandle>(null);
-  const filesRef = useRef<FilesPanelHandle>(null);
   const teamRef = useRef<JobTeamPanelHandle>(null);
   const modulesRef = useRef<JobModulesPanelHandle>(null);
-  // "+" menüsündeki "Drive'dan seç" seçeneğinin etiketi bağlı sağlayıcıya göre
-  // değişiyor ve o bilgi FilesPanel'in içinde hesaplanıyor; panel yukarı
-  // bildiriyor. Hiçbir sağlayıcı bağlı değilse seçenek hiç gösterilmez.
-  const [filesProvider, setFilesProvider] = useState<"google" | "microsoft" | undefined>(undefined);
 
   // Sekmeye göre alt navigasyondaki "+" butonunun ne yapacağı.
   //
@@ -97,24 +92,11 @@ export default function JobDetail() {
       ? { label: "İşe al", onClick: () => teamRef.current?.openHire() }
       : activeTab === "modules"
       ? { label: "Modül ekle", onClick: () => modulesRef.current?.openAdd() }
-      : activeTab === "files"
-      ? {
-          label: "Dosya ekle",
-          options: [
-            { label: "Dosya yükle", onClick: () => filesRef.current?.openUpload() },
-            { label: "Yeni dosya oluştur", onClick: () => filesRef.current?.openCreateNative() },
-            ...(filesProvider
-              ? [
-                  {
-                    label: filesProvider === "microsoft" ? "OneDrive'dan seç" : "Drive'dan seç",
-                    onClick: () => filesRef.current?.openBrowseDrive(),
-                  },
-                ]
-              : []),
-          ],
-        }
-      : null,
-    [activeTab, filesProvider]
+      : // Dosyalar sekmesinin "+" eylemini FilesPanel'in kendisi kaydediyor
+        // (bkz. components/FilesPanel.tsx) — seçenekler bağlı buluta göre
+        // değiştiği için o bilgi yalnızca panelin içinde var.
+        null,
+    [activeTab]
   );
 
   const reload = () => {
@@ -565,7 +547,7 @@ export default function JobDetail() {
           )}
 
           {activeTab === "files" && (
-            <FilesPanel ref={filesRef} jobId={id} actionsInFab onProviderChange={setFilesProvider} />
+            <FilesPanel jobId={id} />
           )}
 
           {/* Modüller işin içinde de görünür: anasayfadan atanan modüle

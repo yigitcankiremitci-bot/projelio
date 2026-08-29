@@ -2,10 +2,9 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { Product } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import { useProjectFabAction } from "../lib/projectFab";
+import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import ProductCard from "./ProductCard";
 import AddEditProductModal from "./AddEditProductModal";
-import { IconPlus } from "./icons";
 
 export interface ProductsPanelHandle {
   openAdd: () => void;
@@ -16,18 +15,11 @@ interface Props {
   // Verilirse (örn. Ürün Yönetimi departmanının detay sayfasından açıldığında)
   // buradan eklenen yeni ürünler otomatik olarak o departmana bağlanır.
   departmentId?: string;
-  // Departman sayfasında bu panel Modüller ile birlikte gösterildiğinde, şirket
-  // anasayfasında da Departmanlar/Modüller ile birlikteyken global "+" düğmesi
-  // başka bir bileşene ait olur (bkz. DepartmentModulesPanel, OrganizationDetail)
-  // — bu durumda ürün/hizmet ekleme kendi satır içi düğmesiyle ya da dışarıdan
-  // ProductsPanelHandle.openAdd ile tetiklenir. Organizasyonun "Ürün/Hizmet"
-  // sekmesinde (tek başına gösterildiğinde) varsayılan olarak FAB kullanılır.
+  // Panel "+"a kendi eylemini kaydeder. Yalnızca eklemenin BAŞKA bir menüden
+  // sunulduğu yerde kapatılır: şirket Anasayfası'nda "+" beş kısayolu birden
+  // taşıyan tek bir menü açıyor (bkz. OrganizationDetail HomeAddFabRegistrar) ve
+  // "Ürün ekle" orada zaten var — ikinci kez kaydedilirse menüde iki kere çıkardı.
   useFab?: boolean;
-  // useFab=false iken satır içi "+ Ürün/Hizmet ekle" düğmesi normalde gösterilir;
-  // Anasayfa'da bu düğme yerine tek, birleşik "+" menüsü var (bkz.
-  // OrganizationDetail) — orada showAddButton=false verilip düğme tamamen
-  // gizlenir, ekleme yalnızca ProductsPanelHandle.openAdd ile tetiklenir.
-  showAddButton?: boolean;
 }
 
 // Ürün Yönetimi departmanından eklenen ürün/hizmetler; hem departman detayında hem de
@@ -35,7 +27,7 @@ interface Props {
 // OrganizationDetail) ve ayrı "Ürün/Hizmet" sekmesinde iş kartlarıyla aynı
 // görünümde (bkz. ProductCard) listelenir.
 const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPanel(
-  { organizationId, departmentId, useFab = true, showAddButton = true },
+  { organizationId, departmentId, useFab = true },
   ref
 ) {
   const c = useThemeColors();
@@ -57,22 +49,16 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
 
   useImperativeHandle(ref, () => ({ openAdd: () => setAdding(true) }));
 
+  const fabAvailable = useFabAvailable();
+  useProjectFabAction(
+    useFab && fabAvailable ? { label: "Ürün/Hizmet ekle", onClick: () => setAdding(true) } : null,
+    [useFab, fabAvailable, organizationId, departmentId],
+    FAB_PRIORITY.panel
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {useFab && <ProductsFabRegistrar onAdd={() => setAdding(true)} deps={[organizationId, departmentId]} />}
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Ürün/Hizmet</h2>
-        {!useFab && showAddButton && (
-          <button
-            onClick={() => setAdding(true)}
-            style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: c.primary, background: "transparent", border: "none" }}
-          >
-            <IconPlus size={13} color={c.primary} />
-            Ürün/Hizmet ekle
-          </button>
-        )}
-      </div>
+      <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Ürün/Hizmet</h2>
 
       {loading ? (
         <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
@@ -87,9 +73,7 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
             fontSize: 15,
           }}
         >
-          {useFab
-            ? 'Henüz ürün/hizmet yok. Sağ alttaki "+" ile Ürün Yönetimi departmanına ürün/hizmet ekleyebilirsin.'
-            : "Henüz ürün/hizmet yok."}
+          {'Henüz ürün/hizmet yok. Sayfadaki "+" ile Ürün Yönetimi departmanına ürün/hizmet ekleyebilirsin.'}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
@@ -130,14 +114,3 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
 });
 
 export default ProductsPanel;
-
-// useProjectFabAction'ı yalnızca FAB gerçekten kullanılacaksa çağırmak için ayrı
-// bir bileşene alındı: bir hook'u koşullu çağırmak yerine, hook'u çağıran
-// bileşeni koşullu render etmek React kurallarına uygun doğru yöntemdir. Bu
-// sayede ProductsPanel departman sayfasında Modüller ile birlikteyken FAB'a
-// hiç dokunmaz (aksi halde iki panel birbirinin "+" eylemini geçersiz kılardı).
-function ProductsFabRegistrar({ onAdd, deps }: { onAdd: () => void; deps: unknown[] }) {
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useProjectFabAction({ label: "Ürün/Hizmet ekle", onClick: onAdd }, deps);
-  return null;
-}

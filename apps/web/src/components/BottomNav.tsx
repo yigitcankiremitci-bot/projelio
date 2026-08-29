@@ -1,14 +1,16 @@
-import { useContext, useState } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import type { OrgType } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus, IconFolder, IconActivity } from "./icons";
+import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus, IconFolder, IconActivity, IconBuilding } from "./icons";
 import CreateJobModal from "./CreateJobModal";
 import CreateProjectModal from "./CreateProjectModal";
 import CreateOperationModal from "./CreateOperationModal";
 import CreateTaskModal from "./CreateTaskModal";
 import CreateOrganizationModal from "./CreateOrganizationModal";
 import CreateGroupModal from "./CreateGroupModal";
-import { ProjectFabContext } from "../lib/projectFab";
+import { useProjectFab } from "../lib/projectFab";
+import { useCurrentUser } from "../lib/useCurrentUser";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { tourAnchor } from "../lib/tour/types";
 import { SIDEBAR_WIDTH, Z } from "../lib/layout";
@@ -20,6 +22,12 @@ const rightItems = [
 ];
 
 type ModalKind = "job" | "project" | "operation" | "task" | "organization" | "group" | "organization-in-group";
+
+// Kendi organizasyonunu kurabilecek hesap tipleri. employee/subcontractor bir
+// organizasyona BAĞLI çalışır, kendi yapısını kurmaz (bkz. shared/types.ts
+// AccountType yorumu); organization_owner/group_owner zaten anasayfaya değil
+// kendi yapısına düşer (bkz. Dashboard.tsx redirect).
+const CAN_FOUND_ORG = new Set(["freelancer", "organization_owner", "group_owner"]);
 
 interface Props {
   /** Masaüstünde "+" butonunun ortalanacağı alanı belirler — sidebar kapalıyken
@@ -33,8 +41,16 @@ export default function BottomNav({ sidebarOpen }: Props) {
   const isDesktop = useIsDesktop();
   const [modal, setModal] = useState<ModalKind | null>(null);
   const [choosing, setChoosing] = useState(false);
-  const { action: fabAction } = useContext(ProjectFabContext);
+  // "Şirket kur" ve "İşletme aç" aynı modalı açar, yalnızca ölçek ön seçimi farklı.
+  // null = ön seçim yok (Organizasyonlar sayfasındaki genel "+" girişi).
+  const [newOrgType, setNewOrgType] = useState<OrgType | null>(null);
+  const fabAction = useProjectFab();
   const homeTarget = useHomeTarget();
+  // Anasayfadaki "+" menüsünde şirket/işletme seçeneklerinin çıkıp çıkmayacağı
+  // hesap tipine bağlı. Yüklenmeden (user null) seçenek gösterilmez: menü bir an
+  // dolu görünüp seçenek kaybolmasın.
+  const { user } = useCurrentUser();
+  const canFoundOrg = !!user?.accountType && CAN_FOUND_ORG.has(user.accountType);
 
   // Organizasyon/Grup artık burada ayrı bir sekme değil: mobilde de artık üstteki
   // ok ile açılan sidebar (Grup > Organizasyon > İş ağacı) üzerinden erişiliyor,
@@ -64,7 +80,7 @@ export default function BottomNav({ sidebarOpen }: Props) {
   const orgDetailMatch = location.pathname.match(/^\/organizations\/([^/]+)$/);
   const deptDetailMatch = location.pathname.match(/^\/departments\/([^/]+)$/);
 
-  let createAction: "job" | "job-choice" | "custom" | ModalKind | null = null;
+  let createAction: "job" | "job-choice" | "home-choice" | "custom" | ModalKind | null = null;
   let jobId: string | null = null;
   let groupIdForOrg: string | null = null;
   let fabLabel = "Oluştur";
@@ -98,15 +114,24 @@ export default function BottomNav({ sidebarOpen }: Props) {
     // ekleme) bağlıdır. Kayıtlı eylem yoksa buton basitçe gizlenir.
     createAction = null;
   } else if (deptDetailMatch) {
-    // Departman detayında da varsayılan bir eylem yok — kadro daveti sayfanın kendi
-    // "+ Kişi davet et" düğmesiyle yapılır; "+" yalnızca Ürün Yönetimi departmanında
-    // ProductsPanel'in kayıt ettirdiği "Ürün/Hizmet ekle" eylemine bağlıdır.
+    // Departman detayında da varsayılan bir eylem yok: her sekme (kadro, görev,
+    // bütçe, modüller, dosyalar) kendi ekleme eylemini kaydeder.
     createAction = null;
+  } else if (location.pathname === "/") {
+    // Ana sayfada kayıtlı eylem yoksa (İşler sekmesi) "+" yeni iş açar. Serbest
+    // çalışan büyümek isterse şirketleşme yolu da buradan geçer: işini büyütmek
+    // isteyen kullanıcı için "şirket kur / işletme aç" ayrı bir sayfada aranacak
+    // bir şey değil, yeni iş açmakla aynı düğmenin altında durmalı. Bu seçenekleri
+    // göremeyen hesaplarda (çalışan/taşeron) "+" eskisi gibi doğrudan iş açar,
+    // araya gereksiz bir menü girmez.
+    createAction = canFoundOrg ? "home-choice" : "job";
+    fabLabel = canFoundOrg ? "İş, şirket veya işletme ekle" : "Yeni iş";
   } else {
-    // "+" düğmesi diğer tüm sayfalarda da (ana sayfa, takvim, yapılacaklar, ayarlar)
-    // görünür ve yeni iş oluşturur.
-    createAction = "job";
-    fabLabel = "Yeni iş";
+    // Kalan sayfalarda (Ayarlar, Arşiv, Lio kredisi, yönetim paneli…) eklenecek
+    // bir şey yok. Eskiden buraya da "Yeni iş" düşüyordu: kullanıcı Ayarlar'da
+    // "+"a basınca karşısına iş oluşturma ekranı çıkıyordu. "+" artık yalnızca
+    // BULUNULAN sayfanın ekleme işlevini taşır; işlev yoksa buton hiç çıkmaz.
+    createAction = null;
   }
 
   // Kayıtlı eylem birden fazla seçenek sunuyorsa (bkz. ProjectFabAction.options),
@@ -120,9 +145,12 @@ export default function BottomNav({ sidebarOpen }: Props) {
       } else {
         fabAction?.onClick?.();
       }
-    } else if (createAction === "job-choice") {
+    } else if (createAction === "job-choice" || createAction === "home-choice") {
       setChoosing((prev) => !prev);
     } else if (createAction) {
+      // Genel giriş (Organizasyonlar sayfası): önceki menüden kalan ölçek ön
+      // seçimi modalı yanlış başlıkla açmasın.
+      if (createAction === "organization") setNewOrgType(null);
       setModal(createAction);
     }
   };
@@ -150,9 +178,20 @@ export default function BottomNav({ sidebarOpen }: Props) {
     </button>
   );
 
-  // jobId'deyken sabit üç seçenek (proje/rutin/görev); özel bir fabAction
-  // birden fazla seçenek kaydettiyse (bkz. options) onlar kullanılır.
-  const choiceMenuItems: { label: string; icon: typeof IconFolder; onClick: () => void }[] = jobId
+  const openOrgModal = (type: OrgType) => {
+    setNewOrgType(type);
+    setModal("organization");
+  };
+
+  // jobId'deyken sabit üç seçenek (proje/rutin/görev); anasayfada iş + şirketleşme;
+  // özel bir fabAction birden fazla seçenek kaydettiyse (bkz. options) onlar kullanılır.
+  const choiceMenuItems: { label: string; icon: typeof IconFolder; onClick: () => void }[] = createAction === "home-choice"
+    ? [
+        { label: "Yeni iş", icon: IconFolder, onClick: () => setModal("job") },
+        { label: "Şirket kur", icon: IconBuilding, onClick: () => openOrgModal("sirket") },
+        { label: "İşletme aç", icon: IconBuilding, onClick: () => openOrgModal("isletme") },
+      ]
+    : jobId
     ? [
         { label: "Yeni proje", icon: IconFolder, onClick: () => setModal("project") },
         // Rutin: süresi olmayan, tekrarlayan işlerden oluşan çalışma (kodda "operation").
@@ -214,7 +253,21 @@ export default function BottomNav({ sidebarOpen }: Props) {
       {modal === "project" && jobId && <CreateProjectModal jobId={jobId} onClose={() => setModal(null)} />}
       {modal === "operation" && jobId && <CreateOperationModal jobId={jobId} onClose={() => setModal(null)} />}
       {modal === "task" && jobId && <CreateTaskModal jobId={jobId} onClose={() => setModal(null)} />}
-      {modal === "organization" && <CreateOrganizationModal onClose={() => setModal(null)} />}
+      {modal === "organization" && (
+        <CreateOrganizationModal
+          initialOrgType={newOrgType ?? undefined}
+          onClose={() => setModal(null)}
+          // Kurduğu yapının içine düşsün — modalın varsayılanı olan "sayfayı
+          // yenile" kullanıcıyı yine "İşlerim"de bırakıyor, yeni kurduğu şirketi
+          // kendisi aramak zorunda kalıyordu. Router yerine tam sayfa geçişi:
+          // sidebar'daki Organizasyonlar bağlantısı ve ağaç, açılışta bir kez
+          // çekilen listelere bakıyor (bkz. useNavVisibility) — yenilenmeden yeni
+          // kayıt oralarda görünmezdi.
+          onCreated={(org) => {
+            window.location.href = `/organizations/${org.id}`;
+          }}
+        />
+      )}
       {modal === "group" && <CreateGroupModal onClose={() => setModal(null)} />}
       {modal === "organization-in-group" && groupIdForOrg && (
         <CreateOrganizationModal fixedGroupId={groupIdForOrg} onClose={() => setModal(null)} />

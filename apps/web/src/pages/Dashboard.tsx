@@ -11,6 +11,8 @@ import { useNavVisibility } from "../lib/useNavVisibility";
 import { onJobInvitesChanged } from "../lib/jobInvites";
 import { IconBuilding, IconLayers, IconChevronRight, IconFolder, IconActivity, IconFile, IconSparkle } from "../components/icons";
 import ProfileCard from "../components/ProfileCard";
+import AiCreditsChip from "../components/AiCreditsChip";
+import { useAppPrefs } from "../lib/appPrefs";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import BudgetPanel from "../components/BudgetPanel";
 import AllFilesPanel from "../components/AllFilesPanel";
@@ -137,6 +139,7 @@ export default function Dashboard() {
   // Masaüstünde sol sidebar'da zaten Organizasyonlar/Gruplar linkleri var;
   // bu kısayol satırı sadece sidebar'ın kaybolduğu mobil görünümde gösterilir.
   const isDesktop = useIsDesktop();
+  const prefs = useAppPrefs();
   // Kısayollar da nav ile aynı kuralı izler: yalnızca erişilebilir en az bir
   // organizasyon/grup varsa gösterilir.
   const { showOrganizations, showGroups } = useNavVisibility();
@@ -300,7 +303,12 @@ export default function Dashboard() {
         {/* Hem masaüstünde hem mobilde sağa dayalı: kartın kendi kompozisyonu
             (sağa hizalı metin, sağdaki avatar, transformOrigin: right) sağ kenara
             yaslandığında doğru duruyor. */}
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: isDesktop ? 12 : 8 }}>
+          {/* Lio kredisi rozeti kişi kartının SOLUNDA: kart sağ kenara dayanmak
+              (bleedRight) üzerine kurulu, sağına bir şey konulamaz. Lio gizlenmişse
+              (Ayarlar > Yardımcılar) rozet de görünmez — kullanmadığı bir aracın
+              bakiyesi anasayfada yer kaplamasın. */}
+          {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
           {/* Tam sayfa dolgusu kadar: kart kenara dayanır ama avatar kırpılmaz. */}
           <ProfileCard bleedRight={isDesktop ? 28 : 16} compact={!isDesktop} />
         </div>

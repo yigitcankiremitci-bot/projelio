@@ -17,6 +17,7 @@ import TaskAttachmentBadges from "./TaskAttachmentBadges";
 import Modal from "./Modal";
 import AutoGrowTextarea from "./AutoGrowTextarea";
 import { useSortableList, SORTABLE_BASE_OPTIONS } from "../lib/useSortableList";
+import { useClickIntent } from "../lib/clickIntent";
 import { useKeepInView } from "../lib/useKeepInView";
 import { useUndo } from "../lib/undo";
 import { formatTaskDuration } from "../lib/dates";
@@ -751,6 +752,10 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     return cb;
   };
 
+  // Kartta hem tek (alt görevleri aç/kapa) hem çift (kaynağa git) tıklama işi var;
+  // ikisinin birbirine karışmaması için bkz. lib/clickIntent.
+  const click = useClickIntent();
+
   const toggleExpand = (id: string) => {
     if (!subtasksEnabled) return;
     setExpanded((prev) => {
@@ -1066,16 +1071,20 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                 // Alt görev sürüklenirken imlecin altındaki kart bu işaretle
                 // bulunur ve kapalıysa kendiliğinden açılır (bkz. handleSubtaskDragMove).
                 data-task-card-id={subtasksEnabled ? t.id : undefined}
-                onClick={() => toggleExpand(t.id)}
-                // Çift tıklama görevin kaynağına gider. Tek tıklama alt görevleri
-                // açıp kapadığı için burada onu da geri alıyoruz: aksi halde
-                // kullanıcı çift tıkladığında liste bir açılıp bir kapanıyor.
+                // Tek tıklama alt görevleri açar/kapar, çift tıklama görevin
+                // kaynağına gider. Çift tıklamada tarayıcı önce İKİ `click`
+                // gönderdiği için tek tıklama işi doğrudan burada yapılamaz:
+                // eskiden yapılıyor ve `dblclick` içinde bir kez daha
+                // toggleExpand çağrılarak "geri alınmaya" çalışılıyordu — ama
+                // geri alınması gereken iki tık vardı, üçüncü çağrı listeyi açık
+                // bırakıp gözle görülür bir açılıp-kapanmaya yol açıyordu.
+                // Artık tek tıklama kısa bir süre bekletiliyor (bkz. clickIntent).
+                onClick={() => (onOpenSource ? click.single(() => toggleExpand(t.id)) : toggleExpand(t.id))}
                 onDoubleClick={
                   onOpenSource
                     ? (e) => {
                         e.stopPropagation();
-                        toggleExpand(t.id);
-                        onOpenSource(t);
+                        click.double(() => onOpenSource(t));
                       }
                     : undefined
                 }

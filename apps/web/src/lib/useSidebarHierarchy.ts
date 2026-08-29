@@ -140,8 +140,19 @@ export function useSidebarHierarchy(): SidebarHierarchy {
         // Sidebar'da yalnızca AÇIK olanlar görünür: tamamlanmış/arşivlenmiş
         // projeler ve bitmiş rutinler gezinme ağacını kalabalıklaştırmasın
         // (bkz. SidebarTree.renderJob — "Projeler"/"Rutinler" altında listelenir).
+        //
+        // DIŞLAMA ile yazılıyor, "yalnızca active" ile DEĞİL: proje durumları beş
+        // tane (active/on_hold/passive/completed/archived, bkz. PROJECT_STATUSES).
+        // Beyaz liste yazıldığında "Beklemede" ve "Pasif" projeler de sidebar'dan
+        // düşüyordu — kullanıcı projelerinin çoğunu menüde bulamıyordu. Yeni bir
+        // durum eklenirse varsayılan olarak GÖRÜNÜR olması da doğru davranış.
         const projMap = new Map<string, Project[]>();
-        j.forEach((job, idx) => projMap.set(job.id, projectLists[idx].filter((p) => p.status === "active")));
+        j.forEach((job, idx) =>
+          projMap.set(
+            job.id,
+            projectLists[idx].filter((p) => p.status !== "completed" && p.status !== "archived")
+          )
+        );
         setOpenProjectsByJobId(projMap);
 
         const opMap = new Map<string, Operation[]>();

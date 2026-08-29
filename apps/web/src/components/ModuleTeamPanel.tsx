@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { DepartmentMember, JobMember, ModuleAccess, ModuleMember, ModuleMemberRole } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
+import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { IconX } from "./icons";
 
 // Kayıtların sahibi module_records ile aynı desende iki türlü olabilir: bir
@@ -174,6 +175,19 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
     }
   };
 
+  // Modüle kişi atama da sayfanın "+" düğmesinde: modül sayfasında "+" hem
+  // modülün kendi ekleme eylemini hem bunu tek menüde toplar (bkz.
+  // lib/projectFab.tsx mergeActions). Modal içinde "+" ulaşılamadığı için
+  // başlıktaki "Kişi ata" düğmesi orada geri gelir.
+  const fabAvailable = useFabAvailable();
+  useProjectFabAction(
+    canManage && fabAvailable && !loading && resolved?.role !== "subcontractor"
+      ? { label: "Kişi ata", onClick: () => setAdding(true) }
+      : null,
+    [canManage, fabAvailable, loading, resolved?.role, moduleKey],
+    FAB_PRIORITY.panel
+  );
+
   if (loading) return <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Ekip yükleniyor…</p>;
 
   // Dış kaynak rolündeki kişi ekibi göremez (bkz. 042 rol açıklamaları).
@@ -185,7 +199,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
         <span style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary }}>
           Modül ekibi{members.length > 0 ? ` · ${members.length}` : ""}
         </span>
-        {canManage && (
+        {canManage && !fabAvailable && (
           <button
             type="button"
             onClick={() => setAdding((v) => !v)}
@@ -329,6 +343,22 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
               </div>
             ))
           )}
+          {/* Vazgeçme listenin içinde: başlıktaki düğme sayfanın "+"ına taşındı. */}
+          <button
+            type="button"
+            onClick={() => setAdding(false)}
+            style={{
+              alignSelf: "flex-start",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              fontSize: 12,
+              color: c.textSecondary,
+              cursor: "pointer",
+            }}
+          >
+            Vazgeç
+          </button>
         </div>
       )}
 

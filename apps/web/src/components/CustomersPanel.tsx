@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { ALL_ROLES, ROLE_COLORS, ROLE_LABELS, STATUS_LABELS, profileFor } from "../lib/partyProfiles";
 import { useUndo } from "../lib/undo";
+import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { IconTrash, IconX } from "./icons";
 
 interface Props {
@@ -133,6 +134,15 @@ export default function CustomersPanel({
     setError("");
   };
 
+  // Ekleme sayfanın "+" düğmesinden. Panelin başlığındaki ikinci düğme kalktı;
+  // modal içinde (bkz. Modal.tsx) "+" ulaşılamadığı için orada geri gelir.
+  const fabAvailable = useFabAvailable();
+  useProjectFabAction(
+    canWrite && fabAvailable ? { label: "Müşteri ekle", onClick: openCreate } : null,
+    [canWrite, fabAvailable, organizationId, departmentId, jobId],
+    FAB_PRIORITY.panel
+  );
+
   /**
    * Ada göre kopya kontrolü, kullanıcı adı yazmayı bitirdiğinde çalışır.
    * Engelleyici değil: "ABC Ltd" iki ayrı şube olabilir, karar kullanıcınındır.
@@ -213,15 +223,17 @@ export default function CustomersPanel({
             <span style={{ fontSize: 12, color: c.textSecondary }}>{profile.label}</span>
           )}
         </div>
-        {canWrite ? (
-          <button
-            onClick={() => (formMode ? closeForm() : openCreate())}
-            style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
-          >
-            {formMode ? "Vazgeç" : "+ Müşteri ekle"}
-          </button>
-        ) : (
+        {!canWrite ? (
           <span style={{ fontSize: 12, color: c.textSecondary }}>Salt görüntüleme</span>
+        ) : (
+          !fabAvailable && (
+            <button
+              onClick={() => (formMode ? closeForm() : openCreate())}
+              style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+            >
+              {formMode ? "Vazgeç" : "+ Müşteri ekle"}
+            </button>
+          )
         )}
       </div>
 
@@ -385,13 +397,24 @@ export default function CustomersPanel({
           )}
 
           {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={{ padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14 }}
-          >
-            {saving ? "Kaydediliyor…" : formMode.kind === "edit" ? "Güncelle" : "Kaydet"}
-          </button>
+          {/* Vazgeçme yolu formun İÇİNDE: eskiden başlıktaki ekleme düğmesi
+              "Vazgeç"e dönüşüyordu, o düğme "+"a taşınınca formu kapatmanın
+              yolu kalmıyordu. */}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14 }}
+            >
+              {saving ? "Kaydediliyor…" : formMode.kind === "edit" ? "Güncelle" : "Kaydet"}
+            </button>
+            <button
+              onClick={closeForm}
+              style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 14 }}
+            >
+              Vazgeç
+            </button>
+          </div>
         </div>
       )}
 
@@ -400,6 +423,7 @@ export default function CustomersPanel({
       ) : parties.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
           Henüz müşteri kaydı yok. Satış ve Müşteri İlişkileri aynı listeyi görür.
+          {canWrite && fabAvailable ? ' Eklemek için sayfadaki "+" düğmesini kullan.' : ""}
         </p>
       ) : visible.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Aramanla eşleşen kayıt yok.</p>

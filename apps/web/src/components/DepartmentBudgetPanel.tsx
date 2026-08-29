@@ -3,6 +3,7 @@ import type { BudgetTransaction, BudgetTransactionType, Task, TaskBudgetStatus }
 import { api } from "../api/client";
 import { useRefreshOnUndo } from "../lib/undo";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useFabAvailable } from "../lib/projectFab";
 import { useUndo } from "../lib/undo";
 import { IconEdit, IconTrash } from "./icons";
 
@@ -72,6 +73,11 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
   useImperativeHandle(ref, () => ({
     openCreate: () => setAdding(true),
   }));
+
+  // Ekleme sayfanın "+" düğmesinde (kaydı DepartmentDetail yapıyor, yetkiyi de
+  // orada denetliyor). Başlıktaki "+ Kayıt ekle" düğmesi aynı işi yapan bir
+  // kopyaydı; yalnızca "+"ın ulaşılamadığı yerde (modal içi) gösteriliyor.
+  const fabAvailable = useFabAvailable();
   const [type, setType] = useState<BudgetTransactionType>("expense");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -318,16 +324,18 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <span style={{ fontSize: 14, color: c.textSecondary }}>Hareketler</span>
-          <button
-            onClick={() => {
-              setAdding((v) => !v);
-              resetForm();
-              setError("");
-            }}
-            style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none" }}
-          >
-            {adding ? "Vazgeç" : "+ Kayıt ekle"}
-          </button>
+          {!fabAvailable && (
+            <button
+              onClick={() => {
+                setAdding((v) => !v);
+                resetForm();
+                setError("");
+              }}
+              style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none" }}
+            >
+              {adding ? "Vazgeç" : "+ Kayıt ekle"}
+            </button>
+          )}
         </div>
 
         {adding && (
@@ -366,19 +374,17 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
               >
                 {saving ? "Kaydediliyor…" : editing ? "Değişikliği kaydet" : "Kaydet"}
               </button>
-              {/* Düzenleme kipinden çıkış: aynı form ekleme için de kullanıldığı
-                  için kullanıcının "vazgeçtim" diyebileceği bir yol gerekiyor. */}
-              {editing && (
-                <button
-                  onClick={() => {
-                    resetForm();
-                    setAdding(false);
-                  }}
-                  style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 14 }}
-                >
-                  Vazgeç
-                </button>
-              )}
+              {/* "Vazgeçtim" yolu her zaman formun içinde: ekleme "+"a taşınınca
+                  başlıktaki düğme (açıkken "Vazgeç" yazan) artık yok. */}
+              <button
+                onClick={() => {
+                  resetForm();
+                  setAdding(false);
+                }}
+                style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 14 }}
+              >
+                Vazgeç
+              </button>
             </div>
           </div>
         )}

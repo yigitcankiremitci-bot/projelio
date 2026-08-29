@@ -7,6 +7,8 @@ import OrganizationCard from "../components/OrganizationCard";
 import EditGroupModal from "../components/EditGroupModal";
 import FilesPanel from "../components/FilesPanel";
 import ProfileCard from "../components/ProfileCard";
+import AiCreditsChip from "../components/AiCreditsChip";
+import { useAppPrefs } from "../lib/appPrefs";
 import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -25,6 +27,7 @@ export default function GroupDetail() {
   const c = useThemeColors();
   const cover = useCoverTheme();
   const isDesktop = useIsDesktop();
+  const prefs = useAppPrefs();
   const gutter = pageGutter(isDesktop);
   const [group, setGroup] = useState<Group | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -84,7 +87,12 @@ export default function GroupDetail() {
             </>
           )
         }
-        aside={<ProfileCard />}
+        aside={
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {prefs.showLio && <AiCreditsChip />}
+            <ProfileCard />
+          </div>
+        }
         action={
           <button onClick={() => setEditing(true)} aria-label="Grubu düzenle" style={coverActionButton(c)}>
             <IconSettings size={20} color={c.textSecondary} />

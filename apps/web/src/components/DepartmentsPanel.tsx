@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import type { Department, DepartmentCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import { useProjectFabAction } from "../lib/projectFab";
+import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { onEnter } from "../lib/enterAction";
 import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo } from "../lib/undo";
@@ -15,10 +15,10 @@ export interface DepartmentsPanelHandle {
 
 interface Props {
   organizationId: string;
-  // Şirket anasayfasında Ürün/Hizmet ile birlikte gösterildiğinde global "+"
-  // düğmesi tek bir birleşik seçim menüsüne (bkz. OrganizationDetail) bağlanır;
-  // bu durumda useFab=false verilip ekleme DepartmentsPanelHandle.openAdd ile
-  // dışarıdan tetiklenir (ProductsPanel'deki useFab deseninin aynısı).
+  // Şirket anasayfasında "+" beş kısayolu birden taşıyan tek bir menü açıyor
+  // (bkz. OrganizationDetail HomeAddFabRegistrar) ve "Departman kur" orada zaten
+  // var; ikinci kez kaydedilmesin diye orada useFab=false verilir ve ekleme
+  // DepartmentsPanelHandle.openAdd ile tetiklenir (ProductsPanel'deki desenin aynısı).
   useFab?: boolean;
   // "scroll" (varsayılan): Anasayfa özetindeki gibi tek satır, yana kaydırmalı,
   // kompakt kartlar. "grid": ayrı Departmanlar sekmesindeki gibi satıra sığdığı
@@ -89,13 +89,18 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
     [layout, departments.length === 0]
   );
 
+  const fabAvailable = useFabAvailable();
+  useProjectFabAction(
+    useFab && fabAvailable ? { label: "Departman ekle", onClick: () => setAdding((v) => !v) } : null,
+    [useFab, fabAvailable, organizationId],
+    FAB_PRIORITY.panel
+  );
+
   const existingKeys = new Set(departments.map((d) => d.catalogKey).filter(Boolean));
   const availableCatalog = catalog.filter((entry) => !existingKeys.has(entry.key));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {useFab && <DepartmentsFabRegistrar onAdd={() => setAdding((v) => !v)} deps={[organizationId]} />}
-
       <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Departmanlar</h2>
 
       {adding && (
@@ -163,20 +168,6 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
 });
 
 export default DepartmentsPanel;
-
-// ProductsPanel.ProductsFabRegistrar ile aynı desen: bir hook'u koşullu
-// çağırmak yerine hook'u çağıran bileşeni koşullu render etmek gerekir.
-// useFab=false iken (bkz. OrganizationDetail Anasayfa) bu bileşen HİÇ
-// mount edilmez — aksi halde (önceki "useProjectFabAction(useFab ? … :
-// null)" hâli) bu panel her hâlükârda hook'u çağırıp action'ı null'a
-// çekerdi; sıralamaya göre bu, Anasayfa'nın kendi "+" menüsünü kaydettiği
-// eylemi hemen ardından silebilirdi — Anasayfa'da "+" düğmesinin
-// görünmemesinin sebebi buydu.
-function DepartmentsFabRegistrar({ onAdd, deps }: { onAdd: () => void; deps: unknown[] }) {
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useProjectFabAction({ label: "Departman ekle", onClick: onAdd }, deps);
-  return null;
-}
 
 function AddDepartmentForm({
   organizationId,

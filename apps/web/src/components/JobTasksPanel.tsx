@@ -16,6 +16,7 @@ import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { useTaskSelection } from "../lib/useTaskSelection";
 import { selectedLioTasks } from "../lib/askLio";
 import { useUndo } from "../lib/undo";
+import { useClickIntent } from "../lib/clickIntent";
 import { backState } from "../lib/backTarget";
 import { focusParams, resolveTaskFocus, type FocusWhere, type TaskFocus } from "../lib/taskFocus";
 
@@ -99,8 +100,10 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
   // Tek tıklama görev kartını açıyor, çift tıklama kaynağa gidiyor. Tarayıcı
   // çift tıklamayı ancak ikinci tıklamadan sonra bildirdiği için tek tıklama
   // kısa süre geciktiriliyor: aksi halde çift tıklamada önce modal açılıp
-  // hemen ardından sayfa değişiyor, ekran bir an "zıplıyordu".
-  const clickTimer = useRef<number | null>(null);
+  // hemen ardından sayfa değişiyor, ekran bir an "zıplıyordu". Bekleme süresi
+  // TaskColumn ile ORTAK (bkz. lib/clickIntent) — iki yerde farklı olursa
+  // "bazı yerlerde çift tıklayabiliyorum bazılarında tıklayamıyorum" hissi doğar.
+  const click = useClickIntent();
   const { pushUndo, pushDestructive } = useUndo();
   const [creating, setCreating] = useState(false);
   const [outputs, setOutputs] = useState<Output[]>([]);
@@ -250,10 +253,6 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
     const t = window.setTimeout(() => setFocusTarget(undefined), 2500);
     return () => window.clearTimeout(t);
   }, [focusTarget]);
-
-  useEffect(() => () => {
-    if (clickTimer.current) window.clearTimeout(clickTimer.current);
-  }, []);
 
   /**
    * Çift tıklama: görevin yaşadığı sayfaya gidip kartı parlatır — Yapılacaklar
@@ -423,20 +422,10 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
                     className={
                       focusTarget?.where === "today" && focusTarget.id === t.id ? "task-highlight-flash" : undefined
                     }
-                    onClick={() => {
-                      if (clickTimer.current) return;
-                      clickTimer.current = window.setTimeout(() => {
-                        clickTimer.current = null;
-                        onEditTask(t);
-                      }, 200);
-                    }}
+                    onClick={() => click.single(() => onEditTask(t))}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
-                      if (clickTimer.current) {
-                        window.clearTimeout(clickTimer.current);
-                        clickTimer.current = null;
-                      }
-                      openTaskSource(t, "today");
+                      click.double(() => openTaskSource(t, "today"));
                     }}
                     title="Tıkla: görevi aç · Çift tıkla: görevin bulunduğu sayfaya git"
                     style={{

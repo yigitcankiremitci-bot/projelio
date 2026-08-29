@@ -10,7 +10,7 @@ import DepartmentBudgetPanel, { DepartmentBudgetPanelHandle } from "../component
 import DepartmentTabs, { DepartmentTab, visibleDepartmentTabs } from "../components/DepartmentTabs";
 import ProductsPanel from "../components/ProductsPanel";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
-import FilesPanel, { FilesPanelHandle } from "../components/FilesPanel";
+import FilesPanel from "../components/FilesPanel";
 import DepartmentSettingsModal from "../components/DepartmentSettingsModal";
 import ProfileCard from "../components/ProfileCard";
 import { CoverBackLink } from "../components/EntityCover";
@@ -66,7 +66,6 @@ export default function DepartmentDetail() {
   const teamRef = useRef<DepartmentMembersListHandle>(null);
   const tasksRef = useRef<DepartmentTasksPanelHandle>(null);
   const budgetRef = useRef<DepartmentBudgetPanelHandle>(null);
-  const filesRef = useRef<FilesPanelHandle>(null);
 
   const reload = () => {
     if (!id) return;
@@ -87,9 +86,9 @@ export default function DepartmentDetail() {
   }, [department?.name]);
 
   // Alt navigasyondaki "+" butonu, proje detayındaki (ProjectDetail) ile aynı desende:
-  // departman detayında hangi sekmedeysek ona uygun eylemi tetikler. Ürün Yönetimi
-  // departmanının "Modüller" sekmesi kendi "Ürün/Hizmet ekle" düğmesini kullanır (bkz.
-  // ProductsPanel useFab=false); Dosyalar sekmesi dosya yükleme/oluşturma seçimini açar.
+  // departman detayında hangi sekmedeysek ona uygun eylemi tetikler. Modüller ve
+  // Dosyalar sekmelerinin eylemini panellerin kendisi kaydeder (bkz.
+  // DepartmentModulesPanel / ProductsPanel / FilesPanel), o yüzden burada yoklar.
   useProjectFabAction(
     !department
       ? null
@@ -107,15 +106,8 @@ export default function DepartmentDetail() {
       ? access?.canManage === false
         ? null
         : { label: "Kayıt ekle", onClick: () => budgetRef.current?.openCreate() }
-      : activeTab === "files"
-      ? {
-          label: "Dosya ekle",
-          options: [
-            { label: "Dosya yükle", onClick: () => filesRef.current?.openUpload() },
-            { label: "Yeni dosya oluştur", onClick: () => filesRef.current?.openCreateNative() },
-          ],
-        }
-      : null,
+      : // Dosyalar sekmesinin "+" eylemi panelin kendisinde (bkz. FilesPanel).
+        null,
     [activeTab, department?.id, access?.canManage]
   );
 
@@ -275,13 +267,16 @@ export default function DepartmentDetail() {
 
                 {isProductDepartment && (
                   <div style={{ marginTop: 20 }}>
-                    <ProductsPanel organizationId={department.organizationId} departmentId={department.id} useFab={false} />
+                    {/* "+" hem modül hem ürün ekleyebiliyor: iki panel de kendi
+                        eylemini kaydeder, BottomNav ikisini tek menüde birleştirir
+                        (bkz. lib/projectFab.tsx mergeActions). */}
+                    <ProductsPanel organizationId={department.organizationId} departmentId={department.id} />
                   </div>
                 )}
               </>
             )}
 
-            {activeTab === "files" && <FilesPanel ref={filesRef} departmentId={department.id} />}
+            {activeTab === "files" && <FilesPanel departmentId={department.id} />}
           </>
         )}
       </div>

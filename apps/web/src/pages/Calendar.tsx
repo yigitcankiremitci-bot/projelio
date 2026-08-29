@@ -5,6 +5,7 @@ import { planning, type PlanSuggestionResult } from "../api/planning";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useSwipeNavigate } from "../lib/useSwipeNavigate";
 import { askLio } from "../lib/askLio";
+import { useProjectFabAction } from "../lib/projectFab";
 import {
   addDays,
   addMonths,
@@ -14,6 +15,8 @@ import {
   shortDayLabel,
   startOfMonth,
   startOfWeek,
+  timeToMinutes,
+  minutesToTime,
   todayStr,
   type DraggedItem,
 } from "../lib/planGrid";
@@ -178,6 +181,32 @@ export default function CalendarView() {
     load();
   };
 
+  // Çalışma ritmi takvim yanıtıyla birlikte geliyor (bkz. PlanCalendarView.preferences).
+  // `data` henüz yokken kullanılmayacağı için varsayılanlar yalnızca tip
+  // güvenliği içindir; ilk render zaten "yükleniyor" ile geçiliyor.
+  const prefs = data?.preferences;
+  const dayStart = prefs?.dayStart ?? "09:00";
+  const dayEnd = prefs?.dayEnd ?? "18:00";
+  const workdays = prefs?.workdays ?? [1, 2, 3, 4, 5];
+  const blockMinutes = prefs?.focusBlockMinutes ?? 90;
+
+  // Takvimde "+" yeni bir plan bloğu açar. Eskiden bu sayfa kendi eylemini
+  // kaydetmediği için "+" varsayılana düşüyor ve takvimin ortasında "Yeni iş"
+  // ekranı açıyordu. Blok, bakılan günün mesai başlangıcına konur; saat zaten
+  // modalde değiştirilebiliyor.
+  useProjectFabAction(
+    {
+      label: "Plan bloğu ekle",
+      onClick: () =>
+        setDraftBlock({
+          blockDate: view === "day" ? anchor : todayStr(),
+          startsAt: dayStart,
+          endsAt: minutesToTime(timeToMinutes(dayStart) + blockMinutes),
+        }),
+    },
+    [view, anchor, dayStart, blockMinutes]
+  );
+
   // -------------------------------------------------------------------- Render
 
   if (loading && !data) {
@@ -187,15 +216,6 @@ export default function CalendarView() {
       </div>
     );
   }
-
-  // Çalışma ritmi takvim yanıtıyla birlikte geliyor (bkz. PlanCalendarView.preferences).
-  // `data` henüz yokken kullanılmayacağı için varsayılanlar yalnızca tip
-  // güvenliği içindir; ilk render zaten "yükleniyor" ile geçiliyor.
-  const prefs = data?.preferences;
-  const dayStart = prefs?.dayStart ?? "09:00";
-  const dayEnd = prefs?.dayEnd ?? "18:00";
-  const workdays = prefs?.workdays ?? [1, 2, 3, 4, 5];
-  const blockMinutes = prefs?.focusBlockMinutes ?? 90;
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: isDesktop ? 28 : 16 }}>

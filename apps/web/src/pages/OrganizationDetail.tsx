@@ -16,6 +16,8 @@ import OrgTabs, { CORE_ORG_TABS, OrgTab, visibleOrgTabs } from "../components/Or
 import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
 import ProfileCard from "../components/ProfileCard";
+import AiCreditsChip from "../components/AiCreditsChip";
+import { useAppPrefs } from "../lib/appPrefs";
 import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
@@ -48,6 +50,7 @@ export default function OrganizationDetail() {
   const c = useThemeColors();
   const cover = useCoverTheme();
   const isDesktop = useIsDesktop();
+  const prefs = useAppPrefs();
   const gutter = pageGutter(isDesktop);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [editing, setEditing] = useState(false);
@@ -204,7 +207,14 @@ export default function OrganizationDetail() {
         // gibi küçültülür — ekran kenarına dayamayı EntityCover üstleniyor.
         // collapsible: mobilde yalnızca fotoğraf durur, kapsül dokununca yandan
         // kayarak çıkar — kapak fotoğrafının köşesi sürekli kapalı kalmasın.
-        aside={<ProfileCard compact={!isDesktop} collapsible />}
+        aside={
+          // Lio kredisi rozeti kişi kartının solunda: kart sağa dayanmak üzere
+          // kurulu (bkz. ProfileCard), sağına bir şey konulamaz.
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
+            <ProfileCard compact={!isDesktop} collapsible />
+          </div>
+        }
         asideOnMobile
         action={
           <button onClick={() => setEditing(true)} aria-label="Organizasyonu düzenle" style={coverActionButton(c)}>
@@ -244,13 +254,7 @@ export default function OrganizationDetail() {
               setAddingRecordModule={setAddingRecordModule}
               setAddingFile={setAddingFile}
             />
-            <ProductsPanel
-              ref={productsRef}
-              organizationId={id}
-              departmentId={productDepartmentId}
-              useFab={false}
-              showAddButton={false}
-            />
+            <ProductsPanel ref={productsRef} organizationId={id} departmentId={productDepartmentId} useFab={false} />
             <div style={{ marginTop: 28 }}>
               <DepartmentsPanel ref={departmentsRef} organizationId={id} useFab={false} />
             </div>

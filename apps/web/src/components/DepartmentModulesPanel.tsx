@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import type { ModuleAccess, ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import { useProjectFabAction } from "../lib/projectFab";
+import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
 import { isOpenableModule } from "../lib/entityModules";
 import { moduleSurface } from "../lib/moduleSurfaces";
@@ -118,9 +118,13 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
 
   // Özel (kataloğa dayanmayan) departmanların önceden tanımlı modülü yok, o
   // yüzden bu sayfalarda "+" düğmesi devreye girmez.
+  const fabAvailable = useFabAvailable();
   useProjectFabAction(
-    departmentKey ? { label: "Modül ekle", onClick: () => setAdding((v) => !v) } : null,
-    [organizationId, departmentKey]
+    departmentKey && fabAvailable ? { label: "Modül ekle", onClick: () => setAdding((v) => !v) } : null,
+    [organizationId, departmentKey, fabAvailable],
+    // Panel önceliği: aynı sekmedeki Ürün/Hizmet paneliyle tek menüde birleşsin
+    // (bkz. lib/projectFab.tsx mergeActions).
+    FAB_PRIORITY.panel
   );
 
   const isEnabled = (moduleKey: string) => enabled.some((m) => m.moduleKey === moduleKey);
@@ -211,7 +215,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Bu departman için henüz modül tanımlı değil.</p>
       ) : activeCatalog.length === 0 ? (
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-          Henüz etkinleştirilmiş modül yok. Sağ alttaki "+" ile ekleyebilirsin.
+          Henüz etkinleştirilmiş modül yok. Sayfadaki "+" ile ekleyebilirsin.
         </p>
       ) : (
         // Şirket anasayfasındaki modül kartlarıyla aynı görünüm: sabit boy,

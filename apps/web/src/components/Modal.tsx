@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
+import { bodyScrollLock } from "../lib/scrollLock";
 import { Z } from "../lib/layout";
 import { createPortal } from "react-dom";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
+import { FabSuppressed } from "../lib/projectFab";
 import { IconX } from "./icons";
 
 /**
@@ -149,15 +151,13 @@ export default function Modal({
   //
   // overscroll-behavior modalin İÇİNDEN çıkan kaydırmayı durduruyor, ama
   // kullanıcı fareyi modalin DIŞINDAKİ karartmaya götürüp kaydırırsa arka sayfa
-  // yine kayıyor. İkisi birlikte gerekiyor. Eski değeri saklayıp geri koyuyoruz:
-  // üst üste iki modal açılıp kapandığında sayfa kilitli kalmasın.
-  useEffect(() => {
-    const oncekiOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = oncekiOverflow;
-    };
-  }, []);
+  // yine kayıyor. İkisi birlikte gerekiyor.
+  //
+  // Kilit SAYAÇLI (bkz. lib/scrollLock). Burada eski değeri saklayıp geri koymak
+  // iç içe modallarda bozuluyordu: görev düzenleme modalı + içindeki silme onayı
+  // birlikte kapandığında içteki modal "hidden"ı geri koyuyor ve sayfa,
+  // kullanıcı yenileyene kadar kaydırılamaz kalıyordu.
+  useEffect(() => bodyScrollLock.acquire(), []);
 
   // Modal her zaman body'ye taşınır (portal). Aksi halde CSS "transform" ya da
   // "will-change" uygulanmış bir üst öğenin içinde kalırsa (örn. hover'da büyüyen
@@ -230,7 +230,10 @@ export default function Modal({
             <IconX size={18} color={c.textSecondary} />
           </button>
         </div>
-        {children}
+        {/* Modalin içi "+" düğmesine kapalı: yuvarlak buton karartmanın altında
+            kalıyor, oradan tetiklenemez. İçerideki paneller bunu görüp kendi
+            satır içi ekleme düğmelerini gösterir (bkz. lib/projectFab.tsx). */}
+        <FabSuppressed>{children}</FabSuppressed>
         {footer && (
           <div
             style={{

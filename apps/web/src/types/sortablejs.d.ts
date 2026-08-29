@@ -28,7 +28,10 @@ declare module "sortablejs" {
     ghostClass?: string;
     chosenClass?: string;
     dragClass?: string;
-    filter?: string;
+    // Seçici ya da karar fonksiyonu. Fonksiyon biçiminde Sortable bunu
+    // `filter.call(sortable, evt, draggableAtasi, sortable)` ile çağırır ve
+    // true dönerse sürükleme başlamaz (bkz. lib/useSortableList.sortableFilter).
+    filter?: string | ((evt: Event, target: HTMLElement, sortable: Sortable) => boolean);
     preventOnFilter?: boolean;
     handle?: string;
     // Kenara yaklaşınca sayfayı/kutuyu kaydırma (AutoScroll eklentisi; paketin

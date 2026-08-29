@@ -7,6 +7,7 @@ import { isReferenceValue } from "../lib/moduleRecordConfigs";
 import { hasDynamicFields, toDisplayData, useModuleReferences } from "../lib/moduleReferences";
 import { useUndo } from "../lib/undo";
 import { useSortableList } from "../lib/useSortableList";
+import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import type { SortableOptions } from "sortablejs";
 import Modal from "./Modal";
 import TaskFromRecordModal from "./TaskFromRecordModal";
@@ -256,6 +257,17 @@ export default function ModuleRecordsPanel({
     setError("");
   };
 
+  // Ekleme eylemi sayfanın "+" düğmesinde. Panel başlığında ikinci bir düğme
+  // tutmuyoruz: aynı işi yapan iki düğme, kullanıcıya iki farklı iş yapıyormuş
+  // gibi görünüyordu. Modalin içinde "+" ulaşılamadığı için (bkz. Modal.tsx)
+  // orada satır içi düğme geri gelir.
+  const fabAvailable = useFabAvailable();
+  useProjectFabAction(
+    canWrite && fabAvailable ? { label: config.addLabel, onClick: openCreate } : null,
+    [canWrite, fabAvailable, config.addLabel, moduleKey],
+    FAB_PRIORITY.panel
+  );
+
   /**
    * Kayıt bir müşteriye referans veriyorsa müşteri kartının geçmişine düşer.
    *
@@ -424,17 +436,19 @@ export default function ModuleRecordsPanel({
     <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: view === "board" ? "none" : 920 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{config.title}</h5>
-        {canWrite ? (
-          <button
-            onClick={openCreate}
-            style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
-          >
-            {`+ ${config.addLabel}`}
-          </button>
-        ) : (
+        {!canWrite ? (
           <span style={{ fontSize: 12, color: c.textSecondary }} title="Bu modüle atanan kişiler kayıt ekleyebilir">
             Salt görüntüleme
           </span>
+        ) : (
+          !fabAvailable && (
+            <button
+              onClick={openCreate}
+              style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+            >
+              {`+ ${config.addLabel}`}
+            </button>
+          )
         )}
       </div>
 
@@ -612,7 +626,10 @@ export default function ModuleRecordsPanel({
       {loading ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
       ) : records.length === 0 ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{config.emptyLabel}</p>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
+          {config.emptyLabel}
+          {canWrite && fabAvailable ? ' Eklemek için sayfadaki "+" düğmesini kullan.' : ""}
+        </p>
       ) : visible.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Aramanla eşleşen kayıt yok.</p>
       ) : (

@@ -14,6 +14,7 @@ import {
 } from "../lib/uploadQueue";
 import { openGooglePicker } from "../lib/googlePicker";
 import { useThemeColors } from "../theme/useThemeColors";
+import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { publishTaskAttachments } from "../lib/taskAttachmentEvents";
 import BrowseDriveModal from "./BrowseDriveModal";
 import ConfirmDialog from "./ConfirmDialog";
@@ -57,18 +58,6 @@ interface Props {
   /** Modal içinde başlık ve büyük yükleme alanı gösterilmez. */
   compact?: boolean;
   /**
-   * Başlıktaki üç ekleme düğmesini (Drive'dan seç / Yeni dosya / Dosya yükle)
-   * gizler; eylemler sayfanın "+" düğmesine taşınmıştır (bkz. JobDetail).
-   * Varsayılan kapalı — diğer sayfalarda düğmeler yerinde kalıyor.
-   */
-  actionsInFab?: boolean;
-  /**
-   * Bağlı bulut sağlayıcısını yukarı bildirir. "+" menüsündeki "Drive'dan seç"
-   * seçeneğinin etiketi (ve gösterilip gösterilmeyeceği) buna bağlı, ama bilgi
-   * yalnızca burada hesaplanıyor.
-   */
-  onProviderChange?: (provider: "google" | "microsoft" | undefined) => void;
-  /**
    * Listelenen dosyalar değiştiğinde çağrılır. Görev modalında kullanılıyor:
    * karttaki dosya rozeti pano listesinden besleniyor, panel haber vermezse
    * yeni dosya ancak bir sonraki tazelemede rozete dönüşürdü.
@@ -77,12 +66,13 @@ interface Props {
 }
 
 /**
- * Sayfa (ProjectDetail/JobDetail/DepartmentDetail) alt navigasyondaki "+"
- * düğmesini bu sekmedeyken buraya bağlamak için kullanır — TeamPanelHandle/
- * OutputsPanelHandle ile birebir aynı desen. FAB'ın KENDİSİ burada değil,
- * çağıran sayfada kayıtlıdır (useProjectFabAction sayfa başına TEK yerden
- * çağrılmalı — bkz. DepartmentsPanel'deki "iki bileşen aynı eylemi kaydediyor"
- * hatasının çözümü); bu panel yalnızca tetikleyici metotları dışa açar.
+ * Panelin dışarıya açtığı tetikleyiciler.
+ *
+ * "+" kaydını artık panelin KENDİSİ yapıyor (bkz. aşağıdaki
+ * useProjectFabAction): eskiden kayıt sayfa başına tek yerden yapılmak
+ * zorundaydı, o yüzden her sayfa aynı üç seçeneği kendi içinde tekrar
+ * yazıyordu. Handle yine de duruyor — dosya eklemeyi başka bir yerden
+ * (örn. bir boş durum kartından) tetiklemek isteyen için.
  */
 export interface FilesPanelHandle {
   openUpload: () => void;
@@ -108,8 +98,6 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     departmentId,
     scope,
     compact = false,
-    actionsInFab = false,
-    onProviderChange,
     onFilesChange,
   },
   ref
@@ -255,13 +243,6 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files]);
 
-  useEffect(() => {
-    onProviderChange?.(connectedProvider);
-    // Panel kapanınca (sekme değişince) seçenek de kalksın.
-    return () => onProviderChange?.(undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectedProvider]);
-
   const handleFileAdded = (file: ProjectFile) => {
     setFiles((prev) => [file, ...prev]);
     setPreview(file);
@@ -299,6 +280,35 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     },
   }));
 
+  // Dosya ekleme sayfanın "+" düğmesinde. Başlıkta üç ayrı düğme (Drive'dan seç
+  // / Yeni dosya / Dosya yükle) duruyordu ve bunlar "+" menüsündeki seçeneklerin
+  // birebir kopyasıydı; her sayfa da aynı menüyü kendi içinde tekrar yazıyordu.
+  // Artık tek yerde, burada. Modal içinde (görev ekleri) "+" ulaşılamadığı için
+  // düğmeler geri gelir; salt okunur bağlamda (organizasyon/grup) hiç çıkmaz.
+  const fabAvailable = useFabAvailable();
+  const fabInHeader = !compact && !readOnly && fabAvailable;
+  useProjectFabAction(
+    fabInHeader && !driveMissing
+      ? {
+          label: "Dosya ekle",
+          options: [
+            { label: "Dosya yükle", onClick: () => inputRef.current?.click() },
+            ...(connectedProvider
+              ? [
+                  { label: "Yeni dosya oluştur", onClick: () => createMenuRef.current?.openMenu() },
+                  {
+                    label: connectedProvider === "microsoft" ? "OneDrive'dan seç" : "Drive'dan seç",
+                    onClick: () => handleBrowseDriveClick(),
+                  },
+                ]
+              : []),
+          ],
+        }
+      : null,
+    [fabInHeader, driveMissing, connectedProvider, departmentId, jobId, projectId, taskId, outputId],
+    FAB_PRIORITY.panel
+  );
+
   return (
     <div>
       {!compact && (
@@ -311,7 +321,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               Yalnızca tetikleyici düğmesi gizleniyor. */}
           {!readOnly && !driveMissing && connectedProvider && (
             <>
-              {!actionsInFab && (
+              {!fabInHeader && (
               <button
                 onClick={handleBrowseDriveClick}
                 style={{
@@ -338,12 +348,12 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 taskId={taskId}
                 outputId={outputId}
                 provider={connectedProvider}
-                hideTrigger={actionsInFab}
+                hideTrigger={fabInHeader}
                 onCreated={handleFileAdded}
               />
             </>
           )}
-          {!readOnly && !actionsInFab && (
+          {!readOnly && !fabInHeader && (
           <button
             onClick={() => inputRef.current?.click()}
             disabled={driveMissing}

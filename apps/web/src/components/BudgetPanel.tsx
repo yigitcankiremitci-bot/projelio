@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import type { BudgetOverview, BudgetTransaction, RecurringPayment } from "@projelio/shared";
 import { api } from "../api/client";
 import { useRefreshOnUndo } from "../lib/undo";
-import { useProjectFabAction } from "../lib/projectFab";
+import { FAB_PRIORITY, useProjectFabAction } from "../lib/projectFab";
 import { useThemeColors } from "../theme/useThemeColors";
 import AddBudgetEntryModal from "./AddBudgetEntryModal";
 import AddRecurringPaymentModal from "./AddRecurringPaymentModal";
 import { useUndo } from "../lib/undo";
-import { IconPlus, IconTrash, IconEdit, IconCalendar, IconFolder } from "./icons";
+import { IconTrash, IconEdit, IconCalendar, IconFolder } from "./icons";
 
 function formatMoney(amount: number): string {
   return `${amount.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
@@ -76,7 +76,20 @@ export default function BudgetPanel() {
   // için gelir/gider eklemek isteyen kullanıcıya iş oluşturma ekranı açılıyordu.
   // BottomNav'daki yorumda aynı hatanın Yapılacaklar sayfasında yaşandığı yazıyor;
   // desen bu: yeni bir sekme eklerken kendi "+" eylemini de kaydet.
-  useProjectFabAction({ label: "Gelir / gider ekle", onClick: () => setAddingEntry(true) }, []);
+  //
+  // Sekmede iki ayrı ekleme var (tek seferlik hareket ve düzenli ödeme); ikisi de
+  // bölüm başlıklarında ayrı düğmelerdeydi, artık tek "+" menüsünde.
+  useProjectFabAction(
+    {
+      label: "Ekle",
+      options: [
+        { label: "Gelir / gider ekle", onClick: () => setAddingEntry(true) },
+        { label: "Düzenli ödeme ekle", onClick: () => setAddingRecurring(true) },
+      ],
+    },
+    [],
+    FAB_PRIORITY.panel
+  );
 
   const reload = () => {
     api.get<BudgetOverview>("/budget/overview").then(setOverview).catch(() => setOverview(null));
@@ -293,18 +306,12 @@ export default function BudgetPanel() {
 
       {/* Düzenli ödemeler */}
       <section>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 12 }}>
-          <h2 style={{ ...sectionTitle, margin: 0 }}>Düzenli ödemeler</h2>
-          <button type="button" onClick={() => setAddingRecurring(true)} style={addButton}>
-            <IconPlus size={14} color={c.textSecondary} />
-            Ekle
-          </button>
-        </div>
+        <h2 style={sectionTitle}>Düzenli ödemeler</h2>
 
         {recurring.length === 0 ? (
           <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 15, padding: 28 }}>
-            Kira, abonelik gibi tekrar eden ödemeleri buraya ekle. Vadesi gelince bütçene otomatik işlenir ve bildirim
-            gönderilir.
+            Kira, abonelik gibi tekrar eden ödemeleri sayfadaki "+" ile ekle. Vadesi gelince bütçene otomatik işlenir ve
+            bildirim gönderilir.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -359,17 +366,11 @@ export default function BudgetPanel() {
 
       {/* Hareketler */}
       <section>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 12 }}>
-          <h2 style={{ ...sectionTitle, margin: 0 }}>Hareketler</h2>
-          <button type="button" onClick={() => setAddingEntry(true)} style={addButton}>
-            <IconPlus size={14} color={c.textSecondary} />
-            Gelir / gider ekle
-          </button>
-        </div>
+        <h2 style={sectionTitle}>Hareketler</h2>
 
         {transactions.length === 0 ? (
           <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 15, padding: 28 }}>
-            Henüz bir hareket yok.
+            Henüz bir hareket yok. Gelir/gider eklemek için sayfadaki "+" düğmesini kullan.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

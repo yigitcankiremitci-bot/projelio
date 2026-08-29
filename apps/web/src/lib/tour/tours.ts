@@ -61,9 +61,9 @@ export const TOURS: Tour[] = [
       {
         id: "ekle",
         title: "Yeni bir şey oluştur",
-        text: "Ortadaki artı düğmesi bulunduğun sayfaya göre iş, proje, görev ya da kayıt ekler.",
+        text: "Ortadaki artı düğmesi bulunduğun sayfaya göre iş, proje, görev ya da kayıt ekler. Ana sayfada ayrıca şirket kurma ve işletme açma seçenekleri de buradan çıkar.",
         speech:
-          "Ekranın altındaki artı düğmesi, bulunduğun sayfaya göre farklı şeyler ekler. Ana sayfadayken yeni bir iş, bir projenin içindeyken görev ya da çıktı oluşturur. Yani her zaman doğru şeyi eklemek için doğru yerdesin.",
+          "Ekranın altındaki artı düğmesi, bulunduğun sayfaya göre farklı şeyler ekler. Ana sayfadayken yeni bir iş açarsın; büyümek istediğinde şirket kurma ve işletme açma seçenekleri de aynı düğmenin altında durur. Bir projenin içindeyken ise görev ya da çıktı oluşturur.",
         anchor: "bottom-nav-fab",
         placement: "top",
         optional: true,

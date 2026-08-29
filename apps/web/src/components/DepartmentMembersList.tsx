@@ -4,6 +4,7 @@ import type { DepartmentMember, DepartmentMemberRole, NotificationPayload, User 
 import { api } from "../api/client";
 import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useFabAvailable } from "../lib/projectFab";
 import { IconTrash } from "./icons";
 
 export interface DepartmentMembersListHandle {
@@ -46,6 +47,9 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
   useImperativeHandle(ref, () => ({
     openCreate: () => setInviting(true),
   }));
+  // Kadroya davet sayfanın "+" düğmesinde (kaydı DepartmentDetail yapıyor,
+  // yetkiyi de orada denetliyor). Başlıktaki düğme onun kopyasıydı.
+  const fabAvailable = useFabAvailable();
   const [mode, setMode] = useState<InviteMode>("user");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<User[]>([]);
@@ -327,15 +331,17 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Kadro</h4>
-        <button
-          onClick={() => {
-            setInviting((v) => !v);
-            resetInviteForm();
-          }}
-          style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none" }}
-        >
-          {inviting ? "Vazgeç" : "+ Kişi davet et"}
-        </button>
+        {!fabAvailable && (
+          <button
+            onClick={() => {
+              setInviting((v) => !v);
+              resetInviteForm();
+            }}
+            style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none" }}
+          >
+            {inviting ? "Vazgeç" : "+ Kişi davet et"}
+          </button>
+        )}
       </div>
 
       {inviting && (
@@ -469,12 +475,24 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
             <option value="subcontractor">Taşeron</option>
           </select>
           {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
-          <button
-            onClick={handleInvite}
-            style={{ padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14 }}
-          >
-            Davet gönder
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={handleInvite}
+              style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14 }}
+            >
+              Davet gönder
+            </button>
+            {/* Vazgeçme formun içinde: başlıktaki düğme "+"a taşındı. */}
+            <button
+              onClick={() => {
+                setInviting(false);
+                resetInviteForm();
+              }}
+              style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 14 }}
+            >
+              Vazgeç
+            </button>
+          </div>
         </div>
       )}
 

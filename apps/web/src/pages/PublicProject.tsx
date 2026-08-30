@@ -18,6 +18,15 @@ import { useIsDesktop } from "../lib/useIsDesktop";
  * mantık YOK: kapalı bölümler yanıtta hiç gelmiyor. Görünürlüğü ön yüzde
  * uygulamak, veriyi tarayıcıya gönderip sonra saklamak demek olurdu.
  */
+/**
+ * Açık sayfanın kendini tazeleme aralığı.
+ *
+ * 15 saniye: bir durum sayfası için fark edilmeyecek kadar kısa, paylaşım
+ * ucunun dakikada 60 isteklik sınırı düşünüldüğünde (ziyaretçi başına 4/dk)
+ * fazlasıyla güvenli.
+ */
+const YENILEME_MS = 15_000;
+
 export default function PublicProject() {
   const { token } = useParams();
   const c = useThemeColors();
@@ -29,11 +38,14 @@ export default function PublicProject() {
   const [rejected, setRejected] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [gateError, setGateError] = useState("");
+  // Sayfanın en son ne zaman tazelendiği — ziyaretçi verinin canlı olduğunu görsün.
+  const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
 
   const apply = (res: PublicProjectAccess) => {
     if (res.state === "open" && res.view) {
       setView(res.view);
       setState("ready");
+      setRefreshedAt(new Date());
       document.title = `${res.view.title} · Projelio`;
       return;
     }
@@ -59,6 +71,42 @@ export default function PublicProject() {
     const request = saved ? projectSharesApi.unlock(token, saved) : projectSharesApi.view(token);
     request.then(apply).catch(() => setState("error"));
   }, [token]);
+
+  /**
+   * Açık sayfa kendini tazeliyor.
+   *
+   * NEDEN SORGULAMA (polling), SOKET DEĞİL: canlı işbirliği soketi her odaya
+   * katılmadan önce JWT ve yetki kontrolü yapıyor (bkz. RealtimeGateway) —
+   * linki açan kişinin ikisi de yok. Ona soket açmak, uygulamanın en hassas
+   * yerine kimlik doğrulamasız bir katılma yolu eklemek demekti. Sorgulama
+   * aynı ucu, aynı süzgeçten geçirerek çağırıyor: yeni bir yüzey açılmıyor.
+   *
+   * SEKME GİZLİYKEN DURUYOR. Arka planda unutulan bir sekmenin saatlerce
+   * istek atması, hem sunucuda hem ziyaretçinin pilinde bedava maliyet.
+   * Sekmeye dönüldüğünde beklemeden bir kez tazeleniyor.
+   *
+   * Hata sessizce yutuluyor: ağ bir an koptu diye ekrandaki proje kaybolmamalı.
+   */
+  useEffect(() => {
+    if (state !== "ready" || !token) return;
+    let iptal = false;
+
+    const tazele = () => {
+      if (document.visibilityState !== "visible") return;
+      const saved = sessionStorage.getItem(gateKey(token));
+      const istek = saved ? projectSharesApi.unlock(token, saved) : projectSharesApi.view(token);
+      istek.then((res) => !iptal && apply(res)).catch(() => {});
+    };
+
+    const zamanlayici = setInterval(tazele, YENILEME_MS);
+    const gorunurlukDegisti = () => tazele();
+    document.addEventListener("visibilitychange", gorunurlukDegisti);
+    return () => {
+      iptal = true;
+      clearInterval(zamanlayici);
+      document.removeEventListener("visibilitychange", gorunurlukDegisti);
+    };
+  }, [state, token]);
 
   const submitEmail = async () => {
     if (!token) return;
@@ -154,7 +202,7 @@ export default function PublicProject() {
             fontSize: 14,
             padding: "9px 16px",
             background: c.primary,
-            color: "#fff",
+            color: c.onPrimary,
             border: "none",
             borderRadius: 8,
             cursor: unlocking || !email.trim() ? "default" : "pointer",
@@ -247,7 +295,7 @@ export default function PublicProject() {
                 fontSize: 13,
                 padding: "8px 16px",
                 background: c.primary,
-                color: "#fff",
+                color: c.onPrimary,
                 borderRadius: 8,
                 textDecoration: "none",
               }}
@@ -302,6 +350,9 @@ export default function PublicProject() {
       <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <h1 style={{ fontSize: isDesktop ? 26 : 21, color: c.textPrimary, margin: 0 }}>{v.title}</h1>
+          {/* Sayfanın canlı olduğunu söylemek, "acaba bu bilgi eski mi" sorusunu
+              baştan kapatıyor — takip eden kişi projeyi bizzat göremiyor. */}
+          <LiveBadge refreshedAt={refreshedAt} />
           <span
             style={{
               fontSize: 12,
@@ -469,14 +520,106 @@ export default function PublicProject() {
         </Card>
       )}
 
-      <footer style={{ fontSize: 12, color: c.textSecondary, textAlign: "center", paddingTop: 8 }}>
-        Bu sayfa salt okunurdur ve proje sorumlusunun paylaştığı bölümleri gösterir.{" "}
-        <Link to="/login" style={{ color: c.accent }}>
-          Projelio
-        </Link>{" "}
-        ile hazırlandı.
+      {/* ------------------------------------------------------ Projelio tanıtımı */}
+      {/* BİLEREK SESSİZ. Bu sayfa, projeyi paylaşan kişinin müşterisine/
+          yatırımcısına gösterdiği yüzü: üstüne parlak bir reklam koymak onun
+          profesyonel izlenimini zedeler, bizim de kazancımız olmaz. O yüzden
+          küçük punto, nötr renk, tek satır ve iki bağlantı — ilgilenen tıklar,
+          ilgilenmeyenin gözünü tırmalamaz. */}
+      <section
+        style={{
+          display: "flex",
+          flexDirection: isDesktop ? "row" : "column",
+          alignItems: isDesktop ? "center" : "flex-start",
+          gap: 12,
+          padding: "14px 16px",
+          background: c.surface,
+          border: `1px solid ${c.border}`,
+          borderRadius: 12,
+        }}
+      >
+        <img src="/logo.png" alt="" style={{ width: 28, height: 28, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+          <span style={{ fontSize: 13, color: c.textPrimary }}>Bu sayfa Projelio ile hazırlandı</span>
+          <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.6 }}>
+            Ekipler projelerini Projelio'da yürütür, müşterisine durum raporu yazmak yerine
+            böyle canlı bir bağlantı paylaşır — karşı tarafın hesap açmasına gerek kalmadan.
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <a
+            href="https://projelio.app"
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              fontSize: 12,
+              padding: "6px 12px",
+              border: `1px solid ${c.border}`,
+              borderRadius: 8,
+              color: c.textSecondary,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Projelio nedir?
+          </a>
+          <Link
+            to="/register"
+            style={{
+              fontSize: 12,
+              padding: "6px 12px",
+              borderRadius: 8,
+              background: c.primary,
+              color: c.onPrimary,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Ücretsiz deneyin
+          </Link>
+        </div>
+      </section>
+
+      <footer style={{ fontSize: 12, color: c.textSecondary, textAlign: "center", paddingTop: 4 }}>
+        Bu sayfa salt okunurdur ve proje sorumlusunun paylaştığı bölümleri gösterir.
       </footer>
     </div>
+  );
+}
+
+/**
+ * "Canlı" rozeti — sayfanın kendini tazelediğini ve verinin ne kadar taze
+ * olduğunu söyler.
+ *
+ * Saat gösteriliyor, "3 sn önce" gibi göreli bir ifade değil: göreli ifade
+ * kendi başına saniyede bir yeniden çizilmek ister ve durum sayfasında bu
+ * kadar kıpırdayan bir öğe dikkati işin kendisinden çalar.
+ */
+function LiveBadge({ refreshedAt }: { refreshedAt: Date | null }) {
+  const c = useThemeColors();
+  if (!refreshedAt) return null;
+  return (
+    <span
+      title="Bu sayfa açık kaldığı sürece kendini günceller; yenilemeniz gerekmez."
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        fontSize: 11,
+        color: c.textSecondary,
+      }}
+    >
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: 999,
+          background: c.success,
+          display: "inline-block",
+        }}
+      />
+      Canlı · {refreshedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+    </span>
   );
 }
 

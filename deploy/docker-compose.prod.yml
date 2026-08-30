@@ -231,13 +231,18 @@ services:
         condition: service_healthy
     env_file: [.env]
     environment:
-      NODE_ENV: staging
+      NODE_ENV: production
       PORT: 3000
       JWT_SECRET: ${APP_JWT_SECRET}
+      # İÇ ağ adresi: konteynerler arası konuşma buradan geçer.
       SUPABASE_URL: http://caddy
+      # TARAYICIYA verilecek storage adresi. SUPABASE_URL iç ağ adı olduğu için
+      # kapak/avatar bağlantıları onunla üretilemez — tarayıcıda çözülmez
+      # (bkz. SupabaseService.publicStorageUrl).
+      PUBLIC_STORAGE_URL: https://api.projelio.app
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-      CORS_ORIGINS: http://193.111.77.252
-      WEB_APP_URL: http://193.111.77.252
+      CORS_ORIGINS: https://app.projelio.app
+      WEB_APP_URL: https://app.projelio.app
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
@@ -251,7 +256,7 @@ services:
       context: ..
       dockerfile: Dockerfile.web
       args:
-        VITE_API_URL: http://api.193.111.77.252.sslip.io
+        VITE_API_URL: https://api.projelio.app
         VITE_GOOGLE_PICKER_API_KEY: ${VITE_GOOGLE_PICKER_API_KEY:-}
         VITE_GOOGLE_PICKER_APP_ID: ${VITE_GOOGLE_PICKER_APP_ID:-}
         VITE_HABIE_URL: ${VITE_HABIE_URL:-}
@@ -261,7 +266,15 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    ports: ["80:80"]
+    # 443 TLS için, 80 hem yönlendirme hem Let's Encrypt HTTP-01 doğrulaması
+    # için açık kalmalı — 80 kapatılırsa sertifika YENİLENEMEZ.
+    ports: ["80:80", "443:443"]
+    volumes:
+      # Sertifika deposu. Kalıcı olmazsa her dağıtımda yeni sertifika istenir
+      # ve Let's Encrypt'in haftalık limitine (alan adı başına 5) takılırız —
+      # CI/CD her push'ta yeniden dağıttığı için bu günler içinde olurdu.
+      - /srv/projelio/data/caddy:/data
+      - /srv/projelio/data/caddy-config:/config
     networks: [projelio]
 
   landing:
@@ -269,8 +282,8 @@ services:
       context: ..
       dockerfile: Dockerfile.landing
       args:
-        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://193.111.77.252:3001}
-        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://193.111.77.252}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://projelio.app}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.projelio.app}
         NEXT_PUBLIC_WHATSAPP: ${NEXT_PUBLIC_WHATSAPP:-}
     image: projelio-landing:local
     container_name: projelio-landing

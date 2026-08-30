@@ -35,6 +35,6 @@ jobs:
         run: |
           docker build -f Dockerfile.backend -t projelio-backend:ci .
           docker build -f Dockerfile.web \
-            --build-arg VITE_API_URL=http://api.193.111.77.252.sslip.io \
+            --build-arg VITE_API_URL=https://api.projelio.app \
             -t projelio-web:ci .
           docker build -f Dockerfile.landing -t projelio-landing:ci .

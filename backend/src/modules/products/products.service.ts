@@ -418,12 +418,12 @@ export class ProductsService {
       .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
-    const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);
+    const publicUrl = this.supabase.publicStorageUrl(COVER_BUCKET, path);
     const nextOrder = current.length ? Math.max(...current.map((image) => image.sortOrder)) + 1 : 0;
 
     const { error: insertError } = await this.supabase.client.from("product_images").insert({
       product_id: id,
-      url: publicUrlData.publicUrl,
+      url: publicUrl,
       storage_path: path,
       sort_order: nextOrder,
       created_by: requestingUserId ?? null,

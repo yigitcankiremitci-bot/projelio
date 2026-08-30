@@ -1,40 +1,66 @@
 {
-	auto_https off
+	# ACME bildirimleri (sertifika yenilenemezse uyarı buraya gider).
+	email info@projelio.app
 }
 
-# Geçici IP/HTTP provası. Kalıcı alan adı gelince gerçek alan adları ve TLS kullanılacak.
-193.111.77.252:80 {
+# ---------------------------------------------------------------- Uygulama
+# Web arayüzü. TLS otomatik (Let's Encrypt, HTTP-01) — bu yüzden 80 portu
+# internete açık kalmak ZORUNDA, yoksa sertifika yenilenemez.
+app.projelio.app {
 	root * /srv/web
 	encode zstd gzip
 	try_files {path} /index.html
 	file_server
+
 	header {
+		# Netlify'dan taşındı (netlify.toml). Netlify gidince bu başlıkları
+		# okuyan kimse kalmıyordu; belgeyi veren origin artık burası.
 		X-Frame-Options "DENY"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)"
-		-Strict-Transport-Security
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+		# CSP RAPOR MODUNDA — bilerek. vite.config.ts'teki politikanın birebir
+		# karşılığı; oradaki CSP_ZORLAYICI bayrağı hâlâ false. Göç sırasında
+		# zorlayıcıya çevirmek, çıkan hatanın göçten mi politikadan mı geldiğini
+		# bulunamaz hale getirirdi. Ayrı bir iş olarak yapılacak.
+		#
+		# dist/_headers dosyası artık kimse tarafından okunmuyor (onu Netlify
+		# okuyordu); tek kaynak burası.
+		Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://api.projelio.app wss://api.projelio.app https://www.googleapis.com https://storage.googleapis.com https://graph.microsoft.com https://*.sharepoint.com https://api.onedrive.com; frame-src 'self' https://api.projelio.app https://docs.google.com https://drive.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 	}
 }
 
-# SPA ve API rotaları çakıştığı için geçici API adresini ücretsiz DNS adı ayırır.
-http://api.193.111.77.252.sslip.io {
+# ---------------------------------------------------------------------- API
+api.projelio.app {
 	encode zstd gzip
-	handle_path /rest/v1/* {
-		reverse_proxy postgrest:3000
-	}
+
+	# Kapak ve avatar görselleri AÇIK kovada duruyor ve tarayıcı bunları
+	# doğrudan çekiyor (bkz. SupabaseService.publicStorageUrl) — bu yüzden
+	# storage dışarı açık olmak zorunda.
 	handle_path /storage/v1/* {
 		reverse_proxy storage:5000
 	}
+
+	# /rest/v1 BİLEREK YOK. Web istemcisi supabase-js kullanmıyor, PostgREST'e
+	# yalnızca backend konuşuyor ve o da iç ağdan (aşağıdaki http://caddy)
+	# geçiyor. Dışarı açmak, hiçbir istemcinin ihtiyaç duymadığı bir yüzeyi
+	# internete koymak olurdu.
+
 	handle {
 		reverse_proxy backend:3000
 	}
+
 	header {
-		-Strict-Transport-Security
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
 	}
 }
 
-# Backend supabase-js istemcisi de aynı URL düzenini Docker ağı içinden kullanır.
+# ------------------------------------------------------------------ İç ağ
+# Backend'in supabase-js istemcisi bu adresi kullanıyor (SUPABASE_URL).
+# http:// öneki açık: iç ağda TLS aranmasın, Caddy buraya sertifika almasın.
 http://caddy {
 	handle_path /rest/v1/* {
 		reverse_proxy postgrest:3000

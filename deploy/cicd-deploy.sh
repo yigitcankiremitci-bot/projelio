@@ -72,11 +72,26 @@ deploy_and_check() {
   docker compose -f "$COMPOSE" up -d --remove-orphans
   docker compose -f "$COMPOSE" ps --status running --services | grep -qx backend
   docker compose -f "$COMPOSE" ps --status running --services | grep -qx landing
+  # SAĞLIK KONTROLLERİ TLS'E BAĞLI DEĞİL — bilerek.
+  # İlk dağıtımda Let's Encrypt sertifikası henüz alınmamış olur; geçerli
+  # sertifika şartı koşan bir kontrol o dağıtımı başarısız sayar, betik de
+  # önceki commit'e geri döner. Sonuç: sertifika hiçbir zaman alınamaz, çünkü
+  # onu alacak sürüm hiçbir zaman ayakta kalamaz. Bu yüzden hepsi düz HTTP
+  # üzerinden, Host başlığıyla yapılıyor.
+
+  # Caddy ayakta ve alan adını tanıyor mu. Beklenen yanıt 308 (https'e
+  # yönlendirme); curl --fail yalnızca 4xx/5xx'te düşer, 3xx başarıdır.
   curl --fail --silent --show-error --retry 12 --retry-delay 5 \
-    --retry-connrefused http://127.0.0.1/ >/dev/null
+    --retry-connrefused -H 'Host: app.projelio.app' http://127.0.0.1/ >/dev/null
+
+  # Yönlendirme cevabı statik dosyaların yerinde olduğunu KANITLAMAZ; imajın
+  # içinde gerçekten derlenmiş bir arayüz var mı, ayrıca bakılıyor.
+  docker compose -f "$COMPOSE" exec -T caddy test -f /srv/web/index.html
+
+  # Backend: iç ağ bloğundan (http://caddy), sertifikadan bağımsız.
   curl --fail --silent --show-error --retry 12 --retry-delay 5 \
-    --retry-connrefused -H 'Host: api.193.111.77.252.sslip.io' \
-    http://127.0.0.1/health >/dev/null
+    --retry-connrefused -H 'Host: caddy' http://127.0.0.1/health >/dev/null
+
   curl --fail --silent --show-error --retry 12 --retry-delay 5 \
     --retry-connrefused http://127.0.0.1:3001/ >/dev/null
 }

@@ -520,11 +520,11 @@ export class UsersService {
       .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
-    const { data: publicUrlData } = this.supabase.client.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+    const publicUrl = this.supabase.publicStorageUrl(AVATAR_BUCKET, path);
 
     const { data: row, error } = await this.supabase.client
       .from("users")
-      .update({ avatar_url: publicUrlData.publicUrl })
+      .update({ avatar_url: publicUrl })
       .eq("id", userId)
       .select()
       .maybeSingle();

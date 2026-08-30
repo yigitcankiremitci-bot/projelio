@@ -184,8 +184,8 @@ export class InstagramPublishService {
       throw new PublishError(`Medya yayına hazırlanamadı: ${error.message}`, false, 60_000);
     }
 
-    const { data } = this.supabase.client.storage.from(PUBLISH_BUCKET).getPublicUrl(storagePath);
-    return { publicUrl: data.publicUrl, storagePath, mimeType, isVideo };
+    const publicUrl = this.supabase.publicStorageUrl(PUBLISH_BUCKET, storagePath);
+    return { publicUrl, storagePath, mimeType, isVideo };
   }
 
   private async cleanup(paths: string[]): Promise<void> {

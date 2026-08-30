@@ -37,4 +37,30 @@ export class SupabaseService implements OnModuleInit {
 
     this.logger.log("Supabase bağlantısı kuruldu");
   }
+
+  /**
+   * Tarayıcıya verilecek GENEL storage adresi.
+   *
+   * NEDEN getPublicUrl'in çıktısı doğrudan kullanılamıyor: supabase-js adresi
+   * SUPABASE_URL'den türetir. Kendi sunucumuzda o değer bir İÇ AĞ adı
+   * (http://caddy) — konteynerler arası konuşma için doğru, ama tarayıcıda
+   * çözülmez. Doğrudan kullanılsaydı yeni yüklenen her kapak ve avatar
+   * veritabanına açılamayan bir adresle yazılırdı; üstelik hata anında değil,
+   * ancak biri görseli görmeye çalıştığında ortaya çıkardı.
+   *
+   * PUBLIC_STORAGE_URL tanımlıysa adresin kökü onunla değiştirilir. Supabase
+   * barındırmalı kurulumda SUPABASE_URL zaten genel bir adres olduğu için
+   * değişken tanımsız bırakılır ve davranış hiç değişmez.
+   */
+  publicStorageUrl(bucket: string, path: string): string {
+    const { data } = this.client.storage.from(bucket).getPublicUrl(path);
+    return this.toPublicUrl(data.publicUrl);
+  }
+
+  private toPublicUrl(url: string): string {
+    const genel = process.env.PUBLIC_STORAGE_URL?.trim().replace(/\/+$/, "");
+    const ic = process.env.SUPABASE_URL?.trim().replace(/\/+$/, "");
+    if (!genel || !ic || genel === ic) return url;
+    return url.startsWith(ic) ? genel + url.slice(ic.length) : url;
+  }
 }

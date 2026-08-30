@@ -311,9 +311,9 @@ export class ProjectsService {
       .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
-    const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);
+    const publicUrl = this.supabase.publicStorageUrl(COVER_BUCKET, path);
 
-    const updated = await this.update(id, { coverImageUrl: publicUrlData.publicUrl });
+    const updated = await this.update(id, { coverImageUrl: publicUrl });
 
     // Kayıt güncellendikten SONRA temizle: güncelleme başarısız olursa eski görsel
     // yerinde kalsın, kayıt silinmiş bir dosyaya işaret etmesin.

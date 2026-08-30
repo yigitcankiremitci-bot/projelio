@@ -366,11 +366,11 @@ export class DepartmentsService {
       .upload(path, file.buffer, { contentType, upsert: true });
     if (uploadError) throw uploadError;
 
-    const { data: publicUrlData } = this.supabase.client.storage.from(COVER_BUCKET).getPublicUrl(path);
+    const publicUrl = this.supabase.publicStorageUrl(COVER_BUCKET, path);
 
     const { data: row, error } = await this.supabase.client
       .from("departments")
-      .update({ cover_image_url: publicUrlData.publicUrl })
+      .update({ cover_image_url: publicUrl })
       .eq("id", id)
       .select("*")
       .maybeSingle();

@@ -103,6 +103,13 @@ services:
       - key: SOCIAL_TOKEN_ENC_KEY
         sync: false
 
+      # Sosyal hesap giris sifreleri (bkz. 076_sosyal_hesap_kimlik_bilgileri.sql).
+      # Jeton anahtarindan AYRI: biri sizarsa digeri etkilenmesin.
+      # openssl rand -base64 32 ile uretin; kaybolursa kayitli hesap sifreleri
+      # COZULEMEZ hale gelir. Ayni deger VPS .env'ine de girilmeli.
+      - key: SOCIAL_CREDENTIAL_ENC_KEY
+        sync: false
+
       # Frontend'in adresi — CORS bu listeyle sınırlanır (virgülle çoğaltılabilir).
       - key: CORS_ORIGINS
         sync: false

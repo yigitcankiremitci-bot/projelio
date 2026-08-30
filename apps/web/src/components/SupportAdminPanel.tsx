@@ -168,7 +168,7 @@ export default function SupportAdminPanel() {
                       disabled={sendingId === r.id || !draft.trim()}
                       style={{
                         background: c.primary,
-                        color: "#fff",
+                        color: c.onPrimary,
                         padding: "8px 15px",
                         borderRadius: 8,
                         border: "none",

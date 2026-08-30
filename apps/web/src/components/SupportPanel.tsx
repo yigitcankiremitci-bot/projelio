@@ -112,7 +112,7 @@ export default function SupportPanel({ me }: { me: User | null }) {
             style={{
               alignSelf: "flex-start",
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               padding: "9px 16px",
               borderRadius: 8,
               border: "none",

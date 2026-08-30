@@ -292,7 +292,7 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
                       <button
                         onClick={() => handleBudgetStatusChange(t.id, "paid")}
                         disabled={busy}
-                        style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "none", background: c.primary, color: "#fff" }}
+                        style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary }}
                       >
                         Ödendi
                       </button>
@@ -302,7 +302,7 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
                     <button
                       onClick={() => handleBudgetStatusChange(t.id, "paid")}
                       disabled={busy}
-                      style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "none", background: c.primary, color: "#fff", flexShrink: 0 }}
+                      style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, flexShrink: 0 }}
                     >
                       Ödendi olarak işaretle
                     </button>
@@ -370,7 +370,7 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
               <button
                 onClick={handleSave}
                 disabled={saving}
-                style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14 }}
+                style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14 }}
               >
                 {saving ? "Kaydediliyor…" : editing ? "Değişikliği kaydet" : "Kaydet"}
               </button>

@@ -1821,7 +1821,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
             </button>
             <button
               onClick={confirmComplete}
-              style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 16, fontWeight: 500 }}
+              style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 16, fontWeight: 500 }}
             >
               Tamamlandı olarak işaretle
             </button>

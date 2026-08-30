@@ -263,7 +263,7 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
                         borderRadius: 6,
                         border: "none",
                         background: c.primary,
-                        color: "#fff",
+                        color: c.onPrimary,
                         flexShrink: 0,
                         cursor: busy ? "wait" : "pointer",
                       }}

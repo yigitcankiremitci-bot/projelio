@@ -125,7 +125,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
             borderRadius: 9,
             border: "none",
             background: c.primary,
-            color: "#fff",
+            color: c.onPrimary,
             fontSize: 15,
             fontWeight: 500,
             cursor: saving || !name.trim() ? "not-allowed" : "pointer",

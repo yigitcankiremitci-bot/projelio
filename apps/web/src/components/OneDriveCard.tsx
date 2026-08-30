@@ -155,7 +155,7 @@ export default function OneDriveCard() {
               borderRadius: 9,
               border: "none",
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               fontSize: 15,
               fontWeight: 500,
               cursor: busy ? "wait" : "pointer",

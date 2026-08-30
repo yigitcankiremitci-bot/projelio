@@ -755,7 +755,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
               borderRadius: 10,
               border: "none",
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               fontSize: 17,
               fontWeight: 500,
             }}

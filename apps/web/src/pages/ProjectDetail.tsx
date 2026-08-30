@@ -735,7 +735,7 @@ export default function ProjectDetail() {
                 handleToggleComplete(parentCompletePrompt.id);
                 setParentCompletePrompt(null);
               }}
-              style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 16, fontWeight: 500 }}
+              style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 16, fontWeight: 500 }}
             >
               Evet, tamamla
             </button>

@@ -143,7 +143,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded }: Pro
             borderRadius: 8,
             border: "none",
             background: c.primary,
-            color: "#fff",
+            color: c.onPrimary,
             fontSize: 15,
             fontWeight: 500,
             opacity: !departmentId || selectedKeys.length === 0 ? 0.6 : 1,

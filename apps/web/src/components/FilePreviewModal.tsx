@@ -163,7 +163,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
               borderRadius: 8,
               border: "none",
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               fontSize: 15,
               fontWeight: 500,
               cursor: "pointer",

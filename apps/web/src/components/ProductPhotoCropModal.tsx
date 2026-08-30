@@ -220,7 +220,7 @@ export default function ProductPhotoCropModal({ files, onCancel, onDone }: Props
               borderRadius: 8,
               border: "none",
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               fontSize: 16,
               fontWeight: 500,
               cursor: "pointer",

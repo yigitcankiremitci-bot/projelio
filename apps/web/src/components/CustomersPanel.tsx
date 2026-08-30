@@ -404,7 +404,7 @@ export default function CustomersPanel({
             <button
               onClick={handleSave}
               disabled={saving}
-              style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14 }}
+              style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14 }}
             >
               {saving ? "Kaydediliyor…" : formMode.kind === "edit" ? "Güncelle" : "Kaydet"}
             </button>
@@ -620,7 +620,7 @@ function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boo
               borderRadius: 6,
               border: "none",
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               cursor: "pointer",
             }}
           >

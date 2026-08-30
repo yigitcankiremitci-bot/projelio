@@ -333,7 +333,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
                     borderRadius: 6,
                     border: "none",
                     background: c.primary,
-                    color: "#fff",
+                    color: c.onPrimary,
                     cursor: "pointer",
                     flexShrink: 0,
                   }}

@@ -80,7 +80,7 @@ export default function MicrosoftReturn() {
                 padding: "9px 18px",
                 borderRadius: 9,
                 background: c.primary,
-                color: "#fff",
+                color: c.onPrimary,
                 fontSize: 15,
                 fontWeight: 500,
                 textDecoration: "none",

@@ -330,7 +330,7 @@ export default function TaskEditModal({
           type="submit"
           form={formId}
           disabled={saving}
-          style={{ width: "100%", background: c.primary, color: "#fff", padding: "10px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
+          style={{ width: "100%", background: c.primary, color: c.onPrimary, padding: "10px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
           {saving ? "Kaydediliyor…" : "Kaydet"}
         </button>
@@ -646,7 +646,7 @@ export default function TaskEditModal({
           <button
             type="submit"
             disabled={postingComment || !commentBody.trim()}
-            style={{ flexShrink: 0, padding: "0 16px", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 16, fontWeight: 500 }}
+            style={{ flexShrink: 0, padding: "0 16px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 16, fontWeight: 500 }}
           >
             Gönder
           </button>

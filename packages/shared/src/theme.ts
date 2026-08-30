@@ -8,6 +8,11 @@ export const colors = {
   light: {
     primary: "#3E4858",
     primaryDark: "#1C222C",
+    // Dolgu düğmelerin ÜSTÜNDEKİ yazı rengi. Sabit "#fff" yazılmıyor çünkü
+    // koyu temada primary açık bir slate (#8593A8): üstüne beyaz yazınca
+    // kontrast 3.0:1'e düşüyor ve düğme pasifmiş gibi görünüyordu. Koyu temada
+    // yazı koyulaşıyor, kontrast 5.9:1 oluyor (AA).
+    onPrimary: "#FFFFFF",
     accent: "#C0813F",
     accentDark: "#8C5A28",
     background: "#F7F8FA",
@@ -22,6 +27,7 @@ export const colors = {
   dark: {
     primary: "#8593A8",
     primaryDark: "#3E4858",
+    onPrimary: "#12151B",
     accent: "#D9A868",
     accentDark: "#C0813F",
     background: "#12151B",

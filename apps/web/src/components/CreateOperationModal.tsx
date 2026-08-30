@@ -127,7 +127,7 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
           style={{
             marginTop: 4,
             background: c.primary,
-            color: "#fff",
+            color: c.onPrimary,
             padding: "11px 0",
             borderRadius: 8,
             border: "none",

@@ -311,7 +311,7 @@ export default function ProcessPanel({
 
   // Balon renk durumu: seçili (dolu primary) / güncel ama seçili değil (hafif accent vurgu) / normal / aralık dışı
   const bubbleStyle = (active: boolean, isCurrent: boolean, inRange: boolean) => {
-    if (active) return { border: c.primary, background: c.primary, color: "#fff", fontWeight: 600 };
+    if (active) return { border: c.primary, background: c.primary, color: c.onPrimary, fontWeight: 600 };
     if (isCurrent && inRange) return { border: c.accent, background: `${c.accent}1f`, color: c.accentDark, fontWeight: 600 };
     if (!inRange) return { border: c.border, background: c.background, color: c.textSecondary, fontWeight: 500 };
     return { border: c.border, background: c.background, color: c.textPrimary, fontWeight: 500 };

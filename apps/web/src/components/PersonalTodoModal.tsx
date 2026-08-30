@@ -207,7 +207,7 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
               borderRadius: 8,
               border: "none",
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               fontSize: 16,
               fontWeight: 500,
             }}

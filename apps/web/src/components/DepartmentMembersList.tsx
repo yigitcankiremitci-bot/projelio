@@ -314,7 +314,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
             <button
               onClick={() => handleRespond(true)}
               disabled={responding}
-              style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14, fontWeight: 500 }}
+              style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
             >
               Onayla
             </button>
@@ -478,7 +478,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={handleInvite}
-              style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14 }}
+              style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14 }}
             >
               Davet gönder
             </button>

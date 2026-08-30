@@ -87,7 +87,7 @@ export default function ForgotPassword() {
               style={{
                 marginTop: 8,
                 background: c.primary,
-                color: "#fff",
+                color: c.onPrimary,
                 padding: "11px 0",
                 borderRadius: 8,
                 border: "none",

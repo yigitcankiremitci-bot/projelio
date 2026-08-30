@@ -311,7 +311,7 @@ export function primaryButton(c: Palette, disabled?: boolean): React.CSSProperti
     borderRadius: 8,
     border: "none",
     background: c.primary,
-    color: "#fff",
+    color: c.onPrimary,
     cursor: disabled ? "default" : "pointer",
     opacity: disabled ? 0.6 : 1,
   };

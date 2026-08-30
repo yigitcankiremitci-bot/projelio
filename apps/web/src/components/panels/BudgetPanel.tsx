@@ -414,7 +414,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                     <button
                       onClick={() => setBudgetStatus(t, "paid")}
                       disabled={approvingId === t.id}
-                      style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: "#fff", flexShrink: 0 }}
+                      style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, flexShrink: 0 }}
                     >
                       Ödendi
                     </button>
@@ -424,7 +424,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                   <button
                     onClick={() => setBudgetStatus(t, "paid")}
                     disabled={approvingId === t.id}
-                    style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: "#fff", flexShrink: 0 }}
+                    style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, flexShrink: 0 }}
                   >
                     Ödendi olarak işaretle
                   </button>
@@ -475,7 +475,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
               <button
                 onClick={handleAddViewer}
                 disabled={!viewerToAdd}
-                style={{ fontSize: 15, padding: "0 12px", borderRadius: 7, border: "none", background: c.primary, color: "#fff" }}
+                style={{ fontSize: 15, padding: "0 12px", borderRadius: 7, border: "none", background: c.primary, color: c.onPrimary }}
               >
                 Ekle
               </button>

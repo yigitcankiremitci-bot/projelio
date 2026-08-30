@@ -170,7 +170,7 @@ export default function AddMemberModal({ projectId, existingUserIds, onClose, on
         <button
           type="submit"
           disabled={saving || !selectedUser}
-          style={{ background: c.primary, color: "#fff", padding: "10px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
+          style={{ background: c.primary, color: c.onPrimary, padding: "10px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
           {saving ? "Ekleniyor…" : "Ekle"}
         </button>

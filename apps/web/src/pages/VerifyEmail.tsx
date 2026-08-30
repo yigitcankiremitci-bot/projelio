@@ -82,7 +82,7 @@ export default function VerifyEmail() {
               style={{
                 display: "inline-block",
                 background: c.primary,
-                color: "#fff",
+                color: c.onPrimary,
                 textDecoration: "none",
                 padding: "11px 22px",
                 borderRadius: 8,

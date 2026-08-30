@@ -262,7 +262,7 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
             borderRadius: 8,
             border: "none",
             background: c.primary,
-            color: "#fff",
+            color: c.onPrimary,
             fontSize: 15,
             fontWeight: 500,
             opacity: !targetId ? 0.6 : 1,

@@ -350,7 +350,7 @@ function AddModulesForm({
         <button
           onClick={handleSave}
           disabled={saving}
-          style={{ padding: "9px 0", borderRadius: 8, border: "none", background: c.primary, color: "#fff", fontSize: 14, fontWeight: 500 }}
+          style={{ padding: "9px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
         >
           {saving ? "Ekleniyor…" : "Modülleri ekle"}
         </button>

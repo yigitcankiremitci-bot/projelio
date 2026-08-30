@@ -325,7 +325,7 @@ export default function NotificationBell() {
                         borderRadius: 8,
                         border: "none",
                         background: c.primary,
-                        color: "#fff",
+                        color: c.onPrimary,
                         fontSize: 14,
                         fontWeight: 500,
                       }}
@@ -399,7 +399,7 @@ export default function NotificationBell() {
                         borderRadius: 8,
                         border: "none",
                         background: c.primary,
-                        color: "#fff",
+                        color: c.onPrimary,
                         fontSize: 14,
                         fontWeight: 500,
                       }}

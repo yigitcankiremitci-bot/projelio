@@ -128,7 +128,7 @@ export default function BulkConvertHierarchyModal({ tasks, selectedIds, onClose,
               borderRadius: 8,
               border: "none",
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               fontSize: 15,
               cursor: "pointer",
             }}

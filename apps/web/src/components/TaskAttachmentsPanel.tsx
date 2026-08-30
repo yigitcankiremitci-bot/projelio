@@ -145,7 +145,7 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
                 borderRadius: 7,
                 border: "none",
                 background: c.primary,
-                color: "#fff",
+                color: c.onPrimary,
                 cursor: "pointer",
               }}
             >

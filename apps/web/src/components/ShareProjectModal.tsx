@@ -250,7 +250,7 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
             data-primary
             style={{
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               padding: "10px 0",
               borderRadius: 8,
               border: "none",

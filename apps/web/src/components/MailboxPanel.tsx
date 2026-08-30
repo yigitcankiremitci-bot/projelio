@@ -246,7 +246,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
                   fontSize: 13,
                   padding: "6px 14px",
                   background: c.primary,
-                  color: "#fff",
+                  color: c.onPrimary,
                   border: "none",
                   borderRadius: 8,
                   cursor: connecting || !configured ? "default" : "pointer",

@@ -136,7 +136,7 @@ export default function TaskFromRecordModal({
               borderRadius: 8,
               border: "none",
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               fontSize: 14,
             }}
           >

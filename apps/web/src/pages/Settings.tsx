@@ -401,7 +401,7 @@ export default function Settings() {
           <button
             type="submit"
             disabled={savingUsername || !me || username === me?.username}
-            style={{ background: c.primary, color: "#fff", padding: "0 16px", borderRadius: 8, border: "none", fontSize: 15, fontWeight: 500 }}
+            style={{ background: c.primary, color: c.onPrimary, padding: "0 16px", borderRadius: 8, border: "none", fontSize: 15, fontWeight: 500 }}
           >
             {savingUsername ? "Kaydediliyor…" : "Kaydet"}
           </button>
@@ -475,7 +475,7 @@ export default function Settings() {
             style={{
               alignSelf: "flex-start",
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               padding: "9px 16px",
               borderRadius: 8,
               border: "none",
@@ -799,7 +799,7 @@ export default function Settings() {
           onClick={() => tour.start("ilk-adimlar")}
           style={{
             background: c.primary,
-            color: "#fff",
+            color: c.onPrimary,
             padding: "9px 16px",
             borderRadius: 8,
             border: "none",

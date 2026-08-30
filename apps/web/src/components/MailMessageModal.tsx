@@ -302,7 +302,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
                   fontSize: 14,
                   padding: "8px 22px",
                   background: c.primary,
-                  color: "#fff",
+                  color: c.onPrimary,
                   border: "none",
                   borderRadius: 8,
                   cursor: sending ? "default" : "pointer",

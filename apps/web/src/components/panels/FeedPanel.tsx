@@ -276,7 +276,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
           <button
             type="submit"
             disabled={posting || !postBody.trim()}
-            style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: c.primary, color: "#fff", fontSize: 15, fontWeight: 500 }}
+            style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: c.primary, color: c.onPrimary, fontSize: 15, fontWeight: 500 }}
           >
             Paylaş
           </button>
@@ -548,7 +548,7 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
             <button
               type="submit"
               disabled={commentPosting || !commentDraft.trim()}
-              style={{ fontSize: 13, padding: "0 12px", borderRadius: 7, border: "none", background: c.primary, color: "#fff" }}
+              style={{ fontSize: 13, padding: "0 12px", borderRadius: 7, border: "none", background: c.primary, color: c.onPrimary }}
             >
               Gönder
             </button>

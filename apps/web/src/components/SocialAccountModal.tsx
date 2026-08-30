@@ -292,7 +292,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
               fontSize: 13,
               padding: "6px 14px",
               background: c.primary,
-              color: "#fff",
+              color: c.onPrimary,
               border: "none",
               borderRadius: 8,
               cursor: saving ? "default" : "pointer",

@@ -86,7 +86,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
           type="submit"
           form={formId}
           disabled={loading}
-          style={{ width: "100%", background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
+          style={{ width: "100%", background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
           {loading ? "Kaydediliyor…" : "Kaydet"}
         </button>

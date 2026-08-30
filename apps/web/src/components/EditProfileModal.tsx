@@ -153,7 +153,7 @@ export default function EditProfileModal({ user, onClose, onSaved }: Props) {
         <button
           type="submit"
           disabled={loading}
-          style={{ marginTop: 4, background: c.primary, color: "#fff", padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
+          style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
           {loading ? "Kaydediliyor…" : "Kaydet"}
         </button>

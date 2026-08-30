@@ -1,5 +1,13 @@
 # Render Blueprint — Projelio backend (NestJS API)
 #
+# ARTIK KULLANILMIYOR. Projelio 2026-08-30'da kendi sunucusuna taşındı:
+# API https://api.projelio.app, arayüz https://app.projelio.app
+# (bkz. deploy/docker-compose.prod.yml ve docs/vps-goc-plani.md).
+#
+# Render servisi ASKIYA ALINDI, silinmedi: geri dönüş yolu olarak bir süre
+# duruyor. Dosya de aynı sebeple duruyor — geri dönmek gerekirse servisin
+# hangi değişkenlerle ayağa kalktığı burada yazılı.
+#
 # Kullanımı: Render panelinde "New +" > "Blueprint" ile bu depoyu bağlayın.
 # Render bu dosyayı okuyup servisi otomatik oluşturur.
 #

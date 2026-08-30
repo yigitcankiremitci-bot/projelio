@@ -45,6 +45,13 @@ const DEFAULT_VISIBILITY: ProjectShareVisibility = {
   budget: false,
 };
 
+/** Linkin neden kapandığı — yalnızca sahibin listesinde görünür. */
+const CLOSED_LABEL: Record<NonNullable<ProjectShareLink["closedReason"]>, string> = {
+  revoked: "Kapatıldı",
+  expired: "Süresi doldu",
+  completed: "Proje tamamlandı",
+};
+
 const EXPIRY_OPTIONS: { label: string; days?: number }[] = [
   { label: "Süresiz" },
   { label: "7 gün", days: 7 },
@@ -60,6 +67,8 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
   const [creating, setCreating] = useState(false);
 
   const [label, setLabel] = useState("");
+  // E-posta kapısı: boş bırakılırsa link doğrudan açılır (bkz. migration 077).
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [visibility, setVisibility] = useState<ProjectShareVisibility>(DEFAULT_VISIBILITY);
   const [expiryIndex, setExpiryIndex] = useState(0);
   // Az önce üretilen link: listede de var ama kullanıcının aradığı şey bu, üstte
@@ -91,12 +100,16 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
         label: label.trim() || undefined,
         visibility,
         expiresInDays: EXPIRY_OPTIONS[expiryIndex].days,
+        recipientEmail: recipientEmail.trim() || undefined,
       });
       setJustCreated(created);
       setLinks((ls) => [created, ...ls]);
       setLabel("");
-    } catch {
-      setError("Link oluşturulamadı. Tekrar dene.");
+      setRecipientEmail("");
+    } catch (err) {
+      // Sunucunun mesajı korunuyor: "Geçerli bir e-posta adresi girin" gibi
+      // düzeltilebilir hataları "tekrar dene" ile örtmek kullanıcıyı çıkmaza sokar.
+      setError(err instanceof Error && err.message ? err.message : "Link oluşturulamadı. Tekrar dene.");
     } finally {
       setCreating(false);
     }
@@ -137,6 +150,26 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
               placeholder="Örn. Müşteri — Ahmet Bey"
               style={{ width: "100%", fontSize: 13, padding: "6px 8px" }}
             />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, color: c.textSecondary }}>
+              E-posta sorulsun mu? (isteğe bağlı)
+            </label>
+            <input
+              type="email"
+              value={recipientEmail}
+              onChange={(e) => setRecipientEmail(e.target.value)}
+              placeholder="ahmet@firma.com"
+              autoComplete="off"
+              style={{ width: "100%", fontSize: 13, padding: "6px 8px" }}
+            />
+            {/* Kapının ne olduğu ve ne OLMADIĞI burada yazılı: sahibi bunu bir
+                kimlik doğrulaması sanıp bütçeyi açarsa yanlış bir güven kurmuş olur. */}
+            <span style={{ fontSize: 11, color: c.textSecondary, lineHeight: 1.6 }}>
+              Doldurursan sayfa açılmadan önce bu adres sorulur; link başkasına iletilse de
+              adresi bilmeyen açamaz. Bir şifre değildir — adresi bilen herkes geçer.
+            </span>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -204,6 +237,9 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
                 </button>
               ))}
             </div>
+            <span style={{ fontSize: 11, color: c.textSecondary }}>
+              Süreden bağımsız olarak, proje tamamlandığında link kendiliğinden kapanır.
+            </span>
           </div>
 
           {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
@@ -254,9 +290,7 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
                     {link.label ?? "Adsız link"}
                   </span>
                   {!link.active && (
-                    <span style={{ fontSize: 11, color: c.danger }}>
-                      {link.revokedAt ? "Kapatıldı" : "Süresi doldu"}
-                    </span>
+                    <span style={{ fontSize: 11, color: c.danger }}>{CLOSED_LABEL[link.closedReason ?? "expired"]}</span>
                   )}
                   {link.active && (
                     <button
@@ -274,6 +308,7 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
 
                 <div style={{ fontSize: 11, color: c.textSecondary, display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <span>{sectionSummary(link.visibility)}</span>
+                  {link.recipientEmail && <span>Kapı: {link.recipientEmail}</span>}
                   <span>
                     {link.viewCount === 0
                       ? "Henüz açılmadı"

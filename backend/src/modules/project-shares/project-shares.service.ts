@@ -4,9 +4,18 @@ import type {
   CreateProjectShareLinkInput,
   ProjectShareLink,
   ProjectShareVisibility,
+  ProjectStatus,
+  PublicProjectAccess,
   PublicProjectView,
 } from "@projelio/shared";
-import { isShareLinkActive, normalizeShareVisibility, taskProgress } from "@projelio/shared";
+import {
+  isLikelyEmail,
+  normalizeShareEmail,
+  normalizeShareVisibility,
+  shareEmailMatches,
+  shareLinkClosedReason,
+  taskProgress,
+} from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { ProjectsService } from "../projects/projects.service";
 import { getWebAppUrl } from "../../common/config/env";
@@ -49,13 +58,27 @@ export class ProjectSharesService {
 
   async list(projectId: string, userId: string): Promise<ProjectShareLink[]> {
     await this.projects.assertCanManageProject(projectId, userId);
+    // Proje durumu linkin açık olup olmadığını belirliyor (tamamlanan proje
+    // linki kapatır), o yüzden listeyle birlikte bir kez okunuyor — satır
+    // başına sorgu atmak yerine.
+    const projectStatus = await this.projectStatus(projectId);
     const { data, error } = await this.supabase.client
       .from("project_share_links")
       .select()
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return (data ?? []).map((row) => this.mapLink(row));
+    return (data ?? []).map((row) => this.mapLink(row, projectStatus));
+  }
+
+  /** Linkin kapanıp kapanmadığını belirleyen tek dış girdi. */
+  private async projectStatus(projectId: string): Promise<ProjectStatus | undefined> {
+    const { data } = await this.supabase.client
+      .from("projects")
+      .select("status")
+      .eq("id", projectId)
+      .maybeSingle();
+    return (data?.status as ProjectStatus) ?? undefined;
   }
 
   async create(projectId: string, userId: string, input: CreateProjectShareLinkInput): Promise<ProjectShareLink> {
@@ -68,13 +91,14 @@ export class ProjectSharesService {
         token: newShareToken(),
         label: cleanLabel(input?.label),
         ...visibilityColumns(normalizeShareVisibility(input?.visibility)),
+        recipient_email: cleanRecipientEmail(input?.recipientEmail),
         expires_at: expiryFromDays(input?.expiresInDays),
         created_by: userId,
       })
       .select()
       .single();
     if (error) throw error;
-    return this.mapLink(data);
+    return this.mapLink(data, await this.projectStatus(projectId));
   }
 
   /**
@@ -86,12 +110,22 @@ export class ProjectSharesService {
   async update(
     id: string,
     userId: string,
-    input: { label?: string; visibility?: ProjectShareVisibility; expiresInDays?: number | null }
+    input: {
+      label?: string;
+      visibility?: ProjectShareVisibility;
+      expiresInDays?: number | null;
+      recipientEmail?: string | null;
+    }
   ): Promise<ProjectShareLink> {
     const existing = await this.requireManageableLink(id, userId);
 
     const patch: Record<string, unknown> = {};
     if (input.label !== undefined) patch.label = cleanLabel(input.label);
+    // null = "kapıyı kaldır", undefined = "dokunma". Kapıyı kaldırmak linki
+    // herkese açar; bu yüzden açıkça null göndermek gerekiyor.
+    if (input.recipientEmail !== undefined) {
+      patch.recipient_email = input.recipientEmail === null ? null : cleanRecipientEmail(input.recipientEmail);
+    }
     if (input.visibility !== undefined) {
       Object.assign(patch, visibilityColumns(normalizeShareVisibility(input.visibility)));
     }
@@ -99,7 +133,9 @@ export class ProjectSharesService {
     if (input.expiresInDays !== undefined) {
       patch.expires_at = input.expiresInDays === null ? null : expiryFromDays(input.expiresInDays);
     }
-    if (Object.keys(patch).length === 0) return this.mapLink(existing);
+    if (Object.keys(patch).length === 0) {
+      return this.mapLink(existing, await this.projectStatus(existing.project_id));
+    }
 
     const { data, error } = await this.supabase.client
       .from("project_share_links")
@@ -108,7 +144,7 @@ export class ProjectSharesService {
       .select()
       .single();
     if (error) throw error;
-    return this.mapLink(data);
+    return this.mapLink(data, await this.projectStatus(data.project_id));
   }
 
   /**
@@ -124,7 +160,7 @@ export class ProjectSharesService {
       .select()
       .single();
     if (error) throw error;
-    return this.mapLink(data);
+    return this.mapLink(data, await this.projectStatus(data.project_id));
   }
 
   private async requireManageableLink(id: string, userId: string): Promise<any> {
@@ -144,12 +180,23 @@ export class ProjectSharesService {
   /**
    * Token'ı görünüme çevirir.
    *
-   * HER OLUMSUZ DURUM 404: token yok, iptal edilmiş, süresi dolmuş, proje
-   * arşivlenmiş — hepsi aynı yanıtı verir. Farklı yanıtlar, elinde token olan
-   * birine "bu link BİR ZAMANLAR vardı" bilgisini sızdırırdı.
+   * HER OLUMSUZ DURUM AYNI YANIT: token yok, iptal edilmiş, süresi dolmuş,
+   * projesi tamamlanmış, proje arşivlenmiş — hepsi `state: "closed"` döner ve
+   * SEBEP TAŞIMAZ. Farklı yanıtlar, elinde token olan birine "bu link BİR
+   * ZAMANLAR vardı" bilgisini sızdırırdı; sebep yalnızca sahibin listesinde
+   * görünür (bkz. mapLink).
+   *
+   * 404 YERİNE 200 dönüyoruz çünkü kapalı link artık bir hata sayfası değil,
+   * Projelio'yu tanıtan bir sayfa gösteriyor (bkz. pages/PublicProject.tsx).
+   * Tanınmayan token da aynı sayfayı görür — ayırt edilemezlik böyle korunuyor.
+   *
+   * E-POSTA KAPISI: linkte adres varsa görünüm ancak doğru adres girildikten
+   * sonra kurulur. `email === undefined` "henüz denemedi" demektir; boş dize
+   * ise bir denemedir ve reddedilir — kapı boş alan gönderilerek atlanamasın.
    */
-  async resolve(token: string): Promise<PublicProjectView> {
-    if (!token || token.length < 16 || token.length > 64) throw new NotFoundException("Bağlantı bulunamadı");
+  async resolve(token: string, email?: string): Promise<PublicProjectAccess> {
+    const closed: PublicProjectAccess = { state: "closed" };
+    if (!token || token.length < 16 || token.length > 64) return closed;
 
     const { data: link, error } = await this.supabase.client
       .from("project_share_links")
@@ -157,10 +204,7 @@ export class ProjectSharesService {
       .eq("token", token)
       .maybeSingle();
     if (error) throw error;
-    if (!link) throw new NotFoundException("Bağlantı bulunamadı");
-    if (!isShareLinkActive({ revokedAt: link.revoked_at, expiresAt: link.expires_at })) {
-      throw new NotFoundException("Bağlantı bulunamadı");
-    }
+    if (!link) return closed;
 
     const { data: project, error: projectError } = await this.supabase.client
       .from("projects")
@@ -168,13 +212,28 @@ export class ProjectSharesService {
       .eq("id", link.project_id)
       .maybeSingle();
     if (projectError) throw projectError;
-    if (!project || project.archived_at) throw new NotFoundException("Bağlantı bulunamadı");
+    if (!project || project.archived_at) return closed;
 
-    const visibility = linkVisibility(link);
-    const view = await this.buildView(project, visibility);
+    const reason = shareLinkClosedReason({
+      revokedAt: link.revoked_at,
+      expiresAt: link.expires_at,
+      projectStatus: project.status,
+    });
+    if (reason) return closed;
 
+    if (link.recipient_email) {
+      if (email === undefined) return { state: "email_required" };
+      if (!shareEmailMatches(link.recipient_email, email)) {
+        return { state: "email_required", emailRejected: true };
+      }
+    }
+
+    const view = await this.buildView(project, linkVisibility(link));
+
+    // Sayaç kapının ARDINDAN artıyor: yanlış adres deneyen biri sahibin
+    // "linke bakan oldu mu" sorusunu kirletmesin.
     void this.countView(link);
-    return view;
+    return { state: "open", view };
   }
 
   /** Ziyaret sayacı. Sahibin "linke bakan oldu mu" sorusu için; kim baktığı TUTULMAZ. */
@@ -360,21 +419,32 @@ export class ProjectSharesService {
 
   // ==================================================================== Eşleme
 
-  private mapLink(row: any): ProjectShareLink {
-    const visibility = linkVisibility(row);
+  /**
+   * Sahibin gördüğü hâl. Linki AÇAN kişinin yanıtından farkı bilinçli:
+   * burada e-posta kapısının adresi ve linkin neden kapandığı da var — ikisi
+   * de public yanıta hiçbir koşulda girmez.
+   */
+  private mapLink(row: any, projectStatus?: ProjectStatus): ProjectShareLink {
+    const closedReason = shareLinkClosedReason({
+      revokedAt: row.revoked_at,
+      expiresAt: row.expires_at,
+      projectStatus,
+    });
     return {
       id: row.id,
       projectId: row.project_id,
       token: row.token,
       url: `${getWebAppUrl()}/takip/${row.token}`,
       label: row.label ?? undefined,
-      visibility,
+      visibility: linkVisibility(row),
+      recipientEmail: row.recipient_email ?? undefined,
       expiresAt: row.expires_at ?? undefined,
       revokedAt: row.revoked_at ?? undefined,
       viewCount: Number(row.view_count ?? 0),
       lastViewedAt: row.last_viewed_at ?? undefined,
       createdAt: row.created_at,
-      active: isShareLinkActive({ revokedAt: row.revoked_at, expiresAt: row.expires_at }),
+      active: closedReason === null,
+      closedReason: closedReason ?? undefined,
     };
   }
 }
@@ -411,6 +481,24 @@ function visibilityColumns(v: ProjectShareVisibility): Record<string, boolean> {
  */
 function newShareToken(): string {
   return randomBytes(24).toString("base64url");
+}
+
+/**
+ * Kapının adresini saklamaya hazırlar.
+ *
+ * Küçük harfe indiriliyor çünkü karşılaştırma da öyle yapılıyor; veritabanında
+ * "Ahmet@X.com", karşılaştırmada "ahmet@x.com" durursa sahibi ne kaydettiğini
+ * göremez. Bariz hatalı adres reddediliyor: yanlış yazılmış bir adres kapıyı
+ * kimsenin açamayacağı hâle getirir ve sahibi bunu ancak alıcı şikâyet edince
+ * öğrenirdi.
+ */
+function cleanRecipientEmail(email?: string): string | null {
+  const normalized = normalizeShareEmail(email);
+  if (!normalized) return null;
+  if (!isLikelyEmail(normalized)) {
+    throw new BadRequestException("Geçerli bir e-posta adresi girin");
+  }
+  return normalized;
 }
 
 function cleanLabel(label?: string): string | null {

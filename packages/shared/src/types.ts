@@ -753,6 +753,13 @@ export const PROJECT_SHARE_VISIBILITY_KEYS: (keyof ProjectShareVisibility)[] = [
 ];
 
 /** Sahibin gördüğü link kaydı. `token` yalnızca linki YÖNETEN kişiye döner. */
+/**
+ * Linkin neden kapandığı. YALNIZCA SAHİBİNE gösterilir — linki açan kişiye
+ * dönen yanıtta yer almaz, çünkü "bu link bir zamanlar vardı ve projesi
+ * tamamlandı" bilgisi bile sızıntıdır.
+ */
+export type ProjectShareClosedReason = "revoked" | "expired" | "completed";
+
 export interface ProjectShareLink {
   id: string;
   projectId: string;
@@ -761,13 +768,20 @@ export interface ProjectShareLink {
   url: string;
   label?: string;
   visibility: ProjectShareVisibility;
+  /**
+   * Linki açacak kişinin e-postası. Doluysa sayfa açılmadan önce sorulur.
+   * Kimlik doğrulaması DEĞİL: adresi bilen geçer (bkz. migration 077).
+   */
+  recipientEmail?: string;
   expiresAt?: string;
   revokedAt?: string;
   viewCount: number;
   lastViewedAt?: string;
   createdAt: string;
-  /** Sunucunun kararı: süresi dolmuş ya da iptal edilmiş link artık açılmıyor. */
+  /** Sunucunun kararı: süresi dolmuş, iptal edilmiş ya da projesi tamamlanmış link açılmıyor. */
   active: boolean;
+  /** Kapalıysa sebebi. Açık linklerde boş. */
+  closedReason?: ProjectShareClosedReason;
 }
 
 export interface CreateProjectShareLinkInput {
@@ -775,6 +789,25 @@ export interface CreateProjectShareLinkInput {
   visibility: ProjectShareVisibility;
   /** Gün cinsinden ömür. Verilmezse süresiz. */
   expiresInDays?: number;
+  /** Boş bırakılırsa link doğrudan açılır. */
+  recipientEmail?: string;
+}
+
+/**
+ * Linki açan kişiye dönen üç durumdan biri.
+ *
+ * "closed" HİÇBİR GEREKÇE TAŞIMAZ ve tanınmayan token da aynı yanıtı alır:
+ * kapalı link ile hiç var olmamış link dışarıdan ayırt edilemez. Sebep
+ * yalnızca sahibin listesinde (ProjectShareLink.closedReason) görünür.
+ */
+export type ProjectShareAccessState = "open" | "email_required" | "closed";
+
+export interface PublicProjectAccess {
+  state: ProjectShareAccessState;
+  /** Yalnızca state === "open" iken dolu. */
+  view?: PublicProjectView;
+  /** Girilen adres tutmadı — kapı yeniden gösterilir. İlk açılışta false. */
+  emailRejected?: boolean;
 }
 
 /** Linki açan kişinin gördüğü görev — atanan adı yalnızca ekip açıksa gelir. */

@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { PublicProjectView, TaskStatus } from "@projelio/shared";
+import type { PublicProjectAccess, PublicProjectView, TaskStatus } from "@projelio/shared";
 import { projectSharesApi } from "../api/projectShares";
-import { ApiError } from "../api/client";
 import { parseServerDate } from "../lib/dates";
 import { PROJECT_STATUS_LABELS, PROJECT_STATUS_STYLE } from "../lib/projectStatus";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -24,26 +23,59 @@ export default function PublicProject() {
   const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const [view, setView] = useState<PublicProjectView | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "gone" | "error">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "gate" | "gone" | "error">("loading");
+  // E-posta kapısı durumu. Adres sunucuya gövdeyle gidiyor, hiçbir yere yazılmıyor.
+  const [email, setEmail] = useState("");
+  const [rejected, setRejected] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+  const [gateError, setGateError] = useState("");
+
+  const apply = (res: PublicProjectAccess) => {
+    if (res.state === "open" && res.view) {
+      setView(res.view);
+      setState("ready");
+      document.title = `${res.view.title} · Projelio`;
+      return;
+    }
+    if (res.state === "email_required") {
+      setRejected(res.emailRejected === true);
+      setState("gate");
+      return;
+    }
+    // "closed": kapatılmış, süresi dolmuş, projesi tamamlanmış ya da hiç var
+    // olmamış link. Sunucu dördünü ayırmıyor, sayfa da ayırmaz.
+    setState("gone");
+  };
 
   useEffect(() => {
     if (!token) {
       setState("gone");
       return;
     }
-    projectSharesApi
-      .view(token)
-      .then((v) => {
-        setView(v);
-        setState("ready");
-        document.title = `${v.title} · Projelio`;
-      })
-      .catch((err) => {
-        // 404 = link yok / kapatılmış / süresi dolmuş. Sunucu üçünü ayırmıyor
-        // (bkz. ProjectSharesService.resolve), sayfa da ayırmaz.
-        setState(err instanceof ApiError && err.status === 404 ? "gone" : "error");
-      });
+    // Kapıyı bir kez geçen ziyaretçi sekmeyi yenilediğinde adresi yeniden
+    // yazmasın diye oturum boyunca hatırlanıyor. sessionStorage bilerek:
+    // sekme kapanınca siliniyor, ortak kullanılan bir bilgisayarda kalmıyor.
+    const saved = sessionStorage.getItem(gateKey(token));
+    const request = saved ? projectSharesApi.unlock(token, saved) : projectSharesApi.view(token);
+    request.then(apply).catch(() => setState("error"));
   }, [token]);
+
+  const submitEmail = async () => {
+    if (!token) return;
+    setUnlocking(true);
+    setGateError("");
+    try {
+      const res = await projectSharesApi.unlock(token, email);
+      if (res.state === "open") sessionStorage.setItem(gateKey(token), email);
+      else sessionStorage.removeItem(gateKey(token));
+      apply(res);
+    } catch (err) {
+      // Tek beklenen hata deneme sınırı (bkz. ShareUnlockRateLimitGuard).
+      setGateError(err instanceof Error ? err.message : "Bağlantı kurulamadı.");
+    } finally {
+      setUnlocking(false);
+    }
+  };
 
   const shell = (children: React.ReactNode) => (
     <div style={{ minHeight: "100vh", background: c.background }}>
@@ -71,17 +103,174 @@ export default function PublicProject() {
     return shell(<p style={{ color: c.textSecondary, fontSize: 14 }}>Yükleniyor…</p>);
   }
 
-  if (state === "gone" || state === "error") {
+  // ---------------------------------------------------------- E-posta kapısı
+  // Burada projeye dair HİÇBİR ŞEY yok — başlık bile. Kapının arkasındaki
+  // bilgiyi kapının önünde göstermek kapıyı anlamsız kılardı.
+  if (state === "gate") {
+    return shell(
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          paddingTop: 32,
+          maxWidth: 380,
+          margin: "0 auto",
+        }}
+      >
+        <h1 style={{ fontSize: 20, color: c.textPrimary, margin: 0 }}>Bu bağlantı size özel</h1>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, lineHeight: 1.6 }}>
+          Devam etmek için bağlantının gönderildiği e-posta adresini yazın.
+        </p>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && !unlocking && submitEmail()}
+          placeholder="ornek@firma.com"
+          autoComplete="email"
+          autoFocus
+          style={{
+            fontSize: 14,
+            padding: "9px 11px",
+            width: "100%",
+            border: `1px solid ${rejected ? c.danger : c.border}`,
+            borderRadius: 8,
+            background: c.surface,
+            color: c.textPrimary,
+          }}
+        />
+        {rejected && (
+          <span style={{ fontSize: 13, color: c.danger }}>
+            Bu adres bu bağlantıya tanımlı değil. Bağlantıyı paylaşan kişiden doğru adresi teyit edebilirsiniz.
+          </span>
+        )}
+        {gateError && <span style={{ fontSize: 13, color: c.danger }}>{gateError}</span>}
+        <button
+          data-primary
+          onClick={submitEmail}
+          disabled={unlocking || !email.trim()}
+          style={{
+            fontSize: 14,
+            padding: "9px 16px",
+            background: c.primary,
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            cursor: unlocking || !email.trim() ? "default" : "pointer",
+            opacity: unlocking || !email.trim() ? 0.6 : 1,
+          }}
+        >
+          {unlocking ? "Kontrol ediliyor…" : "Devam et"}
+        </button>
+        <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.6 }}>
+          Adresiniz yalnızca bu bağlantıyı açmak için kullanılır; kaydedilmez ve size e-posta gönderilmez.
+        </span>
+      </div>
+    );
+  }
+
+  if (state === "error") {
     return shell(
       <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 40, textAlign: "center" }}>
-        <h1 style={{ fontSize: 20, color: c.textPrimary, margin: 0 }}>
-          {state === "gone" ? "Bu bağlantı artık geçerli değil" : "Sayfa açılamadı"}
-        </h1>
+        <h1 style={{ fontSize: 20, color: c.textPrimary, margin: 0 }}>Sayfa açılamadı</h1>
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-          {state === "gone"
-            ? "Link kapatılmış ya da süresi dolmuş olabilir. Projeyi paylaşan kişiden yeni bir bağlantı isteyebilirsin."
-            : "Bağlantı kurulamadı. Sayfayı yenilemeyi dene."}
+          Bağlantı kurulamadı. Sayfayı yenilemeyi dene.
         </p>
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------- Kapanmış bağlantı
+  // Kapatılmış, süresi dolmuş, projesi tamamlanmış ve hiç var olmamış linkler
+  // AYNI sayfayı görür. Sebep yazılsaydı, elinde token olan birine "bu link
+  // bir zamanlar vardı" bilgisi sızardı.
+  //
+  // Hata sayfası değil tanıtım sayfası: buraya gelen kişi projeyi takip eden
+  // gerçek bir insan ve Projelio'yu ilk kez burada görüyor olabilir.
+  if (state === "gone") {
+    return shell(
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+          paddingTop: 32,
+          maxWidth: 460,
+          margin: "0 auto",
+          textAlign: "center",
+        }}
+      >
+        <h1 style={{ fontSize: 20, color: c.textPrimary, margin: 0 }}>Bu bağlantı artık aktif değil</h1>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, lineHeight: 1.6 }}>
+          Takip penceresi kapanmış. Projeyi paylaşan kişiden yeni bir bağlantı isteyebilirsiniz.
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            padding: "18px 20px",
+            marginTop: 8,
+            background: c.surface,
+            border: `1px solid ${c.border}`,
+            borderRadius: 12,
+            textAlign: "left",
+          }}
+        >
+          <span style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary }}>
+            Projelerinizi de böyle paylaşın
+          </span>
+          <span style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.7 }}>
+            Projelio, ekiplerin işlerini tek yerden yürüttüğü bir çalışma alanı. Müşterinize
+            durum raporu hazırlamak yerine, göstermek istediğiniz kadarını gösteren bir bağlantı
+            paylaşırsınız — karşı tarafın hesap açmasına gerek kalmadan.
+          </span>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 18,
+              fontSize: 13,
+              color: c.textSecondary,
+              lineHeight: 1.9,
+            }}
+          >
+            <li>Görev, çıktı, bütçe ve dosyalar tek panoda</li>
+            <li>Hangi bölümün paylaşılacağına bağlantı başına siz karar verirsiniz</li>
+            <li>Proje bitince bağlantı kendiliğinden kapanır</li>
+          </ul>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
+            <Link
+              to="/register"
+              style={{
+                fontSize: 13,
+                padding: "8px 16px",
+                background: c.primary,
+                color: "#fff",
+                borderRadius: 8,
+                textDecoration: "none",
+              }}
+            >
+              Ücretsiz deneyin
+            </Link>
+            <a
+              href="https://projelio.app"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                fontSize: 13,
+                padding: "8px 16px",
+                border: `1px solid ${c.border}`,
+                color: c.textSecondary,
+                borderRadius: 8,
+                textDecoration: "none",
+              }}
+            >
+              Projelio nedir?
+            </a>
+          </div>
+        </div>
       </div>
     );
   }
@@ -360,4 +549,14 @@ function Figure({ label, value }: { label: string; value: string }) {
 function Empty({ children }: { children: React.ReactNode }) {
   const c = useThemeColors();
   return <span style={{ fontSize: 13, color: c.textSecondary }}>{children}</span>;
+}
+
+/**
+ * Kapıyı geçen ziyaretçinin adresini oturum boyunca tutan anahtar.
+ *
+ * Token'a göre ayrı: aynı sekmede iki farklı takip linki açılırsa biri
+ * diğerinin adresini kullanmasın.
+ */
+function gateKey(token: string): string {
+  return `projelio-takip-eposta:${token}`;
 }

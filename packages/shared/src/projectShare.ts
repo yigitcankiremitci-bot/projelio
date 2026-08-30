@@ -1,4 +1,4 @@
-import type { ProjectShareVisibility, TaskStatus } from "./types";
+import type { ProjectShareClosedReason, ProjectShareVisibility, ProjectStatus, TaskStatus } from "./types";
 import { PROJECT_SHARE_VISIBILITY_KEYS } from "./types";
 
 /**
@@ -35,6 +35,72 @@ export function isShareLinkActive(
   const expires = new Date(link.expiresAt.endsWith("Z") ? link.expiresAt : `${link.expiresAt}Z`);
   if (Number.isNaN(expires.getTime())) return true;
   return expires.getTime() > now.getTime();
+}
+
+/**
+ * Linkin neden kapandığı — açıksa null.
+ *
+ * TAMAMLANAN PROJE LİNKİ KAPATIR ve bu karar sütunda tutulmuyor, her okumada
+ * projenin o anki durumuna bakılarak veriliyor. Sebep: proje yeniden açılırsa
+ * (yanlışlıkla tamamlandı işaretlendi, ek iş çıktı) link de kendiliğinden
+ * çalışsın. Damgalanmış bir "kapandı" bilgisi, sahibi linkleri tek tek
+ * yeniden üretmeye zorlardı.
+ *
+ * Sıra en kesin sebepten en geçiciye: iptal geri alınamaz, süre geçmişte
+ * kalmıştır, tamamlanma ise geri dönebilir.
+ */
+export function shareLinkClosedReason(
+  link: { revokedAt?: string | null; expiresAt?: string | null; projectStatus?: ProjectStatus | null },
+  now: Date = new Date()
+): ProjectShareClosedReason | null {
+  if (link.revokedAt) return "revoked";
+  if (!isShareLinkActive({ expiresAt: link.expiresAt }, now)) return "expired";
+  if (link.projectStatus === "completed") return "completed";
+  return null;
+}
+
+/**
+ * E-posta karşılaştırması için tek biçim: kırpılmış ve küçük harfli.
+ *
+ * Kapıyı açan kişi adresi "Ahmet@Firma.COM " diye yazabilir; sahibi de linki
+ * oluştururken başka türlü yazmış olabilir. İkisinin aynı sayılmaması, kapıyı
+ * kullanıcı hatasıyla kilitlenen bir şeye çevirirdi.
+ */
+export function normalizeShareEmail(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim().toLowerCase();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+/**
+ * Kabaca bir e-posta mı.
+ *
+ * Amaç doğrulamak değil, sahibinin yazım hatasını yakalamak: geçersiz bir
+ * adres kaydedilirse kapı hiç açılmaz ve sahibi bunu ancak alıcı şikâyet
+ * edince öğrenir. Tam RFC uyumu aranmıyor — o listeye uymayan geçerli
+ * adresleri reddetmek, hatalı olanı kabul etmekten daha çok zarar verir.
+ */
+export function isLikelyEmail(value: string): boolean {
+  const v = value.trim();
+  if (v.length < 3 || v.length > 160) return false;
+  if (/\s/.test(v)) return false;
+  const at = v.indexOf("@");
+  if (at <= 0 || at !== v.lastIndexOf("@")) return false;
+  const domain = v.slice(at + 1);
+  return domain.includes(".") && !domain.startsWith(".") && !domain.endsWith(".");
+}
+
+/**
+ * Kapıyı açan adres doğru mu.
+ *
+ * Beklenen adres yoksa kapı da yoktur: link doğrudan açılır. Bu fonksiyon
+ * ÇAĞIRANIN beklenen adresi dışarı sızdırmamasına güvenir — karşılaştırma
+ * burada yapılır ki adres hiçbir yanıt gövdesine girmesin.
+ */
+export function shareEmailMatches(expected: unknown, given: unknown): boolean {
+  const want = normalizeShareEmail(expected);
+  if (!want) return true;
+  return normalizeShareEmail(given) === want;
 }
 
 export interface TaskProgress {

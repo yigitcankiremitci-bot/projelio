@@ -68,8 +68,12 @@ değil, dokunduğun alanın testlerini `--filter` ile koştur.
 - **Migration numaraları çakışabiliyor** — `060`, `062`, `063` iki kez kullanılmış.
   Yeni migration eklerken `ls database/migrations | tail` ile en yüksek numarayı
   gör ve bir sonrakini al.
-- **Migration'lar Supabase'e elle uygulanıyor.** Dosyayı yazmak yeterli değil;
-  uygulanması gerektiğini bana hatırlat.
+- **Migration'lar kendi VPS'imizdeki Postgres'e elle uygulanıyor** (Supabase'e
+  değil — 2026-08-30'da göç edildi). Dosyayı yazmak yeterli değil; uygulanması
+  gerektiğini bana hatırlat. Komut:
+  `ssh projelio@100.111.242.24 'docker exec -i projelio-postgres sh -c "psql -v ON_ERROR_STOP=1 -U \$POSTGRES_USER -d \$POSTGRES_DB"' < database/migrations/NNN_ad.sql`
+  (tailnet adresi; genel IP'de 22 kapalı). Şema değiştiyse PostgREST'in
+  önbelleğini tazele: `docker exec projelio-postgres sh -c "psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c \"notify pgrst, 'reload schema'\""`
 - **`client.ts` içindeki oturum sonlanma mantığına dokunma.** 401'lerin tek
   merkezden yönetilmesi bilinçli; oraya `catch` eklemek "her şeyim silinmiş"
   hatasını geri getirir.

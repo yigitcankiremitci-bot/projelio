@@ -38,3 +38,6 @@ _to_delete/
 out/
 .vercel/
 *.tsbuildinfo
+
+# Claude Code kişisel ayarları (izin kuralları) — paylaşılmaz
+.claude/settings.local.json

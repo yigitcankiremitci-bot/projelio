@@ -14,7 +14,7 @@ projelio/
 │   └── mobile/     React Native (Expo) mobil uygulama
 ├── backend/        NestJS REST API + WebSocket (Socket.io)
 ├── database/
-│   └── migrations/ PostgreSQL şema migration'ları (Supabase'e uygulanmış hâli)
+│   └── migrations/ PostgreSQL şema migration'ları (canlıya elle uygulanır)
 ├── landing/        Next.js tanıtım sitesi (projelio.app) — ayrı derlenir
 ├── packages/
 │   └── shared/     Web + mobil + backend arasında paylaşılan TS tipleri
@@ -27,10 +27,10 @@ projelio/
 - **Frontend (Web):** React + Vite + TypeScript
 - **Mobil:** React Native (Expo)
 - **Backend:** Node.js / NestJS (RESTful API + WebSockets)
-- **Veritabanı:** PostgreSQL (Supabase üzerinde barındırılıyor)
+- **Veritabanı:** PostgreSQL 17 (kendi VPS'imizde, Docker; PostgREST üzerinden)
 - **Canlı iletişim:** Socket.io + Firebase Cloud Messaging (mobil push)
 - **Kuyruk / zamanlanmış görevler:** BullMQ + Redis
-- **Dosya depolama:** Supabase Storage
+- **Dosya depolama:** storage-api (kendi VPS'imizde, `api.projelio.app/storage/v1`)
 
 ## Yerel Kurulum (root'tan tek seferde)
 
@@ -51,7 +51,9 @@ npm run start --workspace=@projelio/mobile
 ```
 
 Her uygulamada bir `.env.example` bulunur — çalıştırmadan önce `.env` olarak
-kopyalayıp kendi değerlerinizi girin (Supabase URL/anon key zaten dolu).
+kopyalayıp kendi değerlerinizi girin (veritabanı adresi ve anahtarı zaten dolu).
+İstemci hâlâ `supabase-js`: değişken adları `SUPABASE_*` olarak kaldı, arkasında
+artık kendi PostgREST + storage-api'miz duruyor.
 
 ## Marka Renkleri
 

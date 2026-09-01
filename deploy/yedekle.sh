@@ -16,11 +16,21 @@
 # yedek dosyası sızarsa anahtarlar da sızmasın. Sırların ayrı bir kopyası
 # olmalı (parola yöneticisi).
 #
-# Kurulum (VPS'te, bir kez):
-#   sudo cp /srv/projelio/deploy/systemd/projelio-yedek.* /etc/systemd/system/
-#   sudo systemctl daemon-reload
-#   sudo systemctl enable --now projelio-yedek.timer
-#   sudo systemctl start projelio-yedek.service   # ilk yedeği hemen al
+# KURULUM — iki yol var, ikisi de aynı betiği koşar:
+#
+#   A) root'suz (bugün geçerli olan): projelio kullanıcısının crontab'ı.
+#      `projelio` sudoers'da DEĞİL ve bu makineden root SSH'ı yok, o yüzden
+#      varsayılan yol budur.
+#        ssh projelio@100.111.242.24
+#        ( crontab -l 2>/dev/null | grep -v yedekle.sh; \
+#          echo '30 3 * * * /srv/projelio/deploy/yedekle.sh >> $HOME/yedek/son.log 2>&1' \
+#        ) | crontab -
+#        /srv/projelio/deploy/yedekle.sh        # ilk yedeği hemen al
+#
+#   B) root varsa: systemd birimi daha iyidir (journal'a yazar, Persistent=true
+#      ile kaçırılan günü telafi eder).
+#        cp /srv/projelio/deploy/systemd/projelio-yedek.* /etc/systemd/system/
+#        systemctl daemon-reload && systemctl enable --now projelio-yedek.timer
 #
 # Geri yükleme (dikkat: hedef veriyi ezer):
 #   docker exec -i projelio-postgres pg_restore -U "$POSTGRES_USER" \
@@ -29,16 +39,25 @@
 set -Eeuo pipefail
 
 KOK="/srv/projelio"
-YEDEK="$KOK/yedek"
-GUNLUK="$YEDEK/gunluk"
-HAFTALIK="$YEDEK/haftalik"
 DEPO="$KOK/data/storage"
-KILIT="$YEDEK/.kilit"
 GUNLUK_SAKLAMA=14   # gün
 HAFTALIK_SAKLAMA=8  # hafta
 
+# Yedek nereye yazılacak: /srv/projelio root'un, uygulama kullanıcısı oraya
+# yazamayabilir. Sırayla denenir; ilk yazılabilen kazanır. Böylece betik hem
+# root'lu systemd biriminde hem de projelio'nun crontab'ında aynı şekilde
+# çalışıyor — kurulum yolunu değiştirmek betiği değiştirmeyi gerektirmiyor.
+YEDEK="${PROJELIO_YEDEK:-}"
+if [ -z "$YEDEK" ]; then
+  if mkdir -p "$KOK/yedek" 2>/dev/null; then YEDEK="$KOK/yedek"; else YEDEK="$HOME/yedek"; fi
+fi
+GUNLUK="$YEDEK/gunluk"
+HAFTALIK="$YEDEK/haftalik"
+KILIT="$YEDEK/.kilit"
+
 mkdir -p "$GUNLUK" "$HAFTALIK"
 chmod 700 "$YEDEK"
+echo "Yedek dizini: $YEDEK"
 
 # Üst üste binmesin: yedek uzun sürerse bir sonraki tetikleme beklemesin, atlasın.
 exec 9>"$KILIT"
@@ -70,12 +89,20 @@ docker exec -i projelio-postgres pg_restore --list > /dev/null < "$gecici" \
 mv "$gecici" "$db_dosya"
 
 # --- 2. Yüklenen dosyalar -----------------------------------------------------
-if [ -d "$DEPO" ]; then
+# Dosyalar host'ta root'un olabilir (bind mount'u konteyner oluşturuyor).
+# Okuyamıyorsak konteynerin içinden alıyoruz — docker erişimi zaten var,
+# root gerekmiyor.
+if [ -r "$DEPO" ] && [ -d "$DEPO" ]; then
   tar -czf "$depo_dosya.yaziliyor" -C "$(dirname "$DEPO")" "$(basename "$DEPO")"
   mv "$depo_dosya.yaziliyor" "$depo_dosya"
+elif docker inspect projelio-storage >/dev/null 2>&1; then
+  docker exec projelio-storage tar -czf - -C /var/lib storage > "$depo_dosya.yaziliyor"
+  mv "$depo_dosya.yaziliyor" "$depo_dosya"
+else
+  echo "UYARI: yüklenen dosyalar yedeklenemedi (ne $DEPO okunabiliyor ne de storage konteyneri ayakta)." >&2
 fi
 
-chmod 600 "$GUNLUK"/*
+chmod 600 "$GUNLUK"/* 2>/dev/null || true
 
 # --- 3. Haftalık kopya --------------------------------------------------------
 # Pazar günkü yedek ayrıca haftalığa kopyalanıyor: günlükler 14 günde

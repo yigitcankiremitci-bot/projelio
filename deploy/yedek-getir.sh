@@ -12,14 +12,16 @@
 set -Eeuo pipefail
 
 SUNUCU="projelio@100.111.242.24"   # tailnet; genel IP'de 22 kapalı
-UZAK="/srv/projelio/yedek/gunluk"
+# Betik yedeği /srv/projelio/yedek'e yazamazsa ~/yedek'e düşüyor; ikisine de
+# bakıyoruz ki kurulumun hangi yolla yapıldığını bilmek gerekmesin.
+UZAK_ADAYLAR="/srv/projelio/yedek/gunluk \$HOME/yedek/gunluk"
 HEDEF="${1:-$HOME/Projelio-yedek}"
 
 mkdir -p "$HEDEF"
 
-son_db="$(ssh "$SUNUCU" "ls -t $UZAK/db-*.dump 2>/dev/null | head -1")"
-[ -n "$son_db" ] || { echo "Sunucuda yedek bulunamadı — timer kurulu mu?" >&2; exit 1; }
-son_depo="$(ssh "$SUNUCU" "ls -t $UZAK/depo-*.tar.gz 2>/dev/null | head -1" || true)"
+son_db="$(ssh "$SUNUCU" "ls -t $UZAK_ADAYLAR/db-*.dump 2>/dev/null | head -1")"
+[ -n "$son_db" ] || { echo "Sunucuda yedek bulunamadı — crontab/timer kurulu mu?" >&2; exit 1; }
+son_depo="$(ssh "$SUNUCU" "ls -t $UZAK_ADAYLAR/depo-*.tar.gz 2>/dev/null | head -1" || true)"
 
 echo "İndiriliyor: $(basename "$son_db")"
 scp "$SUNUCU:$son_db" "$HEDEF/"

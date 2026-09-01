@@ -62,6 +62,11 @@ koşar, ne gideceğini gösterip onay ister, sonra CI ve dağıtımı izler.
 
 Migration'lar bu zincire DAHİL DEĞİL — hâlâ elle uygulanıyor (bkz. aşağıda).
 
+Sunucuda **root yok**: `projelio` kullanıcısı sudoers'da değil ve yerel anahtar
+root girişini açmıyor. Bu yüzden sunucuda kurulan her şey (ör. yedekleme)
+kullanıcı crontab'ıyla kuruluyor, systemd birimiyle değil — birimler repoda
+duruyor ama root erişimi olduğu gün işe yarar. Bkz. `deploy/yedekle.sh` başlığı.
+
 Değişiklik sonrası **her zaman `npm run typecheck` çalıştır.** Tüm test setini
 değil, dokunduğun alanın testlerini `--filter` ile koştur.
 

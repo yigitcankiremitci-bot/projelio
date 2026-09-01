@@ -17,6 +17,10 @@ ENV VITE_GOOGLE_PICKER_APP_ID=${VITE_GOOGLE_PICKER_APP_ID}
 ENV VITE_HABIE_URL=${VITE_HABIE_URL}
 RUN npm run build --workspace=@projelio/web
 
+# Sıkıştırma çalışma anında değil BURADA yapılıyor — gerekçesi betiğin başında.
+COPY deploy/onsikistir.mjs deploy/onsikistir.mjs
+RUN node deploy/onsikistir.mjs apps/web/dist
+
 FROM caddy:2.11.4-alpine
 COPY deploy/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/apps/web/dist /srv/web

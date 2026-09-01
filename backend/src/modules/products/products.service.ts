@@ -3,7 +3,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import type { Product, ProductImage, ProductStatus, ProductUnit } from "@projelio/shared";
 import { PRODUCT_UNITS } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
-import { detectImageUpload } from "../../common/upload-image.util";
+import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 import { safeExternalUrl } from "../../common/safe-url";
 
 const COVER_BUCKET = "product-covers";
@@ -415,7 +415,7 @@ export class ProductsService {
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(COVER_BUCKET)
-      .upload(path, file.buffer, { contentType, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true, cacheControl: UPLOAD_CACHE_CONTROL });
     if (uploadError) throw uploadError;
 
     const publicUrl = this.supabase.publicStorageUrl(COVER_BUCKET, path);

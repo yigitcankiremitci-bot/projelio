@@ -6,7 +6,7 @@ import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.u
 import { JobsService } from "../jobs/jobs.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { applyOrder } from "../../common/reorder.util";
-import { detectImageUpload } from "../../common/upload-image.util";
+import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 
 const COVER_BUCKET = "group-covers";
 
@@ -223,7 +223,7 @@ export class GroupsService {
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(COVER_BUCKET)
-      .upload(path, file.buffer, { contentType, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true, cacheControl: UPLOAD_CACHE_CONTROL });
     if (uploadError) throw uploadError;
 
     const publicUrl = this.supabase.publicStorageUrl(COVER_BUCKET, path);

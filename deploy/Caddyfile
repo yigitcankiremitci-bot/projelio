@@ -10,7 +10,33 @@ app.projelio.app {
 	root * /srv/web
 	encode zstd gzip
 	try_files {path} /index.html
-	file_server
+
+	# ÖNCEDEN SIKIŞTIRILMIŞ DOSYALAR. `encode` tek başına her isteği YENİDEN
+	# sıkıştırıyor: 1,29 MB'lık paket her indirmede baştan zstd'den geçiyordu
+	# (ölçüldü: aynı dosya loopback üzerinden sıkıştırmasız 27 ms, sıkıştırmalı
+	# 50 ms). Dosyalar derleme sırasında bir kez .br/.gz olarak üretiliyor
+	# (bkz. Dockerfile.web), Caddy hazır olanı veriyor. Hazır dosya yoksa
+	# `encode` devreye girer, yani bu satır tek başına hiçbir şeyi bozmaz.
+	file_server {
+		precompressed br gzip
+	}
+
+	# ÖNBELLEK. Bu başlıkları Netlify kendiliğinden veriyordu; Caddy vermiyor,
+	# göçten sonra hiçbir dosyada Cache-Control kalmadı. Tarayıcı bu durumda
+	# sezgisel davranıyor ve her dosyayı sık sık yeniden doğrulatıyor — dosya
+	# başına boşuna bir gidiş-dönüş.
+	#
+	# /assets/* hash'li adlarla üretiliyor (index-BjPjQSJU.js): içerik değişince
+	# ad da değişir, bu yüzden sonsuza kadar saklanabilir.
+	@varliklar path /assets/*
+	header @varliklar Cache-Control "public, max-age=31536000, immutable"
+
+	# index.html ve kökteki diğer dosyalar (logo.png, pre-paint.js) SABİT adlı.
+	# Uzun süre saklanırlarsa kullanıcı yeni dağıtımdan sonra da eski uygulamayı
+	# görmeye devam eder; no-cache "sakla ama her seferinde sor" demek — içerik
+	# değişmediyse 304 döner, veri inmez.
+	@belge not path /assets/*
+	header @belge Cache-Control "no-cache"
 
 	header {
 		# Netlify'dan taşındı (netlify.toml). Netlify gidince bu başlıkları
@@ -39,8 +65,39 @@ api.projelio.app {
 	# Kapak ve avatar görselleri AÇIK kovada duruyor ve tarayıcı bunları
 	# doğrudan çekiyor (bkz. SupabaseService.publicStorageUrl) — bu yüzden
 	# storage dışarı açık olmak zorunda.
+	#
+	# ÖNBELLEK BURADA DA ZORLANIYOR, yalnızca yükleme anındaki cacheControl'e
+	# güvenilmiyor: göçten ÖNCE yüklenmiş nesnelerin metadata'sında hâlâ
+	# supabase-js'in varsayılanı (3600) yazıyor ve onları toplu güncellemenin
+	# yolu yok. Bu satır eskisini de yenisini de kapsıyor.
+	#
+	# Bir yıl güvenli, çünkü her yükleme `<id>/<randomUUID>.<ext>` yoluna
+	# gidiyor: aynı adresin içeriği hiç değişmiyor, avatar değişince adres de
+	# değişiyor (bkz. common/upload-image.util.ts, UPLOAD_CACHE_CONTROL).
+	#
+	# YALNIZCA /object/public/*: imzalı (/object/sign/*) ve kimlik doğrulamalı
+	# adresler kapsam dışı — onların içeriği aynı adreste değişebilir ve imzanın
+	# süresi dolar, uzun önbellek oralarda yanlış olurdu.
+	#
+	# YALNIZCA BAŞARILI YANITLAR. Düz bir `header` satırı hata yanıtlarına da
+	# uygulanırdı: storage-api yeniden başlarken denk gelen tek bir 502, o
+	# kapağı ilgili tarayıcıda BİR YIL boyunca kırık gösterirdi ve kullanıcının
+	# yapabileceği hiçbir şey olmazdı. handle_response bunu 200/206 ile
+	# sınırlıyor.
 	handle_path /storage/v1/* {
-		reverse_proxy storage:5000
+		handle /object/public/* {
+			reverse_proxy storage:5000 {
+				@basarili status 200 206
+				handle_response @basarili {
+					header Cache-Control "public, max-age=31536000, immutable"
+					copy_response
+				}
+			}
+		}
+
+		handle {
+			reverse_proxy storage:5000
+		}
 	}
 
 	# /rest/v1 BİLEREK YOK. Web istemcisi supabase-js kullanmıyor, PostgREST'e

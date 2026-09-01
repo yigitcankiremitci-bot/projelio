@@ -108,7 +108,14 @@ async function bootstrap() {
   const corsOrigins = getCorsOrigins();
 
   if (corsOrigins.length) {
-    app.enableCors({ origin: corsOrigins, credentials: true });
+    // maxAge OLMADAN her istek İKİYE KATLANIYOR. İstemci her çağrıda
+    // Authorization + Content-Type + X-Socket-Id gönderiyor; bunlar "basit"
+    // başlık sayılmadığı için tarayıcı önce OPTIONS ön uçuşu yapıyor. Bu yanıt
+    // Access-Control-Max-Age taşımazsa Chrome onu yalnızca 5 saniye saklıyor,
+    // yani pratikte her API çağrısı iki gidiş-dönüş oluyor (ölçüldü: ön uçuş
+    // tek başına ~70-90 ms). 7200 Chrome'un üst sınırı — daha büyük yazmak
+    // işe yaramaz, sessizce 7200'e kırpılır.
+    app.enableCors({ origin: corsOrigins, credentials: true, maxAge: 7200 });
     logger.log(`CORS kısıtlı: ${corsOrigins.join(", ")}`);
   } else {
     // Üretimde buraya hiç düşülmez: assertRequiredEnv() boş CORS_ORIGINS'i

@@ -3,7 +3,7 @@ import { hashPassword, verifyPassword } from "../../common/password.util";
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
-import { detectImageUpload } from "../../common/upload-image.util";
+import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 import { demoHesabindaYasak } from "../../common/demo-hesap";
 import type { Sector, TeamSize, UseCase } from "@projelio/shared";
 import { SECTORS, TEAM_SIZES, USE_CASES } from "@projelio/shared";
@@ -517,7 +517,7 @@ export class UsersService {
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(AVATAR_BUCKET)
-      .upload(path, file.buffer, { contentType, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true, cacheControl: UPLOAD_CACHE_CONTROL });
     if (uploadError) throw uploadError;
 
     const publicUrl = this.supabase.publicStorageUrl(AVATAR_BUCKET, path);

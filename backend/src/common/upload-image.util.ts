@@ -40,6 +40,21 @@ export interface DetectedImage {
 /** Multer'daki sınırla aynı; burada da kontrol edilir (savunma katmanı). */
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
+/**
+ * Yüklenen görsellerin tarayıcıda ne kadar saklanacağı (saniye).
+ *
+ * NEDEN BİR YIL GÜVENLİ: yükleyen her uç nokta dosyayı `<id>/<randomUUID>.<ext>`
+ * yoluna yazıyor, yani AYNI ADRESİN İÇERİĞİ HİÇ DEĞİŞMİYOR. Kullanıcı avatarını
+ * değiştirdiğinde yeni bir UUID üretiliyor, kayıttaki adres de onunla
+ * güncelleniyor ve eskisi siliniyor (bkz. removeStaleUploadsInFolder). Bayat
+ * görsel gösterme riski bu yüzden yok.
+ *
+ * NEDEN GEREKTİ: supabase-js'in varsayılanı 3600, yani kapaklar ve avatarlar
+ * saatte bir yeniden iniyordu. Supabase barındırmalı kurulumda bunu bir CDN
+ * yumuşatıyordu; kendi sunucumuzda her istek storage-api'ye kadar gidiyor.
+ */
+export const UPLOAD_CACHE_CONTROL = "31536000";
+
 interface Signature {
   contentType: string;
   ext: string;

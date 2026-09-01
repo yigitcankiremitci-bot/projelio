@@ -8,7 +8,7 @@ import { OperationsService } from "../operations/operations.service";
 import { FilesService } from "../files/files.service";
 import { AccessService } from "../../common/access/access.service";
 import { applyOrder } from "../../common/reorder.util";
-import { detectImageUpload } from "../../common/upload-image.util";
+import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 
 const COVER_BUCKET = "job-covers";
 
@@ -380,7 +380,7 @@ export class JobsService {
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(COVER_BUCKET)
-      .upload(path, file.buffer, { contentType, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true, cacheControl: UPLOAD_CACHE_CONTROL });
     if (uploadError) throw uploadError;
 
     const publicUrl = this.supabase.publicStorageUrl(COVER_BUCKET, path);

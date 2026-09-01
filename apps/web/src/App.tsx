@@ -1,42 +1,15 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { Routes, Route, Link, useLocation, useParams, Navigate } from "react-router-dom";
 import type { User } from "@projelio/shared";
 import { api } from "./api/client";
 import OnboardingWizard from "./components/OnboardingWizard";
-import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";
-import PublicProject from "./pages/PublicProject";
-import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import VerifyEmail from "./pages/VerifyEmail";
-import GoogleReturn from "./pages/GoogleReturn";
-import HabieConnect from "./pages/HabieConnect";
-import MicrosoftReturn from "./pages/MicrosoftReturn";
-import Privacy from "./pages/Privacy";
-import Terms from "./pages/Terms";
-import JobDetail from "./pages/JobDetail";
-import ProjectDetail from "./pages/ProjectDetail";
-import OperationDetail from "./pages/OperationDetail";
-import Organizations from "./pages/Organizations";
-import OrganizationDetail from "./pages/OrganizationDetail";
-import DepartmentDetail from "./pages/DepartmentDetail";
-import ModulePage from "./pages/ModulePage";
-import Groups from "./pages/Groups";
-import GroupDetail from "./pages/GroupDetail";
-import CalendarView from "./pages/Calendar";
-import AdminPanel from "./pages/AdminPanel";
-import Settings from "./pages/Settings";
-import Archive from "./pages/Archive";
-import TasksOverview from "./pages/TasksOverview";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
 import NotificationBell from "./components/NotificationBell";
 import PresenceStrip from "./components/PresenceStrip";
 import AiLauncher from "./components/AiLauncher";
 import AiLiveActivity from "./components/AiLiveActivity";
-import AiCreditsPage from "./pages/AiCredits";
 import { initPush } from "./push";
 import { useThemeColors } from "./theme/useThemeColors";
 import { ProjectFabProvider } from "./lib/projectFab";
@@ -53,6 +26,43 @@ import UploadTray, { UPLOAD_TRAY_HEIGHT } from "./components/UploadTray";
 import { useUploads } from "./lib/uploadQueue";
 import { CoverBackLink } from "./components/EntityCover";
 import { IconChevronRight, IconUser } from "./components/icons";
+
+// SAYFALAR AYRI PAKETLERE BÖLÜNÜYOR. Hepsi doğrudan import edilirken Vite
+// 27 sayfayı tek dosyada topluyordu (1,29 MB): giriş ekranını görmek için bile
+// yönetici paneli, takvim ve modül ekranları indiriliyordu. lazy ile her sayfa
+// ilk kez açıldığında geliyor; hash'li adı olduğu için de sonsuza kadar
+// önbellekte kalıyor (bkz. deploy/Caddyfile).
+//
+// Bileşenler (Sidebar, AiLauncher…) BİLEREK bölünmedi: uygulama kabuğunun
+// parçası olduklarından her sayfada zaten gerekiyorlar, ayırmak yalnızca
+// fazladan istek olurdu.
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Login = lazy(() => import("./pages/Login"));
+const PublicProject = lazy(() => import("./pages/PublicProject"));
+const Register = lazy(() => import("./pages/Register"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const GoogleReturn = lazy(() => import("./pages/GoogleReturn"));
+const HabieConnect = lazy(() => import("./pages/HabieConnect"));
+const MicrosoftReturn = lazy(() => import("./pages/MicrosoftReturn"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+const JobDetail = lazy(() => import("./pages/JobDetail"));
+const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
+const OperationDetail = lazy(() => import("./pages/OperationDetail"));
+const Organizations = lazy(() => import("./pages/Organizations"));
+const OrganizationDetail = lazy(() => import("./pages/OrganizationDetail"));
+const DepartmentDetail = lazy(() => import("./pages/DepartmentDetail"));
+const ModulePage = lazy(() => import("./pages/ModulePage"));
+const Groups = lazy(() => import("./pages/Groups"));
+const GroupDetail = lazy(() => import("./pages/GroupDetail"));
+const CalendarView = lazy(() => import("./pages/Calendar"));
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Archive = lazy(() => import("./pages/Archive"));
+const TasksOverview = lazy(() => import("./pages/TasksOverview"));
+const AiCreditsPage = lazy(() => import("./pages/AiCredits"));
 
 const HEADER_HEIGHT = 76;
 
@@ -87,6 +97,18 @@ const STICKY_REVEAL = STICKY_TOP_ROW + STICKY_TABS_ROW;
  * görünüyordu. `key` değişince React eskisini söküp yenisini sıfırdan kurar —
  * "yeni projeye geçtim" ile "sayfayı yeniden açtım" aynı şey olur.
  */
+/**
+ * Sayfa paketi inerken görünen ara ekran.
+ *
+ * Bilerek sade: paketler kendi sunucumuzdan ve hash'li adla geliyor, ilk
+ * açılıştan sonra önbellekten okunuyor — yani bu ekran çoğunlukla hiç
+ * görünmüyor. Bir yükleme animasyonu koymak, 50 ms görünüp kaybolan bir
+ * titremeden başka bir şey üretmezdi.
+ */
+function SayfaYukleniyor() {
+  return <div style={{ padding: 24 }} />;
+}
+
 function KeyedProjectDetail() {
   const { id } = useParams();
   return <ProjectDetail key={id} />;
@@ -565,19 +587,21 @@ export default function App() {
 
   if (isAuthScreen) {
     return (
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route path="/google/return" element={<GoogleReturn />} />
-        <Route path="/habie" element={<HabieConnect />} />
-        <Route path="/microsoft/return" element={<MicrosoftReturn />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/takip/:token" element={<PublicProject />} />
-      </Routes>
+      <Suspense fallback={<SayfaYukleniyor />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/google/return" element={<GoogleReturn />} />
+          <Route path="/habie" element={<HabieConnect />} />
+          <Route path="/microsoft/return" element={<MicrosoftReturn />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/takip/:token" element={<PublicProject />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -730,26 +754,28 @@ export default function App() {
               paddingBottom: isDesktop ? 28 : "calc(104px + env(safe-area-inset-bottom))",
             }}
           >
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/jobs/:id" element={<JobDetail />} />
-              <Route path="/projects/:id" element={<KeyedProjectDetail />} />
-              <Route path="/operations/:id" element={<OperationDetail />} />
-              <Route path="/organizations" element={<Organizations />} />
-              <Route path="/organizations/:id" element={<OrganizationDetail />} />
-              <Route path="/departments/:id" element={<DepartmentDetail />} />
-              {/* Sayfa yüzeyli modüller kendi adreslerinde açılır (bkz. lib/moduleSurfaces.ts). */}
-              <Route path="/departments/:departmentId/modules/:moduleKey" element={<ModulePage />} />
-              <Route path="/jobs/:jobId/modules/:moduleKey" element={<ModulePage />} />
-              <Route path="/groups" element={<Groups />} />
-              <Route path="/groups/:id" element={<GroupDetail />} />
-              <Route path="/calendar" element={<CalendarView />} />
-              <Route path="/tasks" element={<TasksOverview />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/settings/archive" element={<Archive />} />
-              <Route path="/settings/ai-credits" element={<AiCreditsPage />} />
-              <Route path="/admin" element={<AdminPanel />} />
-            </Routes>
+            <Suspense fallback={<SayfaYukleniyor />}>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/jobs/:id" element={<JobDetail />} />
+                <Route path="/projects/:id" element={<KeyedProjectDetail />} />
+                <Route path="/operations/:id" element={<OperationDetail />} />
+                <Route path="/organizations" element={<Organizations />} />
+                <Route path="/organizations/:id" element={<OrganizationDetail />} />
+                <Route path="/departments/:id" element={<DepartmentDetail />} />
+                {/* Sayfa yüzeyli modüller kendi adreslerinde açılır (bkz. lib/moduleSurfaces.ts). */}
+                <Route path="/departments/:departmentId/modules/:moduleKey" element={<ModulePage />} />
+                <Route path="/jobs/:jobId/modules/:moduleKey" element={<ModulePage />} />
+                <Route path="/groups" element={<Groups />} />
+                <Route path="/groups/:id" element={<GroupDetail />} />
+                <Route path="/calendar" element={<CalendarView />} />
+                <Route path="/tasks" element={<TasksOverview />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings/archive" element={<Archive />} />
+                <Route path="/settings/ai-credits" element={<AiCreditsPage />} />
+                <Route path="/admin" element={<AdminPanel />} />
+              </Routes>
+            </Suspense>
           </div>
           {/* Mobilde tam alt menü, masaüstünde ise sadece ortadaki "+" butonu olarak
               render edilir — karar BottomNav içinde isDesktop'a göre veriliyor. */}

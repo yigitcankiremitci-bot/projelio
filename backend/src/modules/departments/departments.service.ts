@@ -5,7 +5,7 @@ import { applyOrder } from "../../common/reorder.util";
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { decideDepartmentAccess } from "./department-access";
-import { detectImageUpload } from "../../common/upload-image.util";
+import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 
 const COVER_BUCKET = "department-covers";
 
@@ -363,7 +363,7 @@ export class DepartmentsService {
 
     const { error: uploadError } = await this.supabase.client.storage
       .from(COVER_BUCKET)
-      .upload(path, file.buffer, { contentType, upsert: true });
+      .upload(path, file.buffer, { contentType, upsert: true, cacheControl: UPLOAD_CACHE_CONTROL });
     if (uploadError) throw uploadError;
 
     const publicUrl = this.supabase.publicStorageUrl(COVER_BUCKET, path);

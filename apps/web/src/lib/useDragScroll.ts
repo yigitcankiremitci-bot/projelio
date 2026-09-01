@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import type { RefObject } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { MutableRefObject } from "react";
 import { LONG_PRESS_DELAY } from "./useSortableList";
 
 /**
@@ -38,22 +38,41 @@ const THRESHOLD = 6;
 const INTERACTIVE_SELECTOR = "input, textarea, select, [contenteditable='true']";
 
 /**
+ * REF DEĞİL, GERİ ÇAĞIRMA REF'İ döner — ve bu bilerek böyle.
+ *
+ * Önce sıradan bir `useRef` dönüyordu ve efekt yalnızca `enabled`'a bağlıydı.
+ * Sonuç sessiz bir ölümdü: bu şeritlerin çoğu veriyi sunucudan çekiyor ve ilk
+ * render'da "Yükleniyor…" basıyor, yani efekt çalıştığında kaydırılacak düğüm
+ * HENÜZ YOK. `ref.current` null olduğu için kanca hiçbir şeye bağlanmıyor,
+ * liste geldiğinde de efekt yeniden çalışmadığı için bir daha denemiyordu —
+ * sürükleme, tam da en çok gerektiği yerlerde çalışmıyordu.
+ *
+ * Geri çağırma ref'inde bu mümkün değil: düğüm DOM'a girdiğinde React zaten
+ * çağırıyor, çıktığında null ile tekrar çağırıyor. Çağrı yerinin bir bağımlılık
+ * listesi vermesi (ve onu yanlış yazması) gerekmiyor.
+ *
  * @param enabled Kutu o an gerçekten yatay kaydırılıyorsa true. Kanban panoları
  *                dar ekranda sütunları alt alta diziyor (`overflowX` yok) —
  *                orada sürüklemenin bağlanacak bir şeyi yok.
- * @param externalRef Kutunun ref'i başka bir işe (ör. TabBar'ın kendi kaydırma
- *                    ölçümü) zaten bağlıysa o ref verilir; kanca kendi ref'ini
- *                    üretmek yerine aynı düğüme bağlanır.
+ * @param externalRef Kutunun düğümü başka bir işe de gerekiyorsa (ör. TabBar
+ *                    kendi ok düğmeleri için kaydırma konumunu ölçüyor) o ref
+ *                    verilir; kanca düğümü oraya da yazar.
  */
 export function useDragScroll<T extends HTMLElement = HTMLDivElement>(
   enabled = true,
-  externalRef?: RefObject<T>
-): RefObject<T> {
-  const ownRef = useRef<T>(null);
-  const ref = externalRef ?? ownRef;
+  externalRef?: MutableRefObject<T | null>
+) {
+  const [el, setEl] = useState<T | null>(null);
+
+  const ref = useCallback(
+    (node: T | null) => {
+      if (externalRef) externalRef.current = node;
+      setEl(node);
+    },
+    [externalRef]
+  );
 
   useEffect(() => {
-    const el = ref.current;
     if (!el || !enabled) return;
 
     let startX = 0;
@@ -146,7 +165,7 @@ export function useDragScroll<T extends HTMLElement = HTMLDivElement>(
       document.body.style.removeProperty("user-select");
       el.style.cursor = "";
     };
-  }, [enabled]);
+  }, [el, enabled]);
 
   return ref;
 }

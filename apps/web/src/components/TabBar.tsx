@@ -203,10 +203,11 @@ function FittedTabBar({ tabs, active, onChange, style }: Props) {
  */
 function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
   const c = useThemeColors();
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  // Aynı düğüm: çubuk zaten kendi kaydırma konumunu ölçüyor (ok düğmeleri
-  // için), kanca da onu fareyle sürüklenebilir yapıyor.
-  useDragScroll<HTMLDivElement>(true, scrollerRef);
+  // `HTMLDivElement | null` yazımı bilerek: useDragScroll düğümü bu ref'e
+  // KENDİ yazıyor, o yüzden değiştirilebilir olmalı. Çubuk aynı düğümü ok
+  // düğmelerinin kaydırma konumunu ölçmek için kullanmayı sürdürüyor.
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const scrollerDragRef = useDragScroll<HTMLDivElement>(true, scrollerRef);
   const [edges, setEdges] = useState({ atStart: true, atEnd: true });
 
   useEffect(() => {
@@ -250,7 +251,7 @@ function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
     // ayrılsın (şerittekiler style ile 0'a çeker).
     <div style={{ position: "relative", minWidth: 0, marginBottom: 16, ...style }}>
       <div
-        ref={scrollerRef}
+        ref={scrollerDragRef}
         style={{
           display: "flex",
           gap: 4,

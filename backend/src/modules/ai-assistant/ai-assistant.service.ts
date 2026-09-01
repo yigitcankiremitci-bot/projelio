@@ -20,9 +20,12 @@ import { PlanningService } from "../planning/planning.service";
 import { OutputsService } from "../outputs/outputs.service";
 import { AI_TOOLS, CRITICAL_TOOLS } from "./ai-assistant.tools";
 import { describeModuleFields, hasRecordConfig, normalizeModuleData } from "./ai-modules";
+import { taskTarget } from "./ai-task-target";
 import { getModuleRecordConfig } from "@projelio/shared";
 import { CatalogService } from "../catalog/catalog.service";
 import { OrganizationsService } from "../organizations/organizations.service";
+import { DepartmentsService } from "../departments/departments.service";
+import { DepartmentMembersService } from "../department-members/department-members.service";
 import { OrganizationModulesService } from "../organization-modules/organization-modules.service";
 import { JobModulesService } from "../job-modules/job-modules.service";
 import { ModuleRecordsService } from "../module-records/module-records.service";
@@ -525,6 +528,10 @@ export class AiAssistantService {
     // yetkisiyle aynı kapıdan geçiyor.
     private catalogService: CatalogService,
     private organizationsService: OrganizationsService,
+    // Departman araçları: görev bir projeye ya da bir departmana açılabiliyor
+    // (bkz. Task.departmentId). Yetki kontrolleri yine bu servislerin içinde.
+    private departmentsService: DepartmentsService,
+    private departmentMembersService: DepartmentMembersService,
     private organizationModulesService: OrganizationModulesService,
     private jobModulesService: JobModulesService,
     private moduleRecordsService: ModuleRecordsService,
@@ -750,6 +757,8 @@ export class AiAssistantService {
     "Sen Projelio'nun içine gömülü yapay zeka asistanısın. Adın \"Projelio Asistan\".",
       "Projelio; iş (job) > proje (project) > görev (task) hiyerarşisiyle çalışan bir proje ve serbest çalışan yönetim uygulamasıdır.",
       "Projelerin bütçesi, ekip üyeleri (sahip / üye / taşeron) ve teslim tarihleri vardır. Görevlerin alt görevleri olabilir.",
+      "Kurumsal tarafta ikinci bir hiyerarşi var: organizasyon > departman (Pazarlama, Muhasebe…) > görev. " +
+        "Yani bir görev İKİ yerden birine açılır: bir PROJEYE ya da bir DEPARTMANA. İkisi birbirinin alt kırılımı değildir.",
       "",
       "## Rolün",
       "Kullanıcının asistanısın: sorularını yanıtlar, verilerini analiz eder ve araçlarla gerçek değişiklikler yaparsın.",
@@ -788,10 +797,12 @@ export class AiAssistantService {
       "",
       "## Sınırların",
       "Araçların YALNIZCA şu alanları kapsar: işler (job), projeler, çıktılar (output), görevler ve alt görevler, " +
-        "görev yorumları, proje ekibi ve rolleri, bütçe hareketleri, bildirim özeti, Takvim planlaması " +
+        "görev yorumları, proje ekibi ve rolleri, DEPARTMANLAR (listeleme, kadro ve departman görevleri), " +
+        "bütçe hareketleri, bildirim özeti, Takvim planlaması " +
         "(dönem planı, odak alanları, zaman blokları, ritüeller), kişisel yapılacaklar panosu " +
         "ve MODÜLLER (modül açma/kapatma ve modül kayıtları — bkz. Modüller bölümü).",
-      "Şu alanlar için HİÇBİR aracın yok: e-posta/mailbox, organizasyon ve departman kurma/düzenleme, " +
+      "Şu alanlar için HİÇBİR aracın yok: e-posta/mailbox, organizasyon ve departman KURMA/DÜZENLEME " +
+        "(departmanı listeleyebilir ve içine görev açabilirsin, ama yeni departman açamaz, adını değiştiremez, silemezsin), " +
         "gruplar, operasyonlar, ürünler, iş ortakları ve cari hesaplar, sosyal medya, " +
         "proje gönderileri ve yorumları, destek talepleri, kullanıcı/yetki yönetimi, " +
         "ödeme ve abonelik işlemleri, uygulama ayarları, dosya/rapor indirme veya dışa aktarma.",
@@ -811,6 +822,20 @@ export class AiAssistantService {
         "geri alınması zor değişiklikler), araç çağırmadan ÖNCE eksik bilgilerin HEPSİNİ tek mesajda sor. " +
         "Soruları tek tek sormak hem yavaş hem pahalıdır.",
       "- Küçük ve tek adımlı işlerde soru sorma; en olası yorumu yap ve ne yaptığını söyle.",
+      "",
+      "## Görev nereye açılır",
+      "Görev ya bir PROJEYE ya da bir DEPARTMANA açılır; create_task/create_tasks'a projectId veya departmentId'den " +
+        "TAM OLARAK BİRİNİ ver.",
+      "- Kullanıcı departmandan, organizasyondan, birimden ya da \"ekiplere/departmanlara dağıt\" gibi bir şeyden söz " +
+        "ediyorsa ÖNCE list_departments çağır ve adları eşleştir. Departmandaki kişilere atama yapacaksan " +
+        "list_department_members ile kullanıcı id'lerini al.",
+      "- Adı geçen departmanı listede bulamazsan UYDURMA ve yerine iş/proje AÇMA: hangi departmanı kastettiğini sor. " +
+        "(Bu kural yaşanmış bir hatadan geliyor: departman araçları yokken model, departmanlara dağıtılması istenen " +
+        "görevler için kullanıcının işlerinin altına yeni bir proje açıp hepsini oraya yığdı.)",
+      "- Görevler birden fazla departmana dağıtılacaksa her departman için create_tasks'ı AYRI çağır; tek çağrıda " +
+        "yalnızca tek bir hedef olur.",
+      "- Yeni iş ya da proje oluşturmayı yalnızca kullanıcı açıkça istediğinde yap. Görevi koyacak yer bulamamak " +
+        "proje açmak için gerekçe değildir.",
       "",
       "## Çıktılar",
       "Çıktı, bir projenin teslim edilecek parçasıdır (\"Logo tasarımı\", \"Ana sayfa\"). Görevler bir çıktıya " +
@@ -2161,6 +2186,13 @@ export class AiAssistantService {
     const projectActivity = (label: string, projectId?: string, entityId?: string) =>
       projectId ? make(label, `/projects/${projectId}`, `project:${projectId}`, entityId) : null;
 
+    // Departman görevinin sayfası projede değil, departmanın Görevler sekmesinde
+    // (bkz. tasks.service.ts taskPath). Oda adı da oradan: "department:<id>".
+    const departmentActivity = (label: string, departmentId?: string, entityId?: string) =>
+      departmentId
+        ? make(label, `/departments/${departmentId}?tab=tasks`, `department:${departmentId}`, entityId)
+        : null;
+
     switch (toolName) {
       // Yapılacaklar sayfasının canlı odası yok (pano kişisel, kimseyle
       // paylaşılmıyor); bildirim yalnızca kullanıcıyı sayfaya götürüyor.
@@ -2207,17 +2239,20 @@ export class AiAssistantService {
         return make(label, `/projects/${id}`, `project:${id}`, id);
       }
 
-      case "create_task":
-        return projectActivity(
-          `Görev oluşturuldu${result?.title ? `: ${result.title}` : ""}`,
-          input.projectId,
-          result?.id
-        );
+      case "create_task": {
+        const label = `Görev oluşturuldu${result?.title ? `: ${result.title}` : ""}`;
+        return input.departmentId
+          ? departmentActivity(label, input.departmentId, result?.id)
+          : projectActivity(label, input.projectId, result?.id);
+      }
 
       case "create_tasks": {
         const count = Number(result?.createdCount ?? 0);
         if (!count) return null;
-        return projectActivity(`${count} görev eklendi`, input.projectId);
+        const label = `${count} görev eklendi`;
+        return input.departmentId
+          ? departmentActivity(label, input.departmentId)
+          : projectActivity(label, input.projectId);
       }
 
       case "add_budget_transaction":
@@ -2237,16 +2272,19 @@ export class AiAssistantService {
       case "update_task":
       case "update_task_status":
       case "add_task_comment": {
-        // Görevin hangi projede olduğu girdide yok; tek satırlık bir okuma ile
-        // bulunur. Model çağrısının yanında bu maliyet ihmal edilebilir.
-        const projectId = result?.projectId ?? (await this.getTaskOrThrow(input.taskId)).projectId;
+        // Görevin hangi projede/departmanda olduğu girdide yok; tek satırlık bir
+        // okuma ile bulunur. Model çağrısının yanında bu maliyet ihmal edilebilir.
+        const scope = await this.getTaskOrThrow(input.taskId);
+        const projectId = result?.projectId ?? scope.projectId;
         const label =
           toolName === "add_task_comment"
             ? "Göreve yorum eklendi"
             : toolName === "update_task_status"
               ? "Görev durumu değişti"
               : "Görev güncellendi";
-        return projectActivity(label, projectId, input.taskId);
+        return projectId
+          ? projectActivity(label, projectId, input.taskId)
+          : departmentActivity(label, scope.departmentId, input.taskId);
       }
 
       // Modül kaydı. Modül sayfasının yolu departman ya da iş üzerinden geçiyor
@@ -2486,15 +2524,54 @@ export class AiAssistantService {
     }
   }
 
-  private async getTaskOrThrow(taskId: string): Promise<{ id: string; projectId: string; title: string }> {
+  private async getTaskOrThrow(
+    taskId: string
+  ): Promise<{ id: string; projectId?: string; departmentId?: string; title: string }> {
     const { data, error } = await this.supabase.client
       .from("tasks")
-      .select("id, project_id, title")
+      .select("id, project_id, department_id, title")
       .eq("id", taskId)
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException("Görev bulunamadı.");
-    return { id: data.id, projectId: data.project_id, title: data.title };
+    return {
+      id: data.id,
+      projectId: data.project_id ?? undefined,
+      departmentId: data.department_id ?? undefined,
+      title: data.title,
+    };
+  }
+
+  /**
+   * Bir görev üzerinde işlem yetkisi.
+   *
+   * Görev projeye YA DA departmana ait olabiliyor (bkz. Task.departmentId).
+   * Yalnızca projeye bakan eski kontrol departman görevinde her zaman
+   * "bu proje üzerinde yetkin yok" diyordu — yanlış hem sonuç hem cümle.
+   *
+   * `manage` = arşivleme/silme: projede proje sahibi, departmanda yönetici
+   * (ya da organizasyon sahibi) demek.
+   */
+  private async requireTaskAccess(
+    task: { projectId?: string; departmentId?: string },
+    userId: string,
+    userRole: string,
+    manage = false
+  ): Promise<void> {
+    if (task.projectId) {
+      const allowed: ProjectMembershipRole[] = manage ? ["owner"] : ["owner", "member", "subcontractor"];
+      await this.requireProjectRole(task.projectId, userId, userRole, allowed);
+      return;
+    }
+    if (task.departmentId) {
+      if (userRole === "admin") return;
+      const access = await this.departmentsService.getAccess(task.departmentId, userId);
+      if (!access.canView || (manage && !access.canManage)) {
+        throw new ForbiddenException("Bu departman görevi üzerinde bu işlemi yapma yetkin yok.");
+      }
+      return;
+    }
+    throw new BadRequestException("Görevin bağlı olduğu proje ya da departman bulunamadı.");
   }
 
   private async safeLabel(fn: () => Promise<string>): Promise<string> {
@@ -2592,7 +2669,15 @@ export class AiAssistantService {
 
   // --- Birleşik sorgular ---------------------------------------------------
 
-  /** Kullanıcının erişebildiği tüm projelerdeki görevlerde arama/filtreleme yapar. */
+  /**
+   * Kullanıcının erişebildiği görevlerde arama/filtreleme yapar.
+   *
+   * PROJE görevleri kadar DEPARTMAN görevlerini de tarar: görev iki kaptan
+   * birinde yaşıyor (bkz. Task.departmentId) ve yalnızca projelere bakan bir
+   * arama, Lio'nun az önce departmana açtığı görevi bir daha bulamamasına yol
+   * açardı ("eklendi" dedikten sonra "böyle bir görev yok" demek).
+   * projectId verildiyse arama tek projeye kilitlenir, departmanlar taranmaz.
+   */
   private async searchTasks(userId: string, input: Record<string, any>): Promise<unknown> {
     const projects = input.projectId
       ? [await this.projectsService.findOne(input.projectId)]
@@ -2606,33 +2691,62 @@ export class AiAssistantService {
     const now = new Date();
     const collected: any[] = [];
 
+    const matches = (task: any): boolean => {
+      if (input.query && !task.title?.toLowerCase().includes(String(input.query).toLowerCase())) return false;
+      if (input.status && task.status !== input.status) return false;
+      if (input.assignedToMe && task.assignedTo !== userId) return false;
+
+      const deadline = task.deadline ? new Date(task.deadline) : null;
+      if (input.overdue && !(deadline && deadline < now && task.status !== "completed")) return false;
+      if (input.dueBefore && !(deadline && deadline <= new Date(input.dueBefore))) return false;
+      if (input.dueAfter && !(deadline && deadline >= new Date(input.dueAfter))) return false;
+      return true;
+    };
+
+    const collect = (task: any, scope: Record<string, unknown>) => {
+      const deadline = task.deadline ? new Date(task.deadline) : null;
+      collected.push(
+        pruneEmpty({
+          id: task.id,
+          title: task.title,
+          status: task.status,
+          deadline: shortDate(task.deadline),
+          assignee: task.assignedToName,
+          ...scope,
+          overdue: deadline && deadline < now && task.status !== "completed" ? true : undefined,
+        })
+      );
+    };
+
     for (const project of projects) {
       if (collected.length >= limit) break;
       // findByProject taşeron görünürlük kurallarını zaten uyguluyor.
       const tasks = await this.tasksService.findByProject(project.id, userId);
       for (const task of tasks) {
-        if (input.query && !task.title?.toLowerCase().includes(String(input.query).toLowerCase())) continue;
-        if (input.status && task.status !== input.status) continue;
-        if (input.assignedToMe && task.assignedTo !== userId) continue;
-
-        const deadline = task.deadline ? new Date(task.deadline) : null;
-        if (input.overdue && !(deadline && deadline < now && task.status !== "completed")) continue;
-        if (input.dueBefore && !(deadline && deadline <= new Date(input.dueBefore))) continue;
-        if (input.dueAfter && !(deadline && deadline >= new Date(input.dueAfter))) continue;
-
-        collected.push(
-          pruneEmpty({
-            id: task.id,
-            title: task.title,
-            status: task.status,
-            deadline: shortDate(task.deadline),
-            assignee: task.assignedToName,
-            project: project.title,
-            projectId: project.id,
-            overdue: deadline && deadline < now && task.status !== "completed" ? true : undefined,
-          })
-        );
+        if (!matches(task)) continue;
+        collect(task, { project: project.title, projectId: project.id });
         if (collected.length >= limit) break;
+      }
+    }
+
+    if (!input.projectId && collected.length < limit) {
+      const departments = await this.departmentsService.findAllForUser(userId);
+      for (const department of departments) {
+        if (collected.length >= limit) break;
+        // Kadroda olmayan bir departman listeye zaten gelmez; yine de görevleri
+        // okurken TasksService kendi denetimini yapıyor. Erişim reddi tüm aramayı
+        // düşürmemeli: o departman atlanır, kalanlar taranmaya devam eder.
+        let tasks: any[];
+        try {
+          tasks = await this.tasksService.findByDepartment(department.id, userId);
+        } catch {
+          continue;
+        }
+        for (const task of tasks) {
+          if (!matches(task)) continue;
+          collect(task, { department: department.name, departmentId: department.id });
+          if (collected.length >= limit) break;
+        }
       }
     }
 
@@ -2650,14 +2764,13 @@ export class AiAssistantService {
     let assignedOpen = 0;
     const overdueSamples: any[] = [];
 
-    for (const project of projects) {
-      const tasks = await this.tasksService.findByProject(project.id, userId);
+    const say = (tasks: any[], scope: Record<string, unknown>) => {
       for (const task of tasks) {
         if (task.status === "completed") continue;
         const deadline = task.deadline ? new Date(task.deadline) : null;
         // Çoklu atama (bkz. migration 053): birincil olmayan atananlar da sayılır.
         const assignedToMe = task.assignees?.length
-          ? task.assignees.some((a) => a.userId === userId)
+          ? task.assignees.some((a: any) => a.userId === userId)
           : task.assignedTo === userId;
         if (assignedToMe) assignedOpen++;
         if (deadline && deadline < now) {
@@ -2668,7 +2781,7 @@ export class AiAssistantService {
                 id: task.id,
                 title: task.title,
                 deadline: shortDate(task.deadline),
-                project: project.title,
+                ...scope,
                 assignee: task.assignedToName,
               })
             );
@@ -2676,6 +2789,23 @@ export class AiAssistantService {
         } else if (deadline && deadline <= weekLater) {
           dueThisWeek++;
         }
+      }
+    };
+
+    for (const project of projects) {
+      say(await this.tasksService.findByProject(project.id, userId), { project: project.title });
+    }
+
+    // Departman görevleri de özete girer: aksi halde kullanıcının işinin yarısı
+    // ("muhasebede 6 geciken görev") özet tablosunda hiç görünmez ve Lio eksik
+    // bir tabloya bakıp "gecikmen yok" der.
+    const departments = await this.departmentsService.findAllForUser(userId);
+    for (const department of departments) {
+      try {
+        say(await this.tasksService.findByDepartment(department.id, userId), { department: department.name });
+      } catch {
+        // Kadroda olmadığı için okunamayan departman özeti düşürmemeli.
+        continue;
       }
     }
 
@@ -2691,6 +2821,7 @@ export class AiAssistantService {
     return {
       projectCount: projects.length,
       activeProjectCount: projects.filter((p) => p.status === "active").length,
+      departmentCount: departments.length,
       overdueTaskCount: overdue,
       dueThisWeekCount: dueThisWeek,
       assignedToMeOpenCount: assignedOpen,
@@ -2724,6 +2855,45 @@ export class AiAssistantService {
           status: p.status,
           deadline: shortDate(p.deadline),
         }));
+      }
+
+      case "list_departments": {
+        const departments = input.organizationId
+          ? await this.departmentsService.findByOrganization(input.organizationId, userId)
+          : await this.departmentsService.findAllForUser(userId);
+        if (!departments.length) return [];
+        // Organizasyon adı departman kaydında yok, yalnızca id var. Model "hangi
+        // organizasyonun departmanı" bilgisini görmeli: kullanıcı çoğu zaman
+        // departmanı organizasyon adıyla anıyor ("şirketteki muhasebe").
+        const organizations = await this.organizationsService.findAllForUser(userId);
+        const orgNames = new Map(organizations.map((o) => [o.id, o.name]));
+        return departments.map((d) => ({
+          id: d.id,
+          name: d.name,
+          organizationId: d.organizationId,
+          organization: orgNames.get(d.organizationId),
+          memberCount: d.memberCount,
+        }));
+      }
+
+      case "list_department_members": {
+        // Kadroyu görme yetkisi DepartmentMembersService içinde uygulanıyor:
+        // yetkisi olmayan yalnızca kendini görür (bkz. canViewRoster).
+        const members = await this.departmentMembersService.findByDepartment(input.departmentId, userId);
+        return members
+          .filter((m) => m.userId && m.status === "approved")
+          .map((m) => ({
+            userId: m.userId,
+            name: m.fullName ?? m.username ?? m.email,
+            role: m.role,
+            title: m.title,
+          }));
+      }
+
+      case "list_department_tasks": {
+        await this.departmentsService.assertCanView(input.departmentId, userId);
+        const tasks = await this.tasksService.findByDepartment(input.departmentId, userId);
+        return tasks.map(compactTask);
       }
 
       case "get_project": {
@@ -2934,26 +3104,29 @@ export class AiAssistantService {
         return { success: true };
 
       case "create_task": {
-        await this.requireProjectRole(input.projectId, userId, userRole, ["owner", "member", "subcontractor"]);
-        return this.tasksService.create(
-          input.projectId,
-          {
-            title: input.title,
-            description: input.description,
-            deadline: input.deadline,
-            startDate: input.startDate,
-            assignedTo: input.assignedTo,
-            budget: input.budget,
-            parentTaskId: input.parentTaskId,
-            outputId: input.outputId,
-          },
-          userId
-        );
+        const target = taskTarget(input);
+        const data = {
+          title: input.title,
+          description: input.description,
+          deadline: input.deadline,
+          startDate: input.startDate,
+          assignedTo: input.assignedTo,
+          budget: input.budget,
+          parentTaskId: input.parentTaskId,
+          outputId: input.outputId,
+        };
+        if (target.departmentId) {
+          // Yetki DEPARTMAN kadrosuna göre; TasksService.createForDepartment
+          // kendi içinde denetliyor (org sahibi ya da onaylı kadro üyesi).
+          return this.tasksService.createForDepartment(target.departmentId, data, userId);
+        }
+        await this.requireProjectRole(target.projectId!, userId, userRole, ["owner", "member", "subcontractor"]);
+        return this.tasksService.create(target.projectId!, data, userId);
       }
 
       case "update_task": {
         const task = await this.getTaskOrThrow(input.taskId);
-        await this.requireProjectRole(task.projectId, userId, userRole, ["owner", "member", "subcontractor"]);
+        await this.requireTaskAccess(task, userId, userRole);
         return this.tasksService.update(
           input.taskId,
           {
@@ -2972,44 +3145,46 @@ export class AiAssistantService {
 
       case "update_task_status": {
         const task = await this.getTaskOrThrow(input.taskId);
-        await this.requireProjectRole(task.projectId, userId, userRole, ["owner", "member", "subcontractor"]);
+        await this.requireTaskAccess(task, userId, userRole);
         return this.tasksService.updateStatus(input.taskId, input.status, userId);
       }
 
       case "archive_task": {
         const task = await this.getTaskOrThrow(input.taskId);
-        await this.requireProjectRole(task.projectId, userId, userRole, ["owner"]);
+        await this.requireTaskAccess(task, userId, userRole, true);
         return this.tasksService.archive(input.taskId);
       }
 
       case "delete_task": {
         const task = await this.getTaskOrThrow(input.taskId);
-        await this.requireProjectRole(task.projectId, userId, userRole, ["owner"]);
+        await this.requireTaskAccess(task, userId, userRole, true);
         await this.tasksService.remove(input.taskId);
         return { success: true };
       }
 
       case "create_tasks": {
-        await this.requireProjectRole(input.projectId, userId, userRole, ["owner", "member", "subcontractor"]);
+        const target = taskTarget(input);
+        if (!target.departmentId) {
+          await this.requireProjectRole(target.projectId!, userId, userRole, ["owner", "member", "subcontractor"]);
+        }
         const items: any[] = Array.isArray(input.tasks) ? input.tasks : [];
         const created: unknown[] = [];
         const failed: unknown[] = [];
         for (const item of items) {
           try {
-            const task = await this.tasksService.create(
-              input.projectId,
-              {
-                title: item.title,
-                description: item.description,
-                deadline: item.deadline,
-                startDate: item.startDate,
-                assignedTo: item.assignedTo,
-                budget: item.budget,
-                parentTaskId: item.parentTaskId,
-                outputId: item.outputId,
-              },
-              userId
-            );
+            const data = {
+              title: item.title,
+              description: item.description,
+              deadline: item.deadline,
+              startDate: item.startDate,
+              assignedTo: item.assignedTo,
+              budget: item.budget,
+              parentTaskId: item.parentTaskId,
+              outputId: item.outputId,
+            };
+            const task = target.departmentId
+              ? await this.tasksService.createForDepartment(target.departmentId, data, userId)
+              : await this.tasksService.create(target.projectId!, data, userId);
             created.push(compactTask(task));
           } catch (err: any) {
             failed.push({ title: item?.title, error: err?.message ?? "bilinmeyen hata" });

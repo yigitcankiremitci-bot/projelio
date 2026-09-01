@@ -349,10 +349,50 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       required: ["projectId"],
     },
   },
+  // --- Organizasyon / departman -------------------------------------------
+  // Görev İKİ yere açılabilir: bir projeye ya da bir DEPARTMANA (bkz.
+  // Task.departmentId). Lio'nun uzun süre yalnızca proje araçları vardı;
+  // kullanıcı "departmanlara dağıt" dediğinde model departmanı hiç göremediği
+  // için işlerin altına yeni bir proje açıp bütün görevleri oraya yığıyordu.
+  // Departman KURMA/DÜZENLEME hâlâ kapsam dışı — yalnızca okuma ve görev.
+  {
+    name: "list_departments",
+    description:
+      "Kullanıcının görebildiği departmanları, bağlı oldukları organizasyonun adıyla birlikte listeler. " +
+      "Kullanıcı departmandan söz ettiğinde ya da \"görevleri departmanlara dağıt\" dediğinde ÖNCE bunu çağır: " +
+      "departman id'si buradan alınır. organizationId verilirse yalnızca o organizasyonun departmanları döner.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string", description: "Opsiyonel: tek bir organizasyonla sınırla." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "list_department_members",
+    description:
+      "Bir departmanın kadrosunu listeler (ad, unvan, rol, kullanıcı id'si). Departmandaki bir görevi kişiye " +
+      "atamadan önce doğru kullanıcı id'sini bulmak için kullan.",
+    input_schema: {
+      type: "object",
+      properties: { departmentId: { type: "string" } },
+      required: ["departmentId"],
+    },
+  },
+  {
+    name: "list_department_tasks",
+    description: "Bir departmandaki (arşivlenmemiş) görevleri listeler.",
+    input_schema: {
+      type: "object",
+      properties: { departmentId: { type: "string" } },
+      required: ["departmentId"],
+    },
+  },
   {
     name: "search_tasks",
     description:
-      "Kullanıcının erişebildiği tüm projelerde görev arar. Duruma, atanan kişiye, gecikmişliğe veya tarih aralığına göre filtreler. " +
+      "Kullanıcının erişebildiği tüm projelerde VE departmanlarda görev arar. Duruma, atanan kişiye, gecikmişliğe veya tarih aralığına göre filtreler. " +
       "\"Bu hafta neler var\", \"geciken işlerim\", \"bana atanmış görevler\" gibi sorular için bunu kullan.",
     input_schema: {
       type: "object",
@@ -463,11 +503,14 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   // --- Görev yazma araçları -----------------------------------------------
   {
     name: "create_task",
-    description: "Bir projede yeni görev (veya parentTaskId verilirse alt görev) oluşturur.",
+    description:
+      "Yeni görev (veya parentTaskId verilirse alt görev) oluşturur. Görev bir PROJEYE ya da bir DEPARTMANA " +
+      "açılır: projectId veya departmentId'den TAM OLARAK BİRİNİ ver. Departman id'sini list_departments verir.",
     input_schema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        projectId: { type: "string", description: "Görev bir projeye açılacaksa (departmentId ile birlikte verme)" },
+        departmentId: { type: "string", description: "Görev bir departmana açılacaksa (projectId ile birlikte verme)" },
         title: { type: "string" },
         description: { type: "string" },
         deadline: { type: "string", description: "ISO tarih/saat" },
@@ -477,7 +520,9 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         parentTaskId: { type: "string", description: "Alt görev oluşturmak için üst görev id'si (opsiyonel)" },
         outputId: { type: "string", description: "Görevi bir çıktıya bağlar (opsiyonel)" },
       },
-      required: ["projectId", "title", "deadline"],
+      // projectId ŞEMADA zorunlu değil çünkü departman görevlerinde hiç verilmez;
+      // "ikisinden tam olarak biri" kuralı araç çalıştırılırken denetlenir.
+      required: ["title", "deadline"],
     },
   },
   {
@@ -527,12 +572,15 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "create_tasks",
     description:
-      "Bir projede BİRDEN FAZLA görevi tek seferde oluşturur. Kullanıcı \"şu projeye şu N görevi ekle\" dediğinde " +
-      "her görev için ayrı ayrı create_task çağırmak yerine bunu bir kez çağır (daha az tur = daha az kredi).",
+      "BİR projede ya da BİR departmanda birden fazla görevi tek seferde oluşturur. Kullanıcı \"şu projeye şu N " +
+      "görevi ekle\" dediğinde her görev için ayrı ayrı create_task çağırmak yerine bunu bir kez çağır " +
+      "(daha az tur = daha az kredi). projectId veya departmentId'den TAM OLARAK BİRİNİ ver; hepsi aynı yere açılır. " +
+      "Görevler farklı departmanlara dağıtılacaksa her departman için bu aracı AYRI çağır.",
     input_schema: {
       type: "object",
       properties: {
-        projectId: { type: "string" },
+        projectId: { type: "string", description: "Görevler bir projeye açılacaksa (departmentId ile birlikte verme)" },
+        departmentId: { type: "string", description: "Görevler bir departmana açılacaksa (projectId ile birlikte verme)" },
         tasks: {
           type: "array",
           // maxItems ŞEMADA zorunlu tutuluyor, yalnızca promptta öğütlenmiyor:
@@ -559,7 +607,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
           },
         },
       },
-      required: ["projectId", "tasks"],
+      required: ["tasks"],
     },
   },
 

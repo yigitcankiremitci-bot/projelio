@@ -24,6 +24,8 @@ import { CloudStorageModule } from "../cloud-storage/cloud-storage.module";
 import { RealtimeModule } from "../realtime/realtime.module";
 import { CatalogModule } from "../catalog/catalog.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { DepartmentsModule } from "../departments/departments.module";
+import { DepartmentMembersModule } from "../department-members/department-members.module";
 import { OrganizationModulesModule } from "../organization-modules/organization-modules.module";
 import { JobModulesModule } from "../job-modules/job-modules.module";
 import { ModuleRecordsModule } from "../module-records/module-records.module";
@@ -61,6 +63,10 @@ import { ModuleRecordsModule } from "../module-records/module-records.module";
     // ise kullanıcının hangi organizasyonlarda olduğunu söylüyor.
     CatalogModule,
     OrganizationsModule,
+    // Departman araçları: görev bir projeye ya da bir departmana açılabiliyor.
+    // Departmanı listelemek, kadrosunu görmek ve görevlerini yönetmek için.
+    DepartmentsModule,
+    DepartmentMembersModule,
     OrganizationModulesModule,
     JobModulesModule,
     ModuleRecordsModule,

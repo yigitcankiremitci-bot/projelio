@@ -115,6 +115,26 @@ api.projelio.app {
 	}
 }
 
+# --------------------------------------------------------- Yerel geliştirme
+# http://caddy bloğunun ana bilgisayar adı ŞARTI OLMAYAN ikizi. Neden gerekli:
+# SSH tünelinin ucundaki istemci "Host: localhost" yolluyor, o yüzden yukarıdaki
+# http://caddy bloğuna düşmüyor.
+#
+# GÜVENLİK: bu port compose'da yalnızca 127.0.0.1'e yayımlanıyor
+# (127.0.0.1:8081:8081), yani internetten erişilemez. Tek yolu SSH tüneli,
+# o da tailnet üzerinden. /rest/v1'in internete kapalı olması bozulmuyor.
+:8081 {
+	handle_path /rest/v1/* {
+		reverse_proxy postgrest:3000
+	}
+	handle_path /storage/v1/* {
+		reverse_proxy storage:5000
+	}
+	handle {
+		reverse_proxy backend:3000
+	}
+}
+
 # ------------------------------------------------------------------ İç ağ
 # Backend'in supabase-js istemcisi bu adresi kullanıyor (SUPABASE_URL).
 # http:// öneki açık: iç ağda TLS aranmasın, Caddy buraya sertifika almasın.

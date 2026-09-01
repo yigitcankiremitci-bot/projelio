@@ -310,7 +310,9 @@ services:
         condition: service_healthy
     # 443 TLS için, 80 hem yönlendirme hem Let's Encrypt HTTP-01 doğrulaması
     # için açık kalmalı — 80 kapatılırsa sertifika YENİLENEMEZ.
-    ports: ["80:80", "443:443"]
+    # 8081 yalnızca 127.0.0.1'e bağlı: yerel geliştirmenin SSH tüneli için,
+    # internete kapalı (bkz. Caddyfile'daki :8081 bloğu).
+    ports: ["80:80", "443:443", "127.0.0.1:8081:8081"]
     volumes:
       # Sertifika deposu. Kalıcı olmazsa her dağıtımda yeni sertifika istenir
       # ve Let's Encrypt'in haftalık limitine (alan adı başına 5) takılırız —

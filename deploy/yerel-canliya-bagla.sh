@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 # yerel-canliya-bagla.sh — yerel geliştirmeyi CANLI veritabanına bağlar/ayırır.
 #
-# NE YAPIYOR: backend/.env içindeki iki satırı değiştiriyor —
-#   SUPABASE_URL              -> https://api.projelio.app  (VPS)
+# NE YAPIYOR: backend/.env içindeki üç satırı değiştiriyor —
+#   SUPABASE_URL              -> http://localhost:8081   (SSH tüneli)
 #   SUPABASE_SERVICE_ROLE_KEY -> VPS'in kendi anahtarı
+#   PUBLIC_STORAGE_URL        -> https://api.projelio.app
 # Anahtar sunucudan alınıp doğrudan dosyaya yazılır; ekrana BASILMAZ.
+#
+# NEDEN TÜNEL: veritabanı arayüzü (/rest/v1) internete BİLEREK kapalı
+# (bkz. deploy/Caddyfile). Dışarı açmak, hiçbir tarayıcının ihtiyaç duymadığı
+# bir kapıyı internete koymak olurdu. Tünel, o kapıyı yalnızca senin
+# bilgisayarına açar.
+#
+# NEDEN PUBLIC_STORAGE_URL AYRI: görsellerin adresini tarayıcı çözecek,
+# tarayıcı da tünelin içini görmez. Kapak ve avatarlar genel adresten gelmeli,
+# yoksa hepsi kırık çıkar.
 #
 # NEDEN GEREKLİ: yerel .env eski Supabase projesini gösteriyordu. Oradaki veri
 # 30 Ağustos'ta donmuş bir kopya ve VPS'e uygulanan migration'lar orada yok —
@@ -59,11 +69,13 @@ def ayarla(metin, ad, deger):
         return re.sub(rf"(?m)^{ad}=.*$", satir, metin, count=1)
     return metin.rstrip("\n") + "\n" + satir + "\n"
 
-s = ayarla(s, "SUPABASE_URL", "https://api.projelio.app")
+s = ayarla(s, "SUPABASE_URL", "http://localhost:8081")
+s = ayarla(s, "PUBLIC_STORAGE_URL", "https://api.projelio.app")
 s = ayarla(s, "SUPABASE_SERVICE_ROLE_KEY", anahtar)
 open(yol, "w").write(s)
 PY
 
-echo "✓ Yerel backend artık CANLI veritabanına bağlı."
+echo "✓ Yerel backend artık CANLI veritabanına bağlı (tünel üzerinden)."
+echo "  Çalıştırmak için:  npm run dev:canli   (tüneli kendisi açar)"
 echo "  Yaptığın her değişiklik gerçek veriye gider. Geri dönmek için:"
 echo "    ./deploy/yerel-canliya-bagla.sh --geri"

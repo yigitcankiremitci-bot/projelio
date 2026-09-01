@@ -411,8 +411,7 @@ export class AiAttachmentsService {
         break;
 
       case "document": {
-        const { value } = await mammoth.extractRawText({ buffer });
-        record.text = this.clip(value.trim());
+        record.text = this.clip(await this.readDocument(buffer, name));
         record.detail = `Word · ${this.wordCount(record.text)} kelime`;
         break;
       }
@@ -522,7 +521,18 @@ export class AiAttachmentsService {
     }
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer as any);
+    try {
+      await workbook.xlsx.load(buffer as any);
+    } catch (error) {
+      // ExcelJS her xlsx'i açamıyor. Açamadığında da düzgün bir hata atmıyor:
+      // `xl/workbook.xml`'i ayrıştıramadığında geriye `undefined` dönüyor ve
+      // kütüphane kendi içinde "Cannot read properties of undefined (reading
+      // 'sheets')" diye patlıyor (canlıda görüldü). Ham TypeError genel hata
+      // filtresine düşüp kullanıcıya "Beklenmeyen bir hata oluştu" dedirtiyordu:
+      // ne olduğu da, ne yapacağı da belirsiz. Sebep dosyanın kendisi, sunucu
+      // değil — bu yüzden 400 ve yapılabilir bir öneri döner.
+      throw this.okunamadi("Excel", name, buffer.length, error);
+    }
 
     const lines: string[] = [];
     let totalRows = 0;
@@ -551,6 +561,42 @@ export class AiAttachmentsService {
       text: this.clip(lines.join("\n").trim()),
       detail: `Excel · ${sheetCount} sayfa · ${totalRows} satır`,
     };
+  }
+
+  /**
+   * Word metnini çıkarır.
+   *
+   * mammoth bozuk ya da .docx sanılan (ör. adı değiştirilmiş) bir dosyada ham
+   * hata fırlatıyor; readSheet'teki gerekçeyle burada da anlamlı bir 400'e çevrilir.
+   */
+  private async readDocument(buffer: Buffer, name: string): Promise<string> {
+    try {
+      const { value } = await mammoth.extractRawText({ buffer });
+      return value.trim();
+    } catch (error) {
+      throw this.okunamadi("Word", name, buffer.length, error);
+    }
+  }
+
+  /**
+   * Ayrıştırılamayan dosya için kullanıcıya dönecek hata.
+   *
+   * Asıl teknik sebep YALNIZCA log'a yazılır: kullanıcıya faydası yok, ama aynı
+   * dosya bir daha geldiğinde sebebi aramak yerine log'dan okumak gerekiyor
+   * (bu hata ilk kez "Beklenmeyen bir hata oluştu" olarak geldiğinde sebebi
+   * bulmak sunucu log'una bakmayı gerektirdi).
+   */
+  private okunamadi(tur: string, name: string, bytes: number, error: unknown): BadRequestException {
+    this.logger.warn(
+      `${tur} dosyası okunamadı · ad=${name} boyut=${bytes} · ${
+        error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      }`
+    );
+    return new BadRequestException(
+      `"${name}" bir ${tur} dosyası olarak açılamadı — içeriği bozuk ya da bu biçimi okuyamıyorum. ` +
+        `Dosyayı ${tur === "Excel" ? "Excel ya da Google E-Tablolar'da açıp .xlsx" : "Word'de açıp .docx"} ` +
+        `olarak yeniden kaydedip tekrar dene.`
+    );
   }
 
   private clip(text: string): string {

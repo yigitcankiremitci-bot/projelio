@@ -1,0 +1,13 @@
+[Unit]
+Description=Projelio günlük yedek zamanlayıcısı
+
+[Timer]
+# Gecenin en sakin saati; RandomizedDelaySec yedeği CI/CD kontrolüyle aynı
+# saniyeye denk getirmesin diye var.
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=5min
+# Sunucu o saatte kapalıydıysa açılışta telafi edilir — atlanan gün olmasın.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

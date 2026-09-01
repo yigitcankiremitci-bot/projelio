@@ -1,0 +1,14 @@
+[Unit]
+Description=Projelio günlük yedek (veritabanı + yüklenen dosyalar)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/projelio/deploy/yedekle.sh
+# Yedek, canlı trafiğin önüne geçmesin: düşük öncelikli çalışır.
+Nice=15
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

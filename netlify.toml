@@ -9,6 +9,13 @@
 # API adresi yanlış olan (askıya alınmış Render'ı gösteren) bir paket çıkardı.
 
 [build]
+  # Her push'ta yeniden derlemenin karşılığı yok: çıktı her seferinde AYNI
+  # sabit yönlendirme sayfası. ignore komutu 0 dönünce Netlify derlemeyi iptal
+  # edip önceki yayını olduğu gibi bırakıyor — yönlendirme çalışmaya devam
+  # ediyor, derleme dakikası (kredi) harcanmıyor.
+  # Yeniden derlemek gerekirse bu satırı geçici olarak kaldır.
+  ignore = "exit 0"
+
   command = "mkdir -p yonlendirme && printf '%s' '<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=\"0;url=https://app.projelio.app\"><title>Projelio taşındı</title><p>Projelio yeni adresine taşındı: <a href=\"https://app.projelio.app\">app.projelio.app</a>' > yonlendirme/index.html"
   publish = "yonlendirme"
 

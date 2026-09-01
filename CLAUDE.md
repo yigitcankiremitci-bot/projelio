@@ -42,7 +42,25 @@ npm run dev          # backend + web birlikte (concurrently)
 npm test             # tüm testler
 npm test -- --filter=access   # yalnızca eşleşen testler
 npm run typecheck    # backend + web tsc --noEmit
+npm run yayinla      # kontrol et + onay al + push'la + yayını izle
 ```
+
+## Yayın nasıl oluyor (yerelde çalış, sonra yayınla)
+
+**Canlıya çıkmanın tek yolu main'in origin'e push'lanmasıdır.** Dosya kaydetmek,
+commit atmak, dal açmak canlıya hiçbir şey göndermez — istediğin kadar birikir.
+
+Push'landıktan sonra zincir kendi işler: GitHub Actions `ci.yml` koşar → VPS'teki
+`projelio-deploy.timer` dakikada bir bakar, **yalnızca CI'ı yeşil olan** commit'i
+alır, imajları derleyip `docker compose up -d` yapar.
+
+Kritik ayrıntı: **CI kırmızıysa hiçbir yerde hata görünmez**, zamanlayıcı
+sessizce hiçbir şey yapmaz ve canlı eski hâlinde kalır. Bu yüzden push'u
+doğrudan atmak yerine `npm run yayinla` (bkz. `deploy/yayinla.sh`) kullan:
+commit'lenmemiş dosya var mı bakar, CI'ın koşacağı typecheck + testleri yerelde
+koşar, ne gideceğini gösterip onay ister, sonra CI ve dağıtımı izler.
+
+Migration'lar bu zincire DAHİL DEĞİL — hâlâ elle uygulanıyor (bkz. aşağıda).
 
 Değişiklik sonrası **her zaman `npm run typecheck` çalıştır.** Tüm test setini
 değil, dokunduğun alanın testlerini `--filter` ile koştur.

@@ -210,6 +210,48 @@ services:
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET}
       PGRST_SERVER_PORT: 3000
+
+      # HAVUZDAKİ BAĞLANTILAR SICAK KALSIN. PostgREST'in varsayılanı 30 sn:
+      # bu kadar süre kullanılmayan havuz bağlantısını kapatıyor, sonraki
+      # sorgu da yenisini açtırıyor. Bu sunucuda YENİ BİR POSTGRES BAĞLANTISI
+      # ~27 ms sürüyor — sorgunun kendisi 0,03 ms.
+      #
+      # Ölçüm (2026-09-01, ayrı bir PostgREST konteynerinde, Server-Timing
+      # açık, 40 sn arayla tek tek istek):
+      #   varsayılan 30 sn : 28,6 / 32,3 / 27,7 ms  (transaction 27,2 / 31,1 / 26,2)
+      #   bu satırla       : 7,0 / 2,3 / 3,2 / 2,5 / 4,1 ms
+      # Gecikmenin tamamı `transaction` diliminde, yani bağlantı edinmede;
+      # jwt/parse/plan/response hepsi 0,0-0,1 ms ve pg_stat_statements aynı
+      # sorgu için mean_exec_time 0,027 ms gösteriyor.
+      #
+      # NEDEN BU KADAR SIK OLUYORDU: trafik seyrek. access.service.ts istek
+      # başına ~10 ardışık sorgu atıyor; iki kullanıcı hareketi arasında 30 sn
+      # geçmesi yetiyordu ve havuz boşalmış oluyordu, sonraki hareket bedeli
+      # sorgu sorgu yeniden ödüyordu.
+      #
+      # 27 MS NEREYE GİDİYOR (pgbench ile, aynı makinede tek kullanımlık bir
+      # Postgres üzerinde ayrıştırıldı):
+      #   sıcak bağlantıda sorgu              0,08 ms
+      #   yeniden bağlan, soket + trust       5,9 ms   (yalnız backend fork)
+      #   yeniden bağlan, TCP + scram-sha-256 20,1 ms
+      # Yani ağır basan kalem SCRAM el sıkışması (~14 ms) — 4096 turluk PBKDF2
+      # bu vCPU'da bu kadar tutuyor. Canlı Postgres'te soket üzerinden yeniden
+      # bağlanma 7,8 ms ölçüldü; üstüne TCP+SCRAM ve PostgREST'in oturum
+      # hazırlığı binince ~27 ms çıkıyor.
+      #
+      # ÇÖZÜM NEDEN "BAĞLANTIYI AÇIK TUT": SCRAM'i ucuzlatmanın yolu kimlik
+      # doğrulamayı zayıflatmaktan geçer, huge_pages ise yalnızca fork'un
+      # 5,9 ms'sine dokunur. Bedeli hiç ödememek en ucuzu.
+      #
+      # AYRICA: bu, "Caddy üzerinden gitmek yavaş" diye görünen şeyin gerçek
+      # sebebiydi — Caddy suçsuz. Havuz sıcakken dönüşümlü ölçüldü (2 koşu ×
+      # 8 örnek): caddy üzerinden ortalama 3,3 ve 4,4 ms, doğrudan PostgREST
+      # 3,0 ve 2,9 ms. Yani hop'un bedeli sorgu başına 0,3-1,5 ms.
+      #
+      # Bağlantılar yine de sonsuza kadar yaşamıyor: db-pool-max-lifetime
+      # varsayılanı 1800 sn ve ona dokunulmadı — her bağlantı yarım saatte bir
+      # yenileniyor, yani sızan bir oturum durumu birikemez.
+      PGRST_DB_POOL_MAX_IDLETIME: 1800
     healthcheck:
       test: ["CMD", "postgrest", "--version"]
       interval: 10s

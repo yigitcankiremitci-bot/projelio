@@ -296,7 +296,16 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       CONTACT_TO: ${CONTACT_TO:-info@projelio.app}
       CONTACT_FROM: ${CONTACT_FROM:-Projelio <onboarding@resend.dev>}
-    ports: ["3001:3001"]
+    # SADECE LOOPBACK. Docker yayınlanan portlar için kendi iptables kurallarını
+    # ufw'nin ÖNÜNE koyar, yani "3001:3001" yazmak güvenlik duvarını devre dışı
+    # bırakıp Next.js sunucusunu doğrudan internete açıyordu (ölçüldü: dışarıdan
+    # 193.111.77.252:3001 yanıt veriyordu — TLS yok, güvenlik başlığı yok,
+    # Caddy'nin sağladığı hiçbir koruma yok).
+    #
+    # Dağıtım betiğinin sağlık kontrolü sunucunun kendisinden çağırdığı için
+    # etkilenmiyor; landing ileride Caddy'nin arkasına alındığında da Caddy ona
+    # docker ağı üzerinden (landing:3001) ulaşacak, host portuna ihtiyaç yok.
+    ports: ["127.0.0.1:3001:3001"]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s

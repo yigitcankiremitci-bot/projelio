@@ -128,3 +128,22 @@ create index if not exists social_credential_views_credential_idx
   on public.social_credential_views(credential_id, viewed_at desc);
 
 alter table public.social_credential_views enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- 4) anon/authenticated yetkilerinin geri alınması
+-- ---------------------------------------------------------------------------
+-- NEDEN AÇIKÇA YAZILIYOR: 062 varsayılan yetkileri `postgres` rolü adına
+-- kapatıyor, ama bu migration `supabase_admin` olarak çalıştırılırsa Supabase'in
+-- o rol için tanımladığı varsayılanlar devreye giriyor ve tablolar anon'a AÇIK
+-- doğuyor. Ölçülerek görüldü: 076 uygulandıktan sonra
+-- scripts/db-izin-denetimi.sql üç tabloyu da "anon/auth yetkisi kalan" diye
+-- raporladı.
+--
+-- Bugün tek başına sızıntı değil — RLS açık ve politika yok, yani her şey
+-- reddediliyor. Ama bu tablolar PAROLA tutuyor: koruma tek katmana
+-- indirgenmemeli. İleride biri politika eklerse ya da RLS'i kapatırsa,
+-- yetkinin de kapalı olması aradaki fark olur.
+
+revoke all on public.social_account_credentials from anon, authenticated;
+revoke all on public.social_credential_grants    from anon, authenticated;
+revoke all on public.social_credential_views     from anon, authenticated;

@@ -35,7 +35,11 @@ export class SupabaseService implements OnModuleInit {
       },
     });
 
-    this.logger.log("Supabase bağlantısı kuruldu");
+    // Adres bilerek yazılıyor: "Supabase bağlantısı kuruldu" cümlesi göçten
+    // sonra yanıltıcı hâle geldi — istemci hâlâ supabase-js ama karşı taraf
+    // Supabase değil, kendi sunucumuz. Asıl merak edilen zaten HANGİ
+    // veritabanına bağlanıldığı: canlı mı, eski Supabase kopyası mı?
+    this.logger.log(`Veritabanı bağlantısı kuruldu · ${new URL(url).host}`);
   }
 
   /**

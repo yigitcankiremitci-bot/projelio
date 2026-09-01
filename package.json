@@ -7,7 +7,9 @@
     "packages/*"
   ],
   "scripts": {
+    "predev": "node scripts/portu-bosalt.mjs",
     "dev": "concurrently -n backend,web -c blue,green \"npm run start:dev --workspace=backend\" \"npm run dev --workspace=@projelio/web\"",
+    "predev:canli": "node scripts/portu-bosalt.mjs",
     "dev:canli": "concurrently -n tunel,backend,web -c yellow,blue,green \"ssh -N -L 8081:127.0.0.1:8081 projelio@100.111.242.24\" \"npm run start:dev --workspace=backend\" \"npm run dev --workspace=@projelio/web\"",
     "yayinla": "bash deploy/yayinla.sh",
     "test": "node scripts/run-tests.mjs",

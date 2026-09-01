@@ -23,8 +23,10 @@
 #      varsayılan yol budur.
 #        ssh projelio@100.111.242.24
 #        ( crontab -l 2>/dev/null | grep -v yedekle.sh; \
-#          echo '30 3 * * * /srv/projelio/deploy/yedekle.sh >> $HOME/yedek/son.log 2>&1' \
+#          echo '30 3 * * * /srv/projelio/deploy/yedekle.sh >> $HOME/yedekleme.log 2>&1' \
 #        ) | crontab -
+#      Günlük dosyası ev dizinine yazılır, alt dizine DEĞİL: yönlendirme
+#      betikten önce çalışır, dizin yoksa cron işi sessizce hiç koşmaz.
 #        /srv/projelio/deploy/yedekle.sh        # ilk yedeği hemen al
 #
 #   B) root varsa: systemd birimi daha iyidir (journal'a yazar, Persistent=true

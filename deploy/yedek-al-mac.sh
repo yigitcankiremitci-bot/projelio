@@ -34,8 +34,26 @@ gecici="$HEDEF/.yaziliyor-$damga.dump"
 
 mv "$gecici" "$HEDEF/db-$damga.dump"
 
+# --- Yüklenen dosyalar --------------------------------------------------------
+# Kapaklar, avatarlar, ekler. Veritabanı bunlara yalnızca YOL tutuyor; dosyalar
+# giderse kayıtlar kırık bağlantıya döner. O yüzden ikisi birlikte alınıyor.
+#
+# tar konteynerin içinde çalışıyor (dosyalar host'ta root'un), sıkıştırma ise
+# burada: konteynerde gzip olmayabilir, Mac'te her zaman var.
+depo_gecici="$HEDEF/.yaziliyor-$damga.tar.gz"
+if "${SSH[@]}" "$SUNUCU" 'docker exec projelio-storage tar -cf - -C /var/lib storage' \
+     2>/dev/null | gzip > "$depo_gecici" && [ -s "$depo_gecici" ] \
+     && tar -tzf "$depo_gecici" > /dev/null 2>&1; then
+  mv "$depo_gecici" "$HEDEF/dosyalar-$damga.tar.gz"
+  depo_satir=" · dosyalar-$damga.tar.gz ($(du -h "$HEDEF/dosyalar-$damga.tar.gz" | cut -f1))"
+else
+  rm -f "$depo_gecici"
+  depo_satir=" · UYARI: yüklenen dosyalar alınamadı"
+fi
+
 # Eskiyenleri temizle (yarım kalmışları da).
 find "$HEDEF" -name 'db-*.dump' -mtime "+$SAKLAMA" -delete
+find "$HEDEF" -name 'dosyalar-*.tar.gz' -mtime "+$SAKLAMA" -delete
 find "$HEDEF" -name '.yaziliyor-*' -mtime +1 -delete
 
-echo "$(date '+%Y-%m-%d %H:%M')  yedek tamam: db-$damga.dump ($(du -h "$HEDEF/db-$damga.dump" | cut -f1)) · toplam $(ls -1 "$HEDEF"/db-*.dump | wc -l | tr -d ' ') yedek"
+echo "$(date '+%Y-%m-%d %H:%M')  yedek tamam: db-$damga.dump ($(du -h "$HEDEF/db-$damga.dump" | cut -f1))$depo_satir"

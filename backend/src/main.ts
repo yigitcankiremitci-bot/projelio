@@ -49,6 +49,18 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 async function bootstrap() {
   const logger = bootstrapLogger;
 
+  // Yerelde çalışırken CANLI veritabanına bağlıysan bunu bilmelisin: buradaki
+  // her kayıt, silme ve düzenleme gerçek kullanıcıların verisine gider. Uyarı
+  // bilerek gürültülü — sessiz olsaydı bir gün "test ediyorum" diye silinen
+  // şey gerçek olurdu. Geri dönüş: ./deploy/yerel-canliya-bagla.sh --geri
+  const veritabani = process.env.SUPABASE_URL?.trim() ?? "";
+  if (process.env.NODE_ENV !== "production" && veritabani.includes("api.projelio.app")) {
+    logger.warn("=".repeat(64));
+    logger.warn("DİKKAT: Yerel sunucu CANLI veritabanına bağlı (api.projelio.app).");
+    logger.warn("Yaptığın her değişiklik gerçek veriye gider. Yedek: ~/Projelio-yedek");
+    logger.warn("=".repeat(64));
+  }
+
   if (process.env.ANTHROPIC_API_KEY?.trim()) {
     logger.log(`Projelio AI etkin · model=${process.env.ANTHROPIC_MODEL?.trim() || "claude-haiku-4-5-20251001"}`);
   } else {

@@ -188,35 +188,46 @@ reviewIntervalMonths: 6
 ### 6.3 `pd_marka_kimligi`
 
 `kimlik_ve_yon` içeriye bakar (neden varız, nereye gidiyoruz); bu modül dışarıya
-bakar (ne vaat ediyoruz, nasıl konuşuyoruz, nasıl görünüyoruz). Konumlandırma
-cümlesi bilerek yalnızca `kimlik_ve_yon`'da durur — iki yerde yazılan cümle er
-geç birbirini tutmaz.
+bakar (nerede yarışıyoruz, ne vaat ediyoruz, nasıl konuşuyoruz, neye benziyoruz).
+Vizyon/misyon burada tekrarlanmaz. Tescil süreci `hud_marka_patent_telif`'te,
+persona `pd_hedef_kitle`'de, rakip kartı `pd_rakip_sektor_analizi`'nde kalır —
+buradaki karşılıkları özet değil, marka kararının kendisidir (tek hedef, tek
+cümle, son durum).
 
 ```
 scope: organization
-groups: oz (Öz) · ses (Ses ve dil) · gorunum (Görünüm) · durum (Durum)
-approvalRequires: promise, tone
+groups: konum · oz · kisilik · ses · isim · gorunum · temas · koruma · durum
+approvalRequires: category, promise, tone_formality
 reviewIntervalMonths: 12
-templates: kurumsal, perakende
+templates: hizmet, perakende, uretim
 ```
 
-| key | label | tip | bölüm | not |
-|---|---|---|---|---|
-| `brand_name` | Marka adı | `text` | oz | Organizasyon adından farklı olabilir |
-| `promise` | Marka vaadi | `longtext` | oz | Ürünü değil sonucu anlatır |
-| `tagline` | Slogan | `text` | oz | Zorunlu değil |
-| `personality` | Marka kişiliği | `tags` | oz | 3–5 sıfat |
-| `tone` | Ton | `select` | ses | Sosyal medya hesabının "marka sesi" alanını besler |
-| `voice_rules` | Dil kuralları | `longtext` | ses | Sen/siz, emoji, terim |
-| `avoid` | Kaçınılan sözler | `tags` | ses | |
-| `boilerplate` | Kısa tanıtım metni | `longtext` | ses | Teklif, imza, profil biyografisi |
-| `primary_color` · `secondary_colors` | Renkler | `text` · `tags` | gorunum | HEX kodu — renk adı baskıda tutmaz |
-| `typography` · `logo_usage` · `imagery` | Görsel kurallar | `text` · `longtext` | gorunum | |
-| `guideline_url` | Marka kılavuzu bağlantısı | `text` | gorunum | Dosyalar'daki bağlantı |
-| `status` · `effective_from` · `review_at` · `notes` | — | durum | |
+Bir marka dokümanı en az üç soruya cevap vermeli — onay için gerekli üç alan
+bunlar: **nerede yarışıyoruz** (`category`), **ne vaat ediyoruz** (`promise`),
+**nasıl konuşuyoruz** (`tone_formality`).
 
-Katalog kaydı ve tek kayıt kısıtı: migration `078`. Mevcut organizasyonlarda
-otomatik açılmaz.
+| Bölüm | Alanlar |
+|---|---|
+| konum | `brand_name` · `category` · `primary_audience` · `not_for` · `alternatives` (tags) |
+| oz | `promise` · `differentiator` · `reasons_to_believe` (tags) |
+| kisilik | `archetype` (12 arketip) · `personality` (tags) · `human_reference` |
+| ses | `tone_formality` · `tone_humor` · `tone_boldness` (üç kaydırıcı, 5 kademe) · `voice_rules` · `say_this` · `avoid` · `boilerplate` |
+| isim | `tagline` · `spelling` · `naming_rule` |
+| gorunum | `primary_color` · `secondary_colors` · `color_rule` · `typography` · `logo_usage` · `logo_donts` · `imagery` · `guideline_url` |
+| temas | `touchpoints` (multiselect, 12 kanal) · `signature_element` |
+| koruma | `trademark_status` · `domains` · `handles` |
+| durum | `brand_owner` (user_ref) · `effective_from` · `review_at` · `status` · `notes` |
+
+37 alan, ama okuma görünümü boş alanları gizler: doküman kullanıcının
+doldurduğu kadar uzundur. Üç şablon boş sayfayı kaldırmak için var; hepsi
+taslak olarak yüklenir.
+
+Tek "ton" seçimi yerine üç kaydırıcı kullanılmasının sebebi: "profesyonel"
+diyen iki kişi iki farklı metin yazıyor. Kaydırıcı, metni yazarken bakılacak
+somut bir ayardır.
+
+Katalog kaydı ve tek kayıt kısıtı: migration `078`, açıklama `079`. Mevcut
+organizasyonlarda otomatik açılmaz.
 
 ---
 

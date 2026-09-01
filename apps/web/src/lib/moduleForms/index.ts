@@ -1,4 +1,5 @@
 import { kimlikVeYonConfig } from "./kimlikVeYon";
+import { markaKimligiConfig } from "./markaKimligi";
 import type { ModuleFormConfig } from "./types";
 import { urunStratejileriConfig } from "./urunStratejileri";
 
@@ -18,6 +19,7 @@ export const MODULE_FORM_CONFIGS: Record<string, ModuleFormConfig> = {
   kimlik_ve_yon: kimlikVeYonConfig,
 
   // PAZARLAMA ve BÜYÜME
+  pd_marka_kimligi: markaKimligiConfig,
   pd_urun_stratejileri: urunStratejileriConfig,
 };
 

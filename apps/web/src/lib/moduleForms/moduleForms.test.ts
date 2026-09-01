@@ -116,6 +116,10 @@ describe("konfigürasyon tutarlılığı", () => {
 
   test("isFormModule yalnızca kayıtlı anahtarlar için doğru", () => {
     assert.equal(isFormModule("kimlik_ve_yon"), true);
+    assert.equal(isFormModule("pd_marka_kimligi"), true);
     assert.equal(isFormModule("fm_gelir_gider"), false);
+    // Hukuk'un tescil modülü marka kimliği DEĞİL: adı benzediği için sık
+    // karıştırılıyor, A2 kayıt defteri olarak kalıyor.
+    assert.equal(isFormModule("hud_marka_patent_telif"), false);
   });
 });

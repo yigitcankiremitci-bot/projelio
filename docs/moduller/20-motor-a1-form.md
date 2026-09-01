@@ -185,6 +185,39 @@ reviewIntervalMonths: 6
 
 Ürün silinirse strateji kaydı arşivlenir, silinmez.
 
+### 6.3 `pd_marka_kimligi`
+
+`kimlik_ve_yon` içeriye bakar (neden varız, nereye gidiyoruz); bu modül dışarıya
+bakar (ne vaat ediyoruz, nasıl konuşuyoruz, nasıl görünüyoruz). Konumlandırma
+cümlesi bilerek yalnızca `kimlik_ve_yon`'da durur — iki yerde yazılan cümle er
+geç birbirini tutmaz.
+
+```
+scope: organization
+groups: oz (Öz) · ses (Ses ve dil) · gorunum (Görünüm) · durum (Durum)
+approvalRequires: promise, tone
+reviewIntervalMonths: 12
+templates: kurumsal, perakende
+```
+
+| key | label | tip | bölüm | not |
+|---|---|---|---|---|
+| `brand_name` | Marka adı | `text` | oz | Organizasyon adından farklı olabilir |
+| `promise` | Marka vaadi | `longtext` | oz | Ürünü değil sonucu anlatır |
+| `tagline` | Slogan | `text` | oz | Zorunlu değil |
+| `personality` | Marka kişiliği | `tags` | oz | 3–5 sıfat |
+| `tone` | Ton | `select` | ses | Sosyal medya hesabının "marka sesi" alanını besler |
+| `voice_rules` | Dil kuralları | `longtext` | ses | Sen/siz, emoji, terim |
+| `avoid` | Kaçınılan sözler | `tags` | ses | |
+| `boilerplate` | Kısa tanıtım metni | `longtext` | ses | Teklif, imza, profil biyografisi |
+| `primary_color` · `secondary_colors` | Renkler | `text` · `tags` | gorunum | HEX kodu — renk adı baskıda tutmaz |
+| `typography` · `logo_usage` · `imagery` | Görsel kurallar | `text` · `longtext` | gorunum | |
+| `guideline_url` | Marka kılavuzu bağlantısı | `text` | gorunum | Dosyalar'daki bağlantı |
+| `status` · `effective_from` · `review_at` · `notes` | — | durum | |
+
+Katalog kaydı ve tek kayıt kısıtı: migration `078`. Mevcut organizasyonlarda
+otomatik açılmaz.
+
 ---
 
 ## 7. Göç
@@ -202,7 +235,7 @@ Göç geri alınabilir olmalı: eski satırlar silinmez, `superseded_by` ile iş
 
 ## 8. Bu motor bittiğinde
 
-- 2 modül konfigürasyona düşer
+- 3 modül konfigürasyona düşer
 - Sürüm/onay altyapısı doğar — `hud_sozlesme` ve `hud_mevzuatlar` ileride aynı tabloyu kullanır
 - `longtext` ve `tags` alan tipleri diğer arketiplere de açılır
 

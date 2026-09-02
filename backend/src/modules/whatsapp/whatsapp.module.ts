@@ -1,5 +1,4 @@
 import { forwardRef, Module } from "@nestjs/common";
-import { AiAssistantModule } from "../ai-assistant/ai-assistant.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { WahaHttpClient } from "./waha.client";
 import { WhatsappAdminController } from "./whatsapp-admin.controller";
@@ -20,10 +19,16 @@ import { WhatsappService } from "./whatsapp.service";
  * SupabaseService global modüllerden geliyor.
  *
  * WhatsappLioService, Lio'nun WhatsApp araçlarını (ai-assistant.tools.ts)
- * gerçekleştirir; AI modülü bu servisi WhatsappModule'den alır.
+ * gerçekleştirir; AI modülü bu servisi WhatsappModule'den alır. Ters yön
+ * (otomatik yanıt için draftText) modül import'u DEĞİL: AiAssistantModule
+ * → TasksModule → NotificationsModule → WhatsappModule zinciri zaten var,
+ * buradan AiAssistantModule'ü de içe aktarmak dosya düzeyinde döngü yaratıp
+ * AiAssistantModule'ün ilk import'unu tanımsız bırakıyordu ("module at index
+ * [0] is undefined", 2026-09-03 dağıtımı bu yüzden geri alındı). Lio servisi
+ * AiAssistantService'i ModuleRef ile çağrı anında çözer.
  */
 @Module({
-  imports: [forwardRef(() => NotificationsModule), forwardRef(() => AiAssistantModule)],
+  imports: [forwardRef(() => NotificationsModule)],
   controllers: [WhatsappController, WhatsappAdminController, WhatsappWebhookController],
   providers: [WahaHttpClient, WhatsappService, WhatsappLioService, WhatsappWebhookService, WhatsappSendProcessor],
   exports: [WhatsappService, WhatsappLioService],

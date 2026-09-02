@@ -1,8 +1,9 @@
-import { BadRequestException, forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
 import type { WhatsappMessage, WhatsappThread } from "@projelio/shared";
 import { AccessService } from "../../common/access/access.service";
 import { SupabaseService } from "../../database/supabase.service";
-import { AiAssistantService } from "../ai-assistant/ai-assistant.service";
+import type { AiAssistantService } from "../ai-assistant/ai-assistant.service";
 import { maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
 import { mapMessage, mapThread, WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
 
@@ -34,8 +35,18 @@ export class WhatsappLioService {
     private supabase: SupabaseService,
     private whatsapp: WhatsappService,
     private access: AccessService,
-    @Inject(forwardRef(() => AiAssistantService)) private ai: AiAssistantService
+    private moduleRef: ModuleRef
   ) {}
+
+  /**
+   * AiAssistantService çağrı anında, ModuleRef ile (strict: false → uygulama
+   * genelinden). Constructor'a enjekte edilmiyor ve dosya statik import
+   * edilmiyor: bkz. whatsapp.module.ts — modül döngüsü açılışı çökertiyordu.
+   */
+  private async ai(): Promise<AiAssistantService> {
+    const { AiAssistantService: cls } = await import("../ai-assistant/ai-assistant.service");
+    return this.moduleRef.get(cls, { strict: false });
+  }
 
   // ================================================================ araçlar
 
@@ -165,7 +176,7 @@ export class WhatsappLioService {
       `Yalnızca gönderilecek mesaj metnini yaz, başka hiçbir şey ekleme.`;
     const prompt = `Konuşma geçmişi:\n${transcript}\n\nSon gelen mesaj (${customer}): ${inbound}\n\nYanıtını yaz.`;
 
-    const { text } = await this.ai.draftText({ userId: ownerId, system, prompt, maxTokens: AUTO_REPLY_MAX_TOKENS });
+    const { text } = await (await this.ai()).draftText({ userId: ownerId, system, prompt, maxTokens: AUTO_REPLY_MAX_TOKENS });
     const reply = text.trim();
     if (!reply) return;
     await this.whatsapp.enqueue(thread.id, reply, { sentBy: "lio", sentByUserId: ownerId });

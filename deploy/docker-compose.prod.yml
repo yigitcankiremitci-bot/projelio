@@ -303,7 +303,10 @@ services:
     # ile bakar. Protokol kırıldığında backend değil bu konteyner etkilenir,
     # düzeltme de imaj sürümünü yükseltmekten ibarettir. Sürüm bilerek sabit:
     # "latest" bir gece motor davranışını değiştirip oturumu düşürebilir.
-    image: devlikeapro/waha:2026.8.2
+    # Etiket şeması motor bazlı (gows-, noweb-, chrome-, latest-<sürüm>); düz
+    # "<sürüm>" etiketi YOK — ilk dağıtım bu yüzden düşmüştü. gows-* imajı
+    # yalnızca GOWS motorunu taşır; NOWEB'e geçilecekse etiket de noweb-* olur.
+    image: devlikeapro/waha:gows-2026.8.2
     container_name: projelio-waha
     restart: unless-stopped
     depends_on:

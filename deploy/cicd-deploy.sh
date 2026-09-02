@@ -66,12 +66,17 @@ sync_source() {
     "$SOURCE/" "$ROOT/"
 }
 
+# Her adım "|| return 1" ile: fonksiyon `if deploy_and_check` içinde çağrıldığı
+# için bash burada set -e'yi YOK SAYAR — yalnızca son komutun sonucu sayılır.
+# 2026-09-02'de `compose up` imaj çekemeyip düştü, sonraki sağlık kontrolleri
+# eski konteynerlerde geçti ve dağıtım "başarılı" yazıldı; canlı eski hâlinde
+# kaldı, kimse hata görmedi.
 deploy_and_check() {
-  docker compose -f "$COMPOSE" config --quiet
-  docker compose -f "$COMPOSE" build backend caddy landing
-  docker compose -f "$COMPOSE" up -d --remove-orphans
-  docker compose -f "$COMPOSE" ps --status running --services | grep -qx backend
-  docker compose -f "$COMPOSE" ps --status running --services | grep -qx landing
+  docker compose -f "$COMPOSE" config --quiet || return 1
+  docker compose -f "$COMPOSE" build backend caddy landing || return 1
+  docker compose -f "$COMPOSE" up -d --remove-orphans || return 1
+  docker compose -f "$COMPOSE" ps --status running --services | grep -qx backend || return 1
+  docker compose -f "$COMPOSE" ps --status running --services | grep -qx landing || return 1
   # SAĞLIK KONTROLLERİ TLS'E BAĞLI DEĞİL — bilerek.
   # İlk dağıtımda Let's Encrypt sertifikası henüz alınmamış olur; geçerli
   # sertifika şartı koşan bir kontrol o dağıtımı başarısız sayar, betik de
@@ -81,19 +86,16 @@ deploy_and_check() {
 
   # Caddy ayakta ve alan adını tanıyor mu. Beklenen yanıt 308 (https'e
   # yönlendirme); curl --fail yalnızca 4xx/5xx'te düşer, 3xx başarıdır.
-  curl --fail --silent --show-error --retry 12 --retry-delay 5 \
-    --retry-connrefused -H 'Host: app.projelio.app' http://127.0.0.1/ >/dev/null
+  curl --fail --silent --show-error --retry 12 --retry-delay 5     --retry-connrefused -H 'Host: app.projelio.app' http://127.0.0.1/ >/dev/null || return 1
 
   # Yönlendirme cevabı statik dosyaların yerinde olduğunu KANITLAMAZ; imajın
   # içinde gerçekten derlenmiş bir arayüz var mı, ayrıca bakılıyor.
-  docker compose -f "$COMPOSE" exec -T caddy test -f /srv/web/index.html
+  docker compose -f "$COMPOSE" exec -T caddy test -f /srv/web/index.html || return 1
 
   # Backend: iç ağ bloğundan (http://caddy), sertifikadan bağımsız.
-  curl --fail --silent --show-error --retry 12 --retry-delay 5 \
-    --retry-connrefused -H 'Host: caddy' http://127.0.0.1/health >/dev/null
+  curl --fail --silent --show-error --retry 12 --retry-delay 5     --retry-connrefused -H 'Host: caddy' http://127.0.0.1/health >/dev/null || return 1
 
-  curl --fail --silent --show-error --retry 12 --retry-delay 5 \
-    --retry-connrefused http://127.0.0.1:3001/ >/dev/null
+  curl --fail --silent --show-error --retry 12 --retry-delay 5     --retry-connrefused http://127.0.0.1:3001/ >/dev/null || return 1
 }
 
 sync_source

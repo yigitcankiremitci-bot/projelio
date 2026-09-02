@@ -100,7 +100,7 @@ durumda Postgres tabanlı özel auth-state yazmak gerekir (`useMultiFileAuthStat
 ## 3. Deploy değişiklikleri
 
 `deploy/docker-compose.prod.yml` içindeki `waha` servisi (gerekçeler yorum
-olarak dosyada): imaj `devlikeapro/waha:2026.8.2` sabit; motor `GOWS`; oturum
+olarak dosyada): imaj `devlikeapro/waha:gows-2026.8.2` sabit (etiketler motor bazlı, düz sürüm etiketi yok); motor `GOWS`; oturum
 deposu Postgres (`waha` rolü/DB); `WHATSAPP_RESTART_ALL_SESSIONS=true`;
 webhook ayarı env'de DEĞİL — backend oturumu açarken adres, olay listesi ve
 HMAC anahtarını oturum konfigürasyonuyla verir (`waha.client.ts
@@ -344,7 +344,7 @@ Sohbet ekranı MVP dışı (mesajlar API'de, UI ikinci faz).
 
 | Faz | İş | Çıktı / doğrulama |
 |---|---|---|
-| **0. Karar** ✅ | Ayrı numara; WAHA `2026.8.2` sabitlendi | Bu doküman |
+| **0. Karar** ✅ | Ayrı numara; WAHA `gows-2026.8.2` sabitlendi | Bu doküman |
 | **1. Altyapı** ✅ kod / ⏳ sunucu | compose `waha` servisi, env örnekleri, `whatsapp-kur.sh`, `yedekle.sh` 1b | Sunucuda: `deploy/whatsapp-kur.sh` koşulacak, ardından `npm run yayinla` |
 | **2. Şema + çekirdek** ✅ kod / ⏳ migration | `080_whatsapp.sql`, modül, `waha.client.ts`, uçlar, webhook + HMAC | **Migration elle uygulanacak** (CLAUDE.md'deki komut) + `notify pgrst` |
 | **3. Web bağlantı kartı** ✅ | `WhatsappCard` + `WhatsappConnectionPanel`, `whatsapp-status` soket olayı, `api/whatsapp.ts` | Canlıda QR okutulup `working` görülecek |

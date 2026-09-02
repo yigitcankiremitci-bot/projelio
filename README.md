@@ -57,9 +57,10 @@ artık kendi PostgREST + storage-api'miz duruyor.
 
 ## WhatsApp Bildirimleri
 
-Organizasyon sahibi bu iş için ayrılmış bir numarayı QR ile bağlar; ekip
-üyeleri Ayarlar › Bağlı hesaplar'dan kod alıp o numaraya gönderince
-bildirimleri WhatsApp'tan da alır. Köprü, resmi olmayan "Bağlı Cihazlar"
+Platform yöneticisi Admin paneli'nden havuza numaralar ekler (QR ile); her
+kullanıcıya arka planda kalıcı bir "Projelio numarası" atanır. Kullanıcılar
+Ayarlar › Bağlı hesaplar'dan kod alıp o numaraya gönderince bildirimleri
+WhatsApp'tan alır; Lio aynı numaradan müşterilerle yazışabilir. Köprü, resmi olmayan "Bağlı Cihazlar"
 protokolünü konuşan ayrı bir konteynerdir (WAHA); backend ona yalnızca HTTP
 ile bakar. Tasarım, riskler ve kurulum sırası: `docs/whatsapp-qr-plan.md`.
 Sunucu kurulumu: `deploy/whatsapp-kur.sh`.

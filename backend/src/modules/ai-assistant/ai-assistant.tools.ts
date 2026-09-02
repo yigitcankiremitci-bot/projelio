@@ -3,6 +3,9 @@ import type Anthropic from "@anthropic-ai/sdk";
 // Kullanıcının onayı olmadan ASLA doğrudan çalıştırılmaması gereken araçlar.
 // (Silme, arşivleme ve bütçe/para hareketi gibi geri alınması zor işlemler.)
 export const CRITICAL_TOOLS = new Set<string>([
+  // Müşteriye WhatsApp mesajı: dış dünyaya çıkar, geri alınamaz.
+  "whatsapp_send_message",
+  "whatsapp_set_auto_reply",
   "delete_output",
   "archive_output",
   "delete_task",
@@ -1027,6 +1030,77 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         jobId: { type: "string", description: "İşten çıkarmak için." },
       },
       required: ["moduleKey"],
+    },
+  },
+  // ============================================================ WhatsApp (havuz numarası)
+  {
+    name: "whatsapp_search_customers",
+    description:
+      "Kullanıcının görebildiği müşteri/tedarikçi (party) kayıtlarını ada ya da telefona göre arar; " +
+      "partyId, ad, maskeli telefon ve telefonu olup olmadığını döndürür. Kullanıcı \"X'e WhatsApp'tan " +
+      "yaz\" dediğinde önce bunu çağır, sonra dönen partyId ile whatsapp_send_message'ı kullan. " +
+      "Telefonu olmayan kayda mesaj gönderilemez; kullanıcıdan numara iste.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string", description: "Müşteri adı ya da telefon numarası (parça yeter)." } },
+      required: ["query"],
+    },
+  },
+  {
+    name: "whatsapp_send_message",
+    description:
+      "Kullanıcıya atanmış Projelio WhatsApp numarasından bir müşteriye mesaj gönderir (kuyruğa alır; " +
+      "hız sınırıyla birkaç dakika içinde gider). partyId (whatsapp_search_customers'tan) ya da doğrudan " +
+      "telefon ver. Metni kullanıcı adına, kısa ve WhatsApp'a uygun düz metin olarak yaz; emoji ve " +
+      "başlık kullanma. Bu araç onay ister: göndermeden önce kullanıcıya kime ve ne yazacağını göster.",
+    input_schema: {
+      type: "object",
+      properties: {
+        partyId: { type: "string", description: "Müşteri kaydının kimliği (tercih edilen)." },
+        phone: { type: "string", description: "partyId yoksa telefon numarası (+90…)." },
+        displayName: { type: "string", description: "Telefonla gönderirken kişinin adı (opsiyonel)." },
+        text: { type: "string", description: "Gönderilecek mesaj metni." },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "whatsapp_list_conversations",
+    description:
+      "Kullanıcının Projelio numarası üzerinden yürüyen müşteri konuşmalarını listeler (kim, son mesaj " +
+      "zamanı, Lio otomatik yanıt açık mı). \"WhatsApp'ta kimlerle yazışıyorum\", \"cevapsız mesaj var mı\" için.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "whatsapp_read_conversation",
+    description:
+      "Bir müşteri konuşmasının son mesajlarını okur. threadId (listeden), partyId ya da telefon ver. " +
+      "Müşteri ne yazmış, ne cevaplanmış görmek ve yanıt taslağı önermek için.",
+    input_schema: {
+      type: "object",
+      properties: {
+        threadId: { type: "string" },
+        partyId: { type: "string" },
+        phone: { type: "string" },
+        limit: { type: "number", description: "Kaç mesaj (varsayılan 30, en çok 100)." },
+      },
+    },
+  },
+  {
+    name: "whatsapp_set_auto_reply",
+    description:
+      "Bir müşteri konuşmasında Lio'nun otomatik yanıt vermesini açar/kapatır. Açıkken müşteriden gelen " +
+      "her mesaja Lio, konuşma geçmişine bakarak kendi cevap yazar (kredi kullanıcıdan düşer). Bu araç " +
+      "onay ister. threadId, partyId ya da telefonla konuşmayı belirt.",
+    input_schema: {
+      type: "object",
+      properties: {
+        threadId: { type: "string" },
+        partyId: { type: "string" },
+        phone: { type: "string" },
+        enabled: { type: "boolean" },
+      },
+      required: ["enabled"],
     },
   },
 ];

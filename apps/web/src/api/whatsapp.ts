@@ -1,31 +1,39 @@
-import type { WhatsappLinkCode, WhatsappOverview } from "@projelio/shared";
+import type {
+  WhatsappConnectionSummary,
+  WhatsappLinkCode,
+  WhatsappMessage,
+  WhatsappOverview,
+  WhatsappThread,
+} from "@projelio/shared";
 import { api } from "./client";
 
 /**
- * WhatsApp köprüsü uçları (bkz. docs/whatsapp-qr-plan.md).
+ * WhatsApp köprüsü uçları — havuz modeli (bkz. docs/whatsapp-qr-plan.md §12).
  *
  * QR görseli JSON içinde data-URL olarak gelir: <img> etiketi yetki başlığı
  * taşıyamadığı için görseli doğrudan adresle çekmek mümkün değil.
  */
 export const whatsappApi = {
-  /** Ayarlar ekranının tek çağrısı: organizasyon başına bağlantı + kendi durumum. */
+  // --- Her kullanıcı (Ayarlar) ---
   overview: () => api.get<WhatsappOverview>("/whatsapp/me"),
+  linkCode: () => api.post<WhatsappLinkCode>("/whatsapp/me/link-code", {}),
+  optOut: () => api.post<{ ok: true }>("/whatsapp/me/opt-out", {}),
 
-  // --- Organizasyon sahibi ---
-  start: (organizationId: string) =>
-    api.post<{ ok: true }>(`/organizations/${organizationId}/whatsapp/connection/start`, {}),
+  // --- Müşteri konuşmaları ---
+  threads: () => api.get<WhatsappThread[]>("/whatsapp/threads"),
+  openThread: (body: { phone?: string; partyId?: string; displayName?: string }) => api.post<{ id: string }>("/whatsapp/threads", body),
+  messages: (threadId: string, limit = 50) => api.get<WhatsappMessage[]>(`/whatsapp/threads/${threadId}/messages?limit=${limit}`),
+  send: (threadId: string, body: string) => api.post<WhatsappMessage>(`/whatsapp/threads/${threadId}/messages`, { body }),
+  setAutoReply: (threadId: string, enabled: boolean) => api.patch<WhatsappThread>(`/whatsapp/threads/${threadId}/auto-reply`, { enabled }),
 
-  qr: (organizationId: string) =>
-    api.get<{ qr: string | null }>(`/organizations/${organizationId}/whatsapp/connection/qr`),
-
-  pairingCode: (organizationId: string, phone: string) =>
-    api.post<{ code: string }>(`/organizations/${organizationId}/whatsapp/connection/pairing-code`, { phone }),
-
-  logout: (organizationId: string) =>
-    api.post<{ ok: true }>(`/organizations/${organizationId}/whatsapp/connection/logout`, {}),
-
-  // --- Her kullanıcı ---
-  linkCode: (organizationId: string) => api.post<WhatsappLinkCode>("/whatsapp/me/link-code", { organizationId }),
-
-  optOut: (organizationId: string) => api.post<{ ok: true }>("/whatsapp/me/opt-out", { organizationId }),
+  // --- Yönetici: numara havuzu ---
+  admin: {
+    list: () => api.get<WhatsappConnectionSummary[]>("/admin/whatsapp/numbers"),
+    add: (label: string) => api.post<WhatsappConnectionSummary>("/admin/whatsapp/numbers", { label }),
+    start: (id: string) => api.post<WhatsappConnectionSummary>(`/admin/whatsapp/numbers/${id}/start`, {}),
+    qr: (id: string) => api.get<{ qr: string | null }>(`/admin/whatsapp/numbers/${id}/qr`),
+    pairingCode: (id: string, phone: string) => api.post<{ code: string }>(`/admin/whatsapp/numbers/${id}/pairing-code`, { phone }),
+    logout: (id: string) => api.post<{ ok: true }>(`/admin/whatsapp/numbers/${id}/logout`, {}),
+    remove: (id: string) => api.delete<{ ok: true; movedUsers: number }>(`/admin/whatsapp/numbers/${id}`),
+  },
 };

@@ -1,6 +1,6 @@
 # WhatsApp Entegrasyonu — QR ile Bağlanan Numara (Uygulama Planı)
 
-Durum: **canlıda** (2026-09-02); QR okutma ve ilk bildirim testi bekliyor. Sunucu adımları için §9.
+Durum: **canlıda**; 2026-09-03'te havuz modeline geçildi (§12). Sunucu adımları için §9.
 Karar: bu iş için **ayrı bir numara** kullanılacak (şahsi numara değil).
 
 Bu doküman `docs/whatsapp-mvp-spec.md`'deki Meta Cloud API yaklaşımının yerini
@@ -409,3 +409,40 @@ Canlıya alma sırası (hepsi elle, bu sırayla):
 
 Not: ban süresi/eşik rakamları (2–8 hafta, günde 30–40 mesaj) resmi API satan
 firmaların bloglarından geliyor; ölçüm değil, işaret olarak okunmalı.
+
+---
+
+## 12. Havuz modeli (2026-09-03)
+
+İlk sürümde numara organizasyonun sahibince bağlanıyordu. İstek üzerine model
+değişti (`081_whatsapp_havuz.sql`):
+
+- **Numaralar Projelio'nun.** Yalnız platform yöneticisi (`users.role = admin`)
+  Admin paneli › WhatsApp numaraları'ndan havuza numara ekler, QR okutur,
+  koparır, havuzdan çıkarır. Organizasyon sahibi artık numara bağlamaz.
+- **Kalıcı atama.** Her kullanıcıya ilk ihtiyaçta (kod alırken ya da Lio
+  müşteriye yazarken) havuzdaki çalışan numaralardan en az yüklü olanı
+  atanır (`whatsapp_user_numbers`) ve bir daha değişmez: müşteri hep aynı
+  numarayı görür, kullanıcı için o numara "Projelio numaran"dır. Numara
+  havuzdan çıkarılırsa kullanıcılar başka çalışan numaraya taşınır (tek
+  istisna, bilinçli yönetici işlemi).
+- **Kişi türü.** `whatsapp_contacts.kind`: `user` (kullanıcının kendi telefonu,
+  bildirim alıcısı, opt-in şart) / `customer` (dış kişi, `party_id` bağı).
+  Tekillik `(connection_id, phone_e164)`.
+- **Konuşma türü.** `whatsapp_threads.kind`: `notification` / `customer`;
+  `owner_user_id` konuşmayı başlatan; `organization_id` erişim kapsamı
+  (party'nin organizasyonu; o organizasyonu görebilen herkes okuyabilir);
+  `lio_auto_reply`.
+- **Lio.** Beş araç (`whatsapp_*`, bkz. `docs/api-endpoints.md`); gönderme ve
+  otomatik yanıtı açma `CRITICAL_TOOLS`'ta (onay ister). Otomatik yanıt:
+  müşteriden her mesajda `AiAssistantService.draftText` ile konuşma geçmişine
+  dayalı kısa yanıt üretilir, kuyruğa girer; kredi konuşma sahibinden düşer.
+  Gelen metin güvenilmez girdidir; sistem istemi talimat uygulamamasını söyler.
+- **Gelen yönlendirme.** Kullanıcı telefonu → komutlar; müşteri → sahibine
+  `whatsapp_inbound` bildirimi (+ Lio açıksa yanıt); sahipsiz → yöneticilere.
+- **Ban riski notu.** Müşteriye ilk mesajı biz atıyoruz (istek bu). "Kişi önce
+  yazsın" kuralı yalnızca bildirim kanalında kaldı. 463/475 kısıtları ve
+  ısınma merdiveni numara başına uygulanmaya devam ediyor; havuzda birden çok
+  numara olması yükü dağıtır.
+- **Sonraki adım (yapılmadı):** web'de konuşma ekranı (şu an mesajlar yalnızca
+  Lio ve API üzerinden okunuyor; bildirim Ayarlar'a yönlendiriyor).

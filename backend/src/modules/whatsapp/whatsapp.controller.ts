@@ -1,76 +1,67 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { WhatsappService } from "./whatsapp.service";
 
 /**
- * WhatsApp köprüsünün JWT'li uçları. Webhook ayrı controller'da
- * (whatsapp-webhook.controller.ts): güvenlik modeli tamamen farklı.
- *
- * Yetki servis katmanında: organizasyon sahibi bağlantıyı yönetir
- * (whatsapp-access.ts), organizasyonu görebilen herkes kendi bildirim
- * ayarını yapar.
+ * WhatsApp köprüsünün kullanıcı uçları. Numara yönetimi ayrı controller'da
+ * (whatsapp-admin.controller.ts, yalnız role=admin); webhook ayrı
+ * (whatsapp-webhook.controller.ts, HMAC).
  */
-@Controller()
+@Controller("whatsapp")
 @UseGuards(AuthGuard("jwt"))
 export class WhatsappController {
   constructor(private whatsapp: WhatsappService) {}
 
-  // ============================================================ Ayarlar ekranı (her kullanıcı)
+  // ============================================================ Ayarlar ekranı
 
-  /** Sunucuda yapılandırılmış mı + organizasyon başına bağlantı ve kendi durumum. */
-  @Get("whatsapp/me")
+  /** Sunucuda yapılandırılmış mı, havuz hazır mı, bana atanmış numara ve kendi durumum. */
+  @Get("me")
   overview(@Req() req: any) {
     return this.whatsapp.overviewForUser(req.user.userId);
   }
 
-  @Post("whatsapp/me/link-code")
-  linkCode(@Body() body: { organizationId: string }, @Req() req: any) {
-    return this.whatsapp.createLinkCode(body.organizationId, req.user.userId);
+  /** Eşleştirme kodu; gerekiyorsa önce havuzdan numara atanır. */
+  @Post("me/link-code")
+  linkCode(@Req() req: any) {
+    return this.whatsapp.createLinkCode(req.user.userId);
   }
 
-  @Post("whatsapp/me/opt-out")
-  optOut(@Body() body: { organizationId: string }, @Req() req: any) {
-    return this.whatsapp.optOutMe(body.organizationId, req.user.userId);
+  @Post("me/opt-out")
+  optOut(@Req() req: any) {
+    return this.whatsapp.optOutMe(req.user.userId);
   }
 
-  // ============================================================ Bağlantı (organizasyon sahibi)
+  // ============================================================ Müşteri konuşmaları
 
-  @Post("organizations/:organizationId/whatsapp/connection/start")
-  start(@Param("organizationId") organizationId: string, @Req() req: any) {
-    return this.whatsapp.startConnection(organizationId, req.user.userId);
+  @Get("threads")
+  myThreads(@Query("limit") limit: string | undefined, @Req() req: any) {
+    return this.whatsapp.listMyCustomerThreads(req.user.userId, clampLimit(limit));
   }
 
-  /** QR, data-URL olarak JSON içinde (img etiketi yetki başlığı taşıyamaz). */
-  @Get("organizations/:organizationId/whatsapp/connection/qr")
-  qr(@Param("organizationId") organizationId: string, @Req() req: any) {
-    return this.whatsapp.getQr(organizationId, req.user.userId);
+  /** Müşteriyle konuşma açar (varsa döner). Gövde: { phone } veya { partyId }, isteğe bağlı displayName. */
+  @Post("threads")
+  async openThread(@Body() body: { phone?: string; partyId?: string; displayName?: string }, @Req() req: any) {
+    const { thread } = await this.whatsapp.openCustomerThread(req.user.userId, body, body.displayName);
+    return { id: thread.id };
   }
 
-  @Post("organizations/:organizationId/whatsapp/connection/pairing-code")
-  pairingCode(@Param("organizationId") organizationId: string, @Body() body: { phone: string }, @Req() req: any) {
-    return this.whatsapp.requestPairingCode(organizationId, req.user.userId, body.phone ?? "");
-  }
-
-  @Post("organizations/:organizationId/whatsapp/connection/logout")
-  logout(@Param("organizationId") organizationId: string, @Req() req: any) {
-    return this.whatsapp.logout(organizationId, req.user.userId);
-  }
-
-  // ============================================================ Kişiler ve konuşmalar (organizasyon sahibi)
-
-  @Get("organizations/:organizationId/whatsapp/contacts")
-  contacts(@Param("organizationId") organizationId: string, @Req() req: any) {
-    return this.whatsapp.listContacts(organizationId, req.user.userId);
-  }
-
-  @Get("whatsapp/threads/:threadId/messages")
+  @Get("threads/:threadId/messages")
   messages(@Param("threadId") threadId: string, @Query("limit") limit: string | undefined, @Req() req: any) {
-    const n = Math.min(Math.max(Number(limit) || 50, 1), 200);
-    return this.whatsapp.listThreadMessages(threadId, req.user.userId, n);
+    return this.whatsapp.listThreadMessages(threadId, req.user.userId, clampLimit(limit));
   }
 
-  @Post("whatsapp/threads/:threadId/messages")
+  @Post("threads/:threadId/messages")
   send(@Param("threadId") threadId: string, @Body() body: { body: string }, @Req() req: any) {
-    return this.whatsapp.queueThreadMessage(threadId, req.user.userId, body.body ?? "");
+    return this.whatsapp.queueThreadMessage(threadId, req.user.userId, body.body ?? "", "user");
   }
+
+  /** Lio bu konuşmadaki müşteri mesajlarını kendi yanıtlasın mı. */
+  @Patch("threads/:threadId/auto-reply")
+  autoReply(@Param("threadId") threadId: string, @Body() body: { enabled: boolean }, @Req() req: any) {
+    return this.whatsapp.setAutoReply(threadId, req.user.userId, Boolean(body.enabled));
+  }
+}
+
+function clampLimit(raw: string | undefined): number {
+  return Math.min(Math.max(Number(raw) || 50, 1), 200);
 }

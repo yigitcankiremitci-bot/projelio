@@ -4,17 +4,15 @@ import { whatsappApi } from "../api/whatsapp";
 import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconWhatsapp } from "./icons";
-import WhatsappConnectionPanel from "./WhatsappConnectionPanel";
 import WhatsappNotifyPanel from "./WhatsappNotifyPanel";
 
 /**
- * Ayarlar › Bağlı hesaplar'daki WhatsApp kartı.
+ * Ayarlar › Bağlı hesaplar'daki WhatsApp kartı (havuz modeli).
  *
- * Tek çağrıyla (/whatsapp/me) organizasyon başına bir satır alır: sahibi
- * olduğun organizasyonlarda numarayı bağlama paneli, bağlı numarası olan her
- * organizasyonda kendi bildirim panelin. Veri tek yerden yüklenir, iki panel
- * de aynı `reload` ile tazelenir — soket olayı (`whatsapp-status`) geldiğinde
- * QR'dan "bağlandı"ya geçiş kullanıcı hiçbir şeye basmadan görünür.
+ * Numarayı kullanıcı bağlamaz — numaralar Projelio'nun, yöneticiler havuza
+ * ekler (Admin › WhatsApp numaraları), kullanıcıya ilk ihtiyaçta arka planda
+ * kalıcı bir numara atanır. Bu kart yalnızca kullanıcının kendi bildirim
+ * eşleşmesini yönetir; numara durumu değişince soket olayı kartı tazeler.
  */
 export default function WhatsappCard() {
   const c = useThemeColors();
@@ -64,44 +62,25 @@ export default function WhatsappCard() {
         </div>
       </div>
 
-      {error && (
-        <p style={{ fontSize: 14, color: c.danger, margin: "0 0 8px" }}>{error}</p>
-      )}
+      {error && <p style={{ fontSize: 14, color: c.danger, margin: "0 0 8px" }}>{error}</p>}
 
       {overview && !overview.configured ? (
-        <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 4px" }}>
-          Bu özellik sunucuda henüz yapılandırılmamış.
+        <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 4px" }}>Bu özellik sunucuda henüz yapılandırılmamış.</p>
+      ) : overview && !overview.poolReady && !overview.myNumber ? (
+        <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 4px", lineHeight: 1.5 }}>
+          Henüz bağlı bir Projelio numarası yok; yönetici bir numara bağladığında burada görünecek.
         </p>
-      ) : overview && overview.organizations.length === 0 ? (
-        <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 4px" }}>
-          WhatsApp bağlantısı organizasyon üzerinden kurulur; henüz bir organizasyonda değilsiniz.
-        </p>
-      ) : (
-        overview?.organizations.map((org, i) => (
-          <div
-            key={org.organizationId}
-            style={{
-              paddingTop: i === 0 ? 4 : 14,
-              marginTop: i === 0 ? 0 : 14,
-              borderTop: i === 0 ? "none" : `1px solid ${c.border}`,
-            }}
-          >
-            {overview.organizations.length > 1 && (
-              <div style={{ fontSize: 14, fontWeight: 500, color: c.textSecondary, marginBottom: 8 }}>
-                {org.organizationName}
-              </div>
-            )}
-            {org.canManage && <WhatsappConnectionPanel org={org} onChanged={reload} />}
-            {org.connection?.status === "working" ? (
-              <WhatsappNotifyPanel org={org} onChanged={reload} />
-            ) : !org.canManage ? (
-              <p style={{ fontSize: 15, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
-                Organizasyon sahibi henüz bir WhatsApp numarası bağlamamış.
-              </p>
-            ) : null}
-          </div>
-        ))
-      )}
+      ) : overview ? (
+        <>
+          {overview.myNumber && (
+            <div style={{ fontSize: 14, color: c.textSecondary, marginBottom: 10 }}>
+              Projelio numaranız: <strong style={{ fontWeight: 500, color: c.textPrimary }}>{overview.myNumber.phoneMasked ?? overview.myNumber.label}</strong>
+              {overview.myNumber.status !== "working" && <span style={{ color: c.warning }}> · şu an bağlı değil</span>}
+            </div>
+          )}
+          <WhatsappNotifyPanel overview={overview} onChanged={reload} />
+        </>
+      ) : null}
     </div>
   );
 }

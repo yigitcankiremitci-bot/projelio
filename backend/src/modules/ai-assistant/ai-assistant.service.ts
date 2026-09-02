@@ -6,6 +6,8 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
+  forwardRef,
+  Inject,
 } from "@nestjs/common";
 import Anthropic from "@anthropic-ai/sdk";
 import { SupabaseService } from "../../database/supabase.service";
@@ -42,6 +44,7 @@ import { FilesService } from "../files/files.service";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
 import { AiTranscriptionService } from "./ai-transcription.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
+import { WhatsappLioService } from "../whatsapp/whatsapp-lio.service";
 import type { LioActivityPayload } from "@projelio/shared";
 import {
   BASE_PROMPT_TOKENS,
@@ -522,6 +525,10 @@ export class AiAssistantService {
     private filesService: FilesService,
     // Yapılacaklar sayfası (kişisel pano) araçları için.
     private personalTodosService: PersonalTodosService,
+    // WhatsApp araçları (müşteriye yaz, konuşmayı oku, otomatik yanıt). İki
+    // yönlü bağımlılık: WhatsApp modülü otomatik yanıt için draftText()'i
+    // çağırıyor, bu yüzden forwardRef.
+    @Inject(forwardRef(() => WhatsappLioService)) private whatsappLio: WhatsappLioService,
     // Modül araçları: katalog (hangi modüller var), organizasyon/iş modülleri
     // (hangileri açık) ve kayıtlar (modülün defteri). Yetki kontrolleri bu
     // servislerin İÇİNDE — Lio ayrı bir yol açmıyor, kullanıcının kendi
@@ -3576,6 +3583,37 @@ export class AiAssistantService {
         );
         return { success: true };
       }
+
+      // ============================================================ WhatsApp
+      case "whatsapp_search_customers":
+        return this.whatsappLio.searchCustomers(userId, String(input.query ?? ""));
+
+      case "whatsapp_send_message":
+        return this.whatsappLio.sendToCustomer(userId, {
+          partyId: input.partyId,
+          phone: input.phone,
+          displayName: input.displayName,
+          text: String(input.text ?? ""),
+        });
+
+      case "whatsapp_list_conversations":
+        return this.whatsappLio.listConversations(userId);
+
+      case "whatsapp_read_conversation":
+        return this.whatsappLio.readConversation(userId, {
+          threadId: input.threadId,
+          partyId: input.partyId,
+          phone: input.phone,
+          limit: input.limit,
+        });
+
+      case "whatsapp_set_auto_reply":
+        return this.whatsappLio.setAutoReply(userId, {
+          threadId: input.threadId,
+          partyId: input.partyId,
+          phone: input.phone,
+          enabled: Boolean(input.enabled),
+        });
 
       default:
         throw new BadRequestException(`Bilinmeyen araç: ${name}`);

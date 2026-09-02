@@ -110,7 +110,7 @@ export class WhatsappSendProcessor {
     const now = new Date();
     const { data: queued } = await this.supabase.client
       .from("whatsapp_messages")
-      .select("id, thread_id, body, attempt_count, created_at, whatsapp_threads!inner(connection_id, contact_id, whatsapp_contacts(wa_jid, opt_in_state, last_inbound_at))")
+      .select("id, thread_id, body, attempt_count, created_at, whatsapp_threads!inner(connection_id, contact_id, kind, whatsapp_contacts(wa_jid, opt_in_state, last_inbound_at))")
       .eq("status", "queued")
       .eq("whatsapp_threads.connection_id", conn.id)
       .or(`next_attempt_at.is.null,next_attempt_at.lte.${now.toISOString()}`)
@@ -129,7 +129,13 @@ export class WhatsappSendProcessor {
         await this.markFailed(row.id, "stale", "Kuyrukta 6 saatten uzun bekledi");
         continue;
       }
-      if (!contact || contact.opt_in_state !== "opted_in" || !contact.last_inbound_at) {
+      if (!contact) {
+        await this.markFailed(row.id, "no_contact", "Kişi kaydı yok");
+        continue;
+      }
+      // Bildirim akışında opt-in şart; müşteri konuşmasını kullanıcı/Lio
+      // başlatır, opt-in kavramı yok (ban riski hız sınırlarıyla yönetilir).
+      if (thread.kind === "notification" && (contact.opt_in_state !== "opted_in" || !contact.last_inbound_at)) {
         await this.markFailed(row.id, "not_opted_in", "Kişi bildirim almıyor");
         continue;
       }

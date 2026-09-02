@@ -161,28 +161,40 @@ kaydın *varlığını* görür.
 verilebilir; departmanı görebildiği için modülü okuyabilen ama modüle atanmamış
 kişiye izin verilmez.
 
-## WhatsApp köprüsü (`/whatsapp`, `/organizations/:id/whatsapp`)
+## WhatsApp köprüsü (`/whatsapp`, `/admin/whatsapp`)
 
-QR ile bağlanan numara üzerinden bildirim; tasarım `docs/whatsapp-qr-plan.md`.
-Numarayı yalnızca **organizasyon sahibi** bağlar/koparır; organizasyonu
-görebilen herkes kendi bildirim ayarını yapar. Numaralar yanıtlarda maskelidir.
+Havuz modeli (tasarım `docs/whatsapp-qr-plan.md` §12): numaralar Projelio'nun,
+yöneticiler havuza ekler, her kullanıcıya ilk ihtiyaçta kalıcı bir numara
+atanır; bildirimler ve Lio'nun müşteri yazışmaları o numaradan gider.
+Numaralar yanıtlarda maskelidir.
 
 | Method | Path | Açıklama | Body |
 |---|---|---|---|
-| GET | `/whatsapp/me` | Sunucuda yapılandırılmış mı + organizasyon başına bağlantı özeti ve kendi opt-in durumum (`WhatsappOverview`) | — |
-| POST | `/whatsapp/me/link-code` | Eşleştirme kodu üretir (`PROJELIO-XXXX`, 24 saat). Kullanıcı kodu organizasyonun numarasına gönderir; sunucu numarayı hesaba bağlar | `{ organizationId }` |
-| POST | `/whatsapp/me/opt-out` | Bu organizasyondan WhatsApp bildirimi almayı durdurur | `{ organizationId }` |
-| POST | `/organizations/:id/whatsapp/connection/start` | WAHA oturumunu açar; durum `starting` → `scan_qr` | — |
-| GET | `/organizations/:id/whatsapp/connection/qr` | QR görseli, JSON içinde data-URL: `{ qr }`. Yalnızca `scan_qr` durumunda; bağlıysa 409 | — |
-| POST | `/organizations/:id/whatsapp/connection/pairing-code` | QR yerine telefon numarasıyla eşleştirme kodu: `{ code }` | `{ phone }` |
-| POST | `/organizations/:id/whatsapp/connection/logout` | Numarayı ayırır (satır silinmez, durum `stopped`) | — |
-| GET | `/organizations/:id/whatsapp/contacts` | Kişi listesi (sahip) | — |
-| GET | `/whatsapp/threads/:threadId/messages?limit=` | Konuşma mesajları (sahip) | — |
-| POST | `/whatsapp/threads/:threadId/messages` | Serbest metni kuyruğa alır; gönderim dakikalık işleyicide, hız sınırıyla | `{ body }` |
+| GET | `/whatsapp/me` | Yapılandırılmış mı, havuz hazır mı, bana atanmış numara, kendi opt-in durumum (`WhatsappOverview`) | — |
+| POST | `/whatsapp/me/link-code` | Eşleştirme kodu (`PROJELIO-XXXX`, 24 saat). Gerekiyorsa önce havuzdan numara atanır; kullanıcı kodu o numaraya gönderir | — |
+| POST | `/whatsapp/me/opt-out` | WhatsApp bildirimlerini durdurur | — |
+| GET | `/whatsapp/threads` | Kullanıcının müşteri konuşmaları (`WhatsappThread[]`) | — |
+| POST | `/whatsapp/threads` | Müşteriyle konuşma açar/bulur; `{ id }` döner | `{ partyId? , phone?, displayName? }` |
+| GET | `/whatsapp/threads/:id/messages?limit=` | Konuşma mesajları (sahibi, konuşmanın organizasyonunu görebilen ya da admin) | — |
+| POST | `/whatsapp/threads/:id/messages` | Serbest metni kuyruğa alır; gönderim dakikalık işleyicide, hız sınırıyla | `{ body }` |
+| PATCH | `/whatsapp/threads/:id/auto-reply` | Lio bu konuşmada müşteriye kendi yanıtlasın mı | `{ enabled }` |
+| GET | `/admin/whatsapp/numbers` | **admin** — havuzdaki numaralar ve atanmış kullanıcı sayıları | — |
+| POST | `/admin/whatsapp/numbers` | **admin** — havuza numara ekler, QR bekleyen oturumu açar | `{ label }` |
+| POST | `/admin/whatsapp/numbers/:id/start` | **admin** — durmuş/kopmuş numarayı yeniden bağlamaya açar | — |
+| GET | `/admin/whatsapp/numbers/:id/qr` | **admin** — QR, JSON içinde data-URL `{ qr }` | — |
+| POST | `/admin/whatsapp/numbers/:id/pairing-code` | **admin** — telefon numarasıyla eşleştirme kodu `{ code }` | `{ phone }` |
+| POST | `/admin/whatsapp/numbers/:id/logout` | **admin** — numarayı ayırır; satır ve atamalar kalır | — |
+| DELETE | `/admin/whatsapp/numbers/:id` | **admin** — havuzdan çıkarır; atanmış kullanıcılar başka bağlı numaraya taşınır | — |
 | POST | `/whatsapp/webhook` | **JWT yok.** WAHA'nın olay bildirimi; `X-Webhook-Hmac` (sha512, ham gövde) doğrulanır, olay saklanıp hemen 200 dönülür | WAHA zarfı |
 
-Gelen mesajlarda yalnızca şu komutlar tanınır: eşleştirme kodu, `DUR`
-(opt-out), `BAŞLAT` (opt-in). Başka metin yorumlanmaz, Lio'ya iletilmez.
+Gelen mesaj yönlendirmesi: gönderen bir Projelio kullanıcısının telefonuysa
+yalnızca komutlar tanınır (eşleştirme kodu, `DUR`, `BAŞLAT`); değilse müşteri
+sayılır — konuşmanın sahibine `whatsapp_inbound` bildirimi gider, Lio otomatik
+yanıt açıksa Lio cevaplar, sahipsiz konuşmada tüm yöneticilere bildirim gider.
+
+Lio araçları: `whatsapp_search_customers`, `whatsapp_send_message` (onaylı),
+`whatsapp_list_conversations`, `whatsapp_read_conversation`,
+`whatsapp_set_auto_reply` (onaylı). Bkz. `ai-assistant.tools.ts`.
 
 ## Admin (`/admin`) — sadece `role: admin`
 

@@ -1,9 +1,11 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { WahaHttpClient } from "./waha.client";
+import { WhatsappLioService } from "./whatsapp-lio.service";
 import { AUTO_REPLIES, parseInboundCommand } from "./whatsapp-optin";
 import { isGroupJid, isLidJid, jidToE164, maskPhone } from "./whatsapp-phone";
-import { WhatsappService, type ConnectionRow } from "./whatsapp.service";
+import { WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
 
 /** WAHA webhook zarfı — yalnızca kullandığımız alanlar. */
 export interface WahaWebhookEnvelope {
@@ -30,9 +32,15 @@ const ACK_NAME_TO_STATUS: Record<string, "sent" | "delivered" | "read" | "failed
  * WAHA'dan gelen olayların işlenmesi.
  *
  * İki aşama: controller ham olayı `whatsapp_webhook_events`'e yazıp hemen 200
- * döner (WAHA yanıt beklerken tıkanmasın, tekrar denemesin); işleme burada,
- * ayrı adımda. event_id unique olduğu için aynı olay iki kez gelse de bir kez
- * işlenir. İşlenemeyen olay `error` ile kalır, dakikalık işleyici yeniden dener.
+ * döner; işleme burada, ayrı adımda. event_id unique olduğu için aynı olay
+ * iki kez gelse de bir kez işlenir.
+ *
+ * Gelen mesajın yönlendirmesi (havuz modeli):
+ *   - Gönderen, bir Projelio kullanıcısının telefonu (kind=user) → bildirim
+ *     akışı: yalnız komutlar tanınır (kod / DUR / BAŞLAT), otomatik yanıt.
+ *   - Aksi hâlde müşteri (kind=customer): konuşma sahibine uygulama içi
+ *     bildirim; Lio otomatik yanıt açıksa Lio cevaplar. Sahipsizse (müşteri
+ *     ilk kez, kimse başlatmamış) yöneticilere bildirim.
  */
 @Injectable()
 export class WhatsappWebhookService {
@@ -42,7 +50,9 @@ export class WhatsappWebhookService {
   constructor(
     private supabase: SupabaseService,
     private waha: WahaHttpClient,
-    private whatsapp: WhatsappService
+    private whatsapp: WhatsappService,
+    private lio: WhatsappLioService,
+    @Inject(forwardRef(() => NotificationsService)) private notifications: NotificationsService
   ) {}
 
   /** Ham olayı saklar. Zaten varsa false döner (tekrar teslim). */
@@ -87,7 +97,7 @@ export class WhatsappWebhookService {
           const message = e instanceof Error ? e.message : String(e);
           this.logger.warn(`Webhook olayı işlenemedi (${row.event}): ${message}`);
           // İşlendi sayılır ama hata yazılır: aynı olayda sürekli patlayıp
-          // arkadakileri tıkamasın. Log yeter; olayın kendisi tabloda duruyor.
+          // arkadakileri tıkamasın. Olayın kendisi tabloda duruyor.
           await this.supabase.client
             .from("whatsapp_webhook_events")
             .update({ processed_at: new Date().toISOString(), error: message.slice(0, 500) })
@@ -153,23 +163,34 @@ export class WhatsappWebhookService {
       // veriyor; önce oraya bakılır, yoksa WAHA'ya sorulur.
       const senderAlt: unknown = payload?._data?.Info?.SenderAlt;
       phone = jidToE164(typeof senderAlt === "string" ? senderAlt : null);
-      if (!phone) {
-        const pn = await this.waha.resolveLid(conn.session_name, from);
-        phone = jidToE164(pn);
-      }
+      if (!phone) phone = jidToE164(await this.waha.resolveLid(conn.session_name, from));
     }
     if (!phone) {
       this.logger.warn(`Gönderen numarası çözülemedi: ${from}`);
       return;
     }
 
-    const contact = await this.upsertContact(conn.organization_id, phone, from, payload);
-    const threadId = await this.whatsapp.ensureThread(conn.id, contact.id);
     const now = new Date().toISOString();
-
+    const displayName: string | null = payload?._data?.pushName ?? payload?._data?.notifyName ?? payload?.notifyName ?? null;
     const body: string = typeof payload.body === "string" ? payload.body : "";
+    const command = parseInboundCommand(body);
+
+    // Kişi: kayıtlıysa türü korunur; ilk kez yazan biri eşleştirme kodu
+    // gönderiyorsa kullanıcıdır, yoksa müşteri.
+    const contact = await this.whatsapp.upsertContact(conn.id, phone, {
+      kind: command.kind === "link" ? "user" : "customer",
+      display_name: displayName,
+      last_inbound_at: now,
+    });
+    const isUserPhone = contact.kind === "user" || Boolean(contact.user_id) || command.kind === "link";
+    const thread = await this.whatsapp.ensureThread(conn.id, contact.id, {
+      kind: isUserPhone ? "notification" : "customer",
+      owner_user_id: contact.user_id ?? null,
+      title: displayName,
+    });
+
     const { error: insertError } = await this.supabase.client.from("whatsapp_messages").insert({
-      thread_id: threadId,
+      thread_id: thread.id,
       direction: "inbound",
       wa_message_id: payload.id ?? null,
       body: body || (payload.hasMedia ? "[medya]" : null),
@@ -183,13 +204,22 @@ export class WhatsappWebhookService {
     await this.supabase.client
       .from("whatsapp_threads")
       .update({ last_inbound_at: now, last_message_at: now, updated_at: now })
-      .eq("id", threadId);
+      .eq("id", thread.id);
 
-    const command = parseInboundCommand(body);
+    if (isUserPhone) return this.onUserMessage(conn, contact, thread, payload, command);
+    return this.onCustomerMessage(conn, contact, thread, body || "[medya]");
+  }
+
+  /** Projelio kullanıcısının kendi telefonundan gelen mesaj: yalnız komutlar. */
+  private async onUserMessage(
+    conn: ConnectionRow,
+    contact: ContactRow,
+    thread: ThreadRow,
+    payload: any,
+    command: ReturnType<typeof parseInboundCommand>
+  ): Promise<void> {
     if (command.kind === "none") return;
-
-    // Kişi bize yazdı; okundu işareti doğal davranış, cevap da anında gider
-    // (kuyruk beklemez — karşı taraf telefonun başında).
+    const now = new Date().toISOString();
     const chatId = contact.wa_jid;
     await this.waha.sendSeen(conn.session_name, chatId, payload.id ? [payload.id] : undefined).catch(() => {});
 
@@ -197,18 +227,20 @@ export class WhatsappWebhookService {
     let linkedUserId: string | undefined;
     switch (command.kind) {
       case "link": {
-        const userId = await this.consumeLinkCode(command.code, conn.organization_id);
+        const userId = await this.consumeLinkCode(command.code, conn.id);
         if (!userId) {
           reply = AUTO_REPLIES.linkCodeInvalid;
           break;
         }
         await this.updateContact(contact.id, {
+          kind: "user",
           user_id: userId,
           opt_in_state: "opted_in",
           opt_in_source: "link_code",
           opt_in_at: now,
           opt_out_at: null,
         });
+        await this.supabase.client.from("whatsapp_threads").update({ owner_user_id: userId, kind: "notification" }).eq("id", thread.id);
         linkedUserId = userId;
         reply = AUTO_REPLIES.linked;
         break;
@@ -229,39 +261,39 @@ export class WhatsappWebhookService {
         break;
     }
 
-    await this.sendImmediate(conn, threadId, chatId, reply);
+    await this.sendImmediate(conn, thread.id, chatId, reply);
     // Kullanıcının Ayarlar sayfası açıksa "bağlandı"yı anında görsün.
     if (linkedUserId) this.whatsapp.pushStatus(conn, linkedUserId);
   }
 
-  private async upsertContact(organizationId: string, phone: string, jid: string, payload: any): Promise<any> {
-    const now = new Date().toISOString();
-    const displayName: string | null = payload?._data?.pushName ?? payload?._data?.notifyName ?? payload?.notifyName ?? null;
-    const chatJid = isLidJid(jid) ? phone.replace(/^\+/, "") + "@c.us" : jid;
-
-    const { data: existing } = await this.supabase.client
-      .from("whatsapp_contacts")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .eq("phone_e164", phone)
-      .maybeSingle();
-
-    if (existing) {
-      const patch: Record<string, unknown> = { last_inbound_at: now, updated_at: now, wa_jid: chatJid };
-      if (displayName && !(existing as any).display_name) patch.display_name = displayName;
-      const { data } = await this.supabase.client.from("whatsapp_contacts").update(patch).eq("id", (existing as any).id).select().single();
-      return data;
+  /**
+   * Müşteriden gelen mesaj: sahibine bildirim; Lio otomatik yanıt açıksa Lio
+   * cevaplar. Sahipsiz konuşma (kimse başlatmamış, müşteri ilk yazan) → tüm
+   * yöneticilere bildirim; ilk yanıtlayan sahiplenir.
+   */
+  private async onCustomerMessage(conn: ConnectionRow, contact: ContactRow, thread: ThreadRow, body: string): Promise<void> {
+    const who = contact.display_name ?? maskPhone(contact.phone_e164);
+    const preview = body.length > 140 ? body.slice(0, 137) + "…" : body;
+    const recipients = thread.owner_user_id ? [thread.owner_user_id] : await this.adminUserIds();
+    for (const userId of recipients) {
+      void this.notifications.notifyUser(
+        userId,
+        "whatsapp_inbound",
+        `WhatsApp · ${who}`,
+        thread.owner_user_id ? preview : `Sahipsiz konuşma (${conn.label ?? "havuz"}): ${preview}`,
+        "/settings?tab=baglantilar"
+      );
     }
-    const { data, error } = await this.supabase.client
-      .from("whatsapp_contacts")
-      .insert({ organization_id: organizationId, phone_e164: phone, wa_jid: chatJid, display_name: displayName, last_inbound_at: now })
-      .select()
-      .single();
-    if (error) {
-      if (error.code === "23505") return this.upsertContact(organizationId, phone, jid, payload);
-      throw error;
+    if (thread.lio_auto_reply && thread.owner_user_id) {
+      await this.lio.replyToInbound(thread, contact, conn, body).catch((e) => {
+        this.logger.warn(`Lio otomatik yanıt başarısız (${thread.id}): ${e instanceof Error ? e.message : e}`);
+      });
     }
-    return data;
+  }
+
+  private async adminUserIds(): Promise<string[]> {
+    const { data } = await this.supabase.client.from("users").select("id").eq("role", "admin");
+    return ((data ?? []) as any[]).map((u) => u.id);
   }
 
   private async updateContact(id: string, patch: Record<string, unknown>): Promise<void> {
@@ -272,17 +304,17 @@ export class WhatsappWebhookService {
     if (error) throw error;
   }
 
-  /** Kodu tüketir; geçerliyse kullanıcı kimliğini döner. */
-  private async consumeLinkCode(code: string, organizationId: string): Promise<string | null> {
+  /** Kodu tüketir; geçerliyse kullanıcı kimliğini döner. Kod bu numaraya ait olmalı. */
+  private async consumeLinkCode(code: string, connectionId: string): Promise<string | null> {
     const { data } = await this.supabase.client
       .from("whatsapp_link_codes")
-      .select("code, user_id, expires_at, used_at")
+      .select("code, user_id, expires_at, used_at, connection_id")
       .eq("code", code)
-      .eq("organization_id", organizationId)
       .maybeSingle();
     if (!data) return null;
     const row = data as any;
     if (row.used_at || new Date(row.expires_at).getTime() < Date.now()) return null;
+    if (row.connection_id && row.connection_id !== connectionId) return null;
     const { data: claimed } = await this.supabase.client
       .from("whatsapp_link_codes")
       .update({ used_at: new Date().toISOString() })
@@ -304,6 +336,7 @@ export class WhatsappWebhookService {
         wa_message_id: result.id,
         body: text,
         status: "sent",
+        sent_by: "system",
         attempt_count: 1,
         sent_at: now,
       });

@@ -1,29 +1,24 @@
 import { useState } from "react";
-import type { WhatsappLinkCode, WhatsappOrganizationView } from "@projelio/shared";
+import type { WhatsappLinkCode, WhatsappOverview } from "@projelio/shared";
 import { whatsappApi } from "../api/whatsapp";
 import { useThemeColors } from "../theme/useThemeColors";
 
 /**
  * Kullanıcının kendi WhatsApp bildirim paneli.
  *
- * Akış tersine kurulu: ilk mesajı kullanıcı atar. Kod alır, wa.me
- * bağlantısına tıklar, hazır gelen "PROJELIO-XXXX" mesajını gönderir; sunucu
- * kodu tanıyıp numarayı hesaba bağlar. Neden biz yazmıyoruz: WhatsApp'ın
- * tanımadığı kişiye yazma kısıtı ve ban riski (docs/whatsapp-qr-plan.md §5.3).
+ * Akış tersine kurulu: ilk mesajı kullanıcı atar. Kod alır (bu sırada
+ * havuzdan numarası atanır), wa.me bağlantısına tıklar, hazır gelen
+ * "PROJELIO-XXXX" mesajını gönderir; sunucu kodu tanıyıp numarayı hesaba
+ * bağlar. Neden biz yazmıyoruz: WhatsApp'ın tanımadığı kişiye yazma kısıtı
+ * ve ban riski (docs/whatsapp-qr-plan.md §5.3).
  */
-export default function WhatsappNotifyPanel({
-  org,
-  onChanged,
-}: {
-  org: WhatsappOrganizationView;
-  onChanged: () => void;
-}) {
+export default function WhatsappNotifyPanel({ overview, onChanged }: { overview: WhatsappOverview; onChanged: () => void }) {
   const c = useThemeColors();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [link, setLink] = useState<WhatsappLinkCode | null>(null);
 
-  const state = org.me.optInState;
+  const state = overview.me.optInState;
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -63,12 +58,12 @@ export default function WhatsappNotifyPanel({
     return (
       <div>
         <div style={{ fontSize: 15, color: c.textPrimary, marginBottom: 8 }}>
-          Bildirimleriniz <strong style={{ fontWeight: 500 }}>{org.me.phoneMasked}</strong> numarasına gidiyor.
+          Bildirimleriniz <strong style={{ fontWeight: 500 }}>{overview.me.phoneMasked}</strong> numaranıza gidiyor.
         </div>
         <button
           onClick={() =>
             run(async () => {
-              await whatsappApi.optOut(org.organizationId);
+              await whatsappApi.optOut();
               onChanged();
             })
           }
@@ -86,8 +81,8 @@ export default function WhatsappNotifyPanel({
     <div>
       <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>
         {state === "opted_out"
-          ? "WhatsApp bildirimleriniz durdurulmuş. Yeniden açmak için kod alıp numaraya gönderin ya da WhatsApp'tan BAŞLAT yazın."
-          : "Bildirimleri WhatsApp'tan almak için bir kod alın ve aşağıdaki bağlantıyla organizasyonun numarasına gönderin. Numaranız bu mesajla eşleşir."}
+          ? "WhatsApp bildirimleriniz durdurulmuş. Yeniden açmak için kod alıp Projelio numaranıza gönderin ya da WhatsApp'tan BAŞLAT yazın."
+          : "Bildirimleri WhatsApp'tan almak için bir kod alın ve aşağıdaki bağlantıyla Projelio numaranıza gönderin. Telefonunuz bu mesajla eşleşir."}
       </p>
 
       {link ? (
@@ -97,16 +92,13 @@ export default function WhatsappNotifyPanel({
             WhatsApp'ta gönder
           </a>
           <p style={{ fontSize: 14, color: c.textSecondary, margin: "10px 0 0", lineHeight: 1.5 }}>
-            Bağlantı telefonunuzda ya da WhatsApp Web'de açılır; mesaj hazır yazılı gelir, yalnızca gönderin. Gönderdikten
-            sonra bu sayfa kendiliğinden güncellenir. Kod {new Date(link.expiresAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}'e kadar geçerli.
+            Bağlantı telefonunuzda ya da WhatsApp Web'de açılır; mesaj {link.numberMasked} numarasına hazır yazılı gelir, yalnızca
+            gönderin. Gönderdikten sonra bu sayfa kendiliğinden güncellenir. Kod{" "}
+            {new Date(link.expiresAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}'e kadar geçerli.
           </p>
         </div>
       ) : (
-        <button
-          onClick={() => run(async () => setLink(await whatsappApi.linkCode(org.organizationId)))}
-          disabled={busy}
-          style={primaryButton}
-        >
+        <button onClick={() => run(async () => setLink(await whatsappApi.linkCode()))} disabled={busy} style={primaryButton}>
           {busy ? "Kod alınıyor…" : "Kod al"}
         </button>
       )}

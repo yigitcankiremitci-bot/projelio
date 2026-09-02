@@ -1388,7 +1388,10 @@ export interface NotificationPayload {
     | "support_reply"
     // Yalnızca YÖNETİCİLERE gider: Anthropic bakiyesi azaldı ya da günlük harcama
     // ani sıçradı (bkz. ai-spend-alert.processor.ts). Kullanıcıya gösterilmez.
-    | "ai_spend_alert";
+    | "ai_spend_alert"
+    // Müşteriden WhatsApp mesajı geldi (bkz. whatsapp-webhook.service.ts).
+    // Konuşmanın sahibine gider; Lio otomatik yanıt açıksa yine bilgi amaçlı.
+    | "whatsapp_inbound";
   title: string;
   body: string;
   link?: string;
@@ -2303,15 +2306,17 @@ export interface SupportRequest {
 }
 
 // ============================================================ WhatsApp
-// QR ile bağlanan numara üzerinden bildirim (bkz. docs/whatsapp-qr-plan.md).
+// Havuz modeli (bkz. docs/whatsapp-qr-plan.md §12): numaralar platformun,
+// yöneticiler ekler, her kullanıcıya kalıcı bir numara atanır, Lio bu
+// numaradan müşterilerle konuşur.
 
 export type WhatsappConnectionStatus = "stopped" | "starting" | "scan_qr" | "working" | "failed";
 export type WhatsappOptInState = "unknown" | "opted_in" | "opted_out";
 
-/** Organizasyonun bağlı numarası — numara maskeli, sır taşımaz. */
+/** Havuzdaki bir numara — numara maskeli, sır taşımaz. */
 export interface WhatsappConnectionSummary {
   id: string;
-  organizationId: string;
+  label: string;
   status: WhatsappConnectionStatus;
   engine?: string;
   phoneMasked?: string;
@@ -2320,54 +2325,69 @@ export interface WhatsappConnectionSummary {
   /** 463/475 (WhatsApp kısıtı) yüzünden gönderim durdurulduysa bitiş anı. */
   pausedUntil?: string;
   pauseReason?: string;
-  linkedByUserId?: string;
+  /** Bu numaraya atanmış kullanıcı sayısı (yönetici ekranı). */
+  assignedUsers?: number;
+  createdAt?: string;
 }
 
-/** Kullanıcının bu organizasyondaki kendi WhatsApp bildirim durumu. */
+/** Kullanıcının kendi WhatsApp bildirim durumu. */
 export interface WhatsappMyContact {
   optInState: WhatsappOptInState | "not_linked";
   phoneMasked?: string;
 }
 
-/** Eşleştirme kodu: kullanıcı bu kodu organizasyonun numarasına gönderir. */
+/** Eşleştirme kodu: kullanıcı bu kodu kendisine atanmış numaraya gönderir. */
 export interface WhatsappLinkCode {
   code: string;
   /** wa.me bağlantısı, kod hazır yazılı. */
   url: string;
   expiresAt: string;
+  /** Kodun gönderileceği Projelio numarası (maskeli). */
+  numberMasked: string;
 }
 
-/** Ayarlar ekranının tek çağrıda aldığı görünüm: organizasyon başına bir satır. */
-export interface WhatsappOrganizationView {
-  organizationId: string;
-  organizationName: string;
-  /** Yalnızca organizasyon sahibi: bağla / QR / kopar. */
-  canManage: boolean;
-  connection: WhatsappConnectionSummary | null;
-  me: WhatsappMyContact;
-}
-
+/** Ayarlar ekranının tek çağrıda aldığı görünüm. */
 export interface WhatsappOverview {
-  /** Sunucuda WAHA köprüsü tanımlı mı; değilse kartlar "yapılandırılmamış" der. */
+  /** Sunucuda WAHA köprüsü tanımlı mı; değilse kart "yapılandırılmamış" der. */
   configured: boolean;
-  organizations: WhatsappOrganizationView[];
+  /** Havuzda çalışır durumda numara var mı. */
+  poolReady: boolean;
+  /** Kullanıcıya atanmış numara (henüz atanmadıysa null; ilk ihtiyaçta atanır). */
+  myNumber: WhatsappConnectionSummary | null;
+  me: WhatsappMyContact;
 }
 
 export interface WhatsappContact {
   id: string;
-  organizationId: string;
+  connectionId: string;
+  kind: "user" | "customer";
   phoneMasked: string;
   displayName?: string;
   userId?: string;
+  partyId?: string;
   optInState: WhatsappOptInState;
   lastInboundAt?: string;
   createdAt: string;
+}
+
+export interface WhatsappThread {
+  id: string;
+  connectionId: string;
+  kind: "notification" | "customer";
+  ownerUserId?: string;
+  organizationId?: string;
+  title?: string;
+  contact: { phoneMasked: string; displayName?: string; partyId?: string };
+  lioAutoReply: boolean;
+  lastMessageAt?: string;
+  lastInboundAt?: string;
 }
 
 export interface WhatsappMessage {
   id: string;
   threadId: string;
   direction: "inbound" | "outbound";
+  sentBy?: "system" | "user" | "lio";
   body?: string;
   status: "queued" | "sending" | "sent" | "delivered" | "read" | "failed" | "received";
   errorDetail?: string;
@@ -2377,9 +2397,9 @@ export interface WhatsappMessage {
   readAt?: string;
 }
 
-/** Soket olayı `whatsapp-status`: bağlantı durumu değişti, kartı tazele. */
+/** Soket olayı `whatsapp-status`: numara durumu değişti, kartı tazele. */
 export interface WhatsappStatusEvent {
-  organizationId: string;
+  connectionId: string;
   status: WhatsappConnectionStatus;
   phoneMasked?: string;
 }

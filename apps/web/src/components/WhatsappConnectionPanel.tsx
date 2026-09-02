@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { WhatsappOrganizationView } from "@projelio/shared";
+import type { WhatsappConnectionSummary } from "@projelio/shared";
 import { whatsappApi } from "../api/whatsapp";
 import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
@@ -8,27 +8,26 @@ import ConfirmDialog from "./ConfirmDialog";
 const QR_REFRESH_MS = 15_000;
 
 /**
- * Organizasyon sahibinin numara bağlama paneli: Bağla → QR (ya da eşleştirme
- * kodu) → bağlı. Kopan bağlantı kendiliğinden yeniden BAŞLATILMAZ: düğme
- * insan kararı ister (bağlan/kop döngüsü ban tetikleyicisi).
+ * Havuzdaki tek bir numaranın yönetici paneli: QR (ya da eşleştirme kodu) →
+ * bağlı → kopar / havuzdan çıkar. Kopan bağlantı kendiliğinden yeniden
+ * BAŞLATILMAZ: düğme insan kararı ister (bağlan/kop döngüsü ban tetikleyicisi).
  */
 export default function WhatsappConnectionPanel({
-  org,
+  number,
   onChanged,
 }: {
-  org: WhatsappOrganizationView;
+  number: WhatsappConnectionSummary;
   onChanged: () => void;
 }) {
   const c = useThemeColors();
-  const conn = org.connection;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [qr, setQr] = useState<string | null>(null);
   const [pairPhone, setPairPhone] = useState("");
   const [pairCode, setPairCode] = useState("");
-  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [confirm, setConfirm] = useState<"logout" | "remove" | null>(null);
 
-  const status = conn?.status ?? "stopped";
+  const status = number.status;
 
   // QR yalnızca beklenirken çekilir; bağlanınca durur.
   useEffect(() => {
@@ -38,8 +37,8 @@ export default function WhatsappConnectionPanel({
     }
     let cancelled = false;
     const fetchQr = () =>
-      whatsappApi
-        .qr(org.organizationId)
+      whatsappApi.admin
+        .qr(number.id)
         .then((r) => {
           if (!cancelled) setQr(r.qr);
         })
@@ -50,7 +49,7 @@ export default function WhatsappConnectionPanel({
       cancelled = true;
       clearInterval(timer);
     };
-  }, [status, org.organizationId]);
+  }, [status, number.id]);
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -64,12 +63,6 @@ export default function WhatsappConnectionPanel({
       setBusy(false);
     }
   };
-
-  const handlePairing = () =>
-    run(async () => {
-      const { code } = await whatsappApi.pairingCode(org.organizationId, pairPhone);
-      setPairCode(code);
-    });
 
   const primaryButton = {
     padding: "9px 16px",
@@ -91,94 +84,98 @@ export default function WhatsappConnectionPanel({
     cursor: "pointer",
   } as const;
 
+  const paused = number.pausedUntil && new Date(number.pausedUntil) > new Date();
+
   return (
-    <div style={{ marginBottom: 12 }}>
-      {status === "working" && conn ? (
+    <div style={{ padding: "14px 16px", border: `1px solid ${c.border}`, borderRadius: 10, background: c.background }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary }}>{number.label}</div>
+        <div style={{ fontSize: 14, color: status === "working" ? c.success : status === "failed" ? c.danger : c.textSecondary }}>
+          {status === "working" ? "bağlı" : status === "scan_qr" ? "QR bekliyor" : status === "starting" ? "hazırlanıyor" : status === "failed" ? "koptu" : "durduruldu"}
+        </div>
+        {number.phoneMasked && <div style={{ fontSize: 14, color: c.textSecondary }}>{number.phoneMasked}</div>}
+        <div style={{ fontSize: 14, color: c.textSecondary, marginLeft: "auto" }}>{number.assignedUsers ?? 0} kullanıcı</div>
+      </div>
+
+      {paused && (
+        <p style={{ fontSize: 14, color: c.warning, margin: "0 0 8px", lineHeight: 1.5 }}>
+          WhatsApp gönderimi kısıtladı; {new Date(number.pausedUntil!).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}'e kadar kuyrukta.
+          {number.pauseReason ? ` (${number.pauseReason})` : ""}
+        </p>
+      )}
+
+      {status === "scan_qr" && (
         <>
-          <div style={{ fontSize: 15, color: c.textPrimary, marginBottom: 6 }}>
-            Bağlı numara: <strong style={{ fontWeight: 500 }}>{conn.phoneMasked}</strong>
-            {conn.pushName ? <span style={{ color: c.textSecondary }}> · {conn.pushName}</span> : null}
-          </div>
-          {conn.pausedUntil && new Date(conn.pausedUntil) > new Date() && (
-            <p style={{ fontSize: 14, color: c.warning, margin: "0 0 8px", lineHeight: 1.5 }}>
-              WhatsApp gönderimi geçici olarak kısıtladı; bildirimler {new Date(conn.pausedUntil).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}'e
-              kadar kuyrukta bekleyecek.{conn.pauseReason ? ` (${conn.pauseReason})` : ""}
-            </p>
-          )}
-          <button onClick={() => setConfirmLogout(true)} disabled={busy} style={{ ...ghostButton, color: c.danger }}>
-            Bağlantıyı kes
-          </button>
-        </>
-      ) : status === "scan_qr" ? (
-        <>
-          <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>
-            Telefonda WhatsApp › Bağlı cihazlar › Cihaz bağla'ya girip bu kodu okutun. Kod kendiliğinden yenilenir.
+          <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
+            Numaranın telefonunda WhatsApp › Bağlı cihazlar › Cihaz bağla ile bu kodu okutun. Kod kendiliğinden yenilenir.
           </p>
           {qr ? (
             <img src={qr} alt="WhatsApp QR" width={220} height={220} style={{ display: "block", borderRadius: 8, background: "#fff" }} />
           ) : (
             <div style={{ width: 220, height: 220, borderRadius: 8, background: c.border }} />
           )}
-          <details style={{ marginTop: 12, fontSize: 14, color: c.textSecondary }}>
+          <details style={{ marginTop: 10, fontSize: 14, color: c.textSecondary }}>
             <summary style={{ cursor: "pointer" }}>QR okutamıyorum, kodla bağlanayım</summary>
             <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
               <input
                 value={pairPhone}
                 onChange={(e) => setPairPhone(e.target.value)}
                 placeholder="+90 5xx xxx xx xx"
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: `1px solid ${c.border}`,
-                  background: c.background,
-                  color: c.textPrimary,
-                  fontSize: 15,
-                }}
+                style={{ padding: "8px 10px", borderRadius: 8, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary, fontSize: 15 }}
               />
-              <button onClick={handlePairing} disabled={busy || !pairPhone.trim()} style={{ ...ghostButton, color: c.textPrimary }}>
+              <button
+                onClick={() => run(async () => setPairCode((await whatsappApi.admin.pairingCode(number.id, pairPhone)).code))}
+                disabled={busy || !pairPhone.trim()}
+                style={{ ...ghostButton, color: c.textPrimary }}
+              >
                 Kod al
               </button>
-              {pairCode && (
-                <span style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, letterSpacing: 1 }}>{pairCode}</span>
-              )}
+              {pairCode && <span style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, letterSpacing: 1 }}>{pairCode}</span>}
             </div>
-            <p style={{ margin: "8px 0 0", lineHeight: 1.5 }}>
-              Telefonda Cihaz bağla › Bunun yerine telefon numarasıyla bağla deyip bu kodu girin.
-            </p>
           </details>
-          <div style={{ marginTop: 12 }}>
-            <button onClick={() => run(() => whatsappApi.logout(org.organizationId))} disabled={busy} style={{ ...ghostButton, color: c.textSecondary }}>
-              Vazgeç
-            </button>
-          </div>
-        </>
-      ) : status === "starting" ? (
-        <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>Bağlantı hazırlanıyor…</p>
-      ) : (
-        <>
-          <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>
-            {status === "failed"
-              ? "Bağlantı koptu. Numara telefonda hâlâ bağlı görünüyorsa önce oradan çıkarıp yeniden bağlayın."
-              : "Bu iş için ayrılmış bir WhatsApp numarasını QR ile bağlayın; ekip üyeleri bildirimlerini bu numaradan alır."}
-          </p>
-          <button onClick={() => run(() => whatsappApi.start(org.organizationId))} disabled={busy} style={primaryButton}>
-            {busy ? "Başlatılıyor…" : status === "failed" ? "Yeniden bağla" : "Numara bağla"}
-          </button>
         </>
       )}
 
+      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        {(status === "stopped" || status === "failed") && (
+          <button onClick={() => run(() => whatsappApi.admin.start(number.id))} disabled={busy} style={primaryButton}>
+            {status === "failed" ? "Yeniden bağla" : "Bağla"}
+          </button>
+        )}
+        {(status === "working" || status === "scan_qr" || status === "starting") && (
+          <button onClick={() => setConfirm("logout")} disabled={busy} style={{ ...ghostButton, color: c.danger }}>
+            {status === "working" ? "Bağlantıyı kes" : "Vazgeç"}
+          </button>
+        )}
+        <button onClick={() => setConfirm("remove")} disabled={busy} style={{ ...ghostButton, color: c.textSecondary }}>
+          Havuzdan çıkar
+        </button>
+      </div>
+
       {error && <p style={{ fontSize: 14, color: c.danger, margin: "8px 0 0" }}>{error}</p>}
 
-      {confirmLogout && (
+      {confirm === "logout" && (
         <ConfirmDialog
           title="WhatsApp bağlantısını kes"
-          message="Numara Projelio'dan ayrılacak; ekip üyelerine WhatsApp bildirimi gitmeyecek. Mesaj geçmişi silinmez."
+          message="Numara Projelio'dan ayrılacak; bu numaraya atanmış kullanıcılara bildirim gitmeyecek ve Lio bu numaradan yazamayacak. Kayıtlar ve atamalar silinmez, yeniden bağlanabilir."
           confirmLabel="Bağlantıyı kes"
           onConfirm={async () => {
-            setConfirmLogout(false);
-            await run(() => whatsappApi.logout(org.organizationId));
+            setConfirm(null);
+            await run(() => whatsappApi.admin.logout(number.id));
           }}
-          onCancel={() => setConfirmLogout(false)}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+      {confirm === "remove" && (
+        <ConfirmDialog
+          title="Numarayı havuzdan çıkar"
+          message="Bu numaraya atanmış kullanıcılar başka bir bağlı numaraya taşınır; müşterileri artık farklı bir numaradan mesaj görür. Başka bağlı numara yoksa işlem reddedilir."
+          confirmLabel="Havuzdan çıkar"
+          onConfirm={async () => {
+            setConfirm(null);
+            await run(() => whatsappApi.admin.remove(number.id));
+          }}
+          onCancel={() => setConfirm(null)}
         />
       )}
     </div>

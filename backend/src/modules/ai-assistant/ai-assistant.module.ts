@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { AiAssistantController } from "./ai-assistant.controller";
 import { AiAssistantService } from "./ai-assistant.service";
 import { AiCreditsService } from "./ai-credits.service";
@@ -29,6 +29,7 @@ import { DepartmentMembersModule } from "../department-members/department-member
 import { OrganizationModulesModule } from "../organization-modules/organization-modules.module";
 import { JobModulesModule } from "../job-modules/job-modules.module";
 import { ModuleRecordsModule } from "../module-records/module-records.module";
+import { WhatsappModule } from "../whatsapp/whatsapp.module";
 
 @Module({
   imports: [
@@ -70,6 +71,9 @@ import { ModuleRecordsModule } from "../module-records/module-records.module";
     OrganizationModulesModule,
     JobModulesModule,
     ModuleRecordsModule,
+    // WhatsApp araçları (müşteriye yaz, konuşmayı oku). İki yönlü bağımlılık:
+    // WhatsApp modülü otomatik yanıt için draftText()'i çağırıyor.
+    forwardRef(() => WhatsappModule),
   ],
   controllers: [AiAssistantController],
   providers: [

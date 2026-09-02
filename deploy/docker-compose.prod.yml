@@ -321,7 +321,10 @@ services:
       # Oturum anahtarları ayrı bir veritabanında (waha rolü, CREATEDB yetkili:
       # WAHA oturum başına kendi veritabanını açar). Dosya volume'u yerine
       # Postgres seçildi ki yedekleme tek kanaldan (pg_dump) yürüsün.
-      WHATSAPP_SESSIONS_POSTGRESQL_URL: postgresql://waha:${WAHA_DB_PASSWORD}@postgres:5432/waha
+      # sslmode=disable şart: WAHA varsayılan olarak TLS ister, iç ağdaki
+      # Postgres TLS konuşmuyor ("The server does not support SSL connections"
+      # ile yeniden başlatma döngüsüne girdi, 2026-09-02).
+      WHATSAPP_SESSIONS_POSTGRESQL_URL: postgresql://waha:${WAHA_DB_PASSWORD}@postgres:5432/waha?sslmode=disable
       # Konteyner yeniden başlayınca kayıtlı oturumlar kendiliğinden kalksın;
       # yoksa her dağıtımda QR yeniden okutulur.
       WHATSAPP_RESTART_ALL_SESSIONS: "true"

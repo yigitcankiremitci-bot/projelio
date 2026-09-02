@@ -294,7 +294,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      # 300s: bu sunucunun diski yavaş; dağıtımdan hemen sonra (imaj katmanları
+      # yazılırken) backend'in 45 modülü yüklemesi 2-4 dakika sürebiliyor.
+      # 30s'de sağlık kontrolü zaman aşımına uğruyor, compose bağımlı Caddy'yi
+      # başlatmıyor ve dağıtım betiği önceki sürüme dönüyor — 2026-09-03'te
+      # yaşandı, zamanlayıcı her dakika yeniden deneyip döngüye girdi.
+      start_period: 300s
     networks: [projelio]
 
   waha:

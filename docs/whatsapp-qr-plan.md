@@ -1,6 +1,6 @@
 # WhatsApp Entegrasyonu — QR ile Bağlanan Numara (Uygulama Planı)
 
-Durum: **kod yazıldı, canlıya alınmadı** (2026-09-02). Sunucu adımları için §9.
+Durum: **canlıda** (2026-09-02); QR okutma ve ilk bildirim testi bekliyor. Sunucu adımları için §9.
 Karar: bu iş için **ayrı bir numara** kullanılacak (şahsi numara değil).
 
 Bu doküman `docs/whatsapp-mvp-spec.md`'deki Meta Cloud API yaklaşımının yerini
@@ -139,6 +139,27 @@ o klasör için bir tar satırı yazılır.
 
 Dağıtım zinciri (`npm run yayinla`) compose değişikliğini kendiliğinden alır;
 yeni imaj ilk `docker compose up -d`'de çekilir.
+
+**İlk canlıya almadan öğrenilenler (2026-09-02):**
+
+- `.env`'e değişken eklemek `env_file: .env` kullanan HER servisi (Postgres
+  dahil) yeniden oluşturur — compose env değişimini konfigürasyon değişimi
+  sayar. `whatsapp-kur.sh` üç değişken ekleyince Postgres, storage, PostgREST,
+  backend ve landing aynı anda yeniden başladı. Bir dahaki sefere yeni sırları
+  `.env`'e eklemeden önce kısa bir kesintiye hazır ol; kalıcı çözüm WAHA
+  sırlarını `env_file` yerine ilgili servislerin `environment` bloğuna vermek.
+- Sunucu diski yavaş: 853 MB imaj yaklaşık 200 KB/s ile bir saatte indi;
+  imaj açılırken ve `docker compose build` koşarken I/O baskısı %70'i aştı,
+  backend modülleri saniyeler süren yüklemelerle açılamadı ve sağlık
+  kontrolü zaman aşımına uğradı (Caddy o yüzden başlatılmadı, elle
+  `docker start projelio-caddy` gerekti). WAHA'nın GOWS motoru da aynı
+  nedenle "did not start after 10000 ms" diye birkaç kez yeniden başladı;
+  yük düşünce kendiliğinden kalktı.
+- WAHA Postgres URL'sinde `?sslmode=disable` şart (aksi hâlde "The server
+  does not support SSL connections" ile döngü).
+- İmaj etiketleri motor bazlı: `gows-<sürüm>`; düz `<sürüm>` etiketi yok.
+- GOWS + Postgres oturum deposu ÇALIŞIYOR: ilk açılışta `waha_gows`
+  veritabanı kendiliğinden açıldı. Yukarıdaki "belirsiz nokta" kapandı.
 
 ---
 

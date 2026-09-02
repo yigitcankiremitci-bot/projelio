@@ -9,7 +9,7 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import { Server, Socket } from "socket.io";
 import { getGatewayCorsOrigin } from "../../common/config/env";
-import type { NotificationPayload } from "@projelio/shared";
+import type { NotificationPayload, WhatsappStatusEvent } from "@projelio/shared";
 
 // CORS kaynağı main.ts'teki HTTP ayarıyla AYNI listeden gelir (bkz.
 // common/config/env.ts getGatewayCorsOrigin) — burada ayrıca ayrıştırılmıyor,
@@ -45,6 +45,12 @@ export class NotificationsGateway {
 
   sendToUser(userId: string, notification: NotificationPayload) {
     this.server.to(`user:${userId}`).emit("notification", notification);
+  }
+
+  // WhatsApp bağlantı durumu değişti (QR okutuldu, koptu, numara eşlendi):
+  // Ayarlar sayfasındaki kart kendini tazelesin. Aynı kullanıcı odası.
+  sendWhatsappStatus(userId: string, event: WhatsappStatusEvent) {
+    this.server.to(`user:${userId}`).emit("whatsapp-status", event);
   }
 
   // Bir kullanıcı "üzerinde çalışıyorum" durumunu değiştirdiğinde, iş ekibi

@@ -90,6 +90,23 @@ docker exec -i projelio-postgres pg_restore --list > /dev/null < "$gecici" \
   || { rm -f "$gecici"; echo "HATA: dump doğrulanamadı, atıldı." >&2; exit 1; }
 mv "$gecici" "$db_dosya"
 
+# --- 1b. WhatsApp oturum veritabanları ----------------------------------------
+# WAHA oturum anahtarlarını ana veritabanında değil, "waha" ile başlayan ayrı
+# veritabanlarında tutar (oturum başına bir tane açabiliyor; adı motora göre
+# değişir, o yüzden ada değil önek'e bakıyoruz). Yukarıdaki pg_dump tek
+# veritabanı alır, bunlar dışarıda kalırdı. Kaybı ölümcül değil — numara QR ile
+# yeniden bağlanır — ama her felakette QR okutmak zorunda kalmamak için alınıyor.
+# Boş liste (WhatsApp hiç kurulmadıysa) sessizce geçilir.
+waha_dbler="$(docker exec projelio-postgres sh -c \
+  'psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select datname from pg_database where datname like '"'"'waha%'"'"' order by 1"' 2>/dev/null || true)"
+for waha_db in $waha_dbler; do
+  waha_dosya="$GUNLUK/$waha_db-$damga.dump"
+  docker exec projelio-postgres sh -c \
+    "pg_dump -Fc --no-owner -U \"\$POSTGRES_USER\" \"$waha_db\"" > "$waha_dosya.yaziliyor" \
+    && mv "$waha_dosya.yaziliyor" "$waha_dosya" \
+    || { rm -f "$waha_dosya.yaziliyor"; echo "UYARI: $waha_db yedeklenemedi, geçildi." >&2; }
+done
+
 # --- 2. Yüklenen dosyalar -----------------------------------------------------
 # Dosyalar host'ta root'un olabilir (bind mount'u konteyner oluşturuyor).
 # Okuyamıyorsak konteynerin içinden alıyoruz — docker erişimi zaten var,

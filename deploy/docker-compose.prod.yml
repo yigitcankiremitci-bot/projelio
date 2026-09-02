@@ -285,12 +285,60 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       CORS_ORIGINS: https://app.projelio.app
       WEB_APP_URL: https://app.projelio.app
+      # WhatsApp köprüsü iç ağ adresi; WAHA'nın backend'e webhook atacağı
+      # adres de iç ağdan (Caddy'ye uğramadan) verilir.
+      WAHA_URL: http://waha:3000
+      WHATSAPP_WEBHOOK_URL: http://backend:3000/whatsapp/webhook
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
+    networks: [projelio]
+
+  waha:
+    # WhatsApp köprüsü (bkz. docs/whatsapp-qr-plan.md). Resmi olmayan "Bağlı
+    # Cihazlar" protokolünü konuşan tek yer burası; backend ona yalnızca HTTP
+    # ile bakar. Protokol kırıldığında backend değil bu konteyner etkilenir,
+    # düzeltme de imaj sürümünü yükseltmekten ibarettir. Sürüm bilerek sabit:
+    # "latest" bir gece motor davranışını değiştirip oturumu düşürebilir.
+    image: devlikeapro/waha:2026.8.2
+    container_name: projelio-waha
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: Europe/Istanbul
+      # GOWS: whatsmeow tabanlı Go motoru, tarayıcısız, ~200 MB. Sorun çıkarsa
+      # NOWEB'e geçmek entegrasyonu değiştirmez (aynı HTTP API).
+      WHATSAPP_DEFAULT_ENGINE: GOWS
+      WAHA_API_KEY: ${WAHA_API_KEY}
+      # Oturum anahtarları ayrı bir veritabanında (waha rolü, CREATEDB yetkili:
+      # WAHA oturum başına kendi veritabanını açar). Dosya volume'u yerine
+      # Postgres seçildi ki yedekleme tek kanaldan (pg_dump) yürüsün.
+      WHATSAPP_SESSIONS_POSTGRESQL_URL: postgresql://waha:${WAHA_DB_PASSWORD}@postgres:5432/waha
+      # Konteyner yeniden başlayınca kayıtlı oturumlar kendiliğinden kalksın;
+      # yoksa her dağıtımda QR yeniden okutulur.
+      WHATSAPP_RESTART_ALL_SESSIONS: "true"
+      # Webhook ayarı burada DEĞİL: backend oturumu açarken kendi webhook
+      # adresini ve HMAC anahtarını oturum konfigürasyonuyla verir (kodda
+      # sürümlenir, env'e dağılmaz).
+      WAHA_PRINT_QR: "false"
+    # WhatsApp'a bağlı bir oturumun log satırları numara ve mesaj içeriği
+    # taşıyabilir; diskte sınırsız birikmesin.
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "3" }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/ping',{headers:{'X-Api-Key':process.env.WAHA_API_KEY}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    # Port yayımlanmıyor ve Caddy'de yolu yok: WAHA'ya yalnızca backend,
+    # compose ağı üzerinden (http://waha:3000) ulaşır.
     networks: [projelio]
 
   caddy:

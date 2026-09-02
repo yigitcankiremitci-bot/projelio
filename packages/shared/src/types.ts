@@ -2301,3 +2301,85 @@ export interface SupportRequest {
   userFullName?: string;
   userEmail?: string;
 }
+
+// ============================================================ WhatsApp
+// QR ile bağlanan numara üzerinden bildirim (bkz. docs/whatsapp-qr-plan.md).
+
+export type WhatsappConnectionStatus = "stopped" | "starting" | "scan_qr" | "working" | "failed";
+export type WhatsappOptInState = "unknown" | "opted_in" | "opted_out";
+
+/** Organizasyonun bağlı numarası — numara maskeli, sır taşımaz. */
+export interface WhatsappConnectionSummary {
+  id: string;
+  organizationId: string;
+  status: WhatsappConnectionStatus;
+  engine?: string;
+  phoneMasked?: string;
+  pushName?: string;
+  lastConnectedAt?: string;
+  /** 463/475 (WhatsApp kısıtı) yüzünden gönderim durdurulduysa bitiş anı. */
+  pausedUntil?: string;
+  pauseReason?: string;
+  linkedByUserId?: string;
+}
+
+/** Kullanıcının bu organizasyondaki kendi WhatsApp bildirim durumu. */
+export interface WhatsappMyContact {
+  optInState: WhatsappOptInState | "not_linked";
+  phoneMasked?: string;
+}
+
+/** Eşleştirme kodu: kullanıcı bu kodu organizasyonun numarasına gönderir. */
+export interface WhatsappLinkCode {
+  code: string;
+  /** wa.me bağlantısı, kod hazır yazılı. */
+  url: string;
+  expiresAt: string;
+}
+
+/** Ayarlar ekranının tek çağrıda aldığı görünüm: organizasyon başına bir satır. */
+export interface WhatsappOrganizationView {
+  organizationId: string;
+  organizationName: string;
+  /** Yalnızca organizasyon sahibi: bağla / QR / kopar. */
+  canManage: boolean;
+  connection: WhatsappConnectionSummary | null;
+  me: WhatsappMyContact;
+}
+
+export interface WhatsappOverview {
+  /** Sunucuda WAHA köprüsü tanımlı mı; değilse kartlar "yapılandırılmamış" der. */
+  configured: boolean;
+  organizations: WhatsappOrganizationView[];
+}
+
+export interface WhatsappContact {
+  id: string;
+  organizationId: string;
+  phoneMasked: string;
+  displayName?: string;
+  userId?: string;
+  optInState: WhatsappOptInState;
+  lastInboundAt?: string;
+  createdAt: string;
+}
+
+export interface WhatsappMessage {
+  id: string;
+  threadId: string;
+  direction: "inbound" | "outbound";
+  body?: string;
+  status: "queued" | "sending" | "sent" | "delivered" | "read" | "failed" | "received";
+  errorDetail?: string;
+  createdAt: string;
+  sentAt?: string;
+  deliveredAt?: string;
+  readAt?: string;
+}
+
+/** Soket olayı `whatsapp-status`: bağlantı durumu değişti, kartı tazele. */
+export interface WhatsappStatusEvent {
+  organizationId: string;
+  status: WhatsappConnectionStatus;
+  phoneMasked?: string;
+}

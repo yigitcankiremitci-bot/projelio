@@ -497,3 +497,20 @@ export function IconOutdent({ size = 18, color = "currentColor" }: IconProps) {
     </svg>
   );
 }
+
+export function IconWhatsapp({ size = 18 }: IconProps) {
+  // Marka ikonu: WhatsApp yeşili paletten değil, markadan geliyor — diğer
+  // marka ikonlarıyla (Drive, OneDrive) aynı gerekçeyle tema rengine boyanmıyor.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 2.5a9.5 9.5 0 0 0-8.2 14.3L2.5 21.5l4.9-1.3A9.5 9.5 0 1 0 12 2.5z"
+        fill="#25D366"
+      />
+      <path
+        d="M9.2 7.6c-.2-.5-.4-.5-.6-.5h-.5c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.2 4.9 4.3 2.4.9 2.9.8 3.4.7.5-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3l-2-1c-.3-.1-.5-.2-.7.2l-1 1.2c-.2.2-.4.2-.6.1-.3-.1-1.2-.5-2.3-1.5-.9-.8-1.5-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5c.1-.2 0-.4 0-.5L9.2 7.6z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}

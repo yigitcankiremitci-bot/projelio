@@ -67,7 +67,11 @@ async function bootstrap() {
     logger.warn("Projelio AI devre dışı: ANTHROPIC_API_KEY tanımlı değil (backend/.env).");
   }
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: WhatsApp köprüsünün webhook imzası (HMAC) ham gövde üzerinden
+  // doğrulanır; JSON ayrıştırıldıktan sonra yeniden serileştirilen gövde
+  // bayt bayt aynı olmayabilir. Nest ham gövdeyi yalnızca bu seçenekle
+  // (req.rawBody) saklar. Bkz. whatsapp-webhook.controller.ts
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   // Render (ve benzeri PaaS) uygulamayı bir ters vekil sunucunun arkasında çalıştırır.
   // Bu ayar yapılmazsa Express, req.ip olarak istemcinin değil vekil sunucunun iç

@@ -15,6 +15,7 @@ import { demoHesap } from "../lib/demoHesap";
 import TabBar from "../components/TabBar";
 import GoogleDriveCard from "../components/GoogleDriveCard";
 import OneDriveCard from "../components/OneDriveCard";
+import WhatsappCard from "../components/WhatsappCard";
 import {
   IconShield,
   IconLogout,
@@ -825,6 +826,7 @@ export default function Settings() {
       <>
         <GoogleDriveCard />
         <OneDriveCard />
+        <WhatsappCard />
       </>
     ),
     destek: <SupportPanel me={me} />,

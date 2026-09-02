@@ -161,6 +161,29 @@ kaydın *varlığını* görür.
 verilebilir; departmanı görebildiği için modülü okuyabilen ama modüle atanmamış
 kişiye izin verilmez.
 
+## WhatsApp köprüsü (`/whatsapp`, `/organizations/:id/whatsapp`)
+
+QR ile bağlanan numara üzerinden bildirim; tasarım `docs/whatsapp-qr-plan.md`.
+Numarayı yalnızca **organizasyon sahibi** bağlar/koparır; organizasyonu
+görebilen herkes kendi bildirim ayarını yapar. Numaralar yanıtlarda maskelidir.
+
+| Method | Path | Açıklama | Body |
+|---|---|---|---|
+| GET | `/whatsapp/me` | Sunucuda yapılandırılmış mı + organizasyon başına bağlantı özeti ve kendi opt-in durumum (`WhatsappOverview`) | — |
+| POST | `/whatsapp/me/link-code` | Eşleştirme kodu üretir (`PROJELIO-XXXX`, 24 saat). Kullanıcı kodu organizasyonun numarasına gönderir; sunucu numarayı hesaba bağlar | `{ organizationId }` |
+| POST | `/whatsapp/me/opt-out` | Bu organizasyondan WhatsApp bildirimi almayı durdurur | `{ organizationId }` |
+| POST | `/organizations/:id/whatsapp/connection/start` | WAHA oturumunu açar; durum `starting` → `scan_qr` | — |
+| GET | `/organizations/:id/whatsapp/connection/qr` | QR görseli, JSON içinde data-URL: `{ qr }`. Yalnızca `scan_qr` durumunda; bağlıysa 409 | — |
+| POST | `/organizations/:id/whatsapp/connection/pairing-code` | QR yerine telefon numarasıyla eşleştirme kodu: `{ code }` | `{ phone }` |
+| POST | `/organizations/:id/whatsapp/connection/logout` | Numarayı ayırır (satır silinmez, durum `stopped`) | — |
+| GET | `/organizations/:id/whatsapp/contacts` | Kişi listesi (sahip) | — |
+| GET | `/whatsapp/threads/:threadId/messages?limit=` | Konuşma mesajları (sahip) | — |
+| POST | `/whatsapp/threads/:threadId/messages` | Serbest metni kuyruğa alır; gönderim dakikalık işleyicide, hız sınırıyla | `{ body }` |
+| POST | `/whatsapp/webhook` | **JWT yok.** WAHA'nın olay bildirimi; `X-Webhook-Hmac` (sha512, ham gövde) doğrulanır, olay saklanıp hemen 200 dönülür | WAHA zarfı |
+
+Gelen mesajlarda yalnızca şu komutlar tanınır: eşleştirme kodu, `DUR`
+(opt-out), `BAŞLAT` (opt-in). Başka metin yorumlanmaz, Lio'ya iletilmez.
+
 ## Admin (`/admin`) — sadece `role: admin`
 
 | Method | Path | Açıklama |
@@ -180,6 +203,7 @@ sunucu o kullanıcıya özel `user:<id>` odasına katılır.
 | Event (server → client) | Payload | Açıklama |
 |---|---|---|
 | `notification` | `NotificationPayload` (bkz. `packages/shared/src/types.ts`) | Davet, rol güncellemesi, bütçe değişikliği, deadline hatırlatması |
+| `whatsapp-status` | `WhatsappStatusEvent` | WhatsApp bağlantı durumu değişti (QR okutuldu, koptu, numara eşlendi); Ayarlar kartı kendini tazeler |
 
 Bildirim tipleri: `task_due_24h`, `task_due_1h`, `project_deadline_24h`,
 `team_invite`, `role_updated`, `budget_changed`, `join_request`.

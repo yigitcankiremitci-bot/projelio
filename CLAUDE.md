@@ -21,6 +21,7 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | SQL migration'lar | `database/migrations/NNN_ad.sql` |
 | API referansı | `docs/api-endpoints.md` |
 | Tanıtım sitesi (Next.js) | `landing/` |
+| WhatsApp köprüsü (WAHA yan-servisi + modül) | `backend/src/modules/whatsapp/`, `deploy/docker-compose.prod.yml` `waha` servisi, tasarım `docs/whatsapp-qr-plan.md` |
 
 Backend'de 42 modül var (`backend/src/modules/` altında listelenir). Lio =
 `modules/ai-assistant/`; araç tanımları `ai-assistant.tools.ts`, kredi sistemi

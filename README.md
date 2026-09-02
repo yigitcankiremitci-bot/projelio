@@ -55,6 +55,15 @@ kopyalayıp kendi değerlerinizi girin (veritabanı adresi ve anahtarı zaten do
 İstemci hâlâ `supabase-js`: değişken adları `SUPABASE_*` olarak kaldı, arkasında
 artık kendi PostgREST + storage-api'miz duruyor.
 
+## WhatsApp Bildirimleri
+
+Organizasyon sahibi bu iş için ayrılmış bir numarayı QR ile bağlar; ekip
+üyeleri Ayarlar › Bağlı hesaplar'dan kod alıp o numaraya gönderince
+bildirimleri WhatsApp'tan da alır. Köprü, resmi olmayan "Bağlı Cihazlar"
+protokolünü konuşan ayrı bir konteynerdir (WAHA); backend ona yalnızca HTTP
+ile bakar. Tasarım, riskler ve kurulum sırası: `docs/whatsapp-qr-plan.md`.
+Sunucu kurulumu: `deploy/whatsapp-kur.sh`.
+
 ## Marka Renkleri
 
 - Ana renk: Gri-Lacivert / Slate Navy — `#3E4858`

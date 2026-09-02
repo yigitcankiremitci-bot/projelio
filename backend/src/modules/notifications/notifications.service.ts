@@ -1,8 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import * as webpush from "web-push";
 import type { NotificationPayload, PushSubscriptionPayload } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsGateway } from "./notifications.gateway";
+import { WhatsappService } from "../whatsapp/whatsapp.service";
 
 function mapNotification(row: any): NotificationPayload {
   return {
@@ -24,7 +25,11 @@ export class NotificationsService {
 
   constructor(
     private supabase: SupabaseService,
-    private gateway: NotificationsGateway
+    private gateway: NotificationsGateway,
+    // forwardRef: WhatsApp modülü bağlantı durumunu tarayıcıya iletmek için bu
+    // modülün gateway'ini kullanıyor; biz de bildirimi WhatsApp'a vermek için
+    // onu — iki yönlü bağımlılık Nest'te ancak böyle çözülüyor.
+    @Inject(forwardRef(() => WhatsappService)) private whatsapp: WhatsappService
   ) {
     const publicKey = process.env.VAPID_PUBLIC_KEY;
     const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -55,6 +60,9 @@ export class NotificationsService {
     const notification = mapNotification(row);
     this.gateway.sendToUser(userId, notification);
     void this.sendPush(userId, notification);
+    // Dördüncü kanal: kullanıcı WhatsApp'a bağlıysa kuyruğa girer, değilse
+    // sessizce döner. Gönderim burada değil, dakikalık işleyicide (hız sınırı).
+    void this.whatsapp.notifyUser(userId, notification);
     return notification;
   }
 

@@ -29,7 +29,24 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 Backend'de 46 modül, 450'den fazla HTTP ucu var (`node scripts/uc-listesi.mjs` ile
 listelenir — elle yazılmış liste bayatlıyor). Lio =
 `modules/ai-assistant/`; araç tanımları `ai-assistant.tools.ts`, kredi sistemi
-`ai-credits.service.ts` + `ai-credits.config.ts`.
+`ai-credits.service.ts` + `ai-credits.config.ts`, sağlayıcı katmanı
+`ai-assistant/providers/`.
+
+**Lio çok sağlayıcılıdır.** Model çağrısı doğrudan Anthropic SDK'sına değil,
+`providers/provider-registry.ts` üzerinden gider. Yeni sağlayıcı ya da model
+eklemek = `providers/providers.config.ts` içindeki `PROVIDER_CATALOG`'a bir
+satır. **Fiyat da o satırda** — `MODEL_PRICING` katalogdan besleniyor, ikinci
+bir liste tutulmuyor. OpenAI ya da Anthropic uyumlu API sunan her sağlayıcı
+(z.ai/GLM, MiniMax, DeepSeek, Groq, OpenRouter, Ollama) kod yazmadan eklenir;
+yalnızca bu iki biçime de uymayan bir sağlayıcı için `LlmProvider` arayüzünü
+uygulayan yeni bir sınıf gerekir.
+
+Sağlayıcı listesi, öncelik sırası, model seçimi ve KVKK notu için aşağıdaki
+"Sunucuda elle kurulması gerekenler" başlığına bak.
+
+Kanonik istek biçimi **Anthropic Messages biçimidir**: 68 araç tanımı ve tüm
+servis kodu o dilde yazılmış, çeviri yükü yalnızca onu gerektiren sağlayıcıya
+biniyor (`providers/openai-format.ts`, testleri `openai-format.test.ts`).
 
 `apps/mobile` (Expo) neredeyse boş — asıl istemci `apps/web`.
 
@@ -88,12 +105,75 @@ Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 | Arıza bildirimi | `PROJELIO_NTFY_KONU` ya da `PROJELIO_TELEGRAM_TOKEN`+`_CHAT` | `/etc/projelio/uyari.env` ya da `~/uyari.env` |
 | Yedek yaşam sinyali | `PROJELIO_YEDEK_PING` | aynı dosya |
 | WhatsApp'tan Lio'ya komut | `WHATSAPP_LIO_KOMUT=1` | `backend/.env` |
+| Lio'nun AI sağlayıcı sırası | `AI_PROVIDERS` | `backend/.env` |
 
-`WHATSAPP_LIO_KOMUT` açıkken kullanıcının bağlı telefonundan yazdığı serbest
-metin Lio'nun araçlı akışına giriyor (bkz. `docs/whatsapp-lio-komut-plani.md`).
-Kapalıyken o metin sessizce düşer — WhatsApp yalnızca bildirim kanalı olarak
-çalışmaya devam eder. Saatlik istek tavanı `WHATSAPP_LIO_SAATLIK` (varsayılan
-10), gelen metin uzunluğu `WHATSAPP_LIO_MAX_UZUNLUK` (varsayılan 1000).
+`AI_PROVIDERS` sağlayıcıları hem **açar** hem **sıralar** — virgülle ayrılmış,
+soldan sağa öncelikli:
+
+```
+AI_PROVIDERS=anthropic          # varsayılan (değişken tanımsızsa da bu)
+AI_PROVIDERS=anthropic,zai      # önce Anthropic, düşerse z.ai
+AI_PROVIDERS=zai,anthropic      # önce ucuz olan, yedek Anthropic
+```
+
+Bir sağlayıcının anahtarı (`ANTHROPIC_API_KEY`, `ZAI_API_KEY`,
+`MINIMAX_API_KEY`) tanımlı değilse listede olsa bile atlanır — log'a uyarı
+düşer. Yedeğe geçiş yalnızca **geçici** hatalarda olur (429, 5xx, bağlantı ve
+sağlayıcıya özgü 401/404); 400'de geçilmez, çünkü bozuk istek her sağlayıcıda
+bozuktur. Kredi, yedeğe geçilirse **gerçekten kullanılan** modelin fiyatından
+kesilir.
+
+### Model seçimi
+
+Kademe (hızlı/dengeli/güçlü) seçimi duruyor; artık ona ek olarak kullanıcı
+**tam modeli** de seçebiliyor. `POST /ai/chat` gövdesine
+`model: "saglayici:model"` (ör. `"zai:glm-5.3"`) konur; seçenekleri
+`GET /ai/models` döner (`models` alanı — yalnızca ETKİN sağlayıcıların
+modelleri, fiyat ve bağlam penceresiyle).
+
+Seçilen model listenin başına geçer, kademenin normal adayları **yedekte
+kalır**: seçim geçici olarak düşerse iş durmaz. Geçersiz ya da kapalı bir
+sağlayıcıya ait seçim sessizce yok sayılır ve kademe kararı işler — eski bir
+sohbette kalmış seçim yüzünden asistan durmasın diye.
+
+Kademe varsayılanını ortamdan ezmek için `AI_MODEL_<SAĞLAYICI>_<KADEME>`
+(ör. `AI_MODEL_ZAI_SMART=glm-4.7`); eski `ANTHROPIC_MODEL` çalışmaya devam eder
+ama yalnızca Anthropic birincilken.
+
+### Katalogdaki modeller (Eylül 2026 liste fiyatları, USD/milyon token)
+
+| Sağlayıcı | Model | Giriş | Çıkış | Bağlam | Görsel |
+|---|---|---|---|---|---|
+| Anthropic | Claude Haiku 4.5 | 1 | 5 | 200K | ✓ |
+| Anthropic | Claude Sonnet 5 | 3 | 15 | 200K | ✓ |
+| Anthropic | Claude Opus 5 | 15 | 75 | 200K | ✓ |
+| z.ai | GLM 5.3 Flash | 0,075 | 0,25 | 200K | — |
+| z.ai | GLM 4.7 FlashX | 0,07 | 0,4 | 128K | — |
+| z.ai | GLM 5.3 | 1,4 | 4,4 | 1M | — |
+| z.ai | GLM 4.7 | 0,6 | 2,2 | 200K | — |
+| z.ai | GLM 4.6V | 0,3 | 0,9 | 64K | ✓ |
+| z.ai | GLM 5.2 | 1,4 | 4,4 | 200K | — |
+| MiniMax | M2.7 Hızlı | 0,3 | 1,2 | 200K | — |
+| MiniMax | M2.7 | 0,3 | 1,2 | 200K | — |
+| MiniMax | M3 | 0,3 | 1,2 | 1M | ✓ |
+
+Fiyatların **tek kaynağı** `providers.config.ts`; `MODEL_PRICING` oradan
+besleniyor (`catalogPricing()`). Katalogda fiyatı olmayan model
+DEFAULT_PRICING'e (15/75 USD) düşer ve müşteriden gerçeğin kat kat üstünde
+kredi kesilir — bir test bunu yakalıyor (`providers.config.test.ts`).
+
+MiniMax **Anthropic uyumlu uç** (`/anthropic`) sunduğu için `kind: "anthropic"`
+ile bağlandı: çeviri katmanı devreye girmiyor, araç akışı Anthropic'le birebir
+aynı yoldan geçiyor. z.ai OpenAI uyumlu olduğu için `openai-format.ts`
+çevirisinden geçer.
+
+Durumu görmek için `GET /ai/health`: hangi sağlayıcılar tanımlı, hangileri
+etkin, hangi model kullanılıyor.
+
+⚠️ **Anthropic dışı sağlayıcılar bilinçli olarak varsayılan DEĞİL.** İkisi de
+(MiniMax, z.ai) Çin merkezli; müşteri verisi (görev içerikleri, dosya adları,
+WhatsApp mesajları) oraya gider. KVKK açısından bu teknik değil ticari/hukuki
+bir karar — açmadan önce bilerek karar ver.
 
 Kurulum adımları `deploy/yedekle.sh` ve `deploy/uyar.sh` başlıklarında yazılı.
 Dış kopya kurulana kadar yedekler **yalnızca korumaya çalıştıkları diskte**

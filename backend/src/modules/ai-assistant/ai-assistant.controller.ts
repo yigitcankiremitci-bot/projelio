@@ -40,12 +40,14 @@ import {
   MIN_BALANCE_TO_START,
   MODEL_TIERS,
 } from "./ai-credits.config";
+import { LlmProviderRegistry } from "./providers/provider-registry";
 
 @Controller("ai")
 @UseGuards(AuthGuard("jwt"))
 export class AiAssistantController {
   constructor(
     private aiAssistantService: AiAssistantService,
+    private providers: LlmProviderRegistry,
     private creditsService: AiCreditsService,
     private conversationsService: AiConversationsService,
     private attachmentsService: AiAttachmentsService,
@@ -62,7 +64,14 @@ export class AiAssistantController {
   chat(
     @Req() req: any,
     @Body()
-    body: { message: string; conversationId?: string; tier?: string; attachmentIds?: string[] }
+    body: {
+      message: string;
+      conversationId?: string;
+      tier?: string;
+      attachmentIds?: string[];
+      /** "saglayici:model" — kademeden bağımsız açık model seçimi. */
+      model?: string;
+    }
   ) {
     return this.aiAssistantService.chat(
       req.user.userId,
@@ -70,7 +79,8 @@ export class AiAssistantController {
       body.message,
       body.conversationId,
       body.tier,
-      body.attachmentIds
+      body.attachmentIds,
+      { model: body.model }
     );
   }
 
@@ -102,6 +112,10 @@ export class AiAssistantController {
     return {
       defaultTier: DEFAULT_TIER,
       tiers: Object.values(MODEL_TIERS),
+      // Etkin sağlayıcıların tüm modelleri. Kademe seçimi (hızlı/dengeli/güçlü)
+      // duruyor; bu liste "hangi modeli tam olarak istiyorum" diyen kullanıcı
+      // için. Boşsa arayüz yalnızca kademe seçicisini gösterir.
+      models: this.providers.availableModels(),
       maxAttachments: MAX_ATTACHMENTS_PER_MESSAGE,
     };
   }

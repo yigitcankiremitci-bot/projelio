@@ -25,12 +25,18 @@
 export const DEFAULT_EXTERNAL_TIMEOUT_MS = 20_000;
 
 export class ExternalTimeoutError extends Error {
-  constructor(
-    readonly url: string | URL,
-    readonly timeoutMs: number
-  ) {
+  // Alanlar AÇIKÇA yazılıyor, "parametre özelliği" (constructor(readonly x))
+  // kısayolu kullanılmıyor: Node'un tip-silme çalıştırıcısı o söz dizimini
+  // desteklemiyor ve bu dosyayı içe aktaran her modül testlerde/betiklerde
+  // yüklenemez hâle geliyordu. Derlenmiş NestJS çıktısı iki yazımda da aynı.
+  readonly url: string | URL;
+  readonly timeoutMs: number;
+
+  constructor(url: string | URL, timeoutMs: number) {
     super(`Dış servis ${timeoutMs} ms içinde yanıt vermedi: ${safeHost(url)}`);
     this.name = "ExternalTimeoutError";
+    this.url = url;
+    this.timeoutMs = timeoutMs;
   }
 }
 

@@ -245,11 +245,20 @@ export class WhatsappWebhookService {
       const body: string = typeof payload.body === "string" ? payload.body : "";
       if (!body.trim()) return;
       await this.waha.sendSeen(conn.session_name, contact.wa_jid, payload.id ? [payload.id] : undefined).catch(() => {});
+      // "Yazıyor…" göstergesi: araçlı tur 15 saniye sürebiliyor ve o süre
+      // boyunca kullanıcı hiçbir şey görmüyordu — mesajı aldık mı belli
+      // değildi. Ayrı bir "inceliyorum" mesajı ATMIYORUZ: kuyrukta sıra
+      // kapar, kotadan yer ve kullanıcıya iki bildirim gider. WhatsApp'ın
+      // kendi göstergesi bunu bedelsiz yapıyor.
+      await this.waha.startTyping(conn.session_name, contact.wa_jid).catch(() => {});
       // Beklenmeyen hata kuyruğu tıkamasın: olay işlenmiş sayılır, kullanıcı
       // cevapsız kalır ama sonraki mesajları çalışır.
       await this.lio
         .handleUserCommand(thread, contact, conn, contact.user_id, body)
-        .catch((e) => this.logger.warn(`Lio komutu başarısız (${thread.id}): ${e instanceof Error ? e.message : e}`));
+        .catch((e) => this.logger.warn(`Lio komutu başarısız (${thread.id}): ${e instanceof Error ? e.message : e}`))
+        // Gösterge her hâlükârda kapanmalı: hata durumunda açık kalırsa
+        // kullanıcı gelmeyecek bir cevabı bekler.
+        .finally(() => this.waha.stopTyping(conn.session_name, contact.wa_jid).catch(() => {}));
       return;
     }
     const now = new Date().toISOString();

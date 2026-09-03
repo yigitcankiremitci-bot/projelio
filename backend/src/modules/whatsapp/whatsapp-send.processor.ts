@@ -39,6 +39,22 @@ export class WhatsappSendProcessor {
     private webhook: WhatsappWebhookService
   ) {}
 
+  /**
+   * Kuyruğu HEMEN işlemeye çalışır (dakikalık cron'u beklemeden).
+   *
+   * Kullanıcı WhatsApp'tan Lio'ya soru sorduğunda cevap kuyruğa giriyor ve
+   * eskiden bir sonraki cron turuna kadar (0-60 sn) orada bekliyordu — saf
+   * bekleme, hiçbir işe yaramayan gecikme. Bildirimlerde bu önemsiz, ama
+   * kullanıcı ekranın başında cevap beklerken bir dakika uzun.
+   *
+   * Güvenli: tick() zaten `running` bayrağıyla korunuyor, üst üste binen
+   * çağrılar sessizce dönüyor. Hata yutulur — tetikleme bir HIZLANDIRMA,
+   * cron yedeği her hâlükârda duruyor.
+   */
+  tetikle(): void {
+    void this.tick().catch(() => {});
+  }
+
   @Cron("* * * * *")
   async tick(): Promise<void> {
     if (!this.whatsapp.isConfigured()) return;

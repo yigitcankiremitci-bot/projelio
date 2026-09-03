@@ -243,6 +243,28 @@ Kredi yüklemek için: ${url}`;
       sentByUserId: userId,
       bypassQuietHours: true,
     });
+    // Kuyruğu hemen işlet: kullanıcı ekranın başında cevap bekliyor,
+    // dakikalık cron turunu beklemek boşa geçen bir dakika olurdu.
+    // Bildirimlerde bu gerekmez (kimse beklemiyor), o yüzden tetikleme
+    // enqueue'nun içinde değil burada.
+    this.kuyrugoTetikle();
+  }
+
+  /**
+   * Gönderim işleyicisini uyandırır. ModuleRef ile çağrı anında çözülüyor:
+   * WhatsappSendProcessor bu servisi (webhook üzerinden) zaten kullanıyor,
+   * constructor'a enjekte etmek modül döngüsü kurardı — bkz. whatsapp.module.ts
+   * başlığındaki 2026-09-03 olayı.
+   */
+  private kuyrugoTetikle(): void {
+    void (async () => {
+      try {
+        const { WhatsappSendProcessor } = await import("./whatsapp-send.processor");
+        this.moduleRef.get(WhatsappSendProcessor, { strict: false }).tetikle();
+      } catch {
+        // Çözülemezse cron yedeği devrede: cevap en geç bir dakikada gider.
+      }
+    })();
   }
 
   /**

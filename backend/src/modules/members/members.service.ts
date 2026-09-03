@@ -166,7 +166,7 @@ export class MembersService {
       .select()
       .single();
     if (error) throw error;
-    this.notificationsService.notifyUser(userId, "team_invite", "Ekip Daveti", "Bir projeye davet edildiniz.");
+    this.notificationsService.notifyUserSafe(userId, "team_invite", "Ekip Daveti", "Bir projeye davet edildiniz.");
     return mapMember(row);
   }
 
@@ -229,7 +229,7 @@ export class MembersService {
     // Proje sahibi haberdar olsun: ekipten biri sessizce düşmesin.
     if (project.owner_id) {
       const name = await this.getUserName(userId);
-      void this.notificationsService.notifyUser(
+      this.notificationsService.notifyUserSafe(
         project.owner_id,
         "role_updated",
         "Ekipten ayrılma",
@@ -263,7 +263,7 @@ export class MembersService {
       .select("*, users(full_name, email, username)")
       .single();
     if (error) throw error;
-    this.notificationsService.notifyUser(
+    this.notificationsService.notifyUserSafe(
       userId,
       "member_joined",
       "Ekibe Eklendin",
@@ -327,7 +327,7 @@ export class MembersService {
     if (!row) throw new NotFoundException("Üyelik isteği bulunamadı");
     const member = mapMember(row);
     if (approve) {
-      this.notificationsService.notifyUser(
+      this.notificationsService.notifyUserSafe(
         member.userId,
         "member_joined",
         "Projeye Katıldın",
@@ -355,7 +355,7 @@ export class MembersService {
     if (error) throw error;
     if (!row) throw new NotFoundException("Üyelik bulunamadı");
     const member = mapMember(row);
-    this.notificationsService.notifyUser(
+    this.notificationsService.notifyUserSafe(
       member.userId,
       "budget_changed",
       "Anlaşma Güncellendi",

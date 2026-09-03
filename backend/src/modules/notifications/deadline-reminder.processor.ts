@@ -27,6 +27,16 @@ const MAX_LATE_MS = 6 * 60 * 60 * 1000;
 export class DeadlineReminderProcessor {
   private readonly logger = new Logger(DeadlineReminderProcessor.name);
 
+  /**
+   * Bir tur bitmeden yenisi başlamasın.
+   *
+   * NEDEN: tur, hatırlatma sayısı kadar bildirim yazıp damga güncelliyor; yoğun
+   * bir günde bu 5 dakikayı aşabilir. Turlar üst üste bindiğinde ikisi de aynı
+   * "damgalanmamış" satırları görür ve AYNI HATIRLATMA İKİ KEZ gider. Aynı koruma
+   * whatsapp-send ve social-publish işleyicilerinde de var; burada eksikti.
+   */
+  private running = false;
+
   constructor(
     private supabase: SupabaseService,
     private notificationsService: NotificationsService
@@ -34,8 +44,17 @@ export class DeadlineReminderProcessor {
 
   @Cron("*/5 * * * *")
   async checkUpcomingDeadlines() {
-    await this.checkTaskReminders();
-    await this.checkPersonalTodoReminders();
+    if (this.running) return;
+    this.running = true;
+    try {
+      await this.checkTaskReminders();
+      await this.checkPersonalTodoReminders();
+    } catch (e) {
+      // Tur düşerse bir sonraki tur devam etsin; bayrak finally'de bırakılıyor.
+      this.logger.error(`Hatırlatma turu düştü: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      this.running = false;
+    }
   }
 
   /** Proje/departman görevleri (bkz. 057). Bildirim tüm atananlara gider. */
@@ -62,6 +81,12 @@ export class DeadlineReminderProcessor {
     }
     if (!data?.length) return;
 
+    // Damgalanacak görevler biriktirilir, tur sonunda TEK sorguda yazılır.
+    // Önceden satır başına ayrı UPDATE atılıyordu: 500 hatırlatma = 500 ardışık
+    // gidiş-dönüş, ki bu 5 dakikalık cron penceresini aşıp turların üst üste
+    // binmesine yol açabiliyordu.
+    const damgalanacak: string[] = [];
+
     for (const task of data as any[]) {
       const dueMoment = combine(task.deadline, task.deadline_time);
       if (!dueMoment) continue;
@@ -82,7 +107,10 @@ export class DeadlineReminderProcessor {
             : undefined;
 
         for (const userId of recipients) {
-          void this.notificationsService.notifyUser(
+          // notifyUserSafe: hata yutulup loglanır. Önceden `void notifyUser`
+          // kullanılıyordu ve o, reddi YUTMUYORDU — veritabanı bir an hata
+          // verdiğinde yakalanmamış promise reddi süreci düşürebiliyordu.
+          this.notificationsService.notifyUserSafe(
             userId,
             "task_reminder",
             "Görev hatırlatması",
@@ -96,10 +124,17 @@ export class DeadlineReminderProcessor {
 
       // Başarılı da olsa, çok geç kaldığı için atlandı da olsa damgalanır:
       // aksi halde aynı görev her taramada yeniden ele alınırdı.
-      await this.supabase.client
+      damgalanacak.push(task.id);
+    }
+
+    if (damgalanacak.length) {
+      const { error: damgaHatasi } = await this.supabase.client
         .from("tasks")
         .update({ reminder_sent_at: new Date().toISOString() })
-        .eq("id", task.id);
+        .in("id", damgalanacak);
+      // Damga atılamazsa aynı hatırlatma bir sonraki turda tekrar gider; sessiz
+      // kalmasın ki tekrarın sebebi log'dan görülebilsin.
+      if (damgaHatasi) this.logger.error(`Hatırlatma damgası yazılamadı: ${damgaHatasi.message}`);
     }
   }
 
@@ -130,6 +165,9 @@ export class DeadlineReminderProcessor {
     }
     if (!data?.length) return;
 
+    // Görev hatırlatmalarıyla aynı gerekçe: damgalar tek sorguda yazılır.
+    const damgalanacak: string[] = [];
+
     for (const todo of data as any[]) {
       const dueMoment = combine(todo.due_date, todo.due_time);
       if (!dueMoment) continue;
@@ -139,7 +177,7 @@ export class DeadlineReminderProcessor {
 
       if (now.getTime() - fireAt.getTime() <= MAX_LATE_MS) {
         const timeLabel = String(todo.due_time).slice(0, 5);
-        void this.notificationsService.notifyUser(
+        this.notificationsService.notifyUserSafe(
           todo.user_id,
           "task_reminder",
           "Görev hatırlatması",
@@ -150,10 +188,15 @@ export class DeadlineReminderProcessor {
         );
       }
 
-      await this.supabase.client
+      damgalanacak.push(todo.id);
+    }
+
+    if (damgalanacak.length) {
+      const { error: damgaHatasi } = await this.supabase.client
         .from("personal_todos")
         .update({ reminder_sent_at: new Date().toISOString() })
-        .eq("id", todo.id);
+        .in("id", damgalanacak);
+      if (damgaHatasi) this.logger.error(`Kişisel hatırlatma damgası yazılamadı: ${damgaHatasi.message}`);
     }
   }
 }

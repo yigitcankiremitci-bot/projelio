@@ -66,6 +66,31 @@ export class NotificationsService {
     return notification;
   }
 
+  /**
+   * Bildirimi "gönderebilirsen gönder" niyetiyle yollar: hata fırlatmaz, loglar.
+   *
+   * NEDEN VAR: notifyUser veritabanı hatasında `throw` ediyor. Çağıranların
+   * çoğu bunu bilerek `try/catch`e almış ("bildirim gitmese de görev oluşturma
+   * başarılı sayılır"), ama bir kısmı çağrıyı beklemeden, catch'siz bırakmıştı.
+   * O hâlde geçici bir DB hatası YAKALANMAMIŞ bir promise reddine dönüşüyor ve
+   * Node 22'nin varsayılanı (--unhandled-rejections=throw) SÜRECİ ÖLDÜRÜYOR:
+   * yani gönderilemeyen tek bir bildirim tüm backend'i düşürebiliyordu.
+   *
+   * Ana işlemi (görev atama, dosya yükleme, bütçe kaydı) bildirime bağlamak
+   * istemediğimiz her yerde bunu kullan; sonucu beklemen gerekiyorsa notifyUser.
+   */
+  notifyUserSafe(
+    userId: string,
+    type: NotificationPayload["type"],
+    title: string,
+    body: string,
+    link?: string
+  ): void {
+    void this.notifyUser(userId, type, title, body, link).catch((error) =>
+      this.logger.warn(`Bildirim gönderilemedi (${type} → ${userId}): ${error instanceof Error ? error.message : error}`)
+    );
+  }
+
   async findForUser(userId: string, limit = 50): Promise<{ notifications: NotificationPayload[]; unreadCount: number }> {
     const { data, error } = await this.supabase.client
       .from("notifications")
@@ -97,8 +122,9 @@ export class NotificationsService {
     if (error) throw error;
   }
 
-  broadcastActiveWorker(userId: string, activeTaskId: string | null): void {
-    this.gateway.broadcastActiveWorker(userId, activeTaskId);
+  /** room: sinyalin gideceği oda (bkz. gateway'deki gerekçe); yoksa gönderilmez. */
+  broadcastActiveWorker(userId: string, activeTaskId: string | null, room?: string | null): void {
+    this.gateway.broadcastActiveWorker(userId, activeTaskId, room);
   }
 
   getVapidPublicKey(): string {

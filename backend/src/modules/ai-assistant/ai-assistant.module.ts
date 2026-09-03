@@ -1,5 +1,6 @@
 import { forwardRef, Module } from "@nestjs/common";
 import { LlmProviderRegistry } from "./providers/provider-registry";
+import { AiModelSettingsService } from "./ai-model-settings.service";
 import { AiAssistantController } from "./ai-assistant.controller";
 import { AiAssistantService } from "./ai-assistant.service";
 import { AiCreditsService } from "./ai-credits.service";
@@ -79,6 +80,7 @@ import { WhatsappModule } from "../whatsapp/whatsapp.module";
   controllers: [AiAssistantController],
   providers: [
     LlmProviderRegistry,
+    AiModelSettingsService,
     AiAssistantService,
     AiCreditsService,
     AiConversationsService,

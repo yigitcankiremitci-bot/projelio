@@ -3,7 +3,13 @@ import type { ThemeColors } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import AiCreditOrdersAdmin from "./AiCreditOrdersAdmin";
 import { api } from "../api/client";
-import { aiChat, type AiHealth, type AiProviderBalance, type AiUserBalanceRow } from "../api/aiChat";
+import {
+  aiChat,
+  type AiHealth,
+  type AiModelSettingsResponse,
+  type AiProviderBalance,
+  type AiUserBalanceRow,
+} from "../api/aiChat";
 import { IconSparkle } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
 
@@ -43,6 +49,9 @@ export default function AiCreditAdminPanel() {
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [margin, setMargin] = useState<MarginReport | null>(null);
   const [health, setHealth] = useState<AiHealth | null>(null);
+  const [modelSettings, setModelSettings] = useState<AiModelSettingsResponse | null>(null);
+  const [modelSaving, setModelSaving] = useState<string | null>(null);
+  const [modelFeedback, setModelFeedback] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [providerBalance, setProviderBalance] = useState<AiProviderBalance | null>(null);
   const [topupAmount, setTopupAmount] = useState("50");
@@ -88,6 +97,7 @@ export default function AiCreditAdminPanel() {
       .getHealth()
       .then(setHealth)
       .catch(() => {});
+    loadModelSettings();
   }, []);
 
   const filteredUserBalances = (userBalances ?? []).filter((u) => {
@@ -99,6 +109,48 @@ export default function AiCreditAdminPanel() {
       u.email?.toLowerCase().includes(q)
     );
   });
+
+  const loadModelSettings = () => {
+    aiChat
+      .getModelSettings()
+      .then(setModelSettings)
+      .catch(() => {});
+  };
+
+  /**
+   * Bir kademenin modelini değiştirir.
+   *
+   * Kaydetme sonrası ayarlar SUNUCUDAN yeniden okunur: doğrulama backend'de
+   * (katalogda olmayan model reddediliyor), dolayısıyla ekranda gösterilecek
+   * doğru durum da oradan gelmeli.
+   */
+  const handleModelChange = async (tier: string, modelKey: string) => {
+    setModelSaving(tier);
+    setModelFeedback(null);
+    try {
+      await aiChat.setModelSetting({ tier, modelKey: modelKey || null });
+      loadModelSettings();
+      setModelFeedback({ ok: true, text: "Model güncellendi." });
+    } catch (err: any) {
+      setModelFeedback({ ok: false, text: err?.message ?? "Model kaydedilemedi." });
+    } finally {
+      setModelSaving(null);
+    }
+  };
+
+  const handleDefaultTierChange = async (tier: string) => {
+    setModelSaving("default");
+    setModelFeedback(null);
+    try {
+      await aiChat.setModelSetting({ defaultTier: tier });
+      loadModelSettings();
+      setModelFeedback({ ok: true, text: "Varsayılan kademe güncellendi." });
+    } catch (err: any) {
+      setModelFeedback({ ok: false, text: err?.message ?? "Kaydedilemedi." });
+    } finally {
+      setModelSaving(null);
+    }
+  };
 
   const handleProviderTopUp = async () => {
     const amountUsd = Number(topupAmount);
@@ -480,6 +532,102 @@ export default function AiCreditAdminPanel() {
               );
             })}
           </div>
+
+          {/* Kademe -> model eşlemesi. Kullanıcıda hiçbir model kararı yok;
+              buradan seçilen model herkes için geçerli. "Varsayılan" seçilirse
+              kod/ortam değişkeni varsayılanına dönülür. */}
+          {modelSettings && (
+            <div style={{ marginTop: 18, borderTop: `1px solid ${c.border}`, paddingTop: 16 }}>
+              <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 4 }}>
+                Kademe ve model seçimi
+              </div>
+              <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>
+                Bu kararlar tüm kullanıcılar için geçerlidir; kullanıcılar model seçemez.
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 12, color: c.textSecondary, display: "block", marginBottom: 6 }}>
+                  Herkesin kullandığı kademe
+                </label>
+                <select
+                  value={modelSettings.defaultTier}
+                  disabled={modelSaving === "default"}
+                  onChange={(e) => handleDefaultTierChange(e.target.value)}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: `1px solid ${c.border}`,
+                    background: c.surface,
+                    color: c.textPrimary,
+                    fontSize: 13,
+                    minWidth: 260,
+                  }}
+                >
+                  {modelSettings.tierInfo.map((t) => (
+                    <option key={t.tier} value={t.tier}>
+                      {t.label} — {t.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {modelSettings.tierInfo.map((info) => {
+                const row = modelSettings.tiers.find((t) => t.tier === info.tier);
+                const aktifKademe = modelSettings.defaultTier === info.tier;
+                return (
+                  <div key={info.tier} style={{ marginBottom: 12 }}>
+                    <label
+                      style={{
+                        fontSize: 12,
+                        color: c.textSecondary,
+                        display: "block",
+                        marginBottom: 6,
+                      }}
+                    >
+                      {info.label} kademesinde çalışacak model
+                      {aktifKademe && (
+                        <span style={{ color: c.success, fontWeight: 600 }}> · şu an kullanılan</span>
+                      )}
+                    </label>
+                    <select
+                      value={row?.modelKey ?? ""}
+                      disabled={modelSaving === info.tier}
+                      onChange={(e) => handleModelChange(info.tier, e.target.value)}
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: 8,
+                        border: `1px solid ${aktifKademe ? c.accent : c.border}`,
+                        background: c.surface,
+                        color: c.textPrimary,
+                        fontSize: 13,
+                        minWidth: 260,
+                        maxWidth: "100%",
+                      }}
+                    >
+                      <option value="">Varsayılan ({info.model})</option>
+                      {modelSettings.available.map((m) => (
+                        <option key={m.key} value={m.key}>
+                          {m.providerLabel} · {m.label} (${m.price.input}/${m.price.output} · 1M token)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+
+              {modelFeedback && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    marginTop: 8,
+                    color: modelFeedback.ok ? c.success : c.danger,
+                  }}
+                >
+                  {modelFeedback.text}
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 12, lineHeight: 1.5 }}>
             Sıra öncelik demektir: birincil sağlayıcı geçici olarak yanıt vermezse (hız

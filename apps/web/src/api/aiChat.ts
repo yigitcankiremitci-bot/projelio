@@ -238,18 +238,47 @@ export interface AiHealth {
   transcriptionConfigured: boolean;
 }
 
+/** Admin model ayarları (`GET /ai/admin/model-settings`). */
+export interface AiModelSettingsResponse {
+  defaultTier: string;
+  tiers: Array<{ tier: string; modelKey: string | null; updatedAt: string | null }>;
+  tierInfo: Array<{ tier: string; label: string; description: string; costMultiplier: number; model: string }>;
+  available: Array<{
+    key: string;
+    providerId: string;
+    providerLabel: string;
+    id: string;
+    label: string;
+    description: string;
+    tier: string;
+    vision: boolean;
+    contextWindow: number;
+    price: { input: number; output: number; cachedInput?: number };
+  }>;
+  health: AiHealth;
+}
+
 export const aiChat = {
-  send: (message: string, conversationId?: string, tier?: AiModelTier, attachmentIds?: string[]) =>
-    api.post<AiChatResult>("/ai/chat", { message, conversationId, tier, attachmentIds }),
+  // Kademe/model GÖNDERİLMEZ: hangi modelin çalışacağına yönetici karar verir
+  // (bkz. backend ai-model-settings.service.ts). Sunucu gövdedeki tier alanını
+  // zaten yok sayıyor; buradan da göndermiyoruz.
+  send: (message: string, conversationId?: string, attachmentIds?: string[]) =>
+    api.post<AiChatResult>("/ai/chat", { message, conversationId, attachmentIds }),
   confirm: (actionId: string, confirmed: boolean) =>
     api.post<AiConfirmResult>("/ai/confirm", { actionId, confirmed }),
-  // Duraklatılmış bir isteği sürdürür/durdurur. tier verilirse kalan adımlar o modelle işlenir.
-  continueRun: (runId: string, confirmed: boolean, tier?: AiModelTier, approveAll?: boolean) =>
-    api.post<AiChatResult>("/ai/continue", { runId, confirmed, tier, approveAll }),
-  getModels: () =>
-    api.get<{ defaultTier: AiModelTier; tiers: AiModelTierInfo[]; maxAttachments: number }>("/ai/models"),
+  // Duraklatılmış bir isteği sürdürür/durdurur. Kademe değiştirilemez.
+  continueRun: (runId: string, confirmed: boolean, approveAll?: boolean) =>
+    api.post<AiChatResult>("/ai/continue", { runId, confirmed, approveAll }),
+  getModels: () => api.get<{ maxAttachments: number }>("/ai/models"),
   /** Sağlayıcı durumu — yalnızca admin çağırabilir. */
   getHealth: () => api.get<AiHealth>("/ai/health"),
+  /** Model ayarları (yalnızca admin): hangi kademede hangi model çalışıyor. */
+  getModelSettings: () => api.get<AiModelSettingsResponse>("/ai/admin/model-settings"),
+  setModelSetting: (body: { tier?: string; modelKey?: string | null; defaultTier?: string }) =>
+    api.post<{ defaultTier: string; tiers: Array<{ tier: string; modelKey: string | null }> }>(
+      "/ai/admin/model-settings",
+      body
+    ),
 
   // --- Dosya ekleri ---
   // Dosya, mesajdan AYRI olarak önce okunur: ses çözümleme gibi ücretli işler bir

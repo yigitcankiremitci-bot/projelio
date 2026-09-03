@@ -55,6 +55,7 @@ import {
   type ModelTier,
 } from "./ai-credits.config";
 import { LlmProviderRegistry, type ProviderChoice } from "./providers/provider-registry";
+import { AiModelSettingsService } from "./ai-model-settings.service";
 import type { LlmRequest, LlmResponse } from "./providers/llm-provider";
 
 const DEFAULT_MODEL = MODEL_TIERS.fast.model;
@@ -587,7 +588,8 @@ export class AiAssistantService {
     private jobModulesService: JobModulesService,
     private moduleRecordsService: ModuleRecordsService,
     private realtime: RealtimeGateway,
-    private providers: LlmProviderRegistry
+    private providers: LlmProviderRegistry,
+    private modelSettings: AiModelSettingsService
   ) {}
 
   /** Kademe belirtilmeyen yerler (ör. draftText) için varsayılan model. */
@@ -1213,10 +1215,20 @@ export class AiAssistantService {
     const trimmed = userMessage?.trim() || (attachments.length ? EMPTY_MESSAGE_WITH_FILE : "");
     if (!trimmed) throw new BadRequestException("Mesaj boş olamaz.");
 
-    const tier = resolveTier(tierInput).tier;
-    // Model seçimi kademeden BAĞIMSIZ: kullanıcı "GLM 5.3 kullan" diyebilir.
-    // Geçersiz/kapalı bir seçim sessizce yok sayılır ve kademe kararı işler.
-    const preferredModel = this.providers.normalizeModelChoice(options?.model);
+    // Kademe ve model kararı ADMİNE aittir, kullanıcıya değil.
+    //
+    // NEDEN: ikisi de doğrudan maliyet kararı — kademe faturayı 15 kata kadar
+    // (Haiku $1 → Opus $75/milyon çıktı), model seçimi ise sağlayıcı bazında
+    // değiştiriyor. Ayrıca bu uç herkese açık: gövdeye `model` yazan bir
+    // kullanıcı en pahalı modeli çalıştırabiliyordu.
+    //
+    // `tierInput` ve `options.model` imzada DURUYOR ama bilerek kullanılmıyor:
+    // eski istemciler bu alanları göndermeye devam ediyor ve istekleri
+    // reddetmek yerine sessizce yok saymak doğru davranış (bkz. continueRun).
+    const tier = await this.modelSettings.defaultTier();
+    const preferredModel = this.providers.normalizeModelChoice(
+      await this.modelSettings.modelKeyForTier(tier)
+    );
 
     // Teşhis izi: bu satır görünmüyorsa istek bu backend'e hiç ulaşmamıştır.
     this.logger.log(
@@ -1475,7 +1487,9 @@ export class AiAssistantService {
     }
 
     const balance = await this.creditsService.assertCanStart(userId);
-    if (tierInput) run.tier = resolveTier(tierInput).tier;
+    // Kademe kullanıcı tarafından değiştirilemez (bkz. chat'teki açıklama).
+    // `tierInput` eski istemciler gönderdiği için imzada duruyor, yok sayılıyor.
+    void tierInput;
     // Devam ederken de aynı rezervasyon geçerli: kredi yetmiyorsa sürdürmek,
     // kullanıcıyı yarım işle borç bakiyesine sokmak olurdu.
     this.creditsService.assertBalanceCovers(balance, this.minimumTurnCredits(this.modelForTier(run.tier, run.preferredModel), run.messages));

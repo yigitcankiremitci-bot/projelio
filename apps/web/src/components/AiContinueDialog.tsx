@@ -6,9 +6,8 @@ import type { AiContinuation, AiModelTier, AiModelTierInfo } from "../api/aiChat
 interface Props {
   continuation: AiContinuation;
   /** Sunucudan gelen kademe listesi; boşsa model seçimi gösterilmez. */
-  tiers: AiModelTierInfo[];
   /** `approveAll` işaretliyse bu istek boyunca bir daha onay sorulmaz. */
-  onContinue: (tier: AiModelTier, approveAll: boolean) => Promise<void> | void;
+  onContinue: (approveAll: boolean) => Promise<void> | void;
   onStop: () => void;
 }
 
@@ -25,9 +24,8 @@ interface Props {
  * geçmenin gerçekten işe yarayacağı andır. Kademe yükseltmek kalan adımları
  * pahalılaştırır ama genelde adım sayısını azaltır.
  */
-export default function AiContinueDialog({ continuation, tiers, onContinue, onStop }: Props) {
+export default function AiContinueDialog({ continuation, onContinue, onStop }: Props) {
   const c = useThemeColors();
-  const [tier, setTier] = useState<AiModelTier>(continuation.tier);
   const [busy, setBusy] = useState(false);
   /**
    * Varsayılan olarak AÇIK.
@@ -42,14 +40,11 @@ export default function AiContinueDialog({ continuation, tiers, onContinue, onSt
   // Ön uyarıda henüz hiçbir şey yapılmadı: "harcanan" ve "yapılan" satırları
   // yanıltıcı olur, onların yerine tek bir tahmin gösterilir.
   const upfront = continuation.reason === "estimate";
-  const current = tiers.find((t) => t.tier === continuation.tier);
-  const chosen = tiers.find((t) => t.tier === tier);
-  const upgraded = !!current && !!chosen && chosen.costMultiplier > current.costMultiplier;
 
   const handleContinue = async () => {
     setBusy(true);
     try {
-      await onContinue(tier, approveAll);
+      await onContinue(approveAll);
     } finally {
       setBusy(false);
     }
@@ -102,43 +97,9 @@ export default function AiContinueDialog({ continuation, tiers, onContinue, onSt
         )}
       </div>
 
-      {tiers.length > 1 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 6 }}>
-            Kalan adımlar hangi modelle işlensin?
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {tiers.map((t) => (
-              <button
-                key={t.tier}
-                type="button"
-                onClick={() => setTier(t.tier)}
-                title={t.description}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  fontSize: 13,
-                  border: `1px solid ${t.tier === tier ? c.accent : c.border}`,
-                  background: t.tier === tier ? c.accent : "transparent",
-                  color: t.tier === tier ? "#fff" : c.textPrimary,
-                }}
-              >
-                {t.label}
-                {t.costMultiplier > 1 && (
-                  <span style={{ opacity: 0.75, marginLeft: 5 }}>×{t.costMultiplier}</span>
-                )}
-              </button>
-            ))}
-          </div>
-          {upgraded && (
-            <p style={{ fontSize: 12, color: c.warning, margin: "8px 0 0", lineHeight: 1.4 }}>
-              Daha güçlü model genelde işi daha az adımda bitirir, ama adım başına kredi bedeli
-              yaklaşık {chosen!.costMultiplier / (current?.costMultiplier || 1)} katına çıkar.
-            </p>
-          )}
-        </div>
-      )}
+      {/* Kademe seçici KALDIRILDI: hangi modelin çalışacağına yönetici karar
+          verir (Admin paneli > AI sağlayıcıları). Kullanıcıya kalan tek karar
+          işi sürdürmek ya da durdurmak. */}
 
       <label
         style={{

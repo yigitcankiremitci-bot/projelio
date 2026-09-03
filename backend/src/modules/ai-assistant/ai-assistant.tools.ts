@@ -27,6 +27,75 @@ export const CRITICAL_TOOLS = new Set<string>([
   "disable_module",
 ]);
 
+// Veri DEĞİŞTİREN ama kritik olmayan araçlar. Kritik olanlar yukarıda;
+// bir araç iki listede birden olmamalı (bkz. ai-assistant.tools.test.ts).
+//
+// Neden ayrı bir liste: WhatsApp'tan gelen isteklerde kullanıcı "yalnızca
+// soruları yanıtla, hiçbir şeyi değiştirme" diyebiliyor (whatsapp_contacts.
+// lio_allow_writes). O anahtar kapalıyken modele bu araçlar verilmez.
+//
+// Listede OLMAYANLAR bilerek dışarıda: release_files ve open_file sohbetin
+// durumunu değiştirir, veriyi değil; suggest_schedule yalnızca öneri üretir
+// (yazan create_time_blocks'tur); geri kalan her şey okumadır.
+export const WRITE_TOOLS = new Set<string>([
+  // Kişisel yapılacaklar
+  "create_todo",
+  "create_todos",
+  "update_todo",
+  "set_todo_status",
+  "update_assigned_todo_prefs",
+  "reorder_todos",
+  "restore_todo",
+  // İş / proje / görev
+  "create_job",
+  "update_job",
+  "create_project",
+  "update_project",
+  "create_task",
+  "create_tasks",
+  "update_task",
+  "update_task_status",
+  // Çıktılar ve yorumlar
+  "create_output",
+  "update_output",
+  "add_task_comment",
+  // Planlama
+  "set_period_plan",
+  "create_time_blocks",
+  "update_time_block_status",
+  "complete_ritual",
+  // Modül defteri
+  "create_module_record",
+  "update_module_record",
+  "enable_module",
+]);
+
+/**
+ * Kanala göre araç seti.
+ *
+ * WhatsApp'ta kritik araçlar modele HİÇ VERİLMEZ. Sebebi onay akışının web'e
+ * bağlı olması: chat() kritik bir araç görünce koşuyu dondurup
+ * {type:"confirmation"} döndürüyor ve devamı confirmAction ile geliyor —
+ * WhatsApp'ta bu diyaloğu gösterecek ekran yok. Araç verilmezse onay durumu
+ * da doğmaz; Lio "bunu uygulamadan yapmanız gerekiyor" der.
+ *
+ * whatsapp_* araçları da dışarıda: WhatsApp'tan WhatsApp mesajı göndertmek,
+ * tek mesajla zincir kurmanın en kolay yolu.
+ */
+export function toolsForChannel(
+  channel: "web" | "whatsapp",
+  opts: { allowWrites?: boolean } = {}
+): Anthropic.Tool[] {
+  if (channel === "web") return AI_TOOLS;
+  const allowWrites = opts.allowWrites ?? true;
+  return AI_TOOLS.filter(
+    (tool) =>
+      !CRITICAL_TOOLS.has(tool.name) &&
+      !tool.name.startsWith("whatsapp_") &&
+      (allowWrites || !WRITE_TOOLS.has(tool.name))
+  );
+}
+
 export const AI_TOOLS: Anthropic.Tool[] = [
   // --- Sohbete sabitlenmiş dosyalar ------------------------------------
   {

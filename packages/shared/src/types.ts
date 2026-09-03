@@ -2336,6 +2336,12 @@ export interface WhatsappMyContact {
   phoneMasked?: string;
   /** Numaranın hesaba bağlandığı an (kullanıcı kod ya da EVET gönderdiğinde). */
   verifiedAt?: string;
+  /**
+   * WhatsApp'tan yazılan isteklerle veri değiştirilebilsin mi (görev aç,
+   * kayıt güncelle). Kapalıyken Lio yalnızca soruları yanıtlar. Silme,
+   * arşivleme ve bütçe hareketi bu kanalda her hâlükârda kapalı.
+   */
+  lioAllowWrites?: boolean;
 }
 
 /** Yönetici listesi: WhatsApp numarasını hesabına bağlamış kullanıcılar. */

@@ -1,14 +1,24 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import type { WhatsappMessage, WhatsappThread } from "@projelio/shared";
+import { getWebAppUrl } from "../../common/config/env";
 import { AccessService } from "../../common/access/access.service";
 import { SupabaseService } from "../../database/supabase.service";
-import type { AiAssistantService } from "../ai-assistant/ai-assistant.service";
+import type { AiAssistantService, ChatResult } from "../ai-assistant/ai-assistant.service";
+import { decideLioKomut, lioKomutConfigFromEnv } from "./lio-komut-sinir";
+import { formatForWhatsapp } from "./whatsapp-lio-format";
 import { maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
 import { mapMessage, mapThread, WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
 
 /** Otomatik yanıt üretirken modele verilen geçmiş mesaj sayısı. */
 const AUTO_REPLY_CONTEXT = 20;
+/**
+ * WhatsApp konuşmasının bağlı olduğu Lio sohbeti bu süre boyunca sessiz
+ * kalırsa yenisi açılır. WhatsApp'ta konuşma günlerce açık kalıyor; dünkü
+ * bağlamı bugünkü soruya taşımak hem pahalı hem kafa karıştırıcı olurdu.
+ * Kuyruktaki MAX_QUEUE_AGE_MS ile aynı değer.
+ */
+const KOMUT_SOHBET_PENCERESI_MS = 6 * 60 * 60 * 1000;
 /** Otomatik yanıtın üst uzunluğu (WhatsApp'ta kısa mesaj doğal). */
 const AUTO_REPLY_MAX_TOKENS = 400;
 
@@ -135,6 +145,142 @@ export class WhatsappLioService {
   private async contactOf(thread: ThreadRow): Promise<ContactRow | null> {
     const { data } = await this.supabase.client.from("whatsapp_contacts").select("*").eq("id", thread.contact_id).maybeSingle();
     return (data as ContactRow | null) ?? null;
+  }
+
+  // ================================================================ kullanıcı komutu
+
+  /**
+   * Kullanıcının KENDİ telefonundan gelen serbest metin: Lio'nun araçlı
+   * akışına girer ve cevap aynı konuşmaya kuyruklanır.
+   *
+   * replyToInbound'dan farkı, farkın tamamı: orada müşteri yazıyor ve Lio
+   * yalnızca metin üretiyor (draftText, araç yok); burada mesajın sahibi
+   * uygulamanın kullanıcısı, dolayısıyla kendi yetkisiyle kendi verisine
+   * erişen araçlı bir tur çalıştırılıyor.
+   *
+   * Kanal süzgeci chat() içinde (toolsForChannel): kritik araçlar modele hiç
+   * verilmez, çünkü onay diyaloğu web ekranına bağlı. Yazma izni kişi
+   * bazında kapatılabilir (whatsapp_contacts.lio_allow_writes).
+   */
+  async handleUserCommand(
+    thread: ThreadRow,
+    contact: ContactRow,
+    conn: ConnectionRow,
+    userId: string,
+    text: string
+  ): Promise<void> {
+    const config = lioKomutConfigFromEnv();
+    const karar = decideLioKomut(config, text, {
+      sentLastHour: await this.komutSayisiSonSaat(thread.id),
+    });
+    if (karar.allowed === false) {
+      // Boş/medya mesajında reply yok: "anlamadım" demek gürültü olurdu.
+      // sayilsin=false: reddin kendisi kotadan yemesin (bkz. gonder).
+      if (karar.reply) await this.gonder(thread.id, userId, karar.reply, false);
+      return;
+    }
+
+    const convId = await this.komutSohbeti(thread);
+    const role = await this.kullaniciRolu(userId);
+
+    const result = await (await this.ai()).chat(
+      userId,
+      role,
+      karar.text,
+      convId,
+      "fast",
+      undefined,
+      { channel: "whatsapp", allowWrites: contact.lio_allow_writes !== false }
+    );
+
+    // chat() sohbeti kendisi açmış olabilir (convId undefined geçtiysek);
+    // hangi sohbete bağlandığını bilmeden sürekliliği kuramayız.
+    await this.komutSohbetiKaydet(thread.id, result.conversationId);
+
+    const reply = this.komutCevabi(result);
+    if (reply) await this.gonder(thread.id, userId, reply);
+    this.logger.log(`Lio komutu yanıtlandı (${conn.session_name}, ${maskPhone(contact.phone_e164)})`);
+  }
+
+  /** Cevap metni — ChatResult'ın her hâli WhatsApp'ta bir karşılık bulmalı. */
+  private komutCevabi(result: ChatResult): string | null {
+    const url = getWebAppUrl();
+    switch (result?.type) {
+      case "message":
+        return formatForWhatsapp(result.text ?? "", url) || null;
+      case "out_of_credits":
+        return `Krediniz bu isteği tamamlamaya yetmedi.${result.doneSummary ? " " + result.doneSummary : ""}
+
+Kredi yüklemek için: ${url}`;
+      case "continuation":
+        // Web'de "devam edeyim mi?" diye sorulur; WhatsApp'ta o diyalog yok.
+        return formatForWhatsapp(
+          `${result.text ?? ""}
+
+İşin kalanı için uygulamadaki Lio'yu kullanın.`,
+          url
+        );
+      case "confirmation":
+        // Oluşmamalı: kritik araçlar bu kanalda modele verilmiyor.
+        this.logger.error(`WhatsApp kanalında onay istendi: ${result.toolName}`);
+        return "Bu işlem WhatsApp üzerinden yapılamıyor; uygulamadaki Lio'dan yapabilirsiniz.";
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Cevabı kuyruğa koyar; sessiz saat muafiyetiyle (kullanıcı kendi sordu).
+   *
+   * `sayilsin` sayacı ilgilendirir: SINIR REDDİ mesajları sayılmamalı. Aksi
+   * hâlde "çok fazla istek gönderdiniz" uyarısı sayacı bir daha artırır ve
+   * kullanıcı tavana bir kez dayandıktan sonra her mesajında yeni bir uyarı
+   * üretip sayacı tavanın üstünde tutar — saat hiç dolmaz.
+   */
+  private async gonder(threadId: string, userId: string, text: string, sayilsin = true): Promise<void> {
+    await this.whatsapp.enqueue(threadId, text, {
+      sentBy: sayilsin ? "lio" : "system",
+      sentByUserId: userId,
+      bypassQuietHours: true,
+    });
+  }
+
+  /**
+   * Bu konuşmadan son bir saatte kaç komut işlendi.
+   *
+   * Giden "lio" mesajları sayılır: her işlenen komut bir tanesini üretiyor.
+   * Sınır reddi "system" olarak gittiği için buraya girmez (bkz. gonder).
+   */
+  private async komutSayisiSonSaat(threadId: string): Promise<number> {
+    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count } = await this.supabase.client
+      .from("whatsapp_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("thread_id", threadId)
+      .eq("direction", "outbound")
+      .eq("sent_by", "lio")
+      .gte("created_at", since);
+    return count ?? 0;
+  }
+
+  /** Süren sohbet varsa onu, yoksa null (chat() yenisini açar). */
+  private async komutSohbeti(thread: ThreadRow): Promise<string | undefined> {
+    if (!thread.ai_conversation_id || !thread.ai_conversation_at) return undefined;
+    const age = Date.now() - new Date(thread.ai_conversation_at).getTime();
+    return age < KOMUT_SOHBET_PENCERESI_MS ? thread.ai_conversation_id : undefined;
+  }
+
+  private async komutSohbetiKaydet(threadId: string, conversationId: string): Promise<void> {
+    if (!conversationId) return;
+    await this.supabase.client
+      .from("whatsapp_threads")
+      .update({ ai_conversation_id: conversationId, ai_conversation_at: new Date().toISOString() })
+      .eq("id", threadId);
+  }
+
+  private async kullaniciRolu(userId: string): Promise<string> {
+    const { data } = await this.supabase.client.from("users").select("role").eq("id", userId).maybeSingle();
+    return (data as any)?.role ?? "user";
   }
 
   // ================================================================ otomatik yanıt

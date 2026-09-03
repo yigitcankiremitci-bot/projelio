@@ -20,6 +20,7 @@ export const whatsappApi = {
   linkCode: () => api.post<WhatsappLinkCode>("/whatsapp/me/link-code", {}),
   optOut: () => api.post<{ ok: true }>("/whatsapp/me/opt-out", {}),
   unlink: () => api.post<{ ok: true }>("/whatsapp/me/unlink", {}),
+  setLioWrites: (enabled: boolean) => api.patch<{ lioAllowWrites: boolean }>("/whatsapp/me/lio-writes", { enabled }),
 
   // --- Müşteri konuşmaları ---
   threads: () => api.get<WhatsappThread[]>("/whatsapp/threads"),

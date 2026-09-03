@@ -20,7 +20,7 @@ import { TaskCommentsService } from "../task-comments/task-comments.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PlanningService } from "../planning/planning.service";
 import { OutputsService } from "../outputs/outputs.service";
-import { AI_TOOLS, CRITICAL_TOOLS } from "./ai-assistant.tools";
+import { AI_TOOLS, CRITICAL_TOOLS, toolsForChannel } from "./ai-assistant.tools";
 import { describeModuleFields, hasRecordConfig, normalizeModuleData } from "./ai-modules";
 import { taskTarget } from "./ai-task-target";
 import { getModuleRecordConfig } from "@projelio/shared";
@@ -314,6 +314,14 @@ interface PendingRun {
   askAgain: boolean;
   /** Bu segmentte açılmış kredi tutmaları; segment biterken hepsi kaldırılır. */
   holds: string[];
+  /**
+   * İsteğin geldiği kanal. Araç seti buna göre süzülür (toolsForChannel):
+   * WhatsApp'ta kritik araçlar modele HİÇ verilmez, çünkü onay diyaloğu
+   * web ekranına bağlı. Varsayılan "web" — mevcut çağıranlar değişmez.
+   */
+  channel: "web" | "whatsapp";
+  /** WhatsApp'ta kullanıcı veri değiştirmeyi kapatmış olabilir (§3.8). */
+  allowWrites: boolean;
   createdAt: number;
 }
 
@@ -398,6 +406,25 @@ const MAX_ACTIVE_FILES = 5;
 
 /** Yalnızca dosya gönderilip hiçbir şey yazılmadığında kullanılan varsayılan istek. */
 const EMPTY_MESSAGE_WITH_FILE = "Bu dosyayı incele ve ne olduğunu özetle.";
+
+/**
+ * WhatsApp kanalının ek talimatı. Statik (önbelleğe alınan) blokta DEĞİL,
+ * dinamik bağlamda: statik blok araç şemalarıyla birlikte önbelleğe alınıyor
+ * ve web isteklerinin çoğunluğu o öneki paylaşıyor — kanala göre değişen bir
+ * metni oraya koymak her WhatsApp isteğinde önbelleği ıskalatırdı.
+ *
+ * Biçim kuralı bir RİCA'dır; model yine de markdown üretirse son savunma
+ * whatsapp-lio-format.ts'te.
+ */
+const WHATSAPP_CHANNEL_PROMPT = [
+  "### Bu istek WhatsApp'tan geldi",
+  "Cevabın WhatsApp mesajı olarak gidecek. Buna göre yaz:",
+  "- Düz metin üret: başlık, kalın yazı, tablo ve markdown kullanma. Kısa madde listesi olur.",
+  "- Kısa tut: en fazla 800 karakter. Sığmayacaksa en önemlisini yaz ve ayrıntı için uygulamaya yönlendir.",
+  "- Dosya bağlantısı verme; WhatsApp'ta açılmaz.",
+  "- Silme, arşivleme ve bütçe hareketi araçların BU KANALDA yok. Kullanıcı böyle bir şey isterse",
+  "  yapamayacağını söyle ve uygulamadan yapmasını öner; yapabilmiş gibi davranma.",
+].join("\n");
 
 const ACTION_LABELS: Record<string, string> = {
   create_job: "iş oluşturuldu",
@@ -1142,7 +1169,12 @@ export class AiAssistantService {
     userMessage: string,
     conversationId?: string,
     tierInput?: string,
-    attachmentIds?: string[]
+    attachmentIds?: string[],
+    /**
+     * Kanal seçenekleri. Verilmezse web: mevcut çağıranların davranışı aynen
+     * korunur. WhatsApp köprüsü için bkz. whatsapp-lio.service.ts.
+     */
+    options?: { channel?: "web" | "whatsapp"; allowWrites?: boolean }
   ): Promise<ChatResult> {
     // Ekler mesajdan önce çözülür: süresi dolmuş bir ek varsa hiç API çağrısı yapmadan hata verilir.
     const attachments = this.attachmentsService.take(userId, attachmentIds ?? []);
@@ -1242,6 +1274,8 @@ export class AiAssistantService {
       pausedEstimate: 0,
       askAgain: true,
       holds: [],
+      channel: options?.channel ?? "web",
+      allowWrites: options?.allowWrites ?? true,
       createdAt: Date.now(),
     };
 
@@ -1661,9 +1695,14 @@ export class AiAssistantService {
           },
           // Açık dosya bildirimi HER TURDA yeniden yazılır: koşunun ortasında
           // release_files çağrılırsa bir sonraki tur doğru durumu görmeli.
-          { type: "text", text: `${run.baseContext}\n\n${this.activeFileStatus(run.activeFiles)}` },
+          {
+            type: "text",
+            text:
+              `${run.baseContext}\n\n${this.activeFileStatus(run.activeFiles)}` +
+              (run.channel === "whatsapp" ? `\n\n${WHATSAPP_CHANNEL_PROMPT}` : ""),
+          },
         ] as any,
-        tools: AI_TOOLS,
+        tools: toolsForChannel(run.channel, { allowWrites: run.allowWrites }),
         messages: run.messages,
       });
       run.iterationsUsed += 1;
@@ -1752,6 +1791,30 @@ export class AiAssistantService {
       }
 
       const criticalUse = toolUses.find((use) => CRITICAL_TOOLS.has(use.name));
+      // WhatsApp'ta onay diyaloğu gösterilemez. toolsForChannel bu araçları
+      // zaten modele vermiyor, yani buraya normalde düşülmez; düşülürse
+      // (araç adı değişti, süzgeç bozuldu) koşuyu ONAY BEKLER hâlde bırakmak
+      // kullanıcıya sonsuza kadar cevapsız kalmak demek olurdu. Araç sonucu
+      // olarak reddedip modele devam ettiriyoruz: Lio "bunu uygulamadan
+      // yapmalısınız" diyebilsin.
+      if (criticalUse && run.channel === "whatsapp") {
+        this.logger.error(
+          `WhatsApp kanalında kritik araç istendi (süzgeç kaçırdı): ${criticalUse.name}`
+        );
+        run.messages.push({ role: "assistant", content: response.content });
+        run.messages.push({
+          role: "user",
+          content: toolUses.map((use) => ({
+            type: "tool_result" as const,
+            tool_use_id: use.id,
+            content:
+              "Bu işlem WhatsApp üzerinden yapılamaz. Kullanıcıya işlemi Projelio uygulamasından " +
+              "yapması gerektiğini söyle; yapılmış gibi davranma.",
+            is_error: true,
+          })),
+        });
+        continue;
+      }
       if (criticalUse) {
         const actionId = randomUUID();
         const input = (criticalUse.input as Record<string, any>) ?? {};

@@ -1,12 +1,12 @@
 # WhatsApp'tan Lio'ya komut — plan
 
-> **DURUM (2026-09-03): uçtan uca uygulandı, sunucuda AÇILMAYI bekliyor.**
+> **DURUM (2026-09-03): uygulandı; migration canlıda, bayrak bekliyor.**
 >
 > Akış kapandı: kullanıcının bağlı telefonundan gelen serbest metin Lio'nun
-> araçlı akışına giriyor ve cevap aynı konuşmaya kuyruklanıyor. Canlıya
-> çıkması için iki elle adım kaldı: **migration 085'i uygulamak** ve
-> **`WHATSAPP_LIO_KOMUT=1`** tanımlamak. İkisi de yapılmadan özellik sessizce
-> kapalı — kod eskisi gibi davranır.
+> araçlı akışına giriyor ve cevap aynı konuşmaya kuyruklanıyor. Migration 085
+> canlıya **uygulandı** (93/93, PostgREST önbelleği tazelendi). Özelliğin
+> çalışması için kalan tek adım sunucuda **`WHATSAPP_LIO_KOMUT=1`**
+> tanımlamak; o tanımlanana kadar gelen serbest metin eskisi gibi düşer.
 >
 > | Bölüm | Durum | Nerede |
 > |---|---|---|
@@ -14,7 +14,7 @@
 > | §3.2 `chat()` kanal parametresi | ✅ | `ai-assistant.service.ts` (`channel`, `allowWrites`, kanal istemi, savunma dalı) |
 > | §3.3 Köprü | ✅ | `whatsapp-lio.service.ts` (`handleUserCommand`) |
 > | §3.4 Webhook'a bağlama | ✅ | `whatsapp-webhook.service.ts` (`onUserMessage`) |
-> | §3.5 Migration | ✅ yazıldı, ⬜ **uygulanmadı** | `database/migrations/085_whatsapp_lio_komut.sql` |
+> | §3.5 Migration | ✅ canlıda uygulandı | `database/migrations/085_whatsapp_lio_komut.sql` |
 > | §3.6 Sınırlar + sessiz saat muafiyeti | ✅ | `lio-komut-sinir.ts`, `whatsapp-rate-limit.ts`, `whatsapp-send.processor.ts` |
 > | §3.7 Biçimlendirme | ✅ | `whatsapp-lio-format.ts` + testi |
 > | §3.8 Yazma izni anahtarı | ✅ | `WhatsappLioWritesToggle.tsx`, `setLioAllowWrites` |

@@ -26,6 +26,12 @@ export class WhatsappController {
     return this.whatsapp.createLinkCode(req.user.userId);
   }
 
+  /** WhatsApp'tan veri değiştirilebilsin mi (görev aç, kayıt güncelle). */
+  @Patch("me/lio-writes")
+  lioWrites(@Body() body: { enabled: boolean }, @Req() req: any) {
+    return this.whatsapp.setLioAllowWrites(req.user.userId, Boolean(body.enabled));
+  }
+
   @Post("me/opt-out")
   optOut(@Req() req: any) {
     return this.whatsapp.optOutMe(req.user.userId);

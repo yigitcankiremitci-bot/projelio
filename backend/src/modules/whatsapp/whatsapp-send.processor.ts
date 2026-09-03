@@ -110,7 +110,7 @@ export class WhatsappSendProcessor {
     const now = new Date();
     const { data: queued } = await this.supabase.client
       .from("whatsapp_messages")
-      .select("id, thread_id, body, attempt_count, created_at, whatsapp_threads!inner(connection_id, contact_id, kind, whatsapp_contacts(wa_jid, opt_in_state, last_inbound_at))")
+      .select("id, thread_id, body, attempt_count, created_at, bypass_quiet_hours, whatsapp_threads!inner(connection_id, contact_id, kind, whatsapp_contacts(wa_jid, opt_in_state, last_inbound_at))")
       .eq("status", "queued")
       .eq("whatsapp_threads.connection_id", conn.id)
       .or(`next_attempt_at.is.null,next_attempt_at.lte.${now.toISOString()}`)
@@ -149,10 +149,16 @@ export class WhatsappSendProcessor {
         pausedUntil: conn.paused_until ? new Date(conn.paused_until) : null,
         localHour: localHour(TIMEZONE, now),
         now,
+        bypassQuietHours: row.bypass_quiet_hours === true,
       });
       if (decision.allowed === false) {
         const reason = decision.reason;
         if (reason === "per_contact") continue; // yalnızca bu kişi doldu, diğerleri gidebilir
+        // Sessiz saat artık mesaja özel: bu satır bekletilse de kuyrukta
+        // muaf bir mesaj (kullanıcının kendi isteğine cevap) olabilir, onu
+        // sabaha bırakmamak için taramaya devam edilir. Diğer sınırlar
+        // bağlantı geneli olduğu için turu bitirir.
+        if (reason === "quiet_hours") continue;
         this.logger.debug(`Gönderim bekletildi (${conn.session_name}): ${reason}`);
         return; // bağlantı geneli sınır: bu tur bitti
       }

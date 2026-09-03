@@ -67,6 +67,11 @@ export type ContactRow = {
   opt_in_at: string | null;
   /** Profil telefonu eşleşen aday; EVET onayıyla user_id olur (082). */
   pending_user_id: string | null;
+  /**
+   * WhatsApp'tan veri değiştirilebilsin mi (görev aç, kayıt güncelle).
+   * Kapalıyken Lio yalnızca okur. Silme/bütçe her hâlükârda kapalı (085).
+   */
+  lio_allow_writes: boolean;
   last_inbound_at: string | null;
   created_at: string;
 };
@@ -79,6 +84,9 @@ export type ThreadRow = {
   owner_user_id: string | null;
   organization_id: string | null;
   lio_auto_reply: boolean;
+  /** Bağlı Lio sohbeti ve son kullanım anı — komut sürekliliği için (085). */
+  ai_conversation_id: string | null;
+  ai_conversation_at: string | null;
   title: string | null;
   last_inbound_at: string | null;
   last_outbound_at: string | null;
@@ -291,7 +299,7 @@ export class WhatsappService {
     ]);
     const { data: contact } = await this.supabase.client
       .from("whatsapp_contacts")
-      .select("phone_e164, opt_in_state, opt_in_at")
+      .select("phone_e164, opt_in_state, opt_in_at, lio_allow_writes")
       .eq("user_id", userId)
       .eq("kind", "user")
       .order("created_at", { ascending: false })
@@ -307,6 +315,7 @@ export class WhatsappService {
             optInState: (contact as any).opt_in_state,
             phoneMasked: maskPhone((contact as any).phone_e164),
             verifiedAt: (contact as any).opt_in_at ?? undefined,
+            lioAllowWrites: (contact as any).lio_allow_writes !== false,
           }
         : { optInState: "not_linked" },
     };
@@ -582,6 +591,28 @@ export class WhatsappService {
     return this.enqueue(threadId, text, { sentBy, sentByUserId: userId });
   }
 
+  /**
+   * "WhatsApp'tan değişiklik yapılabilsin" anahtarı — kullanıcının KENDİ
+   * bağlı telefonu için. Kişi bazında: biri iş ve özel numarasını ayrı
+   * bağlarsa ayrı ayarlanabilir.
+   *
+   * Yetki: yalnızca kişinin bağlı olduğu kullanıcı. Başkasının telefonunun
+   * iznini değiştirmek, o kişinin verisine WhatsApp'tan yazma yolu açmak
+   * olurdu — bu yüzden user_id eşleşmesi sorgunun İÇİNDE.
+   */
+  async setLioAllowWrites(userId: string, enabled: boolean): Promise<{ lioAllowWrites: boolean }> {
+    const { data, error } = await this.supabase.client
+      .from("whatsapp_contacts")
+      .update({ lio_allow_writes: enabled, updated_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .eq("kind", "user")
+      .select("id")
+      .limit(1);
+    if (error) throw error;
+    if (!data?.length) throw new BadRequestException("Hesabınıza bağlı bir WhatsApp numarası yok");
+    return { lioAllowWrites: enabled };
+  }
+
   async setAutoReply(threadId: string, userId: string, enabled: boolean): Promise<WhatsappThread> {
     await this.assertCanViewThread(threadId, userId);
     const { data, error } = await this.supabase.client
@@ -691,7 +722,14 @@ export class WhatsappService {
   async enqueue(
     threadId: string,
     body: string,
-    meta: { sentBy: "system" | "user" | "lio"; sentByUserId?: string | null; notificationId?: string | null; dedupeKey?: string }
+    meta: {
+      sentBy: "system" | "user" | "lio";
+      sentByUserId?: string | null;
+      notificationId?: string | null;
+      dedupeKey?: string;
+      /** Kullanıcının kendi isteğine cevap: sessiz saatte de gider (bkz. 085). */
+      bypassQuietHours?: boolean;
+    }
   ): Promise<WhatsappMessage> {
     const { data, error } = await this.supabase.client
       .from("whatsapp_messages")
@@ -704,6 +742,7 @@ export class WhatsappService {
         sent_by_user_id: meta.sentByUserId ?? null,
         notification_id: meta.notificationId ?? null,
         dedupe_key: meta.dedupeKey ?? null,
+        bypass_quiet_hours: meta.bypassQuietHours ?? false,
       })
       .select()
       .single();

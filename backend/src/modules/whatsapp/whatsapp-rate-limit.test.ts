@@ -87,6 +87,57 @@ describe("gönderim kararı", () => {
   });
 });
 
+// Kullanıcı gece 02:00'de Lio'ya kendisi yazdıysa cevap sabaha kalmamalı:
+// sessiz saat istenmeyen mesajı önlemek için var, istenen mesajı geciktirmek
+// için değil. Muafiyet YALNIZCA sessiz saate; hacim tavanları ban riskinin
+// asıl kaynağı olduğu için delinmez.
+describe("sessiz saat muafiyeti", () => {
+  test("muafiyetsiz sessiz saatte engellenir", () => {
+    assert.deepEqual(decideSend(DEFAULT_RATE_LIMIT, facts({ localHour: 2 })), {
+      allowed: false,
+      reason: "quiet_hours",
+    });
+  });
+
+  test("muafiyetle sessiz saatte geçer", () => {
+    assert.deepEqual(
+      decideSend(DEFAULT_RATE_LIMIT, facts({ localHour: 2, bypassQuietHours: true })),
+      { allowed: true }
+    );
+  });
+
+  test("muafiyet dakika tavanını AŞAMAZ", () => {
+    assert.deepEqual(
+      decideSend(DEFAULT_RATE_LIMIT, facts({ localHour: 2, bypassQuietHours: true, sentLastMinute: 8 })),
+      { allowed: false, reason: "per_minute" }
+    );
+  });
+
+  test("muafiyet günlük tavanı AŞAMAZ", () => {
+    assert.deepEqual(
+      decideSend(DEFAULT_RATE_LIMIT, facts({ localHour: 2, bypassQuietHours: true, sentToday: 1500 })),
+      { allowed: false, reason: "per_day" }
+    );
+  });
+
+  test("muafiyet duraklatmayı AŞAMAZ", () => {
+    // 463/475 sonrası duraklatma WhatsApp'ın kendi kısıtı; delinirse ban gelir.
+    const paused = facts({
+      localHour: 2,
+      bypassQuietHours: true,
+      pausedUntil: new Date(now.getTime() + 1000),
+    });
+    assert.deepEqual(decideSend(DEFAULT_RATE_LIMIT, paused), { allowed: false, reason: "paused" });
+  });
+
+  test("muafiyet gündüz davranışını değiştirmez", () => {
+    assert.deepEqual(
+      decideSend(DEFAULT_RATE_LIMIT, facts({ localHour: 14, bypassQuietHours: true })),
+      { allowed: true }
+    );
+  });
+});
+
 describe("yardımcılar", () => {
   test("jitter aralıkta", () => {
     assert.equal(jitterMs(DEFAULT_RATE_LIMIT, () => 0), 2000);

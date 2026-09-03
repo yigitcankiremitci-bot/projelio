@@ -95,6 +95,16 @@ export interface SendWindowFacts {
   /** Yerel saat (0–23). Zaman dilimi dönüşümü çağıranın işi. */
   localHour: number;
   now: Date;
+  /**
+   * Kullanıcının kendi isteğine cevap: sessiz saat uygulanmaz.
+   *
+   * Sessiz saat kuralı ban riskini düşürmek için var ve tetikleyici gece
+   * yarısı BİLDİRİM atmak. Kullanıcı 02:00'de Lio'ya kendisi yazdıysa cevabı
+   * sabaha ertelemek istenmeyen mesaj korkusuyla istenen mesajı geciktirmek
+   * olurdu. Yalnızca sessiz saati atlar — hacim tavanları (dakika/saat/gün/
+   * kişi) ban riskinin asıl kaynağı olduğu için bu bayrakla delinmez.
+   */
+  bypassQuietHours?: boolean;
 }
 
 export type SendDecision = { allowed: true } | { allowed: false; reason: SendBlockReason };
@@ -106,7 +116,9 @@ export function decideSend(config: RateLimitConfig, facts: SendWindowFacts): Sen
   if (facts.pausedUntil && facts.pausedUntil.getTime() > facts.now.getTime()) {
     return { allowed: false, reason: "paused" };
   }
-  if (isQuietHour(config, facts.localHour)) return { allowed: false, reason: "quiet_hours" };
+  if (!facts.bypassQuietHours && isQuietHour(config, facts.localHour)) {
+    return { allowed: false, reason: "quiet_hours" };
+  }
   if (facts.sentLastMinute >= config.perMinute) return { allowed: false, reason: "per_minute" };
   if (facts.sentLastHour >= config.perHour) return { allowed: false, reason: "per_hour" };
   if (facts.sentToday >= dailyCapForWarmup(config, facts.warmupStartedAt, facts.now)) {

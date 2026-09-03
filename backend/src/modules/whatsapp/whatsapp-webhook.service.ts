@@ -3,6 +3,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { WahaHttpClient } from "./waha.client";
 import { WhatsappLioService } from "./whatsapp-lio.service";
+import { isLioCommandEnabled } from "./lio-komut-sinir";
 import { AUTO_REPLIES, confirmPrompt, parseInboundCommand } from "./whatsapp-optin";
 import { isGroupJid, isLidJid, jidToE164, maskPhone } from "./whatsapp-phone";
 import { WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
@@ -233,7 +234,24 @@ export class WhatsappWebhookService {
     payload: any,
     command: ReturnType<typeof parseInboundCommand>
   ): Promise<void> {
-    if (command.kind === "none") return;
+    // Komut değilse serbest metindir: Lio'nun araçlı akışına gider.
+    // Eskiden burada sessizce dönülüyordu; kullanıcı kendi telefonundan
+    // yazdığı hiçbir şeye cevap alamıyordu.
+    if (command.kind === "none") {
+      if (!isLioCommandEnabled()) return;
+      // Yalnızca gerçekten bağlanmış ve bildirim almayı kabul etmiş kullanıcı.
+      // Aday (pending_user_id) yetmez: kimlik henüz EVET ile doğrulanmadı.
+      if (!contact.user_id || contact.opt_in_state !== "opted_in") return;
+      const body: string = typeof payload.body === "string" ? payload.body : "";
+      if (!body.trim()) return;
+      await this.waha.sendSeen(conn.session_name, contact.wa_jid, payload.id ? [payload.id] : undefined).catch(() => {});
+      // Beklenmeyen hata kuyruğu tıkamasın: olay işlenmiş sayılır, kullanıcı
+      // cevapsız kalır ama sonraki mesajları çalışır.
+      await this.lio
+        .handleUserCommand(thread, contact, conn, contact.user_id, body)
+        .catch((e) => this.logger.warn(`Lio komutu başarısız (${thread.id}): ${e instanceof Error ? e.message : e}`));
+      return;
+    }
     const now = new Date().toISOString();
     const chatId = contact.wa_jid;
     await this.waha.sendSeen(conn.session_name, chatId, payload.id ? [payload.id] : undefined).catch(() => {});

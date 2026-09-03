@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { WhatsappLinkCode, WhatsappOverview } from "@projelio/shared";
 import { whatsappApi } from "../api/whatsapp";
+import WhatsappLioWritesToggle from "./WhatsappLioWritesToggle";
 import { useThemeColors } from "../theme/useThemeColors";
 
 /**
@@ -73,6 +74,7 @@ export default function WhatsappNotifyPanel({ overview, onChanged }: { overview:
           Bildirimleri durdur
         </button>
         {error && <p style={{ fontSize: 14, color: c.danger, margin: "8px 0 0" }}>{error}</p>}
+        <WhatsappLioWritesToggle enabled={overview.me.lioAllowWrites !== false} onChanged={onChanged} />
       </div>
     );
   }

@@ -98,17 +98,72 @@ deploy_and_check() {
   curl --fail --silent --show-error --retry 12 --retry-delay 5     --retry-connrefused http://127.0.0.1:3001/ >/dev/null || return 1
 }
 
+# Eski imajların temizliği BAŞARIDAN BAĞIMSIZ yapılır.
+# Önceden yalnızca başarılı dağıtımda çalışıyordu; üst üste başarısız dağıtımlar
+# imaj biriktirip diski dolduruyordu. Dolu disk yalnızca dağıtımı değil YEDEĞİ de
+# durdurur (bkz. yedekle.sh'taki 2 GB kontrolü) — yani başarısız dağıtım zinciri
+# sessizce "yedeksiz kaldık" durumuna götürebiliyordu.
+temizle() { docker image prune -f --filter 'until=168h' >/dev/null 2>&1 || true; }
+
+# Uygulanmamış migration var mı?
+#
+# NEDEN BURADA: kod otomatik dağıtılıyor ama ŞEMA dağıtılmıyor — migration'lar
+# hâlâ elle uygulanıyor. Yeni bir kolona bakan backend sürümü canlıya çıkıp
+# migration unutulursa uygulama çalışma anında patlıyor ve dağıtımın sağlık
+# kontrolü bunu YAKALAYAMIYOR (yalnızca /health'e bakıyor, o da veritabanına
+# bakmıyordu). Bu kontrol boşluğu kapatır.
+#
+# Dağıtımı DURDURMAZ: migration'ların çoğu geriye dönük uyumlu ve dağıtımı
+# bloke etmek daha büyük zarar verirdi. Yalnızca haber verir.
+migration_uyarisi() {
+  local kayit bekleyen
+  kayit="$(docker exec -i "$KONTEYNER_PG" sh -c \
+    'psql -qAt -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select to_regclass('"'"'public.schema_migrations'"'"') is not null"' \
+    2>/dev/null | tr -d '[:space:]')" || return 0
+  # Tablo henüz yoksa (083 uygulanmadıysa) bu kontrol sessizce atlanır.
+  [ "$kayit" = "t" ] || return 0
+
+  bekleyen="$(docker exec -i "$KONTEYNER_PG" sh -c \
+    'psql -qAt -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select count(*) from public.schema_migrations"' \
+    2>/dev/null | tr -d '[:space:]')" || return 0
+  local dosya_sayisi
+  dosya_sayisi="$(ls "$ROOT/database/migrations"/*.sql 2>/dev/null | wc -l | tr -d ' ')"
+
+  if [ -n "$bekleyen" ] && [ "$dosya_sayisi" -gt "$bekleyen" ]; then
+    echo "UYARI: $((dosya_sayisi - bekleyen)) migration uygulanmamış görünüyor." >&2
+    [ -x "$UYAR_BETIK" ] && "$UYAR_BETIK" "Uygulanmamış migration var" \
+      "Repoda $dosya_sayisi migration var, canlıda $bekleyen kayıtlı.
+Dağıtım tamamlandı ama şema geride olabilir.
+Kontrol: ./deploy/migrate.sh durum" || true
+  fi
+}
+
+KONTEYNER_PG="projelio-postgres"
+UYAR_BETIK="$(dirname "$0")/uyar.sh"
+
 sync_source
 if deploy_and_check; then
   printf '%s\n' "$candidate" >"$STATE"
-  docker image prune -f --filter 'until=168h' >/dev/null
+  temizle
+  migration_uyarisi || true
   exit 0
 fi
 
 echo "Deploy başarısız; önceki commit geri yükleniyor." >&2
+geri_dondu="hayır"
 if [[ "$previous" =~ ^[0-9a-f]{40}$ ]]; then
   git -C "$SOURCE" checkout --quiet --detach "$previous"
   sync_source
-  deploy_and_check
+  if deploy_and_check; then geri_dondu="evet"; fi
 fi
+temizle
+
+# Haber ver: systemd OnFailure yalnızca root'lu kurulumda çalışıyor, bu sunucuda
+# iş crontab'la koşuyor (bkz. yedekle.sh başlığı). Uyarı burada da tetiklenmezse
+# hata yine sessiz kalırdı — zamanlayıcı her dakika yeniden deneyip döngüye girer.
+[ -x "$UYAR_BETIK" ] && "$UYAR_BETIK" "Dağıtım başarısız" \
+  "Commit: $candidate
+Önceki sürüme dönüldü: $geri_dondu
+Ayrıntı: journalctl -u projelio-deploy -n 50" || true
+
 exit 1

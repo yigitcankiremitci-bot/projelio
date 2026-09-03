@@ -2,6 +2,9 @@
 Description=Projelio başarılı main commitini canlıya al
 After=docker.service network-online.target
 Wants=network-online.target
+# Dağıtım düşerse haber ver. Bu satır olmadan hata yalnızca journal'a yazılıyor
+# ve zamanlayıcı her dakika sessizce yeniden deniyordu (2026-09-03'te yaşandı).
+OnFailure=projelio-uyari@%n.service
 
 [Service]
 Type=oneshot

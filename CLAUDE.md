@@ -68,6 +68,22 @@ root girişini açmıyor. Bu yüzden sunucuda kurulan her şey (ör. yedekleme)
 kullanıcı crontab'ıyla kuruluyor, systemd birimiyle değil — birimler repoda
 duruyor ama root erişimi olduğu gün işe yarar. Bkz. `deploy/yedekle.sh` başlığı.
 
+### Sunucuda elle kurulması gerekenler (kod tarafı hazır, ayar bekliyor)
+
+Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
+
+| Ne | Değişken | Nerede tanımlanır |
+|---|---|---|
+| Yedeğin dış kopyası | `PROJELIO_UZAK_HEDEF` | crontab / `~/uyari.env` |
+| Arıza bildirimi | `PROJELIO_NTFY_KONU` ya da `PROJELIO_TELEGRAM_TOKEN`+`_CHAT` | `/etc/projelio/uyari.env` ya da `~/uyari.env` |
+| Yedek yaşam sinyali | `PROJELIO_YEDEK_PING` | aynı dosya |
+
+Kurulum adımları `deploy/yedekle.sh` ve `deploy/uyar.sh` başlıklarında yazılı.
+Dış kopya kurulana kadar yedekler **yalnızca korumaya çalıştıkları diskte**
+duruyor. Ayrıca dışarıdan bir uptime izleyicisi `https://api.projelio.app/health/ready`
+adresine bakmalı — `/health` yalnızca sürecin ayakta olduğunu söyler,
+veritabanı ölüyken bile 200 döner.
+
 Değişiklik sonrası **her zaman `npm run typecheck` çalıştır.** Tüm test setini
 değil, dokunduğun alanın testlerini `--filter` ile koştur.
 
@@ -89,18 +105,47 @@ değil, dokunduğun alanın testlerini `--filter` ile koştur.
 
 ## Dikkat edilecekler
 
-- **Migration numaraları çakışabiliyor** — `060`, `062`, `063` iki kez kullanılmış.
-  Yeni migration eklerken `ls database/migrations | tail` ile en yüksek numarayı
-  gör ve bir sonrakini al.
+- **Migration numaraları çakışabiliyor** — `019`, `027`, `043`, `044`, `051`,
+  `058`, `060`, `063` iki kez kullanılmış (hepsi farklı tablolara dokunduğu için
+  zararsız). Yeni migration eklerken `ls database/migrations | tail` ile en
+  yüksek numarayı gör ve bir sonrakini al.
+- **Geri alma (rollback) betikleri `database/geri-al/` altında**, migrations
+  içinde DEĞİL. Aynı numarayı taşıyorlardı ve sıralı toplu uygulamada ileri
+  migration'ı hemen ardından geri alıyorlardı (bkz. `database/geri-al/README.md`).
 - **Migration'lar kendi VPS'imizdeki Postgres'e elle uygulanıyor** (Supabase'e
   değil — 2026-08-30'da göç edildi). Dosyayı yazmak yeterli değil; uygulanması
-  gerektiğini bana hatırlat. Komut:
+  gerektiğini bana hatırlat. Tercih edilen yol `deploy/migrate.sh`:
+
+  ```bash
+  ./deploy/migrate.sh durum     # bekleyenleri listeler
+  ./deploy/migrate.sh uygula    # sırayla uygular, kaydeder, PostgREST'i tazeler
+  ```
+
+  Betik `schema_migrations` tablosunu (migration 083) kullanır: uygulanmışları
+  atlar, her dosyayı tek transaction'da çalıştırır, sonradan değiştirilmiş
+  dosyaları yakalar. **İlk kurulumda** önce 083'ü elle uygula, sonra
+  `./deploy/migrate.sh isaretle` ile mevcut 82 dosyayı "uygulanmış" say.
+
+  Elle uygulamak gerekirse:
   `ssh projelio@100.111.242.24 'docker exec -i projelio-postgres sh -c "psql -v ON_ERROR_STOP=1 -U \$POSTGRES_USER -d \$POSTGRES_DB"' < database/migrations/NNN_ad.sql`
   (tailnet adresi; genel IP'de 22 kapalı). Şema değiştiyse PostgREST'in
   önbelleğini tazele: `docker exec projelio-postgres sh -c "psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c \"notify pgrst, 'reload schema'\""`
 - **`client.ts` içindeki oturum sonlanma mantığına dokunma.** 401'lerin tek
   merkezden yönetilmesi bilinçli; oraya `catch` eklemek "her şeyim silinmiş"
   hatasını geri getirir.
+- **Bildirim gönderirken `notifyUserSafe` kullan**, `notifyUser` değil.
+  `notifyUser` veritabanı hatasında `throw` ediyor; beklenmeden bırakılırsa
+  Node 22 yakalanmamış promise reddinde SÜRECİ ÖLDÜRÜR. Sonucu gerçekten
+  beklemen gerekmiyorsa (ki bildirimlerde neredeyse hiç gerekmez) güvenli olanı
+  çağır. `main.ts`'te güvenlik ağı var ama oraya düşen her kayıt bir eksik
+  catch demektir.
+- **Dış servise giden her `fetch` zaman aşımlı olmalı** —
+  `common/http/fetch-with-timeout.ts`. Node'un fetch'inde yanıt için varsayılan
+  zaman aşımı YOK; asılı kalan bir istek kuyruk işleyicisini (`running` bayrağı)
+  süresiz kilitleyebiliyor. Veritabanı çağrıları için aynı koruma
+  `database/retrying-fetch.ts` içinde zaten var.
+- **Liste uçlarına tavan koy** — `common/liste-tavani.ts`. Kod tabanında gerçek
+  sayfalama yok; tavan, veri beklenmedik biçimde büyüdüğünde kopmayı önlüyor.
 - **Büyük dosyalar** — bunları tamamen okumaya çalışma, ilgili bölümü hedefle:
   `files.service.ts` (~1900), `planning.service.ts` (~1600),
   `TaskColumn.tsx` (~1500), `ai-assistant.service.ts` (~1300),

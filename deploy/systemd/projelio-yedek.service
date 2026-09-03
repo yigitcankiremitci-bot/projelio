@@ -2,6 +2,9 @@
 Description=Projelio günlük yedek (veritabanı + yüklenen dosyalar)
 After=docker.service
 Requires=docker.service
+# Yedek düşerse (ya da dış kopya gönderilemezse — betik o hâlde 2 ile çıkar)
+# haber ver. "Yedeğim var" sanıp yedeksiz kalmak, bu listedeki en pahalı hata.
+OnFailure=projelio-uyari@%n.service
 
 [Service]
 Type=oneshot

@@ -1,5 +1,29 @@
 # Projelio production stack.
 # Postgres, Supabase Storage, PostgREST, backend, web/Caddy ve landing yığını.
+#
+# KAYNAK SINIRLARI (mem_limit) — neden her serviste var:
+# Sunucu 4 vCPU / 7.8 GB ve bu yedi konteyner aynı makineyi paylaşıyor. Sınır
+# olmadığında bir servisin bellek sızıntısı ya da ani yükü tüm makineyi yiyor;
+# çekirdeğin OOM killer'ı devreye girip HANGİ süreci öldüreceğini kendi seçiyor
+# ve genelde en çok bellek kullananı, yani Postgres'i seçiyor. Veritabanının
+# böyle kirli kapanması kurtarma ve olası veri kaybı demek.
+#
+# Sınır konulduğunda ise sadece SINIRI AŞAN konteyner ölür, komşuları ayakta
+# kalır ve `restart: unless-stopped` onu geri getirir. Toplam (postgres 3g +
+# backend 1200m + waha 900m + storage 512m + postgrest 384m + caddy 192m +
+# landing 384m ≈ 6.5 GB) fiziksel belleğin altında bırakıldı; kalan ~1.3 GB
+# çekirdek, dosya önbelleği ve dağıtım sırasındaki geçici ikinci konteyner için.
+#
+# LOG ROTASYONU — neden her serviste var:
+# Docker'ın json-file sürücüsü varsayılanda SINIRSIZ büyür. Yalnızca waha'da
+# sınır vardı; diğer altısı diski doldurabilirdi. Dolu disk yalnızca logu değil
+# yedeklemeyi de durdurur (bkz. yedekle.sh'taki 2 GB kontrolü), yani sessizce
+# "yedeksiz kaldık" durumuna götürür.
+#
+# Sınırı değiştirmen gerekirse önce `docker stats` ile gerçek kullanıma bak.
+x-logging: &varsayilan-log
+  driver: json-file
+  options: { max-size: "20m", max-file: "3" }
 
 name: projelio
 
@@ -14,6 +38,10 @@ services:
     image: supabase/postgres:17.6.1.166
     container_name: projelio-postgres
     restart: unless-stopped
+    # 3g: shared_buffers 2GB + work_mem'lerin toplamı + bağlantı başına yük.
+    # Bu değeri düşürürsen aşağıdaki -c shared_buffers ayarını da düşür.
+    mem_limit: 3g
+    logging: *varsayilan-log
     shm_size: 512mb
     env_file:
       - .env
@@ -121,6 +149,8 @@ services:
     image: supabase/storage-api:v1.28.4
     container_name: projelio-storage
     restart: unless-stopped
+    mem_limit: 512m
+    logging: *varsayilan-log
     depends_on:
       postgres:
         condition: service_healthy
@@ -200,6 +230,8 @@ services:
     image: postgrest/postgrest:v14.16
     container_name: projelio-postgrest
     restart: unless-stopped
+    mem_limit: 384m
+    logging: *varsayilan-log
     depends_on:
       postgres:
         condition: service_healthy
@@ -266,6 +298,10 @@ services:
     image: projelio-backend:local
     container_name: projelio-backend
     restart: unless-stopped
+    # 1200m: Node'un varsayılan heap'i (~1 GB) + yükleme tamponları. Yükleme
+    # uçları dosyayı belleğe alıyor (memoryStorage), o yüzden pay bırakıldı.
+    mem_limit: 1200m
+    logging: *varsayilan-log
     depends_on:
       postgrest:
         condition: service_healthy
@@ -316,6 +352,11 @@ services:
     image: devlikeapro/waha:gows-2026.8.2
     container_name: projelio-waha
     restart: unless-stopped
+    # 900m: GOWS motoru ~200 MB diyor, üstüne oturum sayısına göre pay. Sınır
+    # özellikle burada önemli: üçüncü taraf ve resmi olmayan bir protokol
+    # konuşuyor, sızıntısı fark edilmeden büyür. Sınırı aşarsa yalnızca WhatsApp
+    # köprüsü yeniden başlar; veritabanı ve uygulama etkilenmez.
+    mem_limit: 900m
     depends_on:
       postgres:
         condition: service_healthy
@@ -340,10 +381,9 @@ services:
       # sürümlenir, env'e dağılmaz).
       WAHA_PRINT_QR: "false"
     # WhatsApp'a bağlı bir oturumun log satırları numara ve mesaj içeriği
-    # taşıyabilir; diskte sınırsız birikmesin.
-    logging:
-      driver: json-file
-      options: { max-size: "20m", max-file: "3" }
+    # taşıyabilir; diskte sınırsız birikmesin. (Artık tüm servislerde aynı
+    # sınır var; buradaki kopya ortak tanıma bağlandı.)
+    logging: *varsayilan-log
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/ping',{headers:{'X-Api-Key':process.env.WAHA_API_KEY}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
@@ -366,6 +406,8 @@ services:
     image: projelio-web:local
     container_name: projelio-caddy
     restart: unless-stopped
+    mem_limit: 192m
+    logging: *varsayilan-log
     depends_on:
       backend:
         condition: service_healthy
@@ -393,6 +435,8 @@ services:
     image: projelio-landing:local
     container_name: projelio-landing
     restart: unless-stopped
+    mem_limit: 384m
+    logging: *varsayilan-log
     env_file: [.env]
     environment:
       NODE_ENV: production

@@ -1,9 +1,6 @@
-import { BadRequestException, Logger } from "@nestjs/common";
-// `import type`: yalnızca tip gerekiyor. Değer olarak import etmek, Nest
-// dekoratörü taşıyan o dosyayı da yüklerdi ve tip-silme test koşucusu onu
-// ayrıştıramıyor. Çalışma anında bağımlılık zaten Nest tarafından enjekte edilir.
-import type { SupabaseService } from "../../database/supabase.service";
-import { findModel } from "./providers/providers.config";
+import { BadRequestException, Inject, Injectable, Logger } from "@nestjs/common";
+import { SupabaseService } from "../../database/supabase.service";
+import { isValidTier, normalizeModelKey, normalizeTier, TIERS } from "./ai-model-settings.validate";
 import type { ModelTier } from "./ai-credits.config";
 
 export interface AiModelSettingRow {
@@ -18,8 +15,6 @@ export interface AiModelSettings {
   tiers: AiModelSettingRow[];
 }
 
-const TIERS: ModelTier[] = ["fast", "smart", "max"];
-
 /**
  * Lio'nun model ayarları — kademe başına hangi model çalışacak.
  *
@@ -33,11 +28,19 @@ const TIERS: ModelTier[] = ["fast", "smart", "max"];
  * anında geçerli oluyor, önbellek yalnızca okuma yükünü azaltıyor.
  */
 /*
- * Dekoratör ve "parametre özelliği" (constructor(private x)) BİLEREK
- * kullanılmıyor: Node'un tip-silme test koşucusu ikisini de ayrıştıramıyor ve
- * bu dosya testlerde yüklenemiyordu. Nest, sınıfı `providers` dizisinden
- * @Inject ile kurabiliyor; derlenmiş çıktı aynı.
+ * @Injectable ZORUNLU: bu sınıfın bir bağımlılığı var (SupabaseService) ve Nest
+ * dekoratör olmadan constructor tiplerini okuyamıyor — enjeksiyon sessizce
+ * atlanıp `this.supabase` undefined kalıyordu (canlıda "bir hata oluştu").
+ * Bağımlılığı OLMAYAN LlmProviderRegistry dekoratörsüz çalışabiliyor, bu sınıf
+ * çalışamaz.
+ *
+ * `@Inject(SupabaseService)` açıkça yazılıyor: `import type` ile alınan tip
+ * derlemede silindiği için Nest'in tip-yansımasına güvenilemez.
+ *
+ * "Parametre özelliği" (constructor(private x)) kullanılmıyor; onu Node'un
+ * tip-silme test koşucusu ayrıştıramıyor (bkz. fetch-with-timeout.ts).
  */
+@Injectable()
 export class AiModelSettingsService {
   private readonly logger = new Logger(AiModelSettingsService.name);
   private cache: { value: AiModelSettings; expiresAt: number } | null = null;
@@ -45,7 +48,7 @@ export class AiModelSettingsService {
 
   private readonly supabase: SupabaseService;
 
-  constructor(supabase: SupabaseService) {
+  constructor(@Inject(SupabaseService) supabase: SupabaseService) {
     this.supabase = supabase;
   }
 
@@ -81,7 +84,7 @@ export class AiModelSettingsService {
       for (const row of modeller.data ?? []) satirlar.set(row.tier, row);
 
       const value: AiModelSettings = {
-        defaultTier: this.normalizeTier((genel.data as any)?.default_tier) ?? "fast",
+        defaultTier: normalizeTier((genel.data as any)?.default_tier),
         tiers: TIERS.map((tier) => ({
           tier,
           modelKey: satirlar.get(tier)?.model_key ?? null,
@@ -115,15 +118,11 @@ export class AiModelSettingsService {
    * her istekte sağlayıcıdan 404 alırdı ve sebebi panelde görünmezdi.
    */
   async setTierModel(tier: ModelTier, modelKey: string | null, adminUserId: string): Promise<void> {
-    if (!TIERS.includes(tier)) throw new BadRequestException("Geçersiz kademe.");
+    if (!isValidTier(tier)) throw new BadRequestException("Geçersiz kademe.");
 
-    const temiz = modelKey?.trim() || null;
-    if (temiz) {
-      const [providerId, ...rest] = temiz.split(":");
-      if (!providerId || rest.length === 0 || !findModel(providerId, rest.join(":"))) {
-        throw new BadRequestException(`"${temiz}" katalogda yok. Geçerli bir model seçin.`);
-      }
-    }
+    const dogrulama = normalizeModelKey(modelKey);
+    if (!dogrulama.ok) throw new BadRequestException(dogrulama.error);
+    const temiz = dogrulama.value;
 
     const { error } = await this.supabase.client
       .from("ai_model_settings")
@@ -139,7 +138,7 @@ export class AiModelSettingsService {
 
   /** Varsayılan kademeyi ayarlar — tüm kullanıcılar bunu kullanır. */
   async setDefaultTier(tier: ModelTier, adminUserId: string): Promise<void> {
-    if (!TIERS.includes(tier)) throw new BadRequestException("Geçersiz kademe.");
+    if (!isValidTier(tier)) throw new BadRequestException("Geçersiz kademe.");
 
     const { error } = await this.supabase.client
       .from("ai_assistant_settings")
@@ -151,10 +150,5 @@ export class AiModelSettingsService {
 
     this.invalidate();
     this.logger.log(`Varsayılan kademe değişti · ${tier} · admin=${adminUserId.slice(0, 8)}…`);
-  }
-
-  private normalizeTier(value: unknown): ModelTier | null {
-    const v = String(value ?? "").trim() as ModelTier;
-    return TIERS.includes(v) ? v : null;
   }
 }

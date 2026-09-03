@@ -421,6 +421,13 @@ const EMPTY_MESSAGE_WITH_FILE = "Bu dosyayı incele ve ne olduğunu özetle.";
  * Biçim kuralı bir RİCA'dır; model yine de markdown üretirse son savunma
  * whatsapp-lio-format.ts'te.
  */
+/**
+ * Modelin "bugün", "akşam", "2 saat sonra" gibi ifadeleri çözerken kullandığı
+ * saat dilimi. Sunucu UTC çalıştığı için bu olmadan tarih gece yarısından
+ * sonra bir gün geriye kayıyordu (bkz. buildDynamicSystemPrompt).
+ */
+const AI_TIMEZONE = process.env.TZ?.trim() || "Europe/Istanbul";
+
 const WHATSAPP_CHANNEL_PROMPT = [
   "### Bu istek WhatsApp'tan geldi",
   "",
@@ -1088,10 +1095,24 @@ export class AiAssistantService {
    */
   private async buildDynamicSystemPrompt(userId: string, userRole: string): Promise<string> {
     const context = await this.buildWorkspaceContext(userId);
-    const today = new Date().toISOString().slice(0, 10);
+    // Yerel saate göre, UTC'ye göre DEĞİL. İki ayrı hata düzeltiyor:
+    //  1. toISOString() UTC verir; Türkiye UTC+3 olduğu için gece 00:00-03:00
+    //     arasında model kendini bir GÜN GERİDE sanıyordu ("bugün" dünü
+    //     gösteriyordu).
+    //  2. Saat hiç gönderilmiyordu. "Akşam 19'da hatırlat", "iki saat sonra",
+    //     "bugün akşam" gibi istekleri model saati bilmeden yorumlayamaz;
+    //     WhatsApp'tan bu tür istekler web'e göre çok daha sık geliyor.
+    const now = new Date();
+    const tarihSaat = new Intl.DateTimeFormat("tr-TR", {
+      timeZone: AI_TIMEZONE,
+      dateStyle: "full",
+      timeStyle: "short",
+    }).format(now);
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: AI_TIMEZONE }).format(now);
     return [
       "## Bağlam",
-      `- Bugünün tarihi: ${today}`,
+      `- Bugünün tarihi: ${today} (${tarihSaat})`,
+      `- Saat dilimi: ${AI_TIMEZONE}. Göreli zaman ifadelerini (bugün, yarın, akşam, 2 saat sonra) bu saate göre çöz.`,
       `- Kullanıcının rolü: ${userRole === "admin" ? "admin (yönetici)" : "freelancer"}`,
       context,
     ].join("\n");

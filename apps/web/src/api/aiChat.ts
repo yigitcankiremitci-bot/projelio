@@ -197,6 +197,47 @@ export interface AiProviderBalance {
   lastCheckpoint?: { amountUsd: number; createdAt: string };
 }
 
+/**
+ * Sağlayıcı sağlık/durum bilgisi (`GET /ai/health`, yalnızca admin).
+ *
+ * Lio çok sağlayıcılıdır: hangi sağlayıcıların tanımlı ve etkin olduğu
+ * sunucudaki AI_PROVIDERS değişkeniyle belirlenir. Panel bunu yalnızca
+ * GÖSTERİR — açıp kapatmak sunucu ayarıdır, arayüzden yapılmaz.
+ */
+export interface AiProviderInfo {
+  id: string;
+  label: string;
+  kind: string;
+  /** API anahtarı tanımlı mı? */
+  configured: boolean;
+  /** AI_PROVIDERS listesinde sayılıyor ve anahtarı var mı? */
+  active: boolean;
+  models: Array<{
+    key: string;
+    id: string;
+    label: string;
+    description: string;
+    tier: string;
+    vision: boolean;
+    contextWindow: number;
+    price: { input: number; output: number; cachedInput?: number };
+  }>;
+  capabilities: { promptCaching: boolean; tools: boolean; vision: boolean };
+}
+
+export interface AiHealth {
+  apiKeyPresent: boolean;
+  apiKeyPrefix: string | null;
+  model: string;
+  /** Birincil sağlayıcının kimliği; hiç yapılandırılmamışsa null. */
+  provider: string | null;
+  providers: AiProviderInfo[];
+  reachable: boolean;
+  error?: string;
+  httpStatus?: number;
+  transcriptionConfigured: boolean;
+}
+
 export const aiChat = {
   send: (message: string, conversationId?: string, tier?: AiModelTier, attachmentIds?: string[]) =>
     api.post<AiChatResult>("/ai/chat", { message, conversationId, tier, attachmentIds }),
@@ -207,6 +248,8 @@ export const aiChat = {
     api.post<AiChatResult>("/ai/continue", { runId, confirmed, tier, approveAll }),
   getModels: () =>
     api.get<{ defaultTier: AiModelTier; tiers: AiModelTierInfo[]; maxAttachments: number }>("/ai/models"),
+  /** Sağlayıcı durumu — yalnızca admin çağırabilir. */
+  getHealth: () => api.get<AiHealth>("/ai/health"),
 
   // --- Dosya ekleri ---
   // Dosya, mesajdan AYRI olarak önce okunur: ses çözümleme gibi ücretli işler bir

@@ -3,7 +3,7 @@ import type { ThemeColors } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import AiCreditOrdersAdmin from "./AiCreditOrdersAdmin";
 import { api } from "../api/client";
-import { aiChat, type AiProviderBalance, type AiUserBalanceRow } from "../api/aiChat";
+import { aiChat, type AiHealth, type AiProviderBalance, type AiUserBalanceRow } from "../api/aiChat";
 import { IconSparkle } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
 
@@ -42,6 +42,7 @@ export default function AiCreditAdminPanel() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [margin, setMargin] = useState<MarginReport | null>(null);
+  const [health, setHealth] = useState<AiHealth | null>(null);
 
   const [providerBalance, setProviderBalance] = useState<AiProviderBalance | null>(null);
   const [topupAmount, setTopupAmount] = useState("50");
@@ -81,6 +82,12 @@ export default function AiCreditAdminPanel() {
       .catch(() => {});
     loadProviderBalance();
     loadUserBalances();
+    // Sağlayıcı durumu: hangi AI sağlayıcıları açık. Hata yutulur — bu bölüm
+    // bilgilendirme amaçlı, yüklenemezse panelin geri kalanı çalışmaya devam etsin.
+    aiChat
+      .getHealth()
+      .then(setHealth)
+      .catch(() => {});
   }, []);
 
   const filteredUserBalances = (userBalances ?? []).filter((u) => {
@@ -410,6 +417,78 @@ export default function AiCreditAdminPanel() {
       </div>
 
       <div style={{ height: isDesktop ? 18 : 0 }} />
+
+      {/* AI sağlayıcıları: Lio çok sağlayıcılıdır (Anthropic, MiniMax, z.ai).
+          Hangilerinin açık olduğu ve öncelik sırası SUNUCU ayarıdır (AI_PROVIDERS);
+          burada yalnızca gösterilir. Arayüzden açıp kapatmak bilinçli olarak yok:
+          hangi sağlayıcıya müşteri verisi gittiği tek tıkla değişmemeli. */}
+      {health && (
+        <div
+          style={{
+            background: c.surface,
+            border: `1px solid ${c.border}`,
+            borderRadius: 12,
+            padding: 16,
+            marginBottom: 18,
+          }}
+        >
+          <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 10 }}>AI sağlayıcıları</div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 14 }}>
+            <Metric label="Kullanılan model" value={health.model} />
+            <Metric
+              label="Birincil sağlayıcı"
+              value={health.providers.find((p) => p.id === health.provider)?.label ?? "—"}
+            />
+            <Metric
+              label="Erişim"
+              value={health.reachable ? "Çalışıyor" : "Ulaşılamıyor"}
+              highlight={health.reachable ? c.success : c.danger}
+            />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {health.providers.map((p) => {
+              // Üç durum var ve ayrımı önemli: etkin (kullanılıyor), anahtarı var
+              // ama listede yok (kapalı), anahtarı bile yok (kurulmamış).
+              const durum = p.active
+                ? { metin: "Etkin", renk: c.success }
+                : p.configured
+                  ? { metin: "Kapalı", renk: c.textSecondary }
+                  : { metin: "Anahtar yok", renk: c.textSecondary };
+              return (
+                <div
+                  key={p.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    flexWrap: "wrap",
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    background: p.active ? `${c.success}14` : "transparent",
+                    border: `1px solid ${p.active ? `${c.success}55` : c.border}`,
+                  }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: 14, color: c.textPrimary }}>{p.label}</span>
+                  <span style={{ fontSize: 12, color: durum.renk, fontWeight: 600 }}>{durum.metin}</span>
+                  <span style={{ fontSize: 12, color: c.textSecondary }}>
+                    {p.models.length} model
+                    {p.active && p.models.some((m) => m.vision) ? " · görsel okuyabilir" : ""}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 12, lineHeight: 1.5 }}>
+            Sıra öncelik demektir: birincil sağlayıcı geçici olarak yanıt vermezse (hız
+            sınırı, sunucu hatası, bağlantı) istek sıradakine devredilir ve kredi
+            gerçekten kullanılan modelin fiyatından kesilir. Sağlayıcı açıp kapatmak ya da
+            sırayı değiştirmek için sunucudaki <code>AI_PROVIDERS</code> değişkenini düzenle.
+          </div>
+        </div>
+      )}
 
       {/* Self-servis kredi siparişleri: ödemesi alınanları onaylayıp krediyi yükler.
           Onay sonrası kullanıcı bakiyeleri listesi de tazelenmeli. */}

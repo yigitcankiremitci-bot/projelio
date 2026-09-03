@@ -203,3 +203,58 @@ describe("createRetryingFetch — HTTP hataları yeniden denenmez", () => {
     assert.equal(calls, 1);
   });
 });
+
+describe("createRetryingFetch — zaman aşımı", () => {
+  test("asılı kalan okuma isteği kesilir ve yeniden denenir", async () => {
+    // Karşı taraf yanıt vermiyor: zaman aşımı olmasaydı istek sonsuza kadar
+    // asılı kalır, yeniden deneme mantığı da onunla birlikte kilitlenirdi.
+    let calls = 0;
+    const f = createRetryingFetch(async (_input: any, init?: any) => {
+      calls += 1;
+      if (calls === 1) {
+        // İlk deneme: yanıt vermeyen sunucu. Yalnızca abort ile sonlanır.
+        return await new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            const err = new Error("aborted");
+            err.name = "AbortError";
+            reject(err);
+          });
+        });
+      }
+      return OK;
+    }, { sleep: noSleep, timeoutMs: 10 });
+
+    const res = await f("https://x/rest/v1/party");
+    assert.equal(res.ok, true);
+    assert.equal(calls, 2);
+  });
+
+  test("çağıranın kendi iptali yeniden denenmez", async () => {
+    // supabase-js abortSignal() ile isteği iptal edebiliyor. Bu bir ağ hatası
+    // değil, kasıtlı vazgeçiştir — yeniden denemek isteneni yapmamak olurdu.
+    const controller = new AbortController();
+    let calls = 0;
+    const f = createRetryingFetch(async () => {
+      calls += 1;
+      controller.abort();
+      const err = new Error("aborted");
+      err.name = "AbortError";
+      throw err;
+    }, { sleep: noSleep });
+
+    await assert.rejects(() => f("https://x/rest/v1/party", { signal: controller.signal } as any));
+    assert.equal(calls, 1);
+  });
+
+  test("timeoutMs=0 verilirse zaman aşımı uygulanmaz", async () => {
+    // Uzun süren tek seferlik işler (ör. büyük dışa aktarım) için kaçış kapısı.
+    let seenSignal: unknown = "yok";
+    const f = createRetryingFetch(async (_input: any, init?: any) => {
+      seenSignal = init?.signal;
+      return OK;
+    }, { sleep: noSleep, timeoutMs: 0 });
+
+    await f("https://x/rest/v1/party");
+    assert.equal(seenSignal, undefined);
+  });
+});

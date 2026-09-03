@@ -5,6 +5,7 @@ import {
   OnModuleInit,
   ServiceUnavailableException,
 } from "@nestjs/common";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 /** OpenAI transkripsiyon uç noktasının kabul ettiği azami dosya boyutu. */
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
@@ -82,11 +83,18 @@ export class AiTranscriptionService implements OnModuleInit {
 
     let response: Response;
     try {
-      response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}` },
-        body: form,
-      });
+      response = await fetchWithTimeout(
+        "https://api.openai.com/v1/audio/transcriptions",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}` },
+          body: form,
+        },
+        // Varsayılan 20 sn burada yetmez: 25 MB'a kadar ses yükleniyor ve
+        // çözümleme sesin uzunluğuyla orantılı sürüyor. Yine de sınırsız
+        // bırakılmıyor — asılı kalan istek kullanıcının kredisini tutar.
+        120_000
+      );
     } catch (err: any) {
       throw new ServiceUnavailableException(
         `Ses çözümleme servisine ulaşılamadı: ${err?.message ?? "bağlantı hatası"}`

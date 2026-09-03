@@ -3,6 +3,7 @@ import { JwtService } from "@nestjs/jwt";
 import { createTokenCrypto } from "../../common/crypto/token-crypto";
 import { extractMetaError } from "./publish-format";
 import { getWebAppUrl } from "../../common/config/env";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 /**
  * Instagram bağlantısı — "Instagram API with Instagram Login" yolu.
@@ -161,7 +162,7 @@ export class InstagramOAuthService {
   async exchangeCode(code: string): Promise<{ accessToken: string; userId: string; permissions?: string[] }> {
     this.assertConfigured();
 
-    const res = await fetch(TOKEN_ENDPOINT, {
+    const res = await fetchWithTimeout(TOKEN_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -204,7 +205,7 @@ export class InstagramOAuthService {
       client_secret: this.clientSecret!,
       access_token: shortLivedToken,
     });
-    const res = await fetch(`${IG_GRAPH_HOST}/access_token?${params.toString()}`);
+    const res = await fetchWithTimeout(`${IG_GRAPH_HOST}/access_token?${params.toString()}`);
 
     if (!res.ok) {
       const body = await res.text();
@@ -229,7 +230,7 @@ export class InstagramOAuthService {
     this.assertConfigured();
 
     const params = new URLSearchParams({ grant_type: "ig_refresh_token", access_token: longLivedToken });
-    const res = await fetch(`${IG_GRAPH_HOST}/refresh_access_token?${params.toString()}`);
+    const res = await fetchWithTimeout(`${IG_GRAPH_HOST}/refresh_access_token?${params.toString()}`);
 
     if (!res.ok) {
       const body = await res.text();
@@ -247,7 +248,7 @@ export class InstagramOAuthService {
       fields: "id,username,name,profile_picture_url,followers_count,account_type",
       access_token: accessToken,
     });
-    const res = await fetch(`${IG_GRAPH_HOST}/${IG_API_VERSION}/me?${params.toString()}`);
+    const res = await fetchWithTimeout(`${IG_GRAPH_HOST}/${IG_API_VERSION}/me?${params.toString()}`);
 
     if (!res.ok) {
       const body = await res.text();

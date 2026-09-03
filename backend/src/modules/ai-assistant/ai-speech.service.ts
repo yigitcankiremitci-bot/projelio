@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 /**
  * Tek seferde seslendirilecek azami karakter.
@@ -92,16 +93,22 @@ export class AiSpeechService {
 
     let response: Response;
     try {
-      response = await fetch("https://api.openai.com/v1/audio/speech", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: process.env.OPENAI_TTS_MODEL?.trim() || "tts-1",
-          voice: resolveVoice(voice),
-          input,
-          response_format: "mp3",
-        }),
-      });
+      response = await fetchWithTimeout(
+        "https://api.openai.com/v1/audio/speech",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: process.env.OPENAI_TTS_MODEL?.trim() || "tts-1",
+            voice: resolveVoice(voice),
+            input,
+            response_format: "mp3",
+          }),
+        },
+        // Seslendirme metin uzunluğuyla orantılı sürer; varsayılanın üstünde
+        // ama sınırsız değil (bkz. ai-transcription.service.ts'teki gerekçe).
+        60_000
+      );
     } catch (err: any) {
       throw new ServiceUnavailableException(
         `Ses servisine ulaşılamadı: ${err?.message ?? "bağlantı hatası"}`

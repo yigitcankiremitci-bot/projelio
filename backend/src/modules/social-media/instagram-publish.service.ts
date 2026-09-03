@@ -5,6 +5,7 @@ import { FilesService } from "../files/files.service";
 import { IG_API_VERSION, IG_GRAPH_HOST } from "./instagram-oauth.service";
 import { extractMetaError } from "./publish-format";
 import { SocialTokensService } from "./social-tokens.service";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 /**
  * Instagram'a yayın.
@@ -351,7 +352,7 @@ export class InstagramPublishService {
   // ============================================================ HTTP
 
   private async post<T>(path: string, body: Record<string, string>): Promise<T> {
-    const res = await fetch(`${IG_GRAPH_HOST}/${IG_API_VERSION}/${path}`, {
+    const res = await fetchWithTimeout(`${IG_GRAPH_HOST}/${IG_API_VERSION}/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams(body),
@@ -360,7 +361,7 @@ export class InstagramPublishService {
   }
 
   private async get<T>(path: string, query: Record<string, string>): Promise<T> {
-    const res = await fetch(`${IG_GRAPH_HOST}/${IG_API_VERSION}/${path}?${new URLSearchParams(query)}`);
+    const res = await fetchWithTimeout(`${IG_GRAPH_HOST}/${IG_API_VERSION}/${path}?${new URLSearchParams(query)}`);
     return this.parse<T>(res, path);
   }
 

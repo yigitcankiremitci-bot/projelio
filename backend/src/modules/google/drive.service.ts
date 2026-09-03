@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD_API = "https://www.googleapis.com/upload/drive/v3";
@@ -104,7 +105,7 @@ export class DriveService {
     init: RequestInit = {},
     base = DRIVE_API
   ): Promise<T> {
-    const res = await fetch(`${base}${path}`, {
+    const res = await fetchWithTimeout(`${base}${path}`, {
       ...init,
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -258,7 +259,7 @@ export class DriveService {
     accessToken: string,
     meta: { name: string; mimeType: string; parentId?: string; sizeBytes?: number }
   ): Promise<string> {
-    const res = await fetch(`${DRIVE_UPLOAD_API}/files?uploadType=resumable&fields=${FILE_FIELDS}`, {
+    const res = await fetchWithTimeout(`${DRIVE_UPLOAD_API}/files?uploadType=resumable&fields=${FILE_FIELDS}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -303,7 +304,7 @@ export class DriveService {
     | { state: "incomplete"; receivedBytes: number }
     | { state: "gone" }
   > {
-    const res = await fetch(uploadUrl, {
+    const res = await fetchWithTimeout(uploadUrl, {
       method: "PUT",
       // "*" = gövde göndermiyorum, yalnızca durumu soruyorum. Toplam boyut
       // bilinmiyorsa da "*" geçerli.
@@ -335,7 +336,7 @@ export class DriveService {
    */
   async cancelResumable(uploadUrl: string): Promise<void> {
     // Google iptalde standart dışı 499 dönüyor; hata saymıyoruz.
-    await fetch(uploadUrl, { method: "DELETE", headers: { "Content-Length": "0" } }).catch(() => undefined);
+    await fetchWithTimeout(uploadUrl, { method: "DELETE", headers: { "Content-Length": "0" } }).catch(() => undefined);
   }
 
   // ------------------------------------------------------------------- okuma
@@ -356,7 +357,7 @@ export class DriveService {
       ? `${DRIVE_API}/files/${fileId}/export?mimeType=${encodeURIComponent(exportAs.mime)}`
       : `${DRIVE_API}/files/${fileId}?alt=media`;
 
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const res = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${accessToken}` } });
 
     if (!res.ok) {
       if (res.status === 404) throw new DriveFileMissingError(fileId);

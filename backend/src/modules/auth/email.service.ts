@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { getWebAppUrl, isProduction } from "../../common/config/env";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -125,7 +126,7 @@ export class EmailService {
 
   private async send(params: { to: string; subject: string; html: string; text: string }): Promise<void> {
     try {
-      const response = await fetch(RESEND_ENDPOINT, {
+      const response = await fetchWithTimeout(RESEND_ENDPOINT, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.apiKey}`,

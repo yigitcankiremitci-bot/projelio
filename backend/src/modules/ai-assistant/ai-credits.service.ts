@@ -12,6 +12,7 @@ import {
 } from "./ai-credits.config";
 import { demoKullanicisiMi } from "../../common/demo-hesap";
 import { DemoAiKotasi, DEMO_SAATLIK_KREDI } from "./demo-ai-kotasi";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 /**
  * Bakiye yetersizliğini HTTP 402 (Payment Required) ile bildirir; istemci bu kodu
@@ -244,36 +245,22 @@ export class AiCreditsService {
       throw new BadRequestException("Kredi miktarı pozitif bir sayı olmalı.");
     }
 
-    const balanceAfter = await this.applyChange(userId, credits, true);
-    const { error: txError } = await this.supabase.client.from("ai_credit_transactions").insert({
-      user_id: userId,
-      type,
+    // Bakiye ve defter satırı tek transaction'da yazılır (bkz. migration 084).
+    //
+    // Burada ÖNCEDEN elle telafi vardı: bakiye artırılıyor, defter satırı ayrı
+    // yazılıyor, yazılamazsa eklenen kredi geri alınmaya çalışılıyordu. Telafinin
+    // kendisi de düşebildiği için "bakiye defterle uyumsuz, elle düzeltilmeli"
+    // durumu mümkündü. Veritabanı tarafındaki transaction bu sınıfı tamamen
+    // ortadan kaldırıyor: sipariş başına tek satıra izin veren tekil indeks
+    // (uniq_ai_credit_tx_order) ikinci yüklemeyi reddederse bakiye de artmaz.
+    await this.chargeAtomic({
+      userId,
       credits,
-      balance_after: balanceAfter,
-      description: description ?? null,
-      created_by: createdBy ?? null,
-      order_id: orderId ?? null,
+      type,
+      description,
+      createdBy,
+      orderId,
     });
-    if (txError) {
-      // Bakiye ARTTI ama defter satırı yazılamadı. Supabase istemcisinde çok
-      // ifadeli işlem (transaction) yok, bu yüzden telafi elle yapılıyor: eklenen
-      // kredi geri alınır. Aksi halde en tehlikeli sonuç doğardı — sipariş başına
-      // tek satıra izin veren tekil indeks ikinci yüklemeyi reddederken bakiye
-      // yine de İKİ KEZ artmış olurdu (ödenmemiş kredi).
-      this.logger.error(
-        `Kredi defteri satırı yazılamadı (user=${userId}, order=${orderId ?? "-"}): ${txError.message}. Bakiye geri alınıyor.`
-      );
-      try {
-        await this.applyChange(userId, -credits, true);
-      } catch (rollbackError) {
-        // Telafi de başarısızsa sessiz kalınamaz: bakiye artık defterle uyumsuz.
-        this.logger.error(
-          `KRİTİK: kredi geri alınamadı (user=${userId}, credits=${credits}). Bakiye defterle uyumsuz, elle düzeltilmeli.`,
-          rollbackError as Error
-        );
-      }
-      throw txError;
-    }
 
     return this.getBalance(userId);
   }
@@ -307,23 +294,20 @@ export class AiCreditsService {
 
     if (credits <= 0) return { credits: 0, balanceAfter: (await this.getBalance(userId)).balance };
 
-    const balanceAfter = await this.applyChange(userId, -credits, true);
-
-    const { error } = await this.supabase.client.from("ai_credit_transactions").insert({
-      user_id: userId,
-      type: "usage",
+    // Bakiye ve defter kaydı tek transaction'da (bkz. chargeAtomic).
+    const balanceAfter = await this.chargeAtomic({
+      userId,
       credits: -credits,
-      balance_after: balanceAfter,
+      type: "usage",
       description: "AI asistan kullanımı",
-      conversation_id: conversationId ?? null,
+      conversationId,
       model,
       // Denetlenebilirlik için tüm girdi token'ları (önbellek dahil) tek alanda toplanır.
-      input_tokens: inputTokens + (cacheWriteTokens ?? 0) + (cacheReadTokens ?? 0),
-      output_tokens: outputTokens,
-      cost_usd: costUsd,
-      charged_usd: chargedUsd,
+      inputTokens: inputTokens + (cacheWriteTokens ?? 0) + (cacheReadTokens ?? 0),
+      outputTokens,
+      costUsd,
+      chargedUsd,
     });
-    if (error) this.logger.error(`Kredi hareketi kaydedilemedi: ${error.message}`);
 
     return { credits, balanceAfter };
   }
@@ -352,22 +336,18 @@ export class AiCreditsService {
 
     if (credits <= 0) return { credits: 0, balanceAfter: (await this.getBalance(userId)).balance };
 
-    const balanceAfter = await this.applyChange(userId, -credits, true);
-
-    const { error } = await this.supabase.client.from("ai_credit_transactions").insert({
-      user_id: userId,
-      type: "usage",
+    const balanceAfter = await this.chargeAtomic({
+      userId,
       credits: -credits,
-      balance_after: balanceAfter,
+      type: "usage",
       description: `Ses çözümleme${fileName ? ` · ${fileName}` : ""} (${Math.round(durationSeconds)} sn)`,
-      conversation_id: conversationId ?? null,
+      conversationId,
       model: process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || "whisper-1",
-      input_tokens: 0,
-      output_tokens: 0,
-      cost_usd: costUsd,
-      charged_usd: chargedUsd,
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd,
+      chargedUsd,
     });
-    if (error) this.logger.error(`Transkripsiyon kredi hareketi kaydedilemedi: ${error.message}`);
 
     return { credits, balanceAfter };
   }
@@ -391,22 +371,18 @@ export class AiCreditsService {
 
     if (credits <= 0) return { credits: 0, balanceAfter: (await this.getBalance(userId)).balance };
 
-    const balanceAfter = await this.applyChange(userId, -credits, true);
-
-    const { error } = await this.supabase.client.from("ai_credit_transactions").insert({
-      user_id: userId,
-      type: "usage",
+    const balanceAfter = await this.chargeAtomic({
+      userId,
       credits: -credits,
-      balance_after: balanceAfter,
+      type: "usage",
       description: `Sesli yanıt (${chars} karakter)`,
-      conversation_id: conversationId ?? null,
+      conversationId,
       model: process.env.OPENAI_TTS_MODEL?.trim() || "tts-1",
-      input_tokens: 0,
-      output_tokens: 0,
-      cost_usd: costUsd,
-      charged_usd: chargedUsd,
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd,
+      chargedUsd,
     });
-    if (error) this.logger.error(`Seslendirme kredi hareketi kaydedilemedi: ${error.message}`);
 
     return { credits, balanceAfter };
   }
@@ -540,7 +516,7 @@ export class AiCreditsService {
         url.searchParams.set("limit", "31");
         if (page) url.searchParams.set("page", page);
 
-        const res = await fetch(url, {
+        const res = await fetchWithTimeout(url, {
           headers: {
             "x-api-key": adminKey,
             "anthropic-version": "2023-06-01",
@@ -778,11 +754,45 @@ export class AiCreditsService {
     return { credits: 0, balanceAfter: this.demoKotasi.kalan() };
   }
 
-  private async applyChange(userId: string, credits: number, allowNegative: boolean): Promise<number> {
-    const { data, error } = await this.supabase.client.rpc("ai_apply_credit_change", {
-      p_user_id: userId,
-      p_credits: credits,
-      p_allow_negative: allowNegative,
+  /**
+   * Bakiye değişikliği + defter kaydını TEK İŞLEMDE yazar (bkz. migration 084).
+   *
+   * NEDEN AYRI BİR YOL: önceden bakiye `ai_apply_credit_change` ile düşülüyor, defter kaydı
+   * AYRI bir insert ile yazılıyor ve o insert'in hatası yalnızca loglanıyordu.
+   * Veritabanı bir an hata verdiğinde kullanıcının kredisi gidiyor ama defterde
+   * karşılığı olmuyordu — "kredim nereye gitti" sorusunun cevabı yoktu.
+   *
+   * Artık ikisi aynı transaction'da: biri düşerse ikisi de geri alınır.
+   */
+  private async chargeAtomic(params: {
+    userId: string;
+    credits: number;
+    type: "topup" | "usage" | "refund" | "adjustment" | "welcome";
+    description?: string;
+    conversationId?: string;
+    model?: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    costUsd?: number;
+    chargedUsd?: number;
+    createdBy?: string;
+    orderId?: string;
+    allowNegative?: boolean;
+  }): Promise<number> {
+    const { data, error } = await this.supabase.client.rpc("ai_charge_credits", {
+      p_user_id: params.userId,
+      p_credits: params.credits,
+      p_type: params.type,
+      p_description: params.description ?? null,
+      p_conversation_id: params.conversationId ?? null,
+      p_model: params.model ?? null,
+      p_input_tokens: params.inputTokens ?? null,
+      p_output_tokens: params.outputTokens ?? null,
+      p_cost_usd: params.costUsd ?? null,
+      p_charged_usd: params.chargedUsd ?? null,
+      p_created_by: params.createdBy ?? null,
+      p_order_id: params.orderId ?? null,
+      p_allow_negative: params.allowNegative ?? true,
     });
     if (error) {
       if (error.message?.includes("INSUFFICIENT_CREDITS")) {

@@ -3,21 +3,18 @@ import type { RefObject } from "react";
 import { Routes, Route, Link, useLocation, useParams, Navigate } from "react-router-dom";
 import type { User } from "@projelio/shared";
 import { api } from "./api/client";
-import OnboardingWizard from "./components/OnboardingWizard";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
 import NotificationBell from "./components/NotificationBell";
 import PresenceStrip from "./components/PresenceStrip";
-import AiLauncher from "./components/AiLauncher";
 import AiLiveActivity from "./components/AiLiveActivity";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { initPush } from "./push";
 import { useThemeColors } from "./theme/useThemeColors";
 import { ProjectFabProvider } from "./lib/projectFab";
 import { PageHeaderProvider, usePageHeaderState } from "./lib/pageHeader";
 import { UndoProvider } from "./lib/undo";
 import { TourProvider } from "./lib/tour/TourContext";
-import TourOverlay from "./components/tour/TourOverlay";
-import TourLauncher from "./components/tour/TourLauncher";
 import { useIsDesktop } from "./lib/useIsDesktop";
 import { getSidebarDefaultOpen, useAppPrefs } from "./lib/appPrefs";
 import { refreshSession } from "./lib/session";
@@ -33,9 +30,21 @@ import { IconChevronRight, IconUser } from "./components/icons";
 // ilk kez açıldığında geliyor; hash'li adı olduğu için de sonsuza kadar
 // önbellekte kalıyor (bkz. deploy/Caddyfile).
 //
-// Bileşenler (Sidebar, AiLauncher…) BİLEREK bölünmedi: uygulama kabuğunun
-// parçası olduklarından her sayfada zaten gerekiyorlar, ayırmak yalnızca
-// fazladan istek olurdu.
+// Kabuk bileşenleri (Sidebar, BottomNav, NotificationBell…) BİLEREK bölünmedi:
+// her sayfada zaten gerekiyorlar, ayırmak yalnızca fazladan istek olurdu.
+//
+// AMA üçü kabuğun parçası DEĞİL, yalnızca koşullu açılıyor ve ağır bağımlılık
+// taşıyorlar; onlar aşağıda ayrıca bölündü:
+//   · OnboardingWizard — yalnızca yeni kullanıcıya, bir kez
+//   · AiLauncher → AiAssistantPanel — yalnızca panel açılınca (yanında
+//     seslendirme motorunu, Google Picker'ı ve görsel küçültmeyi de getiriyor)
+//   · TourOverlay/TourLauncher — yalnızca tur başlatılınca
+// Bunlar statik import'ken giriş ekranını görmek için bile indiriliyorlardı.
+const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
+const AiLauncher = lazy(() => import("./components/AiLauncher"));
+const TourOverlay = lazy(() => import("./components/tour/TourOverlay"));
+const TourLauncher = lazy(() => import("./components/tour/TourLauncher"));
+
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Login = lazy(() => import("./pages/Login"));
 const PublicProject = lazy(() => import("./pages/PublicProject"));
@@ -639,7 +648,13 @@ export default function App() {
         her an başlatabilir. */}
     <TourProvider autoStartEnabled={Boolean(me?.onboardingCompletedAt)}>
     <div style={{ minHeight: "100vh" }}>
-      {me && !me.onboardingCompletedAt && <OnboardingWizard onCompleted={reloadMe} />}
+      {/* fallback={null}: bu üç parça arka planda inerken ekranda bir şey
+          göstermeye gerek yok — kabuk zaten çizilmiş durumda. */}
+      {me && !me.onboardingCompletedAt && (
+        <Suspense fallback={null}>
+          <OnboardingWizard onCompleted={reloadMe} />
+        </Suspense>
+      )}
 
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} overlay={!isDesktop} isAdmin={me?.role === "admin"} />
 
@@ -722,11 +737,17 @@ export default function App() {
           </>
         )}
         <NotificationBell />
-        {me?.onboardingCompletedAt && <TourLauncher />}
-        <TourOverlay />
+        <Suspense fallback={null}>
+          {me?.onboardingCompletedAt && <TourLauncher />}
+          <TourOverlay />
+        </Suspense>
         {/* Lio balonu ve kişi şeridi ekranda sürekli duran öğeler; ikisi de
             Ayarlar > Yardımcılar'dan gizlenebilir (bkz. lib/appPrefs.tsx). */}
-        {prefs.showLio && <AiLauncher />}
+        {prefs.showLio && (
+          <Suspense fallback={null}>
+            <AiLauncher />
+          </Suspense>
+        )}
         {/* Lio bir kayıt oluşturduğunda sayfayı oraya taşır ve ne yaptığını
             kısa bir şeritle söyler (bkz. AiLiveActivity). Lio gizlenmiş olsa
             bile duruyor: sinyal ancak Lio çalışıyorsa geliyor zaten. */}
@@ -754,6 +775,11 @@ export default function App() {
               paddingBottom: isDesktop ? 28 : "calc(104px + env(safe-area-inset-bottom))",
             }}
           >
+            {/* Sayfa seviyesinde ikinci hata sınırı: bir sayfa patlarsa kenar
+                çubuğu, üst çubuk ve alt menü ayakta kalsın — kullanıcı başka bir
+                sayfaya geçebilsin. key={location.pathname}: adres değişince sınır
+                sıfırlanır, yoksa hatalı sayfadan çıkılsa bile hata ekranı kalırdı. */}
+            <AppErrorBoundary scope="route" key={location.pathname}>
             <Suspense fallback={<SayfaYukleniyor />}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
@@ -776,6 +802,7 @@ export default function App() {
                 <Route path="/admin" element={<AdminPanel />} />
               </Routes>
             </Suspense>
+            </AppErrorBoundary>
           </div>
           {/* Mobilde tam alt menü, masaüstünde ise sadece ortadaki "+" butonu olarak
               render edilir — karar BottomNav içinde isDesktop'a göre veriliyor. */}

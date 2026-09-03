@@ -1,8 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import * as webpush from "web-push";
 import type { NotificationPayload, PushSubscriptionPayload } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsGateway } from "./notifications.gateway";
+import { WhatsappService } from "../whatsapp/whatsapp.service";
 
 function mapNotification(row: any): NotificationPayload {
   return {
@@ -24,7 +25,11 @@ export class NotificationsService {
 
   constructor(
     private supabase: SupabaseService,
-    private gateway: NotificationsGateway
+    private gateway: NotificationsGateway,
+    // forwardRef: WhatsApp modülü bağlantı durumunu tarayıcıya iletmek için bu
+    // modülün gateway'ini kullanıyor; biz de bildirimi WhatsApp'a vermek için
+    // onu — iki yönlü bağımlılık Nest'te ancak böyle çözülüyor.
+    @Inject(forwardRef(() => WhatsappService)) private whatsapp: WhatsappService
   ) {
     const publicKey = process.env.VAPID_PUBLIC_KEY;
     const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -55,7 +60,35 @@ export class NotificationsService {
     const notification = mapNotification(row);
     this.gateway.sendToUser(userId, notification);
     void this.sendPush(userId, notification);
+    // Dördüncü kanal: kullanıcı WhatsApp'a bağlıysa kuyruğa girer, değilse
+    // sessizce döner. Gönderim burada değil, dakikalık işleyicide (hız sınırı).
+    void this.whatsapp.notifyUser(userId, notification);
     return notification;
+  }
+
+  /**
+   * Bildirimi "gönderebilirsen gönder" niyetiyle yollar: hata fırlatmaz, loglar.
+   *
+   * NEDEN VAR: notifyUser veritabanı hatasında `throw` ediyor. Çağıranların
+   * çoğu bunu bilerek `try/catch`e almış ("bildirim gitmese de görev oluşturma
+   * başarılı sayılır"), ama bir kısmı çağrıyı beklemeden, catch'siz bırakmıştı.
+   * O hâlde geçici bir DB hatası YAKALANMAMIŞ bir promise reddine dönüşüyor ve
+   * Node 22'nin varsayılanı (--unhandled-rejections=throw) SÜRECİ ÖLDÜRÜYOR:
+   * yani gönderilemeyen tek bir bildirim tüm backend'i düşürebiliyordu.
+   *
+   * Ana işlemi (görev atama, dosya yükleme, bütçe kaydı) bildirime bağlamak
+   * istemediğimiz her yerde bunu kullan; sonucu beklemen gerekiyorsa notifyUser.
+   */
+  notifyUserSafe(
+    userId: string,
+    type: NotificationPayload["type"],
+    title: string,
+    body: string,
+    link?: string
+  ): void {
+    void this.notifyUser(userId, type, title, body, link).catch((error) =>
+      this.logger.warn(`Bildirim gönderilemedi (${type} → ${userId}): ${error instanceof Error ? error.message : error}`)
+    );
   }
 
   async findForUser(userId: string, limit = 50): Promise<{ notifications: NotificationPayload[]; unreadCount: number }> {
@@ -89,8 +122,9 @@ export class NotificationsService {
     if (error) throw error;
   }
 
-  broadcastActiveWorker(userId: string, activeTaskId: string | null): void {
-    this.gateway.broadcastActiveWorker(userId, activeTaskId);
+  /** room: sinyalin gideceği oda (bkz. gateway'deki gerekçe); yoksa gönderilmez. */
+  broadcastActiveWorker(userId: string, activeTaskId: string | null, room?: string | null): void {
+    this.gateway.broadcastActiveWorker(userId, activeTaskId, room);
   }
 
   getVapidPublicKey(): string {

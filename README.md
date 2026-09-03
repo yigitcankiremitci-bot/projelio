@@ -10,50 +10,79 @@ canlı bildirimler, bütçe/anlaşma yönetimi ve takvim görünümü sunan plat
 ```
 projelio/
 ├── apps/
-│   ├── web/        React (Vite + TS) web uygulaması
-│   └── mobile/     React Native (Expo) mobil uygulama
-├── backend/        NestJS REST API + WebSocket (Socket.io)
+│   ├── web/        React (Vite + TS) web uygulaması — ASIL İSTEMCİ
+│   └── mobile/     Expo iskeleti — 3 ekran, geliştirilmiyor
+├── backend/        NestJS REST API + WebSocket (Socket.io), 46 modül
 ├── database/
-│   └── migrations/ PostgreSQL şema migration'ları (canlıya elle uygulanır)
+│   ├── migrations/ PostgreSQL şema migration'ları (deploy/migrate.sh ile uygulanır)
+│   └── geri-al/    Geri alma betikleri — migrations'ın DIŞINDA, bilerek
+├── deploy/         Dağıtım, yedekleme, migration ve uyarı betikleri
 ├── landing/        Next.js tanıtım sitesi (projelio.app) — ayrı derlenir
 ├── packages/
 │   └── shared/     Web + mobil + backend arasında paylaşılan TS tipleri
-└── docs/
-    └── api-endpoints.md  API endpoint referansı
+└── docs/           API referansı, kurulum ve modül tasarım notları
 ```
 
 ## Teknoloji Yığını
 
-- **Frontend (Web):** React + Vite + TypeScript
-- **Mobil:** React Native (Expo)
-- **Backend:** Node.js / NestJS (RESTful API + WebSockets)
+- **Frontend (Web):** React 18 + Vite + TypeScript
+- **Backend:** Node.js 22 / NestJS (RESTful API + WebSockets)
 - **Veritabanı:** PostgreSQL 17 (kendi VPS'imizde, Docker; PostgREST üzerinden)
-- **Canlı iletişim:** Socket.io + Firebase Cloud Messaging (mobil push)
-- **Kuyruk / zamanlanmış görevler:** BullMQ + Redis
+- **Canlı iletişim:** Socket.io (oda tabanlı; tek sunucu örneği varsayar)
+- **Tarayıcı bildirimi:** Web Push (VAPID)
+- **Zamanlanmış işler:** `@nestjs/schedule` (`@Cron`) + veritabanı tabloları
 - **Dosya depolama:** storage-api (kendi VPS'imizde, `api.projelio.app/storage/v1`)
+- **Test:** Node'un yerleşik koşucusu (`node --test`) — vitest/jest yok
 
-## Yerel Kurulum (root'tan tek seferde)
+> **Kuyruk altyapısı yok.** `bullmq`, `ioredis` ve `firebase-admin` paketleri
+> `backend/package.json`'da duruyor ama **hiçbiri kullanılmıyor**; Redis servisi
+> de sağlanmış değil. Kuyruk gerektiren işler (WhatsApp gönderimi, sosyal medya
+> yayını) veritabanı tablosu + dakikalık `@Cron` taraması ile yürüyor. Ölçek
+> büyüyüp gerçek bir kuyruğa geçilecekse "zaten var" diye planlama — kurulması
+> gerekiyor.
 
-Bu monorepo npm workspaces kullanır — bağımlılıkları root'tan kurmak yeterli:
+## Yerel Kurulum
+
+Bu monorepo npm workspaces kullanır — bağımlılıkları kökten kurmak yeterli:
 
 ```bash
-npm install          # root'ta: web + mobile + backend + shared paketini kurar
-docker compose up -d # Redis'i başlatır (BullMQ için)
+npm install
+npm run dev          # backend + web birlikte (concurrently)
+```
 
-# Backend'i ayrı terminalde çalıştır
+Ayrı ayrı çalıştırmak istersen:
+
+```bash
 npm run start:dev --workspace=backend
-
-# Web'i ayrı terminalde çalıştır
 npm run dev --workspace=@projelio/web
-
-# Mobili ayrı terminalde çalıştır
-npm run start --workspace=@projelio/mobile
 ```
 
 Her uygulamada bir `.env.example` bulunur — çalıştırmadan önce `.env` olarak
-kopyalayıp kendi değerlerinizi girin (veritabanı adresi ve anahtarı zaten dolu).
-İstemci hâlâ `supabase-js`: değişken adları `SUPABASE_*` olarak kaldı, arkasında
-artık kendi PostgREST + storage-api'miz duruyor.
+kopyalayıp kendi değerlerinizi girin.
+
+İstemci hâlâ `supabase-js` paketini kullanıyor: değişken adları `SUPABASE_*`
+olarak kaldı, arkasında artık kendi PostgREST + storage-api'miz duruyor
+(2026-08-30'da Supabase'den kendi VPS'imize göç edildi).
+
+## Sık kullanılan komutlar
+
+```bash
+npm test                      # tüm testler (backend + web)
+npm test -- --filter=access   # yalnızca eşleşenler
+npm run typecheck             # backend + web tsc --noEmit
+npm run yayinla               # kontrol et + onay al + push'la + yayını izle
+./deploy/migrate.sh durum     # bekleyen migration var mı
+```
+
+## WhatsApp Bildirimleri
+
+Platform yöneticisi Admin paneli'nden havuza numaralar ekler (QR ile); her
+kullanıcıya arka planda kalıcı bir "Projelio numarası" atanır. Kullanıcılar
+Ayarlar › Bağlı hesaplar'dan kod alıp o numaraya gönderince bildirimleri
+WhatsApp'tan alır; Lio aynı numaradan müşterilerle yazışabilir. Köprü, resmi olmayan "Bağlı Cihazlar"
+protokolünü konuşan ayrı bir konteynerdir (WAHA); backend ona yalnızca HTTP
+ile bakar. Tasarım, riskler ve kurulum sırası: `docs/whatsapp-qr-plan.md`.
+Sunucu kurulumu: `deploy/whatsapp-kur.sh`.
 
 ## Marka Renkleri
 

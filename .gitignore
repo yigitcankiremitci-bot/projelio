@@ -6,6 +6,11 @@ build/
 # Sır içeren tüm .env türevleri (.env.dump gibi) — örnek dosyalar hariç
 .env.*
 !.env.*.example
+# Anahtar adını taşıyan dosyalar kök dizinde kazara oluşabiliyor (kabuk
+# yönlendirmesi: `... > service_role`). Adı bir sırrı çağrıştırdığı için,
+# ileride aynı ada DOLU bir dosya oluşursa commit'e girmesin.
+/service_role
+/anon_key
 *.log
 .expo/
 .DS_Store

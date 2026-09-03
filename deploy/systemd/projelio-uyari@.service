@@ -1,0 +1,15 @@
+[Unit]
+# Şablon birim: başka bir birim düştüğünde systemd bunu çalıştırır.
+# "%i" düşen birimin adıdır (OnFailure=projelio-uyari@%n.service ile geçirilir).
+#
+# NEDEN ŞABLON: her birim için ayrı bir uyarı birimi yazmak yerine tek tanım
+# yeterli — yeni bir zamanlanmış iş eklendiğinde sadece OnFailure satırı eklenir.
+Description=Projelio arıza bildirimi (%i)
+
+[Service]
+Type=oneshot
+# Kanal ayarları burada; dosya yoksa birim yine çalışır (uyar.sh stderr'e yazar).
+EnvironmentFile=-/etc/projelio/uyari.env
+# Düşen birimin son satırları mesaja eklenir: "bir şey bozuldu" demek yetmiyor,
+# NE bozulduğu da lazım. journalctl çıktısı boşsa mesaj yine gider.
+ExecStart=/bin/sh -c '/srv/projelio/deploy/uyar.sh "BAŞARISIZ: %i" "$(journalctl -u %i -n 25 --no-pager 2>/dev/null || echo "journal okunamadı")"'

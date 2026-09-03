@@ -116,7 +116,7 @@ export class BudgetService {
     if (error) throw error;
     const tx = mapTransaction(row);
     if (tx.userId) {
-      this.notificationsService.notifyUser(
+      this.notificationsService.notifyUserSafe(
         tx.userId,
         "budget_changed",
         "Bütçe Güncellendi",

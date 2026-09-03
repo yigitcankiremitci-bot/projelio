@@ -63,6 +63,48 @@ async function parseResponse<T>(res: Response): Promise<T> {
   }
 }
 
+/**
+ * Bir isteğin ne kadar sürebileceği.
+ *
+ * NEDEN GEREKLİ: tarayıcının fetch'inde varsayılan bir zaman aşımı YOKTUR.
+ * Sunucu yanıt vermezse (soğuk başlangıç, kopmuş bağlantı, ağ kara deliği)
+ * istek dakikalarca asılı kalıyordu: ekranda sonsuza kadar dönen bir spinner,
+ * hata mesajı yok, kullanıcı "uygulama dondu" deyip sayfayı yeniliyordu.
+ *
+ * 30 sn: en yavaş meşru sorgunun rahatça sığdığı, ama asılı kalmış bir isteği
+ * kullanıcıyı dakikalarca bekletmeden kesen aralık.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Ağ katmanı hatalarını ApiError'a çevirir.
+ *
+ * NEDEN: fetch reddedince ham `TypeError: Failed to fetch` yukarı çıkıyordu.
+ * Çağrı yerlerindeki `err instanceof ApiError` kontrolleri bunu kaçırıyor,
+ * kullanıcıya da İngilizce ve anlamsız bir metin görünüyordu. status: 0
+ * konvansiyonu "sunucuya hiç ulaşılamadı"yı HTTP hatalarından ayırır.
+ */
+function toNetworkError(error: unknown): ApiError {
+  if (error instanceof ApiError) return error;
+  const aborted = error instanceof DOMException && error.name === "AbortError";
+  return new ApiError(
+    aborted ? "Sunucu zamanında yanıt vermedi. Bağlantınızı kontrol edip tekrar deneyin." : "Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.",
+    0
+  );
+}
+
+/**
+ * Çağıranın kendi signal'ini zaman aşımıyla birleştirir.
+ * Çağıranın iptali ezilmemeli: bileşenler sayfa değişiminde isteği iptal ediyor.
+ */
+function signalWithTimeout(caller: AbortSignal | null | undefined): { signal: AbortSignal; done: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const signal =
+    caller && typeof AbortSignal.any === "function" ? AbortSignal.any([caller, controller.signal]) : controller.signal;
+  return { signal, done: () => clearTimeout(timer) };
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("projelio_token");
   // Açık soketin kimliği: sunucu bundan isteğin HANGİ SAYFADAN geldiğini bulup
@@ -70,15 +112,27 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // ve backend realtime.interceptor.ts). Yoksa (soket kapalı) sinyal gitmez,
   // istek normal çalışır.
   const socketId = getSocketId();
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(socketId ? { "X-Socket-Id": socketId } : {}),
-      ...options.headers,
-    },
-  });
+  const timeout = signalWithTimeout(options.signal);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      signal: timeout.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(socketId ? { "X-Socket-Id": socketId } : {}),
+        ...options.headers,
+      },
+    });
+  } catch (error) {
+    // Çağıranın kendi iptali sessizce yukarı verilir: bu bir hata değil,
+    // "bu veriye artık ihtiyacım yok" demektir (sayfa değişti).
+    if (options.signal?.aborted) throw error;
+    throw toNetworkError(error);
+  } finally {
+    timeout.done();
+  }
   if (!res.ok) {
     const text = await res.text();
     let message = `API error ${res.status}`;
@@ -130,12 +184,35 @@ async function uploadFile<T>(path: string, formData: FormData, signal?: AbortSig
   return parseResponse<T>(res);
 }
 
+/**
+ * İptal edilmiş istek hatası mı?
+ *
+ * Bileşen sayfa değişiminde isteği iptal ettiğinde ortaya çıkan hata bir arıza
+ * değildir; kullanıcıya gösterilmemeli. `.catch(ignoreAbort)` ile yutulabilir:
+ *   api.get(path, ac.signal).then(setX).catch(ignoreAbort);
+ */
+export function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+/** İptal hatalarını yutar, gerçek hatayı yeniden fırlatır. */
+export function ignoreAbort(error: unknown): void {
+  if (!isAbortError(error)) throw error;
+}
+
 export const api = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: "POST", body: JSON.stringify(body) }),
-  patch: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  // signal isteğe bağlı ama GET'te önemli: kullanıcı kenar çubuğundan hızlıca
+  // proje A → B → C gezdiğinde, geç dönen A yanıtı C'nin ekranını eziyordu
+  // (kullanıcı yanlış projenin verisini görüyor). Efektte bir AbortController
+  // açıp temizlikte abort etmek bunu kökünden çözer:
+  //   useEffect(() => { const ac = new AbortController();
+  //     api.get(path, ac.signal).then(setX).catch(ignoreAbort);
+  //     return () => ac.abort(); }, [path]);
+  get: <T>(path: string, signal?: AbortSignal) => request<T>(path, { signal }),
+  post: <T>(path: string, body: unknown, signal?: AbortSignal) =>
+    request<T>(path, { method: "POST", body: JSON.stringify(body), signal }),
+  patch: <T>(path: string, body: unknown, signal?: AbortSignal) =>
+    request<T>(path, { method: "PATCH", body: JSON.stringify(body), signal }),
   // keepalive: true — sekme/pencere kapatılırken de isteğin tamamlanmasına izin
   // verir. Özellikle geciktirilmiş silme akışının (bkz. lib/undo.tsx pushDestructive)
   // beforeunload sırasında attığı "flush" isteği için kritik: keepalive olmadan

@@ -1,5 +1,15 @@
 # A5 — Takvim / Plan Motoru (kurulum)
 
+> **⛔ UYGULANMADI — bu bir tasarım belgesidir.**
+>
+> `ModulePlanConfig`, tekrar kuralı ve görev üretimi kodda **yok**. Bugün var olan tek şey, hangi modülün takvim/plan yüzeyine ait
+> olduğunu söyleyen anahtar listesi (`apps/web/src/lib/moduleSurfaces.ts`) —
+> motorun kendisi değil, yalnızca yüzey eşlemesi.
+>
+> Aşağıdaki "bugünkü kod şunu yapıyor" cümleleri belge yazıldığı **2026-08-15**
+> tarihine aittir. Motor yazılacaksa bu tasarım başlangıç noktasıdır; ama önce
+> kodun bugünkü hâline karşı yeniden doğrulanmalı.
+
 > Kapsam: **veri modeli + tekrar kuralı + görev üretimi + 5 modülün kurulumu.** Takvim ızgarası, sürükle-taşı ve zaman çizelgesi görünümü bu turda yok — görünümler ayrı turda.
 >
 > Bu motora düşen modüller: `pd_sosyal_medya` (referans), `pd_email`, `pd_reklam`, `ik_egitim_gelisim`, `fm_vergi_takip` → **5 modül**

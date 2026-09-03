@@ -1,22 +1,35 @@
-# Hesap silme — mevcut durum ve tasarım notu
+# Hesap silme — tasarım ve uygulama
 
-> Bu belge 2026-08-23 tarihli güvenlik geçişinde yazıldı. Tasarım kararı **verildi**
-> (bkz. "Verilen karar"), kod **henüz yazılmadı**.
+> **DURUM: uygulandı ve canlıda.** Bu belge 2026-08-23'te bir tasarım notu olarak
+> yazıldı; aşağıdaki tasarım o zamandan beri koda geçti. Aşağıdaki gerekçeler
+> (cascade tuzağı, veri kategorileri) hâlâ geçerli ve kodun *neden* böyle
+> yazıldığını açıklıyor — bu yüzden korunuyor.
 
-## Mevcut durum: hesap silme YOK
+## Bugün ne var
 
-Kod tabanında hesap silen ya da kapatan hiçbir uç yok. `users.controller.ts` ve
-`auth.controller.ts` içinde `@Delete` yok; `deleteAccount`, `anonymize` gibi bir
-servis metodu da yok. Ne sert (hard) ne yumuşak (soft) silme var — hiç yok.
+| Ne | Nerede |
+|---|---|
+| Silme talebi | `DELETE /users/me` — `users.controller.ts` |
+| Silinecekleri önizleme | `GET /users/me/deletion-preview` |
+| Veri dışa aktarma (taşınabilirlik) | `GET /users/me/export` |
+| İş mantığı | `account-deletion.service.ts`, kuralları `account-deletion.rules.ts` |
+| Şema | migration `070_hesap_silme.sql` (`users.deleted_at`) |
+| Testler | `account-deletion.rules.test.ts` |
 
-Buna karşılık **gizlilik politikası bunu vaat ediyor** (`apps/web/src/lib/legal/privacyPolicy.ts`):
+**İki aşamalı silme (belgede özgün olarak yoktu, sonradan eklendi):** "Sil" demek
+hemen silmiyor. Talep alınınca yalnızca `deleted_at` damgalanıyor ve hesap
+kullanılamaz hâle geliyor; kalıcı silme `GRACE_PERIOD_DAYS = 30` gün sonra,
+`account-purge.processor.ts` (günlük `@Cron`) tarafından yapılıyor. Bu süre
+içinde hesap **geri alınabiliyor** (`deleted_at: null`).
 
-- *"Hesabınızı sildiğinizde … veriler en geç 30 gün içinde kalıcı olarak silinir"*
-- *"Çoğu talebi kendiniz karşılayabilirsiniz: … **hesabınızı silme talebi oluşturabilirsiniz**"*
-- KVKK m.11 ve GDPR kapsamında silme (erasure) ve taşınabilirlik (portability) hakları
+Bekleme süresi gizlilik politikasındaki "en geç 30 gün içinde kalıcı olarak
+silinir" vaadiyle bilerek aynı tutuldu.
 
-Yani metin, üründe olmayan bir yeteneği anlatıyor. Bu hem KVKK/GDPR açısından bir
-uyum boşluğu, hem de kullanıcıya yanlış bilgi.
+## Neden bu kadar dikkatli yazıldı
+
+Aşağıdaki bölümler, "sadece bir DELETE ekle" yaklaşımının neden çalışmadığını
+anlatıyor. Silme kodunu değiştirecek olan önce bunları okumalı — özellikle
+başkalarının verisini silme riski (`ON DELETE CASCADE` zincirleri).
 
 ## Neden "sadece bir DELETE ekle" olmuyor
 
@@ -154,9 +167,14 @@ Uygulama notu: üye kontrolü `project_members` / `job_members` üzerinden
 `status = 'approved'` ve `user_id <> silinen` koşuluyla yapılmalı. Davet
 aşamasında kalmış (`invited`/`pending`) kayıtlar "başka üye var" saymaz.
 
-## Bu belge yazılana kadar yapılmayanlar
+## Sonradan eklenen: bekleme süresi
 
-- Kod yazılmadı. Silme, yanlış yapıldığında geri alınamayan tek işlem; şemadaki
-  cascade tuzağı görülmeden yazılsaydı ekip verisi yok edilebilirdi.
-- Gizlilik politikası metni de değiştirilmedi — hukuki metni ürün kararı
-  netleşmeden düzenlemek doğru olmaz.
+Özgün tasarımda yoktu, uygulama sırasında eklendi: silme talebi anında
+kalıcılaşmıyor, 30 gün `deleted_at` damgasıyla bekliyor ve geri alınabiliyor.
+
+Gerekçe kodda yazılı (`account-deletion.service.ts`): hesap silme çoğu zaman
+anlık bir kararla veriliyor ve geri alınamıyor. Bekleme süresi hem kullanıcıya
+dönüş yolu bırakıyor hem de ele geçirilmiş bir hesapta saldırganın veriyi tek
+tıkla yok etmesini engelliyor.
+
+Kalıcı silmeyi `account-purge.processor.ts` günlük olarak yapıyor.

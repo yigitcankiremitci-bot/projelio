@@ -1,6 +1,7 @@
 import { HttpException, Injectable, Logger } from "@nestjs/common";
 import type { MailFolder, MailListPage, MailMessageDetail } from "@projelio/shared";
 import { describeGraphError, mapMessage, mapMessageDetail } from "./mail-format";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 /**
  * Microsoft Graph'ın posta uçlarına ince bir sarmalayıcı.
@@ -173,7 +174,7 @@ export class GraphMailService {
     url: string,
     options: { method?: string; body?: unknown } = {}
   ): Promise<T> {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: options.method ?? "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,

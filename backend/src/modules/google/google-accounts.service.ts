@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { DRIVE_SCOPE, GoogleOAuthService } from "./google-oauth.service";
 import { decryptToken, encryptToken } from "./token-crypto.util";
+import { TekUcus } from "../../common/tek-ucus";
 
 export interface GoogleAccount {
   id: string;
@@ -213,6 +214,24 @@ export class GoogleAccountsService {
     // 60 saniyelik pay: token isteğin ortasında sona ermesin.
     if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
 
+    // Aynı hesap için EŞZAMANLI yenileme yapılmaz.
+    //
+    // NEDEN: ön yüz bir Drive klasörünü açarken paralel birkaç istek atıyor
+    // (liste + küçük resimler). Token o anda süresi dolmuşsa hepsi birden
+    // önbellekte bulamayıp AYRI AYRI yenileme başlatıyordu. Google bunu tolere
+    // ediyor ama refresh token rotasyonu olan sağlayıcılarda SON YAZAN KAZANIR
+    // ve diğerlerinin aldığı token geçersizleşir — kullanıcı sebepsiz yere
+    // "yeniden bağlanın" ekranı görür.
+    //
+    // Çözüm: ilk çağıran yenilemeyi başlatır, aynı anda gelenler AYNI promise'i
+    // bekler. finally'de haritadan silinir ki sonraki yenileme yeniden başlasın.
+    return this.tekUcus.calistir(accountId, () => this.refreshAccessTokenNow(accountId));
+  }
+
+  /** Hesap başına tek yenileme (bkz. common/tek-ucus.ts — orada sınanıyor). */
+  private readonly tekUcus = new TekUcus<string>();
+
+  private async refreshAccessTokenNow(accountId: string): Promise<string> {
     const account = await this.findById(accountId);
     if (!account) throw new DriveNotConnectedError();
     if (account.driveRevokedAt) throw new DriveReauthRequiredError();

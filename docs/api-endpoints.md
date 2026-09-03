@@ -1,9 +1,40 @@
 # Projelio — API Endpoint Referansı
 
-Base URL: `http://localhost:3000` (backend `.env` içindeki `PORT` değişkenine göre değişir)
+**Base URL:** üretimde `https://api.projelio.app`, yerelde `http://localhost:3000`
+(backend `.env` içindeki `PORT` değişkenine göre).
 
-Aksi belirtilmedikçe tüm endpoint'ler `Authorization: Bearer <JWT>` header'ı gerektirir
-(`@UseGuards(AuthGuard('jwt'))`). Admin'e özel endpoint'ler ayrıca `RolesGuard` ile korunur.
+Aksi belirtilmedikçe tüm uçlar `Authorization: Bearer <JWT>` başlığı gerektirir
+(`@UseGuards(AuthGuard('jwt'))`). Admin'e özel uçlar ayrıca `RolesGuard` ile korunur.
+
+> **⚠️ Bu belge TAM DEĞİL — seçilmiş uçları ayrıntılı anlatır.**
+>
+> Kodda **450'den fazla uç / 43 modül** var; burada bunların bir bölümü belgeli. Eksik
+> olması bir hata değil, bilinçli bir sınır: gövde şeması ve davranış açıklaması
+> gereken uçlar burada, gerisi koddan okunur.
+>
+> **Tam ve daima güncel listeyi koddan üret:**
+>
+> ```bash
+> node scripts/uc-listesi.mjs             # okunur liste
+> node scripts/uc-listesi.mjs --markdown  # tablo hâlinde
+> node scripts/uc-listesi.mjs --sayim     # yalnızca özet
+> ```
+>
+> Elle yazılan bir liste kod değiştikçe sessizce yanlışa döner; bu yüzden
+> "hangi uçlar var" sorusunun cevabı betiktir, bu dosya değil.
+
+## Kimlik doğrulaması gerektirmeyen uçlar
+
+Kodda **6 tane** var, hepsi kasıtlı (`node scripts/uc-listesi.mjs` ile doğrulanır):
+
+| Uç | Neden açık |
+|---|---|
+| `GET /health` | Docker healthcheck — süreç ayakta mı |
+| `GET /health/ready` | Dış izleme — veritabanına da bakar, ölüyse 503 |
+| `GET /public/projects/:token` | Herkese açık proje paylaşımı |
+| `POST /public/projects/:token/unlock` | Paylaşımın e-posta kapısı |
+| `GET /social/instagram/callback` | OAuth dönüşü (Meta çağırır) |
+| `POST /whatsapp/webhook` | WAHA çağırır; HMAC imzasıyla doğrulanır |
 
 ## Auth (`/auth`)
 
@@ -65,7 +96,8 @@ her linkte vardır ve kapatılamaz.
 |---|---|---|---|
 | GET | `/public/projects/:token` | Linkin açtığı görünüm (`PublicProjectView`) | — |
 
-Uygulamadaki **tek** kimliksiz uç budur. `Authorization` header'ı beklemez,
+Bu, kullanıcı verisi döndüren tek kimliksiz uçtur (diğer beşi sağlık, OAuth
+dönüşü ve webhook — bkz. yukarıdaki tablo). `Authorization` header'ı beklemez,
 gönderilirse yok sayar. Token yok / link kapatılmış / süresi dolmuş / proje
 arşivlenmiş durumlarının hepsi ayrımsız **404** döner — farklı yanıtlar linkin
 bir zamanlar var olduğunu sızdırırdı. IP başına dakikada 60 istekle sınırlıdır
@@ -162,12 +194,72 @@ kaydın *varlığını* görür.
 verilebilir; departmanı görebildiği için modülü okuyabilen ama modüle atanmamış
 kişiye izin verilmez.
 
+## WhatsApp köprüsü (`/whatsapp`, `/admin/whatsapp`)
+
+Havuz modeli (tasarım `docs/whatsapp-qr-plan.md` §12): numaralar Projelio'nun,
+yöneticiler havuza ekler, her kullanıcıya ilk ihtiyaçta kalıcı bir numara
+atanır; bildirimler ve Lio'nun müşteri yazışmaları o numaradan gider.
+Numaralar yanıtlarda maskelidir.
+
+| Method | Path | Açıklama | Body |
+|---|---|---|---|
+| GET | `/whatsapp/me` | Yapılandırılmış mı, havuz hazır mı, bana atanmış numara, kendi opt-in durumum (`WhatsappOverview`) | — |
+| POST | `/whatsapp/me/link-code` | Eşleştirme kodu (`PROJELIO-XXXX`, 24 saat). Gerekiyorsa önce havuzdan numara atanır; kullanıcı kodu o numaraya gönderir | — |
+| POST | `/whatsapp/me/opt-out` | WhatsApp bildirimlerini durdurur | — |
+| POST | `/whatsapp/me/unlink` | Doğrulanmış numarayı hesaptan ayırır (cihaz/numara değişti); yeniden bağlanmak kod ister | — |
+| GET | `/whatsapp/threads` | Kullanıcının müşteri konuşmaları (`WhatsappThread[]`) | — |
+| POST | `/whatsapp/threads` | Müşteriyle konuşma açar/bulur; `{ id }` döner | `{ partyId? , phone?, displayName? }` |
+| GET | `/whatsapp/threads/:id/messages?limit=` | Konuşma mesajları (sahibi, konuşmanın organizasyonunu görebilen ya da admin) | — |
+| POST | `/whatsapp/threads/:id/messages` | Serbest metni kuyruğa alır; gönderim dakikalık işleyicide, hız sınırıyla | `{ body }` |
+| PATCH | `/whatsapp/threads/:id/auto-reply` | Lio bu konuşmada müşteriye kendi yanıtlasın mı | `{ enabled }` |
+| GET | `/admin/whatsapp/numbers` | **admin** — havuzdaki numaralar ve atanmış kullanıcı sayıları | — |
+| GET | `/admin/whatsapp/linked-users` | **admin** — numarasını doğrulamış kullanıcılar (ad, e-posta, maskeli telefon, numara etiketi, bildirim durumu) | — |
+| POST | `/admin/whatsapp/numbers` | **admin** — havuza numara ekler, QR bekleyen oturumu açar | `{ label }` |
+| POST | `/admin/whatsapp/numbers/:id/start` | **admin** — durmuş/kopmuş numarayı yeniden bağlamaya açar | — |
+| GET | `/admin/whatsapp/numbers/:id/qr` | **admin** — QR, JSON içinde data-URL `{ qr }` | — |
+| POST | `/admin/whatsapp/numbers/:id/pairing-code` | **admin** — telefon numarasıyla eşleştirme kodu `{ code }` | `{ phone }` |
+| POST | `/admin/whatsapp/numbers/:id/logout` | **admin** — numarayı ayırır; satır ve atamalar kalır | — |
+| DELETE | `/admin/whatsapp/numbers/:id` | **admin** — havuzdan çıkarır; atanmış kullanıcılar başka bağlı numaraya taşınır | — |
+| POST | `/whatsapp/webhook` | **JWT yok.** WAHA'nın olay bildirimi; `X-Webhook-Hmac` (sha512, ham gövde) doğrulanır, olay saklanıp hemen 200 dönülür | WAHA zarfı |
+
+Gelen mesaj yönlendirmesi: gönderen bir Projelio kullanıcısının telefonuysa
+yalnızca komutlar tanınır (eşleştirme kodu, `DUR`, `BAŞLAT`, `EVET`); tanınmayan
+telefon tam bir kullanıcının profil telefonuyla (`users.phone`) eşleşiyorsa
+"EVET yazın" denir ve EVET gelince numara o hesaba bağlanır; değilse müşteri
+sayılır — konuşmanın sahibine `whatsapp_inbound` bildirimi gider, Lio otomatik
+yanıt açıksa Lio cevaplar, sahipsiz konuşmada tüm yöneticilere bildirim gider.
+
+Lio araçları: `whatsapp_search_customers`, `whatsapp_send_message` (onaylı),
+`whatsapp_list_conversations`, `whatsapp_read_conversation`,
+`whatsapp_set_auto_reply` (onaylı). Bkz. `ai-assistant.tools.ts`.
+
 ## Admin (`/admin`) — sadece `role: admin`
 
 | Method | Path | Açıklama |
 |---|---|---|
 | GET | `/admin/stats` | Kullanıcı sayısı, aktif/tamamlanmış proje istatistikleri |
 | GET | `/admin/users` | Tüm kullanıcıları listele |
+
+## Sağlık uçları (`/health`) — kimlik gerektirmez
+
+| Metot | Yol | Ne söyler |
+|---|---|---|
+| GET | `/health` | **Canlılık:** süreç ayakta mı. Bilerek hiçbir bağımlılığa bakmaz |
+| GET | `/health/ready` | **Hazır olma:** veritabanına da dokunur; ulaşılamıyorsa **503** |
+
+İkisi ayrı olmalı, çünkü işleri farklı:
+
+- `/health`'i Docker healthcheck çağırıyor. Buraya veritabanı kontrolü eklemek
+  zararlı olurdu: veritabanı bir an yanıt vermediğinde konteyner "sağlıksız"
+  sayılıp yeniden başlatılır, bu da toparlanmayı hızlandırmak yerine geciktirir.
+- `/health/ready` dış izleme içindir (UptimeRobot, Healthchecks.io). `/health`
+  tek başına yanıltıcıydı: veritabanı tamamen ölmüşken bile 200 dönüyordu.
+
+```json
+// GET /health/ready — 200
+{ "status": "ok", "database": "ok", "databaseLatencyMs": 9,
+  "uptimeSeconds": 609, "timestamp": "2026-09-03T09:44:03.663Z" }
+```
 
 ## Canlı Bildirimler (WebSocket — Socket.io)
 
@@ -181,6 +273,7 @@ sunucu o kullanıcıya özel `user:<id>` odasına katılır.
 | Event (server → client) | Payload | Açıklama |
 |---|---|---|
 | `notification` | `NotificationPayload` (bkz. `packages/shared/src/types.ts`) | Davet, rol güncellemesi, bütçe değişikliği, deadline hatırlatması |
+| `whatsapp-status` | `WhatsappStatusEvent` | WhatsApp bağlantı durumu değişti (QR okutuldu, koptu, numara eşlendi); Ayarlar kartı kendini tazeler |
 
 Bildirim tipleri: `task_due_24h`, `task_due_1h`, `project_deadline_24h`,
 `team_invite`, `role_updated`, `budget_changed`, `join_request`.

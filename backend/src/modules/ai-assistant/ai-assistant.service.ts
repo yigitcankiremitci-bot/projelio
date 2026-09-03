@@ -6,6 +6,8 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
+  forwardRef,
+  Inject,
 } from "@nestjs/common";
 import Anthropic from "@anthropic-ai/sdk";
 import { SupabaseService } from "../../database/supabase.service";
@@ -18,7 +20,7 @@ import { TaskCommentsService } from "../task-comments/task-comments.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PlanningService } from "../planning/planning.service";
 import { OutputsService } from "../outputs/outputs.service";
-import { AI_TOOLS, CRITICAL_TOOLS } from "./ai-assistant.tools";
+import { AI_TOOLS, CRITICAL_TOOLS, toolsForChannel } from "./ai-assistant.tools";
 import { describeModuleFields, hasRecordConfig, normalizeModuleData } from "./ai-modules";
 import { taskTarget } from "./ai-task-target";
 import { getModuleRecordConfig } from "@projelio/shared";
@@ -56,6 +58,7 @@ import { FilesService } from "../files/files.service";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
 import { AiTranscriptionService } from "./ai-transcription.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
+import { WhatsappLioService } from "../whatsapp/whatsapp-lio.service";
 import type { LioActivityPayload } from "@projelio/shared";
 import {
   BASE_PROMPT_TOKENS,
@@ -65,6 +68,8 @@ import {
   resolveTier,
   type ModelTier,
 } from "./ai-credits.config";
+import { LlmProviderRegistry, type ProviderChoice } from "./providers/provider-registry";
+import type { LlmRequest, LlmResponse } from "./providers/llm-provider";
 
 const DEFAULT_MODEL = MODEL_TIERS.fast.model;
 const PENDING_ACTION_TTL_MS = 10 * 60 * 1000; // 10 dakika
@@ -273,6 +278,8 @@ interface PendingRun {
   userRole: string;
   conversationId: string;
   tier: ModelTier;
+  /** Kullanıcının açıkça seçtiği model ("saglayici:model"); yoksa kademe kararı geçerli. */
+  preferredModel?: string | null;
   messages: Anthropic.MessageParam[];
   /**
    * Bağlamın dosyadan BAĞIMSIZ kısmı (tarih, rol, iş/proje özeti).
@@ -325,6 +332,14 @@ interface PendingRun {
   askAgain: boolean;
   /** Bu segmentte açılmış kredi tutmaları; segment biterken hepsi kaldırılır. */
   holds: string[];
+  /**
+   * İsteğin geldiği kanal. Araç seti buna göre süzülür (toolsForChannel):
+   * WhatsApp'ta kritik araçlar modele HİÇ verilmez, çünkü onay diyaloğu
+   * web ekranına bağlı. Varsayılan "web" — mevcut çağıranlar değişmez.
+   */
+  channel: "web" | "whatsapp";
+  /** WhatsApp'ta kullanıcı veri değiştirmeyi kapatmış olabilir (§3.8). */
+  allowWrites: boolean;
   createdAt: number;
 }
 
@@ -420,6 +435,39 @@ const MAX_ACTIVE_FILES = 5;
 
 /** Yalnızca dosya gönderilip hiçbir şey yazılmadığında kullanılan varsayılan istek. */
 const EMPTY_MESSAGE_WITH_FILE = "Bu dosyayı incele ve ne olduğunu özetle.";
+
+/**
+ * WhatsApp kanalının ek talimatı. Statik (önbelleğe alınan) blokta DEĞİL,
+ * dinamik bağlamda: statik blok araç şemalarıyla birlikte önbelleğe alınıyor
+ * ve web isteklerinin çoğunluğu o öneki paylaşıyor — kanala göre değişen bir
+ * metni oraya koymak her WhatsApp isteğinde önbelleği ıskalatırdı.
+ *
+ * Biçim kuralı bir RİCA'dır; model yine de markdown üretirse son savunma
+ * whatsapp-lio-format.ts'te.
+ */
+const WHATSAPP_CHANNEL_PROMPT = [
+  "### Bu istek WhatsApp'tan geldi",
+  "",
+  "SADECE YAZIM BİÇİMİ değişir; araçların ve yetkilerin web'dekiyle AYNI şekilde çalışır.",
+  "Elindeki her aracı burada da normal şekilde kullan.",
+  "",
+  "Biçim:",
+  "- Düz metin üret: başlık, kalın yazı, tablo ve markdown kullanma. Kısa madde listesi olur.",
+  "- Kısa tut: en fazla 800 karakter. Sığmayacaksa en önemlisini yaz ve ayrıntı için uygulamaya yönlendir.",
+  "- Dosya bağlantısı verme; WhatsApp'ta açılmaz.",
+  "",
+  "İŞ YAPMA (en önemli kural):",
+  "- Bir şey eklemen/değiştirmen isteniyorsa İLGİLİ ARACI ÇAĞIR. Aracı çağırmadan",
+  "  \"ekledim\", \"kaydettim\", \"hatırlatma kurdum\" DEME — araç sonucu dönmeden iş yapılmış değildir.",
+  "- Kanal, iş yapmana engel DEĞİLDİR. \"WhatsApp'tan olmaz, uygulamadan yapın\" deme;",
+  "  yalnızca aşağıdaki iki durumda uygulamaya yönlendir.",
+  "- Aracı çağırıp HATA aldıysan ne olduğunu açıkça söyle; sebebini uydurma.",
+  "",
+  "Uygulamaya yönlendireceğin İKİ durum (yalnızca bunlar):",
+  "1. Silme, arşivleme ve bütçe hareketi araçları bu kanalda gerçekten YOK.",
+  "   İstenirse yapamayacağını söyle; yapmış gibi davranma.",
+  "2. O iş için elinde hiçbir araç yoksa.",
+].join("\n");
 
 const ACTION_LABELS: Record<string, string> = {
   create_job: "iş oluşturuldu",
@@ -538,7 +586,6 @@ function summarizeExecuted(executed: string[]): string {
 @Injectable()
 export class AiAssistantService {
   private readonly logger = new Logger(AiAssistantService.name);
-  private anthropic: Anthropic | null = null;
   // MVP: onay bekleyen kritik işlemler bellekte tutulur. Tek instance için yeterlidir;
   // çoklu instance / restart senaryosu için ileride paylaşımlı bir depoya taşınabilir.
   // (ioredis bağımlılıkta duruyor ama kullanılmıyor; Redis servisi de sağlanmış değil.)
@@ -566,6 +613,10 @@ export class AiAssistantService {
     private filesService: FilesService,
     // Yapılacaklar sayfası (kişisel pano) araçları için.
     private personalTodosService: PersonalTodosService,
+    // WhatsApp araçları (müşteriye yaz, konuşmayı oku, otomatik yanıt). İki
+    // yönlü bağımlılık: WhatsApp modülü otomatik yanıt için draftText()'i
+    // çağırıyor, bu yüzden forwardRef.
+    @Inject(forwardRef(() => WhatsappLioService)) private whatsappLio: WhatsappLioService,
     // Modül araçları: katalog (hangi modüller var), organizasyon/iş modülleri
     // (hangileri açık) ve kayıtlar (modülün defteri). Yetki kontrolleri bu
     // servislerin İÇİNDE — Lio ayrı bir yol açmıyor, kullanıcının kendi
@@ -590,7 +641,8 @@ export class AiAssistantService {
     private supportService: SupportService,
     // Rapor/dışa aktarma dosyalarını üretir ve indirilebilir tutar.
     private exportsService: AiExportsService,
-    private realtime: RealtimeGateway
+    private realtime: RealtimeGateway,
+    private providers: LlmProviderRegistry
   ) {}
 
   /** Kademe belirtilmeyen yerler (ör. draftText) için varsayılan model. */
@@ -605,31 +657,86 @@ export class AiAssistantService {
    * değiştir" için konmuştu. Kullanıcı bilerek üst kademe seçtiyse env'in onu geri
    * ucuz modele düşürmesi, ödediği kredinin karşılığını vermemek olurdu.
    */
-  private modelForTier(tier: ModelTier): string {
-    if (tier === "fast") return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
-    return MODEL_TIERS[tier]?.model ?? DEFAULT_MODEL;
+  private modelForTier(tier: ModelTier, preferred?: string | null): string {
+    // ANTHROPIC_MODEL geriye dönük çalışır ama yalnızca birincil sağlayıcı
+    // Anthropic'ken anlamlıdır; başka sağlayıcı öndeyken onun modeli geçerli.
+    const primary = this.providers.primaryForTier(tier, preferred);
+    if (tier === "fast" && (!primary || primary.definition.id === "anthropic")) {
+      return process.env.ANTHROPIC_MODEL?.trim() || primary?.model || DEFAULT_MODEL;
+    }
+    return primary?.model ?? MODEL_TIERS[tier]?.model ?? DEFAULT_MODEL;
   }
 
-  private getClient(): Anthropic {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
-    if (!apiKey) {
-      this.logger.error(
-        "ANTHROPIC_API_KEY bu süreçte tanımlı değil. Yüklenen .env: " +
-          `${process.env.__PROJELIO_ENV_PATH ?? "(bilinmiyor)"}`
-      );
-      throw new BadRequestException(
-        "AI asistanı yapılandırılmamış: backend/.env dosyasına ANTHROPIC_API_KEY eklemeniz gerekiyor."
+  /**
+   * Yapılandırılmış sağlayıcıları sırayla dener ve ilk başarılı yanıtı döndürür.
+   *
+   * Hata çevirisi ESKİDEN callAnthropic içindeydi; sağlayıcı bağımsız olması
+   * için buraya alındı. Yedeğe geçme kararı ham hata üzerinden registry'de
+   * verilir, kullanıcıya gösterilecek mesaj ise yalnızca hepsi düştüğünde
+   * burada üretilir.
+   */
+  private async callModel(
+    tier: ModelTier,
+    build: (choice: ProviderChoice) => LlmRequest,
+    preferred?: string | null
+  ): Promise<{ response: LlmResponse; model: string; providerLabel: string }> {
+    try {
+      const { response, choice } = await this.providers.send(tier, build, { preferred });
+      return { response, model: choice.model, providerLabel: choice.definition.label };
+    } catch (err: any) {
+      throw this.toUserFacingError(err);
+    }
+  }
+
+  /** Sağlayıcı hatasını kullanıcıya gösterilebilir bir istisnaya çevirir. */
+  private toUserFacingError(err: any): Error {
+    const status: number | undefined = err?.status;
+
+    if (status === 401) {
+      this.logger.error(`Sağlayıcı 401: API anahtarı geçersiz. ${err?.message ?? ""}`);
+      return new BadRequestException(
+        "AI sağlayıcısının API anahtarı geçersiz görünüyor. backend/.env içindeki anahtarı kontrol edin."
       );
     }
-    if (!this.anthropic) {
-      this.anthropic = new Anthropic({
-        apiKey,
-        // Ağ dalgalanmalarında SDK kendisi tekrar denesin.
-        maxRetries: 3,
-        timeout: 60_000,
-      });
+    if (status === 404) {
+      this.logger.error(`Sağlayıcı 404: model bulunamadı. ${err?.message ?? ""}`);
+      return new BadRequestException(
+        "Seçilen model sağlayıcıda bulunamadı. Model ayarlarını kontrol edin."
+      );
     }
-    return this.anthropic;
+    if (status === 400) {
+      this.logger.error(`Sağlayıcı 400: ${err?.message}`);
+      // Kredi bakiyesi yetersizken sağlayıcı 400 döner; bu en sık karşılaşılan kurulum
+      // sorunu olduğu için genel "geçersiz istek" mesajının arkasına saklanmasın.
+      if (/credit balance|insufficient|quota/i.test(err?.message ?? "")) {
+        return new ServiceUnavailableException(
+          "AI sağlayıcısı hesabınızda kredi kalmamış. Sağlayıcı panelinden kredi yükleyin."
+        );
+      }
+      // Ham sağlayıcı metni kullanıcıya GİTMEZ: 400 mesajları isteğin iç yapısını
+      // anlatır ("messages.0.content.0.text: field required", model adı, jeton
+      // sınırı…). Kullanıcı için anlamsız, bizim uygulama detayımızı dışarı veriyor.
+      // Teşhis için gereken metin bir satır yukarıda zaten loglanıyor.
+      return new BadRequestException(
+        "Bu istek işlenemedi. Mesajı kısaltıp ya da ekleri azaltıp tekrar dener misin?"
+      );
+    }
+    if (status === 429) {
+      return new ServiceUnavailableException(
+        "AI sağlayıcısının hız sınırına takıldı ya da kredi limitiniz dolmuş olabilir. Biraz sonra tekrar deneyin."
+      );
+    }
+    if (status && status >= 500) {
+      return new ServiceUnavailableException("AI servisi şu anda yanıt vermiyor. Biraz sonra tekrar deneyin.");
+    }
+    if (err instanceof BadRequestException || err instanceof ServiceUnavailableException) {
+      return err;
+    }
+
+    // Statü yoksa bağlantı kurulamamıştır ("fetch failed" bu dalda düşer).
+    const { code, detail, message } = this.describeConnectionError(err);
+    this.logger.error(`AI sağlayıcı bağlantı hatası [${code}]: ${detail}`);
+    return new ServiceUnavailableException(`${message} (teknik detay: ${code})`);
   }
 
   /**
@@ -671,68 +778,18 @@ export class AiAssistantService {
     return { code: code || "UNKNOWN", detail, message: hint };
   }
 
-  /** Anthropic çağrılarını tek noktadan sarmalar: hataları anlamlı mesajlara çevirir ve loglar. */
-  private async callAnthropic(
-    anthropic: Anthropic,
-    params: Anthropic.MessageCreateParamsNonStreaming
-  ): Promise<Anthropic.Message> {
-    try {
-      return await anthropic.messages.create(params);
-    } catch (err: any) {
-      const status: number | undefined = err?.status;
-
-      if (status === 401) {
-        this.logger.error("Anthropic 401: API anahtarı geçersiz.");
-        throw new BadRequestException(
-          "Anthropic API anahtarı geçersiz görünüyor. backend/.env içindeki ANTHROPIC_API_KEY değerini kontrol edin."
-        );
-      }
-      if (status === 404) {
-        this.logger.error(`Anthropic 404: model bulunamadı (${params.model}).`);
-        throw new BadRequestException(
-          `"${params.model}" modeli bulunamadı. backend/.env içindeki ANTHROPIC_MODEL değerini kontrol edin.`
-        );
-      }
-      if (status === 400) {
-        this.logger.error(`Anthropic 400: ${err?.message}`);
-        // Kredi bakiyesi yetersizken Anthropic 400 döner; bu en sık karşılaşılan kurulum
-        // sorunu olduğu için genel "geçersiz istek" mesajının arkasına saklanmasın.
-        if (/credit balance/i.test(err?.message ?? "")) {
-          throw new ServiceUnavailableException(
-            "Anthropic hesabınızda API kredisi kalmamış. console.anthropic.com > Plans & Billing üzerinden kredi yükleyin."
-          );
-        }
-        // Ham sağlayıcı metni kullanıcıya GİTMEZ: Anthropic'in 400 mesajları isteğin
-        // iç yapısını anlatır ("messages.0.content.0.text: field required", model adı,
-        // jeton sınırı…). Kullanıcı için anlamsız, bizim uygulama detayımızı dışarı
-        // veriyor. Teşhis için gereken metin bir satır yukarıda zaten loglanıyor.
-        throw new BadRequestException(
-          "Bu istek işlenemedi. Mesajı kısaltıp ya da ekleri azaltıp tekrar dener misin?"
-        );
-      }
-      if (status === 429) {
-        throw new ServiceUnavailableException(
-          "Anthropic hız sınırına takıldı ya da kredi limitiniz dolmuş olabilir. Biraz sonra tekrar deneyin."
-        );
-      }
-      if (status && status >= 500) {
-        throw new ServiceUnavailableException("Anthropic servisi şu anda yanıt vermiyor. Biraz sonra tekrar deneyin.");
-      }
-
-      // Statü yoksa bağlantı kurulamamıştır ("fetch failed" bu dalda düşer).
-      const { code, detail, message } = this.describeConnectionError(err);
-      this.logger.error(`Anthropic bağlantı hatası [${code}]: ${detail}`);
-      throw new ServiceUnavailableException(`${message} (teknik detay: ${code})`);
-    }
-  }
-
-  /** Teşhis: yapılandırma doğru mu ve Anthropic API'ye gerçekten ulaşılabiliyor mu? */
+  /** Teşhis: yapılandırma doğru mu ve seçili sağlayıcıya gerçekten ulaşılabiliyor mu? */
   async health(): Promise<Record<string, unknown>> {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+    const primary = this.providers.primaryForTier("fast");
+    const apiKey = primary ? process.env[primary.definition.apiKeyEnv]?.trim() : undefined;
     const base = {
       apiKeyPresent: !!apiKey,
       apiKeyPrefix: apiKey ? `${apiKey.slice(0, 12)}…${apiKey.slice(-4)}` : null,
       model: this.model,
+      // Hangi sağlayıcılar tanımlı, hangileri sırada — yanlış AI_PROVIDERS
+      // yazımı en sık karşılaşılacak kurulum hatası, teşhiste görünsün.
+      provider: primary?.definition.id ?? null,
+      providers: this.providers.describe(),
       nodeVersion: process.version,
       proxyEnv: process.env.HTTPS_PROXY ?? process.env.https_proxy ?? null,
       // Ses ekleri ayrı bir sağlayıcıya gidiyor; anahtarı yoksa yalnızca ses çalışmaz,
@@ -740,14 +797,19 @@ export class AiAssistantService {
       transcriptionConfigured: this.transcriptionService.configured,
     };
 
-    if (!apiKey) {
-      return { ...base, reachable: false, error: "ANTHROPIC_API_KEY tanımlı değil (backend/.env)." };
+    if (!primary || !apiKey) {
+      return {
+        ...base,
+        reachable: false,
+        error: primary
+          ? `${primary.definition.apiKeyEnv} tanımlı değil (backend/.env).`
+          : "Yapılandırılmış AI sağlayıcısı yok (AI_PROVIDERS / API anahtarlarını kontrol edin).",
+      };
     }
 
     try {
-      const anthropic = this.getClient();
-      await anthropic.messages.create({
-        model: this.model,
+      await primary.provider.send({
+        model: primary.model,
         max_tokens: 8,
         messages: [{ role: "user", content: "ping" }],
       });
@@ -1222,20 +1284,21 @@ export class AiAssistantService {
     maxTokens?: number;
   }): Promise<{ text: string }> {
     await this.creditsService.assertCanStart(params.userId);
-    const anthropic = this.getClient();
 
-    const response = await this.callAnthropic(anthropic, {
-      model: this.model,
+    const { response, model } = await this.callModel("fast", (choice) => ({
+      model: choice.model,
       max_tokens: params.maxTokens ?? 1200,
       system: params.system,
       messages: [{ role: "user", content: params.prompt }],
-    });
+    }));
 
     const usage: any = response.usage ?? {};
     await this.creditsService
       .chargeUsage({
         userId: params.userId,
-        model: this.model,
+        // Yedeğe geçilmiş olabilir: ücret GERÇEKTEN kullanılan modelin
+        // fiyatından kesilir, birincil sağlayıcınınkinden değil.
+        model,
         inputTokens: usage.input_tokens ?? 0,
         outputTokens: usage.output_tokens ?? 0,
         cacheWriteTokens: usage.cache_creation_input_tokens ?? 0,
@@ -1260,7 +1323,12 @@ export class AiAssistantService {
     userMessage: string,
     conversationId?: string,
     tierInput?: string,
-    attachmentIds?: string[]
+    attachmentIds?: string[],
+    /**
+     * Kanal seçenekleri. Verilmezse web: mevcut çağıranların davranışı aynen
+     * korunur. WhatsApp köprüsü için bkz. whatsapp-lio.service.ts.
+     */
+    options?: { channel?: "web" | "whatsapp"; allowWrites?: boolean; model?: string | null }
   ): Promise<ChatResult> {
     // Ekler mesajdan önce çözülür: süresi dolmuş bir ek varsa hiç API çağrısı yapmadan hata verilir.
     const attachments = this.attachmentsService.take(userId, attachmentIds ?? []);
@@ -1271,6 +1339,9 @@ export class AiAssistantService {
     if (!trimmed) throw new BadRequestException("Mesaj boş olamaz.");
 
     const tier = resolveTier(tierInput).tier;
+    // Model seçimi kademeden BAĞIMSIZ: kullanıcı "GLM 5.3 kullan" diyebilir.
+    // Geçersiz/kapalı bir seçim sessizce yok sayılır ve kademe kararı işler.
+    const preferredModel = this.providers.normalizeModelChoice(options?.model);
 
     // Teşhis izi: bu satır görünmüyorsa istek bu backend'e hiç ulaşmamıştır.
     this.logger.log(
@@ -1322,7 +1393,7 @@ export class AiAssistantService {
 
     // Bakiye bu isteğin en pahalı hâlini karşılamıyorsa HİÇ BAŞLAMA. Kontrol
     // mesaj kaydedilmeden önce yapılır: yanıtlanmayacak bir mesaj sohbete düşmesin.
-    this.creditsService.assertBalanceCovers(balance, this.minimumTurnCredits(this.modelForTier(tier), messages));
+    this.creditsService.assertBalanceCovers(balance, this.minimumTurnCredits(this.modelForTier(tier, preferredModel), messages));
 
     // Çıkarılan metin mesaj kaydına yazılır: sonraki turlarda geçmiş buradan kurulur.
     // Dosyanın kendisi saklanmaz (bkz. AiAttachmentsService).
@@ -1347,6 +1418,7 @@ export class AiAssistantService {
       userRole,
       conversationId: convId,
       tier,
+      preferredModel,
       messages,
       baseContext: await this.buildDynamicSystemPrompt(userId, userRole),
       executed: [],
@@ -1360,6 +1432,8 @@ export class AiAssistantService {
       pausedEstimate: 0,
       askAgain: true,
       holds: [],
+      channel: options?.channel ?? "web",
+      allowWrites: options?.allowWrites ?? true,
       createdAt: Date.now(),
     };
 
@@ -1529,7 +1603,7 @@ export class AiAssistantService {
     if (tierInput) run.tier = resolveTier(tierInput).tier;
     // Devam ederken de aynı rezervasyon geçerli: kredi yetmiyorsa sürdürmek,
     // kullanıcıyı yarım işle borç bakiyesine sokmak olurdu.
-    this.creditsService.assertBalanceCovers(balance, this.minimumTurnCredits(this.modelForTier(run.tier), run.messages));
+    this.creditsService.assertBalanceCovers(balance, this.minimumTurnCredits(this.modelForTier(run.tier, run.preferredModel), run.messages));
     run.startingBalance = balance;
     // Her onay bir eşik daha harcama izni verir. Tavan, duraklatmaya sebep olan
     // TAHMİNİ de kapsamalı: 868 kredilik bir tur için onay alıp tavanı yalnızca
@@ -1552,8 +1626,9 @@ export class AiAssistantService {
    * harcama eşiğine gelindiğinde ve tur sınırına gelindiğinde.
    */
   private async runLoop(run: PendingRun): Promise<ChatResult> {
-    const anthropic = this.getClient();
-    const model = this.modelForTier(run.tier);
+    // `let`: sağlayıcı yedeğe geçerse gerçekte kullanılan model değişir ve kredi
+    // hesabı (calculateUsageCost) o modelin fiyatından yapılmalıdır.
+    let model = this.modelForTier(run.tier, run.preferredModel);
     const totals: TokenTotals = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
     /** Son turun kredi bedeli — "devam edersem ne kadar tutar" tahmini bundan çıkar. */
     let lastStepCredits = 0;
@@ -1765,8 +1840,8 @@ export class AiAssistantService {
       if (run.iterationsUsed >= MAX_TOTAL_ITERATIONS) break;
 
       const creditsBefore = segmentCredits();
-      const response = await this.callAnthropic(anthropic, {
-        model,
+      const { response, model: usedModel } = await this.callModel(run.tier, (choice) => ({
+        model: choice.model,
         // Çıktı sınırı kalan krediye göre kısılabilir (bkz. planTurn).
         max_tokens: plan.maxTokens,
         // Sistem promptu iki bloğa ayrılır: statik blok (araç şemalarıyla birlikte)
@@ -1775,15 +1850,26 @@ export class AiAssistantService {
           {
             type: "text",
             text: AiAssistantService.STATIC_SYSTEM_PROMPT,
-            ...(CACHING_ENABLED ? { cache_control: { type: "ephemeral" } } : {}),
+            // Önbellek işareti yalnızca destekleyen sağlayıcıya konur; desteklemeyen
+            // sağlayıcılarda bu alan bilinmeyen bir anahtar olarak reddedilebilir.
+            ...(CACHING_ENABLED && choice.provider.capabilities.promptCaching
+              ? { cache_control: { type: "ephemeral" } }
+              : {}),
           },
           // Açık dosya bildirimi HER TURDA yeniden yazılır: koşunun ortasında
           // release_files çağrılırsa bir sonraki tur doğru durumu görmeli.
-          { type: "text", text: `${run.baseContext}\n\n${this.activeFileStatus(run.activeFiles)}` },
+          {
+            type: "text",
+            text:
+              `${run.baseContext}\n\n${this.activeFileStatus(run.activeFiles)}` +
+              (run.channel === "whatsapp" ? `\n\n${WHATSAPP_CHANNEL_PROMPT}` : ""),
+          },
         ] as any,
-        tools: AI_TOOLS,
+        tools: toolsForChannel(run.channel, { allowWrites: run.allowWrites }),
         messages: run.messages,
-      });
+      }), run.preferredModel);
+      // Yedeğe geçilmiş olabilir; sonraki kredi hesapları gerçek modeli kullansın.
+      model = usedModel;
       run.iterationsUsed += 1;
 
       const usage: any = response.usage ?? {};
@@ -1870,6 +1956,30 @@ export class AiAssistantService {
       }
 
       const criticalUse = toolUses.find((use) => CRITICAL_TOOLS.has(use.name));
+      // WhatsApp'ta onay diyaloğu gösterilemez. toolsForChannel bu araçları
+      // zaten modele vermiyor, yani buraya normalde düşülmez; düşülürse
+      // (araç adı değişti, süzgeç bozuldu) koşuyu ONAY BEKLER hâlde bırakmak
+      // kullanıcıya sonsuza kadar cevapsız kalmak demek olurdu. Araç sonucu
+      // olarak reddedip modele devam ettiriyoruz: Lio "bunu uygulamadan
+      // yapmalısınız" diyebilsin.
+      if (criticalUse && run.channel === "whatsapp") {
+        this.logger.error(
+          `WhatsApp kanalında kritik araç istendi (süzgeç kaçırdı): ${criticalUse.name}`
+        );
+        run.messages.push({ role: "assistant", content: response.content });
+        run.messages.push({
+          role: "user",
+          content: toolUses.map((use) => ({
+            type: "tool_result" as const,
+            tool_use_id: use.id,
+            content:
+              "Bu işlem WhatsApp üzerinden yapılamaz. Kullanıcıya işlemi Projelio uygulamasından " +
+              "yapması gerektiğini söyle; yapılmış gibi davranma.",
+            is_error: true,
+          })),
+        });
+        continue;
+      }
       if (criticalUse) {
         const actionId = randomUUID();
         const input = (criticalUse.input as Record<string, any>) ?? {};
@@ -4157,6 +4267,37 @@ export class AiAssistantService {
 
       case "export_report":
         return this.exportReport(userId, userRole, input);
+
+      // ============================================================ WhatsApp
+      case "whatsapp_search_customers":
+        return this.whatsappLio.searchCustomers(userId, String(input.query ?? ""));
+
+      case "whatsapp_send_message":
+        return this.whatsappLio.sendToCustomer(userId, {
+          partyId: input.partyId,
+          phone: input.phone,
+          displayName: input.displayName,
+          text: String(input.text ?? ""),
+        });
+
+      case "whatsapp_list_conversations":
+        return this.whatsappLio.listConversations(userId);
+
+      case "whatsapp_read_conversation":
+        return this.whatsappLio.readConversation(userId, {
+          threadId: input.threadId,
+          partyId: input.partyId,
+          phone: input.phone,
+          limit: input.limit,
+        });
+
+      case "whatsapp_set_auto_reply":
+        return this.whatsappLio.setAutoReply(userId, {
+          threadId: input.threadId,
+          partyId: input.partyId,
+          phone: input.phone,
+          enabled: Boolean(input.enabled),
+        });
 
       default:
         throw new BadRequestException(`Bilinmeyen araç: ${name}`);

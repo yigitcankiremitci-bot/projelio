@@ -3,6 +3,9 @@ import type Anthropic from "@anthropic-ai/sdk";
 // Kullanıcının onayı olmadan ASLA doğrudan çalıştırılmaması gereken araçlar.
 // (Silme, arşivleme ve bütçe/para hareketi gibi geri alınması zor işlemler.)
 export const CRITICAL_TOOLS = new Set<string>([
+  // Müşteriye WhatsApp mesajı: dış dünyaya çıkar, geri alınamaz.
+  "whatsapp_send_message",
+  "whatsapp_set_auto_reply",
   "delete_output",
   "archive_output",
   "delete_task",
@@ -41,6 +44,75 @@ export const CRITICAL_TOOLS = new Set<string>([
   // görmeden gitmemeli.
   "create_support_request",
 ]);
+
+// Veri DEĞİŞTİREN ama kritik olmayan araçlar. Kritik olanlar yukarıda;
+// bir araç iki listede birden olmamalı (bkz. ai-assistant.tools.test.ts).
+//
+// Neden ayrı bir liste: WhatsApp'tan gelen isteklerde kullanıcı "yalnızca
+// soruları yanıtla, hiçbir şeyi değiştirme" diyebiliyor (whatsapp_contacts.
+// lio_allow_writes). O anahtar kapalıyken modele bu araçlar verilmez.
+//
+// Listede OLMAYANLAR bilerek dışarıda: release_files ve open_file sohbetin
+// durumunu değiştirir, veriyi değil; suggest_schedule yalnızca öneri üretir
+// (yazan create_time_blocks'tur); geri kalan her şey okumadır.
+export const WRITE_TOOLS = new Set<string>([
+  // Kişisel yapılacaklar
+  "create_todo",
+  "create_todos",
+  "update_todo",
+  "set_todo_status",
+  "update_assigned_todo_prefs",
+  "reorder_todos",
+  "restore_todo",
+  // İş / proje / görev
+  "create_job",
+  "update_job",
+  "create_project",
+  "update_project",
+  "create_task",
+  "create_tasks",
+  "update_task",
+  "update_task_status",
+  // Çıktılar ve yorumlar
+  "create_output",
+  "update_output",
+  "add_task_comment",
+  // Planlama
+  "set_period_plan",
+  "create_time_blocks",
+  "update_time_block_status",
+  "complete_ritual",
+  // Modül defteri
+  "create_module_record",
+  "update_module_record",
+  "enable_module",
+]);
+
+/**
+ * Kanala göre araç seti.
+ *
+ * WhatsApp'ta kritik araçlar modele HİÇ VERİLMEZ. Sebebi onay akışının web'e
+ * bağlı olması: chat() kritik bir araç görünce koşuyu dondurup
+ * {type:"confirmation"} döndürüyor ve devamı confirmAction ile geliyor —
+ * WhatsApp'ta bu diyaloğu gösterecek ekran yok. Araç verilmezse onay durumu
+ * da doğmaz; Lio "bunu uygulamadan yapmanız gerekiyor" der.
+ *
+ * whatsapp_* araçları da dışarıda: WhatsApp'tan WhatsApp mesajı göndertmek,
+ * tek mesajla zincir kurmanın en kolay yolu.
+ */
+export function toolsForChannel(
+  channel: "web" | "whatsapp",
+  opts: { allowWrites?: boolean } = {}
+): Anthropic.Tool[] {
+  if (channel === "web") return AI_TOOLS;
+  const allowWrites = opts.allowWrites ?? true;
+  return AI_TOOLS.filter(
+    (tool) =>
+      !CRITICAL_TOOLS.has(tool.name) &&
+      !tool.name.startsWith("whatsapp_") &&
+      (allowWrites || !WRITE_TOOLS.has(tool.name))
+  );
+}
 
 export const AI_TOOLS: Anthropic.Tool[] = [
   // --- Sohbete sabitlenmiş dosyalar ------------------------------------
@@ -1573,6 +1645,77 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         dosyaAdi: { type: "string", description: "Uzantısız dosya adı (opsiyonel)." },
       },
       required: ["veri"],
+    },
+  },
+  // ============================================================ WhatsApp (havuz numarası)
+  {
+    name: "whatsapp_search_customers",
+    description:
+      "Kullanıcının görebildiği müşteri/tedarikçi (party) kayıtlarını ada ya da telefona göre arar; " +
+      "partyId, ad, maskeli telefon ve telefonu olup olmadığını döndürür. Kullanıcı \"X'e WhatsApp'tan " +
+      "yaz\" dediğinde önce bunu çağır, sonra dönen partyId ile whatsapp_send_message'ı kullan. " +
+      "Telefonu olmayan kayda mesaj gönderilemez; kullanıcıdan numara iste.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string", description: "Müşteri adı ya da telefon numarası (parça yeter)." } },
+      required: ["query"],
+    },
+  },
+  {
+    name: "whatsapp_send_message",
+    description:
+      "Kullanıcıya atanmış Projelio WhatsApp numarasından bir müşteriye mesaj gönderir (kuyruğa alır; " +
+      "hız sınırıyla birkaç dakika içinde gider). partyId (whatsapp_search_customers'tan) ya da doğrudan " +
+      "telefon ver. Metni kullanıcı adına, kısa ve WhatsApp'a uygun düz metin olarak yaz; emoji ve " +
+      "başlık kullanma. Bu araç onay ister: göndermeden önce kullanıcıya kime ve ne yazacağını göster.",
+    input_schema: {
+      type: "object",
+      properties: {
+        partyId: { type: "string", description: "Müşteri kaydının kimliği (tercih edilen)." },
+        phone: { type: "string", description: "partyId yoksa telefon numarası (+90…)." },
+        displayName: { type: "string", description: "Telefonla gönderirken kişinin adı (opsiyonel)." },
+        text: { type: "string", description: "Gönderilecek mesaj metni." },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "whatsapp_list_conversations",
+    description:
+      "Kullanıcının Projelio numarası üzerinden yürüyen müşteri konuşmalarını listeler (kim, son mesaj " +
+      "zamanı, Lio otomatik yanıt açık mı). \"WhatsApp'ta kimlerle yazışıyorum\", \"cevapsız mesaj var mı\" için.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "whatsapp_read_conversation",
+    description:
+      "Bir müşteri konuşmasının son mesajlarını okur. threadId (listeden), partyId ya da telefon ver. " +
+      "Müşteri ne yazmış, ne cevaplanmış görmek ve yanıt taslağı önermek için.",
+    input_schema: {
+      type: "object",
+      properties: {
+        threadId: { type: "string" },
+        partyId: { type: "string" },
+        phone: { type: "string" },
+        limit: { type: "number", description: "Kaç mesaj (varsayılan 30, en çok 100)." },
+      },
+    },
+  },
+  {
+    name: "whatsapp_set_auto_reply",
+    description:
+      "Bir müşteri konuşmasında Lio'nun otomatik yanıt vermesini açar/kapatır. Açıkken müşteriden gelen " +
+      "her mesaja Lio, konuşma geçmişine bakarak kendi cevap yazar (kredi kullanıcıdan düşer). Bu araç " +
+      "onay ister. threadId, partyId ya da telefonla konuşmayı belirt.",
+    input_schema: {
+      type: "object",
+      properties: {
+        threadId: { type: "string" },
+        partyId: { type: "string" },
+        phone: { type: "string" },
+        enabled: { type: "boolean" },
+      },
+      required: ["enabled"],
     },
   },
 ];

@@ -2,6 +2,7 @@ import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { isMicrosoftTokenCryptoConfigured } from "./microsoft-token-crypto.util";
 import { getWebAppUrl } from "../../common/config/env";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 // "common" tenant: hem kişisel (outlook.com/hotmail.com) hem iş/okul hesapları
 // aynı uç noktadan geçer. Projelio kimin hangi organizasyona ait olduğuyla
@@ -205,7 +206,7 @@ export class MicrosoftOAuthService {
   async exchangeCode(code: string, scopes?: string[], redirectUri?: string): Promise<MicrosoftTokenResponse> {
     this.assertConfigured();
 
-    const res = await fetch(TOKEN_ENDPOINT, {
+    const res = await fetchWithTimeout(TOKEN_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -249,7 +250,7 @@ export class MicrosoftOAuthService {
   ): Promise<{ accessToken: string; expiresIn: number } | { invalidGrant: true }> {
     this.assertConfigured();
 
-    const res = await fetch(TOKEN_ENDPOINT, {
+    const res = await fetchWithTimeout(TOKEN_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({

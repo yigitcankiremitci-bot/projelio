@@ -1,6 +1,19 @@
 # Karar Notu — Bütçe Yönetimi vs. Gelir-Gider Defteri
 
-**Durum:** Karara bağlandı. Uygulama önerisi aşağıda; migration henüz yazılmadı.
+> **Durum (2026-09-03): karar duruyor, UYGULANMADI — süresiz ertelendi.**
+>
+> Karar 2026-08-09'da alındı; aradan geçen sürede `money_entry` tablosu
+> yazılmadı ve kodda hiçbir izi yok. Bütçe tarafı bugün eski şemayla
+> (`budget_transactions`, `recurring_payments`) sorunsuz çalışıyor, yani bu bir
+> arıza değil — yapılmamış bir iyileştirme.
+>
+> Bu belge **kararın gerekçesini** korumak için duruyor: bütçe yönetimi ile
+> gelir-gider defterinin neden ayrı kavramlar olduğu ve birleştirilirse ne
+> kırılacağı burada yazılı. Konuya dönülürse başlangıç noktası budur.
+>
+> `10-modul-fm_gelir_gider.md`'deki alan yeniden adlandırması
+> (`type` → `direction`, `entryDate` → `occurred_at`) bu karara bağlıdır ve o da
+> yapılmadı — o belgedeki sözleşme bugünkü kodla bu noktada çelişir.
 
 ---
 

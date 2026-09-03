@@ -46,8 +46,40 @@ import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
+// Son savunma hattı: yakalanmamış promise reddi ve istisna süreci ÖLDÜRMESİN.
+//
+// NEDEN: Node 22'nin varsayılanı `--unhandled-rejections=throw`. Yani beklenmeden
+// (await/catch'siz) bırakılmış tek bir promise reddi — örneğin bildirim yazarken
+// alınan geçici bir veritabanı hatası — tüm backend'i düşürüyordu. Docker yeniden
+// başlatıyor ama o sırada uçuşta olan her istek ölüyor ve log'da sebep görünmüyor.
+//
+// Buradaki amaç hatayı GİZLEMEK değil, GÖRÜNÜR kılıp ayakta kalmak: sebep tam
+// olarak yazılır (cause dahil), süreç yaşamaya devam eder. Kaynağı bulup düzeltmek
+// yine gerekir — bu ağ, bulunana kadar servisin ayakta kalmasını sağlar.
+// Bildirim gibi "gitmese de olur" işler için doğru yer NotificationsService
+// .notifyUserSafe'tir; buraya düşen her kayıt aslında bir eksik catch demektir.
+function installProcessGuards(logger: Logger): void {
+  process.on("unhandledRejection", (reason) => {
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    const cause = (error as Error & { cause?: unknown }).cause;
+    logger.error(
+      `Yakalanmamış promise reddi: ${error.message}${cause ? ` · sebep: ${String(cause)}` : ""}`,
+      error.stack
+    );
+  });
+
+  // uncaughtException'da süreç KASITLI olarak sonlandırılır: bu noktada yığın
+  // yarıda kalmıştır ve devam etmek bozuk durumla çalışmak demektir. Fark şu ki
+  // artık sessizce değil, sebebi yazarak ölüyor.
+  process.on("uncaughtException", (error) => {
+    logger.error(`Yakalanmamış istisna, süreç kapanıyor: ${error.message}`, error.stack);
+    process.exit(1);
+  });
+}
+
 async function bootstrap() {
   const logger = bootstrapLogger;
+  installProcessGuards(logger);
 
   // Yerelde çalışırken CANLI veritabanına bağlıysan bunu bilmelisin: buradaki
   // her kayıt, silme ve düzenleme gerçek kullanıcıların verisine gider. Uyarı
@@ -67,7 +99,11 @@ async function bootstrap() {
     logger.warn("Projelio AI devre dışı: ANTHROPIC_API_KEY tanımlı değil (backend/.env).");
   }
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: WhatsApp köprüsünün webhook imzası (HMAC) ham gövde üzerinden
+  // doğrulanır; JSON ayrıştırıldıktan sonra yeniden serileştirilen gövde
+  // bayt bayt aynı olmayabilir. Nest ham gövdeyi yalnızca bu seçenekle
+  // (req.rawBody) saklar. Bkz. whatsapp-webhook.controller.ts
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   // Render (ve benzeri PaaS) uygulamayı bir ters vekil sunucunun arkasında çalıştırır.
   // Bu ayar yapılmazsa Express, req.ip olarak istemcinin değil vekil sunucunun iç

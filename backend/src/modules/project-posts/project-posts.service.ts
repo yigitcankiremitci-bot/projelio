@@ -6,6 +6,7 @@ import { DepartmentMembersService } from "../department-members/department-membe
 import { NotificationsService } from "../notifications/notifications.service";
 import { extractMentionHandles } from "../../common/mentions.util";
 import { requireUuid } from "../../common/validation/input";
+import { AKIS_TAVANI } from "../../common/liste-tavani";
 
 function mapPost(
   row: any,
@@ -62,7 +63,13 @@ export class ProjectPostsService {
   }
 
   private async findByScope(scope: PostScope, requestingUserId?: string): Promise<ProjectPost[]> {
-    let query = this.supabase.client.from("project_posts").select("*, users(full_name)").order("created_at", { ascending: false });
+    // En yeniden eskiye sıralı, tavanlı: akış doğal olarak sınırsız büyüyor ve
+    // eski gönderiler pratikte hiç görülmüyor (bkz. common/liste-tavani.ts).
+    let query = this.supabase.client
+      .from("project_posts")
+      .select("*, users(full_name)")
+      .order("created_at", { ascending: false })
+      .limit(AKIS_TAVANI);
     query = scope.departmentId ? query.eq("department_id", scope.departmentId) : query.eq("project_id", scope.projectId!);
     const { data, error } = await query;
     if (error) throw error;
@@ -83,7 +90,11 @@ export class ProjectPostsService {
     const deptIds = (depts ?? []).map((d: any) => d.id);
     const deptNameById = new Map<string, string>((depts ?? []).map((d: any) => [d.id, d.name]));
 
-    let query = this.supabase.client.from("project_posts").select("*, users(full_name)").order("created_at", { ascending: false });
+    let query = this.supabase.client
+      .from("project_posts")
+      .select("*, users(full_name)")
+      .order("created_at", { ascending: false })
+      .limit(AKIS_TAVANI);
     query =
       deptIds.length > 0
         // organizationId filtre metnine gömülüyor. Buraya gelmeden önce

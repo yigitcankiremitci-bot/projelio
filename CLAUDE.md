@@ -19,12 +19,34 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | HTTP istemcisi, hata tipi, oturum | `apps/web/src/api/client.ts` |
 | Web+mobil+backend ortak tipler | `packages/shared/src/types.ts` |
 | SQL migration'lar | `database/migrations/NNN_ad.sql` |
-| API referansı | `docs/api-endpoints.md` |
+| Geri alma betikleri | `database/geri-al/` — migrations'ın DIŞINDA, bilerek |
+| Dağıtım/yedek/migration betikleri | `deploy/` |
+| API referansı | `docs/api-endpoints.md` (seçilmiş uçlar) + `node scripts/uc-listesi.mjs` (tam liste) |
+| Modül sistemi tasarımı | `docs/moduller/` — 20 belge; README'de faz tablosu |
 | Tanıtım sitesi (Next.js) | `landing/` |
+| WhatsApp köprüsü (WAHA yan-servisi + modül) | `backend/src/modules/whatsapp/`, `deploy/docker-compose.prod.yml` `waha` servisi, tasarım `docs/whatsapp-qr-plan.md` |
 
-Backend'de 42 modül var (`backend/src/modules/` altında listelenir). Lio =
+Backend'de 46 modül, 450'den fazla HTTP ucu var (`node scripts/uc-listesi.mjs` ile
+listelenir — elle yazılmış liste bayatlıyor). Lio =
 `modules/ai-assistant/`; araç tanımları `ai-assistant.tools.ts`, kredi sistemi
-`ai-credits.service.ts` + `ai-credits.config.ts`.
+`ai-credits.service.ts` + `ai-credits.config.ts`, sağlayıcı katmanı
+`ai-assistant/providers/`.
+
+**Lio çok sağlayıcılıdır.** Model çağrısı doğrudan Anthropic SDK'sına değil,
+`providers/provider-registry.ts` üzerinden gider. Yeni sağlayıcı ya da model
+eklemek = `providers/providers.config.ts` içindeki `PROVIDER_CATALOG`'a bir
+satır. **Fiyat da o satırda** — `MODEL_PRICING` katalogdan besleniyor, ikinci
+bir liste tutulmuyor. OpenAI ya da Anthropic uyumlu API sunan her sağlayıcı
+(z.ai/GLM, MiniMax, DeepSeek, Groq, OpenRouter, Ollama) kod yazmadan eklenir;
+yalnızca bu iki biçime de uymayan bir sağlayıcı için `LlmProvider` arayüzünü
+uygulayan yeni bir sınıf gerekir.
+
+Sağlayıcı listesi, öncelik sırası, model seçimi ve KVKK notu için aşağıdaki
+"Sunucuda elle kurulması gerekenler" başlığına bak.
+
+Kanonik istek biçimi **Anthropic Messages biçimidir**: 68 araç tanımı ve tüm
+servis kodu o dilde yazılmış, çeviri yükü yalnızca onu gerektiren sağlayıcıya
+biniyor (`providers/openai-format.ts`, testleri `openai-format.test.ts`).
 
 `apps/mobile` (Expo) neredeyse boş — asıl istemci `apps/web`.
 
@@ -62,10 +84,102 @@ koşar, ne gideceğini gösterip onay ister, sonra CI ve dağıtımı izler.
 
 Migration'lar bu zincire DAHİL DEĞİL — hâlâ elle uygulanıyor (bkz. aşağıda).
 
+**⚠️ Tailscale anahtarı 2027-02-25'te doluyor.** Sunucuya SSH yalnızca tailnet
+üzerinden (`projelio@100.111.242.24`) yapılıyor; 22 numaralı port genel IP'de
+kapalı. Anahtar yenilenmezse erişim tamamen kopar ve geriye yalnızca sağlayıcı
+konsolu kalır. Kalıcı çözüm: Tailscale panelinden bu makineye *"Disable key
+expiry"* işaretlemek (altyapı düğümleri için önerilen yol).
+
 Sunucuda **root yok**: `projelio` kullanıcısı sudoers'da değil ve yerel anahtar
 root girişini açmıyor. Bu yüzden sunucuda kurulan her şey (ör. yedekleme)
 kullanıcı crontab'ıyla kuruluyor, systemd birimiyle değil — birimler repoda
 duruyor ama root erişimi olduğu gün işe yarar. Bkz. `deploy/yedekle.sh` başlığı.
+
+### Sunucuda elle kurulması gerekenler (kod tarafı hazır, ayar bekliyor)
+
+Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
+
+| Ne | Değişken | Nerede tanımlanır |
+|---|---|---|
+| Yedeğin dış kopyası | `PROJELIO_UZAK_HEDEF` | crontab / `~/uyari.env` |
+| Arıza bildirimi | `PROJELIO_NTFY_KONU` ya da `PROJELIO_TELEGRAM_TOKEN`+`_CHAT` | `/etc/projelio/uyari.env` ya da `~/uyari.env` |
+| Yedek yaşam sinyali | `PROJELIO_YEDEK_PING` | aynı dosya |
+| WhatsApp'tan Lio'ya komut | `WHATSAPP_LIO_KOMUT=1` | `backend/.env` |
+| Lio'nun AI sağlayıcı sırası | `AI_PROVIDERS` | `backend/.env` |
+
+`AI_PROVIDERS` sağlayıcıları hem **açar** hem **sıralar** — virgülle ayrılmış,
+soldan sağa öncelikli:
+
+```
+AI_PROVIDERS=anthropic          # varsayılan (değişken tanımsızsa da bu)
+AI_PROVIDERS=anthropic,zai      # önce Anthropic, düşerse z.ai
+AI_PROVIDERS=zai,anthropic      # önce ucuz olan, yedek Anthropic
+```
+
+Bir sağlayıcının anahtarı (`ANTHROPIC_API_KEY`, `ZAI_API_KEY`,
+`MINIMAX_API_KEY`) tanımlı değilse listede olsa bile atlanır — log'a uyarı
+düşer. Yedeğe geçiş yalnızca **geçici** hatalarda olur (429, 5xx, bağlantı ve
+sağlayıcıya özgü 401/404); 400'de geçilmez, çünkü bozuk istek her sağlayıcıda
+bozuktur. Kredi, yedeğe geçilirse **gerçekten kullanılan** modelin fiyatından
+kesilir.
+
+### Model seçimi
+
+Kademe (hızlı/dengeli/güçlü) seçimi duruyor; artık ona ek olarak kullanıcı
+**tam modeli** de seçebiliyor. `POST /ai/chat` gövdesine
+`model: "saglayici:model"` (ör. `"zai:glm-5.3"`) konur; seçenekleri
+`GET /ai/models` döner (`models` alanı — yalnızca ETKİN sağlayıcıların
+modelleri, fiyat ve bağlam penceresiyle).
+
+Seçilen model listenin başına geçer, kademenin normal adayları **yedekte
+kalır**: seçim geçici olarak düşerse iş durmaz. Geçersiz ya da kapalı bir
+sağlayıcıya ait seçim sessizce yok sayılır ve kademe kararı işler — eski bir
+sohbette kalmış seçim yüzünden asistan durmasın diye.
+
+Kademe varsayılanını ortamdan ezmek için `AI_MODEL_<SAĞLAYICI>_<KADEME>`
+(ör. `AI_MODEL_ZAI_SMART=glm-4.7`); eski `ANTHROPIC_MODEL` çalışmaya devam eder
+ama yalnızca Anthropic birincilken.
+
+### Katalogdaki modeller (Eylül 2026 liste fiyatları, USD/milyon token)
+
+| Sağlayıcı | Model | Giriş | Çıkış | Bağlam | Görsel |
+|---|---|---|---|---|---|
+| Anthropic | Claude Haiku 4.5 | 1 | 5 | 200K | ✓ |
+| Anthropic | Claude Sonnet 5 | 3 | 15 | 200K | ✓ |
+| Anthropic | Claude Opus 5 | 15 | 75 | 200K | ✓ |
+| z.ai | GLM 5.3 Flash | 0,075 | 0,25 | 200K | — |
+| z.ai | GLM 4.7 FlashX | 0,07 | 0,4 | 128K | — |
+| z.ai | GLM 5.3 | 1,4 | 4,4 | 1M | — |
+| z.ai | GLM 4.7 | 0,6 | 2,2 | 200K | — |
+| z.ai | GLM 4.6V | 0,3 | 0,9 | 64K | ✓ |
+| z.ai | GLM 5.2 | 1,4 | 4,4 | 200K | — |
+| MiniMax | M2.7 Hızlı | 0,3 | 1,2 | 200K | — |
+| MiniMax | M2.7 | 0,3 | 1,2 | 200K | — |
+| MiniMax | M3 | 0,3 | 1,2 | 1M | ✓ |
+
+Fiyatların **tek kaynağı** `providers.config.ts`; `MODEL_PRICING` oradan
+besleniyor (`catalogPricing()`). Katalogda fiyatı olmayan model
+DEFAULT_PRICING'e (15/75 USD) düşer ve müşteriden gerçeğin kat kat üstünde
+kredi kesilir — bir test bunu yakalıyor (`providers.config.test.ts`).
+
+MiniMax **Anthropic uyumlu uç** (`/anthropic`) sunduğu için `kind: "anthropic"`
+ile bağlandı: çeviri katmanı devreye girmiyor, araç akışı Anthropic'le birebir
+aynı yoldan geçiyor. z.ai OpenAI uyumlu olduğu için `openai-format.ts`
+çevirisinden geçer.
+
+Durumu görmek için `GET /ai/health`: hangi sağlayıcılar tanımlı, hangileri
+etkin, hangi model kullanılıyor.
+
+⚠️ **Anthropic dışı sağlayıcılar bilinçli olarak varsayılan DEĞİL.** İkisi de
+(MiniMax, z.ai) Çin merkezli; müşteri verisi (görev içerikleri, dosya adları,
+WhatsApp mesajları) oraya gider. KVKK açısından bu teknik değil ticari/hukuki
+bir karar — açmadan önce bilerek karar ver.
+
+Kurulum adımları `deploy/yedekle.sh` ve `deploy/uyar.sh` başlıklarında yazılı.
+Dış kopya kurulana kadar yedekler **yalnızca korumaya çalıştıkları diskte**
+duruyor. Ayrıca dışarıdan bir uptime izleyicisi `https://api.projelio.app/health/ready`
+adresine bakmalı — `/health` yalnızca sürecin ayakta olduğunu söyler,
+veritabanı ölüyken bile 200 döner.
 
 Değişiklik sonrası **her zaman `npm run typecheck` çalıştır.** Tüm test setini
 değil, dokunduğun alanın testlerini `--filter` ile koştur.
@@ -88,18 +202,47 @@ değil, dokunduğun alanın testlerini `--filter` ile koştur.
 
 ## Dikkat edilecekler
 
-- **Migration numaraları çakışabiliyor** — `060`, `062`, `063` iki kez kullanılmış.
-  Yeni migration eklerken `ls database/migrations | tail` ile en yüksek numarayı
-  gör ve bir sonrakini al.
+- **Migration numaraları çakışabiliyor** — `019`, `027`, `043`, `044`, `051`,
+  `058`, `060`, `063` iki kez kullanılmış (hepsi farklı tablolara dokunduğu için
+  zararsız). Yeni migration eklerken `ls database/migrations | tail` ile en
+  yüksek numarayı gör ve bir sonrakini al.
+- **Geri alma (rollback) betikleri `database/geri-al/` altında**, migrations
+  içinde DEĞİL. Aynı numarayı taşıyorlardı ve sıralı toplu uygulamada ileri
+  migration'ı hemen ardından geri alıyorlardı (bkz. `database/geri-al/README.md`).
 - **Migration'lar kendi VPS'imizdeki Postgres'e elle uygulanıyor** (Supabase'e
   değil — 2026-08-30'da göç edildi). Dosyayı yazmak yeterli değil; uygulanması
-  gerektiğini bana hatırlat. Komut:
+  gerektiğini bana hatırlat. Tercih edilen yol `deploy/migrate.sh`:
+
+  ```bash
+  ./deploy/migrate.sh durum     # bekleyenleri listeler
+  ./deploy/migrate.sh uygula    # sırayla uygular, kaydeder, PostgREST'i tazeler
+  ```
+
+  Betik `schema_migrations` tablosunu (migration 083) kullanır: uygulanmışları
+  atlar, her dosyayı tek transaction'da çalıştırır, sonradan değiştirilmiş
+  dosyaları yakalar. **İlk kurulumda** önce 083'ü elle uygula, sonra
+  `./deploy/migrate.sh isaretle` ile mevcut 82 dosyayı "uygulanmış" say.
+
+  Elle uygulamak gerekirse:
   `ssh projelio@100.111.242.24 'docker exec -i projelio-postgres sh -c "psql -v ON_ERROR_STOP=1 -U \$POSTGRES_USER -d \$POSTGRES_DB"' < database/migrations/NNN_ad.sql`
   (tailnet adresi; genel IP'de 22 kapalı). Şema değiştiyse PostgREST'in
   önbelleğini tazele: `docker exec projelio-postgres sh -c "psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c \"notify pgrst, 'reload schema'\""`
 - **`client.ts` içindeki oturum sonlanma mantığına dokunma.** 401'lerin tek
   merkezden yönetilmesi bilinçli; oraya `catch` eklemek "her şeyim silinmiş"
   hatasını geri getirir.
+- **Bildirim gönderirken `notifyUserSafe` kullan**, `notifyUser` değil.
+  `notifyUser` veritabanı hatasında `throw` ediyor; beklenmeden bırakılırsa
+  Node 22 yakalanmamış promise reddinde SÜRECİ ÖLDÜRÜR. Sonucu gerçekten
+  beklemen gerekmiyorsa (ki bildirimlerde neredeyse hiç gerekmez) güvenli olanı
+  çağır. `main.ts`'te güvenlik ağı var ama oraya düşen her kayıt bir eksik
+  catch demektir.
+- **Dış servise giden her `fetch` zaman aşımlı olmalı** —
+  `common/http/fetch-with-timeout.ts`. Node'un fetch'inde yanıt için varsayılan
+  zaman aşımı YOK; asılı kalan bir istek kuyruk işleyicisini (`running` bayrağı)
+  süresiz kilitleyebiliyor. Veritabanı çağrıları için aynı koruma
+  `backend/src/database/retrying-fetch.ts` içinde zaten var.
+- **Liste uçlarına tavan koy** — `common/liste-tavani.ts`. Kod tabanında gerçek
+  sayfalama yok; tavan, veri beklenmedik biçimde büyüdüğünde kopmayı önlüyor.
 - **Büyük dosyalar** — bunları tamamen okumaya çalışma, ilgili bölümü hedefle:
   `files.service.ts` (~1900), `planning.service.ts` (~1600),
   `TaskColumn.tsx` (~1500), `ai-assistant.service.ts` (~1300),

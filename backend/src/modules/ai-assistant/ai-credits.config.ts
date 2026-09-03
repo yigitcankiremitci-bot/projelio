@@ -1,3 +1,5 @@
+import { catalogPricing, defaultModelForTier, PROVIDER_CATALOG } from "./providers/providers.config";
+
 /**
  * Projelio AI kredi ekonomisi.
  *
@@ -25,10 +27,14 @@ export interface ModelPricing {
  * aksi halde kâr marjı hesabı yanlış olur.
  */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-  "claude-haiku-4-5-20251001": { inputPerMillion: 1, outputPerMillion: 5 },
+  // Fiyatların TEK KAYNAĞI sağlayıcı kataloğu: her model orada zaten fiyatıyla
+  // birlikte tanımlı, burada ikinci bir liste tutmak ikisinin ayrışmasına ve
+  // müşteriden yanlış kredi kesilmesine yol açardı.
+  ...catalogPricing(),
+
+  // Katalogda karşılığı olmayan takma adlar. Sürüm sabitlenmemiş model adı
+  // (`claude-haiku-4-5`) eski kayıtlarda ve ANTHROPIC_MODEL değerinde geçebiliyor.
   "claude-haiku-4-5": { inputPerMillion: 1, outputPerMillion: 5 },
-  "claude-sonnet-5": { inputPerMillion: 3, outputPerMillion: 15 },
-  "claude-opus-5": { inputPerMillion: 15, outputPerMillion: 75 },
 };
 
 export const DEFAULT_PRICING: ModelPricing = { inputPerMillion: 15, outputPerMillion: 75 };
@@ -176,29 +182,41 @@ export interface ModelTierInfo {
   costMultiplier: number;
 }
 
+/**
+ * Kademe tanımları. `model` alanı ARTIK BURADA SABİT DEĞİL: gerçekte kullanılan
+ * model, etkin sağlayıcıya göre çalışma anında seçilir (bkz. provider-registry).
+ * Buradaki değer yalnızca sağlayıcı katmanı hiçbir aday bulamazsa geçerli olan
+ * son çare ve geriye dönük uyumluluk içindir.
+ */
 export const MODEL_TIERS: Record<ModelTier, ModelTierInfo> = {
   fast: {
     tier: "fast",
-    model: "claude-haiku-4-5-20251001",
+    model: anthropicModelFor("fast"),
     label: "Hızlı",
     description: "Günlük işler: listeleme, görev ekleme, durum güncelleme.",
     costMultiplier: 1,
   },
   smart: {
     tier: "smart",
-    model: "claude-sonnet-5",
+    model: anthropicModelFor("smart"),
     label: "Dengeli",
     description: "Çok adımlı planlama, analiz ve belirsiz isteklerin yorumlanması.",
     costMultiplier: 3,
   },
   max: {
     tier: "max",
-    model: "claude-opus-5",
+    model: anthropicModelFor("max"),
     label: "Güçlü",
     description: "En zor işler. Belirgin şekilde pahalıdır; yalnızca gerektiğinde seçin.",
     costMultiplier: 15,
   },
 };
+
+/** Kademenin Anthropic karşılığı — kademe tablosunun son çare varsayılanı. */
+function anthropicModelFor(tier: ModelTier): string {
+  const anthropic = PROVIDER_CATALOG.find((p) => p.id === "anthropic")!;
+  return defaultModelForTier(anthropic, tier)!.id;
+}
 
 export const DEFAULT_TIER: ModelTier = "fast";
 

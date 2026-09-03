@@ -11,7 +11,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const searchRoots = [join(root, "apps/web/src"), join(root, "backend/src"), join(root, "packages")];
@@ -46,7 +46,7 @@ const run = spawnSync(
   process.execPath,
   [
     "--import",
-    join(root, "scripts/register-ts-resolve.mjs"),
+    pathToFileURL(join(root, "scripts/register-ts-resolve.mjs")).href,
     // backend/package.json CommonJS (NestJS gereği); test dosyaları ESM olduğu
     // için Node her seferinde uyarı basıyor. Uyarı zararsız, gürültüsü değil.
     "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",

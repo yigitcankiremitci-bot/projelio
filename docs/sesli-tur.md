@@ -33,7 +33,7 @@ adım adım geçilebilir.
 | `src/components/tour/TourLauncher.tsx` | Sağ üstteki **?** düğmesi ve tur listesi |
 | `src/components/tour/TourHelpDot.tsx` | Herhangi bir alanın yanına konabilen küçük **?** rozeti |
 | `public/tour-audio/tr/` | Ses kayıtları (bkz. oradaki README) |
-| `scripts/tour-audio.mjs` | Seslendirme metinlerini üretir / eksik kayıtları listeler |
+| `apps/web/scripts/tour-audio.mjs` | Seslendirme metinlerini üretir / eksik kayıtları listeler |
 
 ## Yeni tur eklemek
 

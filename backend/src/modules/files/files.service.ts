@@ -18,6 +18,7 @@ import {
 import type { CloudFile, StorageProvider } from "../cloud-storage/cloud-storage.types";
 import { NotificationsService } from "../notifications/notifications.service";
 import { decodeUploadFileName } from "../../common/upload-filename.util";
+import { LISTE_TAVANI } from "../../common/liste-tavani";
 
 export type { NativeFileKind };
 
@@ -1051,7 +1052,8 @@ export class FilesService {
       .select()
       .eq("job_id", jobId)
       .is("archived_at", null)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(LISTE_TAVANI);
 
     if (filter.taskId) query = query.eq("task_id", filter.taskId);
     else if (filter.outputId) query = query.eq("output_id", filter.outputId);
@@ -1092,7 +1094,8 @@ export class FilesService {
       .select()
       .eq("department_id", departmentId)
       .is("archived_at", null)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(LISTE_TAVANI);
     if (error) throw error;
 
     const canEdit = await this.canEditInDriveForDepartment(departmentId, userId);

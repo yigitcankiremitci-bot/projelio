@@ -2,6 +2,7 @@ import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { isTokenCryptoConfigured } from "./token-crypto.util";
 import { getWebAppUrl } from "../../common/config/env";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
@@ -139,7 +140,7 @@ export class GoogleOAuthService {
   async exchangeCode(code: string): Promise<GoogleTokenResponse> {
     this.assertConfigured();
 
-    const res = await fetch(TOKEN_ENDPOINT, {
+    const res = await fetchWithTimeout(TOKEN_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -172,7 +173,7 @@ export class GoogleOAuthService {
   ): Promise<{ accessToken: string; expiresIn: number } | { invalidGrant: true }> {
     this.assertConfigured();
 
-    const res = await fetch(TOKEN_ENDPOINT, {
+    const res = await fetchWithTimeout(TOKEN_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -196,7 +197,7 @@ export class GoogleOAuthService {
 
   async revokeToken(token: string): Promise<void> {
     try {
-      await fetch(REVOKE_ENDPOINT, {
+      await fetchWithTimeout(REVOKE_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ token }),

@@ -5,6 +5,7 @@ import { visibleTaskIdsForSubcontractor } from "../../common/access/subcontracto
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { applyOrder } from "../../common/reorder.util";
+import { LISTE_TAVANI } from "../../common/liste-tavani";
 import {
   assertConvertToSubtaskAllowed,
   assertConvertToTaskAllowed,
@@ -146,7 +147,8 @@ export class TasksService {
       .eq("project_id", projectId)
       .is("archived_at", null)
       .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .limit(LISTE_TAVANI);
     if (error) throw error;
     const tasks = (data ?? []).map(mapTask);
 
@@ -165,7 +167,8 @@ export class TasksService {
       .eq("department_id", departmentId)
       .is("archived_at", null)
       .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .limit(LISTE_TAVANI);
     if (error) throw error;
     return (data ?? []).map(mapTask);
   }
@@ -245,7 +248,7 @@ export class TasksService {
       const assigner = await this.getUserName(requestingUserId);
       for (const userId of toAdd) {
         if (userId === requestingUserId) continue;
-        this.notificationsService.notifyUser(
+        this.notificationsService.notifyUserSafe(
           userId,
           "task_assigned",
           "Yeni Görev Atandı",
@@ -431,6 +434,22 @@ export class TasksService {
 
   // Var olan bir görevin proje/departman kapsamını çeker; sonra assertTaskAccess'e verilir.
   // Görev bulunamazsa null döner — çağıran taraf zaten kendi NotFoundException'ını fırlatır.
+  /**
+   * Görevin ait olduğu işin canlı yayın odası ("job:<id>"), yoksa null.
+   *
+   * Görev doğrudan işe değil projeye bağlı; iş kimliği projeden okunuyor.
+   * Tek sorgu: tasks -> projects(job_id) gömülü seçimle alınır.
+   */
+  private async jobRoomOfTask(taskId: string): Promise<string | null> {
+    const { data } = await this.supabase.client
+      .from("tasks")
+      .select("projects(job_id)")
+      .eq("id", taskId)
+      .maybeSingle();
+    const jobId = (data as any)?.projects?.job_id;
+    return jobId ? `job:${jobId}` : null;
+  }
+
   private async getTaskScope(id: string): Promise<{ projectId?: string | null; departmentId?: string | null } | null> {
     const { data } = await this.supabase.client.from("tasks").select("project_id, department_id").eq("id", id).maybeSingle();
     if (!data) return null;
@@ -1169,7 +1188,12 @@ export class TasksService {
       .eq("id", userId);
     if (error) throw error;
     const activeTaskId = active ? taskId : null;
-    this.notificationsService.broadcastActiveWorker(userId, activeTaskId);
+    // Sinyal, herkese değil ilgili odaya gider (bkz. NotificationsGateway
+    // .broadcastActiveWorker). Bu durumu gösteren tek ekran iş sayfasındaki ekip
+    // paneli ve o sayfa `job:<id>` odasında duruyor (bkz. pages/JobDetail.tsx),
+    // bu yüzden görevin projesi üzerinden İŞ kimliği bulunur. Görev bir işe bağlı
+    // değilse sinyal gönderilmez — dinleyen bir ekran zaten yoktur.
+    this.notificationsService.broadcastActiveWorker(userId, activeTaskId, await this.jobRoomOfTask(taskId));
     return { activeTaskId };
   }
 

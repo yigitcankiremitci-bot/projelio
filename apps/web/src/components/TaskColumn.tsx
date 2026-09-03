@@ -1,9 +1,13 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import Sortable, { type SortableEvent } from "sortablejs";
 import type { Task, TaskPriority, TaskStatus } from "@projelio/shared";
 import { MAX_TASK_PRIORITY } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
+
+/** Alt görevi olmayan kartlar için sabit boş dizi: her çağrıda yenisini
+ *  üretmek gereksiz referans değişikliği (ve gereksiz render) yaratır. */
+const EMPTY_TASKS: Task[] = [];
 import {
   IconPlus,
   IconChevronRight,
@@ -279,31 +283,67 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   // Bir üst görevin altında gösterilecek alt görevler.
   // Tamamlandı kolonunda üst görev zaten tamamlanmışsa tüm alt görevleri (durumu ne olursa olsun) gösteriyoruz.
   // Diğer kolonlarda tamamlanmış alt görevler buradan kalkıp Tamamlandı'daki hayalet gruba taşınıyor.
-  const subtasksOf = (parentId: string) =>
-    allTasks.filter((t) => t.parentTaskId === parentId && (isCompletedColumn || t.status !== "completed"));
+  // Alt görevler üst göreve göre TEK GEÇİŞTE gruplanır.
+  //
+  // NEDEN: aşağıdaki subtasksOf ve subtaskStats her kart için allTasks'ı baştan
+  // filtreliyordu. 200 görevlik bir kolonda bu, render başına 400 tam tarama
+  // demek (O(n²)) — üstelik kolon her tuş vuruşunda yeniden çiziliyor (başlık
+  // yerinde düzenlenirken), yani yazarken hissedilir gecikme oluşuyordu.
+  const altGorevlerByParent = useMemo(() => {
+    const harita = new Map<string, Task[]>();
+    for (const t of allTasks) {
+      if (!t.parentTaskId) continue;
+      const liste = harita.get(t.parentTaskId);
+      if (liste) liste.push(t);
+      else harita.set(t.parentTaskId, [t]);
+    }
+    return harita;
+  }, [allTasks]);
+
+  // "Bugünün başlangıcı" render başına bir kez: gecikme kontrolü her kartta
+  // aynı değeri kullanıyor, kart başına yeniden hesaplamak gereksiz.
+  const bugunBaslangici = useMemo(() => {
+    const simdi = new Date();
+    return new Date(simdi.getFullYear(), simdi.getMonth(), simdi.getDate());
+    // Bağımlılık yok: gün içinde değişmiyor, gece yarısını geçen açık sekmede
+    // zaten bir sonraki veri tazelemesinde yeniden hesaplanıyor.
+  }, []);
+
+  const subtasksOf = (parentId: string) => {
+    const hepsi = altGorevlerByParent.get(parentId);
+    if (!hepsi) return EMPTY_TASKS;
+    return isCompletedColumn ? hepsi : hepsi.filter((t) => t.status !== "completed");
+  };
 
   // Rozet için: toplam alt görev ve henüz tamamlanmamış (kalan) alt görev sayısı.
   const subtaskStats = (parentId: string) => {
-    const all = allTasks.filter((t) => t.parentTaskId === parentId);
-    const remaining = all.filter((t) => t.status !== "completed").length;
+    const all = altGorevlerByParent.get(parentId);
+    if (!all) return { total: 0, remaining: 0 };
+    let remaining = 0;
+    for (const t of all) if (t.status !== "completed") remaining += 1;
     return { total: all.length, remaining };
   };
 
   // Sadece Tamamlandı kolonunda: üst görevi henüz tamamlanmamış ama kendisi tamamlanmış alt görevler.
   // Bunlar üst görevin hayalet (düşük opasiteli) bir başlığı altında gruplanır.
+  // Üst görevi kimlikten bulmak için harita: aşağıdaki döngü her alt görev için
+  // allTasks.find çağırıyordu, yani yine O(n²). Harita tek geçişte kuruluyor.
+  const gorevById = useMemo(() => new Map(allTasks.map((t) => [t.id, t])), [allTasks]);
+
   const ghostGroups: { parent: Task; subtasks: Task[] }[] = [];
   if (isCompletedColumn) {
     const byParent = new Map<string, Task[]>();
     for (const t of allTasks) {
       if (!t.parentTaskId || t.status !== "completed") continue;
-      const parent = allTasks.find((p) => p.id === t.parentTaskId);
+      const parent = gorevById.get(t.parentTaskId);
       if (!parent || parent.status === "completed") continue;
-      if (!byParent.has(parent.id)) byParent.set(parent.id, []);
-      byParent.get(parent.id)!.push(t);
+      const liste = byParent.get(parent.id);
+      if (liste) liste.push(t);
+      else byParent.set(parent.id, [t]);
     }
     for (const [parentId, subs] of byParent) {
-      const parent = allTasks.find((p) => p.id === parentId)!;
-      ghostGroups.push({ parent, subtasks: subs });
+      const parent = gorevById.get(parentId);
+      if (parent) ghostGroups.push({ parent, subtasks: subs });
     }
   }
 
@@ -1058,11 +1098,12 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
           const stats = subtaskStats(t.id);
           // Gün bazlı karşılaştırma: son günü bugün olan görevler gün bitmeden
           // "gecikmiş" (kırmızı) görünmesin — sadece tarihi gerçekten geçmişse.
+          // "Bugün" döngü DIŞINDA bir kez hesaplanıyor (bkz. bugunBaslangici):
+          // burada kurulunca her render'da kart başına iki Date nesnesi daha
+          // yaratılıyordu ve değeri zaten hepsinde aynı.
           const deadlineDate = new Date(t.deadline);
           const deadlineDay = new Date(deadlineDate.getFullYear(), deadlineDate.getMonth(), deadlineDate.getDate());
-          const now = new Date();
-          const todayDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          const isOverdue = t.status !== "completed" && deadlineDay < todayDay;
+          const isOverdue = t.status !== "completed" && deadlineDay < bugunBaslangici;
           const isOverdueWithPendingSubtasks = isOverdue && stats.total > 0 && stats.remaining > 0;
           return (
             <div key={t.id} data-id={t.id} style={{ marginBottom: 8 }}>

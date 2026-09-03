@@ -45,6 +45,7 @@ import { PlanningModule } from "./modules/planning/planning.module";
 import { CreationRequestsModule } from "./modules/creation-requests/creation-requests.module";
 import { SocialMediaModule } from "./modules/social-media/social-media.module";
 import { MailboxModule } from "./modules/mailbox/mailbox.module";
+import { WhatsappModule } from "./modules/whatsapp/whatsapp.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
 import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.interceptor";
 
@@ -97,6 +98,8 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     SocialMediaModule,
     // E-posta modülünün gelen kutusu (Outlook/Graph, bkz. 064_mail_accounts.sql).
     MailboxModule,
+    // WhatsApp köprüsü: QR ile bağlanan numara üzerinden bildirim (bkz. 080_whatsapp.sql).
+    WhatsappModule,
     // Taşeronun iş/proje açma talepleri (onay akışı).
     CreationRequestsModule,
     // Aynı sayfadaki kullanıcıların birbirini görmesi ve değişikliklerin anında

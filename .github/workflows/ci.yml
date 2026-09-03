@@ -14,6 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Monorepo (backend + web + shared): tip denetimi ve testler.
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -26,15 +27,75 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # Tip kontrolü ve testler Nest'in bağımlılık çözümlemesini görmez: modül
+      # döngüsü gibi hatalar ancak uygulama açılırken çıkar (2026-09-03'te böyle
+      # bir hata canlıya gitti, dağıtım betiği geri aldı). Sahte sırlarla açılıp
+      # "successfully started" görülene kadar beklenir; veritabanı gerekmez.
+      - name: Backend açılış kontrolü
+        run: |
+          npm run build --workspace=backend --silent
+          cd backend
+          PORT=3999           JWT_SECRET=ci-acilis-kontrolu-gizli-anahtar-0123456789           SUPABASE_URL=http://127.0.0.1:1           SUPABASE_SERVICE_ROLE_KEY=ci-acilis-kontrolu-servis-anahtari-0123456789             node dist/main > boot.log 2>&1 &
+          pid=$!
+          for i in $(seq 1 60); do
+            grep -q "Nest application successfully started" boot.log && break
+            if ! kill -0 "$pid" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          kill "$pid" 2>/dev/null || true
+          grep -q "Nest application successfully started" boot.log || { echo "Backend açılamadı:"; tail -60 boot.log; exit 1; }
+
+  # Landing kök npm workspace'i DEĞİL; kendi package-lock.json'ı var, bu yüzden
+  # ayrı iş olarak ve kendi klasöründe kuruluyor.
+  landing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: landing/package-lock.json
       - name: Landing bağımlılıklarını ve buildini doğrula
         working-directory: landing
         run: |
           npm ci
           npm run build
-      - name: Docker imajlarını doğrula
-        run: |
-          docker build -f Dockerfile.backend -t projelio-backend:ci .
-          docker build -f Dockerfile.web \
-            --build-arg VITE_API_URL=https://api.projelio.app \
-            -t projelio-web:ci .
-          docker build -f Dockerfile.landing -t projelio-landing:ci .
+
+  # Üç imaj birbirinden bağımsız; matrix ile paralel derleniyor. Amaç imajı
+  # yayımlamak değil, Dockerfile'ların bozulmadığını doğrulamak — asıl derleme
+  # VPS'te cicd-deploy.sh içinde yapılıyor.
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # GitHub Actions cache'ine yazmak için gerekiyor (cache-to: type=gha).
+    permissions:
+      contents: read
+      actions: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            dockerfile: Dockerfile.backend
+            build-args: ""
+          - name: web
+            dockerfile: Dockerfile.web
+            build-args: VITE_API_URL=https://api.projelio.app
+          - name: landing
+            dockerfile: Dockerfile.landing
+            build-args: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: ${{ matrix.name }} imajını doğrula
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.build-args }}
+          push: false
+          tags: projelio-${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max

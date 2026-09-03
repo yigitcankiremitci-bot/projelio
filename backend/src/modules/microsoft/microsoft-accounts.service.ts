@@ -9,6 +9,7 @@ import {
   MicrosoftOAuthService,
 } from "./microsoft-oauth.service";
 import { decryptMicrosoftToken, encryptMicrosoftToken } from "./microsoft-token-crypto.util";
+import { TekUcus } from "../../common/tek-ucus";
 
 export interface MicrosoftAccount {
   id: string;
@@ -248,6 +249,22 @@ export class MicrosoftAccountsService {
     const cached = this.accessTokenCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
 
+    // Aynı hesap+izin kümesi için EŞZAMANLI yenileme yapılmaz.
+    //
+    // Google tarafındaki (google-accounts.service.ts) ile aynı gerekçe, ama burada
+    // sonucu daha ağır: Azure AD eşzamanlı yenileme isteklerine kısıtlama (throttling)
+    // uyguluyor ve refresh token rotasyonunda son yazan kazandığı için diğer
+    // isteklerin jetonu geçersizleşiyor — kullanıcı sebepsiz "yeniden bağlanın" görür.
+    //
+    // Kilit anahtarı önbellekle AYNI: izin kümesi farklıysa jeton da farklı,
+    // ikisi birbirini beklememeli.
+    return this.tekUcus.calistir(cacheKey, () => this.refreshAccessTokenNow(accountId, requested, cacheKey));
+  }
+
+  /** Hesap+izin kümesi başına tek yenileme (bkz. common/tek-ucus.ts). */
+  private readonly tekUcus = new TekUcus<string>();
+
+  private async refreshAccessTokenNow(accountId: string, requested: string[], cacheKey: string): Promise<string> {
     const account = await this.findById(accountId);
     if (!account) throw new DriveNotConnectedError();
     if (account.driveRevokedAt) throw new DriveReauthRequiredError();

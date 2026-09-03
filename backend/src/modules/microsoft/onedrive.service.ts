@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { BLANK_DOCX_BASE64, BLANK_PPTX_BASE64, BLANK_XLSX_BASE64 } from "./office-templates";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 const GRAPH_API = "https://graph.microsoft.com/v1.0";
 
@@ -85,7 +86,7 @@ export class OneDriveService {
   private readonly logger = new Logger(OneDriveService.name);
 
   private async call<T>(accessToken: string, path: string, init: RequestInit = {}): Promise<T> {
-    const res = await fetch(`${GRAPH_API}${path}`, {
+    const res = await fetchWithTimeout(`${GRAPH_API}${path}`, {
       ...init,
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -226,7 +227,7 @@ export class OneDriveService {
   async resumableStatus(
     uploadUrl: string
   ): Promise<{ state: "incomplete"; receivedBytes: number } | { state: "gone" }> {
-    const res = await fetch(uploadUrl, { method: "GET" }).catch(() => null);
+    const res = await fetchWithTimeout(uploadUrl, { method: "GET" }).catch(() => null);
     if (!res || !res.ok) return { state: "gone" };
 
     const json = await res.json().catch(() => null);
@@ -236,7 +237,7 @@ export class OneDriveService {
 
   /** Yükleme oturumunu iptal eder; iptal edilmezse oturum bir süre daha yaşar. */
   async cancelResumable(uploadUrl: string): Promise<void> {
-    await fetch(uploadUrl, { method: "DELETE" }).catch(() => undefined);
+    await fetchWithTimeout(uploadUrl, { method: "DELETE" }).catch(() => undefined);
   }
 
   // ------------------------------------------------------------------- okuma
@@ -260,7 +261,7 @@ export class OneDriveService {
    * gerek yok.
    */
   async downloadResponse(accessToken: string, itemId: string): Promise<Response> {
-    const res = await fetch(`${GRAPH_API}/me/drive/items/${itemId}/content`, {
+    const res = await fetchWithTimeout(`${GRAPH_API}/me/drive/items/${itemId}/content`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
@@ -361,7 +362,7 @@ export class OneDriveService {
     destParentId: string,
     newName?: string
   ): Promise<DriveFile> {
-    const res = await fetch(`${GRAPH_API}/me/drive/items/${itemId}/copy`, {
+    const res = await fetchWithTimeout(`${GRAPH_API}/me/drive/items/${itemId}/copy`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -393,7 +394,7 @@ export class OneDriveService {
     // 20 x 500ms ~= 10 saniye üst sınır; çoğu dosya için kopyalama çok daha
     // hızlı tamamlanır.
     for (let attempt = 0; attempt < 20; attempt++) {
-      const statusRes = await fetch(monitorUrl);
+      const statusRes = await fetchWithTimeout(monitorUrl);
       const statusJson = await statusRes.json().catch(() => null);
       if (statusJson?.status === "completed" && statusJson?.resourceId) {
         return this.getFile(accessToken, statusJson.resourceId);

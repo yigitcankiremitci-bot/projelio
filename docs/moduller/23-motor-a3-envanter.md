@@ -1,5 +1,15 @@
 # A3 — Envanter Motoru (kurulum)
 
+> **⛔ UYGULANMADI — bu bir tasarım belgesidir.**
+>
+> `ModuleInventoryConfig`, hareket tablosu ve bakiye türetme kodda **yok**. Bugün var olan tek şey, hangi modülün envanter yüzeyine ait
+> olduğunu söyleyen anahtar listesi (`apps/web/src/lib/moduleSurfaces.ts`) —
+> motorun kendisi değil, yalnızca yüzey eşlemesi.
+>
+> Aşağıdaki "bugünkü kod şunu yapıyor" cümleleri belge yazıldığı **2026-08-15**
+> tarihine aittir. Motor yazılacaksa bu tasarım başlangıç noktasıdır; ama önce
+> kodun bugünkü hâline karşı yeniden doğrulanmalı.
+
 > Kapsam: **veri modeli + hareket mantığı + depo kurulumu + tedarik/sevkiyat bağlantısı.** Kalem tablosu yerleşimi, hareket defteri görünümü ve kritik stok rozetleri bu turda yok — görünümler ayrı turda.
 >
 > Bu motora düşen modül: `oud_depo` → **1 modül** (besleyenler A4'te: `oud_tedarik`, `oud_sevkiyat_yonetimi`)

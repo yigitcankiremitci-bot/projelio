@@ -130,3 +130,12 @@ istemeyeceğin şeyler burada ortaya çıkar.
 - [ ] En az bir kez elle yedek alındı ve boyutu makul
 - [ ] Geri yükleme bir kez denendi
 - [ ] Storage kovalarının kapsam dışı olduğu biliniyor
+
+## WhatsApp oturum veritabanları
+
+WAHA (WhatsApp köprüsü) oturum anahtarlarını ana veritabanında değil, `waha`
+ile başlayan ayrı veritabanlarında tutar. `deploy/yedekle.sh` bunları 1b
+adımında ayrıca döker (`waha_*-<damga>.dump`). Kaybı ölümcül değildir: numara
+yönetici panelinden QR ile yeniden bağlanır; mesaj geçmişi ve atamalar ana
+veritabanındadır. Ayrıntı: `docs/moduller/16-whatsapp.md` §3.
+

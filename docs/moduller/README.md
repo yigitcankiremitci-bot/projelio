@@ -42,6 +42,7 @@ Her modül `00`'daki sözleşme formatında yazılır. Arketip başına bir **re
 | 13 | [Sosyal Medya](13-modul-sosyal-medya.md) | A5 — Takvim / Plan | **Uygulandı** — kendi tabloları (054) + takvim/composer/hesap paneli |
 | 14 | [Instagram entegrasyonu](14-instagram-entegrasyonu.md) | — (entegrasyon notu) | **Uygulandı** — bağlantı (058), doğrudan yayın, zamanlanmış kuyruk |
 | 15 | [E-posta gelen kutusu](15-eposta-gelen-kutusu.md) | — (entegrasyon notu) | **Uygulandı** — Outlook/Graph (064), okuma + yanıt + Lio taslağı |
+| 16 | [WhatsApp köprüsü](16-whatsapp.md) | — (entegrasyon notu) | **Uygulandı** — QR ile bağlanan numara havuzu (080–082), bildirim kanalı, Lio müşteri yazışması |
 
 Sırada: `spd_satis_planlama` (A4) · `oud_depo` (A3)
 

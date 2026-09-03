@@ -444,5 +444,13 @@ değişti (`081_whatsapp_havuz.sql`):
   yazsın" kuralı yalnızca bildirim kanalında kaldı. 463/475 kısıtları ve
   ısınma merdiveni numara başına uygulanmaya devam ediyor; havuzda birden çok
   numara olması yükü dağıtır.
+- **Profil telefonu (§13, 2026-09-03):** Ayarlar › Hesap'ta "WhatsApp numarası"
+  salt okunur gösterilir (doğrulanmış numara + "Bağlantıyı kaldır"); kullanıcı
+  numara yazmaz. Tanınmayan bir telefon Projelio numarasına yazdığında
+  `users.phone` (onboarding) ile tam ve tek eşleşme varsa "EVET yazın" denir,
+  EVET gelince kod akışı atlanarak bağlanır (`whatsapp_contacts.pending_user_id`,
+  082). Doğrulama yine kullanıcının kendi telefonundan geliyor; ad yanıtta
+  gösterilir ki yanlış kişi "ben değilim" diyebilsin. Yönetici paneli bağlı
+  kullanıcıları listeler.
 - **Sonraki adım (yapılmadı):** web'de konuşma ekranı (şu an mesajlar yalnızca
   Lio ve API üzerinden okunuyor; bildirim Ayarlar'a yönlendiriyor).

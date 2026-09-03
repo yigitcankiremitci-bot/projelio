@@ -1,6 +1,7 @@
 import type {
   WhatsappConnectionSummary,
   WhatsappLinkCode,
+  WhatsappLinkedUser,
   WhatsappMessage,
   WhatsappOverview,
   WhatsappThread,
@@ -18,6 +19,7 @@ export const whatsappApi = {
   overview: () => api.get<WhatsappOverview>("/whatsapp/me"),
   linkCode: () => api.post<WhatsappLinkCode>("/whatsapp/me/link-code", {}),
   optOut: () => api.post<{ ok: true }>("/whatsapp/me/opt-out", {}),
+  unlink: () => api.post<{ ok: true }>("/whatsapp/me/unlink", {}),
 
   // --- Müşteri konuşmaları ---
   threads: () => api.get<WhatsappThread[]>("/whatsapp/threads"),
@@ -29,6 +31,7 @@ export const whatsappApi = {
   // --- Yönetici: numara havuzu ---
   admin: {
     list: () => api.get<WhatsappConnectionSummary[]>("/admin/whatsapp/numbers"),
+    linkedUsers: () => api.get<WhatsappLinkedUser[]>("/admin/whatsapp/linked-users"),
     add: (label: string) => api.post<WhatsappConnectionSummary>("/admin/whatsapp/numbers", { label }),
     start: (id: string) => api.post<WhatsappConnectionSummary>(`/admin/whatsapp/numbers/${id}/start`, {}),
     qr: (id: string) => api.get<{ qr: string | null }>(`/admin/whatsapp/numbers/${id}/qr`),

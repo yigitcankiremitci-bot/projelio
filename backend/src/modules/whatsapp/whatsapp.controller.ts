@@ -31,6 +31,12 @@ export class WhatsappController {
     return this.whatsapp.optOutMe(req.user.userId);
   }
 
+  /** Numarayı hesaptan ayırır (cihaz/numara değişti); yeniden bağlanmak kod ister. */
+  @Post("me/unlink")
+  unlink(@Req() req: any) {
+    return this.whatsapp.unlinkMe(req.user.userId);
+  }
+
   // ============================================================ Müşteri konuşmaları
 
   @Get("threads")

@@ -2334,6 +2334,20 @@ export interface WhatsappConnectionSummary {
 export interface WhatsappMyContact {
   optInState: WhatsappOptInState | "not_linked";
   phoneMasked?: string;
+  /** Numaranın hesaba bağlandığı an (kullanıcı kod ya da EVET gönderdiğinde). */
+  verifiedAt?: string;
+}
+
+/** Yönetici listesi: WhatsApp numarasını hesabına bağlamış kullanıcılar. */
+export interface WhatsappLinkedUser {
+  userId: string;
+  fullName: string;
+  email: string;
+  phoneMasked: string;
+  optInState: WhatsappOptInState;
+  verifiedAt?: string;
+  /** Kullanıcıya atanmış Projelio numarasının etiketi. */
+  numberLabel?: string;
 }
 
 /** Eşleştirme kodu: kullanıcı bu kodu kendisine atanmış numaraya gönderir. */

@@ -26,6 +26,13 @@ describe("gelen komut çözümleme", () => {
     }
   });
 
+  test("onay kelimeleri", () => {
+    for (const w of ["EVET", "evet", "Onaylıyorum", "tamam", "ok"]) {
+      assert.deepEqual(parseInboundCommand(w), { kind: "confirm" }, w);
+    }
+    assert.deepEqual(parseInboundCommand("evet ama yarın"), { kind: "none" });
+  });
+
   test("cümle içindeki komut kelimesi komut değildir", () => {
     assert.deepEqual(parseInboundCommand("dur bakalım şunu da ekle"), { kind: "none" });
   });

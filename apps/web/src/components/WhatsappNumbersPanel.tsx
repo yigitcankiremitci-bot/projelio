@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { WhatsappConnectionSummary, WhatsappStatusEvent } from "@projelio/shared";
+import type { WhatsappConnectionSummary, WhatsappLinkedUser, WhatsappStatusEvent } from "@projelio/shared";
 import { whatsappApi } from "../api/whatsapp";
 import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -14,15 +14,16 @@ import WhatsappConnectionPanel from "./WhatsappConnectionPanel";
 export default function WhatsappNumbersPanel() {
   const c = useThemeColors();
   const [numbers, setNumbers] = useState<WhatsappConnectionSummary[] | null>(null);
+  const [linked, setLinked] = useState<WhatsappLinkedUser[]>([]);
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const reload = useCallback(() => {
-    return whatsappApi.admin
-      .list()
-      .then((n) => {
+    return Promise.all([whatsappApi.admin.list(), whatsappApi.admin.linkedUsers()])
+      .then(([n, l]) => {
         setNumbers(n);
+        setLinked(l);
         setError("");
       })
       .catch((e: any) => setError(e?.message ?? "Numaralar alınamadı."));
@@ -116,6 +117,48 @@ export default function WhatsappNumbersPanel() {
         {numbers?.map((n) => (
           <WhatsappConnectionPanel key={n.id} number={n} onChanged={reload} />
         ))}
+      </div>
+
+      {/* Numarasını doğrulamış kullanıcılar: kim hangi Projelio numarasına bağlı. */}
+      <div style={{ marginTop: 18 }}>
+        <div style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, marginBottom: 6 }}>
+          Bağlı kullanıcılar <span style={{ color: c.textSecondary, fontWeight: 400 }}>({linked.length})</span>
+        </div>
+        {linked.length === 0 ? (
+          <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Henüz numarasını doğrulayan kullanıcı yok.</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <thead>
+                <tr style={{ color: c.textSecondary, textAlign: "left" }}>
+                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>Kullanıcı</th>
+                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>Telefon</th>
+                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>Projelio numarası</th>
+                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>Bildirim</th>
+                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>Doğrulama</th>
+                </tr>
+              </thead>
+              <tbody>
+                {linked.map((u) => (
+                  <tr key={u.userId} style={{ borderTop: `1px solid ${c.border}`, color: c.textPrimary }}>
+                    <td style={{ padding: "6px 8px" }}>
+                      {u.fullName}
+                      <div style={{ fontSize: 12, color: c.textSecondary }}>{u.email}</div>
+                    </td>
+                    <td style={{ padding: "6px 8px" }}>{u.phoneMasked}</td>
+                    <td style={{ padding: "6px 8px" }}>{u.numberLabel ?? "—"}</td>
+                    <td style={{ padding: "6px 8px", color: u.optInState === "opted_in" ? c.success : c.textSecondary }}>
+                      {u.optInState === "opted_in" ? "açık" : u.optInState === "opted_out" ? "durdurulmuş" : "—"}
+                    </td>
+                    <td style={{ padding: "6px 8px", color: c.textSecondary }}>
+                      {u.verifiedAt ? new Date(u.verifiedAt).toLocaleDateString("tr-TR") : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

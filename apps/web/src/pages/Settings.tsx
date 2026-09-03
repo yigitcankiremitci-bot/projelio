@@ -16,6 +16,7 @@ import TabBar from "../components/TabBar";
 import GoogleDriveCard from "../components/GoogleDriveCard";
 import OneDriveCard from "../components/OneDriveCard";
 import WhatsappCard from "../components/WhatsappCard";
+import WhatsappProfileCard from "../components/WhatsappProfileCard";
 import {
   IconShield,
   IconLogout,
@@ -367,6 +368,13 @@ export default function Settings() {
           </span>
           <IconChevronRight size={16} color={c.textSecondary} />
         </button>
+      </SettingCard>
+
+      <SettingCard
+        title="WhatsApp numarası"
+        description="Doğrulanmış numaran — elle yazılmaz, telefonundan gönderdiğin kodla eşleşir (Bağlı hesaplar sekmesi)."
+      >
+        <WhatsappProfileCard />
       </SettingCard>
 
       <SettingCard title="Kullanıcı adı" description="Ekip üyesi eklerken seni bu kullanıcı adıyla arayabilirler.">

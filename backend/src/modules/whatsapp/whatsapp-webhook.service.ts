@@ -3,7 +3,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { WahaHttpClient } from "./waha.client";
 import { WhatsappLioService } from "./whatsapp-lio.service";
-import { AUTO_REPLIES, parseInboundCommand } from "./whatsapp-optin";
+import { AUTO_REPLIES, confirmPrompt, parseInboundCommand } from "./whatsapp-optin";
 import { isGroupJid, isLidJid, jidToE164, maskPhone } from "./whatsapp-phone";
 import { WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
 
@@ -182,7 +182,9 @@ export class WhatsappWebhookService {
       display_name: displayName,
       last_inbound_at: now,
     });
-    const isUserPhone = contact.kind === "user" || Boolean(contact.user_id) || command.kind === "link";
+    // Bekleyen aday varken gelen EVET, kullanıcı akışına girer (bkz. 082).
+    const isConfirmingPending = command.kind === "confirm" && Boolean(contact.pending_user_id);
+    const isUserPhone = contact.kind === "user" || Boolean(contact.user_id) || command.kind === "link" || isConfirmingPending;
     const thread = await this.whatsapp.ensureThread(conn.id, contact.id, {
       kind: isUserPhone ? "notification" : "customer",
       owner_user_id: contact.user_id ?? null,
@@ -207,6 +209,19 @@ export class WhatsappWebhookService {
       .eq("id", thread.id);
 
     if (isUserPhone) return this.onUserMessage(conn, contact, thread, payload, command);
+
+    // Kodsuz eşleşme: tanımadığımız bir telefon, tam bir kullanıcının profil
+    // telefonuyla eşleşiyorsa önce "EVET yazın" denir; müşteri akışı bu
+    // mesajda çalışmaz (kullanıcı kendi bildirim numarasını bağlıyor olabilir).
+    if (!contact.user_id && !contact.pending_user_id) {
+      const owner = await this.whatsapp.findProfilePhoneOwner(contact.phone_e164);
+      if (owner) {
+        await this.updateContact(contact.id, { pending_user_id: owner.id, pending_since: now });
+        await this.waha.sendSeen(conn.session_name, contact.wa_jid, payload.id ? [payload.id] : undefined).catch(() => {});
+        await this.sendImmediate(conn, thread.id, contact.wa_jid, confirmPrompt(owner.full_name));
+        return;
+      }
+    }
     return this.onCustomerMessage(conn, contact, thread, body || "[medya]");
   }
 
@@ -237,6 +252,24 @@ export class WhatsappWebhookService {
           user_id: userId,
           opt_in_state: "opted_in",
           opt_in_source: "link_code",
+          opt_in_at: now,
+          opt_out_at: null,
+        });
+        await this.supabase.client.from("whatsapp_threads").update({ owner_user_id: userId, kind: "notification" }).eq("id", thread.id);
+        linkedUserId = userId;
+        reply = AUTO_REPLIES.linked;
+        break;
+      }
+      case "confirm": {
+        const userId = contact.pending_user_id;
+        if (!userId) return; // bekleyen aday yok: sıradan mesaj, yanıt verme
+        await this.updateContact(contact.id, {
+          kind: "user",
+          user_id: userId,
+          pending_user_id: null,
+          pending_since: null,
+          opt_in_state: "opted_in",
+          opt_in_source: "profile_phone",
           opt_in_at: now,
           opt_out_at: null,
         });

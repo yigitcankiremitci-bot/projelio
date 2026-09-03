@@ -10,6 +10,9 @@ export type InboundCommand =
   | { kind: "link"; code: string }
   | { kind: "opt_out" }
   | { kind: "opt_in" }
+  // "EVET": profil telefonu eşleşmesi onayı (bkz. 082). Yalnızca bekleyen aday
+  // varken anlamlıdır; yoksa sıradan mesaj sayılır.
+  | { kind: "confirm" }
   | { kind: "none" };
 
 /** Eşleştirme kodu biçimi: PROJELIO-XXXX (4 karakter, karışıklık yaratan 0/O/1/I yok). */
@@ -20,6 +23,7 @@ const LINK_CODE_PATTERN = new RegExp(`${LINK_CODE_PREFIX}([${LINK_CODE_ALPHABET}
 
 const OPT_OUT_WORDS = new Set(["dur", "durdur", "iptal", "stop", "cikis", "çıkış", "çık", "cik"]);
 const OPT_IN_WORDS = new Set(["başlat", "baslat", "start", "devam", "aç", "ac"]);
+const CONFIRM_WORDS = new Set(["evet", "onaylıyorum", "onayliyorum", "onayla", "tamam", "ok", "yes"]);
 
 /** Türkçe büyük/küçük harf tuzakları için (İ→i, I→ı) yerel ayarlı küçültme. */
 function fold(text: string): string {
@@ -38,6 +42,7 @@ export function parseInboundCommand(text: string | null | undefined): InboundCom
   const word = fold(raw).replace(/[.!]+$/, "");
   if (OPT_OUT_WORDS.has(word)) return { kind: "opt_out" };
   if (OPT_IN_WORDS.has(word)) return { kind: "opt_in" };
+  if (CONFIRM_WORDS.has(word)) return { kind: "confirm" };
 
   return { kind: "none" };
 }
@@ -66,4 +71,13 @@ export const AUTO_REPLIES = {
   optedOut: "Projelio bildirimleri durduruldu. Yeniden başlatmak için BAŞLAT yazın.",
   optedIn: "Projelio bildirimleri yeniden açıldı. Durdurmak için DUR yazın.",
   optInUnknown: "Bu numara Projelio'da bir kullanıcıya bağlı değil. Projelio › Ayarlar › Bağlı hesaplar'dan kod alıp buraya gönderin.",
+  unlinked: "Bu numara Projelio hesabınızdan ayrıldı. Yeniden bağlamak için Ayarlar › Bağlı hesaplar'dan kod alın.",
 } as const;
+
+/**
+ * Profil telefonu eşleşince sorulan onay. Ad gösterilir ki yanlış kişiye
+ * bağlanma riski kullanıcının gözüne görünsün ("ben Ayşe değilim" diyebilsin).
+ */
+export function confirmPrompt(fullName: string): string {
+  return `Bu numara Projelio'da "${fullName}" hesabının profil telefonuyla eşleşiyor. Bildirimleri bu numaradan almak için EVET yazın; siz değilseniz yanıtlamayın.`;
+}

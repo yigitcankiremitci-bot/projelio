@@ -22,6 +22,12 @@ export class WhatsappAdminController {
     return this.whatsapp.listNumbers();
   }
 
+  /** Numarasını hesabına bağlamış kullanıcılar (doğrulanmış telefonlar, maskeli). */
+  @Get("linked-users")
+  linkedUsers() {
+    return this.whatsapp.listLinkedUsers();
+  }
+
   /** Havuza numara ekler ve QR bekleyen oturumu açar. Gövde: { label } */
   @Post("numbers")
   add(@Body() body: { label: string }, @Req() req: any) {

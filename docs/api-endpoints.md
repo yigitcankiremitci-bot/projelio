@@ -173,12 +173,14 @@ Numaralar yanıtlarda maskelidir.
 | GET | `/whatsapp/me` | Yapılandırılmış mı, havuz hazır mı, bana atanmış numara, kendi opt-in durumum (`WhatsappOverview`) | — |
 | POST | `/whatsapp/me/link-code` | Eşleştirme kodu (`PROJELIO-XXXX`, 24 saat). Gerekiyorsa önce havuzdan numara atanır; kullanıcı kodu o numaraya gönderir | — |
 | POST | `/whatsapp/me/opt-out` | WhatsApp bildirimlerini durdurur | — |
+| POST | `/whatsapp/me/unlink` | Doğrulanmış numarayı hesaptan ayırır (cihaz/numara değişti); yeniden bağlanmak kod ister | — |
 | GET | `/whatsapp/threads` | Kullanıcının müşteri konuşmaları (`WhatsappThread[]`) | — |
 | POST | `/whatsapp/threads` | Müşteriyle konuşma açar/bulur; `{ id }` döner | `{ partyId? , phone?, displayName? }` |
 | GET | `/whatsapp/threads/:id/messages?limit=` | Konuşma mesajları (sahibi, konuşmanın organizasyonunu görebilen ya da admin) | — |
 | POST | `/whatsapp/threads/:id/messages` | Serbest metni kuyruğa alır; gönderim dakikalık işleyicide, hız sınırıyla | `{ body }` |
 | PATCH | `/whatsapp/threads/:id/auto-reply` | Lio bu konuşmada müşteriye kendi yanıtlasın mı | `{ enabled }` |
 | GET | `/admin/whatsapp/numbers` | **admin** — havuzdaki numaralar ve atanmış kullanıcı sayıları | — |
+| GET | `/admin/whatsapp/linked-users` | **admin** — numarasını doğrulamış kullanıcılar (ad, e-posta, maskeli telefon, numara etiketi, bildirim durumu) | — |
 | POST | `/admin/whatsapp/numbers` | **admin** — havuza numara ekler, QR bekleyen oturumu açar | `{ label }` |
 | POST | `/admin/whatsapp/numbers/:id/start` | **admin** — durmuş/kopmuş numarayı yeniden bağlamaya açar | — |
 | GET | `/admin/whatsapp/numbers/:id/qr` | **admin** — QR, JSON içinde data-URL `{ qr }` | — |
@@ -188,7 +190,9 @@ Numaralar yanıtlarda maskelidir.
 | POST | `/whatsapp/webhook` | **JWT yok.** WAHA'nın olay bildirimi; `X-Webhook-Hmac` (sha512, ham gövde) doğrulanır, olay saklanıp hemen 200 dönülür | WAHA zarfı |
 
 Gelen mesaj yönlendirmesi: gönderen bir Projelio kullanıcısının telefonuysa
-yalnızca komutlar tanınır (eşleştirme kodu, `DUR`, `BAŞLAT`); değilse müşteri
+yalnızca komutlar tanınır (eşleştirme kodu, `DUR`, `BAŞLAT`, `EVET`); tanınmayan
+telefon tam bir kullanıcının profil telefonuyla (`users.phone`) eşleşiyorsa
+"EVET yazın" denir ve EVET gelince numara o hesaba bağlanır; değilse müşteri
 sayılır — konuşmanın sahibine `whatsapp_inbound` bildirimi gider, Lio otomatik
 yanıt açıksa Lio cevaplar, sahipsiz konuşmada tüm yöneticilere bildirim gider.
 

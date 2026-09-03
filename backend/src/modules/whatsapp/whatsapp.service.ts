@@ -15,6 +15,7 @@ import type {
   WhatsappConnectionSummary,
   WhatsappContact,
   WhatsappLinkCode,
+  WhatsappLinkedUser,
   WhatsappMessage,
   WhatsappOverview,
   WhatsappStatusEvent,
@@ -63,6 +64,9 @@ export type ContactRow = {
   user_id: string | null;
   party_id: string | null;
   opt_in_state: "unknown" | "opted_in" | "opted_out";
+  opt_in_at: string | null;
+  /** Profil telefonu eşleşen aday; EVET onayıyla user_id olur (082). */
+  pending_user_id: string | null;
   last_inbound_at: string | null;
   created_at: string;
 };
@@ -287,7 +291,7 @@ export class WhatsappService {
     ]);
     const { data: contact } = await this.supabase.client
       .from("whatsapp_contacts")
-      .select("phone_e164, opt_in_state")
+      .select("phone_e164, opt_in_state, opt_in_at")
       .eq("user_id", userId)
       .eq("kind", "user")
       .order("created_at", { ascending: false })
@@ -299,9 +303,70 @@ export class WhatsappService {
       poolReady: (count ?? 0) > 0,
       myNumber: mine ? this.mapConnection(mine) : null,
       me: contact
-        ? { optInState: (contact as any).opt_in_state, phoneMasked: maskPhone((contact as any).phone_e164) }
+        ? {
+            optInState: (contact as any).opt_in_state,
+            phoneMasked: maskPhone((contact as any).phone_e164),
+            verifiedAt: (contact as any).opt_in_at ?? undefined,
+          }
         : { optInState: "not_linked" },
     };
+  }
+
+  /**
+   * Numarayı hesaptan ayırır (cihaz/numara değişti). Kişi satırı silinmez:
+   * telefon bir daha yazarsa müşteri sayılır; yeniden bağlanmak kod ister.
+   */
+  async unlinkMe(userId: string): Promise<{ ok: true }> {
+    const now = new Date().toISOString();
+    const { error } = await this.supabase.client
+      .from("whatsapp_contacts")
+      .update({ user_id: null, kind: "customer", opt_in_state: "unknown", opt_out_at: now, pending_user_id: null, updated_at: now })
+      .eq("user_id", userId)
+      .eq("kind", "user");
+    if (error) throw error;
+    // Bildirim konuşmaları sahipsiz kalsın; müşteri konuşmalarına dokunulmaz.
+    await this.supabase.client
+      .from("whatsapp_threads")
+      .update({ owner_user_id: null, updated_at: now })
+      .eq("owner_user_id", userId)
+      .eq("kind", "notification");
+    return { ok: true };
+  }
+
+  /** Yönetici: numarasını hesabına bağlamış kullanıcılar. */
+  async listLinkedUsers(): Promise<WhatsappLinkedUser[]> {
+    const [{ data: contacts }, { data: assignments }] = await Promise.all([
+      this.supabase.client
+        .from("whatsapp_contacts")
+        .select("user_id, phone_e164, opt_in_state, opt_in_at, users(full_name, email)")
+        .eq("kind", "user")
+        .not("user_id", "is", null)
+        .order("opt_in_at", { ascending: false }),
+      this.supabase.client.from("whatsapp_user_numbers").select("user_id, whatsapp_connections(label)"),
+    ]);
+    const labels = new Map<string, string>();
+    for (const a of (assignments ?? []) as any[]) labels.set(a.user_id, a.whatsapp_connections?.label ?? "");
+    return ((contacts ?? []) as any[]).map((c) => ({
+      userId: c.user_id,
+      fullName: c.users?.full_name ?? "",
+      email: c.users?.email ?? "",
+      phoneMasked: maskPhone(c.phone_e164),
+      optInState: c.opt_in_state,
+      verifiedAt: c.opt_in_at ?? undefined,
+      numberLabel: labels.get(c.user_id) || undefined,
+    }));
+  }
+
+  /**
+   * Kodsuz eşleşme adayı: gönderen telefon tam olarak BİR kullanıcının profil
+   * telefonuyla (users.phone, normalize edilmiş) eşleşiyorsa o kullanıcı.
+   * Birden çok eşleşme belirsizdir → aday yok, kod akışına düşülür.
+   */
+  async findProfilePhoneOwner(phoneE164: string): Promise<{ id: string; full_name: string } | null> {
+    const tail = phoneE164.slice(-9);
+    const { data } = await this.supabase.client.from("users").select("id, full_name, phone").ilike("phone", `%${tail}%`).limit(10);
+    const matches = ((data ?? []) as any[]).filter((u) => normalizePhoneE164(u.phone) === phoneE164);
+    return matches.length === 1 ? { id: matches[0].id, full_name: matches[0].full_name } : null;
   }
 
   mapConnection(row: ConnectionRow, assignedUsers?: number): WhatsappConnectionSummary {

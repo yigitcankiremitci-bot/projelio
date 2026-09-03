@@ -4,7 +4,7 @@
 
 ```bash
 npm run typecheck   # backend + web derleme denetimi
-npm test            # 416 test
+npm test            # tüm testler (bugün 1084)
 npm run dev         # backend + web birlikte
 ```
 
@@ -101,9 +101,20 @@ Toplam 40 modül tam tanımlı. Kalan 17: 11 panel, 5 çekirdek, 1 kendi tablosu
 
 ## 6. Bilinen sınırlar (hata değil)
 
-- **Depo** miktarı doğrudan tutuyor; hareket defteri (giriş/çıkış/sayım) A3 motoruyla gelecek.
-- **Aşamalı modüller** (satış hunisi, destek talebi, kalite kontrol, işe alım) liste + aşama alanı; kanban A4 motoruyla gelecek.
-- **Vizyon/Misyon** tek kayıtlık form olmalı; şu an her kayıt bir *sürüm* gibi çalışıyor.
-- **Karşı taraf / sorumlu** alanları serbest metin; gerçek referans (`entity_ref`, `user_ref`) Faz 2'de.
-- **Müşteri modülü** Satış ve Müşteri İlişkileri'nde ayrı kayıt tutuyor — bilinen veri bölünmesi, Faz 3'te tek `party` tablosunda birleşecek.
+Hâlâ geçerli olanlar:
+
+- **Depo** miktarı doğrudan tutuyor; hareket defteri (giriş/çıkış/sayım) A3
+  motoruyla gelecek — motor yazılmadı (bkz. `23-motor-a3-envanter.md`).
+- **Aşamalı modüller** (satış hunisi, destek talebi, kalite kontrol, işe alım)
+  liste + aşama alanı; kanban A4 motoruyla gelecek — motor yazılmadı
+  (bkz. `21-motor-a4-pipeline.md`).
 - **Dışa aktarma ve toplu işlem** henüz yok.
+
+Çözülenler *(2026-09-03'te güncellendi — bu maddeler artık sınır değil)*:
+
+- ~~Vizyon/Misyon her kayıt bir sürüm gibi çalışıyor~~ → A1 form motoru yazıldı,
+  tek kayıtlık form olarak çalışıyor (`apps/web/src/lib/moduleForms/`).
+- ~~Karşı taraf / sorumlu serbest metin~~ → `entity_ref` ve `user_ref` alan
+  tipleri mevcut ve kullanılıyor.
+- ~~Müşteri modülü iki yerde ayrı kayıt tutuyor~~ → `party` tablosunda
+  birleştirildi (migration 046, `backend/src/modules/party/`).

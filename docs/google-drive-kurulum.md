@@ -39,7 +39,7 @@ getirmek için yapılması gerekenleri anlatır.
 
 ## 2. Ortam değişkenleri
 
-`backend/.env` (üretimde Render panelinden):
+`backend/.env` (üretimde sunucudaki `deploy/.env.prod`):
 
 ```bash
 GOOGLE_CLIENT_ID=...apps.googleusercontent.com
@@ -66,7 +66,7 @@ doğrudan Google'a gider — backend'e hiç uğramaz, dolayısıyla
 `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` ona yetmez. Kendi frontend
 değişkenlerini ister:
 
-`apps/web/.env` (üretimde Netlify panelinden):
+`apps/web/.env` (üretimde derleme anında; imaj VPS'te üretilir):
 
 ```bash
 VITE_GOOGLE_PICKER_API_KEY=AIza...
@@ -105,7 +105,8 @@ gösterir; dosya yükleme ve diğer Drive özellikleri etkilenmez.
 ## 3. Veritabanı
 
 `database/migrations/022_google_drive_files.sql` uygulanmış olmalı
-(Supabase projesi `projelio` üzerinde uygulandı). Getirdikleri:
+(kendi VPS'imizdeki Postgres'te uygulandı; `./deploy/migrate.sh durum` ile
+doğrulanabilir). Getirdikleri:
 
 | Tablo | Ne işe yarar |
 |---|---|

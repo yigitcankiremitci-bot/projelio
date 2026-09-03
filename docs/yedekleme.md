@@ -1,141 +1,137 @@
 # Yedekleme
 
-Bu belge Projelio verisinin nerede durduğunu, neyin yedeklendiğini ve neyin
-**yedeklenmediğini** anlatır. En önemli kısmı son bölüm: yedek almak yetmez,
-geri yüklemeyi bir kez denemiş olmak gerekir.
+Bu belge yedeğin **ne olduğunu ve nasıl geri yükleneceğini** anlatır. Betiğin
+kendi içindeki yorumlar daha ayrıntılıdır: `deploy/yedekle.sh`.
+
+> 2026-08-30'daki VPS göçünden önce yedekleme Supabase panelinde yönetiliyordu.
+> Artık öyle değil: her şey kendi sunucumuzda ve yedeği biz alıyoruz.
 
 ## Veri nerede duruyor
 
-| Ne | Nerede | Yedeği kim alıyor |
+| Ne | Nerede | Yedekleniyor mu |
 |---|---|---|
-| Tüm uygulama verisi (kullanıcı, proje, görev, bütçe, mesaj…) | Supabase Postgres | **Supabase planı** — aşağıya bak |
-| Avatar ve kapak görselleri | Supabase Storage kovaları | **Kimse.** Postgres yedeğine DAHİL DEĞİL |
-| Kullanıcı dosyaları (Drive/OneDrive) | Kullanıcının kendi bulut hesabı | Kullanıcının sağlayıcısı |
-| Kod | Git | Git remote |
-| Sırlar (`JWT_SECRET`, `GOOGLE_TOKEN_ENC_KEY`…) | Render paneli | **Kimse.** Elle yedeklenmeli |
+| Veritabanı | Kendi VPS'imizde Postgres 17 (`projelio-postgres` konteyneri) | ✅ `pg_dump -Fc` |
+| WhatsApp oturumları | Aynı Postgres, `waha%` önekli ayrı veritabanları | ✅ ayrı dump |
+| Yüklenen dosyalar | `/srv/projelio/data/storage` (kapak, avatar, ekler) | ✅ `tar.gz` |
+| Sırlar (`.env`, `/etc/projelio`) | Sunucuda | ❌ **bilerek hariç** (aşağıya bak) |
 
-## 1. Veritabanı — asıl iş Supabase panelinde
+## Nasıl çalışıyor
 
-Otomatik veritabanı yedeği **kodla değil, Supabase planıyla** açılır. Kontrol
-edilecek yer: Supabase > Project Settings > **Database** > Backups.
+`deploy/yedekle.sh` her gece **03:30**'da kullanıcı crontab'ıyla koşuyor
+(sunucuda root olmadığı için systemd birimi değil — bkz. CLAUDE.md).
 
-- **Free plan:** otomatik yedek **yok**. Veri kaybı durumunda geri dönüş yok.
-- **Pro plan:** günlük otomatik yedek, 7 gün saklama.
-- **PITR (Point-in-Time Recovery):** ayrı ek — dakika hassasiyetinde geri dönüş.
+Betiğin yaptıkları, sırayla:
 
-> Yapılacak ilk şey bu sayfaya bakıp planın ne sağladığını görmek. Bu belgedeki
-> her şey onun tamamlayıcısıdır, yerine geçmez.
+1. **Disk kontrolü** — 2 GB'ın altında boş alan varsa yedek almaz. Diski
+   doldurup canlıyı durdurmak, o günün yedeğini atlamaktan beterdir.
+2. **Veritabanı** — `pg_dump -Fc` (custom format). Önce geçici ada yazılır,
+   `pg_restore --list` ile **okunabilirliği sınanır**, ancak geçerse gerçek
+   adına taşınır. Sessizce bozuk bir yedek, yedeksizlikten tehlikelidir.
+3. **WhatsApp oturumları** — WAHA oturum anahtarlarını ana veritabanında değil
+   `waha%` önekli ayrı veritabanlarında tutuyor; ana dump onları kapsamaz.
+   Kaybı ölümcül değil (QR ile yeniden bağlanılır) ama her felakette QR
+   okutmamak için alınıyor.
+4. **Yüklenen dosyalar** — `tar.gz`. Veritabanı bunlara yalnızca yol tutuyor;
+   dosyalar giderse kayıtlar kırık bağlantıya döner, o yüzden ikisi birlikte.
+5. **Dış kopya** — `PROJELIO_UZAK_HEDEF` tanımlıysa `rclone` ile uzak hedefe.
+6. **Yaşam sinyali** — `PROJELIO_YEDEK_PING` tanımlıysa başarıda ping atılır.
 
-### Elle / zamanlanabilir yedek
+Saklama: **14 günlük** + **8 haftalık** (pazar kopyası). `flock` ile üst üste
+binme koruması var.
 
-Plandan bağımsız olarak kendi kopyanı almak için:
+## ⚠️ Kurulması gereken iki şey
 
-```bash
-SUPABASE_DB_URL='postgresql://...' ./scripts/yedek-al.sh
-```
+Kod hazır ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 
-Bağlantı dizesi: Supabase > Project Settings > Database > Connection string >
-**URI** (havuzlayıcı "pooler" değil, doğrudan bağlantı — `pg_dump` havuzlayıcıyla
-çalışmaz).
+### 1. Dış kopya — en yüksek öncelikli eksik
 
-Script `pg_dump` gerektirir:
-
-```bash
-brew install libpq && brew link --force libpq
-```
-
-Çıktı `yedek/` klasörüne yazılır. **Bu klasör `.gitignore`'da** — dosya
-veritabanının tamamını içeriyor (şifre hash'leri, şifrelenmiş Drive jetonları),
-asla commit edilmemeli.
-
-### Otomatiğe bağlamak
-
-Script kendi kendine çalışmaz. Seçenekler, uygunluk sırasıyla:
-
-1. **Supabase Pro planı** — en doğrusu. Yedek Supabase'in altyapısında durur,
-   bizim tarafta hiçbir şey çalıştırmak gerekmez.
-2. **Kendi bilgisayarında zamanlanmış görev** (macOS `launchd`, Linux `cron`) —
-   bilgisayar açıkken çalışır. Küçük ekipler için makul, ama "bilgisayar kapalıydı"
-   riskini taşır.
-3. **Render Cron Job** — `render.yaml`'a `type: cron` bir servis eklenebilir. ÖNEMLİ:
-   Render'ın diski geçicidir, yedek orada kalmaz; script'in çıktıyı bir nesne
-   deposuna (S3, Backblaze B2) yüklemesi gerekir. Yani bu seçenek ek altyapı ve
-   yeni bir sır demektir.
-
-> Uygulama içindeki `@Cron` işleri (bkz. `backend/src/modules/*/*.processor.ts`)
-> bu iş için **kullanılmamalı**: web servisinin diski geçici, ve veritabanı yedeği
-> alan bir süreç isteklere cevap veren süreçle aynı yerde olmamalı.
-
-## 2. Supabase Storage kovaları — en sık atlanan yer
-
-Avatar ve kapak görselleri Postgres'te değil, ayrı nesne deposunda. Koddaki tam
-liste (`grep -rn 'BUCKET = "' backend/src` ile doğrulanabilir):
-
-| Kova | İçerik |
-|---|---|
-| `avatars` | Kullanıcı profil görselleri |
-| `job-covers` | İş kapakları |
-| `project-covers` | Proje **ve operasyon** kapakları (ikisi aynı kovayı kullanıyor) |
-| `organization-covers` | Organizasyon kapakları |
-| `department-covers` | Departman kapakları |
-| `group-covers` | Grup kapakları |
-| `product-covers` | Ürün kapakları |
-| `social-publish` | Instagram'a gönderim için geçici public medya |
-
-**Veritabanı yedeği bunları içermez.** Veritabanını geri yüklersen kayıtlar
-kalır ama görseller kırık gelir.
-
-Supabase CLI ile indirilebilir:
+Şu an yedekler `/srv/projelio/yedek` altında, yani **korumaya çalıştıkları
+diskin üzerinde**. Disk ölürse veri de yedek de gider; sunucu ele geçirilirse
+yedekler saldırganla aynı makinededir.
 
 ```bash
-supabase storage download --recursive ss://avatars ./yedek/kovalar/avatars
+curl https://rclone.org/install.sh | sudo bash   # root gerekiyorsa ikiliyi ~/bin'e koy
+rclone config      # hedefi tanımla (B2/S3/Drive)
+rclone config      # üzerine type=crypt katmanı ekle — yedek şifreli çıksın
 ```
 
-Bu görseller kritik değil (kaybı can yakmaz, kullanıcı yeniden yükler), o yüzden
-sıklığı düşük tutulabilir. `social-publish` zaten geçici, hiç yedeklenmesi
-gerekmiyor. Ama "yedeğim var" derken neyin kapsam dışı olduğunu bilmek gerekir.
-
-## 3. Sırlar — kaybı geri dönüşü olmayan tek şey
-
-Render panelindeki ortam değişkenleri hiçbir yedeğe dahil değil. İkisi özellikle
-kritik:
-
-- **`GOOGLE_TOKEN_ENC_KEY`** — kullanıcıların Drive yenileme jetonları bununla
-  şifreleniyor. **Kaybolursa veritabanı yedeği bile işe yaramaz**: tüm Drive
-  bağlantıları kopar ve her kullanıcının yeniden bağlanması gerekir.
-- **`JWT_SECRET`** — kaybı daha hafif: herkesin oturumu kapanır, yeniden giriş
-  yaparlar.
-
-Bunları bir parola yöneticisinde sakla. Bir metin dosyasında ya da bu depoda değil.
-
-## 4. Geri yükleme
-
-Geri yükleme denenmemiş bir yedek, yedek sayılmaz. Boş bir Supabase projesi (ya da
-yerel Postgres) açıp şunu çalıştır:
+Sonra `~/uyari.env` ya da crontab'a:
 
 ```bash
-gunzip -c yedek/projelio_2026-08-23_120000.sql.gz | psql "$HEDEF_DB_URL"
+PROJELIO_UZAK_HEDEF=yedek-sifreli:projelio
 ```
 
-Sonra kontrol et: kullanıcı sayısı doğru mu, bir projenin görevleri geliyor mu,
-giriş yapılabiliyor mu.
+Betik `--immutable` ile gönderir: uzakta var olan dosya bir daha yazılmaz
+(yerelde bozulan bir dosya uzaktakini ezemesin). **Saklama uzakta ayrıca
+ayarlanmalı** (B2 lifecycle / S3 object lock); betik uzaktan hiçbir şey silmez.
 
-**Yılda en az bir kez** bu tatbikatı yap. Gerçekten ihtiyaç duyduğun gün öğrenmek
-istemeyeceğin şeyler burada ortaya çıkar.
+### 2. Yaşam sinyali
 
-## 5. Kontrol listesi
+"Yedek başarısız oldu"yu log'a yazmak yetmiyor, kimse log'a bakmıyor. Daha
+kötüsü: betik **hiç çalışmadıysa** (cron silinmiş, sunucu kapalı) log'da da
+hiçbir şey olmuyor — sessizlik hem "her şey yolunda" hem "haftalardır yedek
+yok" anlamına geliyor.
 
-- [ ] Supabase planının otomatik yedek sağlayıp sağlamadığı kontrol edildi
-- [ ] `GOOGLE_TOKEN_ENC_KEY` ve `JWT_SECRET` parola yöneticisinde
-- [ ] En az bir kez elle yedek alındı ve boyutu makul
-- [ ] Geri yükleme bir kez denendi
-- [ ] Storage kovalarının kapsam dışı olduğu biliniyor
+[healthchecks.io](https://healthchecks.io) üzerinde bir kontrol oluşturup:
 
-## WhatsApp oturum veritabanları
+```bash
+PROJELIO_YEDEK_PING=https://hc-ping.com/<kontrol-kimligi>
+```
 
-WAHA (WhatsApp köprüsü) oturum anahtarlarını ana veritabanında değil, `waha`
-ile başlayan ayrı veritabanlarında tutar. `deploy/yedekle.sh` bunları 1b
-adımında ayrıca döker (`waha_*-<damga>.dump`). Kaybı ölümcül değildir: numara
-yönetici panelinden QR ile yeniden bağlanır; mesaj geçmişi ve atamalar ana
-veritabanındadır. Ayrıntı: `docs/moduller/16-whatsapp.md` §3.
+Beklenen sürede sinyal gelmezse karşı taraf uyarır. Hata durumunda betik
+`/fail` uçuna ping atar. Arıza bildirimi için ayrıca `deploy/uyar.sh`
+(ntfy/Telegram) devrede — bkz. CLAUDE.md.
 
+## Sırlar neden yedeklenmiyor
+
+`.env` ve `/etc/projelio` altındaki anahtarlar **bilerek** dışarıda: yedek
+dosyası sızarsa anahtarlar da sızmasın. Bunların ayrı bir kopyası olmalı
+(parola yöneticisi). Kaybı geri dönüşü olmayan tek şey bunlar — veritabanı
+yedekten döner, ama `SOCIAL_CREDENTIAL_ENC_KEY` giderse şifreli sosyal medya
+jetonları **hiçbir şekilde** çözülemez.
+
+Yedeklenmesi gereken kritik değişkenler: `APP_JWT_SECRET`,
+`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `POSTGRES_PASSWORD`,
+`SOCIAL_CREDENTIAL_ENC_KEY`, `GOOGLE_TOKEN_ENC_KEY`, `WAHA_API_KEY`,
+`ANTHROPIC_API_KEY`, VAPID anahtar çifti.
+
+## Geri yükleme
+
+Yedekler `pg_dump -Fc` (custom format) — **düz SQL değil**, yani `psql <
+dosya` ile geri yüklenmez, `pg_restore` gerekir.
+
+```bash
+# Veritabanı (DİKKAT: hedefteki veriyi ezer)
+docker exec -i projelio-postgres pg_restore -U "$POSTGRES_USER" \
+  -d "$POSTGRES_DB" --clean --if-exists < yedek.dump
+
+# Yüklenen dosyalar
+tar -xzf depo-YYYYMMDD-HHMM.tar.gz -C /srv/projelio/data/
+```
+
+Şema değiştiyse PostgREST önbelleğini tazele:
+
+```bash
+docker exec projelio-postgres sh -c "psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c \"notify pgrst, 'reload schema'\""
+```
+
+Yedeği yerel makineye çekmek için: `deploy/yedek-getir.sh`.
+
+## Denenmemiş olan
+
+`pg_restore --list` yedeğin **okunabilir** olduğunu kanıtlıyor, **geri
+yüklenebilir ve tutarlı** olduğunu değil. Tam bir geri dönüş provası henüz
+yapılmadı. Ayda bir, tek kullanımlık bir Postgres konteynerine son dump'ı
+yükleyip birkaç sağlık sorgusu (tablo sayısı, `users` satır sayısı, en yeni
+`created_at`) koşan bir kontrol, "yedeğim var" varsayımını gerçek kanıta
+çevirir.
+
+## Kontrol listesi
+
+- [x] Günlük yedek cron'u kurulu (03:30)
+- [x] Veritabanı + dosyalar + WhatsApp oturumları kapsamda
+- [x] Dump bütünlüğü her yedekte sınanıyor
+- [ ] **Dış kopya (`PROJELIO_UZAK_HEDEF`) — kurulmadı**
+- [ ] **Yaşam sinyali (`PROJELIO_YEDEK_PING`) — kurulmadı**
+- [ ] Sırların parola yöneticisinde kopyası var mı
+- [ ] Geri yükleme provası yapıldı mı

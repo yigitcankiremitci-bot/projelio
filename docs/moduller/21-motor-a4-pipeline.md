@@ -1,5 +1,15 @@
 # A4 — Pipeline Motoru (kurulum)
 
+> **⛔ UYGULANMADI — bu bir tasarım belgesidir.**
+>
+> `ModulePipelineConfig`, aşama geçiş tablosu ve kanban kodda **yok**. Bugün var olan tek şey, hangi modülün aşamalı süreç (pipeline) yüzeyine ait
+> olduğunu söyleyen anahtar listesi (`apps/web/src/lib/moduleSurfaces.ts`) —
+> motorun kendisi değil, yalnızca yüzey eşlemesi.
+>
+> Aşağıdaki "bugünkü kod şunu yapıyor" cümleleri belge yazıldığı **2026-08-15**
+> tarihine aittir. Motor yazılacaksa bu tasarım başlangıç noktasıdır; ama önce
+> kodun bugünkü hâline karşı yeniden doğrulanmalı.
+
 > Kapsam: **veri modeli + konfigürasyon + davranış + 7 modülün aşama kurulumu.** Kanban yerleşimi, sürükle-bırak animasyonu ve huni grafiği bu turda yok — görünümler ayrı turda.
 >
 > Bu motora düşen modüller: `spd_satis_planlama_b2b_b2c` (referans), `ik_ise_alim_oryantasyon`, `mid_sikayet_oneri`, `mid_teknik_destek`, `oud_tedarik`, `oud_sevkiyat_yonetimi`, `oud_kalite_kontrol` → **7 modül**

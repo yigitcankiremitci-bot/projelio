@@ -1,9 +1,40 @@
 # Projelio — API Endpoint Referansı
 
-Base URL: `http://localhost:3000` (backend `.env` içindeki `PORT` değişkenine göre değişir)
+**Base URL:** üretimde `https://api.projelio.app`, yerelde `http://localhost:3000`
+(backend `.env` içindeki `PORT` değişkenine göre).
 
-Aksi belirtilmedikçe tüm endpoint'ler `Authorization: Bearer <JWT>` header'ı gerektirir
-(`@UseGuards(AuthGuard('jwt'))`). Admin'e özel endpoint'ler ayrıca `RolesGuard` ile korunur.
+Aksi belirtilmedikçe tüm uçlar `Authorization: Bearer <JWT>` başlığı gerektirir
+(`@UseGuards(AuthGuard('jwt'))`). Admin'e özel uçlar ayrıca `RolesGuard` ile korunur.
+
+> **⚠️ Bu belge TAM DEĞİL — seçilmiş uçları ayrıntılı anlatır.**
+>
+> Kodda **450'den fazla uç / 43 modül** var; burada bunların bir bölümü belgeli. Eksik
+> olması bir hata değil, bilinçli bir sınır: gövde şeması ve davranış açıklaması
+> gereken uçlar burada, gerisi koddan okunur.
+>
+> **Tam ve daima güncel listeyi koddan üret:**
+>
+> ```bash
+> node scripts/uc-listesi.mjs             # okunur liste
+> node scripts/uc-listesi.mjs --markdown  # tablo hâlinde
+> node scripts/uc-listesi.mjs --sayim     # yalnızca özet
+> ```
+>
+> Elle yazılan bir liste kod değiştikçe sessizce yanlışa döner; bu yüzden
+> "hangi uçlar var" sorusunun cevabı betiktir, bu dosya değil.
+
+## Kimlik doğrulaması gerektirmeyen uçlar
+
+Kodda **6 tane** var, hepsi kasıtlı (`node scripts/uc-listesi.mjs` ile doğrulanır):
+
+| Uç | Neden açık |
+|---|---|
+| `GET /health` | Docker healthcheck — süreç ayakta mı |
+| `GET /health/ready` | Dış izleme — veritabanına da bakar, ölüyse 503 |
+| `GET /public/projects/:token` | Herkese açık proje paylaşımı |
+| `POST /public/projects/:token/unlock` | Paylaşımın e-posta kapısı |
+| `GET /social/instagram/callback` | OAuth dönüşü (Meta çağırır) |
+| `POST /whatsapp/webhook` | WAHA çağırır; HMAC imzasıyla doğrulanır |
 
 ## Auth (`/auth`)
 
@@ -65,7 +96,8 @@ her linkte vardır ve kapatılamaz.
 |---|---|---|---|
 | GET | `/public/projects/:token` | Linkin açtığı görünüm (`PublicProjectView`) | — |
 
-Uygulamadaki **tek** kimliksiz uç budur. `Authorization` header'ı beklemez,
+Bu, kullanıcı verisi döndüren tek kimliksiz uçtur (diğer beşi sağlık, OAuth
+dönüşü ve webhook — bkz. yukarıdaki tablo). `Authorization` header'ı beklemez,
 gönderilirse yok sayar. Token yok / link kapatılmış / süresi dolmuş / proje
 arşivlenmiş durumlarının hepsi ayrımsız **404** döner — farklı yanıtlar linkin
 bir zamanlar var olduğunu sızdırırdı. IP başına dakikada 60 istekle sınırlıdır
@@ -206,6 +238,27 @@ Lio araçları: `whatsapp_search_customers`, `whatsapp_send_message` (onaylı),
 |---|---|---|
 | GET | `/admin/stats` | Kullanıcı sayısı, aktif/tamamlanmış proje istatistikleri |
 | GET | `/admin/users` | Tüm kullanıcıları listele |
+
+## Sağlık uçları (`/health`) — kimlik gerektirmez
+
+| Metot | Yol | Ne söyler |
+|---|---|---|
+| GET | `/health` | **Canlılık:** süreç ayakta mı. Bilerek hiçbir bağımlılığa bakmaz |
+| GET | `/health/ready` | **Hazır olma:** veritabanına da dokunur; ulaşılamıyorsa **503** |
+
+İkisi ayrı olmalı, çünkü işleri farklı:
+
+- `/health`'i Docker healthcheck çağırıyor. Buraya veritabanı kontrolü eklemek
+  zararlı olurdu: veritabanı bir an yanıt vermediğinde konteyner "sağlıksız"
+  sayılıp yeniden başlatılır, bu da toparlanmayı hızlandırmak yerine geciktirir.
+- `/health/ready` dış izleme içindir (UptimeRobot, Healthchecks.io). `/health`
+  tek başına yanıltıcıydı: veritabanı tamamen ölmüşken bile 200 dönüyordu.
+
+```json
+// GET /health/ready — 200
+{ "status": "ok", "database": "ok", "databaseLatencyMs": 9,
+  "uptimeSeconds": 609, "timestamp": "2026-09-03T09:44:03.663Z" }
+```
 
 ## Canlı Bildirimler (WebSocket — Socket.io)
 

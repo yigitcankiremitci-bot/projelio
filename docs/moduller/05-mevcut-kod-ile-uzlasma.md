@@ -92,7 +92,7 @@ Sıralama bağımlılığa göre; her faz kendi başına kullanılabilir bir iyi
 
 ### Faz 0 — Yetki ✅ TAMAMLANDI
 
-- `module_members` tablosu → `database/migrations/042_module_members.sql` *(uygulanmayı bekliyor)*
+- `module_members` tablosu → `database/migrations/042_module_members.sql` *(canlıda uygulandı)*
 - `organization_modules.department_id` eklendi — aynı modül birden fazla departmanda etkinleşebiliyor
 - `ModuleMembersService` — yetki çözümlemesi tek yerde
 - `ModuleRecordsService` artık bu servisi kullanıyor
@@ -364,10 +364,15 @@ Pipeline (kanban + aşama konfigürasyonu, 7 modül) → Takvim (5 modül) → E
 
 ## 5. Özet
 
-| | |
-|---|---|
-| Mimari yön | Kodun gittiği yönle uyumlu — çatışma yok |
-| En acil iş | `module_members` (Faz 0) — sistem bugün tanımı gereği çalışmıyor |
-| En yüksek getirili iş | A2 motoru (Faz 1) — tek dosya, tüm modüller |
-| En büyük veri riski | Müşteri kaydının iki modüle bölünmüş olması — ne kadar erken çözülürse o kadar az veri taşınır |
-| Spec'lerin durumu | Hedef tarifi. Kod 6 fazın 1.'sinde. Fazlar arası atlanmamalı |
+> **⚠️ Aşağıdaki tablo 2026-08-15 tarihlidir ve ARTIK GEÇERLİ DEĞİL.**
+> Saydığı üç işin üçü de yapıldı: `module_members` uygulandı (042), A2 motoru
+> yazıldı, müşteri bölünmesi 046 ile çözüldü. Tablo tarihî kayıt olarak
+> duruyor — güncel durum için `docs/moduller/README.md`'deki faz tablosuna bak.
+
+| | | Bugün |
+|---|---|---|
+| Mimari yön | Kodun gittiği yönle uyumlu — çatışma yok | ✅ hâlâ geçerli |
+| En acil iş | `module_members` (Faz 0) | ✅ yapıldı (042 canlıda) |
+| En yüksek getirili iş | A2 motoru (Faz 1) | ✅ yazıldı |
+| En büyük veri riski | Müşteri kaydının iki modüle bölünmüş olması | ✅ çözüldü (046) |
+| Spec'lerin durumu | Kod 6 fazın 1.'sinde | ❌ eskimiş — kalan iş A4/A5/A3 motorları ve `money_entry` |

@@ -69,7 +69,7 @@ Kalan 4 motor (A1 form, A3 envanter, A4 pipeline, A5 takvim) modülleri **çalı
 | 0 | `module_members` — modüle kişi atama ve yetki | ✅ uygulandı |
 | 0.5 | 40 modül tanımı, departman bazlı dosyalar | ✅ |
 | 1 | A2 motoru — düzenleme, arşivleme, arama, filtre, sıralama | ✅ |
-| — | Test altyapısı (416 test, sıfır yeni bağımlılık) | ✅ |
+| — | Test altyapısı (sıfır yeni bağımlılık, `node --test`) | ✅ |
 | 3 | `party` ortak varlığı + müşteri modülü birleşmesi | ✅ |
 | 2 | Alan tipi genişletmesi (`currency`, `entity_ref`, `user_ref`…) | ✅ (`file` hariç) |
 | 5 | A6 panel motoru (tek motor, **12 modül**) | ✅ |
@@ -85,7 +85,7 @@ Migration'lar `042` ve `043` canlıya uygulandı.
 ## Komutlar
 
 ```bash
-npm test          482 test
+npm test          tüm testler (bugün 1084)
 npm run typecheck backend + web
 npm run dev       backend + web birlikte
 ```

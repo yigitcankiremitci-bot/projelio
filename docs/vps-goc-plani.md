@@ -1,10 +1,36 @@
 # Tek VPS'e Göç — Önceleme ve Plan
 
-Hedef sunucu: `193.111.77.252`
+> **✅ GÖÇ TAMAMLANDI (2026-08-30). BU BELGE ARTIK TARİHÎ KAYITTIR.**
+>
+> Aşağıdaki adımların **tamamı yapıldı**. Gelecek zaman kipini ("kurulacak",
+> "taşınır", "geri dönülebilir") plan olarak okuma — hepsi geçmiş.
+>
+> **Bugünkü gerçek:** her şey tek VPS'te. Web `https://app.projelio.app`,
+> API `https://api.projelio.app`, tanıtım `https://projelio.app`. Netlify ve
+> Render **kullanılmıyor** (Netlify yalnızca eski adresi yönlendiriyor, Render
+> askıda — bkz. `netlify.toml` ve `render.yaml` başlıkları).
+>
+> **Günlük işletim için buraya bakma.** Yerine:
+> - Dağıtım ve yayın: `CLAUDE.md` → "Yayın nasıl oluyor"
+> - Yığın tanımı: `deploy/docker-compose.prod.yml`
+> - Yedekleme: `docs/yedekleme.md`, `deploy/yedekle.sh`
+> - Migration: `deploy/migrate.sh`
+>
+> **⚠️ Bu belgedeki hâlâ geçerli tek operasyonel uyarı:**
+> **Tailscale anahtarı 2027-02-25'te doluyor.** Yenilenmezse tailnet erişimi
+> kopar ve 22 numaralı port dışarıya kapalı olduğu için geriye yalnızca
+> sağlayıcı konsolu kalır. Tailscale panelinden bu makineye
+> *"Disable key expiry"* işaretlemek kalıcı çözümdür (§5'te ayrıntı).
+>
+> Belgedeki bazı dosya adları hiç üretilmedi (`deploy/Caddyfile.gw`,
+> `scripts/vps-goc.sh`, `docs/vps-kurulum.md`) — planlanıp vazgeçilmiş
+> adlardır, aramaya kalkma.
 
-Mevcut dağıtım Netlify (web) + Render (API) + Supabase (veritabanı/storage)
-üçlüsünden tek bir VPS'e taşınır. Bu belge kararları, adımları ve geri dönüş
-yolunu yazar.
+Hedef sunucu: `193.111.77.252` (tailnet: `100.111.242.24`)
+
+Göç öncesi dağıtım Netlify (web) + Render (API) + Supabase (veritabanı/storage)
+üçlüsüydü; tek bir VPS'e taşındı. Bu belge kararları, adımları ve o gün
+tasarlanan geri dönüş yolunu yazar.
 
 ## 0. Sunucu önceleme sonucu (doğrulandı)
 

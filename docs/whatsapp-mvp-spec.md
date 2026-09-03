@@ -1,12 +1,21 @@
 # WhatsApp Entegrasyonu — MVP Teknik Spec
 
-Durum: taslak (uygulanmadı). Bu doküman yalnızca planı anlatır; repoda henüz
-`backend/src/modules/whatsapp/` yok, migration yazılmadı.
-
-> **2026-09-02 — Yön değişti.** Üretim yolu olarak Cloud API yerine QR ile
-> bağlanan numara (WAHA yan-servisi) seçildi; güncel plan
-> `docs/whatsapp-qr-plan.md`. Bu dosya, ileride resmi API'ye geçilirse
-> referans olsun diye duruyor. Aşağıdaki "karar girdileri" artık geçerli değil.
+> **⛔ BU YOL SEÇİLMEDİ — ARŞİV BELGESİ.** Aşağıdaki Meta Cloud API tasarımı
+> hiç uygulanmadı ve uygulanması planlanmıyor. Dosya yalnızca *ileride resmi
+> API'ye geçilirse* karar girdileri elde olsun diye duruyor.
+>
+> **Bugün canlıda olan sistem tamamen farklıdır:** QR ile bağlanan numara +
+> WAHA yan-servisi. Gerçek tasarım, tarihçe ve sunucu adımları:
+> `docs/whatsapp-qr-plan.md`. Modül özeti: `docs/moduller/16-whatsapp.md`.
+>
+> Aşağıdaki hiçbir şey kodda yoktur: Meta onaylı template'ler, 24 saatlik
+> hizmet penceresi, konuşma başına faturalama, Meta webhook challenge.
+> Kodda gerçekte olanlar (`backend/src/modules/whatsapp/`, migration 080-082):
+> numara havuzu, QR eşleştirme, opt-in, hız sınırı ve jitter, HMAC imzalı
+> webhook, oturum uzlaştırma.
+>
+> *(Not: bu dosyanın eski başlığı "repoda henüz `backend/src/modules/whatsapp/`
+> yok" diyordu — 2026-09-03 itibarıyla yanlış: 20 dosyalık modül canlıda.)*
 
 Karar girdileri (tartışmaya kapalı, üstten verildi):
 

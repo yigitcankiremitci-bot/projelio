@@ -19,11 +19,15 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | HTTP istemcisi, hata tipi, oturum | `apps/web/src/api/client.ts` |
 | Web+mobil+backend ortak tipler | `packages/shared/src/types.ts` |
 | SQL migration'lar | `database/migrations/NNN_ad.sql` |
-| API referansı | `docs/api-endpoints.md` |
+| Geri alma betikleri | `database/geri-al/` — migrations'ın DIŞINDA, bilerek |
+| Dağıtım/yedek/migration betikleri | `deploy/` |
+| API referansı | `docs/api-endpoints.md` (seçilmiş uçlar) + `node scripts/uc-listesi.mjs` (tam liste) |
+| Modül sistemi tasarımı | `docs/moduller/` — 20 belge; README'de faz tablosu |
 | Tanıtım sitesi (Next.js) | `landing/` |
 | WhatsApp köprüsü (WAHA yan-servisi + modül) | `backend/src/modules/whatsapp/`, `deploy/docker-compose.prod.yml` `waha` servisi, tasarım `docs/whatsapp-qr-plan.md` |
 
-Backend'de 42 modül var (`backend/src/modules/` altında listelenir). Lio =
+Backend'de 46 modül, 450'den fazla HTTP ucu var (`node scripts/uc-listesi.mjs` ile
+listelenir — elle yazılmış liste bayatlıyor). Lio =
 `modules/ai-assistant/`; araç tanımları `ai-assistant.tools.ts`, kredi sistemi
 `ai-credits.service.ts` + `ai-credits.config.ts`.
 
@@ -63,6 +67,12 @@ koşar, ne gideceğini gösterip onay ister, sonra CI ve dağıtımı izler.
 
 Migration'lar bu zincire DAHİL DEĞİL — hâlâ elle uygulanıyor (bkz. aşağıda).
 
+**⚠️ Tailscale anahtarı 2027-02-25'te doluyor.** Sunucuya SSH yalnızca tailnet
+üzerinden (`projelio@100.111.242.24`) yapılıyor; 22 numaralı port genel IP'de
+kapalı. Anahtar yenilenmezse erişim tamamen kopar ve geriye yalnızca sağlayıcı
+konsolu kalır. Kalıcı çözüm: Tailscale panelinden bu makineye *"Disable key
+expiry"* işaretlemek (altyapı düğümleri için önerilen yol).
+
 Sunucuda **root yok**: `projelio` kullanıcısı sudoers'da değil ve yerel anahtar
 root girişini açmıyor. Bu yüzden sunucuda kurulan her şey (ör. yedekleme)
 kullanıcı crontab'ıyla kuruluyor, systemd birimiyle değil — birimler repoda
@@ -77,6 +87,13 @@ Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 | Yedeğin dış kopyası | `PROJELIO_UZAK_HEDEF` | crontab / `~/uyari.env` |
 | Arıza bildirimi | `PROJELIO_NTFY_KONU` ya da `PROJELIO_TELEGRAM_TOKEN`+`_CHAT` | `/etc/projelio/uyari.env` ya da `~/uyari.env` |
 | Yedek yaşam sinyali | `PROJELIO_YEDEK_PING` | aynı dosya |
+| WhatsApp'tan Lio'ya komut | `WHATSAPP_LIO_KOMUT=1` | `backend/.env` |
+
+`WHATSAPP_LIO_KOMUT` açıkken kullanıcının bağlı telefonundan yazdığı serbest
+metin Lio'nun araçlı akışına giriyor (bkz. `docs/whatsapp-lio-komut-plani.md`).
+Kapalıyken o metin sessizce düşer — WhatsApp yalnızca bildirim kanalı olarak
+çalışmaya devam eder. Saatlik istek tavanı `WHATSAPP_LIO_SAATLIK` (varsayılan
+10), gelen metin uzunluğu `WHATSAPP_LIO_MAX_UZUNLUK` (varsayılan 1000).
 
 Kurulum adımları `deploy/yedekle.sh` ve `deploy/uyar.sh` başlıklarında yazılı.
 Dış kopya kurulana kadar yedekler **yalnızca korumaya çalıştıkları diskte**
@@ -143,7 +160,7 @@ değil, dokunduğun alanın testlerini `--filter` ile koştur.
   `common/http/fetch-with-timeout.ts`. Node'un fetch'inde yanıt için varsayılan
   zaman aşımı YOK; asılı kalan bir istek kuyruk işleyicisini (`running` bayrağı)
   süresiz kilitleyebiliyor. Veritabanı çağrıları için aynı koruma
-  `database/retrying-fetch.ts` içinde zaten var.
+  `backend/src/database/retrying-fetch.ts` içinde zaten var.
 - **Liste uçlarına tavan koy** — `common/liste-tavani.ts`. Kod tabanında gerçek
   sayfalama yok; tavan, veri beklenmedik biçimde büyüdüğünde kopmayı önlüyor.
 - **Büyük dosyalar** — bunları tamamen okumaya çalışma, ilgili bölümü hedefle:

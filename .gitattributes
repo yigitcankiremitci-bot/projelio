@@ -1,0 +1,44 @@
+# Satır sonu kuralları.
+#
+# NEDEN VAR: geliştirme Windows'ta yapılıyor ve `core.autocrlf=true` ayarı
+# checkout sırasında dosyaları CRLF'e çeviriyor. Depoda ve sunucuda her şey LF
+# olduğu için bu çoğu dosyada görünmez bir ayrıntı — ama kabuk betiklerinde
+# değil: shebang satırı `#!/usr/bin/env bash\r` olunca Linux çekirdeği
+# "bash\r" adında bir yorumlayıcı arar ve betik ÇALIŞMAZ:
+#
+#   /usr/bin/env: $'bash\r': No such file or directory
+#
+# CI/CD zaten git checkout ile LF alıyor, yani normal dağıtım yolu güvenli.
+# Ama bir betiği yerelden sunucuya doğrudan kopyalamak (scp/rsync) CRLF'li
+# çalışma kopyasını gönderiyor ve betik sessizce kırılıyor — 2026-09-03'te
+# yedekle.sh tam olarak böyle çalışmadı.
+#
+# Aşağıdaki kurallar bu dosyaların çalışma kopyasında DA LF kalmasını zorlar.
+
+# Öntanımlı: satır sonlarını git kendi belirlesin (metin dosyaları normalize edilir).
+* text=auto
+
+# Sunucuda çalışan her şey her zaman LF — çalışma kopyasında bile.
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Konteyner ve dağıtım tanımları da Linux tarafında okunuyor.
+Dockerfile* text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+deploy/Caddyfile text eol=lf
+deploy/systemd/* text eol=lf
+
+# SQL migration'lar psql'e boru ile veriliyor; CRLF sorun çıkarmıyor ama
+# sunucu tarafında tutarlılık için LF sabitleniyor.
+*.sql text eol=lf
+
+# İkili dosyalar dokunulmadan kalsın.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.mp3 binary
+*.dump binary

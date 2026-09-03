@@ -27,6 +27,23 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # Tip kontrolü ve testler Nest'in bağımlılık çözümlemesini görmez: modül
+      # döngüsü gibi hatalar ancak uygulama açılırken çıkar (2026-09-03'te böyle
+      # bir hata canlıya gitti, dağıtım betiği geri aldı). Sahte sırlarla açılıp
+      # "successfully started" görülene kadar beklenir; veritabanı gerekmez.
+      - name: Backend açılış kontrolü
+        run: |
+          npm run build --workspace=backend --silent
+          cd backend
+          PORT=3999           JWT_SECRET=ci-acilis-kontrolu-gizli-anahtar-0123456789           SUPABASE_URL=http://127.0.0.1:1           SUPABASE_SERVICE_ROLE_KEY=ci-acilis-kontrolu-servis-anahtari-0123456789             node dist/main > boot.log 2>&1 &
+          pid=$!
+          for i in $(seq 1 60); do
+            grep -q "Nest application successfully started" boot.log && break
+            if ! kill -0 "$pid" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          kill "$pid" 2>/dev/null || true
+          grep -q "Nest application successfully started" boot.log || { echo "Backend açılamadı:"; tail -60 boot.log; exit 1; }
 
   # Landing kök npm workspace'i DEĞİL; kendi package-lock.json'ı var, bu yüzden
   # ayrı iş olarak ve kendi klasöründe kuruluyor.

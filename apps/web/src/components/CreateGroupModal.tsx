@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 
 interface Props {
   onClose: () => void;
@@ -21,6 +22,7 @@ export default function CreateGroupModal({ onClose, onCreated }: Props) {
     setLoading(true);
     try {
       await api.post("/groups", { name, description: description || undefined });
+      notifySidebarChanged();
       onClose();
       if (onCreated) onCreated();
       else window.location.reload();

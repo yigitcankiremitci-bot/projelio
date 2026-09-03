@@ -6,6 +6,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 
 interface Props {
   group: Group;
@@ -58,6 +59,7 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
         formData.append("file", resized);
         await api.uploadFile(`/groups/${group.id}/cover`, formData);
       }
+      notifySidebarChanged();
       onSaved();
       onClose();
     } catch {
@@ -106,6 +108,7 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
       <EntityDangerZone
         entityLabel="Grubu"
         resourcePath={`/groups/${group.id}`}
+        affectsSidebar
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
         archiveMessage={`"${group.name}" grubunu arşive eklemek istediğine emin misin? Bu gruba bağlı tüm organizasyonlar ve projeler de arşive taşınır.`}

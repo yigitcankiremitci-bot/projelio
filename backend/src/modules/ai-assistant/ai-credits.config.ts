@@ -83,18 +83,26 @@ export const MIN_BALANCE_TO_START = Number(process.env.AI_MIN_BALANCE_TO_START ?
  * Sistem promptu + araç şemaları + günlük bağlamın kabaca token karşılığı.
  *
  * Bir turun bedelini ÖNDEN kestirmek için kullanılır (bkz. AiAssistantService.reserveFor).
- * Ölçüm (2026-08, çıktı araçları eklendikten sonra): araç şemaları JSON olarak
- * ~17.500 karakter (≈5.000 token), statik sistem promptu ~10.300 karakter
- * (≈2.950 token), günlük bağlam ~800 token → ≈8.750. Varsayılan bunun biraz
- * üstünde tutuldu ki yeni bir araç eklendiğinde pay hemen erimesin.
- * Prompt/araç listesi belirgin şekilde büyürse burayı yeniden ölçün.
+ * Ölçüm (2026-09, tablodan toplu içe aktarma araçları eklendikten sonra):
+ * araç şemaları JSON olarak 51.629 karakter (≈14.750 token), statik sistem promptu
+ * 24.442 karakter (≈7.000 token), günlük bağlam ~800 token → ≈22.550. Varsayılan
+ * bunun biraz üstünde tutuldu ki yeni bir araç eklendiğinde pay hemen erimesin.
+ * Prompt/araç listesi belirgin şekilde büyürse burayı yeniden ölçün — ölçmenin
+ * yolu: `JSON.stringify(AI_TOOLS).length` ve STATIC_SYSTEM_PROMPT'un uzunluğu,
+ * ikisi de 3,5 karakter/token ile bölünür.
+ *
+ * ESKİ DEĞER 10.000'Dİ ve ölçümün gerisinde kalmıştı: araç listesi 63'ten 90'a,
+ * sistem promptu iki katına çıkmıştı. Az tahmin, kullanıcının eksi bakiyeye
+ * düşmesi demek. Karşılığında bir turun ÖNDEN tutulan bedeli büyüdü; istekler
+ * "devam edeyim mi?" eşiğine daha erken çarpıyorsa AI_BASE_PROMPT_TOKENS ile
+ * düşürülebilir (bkz. aşağıdaki not).
  *
  * Önbellek indirimi KASITLI olarak yok sayılır: önbellek ıskalayabilir ve o zaman gerçek
  * bedel bu sayıya yaklaşır. Kullanıcıya eksi bakiye göstermektense ihtiyatlı davranıp
  * "yeterli kredin yok" demeyi tercih ediyoruz. Eşik fazla katı gelirse AI_BASE_PROMPT_TOKENS
  * ile düşürülebilir — karşılığında küçük bir eksi bakiye riski kabul edilmiş olur.
  */
-export const BASE_PROMPT_TOKENS = Number(process.env.AI_BASE_PROMPT_TOKENS ?? 10_000);
+export const BASE_PROMPT_TOKENS = Number(process.env.AI_BASE_PROMPT_TOKENS ?? 24_000);
 
 /**
  * Yeni kullanıcılara ilk kullanımda tanımlanan deneme kredisi (0 = kapalı).

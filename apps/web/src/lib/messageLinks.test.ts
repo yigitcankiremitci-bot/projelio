@@ -40,6 +40,19 @@ describe("Lio yanıtındaki bağlantılar", () => {
     assert.ok(segments.every((s) => s.type === "text"));
   });
 
+  test("Lio'nun ürettiği rapor kendi türünde bir parça olur", () => {
+    // Dosya kitaplığında bir kayıt değil, sunucuda geçici duran bir çıktı:
+    // önizleme yok, tıklanınca iniyor.
+    const id = "3c1f2b04-9a7e-4d51-8b60-11aa22bb33cc";
+    const segments = parseMessageLinks(`[gorevler.xlsx](projelio:export/${id})`);
+    assert.deepEqual(segments, [{ type: "export", label: "gorevler.xlsx", exportId: id }]);
+  });
+
+  test("uydurma rapor kimliği tıklanabilir yapılmaz", () => {
+    const segments = parseMessageLinks("[rapor.xlsx](projelio:export/olmayan-rapor)");
+    assert.ok(segments.every((s) => s.type === "text"));
+  });
+
   test("bağlantısız metin tek parça kalır", () => {
     assert.deepEqual(parseMessageLinks("Bugün üç görev tamamlandı."), [
       { type: "text", value: "Bugün üç görev tamamlandı." },

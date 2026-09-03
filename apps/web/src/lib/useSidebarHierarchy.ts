@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Department, Group, Job, Operation, Organization, Project } from "@projelio/shared";
 import { api } from "../api/client";
+import { onSidebarChanged } from "./sidebarEvents";
 
 /**
  * Sidebar'daki gezinme ağacının veri modeli. Hiyerarşi: Grup -> Organizasyon -> (Departman | İş).
@@ -33,6 +34,28 @@ export interface SidebarHierarchy {
   openProjectsByJobId: Map<string, Project[]>;
   openOperationsByJobId: Map<string, Operation[]>;
   loading: boolean;
+}
+
+/**
+ * Sidebar ağacında yalnızca AÇIK proje ve rutinler görünür. Kural burada tek
+ * yerde durur çünkü ağacı kuran filtrenin yanı sıra, durumu değiştiren ekranlar
+ * da (ProjectCard, ProjectDetail, OperationDetail) "bu değişiklik ağacı
+ * etkiliyor mu" sorusunu bununla yanıtlıyor — kural iki yere kopyalanırsa biri
+ * güncellenip diğeri unutulur.
+ *
+ * DIŞLAMA ile yazılıyor, "yalnızca active" ile DEĞİL: proje durumları beş tane
+ * (active/on_hold/passive/completed/archived, bkz. PROJECT_STATUSES). Beyaz
+ * liste yazıldığında "Beklemede" ve "Pasif" projeler de sidebar'dan düşüyordu —
+ * kullanıcı projelerinin çoğunu menüde bulamıyordu. Yeni bir durum eklenirse
+ * varsayılan olarak GÖRÜNÜR olması da doğru davranış.
+ */
+export function isProjectInSidebar(status: Project["status"]): boolean {
+  return status !== "completed" && status !== "archived";
+}
+
+/** Bitmiş rutinler gezinme ağacını kalabalıklaştırmasın. */
+export function isOperationInSidebar(status: Operation["status"]): boolean {
+  return status !== "ended";
 }
 
 function buildHierarchy(
@@ -111,10 +134,18 @@ export function useSidebarHierarchy(): SidebarHierarchy {
   const [openProjectsByJobId, setOpenProjectsByJobId] = useState<Map<string, Project[]>>(new Map());
   const [openOperationsByJobId, setOpenOperationsByJobId] = useState<Map<string, Operation[]>>(new Map());
   const [loading, setLoading] = useState(true);
+  // Ağacı ilgilendiren bir kayıt arşivlenince/silinince veriyi yeniden çekmek
+  // için artan sayaç (bkz. lib/sidebarEvents.ts). Sidebar uygulama kabuğunda
+  // durduğu ve route değişiminde yeniden kurulmadığı için tek çare bu.
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => onSidebarChanged(() => setReloadKey((k) => k + 1)), []);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    // Tazelemede "yükleniyor" durumuna DÜŞÜLMEZ: ağaç bir anlığına kaybolup
+    // geri gelmesin, eski liste yenisi gelene kadar ekranda kalsın.
+    if (reloadKey === 0) setLoading(true);
     Promise.all([
       api.get<Group[]>("/groups").catch(() => []),
       api.get<Organization[]>("/organizations").catch(() => []),
@@ -137,26 +168,15 @@ export function useSidebarHierarchy(): SidebarHierarchy {
         o.forEach((org, idx) => deptMap.set(org.id, deptLists[idx]));
         setDepartmentsByOrgId(deptMap);
 
-        // Sidebar'da yalnızca AÇIK olanlar görünür: tamamlanmış/arşivlenmiş
-        // projeler ve bitmiş rutinler gezinme ağacını kalabalıklaştırmasın
-        // (bkz. SidebarTree.renderJob — "Projeler"/"Rutinler" altında listelenir).
-        //
-        // DIŞLAMA ile yazılıyor, "yalnızca active" ile DEĞİL: proje durumları beş
-        // tane (active/on_hold/passive/completed/archived, bkz. PROJECT_STATUSES).
-        // Beyaz liste yazıldığında "Beklemede" ve "Pasif" projeler de sidebar'dan
-        // düşüyordu — kullanıcı projelerinin çoğunu menüde bulamıyordu. Yeni bir
-        // durum eklenirse varsayılan olarak GÖRÜNÜR olması da doğru davranış.
+        // Sidebar'da yalnızca AÇIK olanlar görünür (bkz. isProjectInSidebar /
+        // isOperationInSidebar — SidebarTree.renderJob bunları "Projeler" ve
+        // "Rutinler" kısayollarının altında tek tek listeler).
         const projMap = new Map<string, Project[]>();
-        j.forEach((job, idx) =>
-          projMap.set(
-            job.id,
-            projectLists[idx].filter((p) => p.status !== "completed" && p.status !== "archived")
-          )
-        );
+        j.forEach((job, idx) => projMap.set(job.id, projectLists[idx].filter((p) => isProjectInSidebar(p.status))));
         setOpenProjectsByJobId(projMap);
 
         const opMap = new Map<string, Operation[]>();
-        j.forEach((job, idx) => opMap.set(job.id, operationLists[idx].filter((o2) => o2.status !== "ended")));
+        j.forEach((job, idx) => opMap.set(job.id, operationLists[idx].filter((o2) => isOperationInSidebar(o2.status))));
         setOpenOperationsByJobId(opMap);
 
         setLoading(false);
@@ -167,7 +187,7 @@ export function useSidebarHierarchy(): SidebarHierarchy {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const hierarchy = buildHierarchy(groups, orgs, jobs, departmentsByOrgId);
   return { ...hierarchy, openProjectsByJobId, openOperationsByJobId, loading };

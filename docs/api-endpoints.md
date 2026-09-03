@@ -123,6 +123,7 @@ koşulda dönmez.
 | GET | `/ai/admin/credit-orders` | Tüm siparişler (`?status=`) | — |
 | POST | `/ai/admin/credit-orders/:id/mark-paid` | Ödemeyi onaylar → krediyi yükler | `{ reference?, note? }` |
 | POST | `/ai/admin/credit-orders/:id/retry-credit` | "Ödendi ama yüklenmedi" durumunu yeniden dener | — |
+| GET | `/ai/exports/:id` | Lio'nun ürettiği rapor dosyasını indirir (30 dk geçerli, yalnızca sahibi) | — |
 
 Sipariş fiyatı ve kredi miktarı **istemciden alınmaz**; yalnızca `packageKey`
 gönderilir ve değerler sunucudaki katalogdan (`ai-credits.config.ts`

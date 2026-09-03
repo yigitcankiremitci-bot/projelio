@@ -3,6 +3,7 @@ import type { Operation, OperationBudgetPeriod } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 
 interface Props {
   jobId: string;
@@ -39,6 +40,7 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
         budgetPeriod,
         startedOn: new Date(startedOn).toISOString(),
       });
+      notifySidebarChanged();
       onClose();
       if (onCreated) onCreated(created);
       else window.location.reload();

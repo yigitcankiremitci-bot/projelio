@@ -22,6 +22,24 @@ export const CRITICAL_TOOLS = new Set<string>([
   // Modül kapatmak kayıtları silmez ama modülü ekiplerin ekranlarından
   // tamamen kaldırır — organizasyon çapında görünür bir etki.
   "disable_module",
+  // Kapsayıcıların arşivlenmesi KADEMELİ: grup arşivlenince altındaki
+  // organizasyonlar ve işler, organizasyon arşivlenince işleri de arşivlenir
+  // (bkz. GroupsService.archive / OrganizationsService.archive). Tek bir
+  // cümlenin yüzlerce kaydı ekranlardan kaldırması onaysız olmamalı.
+  "archive_group",
+  "delete_group",
+  "archive_organization",
+  "delete_organization",
+  "archive_department",
+  "delete_department",
+  "archive_operation",
+  "delete_operation",
+  "archive_product",
+  "delete_product",
+  // Destek talebi Projelio ekibine giden bir MESAJDIR: gönderildikten sonra
+  // geri alınamaz ve karşı tarafta bir insan okur. Kullanıcı ne yazdığını
+  // görmeden gitmemeli.
+  "create_support_request",
 ]);
 
 export const AI_TOOLS: Anthropic.Tool[] = [
@@ -94,6 +112,147 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["fileId"],
+    },
+  },
+  // --- Tablodan toplu içe aktarma ----------------------------------------
+  // Büyük bir tablo sohbete SABİTLENMEZ; künyesi görünür, satırları sunucuda
+  // durur. Aşağıdaki araçlar o satırlara erişir.
+  {
+    name: "read_sheet",
+    description:
+      "Sohbetteki bir tablonun (Excel/CSV) satırlarını okur. Büyük tablolarda içerik künye olarak " +
+      "geldiği için satırları buradan istersin. dosyaKimligi'ni \"Şu an açık dosyalar\" listesinden al. " +
+      "PAHALI: her satır token'dır. Kayıt açacaksan satırları okumana GEREK YOK — " +
+      "import_tasks_from_sheet zaten sunucudaki satırları okuyor. Bunu yalnızca sütunları anlamak ya da " +
+      "kullanıcıya birkaç satır göstermek için, dar aralıkla çağır.",
+    input_schema: {
+      type: "object",
+      properties: {
+        dosyaKimligi: { type: "string", description: "Açık dosyanın kimliği." },
+        sayfa: { type: "string", description: "Sayfa adı (opsiyonel, varsayılan ilk sayfa)." },
+        ilkSatir: { type: "number", description: "1 tabanlı ilk satır (varsayılan 1)." },
+        sonSatir: { type: "number", description: "1 tabanlı son satır. En çok 40 satır döner." },
+      },
+      required: ["dosyaKimligi"],
+    },
+  },
+  {
+    name: "list_sheet_values",
+    description:
+      "Bir sütundaki FARKLI değerleri ve her birinin kaç satırda geçtiğini döndürür. " +
+      "\"Görevleri uygun departmanlara dağıt\" gibi isteklerde önce bunu çağır: 100 satırı okumak yerine " +
+      "8 farklı birim adını görür, list_departments ile eşler ve tek bir içe aktarma çağrısı yazarsın.",
+    input_schema: {
+      type: "object",
+      properties: {
+        dosyaKimligi: { type: "string" },
+        sayfa: { type: "string" },
+        kolon: { type: "string", description: "Sütun başlığı (ör. \"Birim\")." },
+        basliksatiri: { type: "number", description: "Başlık satırının numarası (varsayılan 1)." },
+      },
+      required: ["dosyaKimligi", "kolon"],
+    },
+  },
+  {
+    name: "import_tasks_from_sheet",
+    description:
+      "Tablodaki satırları GÖREVE çevirir — satırları sunucu okur, sen yalnızca eşlemeyi yazarsın. " +
+      "20'den fazla satırlık bir dosyadan görev açarken create_tasks'ı tekrar tekrar çağırmak YERİNE bunu kullan: " +
+      "tek çağrıda yüzlerce satır işlenir, tarihler sunucuda çözülür, atlanan satırlar gerekçesiyle döner.\n" +
+      "AKIŞ: (1) onizleme:true ile çağır, (2) dönen özeti kullanıcıya göster ve onay al, " +
+      "(3) aynı çağrıyı onizleme:false ile tekrarla.\n" +
+      "Hedef üç şekilde verilir: tek hedef (projectId ya da departmentId), satır satır dağıtım " +
+      "(hedef.kolon + hedef.kurallar) ya da ikisi birden (eşleşmeyenler varsayılana gider). " +
+      "Kural eşleşmezse ve varsayılan yoksa satır ATLANIR — hedef uydurulmaz.",
+    input_schema: {
+      type: "object",
+      properties: {
+        dosyaKimligi: { type: "string" },
+        sayfa: { type: "string" },
+        basliksatiri: { type: "number", description: "Başlık satırının numarası (varsayılan 1)." },
+        ilkSatir: { type: "number", description: "İşlenecek ilk veri satırı (opsiyonel)." },
+        sonSatir: { type: "number", description: "İşlenecek son veri satırı (opsiyonel)." },
+        esleme: {
+          type: "object",
+          description: "Görev alanlarının hangi SÜTUN BAŞLIĞINDAN geleceği.",
+          properties: {
+            baslik: { type: "string", description: "ZORUNLU. Görev başlığının sütunu." },
+            aciklama: { type: "string" },
+            teslim: { type: "string", description: "Teslim tarihi sütunu; biçimi sunucu çözer." },
+            baslangic: { type: "string" },
+            atanan: { type: "string", description: "Sorumlu KİŞİ ADI sütunu; atananKurallari ile eşlenir." },
+            butce: { type: "string" },
+          },
+          required: ["baslik"],
+        },
+        hedef: {
+          type: "object",
+          description: "Görevlerin nereye açılacağı.",
+          properties: {
+            projectId: { type: "string", description: "Hepsi tek projeye gidecekse." },
+            departmentId: { type: "string", description: "Hepsi tek departmana gidecekse." },
+            kolon: { type: "string", description: "Dağıtımın bakacağı sütun (ör. \"Birim\")." },
+            kurallar: {
+              type: "array",
+              description: "Sütundaki değer -> hedef eşlemesi.",
+              items: {
+                type: "object",
+                properties: {
+                  deger: { type: "string", description: "Sütundaki değer (ör. \"Pazarlama\")." },
+                  projectId: { type: "string" },
+                  departmentId: { type: "string" },
+                },
+                required: ["deger"],
+              },
+            },
+            varsayilanProjectId: { type: "string", description: "Eşleşmeyen satırlar için." },
+            varsayilanDepartmentId: { type: "string", description: "Eşleşmeyen satırlar için." },
+          },
+        },
+        atananKurallari: {
+          type: "array",
+          description: "Tablodaki kişi adı -> kullanıcı kimliği (list_department_members / list_project_members).",
+          items: {
+            type: "object",
+            properties: { deger: { type: "string" }, userId: { type: "string" } },
+            required: ["deger", "userId"],
+          },
+        },
+        onizleme: {
+          type: "boolean",
+          description: "Varsayılan true: hiçbir şey yazılmaz, ne olacağı özetlenir. Yazmak için false.",
+        },
+      },
+      required: ["dosyaKimligi", "esleme"],
+    },
+  },
+  {
+    name: "import_module_records_from_sheet",
+    description:
+      "Tablodaki satırları bir MODÜLÜN kayıt defterine yazar (Gelir-Gider, Fatura, Sözleşme…). " +
+      "Önce describe_module ile alan anahtarlarını öğren; esleme'de anahtar -> sütun başlığı ver. " +
+      "import_tasks_from_sheet ile aynı akış: önce onizleme:true, onay sonrası onizleme:false. " +
+      "Kayıt defteri olmayan modüllere (analiz/raporlama panelleri, ürünler) yazamaz.",
+    input_schema: {
+      type: "object",
+      properties: {
+        dosyaKimligi: { type: "string" },
+        sayfa: { type: "string" },
+        basliksatiri: { type: "number" },
+        ilkSatir: { type: "number" },
+        sonSatir: { type: "number" },
+        moduleKey: { type: "string", description: "Katalogdaki modül anahtarı." },
+        organizationId: { type: "string", description: "Organizasyon defteri için." },
+        jobId: { type: "string", description: "Serbest çalışanda işin defteri için." },
+        departmentId: { type: "string", description: "Kayıt bir departmana bağlanacaksa (opsiyonel)." },
+        esleme: {
+          type: "object",
+          description: "Modül ALAN ANAHTARI -> sütun başlığı. Ör. { tutar: \"Tutar\", tarih: \"Fatura Tarihi\" }.",
+          additionalProperties: { type: "string" },
+        },
+        onizleme: { type: "boolean", description: "Varsayılan true." },
+      },
+      required: ["dosyaKimligi", "moduleKey", "esleme"],
     },
   },
   // --- Yapılacaklar sayfası (kişisel pano) -----------------------------
@@ -1027,6 +1186,393 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         jobId: { type: "string", description: "İşten çıkarmak için." },
       },
       required: ["moduleKey"],
+    },
+  },
+  // --- Gruplar, organizasyonlar ve departmanlar --------------------------
+  // Sıralama kullanıcının gözündeki kapsayıcılık sırasıyla aynı:
+  // grup > organizasyon > departman. Bir kademeyi kurmadan altını kuramazsın.
+  {
+    name: "list_groups",
+    description:
+      "Kullanıcının gruplarını listeler. Grup, organizasyonların ve işlerin en üstteki kapsayıcısıdır " +
+      "(bir holding, bir şahsın tüm şirketleri…). Organizasyonu bir gruba bağlayacaksan grubun " +
+      "kimliğini buradan al.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "create_group",
+    description: "Yeni grup oluşturur. Kullanıcı açıkça grup istemediyse oluşturma; organizasyon grupsuz da yaşar.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Grup adı." },
+        description: { type: "string", description: "Kısa açıklama (opsiyonel)." },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "update_group",
+    description: "Grubun adını ya da açıklamasını değiştirir. Yalnızca grup sahibi yapabilir.",
+    input_schema: {
+      type: "object",
+      properties: {
+        groupId: { type: "string" },
+        name: { type: "string" },
+        description: { type: "string" },
+      },
+      required: ["groupId"],
+    },
+  },
+  {
+    name: "archive_group",
+    description:
+      "Grubu arşivler. DİKKAT: gruba bağlı organizasyonlar ve işler de arşivlenir " +
+      "(onların projeleri ve görevleri de). Geri alınabilir ama etkisi geniştir, kullanıcıya söyle.",
+    input_schema: { type: "object", properties: { groupId: { type: "string" } }, required: ["groupId"] },
+  },
+  {
+    name: "delete_group",
+    description: "Grubu KALICI olarak siler. Geri alınamaz.",
+    input_schema: { type: "object", properties: { groupId: { type: "string" } }, required: ["groupId"] },
+  },
+  {
+    name: "list_organizations",
+    description:
+      "Kullanıcının erişebildiği organizasyonları (şirket/işletme) listeler. Departman, ürün ve modül " +
+      "araçlarının istediği organizationId'nin kaynağı burasıdır; kullanıcıya kimlik sorma.",
+    input_schema: {
+      type: "object",
+      properties: {
+        groupId: { type: "string", description: "Yalnızca bu gruba bağlı olanlar (opsiyonel)." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "create_organization",
+    description:
+      "Yeni organizasyon (şirket ya da işletme) oluşturur. Kullanıcı yalnızca açıkça istediğinde çağır. " +
+      "orgType: \"sirket\" tüzel kişilik, \"isletme\" şahıs işletmesi — kullanıcı belirtmediyse \"sirket\".",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Organizasyon adı." },
+        description: { type: "string", description: "Kısa açıklama (opsiyonel)." },
+        orgType: { type: "string", enum: ["sirket", "isletme"], description: "Varsayılan \"sirket\"." },
+        groupId: { type: "string", description: "Bir gruba bağlamak için (opsiyonel)." },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "update_organization",
+    description:
+      "Organizasyonun adını, açıklamasını, türünü ya da bağlı olduğu grubu değiştirir. " +
+      "Yalnızca organizasyon sahibi yapabilir. Gruptan çıkarmak için groupId'yi boş dize gönder.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string" },
+        name: { type: "string" },
+        description: { type: "string" },
+        orgType: { type: "string", enum: ["sirket", "isletme"] },
+        groupId: { type: "string", description: "Yeni grup kimliği; gruptan çıkarmak için boş dize." },
+      },
+      required: ["organizationId"],
+    },
+  },
+  {
+    name: "archive_organization",
+    description:
+      "Organizasyonu arşivler: kenar çubuğundan ve listelerden kalkar. DİKKAT: organizasyona bağlı " +
+      "İŞLER de (projeleri ve görevleriyle birlikte) arşivlenir. Geri alınabilir — kullanıcı " +
+      "organizasyon sayfasındaki Arşiv'den geri çıkarabilir.",
+    input_schema: {
+      type: "object",
+      properties: { organizationId: { type: "string" } },
+      required: ["organizationId"],
+    },
+  },
+  {
+    name: "delete_organization",
+    description:
+      "Organizasyonu KALICI olarak siler. Altındaki departmanlar, ürünler ve modül kayıtları da gider. " +
+      "Geri alınamaz — kullanıcı silmek yerine arşivlemek isteyip istemediğini söylemediyse önce onu sor.",
+    input_schema: {
+      type: "object",
+      properties: { organizationId: { type: "string" } },
+      required: ["organizationId"],
+    },
+  },
+  {
+    name: "create_department",
+    description:
+      "Organizasyona yeni departman açar (Pazarlama, Muhasebe, Üretim…). Yalnızca organizasyon sahibi " +
+      "yapabilir. Aynı adı taşıyan departman zaten varsa yenisini açma, mevcudu kullan.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string", description: "list_organizations'tan gelen kimlik." },
+        name: { type: "string", description: "Departman adı." },
+        description: { type: "string", description: "Ne işle ilgilendiği (opsiyonel)." },
+      },
+      required: ["organizationId", "name"],
+    },
+  },
+  {
+    name: "update_department",
+    description: "Departmanın adını ya da açıklamasını değiştirir. Yalnızca organizasyon sahibi yapabilir.",
+    input_schema: {
+      type: "object",
+      properties: {
+        departmentId: { type: "string" },
+        name: { type: "string" },
+        description: { type: "string" },
+      },
+      required: ["departmentId"],
+    },
+  },
+  {
+    name: "archive_department",
+    description:
+      "Departmanı arşivler. Görevleri ve kayıtları silinmez ama departman organizasyonun " +
+      "ekranlarından kalkar. Geri alınabilir.",
+    input_schema: {
+      type: "object",
+      properties: { departmentId: { type: "string" } },
+      required: ["departmentId"],
+    },
+  },
+  {
+    name: "delete_department",
+    description:
+      "Departmanı KALICI olarak siler. Departmanın görevleri ve modül kayıtları da gider. Geri alınamaz.",
+    input_schema: {
+      type: "object",
+      properties: { departmentId: { type: "string" } },
+      required: ["departmentId"],
+    },
+  },
+  // --- Rutinler (operasyonlar) -------------------------------------------
+  // Kullanıcı bunlara "rutin" diyor; arayüzdeki adı da bu. Bir işe bağlı,
+  // tekrar eden yükümlülük (aylık muhasebe, haftalık bakım…).
+  {
+    name: "list_operations",
+    description:
+      "Kullanıcının rutinlerini (operasyonlarını) listeler. Rutin, bir İŞE bağlı ve tekrar eden " +
+      "yükümlülüktür: aylık muhasebe, haftalık bakım, yıllık sözleşme yenileme… " +
+      "Durumu, dönemsel bütçesi ve sıradaki tarihi döner.",
+    input_schema: {
+      type: "object",
+      properties: { jobId: { type: "string", description: "Yalnızca bu işin rutinleri (opsiyonel)." } },
+      required: [],
+    },
+  },
+  {
+    name: "create_operation",
+    description:
+      "Yeni rutin oluşturur. Rutin bir işe bağlı olmak ZORUNDA — işi bilmiyorsan önce list_jobs. " +
+      "Rutinin tekrar takvimini (hangi gün, hangi sıklık) buradan kuramazsın; onu kullanıcı " +
+      "rutinin kendi sayfasından ekler, bunu söyle.",
+    input_schema: {
+      type: "object",
+      properties: {
+        jobId: { type: "string", description: "Rutinin bağlanacağı iş." },
+        title: { type: "string", description: "Rutinin adı." },
+        description: { type: "string" },
+        budgetPerPeriod: { type: "number", description: "Dönem başına bütçe (opsiyonel)." },
+        budgetPeriod: { type: "string", enum: ["weekly", "monthly", "yearly"], description: "Varsayılan monthly." },
+        startedOn: { type: "string", description: "Başlangıç tarihi YYYY-MM-DD (opsiyonel, varsayılan bugün)." },
+      },
+      required: ["jobId", "title"],
+    },
+  },
+  {
+    name: "update_operation",
+    description:
+      "Rutinin adını, açıklamasını, bütçesini ya da durumunu değiştirir. " +
+      "status: \"active\" sürüyor, \"paused\" duraklatıldı, \"ended\" kapandı.",
+    input_schema: {
+      type: "object",
+      properties: {
+        operationId: { type: "string" },
+        title: { type: "string" },
+        description: { type: "string" },
+        budgetPerPeriod: { type: "number" },
+        budgetPeriod: { type: "string", enum: ["weekly", "monthly", "yearly"] },
+        status: { type: "string", enum: ["active", "paused", "ended"] },
+        endedOn: { type: "string", description: "Kapanış tarihi YYYY-MM-DD (status=ended ile)." },
+      },
+      required: ["operationId"],
+    },
+  },
+  {
+    name: "archive_operation",
+    description: "Rutini arşivler; geçmiş kayıtları durur ama rutin listelerden kalkar. Geri alınabilir.",
+    input_schema: {
+      type: "object",
+      properties: { operationId: { type: "string" } },
+      required: ["operationId"],
+    },
+  },
+  {
+    name: "delete_operation",
+    description: "Rutini KALICI olarak siler; tekrarları ve geçmişi de gider. Geri alınamaz.",
+    input_schema: {
+      type: "object",
+      properties: { operationId: { type: "string" } },
+      required: ["operationId"],
+    },
+  },
+  // --- Ürünler -----------------------------------------------------------
+  {
+    name: "list_products",
+    description:
+      "Bir organizasyonun ürünlerini/hizmetlerini listeler (stok, fiyat, kategori). " +
+      "organizationId'yi list_organizations'tan al.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string" },
+        query: { type: "string", description: "Ad, stok kodu ya da kategoride aranacak metin (opsiyonel)." },
+        limit: { type: "number", description: "En fazla kaç sonuç (varsayılan 30, en çok 100)." },
+      },
+      required: ["organizationId"],
+    },
+  },
+  {
+    name: "create_product",
+    description:
+      "Organizasyona ürün/hizmet ekler. Fiyat ve stok sayısaldır; kullanıcı söylemediyse boş bırak, " +
+      "UYDURMA. Aynı stok kodu (sku) şirkette iki kez kullanılamaz.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string" },
+        name: { type: "string", description: "Ürün ya da hizmet adı." },
+        description: { type: "string" },
+        sku: { type: "string", description: "Stok kodu (opsiyonel, şirkette benzersiz)." },
+        category: { type: "string" },
+        brand: { type: "string" },
+        unit: {
+          type: "string",
+          enum: ["adet", "kg", "gram", "litre", "metre", "m2", "m3", "paket", "kutu", "saat", "gun", "ay"],
+          description: "Birim (opsiyonel).",
+        },
+        stockQuantity: { type: "number" },
+        price: { type: "number", description: "Satış fiyatı." },
+        costPrice: { type: "number", description: "Maliyet." },
+        currency: { type: "string", description: "Para birimi, varsayılan TRY." },
+        taxRate: { type: "number", description: "KDV oranı (%)." },
+        status: { type: "string", enum: ["active", "inactive"] },
+        notes: { type: "string" },
+      },
+      required: ["organizationId", "name"],
+    },
+  },
+  {
+    name: "update_product",
+    description:
+      "Ürünün alanlarını günceller. YALNIZCA değişen alanları gönder; vermediklerin olduğu gibi kalır. " +
+      "Kimliği list_products'tan al.",
+    input_schema: {
+      type: "object",
+      properties: {
+        productId: { type: "string" },
+        name: { type: "string" },
+        description: { type: "string" },
+        sku: { type: "string" },
+        category: { type: "string" },
+        brand: { type: "string" },
+        unit: {
+          type: "string",
+          enum: ["adet", "kg", "gram", "litre", "metre", "m2", "m3", "paket", "kutu", "saat", "gun", "ay"],
+        },
+        stockQuantity: { type: "number" },
+        price: { type: "number" },
+        costPrice: { type: "number" },
+        currency: { type: "string" },
+        taxRate: { type: "number" },
+        status: { type: "string", enum: ["active", "inactive"] },
+        notes: { type: "string" },
+      },
+      required: ["productId"],
+    },
+  },
+  {
+    name: "archive_product",
+    description: "Ürünü arşivler: listelerden kalkar, kaydı durur. Geri alınabilir.",
+    input_schema: { type: "object", properties: { productId: { type: "string" } }, required: ["productId"] },
+  },
+  {
+    name: "delete_product",
+    description: "Ürünü KALICI olarak siler; fotoğrafları da gider. Geri alınamaz.",
+    input_schema: { type: "object", properties: { productId: { type: "string" } }, required: ["productId"] },
+  },
+  // --- Destek talepleri ---------------------------------------------------
+  {
+    name: "list_support_requests",
+    description:
+      "Kullanıcının Projelio ekibine açtığı destek taleplerini ve gelen yanıtları listeler. " +
+      "\"Talebime cevap geldi mi\", \"ne sormuştum\" gibi sorularda çağır.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "create_support_request",
+    description:
+      "Projelio ekibine destek talebi açar. YALNIZCA kullanıcı açıkça \"destek talebi aç\", " +
+      "\"ekibe ilet\", \"bunu bildir\" dediğinde çağır — bir soruya cevap veremediğin için " +
+      "kendiliğinden talep AÇMA. Konuyu ve mesajı kullanıcının anlattığından yaz; " +
+      "eksikse sor, uydurma. Mesaj gönderildikten sonra geri alınamaz.",
+    input_schema: {
+      type: "object",
+      properties: {
+        subject: { type: "string", description: "Kısa konu başlığı." },
+        message: { type: "string", description: "Talebin ayrıntısı." },
+        name: { type: "string", description: "Talebi açan kişinin adı (opsiyonel; boşsa hesaptaki ad kullanılır)." },
+      },
+      required: ["subject", "message"],
+    },
+  },
+  // --- Dışa aktarma -------------------------------------------------------
+  {
+    name: "export_report",
+    description:
+      "Projelio'daki bir veri kümesini Excel (xlsx) ya da CSV dosyasına döker. " +
+      "\"Excel'e aktar\", \"rapor çıkar\", \"dosya olarak ver\", \"indirebileyim\" gibi isteklerde çağır.\n" +
+      "hedef=\"indirme\" (varsayılan): dosya 30 dakika geçerli bir bağlantı olarak döner. " +
+      "Dönen bağlantıyı yanıtında `[dosya adı](projelio:export/<id>)` biçiminde YAZ — kullanıcı " +
+      "tıklayınca dosya iner. Bağlantının etrafına ** koyma.\n" +
+      "hedef=\"dosya_kitapligi\": dosya işin/projenin/departmanın dosyalarına YÜKLENİR ve kalıcı olur; " +
+      "bu durumda dönen fileId ile `[dosya adı](projelio:file/<fileId>)` yaz. Yükleme, işin " +
+      "Drive/OneDrive bağlantısını gerektirir; bağlı değilse hata döner, o zaman indirme bağlantısı ver.\n" +
+      "Rapora YALNIZCA kullanıcının görmeye yetkili olduğu veriler girer.",
+    input_schema: {
+      type: "object",
+      properties: {
+        veri: {
+          type: "string",
+          enum: ["gorevler", "butce", "modul_kayitlari", "urunler", "yapilacaklar", "projeler"],
+          description:
+            "Hangi veri kümesi: gorevler (projectId ya da departmentId), butce (projectId), " +
+            "modul_kayitlari (moduleKey + organizationId ya da jobId), urunler (organizationId), " +
+            "yapilacaklar (kişisel pano, ek parametre istemez), projeler (jobId).",
+        },
+        projectId: { type: "string" },
+        departmentId: { type: "string" },
+        jobId: { type: "string" },
+        organizationId: { type: "string" },
+        moduleKey: { type: "string", description: "veri=modul_kayitlari için modül anahtarı." },
+        bicim: { type: "string", enum: ["xlsx", "csv"], description: "Varsayılan xlsx." },
+        hedef: {
+          type: "string",
+          enum: ["indirme", "dosya_kitapligi"],
+          description: "Varsayılan indirme. Kullanıcı \"dosyalara kaydet\" derse dosya_kitapligi.",
+        },
+        dosyaAdi: { type: "string", description: "Uzantısız dosya adı (opsiyonel)." },
+      },
+      required: ["veri"],
     },
   },
 ];

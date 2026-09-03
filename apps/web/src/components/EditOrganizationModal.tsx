@@ -7,6 +7,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 
 interface Props {
   organization: Organization;
@@ -70,6 +71,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
         formData.append("file", resized);
         await api.uploadFile(`/organizations/${organization.id}/cover`, formData);
       }
+      notifySidebarChanged();
       onSaved();
       onClose();
     } catch {
@@ -141,6 +143,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
       <EntityDangerZone
         entityLabel="Organizasyonu"
         resourcePath={`/organizations/${organization.id}`}
+        affectsSidebar
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
         archiveMessage={`"${organization.name}" organizasyonunu arşive eklemek istediğine emin misin? Bu organizasyona bağlı tüm projeler de arşive taşınır.`}

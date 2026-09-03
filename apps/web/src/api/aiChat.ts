@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, API_URL } from "./client";
 
 export interface AiChatMessage {
   role: "user" | "assistant";
@@ -226,6 +226,42 @@ export const aiChat = {
       `/ai/attachments/browse${folderId ? `?folderId=${encodeURIComponent(folderId)}` : ""}`
     ),
   attachmentSource: () => api.get<{ provider: "google" | "microsoft" | null }>("/ai/attachments/source"),
+
+  /**
+   * Lio'nun ürettiği raporu indirir.
+   *
+   * api.get JSON bekliyor, rapor ise ikili veri — doğrudan fetch (aynı desen:
+   * bkz. DeleteAccountModal veri çıktısı). Dosya adı sunucunun gönderdiği
+   * Content-Disposition'dan okunur; olmazsa çağıran yerin verdiği ad kullanılır.
+   */
+  downloadExport: async (exportId: string, fallbackName: string) => {
+    const token = localStorage.getItem("projelio_token");
+    const res = await fetch(`${API_URL}/ai/exports/${exportId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      // Süresi dolan rapor 404 döner; kullanıcıya "yeniden üret" demek için
+      // sunucunun kendi cümlesi taşınıyor.
+      let message = "Rapor indirilemedi.";
+      try {
+        const parsed = JSON.parse(await res.text());
+        if (parsed?.message) message = Array.isArray(parsed.message) ? parsed.message.join(", ") : parsed.message;
+      } catch {
+        // gövde boş ya da JSON değil: varsayılan mesaj kalsın
+      }
+      throw new Error(message);
+    }
+
+    const disposition = res.headers.get("Content-Disposition") ?? "";
+    const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = encoded ? decodeURIComponent(encoded) : fallbackName;
+    link.click();
+    URL.revokeObjectURL(url);
+  },
 
   /**
    * Metni doğal sese çevirir (ücretli, isteğe bağlı).

@@ -236,6 +236,7 @@ export default function DepartmentSettingsModal({
       <EntityDangerZone
         entityLabel="Departmanı"
         resourcePath={`/departments/${department.id}`}
+        affectsSidebar
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
         archiveMessage={`"${department.name}" departmanını arşive eklemek istediğine emin misin? Departman, organizasyonun departman listesinden kaldırılır; ekip, görevler ve dosyalar korunur.`}

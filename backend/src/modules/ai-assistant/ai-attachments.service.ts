@@ -10,6 +10,13 @@ import { FOLDER_MIME } from "../microsoft/onedrive.service";
 import { AiCreditsService } from "./ai-credits.service";
 import { estimateTranscriptionCredits } from "./ai-credits.config";
 import { AiTranscriptionService, MAX_AUDIO_BYTES } from "./ai-transcription.service";
+import {
+  buildSheetSummary,
+  INLINE_SHEET_CHARS,
+  MAX_RETAINED_ROWS,
+  parseCsv,
+  type SheetData,
+} from "./ai-sheet-import";
 
 /** Lio'nun okuyabildiği ek türleri. */
 export type AttachmentKind = "image" | "pdf" | "document" | "sheet" | "text" | "audio";
@@ -34,6 +41,14 @@ export interface PreparedAttachment {
   base64?: string;
   /** Kullanıcıya gösterilen kısa döküm: "3 sayfa · 240 satır", "1 dk 12 sn ses". */
   detail: string;
+  /**
+   * TABLONUN SATIRLARI (yalnızca Excel/CSV).
+   *
+   * Modele gitmez, sunucuda durur: 100 satırlık bir dosyayı modele okutup
+   * geri yazdırmak yerine satırları burada tutup içe aktarmayı sunucuda
+   * yapıyoruz (bkz. ai-sheet-import.ts). Model yalnızca künyeyi görür.
+   */
+  sheets?: SheetData[];
   /** Bu eki hazırlarken şimdiden düşülen kredi (ses çözümleme). */
   creditsCharged: number;
   createdAt: number;
@@ -75,8 +90,8 @@ const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024;
  * pahalılaştırır. 20.000 karakter ≈ 5.000 token ≈ tur başına birkaç kredi.
  */
 const MAX_TEXT_CHARS = Number(process.env.AI_ATTACHMENT_TEXT_CHARS ?? 20_000);
-/** Excel'de sayfa başına okunacak azami satır. */
-const MAX_SHEET_ROWS = 400;
+// Excel'de sayfa başına okunacak azami satır artık burada değil: satırlar
+// sunucuda saklandığı için sınır MAX_RETAINED_ROWS (bkz. ai-sheet-import.ts).
 /** Tek mesaja iliştirilebilecek azami ek. */
 export const MAX_ATTACHMENTS_PER_MESSAGE = 5;
 /**
@@ -351,7 +366,8 @@ export class AiAttachmentsService {
     for (const id of ids) {
       const record = this.prepared.get(id);
       if (!record || record.userId !== userId) continue;
-      if (!record.base64) {
+      // Tablolar da bellekte kalır: satırları sunucu okuyor (bkz. sheets).
+      if (!record.base64 && !record.sheets) {
         this.prepared.delete(id);
         continue;
       }
@@ -367,6 +383,20 @@ export class AiAttachmentsService {
     const record = this.prepared.get(id);
     if (!record || record.userId !== userId) return undefined;
     return record.base64;
+  }
+
+  /**
+   * Sabitlenmiş bir tablonun satırları (süresi dolduysa undefined).
+   *
+   * read_sheet ve import_* araçlarının tek veri kaynağı. Sahiplik burada
+   * doğrulanır: kimlik sohbet metninde görünüyor, başkasının eline geçerse
+   * bile başkasının dosyasını açmaz.
+   */
+  getSheets(userId: string, id: string): SheetData[] | undefined {
+    this.sweep();
+    const record = this.prepared.get(id);
+    if (!record || record.userId !== userId) return undefined;
+    return record.sheets;
   }
 
   /** Sohbetten bırakılan eklerin bellekteki izini siler. */
@@ -417,9 +447,10 @@ export class AiAttachmentsService {
       }
 
       case "sheet": {
-        const { text, detail } = await this.readSheet(buffer, mimeType, name);
+        const { text, detail, sheets } = await this.readSheet(buffer, mimeType, name);
         record.text = text;
         record.detail = detail;
+        record.sheets = sheets;
         break;
       }
 
@@ -514,10 +545,24 @@ export class AiAttachmentsService {
     }
   }
 
-  private async readSheet(buffer: Buffer, mimeType: string, name: string): Promise<{ text: string; detail: string }> {
+  private async readSheet(
+    buffer: Buffer,
+    mimeType: string,
+    name: string
+  ): Promise<{ text: string; detail: string; sheets: SheetData[] }> {
     if (mimeType === "text/csv") {
-      const text = this.clip(buffer.toString("utf8").trim());
-      return { text, detail: `CSV · ${text.split("\n").length} satır` };
+      const rows = parseCsv(buffer.toString("utf8"));
+      const sheet: SheetData = {
+        name: name.replace(/\.[^.]+$/, "") || "CSV",
+        rows: rows.slice(0, MAX_RETAINED_ROWS),
+        truncated: rows.length > MAX_RETAINED_ROWS,
+      };
+      if (!sheet.rows.length) throw new BadRequestException(`"${name}" içinde dolu bir satır bulunamadı.`);
+      return {
+        text: this.sheetText([sheet]),
+        detail: `CSV · ${rows.length} satır`,
+        sheets: [sheet],
+      };
     }
 
     const workbook = new ExcelJS.Workbook();
@@ -534,33 +579,53 @@ export class AiAttachmentsService {
       throw this.okunamadi("Excel", name, buffer.length, error);
     }
 
-    const lines: string[] = [];
+    // SATIRLAR SUNUCUDA KALIR. Eskiden burada doğrudan modele gidecek metin
+    // örülüyordu ve 400 satırda kesiliyordu; artık satırlar saklanıyor, modele
+    // giden metin bunlardan türetiliyor (bkz. sheetText).
+    const sheets: SheetData[] = [];
     let totalRows = 0;
     workbook.eachSheet((sheet) => {
-      lines.push(`## Sayfa: ${sheet.name}`);
-      let printed = 0;
+      const rows: string[][] = [];
+      let kesildi = false;
       sheet.eachRow({ includeEmpty: false }, (row) => {
-        if (printed >= MAX_SHEET_ROWS) return;
+        if (rows.length >= MAX_RETAINED_ROWS) {
+          kesildi = true;
+          return;
+        }
         const values = Array.isArray(row.values) ? row.values.slice(1) : [];
         const cells = values.map(cellText);
-        // Tamamen boş satırlar modele gönderilmez; yalnızca token yakar.
+        // Tamamen boş satır ne saklanır ne gönderilir.
         if (cells.every((cell) => cell === "")) return;
-        lines.push(cells.join(" | "));
-        printed += 1;
-        totalRows += 1;
+        rows.push(cells);
       });
-      if (sheet.rowCount > MAX_SHEET_ROWS) {
-        lines.push(`… (${sheet.name} sayfasının ilk ${MAX_SHEET_ROWS} satırı gösterildi)`);
-      }
-      lines.push("");
+      if (!rows.length) return;
+      totalRows += rows.length;
+      sheets.push({ name: sheet.name, rows, truncated: kesildi || undefined });
     });
 
     if (totalRows === 0) throw new BadRequestException(`"${name}" içinde dolu bir satır bulunamadı.`);
-    const sheetCount = workbook.worksheets.length;
     return {
-      text: this.clip(lines.join("\n").trim()),
-      detail: `Excel · ${sheetCount} sayfa · ${totalRows} satır`,
+      text: this.sheetText(sheets),
+      detail: `Excel · ${sheets.length} sayfa · ${totalRows} satır`,
+      sheets,
     };
+  }
+
+  /**
+   * Tablonun modele GİDEN hâli.
+   *
+   * Küçük tablo bugünkü gibi olduğu gibi gider: birkaç satırlık bir liste için
+   * modeli read_sheet çağırmaya zorlamak fazladan bir tur (ve fazladan kredi)
+   * demekti. Büyük tabloda ise yalnızca künye gider — başlıklar, satır sayısı ve
+   * birkaç örnek satır — gerisini içe aktarma araçları sunucudan okur.
+   */
+  private sheetText(sheets: SheetData[]): string {
+    const tamami = sheets
+      .map((sheet) => [`## Sayfa: ${sheet.name}`, ...sheet.rows.map((row) => row.join(" | ")), ""].join("\n"))
+      .join("\n")
+      .trim();
+    if (tamami.length <= INLINE_SHEET_CHARS && !sheets.some((s) => s.truncated)) return tamami;
+    return buildSheetSummary(sheets);
   }
 
   /**

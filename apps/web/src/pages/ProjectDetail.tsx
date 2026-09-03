@@ -29,6 +29,8 @@ import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 import { useIsSubcontractor } from "../lib/useCurrentUser";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
+import { isProjectInSidebar } from "../lib/useSidebarHierarchy";
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -228,7 +230,13 @@ export default function ProjectDetail() {
   const handleStatusChange = async (status: ProjectStatus) => {
     if (!id) return;
     const updated = await api.patch<Project>(`/projects/${id}`, { status }).catch(() => null);
-    if (updated) setProject(updated);
+    if (!updated) return;
+    // Bkz. ProjectCard.handleStatusChange — durum projeyi sidebar ağacına
+    // sokup çıkarabiliyor.
+    if (project && isProjectInSidebar(project.status) !== isProjectInSidebar(updated.status)) {
+      notifySidebarChanged();
+    }
+    setProject(updated);
   };
 
   const handleToggleActive = (taskId: string) => {

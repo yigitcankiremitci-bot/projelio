@@ -171,6 +171,57 @@ export class ModuleRecordsService {
     return mapModuleRecord(row);
   }
 
+  /**
+   * TOPLU kayıt ekleme — dosyadan içe aktarma için (bkz. ai-sheet-import.ts).
+   *
+   * create()/createForJob() her kayıt için ayrı yetki kontrolü ve ayrı insert
+   * yapıyor; 100 satırlık bir tablo 200 gidiş dönüş demekti. Burada yetki bir
+   * kez doğrulanır, satırlar tek insert ile yazılır.
+   *
+   * Veri DOĞRULAMASI çağıranın işidir (bkz. normalizeModuleData): tanımda
+   * olmayan bir anahtar hiçbir ekranda görünmez, o yüzden buraya süzülmüş veri
+   * gelmeli.
+   */
+  async createMany(
+    target: { organizationId?: string; jobId?: string; departmentId?: string; moduleKey: string },
+    rows: Record<string, unknown>[],
+    requestingUserId: string
+  ): Promise<{ id: string }[]> {
+    if (!rows.length) return [];
+    if (!target.moduleKey) throw new BadRequestException("moduleKey gerekli");
+
+    if (target.jobId) {
+      await this.assertCanManageJob(target.jobId, target.moduleKey, requestingUserId);
+      const { data: assigned } = await this.supabase.client
+        .from("job_modules")
+        .select("id")
+        .eq("job_id", target.jobId)
+        .eq("module_key", target.moduleKey)
+        .maybeSingle();
+      if (!assigned) throw new BadRequestException("Bu modül bu işe atanmamış");
+    } else if (target.organizationId) {
+      await this.assertCanManage(target.organizationId, target.moduleKey, target.departmentId, requestingUserId);
+    } else {
+      throw new BadRequestException("organizationId ya da jobId gerekli");
+    }
+
+    const { data, error } = await this.supabase.client
+      .from("module_records")
+      .insert(
+        rows.map((data) => ({
+          organization_id: target.jobId ? null : target.organizationId,
+          job_id: target.jobId ?? null,
+          department_id: target.jobId ? null : (target.departmentId ?? null),
+          module_key: target.moduleKey,
+          data,
+          created_by: requestingUserId,
+        }))
+      )
+      .select("id");
+    if (error) throw error;
+    return (data ?? []).map((row: any) => ({ id: row.id as string }));
+  }
+
   async findOne(id: string): Promise<ModuleRecord> {
     const { data, error } = await this.supabase.client.from("module_records").select("*").eq("id", id).maybeSingle();
     if (error) throw error;

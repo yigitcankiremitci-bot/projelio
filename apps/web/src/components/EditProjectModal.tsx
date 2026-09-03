@@ -7,6 +7,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 
 interface Props {
   /**
@@ -81,6 +82,7 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
         await api.uploadFile(`/projects/${project.id}/cover`, formData);
       }
       if (onSaved) {
+        notifySidebarChanged();
         onSaved();
         onClose();
       } else {
@@ -159,6 +161,7 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
       <EntityDangerZone
         entityLabel="Projeyi"
         resourcePath={`/projects/${project.id}`}
+        affectsSidebar
         onArchive={handleArchive}
         onDelete={handleDelete}
         archiveMessage={`"${project.title}" projesini arşive eklemek istediğine emin misin? Bu projeye bağlı tüm görevler, alt görevler ve çıktılar da arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}

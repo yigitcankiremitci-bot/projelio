@@ -574,6 +574,79 @@ export class TasksService {
     return this.reloadTask(task.id);
   }
 
+  /**
+   * TOPLU görev ekleme — dosyadan içe aktarma için (bkz. ai-sheet-import.ts).
+   *
+   * create()'i döngüye sokmak yerine ayrı bir yol olmasının iki sebebi var:
+   *
+   *   1. HIZ. create() görev başına sıra numarası sorgusu, insert, atama
+   *      senkronu ve yeniden okuma yapıyor — 100 satır 400+ gidiş dönüş demek
+   *      ve istek zaman aşımına giderdi. Burada hedef başına 3 sorgu var.
+   *   2. BİLDİRİM SELİ. create() her yeni görevde ekibe bildirim atıyor; toplu
+   *      içe aktarmada bu, ekibin telefonuna 100 bildirim düşmesi olurdu. Toplu
+   *      ekleme kullanıcının EKRANINDA zaten tek satırda özetleniyor
+   *      (Lio canlı bildirimi), o yüzden burada bildirim gönderilmez.
+   *
+   * Atama kuralı create() ile aynı: kimse verilmediyse görev ekleyene atanır,
+   * yoksa hiç kimsenin Yapılacaklar panosuna düşmez.
+   */
+  async createMany(
+    target: { projectId?: string; departmentId?: string },
+    items: Partial<Task>[],
+    requestingUserId: string
+  ): Promise<{ id: string; title: string }[]> {
+    if (!items.length) return [];
+    if (!target.projectId === !target.departmentId) {
+      throw new BadRequestException("Toplu görev eklerken projectId ya da departmentId'den yalnızca biri verilmeli");
+    }
+
+    if (target.projectId) {
+      await this.assertProjectAccess(target.projectId, requestingUserId, "Bu projeye görev ekleme yetkiniz yok");
+    } else {
+      await this.assertDepartmentAccess(target.departmentId!, requestingUserId);
+    }
+
+    // Sıra numarası bir kez okunur, satırlara artarak dağıtılır.
+    const alan = target.projectId ? "project_id" : "department_id";
+    const { data: maxRows } = await this.supabase.client
+      .from("tasks")
+      .select("sort_order")
+      .eq(alan, target.projectId ?? target.departmentId)
+      .is("parent_task_id", null)
+      .order("sort_order", { ascending: false })
+      .limit(1);
+    let sira = ((maxRows?.[0]?.sort_order as number | undefined) ?? -1) + 1;
+
+    const bugun = new Date().toISOString();
+    const rows = items.map((item) => ({
+      sort_order: sira++,
+      project_id: target.projectId ?? null,
+      department_id: target.departmentId ?? null,
+      output_id: item.outputId ?? null,
+      assigned_to: item.assignedTo ?? requestingUserId,
+      title: item.title ?? "",
+      description: item.description ?? null,
+      start_date: item.startDate ?? null,
+      deadline: item.deadline ?? bugun,
+      status: item.status ?? "todo",
+      budget: item.budget ?? 0,
+    }));
+
+    const { data, error } = await this.supabase.client.from("tasks").insert(rows).select("id, title, assigned_to");
+    if (error) throw error;
+
+    // Atama ilişkisi ayrı tabloda (bkz. 053); tek insert ile kurulur.
+    const atamalar = (data ?? [])
+      .filter((row: any) => row.assigned_to)
+      .map((row: any) => ({ task_id: row.id, user_id: row.assigned_to, assigned_by: requestingUserId }));
+    if (atamalar.length) {
+      const { error: atamaHatasi } = await this.supabase.client.from("task_assignees").insert(atamalar);
+      if (atamaHatasi) throw atamaHatasi;
+    }
+
+    return (data ?? []).map((row: any) => ({ id: row.id as string, title: row.title as string }));
+  }
+
   async createForDepartment(departmentId: string, data: Partial<Task>, requestingUserId?: string): Promise<Task> {
     await this.assertDepartmentAccess(departmentId, requestingUserId);
 

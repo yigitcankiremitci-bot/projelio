@@ -9,6 +9,7 @@ import { AiAttachmentsService } from "./ai-attachments.service";
 import { AiTranscriptionService } from "./ai-transcription.service";
 import { AiSpeechService } from "./ai-speech.service";
 import { AiSpendAlertProcessor } from "./ai-spend-alert.processor";
+import { AiExportsService } from "./ai-exports.service";
 import { TasksModule } from "../tasks/tasks.module";
 import { ProjectsModule } from "../projects/projects.module";
 import { JobsModule } from "../jobs/jobs.module";
@@ -29,6 +30,10 @@ import { DepartmentMembersModule } from "../department-members/department-member
 import { OrganizationModulesModule } from "../organization-modules/organization-modules.module";
 import { JobModulesModule } from "../job-modules/job-modules.module";
 import { ModuleRecordsModule } from "../module-records/module-records.module";
+import { GroupsModule } from "../groups/groups.module";
+import { OperationsModule } from "../operations/operations.module";
+import { ProductsModule } from "../products/products.module";
+import { SupportModule } from "../support/support.module";
 
 @Module({
   imports: [
@@ -70,6 +75,13 @@ import { ModuleRecordsModule } from "../module-records/module-records.module";
     OrganizationModulesModule,
     JobModulesModule,
     ModuleRecordsModule,
+    // Kapsayıcılar ve ticari kayıtlar: grup (organizasyonların üstü), rutinler
+    // (işe bağlı tekrar eden yükümlülükler) ve organizasyonun ürünleri.
+    GroupsModule,
+    OperationsModule,
+    ProductsModule,
+    // Destek talebi açmak ve kendi taleplerini okumak için.
+    SupportModule,
   ],
   controllers: [AiAssistantController],
   providers: [
@@ -80,6 +92,7 @@ import { ModuleRecordsModule } from "../module-records/module-records.module";
     AiTranscriptionService,
     AiSpeechService,
     AiSpendAlertProcessor,
+    AiExportsService,
     AiCreditOrdersService,
     AiPaymentProvider,
   ],

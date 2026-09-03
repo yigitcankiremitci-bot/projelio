@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useUndo } from "../lib/undo";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 import ConfirmDialog from "./ConfirmDialog";
 import { IconArchive, IconTrash } from "./icons";
 
@@ -24,6 +25,14 @@ interface Props {
    * Verilmezse eski davranış aynen korunur: onArchive/onDelete her şeyi kendi yapar.
    */
   resourcePath?: string;
+  /**
+   * Bu kayıt sidebar'daki gezinme ağacında görünüyorsa (organizasyon, grup, iş,
+   * proje, departman) true ver: arşivleme/silme ve bunların geri alınması
+   * ağacın tazelenmesini tetikler (bkz. lib/sidebarEvents.ts). Görev, çıktı,
+   * ürün gibi ağaçta yeri olmayan kayıtlarda BOŞ BIRAK — her arşivlemede
+   * sidebar'ın onlarca isteğini yeniden atmanın anlamı yok.
+   */
+  affectsSidebar?: boolean;
   onArchive?: () => Promise<void>;
   onDelete?: () => Promise<void>;
 }
@@ -33,6 +42,7 @@ export default function EntityDangerZone({
   archiveMessage,
   deleteMessage,
   resourcePath,
+  affectsSidebar,
   onArchive,
   onDelete,
 }: Props) {
@@ -44,11 +54,18 @@ export default function EntityDangerZone({
 
   const handleArchive = async () => {
     await onArchive?.();
+    if (affectsSidebar) notifySidebarChanged();
     if (!resourcePath) return;
     pushUndo({
       label: `${entityLabel} arşivleme`,
-      run: () => api.patch(`${resourcePath}/restore`, {}),
-      redo: () => api.patch(`${resourcePath}/archive`, {}),
+      run: async () => {
+        await api.patch(`${resourcePath}/restore`, {});
+        if (affectsSidebar) notifySidebarChanged();
+      },
+      redo: async () => {
+        await api.patch(`${resourcePath}/archive`, {});
+        if (affectsSidebar) notifySidebarChanged();
+      },
     });
   };
 
@@ -62,7 +79,12 @@ export default function EntityDangerZone({
     // pencerede Cmd+Z basılırsa istek hiç gönderilmez.
     pushDestructive({
       label: `${entityLabel} silme`,
-      commit: () => api.delete(resourcePath),
+      // Sidebar haberi DELETE gittikten SONRA verilir: geri alma penceresi
+      // boyunca kayıt sunucuda hâlâ duruyor, erken tazeleme onu geri getirirdi.
+      commit: async () => {
+        await api.delete(resourcePath);
+        if (affectsSidebar) notifySidebarChanged();
+      },
       restore: () => {},
       // Sunucu kaydı hâlâ döndüreceği için listeler bu id'yi elemeli
       // (bkz. useWithoutPendingDeletes).

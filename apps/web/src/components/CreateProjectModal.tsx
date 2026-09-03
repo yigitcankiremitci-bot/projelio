@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { notifyCreationRequestsChanged, readCreateOutcome } from "../lib/creationRequests";
 import Modal from "./Modal";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 
 interface Props {
   jobId: string;
@@ -44,6 +45,7 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
         notifyCreationRequestsChanged();
         return;
       }
+      notifySidebarChanged();
       onClose();
       if (onCreated) onCreated();
       else window.location.reload();

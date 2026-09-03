@@ -10,11 +10,13 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import type { Response } from "express";
 import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guard";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
@@ -25,6 +27,7 @@ import { AiPaymentProvider } from "./ai-payment.provider";
 import { AiConversationsService } from "./ai-conversations.service";
 import { toActiveFileInfo } from "./ai-assistant.service";
 import { AiSpeechService } from "./ai-speech.service";
+import { AiExportsService } from "./ai-exports.service";
 import { calculateSpeechCost } from "./ai-credits.config";
 import {
   AiAttachmentsService,
@@ -51,7 +54,8 @@ export class AiAssistantController {
     private attachmentsService: AiAttachmentsService,
     private speechService: AiSpeechService,
     private creditOrders: AiCreditOrdersService,
-    private payment: AiPaymentProvider
+    private payment: AiPaymentProvider,
+    private exportsService: AiExportsService
   ) {}
 
   // --- Sohbet ------------------------------------------------------------
@@ -220,6 +224,20 @@ export class AiAssistantController {
     this.attachmentsService.releaseMany(req.user.userId, files.map((f) => f.id));
     await this.conversationsService.setActiveFiles(id, []);
     return { files: [] };
+  }
+
+  // --- Lio'nun ürettiği raporlar ------------------------------------------
+  //
+  // Sohbetteki `projelio:export/<id>` bağlantısı buraya iner. Rapor bellekte
+  // 30 dakika duruyor (bkz. ai-exports.service.ts); sahiplik orada doğrulanır.
+  @Get("exports/:id")
+  downloadExport(@Req() req: any, @Param("id") id: string, @Res() res: Response) {
+    const file = this.exportsService.take(id, req.user.userId);
+    res.setHeader("Content-Type", file.mimeType);
+    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+    // Kullanıcının kendi verisi: ara sunucular önbelleğe almamalı.
+    res.setHeader("Cache-Control", "private, no-store");
+    res.end(file.buffer);
   }
 
   @Delete("attachments/:id")

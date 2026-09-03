@@ -9,6 +9,8 @@ import CardDescription from "./CardDescription";
 import { IconPlus } from "./icons";
 import StatusBadge from "./StatusBadge";
 import AskLioButton from "./AskLioButton";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
+import { isProjectInSidebar } from "../lib/useSidebarHierarchy";
 
 interface Props {
   project: Project;
@@ -44,7 +46,11 @@ export default function ProjectCard({ project, canManage, onStatusChanged }: Pro
 
   const handleStatusChange = async (status: ProjectStatus) => {
     const updated = await api.patch<Project>(`/projects/${project.id}`, { status }).catch(() => null);
-    if (updated) onStatusChanged?.(updated);
+    if (!updated) return;
+    // "Tamamlandı"/"Arşivlendi" projeyi sidebar ağacından düşürür, geri dönüş de
+    // ekler; yalnızca görünürlük değiştiyse haber ver (bkz. lib/sidebarEvents.ts).
+    if (isProjectInSidebar(project.status) !== isProjectInSidebar(updated.status)) notifySidebarChanged();
+    onStatusChanged?.(updated);
   };
 
   const handleAddCoverClick = (e: React.MouseEvent) => {

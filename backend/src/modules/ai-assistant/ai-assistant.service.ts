@@ -29,6 +29,20 @@ import { DepartmentMembersService } from "../department-members/department-membe
 import { OrganizationModulesService } from "../organization-modules/organization-modules.service";
 import { JobModulesService } from "../job-modules/job-modules.service";
 import { ModuleRecordsService } from "../module-records/module-records.service";
+import { GroupsService } from "../groups/groups.service";
+import { OperationsService } from "../operations/operations.service";
+import { ProductsService, type ProductWriteInput } from "../products/products.service";
+import { SupportService } from "../support/support.service";
+import { AiExportsService } from "./ai-exports.service";
+import { type ExportFormat, type ExportTable } from "./ai-export-builder";
+import {
+  distinctValues,
+  MAX_IMPORT_ROWS,
+  normalizeKey,
+  planRecordImport,
+  planTaskImport,
+  type SheetData,
+} from "./ai-sheet-import";
 import { AiCreditsService, InsufficientCreditsException } from "./ai-credits.service";
 import {
   AiConversationsService,
@@ -367,6 +381,17 @@ const RESULT_LABELS: Record<string, string> = {
   delete_output: "Çıktı silindi.",
   archive_module_record: "Modül kaydı arşivlendi.",
   disable_module: "Modül kapatıldı.",
+  archive_group: "Grup arşivlendi.",
+  delete_group: "Grup silindi.",
+  archive_organization: "Organizasyon arşivlendi.",
+  delete_organization: "Organizasyon silindi.",
+  archive_department: "Departman arşivlendi.",
+  delete_department: "Departman silindi.",
+  archive_operation: "Rutin arşivlendi.",
+  delete_operation: "Rutin silindi.",
+  archive_product: "Ürün arşivlendi.",
+  delete_product: "Ürün silindi.",
+  create_support_request: "Destek talebin Projelio ekibine iletildi.",
 };
 
 /**
@@ -426,6 +451,19 @@ const ACTION_LABELS: Record<string, string> = {
   archive_module_record: "modül kaydı arşivlendi",
   enable_module: "modül açıldı",
   disable_module: "modül kapatıldı",
+  create_group: "grup oluşturuldu",
+  update_group: "grup güncellendi",
+  create_organization: "organizasyon oluşturuldu",
+  update_organization: "organizasyon güncellendi",
+  create_department: "departman açıldı",
+  update_department: "departman güncellendi",
+  create_operation: "rutin oluşturuldu",
+  update_operation: "rutin güncellendi",
+  create_product: "ürün eklendi",
+  update_product: "ürün güncellendi",
+  export_report: "rapor dosyası üretildi",
+  import_tasks_from_sheet: "dosyadan toplu görev eklendi",
+  import_module_records_from_sheet: "dosyadan toplu modül kaydı eklendi",
 };
 
 export function toActiveFileInfo(files: { id: string; name: string; kind: string; detail: string }[]) {
@@ -476,7 +514,13 @@ function clearMidRunFlag(file: ActiveFile): ActiveFile {
  * çağrısı yirmi görev demek olabilir. "2 toplu görev eklendi" hem yanlış hem de
  * Türkçe olarak tuhaf; o yüzden bu etiketler sayısız yazılır.
  */
-const COUNTLESS_ACTIONS = new Set(["toplu görev eklendi", "toplu yapılacak eklendi", "yapılacaklar sıralandı"]);
+const COUNTLESS_ACTIONS = new Set([
+  "toplu görev eklendi",
+  "toplu yapılacak eklendi",
+  "yapılacaklar sıralandı",
+  "dosyadan toplu görev eklendi",
+  "dosyadan toplu modül kaydı eklendi",
+]);
 
 function summarizeExecuted(executed: string[]): string {
   const counts = new Map<string, number>();
@@ -535,6 +579,17 @@ export class AiAssistantService {
     private organizationModulesService: OrganizationModulesService,
     private jobModulesService: JobModulesService,
     private moduleRecordsService: ModuleRecordsService,
+    // Kapsayıcılar ve ticari kayıtlar: grup > organizasyon > departman
+    // hiyerarşisi, işe bağlı rutinler ve organizasyonun ürünleri. Yetki
+    // kontrolleri yine servislerin İÇİNDE (sahiplik/yöneticilik), Lio her
+    // çağrıda kullanıcının kimliğini geçiriyor.
+    private groupsService: GroupsService,
+    private operationsService: OperationsService,
+    private productsService: ProductsService,
+    // Destek talebi: kullanıcının Projelio ekibine yazdığı mesaj.
+    private supportService: SupportService,
+    // Rapor/dışa aktarma dosyalarını üretir ve indirilebilir tutar.
+    private exportsService: AiExportsService,
     private realtime: RealtimeGateway
   ) {}
 
@@ -796,18 +851,26 @@ export class AiAssistantService {
       "- Aynı bilgiyi iki kez sorgulama; bir araçtan aldığın sonucu hatırla ve tekrar çağırma.",
       "",
       "## Sınırların",
-      "Araçların YALNIZCA şu alanları kapsar: işler (job), projeler, çıktılar (output), görevler ve alt görevler, " +
-        "görev yorumları, proje ekibi ve rolleri, DEPARTMANLAR (listeleme, kadro ve departman görevleri), " +
+      "Araçların YALNIZCA şu alanları kapsar: GRUPLAR, ORGANİZASYONLAR, DEPARTMANLAR (kurma, düzenleme, " +
+        "arşivleme, silme ve kadro), işler (job), projeler, çıktılar (output), görevler ve alt görevler, " +
+        "görev yorumları, proje ekibi ve rolleri, RUTİNLER (operasyonlar), ÜRÜNLER, " +
         "bütçe hareketleri, bildirim özeti, Takvim planlaması " +
-        "(dönem planı, odak alanları, zaman blokları, ritüeller), kişisel yapılacaklar panosu " +
-        "ve MODÜLLER (modül açma/kapatma ve modül kayıtları — bkz. Modüller bölümü).",
-      "Şu alanlar için HİÇBİR aracın yok: e-posta/mailbox, organizasyon ve departman KURMA/DÜZENLEME " +
-        "(departmanı listeleyebilir ve içine görev açabilirsin, ama yeni departman açamaz, adını değiştiremez, silemezsin), " +
-        "gruplar, operasyonlar, ürünler, iş ortakları ve cari hesaplar, sosyal medya, " +
-        "proje gönderileri ve yorumları, destek talepleri, kullanıcı/yetki yönetimi, " +
-        "ödeme ve abonelik işlemleri, uygulama ayarları, dosya/rapor indirme veya dışa aktarma.",
-      "Dosyalar özel bir durumdur: kullanıcının sohbete İLİŞTİRDİĞİ dosyayı okuyabilirsin (bkz. Dosyalar), " +
-        "ama Projelio'nun dosya kitaplığında arama yapma, oraya dosya yükleme, taşıma ya da silme aracın yok.",
+        "(dönem planı, odak alanları, zaman blokları, ritüeller), kişisel yapılacaklar panosu, " +
+        "MODÜLLER (modül açma/kapatma ve modül kayıtları — bkz. Modüller bölümü), " +
+        "DESTEK TALEPLERİ ve DIŞA AKTARMA (bkz. ilgili bölümler).",
+      "Şu alanlar için HİÇBİR aracın yok: e-posta/mailbox, iş ortakları ve cari hesaplar, sosyal medya, " +
+        "proje gönderileri ve yorumları, kullanıcı/yetki yönetimi, " +
+        "ödeme ve abonelik işlemleri, uygulama ayarları.",
+      "Kapsayıcıları (grup, organizasyon, departman) SİLMEK ve ARŞİVLEMEK kademelidir: grup arşivlenince " +
+        "altındaki organizasyonlar ve işler, organizasyon arşivlenince işleri de arşivlenir. Bu araçlar " +
+        "kullanıcıya onaylatılır ama etkisinin genişliğini yine de sen söyle. " +
+        "Silme yerine arşivlemenin yeterli olup olmadığını kullanıcı belirtmediyse sor: arşiv geri alınabilir, " +
+        "silme alınamaz. (Eskiden organizasyon araçları YOKTU ve model yaptığını sandığı arşivlemeyi " +
+        "yapmıyordu; artık araç var — \"yapamıyorum\" deme, aracı çağır.)",
+      "Dosyalar özel bir durumdur: kullanıcının sohbete İLİŞTİRDİĞİ dosyayı okuyabilir, Projelio'ya " +
+        "yüklenmiş dosyaları arayıp açabilir (bkz. Projelio'daki dosyalar) ve ürettiğin RAPORU dosya " +
+        "kitaplığına yükleyebilirsin (bkz. Dışa aktarma). Mevcut bir dosyayı taşıma, yeniden adlandırma " +
+        "ya da silme aracın yok.",
       "İstek bu ikinci listedeki bir alana giriyorsa HİÇBİR ARAÇ ÇAĞIRMA. Tek cümleyle \"bunu şu an yapamıyorum\" de, " +
         "kullanıcının bunu uygulamada nereden yapabileceğini söyle ve dur. \"Acaba bir aracım var mı\" diye deneme " +
         "yapma — her deneme kullanıcının kredisinden düşer.",
@@ -837,6 +900,43 @@ export class AiAssistantService {
       "- Yeni iş ya da proje oluşturmayı yalnızca kullanıcı açıkça istediğinde yap. Görevi koyacak yer bulamamak " +
         "proje açmak için gerekçe değildir.",
       "",
+      "## Gruplar, organizasyonlar, departmanlar",
+      "Kapsayıcı sırası: grup > organizasyon > departman. Bir kademeyi kurmadan altını kuramazsın.",
+      "- Kimlikleri list_groups / list_organizations / list_departments ile bul; kullanıcıya asla id sorma.",
+      "- Aynı adı taşıyan bir departman ya da organizasyon zaten varsa YENİSİNİ AÇMA, mevcudu kullan.",
+      "- Grup zorunlu değil: organizasyon grupsuz da yaşar. Kullanıcı istemediyse grup açma.",
+      "- Yeni bir organizasyon ya da departman açmak ekibin göreceği bir yapı değişikliğidir; " +
+        "yalnızca kullanıcı açıkça isterse yap.",
+      "",
+      "## Rutinler (operasyonlar)",
+      "Rutin, bir İŞE bağlı ve tekrar eden yükümlülüktür (aylık muhasebe, haftalık bakım).",
+      "- Rutinin tekrar takvimini (hangi gün, hangi sıklık) kuramazsın; onu kullanıcı rutinin sayfasından ekler. " +
+        "Rutini açtıktan sonra bunu SÖYLE, yoksa kullanıcı tekrarların kurulduğunu sanır.",
+      "- Rutin kapatmak silmek değildir: update_operation ile status=\"ended\" yeterli.",
+      "",
+      "## Ürünler",
+      "Ürün/hizmet kaydı bir ORGANİZASYONA aittir (uyd_urunler modülü kendi tablosuna yazar, module_record değildir).",
+      "- Fiyat, stok ve maliyet sayısaldır; kullanıcı söylemediyse boş bırak, UYDURMA.",
+      "- Stok kodu (sku) şirkette benzersizdir; çakışırsa hatayı olduğu gibi söyle.",
+      "",
+      "## Destek talepleri",
+      "create_support_request Projelio ekibine giden gerçek bir mesaj açar ve geri alınamaz.",
+      "- YALNIZCA kullanıcı açıkça \"destek talebi aç\", \"ekibe ilet\" dediğinde çağır. " +
+        "Bir soruyu yanıtlayamadığın için kendiliğinden talep AÇMA.",
+      "- Konuyu ve mesajı kullanıcının anlattığından yaz; eksikse sor.",
+      "- \"Cevap geldi mi?\" sorusunda list_support_requests ile bak.",
+      "",
+      "## Dışa aktarma",
+      "export_report bir veri kümesini Excel ya da CSV dosyasına döker: görevler, bütçe, modül kayıtları, " +
+        "ürünler, kişisel yapılacaklar, bir işin projeleri.",
+      "- Varsayılan hedef indirme: dönen bağlantıyı `[dosya adı](projelio:export/<id>)` biçiminde yaz. " +
+        "Bağlantı 30 dakika geçerlidir, etrafına ** koyma.",
+      "- Kullanıcı \"dosyalara kaydet\" derse hedef=dosya_kitapligi ver; o zaman dönen fileId ile " +
+        "`[dosya adı](projelio:file/<fileId>)` yaz. Yükleme işin Drive/OneDrive bağlantısını gerektirir; " +
+        "hata dönerse indirme bağlantısına düş.",
+      "- Rapora yalnızca kullanıcının görmeye yetkili olduğu veri girer; bütçeyi yalnızca proje sahibi alabilir.",
+      "- Kaç satır yazıldığını söyle. Sınır aşıldığı için satır atlandıysa bunu MUTLAKA belirt.",
+      "",
       "## Çıktılar",
       "Çıktı, bir projenin teslim edilecek parçasıdır (\"Logo tasarımı\", \"Ana sayfa\"). Görevler bir çıktıya " +
         "bağlanabilir ve pano onları o başlık altında gruplar.",
@@ -855,8 +955,9 @@ export class AiAssistantService {
       "- Kullanıcı ne yapılacağını söylemediyse kendiliğinden kayıt OLUŞTURMA. Özetle ve " +
         "\"bunları sisteme işleyeyim mi?\" diye sor.",
       "- \"Sisteme işle\" dendiğinde önce ne oluşturacağını maddeler hâlinde listele (kaç görev, hangi projeye, " +
-        "hangi tarihlerle) ve onay al. Onay gelince create_tasks gibi TOPLU araçlarla tek seferde yaz; " +
-        "satır satır tek tek ekleme.",
+        "hangi tarihlerle) ve onay al. TABLO (Excel/CSV) ise onayı import_tasks_from_sheet'in ÖNİZLEMESİYLE " +
+        "al — bkz. \"Tablodan toplu içe aktarma\". Tablo değilse (el yazısı fotoğrafı, sohbette yazılmış liste) " +
+        "create_tasks ile topluca yaz; satır satır tek tek ekleme.",
       "- Dosyada olmayan bir alanı (tarih, tutar, sorumlu) UYDURMA. Eksikse boş bırak ya da kullanıcıya sor.",
       "- \"Hepsi eklendi mi?\", \"eksik kaldı mı?\" gibi bir DOĞRULAMA istendiğinde kullanıcıya soru " +
         "SORMA — kontrolü sen yap: dosyadaki kalemleri say, sonra list_tasks/search_tasks ile projedeki " +
@@ -865,10 +966,10 @@ export class AiAssistantService {
       "- İŞLEYEMEDİĞİN SATIRLARI MUTLAKA SÖYLE. Bir satırı anlamadıysan, eşleştiremediysen ya da " +
         "atladıysan sonunda tek tek yaz: \"şu 2 satırı çözemedim: …\". Sessizce atlama — kullanıcı eksiği " +
         "ancak dosyayı elle karşılaştırarak fark eder ve bu güveni bitirir.",
-      "- TOPLU EKLEMEYİ YARIM BIRAKMA. Tek çağrıya en fazla 10 kalem sığdığı için 23 kalemlik bir " +
-        "dosya ÜÇ çağrı ister. Her çağrıdan sonra \"dosyada kaç kalem vardı, kaçını ekledim, kaç kaldı\" " +
-        "diye say; kalan sıfırlanmadan işi bitmiş sayma. İki çağrı yapıp durmak, kullanıcının son " +
-        "kalemlerini sessizce kaybetmesi demektir.",
+      "- TOPLU EKLEMEYİ YARIM BIRAKMA. create_tasks'a tek çağrıda en fazla 10 kalem sığar; 23 kalemlik bir " +
+        "liste ÜÇ çağrı ister. Her çağrıdan sonra \"kaç kalem vardı, kaçını ekledim, kaç kaldı\" diye say; " +
+        "kalan sıfırlanmadan işi bitmiş sayma. (Tabloda bu sorun yok: import_tasks_from_sheet hepsini tek " +
+        "çağrıda yazar ve kaçının atlandığını söyler.)",
       "- İş bittiğinde kendi kendini denetle: eklediğin kalem sayısını dosyadaki kalem sayısıyla " +
         "karşılaştır ve farkı SÖYLE. Kullanıcı sormadan.",
       "- İş bittiğinde tek cümlelik kapanış yap: kaç kalem oluşturuldu, kaçı atlandı, hangi yapıya oturdu.",
@@ -885,6 +986,27 @@ export class AiAssistantService {
         "Cevap dosyada varsa sormak hem yavaş hem pahalıdır.",
       "- İçerikte \"kısaltıldı\" notu varsa dosyanın tamamını görmediğini söyle; eksik veriye dayanarak " +
         "\"hepsi bu kadar\" deme.",
+      "",
+      "### Tablodan toplu içe aktarma (Excel/CSV)",
+      "Büyük tablolar sohbete SABİTLENMEZ: künyesi (başlıklar, satır sayısı, birkaç örnek satır) sana verilir, " +
+        "satırların tamamı sunucuda durur. Bu yüzden \"dosyanın devamını göremiyorum\" DEME — satırları " +
+        "araçlar okuyor.",
+      "- 20'den fazla satırdan kayıt açacaksan create_tasks'ı TEKRAR TEKRAR ÇAĞIRMA. Doğru araç " +
+        "import_tasks_from_sheet: satırları sunucu okur, tarihleri sunucu çözer, sen yalnızca hangi sütunun " +
+        "ne olduğunu ve hangi değerin nereye gideceğini yazarsın. 100 satır tek çağrıdır.",
+      "- Akış: (1) künyeden sütunları gör, gerekiyorsa list_sheet_values ile dağıtım sütunundaki FARKLI " +
+        "değerleri çek, (2) list_departments/list_projects ile o değerleri hedeflere eşle, " +
+        "(3) import_tasks_from_sheet'i onizleme:true ile çağır, (4) dönen özeti kullanıcıya göster ve onay al, " +
+        "(5) aynı çağrıyı onizleme:false ile tekrarla.",
+      "- Satırları OKUMAK için read_sheet'i yalnızca gerçekten gerektiğinde ve dar aralıkla çağır; " +
+        "kayıt açmak için satırları okumana gerek YOK, araç zaten sunucudaki satırlara bakıyor.",
+      "- Hedefi eşleşmeyen satır ATLANIR. Uydurma hedef açma, yeni proje/departman kurma: " +
+        "önizlemede kaç satırın neden atlandığı yazıyor, onu kullanıcıya söyle ve ne yapmak istediğini sor " +
+        "(varsayılan hedef vermek ya da o satırları elde bırakmak).",
+      "- Sonucu MUTLAKA raporla: kaç kayıt açıldı, kaç satır atlandı ve neden, hangi hedefe kaç tane gitti. " +
+        "Satır tavanına gelinirse (kalanIlkSatir dönerse) kalanlar için aynı çağrıyı o satırdan devam ettir.",
+      "- Modül kayıtları da aynı şekilde: describe_module ile alan anahtarlarını al, " +
+        "import_module_records_from_sheet'e anahtar -> sütun eşlemesi ver.",
       "",
       "### Projelio'daki dosyalar",
       "Kullanıcının işlerine ve projelerine yüklenmiş dosyaları SEN de getirebilirsin; kullanıcının " +
@@ -978,8 +1100,9 @@ export class AiAssistantService {
       "- Modül kapatmak kayıtları silmez ama modülü ekiplerin ekranlarından kaldırır; bunu kullanıcıya söyle.",
       "- Her modül kayıt defteri DEĞİLDİR: müşteri, ürünler ve sosyal medya kendi ekranlarına yazar, " +
         "analiz/raporlama/denetim gibi türev paneller ise veriyi başka modüllerden üretir. " +
-        "describe_module bunlara \"kayitDefteriMi: false\" der — kayıt eklemeye çalışma, " +
-        "kullanıcıyı modülün kendi sayfasına yönlendir.",
+        "describe_module bunlara \"kayitDefteriMi: false\" der — buraya module_record EKLEME.",
+      "- ÜRÜNLER istisnadır: kendi araçları var (list_products/create_product/update_product). " +
+        "Ürün Yönetimi modülünde kayıt istendiğinde kullanıcıyı sayfaya yönlendirme, o araçları kullan.",
       "",
       "## Kredi disiplini",
       "Kullanıcı her turun ve her araç çağrısının bedelini kredi olarak öder. Bu yüzden:",
@@ -1059,7 +1182,9 @@ export class AiAssistantService {
 
     return [
       "## Şu an açık dosyalar",
-      ...activeFiles.map((file) => `- ${file.name} (${file.detail})`),
+      // Kimlik de yazılır: read_sheet ve import_* araçları dosyayı bu kimlikle
+      // istiyor (tablo satırları sohbette değil sunucuda duruyor).
+      ...activeFiles.map((file) => `- ${file.name} (${file.detail}) · dosyaKimligi: ${file.id}`),
       "Bu dosyaların içeriği bu isteğin EN BAŞINDA sana verildi; elindeler.",
       ...(midRun.length
         ? [
@@ -2239,6 +2364,81 @@ export class AiAssistantService {
         return make(label, `/projects/${id}`, `project:${id}`, id);
       }
 
+      case "create_group":
+      case "update_group":
+      case "archive_group": {
+        const id = result?.groupId ?? input.groupId;
+        if (!id) return null;
+        const label =
+          toolName === "create_group"
+            ? "Grup oluşturuldu"
+            : toolName === "update_group"
+              ? "Grup güncellendi"
+              : "Grup arşivlendi";
+        return make(label, `/groups/${id}`, `group:${id}`, id);
+      }
+
+      case "create_organization":
+      case "update_organization":
+      case "archive_organization": {
+        const id = result?.organizationId ?? input.organizationId;
+        if (!id) return null;
+        const ad = result?.ad ? `: ${result.ad}` : "";
+        const label =
+          toolName === "create_organization"
+            ? `Organizasyon oluşturuldu${ad}`
+            : toolName === "update_organization"
+              ? `Organizasyon güncellendi${ad}`
+              : "Organizasyon arşivlendi";
+        return make(label, `/organizations/${id}`, `organization:${id}`, id);
+      }
+
+      case "create_department":
+      case "update_department":
+      case "archive_department": {
+        const id = result?.departmentId ?? input.departmentId;
+        const label =
+          toolName === "create_department"
+            ? `Departman açıldı${result?.ad ? `: ${result.ad}` : ""}`
+            : toolName === "update_department"
+              ? "Departman güncellendi"
+              : "Departman arşivlendi";
+        // Yeni açılan departmanda kullanıcı organizasyon sayfasına değil
+        // departmanın kendi sayfasına gitmeli; arşivlenende de sayfa duruyor.
+        return id ? make(label, `/departments/${id}`, `department:${id}`, id) : null;
+      }
+
+      case "create_operation":
+      case "update_operation":
+      case "archive_operation": {
+        const id = result?.operationId ?? input.operationId;
+        if (!id) return null;
+        const label =
+          toolName === "create_operation"
+            ? `Rutin oluşturuldu${result?.ad ? `: ${result.ad}` : ""}`
+            : toolName === "update_operation"
+              ? "Rutin güncellendi"
+              : "Rutin arşivlendi";
+        return make(label, `/operations/${id}`, `operation:${id}`, id);
+      }
+
+      case "create_product":
+      case "update_product": {
+        // Ürünün kendi sayfası yok; listesi organizasyonun Ürünler sekmesinde.
+        const organizationId = input.organizationId ?? (await this.organizationIdOfProduct(result?.productId));
+        if (!organizationId) return null;
+        const label =
+          toolName === "create_product"
+            ? `Ürün eklendi${result?.ad ? `: ${result.ad}` : ""}`
+            : "Ürün güncellendi";
+        return make(
+          label,
+          `/organizations/${organizationId}?tab=products`,
+          `organization:${organizationId}`,
+          result?.productId
+        );
+      }
+
       case "create_task": {
         const label = `Görev oluşturuldu${result?.title ? `: ${result.title}` : ""}`;
         return input.departmentId
@@ -2253,6 +2453,35 @@ export class AiAssistantService {
         return input.departmentId
           ? departmentActivity(label, input.departmentId)
           : projectActivity(label, input.projectId);
+      }
+
+      case "import_tasks_from_sheet": {
+        // Önizleme hiçbir şey yazmıyor; bildirim yalnızca gerçekten yazılınca.
+        const count = Number(result?.olusturulan ?? 0);
+        if (!count) return null;
+        const label = `Dosyadan ${count} görev eklendi`;
+        // Tek hedefe gittiyse oraya götür; dağıtıldıysa götürülecek tek sayfa yok.
+        if (input.hedef?.projectId) return projectActivity(label, input.hedef.projectId);
+        if (input.hedef?.departmentId) return departmentActivity(label, input.hedef.departmentId);
+        return make(label);
+      }
+
+      case "import_module_records_from_sheet": {
+        const count = Number(result?.olusturulan ?? 0);
+        if (!count) return null;
+        const label = `Dosyadan ${count} modül kaydı eklendi`;
+        const moduleKey = input.moduleKey;
+        if (input.jobId && moduleKey) {
+          return make(label, `/jobs/${input.jobId}/modules/${moduleKey}`, `job:${input.jobId}/module/${moduleKey}`);
+        }
+        if (input.departmentId && moduleKey) {
+          return make(
+            label,
+            `/departments/${input.departmentId}/modules/${moduleKey}`,
+            `department:${input.departmentId}/module/${moduleKey}`
+          );
+        }
+        return make(label);
       }
 
       case "add_budget_transaction":
@@ -2654,6 +2883,61 @@ export class AiAssistantService {
           `"${label}" modülünü kapatmak üzeresin. Kayıtlar silinmez ama modül ` +
           `${input.jobId ? "işin" : "organizasyonun"} ekranlarından kaldırılır.`
         );
+      }
+
+      case "archive_group":
+      case "delete_group": {
+        const label = await this.safeLabel(() => this.groupsService.findOne(input.groupId).then((g) => g.name));
+        return name === "delete_group"
+          ? `"${label}" grubunu KALICI olarak silmek üzeresin. Bu işlem geri alınamaz.`
+          : `"${label}" grubunu arşivlemek üzeresin. Gruba bağlı organizasyonlar ve işler de arşivlenir.`;
+      }
+
+      case "archive_organization":
+      case "delete_organization": {
+        const label = await this.safeLabel(() =>
+          this.organizationsService.findOne(input.organizationId).then((o) => o.name)
+        );
+        return name === "delete_organization"
+          ? `"${label}" organizasyonunu KALICI olarak silmek üzeresin. Departmanları, ürünleri ve ` +
+              "modül kayıtları da gider. Bu işlem geri alınamaz."
+          : `"${label}" organizasyonunu arşivlemek üzeresin. Bağlı işler de (projeleri ve görevleriyle) arşivlenir.`;
+      }
+
+      case "archive_department":
+      case "delete_department": {
+        const label = await this.safeLabel(() =>
+          this.departmentsService.findOne(input.departmentId).then((d) => d.name)
+        );
+        return name === "delete_department"
+          ? `"${label}" departmanını KALICI olarak silmek üzeresin. Görevleri ve modül kayıtları da gider.`
+          : `"${label}" departmanını arşivlemek üzeresin. Kayıtlar durur, departman ekranlardan kalkar.`;
+      }
+
+      case "archive_operation":
+      case "delete_operation": {
+        const label = await this.safeLabel(() =>
+          this.operationsService.findOne(input.operationId).then((o) => o.title)
+        );
+        return name === "delete_operation"
+          ? `"${label}" rutinini KALICI olarak silmek üzeresin. Tekrarları ve geçmişi de gider.`
+          : `"${label}" rutinini arşivlemek üzeresin. (Geri alınabilir.)`;
+      }
+
+      case "archive_product":
+      case "delete_product": {
+        const label = await this.safeLabel(() => this.productsService.findOne(input.productId).then((p) => p.name));
+        return name === "delete_product"
+          ? `"${label}" ürününü KALICI olarak silmek üzeresin. Fotoğrafları da gider.`
+          : `"${label}" ürününü arşivlemek üzeresin. (Geri alınabilir.)`;
+      }
+
+      case "create_support_request": {
+        // Onay penceresinde MESAJIN KENDİSİ görünmeli: gönderildikten sonra
+        // geri alınamıyor ve karşı tarafta bir insan okuyor.
+        const mesaj = String(input.message ?? "");
+        const kisa = mesaj.length > 300 ? `${mesaj.slice(0, 300)}…` : mesaj;
+        return `Projelio ekibine destek talebi gönderilecek.\nKonu: ${input.subject}\nMesaj: ${kisa}`;
       }
 
       case "add_budget_transaction": {
@@ -3577,8 +3861,875 @@ export class AiAssistantService {
         return { success: true };
       }
 
+      // --- Tablodan toplu içe aktarma ---------------------------------------
+      //
+      // Satırlar sunucuda (bkz. AiAttachmentsService.sheets); model yalnızca
+      // eşlemeyi yazar. 100 satırlık bir dosya 15 tur yerine 3 tur eder.
+
+      case "read_sheet": {
+        const sheet = this.requireSheet(userId, input);
+        const ilk = Math.max(1, Number(input.ilkSatir) || 1);
+        const son = Math.min(sheet.rows.length, Number(input.sonSatir) || ilk + 39, ilk + 39);
+        return pruneEmpty({
+          sayfa: sheet.name,
+          toplamSatir: sheet.rows.length,
+          satirlar: sheet.rows.slice(ilk - 1, son).map((row, i) => `${ilk + i}: ${row.join(" | ")}`),
+          not:
+            son < sheet.rows.length
+              ? `${son + 1}. satırdan itibaren okunmadı. Kayıt açacaksan satırları okumana gerek yok.`
+              : undefined,
+        });
+      }
+
+      case "list_sheet_values": {
+        const sheet = this.requireSheet(userId, input);
+        const values = distinctValues(sheet, input.kolon, { basliksatiri: input.basliksatiri });
+        return {
+          sayfa: sheet.name,
+          kolon: input.kolon,
+          degerler: values.slice(0, 40),
+          farkliDegerSayisi: values.length,
+        };
+      }
+
+      case "import_tasks_from_sheet":
+        return this.importTasksFromSheet(userId, userRole, input);
+
+      case "import_module_records_from_sheet":
+        return this.importModuleRecordsFromSheet(userId, input);
+
+      // --- Gruplar / organizasyonlar / departmanlar -------------------------
+      //
+      // Kapsayıcı sırası: grup > organizasyon > departman. Yetki her serviste
+      // SAHİPLİK üzerinden denetleniyor (assertOwner / assertOrgOwner) ve
+      // userId her çağrıda geçiliyor — Lio kullanıcının kendi kapısından geçer.
+
+      case "list_groups": {
+        const groups = await this.groupsService.findAllForUser(userId);
+        return groups.map((g) =>
+          pruneEmpty({
+            groupId: g.id,
+            ad: g.name,
+            aciklama: g.description,
+            organizasyonSayisi: g.organizationCount,
+            isSayisi: g.jobCount,
+          })
+        );
+      }
+
+      case "create_group": {
+        const group = await this.groupsService.create(userId, {
+          name: input.name,
+          description: input.description,
+        });
+        return { groupId: group.id, ad: group.name };
+      }
+
+      case "update_group": {
+        const group = await this.groupsService.update(
+          input.groupId,
+          { name: input.name, description: input.description },
+          userId
+        );
+        return { groupId: group.id, ad: group.name };
+      }
+
+      case "archive_group":
+        await this.groupsService.archive(input.groupId, userId);
+        return { success: true };
+
+      case "delete_group":
+        await this.groupsService.remove(input.groupId, userId);
+        return { success: true };
+
+      case "list_organizations": {
+        const orgs = await this.organizationsService.findAllForUser(userId);
+        const filtered = input.groupId ? orgs.filter((o) => o.groupId === input.groupId) : orgs;
+        return filtered.map((o) =>
+          pruneEmpty({
+            organizationId: o.id,
+            ad: o.name,
+            tur: o.orgType,
+            grup: o.groupName,
+            aciklama: o.description,
+            isSayisi: o.jobCount,
+          })
+        );
+      }
+
+      case "create_organization": {
+        const org = await this.organizationsService.create(userId, {
+          name: input.name,
+          description: input.description,
+          orgType: input.orgType === "isletme" ? "isletme" : "sirket",
+          groupId: input.groupId || undefined,
+        });
+        return { organizationId: org.id, ad: org.name, tur: org.orgType };
+      }
+
+      case "update_organization": {
+        // Boş dize "gruptan çıkar" demek, undefined "dokunma". Şemada null
+        // gönderilemediği için ayrım burada yapılıyor; servis null'ı
+        // group_id = null'a çeviriyor (bkz. OrganizationsService.update).
+        const patch: Record<string, unknown> = {
+          name: input.name,
+          description: input.description,
+          orgType: input.orgType,
+        };
+        if (input.groupId !== undefined) patch.groupId = input.groupId || null;
+        const org = await this.organizationsService.update(input.organizationId, patch as any, userId);
+        return { organizationId: org.id, ad: org.name, tur: org.orgType, grup: org.groupName };
+      }
+
+      case "archive_organization":
+        await this.organizationsService.archive(input.organizationId, userId);
+        return { success: true };
+
+      case "delete_organization":
+        await this.organizationsService.remove(input.organizationId, userId);
+        return { success: true };
+
+      case "create_department": {
+        const department = await this.departmentsService.create(
+          input.organizationId,
+          { name: input.name, description: input.description },
+          userId
+        );
+        return { departmentId: department.id, ad: department.name };
+      }
+
+      case "update_department": {
+        const department = await this.departmentsService.update(
+          input.departmentId,
+          { name: input.name, description: input.description },
+          userId
+        );
+        return { departmentId: department.id, ad: department.name };
+      }
+
+      case "archive_department":
+        await this.departmentsService.archive(input.departmentId, userId);
+        return { success: true };
+
+      case "delete_department":
+        await this.departmentsService.remove(input.departmentId, userId);
+        return { success: true };
+
+      // --- Rutinler (operasyonlar) -----------------------------------------
+
+      case "list_operations": {
+        const operations = await this.operationsService.findAllForUser(userId);
+        const filtered = input.jobId ? operations.filter((o) => o.jobId === input.jobId) : operations;
+        return filtered.map((o) =>
+          pruneEmpty({
+            operationId: o.id,
+            ad: o.title,
+            isKimligi: o.jobId,
+            durum: o.status,
+            donemButcesi: o.budgetPerPeriod,
+            donem: o.budgetPeriod,
+            siradakiTarih: shortDate(o.nextDueOn),
+            acikRutinSayisi: o.activeRoutineCount,
+          })
+        );
+      }
+
+      case "create_operation": {
+        // Rutin bir işe bağlı doğuyor ve servis yalnızca ownerId'yi yazıyor;
+        // işin kullanıcıya ait olduğunu burada doğruluyoruz.
+        await this.requireOwnJob(userId, input.jobId);
+        const operation = await this.operationsService.create(userId, {
+          jobId: input.jobId,
+          title: input.title,
+          description: input.description,
+          budgetPerPeriod: input.budgetPerPeriod,
+          budgetPeriod: input.budgetPeriod,
+          startedOn: input.startedOn,
+        });
+        return { operationId: operation.id, ad: operation.title, durum: operation.status };
+      }
+
+      case "update_operation": {
+        const operation = await this.operationsService.update(
+          input.operationId,
+          {
+            title: input.title,
+            description: input.description,
+            budgetPerPeriod: input.budgetPerPeriod,
+            budgetPeriod: input.budgetPeriod,
+            status: input.status,
+            endedOn: input.endedOn,
+          },
+          userId
+        );
+        return { operationId: operation.id, ad: operation.title, durum: operation.status };
+      }
+
+      case "archive_operation":
+        await this.operationsService.archive(input.operationId, userId);
+        return { success: true };
+
+      case "delete_operation":
+        await this.operationsService.remove(input.operationId, userId);
+        return { success: true };
+
+      // --- Ürünler ----------------------------------------------------------
+      //
+      // ProductsService.findByOrganization yetki kontrolü YAPMIYOR (denetim
+      // controller'da duruyor); kapı burada kuruluyor — bkz. requireOwnOrganization.
+
+      case "list_products": {
+        const organizationId = await this.requireOwnOrganization(userId, input.organizationId);
+        const products = await this.productsService.findByOrganization(organizationId);
+        const query = String(input.query ?? "").trim().toLocaleLowerCase("tr");
+        const limit = Math.min(Number(input.limit) || 30, 100);
+        return products
+          .filter((p) =>
+            query
+              ? [p.name, p.sku, p.category, p.brand].some((field) =>
+                  (field ?? "").toLocaleLowerCase("tr").includes(query)
+                )
+              : true
+          )
+          .slice(0, limit)
+          .map((p) =>
+            pruneEmpty({
+              productId: p.id,
+              ad: p.name,
+              sku: p.sku,
+              kategori: p.category,
+              marka: p.brand,
+              stok: p.stockQuantity,
+              birim: p.unit,
+              fiyat: p.price,
+              paraBirimi: p.currency,
+              durum: p.status,
+            })
+          );
+      }
+
+      case "create_product": {
+        const organizationId = await this.requireOwnOrganization(userId, input.organizationId);
+        const product = await this.productsService.create(organizationId, this.productPatch(input), userId);
+        return { productId: product.id, ad: product.name };
+      }
+
+      case "update_product": {
+        const product = await this.productsService.update(input.productId, this.productPatch(input), userId);
+        return { productId: product.id, ad: product.name };
+      }
+
+      case "archive_product":
+        await this.productsService.archive(input.productId, userId);
+        return { success: true };
+
+      case "delete_product":
+        await this.productsService.remove(input.productId, userId);
+        return { success: true };
+
+      // --- Destek talepleri -------------------------------------------------
+
+      case "list_support_requests": {
+        const requests = await this.supportService.findMine(userId);
+        return requests.map((r) =>
+          pruneEmpty({
+            konu: r.subject,
+            durum: r.status === "answered" ? "yanıtlandı" : "açık",
+            mesaj: r.message,
+            yanit: r.reply,
+            tarih: shortDate(r.createdAt),
+          })
+        );
+      }
+
+      case "create_support_request": {
+        // Ad verilmediyse hesaptaki ad kullanılır: kullanıcıya kendi adını
+        // sormak gereksiz, oturumda zaten duruyor.
+        const created = await this.supportService.create(userId, {
+          name: input.name?.trim() || (await this.userDisplayName(userId)),
+          subject: input.subject,
+          message: input.message,
+        });
+        return { konu: created.subject, durum: created.status };
+      }
+
+      // --- Dışa aktarma -----------------------------------------------------
+
+      case "export_report":
+        return this.exportReport(userId, userRole, input);
+
       default:
         throw new BadRequestException(`Bilinmeyen araç: ${name}`);
+    }
+  }
+
+  // --- Tablodan toplu içe aktarmanın yardımcıları ---------------------------
+
+  /**
+   * Açık bir tablonun istenen sayfası.
+   *
+   * Sahiplik AiAttachmentsService'te doğrulanır. Dosya süresi dolmuşsa (sunucu
+   * yeniden başlamış ya da iki saat geçmiş olabilir) modele ne yapacağı
+   * söylenir: içeriği uydurmasın, kullanıcıdan dosyayı tekrar istesin.
+   */
+  private requireSheet(userId: string, input: Record<string, any>): SheetData {
+    const sheets = this.attachmentsService.getSheets(userId, String(input.dosyaKimligi ?? ""));
+    if (!sheets?.length) {
+      throw new BadRequestException(
+        "Bu kimlikte açık bir tablo yok. \"Şu an açık dosyalar\" listesindeki dosyaKimligi değerini kullan; " +
+          "dosya listede yoksa kullanıcıdan tekrar göndermesini iste."
+      );
+    }
+    if (!input.sayfa) return sheets[0];
+    const wanted = normalizeKey(input.sayfa);
+    const found = sheets.find((sheet) => normalizeKey(sheet.name) === wanted);
+    if (!found) {
+      throw new BadRequestException(
+        `"${input.sayfa}" adlı sayfa yok. Sayfalar: ${sheets.map((s) => s.name).join(", ")}`
+      );
+    }
+    return found;
+  }
+
+  /**
+   * Tablodan toplu görev açar.
+   *
+   * İki modda çalışır: onizleme (hiçbir şey yazmaz, ne olacağını söyler) ve
+   * uygulama. Önizleme kasıtlı olarak varsayılan: yüz satırlık bir dosyada
+   * yanlış sütun eşlemesi, ancak kayıtlar açıldıktan sonra fark edilir.
+   */
+  private async importTasksFromSheet(
+    userId: string,
+    userRole: string,
+    input: Record<string, any>
+  ): Promise<unknown> {
+    const sheet = this.requireSheet(userId, input);
+    const plan = planTaskImport(sheet, {
+      esleme: input.esleme ?? {},
+      hedef: input.hedef ?? {},
+      atananKurallari: input.atananKurallari,
+      basliksatiri: input.basliksatiri,
+      ilkSatir: input.ilkSatir,
+      sonSatir: input.sonSatir,
+    });
+
+    // Tek çağrıda işlenecek satır tavanı; kalanı bir sonraki çağrıya devredilir.
+    const islenecek = plan.planlanan.slice(0, MAX_IMPORT_ROWS);
+    const kalanIlkSatir = plan.planlanan[MAX_IMPORT_ROWS]?.satir;
+
+    const gruplar = new Map<
+      string,
+      { projectId?: string; departmentId?: string; hedefAdi: string; items: typeof islenecek }
+    >();
+    for (const task of islenecek) {
+      const key = task.projectId ? `p:${task.projectId}` : `d:${task.departmentId}`;
+      const mevcut = gruplar.get(key);
+      if (mevcut) mevcut.items.push(task);
+      else {
+        gruplar.set(key, {
+          projectId: task.projectId,
+          departmentId: task.departmentId,
+          hedefAdi: task.hedefAdi,
+          items: [task],
+        });
+      }
+    }
+
+    // Yetki her hedef için BİR kez ve ÖNİZLEMEDE DE denetlenir: kullanıcıya
+    // "99 görev açılacak" deyip sonra yetkiden dönmek en kötü sonuç olurdu.
+    for (const grup of gruplar.values()) {
+      if (grup.projectId) {
+        await this.requireProjectRole(grup.projectId, userId, userRole, ["owner", "member", "subcontractor"]);
+      } else if (grup.departmentId) {
+        await this.departmentsService.assertCanView(grup.departmentId, userId);
+      }
+    }
+
+    const hedefler = [...gruplar.values()].map((g) => ({ hedef: g.hedefAdi, adet: g.items.length }));
+
+    if (input.onizleme !== false) {
+      return pruneEmpty({
+        onizleme: true,
+        okunanSatir: plan.toplamSatir,
+        olusturulacak: islenecek.length,
+        hedefler,
+        atlanan: plan.atlanan.slice(0, 8),
+        atlananToplam: plan.atlanan.length || undefined,
+        uyarilar: plan.uyarilar.slice(0, 5),
+        ornek: islenecek.slice(0, 3).map((t) => ({
+          satir: t.satir,
+          baslik: t.title,
+          teslim: t.deadline,
+          hedef: t.hedefAdi,
+        })),
+        kalanIlkSatir,
+        not:
+          "Hiçbir şey YAZILMADI. Özeti kullanıcıya göster, onay alınca aynı çağrıyı onizleme:false ile tekrarla. " +
+          "Tarihi çözülemeyen görevler bugünün tarihiyle açılır; sorumlusu belirtilmeyenler kullanıcıya atanır.",
+      });
+    }
+
+    let olusturulan = 0;
+    const yazilanHedefler: { hedef: string; adet: number }[] = [];
+    for (const grup of gruplar.values()) {
+      const created = await this.tasksService.createMany(
+        { projectId: grup.projectId, departmentId: grup.departmentId },
+        grup.items.map((t) => ({
+          title: t.title,
+          description: t.description,
+          deadline: t.deadline,
+          startDate: t.startDate,
+          budget: t.budget,
+          assignedTo: t.assignedTo,
+        })),
+        userId
+      );
+      olusturulan += created.length;
+      yazilanHedefler.push({ hedef: grup.hedefAdi, adet: created.length });
+    }
+
+    return pruneEmpty({
+      olusturulan,
+      hedefler: yazilanHedefler,
+      atlanan: plan.atlanan.slice(0, 8),
+      atlananToplam: plan.atlanan.length || undefined,
+      uyarilar: plan.uyarilar.slice(0, 5),
+      kalanIlkSatir,
+      not: kalanIlkSatir
+        ? `Satır tavanına gelindi. Kalanlar için aynı çağrıyı ilkSatir:${kalanIlkSatir} ile tekrarla.`
+        : "Bitti. Kaç görev açıldığını ve atlanan satırları kullanıcıya SÖYLE.",
+    });
+  }
+
+  /** Tablodan toplu modül kaydı açar; akış görev içe aktarmasıyla aynı. */
+  private async importModuleRecordsFromSheet(userId: string, input: Record<string, any>): Promise<unknown> {
+    const sheet = this.requireSheet(userId, input);
+    const moduleName = await this.moduleDisplayName(input.moduleKey);
+    if (!hasRecordConfig(input.moduleKey)) {
+      throw new BadRequestException(
+        `"${moduleName}" bir kayıt defteri değil; buraya toplu kayıt yazılamaz (bkz. describe_module).`
+      );
+    }
+
+    const target = input.jobId
+      ? { jobId: await this.requireOwnJob(userId, input.jobId), moduleKey: input.moduleKey }
+      : {
+          organizationId: await this.requireOwnOrganization(userId, input.organizationId),
+          departmentId: input.departmentId,
+          moduleKey: input.moduleKey,
+        };
+
+    const plan = planRecordImport(sheet, {
+      esleme: input.esleme ?? {},
+      basliksatiri: input.basliksatiri,
+      ilkSatir: input.ilkSatir,
+      sonSatir: input.sonSatir,
+    });
+
+    const islenecek = plan.planlanan.slice(0, MAX_IMPORT_ROWS);
+    const kalanIlkSatir = plan.planlanan[MAX_IMPORT_ROWS]?.satir;
+
+    // Her satır alan tanımından geçer: tanımda olmayan anahtar hiçbir ekranda
+    // görünmez, zorunlu alanı eksik satır da kaydedilmemeli.
+    const hazir: Record<string, unknown>[] = [];
+    const atlanan = [...plan.atlanan];
+    const uyarilar: { satir: number; sebep: string }[] = [];
+    for (const row of islenecek) {
+      try {
+        const { data, warnings } = normalizeModuleData(input.moduleKey, moduleName, row.data, {
+          requireMandatory: true,
+        });
+        if (Object.keys(data).length === 0) {
+          atlanan.push({ satir: row.satir, sebep: "eşlenen alanların hiçbiri tanımda yok" });
+          continue;
+        }
+        if (warnings.length) uyarilar.push({ satir: row.satir, sebep: warnings[0] });
+        hazir.push(data);
+      } catch (err: any) {
+        atlanan.push({ satir: row.satir, sebep: err?.message ?? "kayıt doğrulanamadı" });
+      }
+    }
+
+    if (input.onizleme !== false) {
+      return pruneEmpty({
+        onizleme: true,
+        modul: moduleName,
+        okunanSatir: plan.toplamSatir,
+        olusturulacak: hazir.length,
+        atlanan: atlanan.slice(0, 8),
+        atlananToplam: atlanan.length || undefined,
+        uyarilar: uyarilar.slice(0, 5),
+        ornek: hazir.slice(0, 2),
+        kalanIlkSatir,
+        not: "Hiçbir şey YAZILMADI. Onay alınca aynı çağrıyı onizleme:false ile tekrarla.",
+      });
+    }
+
+    const created = await this.moduleRecordsService.createMany(target, hazir, userId);
+    return pruneEmpty({
+      olusturulan: created.length,
+      modul: moduleName,
+      atlanan: atlanan.slice(0, 8),
+      atlananToplam: atlanan.length || undefined,
+      uyarilar: uyarilar.slice(0, 5),
+      kalanIlkSatir,
+      not: kalanIlkSatir
+        ? `Satır tavanına gelindi. Kalanlar için ilkSatir:${kalanIlkSatir} ile tekrarla.`
+        : "Bitti. Kaç kayıt yazıldığını ve atlananları kullanıcıya SÖYLE.",
+    });
+  }
+
+  // --- Yeni alanların yardımcıları -----------------------------------------
+
+  /** Ürün araçlarının ortak alan eşlemesi; verilmeyen alan dokunulmadan kalır. */
+  private productPatch(input: Record<string, any>): ProductWriteInput {
+    const patch: Record<string, unknown> = {};
+    const fields = [
+      "name",
+      "description",
+      "sku",
+      "brand",
+      "category",
+      "unit",
+      "stockQuantity",
+      "price",
+      "costPrice",
+      "currency",
+      "taxRate",
+      "status",
+      "notes",
+    ];
+    for (const field of fields) {
+      if (input[field] !== undefined) patch[field] = input[field];
+    }
+    return patch as ProductWriteInput;
+  }
+
+  /** Ürünün organizasyonu — canlı bildirimin hedef sayfası için (bkz. describeActivity). */
+  private async organizationIdOfProduct(productId?: string): Promise<string | undefined> {
+    if (!productId) return undefined;
+    try {
+      const product = await this.productsService.findOne(productId);
+      return product.organizationId;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Destek talebinde görünecek ad; kullanıcıya sormaya gerek yok. */
+  private async userDisplayName(userId: string): Promise<string> {
+    const { data } = await this.supabase.client
+      .from("users")
+      .select("full_name, email")
+      .eq("id", userId)
+      .maybeSingle();
+    return (data?.full_name as string) || (data?.email as string) || "Projelio kullanıcısı";
+  }
+
+  // --- Dışa aktarma ---------------------------------------------------------
+
+  /**
+   * Rapor üretir: veriyi toplar, dosyaya çevirir, indirme bağlantısı ya da
+   * dosya kitaplığındaki kayıt olarak döndürür.
+   *
+   * VERİYİ TOPLAMAK BURADA, dosyaya çevirmek AiExportsService'te. Böylece
+   * raporun gördüğü şey Lio'nun list_* araçlarının gördüğüyle AYNI kapıdan
+   * geçiyor: yetkisi olmayan bir projeyi listeleyemeyen kullanıcı onu dışa da
+   * aktaramaz.
+   */
+  private async exportReport(
+    userId: string,
+    userRole: string,
+    input: Record<string, any>
+  ): Promise<unknown> {
+    const format: ExportFormat = input.bicim === "csv" ? "csv" : "xlsx";
+    const { table, defaultName, target } = await this.collectExportTable(userId, userRole, input);
+
+    if (table.rows.length === 0) {
+      throw new BadRequestException(
+        "Dışa aktarılacak kayıt bulunamadı. Filtreleri gözden geçir ya da kullanıcıya söyle."
+      );
+    }
+
+    const totalRows = table.rows.length;
+    const built = await this.exportsService.build(userId, {
+      fileName: input.dosyaAdi || defaultName,
+      format,
+      table,
+    });
+    // Kesilen satırı SÖYLEMEK zorunlu: eksik bir raporu kullanıcı ancak elle
+    // sayarak fark eder (bkz. MAX_EXPORT_ROWS).
+    const kesilen = totalRows > built.rowCount ? totalRows - built.rowCount : 0;
+
+    if (input.hedef === "dosya_kitapligi") {
+      const fileId = await this.uploadExportToLibrary(userId, built.id, target);
+      return pruneEmpty({
+        fileId,
+        dosyaAdi: built.fileName,
+        satirSayisi: built.rowCount,
+        atlananSatir: kesilen || undefined,
+        not: "Dosya kitaplığa yüklendi. Kullanıcıya `[dosya adı](projelio:file/<fileId>)` biçiminde ver.",
+      });
+    }
+
+    return pruneEmpty({
+      indirmeBaglantisi: `projelio:export/${built.id}`,
+      dosyaAdi: built.fileName,
+      satirSayisi: built.rowCount,
+      atlananSatir: kesilen || undefined,
+      gecerlilik: "30 dakika",
+      not: "Bağlantıyı yanıtında `[dosya adı](projelio:export/<id>)` biçiminde yaz; kullanıcı tıklayınca dosya iner.",
+    });
+  }
+
+  /** Üretilen raporu işin/projenin/departmanın dosyalarına yükler. */
+  private async uploadExportToLibrary(
+    userId: string,
+    exportId: string,
+    target: { projectId?: string; departmentId?: string; jobId?: string }
+  ): Promise<string> {
+    if (!target.projectId && !target.departmentId && !target.jobId) {
+      throw new BadRequestException(
+        "Bu veri kümesinin bağlı olduğu bir iş/proje/departman yok, dosya kitaplığına yüklenemez. " +
+          "İndirme bağlantısı olarak ver."
+      );
+    }
+
+    const stored = this.exportsService.take(exportId, userId);
+    // FilesService multer dosyası bekliyor; ürettiğimiz tampon aynı biçime
+    // sarılıyor (istek gövdesinden gelmediği için boyut/ad elimizde).
+    const file = {
+      originalname: stored.fileName,
+      mimetype: stored.mimeType,
+      buffer: stored.buffer,
+      size: stored.buffer.length,
+    } as Express.Multer.File;
+
+    if (target.projectId) {
+      const uploaded = await this.filesService.uploadInlineForProject(target.projectId, userId, file, {});
+      return uploaded.id;
+    }
+    if (target.departmentId) {
+      const uploaded = await this.filesService.uploadInlineForDepartment(target.departmentId, userId, file);
+      return uploaded.id;
+    }
+    const uploaded = await this.filesService.uploadInline(target.jobId!, userId, file, {});
+    return uploaded.id;
+  }
+
+  /**
+   * Rapora girecek tabloyu hazırlar.
+   *
+   * Her veri kümesi kendi yetki kapısından geçer — list_* araçlarında ne
+   * kullanılıyorsa aynısı.
+   */
+  private async collectExportTable(
+    userId: string,
+    userRole: string,
+    input: Record<string, any>
+  ): Promise<{
+    table: ExportTable;
+    defaultName: string;
+    target: { projectId?: string; departmentId?: string; jobId?: string };
+  }> {
+    const today = new Date().toISOString().slice(0, 10);
+    const cell = (value: unknown): string | number | undefined => {
+      if (value === undefined || value === null || value === "") return undefined;
+      if (typeof value === "number") return value;
+      if (Array.isArray(value)) return value.join(", ");
+      if (typeof value === "object") return JSON.stringify(value);
+      return String(value);
+    };
+
+    switch (input.veri) {
+      case "gorevler": {
+        const durum: Record<string, string> = {
+          todo: "Yapılacak",
+          in_progress: "Yapılıyor",
+          completed: "Tamamlandı",
+        };
+        let tasks;
+        let baslik: string;
+        if (input.projectId) {
+          await this.requireProjectRole(input.projectId, userId, userRole, ["owner", "member", "subcontractor"]);
+          const project = await this.projectsService.findOne(input.projectId);
+          tasks = await this.tasksService.findByProject(input.projectId, userId);
+          baslik = project.title;
+        } else if (input.departmentId) {
+          await this.departmentsService.assertCanView(input.departmentId, userId);
+          const department = await this.departmentsService.findOne(input.departmentId);
+          tasks = await this.tasksService.findByDepartment(input.departmentId, userId);
+          baslik = department.name;
+        } else {
+          throw new BadRequestException("Görev raporu için projectId ya da departmentId vermelisin.");
+        }
+
+        return {
+          defaultName: `gorevler-${baslik}-${today}`,
+          target: { projectId: input.projectId, departmentId: input.departmentId },
+          table: {
+            title: "Görevler",
+            headers: ["Başlık", "Durum", "Öncelik", "Başlangıç", "Teslim", "Atanan", "Bütçe", "Açıklama"],
+            rows: tasks.map((t: any) => [
+              cell(t.title),
+              durum[t.status] ?? t.status,
+              cell(t.priority),
+              shortDate(t.startDate),
+              shortDate(t.deadline),
+              cell(t.assignedToName),
+              cell(t.budget),
+              cell(t.description),
+            ]),
+          },
+        };
+      }
+
+      case "butce": {
+        if (!input.projectId) throw new BadRequestException("Bütçe raporu için projectId gerekli.");
+        // Bütçeyi yalnızca proje sahibi görebiliyor (bkz. list_budget_transactions).
+        await this.requireProjectRole(input.projectId, userId, userRole, ["owner"]);
+        const [project, transactions] = await Promise.all([
+          this.projectsService.findOne(input.projectId),
+          this.budgetService.findByProject(input.projectId, userId),
+        ]);
+        const tur: Record<string, string> = { income: "Gelir", expense: "Gider", payout: "Ödeme" };
+        return {
+          defaultName: `butce-${project.title}-${today}`,
+          target: { projectId: input.projectId },
+          table: {
+            title: "Bütçe hareketleri",
+            headers: ["Tarih", "Tür", "Tutar", "Açıklama"],
+            rows: transactions.map((t: any) => [
+              shortDate(t.occurredAt),
+              tur[t.type] ?? t.type,
+              cell(t.amount),
+              cell(t.description),
+            ]),
+          },
+        };
+      }
+
+      case "modul_kayitlari": {
+        const moduleName = await this.moduleDisplayName(input.moduleKey);
+        if (!hasRecordConfig(input.moduleKey)) {
+          throw new BadRequestException(
+            `"${moduleName}" bir kayıt defteri değil; dışa aktarılacak kaydı yok (bkz. describe_module).`
+          );
+        }
+        const config = getModuleRecordConfig(input.moduleKey, moduleName);
+        const records = input.jobId
+          ? await this.moduleRecordsService.findByJob(await this.requireOwnJob(userId, input.jobId), input.moduleKey)
+          : await this.moduleRecordsService.findByOrganization(
+              await this.requireOwnOrganization(userId, input.organizationId),
+              input.moduleKey,
+              userId
+            );
+
+        return {
+          defaultName: `${moduleName}-${today}`,
+          target: { jobId: input.jobId },
+          table: {
+            title: moduleName,
+            headers: ["Oluşturuldu", ...config.fields.map((f) => f.label)],
+            rows: records.map((r: any) => [
+              shortDate(r.createdAt),
+              ...config.fields.map((f) => cell(r.data?.[f.key])),
+            ]),
+          },
+        };
+      }
+
+      case "urunler": {
+        const organizationId = await this.requireOwnOrganization(userId, input.organizationId);
+        const products = await this.productsService.findByOrganization(organizationId);
+        return {
+          defaultName: `urunler-${today}`,
+          target: {},
+          table: {
+            title: "Ürünler",
+            headers: [
+              "Ad",
+              "Stok kodu",
+              "Kategori",
+              "Marka",
+              "Birim",
+              "Stok",
+              "Fiyat",
+              "Para birimi",
+              "Maliyet",
+              "KDV %",
+              "Durum",
+              "Notlar",
+            ],
+            rows: products.map((p: any) => [
+              cell(p.name),
+              cell(p.sku),
+              cell(p.category),
+              cell(p.brand),
+              cell(p.unit),
+              cell(p.stockQuantity),
+              cell(p.price),
+              cell(p.currency),
+              cell(p.costPrice),
+              cell(p.taxRate),
+              p.status === "inactive" ? "Pasif" : "Aktif",
+              cell(p.notes),
+            ]),
+          },
+        };
+      }
+
+      case "yapilacaklar": {
+        const board = await this.personalTodosService.getBoard(userId, { source: "all", includeHidden: false });
+        const durum: Record<string, string> = {
+          todo: "Yapılacak",
+          in_progress: "Yapılıyor",
+          completed: "Tamamlandı",
+        };
+        return {
+          defaultName: `yapilacaklar-${today}`,
+          target: {},
+          table: {
+            title: "Yapılacaklar",
+            headers: ["Başlık", "Kaynak", "Durum", "Teslim", "Saat", "Proje", "Kişisel not"],
+            rows: board.map((item: any) => [
+              cell(item.title),
+              item.source === "assigned" ? "Atanmış görev" : "Kişisel",
+              durum[item.status] ?? item.status,
+              shortDate(item.effectiveDueDate),
+              cell(item.deadlineTime),
+              cell(item.projectTitle),
+              cell(item.personalNote),
+            ]),
+          },
+        };
+      }
+
+      case "projeler": {
+        if (!input.jobId) throw new BadRequestException("Proje raporu için jobId gerekli.");
+        const jobId = await this.requireOwnJob(userId, input.jobId);
+        const job = await this.jobsService.findOne(jobId);
+        const projects = (await this.projectsService.findAllForUser(userId)).filter((p) => p.jobId === jobId);
+        return {
+          defaultName: `projeler-${job.title}-${today}`,
+          target: { jobId },
+          table: {
+            title: "Projeler",
+            headers: ["Proje", "Durum", "Bütçe", "Başlangıç", "Teslim", "Açıklama"],
+            rows: projects.map((p: any) => [
+              cell(p.title),
+              cell(p.status),
+              cell(p.totalBudget),
+              shortDate(p.startDate),
+              shortDate(p.deadline),
+              cell(p.description),
+            ]),
+          },
+        };
+      }
+
+      default:
+        throw new BadRequestException(`Bilinmeyen veri kümesi: ${input.veri}`);
     }
   }
 

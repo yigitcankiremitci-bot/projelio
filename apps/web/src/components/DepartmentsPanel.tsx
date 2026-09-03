@@ -9,6 +9,7 @@ import { useLatestRef, useRefreshOnUndo, useReorderUndo } from "../lib/undo";
 import DepartmentCard from "./DepartmentCard";
 import { IconX } from "./icons";
 import { useDragScroll } from "../lib/useDragScroll";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 
 export interface DepartmentsPanelHandle {
   openAdd: () => void;
@@ -206,6 +207,7 @@ function AddDepartmentForm({
       if (customName.trim()) {
         await api.post(`/organizations/${organizationId}/departments`, { name: customName.trim() });
       }
+      notifySidebarChanged();
       onAdded();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Departman eklenemedi");

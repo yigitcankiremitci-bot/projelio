@@ -26,7 +26,15 @@ export type MessageSegment =
    * penceresini açar (bkz. FilePreviewModal) — pencerede indirme ve
    * "Drive'da düzenle" zaten var, düzenleme yeni sekmeye oradan gidiyor.
    */
-  | { type: "file"; label: string; fileId: string };
+  | { type: "file"; label: string; fileId: string }
+  /**
+   * Lio'nun ÜRETTİĞİ rapor dosyası: `projelio:export/<kimlik>`.
+   *
+   * Dosya kitaplığındaki bir kayıt değil, sunucuda 30 dakika duran geçici bir
+   * çıktı (bkz. backend ai-exports.service.ts). Önizlenecek bir şey yok,
+   * tıklanınca doğrudan iner — bu yüzden "file"dan ayrı bir tür.
+   */
+  | { type: "export"; label: string; exportId: string };
 
 /**
  * Hem `[ad](adres)` hem de çıplak `https://…` yakalanır: modele "adı bağlantı
@@ -45,6 +53,9 @@ const LINK_PATTERN = /\[([^\]\n]+)\]\(([^()\s]+)\)|(https?:\/\/[^\s<>[\]()]+)/g;
  * bir metin, var olmayan bir dosyaya tıklanabilir bir düğme üretmesin.
  */
 const FILE_LINK = /^projelio:file\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+/** Üretilen rapor bağlantısı; kimlik yine UUID olmak zorunda (bkz. FILE_LINK). */
+const EXPORT_LINK = /^projelio:export\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 
 /**
  * Çıplak adresin sonuna yapışan noktalama.
@@ -66,8 +77,9 @@ export function parseMessageLinks(text: string): MessageSegment[] {
     const label = bare ? rawHref : match[1];
 
     const internal = bare ? null : FILE_LINK.exec(rawHref);
-    const href = internal ? null : safeExternalUrl(rawHref);
-    if (!internal && !href) continue;
+    const exported = bare || internal ? null : EXPORT_LINK.exec(rawHref);
+    const href = internal || exported ? null : safeExternalUrl(rawHref);
+    if (!internal && !exported && !href) continue;
 
     const start = match.index;
     // Çıplak adreste kırpılan noktalama METNE geri döner, bu yüzden bitiş
@@ -78,7 +90,9 @@ export function parseMessageLinks(text: string): MessageSegment[] {
     segments.push(
       internal
         ? { type: "file", label, fileId: internal[1] }
-        : { type: "link", label, href: href! }
+        : exported
+          ? { type: "export", label, exportId: exported[1] }
+          : { type: "link", label, href: href! }
     );
     cursor = end;
     LINK_PATTERN.lastIndex = end;

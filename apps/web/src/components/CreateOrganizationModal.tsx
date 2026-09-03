@@ -4,6 +4,7 @@ import { ORG_TYPE_LABEL } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 
 interface Props {
   onClose: () => void;
@@ -44,6 +45,7 @@ export default function CreateOrganizationModal({ onClose, onCreated, fixedGroup
         orgType,
         groupId: groupId || undefined,
       });
+      notifySidebarChanged();
       onClose();
       if (onCreated) onCreated(created);
       else window.location.reload();

@@ -7,6 +7,7 @@ import { resizeCoverImage } from "../lib/imageProcessing";
 import CoverPicker from "./CoverPicker";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 
 interface Props {
   /**
@@ -87,6 +88,7 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
         await api.uploadFile(`/operations/${operation.id}/cover`, formData);
       }
       if (onSaved) {
+        notifySidebarChanged();
         onSaved();
         onClose();
       } else {
@@ -185,6 +187,7 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
       <EntityDangerZone
         entityLabel="Rutini"
         resourcePath={`/operations/${operation.id}`}
+        affectsSidebar
         onArchive={handleArchive}
         onDelete={handleDelete}
         archiveMessage={`"${operation.title}" rutinini arşive eklemek istediğine emin misin? Rutine bağlı tekrar kuralları ve açılmış görevler de arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}

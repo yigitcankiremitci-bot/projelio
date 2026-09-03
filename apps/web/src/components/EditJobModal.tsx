@@ -6,6 +6,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 import HireMemberModal from "./HireMemberModal";
 import { IconUser } from "./icons";
 
@@ -67,6 +68,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
         formData.append("file", resized);
         await api.uploadFile(`/jobs/${job.id}/cover`, formData);
       }
+      notifySidebarChanged();
       onSaved();
       onClose();
     } catch {
@@ -148,6 +150,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
       <EntityDangerZone
         entityLabel="İşi"
         resourcePath={`/jobs/${job.id}`}
+        affectsSidebar
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
         archiveMessage={`"${job.title}" işini arşive eklemek istediğine emin misin? Bu işe bağlı tüm projeler ve görevler de arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}

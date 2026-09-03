@@ -1870,6 +1870,34 @@ function Bubble({
               );
             }
 
+            if (segment.type === "export") {
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    // Rapor sunucuda 30 dakika duruyor; süresi dolmuşsa sunucu
+                    // ne olduğunu söylüyor, o cümleyi olduğu gibi gösteriyoruz.
+                    aiChat
+                      .downloadExport(segment.exportId, segment.label)
+                      .catch((e) => alert(e instanceof Error ? e.message : "Rapor indirilemedi."));
+                  }}
+                  title="Raporu indir"
+                  style={{
+                    ...linkStyle,
+                    display: "inline",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    font: "inherit",
+                    cursor: "pointer",
+                  }}
+                >
+                  {segment.label}
+                </button>
+              );
+            }
+
             if (segment.type === "link") {
               return (
                 <a key={i} href={segment.href} target="_blank" rel="noreferrer" style={linkStyle}>

@@ -19,6 +19,8 @@ import { useCurrentUser } from "../lib/useCurrentUser";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
+import { isOperationInSidebar } from "../lib/useSidebarHierarchy";
 
 const periodLabel: Record<string, string> = { weekly: "hafta", monthly: "ay", yearly: "yıl" };
 
@@ -154,7 +156,15 @@ export default function OperationDetail() {
   };
 
   const changeStatus = (status: OperationStatus) => {
-    api.patch(`/operations/${id}`, { status }).then(reload).catch(reload);
+    // Biten rutin sidebar ağacından düşer, yeniden başlatılan geri gelir.
+    const visibilityChanged = operation ? isOperationInSidebar(operation.status) !== isOperationInSidebar(status) : false;
+    api
+      .patch(`/operations/${id}`, { status })
+      .then(() => {
+        if (visibilityChanged) notifySidebarChanged();
+        reload();
+      })
+      .catch(reload);
     setStatusPrompt(null);
   };
 

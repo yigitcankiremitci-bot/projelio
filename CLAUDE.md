@@ -105,7 +105,7 @@ Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 | Arıza bildirimi | `PROJELIO_NTFY_KONU` ya da `PROJELIO_TELEGRAM_TOKEN`+`_CHAT` | `/etc/projelio/uyari.env` ya da `~/uyari.env` |
 | Yedek yaşam sinyali | `PROJELIO_YEDEK_PING` | aynı dosya |
 | WhatsApp'tan Lio'ya komut | `WHATSAPP_LIO_KOMUT=1` | `backend/.env` |
-| Lio'nun AI sağlayıcı sırası | `AI_PROVIDERS` | `backend/.env` |
+| Lio'nun AI sağlayıcı sırası | `AI_PROVIDERS` | `backend/.env` (ya da Admin paneli) |
 
 `AI_PROVIDERS` sağlayıcıları hem **açar** hem **sıralar** — virgülle ayrılmış,
 soldan sağa öncelikli:
@@ -123,22 +123,36 @@ sağlayıcıya özgü 401/404); 400'de geçilmez, çünkü bozuk istek her sağl
 bozuktur. Kredi, yedeğe geçilirse **gerçekten kullanılan** modelin fiyatından
 kesilir.
 
-### Model seçimi
+### Model seçimi — KARAR YÖNETİCİDE
 
-Kademe (hızlı/dengeli/güçlü) seçimi duruyor; artık ona ek olarak kullanıcı
-**tam modeli** de seçebiliyor. `POST /ai/chat` gövdesine
-`model: "saglayici:model"` (ör. `"zai:glm-5.3"`) konur; seçenekleri
-`GET /ai/models` döner (`models` alanı — yalnızca ETKİN sağlayıcıların
-modelleri, fiyat ve bağlam penceresiyle).
+Kullanıcı model ya da kademe seçemez. Eskiden seçebiliyordu ve iki sorun
+vardı: `POST /ai/chat` gövdesindeki `model` alanı korumasızdı (herkes Opus'u
+çalıştırabiliyordu), kademe seçimi de faturayı 15 kata kadar değiştiriyordu.
+İkisi de tercih değil **maliyet kararı**.
 
-Seçilen model listenin başına geçer, kademenin normal adayları **yedekte
-kalır**: seçim geçici olarak düşerse iş durmaz. Geçersiz ya da kapalı bir
-sağlayıcıya ait seçim sessizce yok sayılır ve kademe kararı işler — eski bir
-sohbette kalmış seçim yüzünden asistan durmasın diye.
+Sunucu artık kullanıcıdan gelen `tier` ve `model` alanlarını **yok sayar**.
+Alanlar imzalarda duruyor ama kullanılmıyor — güncellenmemiş istemcilerin
+isteklerini reddetmek yerine sessizce yok saymak doğru davranış.
 
-Kademe varsayılanını ortamdan ezmek için `AI_MODEL_<SAĞLAYICI>_<KADEME>`
-(ör. `AI_MODEL_ZAI_SMART=glm-4.7`); eski `ANTHROPIC_MODEL` çalışmaya devam eder
-ama yalnızca Anthropic birincilken.
+Yönetici kararı iki yerden verebilir:
+
+| Yol | Nasıl | Ne zaman |
+|---|---|---|
+| Admin paneli | Admin > AI sağlayıcıları > Kademe ve model seçimi | Olağan yol; SSH gerekmez |
+| Ortam değişkeni | `AI_PROVIDERS`, `AI_MODEL_<SAĞLAYICI>_<KADEME>` | Panel erişilemezse |
+
+Öncelik: veritabanı ayarı > ortam değişkeni > kod varsayılanı. Tablo boşsa ya
+da bir satır yoksa eski davranış aynen sürer, yani migration 086 tek başına
+hiçbir şeyi değiştirmez. Tablolar okunamazsa (ör. migration uygulanmadan)
+asistan **durmaz**, kod varsayılanına düşer.
+
+Seçim kaydedilirken katalogda var mı diye doğrulanır: geçersiz bir kayıt
+asistanın HER isteğinde sağlayıcıdan 404 almasına yol açardı ve sebebi panelde
+görünmezdi (`ai-model-settings.service.ts`, testleri `ai-model-settings.test.ts`).
+
+`GET /ai/models` artık yalnızca `maxAttachments` döner — seçim hakkı olmayan
+kullanıcıya model listesi göstermek anlamsız. Model listesi yalnızca yönetici
+ucundan gelir: `GET /ai/admin/model-settings`.
 
 ### Katalogdaki modeller (Eylül 2026 liste fiyatları, USD/milyon token)
 

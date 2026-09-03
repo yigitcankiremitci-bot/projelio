@@ -3,6 +3,21 @@
 	email info@projelio.app
 }
 
+# -------------------------------------------------------------- Tanıtım sitesi
+# Kalıcı alan adları. Caddy DNS kayıtları VPS'e ulaştığında sertifikaları otomatik alır.
+projelio.app {
+	reverse_proxy landing:3001
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+}
+
+www.projelio.app {
+	redir https://projelio.app{uri} permanent
+}
+
 # ---------------------------------------------------------------- Uygulama
 # Web arayüzü. TLS otomatik (Let's Encrypt, HTTP-01) — bu yüzden 80 portu
 # internete açık kalmak ZORUNDA, yoksa sertifika yenilenemez.
@@ -112,6 +127,36 @@ api.projelio.app {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
+	}
+}
+
+# ------------------------------------------------------- Geçici prova adresleri
+# DNS geçişi tamamlanana kadar IP/HTTP prova adresleri çalışmaya devam eder.
+193.111.77.252:80 {
+	root * /srv/web
+	encode zstd gzip
+	try_files {path} /index.html
+	file_server
+	header {
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)"
+		-Strict-Transport-Security
+	}
+}
+
+# /rest/v1 burada da dışa kapalı; yalnız backend ve açık storage yüzeyi taşınır.
+http://api.193.111.77.252.sslip.io {
+	encode zstd gzip
+	handle_path /storage/v1/* {
+		reverse_proxy storage:5000
+	}
+	handle {
+		reverse_proxy backend:3000
+	}
+	header {
+		-Strict-Transport-Security
 	}
 }
 

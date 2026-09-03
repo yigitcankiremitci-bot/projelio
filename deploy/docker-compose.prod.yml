@@ -285,6 +285,8 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       CORS_ORIGINS: https://app.projelio.app
       WEB_APP_URL: https://app.projelio.app
+      BACKEND_URL: https://api.projelio.app
+      GOOGLE_REDIRECT_URI: https://api.projelio.app/auth/google/callback
       # WhatsApp köprüsü iç ağ adresi; WAHA'nın backend'e webhook atacağı
       # adres de iç ağdan (Caddy'ye uğramadan) verilir.
       WAHA_URL: http://waha:3000
@@ -371,7 +373,7 @@ services:
     # için açık kalmalı — 80 kapatılırsa sertifika YENİLENEMEZ.
     # 8081 yalnızca 127.0.0.1'e bağlı: yerel geliştirmenin SSH tüneli için,
     # internete kapalı (bkz. Caddyfile'daki :8081 bloğu).
-    ports: ["80:80", "443:443", "127.0.0.1:8081:8081"]
+    ports: ["80:80", "443:443", "443:443/udp", "127.0.0.1:8081:8081"]
     volumes:
       # Sertifika deposu. Kalıcı olmazsa her dağıtımda yeni sertifika istenir
       # ve Let's Encrypt'in haftalık limitine (alan adı başına 5) takılırız —

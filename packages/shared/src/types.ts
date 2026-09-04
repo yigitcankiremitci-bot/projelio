@@ -130,7 +130,7 @@ export interface User {
   // Yetki DEĞİLDİR, yalnızca tercih/öneri: modüle erişim departman üyeliğinden gelir.
   onboardingModules?: string[];
   // Hesabın bir şifresi var mı. Google ile açılan hesaplarda password_hash null
-  // kalabiliyor (bkz. users.service createFromGoogle); Ayarlar > Hesap orada
+  // kalabiliyor (bkz. users.service createFromSocialLogin); Ayarlar > Hesap orada
   // "mevcut şifre" sormak yerine ilk kez şifre belirletir. Şifrenin kendisi
   // hiçbir zaman istemciye gitmez, yalnızca bu bayrak.
   hasPassword?: boolean;

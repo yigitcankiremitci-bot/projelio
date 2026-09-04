@@ -3,6 +3,12 @@ import { JwtService } from "@nestjs/jwt";
 import { isMicrosoftTokenCryptoConfigured } from "./microsoft-token-crypto.util";
 import { getWebAppUrl } from "../../common/config/env";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
+import { MicrosoftIdentity, decodeMicrosoftIdentity } from "./microsoft-identity";
+
+// Kimlik çözümlemesi saf bir modülde (Node'un yerleşik test koşucusu
+// dekoratörlü dosyaları içe aktaramıyor); tipi buradan da dışa açıyoruz ki
+// mevcut import edenler değişmesin.
+export { MicrosoftIdentity } from "./microsoft-identity";
 
 // "common" tenant: hem kişisel (outlook.com/hotmail.com) hem iş/okul hesapları
 // aynı uç noktadan geçer. Projelio kimin hangi organizasyona ait olduğuyla
@@ -29,6 +35,16 @@ const TOKEN_ENDPOINT = "https://login.microsoftonline.com/common/oauth2/v2.0/tok
  * openid/email/profile/offline_access ise standart OIDC scope'ları, önek almaz.
  */
 export const MICROSOFT_LOGIN_SCOPES = ["openid", "email", "profile", "offline_access"];
+
+/**
+ * "Microsoft ile giriş" akışının izinleri.
+ *
+ * `offline_access` BİLEREK YOK: girişte yalnızca kimliği (id_token) okuyoruz,
+ * kullanıcı adına sonradan Graph'a çağrı yapmıyoruz. Refresh token istemeyince
+ * saklayacak sır da olmuyor — giriş, MICROSOFT_TOKEN_ENC_KEY tanımlı olmasa da
+ * (yani OneDrive/posta hiç kurulmamışken de) çalışır.
+ */
+export const SIGN_IN_SCOPES = ["openid", "email", "profile"];
 export const ONEDRIVE_SCOPE = "https://graph.microsoft.com/Files.ReadWrite.AppFolder";
 export const ONEDRIVE_BROWSE_SCOPE = "https://graph.microsoft.com/Files.Read.All";
 
@@ -64,15 +80,20 @@ export const MAIL_CONNECT_SCOPES = [...MICROSOFT_LOGIN_SCOPES, ...MAIL_SCOPES];
 
 export interface MicrosoftOAuthStatePayload {
   typ: "microsoft_oauth";
-  /** Bu akış her zaman "connect": önce giriş yapmış kullanıcı OneDrive'ı bağlar. */
-  userId: string;
   /**
-   * Ne bağlanıyor: depolama mı posta mı.
+   * Bağlama akışlarında (drive/mail) hesabın bağlanacağı kullanıcı.
+   *
+   * "login" modunda YOK: kullanıcı henüz giriş yapmamıştır, kim olduğu ancak
+   * Microsoft'un döndürdüğü id_token'dan anlaşılır.
+   */
+  userId?: string;
+  /**
+   * Ne yapılıyor: depolama mı bağlanıyor, posta mı, yoksa "Microsoft ile giriş" mi.
    *
    * Verilmezse "drive" — bu alan eklenmeden önce imzalanmış (10 dakika ömürlü)
    * state'ler akış ortasında geçersizleşmesin diye.
    */
-  mode?: "drive" | "mail";
+  mode?: "drive" | "mail" | "login";
   /** Posta akışında: kutunun bağlanacağı modül kapsamı. */
   organizationId?: string;
   departmentId?: string;
@@ -95,11 +116,6 @@ export interface MicrosoftTokenResponse {
   id_token?: string;
 }
 
-export interface MicrosoftIdentity {
-  sub: string;
-  email: string;
-  name?: string;
-}
 
 @Injectable()
 export class MicrosoftOAuthService {
@@ -182,6 +198,15 @@ export class MicrosoftOAuthService {
     scopes?: string[];
     /** Verilmezse depolama akışının adresi. */
     redirectUri?: string;
+    /**
+     * Verilmezse "consent" (bağlama akışlarının ihtiyacı; aşağıdaki nota bak).
+     *
+     * Giriş akışında "select_account" kullanılır: orada refresh token
+     * saklamıyoruz, dolayısıyla her girişte onay ekranı göstermek kullanıcıyı
+     * boşuna yorardı — ama birden fazla Microsoft hesabı olan kişi hangisiyle
+     * gireceğini seçebilmeli.
+     */
+    prompt?: "consent" | "select_account";
   }): string {
     this.assertConfigured();
 
@@ -195,7 +220,7 @@ export class MicrosoftOAuthService {
       // Google gibi, kullanıcı daha önce onay verdiyse consent ekranını atlayıp
       // sessiz geçebiliyor — bu durumda refresh_token gelmeyebilir. prompt=consent
       // ile her seferinde açıkça onay istenmesini garanti ediyoruz.
-      prompt: "consent",
+      prompt: options.prompt ?? "consent",
       state: options.state,
     });
     if (options.loginHint) params.set("login_hint", options.loginHint);
@@ -289,27 +314,10 @@ export class MicrosoftOAuthService {
   }
 
   /**
-   * id_token içindeki kimliği okur. Google'daki decodeIdentity ile aynı
-   * gerekçe: token doğrudan Microsoft'un token uç noktasından, TLS üzerinden,
-   * client_secret'ımızla kimlik doğrulanmış bir istekte alındı — imza
-   * doğrulaması gerekmiyor.
+   * id_token içindeki kimliği okur (gerekçe ve doğrulama kuralları:
+   * microsoft-identity.ts).
    */
   decodeIdentity(idToken: string): MicrosoftIdentity {
-    const parts = idToken.split(".");
-    if (parts.length < 2) throw new UnauthorizedException("Microsoft kimlik bilgisi okunamadı.");
-
-    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
-    if (!payload?.sub) throw new UnauthorizedException("Microsoft kimlik bilgisi eksik.");
-
-    // Kişisel hesaplarda genelde `email` gelir; bazı iş/okul kiracılarında
-    // yalnızca `preferred_username` (genelde UPN, e-posta biçiminde) olabilir.
-    const email = payload.email ?? payload.preferred_username;
-    if (!email) throw new UnauthorizedException("Microsoft hesabının e-postası alınamadı.");
-
-    return {
-      sub: String(payload.sub),
-      email: String(email).toLowerCase(),
-      name: payload.name ? String(payload.name) : undefined,
-    };
+    return decodeMicrosoftIdentity(idToken);
   }
 }

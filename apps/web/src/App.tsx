@@ -526,8 +526,8 @@ export default function App() {
   // Google dönüş ekranı da kimlik doğrulaması gerektirmeyen bir ekrandır: token
   // henüz yerel depoda yok, tam da burada oluşturuluyor. Korumalı bölgeye
   // koyarsak /login'e yönlenir ve akış hiç tamamlanamaz.
-  // Microsoft dönüşünde token zaten var (yalnızca "bağlama" akışı), ama aynı
-  // bağımsız, tam ekran kart tasarımını paylaşması için burada tutuluyor.
+  // Microsoft dönüşü de aynı: "Microsoft ile giriş" akışında token tam orada
+  // oluşuyor, OneDrive bağlama akışında ise zaten var.
   const isAuthScreen =
     location.pathname === "/login" ||
     location.pathname === "/register" ||

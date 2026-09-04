@@ -122,7 +122,7 @@ export function normalizeUsername(raw: string): string {
 // E-posta karşılaştırmaları büyük/küçük harfe duyarsız olmalı: "Ali@Gmail.com" ile
 // kaydolan biri "ali@gmail.com" ile giriş yapabilmeli, ve ikisi ayrı hesap
 // sayılmamalı. `email` sütunu DB'de case-sensitive UNIQUE olduğu için bu
-// normalizasyonun HER YAZMA/OKUMA noktasında (create, createFromGoogle,
+// normalizasyonun HER YAZMA/OKUMA noktasında (create, createFromSocialLogin,
 // findByEmail) tutarlı şekilde uygulanması şart — aksi halde aynı adresin farklı
 // yazımlarıyla iki ayrı satır oluşabilir.
 export function normalizeEmail(raw: string): string {
@@ -187,17 +187,27 @@ export class UsersService {
   }
 
   /**
-   * Google ile ilk kez giriş yapan kullanıcıyı oluşturur.
+   * Bir sağlayıcıyla (Google / Microsoft) ilk kez giriş yapan kullanıcıyı oluşturur.
    *
    * Şifre yoktur (password_hash null). Kullanıcı adı e-postanın yerel kısmından
    * türetilir; çakışırsa sonuna sayı eklenerek boş bir ad bulunur — kullanıcıyı
    * girişin ortasında "kullanıcı adı seçin" ekranına düşürmemek için.
    */
-  async createFromGoogle(data: {
+  async createFromSocialLogin(data: {
     fullName: string;
     email: string;
     usernameSeed: string;
     avatarUrl?: string;
+    /**
+     * Adresin sahipliğini sağlayıcı doğrulamış mı?
+     *
+     * Google her zaman doğrular. Microsoft'ta iş/okul hesaplarının `email`
+     * claim'ini kiracı yöneticisi serbestçe yazabildiği için her zaman
+     * doğrulanmış sayılmaz (bkz. microsoft-oauth.service.ts decodeIdentity).
+     * Doğrulanmamışsa hesap açılır ama e-posta doğrulaması bekleyen bir hesap
+     * olur — kullanıcı /auth/resend-verification ile bağlantı isteyebilir.
+     */
+    emailVerified: boolean;
   }): Promise<UserRecord> {
     const username = await this.findAvailableUsername(data.usernameSeed);
     const email = normalizeEmail(data.email);
@@ -210,10 +220,10 @@ export class UsersService {
         password_hash: null,
         username,
         avatar_url: data.avatarUrl ?? null,
-        // Google ile açılan hesaplarda e-posta doğrulaması istemiyoruz: adresin
-        // sahibi olduğu zaten Google tarafından doğrulanmış oluyor (bkz.
+        // Sağlayıcı adresi doğruladıysa ayrıca e-posta doğrulaması istemiyoruz:
+        // adresin sahibi olduğu zaten kanıtlanmış oluyor (bkz.
         // google-auth.service.ts'teki identity.emailVerified kontrolü).
-        email_verified_at: new Date().toISOString(),
+        email_verified_at: data.emailVerified ? new Date().toISOString() : null,
       })
       .select()
       .single();
@@ -244,7 +254,7 @@ export class UsersService {
     return `${base}${randomUUID().slice(0, 6)}`;
   }
 
-  /** Google ile gelen kullanıcının profil fotoğrafı yoksa Google'ınkini kullan. */
+  /** Sağlayıcıyla gelen kullanıcının profil fotoğrafı yoksa sağlayıcıdakini kullan. */
   async setAvatarIfEmpty(userId: string, avatarUrl: string): Promise<void> {
     const { error } = await this.supabase.client
       .from("users")

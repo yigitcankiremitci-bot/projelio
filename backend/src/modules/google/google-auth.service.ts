@@ -1,36 +1,15 @@
-import { randomUUID } from "node:crypto";
 import { ConflictException, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { UsersService } from "../users/users.service";
 import { GoogleAccountsService } from "./google-accounts.service";
 import { GoogleIdentity } from "./google-oauth.service";
 import { nowInSeconds } from "../auth/session-payload";
-
-/**
- * Tek kullanımlık devir kodları.
- *
- * Google geri dönüşünden sonra kullanıcıyı ön yüze yönlendirmemiz gerekiyor ama
- * JWT'yi URL'e koymak istemiyoruz: adres çubuğunda, tarayıcı geçmişinde ve
- * Referer başlığında kalır. Bunun yerine 2 dakika ömürlü, tek kullanımlık bir kod
- * veriyoruz; ön yüz onu POST ile gerçek token'la takas ediyor.
- *
- * Bellekte tutuluyor: kod yalnızca saniyeler yaşıyor ve tek istekte harcanıyor.
- * (Backend birden fazla örnekte çalıştırılırsa buranın paylaşımlı bir depoya
- * taşınması gerekir. `ioredis` package.json'da bağımlılık olarak duruyor ama kodda
- * hiçbir yerde kullanılmıyor ve render.yaml'da Redis servisi tanımlı değil — yani
- * "zaten var" değil, önce sağlanması gerekiyor.)
- */
-interface HandoffEntry {
-  token: string;
-  expiresAt: number;
-}
-
-const HANDOFF_TTL_MS = 2 * 60 * 1000;
+import { OAuthHandoffStore } from "../../common/auth/oauth-handoff";
 
 @Injectable()
 export class GoogleAuthService {
   private readonly logger = new Logger(GoogleAuthService.name);
-  private readonly handoffs = new Map<string, HandoffEntry>();
+  private readonly handoffs = new OAuthHandoffStore();
 
   constructor(
     private usersService: UsersService,
@@ -71,11 +50,14 @@ export class GoogleAuthService {
         }
         userId = byEmail.id;
       } else {
-        const created = await this.usersService.createFromGoogle({
+        const created = await this.usersService.createFromSocialLogin({
           fullName: identity.name || identity.email.split("@")[0],
           email: identity.email,
           usernameSeed: identity.email.split("@")[0],
           avatarUrl: identity.picture,
+          // Google'da adres her zaman Google tarafından doğrulanmış kabul edilir
+          // (bu akış bugüne kadar da hesabı doğrulanmış açıyordu).
+          emailVerified: true,
         });
         userId = created.id;
         isNewUser = true;
@@ -149,27 +131,14 @@ export class GoogleAuthService {
   }
 
   // ------------------------------------------------------------- devir kodları
+  // Mantığın tamamı common/auth/oauth-handoff.ts'te; Microsoft akışı da aynısını
+  // kullanıyor.
 
   createHandoff(token: string): string {
-    this.purgeExpiredHandoffs();
-    const code = randomUUID();
-    this.handoffs.set(code, { token, expiresAt: Date.now() + HANDOFF_TTL_MS });
-    return code;
+    return this.handoffs.create(token);
   }
 
   consumeHandoff(code: string): string {
-    const entry = this.handoffs.get(code);
-    this.handoffs.delete(code); // tek kullanımlık: bulunsa da bulunmasa da düşer
-    if (!entry || entry.expiresAt < Date.now()) {
-      throw new UnauthorizedException("Giriş kodu geçersiz veya süresi dolmuş. Tekrar deneyin.");
-    }
-    return entry.token;
-  }
-
-  private purgeExpiredHandoffs(): void {
-    const now = Date.now();
-    for (const [code, entry] of this.handoffs) {
-      if (entry.expiresAt < now) this.handoffs.delete(code);
-    }
+    return this.handoffs.consume(code);
   }
 }

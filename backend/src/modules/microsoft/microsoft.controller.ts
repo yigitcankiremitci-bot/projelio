@@ -1,17 +1,20 @@
-import { Controller, Get, Logger, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Logger, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import type { Response } from "express";
 import { GoogleAccountsService } from "../google/google-accounts.service";
 import { MicrosoftAccountsService } from "./microsoft-accounts.service";
-import { MicrosoftOAuthService } from "./microsoft-oauth.service";
+import { MicrosoftAuthService } from "./microsoft-auth.service";
+import { MicrosoftOAuthService, SIGN_IN_SCOPES } from "./microsoft-oauth.service";
 import { OneDriveService } from "./onedrive.service";
 
 /**
- * google.controller.ts'in OneDrive karşılığı — ama yalnızca "connect" modu var.
+ * google.controller.ts'in Microsoft karşılığı: "Microsoft ile giriş" akışı ve
+ * Ayarlar'daki OneDrive bağlama ekranı.
  *
- * Google'dan fark: "Microsoft ile giriş" diye bir akış yok. Kullanıcı zaten
- * Projelio'ya girişini yapmış olmalı (JwtAuthGuard); bu uç noktalar yalnızca
- * o hesaba bir OneDrive bağlantısı ekler/kaldırır.
+ * İki mod da AYNI geri dönüş adresine (/auth/microsoft/callback) düşer; hangisi
+ * olduğu imzalı `state` içinden okunur. Posta akışı ayrı bir adres kullanır
+ * (bkz. microsoft-oauth.service.ts mailRedirectUri) — bu ikisi ise aynı adresi
+ * paylaşabiliyor, çünkü ikisi de bu controller'da.
  */
 @Controller()
 export class MicrosoftController {
@@ -21,9 +24,35 @@ export class MicrosoftController {
     private oauth: MicrosoftOAuthService,
     private accounts: MicrosoftAccountsService,
     private oneDrive: OneDriveService,
+    private microsoftAuth: MicrosoftAuthService,
     // Depolama sağlayıcısı yalnızca biri olabilir (bkz. microsoft.module.ts).
     private googleAccounts: GoogleAccountsService
   ) {}
+
+  // ------------------------------------------------------------------- giriş
+
+  /** Ön yüz "Microsoft ile devam et" düğmesi buradan yönlendirme adresini alır. */
+  @Get("auth/microsoft/url")
+  loginUrl(@Query("next") next?: string) {
+    // Giriş için jeton şifreleme anahtarı GEREKMEZ (refresh token saklamıyoruz,
+    // bkz. SIGN_IN_SCOPES): isDriveConfigured değil isConfigured'a bakılır.
+    if (!this.oauth.isConfigured()) {
+      return { configured: false as const, url: null };
+    }
+    const state = this.oauth.signState({ mode: "login", next });
+    return {
+      configured: true as const,
+      url: this.oauth.buildAuthUrl({ state, scopes: SIGN_IN_SCOPES, prompt: "select_account" }),
+    };
+  }
+
+  /** Devir kodunu gerçek oturum token'ıyla takas eder (bkz. GoogleController.exchange). */
+  @Post("auth/microsoft/exchange")
+  exchange(@Body("code") code: string) {
+    return { token: this.microsoftAuth.consumeHandoff(code) };
+  }
+
+  // ---------------------------------------------------------------- bağlama
 
   /** Ayarlar ekranındaki "OneDrive'ı bağla" düğmesi buradan yönlendirme adresini alır. */
   @Get("microsoft/connect-url")
@@ -50,10 +79,11 @@ export class MicrosoftController {
   }
 
   /**
-   * Microsoft'un geri dönüş adresi.
+   * Microsoft'un geri dönüş adresi. Hem giriş hem OneDrive bağlama akışı buraya
+   * düşer; hangisi olduğu imzalı `state` içinden okunur.
    *
-   * Google'daki callback'ten farklı olarak burada tek bir mod var (connect);
-   * sonuç yine ön yüze yönlendirmedir, kullanıcı bu adreste ham JSON görmez.
+   * Sonuç her hâlükârda ön yüze yönlendirmedir — kullanıcı bu adreste ham JSON
+   * görmemeli.
    */
   @Get("auth/microsoft/callback")
   async callback(
@@ -65,17 +95,39 @@ export class MicrosoftController {
     const web = this.oauth.webAppUrl;
 
     if (error) {
-      return res.redirect(`${web}/microsoft/return?error=${encodeURIComponent(error)}`);
+      // Kullanıcı onay ekranında "İptal" dedi. Dönüş ekranı, giriş denemesiyle
+      // OneDrive bağlama denemesini ayırt edebilsin diye modu da taşıyoruz —
+      // yoksa girişte "Ayarlara dön" diyen bir hata kartı çıkardı.
+      const params = new URLSearchParams({ error });
+      if (this.modeFromState(state) === "login") params.set("mode", "login");
+      return res.redirect(`${web}/microsoft/return?${params.toString()}`);
     }
 
     try {
       const parsed = this.oauth.verifyState(state);
-      const tokens = await this.oauth.exchangeCode(code);
+      // Kod hangi izin kümesiyle alındıysa takas da onunla yapılır; giriş
+      // akışında OneDrive izinleri hiç istenmedi.
+      const tokens = await this.oauth.exchangeCode(
+        code,
+        parsed.mode === "login" ? SIGN_IN_SCOPES : undefined
+      );
       if (!tokens.id_token) throw new Error("id_token gelmedi");
 
       const identity = this.oauth.decodeIdentity(tokens.id_token);
       const scopes = (tokens.scope ?? "").split(" ").filter(Boolean);
       const next = parsed.next && parsed.next.startsWith("/") ? parsed.next : undefined;
+
+      if (parsed.mode === "login") {
+        const { token, isNewUser } = await this.microsoftAuth.loginWithMicrosoft(identity);
+        // Oturum jetonu URL'e KONMAZ; tek kullanımlık devir kodu verilir
+        // (gerekçe: common/auth/oauth-handoff.ts).
+        const loginParams = new URLSearchParams({ code: this.microsoftAuth.createHandoff(token) });
+        if (isNewUser) loginParams.set("new", "1");
+        if (next) loginParams.set("next", next);
+        return res.redirect(`${web}/microsoft/return?${loginParams.toString()}`);
+      }
+
+      if (!parsed.userId) throw new Error("Microsoft oturum isteği geçersiz.");
 
       const ownedBySomeoneElse = await this.accounts.findByMsSub(identity.sub);
       if (ownedBySomeoneElse && ownedBySomeoneElse.userId !== parsed.userId) {
@@ -109,8 +161,10 @@ export class MicrosoftController {
       return res.redirect(`${web}/microsoft/return?${params.toString()}`);
     } catch (err: any) {
       this.logger.error(`Microsoft callback hatası: ${err?.message ?? String(err)}`);
-      const message = err?.response?.message ?? err?.message ?? "Microsoft bağlantısı tamamlanamadı.";
-      return res.redirect(`${web}/microsoft/return?error=${encodeURIComponent(message)}`);
+      const message = err?.response?.message ?? err?.message ?? "Microsoft işlemi tamamlanamadı.";
+      const params = new URLSearchParams({ error: message });
+      if (this.modeFromState(state) === "login") params.set("mode", "login");
+      return res.redirect(`${web}/microsoft/return?${params.toString()}`);
     }
   }
 
@@ -158,6 +212,20 @@ export class MicrosoftController {
   }
 
   // ----------------------------------------------------------------- yardımcı
+
+  /**
+   * Hata yolunda modu okur. Sessizce yutar: state bozuksa/süresi dolmuşsa da
+   * kullanıcıya hata kartını göstermek zorundayız, mod yalnızca kartın
+   * metnini seçiyor.
+   */
+  private modeFromState(state?: string): string | undefined {
+    if (!state) return undefined;
+    try {
+      return this.oauth.verifyState(state).mode;
+    } catch {
+      return undefined;
+    }
+  }
 
   /** Kullanıcının OneDrive'ında uygulama klasörünü hazırlar (approot'un id'sini çözüp saklar). */
   private async ensureRootFolder(userId: string): Promise<void> {

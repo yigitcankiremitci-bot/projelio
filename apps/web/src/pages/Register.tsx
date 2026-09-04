@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { backState } from "../lib/backTarget";
-import GoogleSignInButton from "../components/GoogleSignInButton";
+import SocialSignInButtons from "../components/SocialSignInButtons";
 import { useThemeColors } from "../theme/useThemeColors";
 
 export default function Register() {
@@ -248,7 +248,7 @@ export default function Register() {
           </Link>
         </form>
 
-        <GoogleSignInButton label="Google ile kayıt ol" />
+        <SocialSignInButtons verb="kayıt ol" />
 
         {/* Kayıt ekranında politikaya bağlantı vermek hem KVKK aydınlatma
             yükümlülüğü hem de Meta/Google uygulama incelemeleri için gerekli. */}

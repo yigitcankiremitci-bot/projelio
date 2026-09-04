@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { backState } from "../lib/backTarget";
-import GoogleSignInButton from "../components/GoogleSignInButton";
+import SocialSignInButtons from "../components/SocialSignInButtons";
 import { demoHesap } from "../lib/demoHesap";
 import { useThemeColors } from "../theme/useThemeColors";
 
@@ -223,7 +223,7 @@ export default function Login() {
           </Link>
         </form>
 
-        <GoogleSignInButton label="Google ile giriş yap" />
+        <SocialSignInButtons verb="giriş yap" />
 
         {/*
           DEMO HESABI — üye olmadan içeriyi gezmek isteyenler için.

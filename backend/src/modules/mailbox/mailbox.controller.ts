@@ -97,6 +97,9 @@ export class MailboxController {
 
     try {
       const parsed = this.oauth.verifyState(state);
+      // `userId` yalnızca bağlama akışlarında dolu; giriş akışının state'i buraya
+      // düşerse (aynı sırla imzalanıyorlar) sahipsiz bir kutu bağlanmasın.
+      if (!parsed.userId) throw new Error("Microsoft oturum isteği geçersiz.");
       const scope = this.scopeFromState(parsed);
 
       const tokens = await this.oauth.exchangeCode(code, MAIL_CONNECT_SCOPES, this.oauth.mailRedirectUri);

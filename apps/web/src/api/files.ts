@@ -143,11 +143,12 @@ export const driveApi = {
 };
 
 /**
- * driveApi'nin OneDrive karşılığı.
+ * driveApi'nin Microsoft karşılığı: hem "Microsoft ile giriş" hem OneDrive
+ * bağlama uçları.
  *
- * Google'dan fark: "OneDrive ile giriş" diye bir akış yok (loginUrl/exchange
- * yok) — kullanıcı zaten Projelio'ya girişini yapmış olmalı, buradaki
- * uç noktalar yalnızca mevcut hesaba bir OneDrive bağlantısı ekler/kaldırır.
+ * `connectUrl` giriş yapmış kullanıcıya OneDrive izni ister; `loginUrl` ise
+ * hiç girişi olmayan ziyaretçiyi Microsoft'a yollar ve dönüşte `exchange` ile
+ * oturum jetonu alınır (Google akışının aynısı).
  */
 export const oneDriveApi = {
   status: () => api.get<GoogleDriveStatus>("/microsoft/status"),
@@ -156,6 +157,11 @@ export const oneDriveApi = {
     api.get<{ configured: boolean; url: string | null; blockedBy?: "google" | "microsoft" }>(
       `/microsoft/connect-url${next ? `?next=${encodeURIComponent(next)}` : ""}`
     ),
+  loginUrl: (next?: string) =>
+    api.get<{ configured: boolean; url: string | null }>(
+      `/auth/microsoft/url${next ? `?next=${encodeURIComponent(next)}` : ""}`
+    ),
+  exchange: (code: string) => api.post<{ token: string }>("/auth/microsoft/exchange", { code }),
 };
 
 /**

@@ -106,9 +106,12 @@ export class MicrosoftAccountsService {
       user_id: params.userId,
       ms_sub: params.msSub,
       email: params.email,
-      picture_url: params.pictureUrl ?? null,
       scopes: params.scopes,
     };
+    // Yalnızca gerçekten fotoğraf geldiyse yazılır: her upsert'te `null`
+    // basılsaydı, fotoğraf taşımayan bir akış (ör. giriş) daha önce kaydedilmiş
+    // fotoğrafı silerdi.
+    if (params.pictureUrl !== undefined) patch.picture_url = params.pictureUrl;
 
     if (params.refreshToken) {
       patch.refresh_token_enc = encryptMicrosoftToken(params.refreshToken);

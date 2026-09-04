@@ -44,6 +44,7 @@ import {
   MODEL_TIERS,
 } from "./ai-credits.config";
 import { LlmProviderRegistry } from "./providers/provider-registry";
+import { AiModelSettingsService } from "./ai-model-settings.service";
 
 @Controller("ai")
 @UseGuards(AuthGuard("jwt"))
@@ -51,6 +52,7 @@ export class AiAssistantController {
   constructor(
     private aiAssistantService: AiAssistantService,
     private providers: LlmProviderRegistry,
+    private modelSettings: AiModelSettingsService,
     private creditsService: AiCreditsService,
     private conversationsService: AiConversationsService,
     private attachmentsService: AiAttachmentsService,
@@ -73,18 +75,18 @@ export class AiAssistantController {
       conversationId?: string;
       tier?: string;
       attachmentIds?: string[];
-      /** "saglayici:model" — kademeden bağımsız açık model seçimi. */
-      model?: string;
     }
   ) {
+    // `tier` gövdede DURUYOR ama artık kullanılmıyor: kademe ve model kararı
+    // adminde (bkz. ai-model-settings.service.ts). Alanı kaldırmak yerine yok
+    // saymak, güncellenmemiş istemcilerin isteklerini kırmamak için.
     return this.aiAssistantService.chat(
       req.user.userId,
       req.user.role,
       body.message,
       body.conversationId,
-      body.tier,
-      body.attachmentIds,
-      { model: body.model }
+      undefined,
+      body.attachmentIds
     );
   }
 
@@ -113,15 +115,10 @@ export class AiAssistantController {
   // Kullanıcının seçebileceği model kademeleri (arayüzdeki model seçici bunu okur).
   @Get("models")
   models() {
-    return {
-      defaultTier: DEFAULT_TIER,
-      tiers: Object.values(MODEL_TIERS),
-      // Etkin sağlayıcıların tüm modelleri. Kademe seçimi (hızlı/dengeli/güçlü)
-      // duruyor; bu liste "hangi modeli tam olarak istiyorum" diyen kullanıcı
-      // için. Boşsa arayüz yalnızca kademe seçicisini gösterir.
-      models: this.providers.availableModels(),
-      maxAttachments: MAX_ATTACHMENTS_PER_MESSAGE,
-    };
+    // Model/kademe listesi kullanıcıya GÖNDERİLMEZ: seçim hakkı yok, listeyi
+    // göstermek yalnızca "neden seçemiyorum" sorusunu doğurur. Ek sayısı
+    // arayüzün dosya seçicisi için gerekli olduğundan kalıyor.
+    return { maxAttachments: MAX_ATTACHMENTS_PER_MESSAGE };
   }
 
   // --- Dosya ekleri -------------------------------------------------------
@@ -441,6 +438,43 @@ export class AiAssistantController {
   health(@Req() req: any) {
     this.assertAdmin(req);
     return this.aiAssistantService.health();
+  }
+
+  // --- Model ayarları (yalnızca yönetici) ---------------------------------
+  //
+  // Model seçimi bir maliyet kararıdır; kullanıcıya değil admine aittir.
+  // Sunucudaki AI_PROVIDERS/AI_MODEL_* değişkenleri hâlâ çalışıyor, bu uçlar
+  // onları SSH gerekmeden panelden yönetebilmek için var.
+
+  @Get("admin/model-settings")
+  async adminModelSettings(@Req() req: any) {
+    this.assertAdmin(req);
+    const [settings, health] = await Promise.all([
+      this.modelSettings.get(),
+      this.aiAssistantService.health(),
+    ]);
+    return {
+      ...settings,
+      tierInfo: Object.values(MODEL_TIERS),
+      // Seçilebilecek modeller: yalnızca ETKİN sağlayıcılarınkiler.
+      available: this.providers.availableModels(),
+      health,
+    };
+  }
+
+  @Post("admin/model-settings")
+  async adminSetModel(
+    @Req() req: any,
+    @Body() body: { tier: string; modelKey?: string | null; defaultTier?: string }
+  ) {
+    this.assertAdmin(req);
+    if (body.defaultTier) {
+      await this.modelSettings.setDefaultTier(body.defaultTier as any, req.user.userId);
+    }
+    if (body.tier) {
+      await this.modelSettings.setTierModel(body.tier as any, body.modelKey ?? null, req.user.userId);
+    }
+    return this.modelSettings.get();
   }
 
   private assertAdmin(req: any): void {

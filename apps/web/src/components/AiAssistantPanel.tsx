@@ -163,8 +163,6 @@ export default function AiAssistantPanel({
   const [credits, setCredits] = useState<AiCredits | null>(null);
   const [confirmation, setConfirmation] = useState<PendingConfirmation | null>(null);
   const [continuation, setContinuation] = useState<AiContinuation | null>(null);
-  const [tiers, setTiers] = useState<AiModelTierInfo[]>([]);
-  const [tier, setTier] = useState<AiModelTier>(readStoredTier);
   const [attachments, setAttachments] = useState<AiAttachment[]>([]);
   /** Okunmayı bekleyen dosya adları — yükleme sürerken çip olarak görünür. */
   const [attaching, setAttaching] = useState<string[]>([]);
@@ -383,24 +381,6 @@ export default function AiAssistantPanel({
       .catch(() => {});
     setTimeout(() => inputRef.current?.focus(), 80);
   }, [open, refreshCredits]);
-
-  // Model kademeleri sunucudan gelir (fiyat çarpanı orada tanımlı); bir kez yeter.
-  useEffect(() => {
-    if (!open || tiers.length > 0) return;
-    aiChat
-      .getModels()
-      .then((res) => setTiers(res.tiers))
-      .catch(() => {});
-  }, [open, tiers.length]);
-
-  const chooseTier = (next: AiModelTier) => {
-    setTier(next);
-    try {
-      localStorage.setItem(TIER_STORAGE_KEY, next);
-    } catch {
-      // Depolama kapalıysa (gizli sekme) seçim yalnızca bu oturumda geçerli olur.
-    }
-  };
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -729,7 +709,6 @@ export default function AiAssistantPanel({
       const result = await aiChat.send(
         trimmed,
         activeId ?? undefined,
-        tier,
         sentAttachments.map((a) => a.id)
       );
 
@@ -834,15 +813,15 @@ export default function AiAssistantPanel({
     if (result.type === "out_of_credits") setCreditsBlocked(true);
   };
 
-  const handleContinueRun = async (nextTier: AiModelTier, approveAll: boolean) => {
+  const handleContinueRun = async (approveAll: boolean) => {
     const pending = continuation;
     if (!pending) return;
     setContinuation(null);
-    if (nextTier !== tier) chooseTier(nextTier);
     setSending(true);
     setError(null);
     try {
-      applyResult(await aiChat.continueRun(pending.runId, true, nextTier, approveAll));
+      // Kademe yükseltme seçeneği yok: model kararı yöneticide.
+      applyResult(await aiChat.continueRun(pending.runId, true, approveAll));
     } catch (err: any) {
       if (err?.status === 402) setCreditsBlocked(true);
       setError(String(err?.message ?? "Devam edilemedi."));
@@ -1607,29 +1586,10 @@ export default function AiAssistantPanel({
               <IconSend size={19} color="#fff" />
             </button>
           </div>
-          {/* Model seçici: zor işlerde kademe yükseltmek adım sayısını düşürür,
-              ama adım başına kredi bedelini artırır — kararı kullanıcı verir. */}
+          {/* Kademe/model seçici KALDIRILDI: hangi modelin çalışacağı bir maliyet
+              kararıdır ve yönetici belirler (Admin paneli > AI sağlayıcıları).
+              Kullanıcıya seçenek göstermek, seçemediği bir şeyi göstermek olurdu. */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "8px 2px 0", flexWrap: "wrap" }}>
-            {tiers.map((t) => (
-              <button
-                key={t.tier}
-                type="button"
-                onClick={() => chooseTier(t.tier)}
-                title={`${t.description} (yaklaşık ${t.costMultiplier}× kredi)`}
-                style={{
-                  padding: "3px 8px",
-                  borderRadius: 999,
-                  fontSize: 11,
-                  cursor: "pointer",
-                  border: `1px solid ${t.tier === tier ? c.accent : c.border}`,
-                  background: t.tier === tier ? c.accent : "transparent",
-                  color: t.tier === tier ? "#fff" : c.textSecondary,
-                }}
-              >
-                {t.label}
-                {t.costMultiplier > 1 && <span style={{ opacity: 0.8 }}> ×{t.costMultiplier}</span>}
-              </button>
-            ))}
             <span style={{ marginLeft: "auto", fontSize: 11, color: c.textSecondary }}>
               Lio hata yapabilir.
             </span>
@@ -1648,7 +1608,6 @@ export default function AiAssistantPanel({
       {continuation && (
         <AiContinueDialog
           continuation={continuation}
-          tiers={tiers}
           onContinue={handleContinueRun}
           onStop={handleStopRun}
         />

@@ -250,7 +250,12 @@ export class WhatsappWebhookService {
       // değildi. Ayrı bir "inceliyorum" mesajı ATMIYORUZ: kuyrukta sıra
       // kapar, kotadan yer ve kullanıcıya iki bildirim gider. WhatsApp'ın
       // kendi göstergesi bunu bedelsiz yapıyor.
-      await this.waha.startTyping(conn.session_name, contact.wa_jid).catch(() => {});
+      //
+      // Tazeleme şart: WhatsApp göstergeyi birkaç saniyede kendiliğinden
+      // söndürüyor. Tek seferlik startTyping uzun turlarda sönüp gönderim
+      // anında yeniden yanıyordu — kullanıcıya "gelip giden" bir titreme
+      // olarak görünüyordu.
+      const yaziyor = this.yaziyorSurdur(conn.session_name, contact.wa_jid);
       // Beklenmeyen hata kuyruğu tıkamasın: olay işlenmiş sayılır, kullanıcı
       // cevapsız kalır ama sonraki mesajları çalışır.
       await this.lio
@@ -258,7 +263,7 @@ export class WhatsappWebhookService {
         .catch((e) => this.logger.warn(`Lio komutu başarısız (${thread.id}): ${e instanceof Error ? e.message : e}`))
         // Gösterge her hâlükârda kapanmalı: hata durumunda açık kalırsa
         // kullanıcı gelmeyecek bir cevabı bekler.
-        .finally(() => this.waha.stopTyping(conn.session_name, contact.wa_jid).catch(() => {}));
+        .finally(() => yaziyor.bitir());
       return;
     }
     const now = new Date().toISOString();
@@ -349,6 +354,41 @@ export class WhatsappWebhookService {
         this.logger.warn(`Lio otomatik yanıt başarısız (${thread.id}): ${e instanceof Error ? e.message : e}`);
       });
     }
+  }
+
+  /**
+   * "Yazıyor…" göstergesini iş bitene kadar açık tutar.
+   *
+   * WhatsApp göstergeyi birkaç saniye sonra kendiliğinden söndürüyor, bu
+   * yüzden düzenli tazelenmesi gerekiyor. Üst sınır var: bir hata yüzünden
+   * `bitir()` hiç çağrılmazsa sonsuza kadar "yazıyor" kalmasın.
+   */
+  private yaziyorSurdur(session: string, chatId: string): { bitir: () => void } {
+    const TAZELE_MS = 5_000;
+    const AZAMI_MS = 90_000;
+    const basladi = Date.now();
+
+    const gonder = () => void this.waha.startTyping(session, chatId).catch(() => {});
+    gonder();
+
+    const zamanlayici = setInterval(() => {
+      if (Date.now() - basladi > AZAMI_MS) {
+        bitir();
+        return;
+      }
+      gonder();
+    }, TAZELE_MS);
+    // Zamanlayıcı süreç kapanışını engellemesin.
+    zamanlayici.unref?.();
+
+    let bitti = false;
+    const bitir = () => {
+      if (bitti) return;
+      bitti = true;
+      clearInterval(zamanlayici);
+      void this.waha.stopTyping(session, chatId).catch(() => {});
+    };
+    return { bitir };
   }
 
   private async adminUserIds(): Promise<string[]> {

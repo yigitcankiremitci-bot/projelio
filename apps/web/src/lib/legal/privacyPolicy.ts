@@ -16,12 +16,12 @@ export const privacyDoc: LegalDoc = {
     tr: {
       title: "Gizlilik Politikası",
       lede: "Hangi veriyi neden topladığımızı, kimlerle paylaştığımızı ve haklarınızı nasıl kullanacağınızı anlatır.",
-      effective: "21 Ağustos 2026",
+      effective: "3 Eylül 2026",
     },
     en: {
       title: "Privacy Policy",
       lede: "What data we collect and why, who we share it with, and how you can exercise your rights.",
-      effective: "21 August 2026",
+      effective: "3 September 2026",
     },
   },
   sections: {
@@ -89,7 +89,8 @@ export const privacyDoc: LegalDoc = {
       {
         h: "6. Lio ve yapay zekâ özellikleri",
         p: [
-          "Lio, Projelio içindeki yapay zekâ asistanıdır. Bir istek gönderdiğinizde mesajınız ve isteği yanıtlamak için gereken bağlam (ör. sorduğunuz görevin başlığı) modeli çalıştıran tedarikçimiz Anthropic, PBC'ye iletilir ve yanıt üretilir.",
+          "Lio, Projelio içindeki yapay zekâ asistanıdır. Bir istek gönderdiğinizde mesajınız ve isteği yanıtlamak için gereken bağlam (ör. sorduğunuz görevin başlığı) modeli çalıştıran tedarikçimize iletilir ve yanıt üretilir.",
+          "Modeli çalıştıran tedarikçi Anthropic, PBC (Amerika Birleşik Devletleri) olup; hizmetin kesintisiz sürmesi için yedek tedarikçi olarak MiniMax ve Z.ai (Zhipu AI) kullanılabilir. Bu iki tedarikçinin sunucuları Çin Halk Cumhuriyeti'ndedir. Yedek tedarikçiler yalnızca birincil tedarikçi geçici olarak yanıt veremediğinde ya da bir modeli açıkça siz seçtiğinizde devreye girer.",
           "İçeriğiniz yapay zekâ modellerinin eğitiminde kullanılmaz. Tedarikçimizle bu yönde bir veri işleme sözleşmesi bulunmaktadır.",
           "Lio, sizin panelde görme yetkiniz olmayan hiçbir veriye erişemez. Yetkilendirme kuralları arayüzde ve sohbette birebir aynı çalışır; Lio bir kaydı ancak siz de görebiliyorsanız okuyabilir, ancak siz de değiştirebiliyorsanız değiştirir.",
           "Sohbet geçmişiniz, konuşmanın devamlılığı için sınırlı bir pencerede saklanır. Kredi sistemi gereği her isteğin tükettiği belirteç (token) miktarı ve maliyeti hesabınıza kaydedilir; bu kayıtlar mesajlarınızın içeriğini barındırmaz.",
@@ -113,7 +114,7 @@ export const privacyDoc: LegalDoc = {
         p: [
           "Organizasyonunuzdaki diğer kullanıcılarla: bir işe, projeye, departmana veya modül ekibine dahil olduğunuzda adınız, profil görseliniz, unvanınız ve o alanda ürettiğiniz içerik, aynı alana erişimi olan kişiler tarafından görülür. Görev atamaları, yorumlar ve akış paylaşımları ilgili ekibe açıktır.",
           "Yöneticilerle: iş sahibi, departman yöneticisi ve organizasyon sahibi, yetkileri kapsamındaki içeriğe ve üyelik bilgilerine erişebilir. Kurumsal e-posta adresinizle katıldığınız bir organizasyonda yöneticinizin bu erişimi hizmetin doğal bir parçasıdır.",
-          "Hizmet sağlayıcılarımızla: Hizmet'i çalıştırmak için sınırlı sayıda tedarikçi kullanırız. Bunlar: barındırma ve veritabanı (Supabase Inc.), uygulama barındırma (Netlify, Inc. ve Render Services, Inc.), e-posta gönderimi (Resend, Inc.), yapay zekâ (Anthropic, PBC), anlık bildirim (Google Firebase ve tarayıcıların web push altyapısı), bağladığınız hâlde Google LLC, Microsoft Corporation ve Meta Platforms, Inc. hizmetleri. Her biri verileri yalnızca bizim adımıza, talimatımız doğrultusunda ve sözleşmeyle sınırlanmış biçimde işler.",
+          "Hizmet sağlayıcılarımızla: Hizmet'i çalıştırmak için sınırlı sayıda tedarikçi kullanırız. Bunlar: barındırma ve veritabanı (Supabase Inc.), uygulama barındırma (Netlify, Inc. ve Render Services, Inc.), e-posta gönderimi (Resend, Inc.), yapay zekâ (Anthropic, PBC; yedek olarak MiniMax ve Z.ai/Zhipu AI), anlık bildirim (Google Firebase ve tarayıcıların web push altyapısı), bağladığınız hâlde Google LLC, Microsoft Corporation ve Meta Platforms, Inc. hizmetleri. Her biri verileri yalnızca bizim adımıza, talimatımız doğrultusunda ve sözleşmeyle sınırlanmış biçimde işler.",
           "Yetkili makamlarla: yalnızca mevzuatın gerektirdiği, usulüne uygun ve yazılı bir talep olduğunda; talebin kapsamıyla sınırlı olarak. Hukuken engellenmediğimiz sürece sizi bilgilendirmeye çalışırız.",
           "Şirket işlemlerinde: birleşme, devir, bölünme veya varlık satışı hâlinde veriler alıcıya aktarılabilir. Böyle bir durumda sizi önceden bilgilendirir ve alıcının bu politikadaki taahhütlere uymasını sağlarız.",
           "Verilerinizi hiçbir koşulda reklam amacıyla üçüncü taraflara satmıyor veya kiralamıyoruz.",
@@ -122,7 +123,7 @@ export const privacyDoc: LegalDoc = {
       {
         h: "9. Yurt dışına aktarım",
         p: [
-          "Kullandığımız barındırma, e-posta, yapay zekâ ve bildirim sağlayıcılarının sunucuları Türkiye dışında bulunabilir. Bu nedenle verileriniz yurt dışına aktarılabilir.",
+          "Kullandığımız barındırma, e-posta, yapay zekâ ve bildirim sağlayıcılarının sunucuları Türkiye dışında bulunabilir. Bu nedenle verileriniz yurt dışına aktarılabilir. Yapay zekâ tedarikçilerimizin sunucuları Amerika Birleşik Devletleri'nde ve — yedek tedarikçiler devreye girdiğinde — Çin Halk Cumhuriyeti'nde bulunmaktadır.",
           "Aktarımlar, 6698 sayılı Kanun'un 9. maddesi kapsamında; standart sözleşme, taahhütname ya da mevzuatın öngördüğü diğer güvencelerden biri sağlanarak yapılır. Avrupa Ekonomik Alanı'ndan yapılan aktarımlarda Avrupa Komisyonu'nun Standart Sözleşme Hükümleri (SCC) uygulanır.",
           "Aktarımın yapıldığı ülkeler ve güvence yöntemi hakkında bilgi almak için bizimle iletişime geçebilirsiniz.",
         ],
@@ -259,7 +260,8 @@ export const privacyDoc: LegalDoc = {
       {
         h: "6. Lio and AI features",
         p: [
-          "Lio is the AI assistant inside Projelio. When you send a request, your message and the context needed to answer it (for example the title of the task you asked about) are sent to Anthropic, PBC, the supplier that runs the model, and an answer is generated.",
+          "Lio is the AI assistant inside Projelio. When you send a request, your message and the context needed to answer it (for example the title of the task you asked about) are sent to the supplier that runs the model, and an answer is generated.",
+          "The model is run by Anthropic, PBC (United States). To keep the service available, MiniMax and Z.ai (Zhipu AI) may be used as fallback suppliers; the servers of these two are located in the People's Republic of China. Fallback suppliers are used only when the primary supplier is temporarily unavailable or when you explicitly select one of their models.",
           "Your content is not used to train AI models. We have a data processing agreement with our supplier to that effect.",
           "Lio cannot reach any data you are not permitted to see in the panel. Permission rules work identically in the interface and in chat: Lio can read a record only if you can, and change it only if you can.",
           "Your chat history is kept for a limited window so the conversation stays coherent. For the credit system, the tokens each request consumed and its cost are recorded against your account; those records do not contain the content of your messages.",
@@ -283,7 +285,7 @@ export const privacyDoc: LegalDoc = {
         p: [
           "With other users in your organisation: when you join a job, project, department or module team, your name, profile picture, title and the content you create there are visible to everyone with access to that area. Task assignments, comments and feed posts are open to the relevant team.",
           "With administrators: the job owner, the department manager and the organisation owner can access content and membership information within the scope of their permissions. If you joined an organisation with your work email address, this administrator access is an inherent part of the Service.",
-          "With our service providers: we use a small number of suppliers to run the Service — hosting and database (Supabase Inc.), application hosting (Netlify, Inc. and Render Services, Inc.), email delivery (Resend, Inc.), AI (Anthropic, PBC), push notifications (Google Firebase and browser web push infrastructure), and, where you connect them, services from Google LLC, Microsoft Corporation and Meta Platforms, Inc. Each processes data only on our behalf, on our instructions and under contractual limits.",
+          "With our service providers: we use a small number of suppliers to run the Service — hosting and database (Supabase Inc.), application hosting (Netlify, Inc. and Render Services, Inc.), email delivery (Resend, Inc.), AI (Anthropic, PBC; with MiniMax and Z.ai/Zhipu AI as fallbacks), push notifications (Google Firebase and browser web push infrastructure), and, where you connect them, services from Google LLC, Microsoft Corporation and Meta Platforms, Inc. Each processes data only on our behalf, on our instructions and under contractual limits.",
           "With competent authorities: only where there is a duly made, written request required by law, and only to the extent of that request. Unless we are legally prevented, we will try to inform you.",
           "In corporate transactions: in a merger, acquisition, demerger or asset sale, data may be transferred to the acquirer. We will inform you beforehand and ensure the acquirer honours the commitments in this policy.",
           "We never sell or rent your data to third parties for advertising.",
@@ -292,7 +294,7 @@ export const privacyDoc: LegalDoc = {
       {
         h: "9. International transfers",
         p: [
-          "The hosting, email, AI and notification providers we use may operate servers outside Türkiye and outside your country. Your data may therefore be transferred internationally.",
+          "The hosting, email, AI and notification providers we use may operate servers outside Türkiye and outside your country. Your data may therefore be transferred internationally. Our AI suppliers operate servers in the United States and — when fallback suppliers are used — in the People's Republic of China.",
           "Transfers are made under Article 9 of Turkish Law no. 6698 with a standard contract, an undertaking, or another safeguard the legislation provides. For transfers out of the European Economic Area we rely on the European Commission's Standard Contractual Clauses.",
           "Contact us if you would like information about the countries involved and the safeguard used.",
         ],

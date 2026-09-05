@@ -3,6 +3,7 @@ import type { Project } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   project: Project;
@@ -16,6 +17,7 @@ function toDateInputValue(iso: string) {
 
 export default function ExtendDeadlineModal({ project, onClose, onSaved }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [deadline, setDeadline] = useState(toDateInputValue(project.deadline));
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,14 +43,14 @@ export default function ExtendDeadlineModal({ project, onClose, onSaved }: Props
   };
 
   return (
-    <Modal title="Deadline'ı değiştir" onClose={onClose}>
+    <Modal title={t("Deadline'ı değiştir")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>
-          Mevcut bitiş tarihi: <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{new Date(project.deadline).toLocaleDateString("tr-TR")}</strong>
+          {t("Mevcut bitiş tarihi:")} <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{new Date(project.deadline).toLocaleDateString("tr-TR")}</strong>
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Yeni bitiş tarihi</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Yeni bitiş tarihi")}</label>
           <input
             type="date"
             value={deadline}

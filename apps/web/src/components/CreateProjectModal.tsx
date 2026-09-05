@@ -4,6 +4,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { notifyCreationRequestsChanged, readCreateOutcome } from "../lib/creationRequests";
 import Modal from "./Modal";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
+import { useT } from "../lib/i18n";
 
 interface Props {
   jobId: string;
@@ -13,6 +14,7 @@ interface Props {
 
 export default function CreateProjectModal({ jobId, onClose, onCreated }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [totalBudget, setTotalBudget] = useState("");
@@ -57,7 +59,7 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
 
   if (sentForApproval) {
     return (
-      <Modal title="Onaya gönderildi" onClose={onClose}>
+      <Modal title={t("Onaya gönderildi")} onClose={onClose}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <p style={{ fontSize: 16, color: c.textPrimary, margin: 0, lineHeight: 1.5 }}>
             <strong>{title}</strong> talebiniz işin sahibine iletildi. Onaylandığında bildirim
@@ -68,7 +70,7 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
             onClick={onClose}
             style={{ background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
           >
-            Tamam
+            {t("Tamam")}
           </button>
         </div>
       </Modal>
@@ -79,30 +81,30 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
     <Modal title="Yeni proje" onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlık")}</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Marka yenileme" style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Kısa açıklama (opsiyonel)" style={{ width: "100%" }} />
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
+          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("Kısa açıklama (opsiyonel)")} style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Anlaşılan ücret (₺)</label>
           <input type="number" min={0} value={totalBudget} onChange={(e) => setTotalBudget(e.target.value)} placeholder="0" style={{ width: "100%" }} />
           <span style={{ fontSize: 13, color: c.textSecondary }}>
-            Müşteriden tahsil edeceğin toplam tutar. Aldığın ödemeler bundan düşülür.
+            {t("Müşteriden tahsil edeceğin toplam tutar. Aldığın ödemeler bundan düşülür.")}
           </span>
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Başlangıç tarihi</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlangıç tarihi")}</label>
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required style={{ width: "100%" }} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş tarihi</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bitiş tarihi")}</label>
             <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} required style={{ width: "100%" }} />
           </div>
         </div>

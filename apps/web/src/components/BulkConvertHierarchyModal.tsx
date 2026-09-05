@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { useUndo } from "../lib/undo";
 import { IconIndent, IconOutdent } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   /** Kapsamdaki TÜM görevler: adaylar ve "alt görevi var mı" bilgisi buradan çıkar. */
@@ -36,6 +37,7 @@ interface SkippedItem {
  */
 export default function BulkConvertHierarchyModal({ tasks, selectedIds, onClose, onDone }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const { pushUndo } = useUndo();
   const [pickingParent, setPickingParent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -107,7 +109,7 @@ export default function BulkConvertHierarchyModal({ tasks, selectedIds, onClose,
   if (result) {
     const finish = () => onDone(result.updated);
     return (
-      <Modal title="Dönüştürme tamamlandı" onClose={finish}>
+      <Modal title={t("Dönüştürme tamamlandı")} onClose={finish}>
         <p style={{ fontSize: 15, color: c.textPrimary, margin: "0 0 12px" }}>
           {result.updated.length} kayıt dönüştürüldü, {result.skipped.length} kayıt dönüştürülemedi:
         </p>
@@ -133,7 +135,7 @@ export default function BulkConvertHierarchyModal({ tasks, selectedIds, onClose,
               cursor: "pointer",
             }}
           >
-            Tamam
+            {t("Tamam")}
           </button>
         </div>
       </Modal>
@@ -145,13 +147,13 @@ export default function BulkConvertHierarchyModal({ tasks, selectedIds, onClose,
     // altına almak, seçimin yarısını kayıp gösterirdi.
     const candidates = tasks.filter((task) => !task.parentTaskId && !selectedIds.has(task.id));
     return (
-      <Modal title="Hangi görevin altına girsinler?" onClose={() => setPickingParent(false)}>
+      <Modal title={t("Hangi görevin altına girsinler?")} onClose={() => setPickingParent(false)}>
         <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 12px" }}>
           {demotable.length} görev seçtiğin görevin alt görevi olacak.
         </p>
         {candidates.length === 0 ? (
           <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-            Alt görev yapılabileceği başka bir görev yok.
+            {t("Alt görev yapılabileceği başka bir görev yok.")}
           </p>
         ) : (
           <div style={{ maxHeight: 300, overflowY: "auto", border: `1px solid ${c.border}`, borderRadius: 10 }}>
@@ -185,7 +187,7 @@ export default function BulkConvertHierarchyModal({ tasks, selectedIds, onClose,
   }
 
   return (
-    <Modal title="Seviye dönüştür" onClose={onClose}>
+    <Modal title={t("Seviye dönüştür")} onClose={onClose}>
       <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 14px", lineHeight: 1.5 }}>
         {selected.length} kayıt seçili.
         {blocked.length > 0 &&
@@ -195,14 +197,14 @@ export default function BulkConvertHierarchyModal({ tasks, selectedIds, onClose,
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <ActionRow
           icon={<IconOutdent size={16} color={c.textSecondary} />}
-          label="Göreve dönüştür"
+          label={t("Göreve dönüştür")}
           detail={promotable.length > 0 ? `${promotable.length} alt görev üst seviyeye çıkar` : "Seçimde alt görev yok"}
           disabled={busy || promotable.length === 0}
           onClick={() => void run(promotable.map((task) => task.id), null)}
         />
         <ActionRow
           icon={<IconIndent size={16} color={c.textSecondary} />}
-          label="Alt göreve dönüştür"
+          label={t("Alt göreve dönüştür")}
           detail={demotable.length > 0 ? `${demotable.length} görev seçilecek bir görevin altına iner` : "Uygun görev yok"}
           disabled={busy || demotable.length === 0}
           onClick={() => setPickingParent(true)}

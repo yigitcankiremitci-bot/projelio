@@ -3,6 +3,7 @@ import type { Department, ModuleCatalogEntry, OrganizationModule } from "@projel
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   organizationId: string;
@@ -17,6 +18,7 @@ interface Props {
 // ekleme mantığı, tek farkla: departman seçimi burada ek bir adım.
 export default function AddModuleModal({ organizationId, onClose, onAdded }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [enabledKeys, setEnabledKeys] = useState<Set<string>>(new Set());
   const [loadingDepts, setLoadingDepts] = useState(true);
@@ -79,19 +81,19 @@ export default function AddModuleModal({ organizationId, onClose, onAdded }: Pro
   };
 
   return (
-    <Modal title="Modül ekle" onClose={onClose}>
+    <Modal title={t("Modül ekle")} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Departman</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Departman")}</label>
           {loadingDepts ? (
-            <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
+            <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
           ) : departments.length === 0 ? (
             <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-              Modül eklemek için önce standart departmanlardan birini eklemelisin.
+              {t("Modül eklemek için önce standart departmanlardan birini eklemelisin.")}
             </p>
           ) : (
             <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: "100%" }}>
-              <option value="">Departman seç…</option>
+              <option value="">{t("Departman seç…")}</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -103,9 +105,9 @@ export default function AddModuleModal({ organizationId, onClose, onAdded }: Pro
 
         {departmentId &&
           (loadingCatalog ? (
-            <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
+            <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
           ) : availableCatalog.length === 0 ? (
-            <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Bu departmanın modüllerinin hepsi zaten etkin.</p>
+            <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Bu departmanın modüllerinin hepsi zaten etkin.")}</p>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
               {availableCatalog.map((entry) => {

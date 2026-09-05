@@ -972,7 +972,7 @@ export default function AiAssistantPanel({
             <img src="/lio-open.png" alt="Lio" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.2 }}>Lio</div>
+            <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.2 }}>{t("Lio")}</div>
             <div style={{ fontSize: 12, opacity: 0.75 }}>
               {credits ? `${formatCredits(credits.balance)} kredi` : "Yükleniyor…"}
             </div>
@@ -1009,11 +1009,11 @@ export default function AiAssistantPanel({
             }}
           >
             <div style={{ fontSize: 12, color: c.textSecondary }}>
-              Her yanıtın yanındaki hoparlöre basarak dinleyebilirsin.
+              {t("Her yanıtın yanındaki hoparlöre basarak dinleyebilirsin.")}
             </div>
 
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: c.textSecondary }}>
-              Ses kaynağı
+              {t("Ses kaynağı")}
               <select
                 value={voiceEngine}
                 onChange={(e) => chooseVoiceEngine(e.target.value as VoiceEngine)}
@@ -1039,7 +1039,7 @@ export default function AiAssistantPanel({
             {voiceEngine === "server" && serverVoices.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: c.textSecondary }}>
-                  Doğal ses
+                  {t("Doğal ses")}
                   <select
                     value={serverVoice}
                     onChange={(e) => chooseServerVoice(e.target.value)}
@@ -1090,7 +1090,7 @@ export default function AiAssistantPanel({
             {/* Ses adı yalnızca tarayıcı sentezinde anlamlı. */}
             {voiceEngine === "browser" && voiceList.length > 1 && (
               <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: c.textSecondary }}>
-                Okuma sesi
+                {t("Okuma sesi")}
                 <select
                   value={voiceName}
                   onChange={(e) => chooseVoiceName(e.target.value)}
@@ -1103,7 +1103,7 @@ export default function AiAssistantPanel({
                     color: c.textPrimary,
                   }}
                 >
-                  <option value="">Otomatik</option>
+                  <option value="">{t("Otomatik")}</option>
                   {voiceList.map((v) => (
                     <option key={v.name} value={v.name}>
                       {v.name}
@@ -1293,7 +1293,7 @@ export default function AiAssistantPanel({
               <span style={{ animation: "projelioAiPulse 1.2s ease infinite" }}>
                 <IconSparkle size={15} color={c.accent} />
               </span>
-              Düşünüyor…
+              {t("Düşünüyor…")}
             </div>
           )}
         </div>
@@ -1332,7 +1332,7 @@ export default function AiAssistantPanel({
                     cursor: "pointer",
                   }}
                 >
-                  Kredi yükle
+                  {t("Kredi yükle")}
                 </button>
               </div>
             )}
@@ -1493,7 +1493,7 @@ export default function AiAssistantPanel({
                       textDecoration: "underline",
                     }}
                   >
-                    Vazgeç
+                    {t("Vazgeç")}
                   </button>
                 </>
               ) : (
@@ -1593,7 +1593,7 @@ export default function AiAssistantPanel({
               Kullanıcıya seçenek göstermek, seçemediği bir şeyi göstermek olurdu. */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "8px 2px 0", flexWrap: "wrap" }}>
             <span style={{ marginLeft: "auto", fontSize: 11, color: c.textSecondary }}>
-              Lio hata yapabilir.
+              {t("Lio hata yapabilir.")}
             </span>
           </div>
         </div>

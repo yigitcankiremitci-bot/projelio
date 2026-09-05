@@ -11,6 +11,7 @@ import { useUndo } from "../lib/undo";
 import ModuleModal from "./ModuleModal";
 import ModuleCard from "./ModuleCard";
 import { IconX } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   organizationId: string;
@@ -30,6 +31,7 @@ interface Props {
 // burada yalnızca bu departmana ait olanlar gösterilir.
 export default function DepartmentModulesPanel({ organizationId, departmentId, departmentKey }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
   const [enabled, setEnabled] = useState<OrganizationModule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,14 +155,14 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
     }
   };
 
-  if (loading) return <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>;
+  if (loading) return <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>;
 
   if (!departmentKey) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Modüller</h4>
+        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Modüller")}</h4>
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-          Bu özel departman için önceden tanımlı bir modül listesi yok.
+          {t("Bu özel departman için önceden tanımlı bir modül listesi yok.")}
         </p>
       </div>
     );
@@ -172,7 +174,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Modüller</h4>
+      <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Modüller")}</h4>
 
       {notice && (
         <div
@@ -212,10 +214,10 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
       )}
 
       {catalog.length === 0 ? (
-        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Bu departman için henüz modül tanımlı değil.</p>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Bu departman için henüz modül tanımlı değil.")}</p>
       ) : activeCatalog.length === 0 ? (
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-          Henüz etkinleştirilmiş modül yok. Sayfadaki "+" ile ekleyebilirsin.
+          {t("Henüz etkinleştirilmiş modül yok. Sayfadaki \"+\" ile ekleyebilirsin.")}
         </p>
       ) : (
         // Şirket anasayfasındaki modül kartlarıyla aynı görünüm: sabit boy,
@@ -284,6 +286,7 @@ function AddModulesForm({
   onAdded: () => void;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -311,14 +314,14 @@ function AddModulesForm({
   return (
     <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>Bu departmana modül ekle</span>
+        <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{t("Bu departmana modül ekle")}</span>
         <button onClick={onClose} aria-label="Kapat" style={{ background: "transparent", border: "none" }}>
           <IconX size={16} color={c.textSecondary} />
         </button>
       </div>
 
       {availableCatalog.length === 0 ? (
-        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Bu departmanın modüllerinin hepsi zaten etkin.</p>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Bu departmanın modüllerinin hepsi zaten etkin.")}</p>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 6 }}>
           {availableCatalog.map((entry) => {

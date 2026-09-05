@@ -3,6 +3,7 @@ import type { WhatsappConnectionSummary } from "@projelio/shared";
 import { whatsappApi } from "../api/whatsapp";
 import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
+import { useT } from "../lib/i18n";
 
 /** QR görselinin tazelenme aralığı; WhatsApp QR'ı ~20 sn'de bir değiştirir. */
 const QR_REFRESH_MS = 15_000;
@@ -20,6 +21,7 @@ export default function WhatsappConnectionPanel({
   onChanged: () => void;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [qr, setQr] = useState<string | null>(null);
@@ -107,7 +109,7 @@ export default function WhatsappConnectionPanel({
       {status === "scan_qr" && (
         <>
           <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 10px", lineHeight: 1.5 }}>
-            Numaranın telefonunda WhatsApp › Bağlı cihazlar › Cihaz bağla ile bu kodu okutun. Kod kendiliğinden yenilenir.
+            {t("Numaranın telefonunda WhatsApp › Bağlı cihazlar › Cihaz bağla ile bu kodu okutun. Kod kendiliğinden yenilenir.")}
           </p>
           {qr ? (
             <img src={qr} alt="WhatsApp QR" width={220} height={220} style={{ display: "block", borderRadius: 8, background: "#fff" }} />
@@ -115,7 +117,7 @@ export default function WhatsappConnectionPanel({
             <div style={{ width: 220, height: 220, borderRadius: 8, background: c.border }} />
           )}
           <details style={{ marginTop: 10, fontSize: 14, color: c.textSecondary }}>
-            <summary style={{ cursor: "pointer" }}>QR okutamıyorum, kodla bağlanayım</summary>
+            <summary style={{ cursor: "pointer" }}>{t("QR okutamıyorum, kodla bağlanayım")}</summary>
             <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
               <input
                 value={pairPhone}
@@ -128,7 +130,7 @@ export default function WhatsappConnectionPanel({
                 disabled={busy || !pairPhone.trim()}
                 style={{ ...ghostButton, color: c.textPrimary }}
               >
-                Kod al
+                {t("Kod al")}
               </button>
               {pairCode && <span style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, letterSpacing: 1 }}>{pairCode}</span>}
             </div>
@@ -148,7 +150,7 @@ export default function WhatsappConnectionPanel({
           </button>
         )}
         <button onClick={() => setConfirm("remove")} disabled={busy} style={{ ...ghostButton, color: c.textSecondary }}>
-          Havuzdan çıkar
+          {t("Havuzdan çıkar")}
         </button>
       </div>
 
@@ -156,9 +158,9 @@ export default function WhatsappConnectionPanel({
 
       {confirm === "logout" && (
         <ConfirmDialog
-          title="WhatsApp bağlantısını kes"
+          title={t("WhatsApp bağlantısını kes")}
           message="Numara Projelio'dan ayrılacak; bu numaraya atanmış kullanıcılara bildirim gitmeyecek ve Lio bu numaradan yazamayacak. Kayıtlar ve atamalar silinmez, yeniden bağlanabilir."
-          confirmLabel="Bağlantıyı kes"
+          confirmLabel={t("Bağlantıyı kes")}
           onConfirm={async () => {
             setConfirm(null);
             await run(() => whatsappApi.admin.logout(number.id));
@@ -168,9 +170,9 @@ export default function WhatsappConnectionPanel({
       )}
       {confirm === "remove" && (
         <ConfirmDialog
-          title="Numarayı havuzdan çıkar"
+          title={t("Numarayı havuzdan çıkar")}
           message="Bu numaraya atanmış kullanıcılar başka bir bağlı numaraya taşınır; müşterileri artık farklı bir numaradan mesaj görür. Başka bağlı numara yoksa işlem reddedilir."
-          confirmLabel="Havuzdan çıkar"
+          confirmLabel={t("Havuzdan çıkar")}
           onConfirm={async () => {
             setConfirm(null);
             await run(() => whatsappApi.admin.remove(number.id));

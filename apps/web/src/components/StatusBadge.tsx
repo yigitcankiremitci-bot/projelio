@@ -6,6 +6,7 @@ import { IconCheck, IconChevronRight } from "./icons";
 // Etiketler, sıra ve renkler React'ten bağımsız bir dosyada: kontrastları test
 // edilebilsin diye (bkz. lib/projectStatus.test.ts).
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, PROJECT_STATUS_STYLE } from "../lib/projectStatus";
+import { useT } from "../lib/i18n";
 
 interface Props {
   status: ProjectStatus;
@@ -31,6 +32,7 @@ const badgeStyle = (s: { bg: string; text: string }) => ({
 
 export default function StatusBadge({ status, onChange }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const s = PROJECT_STATUS_STYLE[status];
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -118,7 +120,7 @@ export default function StatusBadge({ status, onChange }: Props) {
         }}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Durumu değiştir"
+        title={t("Durumu değiştir")}
         style={{
           ...badgeStyle(s),
           display: "inline-flex",

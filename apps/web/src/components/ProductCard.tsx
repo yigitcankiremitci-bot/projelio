@@ -7,6 +7,7 @@ import CardDescription from "./CardDescription";
 import ProductPhotoCropModal from "./ProductPhotoCropModal";
 import { coverBackground, isCoverPreset } from "../lib/covers";
 import { IconPlus } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   product: Product;
@@ -44,6 +45,7 @@ function formatStock(product: Product): string | null {
 
 export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [coverUrl, setCoverUrl] = useState(product.coverImageUrl);
   const [imageCount, setImageCount] = useState(product.images?.length ?? (product.coverImageUrl ? 1 : 0));
   const [uploading, setUploading] = useState(false);
@@ -152,8 +154,8 @@ export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) 
           type="button"
           onClick={handleAddCoverClick}
           disabled={uploading}
-          aria-label="Ürün fotoğrafı ekle"
-          title="Ürün fotoğrafı ekle"
+          aria-label={t("Ürün fotoğrafı ekle")}
+          title={t("Ürün fotoğrafı ekle")}
           className="entity-card-cover-add"
           style={{
             position: "absolute",
@@ -202,7 +204,7 @@ export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) 
               background: "rgba(26,31,41,0.62)",
             }}
           >
-            Satış dışı
+            {t("Satış dışı")}
           </span>
         )}
 

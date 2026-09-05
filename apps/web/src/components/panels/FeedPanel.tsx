@@ -5,6 +5,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { formatDateTime } from "../../lib/dates";
 import { useRefreshOnUndo } from "../../lib/undo";
 import { IconCheck, IconHeart, IconMessageCircle } from "../icons";
+import { useT } from "../../lib/i18n";
 
 export interface FeedPanelHandle {
   openCreate: () => void;
@@ -76,6 +77,7 @@ function getMentionQuery(text: string, cursor: number): { start: number; query: 
 
 const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projectId, departmentId, organizationId, tasks }, ref) {
   const c = useThemeColors();
+  const t = useT();
   const [comments, setComments] = useState<FeedComment[]>([]);
   const [posts, setPosts] = useState<ProjectPost[]>([]);
   const [members, setMembers] = useState<FeedMember[]>([]);
@@ -278,7 +280,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
             disabled={posting || !postBody.trim()}
             style={{ padding: "6px 14px", borderRadius: 7, border: "none", background: c.primary, color: c.onPrimary, fontSize: 15, fontWeight: 500 }}
           >
-            Paylaş
+            {t("Paylaş")}
           </button>
         </div>
 
@@ -330,9 +332,9 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {loading ? (
-          <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
+          <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
         ) : items.length === 0 ? (
-          <p style={{ fontSize: 15, color: c.textSecondary }}>Henüz bir paylaşım veya yorum yok.</p>
+          <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Henüz bir paylaşım veya yorum yok.")}</p>
         ) : (
           items.map((item) =>
             item.kind === "post" ? (
@@ -364,7 +366,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ fontSize: 15, color: c.textPrimary }}>
                     {item.task.completedByName ? `${item.task.completedByName}, ` : ""}
-                    <strong style={{ fontWeight: 500 }}>"{item.task.title}"</strong> görevini tamamladı
+                    <strong style={{ fontWeight: 500 }}>"{item.task.title}"</strong> {t("görevini tamamladı")}
                   </span>
                 </div>
                 <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>
@@ -398,6 +400,7 @@ interface PostCardProps {
 
 function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps) {
   const c = useThemeColors();
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const [postComments, setPostComments] = useState<PostComment[] | null>(null);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -500,7 +503,7 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
       <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
         <button
           onClick={handleLike}
-          aria-label="Beğen"
+          aria-label={t("Beğen")}
           style={{ display: "flex", alignItems: "center", gap: 5, background: "transparent", border: "none", padding: 0 }}
         >
           <IconHeart size={16} color={post.likedByMe ? c.accentDark : c.textSecondary} filled={post.likedByMe} />
@@ -521,7 +524,7 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
       {expanded && (
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${c.border}`, display: "flex", flexDirection: "column", gap: 8 }}>
           {loadingComments ? (
-            <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
           ) : postComments && postComments.length > 0 ? (
             postComments.map((cm) => (
               <CommentRow
@@ -535,7 +538,7 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
               />
             ))
           ) : (
-            <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Henüz yorum yok.</p>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Henüz yorum yok.")}</p>
           )}
 
           <form onSubmit={handleCommentSubmit} style={{ display: "flex", gap: 6 }}>
@@ -550,7 +553,7 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
               disabled={commentPosting || !commentDraft.trim()}
               style={{ fontSize: 13, padding: "0 12px", borderRadius: 7, border: "none", background: c.primary, color: c.onPrimary }}
             >
-              Gönder
+              {t("Gönder")}
             </button>
           </form>
         </div>
@@ -566,6 +569,7 @@ interface CommentRowProps {
 
 function CommentRow({ comment, onLikeToggled }: CommentRowProps) {
   const c = useThemeColors();
+  const t = useT();
   const [liking, setLiking] = useState(false);
 
   const handleLike = async () => {
@@ -593,7 +597,7 @@ function CommentRow({ comment, onLikeToggled }: CommentRowProps) {
       <p style={{ fontSize: 14, color: c.textPrimary, margin: "0 0 3px" }}>{renderMentions(comment.body, c.primary)}</p>
       <button
         onClick={handleLike}
-        aria-label="Yorumu beğen"
+        aria-label={t("Yorumu beğen")}
         style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: "none", padding: 0, alignSelf: "flex-start" }}
       >
         <IconHeart size={13} color={comment.likedByMe ? c.accentDark : c.textSecondary} filled={comment.likedByMe} />

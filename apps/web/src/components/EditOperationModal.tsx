@@ -8,6 +8,7 @@ import CoverPicker from "./CoverPicker";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
+import { useT } from "../lib/i18n";
 
 interface Props {
   /**
@@ -37,6 +38,7 @@ const periods: { value: OperationBudgetPeriod; label: string }[] = [
  */
 export default function EditOperationModal({ operation, onClose, onSaved}: Props) {
   const c = useThemeColors();
+  const t = useT();
   const navigate = useNavigate();
   const [title, setTitle] = useState(operation.title);
   const [description, setDescription] = useState(operation.description ?? "");
@@ -101,19 +103,19 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
   };
 
   return (
-    <Modal title="Rutini düzenle" onClose={onClose}>
+    <Modal title={t("Rutini düzenle")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlık")}</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Kısa açıklama (opsiyonel)"
+            placeholder={t("Kısa açıklama (opsiyonel)")}
             style={{ width: "100%" }}
           />
         </div>
@@ -130,7 +132,7 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Dönem</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Dönem")}</label>
             <select
               value={budgetPeriod}
               onChange={(e) => setBudgetPeriod(e.target.value as OperationBudgetPeriod)}
@@ -146,7 +148,7 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlangıç tarihi</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlangıç tarihi")}</label>
           <input
             type="date"
             value={startedOn}

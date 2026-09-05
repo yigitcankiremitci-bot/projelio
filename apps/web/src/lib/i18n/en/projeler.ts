@@ -273,4 +273,52 @@ export const projeler: TranslationDict = {
     "Teams run their projects in Projelio and, instead of writing a status report, share a live link like this one — with no account needed on the client's side.",
   "Bu sayfa salt okunurdur ve proje sorumlusunun paylaştığı bölümleri gösterir.":
     "This page is read-only and shows the sections the project owner chose to share.",
+  // ─────────────────────────────────────────────── Bütçe ve ödemeler (ek)
+  "Gelir / Gider": "Income / expense",
+  "Alacak / Borç": "Receivable / payable",
+  "İlk ödeme": "First payment",
+  "Satış dışı": "Non-sales",
+  "Projesiz — genel kayıt": "No project — general record",
+  "Bu tutar projenin beklenen ödemesinden düşülür.":
+    "This amount is deducted from the project's expected payment.",
+  "Müşteriden tahsil edeceğin toplam tutar. Aldığın ödemeler bundan düşülür.":
+    "The total you'll collect from the client. Payments received are deducted from it.",
+  "Müşteriden tahsil ettiğin tutar — beklenen ödemeden düşülür.":
+    "The amount collected from the client — deducted from the expected payment.",
+  "Vadesi gelince tutar bütçene otomatik işlenir ve bildirim gönderilir.":
+    "When it falls due, the amount is recorded in your budget automatically and you're notified.",
+  "Rutinin sonu olmadığı için toplam bütçe yerine dönemsel çalışma ücreti tutulur.":
+    "Because a routine has no end, a per-period fee is kept instead of a total budget.",
+  "Mevcut bitiş tarihi:": "Current end date:",
+  "Yeni bitiş tarihi": "New end date",
+  "Hatırlatıcı": "Reminder",
+  "Takvim yükleniyor…": "Loading the calendar…",
+  "Takvime uygula": "Apply to the calendar",
+  "Hedeflerin çalışma saatlerine göre dağıtıldı. Elle koyduğun bloklara dokunulmadı.":
+    "Your goals were spread across your working hours. Blocks you placed by hand were left alone.",
+  "Örn. Ofis kirası": "e.g. Office rent",
+  "Örn. Master dosyası": "e.g. Master file",
+  "Örn. Toplantı Notları": "e.g. Meeting notes",
+  "Ürün/Hizmet": "Product / service",
+  "Ürün:": "Product:",
+  "Ürün fotoğrafı ekle": "Add a product photo",
+  "Önce Ürünler modülünden bir ürün ekleyin.": "Add a product from the Products module first.",
+  "Arşive ekle": "Add to archive",
+  "Seviye dönüştür": "Change level",
+  "Dönüştürme tamamlandı": "Conversion complete",
+  "İçe aktarılıyor…": "Importing…",
+  "Taslağa yükle": "Load into the draft",
+  "Taslağı at": "Discard the draft",
+  "Şablondan başla:": "Start from a template:",
+  "Vitrin": "Showcase",
+  "Uyum": "Compliance",
+  "Sürüm geçmişi": "Version history",
+  "Henüz sürüm yok — ilk onaydan sonra burada birikir.":
+    "No versions yet — they accumulate here after the first approval.",
+  "Onaya gönderildi": "Sent for approval",
+  "Kaydet ve onayla": "Save and approve",
+  "Kaydetmek yayımlamaz: metin onaylanana kadar okuma görünümünde eski hali kalır.":
+    "Saving doesn't publish: the reading view keeps the old text until it's approved.",
+  "Kayıtlı bir ilk hâl bulunamadı.": "No saved original was found.",
+  "Düzenleme kipi açık.": "Edit mode is on.",
 };

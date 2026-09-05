@@ -1,5 +1,6 @@
 import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
+import { cevirmenSuAn } from "../lib/i18n";
 
 /**
  * Uygulamanın hata sınırı — beyaz ekranı bitiren şey.
@@ -82,6 +83,8 @@ export class AppErrorBoundary extends Component<Props, State> {
   };
 
   render(): ReactNode {
+    // Sınıf bileşeni: kanca çağıramaz (bkz. lib/i18n cevirmenSuAn).
+    const t = cevirmenSuAn();
     const { error } = this.state;
     if (!error) return this.props.children;
 
@@ -132,7 +135,7 @@ export class AppErrorBoundary extends Component<Props, State> {
             cursor: "pointer",
           }}
         >
-          Sayfayı yenile
+          {t("Sayfayı yenile")}
         </button>
       </div>
     );

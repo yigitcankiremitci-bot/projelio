@@ -10,6 +10,7 @@ import {
 } from "../lib/moduleForms";
 import { useModuleReferences } from "../lib/moduleReferences";
 import ModuleFieldInput from "./ModuleFieldInput";
+import { useT } from "../lib/i18n";
 
 // A1 — Form / Doküman görünümü.
 //
@@ -81,6 +82,7 @@ export default function ModuleFormPanel({
   canApprove = false,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const basePath = jobId ? `/jobs/${jobId}/module-records` : `/organizations/${organizationId}/module-records`;
 
   const [records, setRecords] = useState<ModuleRecord[]>([]);
@@ -237,7 +239,7 @@ export default function ModuleFormPanel({
     }
   };
 
-  if (loading) return <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>;
+  if (loading) return <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>;
 
   const setValue = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -246,10 +248,10 @@ export default function ModuleFormPanel({
       {/* Varlık kapsamı: her ürün için ayrı bir doküman. Seçim kaydın kimliğidir. */}
       {config.scope === "entity" && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13, color: c.textSecondary }}>Ürün:</span>
+          <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Ürün:")}</span>
           {products.length === 0 ? (
             <span style={{ fontSize: 13, color: c.textSecondary }}>
-              Önce Ürünler modülünden bir ürün ekleyin.
+              {t("Önce Ürünler modülünden bir ürün ekleyin.")}
             </span>
           ) : (
             <select
@@ -335,21 +337,21 @@ export default function ModuleFormPanel({
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {canWrite && (
               <button onClick={startEdit} style={{ fontSize: 13 }}>
-                Düzenle
+                {t("Düzenle")}
               </button>
             )}
             {canApprove && pending.length > 0 && (
               <button onClick={handleApprove} disabled={busy || missing.length > 0} style={{ fontSize: 13 }}>
-                Onayla
+                {t("Onayla")}
               </button>
             )}
             {canWrite && draft && (
               <button onClick={handleDiscard} disabled={busy} style={{ fontSize: 13 }}>
-                Taslağı at
+                {t("Taslağı at")}
               </button>
             )}
             <button onClick={openVersions} style={{ fontSize: 13 }}>
-              Sürüm geçmişi
+              {t("Sürüm geçmişi")}
             </button>
           </div>
 
@@ -365,7 +367,7 @@ export default function ModuleFormPanel({
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {config.templates && config.templates.length > 0 && !record && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 12, color: c.textSecondary }}>Şablondan başla:</span>
+              <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Şablondan başla:")}</span>
               {config.templates.map((t) => (
                 <button key={t.key} type="button" onClick={() => applyTemplate(t.key)} style={{ fontSize: 12 }}>
                   {t.label}
@@ -391,7 +393,7 @@ export default function ModuleFormPanel({
                   <label key={f.key} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     <span style={{ fontSize: 12, color: c.textSecondary }}>
                       {f.label}
-                      {f.requiredForApproval && <span style={{ color: c.textSecondary }}> · onay için gerekli</span>}
+                      {f.requiredForApproval && <span style={{ color: c.textSecondary }}> {t("· onay için gerekli")}</span>}
                     </span>
                     <ModuleFieldInput field={f} form={form} setValue={setValue} references={references} />
                     {f.help && <span style={{ fontSize: 11, color: c.textSecondary }}>{f.help}</span>}
@@ -403,29 +405,29 @@ export default function ModuleFormPanel({
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button data-primary onClick={handleSave} disabled={busy} style={{ fontSize: 13 }}>
-              Kaydet
+              {t("Kaydet")}
             </button>
             {canApprove && (
               <button onClick={handleApprove} disabled={busy} style={{ fontSize: 13 }}>
-                Kaydet ve onayla
+                {t("Kaydet ve onayla")}
               </button>
             )}
             <button onClick={() => setMode("read")} disabled={busy} style={{ fontSize: 13 }}>
-              Vazgeç
+              {t("Vazgeç")}
             </button>
           </div>
           <span style={{ fontSize: 11, color: c.textSecondary }}>
-            Kaydetmek yayımlamaz: metin onaylanana kadar okuma görünümünde eski hali kalır.
+            {t("Kaydetmek yayımlamaz: metin onaylanana kadar okuma görünümünde eski hali kalır.")}
           </span>
         </div>
       )}
 
       {mode === "versions" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <span style={{ fontSize: 13, color: c.textPrimary }}>Sürüm geçmişi</span>
+          <span style={{ fontSize: 13, color: c.textPrimary }}>{t("Sürüm geçmişi")}</span>
           {versions.length === 0 ? (
             <span style={{ fontSize: 13, color: c.textSecondary }}>
-              Henüz sürüm yok — ilk onaydan sonra burada birikir.
+              {t("Henüz sürüm yok — ilk onaydan sonra burada birikir.")}
             </span>
           ) : (
             versions.map((v) => (
@@ -448,14 +450,14 @@ export default function ModuleFormPanel({
                 </div>
                 {canApprove && (
                   <button onClick={() => revert(v.id)} disabled={busy} style={{ fontSize: 12 }}>
-                    Taslağa yükle
+                    {t("Taslağa yükle")}
                   </button>
                 )}
               </div>
             ))
           )}
           <button onClick={() => setMode("read")} style={{ alignSelf: "flex-start", fontSize: 13 }}>
-            Geri
+            {t("Geri")}
           </button>
         </div>
       )}

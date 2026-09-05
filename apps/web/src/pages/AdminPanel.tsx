@@ -7,6 +7,7 @@ import AiCreditAdminPanel from "../components/AiCreditAdminPanel";
 import SupportAdminPanel from "../components/SupportAdminPanel";
 import DemoAdminPanel from "../components/DemoAdminPanel";
 import WhatsappNumbersPanel from "../components/WhatsappNumbersPanel";
+import { useT } from "../lib/i18n";
 
 /**
  * Bu sayfa yalnızca role === "admin" olan kullanıcılara açılır.
@@ -18,6 +19,7 @@ import WhatsappNumbersPanel from "../components/WhatsappNumbersPanel";
  */
 export default function AdminPanel() {
   const c = useThemeColors();
+  const t = useT();
   const [me, setMe] = useState<User | null | undefined>(undefined);
 
   useEffect(() => {
@@ -67,10 +69,10 @@ export default function AdminPanel() {
             <IconShield size={18} color={c.accent} />
           </span>
           <h2 style={{ color: c.textPrimary, fontSize: 20, fontWeight: 500, margin: "0 0 8px" }}>
-            Bu sayfaya erişim yetkin yok
+            {t("Bu sayfaya erişim yetkin yok")}
           </h2>
           <p style={{ color: c.textSecondary, fontSize: 14, margin: 0, lineHeight: 1.5 }}>
-            Admin paneli yalnızca yönetici hesapları içindir.
+            {t("Admin paneli yalnızca yönetici hesapları içindir.")}
           </p>
         </div>
       </div>
@@ -79,9 +81,9 @@ export default function AdminPanel() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
-      <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 500, margin: "0 0 8px" }}>Admin paneli</h1>
+      <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 500, margin: "0 0 8px" }}>{t("Admin paneli")}</h1>
       <p style={{ color: c.textSecondary, fontSize: 16, margin: "0 0 26px" }}>
-        Kullanıcılar, proje istatistikleri ve sistem durumu burada listelenir.
+        {t("Kullanıcılar, proje istatistikleri ve sistem durumu burada listelenir.")}
       </p>
 
       <AiCreditAdminPanel />

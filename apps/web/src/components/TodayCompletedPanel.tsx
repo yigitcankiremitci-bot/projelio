@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Task } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconCheck, IconChevronRight } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   tasks: Task[];
@@ -19,6 +20,7 @@ function isToday(iso?: string): boolean {
 // Liste uzayabildiği için başlık her zaman görünür, gövde ise açılır/kapanır.
 export default function TodayCompletedPanel({ tasks }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   const completedToday = tasks
@@ -59,7 +61,7 @@ export default function TodayCompletedPanel({ tasks }: Props) {
         >
           <IconCheck size={13} color={c.success} />
         </span>
-        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Bugün yapılanlar</h4>
+        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Bugün yapılanlar")}</h4>
         {completedToday.length > 0 && (
           <span
             style={{
@@ -90,7 +92,7 @@ export default function TodayCompletedPanel({ tasks }: Props) {
       <div style={{ maxHeight: open ? 2000 : 0, overflow: "hidden", transition: "max-height 0.25s ease" }}>
         <div style={{ padding: "0 16px 14px" }}>
           {completedToday.length === 0 ? (
-            <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>Bugün henüz tamamlanan görev yok.</p>
+            <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>{t("Bugün henüz tamamlanan görev yok.")}</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto" }}>
               {completedToday.map((t) => (

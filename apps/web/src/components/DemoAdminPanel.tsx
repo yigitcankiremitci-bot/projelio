@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { demoAdmin, type DemoDurumu } from "../api/demoAdmin";
 import { demoHesap } from "../lib/demoHesap";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 /**
  * Admin > Demo hesabı.
@@ -18,6 +19,7 @@ import { useThemeColors } from "../theme/useThemeColors";
  */
 export default function DemoAdminPanel() {
   const c = useThemeColors();
+  const t = useT();
   const [durum, setDurum] = useState<DemoDurumu | null>(null);
   const [islem, setIslem] = useState<"" | "aciliyor" | "kaydediliyor" | "atiliyor" | "sifirlaniyor">("");
   const [hata, setHata] = useState("");
@@ -65,7 +67,7 @@ export default function DemoAdminPanel() {
   return (
     <section style={{ maxWidth: 760, width: "100%" }}>
       <h2 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, margin: "0 0 12px" }}>
-        Demo hesabı
+        {t("Demo hesabı")}
       </h2>
 
       <div
@@ -79,7 +81,7 @@ export default function DemoAdminPanel() {
         <p style={{ margin: 0, fontSize: 15, color: c.textPrimary, lineHeight: 1.55 }}>
           {aktif ? (
             <>
-              <strong>Düzenleme kipi açık.</strong> Demo verisi şu an sıfırlanmıyor —{" "}
+              <strong>{t("Düzenleme kipi açık.")}</strong> Demo verisi şu an sıfırlanmıyor —{" "}
               <code>{demoHesap.email}</code> ile girip içeriği düzenleyebilirsin. Bitirince
               &quot;Kaydet ve kapat&quot; de: o anki hâl yeni ilk hâl olur.
             </>
@@ -111,7 +113,7 @@ export default function DemoAdminPanel() {
               {ozet.satirSayisi} satır). İlk kaydetmede veritabanına geçer.
             </>
           )}
-          {ozet && ozet.kaynak === "yok" && <>Kayıtlı bir ilk hâl bulunamadı.</>}
+          {ozet && ozet.kaynak === "yok" && <>{t("Kayıtlı bir ilk hâl bulunamadı.")}</>}
         </p>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 16 }}>

@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
 import OperationHealthBadge from "./OperationHealthBadge";
 import AskLioButton from "./AskLioButton";
+import { useT } from "../lib/i18n";
 
 interface Props {
   operation: Operation;
@@ -18,6 +19,7 @@ const periodLabel: Record<string, string> = {
 
 export default function OperationCard({ operation }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const adherence = operation.adherencePct;
   const missed = operation.missedCount ?? 0;
 
@@ -54,7 +56,7 @@ export default function OperationCard({ operation }: Props) {
             olmadığı için "yüzde kaçı bitti" sorusunun cevabı yoktur. */}
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: c.textSecondary, marginBottom: 5 }}>
-            <span>Uyum</span>
+            <span>{t("Uyum")}</span>
             <span>{adherence != null ? `%${adherence}` : "henüz veri yok"}</span>
           </div>
           <div style={{ height: 5, borderRadius: 3, background: c.border, overflow: "hidden" }}>

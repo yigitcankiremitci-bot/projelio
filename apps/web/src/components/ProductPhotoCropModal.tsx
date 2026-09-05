@@ -3,6 +3,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { PRODUCT_ASPECT, resizeProductImage } from "../lib/imageProcessing";
 import type { ProductCropArea } from "../lib/imageProcessing";
+import { useT } from "../lib/i18n";
 
 const FRAME_W = 384;
 const FRAME_H = Math.round(FRAME_W / PRODUCT_ASPECT); // 288 — çıktıyla aynı oran
@@ -34,6 +35,7 @@ interface Props {
  */
 export default function ProductPhotoCropModal({ files, onCancel, onDone }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [index, setIndex] = useState(0);
   const [processed, setProcessed] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
@@ -161,7 +163,7 @@ export default function ProductPhotoCropModal({ files, onCancel, onDone }: Props
           {imgSrc && natural && (
             <img
               src={imgSrc}
-              alt="Kırpma önizlemesi"
+              alt={t("Kırpma önizlemesi")}
               draggable={false}
               style={{
                 position: "absolute",
@@ -183,7 +185,7 @@ export default function ProductPhotoCropModal({ files, onCancel, onDone }: Props
           step={0.01}
           value={zoom}
           onChange={(e) => setZoom(Number(e.target.value))}
-          aria-label="Yakınlaştırma"
+          aria-label={t("Yakınlaştırma")}
           style={{ width: "100%", maxWidth: FRAME_W, height: "auto", padding: 0, border: "none", background: "none" }}
         />
 
@@ -208,7 +210,7 @@ export default function ProductPhotoCropModal({ files, onCancel, onDone }: Props
               cursor: "pointer",
             }}
           >
-            Vazgeç
+            {t("Vazgeç")}
           </button>
           <button
             type="button"

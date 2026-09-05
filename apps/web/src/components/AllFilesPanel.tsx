@@ -7,6 +7,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import FilePreviewModal from "./FilePreviewModal";
 import QuickFileUploadModal, { type UploadTargetOption } from "./QuickFileUploadModal";
 import { IconDownload, IconExternalLink, IconFile } from "./icons";
+import { useT } from "../lib/i18n";
 
 /**
  * İşlerim sayfasındaki "Dosyalar" sekmesi: kullanıcının erişebildiği TÜM işlerin
@@ -26,6 +27,7 @@ interface Props {
 
 export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -104,7 +106,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   // Modal her durumda render edilmeli: dosya yokken de "+" ile yükleme yapılabilsin.
   // (Eskiden boş durumda erken return vardı; taşeronun gördüğü ekran tam da buydu.)
   const body = loading ? (
-    <div style={{ color: c.textSecondary, fontSize: 15 }}>Yükleniyor…</div>
+    <div style={{ color: c.textSecondary, fontSize: 15 }}>{t("Yükleniyor…")}</div>
   ) : error ? (
     <div style={{ color: c.danger, fontSize: 15 }}>{error}</div>
   ) : files.length === 0 ? (
@@ -118,7 +120,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
         fontSize: 16,
       }}
     >
-      Henüz dosya yok.
+      {t("Henüz dosya yok.")}
     </div>
   ) : (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -166,11 +168,11 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
             </div>
           </div>
 
-          <IconButton title="İndir" onClick={() => void handleDownload(file)}>
+          <IconButton title={t("İndir")} onClick={() => void handleDownload(file)}>
             <IconDownload size={16} color={c.textSecondary} />
           </IconButton>
           <IconButton
-            title="Drive'da düzenle"
+            title={t("Drive'da düzenle")}
             onClick={() => window.open(driveEditUrl(file), "_blank", "noopener,noreferrer")}
           >
             <IconExternalLink size={16} color={c.textSecondary} />

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { SupportRequest, User } from "@projelio/shared";
 import { support } from "../api/support";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 /**
  * Ayarlar > Destek — kullanıcının öneri/dilek/şikâyet bıraktığı ve yanıtları
@@ -13,6 +14,7 @@ import { useThemeColors } from "../theme/useThemeColors";
  */
 export default function SupportPanel({ me }: { me: User | null }) {
   const c = useThemeColors();
+  const t = useT();
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -64,9 +66,9 @@ export default function SupportPanel({ me }: { me: User | null }) {
   return (
     <>
       <section style={cardStyle}>
-        <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Bize yaz</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Bize yaz")}</h3>
         <p style={{ fontSize: 13, color: c.textSecondary, margin: "4px 0 0", lineHeight: 1.4 }}>
-          Öneri, dilek ya da şikâyetini buradan iletebilirsin. Yanıtladığımızda sana bildirim gelir.
+          {t("Öneri, dilek ya da şikâyetini buradan iletebilirsin. Yanıtladığımızda sana bildirim gelir.")}
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
@@ -77,7 +79,7 @@ export default function SupportPanel({ me }: { me: User | null }) {
               setName(e.target.value);
               setSent(false);
             }}
-            placeholder="İsmin"
+            placeholder={t("İsmin")}
             maxLength={80}
             required
             style={{ width: "100%" }}
@@ -100,7 +102,7 @@ export default function SupportPanel({ me }: { me: User | null }) {
               setMessage(e.target.value);
               setSent(false);
             }}
-            placeholder="Mesajın"
+            placeholder={t("Mesajın")}
             maxLength={4000}
             required
             rows={5}
@@ -127,14 +129,14 @@ export default function SupportPanel({ me }: { me: User | null }) {
         {error && <p style={{ color: c.danger, fontSize: 14, margin: "8px 0 0" }}>{error}</p>}
         {sent && !error && (
           <p style={{ color: c.success, fontSize: 14, margin: "8px 0 0" }}>
-            Talebin bize ulaştı. Yanıtladığımızda bildirim göndereceğiz.
+            {t("Talebin bize ulaştı. Yanıtladığımızda bildirim göndereceğiz.")}
           </p>
         )}
       </section>
 
       {requests.length > 0 && (
         <section style={cardStyle}>
-          <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 12px" }}>Taleplerim</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 12px" }}>{t("Taleplerim")}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {requests.map((r) => (
               <div

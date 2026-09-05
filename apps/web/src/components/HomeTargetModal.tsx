@@ -3,6 +3,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { useSidebarHierarchy } from "../lib/useSidebarHierarchy";
 import { DEFAULT_HOME_TARGET, setHomeTarget, useHomeTarget, type HomeTarget } from "../lib/homeTarget";
+import { useT } from "../lib/i18n";
 import {
   IconBuilding,
   IconLayers,
@@ -47,6 +48,7 @@ interface Props {
  */
 export default function HomeTargetModal({ onClose }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const current = useHomeTarget();
   const { groups, standaloneOrgs, standaloneJobs, loading } = useSidebarHierarchy();
   const [query, setQuery] = useState("");
@@ -96,9 +98,9 @@ export default function HomeTargetModal({ onClose }: Props) {
   };
 
   return (
-    <Modal title="Ana Sayfa düğmesi" onClose={onClose} maxWidth={460}>
+    <Modal title={t("Ana Sayfa düğmesi")} onClose={onClose} maxWidth={460}>
       <p style={{ margin: "0 0 14px", fontSize: 14, color: c.textSecondary, lineHeight: 1.5 }}>
-        Menüdeki <strong style={{ color: c.textPrimary, fontWeight: 500 }}>Ana Sayfa</strong> düğmesine bastığında
+        {t("Menüdeki")} <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{t("Ana Sayfa")}</strong> düğmesine bastığında
         nereye gitmek istersin? Bu tercih yalnızca bu cihazda geçerlidir.
       </p>
 
@@ -110,10 +112,10 @@ export default function HomeTargetModal({ onClose }: Props) {
         style={{ width: "100%", marginBottom: 12 }}
       />
 
-      {loading && <p style={{ fontSize: 14, color: c.textSecondary }}>Yükleniyor…</p>}
+      {loading && <p style={{ fontSize: 14, color: c.textSecondary }}>{t("Yükleniyor…")}</p>}
 
       {!loading && visibleSections.length === 0 && (
-        <p style={{ fontSize: 14, color: c.textSecondary }}>Eşleşen bir yer yok.</p>
+        <p style={{ fontSize: 14, color: c.textSecondary }}>{t("Eşleşen bir yer yok.")}</p>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -185,7 +187,7 @@ export default function HomeTargetModal({ onClose }: Props) {
             fontSize: 14,
           }}
         >
-          Varsayılana döndür
+          {t("Varsayılana döndür")}
         </button>
       )}
     </Modal>

@@ -446,7 +446,7 @@ export default function ModuleRecordsPanel({
         <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t(config.title)}</h5>
         {!canWrite ? (
           <span style={{ fontSize: 12, color: c.textSecondary }} title={t("Bu modüle atanan kişiler kayıt ekleyebilir")}>
-            Salt görüntüleme
+            {t("Salt görüntüleme")}
           </span>
         ) : (
           !fabAvailable && (
@@ -531,7 +531,7 @@ export default function ModuleRecordsPanel({
               }}
               style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
             >
-              Temizle
+              {t("Temizle")}
             </button>
           )}
         </div>
@@ -626,7 +626,7 @@ export default function ModuleRecordsPanel({
               {saving ? t("Kaydediliyor…") : formMode.kind === "edit" ? t("Güncelle") : t("Kaydet")}
             </button>
             <button onClick={closeForm} disabled={saving} style={{ padding: "8px 16px", fontSize: 14 }}>
-              Vazgeç
+              {t("Vazgeç")}
             </button>
           </div>
         </div>

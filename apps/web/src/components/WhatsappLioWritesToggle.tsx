@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { whatsappApi } from "../api/whatsapp";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 /**
  * "WhatsApp'tan değişiklik yapılabilsin" anahtarı.
@@ -16,6 +17,7 @@ import { useThemeColors } from "../theme/useThemeColors";
  */
 export default function WhatsappLioWritesToggle({ enabled, onChanged }: { enabled: boolean; onChanged: () => void }) {
   const c = useThemeColors();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -43,7 +45,7 @@ export default function WhatsappLioWritesToggle({ enabled, onChanged }: { enable
           style={{ marginTop: 3, cursor: "inherit" }}
         />
         <span>
-          <span style={{ fontSize: 15, color: c.textPrimary }}>WhatsApp'tan değişiklik yapılabilsin</span>
+          <span style={{ fontSize: 15, color: c.textPrimary }}>{t("WhatsApp'tan değişiklik yapılabilsin")}</span>
           <span style={{ display: "block", fontSize: 14, color: c.textSecondary, marginTop: 4, lineHeight: 1.5 }}>
             Lio, WhatsApp'tan yazdığınız isteklerle görev açabilir, kayıt güncelleyebilir. Kapalıyken yalnızca
             sorularınızı yanıtlar. Silme ve bütçe işlemleri WhatsApp'tan hiçbir zaman yapılamaz.

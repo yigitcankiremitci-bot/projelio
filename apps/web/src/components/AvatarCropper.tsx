@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
 import type { CropArea } from "../lib/imageProcessing";
+import { useT } from "../lib/i18n";
 
 interface Props {
   file: File;
@@ -16,6 +17,7 @@ const MAX_ZOOM = 3;
 // Seçilen alan kaynak görselin piksel koordinatlarına çevrilip onChange ile bildirilir.
 export default function AvatarCropper({ file, onChange }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -107,7 +109,7 @@ export default function AvatarCropper({ file, onChange }: Props) {
         {imgSrc && natural && (
           <img
             src={imgSrc}
-            alt="Kırpma önizlemesi"
+            alt={t("Kırpma önizlemesi")}
             draggable={false}
             style={{
               position: "absolute",
@@ -123,7 +125,7 @@ export default function AvatarCropper({ file, onChange }: Props) {
       </div>
 
       <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, textAlign: "center" }}>
-        Fotoğrafı sürükleyerek konumlandır, aşağıdan yakınlaştır.
+        {t("Fotoğrafı sürükleyerek konumlandır, aşağıdan yakınlaştır.")}
       </p>
 
       <input
@@ -133,7 +135,7 @@ export default function AvatarCropper({ file, onChange }: Props) {
         step={0.01}
         value={zoom}
         onChange={(e) => setZoom(Number(e.target.value))}
-        aria-label="Yakınlaştırma"
+        aria-label={t("Yakınlaştırma")}
         style={{ width: "100%", maxWidth: FRAME }}
       />
     </div>

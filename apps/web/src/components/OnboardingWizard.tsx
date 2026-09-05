@@ -24,6 +24,7 @@ import { onEnter } from "../lib/enterAction";
 import { cropAvatarImage } from "../lib/imageProcessing";
 import type { CropArea } from "../lib/imageProcessing";
 import AvatarCropper from "./AvatarCropper";
+import { useT } from "../lib/i18n";
 import {
   IconUser,
   IconBuilding,
@@ -100,6 +101,7 @@ function stepsFor(accountType: AccountType | null): StepKey[] {
 // kurulmamış) kalmasın diye. Profil alanlarının hepsi opsiyonel, adımlar atlanabilir.
 export default function OnboardingWizard({ onCompleted }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const navigate = useNavigate();
 
   const [selected, setSelected] = useState<AccountType | null>(null);
@@ -361,10 +363,10 @@ export default function OnboardingWizard({ onCompleted }: Props) {
                 <IconCheck size={20} color={c.primaryDark} />
               </span>
               <h1 style={{ fontSize: 22, fontWeight: 600, color: c.textPrimary, margin: "0 0 8px" }}>
-                Projelio'ya hoş geldin
+                {t("Projelio'ya hoş geldin")}
               </h1>
               <p style={{ fontSize: 16, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
-                Nasıl çalıştığını seç, arayüzü buna göre ayarlayalım. Bunu istediğin zaman değiştirebilirsin.
+                {t("Nasıl çalıştığını seç, arayüzü buna göre ayarlayalım. Bunu istediğin zaman değiştirebilirsin.")}
               </p>
             </div>
 
@@ -419,7 +421,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
         {step === "profile" && (
           <>
             <Header
-              heading="Seni tanıyalım"
+              heading={t("Seni tanıyalım")}
               sub="Bu bilgiler profilinde görünür ve ekip arkadaşlarının seni tanımasını kolaylaştırır. Tamamı isteğe bağlı."
             />
 
@@ -475,22 +477,22 @@ export default function OnboardingWizard({ onCompleted }: Props) {
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={fieldLabel}>Unvan / görev</label>
+                <label style={fieldLabel}>{t("Unvan / görev")}</label>
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Örn. Kurucu Ortak, Grafik Tasarımcı"
+                  placeholder={t("Örn. Kurucu Ortak, Grafik Tasarımcı")}
                   maxLength={80}
                   style={{ width: "100%" }}
                 />
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={fieldLabel}>Telefon</label>
+                <label style={fieldLabel}>{t("Telefon")}</label>
                 <input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Örn. 0555 123 45 67"
+                  placeholder={t("Örn. 0555 123 45 67")}
                   maxLength={30}
                   inputMode="tel"
                   style={{ width: "100%" }}
@@ -498,7 +500,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={fieldLabel}>Sektör</label>
+                <label style={fieldLabel}>{t("Sektör")}</label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                   {SECTORS.map((key) => (
                     <button
@@ -513,7 +515,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={fieldLabel}>Ekip büyüklüğü</label>
+                <label style={fieldLabel}>{t("Ekip büyüklüğü")}</label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                   {TEAM_SIZES.map((key) => (
                     <button
@@ -528,11 +530,11 @@ export default function OnboardingWizard({ onCompleted }: Props) {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={fieldLabel}>Kısa tanıtım</label>
+                <label style={fieldLabel}>{t("Kısa tanıtım")}</label>
                 <textarea
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  placeholder="Ne iş yaptığını bir iki cümleyle anlat."
+                  placeholder={t("Ne iş yaptığını bir iki cümleyle anlat.")}
                   maxLength={280}
                   rows={3}
                   style={{ width: "100%", resize: "vertical" }}
@@ -568,7 +570,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
 
             {selected === "organization_owner" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={fieldLabel}>Ölçek</label>
+                <label style={fieldLabel}>{t("Ölçek")}</label>
                 <div style={{ display: "flex", gap: 8 }}>
                   {ORG_TYPE_OPTIONS.map((opt) => (
                     <button key={opt.type} onClick={() => setOrgType(opt.type)} style={{ ...cardStyle(orgType === opt.type), flex: 1 }}>
@@ -585,7 +587,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
         {step === "departments" && (
           <>
             <Header
-              heading="Departmanlarını seç"
+              heading={t("Departmanlarını seç")}
               sub={`"${name.trim()}" için ISO 9001 uyumlu standart departmanlardan istediklerini işaretle. Bu adımı boş geçip departmanları sonra da ekleyebilirsin.`}
             />
 
@@ -607,7 +609,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
                 value={customDept}
                 onChange={(e) => setCustomDept(e.target.value)}
                 onKeyDown={onEnter(() => !loading && goNext())}
-                placeholder="Örn. Ar-Ge"
+                placeholder={t("Örn. Ar-Ge")}
                 style={{ width: "100%" }}
               />
             </div>
@@ -617,7 +619,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
         {step === "usage" && (
           <>
             <Header
-              heading="Projelio'yu ne için kullanacaksın?"
+              heading={t("Projelio'yu ne için kullanacaksın?")}
               sub="Birden fazla seçebilirsin. Buna göre hangi ekranların öne çıkacağına karar veriyoruz."
             />
 
@@ -652,12 +654,12 @@ export default function OnboardingWizard({ onCompleted }: Props) {
         {step === "modules" && (
           <>
             <Header
-              heading="Kullanacağın modüller"
+              heading={t("Kullanacağın modüller")}
               sub="Şimdilik işine yarayacakları işaretle — bu bir tercih kaydı, hepsini sonradan açıp kapatabilirsin."
             />
 
             {modulesLoading ? (
-              <p style={{ fontSize: 15, color: c.textSecondary, textAlign: "center", margin: 0 }}>Modüller yükleniyor…</p>
+              <p style={{ fontSize: 15, color: c.textSecondary, textAlign: "center", margin: 0 }}>{t("Modüller yükleniyor…")}</p>
             ) : modules.length === 0 ? (
               <p style={{ fontSize: 15, color: c.textSecondary, textAlign: "center", margin: 0, lineHeight: 1.5 }}>
                 Seçilebilecek bir modül bulunamadı. Bu adımı geçebilirsin; modülleri daha sonra departman sayfalarından açabilirsin.
@@ -682,7 +684,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
 
         {step === "summary" && (
           <>
-            <Header heading="Her şey hazır" sub="Seçtiklerini bir kez gözden geçir; istersen geri dönüp değiştirebilirsin." />
+            <Header heading={t("Her şey hazır")} sub="Seçtiklerini bir kez gözden geçir; istersen geri dönüp değiştirebilirsin." />
 
             <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: "4px 16px", marginBottom: 4 }}>
               {[
@@ -739,7 +741,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
               }}
             >
               <IconChevronLeft size={16} color={c.textSecondary} />
-              Geri
+              {t("Geri")}
             </button>
           )}
           <button

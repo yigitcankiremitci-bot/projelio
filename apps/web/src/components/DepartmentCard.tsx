@@ -9,6 +9,7 @@ import CardDescription from "./CardDescription";
 import { coverBackground } from "../lib/covers";
 import { IconUser, IconEdit } from "./icons";
 import AskLioButton from "./AskLioButton";
+import { useT } from "../lib/i18n";
 
 interface Props {
   department: Department;
@@ -34,6 +35,7 @@ const CARD_HEIGHT = 338;
 
 export default function DepartmentCard({ department, onCoverUpdated }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [coverUrl, setCoverUrl] = useState(getDepartmentCoverUrl(department));
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
@@ -94,7 +96,7 @@ export default function DepartmentCard({ department, onCoverUpdated }: Props) {
           type="button"
           onClick={handleChangeCoverClick}
           disabled={uploading}
-          aria-label="Kapak fotoğrafını değiştir"
+          aria-label={t("Kapak fotoğrafını değiştir")}
           className="entity-card-cover-add"
           style={{
             position: "absolute",
@@ -127,7 +129,7 @@ export default function DepartmentCard({ department, onCoverUpdated }: Props) {
               textAlign: "center",
             }}
           >
-            Yüklenemedi, tekrar dene
+            {t("Yüklenemedi, tekrar dene")}
           </div>
         )}
 

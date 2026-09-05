@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconCheck } from "./icons";
 import { isAssignedTo } from "../lib/taskAssignees";
+import { useT } from "../lib/i18n";
 
 interface Props {
   member: ProjectMember;
@@ -15,6 +16,7 @@ interface Props {
 
 export default function TeamMemberModal({ member, tasks, onClose, onTaskUpdated }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const toggle = async (task: Task) => {
@@ -41,20 +43,20 @@ export default function TeamMemberModal({ member, tasks, onClose, onTaskUpdated 
   return (
     <Modal title={member.fullName ?? "Ekip üyesi"} onClose={onClose} maxWidth={420}>
       <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 14px" }}>
-        Bu üyeye atamak istediğin görevleri işaretle. Bir görev yalnızca tek kişiye atanabilir.
+        {t("Bu üyeye atamak istediğin görevleri işaretle. Bir görev yalnızca tek kişiye atanabilir.")}
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto" }}>
         {sorted.length === 0 ? (
-          <p style={{ fontSize: 15, color: c.textSecondary }}>Bu projede görev yok.</p>
+          <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Bu projede görev yok.")}</p>
         ) : (
-          sorted.map((t) => {
-            const mine = isAssignedTo(t, member.userId);
-            const takenByOther = !!t.assignedTo && !mine;
+          sorted.map((kisi) => {
+            const mine = isAssignedTo(kisi, member.userId);
+            const takenByOther = !!kisi.assignedTo && !mine;
             return (
               <button
-                key={t.id}
-                onClick={() => toggle(t)}
-                disabled={busyId === t.id}
+                key={kisi.id}
+                onClick={() => toggle(kisi)}
+                disabled={busyId === kisi.id}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -64,7 +66,7 @@ export default function TeamMemberModal({ member, tasks, onClose, onTaskUpdated 
                   border: `1px solid ${c.border}`,
                   background: mine ? c.background : "transparent",
                   textAlign: "left",
-                  opacity: t.parentTaskId ? 0.85 : 1,
+                  opacity: kisi.parentTaskId ? 0.85 : 1,
                 }}
               >
                 <span
@@ -83,10 +85,10 @@ export default function TeamMemberModal({ member, tasks, onClose, onTaskUpdated 
                   {mine && <IconCheck size={10} color="#fff" />}
                 </span>
                 <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {t.parentTaskId ? "↳ " : ""}
-                  {t.title}
+                  {kisi.parentTaskId ? "↳ " : ""}
+                  {kisi.title}
                 </span>
-                {takenByOther && <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>atanmış</span>}
+                {takenByOther && <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{t("atanmış")}</span>}
               </button>
             );
           })

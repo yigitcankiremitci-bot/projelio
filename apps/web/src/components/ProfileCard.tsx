@@ -7,6 +7,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import CardDescription from "./CardDescription";
 import { IconUser, IconSettings } from "./icons";
 import EditProfileModal from "./EditProfileModal";
+import { useT } from "../lib/i18n";
 
 // Dar ekranda kart, kendisinin altında duran iş kartlarından yer çalıyordu:
 // 116 px'lik avatar + geniş kapsül tek başına ekranın üçte birini kaplıyor.
@@ -72,6 +73,7 @@ interface Props {
 
 export default function ProfileCard({ bleedRight = 0, compact = false, collapsible = false }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
   const rootRef = useRef<HTMLDivElement>(null);
   const capsuleRef = useRef<HTMLDivElement>(null);
@@ -342,7 +344,7 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
             setEditing(true);
           }}
           role="button"
-          aria-label="Profili düzenle"
+          aria-label={t("Profili düzenle")}
           style={{
             position: "absolute",
             inset: RING_PADDING + 3,

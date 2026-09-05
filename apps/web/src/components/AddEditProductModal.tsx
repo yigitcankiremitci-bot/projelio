@@ -6,6 +6,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 import ProductImagesEditor from "./ProductImagesEditor";
+import { useT } from "../lib/i18n";
 
 interface Props {
   organizationId: string;
@@ -35,6 +36,7 @@ export default function AddEditProductModal({
   onDeleted,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const isEdit = !!product;
 
   // Fotoğraf galerisi ürünün kendi uçlarıyla ANINDA değişiyor (yükleme/silme
@@ -177,7 +179,7 @@ export default function AddEditProductModal({
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Ürünü/hizmeti anlatan metin (opsiyonel)"
+            placeholder={t("Ürünü/hizmeti anlatan metin (opsiyonel)")}
             rows={8}
             style={cokSatirliStil}
           />
@@ -189,7 +191,7 @@ export default function AddEditProductModal({
             <input
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              placeholder="Örn. Mobilya"
+              placeholder={t("Örn. Mobilya")}
               style={{ width: "100%" }}
             />
           )}
@@ -217,7 +219,7 @@ export default function AddEditProductModal({
             <input
               value={sku}
               onChange={(e) => setSku(e.target.value)}
-              placeholder="Şirket içinde benzersiz"
+              placeholder={t("Şirket içinde benzersiz")}
               style={{ width: "100%" }}
             />
           )}
@@ -244,9 +246,9 @@ export default function AddEditProductModal({
           {alan(
             "Para birimi",
             <select value={currency} onChange={(e) => setCurrency(e.target.value)} style={{ width: "100%" }}>
-              <option value="TRY">TRY</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
+              <option value="TRY">{t("TRY")}</option>
+              <option value="USD">{t("USD")}</option>
+              <option value="EUR">{t("EUR")}</option>
             </select>
           )}
         </div>
@@ -283,7 +285,7 @@ export default function AddEditProductModal({
             <input
               value={stockQuantity}
               onChange={(e) => setStockQuantity(e.target.value)}
-              placeholder="Hizmetlerde boş bırakılabilir"
+              placeholder={t("Hizmetlerde boş bırakılabilir")}
               inputMode="decimal"
               style={{ width: "100%" }}
             />,
@@ -309,7 +311,7 @@ export default function AddEditProductModal({
           <input
             value={productUrl}
             onChange={(e) => setProductUrl(e.target.value)}
-            placeholder="https://… (tanıtım ya da satış sayfası)"
+            placeholder={t("https://… (tanıtım ya da satış sayfası)")}
             style={{ width: "100%" }}
           />
         )}
@@ -319,7 +321,7 @@ export default function AddEditProductModal({
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Yalnızca şirket içinde görünür (tedarikçi, raf yeri, uyarı…)"
+            placeholder={t("Yalnızca şirket içinde görünür (tedarikçi, raf yeri, uyarı…)")}
             rows={3}
             style={cokSatirliStil}
           />

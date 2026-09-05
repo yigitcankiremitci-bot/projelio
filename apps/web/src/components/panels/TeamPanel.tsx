@@ -7,6 +7,7 @@ import AddMemberModal from "../AddMemberModal";
 import TeamMemberModal from "../TeamMemberModal";
 import { isAssignedTo } from "../../lib/taskAssignees";
 import { useCurrentUser } from "../../lib/useCurrentUser";
+import { useT } from "../../lib/i18n";
 
 export interface TeamPanelHandle {
   openCreate: () => void;
@@ -27,6 +28,7 @@ const roleLabel: Record<string, string> = {
 
 const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }, ref) {
   const c = useThemeColors();
+  const t = useT();
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -75,7 +77,7 @@ const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projec
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Ekip üyeleri</h4>
+        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Ekip üyeleri")}</h4>
         {myMembership && !isProjectOwner && (
           <button
             type="button"
@@ -90,15 +92,15 @@ const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projec
               cursor: "pointer",
             }}
           >
-            Projeden ayrıl
+            {t("Projeden ayrıl")}
           </button>
         )}
       </div>
 
       {loading ? (
-        <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
       ) : members.length === 0 ? (
-        <p style={{ fontSize: 15, color: c.textSecondary }}>Henüz ekip üyesi eklenmedi.</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Henüz ekip üyesi eklenmedi.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {members.map((m) => {
@@ -143,7 +145,7 @@ const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projec
                     </span>
                     {m.userId === ownerId && (
                       <span style={{ fontSize: 12, color: c.accentDark, background: `${c.accent}22`, borderRadius: 20, padding: "1px 7px" }}>
-                        Yönetici
+                        {t("Yönetici")}
                       </span>
                     )}
                   </div>

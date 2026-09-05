@@ -9,6 +9,7 @@ import EntityDangerZone from "./EntityDangerZone";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import HireMemberModal from "./HireMemberModal";
 import { IconUser } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   job: Job;
@@ -22,6 +23,7 @@ interface Props {
 // organizasyona/gruba bağlanamaz (bkz. CreateJobModal).
 export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchived }: Props) {
   const c = useThemeColors();
+  const t = useT();
   // Kaydet formun dışında, alttaki yapışkan çubukta (bkz. Modal footer).
   const formId = useId();
   const [title, setTitle] = useState(job.title);
@@ -79,7 +81,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
 
   return (
     <Modal
-      title="İşi düzenle"
+      title={t("İşi düzenle")}
       onClose={onClose}
       // Kaydet alta yapışır: altında "İşe al" ve arşivle/sil bölümleri var
       // (bkz. TaskEditModal, aynı düzen).
@@ -96,16 +98,16 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
     >
       <form id={formId} onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlık")}</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Kısa açıklama (opsiyonel)"
+            placeholder={t("Kısa açıklama (opsiyonel)")}
             style={{ width: "100%" }}
           />
         </div>
@@ -141,7 +143,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
           }}
         >
           <IconUser size={15} color={c.textSecondary} />
-          İşe al
+          {t("İşe al")}
         </button>
       </div>
 

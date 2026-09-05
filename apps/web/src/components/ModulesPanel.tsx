@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import ModuleCard from "./ModuleCard";
 import { useDragScroll } from "../lib/useDragScroll";
+import { useT } from "../lib/i18n";
 
 interface Props {
   organizationId: string;
@@ -19,6 +20,7 @@ const SINGLE_ROW_LIMIT = 4;
 
 export default function ModulesPanel({ organizationId }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const scrollRef = useDragScroll<HTMLDivElement>();
   const [enabled, setEnabled] = useState<OrganizationModule[]>([]);
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
@@ -48,10 +50,10 @@ export default function ModulesPanel({ organizationId }: Props) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Modüller</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Modüller")}</h2>
 
       {loading ? (
-        <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
       ) : activeEntries.length === 0 ? (
         <div
           style={{
@@ -63,7 +65,7 @@ export default function ModulesPanel({ organizationId }: Props) {
             fontSize: 15,
           }}
         >
-          Henüz etkinleştirilmiş modül yok. Bir departmanın sayfasından "+" ile modül ekleyebilirsin.
+          {t("Henüz etkinleştirilmiş modül yok. Bir departmanın sayfasından \"+\" ile modül ekleyebilirsin.")}
         </div>
       ) : (
         // Anasayfada modüller departman kartlarıyla aynı mantıkta: yana

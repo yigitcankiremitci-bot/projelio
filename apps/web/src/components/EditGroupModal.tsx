@@ -7,6 +7,7 @@ import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
+import { useT } from "../lib/i18n";
 
 interface Props {
   group: Group;
@@ -18,6 +19,7 @@ interface Props {
 
 export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onArchived }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [name, setName] = useState(group.name);
   const [description, setDescription] = useState(group.description ?? "");
   // Seçili kapak: yüklenmiş bir URL, "preset:<key>" ya da kapak yok.
@@ -69,19 +71,19 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
   };
 
   return (
-    <Modal title="Grubu düzenle" onClose={onClose}>
+    <Modal title={t("Grubu düzenle")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Ad</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Ad")}</label>
           <input value={name} onChange={(e) => setName(e.target.value)} required style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Kısa açıklama (opsiyonel)"
+            placeholder={t("Kısa açıklama (opsiyonel)")}
             style={{ width: "100%" }}
           />
         </div>

@@ -4,6 +4,7 @@ import { mailboxApi } from "../api/mailbox";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconExternalLink, IconSparkle } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   accountId: string;
@@ -39,6 +40,7 @@ const MODE_LABELS: Record<ReplyMode, string> = {
  */
 export default function MailMessageModal({ accountId, message, canWrite, onClose, onSent }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [replyMode, setReplyMode] = useState<ReplyMode | null>(null);
   const [replyText, setReplyText] = useState("");
   const [forwardTo, setForwardTo] = useState("");
@@ -144,7 +146,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
               {new Date(message.receivedAt).toLocaleString("tr-TR")}
             </span>
             {message.webLink && (
-              <a href={message.webLink} target="_blank" rel="noreferrer" title="Outlook'ta aç" style={{ display: "flex" }}>
+              <a href={message.webLink} target="_blank" rel="noreferrer" title={t("Outlook'ta aç")} style={{ display: "flex" }}>
                 <IconExternalLink size={13} color={c.textSecondary} />
               </a>
             )}
@@ -163,7 +165,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
         {/* ---------------------------------------------------- Gövde */}
         {message.bodyHtml ? (
           <iframe
-            title="E-posta gövdesi"
+            title={t("E-posta gövdesi")}
             sandbox=""
             srcDoc={message.bodyHtml}
             style={{
@@ -223,7 +225,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
               <input
                 value={forwardTo}
                 onChange={(e) => setForwardTo(e.target.value)}
-                placeholder="Alıcılar (virgülle ayırın)"
+                placeholder={t("Alıcılar (virgülle ayırın)")}
                 style={{ fontSize: 14, padding: "8px 10px" }}
               />
             )}
@@ -232,7 +234,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
               ref={textarea}
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Yanıtınızı yazın… ya da ne söylemek istediğinizi kısaca yazıp Lio'dan taslak isteyin."
+              placeholder={t("Yanıtınızı yazın… ya da ne söylemek istediğinizi kısaca yazıp Lio'dan taslak isteyin.")}
               style={{
                 fontSize: 14,
                 padding: "12px 14px",
@@ -276,7 +278,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
                 {drafting ? "Lio yazıyor…" : "Lio ile taslak"}
               </button>
               <span style={{ fontSize: 11, color: c.textSecondary, flex: "1 1 200px" }}>
-                Lio taslak yazar, göndermez — okuyup düzelttikten sonra siz gönderirsiniz.
+                {t("Lio taslak yazar, göndermez — okuyup düzelttikten sonra siz gönderirsiniz.")}
               </span>
               <button
                 onClick={() => {
@@ -293,7 +295,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
                   color: c.textSecondary,
                 }}
               >
-                Vazgeç
+                {t("Vazgeç")}
               </button>
               <button
                 onClick={send}

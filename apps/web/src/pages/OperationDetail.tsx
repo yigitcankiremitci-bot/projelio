@@ -21,6 +21,7 @@ import { pageGutter } from "../lib/layout";
 import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { isOperationInSidebar } from "../lib/useSidebarHierarchy";
+import { useT } from "../lib/i18n";
 
 const periodLabel: Record<string, string> = { weekly: "hafta", monthly: "ay", yearly: "yıl" };
 
@@ -42,6 +43,7 @@ export default function OperationDetail() {
   useLiveRoom(id ? `operation:${id}` : null);
   const navigate = useNavigate();
   const c = useThemeColors();
+  const t = useT();
   const cover = useCoverTheme();
   const isDesktop = useIsDesktop();
   const gutter = pageGutter(isDesktop);
@@ -231,7 +233,7 @@ export default function OperationDetail() {
         action={
           // Rutini yalnızca kuran kişi düzenleyebilir (OperationsService.assertCanManage).
           operation && currentUser?.id === operation.ownerId ? (
-            <button onClick={() => setEditing(true)} aria-label="Rutini düzenle" style={coverActionButton(c)}>
+            <button onClick={() => setEditing(true)} aria-label={t("Rutini düzenle")} style={coverActionButton(c)}>
               <IconSettings size={20} color={c.textSecondary} />
             </button>
           ) : undefined
@@ -245,27 +247,27 @@ export default function OperationDetail() {
         {operation && (
           <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
             <button onClick={() => setRoutineModal({})} style={primaryButton(c)}>
-              Yeni rutin
+              {t("Yeni rutin")}
             </button>
             {operation.status === "active" ? (
               <button onClick={() => setStatusPrompt("paused")} style={ghostButton(c)}>
-                Duraklat
+                {t("Duraklat")}
               </button>
             ) : (
               <button onClick={() => changeStatus("active")} style={ghostButton(c)}>
-                Devam ettir
+                {t("Devam ettir")}
               </button>
             )}
             {operation.status !== "ended" && (
               <button onClick={() => setStatusPrompt("ended")} style={ghostButton(c)}>
-                Rutini kapat
+                {t("Rutini kapat")}
               </button>
             )}
           </div>
         )}
 
         {/* ---- Rutinler ---- */}
-        <SectionTitle>Rutinler</SectionTitle>
+        <SectionTitle>{t("Rutinler")}</SectionTitle>
         {routines.length === 0 ? (
           <EmptyBox>
             Bu rutinde henüz tanımlı rutin yok. Rutini ayakta tutan tekrarlayan işleri buraya ekle —
@@ -278,11 +280,11 @@ export default function OperationDetail() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
                   <h3 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: c.textPrimary }}>
                     {r.title}
-                    {!r.active && <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 400 }}> · pasif</span>}
+                    {!r.active && <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 400 }}> {t("· pasif")}</span>}
                   </h3>
                   <button
                     onClick={() => setRoutineModal({ routine: r })}
-                    aria-label="Rutini düzenle"
+                    aria-label={t("Rutini düzenle")}
                     style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer" }}
                   >
                     <IconEdit size={15} color={c.textSecondary} />
@@ -311,7 +313,7 @@ export default function OperationDetail() {
         {/* ---- Kaçırılanlar ---- */}
         {overdue.length > 0 && (
           <>
-            <SectionTitle>Kaçırılanlar</SectionTitle>
+            <SectionTitle>{t("Kaçırılanlar")}</SectionTitle>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
               {overdue.map((o) => (
                 <OccurrenceRow
@@ -327,7 +329,7 @@ export default function OperationDetail() {
         )}
 
         {/* ---- Yaklaşan tekrarlar ---- */}
-        <SectionTitle>Yaklaşan tekrarlar</SectionTitle>
+        <SectionTitle>{t("Yaklaşan tekrarlar")}</SectionTitle>
         {upcoming.length === 0 ? (
           <EmptyBox>
             {routines.length === 0
@@ -369,7 +371,7 @@ export default function OperationDetail() {
                 color: c.textPrimary,
               }}
             >
-              Geçmiş
+              {t("Geçmiş")}
               <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 400 }}>
                 {history.length} tekrar · {historyOpen ? "gizle" : "göster"}
               </span>
@@ -439,7 +441,7 @@ export default function OperationDetail() {
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button onClick={() => setStatusPrompt(null)} style={ghostButton(c)}>
-              Vazgeç
+              {t("Vazgeç")}
             </button>
             <button data-primary onClick={() => changeStatus(statusPrompt)} style={primaryButton(c)}>
               {statusPrompt === "paused" ? "Duraklat" : "Kapat"}
@@ -466,6 +468,7 @@ function OccurrenceRow({
   onOpen?: () => void;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const links = occurrence.attachments ?? [];
   const files = occurrence.files ?? [];
   return (
@@ -482,7 +485,7 @@ function OccurrenceRow({
     >
       <button
         onClick={onComplete}
-        aria-label="Tamamlandı olarak işaretle"
+        aria-label={t("Tamamlandı olarak işaretle")}
         style={{
           width: 22,
           height: 22,
@@ -531,8 +534,8 @@ function OccurrenceRow({
       {onOpen && (
         <button
           onClick={onOpen}
-          aria-label="Tekrarı düzenle"
-          title="Düzenle: başlık, açıklama, saat, link ve dosya"
+          aria-label={t("Tekrarı düzenle")}
+          title={t("Düzenle: başlık, açıklama, saat, link ve dosya")}
           style={{
             background: "transparent",
             border: "none",
@@ -548,7 +551,7 @@ function OccurrenceRow({
 
       <button
         onClick={onSkip}
-        title="Bu tekrarı bilinçli olarak atla — kaçırılmış sayılmaz, seriyi bozmaz"
+        title={t("Bu tekrarı bilinçli olarak atla — kaçırılmış sayılmaz, seriyi bozmaz")}
         style={{
           background: "transparent",
           border: `1px solid ${c.border}`,
@@ -560,7 +563,7 @@ function OccurrenceRow({
           flexShrink: 0,
         }}
       >
-        Atla
+        {t("Atla")}
       </button>
     </div>
   );

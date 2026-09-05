@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { API_URL, api, ApiError } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface DeletionPreview {
   /** Doluysa silme yapılamaz; metin ne yapılması gerektiğini anlatır. */
@@ -64,6 +65,7 @@ const TEKLIFLER = [
 
 export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [preview, setPreview] = useState<DeletionPreview | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [sifre, setSifre] = useState("");
@@ -123,20 +125,20 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
   const hazir = onay.trim() === ONAY_METNI && (!hasPassword || sifre.length > 0) && !preview?.blocker;
 
   return (
-    <Modal title="Hesabını sil" onClose={onClose}>
+    <Modal title={t("Hesabını sil")} onClose={onClose}>
       {yukleniyor ? (
-        <p style={{ color: c.textSecondary, fontSize: 15 }}>Bilgiler yükleniyor…</p>
+        <p style={{ color: c.textSecondary, fontSize: 15 }}>{t("Bilgiler yükleniyor…")}</p>
       ) : preview?.blocker ? (
         <>
           <p style={{ color: c.textPrimary, fontSize: 15, lineHeight: 1.6, margin: "0 0 16px" }}>{preview.blocker}</p>
           <button onClick={onClose} style={{ ...dugme(c.border, c.textPrimary), width: "100%" }}>
-            Anladım
+            {t("Anladım")}
           </button>
         </>
       ) : adim === "teklifler" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <p style={{ color: c.textPrimary, fontSize: 15, lineHeight: 1.6, margin: 0 }}>
-            Gitmeden önce: aşağıdakilerden biri işine yarayabilir. Hiçbiri değilse aşağıdan devam et.
+            {t("Gitmeden önce: aşağıdakilerden biri işine yarayabilir. Hiçbiri değilse aşağıdan devam et.")}
           </p>
 
           {TEKLIFLER.map((t) => (
@@ -156,7 +158,7 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
 
           <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, padding: "11px 13px" }}>
             <p style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, color: c.textPrimary }}>
-              Verilerini yanına al
+              {t("Verilerini yanına al")}
             </p>
             <p style={{ margin: 0, fontSize: 14, color: c.textSecondary, lineHeight: 1.6 }}>
               Görevlerin, işlerin, projelerin ve bütçe kayıtların tek bir Excel dosyasında. Silsen de
@@ -175,22 +177,22 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
 
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onClose} style={{ ...dugme(c.border, c.textPrimary), flex: 1 }}>
-              Vazgeçtim
+              {t("Vazgeçtim")}
             </button>
             <button onClick={() => setAdim("onay")} style={{ ...dugme(c.border, c.danger), flex: 1 }}>
-              Yine de sil
+              {t("Yine de sil")}
             </button>
           </div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <p style={{ color: c.textPrimary, fontSize: 15, lineHeight: 1.6, margin: 0 }}>
-            Hesabın hemen kapanacak, ama verilerin <strong>30 gün</strong> daha duracak.
+            {t("Hesabın hemen kapanacak, ama verilerin")} <strong>{t("30 gün")}</strong> {t("daha duracak.")}
           </p>
 
           <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, padding: "11px 13px" }}>
             <p style={{ margin: 0, fontSize: 14, color: c.textSecondary, lineHeight: 1.6 }}>
-              Fikrin değişirse bu 30 gün içinde <strong style={{ color: c.textPrimary }}>aynı e-posta ve
+              {t("Fikrin değişirse bu 30 gün içinde")} <strong style={{ color: c.textPrimary }}>aynı e-posta ve
               şifreyle giriş yapman yeterli</strong> — hesabın olduğu gibi geri açılır, hiçbir şey kaybolmaz.
               Bu bilgiyi e-postayla da göndereceğiz.
             </p>
@@ -218,14 +220,14 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
 
           {preview && preview.korunacakIsler.length > 0 && (
             <p style={{ color: c.textSecondary, fontSize: 14, margin: 0, lineHeight: 1.6 }}>
-              Şu işler ekibinde başka üyeler olduğu için <strong>korunacak</strong>:{" "}
+              {t("Şu işler ekibinde başka üyeler olduğu için")} <strong>{t("korunacak")}</strong>:{" "}
               {preview.korunacakIsler.join(", ")}.
             </p>
           )}
 
           {hasPassword && (
             <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 14, color: c.textSecondary }}>
-              Şifren
+              {t("Şifren")}
               <input
                 type="password"
                 value={sifre}
@@ -237,7 +239,7 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
           )}
 
           <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 14, color: c.textSecondary }}>
-            Onaylamak için <strong style={{ color: c.textPrimary }}>{ONAY_METNI}</strong> yaz
+            {t("Onaylamak için")} <strong style={{ color: c.textPrimary }}>{ONAY_METNI}</strong> {t("yaz")}
             <input value={onay} onChange={(e) => setOnay(e.target.value)} style={girdi(c)} />
           </label>
 
@@ -245,7 +247,7 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
 
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => setAdim("teklifler")} style={{ ...dugme(c.border, c.textPrimary), flex: 1 }}>
-              Geri
+              {t("Geri")}
             </button>
             <button
               onClick={sil}

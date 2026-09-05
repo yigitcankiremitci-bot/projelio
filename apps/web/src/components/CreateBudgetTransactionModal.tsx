@@ -3,6 +3,7 @@ import type { BudgetTransaction, BudgetTransactionType } from "@projelio/shared"
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   projectId: string;
@@ -14,6 +15,7 @@ interface Props {
 
 export default function CreateBudgetTransactionModal({ projectId, transaction, onClose, onSaved }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const editing = Boolean(transaction);
   const [type, setType] = useState<BudgetTransactionType>(transaction?.type ?? "expense");
   const [description, setDescription] = useState(transaction?.description ?? "");
@@ -67,7 +69,7 @@ export default function CreateBudgetTransactionModal({ projectId, transaction, o
               fontWeight: 500,
             }}
           >
-            Gelen ödeme
+            {t("Gelen ödeme")}
           </button>
           <button
             type="button"
@@ -83,12 +85,12 @@ export default function CreateBudgetTransactionModal({ projectId, transaction, o
               fontWeight: 500,
             }}
           >
-            Gider
+            {t("Gider")}
           </button>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -98,7 +100,7 @@ export default function CreateBudgetTransactionModal({ projectId, transaction, o
           />
           {type === "income" && (
             <span style={{ fontSize: 13, color: c.textSecondary }}>
-              Müşteriden tahsil ettiğin tutar — beklenen ödemeden düşülür.
+              {t("Müşteriden tahsil ettiğin tutar — beklenen ödemeden düşülür.")}
             </span>
           )}
         </div>

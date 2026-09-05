@@ -5,6 +5,7 @@ import type { NativeFileKind } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconChevronDown, IconFile, IconPlus } from "./icons";
+import { useT } from "../lib/i18n";
 
 export interface CreateNativeFileMenuHandle {
   /** Dışarıdan (örn. Dosyalar sekmesinin "+" FAB seçeneği) tür listesini açar. */
@@ -57,6 +58,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
   ref
 ) {
   const c = useThemeColors();
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [pendingKind, setPendingKind] = useState<{ kind: NativeFileKind; label: string } | null>(null);
   const [name, setName] = useState("");
@@ -104,11 +106,11 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
     <Modal title={pendingKind.label} onClose={() => (saving ? undefined : setPendingKind(null))} maxWidth={380}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Dosya adı</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Dosya adı")}</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Örn. Toplantı Notları"
+            placeholder={t("Örn. Toplantı Notları")}
             autoFocus
             disabled={saving}
             onKeyDown={(e) => e.key === "Enter" && void handleCreate()}
@@ -196,7 +198,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
         }}
       >
         <IconPlus size={15} color={c.textPrimary} />
-        Yeni dosya
+        {t("Yeni dosya")}
         <IconChevronDown size={13} color={c.textSecondary} />
       </button>
 

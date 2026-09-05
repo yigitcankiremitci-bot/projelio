@@ -67,15 +67,28 @@ function sar(kaynak) {
   // olmuyor: `</>` ile çok aşağıdaki bir `<` eşleşip arada kalan KODU t()'nin
   // içine alıyor ve dosya derlenmez hâle geliyor (bir kez oldu). İkisinin
   // ortası: kırpılınca tek satır kalan metinler sarılır, kalmayanlar elde.
+  // `(^|[^=])` — açan `>` bir OK FONKSİYONUNUN parçası olmasın.
+  //
+  // `map((key) =>\n  api.get<Tip[]>(…))` içinde `=>` ile `<` arasındaki
+  // "api.get" metin sanılıp t() içine alınmış ve dosya derlenmez hâle gelmişti.
+  // Ok işaretinden sonra gelen şey hiçbir zaman JSX metni değildir.
+  // Açan `>`ın ÖNCESİ de eleniyor:
+  //   `=` → ok fonksiyonu (`map((k) =>`)
+  //   `]` → jenerik tip kapanışı (`Promise<Tip[]>, Promise<…>`)
+  // İkisinde de sonrasında gelen şey JSX metni değil, koddur; sarılırsa dosya
+  // derlenmez. İkisi de gerçekten başımıza geldi.
   sonuc = sonuc.replace(
-    /(>)([^<>{}]*)(<)/g,
-    (tam, ac, govde, kapa) => {
+    /(^|[^=\]])(>)([^<>{}]*)(<)/g,
+    (tam, onceki, ac, govde, kapa) => {
       const metin = govde.trim();
       // Türkçeye özgü karakter ARANMIYOR: etiketler arasına yazılan her şey
       // tanım gereği ekrana çıkıyor ve "Kapat" da "Vazgeç" kadar çevrilmeli.
       // Harf içermeyen düğümler (boşluk, tire, nokta) metin değildir.
       if (!metin || !/[a-zA-ZçğıöşüÇĞİÖŞÜ]/.test(metin)) return tam;
       if (metin.includes("\n")) return tam;
+      // Görünen metin harfle ya da rakamla başlar. Virgül/noktalı virgül/
+      // parantezle başlayan şey bir ifadenin ortasıdır (`, Promise`).
+      if (!/^[\p{L}\p{N}"'“(]/u.test(metin)) return tam;
       // Kod noktalaması taşıyan "metin" aslında bir ifadedir: `a > b && c < d`
       // ya da `Record<string, unknown>` gibi. Sarılırsa kod bozulur.
       if (/[(){}=;&|?]|=>|::/.test(metin)) return tam;
@@ -84,7 +97,7 @@ function sar(kaynak) {
       const onBosluk = govde.slice(0, govde.indexOf(metin[0]));
       const sonBosluk = govde.slice(govde.indexOf(metin[0]) + metin.length);
       sayac++;
-      return `${ac}${onBosluk}{t("${anahtarla(metin)}")}${sonBosluk}${kapa}`;
+      return `${onceki}${ac}${onBosluk}{t("${anahtarla(metin)}")}${sonBosluk}${kapa}`;
     }
   );
 

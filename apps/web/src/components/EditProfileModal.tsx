@@ -8,6 +8,7 @@ import type { CropArea } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import AvatarCropper from "./AvatarCropper";
 import { IconUser } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   user: User;
@@ -17,6 +18,7 @@ interface Props {
 
 export default function EditProfileModal({ user, onClose, onSaved }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [fullName, setFullName] = useState(user.fullName);
   const [title, setTitle] = useState(user.title ?? "");
   const [bio, setBio] = useState(user.bio ?? "");
@@ -54,7 +56,7 @@ export default function EditProfileModal({ user, onClose, onSaved }: Props) {
   };
 
   return (
-    <Modal title="Profili düzenle" onClose={onClose}>
+    <Modal title={t("Profili düzenle")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 4 }}>
           {avatarFile ? (
@@ -111,19 +113,19 @@ export default function EditProfileModal({ user, onClose, onSaved }: Props) {
                 }}
                 style={{ background: "transparent", border: "none", padding: 0, fontSize: 14, color: c.textSecondary }}
               >
-                Vazgeç
+                {t("Vazgeç")}
               </button>
             )}
           </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Ad soyad</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Ad soyad")}</label>
           <input value={fullName} onChange={(e) => setFullName(e.target.value)} required style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Görev / unvan</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Görev / unvan")}</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -137,11 +139,11 @@ export default function EditProfileModal({ user, onClose, onSaved }: Props) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Kısa açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Kısa açıklama")}</label>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            placeholder="Kendini kısaca tanıt (opsiyonel)"
+            placeholder={t("Kendini kısaca tanıt (opsiyonel)")}
             maxLength={280}
             rows={3}
             style={{ width: "100%", resize: "vertical", fontFamily: "inherit" }}

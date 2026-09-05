@@ -6,6 +6,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { notifyCloudStorageChanged, onCloudStorageChanged } from "../lib/cloudStorageEvents";
 import ConfirmDialog from "./ConfirmDialog";
 import { IconOneDrive } from "./icons";
+import { useT } from "../lib/i18n";
 
 /**
  * Ayarlar ekranındaki OneDrive bağlantı kartı.
@@ -16,6 +17,7 @@ import { IconOneDrive } from "./icons";
  */
 export default function OneDriveCard() {
   const c = useThemeColors();
+  const t = useT();
   const [status, setStatus] = useState<GoogleDriveStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -84,21 +86,21 @@ export default function OneDriveCard() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
         <IconOneDrive size={22} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary }}>OneDrive</div>
+          <div style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{t("OneDrive")}</div>
           <div style={{ fontSize: 14, color: c.textSecondary }}>
-            Proje dosyaları kendi OneDrive'ınızda saklanır
+            {t("Proje dosyaları kendi OneDrive'ınızda saklanır")}
           </div>
         </div>
       </div>
 
       {!status.configured ? (
         <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 4px" }}>
-          Bu özellik sunucuda henüz yapılandırılmamış.
+          {t("Bu özellik sunucuda henüz yapılandırılmamış.")}
         </p>
       ) : status.driveReady ? (
         <>
           <div style={{ fontSize: 15, color: c.textPrimary, marginBottom: 4 }}>
-            Bağlı: <strong style={{ fontWeight: 500 }}>{status.email}</strong>
+            {t("Bağlı:")} <strong style={{ fontWeight: 500 }}>{status.email}</strong>
           </div>
 
           {quotaRatio !== null && (
@@ -133,12 +135,12 @@ export default function OneDriveCard() {
               cursor: "pointer",
             }}
           >
-            Bağlantıyı kaldır
+            {t("Bağlantıyı kaldır")}
           </button>
         </>
       ) : status.lockedByOtherProvider ? (
         <p style={{ fontSize: 15, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
-          Depolama için şu an Google Drive kullanılıyor. Değiştirmek için önce Drive kartından bağlantıyı kaldırın.
+          {t("Depolama için şu an Google Drive kullanılıyor. Değiştirmek için önce Drive kartından bağlantıyı kaldırın.")}
         </p>
       ) : (
         <>
@@ -170,9 +172,9 @@ export default function OneDriveCard() {
 
       {confirmDisconnect && (
         <ConfirmDialog
-          title="OneDrive bağlantısını kaldır"
+          title={t("OneDrive bağlantısını kaldır")}
           message="Projelio'nun OneDrive erişimi kaldırılacak. Dosyalarınız OneDrive'da kalır ama Projelio içinden açılamaz."
-          confirmLabel="Kaldır"
+          confirmLabel={t("Kaldır")}
           onConfirm={handleDisconnect}
           onCancel={() => setConfirmDisconnect(false)}
         />

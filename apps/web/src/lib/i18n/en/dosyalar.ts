@@ -49,4 +49,48 @@ export const dosyalar: TranslationDict = {
     'You need "full access" permission on this mailbox in Exchange.',
   "Kutuyu kaldır": "Remove mailbox",
   "Kutuyu modülden kaldır": "Remove the mailbox from this module",
+  // Bulut depolama kartları (ek)
+  "Google Drive": "Google Drive",
+  OneDrive: "OneDrive",
+  "Drive bağlantısını kaldır": "Disconnect Drive",
+  "OneDrive bağlantısını kaldır": "Disconnect OneDrive",
+  "Bağlantıyı kaldır": "Disconnect",
+  "Drive'da düzenle": "Edit in Drive",
+  "Outlook'ta aç": "Open in Outlook",
+  "Proje dosyaları kendi Drive'ınızda saklanır": "Project files are stored in your own Drive",
+  "Proje dosyaları kendi OneDrive'ınızda saklanır": "Project files are stored in your own OneDrive",
+  "Depolama için şu an Google Drive kullanılıyor. Değiştirmek için önce Drive kartından bağlantıyı kaldırın.":
+    "Google Drive is currently used for storage. To change it, disconnect from the Drive card first.",
+  "Depolama için şu an OneDrive kullanılıyor. Değiştirmek için önce OneDrive kartından bağlantıyı kaldırın.":
+    "OneDrive is currently used for storage. To change it, disconnect from the OneDrive card first.",
+  "Bağlı:": "Connected:",
+  "· bağlı değil": "· not connected",
+  "· şu an bağlı değil": "· not connected right now",
+  "· doğrulandı": "· verified",
+  "· onay için gerekli": "· required for approval",
+
+  // WhatsApp
+  WhatsApp: "WhatsApp",
+  "WhatsApp numaraları": "WhatsApp numbers",
+  "WhatsApp'ta gönder": "Send on WhatsApp",
+  "WhatsApp numarasını hesaptan ayır": "Unlink the WhatsApp number from the account",
+  "WhatsApp'tan değişiklik yapılabilsin": "Allow changes from WhatsApp",
+  "Görev ve son tarih bildirimleri WhatsApp'a da gelsin":
+    "Also send task and deadline notifications to WhatsApp",
+  "Projelio numaranız:": "Your Projelio number:",
+  "numaranıza gidiyor.": "goes to your number.",
+  "Projelio Türkiye": "Projelio Türkiye",
+  "Etiket (ör. Destek 1)": "Label (e.g. Support 1)",
+
+  // Destek
+  "Bize yaz": "Write to us",
+  "Taleplerim": "My requests",
+  "Tüm taleplerim": "All my requests",
+  "Mesajın": "Your message",
+  "Yanıtın — kullanıcıya bildirim olarak gider": "Your reply — sent to the user as a notification",
+  "Talebin bize ulaştı. Yanıtladığımızda bildirim göndereceğiz.":
+    "We've received your request. We'll notify you when we reply.",
+  "Öneri, dilek ya da şikâyetini buradan iletebilirsin. Yanıtladığımızda sana bildirim gelir.":
+    "Send us a suggestion, request or complaint here. You'll be notified when we reply.",
+  "Menüdeki": "In the menu",
 };

@@ -5,6 +5,7 @@ import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconWhatsapp } from "./icons";
 import WhatsappConnectionPanel from "./WhatsappConnectionPanel";
+import { useT } from "../lib/i18n";
 
 /**
  * Yönetici: WhatsApp numara havuzu. Numara ekle → QR okut → bağlı. Her
@@ -13,6 +14,7 @@ import WhatsappConnectionPanel from "./WhatsappConnectionPanel";
  */
 export default function WhatsappNumbersPanel() {
   const c = useThemeColors();
+  const t = useT();
   const [numbers, setNumbers] = useState<WhatsappConnectionSummary[] | null>(null);
   const [linked, setLinked] = useState<WhatsappLinkedUser[]>([]);
   const [label, setLabel] = useState("");
@@ -63,7 +65,7 @@ export default function WhatsappNumbersPanel() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
         <IconWhatsapp size={22} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary }}>WhatsApp numaraları</div>
+          <div style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{t("WhatsApp numaraları")}</div>
           <div style={{ fontSize: 14, color: c.textSecondary }}>
             Havuzdaki numaralar kullanıcılara arka planda kalıcı olarak atanır; Lio ve bildirimler bu numaralardan gider.
           </div>
@@ -75,7 +77,7 @@ export default function WhatsappNumbersPanel() {
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void handleAdd()}
-          placeholder="Etiket (ör. Destek 1)"
+          placeholder={t("Etiket (ör. Destek 1)")}
           style={{
             flex: 1,
             minWidth: 180,
@@ -122,20 +124,20 @@ export default function WhatsappNumbersPanel() {
       {/* Numarasını doğrulamış kullanıcılar: kim hangi Projelio numarasına bağlı. */}
       <div style={{ marginTop: 18 }}>
         <div style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, marginBottom: 6 }}>
-          Bağlı kullanıcılar <span style={{ color: c.textSecondary, fontWeight: 400 }}>({linked.length})</span>
+          {t("Bağlı kullanıcılar")} <span style={{ color: c.textSecondary, fontWeight: 400 }}>({linked.length})</span>
         </div>
         {linked.length === 0 ? (
-          <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Henüz numarasını doğrulayan kullanıcı yok.</p>
+          <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Henüz numarasını doğrulayan kullanıcı yok.")}</p>
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ color: c.textSecondary, textAlign: "left" }}>
-                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>Kullanıcı</th>
-                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>Telefon</th>
-                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>Projelio numarası</th>
-                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>Bildirim</th>
-                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>Doğrulama</th>
+                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>{t("Kullanıcı")}</th>
+                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>{t("Telefon")}</th>
+                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>{t("Projelio numarası")}</th>
+                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>{t("Bildirim")}</th>
+                  <th style={{ padding: "6px 8px", fontWeight: 500 }}>{t("Doğrulama")}</th>
                 </tr>
               </thead>
               <tbody>

@@ -13,6 +13,7 @@ import { useTaskSelection } from "../../lib/useTaskSelection";
 import { selectedLioTasks } from "../../lib/askLio";
 import { sortTasks, type TaskSortMode } from "../../lib/taskSort";
 import { useUndo } from "../../lib/undo";
+import { useT } from "../../lib/i18n";
 
 type CreateOptions = { weekNumber?: number; deadline?: string; startDate?: string };
 export type ViewMode = "project" | "day" | "week" | "month" | "year";
@@ -130,6 +131,7 @@ export default function ProcessPanel({
   onTasksDeleted,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const selection = useTaskSelection();
   const { pushUndo, pushDestructive } = useUndo();
   const [sort, setSort] = useState<TaskSortMode>("manual");
@@ -438,7 +440,7 @@ export default function ProcessPanel({
               <button
                 onClick={goPrevDay}
                 disabled={!canGoPrevDay}
-                aria-label="Önceki gün"
+                aria-label={t("Önceki gün")}
                 style={{
                   width: 26,
                   height: 26,
@@ -490,7 +492,7 @@ export default function ProcessPanel({
               <button
                 onClick={goNextDay}
                 disabled={!canGoNextDay}
-                aria-label="Sonraki gün"
+                aria-label={t("Sonraki gün")}
                 style={{
                   width: 26,
                   height: 26,
@@ -512,7 +514,7 @@ export default function ProcessPanel({
               <button
                 onClick={goPrevWeek}
                 disabled={!canGoPrevWeek}
-                aria-label="Önceki hafta"
+                aria-label={t("Önceki hafta")}
                 style={{
                   width: 26,
                   height: 26,
@@ -585,7 +587,7 @@ export default function ProcessPanel({
               <button
                 onClick={goPrevMonth}
                 disabled={!canGoPrevMonth}
-                aria-label="Önceki ay"
+                aria-label={t("Önceki ay")}
                 style={{
                   width: 26,
                   height: 26,
@@ -807,9 +809,9 @@ export default function ProcessPanel({
           )}
           {confirmingBulkAction === "archive" && (
             <ConfirmDialog
-              title="Görevleri arşivle"
+              title={t("Görevleri arşivle")}
               message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
-              confirmLabel="Arşivle"
+              confirmLabel={t("Arşivle")}
               danger={false}
               onCancel={() => setConfirmingBulkAction(null)}
               onConfirm={handleArchiveSelected}
@@ -817,7 +819,7 @@ export default function ProcessPanel({
           )}
           {confirmingBulkAction === "delete" && (
             <ConfirmDialog
-              title="Görevleri sil"
+              title={t("Görevleri sil")}
               message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`}
               confirmLabel="Sil"
               danger

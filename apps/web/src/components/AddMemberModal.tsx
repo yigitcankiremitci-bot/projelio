@@ -3,6 +3,7 @@ import type { ProjectMember, User } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   projectId: string;
@@ -13,6 +14,7 @@ interface Props {
 
 export default function AddMemberModal({ projectId, existingUserIds, onClose, onAdded }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
@@ -64,10 +66,10 @@ export default function AddMemberModal({ projectId, existingUserIds, onClose, on
   };
 
   return (
-    <Modal title="Ekibe üye ekle" onClose={onClose} maxWidth={380}>
+    <Modal title={t("Ekibe üye ekle")} onClose={onClose} maxWidth={380}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Kullanıcı</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Kullanıcı")}</label>
 
           {selectedUser ? (
             <div
@@ -96,14 +98,14 @@ export default function AddMemberModal({ projectId, existingUserIds, onClose, on
                 }}
                 style={{ background: "transparent", border: "none", color: c.textSecondary, fontSize: 14 }}
               >
-                Değiştir
+                {t("Değiştir")}
               </button>
             </div>
           ) : (
             <>
               <input
                 type="text"
-                placeholder="Kullanıcı adı (@) veya e-posta ile ara…"
+                placeholder={t("Kullanıcı adı (@) veya e-posta ile ara…")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 autoFocus
@@ -112,10 +114,10 @@ export default function AddMemberModal({ projectId, existingUserIds, onClose, on
               {query.trim() && (
                 <div style={{ border: `1px solid ${c.border}`, borderRadius: 8, maxHeight: 200, overflowY: "auto" }}>
                   {searching ? (
-                    <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, padding: "10px 12px" }}>Aranıyor…</p>
+                    <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, padding: "10px 12px" }}>{t("Aranıyor…")}</p>
                   ) : results.length === 0 ? (
                     <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, padding: "10px 12px" }}>
-                      Sonuç bulunamadı.
+                      {t("Sonuç bulunamadı.")}
                     </p>
                   ) : (
                     results.map((u) => (
@@ -150,10 +152,10 @@ export default function AddMemberModal({ projectId, existingUserIds, onClose, on
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Görev / Unvan</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Görev / Unvan")}</label>
           <input
             type="text"
-            placeholder="Örn. Elektrik taşeronu, Grafik tasarımcı…"
+            placeholder={t("Örn. Elektrik taşeronu, Grafik tasarımcı…")}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             style={{ width: "100%" }}

@@ -27,6 +27,7 @@ import PlanTargetsModal from "../components/plan/PlanTargetsModal";
 import PlanBlockModal from "../components/plan/PlanBlockModal";
 import RitualCard from "../components/plan/RitualCard";
 import SchedulePickerPanel from "../components/plan/SchedulePickerPanel";
+import { useT } from "../lib/i18n";
 
 type ViewMode = PlanPeriodKind;
 
@@ -50,6 +51,7 @@ const VIEW_LABELS: Record<ViewMode, string> = { day: "Günlük", week: "Haftalı
  */
 export default function CalendarView() {
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
 
   const [view, setView] = useState<ViewMode>("week");
@@ -212,7 +214,7 @@ export default function CalendarView() {
   if (loading && !data) {
     return (
       <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
-        <p style={{ color: c.textSecondary, fontSize: 15 }}>Takvim yükleniyor…</p>
+        <p style={{ color: c.textSecondary, fontSize: 15 }}>{t("Takvim yükleniyor…")}</p>
       </div>
     );
   }
@@ -221,7 +223,7 @@ export default function CalendarView() {
     <div style={{ minHeight: "100vh", background: c.background, padding: isDesktop ? 28 : 16 }}>
       {/* --------------------------------------------------------- Başlık */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
-        <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 500, margin: 0, marginRight: 6 }}>Takvim</h1>
+        <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 500, margin: 0, marginRight: 6 }}>{t("Takvim")}</h1>
 
         {/* Görünüm seçici ve dönem gezinmesi bu satırda DEĞİL: ikisi de
             takvimin hemen üstünde, ortalanmış kendi şeridinde duruyor
@@ -242,7 +244,7 @@ export default function CalendarView() {
               cursor: "pointer",
             }}
           >
-            Lio'ya sor
+            {t("Lio'ya sor")}
           </button>
           {view !== "month" && (
             <button
@@ -318,7 +320,7 @@ export default function CalendarView() {
             marginBottom: 16,
           }}
         >
-          <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>Bu dönemin niyeti</span>
+          <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{t("Bu dönemin niyeti")}</span>
           <span style={{ fontSize: 15, color: data.progress.period.theme ? c.textPrimary : c.textSecondary, flex: 1, minWidth: 0 }}>
             {data.progress.period.theme ?? "henüz yazılmadı"}
           </span>
@@ -394,7 +396,7 @@ export default function CalendarView() {
                   cursor: "pointer",
                 }}
               >
-                Bugün
+                {t("Bugün")}
               </button>
               <NavButton label="›" onClick={() => step(1)} />
             </div>
@@ -534,6 +536,7 @@ function SuggestionPreview({
   onDismiss: () => void;
 }) {
   const c = useThemeColors();
+  const t = useT();
   return (
     <div
       style={{
@@ -548,7 +551,7 @@ function SuggestionPreview({
         {suggestion.proposedCount} blok · {formatDuration(suggestion.proposedMinutes)} önerildi
       </div>
       <p style={{ margin: 0, fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
-        Hedeflerin çalışma saatlerine göre dağıtıldı. Elle koyduğun bloklara dokunulmadı.
+        {t("Hedeflerin çalışma saatlerine göre dağıtıldı. Elle koyduğun bloklara dokunulmadı.")}
       </p>
 
       {suggestion.shortfall.length > 0 && (
@@ -585,7 +588,7 @@ function SuggestionPreview({
             opacity: busy ? 0.6 : 1,
           }}
         >
-          Takvime uygula
+          {t("Takvime uygula")}
         </button>
         <button
           onClick={onDismiss}
@@ -599,7 +602,7 @@ function SuggestionPreview({
             cursor: "pointer",
           }}
         >
-          Vazgeç
+          {t("Vazgeç")}
         </button>
       </div>
     </div>

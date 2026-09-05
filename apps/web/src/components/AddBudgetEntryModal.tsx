@@ -3,6 +3,7 @@ import type { BudgetTransaction, BudgetTransactionType, Project } from "@projeli
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   /** Verilirse form düzenleme kipinde açılır; yoksa yeni kayıt eklenir. */
@@ -25,6 +26,7 @@ function todayString() {
 
 export default function AddBudgetEntryModal({ transaction, onClose, onSaved }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const editing = Boolean(transaction);
   const [type, setType] = useState<BudgetTransactionType>(transaction?.type ?? "expense");
   const [amount, setAmount] = useState(transaction ? String(transaction.amount) : "");
@@ -68,7 +70,7 @@ export default function AddBudgetEntryModal({ transaction, onClose, onSaved }: P
     <Modal title={editing ? "Kaydı düzenle" : "Gelir / gider ekle"} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Tür</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tür")}</label>
           <select value={type} onChange={(e) => setType(e.target.value as BudgetTransactionType)} style={{ width: "100%" }}>
             {typeOptions.map((o) => (
               <option key={o.value} value={o.value}>
@@ -92,11 +94,11 @@ export default function AddBudgetEntryModal({ transaction, onClose, onSaved }: P
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Örn. Ofis kirası"
+            placeholder={t("Örn. Ofis kirası")}
             style={{ width: "100%" }}
           />
         </div>
@@ -104,7 +106,7 @@ export default function AddBudgetEntryModal({ transaction, onClose, onSaved }: P
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Proje (opsiyonel)</label>
           <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={{ width: "100%" }}>
-            <option value="">Projesiz — genel kayıt</option>
+            <option value="">{t("Projesiz — genel kayıt")}</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.title}
@@ -113,13 +115,13 @@ export default function AddBudgetEntryModal({ transaction, onClose, onSaved }: P
           </select>
           {type === "income" && projectId && (
             <span style={{ fontSize: 13, color: c.textSecondary }}>
-              Bu tutar projenin beklenen ödemesinden düşülür.
+              {t("Bu tutar projenin beklenen ödemesinden düşülür.")}
             </span>
           )}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Tarih</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tarih")}</label>
           <input type="date" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} required style={{ width: "100%" }} />
         </div>
 

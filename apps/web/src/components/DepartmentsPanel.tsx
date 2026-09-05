@@ -10,6 +10,7 @@ import DepartmentCard from "./DepartmentCard";
 import { IconX } from "./icons";
 import { useDragScroll } from "../lib/useDragScroll";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
+import { useT } from "../lib/i18n";
 
 export interface DepartmentsPanelHandle {
   openAdd: () => void;
@@ -39,6 +40,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
   ref
 ) {
   const c = useThemeColors();
+  const t = useT();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [catalog, setCatalog] = useState<DepartmentCatalogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +106,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Departmanlar</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Departmanlar")}</h2>
 
       {adding && (
         <AddDepartmentForm
@@ -119,7 +121,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
       )}
 
       {loading ? (
-        <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
       ) : departments.length === 0 ? (
         <div
           style={{
@@ -184,6 +186,7 @@ function AddDepartmentForm({
   onAdded: () => void;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [customName, setCustomName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -218,14 +221,14 @@ function AddDepartmentForm({
   return (
     <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>Standart departmanlardan seç</span>
+        <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{t("Standart departmanlardan seç")}</span>
         <button onClick={onClose} aria-label="Kapat" style={{ background: "transparent", border: "none" }}>
           <IconX size={16} color={c.textSecondary} />
         </button>
       </div>
 
       {availableCatalog.length === 0 ? (
-        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Standart departmanların hepsi zaten eklenmiş.</p>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Standart departmanların hepsi zaten eklenmiş.")}</p>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 6 }}>
           {availableCatalog.map((entry) => {
@@ -252,12 +255,12 @@ function AddDepartmentForm({
       )}
 
       <div>
-        <label style={{ fontSize: 13, color: c.textSecondary }}>Ya da özel departman adı</label>
+        <label style={{ fontSize: 13, color: c.textSecondary }}>{t("Ya da özel departman adı")}</label>
         <input
           value={customName}
           onChange={(e) => setCustomName(e.target.value)}
           onKeyDown={onEnter(() => void handleSave())}
-          placeholder="Örn. Ar-Ge"
+          placeholder={t("Örn. Ar-Ge")}
           style={{ width: "100%", marginTop: 4 }}
         />
       </div>

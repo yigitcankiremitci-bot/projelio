@@ -5,6 +5,7 @@ import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconWhatsapp } from "./icons";
 import WhatsappNotifyPanel from "./WhatsappNotifyPanel";
+import { useT } from "../lib/i18n";
 
 /**
  * Ayarlar › Bağlı hesaplar'daki WhatsApp kartı (havuz modeli).
@@ -16,6 +17,7 @@ import WhatsappNotifyPanel from "./WhatsappNotifyPanel";
  */
 export default function WhatsappCard() {
   const c = useThemeColors();
+  const t = useT();
   const [overview, setOverview] = useState<WhatsappOverview | null>(null);
   const [error, setError] = useState("");
 
@@ -57,15 +59,15 @@ export default function WhatsappCard() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
         <IconWhatsapp size={22} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary }}>WhatsApp</div>
-          <div style={{ fontSize: 14, color: c.textSecondary }}>Görev ve son tarih bildirimleri WhatsApp'a da gelsin</div>
+          <div style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{t("WhatsApp")}</div>
+          <div style={{ fontSize: 14, color: c.textSecondary }}>{t("Görev ve son tarih bildirimleri WhatsApp'a da gelsin")}</div>
         </div>
       </div>
 
       {error && <p style={{ fontSize: 14, color: c.danger, margin: "0 0 8px" }}>{error}</p>}
 
       {overview && !overview.configured ? (
-        <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 4px" }}>Bu özellik sunucuda henüz yapılandırılmamış.</p>
+        <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 4px" }}>{t("Bu özellik sunucuda henüz yapılandırılmamış.")}</p>
       ) : overview && !overview.poolReady && !overview.myNumber ? (
         <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 4px", lineHeight: 1.5 }}>
           Henüz bağlı bir Projelio numarası yok; yönetici bir numara bağladığında burada görünecek.
@@ -74,8 +76,8 @@ export default function WhatsappCard() {
         <>
           {overview.myNumber && (
             <div style={{ fontSize: 14, color: c.textSecondary, marginBottom: 10 }}>
-              Projelio numaranız: <strong style={{ fontWeight: 500, color: c.textPrimary }}>{overview.myNumber.phoneMasked ?? overview.myNumber.label}</strong>
-              {overview.myNumber.status !== "working" && <span style={{ color: c.warning }}> · şu an bağlı değil</span>}
+              {t("Projelio numaranız:")} <strong style={{ fontWeight: 500, color: c.textPrimary }}>{overview.myNumber.phoneMasked ?? overview.myNumber.label}</strong>
+              {overview.myNumber.status !== "working" && <span style={{ color: c.warning }}> {t("· şu an bağlı değil")}</span>}
             </div>
           )}
           <WhatsappNotifyPanel overview={overview} onChanged={reload} />

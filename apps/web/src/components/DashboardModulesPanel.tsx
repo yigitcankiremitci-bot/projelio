@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useUndo } from "../lib/undo";
 import { IconSparkle, IconX } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   jobs: Job[];
@@ -15,6 +16,7 @@ interface Props {
 // (bkz. OrganizationDetail > Departmanlar).
 export default function DashboardModulesPanel({ jobs }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
   const [byJob, setByJob] = useState<Record<string, JobModule[]>>({});
   const [loading, setLoading] = useState(true);
@@ -94,7 +96,7 @@ export default function DashboardModulesPanel({ jobs }: Props) {
     }
   };
 
-  if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>;
+  if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
 
   if (catalog.length === 0) {
     return (
@@ -108,7 +110,7 @@ export default function DashboardModulesPanel({ jobs }: Props) {
           fontSize: 16,
         }}
       >
-        Serbest çalışanlar için henüz açılmış bir modül yok.
+        {t("Serbest çalışanlar için henüz açılmış bir modül yok.")}
       </div>
     );
   }
@@ -147,7 +149,7 @@ export default function DashboardModulesPanel({ jobs }: Props) {
                   onClick={() => setPickerFor(pickerFor === entry.key ? null : entry.key)}
                   style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", flexShrink: 0 }}
                 >
-                  + İşe ata
+                  {t("+ İşe ata")}
                 </button>
               )}
             </div>
@@ -189,7 +191,7 @@ export default function DashboardModulesPanel({ jobs }: Props) {
                     <button
                       onClick={() => unassign(entry.key, j.id)}
                       disabled={busy}
-                      aria-label="İşten kaldır"
+                      aria-label={t("İşten kaldır")}
                       style={{ display: "flex", background: "transparent", border: "none" }}
                     >
                       <IconX size={11} color={c.primaryDark} />

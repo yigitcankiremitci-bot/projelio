@@ -16,6 +16,7 @@ import { selectedLioTasks } from "../lib/askLio";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 import { useDragScroll } from "../lib/useDragScroll";
+import { useT } from "../lib/i18n";
 
 export interface DepartmentTasksPanelHandle {
   openCreate: () => void;
@@ -37,6 +38,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
   ref
 ) {
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
   // Pano yalnızca masaüstünde yana kayıyor; dar ekranda sütunlar alt alta.
   const boardScrollRef = useDragScroll<HTMLDivElement>(isDesktop);
@@ -288,7 +290,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
     setConfirmingBulkAction(null);
   };
 
-  if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>;
+  if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
 
   return (
     <div>
@@ -360,7 +362,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
       </div>
 
       {parentCompletePrompt && (
-        <Modal title="Görevi tamamla" onClose={() => setParentCompletePrompt(null)}>
+        <Modal title={t("Görevi tamamla")} onClose={() => setParentCompletePrompt(null)}>
           <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
             <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{parentCompletePrompt.title}</strong> görevinin tüm alt
             görevleri tamamlandı. Bu görevi de tamamlandı olarak işaretlemek ister misin?
@@ -370,7 +372,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
               onClick={() => setParentCompletePrompt(null)}
               style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 16 }}
             >
-              Hayır
+              {t("Hayır")}
             </button>
             <button
               data-primary
@@ -380,7 +382,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
               }}
               style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 16, fontWeight: 500 }}
             >
-              Evet, tamamla
+              {t("Evet, tamamla")}
             </button>
           </div>
         </Modal>
@@ -438,9 +440,9 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
 
       {confirmingBulkAction === "archive" && (
         <ConfirmDialog
-          title="Görevleri arşivle"
+          title={t("Görevleri arşivle")}
           message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
-          confirmLabel="Arşivle"
+          confirmLabel={t("Arşivle")}
           danger={false}
           onCancel={() => setConfirmingBulkAction(null)}
           onConfirm={handleArchiveSelected}
@@ -448,7 +450,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
       )}
       {confirmingBulkAction === "delete" && (
         <ConfirmDialog
-          title="Görevleri sil"
+          title={t("Görevleri sil")}
           message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`}
           confirmLabel="Sil"
           danger

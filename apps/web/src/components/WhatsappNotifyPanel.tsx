@@ -3,6 +3,7 @@ import type { WhatsappLinkCode, WhatsappOverview } from "@projelio/shared";
 import { whatsappApi } from "../api/whatsapp";
 import WhatsappLioWritesToggle from "./WhatsappLioWritesToggle";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 /**
  * Kullanıcının kendi WhatsApp bildirim paneli.
@@ -15,6 +16,7 @@ import { useThemeColors } from "../theme/useThemeColors";
  */
 export default function WhatsappNotifyPanel({ overview, onChanged }: { overview: WhatsappOverview; onChanged: () => void }) {
   const c = useThemeColors();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [link, setLink] = useState<WhatsappLinkCode | null>(null);
@@ -59,7 +61,7 @@ export default function WhatsappNotifyPanel({ overview, onChanged }: { overview:
     return (
       <div>
         <div style={{ fontSize: 15, color: c.textPrimary, marginBottom: 8 }}>
-          Bildirimleriniz <strong style={{ fontWeight: 500 }}>{overview.me.phoneMasked}</strong> numaranıza gidiyor.
+          {t("Bildirimleriniz")} <strong style={{ fontWeight: 500 }}>{overview.me.phoneMasked}</strong> {t("numaranıza gidiyor.")}
         </div>
         <button
           onClick={() =>
@@ -71,7 +73,7 @@ export default function WhatsappNotifyPanel({ overview, onChanged }: { overview:
           disabled={busy}
           style={{ ...ghostButton, color: c.danger }}
         >
-          Bildirimleri durdur
+          {t("Bildirimleri durdur")}
         </button>
         {error && <p style={{ fontSize: 14, color: c.danger, margin: "8px 0 0" }}>{error}</p>}
         <WhatsappLioWritesToggle enabled={overview.me.lioAllowWrites !== false} onChanged={onChanged} />
@@ -91,7 +93,7 @@ export default function WhatsappNotifyPanel({ overview, onChanged }: { overview:
         <div>
           <div style={{ fontSize: 20, fontWeight: 500, letterSpacing: 2, color: c.textPrimary, marginBottom: 10 }}>{link.code}</div>
           <a href={link.url} target="_blank" rel="noreferrer" style={primaryButton}>
-            WhatsApp'ta gönder
+            {t("WhatsApp'ta gönder")}
           </a>
           <p style={{ fontSize: 14, color: c.textSecondary, margin: "10px 0 0", lineHeight: 1.5 }}>
             Bağlantı telefonunuzda ya da WhatsApp Web'de açılır; mesaj {link.numberMasked} numarasına hazır yazılı gelir, yalnızca

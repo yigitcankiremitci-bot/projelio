@@ -8,6 +8,7 @@ import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
+import { useT } from "../lib/i18n";
 
 interface Props {
   organization: Organization;
@@ -19,6 +20,7 @@ interface Props {
 
 export default function EditOrganizationModal({ organization, onClose, onSaved, onDeleted, onArchived }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [name, setName] = useState(organization.name);
   const [description, setDescription] = useState(organization.description ?? "");
   const [groupId, setGroupId] = useState(organization.groupId ?? "");
@@ -81,19 +83,19 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
   };
 
   return (
-    <Modal title="Organizasyonu düzenle" onClose={onClose}>
+    <Modal title={t("Organizasyonu düzenle")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Ad</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Ad")}</label>
           <input value={name} onChange={(e) => setName(e.target.value)} required style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Kısa açıklama (opsiyonel)"
+            placeholder={t("Kısa açıklama (opsiyonel)")}
             style={{ width: "100%" }}
           />
         </div>
@@ -101,7 +103,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Bağlı olduğu grup (opsiyonel)</label>
           <select value={groupId} onChange={(e) => setGroupId(e.target.value)} style={{ width: "100%" }}>
-            <option value="">Yok — tek başına organizasyon</option>
+            <option value="">{t("Yok — tek başına organizasyon")}</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
@@ -111,7 +113,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Ölçek</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Ölçek")}</label>
           <select value={orgType} onChange={(e) => setOrgType(e.target.value as OrgType)} style={{ width: "100%" }}>
             {(Object.keys(ORG_TYPE_LABEL) as OrgType[]).map((type) => (
               <option key={type} value={type}>

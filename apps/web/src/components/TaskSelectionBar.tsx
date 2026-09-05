@@ -100,7 +100,7 @@ export default function TaskSelectionBar({
         }}
       >
         <IconCheck size={15} color={c.textSecondary} />
-        Seç
+        {t("Seç")}
       </button>
     );
     if (inline) return enableButton;

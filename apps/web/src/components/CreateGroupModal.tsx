@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
+import { useT } from "../lib/i18n";
 
 interface Props {
   onClose: () => void;
@@ -11,6 +12,7 @@ interface Props {
 
 export default function CreateGroupModal({ onClose, onCreated }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
@@ -36,13 +38,13 @@ export default function CreateGroupModal({ onClose, onCreated }: Props) {
     <Modal title="Yeni grup (holding)" onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Ad</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Örn. Acme Holding" style={{ width: "100%" }} />
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Ad")}</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} required placeholder={t("Örn. Acme Holding")} style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Kısa açıklama (opsiyonel)" style={{ width: "100%" }} />
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
+          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("Kısa açıklama (opsiyonel)")} style={{ width: "100%" }} />
         </div>
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}

@@ -3,6 +3,7 @@ import type { ModuleRecord, OrganizationModule, Party } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleConfigs";
+import { useT } from "../lib/i18n";
 import {
   PERIOD_KEYS,
   buildPeriod,
@@ -30,6 +31,7 @@ interface Props {
  */
 export default function ModulePanelView({ config, organizationId, jobId }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [periodKey, setPeriodKey] = useState<PeriodKey>("this_month");
   const [allRecords, setAllRecords] = useState<ModuleRecord[]>([]);
   const [enabled, setEnabled] = useState<Set<string>>(new Set());
@@ -106,7 +108,7 @@ export default function ModulePanelView({ config, organizationId, jobId }: Props
     URL.revokeObjectURL(url);
   };
 
-  if (loading) return <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>;
+  if (loading) return <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -120,7 +122,7 @@ export default function ModulePanelView({ config, organizationId, jobId }: Props
             value={periodKey}
             onChange={(e) => setPeriodKey(e.target.value as PeriodKey)}
             style={{ fontSize: 13, padding: "5px 6px" }}
-            aria-label="Dönem"
+            aria-label={t("Dönem")}
           >
             {PERIOD_KEYS.map((k) => (
               <option key={k} value={k}>
@@ -133,7 +135,7 @@ export default function ModulePanelView({ config, organizationId, jobId }: Props
               onClick={exportBreakdowns}
               style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
             >
-              Dışa aktar
+              {t("Dışa aktar")}
             </button>
           )}
         </div>

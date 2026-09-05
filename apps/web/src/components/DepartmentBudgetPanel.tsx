@@ -6,6 +6,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { useFabAvailable } from "../lib/projectFab";
 import { useUndo } from "../lib/undo";
 import { IconEdit, IconTrash } from "./icons";
+import { useT } from "../lib/i18n";
 
 export interface DepartmentBudgetPanelHandle {
   openCreate: () => void;
@@ -33,6 +34,7 @@ function fmtMoney(amount: number): string {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   const c = useThemeColors();
+  const t = useT();
   return (
     <div
       style={{
@@ -65,6 +67,7 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
   ref
 ) {
   const c = useThemeColors();
+  const t = useT();
   const [transactions, setTransactions] = useState<BudgetTransaction[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -236,17 +239,17 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
   const paidTotal = sumByStatus("paid");
   const approvedTotal = plannedTotal + paidTotal;
 
-  if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>;
+  if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
-        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Görev bütçeleri</h4>
+        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>{t("Görev bütçeleri")}</h4>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
           <SummaryCard label="Onaylanan" value={fmtMoney(approvedTotal)} />
           <SummaryCard label="Bekleyen" value={fmtMoney(pendingTotal)} />
           <SummaryCard label="Planlanan" value={fmtMoney(plannedTotal)} />
-          <SummaryCard label="Ödenen" value={fmtMoney(paidTotal)} />
+          <SummaryCard label={t("Ödenen")} value={fmtMoney(paidTotal)} />
         </div>
 
         {budgetTasks.length === 0 ? (
@@ -255,18 +258,18 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
           </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {budgetTasks.map((t) => {
-              const parent = t.parentTaskId ? tasks.find((p) => p.id === t.parentTaskId) : undefined;
-              const label = parent ? `↳ ${t.title} (${parent.title})` : t.title;
-              const busy = updatingTaskId === t.id;
+            {budgetTasks.map((kayit) => {
+              const parent = kayit.parentTaskId ? tasks.find((p) => p.id === kayit.parentTaskId) : undefined;
+              const label = parent ? `↳ ${kayit.title} (${parent.title})` : kayit.title;
+              const busy = updatingTaskId === kayit.id;
               return (
                 <div
-                  key={t.id}
+                  key={kayit.id}
                   style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, background: c.surface, border: `1px solid ${c.border}` }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
-                    <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>{fmtMoney(t.budget ?? 0)}</div>
+                    <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>{fmtMoney(kayit.budget ?? 0)}</div>
                   </div>
                   <span
                     style={{
@@ -274,37 +277,37 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
                       padding: "2px 8px",
                       borderRadius: 20,
                       flexShrink: 0,
-                      color: t.budgetStatus === "paid" ? c.accentDark : t.budgetStatus === "planned" ? c.primaryDark : c.textSecondary,
-                      background: t.budgetStatus === "paid" ? `${c.accent}22` : t.budgetStatus === "planned" ? `${c.primary}1a` : c.background,
+                      color: kayit.budgetStatus === "paid" ? c.accentDark : kayit.budgetStatus === "planned" ? c.primaryDark : c.textSecondary,
+                      background: kayit.budgetStatus === "paid" ? `${c.accent}22` : kayit.budgetStatus === "planned" ? `${c.primary}1a` : c.background,
                     }}
                   >
-                    {budgetStatusLabel[t.budgetStatus]}
+                    {budgetStatusLabel[kayit.budgetStatus]}
                   </span>
-                  {t.budgetStatus === "pending" && (
+                  {kayit.budgetStatus === "pending" && (
                     <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                       <button
-                        onClick={() => handleBudgetStatusChange(t.id, "planned")}
+                        onClick={() => handleBudgetStatusChange(kayit.id, "planned")}
                         disabled={busy}
                         style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary }}
                       >
-                        Planlandı
+                        {t("Planlandı")}
                       </button>
                       <button
-                        onClick={() => handleBudgetStatusChange(t.id, "paid")}
+                        onClick={() => handleBudgetStatusChange(kayit.id, "paid")}
                         disabled={busy}
                         style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary }}
                       >
-                        Ödendi
+                        {t("Ödendi")}
                       </button>
                     </div>
                   )}
-                  {t.budgetStatus === "planned" && (
+                  {kayit.budgetStatus === "planned" && (
                     <button
-                      onClick={() => handleBudgetStatusChange(t.id, "paid")}
+                      onClick={() => handleBudgetStatusChange(kayit.id, "paid")}
                       disabled={busy}
                       style={{ fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, flexShrink: 0 }}
                     >
-                      Ödendi olarak işaretle
+                      {t("Ödendi olarak işaretle")}
                     </button>
                   )}
                 </div>
@@ -315,7 +318,7 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
       </div>
 
       <div>
-        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Genel gelir/gider defteri</h4>
+        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>{t("Genel gelir/gider defteri")}</h4>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
           <SummaryCard label="Gelir" value={fmtMoney(income)} />
           <SummaryCard label="Gider" value={fmtMoney(spent)} />
@@ -323,7 +326,7 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <span style={{ fontSize: 14, color: c.textSecondary }}>Hareketler</span>
+          <span style={{ fontSize: 14, color: c.textSecondary }}>{t("Hareketler")}</span>
           {!fabAvailable && (
             <button
               onClick={() => {
@@ -341,11 +344,11 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
         {adding && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 12, color: c.textSecondary }}>Tür</label>
+              <label style={{ fontSize: 12, color: c.textSecondary }}>{t("Tür")}</label>
               <select value={type} onChange={(e) => setType(e.target.value as BudgetTransactionType)} style={{ width: "100%" }}>
-                <option value="income">Gelir</option>
-                <option value="expense">Gider</option>
-                <option value="payout">Hakediş/Ödeme</option>
+                <option value="income">{t("Gelir")}</option>
+                <option value="expense">{t("Gider")}</option>
+                <option value="payout">{t("Hakediş/Ödeme")}</option>
               </select>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -353,15 +356,15 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
               <input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} style={{ width: "100%" }} />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 12, color: c.textSecondary }}>Tarih</label>
+              <label style={{ fontSize: 12, color: c.textSecondary }}>{t("Tarih")}</label>
               <input type="date" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} style={{ width: "100%" }} />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 12, color: c.textSecondary }}>Açıklama</label>
+              <label style={{ fontSize: 12, color: c.textSecondary }}>{t("Açıklama")}</label>
               <input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Örn. Kira, Malzeme, Danışmanlık geliri"
+                placeholder={t("Örn. Kira, Malzeme, Danışmanlık geliri")}
                 style={{ width: "100%" }}
               />
             </div>
@@ -383,41 +386,41 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
                 }}
                 style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 14 }}
               >
-                Vazgeç
+                {t("Vazgeç")}
               </button>
             </div>
           </div>
         )}
 
         {transactions.length === 0 ? (
-          <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Henüz bir gelir/gider kaydı yok.</p>
+          <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Henüz bir gelir/gider kaydı yok.")}</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {transactions.map((t) => (
+            {transactions.map((kayit) => (
               <div
-                key={t.id}
+                key={kayit.id}
                 style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, background: c.surface, border: `1px solid ${c.border}` }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, color: c.textPrimary }}>
-                    {t.type === "income" ? "+ " : "− "}
-                    {fmtMoney(t.amount)}
-                    {t.description ? ` · ${t.description}` : ""}
+                    {kayit.type === "income" ? "+ " : "− "}
+                    {fmtMoney(kayit.amount)}
+                    {kayit.description ? ` · ${kayit.description}` : ""}
                   </div>
                   <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
-                    {typeLabel[t.type]} · {new Date(t.occurredAt).toLocaleDateString("tr-TR")}
+                    {typeLabel[kayit.type]} · {new Date(kayit.occurredAt).toLocaleDateString("tr-TR")}
                   </div>
                 </div>
                 <button
-                  onClick={() => startEdit(t)}
-                  aria-label="Kaydı düzenle"
+                  onClick={() => startEdit(kayit)}
+                  aria-label={t("Kaydı düzenle")}
                   style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", padding: 4 }}
                 >
                   <IconEdit size={14} color={c.textSecondary} />
                 </button>
                 <button
-                  onClick={() => handleDelete(t.id)}
-                  aria-label="Kaydı sil"
+                  onClick={() => handleDelete(kayit.id)}
+                  aria-label={t("Kaydı sil")}
                   style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", padding: 4 }}
                 >
                   <IconTrash size={14} color={c.textSecondary} />

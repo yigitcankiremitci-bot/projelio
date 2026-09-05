@@ -14,6 +14,7 @@ import { useIsDesktop } from "../../lib/useIsDesktop";
 import { useTour } from "../../lib/tour/TourContext";
 import type { TourPlacement } from "../../lib/tour/types";
 import { IconX, IconChevronLeft, IconChevronRight, IconCheck } from "../icons";
+import { useT } from "../../lib/i18n";
 
 const OVERLAY_Z = 300;
 const GAP = 14;
@@ -101,6 +102,7 @@ function placeBubble(
 
 export default function TourOverlay() {
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
   const {
     tour,
@@ -336,7 +338,7 @@ export default function TourOverlay() {
               type="button"
               onClick={() => setRate(RATES[(RATES.indexOf(rate) + 1) % RATES.length] ?? 1)}
               style={{ ...controlBtn, padding: "0 8px" }}
-              title="Anlatım hızı"
+              title={t("Anlatım hızı")}
             >
               {rate}x
             </button>
@@ -346,7 +348,7 @@ export default function TourOverlay() {
 
           <button type="button" onClick={prev} disabled={stepIndex === 0} style={{ ...controlBtn, opacity: stepIndex === 0 ? 0.45 : 1 }}>
             <IconChevronLeft size={14} color={c.textSecondary} />
-            Geri
+            {t("Geri")}
           </button>
 
           <button
@@ -373,11 +375,11 @@ export default function TourOverlay() {
               onChange={(e) => setAutoAdvance(e.target.checked)}
               style={{ width: 15, height: 15, margin: 0 }}
             />
-            Anlatım bitince kendiliğinden ilerle
+            {t("Anlatım bitince kendiliğinden ilerle")}
           </label>
           {voiceEnabled && source === "tts" && (
-            <span style={{ fontSize: 12, color: c.textSecondary }} title="Bu adımın kaydı henüz yüklenmedi; metin cihazın sesiyle okunuyor.">
-              demo ses
+            <span style={{ fontSize: 12, color: c.textSecondary }} title={t("Bu adımın kaydı henüz yüklenmedi; metin cihazın sesiyle okunuyor.")}>
+              {t("demo ses")}
             </span>
           )}
         </div>

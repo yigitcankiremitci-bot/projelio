@@ -48,6 +48,21 @@ const TURKCE = /[çğıöşüÇĞİÖŞÜ]/;
  * Buradaki metinleri "kalan iş" saymak, gerçek işin ölçüsünü iki katına
  * çıkarıp raporu işe yaramaz hâle getiriyordu.
  */
+/**
+ * ZATEN İKİ DİLLİ dosyalar — sözlükten geçmiyorlar.
+ *
+ * Yasal metinlerin her birinde `text.tr` ve `text.en` yan yana duruyor ve
+ * belgenin kendi TR/EN düğmesi var (bkz. components/LegalDocPage.tsx). Açılış
+ * dili uygulamanınkini izliyor, ama düğme bilerek KALDI: Türkçe metin hukuken
+ * bağlayıcı olan sürüm, İngilizce arayüz kullanan birinin de aslına bakabilmesi
+ * gerekiyor. Sözlüğe taşımak çeviriyi ikiye bölerdi.
+ */
+const ZATEN_IKI_DILLI = [
+  "apps/web/src/lib/legal/privacyPolicy.ts",
+  "apps/web/src/lib/legal/termsOfService.ts",
+  "apps/web/src/lib/legal/kvkkNotice.ts",
+];
+
 const MODELE_GIDEN = [
   "backend/src/modules/ai-assistant/ai-assistant.tools.ts",
   "backend/src/modules/ai-assistant/lio-dil-kurallari.ts",
@@ -144,7 +159,7 @@ for (const kok of TARANAN) {
   for (const dosya of dosyalar(join(KOK, kok))) {
     const goreli = relative(KOK, dosya);
     if (SOZLUK_KLASORLERI.some((k) => goreli.startsWith(k))) continue;
-    if (MODELE_GIDEN.includes(goreli)) continue;
+    if (MODELE_GIDEN.includes(goreli) || ZATEN_IKI_DILLI.includes(goreli)) continue;
     if (/\.test\.tsx?$/.test(goreli)) continue;
 
     const kaynak = readFileSync(dosya, "utf8");

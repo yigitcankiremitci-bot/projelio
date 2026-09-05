@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { SupportRequest } from "@projelio/shared";
 import { support } from "../api/support";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 /**
  * Admin > Destek panosu.
@@ -14,6 +15,7 @@ import { useThemeColors } from "../theme/useThemeColors";
  */
 export default function SupportAdminPanel() {
   const c = useThemeColors();
+  const t = useT();
   const [requests, setRequests] = useState<SupportRequest[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -80,7 +82,7 @@ export default function SupportAdminPanel() {
 
       {error && <p style={{ color: c.danger, fontSize: 14, margin: "0 0 10px" }}>{error}</p>}
 
-      {requests === null && <p style={{ fontSize: 14, color: c.textSecondary }}>Yükleniyor…</p>}
+      {requests === null && <p style={{ fontSize: 14, color: c.textSecondary }}>{t("Yükleniyor…")}</p>}
 
       {requests?.length === 0 && (
         <div
@@ -93,7 +95,7 @@ export default function SupportAdminPanel() {
             color: c.textSecondary,
           }}
         >
-          Henüz destek talebi yok.
+          {t("Henüz destek talebi yok.")}
         </div>
       )}
 
@@ -155,7 +157,7 @@ export default function SupportAdminPanel() {
                   <textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    placeholder="Yanıtın — kullanıcıya bildirim olarak gider"
+                    placeholder={t("Yanıtın — kullanıcıya bildirim olarak gider")}
                     rows={4}
                     maxLength={4000}
                     autoFocus
@@ -193,7 +195,7 @@ export default function SupportAdminPanel() {
                         fontSize: 14,
                       }}
                     >
-                      Vazgeç
+                      {t("Vazgeç")}
                     </button>
                   </div>
                 </div>

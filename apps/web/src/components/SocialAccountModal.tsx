@@ -4,6 +4,7 @@ import { socialMediaApi, type SocialAccountInput, type SocialScope } from "../ap
 import { PLATFORM_ORDER, SOCIAL_PLATFORMS, accountColor } from "../lib/socialMedia";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   scope: SocialScope;
@@ -55,6 +56,7 @@ function initialForm(account?: SocialAccount | null): FormState {
  */
 export default function SocialAccountModal({ scope, account, members, onClose, onSaved }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [form, setForm] = useState<FormState>(() => initialForm(account));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -120,7 +122,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
   return (
     <Modal
       title={account ? "Hesabı düzenle" : "Sosyal medya hesabı ekle"}
-      subtitle="Hesabın kimliği, kitlesi ve yayın ritmi — içerik yazarken bu bilgiler composer'da hatırlatılır."
+      subtitle={t("Hesabın kimliği, kitlesi ve yayın ritmi — içerik yazarken bu bilgiler composer'da hatırlatılır.")}
       onClose={onClose}
       maxWidth={560}
       mobileFullScreen
@@ -160,7 +162,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
             <input
               value={form.displayName}
               onChange={(e) => set("displayName", e.target.value)}
-              placeholder="Projelio Türkiye"
+              placeholder={t("Projelio Türkiye")}
               style={field}
             />
           </div>
@@ -191,7 +193,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
           <textarea
             value={form.audienceNote}
             onChange={(e) => set("audienceNote", e.target.value)}
-            placeholder="25–34 yaş, İstanbul, küçük işletme sahibi"
+            placeholder={t("25–34 yaş, İstanbul, küçük işletme sahibi")}
             rows={2}
             style={{ ...field, resize: "vertical" }}
           />
@@ -202,7 +204,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
           <textarea
             value={form.toneNote}
             onChange={(e) => set("toneNote", e.target.value)}
-            placeholder="Samimi ama abartısız; emoji az; teknik terim yok"
+            placeholder={t("Samimi ama abartısız; emoji az; teknik terim yok")}
             rows={2}
             style={{ ...field, resize: "vertical" }}
           />
@@ -214,14 +216,14 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
             <input
               value={form.postingFrequency}
               onChange={(e) => set("postingFrequency", e.target.value)}
-              placeholder="Haftada 3, hafta içi 19:00"
+              placeholder={t("Haftada 3, hafta içi 19:00")}
               style={field}
             />
           </div>
           <div style={{ flex: "1 1 160px", display: "flex", flexDirection: "column", gap: 4 }}>
             {label("Sorumlu")}
             <select value={form.ownerUserId} onChange={(e) => set("ownerUserId", e.target.value)} style={field}>
-              <option value="">Belirtilmedi</option>
+              <option value="">{t("Belirtilmedi")}</option>
               {members.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.label}
@@ -244,7 +246,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
         {account && (
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: c.textPrimary }}>
             <input type="checkbox" checked={form.active} onChange={(e) => set("active", e.target.checked)} />
-            Aktif — pasif hesaplar yeni içerikte seçilemez
+            {t("Aktif — pasif hesaplar yeni içerikte seçilemez")}
           </label>
         )}
 
@@ -263,7 +265,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
           }}
         >
           Buradaki bilgiler hesabın kimliği ve çalışma biçimi. Projelio'nun bu hesaba{" "}
-          <strong>doğrudan yayımlaması</strong> için Hesaplar sekmesindeki “Instagram'a bağla” adımı gerekiyor —
+          <strong>{t("doğrudan yayımlaması")}</strong> için Hesaplar sekmesindeki “Instagram'a bağla” adımı gerekiyor —
           bağlanmayan hesaplarda plan ve metin burada durur, yayını siz yaparsınız.
         </div>
 
@@ -282,7 +284,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
               color: c.textSecondary,
             }}
           >
-            Vazgeç
+            {t("Vazgeç")}
           </button>
           <button
             data-primary

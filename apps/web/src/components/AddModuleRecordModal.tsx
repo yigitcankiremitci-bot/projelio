@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   organizationId: string;
@@ -39,6 +40,7 @@ export default function AddModuleRecordModal({
   onSaved,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const config = MODULE_RECORD_CONFIGS[moduleKey];
   const [departmentId, setDepartmentId] = useState("");
   const [form, setForm] = useState<Record<string, string>>(() => {
@@ -91,7 +93,7 @@ export default function AddModuleRecordModal({
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>Departman (opsiyonel)</label>
             <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: "100%" }}>
-              <option value="">Genel</option>
+              <option value="">{t("Genel")}</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}

@@ -6,6 +6,7 @@ import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/proje
 import { useDragScroll } from "../lib/useDragScroll";
 import ProductCard from "./ProductCard";
 import AddEditProductModal from "./AddEditProductModal";
+import { useT } from "../lib/i18n";
 
 export interface ProductsPanelHandle {
   openAdd: () => void;
@@ -38,6 +39,7 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
   ref
 ) {
   const c = useThemeColors();
+  const t = useT();
   const scrollRef = useDragScroll<HTMLDivElement>(layout === "scroll");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,10 +68,10 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Ürün/Hizmet</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Ürün/Hizmet")}</h2>
 
       {loading ? (
-        <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
       ) : products.length === 0 ? (
         <div
           style={{

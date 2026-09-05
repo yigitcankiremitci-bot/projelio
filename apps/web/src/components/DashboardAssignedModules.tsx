@@ -8,6 +8,7 @@ import ModuleSurface from "./ModuleSurface";
 import ModuleTeamPanel from "./ModuleTeamPanel";
 import Modal from "./Modal";
 import { IconSparkle } from "./icons";
+import { useT } from "../lib/i18n";
 
 // ModuleCard.tsx ile aynı sabit kart yüksekliği — anasayfadaki modül kartları
 // şirket sayfasındakilerle aynı ölçüde dursun.
@@ -32,6 +33,7 @@ interface AssignedModule {
  */
 export default function DashboardAssignedModules({ jobs }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [assigned, setAssigned] = useState<AssignedModule[]>([]);
   const [loading, setLoading] = useState(true);
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -85,7 +87,7 @@ export default function DashboardAssignedModules({ jobs }: Props) {
   return (
     <div style={{ marginTop: 32 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: c.textPrimary }}>Modüllerim</h2>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: c.textPrimary }}>{t("Modüllerim")}</h2>
         <span
           style={{
             fontSize: 12,

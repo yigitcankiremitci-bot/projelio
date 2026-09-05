@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
+import { useT } from "../lib/i18n";
 
 interface Props {
   output: Output;
@@ -15,6 +16,7 @@ interface Props {
 
 export default function EditOutputModal({ output, onClose, onSaved, onDeleted, onArchived }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [title, setTitle] = useState(output.title);
   const [description, setDescription] = useState(output.description ?? "");
   const [error, setError] = useState("");
@@ -52,19 +54,19 @@ export default function EditOutputModal({ output, onClose, onSaved, onDeleted, o
   };
 
   return (
-    <Modal title="Çıktıyı düzenle" onClose={onClose}>
+    <Modal title={t("Çıktıyı düzenle")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlık")}</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Kısa açıklama (opsiyonel)"
+            placeholder={t("Kısa açıklama (opsiyonel)")}
             style={{ width: "100%" }}
           />
         </div>

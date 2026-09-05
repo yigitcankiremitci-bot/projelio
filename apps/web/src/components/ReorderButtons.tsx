@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconChevronUp, IconChevronDown } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   isFirst: boolean;
@@ -14,6 +15,7 @@ interface Props {
 
 export default function ReorderButtons({ isFirst, isLast, onMoveUp, onMoveDown, background, iconColor }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const color = iconColor ?? c.textPrimary;
 
   const btnStyle = (disabled: boolean): CSSProperties => ({
@@ -34,7 +36,7 @@ export default function ReorderButtons({ isFirst, isLast, onMoveUp, onMoveDown, 
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }} onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
-        aria-label="Yukarı taşı"
+        aria-label={t("Yukarı taşı")}
         disabled={isFirst}
         onClick={(e) => {
           e.preventDefault();
@@ -47,7 +49,7 @@ export default function ReorderButtons({ isFirst, isLast, onMoveUp, onMoveDown, 
       </button>
       <button
         type="button"
-        aria-label="Aşağı taşı"
+        aria-label={t("Aşağı taşı")}
         disabled={isLast}
         onClick={(e) => {
           e.preventDefault();

@@ -16,9 +16,11 @@ import {
 } from "../lib/creationRequests";
 import { IconBell } from "./icons";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 export default function NotificationBell() {
   const c = useThemeColors();
+  const t = useT();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationPayload[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -270,13 +272,13 @@ export default function NotificationBell() {
               borderBottom: `1px solid ${c.border}`,
             }}
           >
-            <span style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary }}>Bildirimler</span>
+            <span style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary }}>{t("Bildirimler")}</span>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
                 style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none" }}
               >
-                Tümünü okundu işaretle
+                {t("Tümünü okundu işaretle")}
               </button>
             )}
           </div>
@@ -295,7 +297,7 @@ export default function NotificationBell() {
                   background: `${c.accent}0f`,
                 }}
               >
-                Yanıt bekleyen davetler
+                {t("Yanıt bekleyen davetler")}
               </div>
               {invites.map((invite) => (
                 <div
@@ -330,7 +332,7 @@ export default function NotificationBell() {
                         fontWeight: 500,
                       }}
                     >
-                      Kabul et
+                      {t("Kabul et")}
                     </button>
                     <button
                       onClick={() => answerInvite(invite, false)}
@@ -345,7 +347,7 @@ export default function NotificationBell() {
                         fontSize: 14,
                       }}
                     >
-                      Reddet
+                      {t("Reddet")}
                     </button>
                   </div>
                 </div>
@@ -367,7 +369,7 @@ export default function NotificationBell() {
                   background: `${c.primary}12`,
                 }}
               >
-                Onay bekleyen talepler
+                {t("Onay bekleyen talepler")}
               </div>
               {approvals.map((request) => (
                 <div
@@ -404,7 +406,7 @@ export default function NotificationBell() {
                         fontWeight: 500,
                       }}
                     >
-                      Onayla
+                      {t("Onayla")}
                     </button>
                     <button
                       onClick={() => answerApproval(request, false)}
@@ -419,7 +421,7 @@ export default function NotificationBell() {
                         fontSize: 14,
                       }}
                     >
-                      Reddet
+                      {t("Reddet")}
                     </button>
                   </div>
                 </div>
@@ -430,7 +432,7 @@ export default function NotificationBell() {
           {notifications.length === 0 ? (
             invites.length === 0 && approvals.length === 0 && (
               <p style={{ fontSize: 15, color: c.textSecondary, padding: 16, textAlign: "center", margin: 0 }}>
-                Henüz bildirim yok.
+                {t("Henüz bildirim yok.")}
               </p>
             )
           ) : (
@@ -461,7 +463,7 @@ export default function NotificationBell() {
       )}
 
       {supportReply && (
-        <Modal title="Destek talebin yanıtlandı" onClose={() => setSupportReply(null)} maxWidth={520}>
+        <Modal title={t("Destek talebin yanıtlandı")} onClose={() => setSupportReply(null)} maxWidth={520}>
           <p style={{ fontSize: 15, color: c.textPrimary, margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
             {supportReply.body}
           </p>
@@ -484,7 +486,7 @@ export default function NotificationBell() {
               fontSize: 14,
             }}
           >
-            Tüm taleplerim
+            {t("Tüm taleplerim")}
           </button>
         </Modal>
       )}

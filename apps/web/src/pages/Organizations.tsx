@@ -5,10 +5,12 @@ import OrganizationCard from "../components/OrganizationCard";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useWithoutPendingDeletes } from "../lib/undo";
+import { useT } from "../lib/i18n";
 
 export default function Organizations() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const c = useThemeColors();
+  const t = useT();
   const gridRef = useRef<HTMLDivElement>(null);
   const registerReorderUndo = useReorderUndo();
   const organizationsRef = useLatestRef(organizations);
@@ -47,7 +49,7 @@ export default function Organizations() {
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Organizasyonlar</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Organizasyonlar")}</h1>
       </div>
 
       {visibleOrganizations.length === 0 ? (
@@ -61,7 +63,7 @@ export default function Organizations() {
             fontSize: 16,
           }}
         >
-          Henüz organizasyon yok. Alttaki "+" butonuyla, projelerini bir şirket/marka altında toplamak için bir tane oluşturabilirsin — bu tamamen opsiyonel, freelance projelerin etkilenmez.
+          {t("Henüz organizasyon yok. Alttaki \"+\" butonuyla, projelerini bir şirket/marka altında toplamak için bir tane oluşturabilirsin — bu tamamen opsiyonel, freelance projelerin etkilenmez.")}
         </div>
       ) : (
         <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>

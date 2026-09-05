@@ -182,4 +182,23 @@ export const lio: TranslationDict = {
   "İptal": "Cancel",
   "Kaydedilemedi.": "Could not be saved.",
   "İşlem tamamlanamadı.": "The operation could not be completed.",
+  // ─────────────────────────────────────────────── Lio paneli (ek)
+  Lio: "Lio",
+  "Lio hata yapabilir.": "Lio can make mistakes.",
+  "Düşünüyor…": "Thinking…",
+  "AI kredilerim": "My AI credits",
+  "Sesli anlatım": "Narration",
+  "Sesli kullanım anlatımı": "Narrated walkthrough",
+  "Anlatımı sesli dinle": "Listen to the narration",
+  "Anlatım hızı": "Narration speed",
+  "Anlatım bitince kendiliğinden ilerle": "Advance automatically when the narration ends",
+  "Diğer anlatımlar": "Other narrations",
+  "Okuma sesi": "Reading voice",
+  "Ses kaynağı": "Voice source",
+  "Doğal ses": "Natural voice",
+  "demo ses": "sample voice",
+  "Bu adımın kaydı henüz yüklenmedi; metin cihazın sesiyle okunuyor.":
+    "This step's recording isn't uploaded yet; the text is read with your device's voice.",
+  "Her yanıtın yanındaki hoparlöre basarak dinleyebilirsin.":
+    "Tap the speaker next to any reply to listen to it.",
 };

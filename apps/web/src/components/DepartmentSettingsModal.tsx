@@ -7,6 +7,7 @@ import { getDepartmentCoverUrl, hasCustomDepartmentCover } from "../lib/departme
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 import type { DepartmentTab } from "./DepartmentTabs";
+import { useT } from "../lib/i18n";
 
 interface Props {
   department: Department;
@@ -42,6 +43,7 @@ export default function DepartmentSettingsModal({
   onArchived,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [defaultTab, setDefaultTab] = useState<DepartmentTab>((department.defaultTab as DepartmentTab) || "tasks");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -113,9 +115,9 @@ export default function DepartmentSettingsModal({
   };
 
   return (
-    <Modal title="Departman ayarları" onClose={onClose}>
+    <Modal title={t("Departman ayarları")} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-        <label style={{ fontSize: 15, color: c.textSecondary }}>Kapak</label>
+        <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Kapak")}</label>
         <div
           style={{
             height: 90,
@@ -166,7 +168,7 @@ export default function DepartmentSettingsModal({
                 fontSize: 15,
               }}
             >
-              Varsayılana dön
+              {t("Varsayılana dön")}
             </button>
           )}
         </div>
@@ -188,7 +190,7 @@ export default function DepartmentSettingsModal({
 
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açılış sekmesi</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açılış sekmesi")}</label>
           <select
             value={defaultTab}
             onChange={(e) => setDefaultTab(e.target.value as DepartmentTab)}
@@ -209,7 +211,7 @@ export default function DepartmentSettingsModal({
             ))}
           </select>
           <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-            Bu departman sayfası her açıldığında seçtiğin sekmeyle başlar.
+            {t("Bu departman sayfası her açıldığında seçtiğin sekmeyle başlar.")}
           </p>
         </div>
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DepartmentMember, ProjectMember } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 // Hem proje ekibi hem departman kadrosu için ortak, minimal görüntü şekli.
 interface PickableMember {
@@ -45,6 +46,7 @@ export default function AssigneePicker({
   onChangeValues,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [members, setMembers] = useState<PickableMember[]>([]);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -238,7 +240,7 @@ export default function AssigneePicker({
               setQuery("");
               setOpen(true);
             }}
-            aria-label="Atamayı kaldır"
+            aria-label={t("Atamayı kaldır")}
             style={{ background: "transparent", border: "none", color: c.textSecondary, fontSize: 17, padding: 4 }}
           >
             ×

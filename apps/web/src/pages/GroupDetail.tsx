@@ -16,6 +16,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { usePageHeader } from "../lib/pageHeader";
+import { useT } from "../lib/i18n";
 
 // Not: "İşler" (job) kavramı yalnızca serbest çalışan/taşeron hesaplarına özgüdür;
 // bir holding doğrudan iş değil, organizasyon (ve onların departmanlarını) yönetir.
@@ -25,6 +26,7 @@ export default function GroupDetail() {
   useLiveRoom(id ? `group:${id}` : null);
   const navigate = useNavigate();
   const c = useThemeColors();
+  const t = useT();
   const cover = useCoverTheme();
   const isDesktop = useIsDesktop();
   const prefs = useAppPrefs();
@@ -94,18 +96,18 @@ export default function GroupDetail() {
           </div>
         }
         action={
-          <button onClick={() => setEditing(true)} aria-label="Grubu düzenle" style={coverActionButton(c)}>
+          <button onClick={() => setEditing(true)} aria-label={t("Grubu düzenle")} style={coverActionButton(c)}>
             <IconSettings size={20} color={c.textSecondary} />
           </button>
         }
       />
 
       <div style={{ padding: `14px ${gutter}px 28px` }}>
-        <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 14px" }}>Organizasyonlar</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 14px" }}>{t("Organizasyonlar")}</h2>
 
         {organizations.length === 0 ? (
           <div style={{ border: `1px dashed ${c.border}`, borderRadius: 12, padding: 24, textAlign: "center", color: c.textSecondary, fontSize: 15, marginBottom: 24 }}>
-            Bu gruba bağlı organizasyon yok. Bu sayfadayken alttaki "+" butonuyla ekleyebilirsin.
+            {t("Bu gruba bağlı organizasyon yok. Bu sayfadayken alttaki \"+\" butonuyla ekleyebilirsin.")}
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14, marginBottom: 24 }}>

@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { IconX } from "./icons";
+import { useT } from "../lib/i18n";
 
 // Kayıtların sahibi module_records ile aynı desende iki türlü olabilir: bir
 // organizasyon (departman modülleri) ya da bir iş (serbest çalışan modülleri).
@@ -42,6 +43,7 @@ function displayName(m: { fullName?: string; username?: string; email?: string; 
  */
 export default function ModuleTeamPanel({ organizationId, departmentId, jobId, moduleKey, access }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [members, setMembers] = useState<ModuleMember[]>([]);
   const [resolved, setResolved] = useState<ModuleAccess | undefined>(access);
   const [candidates, setCandidates] = useState<{ userId: string; label: string }[]>([]);
@@ -188,7 +190,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
     FAB_PRIORITY.panel
   );
 
-  if (loading) return <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Ekip yükleniyor…</p>;
+  if (loading) return <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Ekip yükleniyor…")}</p>;
 
   // Dış kaynak rolündeki kişi ekibi göremez (bkz. 042 rol açıklamaları).
   if (resolved?.role === "subcontractor") return null;
@@ -250,7 +252,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
                 >
                   {displayName(m)}
                   {m.status === "invited" && (
-                    <span style={{ fontSize: 12, color: c.textSecondary }}> · davet bekliyor</span>
+                    <span style={{ fontSize: 12, color: c.textSecondary }}> {t("· davet bekliyor")}</span>
                   )}
                 </div>
               </div>
@@ -285,8 +287,8 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
                   type="button"
                   onClick={() => remove(m.id)}
                   disabled={busyId === m.id}
-                  aria-label="Modülden çıkar"
-                  title="Modülden çıkar"
+                  aria-label={t("Modülden çıkar")}
+                  title={t("Modülden çıkar")}
                   style={{ background: "transparent", border: "none", padding: 4, flexShrink: 0, cursor: "pointer" }}
                 >
                   <IconX size={13} color={c.textSecondary} />
@@ -338,7 +340,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
                     flexShrink: 0,
                   }}
                 >
-                  Ata
+                  {t("Ata")}
                 </button>
               </div>
             ))
@@ -357,7 +359,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
               cursor: "pointer",
             }}
           >
-            Vazgeç
+            {t("Vazgeç")}
           </button>
         </div>
       )}

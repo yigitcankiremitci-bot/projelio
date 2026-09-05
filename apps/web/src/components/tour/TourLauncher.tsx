@@ -12,9 +12,11 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { useTour } from "../../lib/tour/TourContext";
 import { AREA_LABELS, tourAnchor } from "../../lib/tour/types";
 import { IconCheck, IconX } from "../icons";
+import { useT } from "../../lib/i18n";
 
 export default function TourLauncher() {
   const c = useThemeColors();
+  const t = useT();
   const { toursHere, allTours, seen, start, tour, voiceEnabled, setVoiceEnabled } = useTour();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -87,8 +89,8 @@ export default function TourLauncher() {
         type="button"
         {...tourAnchor("tour-launcher")}
         onClick={() => setOpen((v) => !v)}
-        aria-label="Sesli kullanım anlatımı"
-        title="Sesli kullanım anlatımı"
+        aria-label={t("Sesli kullanım anlatımı")}
+        title={t("Sesli kullanım anlatımı")}
         style={{
           width: 40,
           height: 40,
@@ -127,7 +129,7 @@ export default function TourLauncher() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px 8px" }}>
-            <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: c.textPrimary }}>Sesli anlatım</span>
+            <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{t("Sesli anlatım")}</span>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -158,13 +160,13 @@ export default function TourLauncher() {
               onChange={(e) => setVoiceEnabled(e.target.checked)}
               style={{ width: 15, height: 15, margin: 0 }}
             />
-            Anlatımı sesli dinle
+            {t("Anlatımı sesli dinle")}
           </label>
 
           {toursHere.length > 0 && (
             <>
               <div style={{ fontSize: 11.5, letterSpacing: 0.3, textTransform: "uppercase", color: c.textSecondary, padding: "6px 10px 4px" }}>
-                Bu sayfa
+                {t("Bu sayfa")}
               </div>
               {toursHere.map((t) => renderRow(t.id, t.title, t.description, AREA_LABELS[t.area]))}
             </>
@@ -173,7 +175,7 @@ export default function TourLauncher() {
           {others.length > 0 && (
             <>
               <div style={{ fontSize: 11.5, letterSpacing: 0.3, textTransform: "uppercase", color: c.textSecondary, padding: "10px 10px 4px" }}>
-                Diğer anlatımlar
+                {t("Diğer anlatımlar")}
               </div>
               {others.map((t) => renderRow(t.id, t.title, t.description, AREA_LABELS[t.area]))}
             </>

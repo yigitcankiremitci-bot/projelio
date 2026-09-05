@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import ProductPhotoCropModal from "./ProductPhotoCropModal";
 import { IconChevronLeft, IconChevronRight, IconPlus, IconStar, IconTrash } from "./icons";
 import { useDragScroll } from "../lib/useDragScroll";
+import { useT } from "../lib/i18n";
 
 /** Servisteki sınırla aynı (bkz. ProductsService.MAX_IMAGES_PER_PRODUCT). */
 const MAX_IMAGES = 12;
@@ -41,6 +42,7 @@ interface Props {
  */
 export default function ProductImagesEditor({ productId, images, pending, onPendingChange, onChanged }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const seritRef = useDragScroll<HTMLDivElement>();
   const [busy, setBusy] = useState(false);
@@ -198,7 +200,7 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
                 }}
               >
                 <IconStar size={10} color="#fff" filled />
-                Vitrin
+                {t("Vitrin")}
               </span>
             )}
 
@@ -206,8 +208,8 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
               type="button"
               onClick={() => void handleRemove(index, kutu.image)}
               disabled={busy}
-              aria-label="Fotoğrafı kaldır"
-              title="Fotoğrafı kaldır"
+              aria-label={t("Fotoğrafı kaldır")}
+              title={t("Fotoğrafı kaldır")}
               style={{
                 position: "absolute",
                 right: 4,
@@ -232,7 +234,7 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
                 type="button"
                 onClick={() => void move(index, index - 1)}
                 disabled={busy || index === 0}
-                aria-label="Sola taşı"
+                aria-label={t("Sola taşı")}
                 title={index === 1 ? "Vitrine al" : "Sola taşı"}
                 style={okStili(index === 0)}
               >
@@ -242,8 +244,8 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
                 type="button"
                 onClick={() => void move(index, index + 1)}
                 disabled={busy || index === total - 1}
-                aria-label="Sağa taşı"
-                title="Sağa taşı"
+                aria-label={t("Sağa taşı")}
+                title={t("Sağa taşı")}
                 style={okStili(index === total - 1)}
               >
                 <IconChevronRight size={13} color="#fff" />

@@ -7,6 +7,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import ModuleSurface from "../components/ModuleSurface";
 import ModuleTeamPanel from "../components/ModuleTeamPanel";
 import { IconChevronLeft } from "../components/icons";
+import { useT } from "../lib/i18n";
 
 /**
  * Bir modülün kendi sayfası.
@@ -23,6 +24,7 @@ export default function ModulePage() {
   // "geri" bağlantısı.
   const { departmentId, jobId, moduleKey } = useParams();
   const c = useThemeColors();
+  const t = useT();
 
   // Modül sayfası kendi odası: aynı departmanın iki farklı modülünde çalışan iki
   // kişi birbirinin sayfasında sayılmasın (yetki kontrolü kök kapsam üzerinden,
@@ -80,11 +82,11 @@ export default function ModulePage() {
     : { to: `/departments/${departmentId}?tab=modules`, label: department?.name ?? "Departman" };
 
   if (loading) {
-    return <p style={{ padding: 28, fontSize: 14, color: c.textSecondary }}>Yükleniyor…</p>;
+    return <p style={{ padding: 28, fontSize: 14, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
   }
 
   if (notFound || !moduleKey || (!department && !job)) {
-    return <p style={{ padding: 28, fontSize: 14, color: c.textSecondary }}>Modül bulunamadı.</p>;
+    return <p style={{ padding: 28, fontSize: 14, color: c.textSecondary }}>{t("Modül bulunamadı.")}</p>;
   }
 
   return (

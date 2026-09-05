@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
 import { COVER_PRESETS, coverBackground, coverPresetValue, findCoverPreset } from "../lib/covers";
 import { IconCheck, IconX } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   /** Kayıtlı kapak değeri: bir URL, "preset:<key>" ya da boş. */
@@ -28,6 +29,7 @@ interface Props {
  */
 export default function CoverPicker({ value, seed, filePreview, onSelectPreset, onFile }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const fileRef = useRef<HTMLInputElement>(null);
   const selectedPreset = findCoverPreset(value);
   const previewBackground = filePreview
@@ -37,7 +39,7 @@ export default function CoverPicker({ value, seed, filePreview, onSelectPreset, 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <label style={{ fontSize: 15, color: c.textSecondary }}>Kapak</label>
+      <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Kapak")}</label>
 
       <div
         style={{
@@ -62,7 +64,7 @@ export default function CoverPicker({ value, seed, filePreview, onSelectPreset, 
             fontSize: 15,
           }}
         >
-          Fotoğraf yükle
+          {t("Fotoğraf yükle")}
         </button>
         {hasSomething && (
           <button
@@ -72,7 +74,7 @@ export default function CoverPicker({ value, seed, filePreview, onSelectPreset, 
               onSelectPreset(undefined);
               if (fileRef.current) fileRef.current.value = "";
             }}
-            aria-label="Kapağı kaldır"
+            aria-label={t("Kapağı kaldır")}
             style={{
               width: 40,
               borderRadius: 8,
@@ -104,11 +106,11 @@ export default function CoverPicker({ value, seed, filePreview, onSelectPreset, 
           bunu yazmazsak kullanıcı yukarıdaki önizlemenin nereden geldiğini anlamıyor. */}
       {!hasSomething && (
         <span style={{ fontSize: 13, color: c.textSecondary }}>
-          Kapak seçmezsen bu kayda özel, kendiliğinden atanmış bir kapak gösterilir.
+          {t("Kapak seçmezsen bu kayda özel, kendiliğinden atanmış bir kapak gösterilir.")}
         </span>
       )}
 
-      <span style={{ fontSize: 13, color: c.textSecondary }}>ya da hazır bir kapak seç</span>
+      <span style={{ fontSize: 13, color: c.textSecondary }}>{t("ya da hazır bir kapak seç")}</span>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 6 }}>
         {COVER_PRESETS.map((preset) => {
           const active = !filePreview && selectedPreset?.key === preset.key;

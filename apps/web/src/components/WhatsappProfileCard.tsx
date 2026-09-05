@@ -4,6 +4,7 @@ import { whatsappApi } from "../api/whatsapp";
 import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
+import { useT } from "../lib/i18n";
 
 /**
  * Ayarlar › Hesap'taki "WhatsApp numarası" satırı — SALT OKUNUR.
@@ -16,6 +17,7 @@ import ConfirmDialog from "./ConfirmDialog";
  */
 export default function WhatsappProfileCard() {
   const c = useThemeColors();
+  const t = useT();
   const [overview, setOverview] = useState<WhatsappOverview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -63,8 +65,8 @@ export default function WhatsappProfileCard() {
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ fontSize: 15, color: c.textPrimary }}>
               <strong style={{ fontWeight: 500 }}>{me.phoneMasked}</strong>
-              <span style={{ color: c.success, fontSize: 14 }}> · doğrulandı</span>
-              {me.optInState === "opted_out" && <span style={{ color: c.textSecondary, fontSize: 14 }}> · bildirimler durdurulmuş</span>}
+              <span style={{ color: c.success, fontSize: 14 }}> {t("· doğrulandı")}</span>
+              {me.optInState === "opted_out" && <span style={{ color: c.textSecondary, fontSize: 14 }}> {t("· bildirimler durdurulmuş")}</span>}
             </div>
             {me.verifiedAt && (
               <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 2 }}>
@@ -86,7 +88,7 @@ export default function WhatsappProfileCard() {
               cursor: "pointer",
             }}
           >
-            Bağlantıyı kaldır
+            {t("Bağlantıyı kaldır")}
           </button>
         </div>
       ) : (
@@ -98,9 +100,9 @@ export default function WhatsappProfileCard() {
       {error && <p style={{ fontSize: 14, color: c.danger, margin: "8px 0 0" }}>{error}</p>}
       {confirmUnlink && (
         <ConfirmDialog
-          title="WhatsApp numarasını hesaptan ayır"
+          title={t("WhatsApp numarasını hesaptan ayır")}
           message="Bu numaraya artık bildirim gitmez. Yeni numara ya da cihaz için Bağlı hesaplar'dan yeniden kod alırsınız."
-          confirmLabel="Ayır"
+          confirmLabel={t("Ayır")}
           onConfirm={handleUnlink}
           onCancel={() => setConfirmUnlink(false)}
         />

@@ -5,6 +5,7 @@ import type { DriveBrowseEntry } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconChevronRight, IconFile, IconFolder } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   target: { jobId: string } | { projectId: string } | { departmentId: string };
@@ -27,6 +28,7 @@ interface Crumb {
  */
 export default function BrowseDriveModal({ target, taskId, outputId, onClose, onImported }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [crumbs, setCrumbs] = useState<Crumb[]>([{ id: undefined, name: "OneDrive" }]);
   const [entries, setEntries] = useState<DriveBrowseEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +69,7 @@ export default function BrowseDriveModal({ target, taskId, outputId, onClose, on
   };
 
   return (
-    <Modal title="OneDrive'dan seç" onClose={onClose} maxWidth={480}>
+    <Modal title={t("OneDrive'dan seç")} onClose={onClose} maxWidth={480}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, marginBottom: 12 }}>
         {crumbs.map((crumb, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -94,9 +96,9 @@ export default function BrowseDriveModal({ target, taskId, outputId, onClose, on
       {error && <p style={{ color: c.danger, fontSize: 14, marginBottom: 10 }}>{error}</p>}
 
       {loading ? (
-        <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
       ) : entries.length === 0 ? (
-        <p style={{ fontSize: 15, color: c.textSecondary }}>Bu klasör boş.</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Bu klasör boş.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 360, overflowY: "auto" }}>
           {entries.map((entry) => (
@@ -130,7 +132,7 @@ export default function BrowseDriveModal({ target, taskId, outputId, onClose, on
                 {entry.name}
               </span>
               {importingId === entry.id && (
-                <span style={{ fontSize: 13, color: c.textSecondary }}>İçe aktarılıyor…</span>
+                <span style={{ fontSize: 13, color: c.textSecondary }}>{t("İçe aktarılıyor…")}</span>
               )}
               {entry.isFolder && <IconChevronRight size={14} color={c.textSecondary} />}
             </button>

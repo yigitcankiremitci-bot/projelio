@@ -5,6 +5,7 @@ import { enqueueUploads } from "../lib/uploadQueue";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconUpload } from "./icons";
+import { useT } from "../lib/i18n";
 
 /** Yüklemenin gideceği yer. uploadFile'ın kabul ettiği hedeflerle birebir aynı. */
 export interface UploadTargetOption {
@@ -42,6 +43,7 @@ export default function QuickFileUploadModal({
   onUploaded,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [targetId, setTargetId] = useState(targets[0]?.id ?? "");
   const [googleStatus, setGoogleStatus] = useState<GoogleDriveStatus | null>(null);
   const [msStatus, setMsStatus] = useState<GoogleDriveStatus | null>(null);
@@ -142,7 +144,7 @@ export default function QuickFileUploadModal({
                   }}
                 >
                   <IconUpload size={18} color={c.textSecondary} />
-                  Dosya seç
+                  {t("Dosya seç")}
                 </button>
 
                 {/* İlerleme ve "vazgeç" artık burada değil: pencere kapansa da

@@ -6,6 +6,7 @@ import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useFabAvailable } from "../lib/projectFab";
 import { IconTrash } from "./icons";
+import { useT } from "../lib/i18n";
 
 export interface DepartmentMembersListHandle {
   openCreate: () => void;
@@ -40,6 +41,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
   ref
 ) {
   const c = useThemeColors();
+  const t = useT();
   const [members, setMembers] = useState<DepartmentMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState(false);
@@ -234,7 +236,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {myLeavePending && (
         <div style={{ fontSize: 13, color: c.textSecondary, textAlign: "right" }}>
-          Ayrılma talebin şirket kurucusunun onayını bekliyor.
+          {t("Ayrılma talebin şirket kurucusunun onayını bekliyor.")}
         </div>
       )}
 
@@ -253,7 +255,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
               cursor: "pointer",
             }}
           >
-            Kadrodan ayrıl
+            {t("Kadrodan ayrıl")}
           </button>
         </div>
       )}
@@ -281,14 +283,14 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
               onClick={() => respondToLeave(m.id, true)}
               style={{ padding: "7px 14px", fontSize: 14, borderRadius: 8, border: "none", background: c.danger, color: "#fff", cursor: "pointer" }}
             >
-              Ayrılmasını onayla
+              {t("Ayrılmasını onayla")}
             </button>
             <button
               type="button"
               onClick={() => respondToLeave(m.id, false)}
               style={{ padding: "7px 14px", fontSize: 14, borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, cursor: "pointer" }}
             >
-              Reddet
+              {t("Reddet")}
             </button>
           </div>
         </div>
@@ -316,21 +318,21 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
               disabled={responding}
               style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
             >
-              Onayla
+              {t("Onayla")}
             </button>
             <button
               onClick={() => handleRespond(false)}
               disabled={responding}
               style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 14 }}
             >
-              Reddet
+              {t("Reddet")}
             </button>
           </div>
         </div>
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Kadro</h4>
+        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Kadro")}</h4>
         {!fabAvailable && (
           <button
             onClick={() => {
@@ -364,7 +366,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
                 fontWeight: 500,
               }}
             >
-              Sistem kullanıcısı
+              {t("Sistem kullanıcısı")}
             </button>
             <button
               type="button"
@@ -383,7 +385,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
                 fontWeight: 500,
               }}
             >
-              E-posta ile davet
+              {t("E-posta ile davet")}
             </button>
           </div>
 
@@ -416,14 +418,14 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
                   }}
                   style={{ background: "transparent", border: "none", color: c.textSecondary, fontSize: 13 }}
                 >
-                  Değiştir
+                  {t("Değiştir")}
                 </button>
               </div>
             ) : (
               <>
                 <input
                   type="text"
-                  placeholder="Kullanıcı adı (@) veya e-posta ile ara…"
+                  placeholder={t("Kullanıcı adı (@) veya e-posta ile ara…")}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   style={{ width: "100%" }}
@@ -431,9 +433,9 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
                 {query.trim() && (
                   <div style={{ border: `1px solid ${c.border}`, borderRadius: 8, maxHeight: 180, overflowY: "auto", background: c.surface }}>
                     {searching ? (
-                      <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, padding: "8px 10px" }}>Aranıyor…</p>
+                      <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, padding: "8px 10px" }}>{t("Aranıyor…")}</p>
                     ) : results.length === 0 ? (
-                      <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, padding: "8px 10px" }}>Sonuç bulunamadı.</p>
+                      <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, padding: "8px 10px" }}>{t("Sonuç bulunamadı.")}</p>
                     ) : (
                       results.map((u) => (
                         <button
@@ -470,9 +472,9 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
 
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Pozisyon/unvan (opsiyonel)" style={{ width: "100%" }} />
           <select value={role} onChange={(e) => setRole(e.target.value as DepartmentMemberRole)} style={{ width: "100%" }}>
-            <option value="employee">Üretici Çalışan</option>
-            <option value="manager">Departman Yöneticisi</option>
-            <option value="subcontractor">Taşeron</option>
+            <option value="employee">{t("Üretici Çalışan")}</option>
+            <option value="manager">{t("Departman Yöneticisi")}</option>
+            <option value="subcontractor">{t("Taşeron")}</option>
           </select>
           {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
           <div style={{ display: "flex", gap: 8 }}>
@@ -480,7 +482,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
               onClick={handleInvite}
               style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14 }}
             >
-              Davet gönder
+              {t("Davet gönder")}
             </button>
             {/* Vazgeçme formun içinde: başlıktaki düğme "+"a taşındı. */}
             <button
@@ -490,16 +492,16 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
               }}
               style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 14 }}
             >
-              Vazgeç
+              {t("Vazgeç")}
             </button>
           </div>
         </div>
       )}
 
       {loading ? (
-        <p style={{ fontSize: 14, color: c.textSecondary }}>Yükleniyor…</p>
+        <p style={{ fontSize: 14, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
       ) : members.length === 0 ? (
-        <p style={{ fontSize: 14, color: c.textSecondary }}>Bu departmanda henüz kadro yok.</p>
+        <p style={{ fontSize: 14, color: c.textSecondary }}>{t("Bu departmanda henüz kadro yok.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {members.map((m) => (
@@ -514,7 +516,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
                   {roleLabel[m.role]} · {statusLabel[m.status] ?? m.status}
                 </div>
               </div>
-              <button onClick={() => handleRemove(m.id)} aria-label="Kadrodan çıkar" style={{ background: "transparent", border: "none" }}>
+              <button onClick={() => handleRemove(m.id)} aria-label={t("Kadrodan çıkar")} style={{ background: "transparent", border: "none" }}>
                 <IconTrash size={14} color={c.textSecondary} />
               </button>
             </div>

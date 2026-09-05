@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
+import { useT } from "../lib/i18n";
 
 interface Props {
   jobId: string;
@@ -19,6 +20,7 @@ const periods: { value: OperationBudgetPeriod; label: string }[] = [
 
 export default function CreateOperationModal({ jobId, onClose, onCreated }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [budgetPerPeriod, setBudgetPerPeriod] = useState("");
@@ -59,22 +61,22 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
 
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlık")}</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            placeholder="Sosyal medya yönetimi"
+            placeholder={t("Sosyal medya yönetimi")}
             style={{ width: "100%" }}
           />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Kısa açıklama (opsiyonel)"
+            placeholder={t("Kısa açıklama (opsiyonel)")}
             style={{ width: "100%" }}
           />
         </div>
@@ -92,7 +94,7 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Dönem</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Dönem")}</label>
             <select
               value={budgetPeriod}
               onChange={(e) => setBudgetPeriod(e.target.value as OperationBudgetPeriod)}
@@ -107,11 +109,11 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
           </div>
         </div>
         <span style={{ fontSize: 13, color: c.textSecondary, marginTop: -6 }}>
-          Rutinin sonu olmadığı için toplam bütçe yerine dönemsel çalışma ücreti tutulur.
+          {t("Rutinin sonu olmadığı için toplam bütçe yerine dönemsel çalışma ücreti tutulur.")}
         </span>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlangıç tarihi</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlangıç tarihi")}</label>
           <input
             type="date"
             value={startedOn}

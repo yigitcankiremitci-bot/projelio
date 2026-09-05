@@ -6,6 +6,7 @@ import { ALL_ROLES, ROLE_COLORS, ROLE_LABELS, STATUS_LABELS, profileFor } from "
 import { useUndo } from "../lib/undo";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { IconTrash, IconX } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   organizationId?: string;
@@ -49,6 +50,7 @@ export default function CustomersPanel({
   canWrite = true,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const profile = profileFor(departmentKey);
 
   const [parties, setParties] = useState<Party[]>([]);
@@ -218,13 +220,13 @@ export default function CustomersPanel({
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-          <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Müşteriler</h5>
+          <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Müşteriler")}</h5>
           {profile.key !== "base" && (
             <span style={{ fontSize: 12, color: c.textSecondary }}>{profile.label}</span>
           )}
         </div>
         {!canWrite ? (
-          <span style={{ fontSize: 12, color: c.textSecondary }}>Salt görüntüleme</span>
+          <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Salt görüntüleme")}</span>
         ) : (
           !fabAvailable && (
             <button
@@ -273,7 +275,7 @@ export default function CustomersPanel({
             onChange={(e) => setRoleFilter(e.target.value as PartyRole | "")}
             style={{ fontSize: 13, padding: "5px 6px" }}
           >
-            <option value="">Rol: tümü</option>
+            <option value="">{t("Rol: tümü")}</option>
             {ALL_ROLES.map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABELS[r]}
@@ -288,7 +290,7 @@ export default function CustomersPanel({
               }}
               style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
             >
-              Temizle
+              {t("Temizle")}
             </button>
           )}
         </div>
@@ -297,7 +299,7 @@ export default function CustomersPanel({
       {formMode && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, background: c.background, borderRadius: 10, padding: 10 }}>
           {formMode.kind === "edit" && (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>Kaydı düzenliyorsun</span>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Kaydı düzenliyorsun")}</span>
           )}
 
           <Field label="Ad / Unvan *">
@@ -305,20 +307,20 @@ export default function CustomersPanel({
               value={form.displayName}
               onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
               onBlur={checkDuplicates}
-              placeholder="Örn. ABC Yazılım Ltd. Şti."
+              placeholder={t("Örn. ABC Yazılım Ltd. Şti.")}
               style={{ width: "100%" }}
             />
           </Field>
 
           <div style={{ display: "flex", gap: 8 }}>
-            <Field label="Tür" style={{ flex: 1 }}>
+            <Field label={t("Tür")} style={{ flex: 1 }}>
               <select
                 value={form.partyType}
                 onChange={(e) => setForm((f) => ({ ...f, partyType: e.target.value }))}
                 style={{ width: "100%" }}
               >
-                <option value="company">Kurum</option>
-                <option value="person">Kişi</option>
+                <option value="company">{t("Kurum")}</option>
+                <option value="person">{t("Kişi")}</option>
               </select>
             </Field>
             <Field label="Rol" style={{ flex: 1 }}>
@@ -384,7 +386,7 @@ export default function CustomersPanel({
                 padding: "8px 10px",
               }}
             >
-              <strong style={{ color: c.textPrimary }}>Bu kaydı daha önce girmiş olabilirsin:</strong>
+              <strong style={{ color: c.textPrimary }}>{t("Bu kaydı daha önce girmiş olabilirsin:")}</strong>
               <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
                 {duplicates.map((d) => (
                   <li key={d.party.id}>
@@ -412,21 +414,21 @@ export default function CustomersPanel({
               onClick={closeForm}
               style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 14 }}
             >
-              Vazgeç
+              {t("Vazgeç")}
             </button>
           </div>
         </div>
       )}
 
       {loading ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
       ) : parties.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
           Henüz müşteri kaydı yok. Satış ve Müşteri İlişkileri aynı listeyi görür.
           {canWrite && fabAvailable ? ' Eklemek için sayfadaki "+" düğmesini kullan.' : ""}
         </p>
       ) : visible.length === 0 ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Aramanla eşleşen kayıt yok.</p>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Aramanla eşleşen kayıt yok.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {hasActiveFilter && (
@@ -486,12 +488,12 @@ export default function CustomersPanel({
                       onClick={() => openEdit(p)}
                       style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
                     >
-                      Düzenle
+                      {t("Düzenle")}
                     </button>
                     <button
                       onClick={() => handleArchive(p)}
-                      aria-label="Arşivle"
-                      title="Arşivle"
+                      aria-label={t("Arşivle")}
+                      title={t("Arşivle")}
                       style={{ background: "transparent", border: "none", cursor: "pointer" }}
                     >
                       <IconTrash size={14} color={c.textSecondary} />
@@ -535,6 +537,7 @@ function Field({
  */
 function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boolean; profile: string }) {
   const c = useThemeColors();
+  const t = useT();
   const [tab, setTab] = useState<"activity" | "contacts">("activity");
   const [activities, setActivities] = useState<PartyActivity[]>([]);
   const [contacts, setContacts] = useState<PartyContact[]>([]);
@@ -624,14 +627,14 @@ function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boo
               cursor: "pointer",
             }}
           >
-            Ekle
+            {t("Ekle")}
           </button>
         </div>
       )}
 
       {tab === "activity" ? (
         activities.length === 0 ? (
-          <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>Henüz temas kaydı yok.</p>
+          <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{t("Henüz temas kaydı yok.")}</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {activities.map((a) => (
@@ -644,7 +647,7 @@ function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boo
           </div>
         )
       ) : contacts.length === 0 ? (
-        <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>Henüz kişi eklenmemiş.</p>
+        <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{t("Henüz kişi eklenmemiş.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {contacts.map((ct) => (
@@ -652,7 +655,7 @@ function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boo
               <span style={{ flex: 1, color: c.textPrimary }}>
                 {ct.name}
                 {ct.title && <span style={{ color: c.textSecondary }}> · {ct.title}</span>}
-                {ct.isPrimary && <span style={{ color: c.primary }}> · birincil</span>}
+                {ct.isPrimary && <span style={{ color: c.primary }}> {t("· birincil")}</span>}
               </span>
               {canWrite && (
                 <button
@@ -660,7 +663,7 @@ function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boo
                     await api.delete(`/party-contacts/${ct.id}`);
                     load();
                   }}
-                  aria-label="Kişiyi çıkar"
+                  aria-label={t("Kişiyi çıkar")}
                   style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
                 >
                   <IconX size={12} color={c.textSecondary} />

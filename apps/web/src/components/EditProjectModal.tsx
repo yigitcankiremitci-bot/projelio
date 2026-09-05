@@ -8,6 +8,7 @@ import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
+import { useT } from "../lib/i18n";
 
 interface Props {
   /**
@@ -29,6 +30,7 @@ function toDateInputValue(iso: string) {
 
 export default function EditProjectModal({ project, onClose, onSaved }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const navigate = useNavigate();
   const [title, setTitle] = useState(project.title);
   const [description, setDescription] = useState(project.description ?? "");
@@ -95,19 +97,19 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
   };
 
   return (
-    <Modal title="Projeyi düzenle" onClose={onClose}>
+    <Modal title={t("Projeyi düzenle")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlık")}</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Kısa açıklama (opsiyonel)"
+            placeholder={t("Kısa açıklama (opsiyonel)")}
             style={{ width: "100%" }}
           />
         </div>
@@ -119,17 +121,17 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
 
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Başlangıç tarihi</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlangıç tarihi")}</label>
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required style={{ width: "100%" }} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş tarihi</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bitiş tarihi")}</label>
             <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} required style={{ width: "100%" }} />
           </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Durum</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Durum")}</label>
           <select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)} style={{ width: "100%" }}>
             {PROJECT_STATUSES.map((s) => (
               <option key={s} value={s}>

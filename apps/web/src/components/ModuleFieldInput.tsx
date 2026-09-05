@@ -4,6 +4,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { CURRENCY_OPTIONS, type ModuleFieldConfig } from "../lib/moduleConfigs";
 import { referenceOptionsFor, type ReferenceSource } from "../lib/moduleReferences";
 import { isReferenceValue } from "../lib/moduleConfigs";
+import { useT } from "../lib/i18n";
 
 interface Props {
   field: ModuleFieldConfig;
@@ -266,6 +267,7 @@ function ReferencePicker({
   createPartyPath?: string;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const options = referenceOptionsFor(field, references);
@@ -313,7 +315,7 @@ function ReferencePicker({
           {selected?.label ?? legacyText}
           {legacyText && (
             // Bağlanmamış eski değer: veri duruyor ama kayda bağlı değil.
-            <span style={{ fontSize: 11, color: c.textSecondary }}> · bağlı değil</span>
+            <span style={{ fontSize: 11, color: c.textSecondary }}> {t("· bağlı değil")}</span>
           )}
         </span>
         <button
@@ -321,7 +323,7 @@ function ReferencePicker({
           onClick={() => setValue("")}
           style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
         >
-          Değiştir
+          {t("Değiştir")}
         </button>
       </div>
     );
@@ -369,7 +371,7 @@ function ReferencePicker({
             </button>
           ))}
           {filtered.length === 0 && !createPartyPath && (
-            <span style={{ padding: "6px 8px", fontSize: 12, color: c.textSecondary }}>Eşleşme yok.</span>
+            <span style={{ padding: "6px 8px", fontSize: 12, color: c.textSecondary }}>{t("Eşleşme yok.")}</span>
           )}
           {createPartyPath && !filtered.some((o) => o.label.toLocaleLowerCase("tr") === query.trim().toLocaleLowerCase("tr")) && (
             <button

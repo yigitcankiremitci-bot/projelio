@@ -5,6 +5,7 @@ import { useUndo } from "../lib/undo";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import ConfirmDialog from "./ConfirmDialog";
 import { IconArchive, IconTrash } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   /** Türkçe -i hâli, örn. "İşi", "Projeyi", "Görevi", "Alt görevi", "Çıktıyı" */
@@ -47,6 +48,7 @@ export default function EntityDangerZone({
   onDelete,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const { pushUndo, pushDestructive } = useUndo();
   const [confirming, setConfirming] = useState<"archive" | "delete" | null>(null);
 
@@ -120,7 +122,7 @@ export default function EntityDangerZone({
         <ConfirmDialog
           title={`${entityLabel} arşive ekle`}
           message={archiveMessage}
-          confirmLabel="Arşive ekle"
+          confirmLabel={t("Arşive ekle")}
           danger={false}
           onCancel={() => setConfirming(null)}
           onConfirm={handleArchive}

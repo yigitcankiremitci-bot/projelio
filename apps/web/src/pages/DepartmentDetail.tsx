@@ -26,6 +26,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { IconLayers, IconSettings } from "../components/icons";
+import { useT } from "../lib/i18n";
 
 // Bir departmanın kendi sayfası: iç dinamikler üstteki sekmelerle ayrılır —
 // Sosyal (Twitter mantığında paylaşım/yorum/beğeni akışı), Görevler (doğrudan
@@ -39,6 +40,7 @@ export default function DepartmentDetail() {
   useLiveRoom(id ? `department:${id}` : null);
   const navigate = useNavigate();
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
   const gutter = pageGutter(isDesktop);
   const [department, setDepartment] = useState<Department | null>(null);
@@ -212,8 +214,8 @@ export default function DepartmentDetail() {
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
-            aria-label="Departman ayarları"
-            title="Departman ayarları"
+            aria-label={t("Departman ayarları")}
+            title={t("Departman ayarları")}
             style={{
               position: "absolute",
               bottom: 14,

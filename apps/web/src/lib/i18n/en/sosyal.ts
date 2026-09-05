@@ -256,4 +256,14 @@ export const sosyal: TranslationDict = {
   "{kisi} verdi": "granted by {kisi}",
   "Bitiş tarihi (boşsa süresiz)": "End date (blank = no expiry)",
   "{tarih} tarihine kadar": "until {tarih}",
+  // Hesap kartı (ek)
+  "Aktif — pasif hesaplar yeni içerikte seçilemez":
+    "Active — inactive accounts can't be picked for new content",
+  "Hesabın kimliği, kitlesi ve yayın ritmi — içerik yazarken bu bilgiler composer'da hatırlatılır.":
+    "The account's identity, audience and posting rhythm — shown as a reminder while you write.",
+  "25–34 yaş, İstanbul, küçük işletme sahibi": "25–34, Istanbul, small business owner",
+  "Samimi ama abartısız; emoji az; teknik terim yok":
+    "Warm but understated; few emoji; no jargon",
+  "Haftada 3, hafta içi 19:00": "3× a week, weekdays at 19:00",
+  "Sosyal medya yönetimi": "Social media management",
 };

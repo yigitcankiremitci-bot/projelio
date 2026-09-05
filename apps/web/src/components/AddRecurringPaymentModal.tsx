@@ -3,6 +3,7 @@ import type { Project, RecurrenceInterval, RecurringPayment } from "@projelio/sh
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   // Verilirse düzenleme modunda açılır.
@@ -31,6 +32,7 @@ function todayString() {
 
 export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [type, setType] = useState<"income" | "expense">(payment?.type ?? "expense");
   const [amount, setAmount] = useState(payment ? String(payment.amount) : "");
   const [description, setDescription] = useState(payment?.description ?? "");
@@ -74,7 +76,7 @@ export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: 
     <Modal title={payment ? "Düzenli ödemeyi düzenle" : "Düzenli ödeme ekle"} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Tür</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tür")}</label>
           <select value={type} onChange={(e) => setType(e.target.value as "income" | "expense")} style={{ width: "100%" }}>
             <option value="expense">Gider (kira, abonelik…)</option>
             <option value="income">Gelir (düzenli tahsilat…)</option>
@@ -95,18 +97,18 @@ export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: 
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Örn. Ofis kirası"
+            placeholder={t("Örn. Ofis kirası")}
             style={{ width: "100%" }}
           />
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Tekrar</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tekrar")}</label>
             <select
               value={interval}
               onChange={(e) => setInterval(e.target.value as RecurrenceInterval)}
@@ -120,7 +122,7 @@ export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: 
             </select>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>İlk ödeme</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("İlk ödeme")}</label>
             <input
               type="date"
               value={nextDueDate}
@@ -132,7 +134,7 @@ export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: 
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Hatırlatıcı</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Hatırlatıcı")}</label>
           <select
             value={reminderDaysBefore}
             onChange={(e) => setReminderDaysBefore(Number(e.target.value))}
@@ -145,14 +147,14 @@ export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: 
             ))}
           </select>
           <span style={{ fontSize: 13, color: c.textSecondary }}>
-            Vadesi gelince tutar bütçene otomatik işlenir ve bildirim gönderilir.
+            {t("Vadesi gelince tutar bütçene otomatik işlenir ve bildirim gönderilir.")}
           </span>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>Proje (opsiyonel)</label>
           <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={{ width: "100%" }}>
-            <option value="">Projesiz — genel kayıt</option>
+            <option value="">{t("Projesiz — genel kayıt")}</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.title}

@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import AddModuleRecordModal from "./AddModuleRecordModal";
 import { useUndo } from "../lib/undo";
 import { IconTrash } from "./icons";
+import { useT } from "../lib/i18n";
 
 export type BudgetQuickAddKind = "income" | "expense" | "receivable" | "payable";
 
@@ -46,6 +47,7 @@ function sumByCurrency(records: ModuleRecord[]): Map<string, number> {
 
 function SummaryCard({ label, value, tone }: { label: string; value: string; tone?: "positive" | "negative" }) {
   const c = useThemeColors();
+  const t = useT();
   return (
     <div
       style={{
@@ -86,6 +88,7 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
  */
 const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudgetPanel({ organizationId }, ref) {
   const c = useThemeColors();
+  const t = useT();
   const [ledger, setLedger] = useState<ModuleRecord[]>([]);
   const [rp, setRp] = useState<ModuleRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +141,7 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
     }
   };
 
-  if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>;
+  if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
 
   const incomeRecords = ledger
     .filter((r) => r.data.type === "income")
@@ -190,7 +193,7 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
 
       {/* --- T tablosu: gelir solda, gider sağda --- */}
       <div>
-        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Gelir / Gider</h4>
+        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>{t("Gelir / Gider")}</h4>
         <div
           style={{
             display: "grid",
@@ -207,9 +210,9 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
 
       {/* --- alacak / borç --- */}
       <div>
-        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Alacak / Borç</h4>
+        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>{t("Alacak / Borç")}</h4>
         {openReceivables.length + openPayables.length + settledRp.length === 0 ? (
-          <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Henüz alacak/borç kaydı yok.</p>
+          <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Henüz alacak/borç kaydı yok.")}</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {[...openReceivables, ...openPayables, ...settledRp].map((r) => {
@@ -278,7 +281,7 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
                   )}
                   <button
                     onClick={() => handleDelete(r.id)}
-                    aria-label="Kaydı sil"
+                    aria-label={t("Kaydı sil")}
                     style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex" }}
                   >
                     <IconTrash size={14} color={c.textSecondary} />
@@ -320,6 +323,7 @@ function LedgerColumn({
   borderRight?: boolean;
 }) {
   const c = useThemeColors();
+  const t = useT();
   return (
     <div style={{ borderRight: borderRight ? `1px solid ${c.border}` : undefined }}>
       <div
@@ -335,7 +339,7 @@ function LedgerColumn({
         {title}
       </div>
       {records.length === 0 ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, padding: 12 }}>Kayıt yok.</p>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, padding: 12 }}>{t("Kayıt yok.")}</p>
       ) : (
         <div>
           {records.map((r) => (
@@ -360,7 +364,7 @@ function LedgerColumn({
               </div>
               <button
                 onClick={() => onDelete(r.id)}
-                aria-label="Kaydı sil"
+                aria-label={t("Kaydı sil")}
                 style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex" }}
               >
                 <IconTrash size={13} color={c.textSecondary} />

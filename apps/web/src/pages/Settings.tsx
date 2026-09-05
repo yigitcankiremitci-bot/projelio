@@ -541,7 +541,7 @@ export default function Settings() {
               <button onClick={() => navigate("/admin")} style={linkRowStyle}>
                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <IconShield size={17} color={c.textSecondary} />
-                  <span style={{ fontSize: 17, color: c.textPrimary }}>Admin paneli</span>
+                  <span style={{ fontSize: 17, color: c.textPrimary }}>{t("Admin paneli")}</span>
                 </span>
                 <IconChevronRight size={16} color={c.textSecondary} />
               </button>
@@ -553,7 +553,7 @@ export default function Settings() {
           <button onClick={() => navigate("/settings/ai-credits")} style={linkRowStyle}>
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <IconSparkle size={17} color={c.accent} />
-              <span style={{ fontSize: 17, color: c.textPrimary }}>AI kredilerim</span>
+              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("AI kredilerim")}</span>
             </span>
             <IconChevronRight size={16} color={c.textSecondary} />
           </button>
@@ -717,7 +717,7 @@ export default function Settings() {
                       lineHeight: 1,
                     }}
                   >
-                    A
+                    {t("A")}
                   </span>
                   <span style={{ fontSize: 11, color: active ? c.primary : c.textSecondary, fontWeight: active ? 500 : 400 }}>
                     {FONT_SCALE_LABELS[option]}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   // İkisinden biri verilmeli.
@@ -13,6 +14,7 @@ interface Props {
 
 export default function CreateOutputModal({ projectId, departmentId, onClose, onCreated }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
@@ -34,26 +36,26 @@ export default function CreateOutputModal({ projectId, departmentId, onClose, on
   };
 
   return (
-    <Modal title="Yeni çıktı" onClose={onClose}>
+    <Modal title={t("Yeni çıktı")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlık")}</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
             autoFocus
-            placeholder="Örn. Master dosyası"
+            placeholder={t("Örn. Master dosyası")}
             style={{ width: "100%" }}
           />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Açıklama</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açıklama")}</label>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Kısa açıklama (opsiyonel)"
+            placeholder={t("Kısa açıklama (opsiyonel)")}
             style={{ width: "100%" }}
           />
         </div>

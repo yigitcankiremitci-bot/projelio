@@ -5,6 +5,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { IconPlus, IconX, IconEdit, IconTrash } from "../icons";
 import CreateBudgetTransactionModal from "../CreateBudgetTransactionModal";
 import { useUndo, useWithoutPendingDeletes } from "../../lib/undo";
+import { useT } from "../../lib/i18n";
 
 export interface BudgetPanelHandle {
   openCreate: () => void;
@@ -21,6 +22,7 @@ interface Props {
 
 function SummaryCard({ label, amount, color }: { label: string; amount: number; color: string }) {
   const c = useThemeColors();
+  const t = useT();
   return (
     <div style={{ flex: 1, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "12px 14px" }}>
       <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{label}</p>
@@ -34,6 +36,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
   ref
 ) {
   const c = useThemeColors();
+  const t = useT();
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -129,12 +132,12 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
   const myMembership = members.find((m) => m.userId === currentUserId);
   const canView = isOwner || myMembership?.canViewBudget;
 
-  if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>;
+  if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
 
   if (!canView) {
     return (
       <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 16 }}>
-        <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>Bu projenin bütçesini görüntüleme yetkin yok.</p>
+        <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>{t("Bu projenin bütçesini görüntüleme yetkin yok.")}</p>
       </div>
     );
   }
@@ -209,14 +212,14 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
         <SummaryCard label="Onaylanan" amount={approvedTotal} color={c.success} />
         <SummaryCard label="Beklenen" amount={pendingTotal} color={c.warning} />
         <SummaryCard label="Planlanan" amount={plannedTotal} color={c.primary} />
-        <SummaryCard label="Ödenen" amount={paidTotal} color={c.accentDark} />
+        <SummaryCard label={t("Ödenen")} amount={paidTotal} color={c.accentDark} />
       </div>
 
       {/* Tahsilat durumu */}
       <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "12px 14px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
           <div>
-            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Anlaşılan ücret</p>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{t("Anlaşılan ücret")}</p>
             <p style={{ fontSize: 19, fontWeight: 600, color: c.textPrimary, margin: 0 }}>
               {agreedFee.toLocaleString("tr-TR")} ₺
             </p>
@@ -250,13 +253,13 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
 
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 110 }}>
-            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Gelen ödeme</p>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{t("Gelen ödeme")}</p>
             <p style={{ fontSize: 19, fontWeight: 600, color: c.success, margin: 0 }}>
               {received.toLocaleString("tr-TR")} ₺
             </p>
           </div>
           <div style={{ flex: 1, minWidth: 110 }}>
-            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Beklenen ödeme</p>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{t("Beklenen ödeme")}</p>
             <p
               style={{
                 fontSize: 19,
@@ -269,23 +272,23 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
             </p>
           </div>
           <div style={{ flex: 1, minWidth: 110 }}>
-            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Yapılan harcamalar</p>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{t("Yapılan harcamalar")}</p>
             <p style={{ fontSize: 19, fontWeight: 600, color: c.danger, margin: 0 }}>
               {totalSpent.toLocaleString("tr-TR")} ₺
             </p>
           </div>
           <div style={{ flex: 1, minWidth: 110 }}>
-            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>Net kazanç</p>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{t("Net kazanç")}</p>
             <p style={{ fontSize: 19, fontWeight: 600, color: netEarned < 0 ? c.danger : c.success, margin: 0 }}>
               {netEarned.toLocaleString("tr-TR")} ₺
             </p>
-            <p style={{ fontSize: 12, color: c.textSecondary, margin: "2px 0 0" }}>Gelen ödeme − harcama</p>
+            <p style={{ fontSize: 12, color: c.textSecondary, margin: "2px 0 0" }}>{t("Gelen ödeme − harcama")}</p>
           </div>
         </div>
       </div>
 
       <div>
-        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>Ödeme hareketleri</h4>
+        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>{t("Ödeme hareketleri")}</h4>
         {visibleTransactions.length === 0 ? (
           <p style={{ fontSize: 15, color: c.textSecondary }}>
             Müşteriden tahsil ettiğin ödemeleri "gelen ödeme" olarak ekle; beklenen ödemeden otomatik düşülür. Eklemek
@@ -293,12 +296,12 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
           </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {visibleTransactions.map((t) => {
-              const isIncome = t.type === "income";
+            {visibleTransactions.map((kayit) => {
+              const isIncome = kayit.type === "income";
               const color = isIncome ? c.success : c.danger;
               return (
                 <div
-                  key={t.id}
+                  key={kayit.id}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -319,17 +322,17 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                       background: `${color}1a`,
                     }}
                   >
-                    {isIncome ? "Gelen ödeme" : t.type === "payout" ? "Hakediş" : "Gider"}
+                    {isIncome ? "Gelen ödeme" : kayit.type === "payout" ? "Hakediş" : "Gider"}
                   </span>
                   <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {t.description || (isIncome ? "Gelen ödeme" : "Gider")}
+                    {kayit.description || (isIncome ? "Gelen ödeme" : "Gider")}
                   </span>
                   <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
-                    {new Date(t.createdAt).toLocaleDateString("tr-TR")}
+                    {new Date(kayit.createdAt).toLocaleDateString("tr-TR")}
                   </span>
                   <span style={{ fontSize: 15, fontWeight: 500, color, flexShrink: 0 }}>
                     {isIncome ? "+" : "-"}
-                    {t.amount.toLocaleString("tr-TR")} ₺
+                    {kayit.amount.toLocaleString("tr-TR")} ₺
                   </span>
 
                   {/* Düğmeler `isOwner`a BAĞLANMAZ: proje kaydında owner_id boş
@@ -339,18 +342,18 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                       kayıt ekleme düğmesi de aynı şekilde açık.
                       Düzenli ödemeden otomatik düşen kayıt elle değiştirilmez,
                       kuralın kendisinden yönetilir (bkz. RecurringPayment). */}
-                  {!t.recurringPaymentId && (
+                  {!kayit.recurringPaymentId && (
                     <span style={{ display: "flex", gap: 2, flexShrink: 0 }}>
                       <button
-                        onClick={() => setEditingEntry(t)}
-                        aria-label="Kaydı düzenle"
+                        onClick={() => setEditingEntry(kayit)}
+                        aria-label={t("Kaydı düzenle")}
                         style={{ background: "transparent", border: "none", padding: 4, display: "flex", cursor: "pointer" }}
                       >
                         <IconEdit size={14} color={c.textSecondary} />
                       </button>
                       <button
-                        onClick={() => handleDelete(t)}
-                        aria-label="Kaydı sil"
+                        onClick={() => handleDelete(kayit)}
+                        aria-label={t("Kaydı sil")}
                         style={{ background: "transparent", border: "none", padding: 4, display: "flex", cursor: "pointer" }}
                       >
                         <IconTrash size={14} color={c.textSecondary} />
@@ -365,14 +368,14 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
       </div>
 
       <div>
-        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>Görev bütçeleri</h4>
+        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>{t("Görev bütçeleri")}</h4>
         {budgetTasks.length === 0 ? (
-          <p style={{ fontSize: 15, color: c.textSecondary }}>Bütçe eklenmiş görev yok.</p>
+          <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Bütçe eklenmiş görev yok.")}</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {budgetTasks.map((t) => (
+            {budgetTasks.map((kayit) => (
               <div
-                key={t.id}
+                key={kayit.id}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -384,10 +387,10 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                 }}
               >
                 <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {taskLabel(t)}
+                  {taskLabel(kayit)}
                 </span>
                 <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, flexShrink: 0 }}>
-                  {(t.budget ?? 0).toLocaleString("tr-TR")} ₺
+                  {(kayit.budget ?? 0).toLocaleString("tr-TR")} ₺
                 </span>
                 <span
                   style={{
@@ -395,38 +398,38 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                     flexShrink: 0,
                     padding: "2px 8px",
                     borderRadius: 20,
-                    color: t.budgetStatus === "paid" ? c.success : t.budgetStatus === "planned" ? c.primary : c.warning,
+                    color: kayit.budgetStatus === "paid" ? c.success : kayit.budgetStatus === "planned" ? c.primary : c.warning,
                     background:
-                      t.budgetStatus === "paid" ? `${c.success}1a` : t.budgetStatus === "planned" ? `${c.primary}1a` : `${c.warning}1a`,
+                      kayit.budgetStatus === "paid" ? `${c.success}1a` : kayit.budgetStatus === "planned" ? `${c.primary}1a` : `${c.warning}1a`,
                   }}
                 >
-                  {t.budgetStatus === "paid" ? "Ödendi" : t.budgetStatus === "planned" ? "Planlandı" : "Bekliyor"}
+                  {kayit.budgetStatus === "paid" ? "Ödendi" : kayit.budgetStatus === "planned" ? "Planlandı" : "Bekliyor"}
                 </span>
-                {isOwner && t.budgetStatus === "pending" && (
+                {isOwner && kayit.budgetStatus === "pending" && (
                   <>
                     <button
-                      onClick={() => setBudgetStatus(t, "planned")}
-                      disabled={approvingId === t.id}
+                      onClick={() => setBudgetStatus(kayit, "planned")}
+                      disabled={approvingId === kayit.id}
                       style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, flexShrink: 0 }}
                     >
-                      Planlandı
+                      {t("Planlandı")}
                     </button>
                     <button
-                      onClick={() => setBudgetStatus(t, "paid")}
-                      disabled={approvingId === t.id}
+                      onClick={() => setBudgetStatus(kayit, "paid")}
+                      disabled={approvingId === kayit.id}
                       style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, flexShrink: 0 }}
                     >
-                      Ödendi
+                      {t("Ödendi")}
                     </button>
                   </>
                 )}
-                {isOwner && t.budgetStatus === "planned" && (
+                {isOwner && kayit.budgetStatus === "planned" && (
                   <button
-                    onClick={() => setBudgetStatus(t, "paid")}
-                    disabled={approvingId === t.id}
+                    onClick={() => setBudgetStatus(kayit, "paid")}
+                    disabled={approvingId === kayit.id}
                     style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, flexShrink: 0 }}
                   >
-                    Ödendi olarak işaretle
+                    {t("Ödendi olarak işaretle")}
                   </button>
                 )}
               </div>
@@ -438,11 +441,11 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
       {isOwner && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Bütçeyi kimler görebilir</h4>
+            <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Bütçeyi kimler görebilir")}</h4>
             <button
               onClick={() => setAddingViewer((v) => !v)}
               disabled={nonViewers.length === 0}
-              aria-label="Görüntüleyici ekle"
+              aria-label={t("Görüntüleyici ekle")}
               style={{
                 width: 24,
                 height: 24,
@@ -459,13 +462,13 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
           </div>
 
           <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 8px" }}>
-            Varsayılan olarak bütçeyi yalnızca proje yöneticisi görür. Aşağıya eklediğin ekip üyeleri de görebilir.
+            {t("Varsayılan olarak bütçeyi yalnızca proje yöneticisi görür. Aşağıya eklediğin ekip üyeleri de görebilir.")}
           </p>
 
           {addingViewer && (
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
               <select value={viewerToAdd} onChange={(e) => setViewerToAdd(e.target.value)} style={{ flex: 1 }}>
-                <option value="">Üye seç…</option>
+                <option value="">{t("Üye seç…")}</option>
                 {nonViewers.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.fullName ?? "Bilinmeyen kullanıcı"}
@@ -477,13 +480,13 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                 disabled={!viewerToAdd}
                 style={{ fontSize: 15, padding: "0 12px", borderRadius: 7, border: "none", background: c.primary, color: c.onPrimary }}
               >
-                Ekle
+                {t("Ekle")}
               </button>
             </div>
           )}
 
           {viewers.length === 0 ? (
-            <p style={{ fontSize: 15, color: c.textSecondary }}>Şu an sadece sen görebiliyorsun.</p>
+            <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Şu an sadece sen görebiliyorsun.")}</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {viewers.map((m) => (
@@ -502,7 +505,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                   <span style={{ fontSize: 15, color: c.textPrimary }}>{m.fullName ?? "Bilinmeyen kullanıcı"}</span>
                   <button
                     onClick={() => setVisibility(m, false)}
-                    aria-label="Görüntüleme yetkisini kaldır"
+                    aria-label={t("Görüntüleme yetkisini kaldır")}
                     style={{ background: "transparent", border: "none", padding: 2, display: "flex" }}
                   >
                     <IconX size={13} color={c.textSecondary} />

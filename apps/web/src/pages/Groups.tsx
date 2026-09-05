@@ -5,10 +5,12 @@ import GroupCard from "../components/GroupCard";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useWithoutPendingDeletes } from "../lib/undo";
+import { useT } from "../lib/i18n";
 
 export default function Groups() {
   const [groups, setGroups] = useState<Group[]>([]);
   const c = useThemeColors();
+  const t = useT();
   const gridRef = useRef<HTMLDivElement>(null);
   const registerReorderUndo = useReorderUndo();
   const groupsRef = useLatestRef(groups);
@@ -61,7 +63,7 @@ export default function Groups() {
             fontSize: 16,
           }}
         >
-          Henüz grup yok. Alttaki "+" butonuyla, birden çok organizasyonu tek bir holding altında toplamak istersen bir tane oluşturabilirsin — bu tamamen opsiyonel.
+          {t("Henüz grup yok. Alttaki \"+\" butonuyla, birden çok organizasyonu tek bir holding altında toplamak istersen bir tane oluşturabilirsin — bu tamamen opsiyonel.")}
         </div>
       ) : (
         <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>

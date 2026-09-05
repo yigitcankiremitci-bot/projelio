@@ -27,6 +27,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings, IconLayers } from "../components/icons";
+import { useT } from "../lib/i18n";
 
 // Şirket akışında görev/tamamlanan-görev karışımı yok — organizasyon seviyesinde
 // tek bir görev listesi kavramı yok (görevler departmanlara özgü, kendi Sosyal
@@ -48,6 +49,7 @@ export default function OrganizationDetail() {
   useLiveRoom(id ? `organization:${id}` : null);
   const navigate = useNavigate();
   const c = useThemeColors();
+  const t = useT();
   const cover = useCoverTheme();
   const isDesktop = useIsDesktop();
   const prefs = useAppPrefs();
@@ -231,7 +233,7 @@ export default function OrganizationDetail() {
         }
         asideOnMobile
         action={
-          <button onClick={() => setEditing(true)} aria-label="Organizasyonu düzenle" style={coverActionButton(c)}>
+          <button onClick={() => setEditing(true)} aria-label={t("Organizasyonu düzenle")} style={coverActionButton(c)}>
             <IconSettings size={20} color={c.textSecondary} />
           </button>
         }

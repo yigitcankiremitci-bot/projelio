@@ -379,7 +379,7 @@ export default function SidebarTree() {
           padding: "2px 10px 8px",
         }}
       >
-        Çalışma alanı
+        {t("Çalışma alanı")}
       </div>
 
       {groups.length > 0 && (

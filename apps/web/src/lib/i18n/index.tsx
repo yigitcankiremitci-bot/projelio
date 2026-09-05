@@ -175,3 +175,18 @@ export function useAccountLocale(accountLocale: Locale | null | undefined) {
     applyFromAccount(accountLocale);
   }, [accountLocale, locale, applyFromAccount]);
 }
+
+/**
+ * Kanca kullanamayan yerler için çevirmen.
+ *
+ * React sınıf bileşenleri (hata sınırı) ve React ağacının dışındaki kod
+ * (api katmanı, olay işleyicileri) kanca çağıramıyor. Bu fonksiyon dili
+ * doğrudan depodan okuyor — sağlayıcıya bağlı değil.
+ *
+ * Bedeli: dil değişince bu metinler KENDİLİĞİNDEN yenilenmiyor, bileşen
+ * yeniden çizilene kadar eski dilde kalıyorlar. Hata ekranı ve tek seferlik
+ * uyarılar için sorun değil; normal arayüzde `useT()` kullan.
+ */
+export function cevirmenSuAn(): Translate {
+  return createTranslator(readStored() ?? browserLocale(), en);
+}

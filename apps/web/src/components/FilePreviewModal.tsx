@@ -13,6 +13,7 @@ import {
 } from "../lib/driveLinks";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconDownload, IconExternalLink, IconX } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   file: ProjectFile;
@@ -23,6 +24,7 @@ interface Props {
 
 export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState("");
   const [openedEditor, setOpenedEditor] = useState(false);
@@ -135,7 +137,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
 
           <button
             onClick={handleDownload}
-            title="İndir"
+            title={t("İndir")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -150,7 +152,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
             }}
           >
             <IconDownload size={16} color={c.textSecondary} />
-            İndir
+            {t("İndir")}
           </button>
 
           <button
@@ -190,7 +192,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
               detail={`Dosya ${driveProviderLabel(file)} üzerinden silinmiş veya taşınmış olabilir.`}
             />
           ) : loadError ? (
-            <EmptyState title="Önizleme açılamadı" detail={loadError} />
+            <EmptyState title={t("Önizleme açılamadı")} detail={loadError} />
           ) : renderLocally ? (
             localUrl ? (
               file.mimeType.startsWith("image/") ? (
@@ -217,7 +219,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
                 />
               )
             ) : (
-              <EmptyState title="Yükleniyor…" detail="" />
+              <EmptyState title={t("Yükleniyor…")} detail="" />
             )
           ) : (
             // Google formatları ve diğer türler Drive'ın kendi önizleyicisiyle

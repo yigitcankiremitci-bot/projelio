@@ -46,3 +46,14 @@ out/
 
 # Claude Code kişisel ayarları (izin kuralları) — paylaşılmaz
 .claude/settings.local.json
+
+# Claude Code'un yerel çalışma dosyaları: worktrees geçici git kopyaları
+# (her biri repo boyutunda), launch.json ise dev sunucusunu tarayıcı
+# panelinde açmak için makineye özel bir kısayol. İkisi de paylaşılmaz.
+.claude/worktrees/
+.claude/launch.json
+
+# Uygulama dışı çıktılar (mağaza görselleri, üretilen paketler). Repoda
+# durmalarının bir sebebi yok ve yayın betiği bunları "commit'lenmemiş
+# değişiklik" sayıp yayını durduruyor.
+output/

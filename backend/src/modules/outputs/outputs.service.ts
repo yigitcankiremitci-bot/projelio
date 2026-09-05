@@ -189,7 +189,9 @@ export class OutputsService {
             userId,
             "task_updated",
             "Yeni Çıktı",
-            `"${output.title}" çıktısı eklendi.`,
+            // Şablon dizesi anahtar olamaz (her çağrıda başka bir dize üretir);
+            // değişken yer tutucuyla geçiyor — bkz. common/i18n/index.ts.
+            { metin: '"{cikti}" çıktısı eklendi.', params: { cikti: output.title } },
             `/projects/${output.projectId}`
           )
         )
@@ -226,7 +228,9 @@ export class OutputsService {
             userId,
             "task_updated",
             "Yeni Çıktı",
-            `"${output.title}" çıktısı eklendi.`,
+            // Şablon dizesi anahtar olamaz (her çağrıda başka bir dize üretir);
+            // değişken yer tutucuyla geçiyor — bkz. common/i18n/index.ts.
+            { metin: '"{cikti}" çıktısı eklendi.', params: { cikti: output.title } },
             `/departments/${output.departmentId}?tab=tasks`
           )
         )

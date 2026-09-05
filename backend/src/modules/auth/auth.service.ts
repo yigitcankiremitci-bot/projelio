@@ -6,6 +6,8 @@ import { EmailVerificationService } from "./email-verification.service";
 import { LoginAttemptService } from "./login-attempt.service";
 import { nowInSeconds } from "./session-payload";
 import { EmailService } from "./email.service";
+import { istekDili } from "../../common/i18n";
+import type { Locale } from "@projelio/shared";
 import { AccountDeletionService } from "../users/account-deletion.service";
 import { DemoSifirlamaService } from "../demo/demo-sifirlama.service";
 import { demoEpostasiMi } from "../../common/demo-hesap";
@@ -30,7 +32,7 @@ export class AuthService {
    * döner. Kullanıcı e-postasındaki bağlantıya tıklayana kadar giriş yapamaz
    * (bkz. login içindeki emailVerifiedAt kontrolü).
    */
-  async register(fullName: string, email: string, password: string, username: string) {
+  async register(fullName: string, email: string, password: string, username: string, locale?: Locale) {
     // Kullanıcı adı çakışması AÇIKÇA söylenir: kullanıcı adı uygulamada zaten
     // herkese görünen bir tanımlayıcı, "alınmış" demek bir bilgi sızdırmaz — üstelik
     // söylemezsek kullanıcı neden kayıt olamadığını anlayamaz.
@@ -56,20 +58,26 @@ export class AuthService {
       // "birisi adresinle kayıt olmaya çalıştı, zaten hesabın var" bildirimi alır.
       // Adres kayıtlı DEĞİLSE zaten kimseye bir şey gitmez.
       try {
-        await this.emailService.sendExistingAccountNotice(existing.email, `${getWebAppUrl()}/login`);
+        // Hesap zaten var: dili kendi kaydından okunur, istekle gelen dil
+        // DEĞİL — bu e-posta hesabın sahibine gidiyor, kaydı deneyene değil.
+        await this.emailService.sendExistingAccountNotice(
+          existing.email,
+          `${getWebAppUrl()}/login`,
+          istekDili(existing.locale)
+        );
       } catch {
         // send kendi hatasını logluyor; bildirim gitmedi diye yanıt değişmemeli.
       }
       return this.registrationPendingResponse(existing.email);
     }
 
-    const user = await this.usersService.create({ fullName, email, passwordHash, username });
+    const user = await this.usersService.create({ fullName, email, passwordHash, username, locale });
 
     // Doğrulama e-postası gönderilemese bile kayıt başarılı sayılır — kullanıcı
     // giriş ekranından "tekrar gönder" diyebilir. Aksi halde geçici bir e-posta
     // sağlayıcı arızası, oluşmuş bir hesabı yarım bırakıp 500 döndürürdü.
     try {
-      await this.emailVerificationService.sendVerification(user.id, user.email);
+      await this.emailVerificationService.sendVerification(user.id, user.email, istekDili(locale));
     } catch {
       // sendVerification kendi hatasını zaten logluyor
     }
@@ -211,6 +219,9 @@ export class AuthService {
       // şifresi olan hesaplara gösterir (Google ile açılanlarda null olabiliyor).
       // Hash'in kendisi DEĞİL, yalnızca varlığı dışarı çıkar.
       hasPassword: Boolean(user.passwordHash),
+      // Arayüz dili. Boş dönerse istemci tarayıcı diline bakar — "Türkçe"
+      // varsayımı YAPMAZ (bkz. migration 087).
+      locale: user.locale,
     };
   }
 }

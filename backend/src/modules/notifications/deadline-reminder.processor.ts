@@ -115,8 +115,8 @@ export class DeadlineReminderProcessor {
             "task_reminder",
             "Görev hatırlatması",
             task.reminder_lead_minutes === 0
-              ? `"${task.title}" görevinin bitiş saati: ${timeLabel}.`
-              : `"${task.title}" görevi ${timeLabel}'de bitiyor.`,
+              ? { metin: '"{gorev}" görevinin bitiş saati: {saat}.', params: { gorev: task.title, saat: timeLabel } }
+              : { metin: '"{gorev}" görevi {saat}\'de bitiyor.', params: { gorev: task.title, saat: timeLabel } },
             link
           );
         }
@@ -182,8 +182,8 @@ export class DeadlineReminderProcessor {
           "task_reminder",
           "Görev hatırlatması",
           todo.reminder_lead_minutes === 0
-            ? `"${todo.title}" görevinin bitiş saati: ${timeLabel}.`
-            : `"${todo.title}" görevi ${timeLabel}'de bitiyor.`,
+            ? { metin: '"{gorev}" görevinin bitiş saati: {saat}.', params: { gorev: todo.title, saat: timeLabel } }
+            : { metin: '"{gorev}" görevi {saat}\'de bitiyor.', params: { gorev: todo.title, saat: timeLabel } },
           "/tasks"
         );
       }

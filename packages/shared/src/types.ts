@@ -1,5 +1,7 @@
 // Veritabanı şemasıyla birebir eşleşen paylaşılan tipler
 
+import type { Locale } from "./i18n";
+
 export type UserRole = "admin" | "freelancer";
 
 // Kullanıcının hiyerarşideki hangi seviyeyi yönettiğini belirler; navigasyonda hangi
@@ -134,6 +136,10 @@ export interface User {
   // "mevcut şifre" sormak yerine ilk kez şifre belirletir. Şifrenin kendisi
   // hiçbir zaman istemciye gitmez, yalnızca bu bayrak.
   hasPassword?: boolean;
+  // Arayüz dili. NULL ise kullanıcı hiç seçim yapmamıştır ve dil tarayıcıdan
+  // (web) ya da Accept-Language başlığından (e-posta/bildirim) çıkarılır.
+  // Seçim yapıldığı anda dolar ve artık tarayıcı diline bakılmaz.
+  locale?: Locale;
 }
 
 export interface Job {

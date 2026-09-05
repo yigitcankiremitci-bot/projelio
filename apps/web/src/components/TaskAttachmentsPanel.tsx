@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { publishTaskAttachments } from "../lib/taskAttachmentEvents";
 import { IconPlus, IconTrash } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   taskId: string;
@@ -34,6 +35,7 @@ interface Props {
  */
 export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [items, setItems] = useState<TaskAttachment[]>([]);
   const [addingLink, setAddingLink] = useState(false);
   const [url, setUrl] = useState("");
@@ -70,7 +72,7 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
       setAddingLink(false);
       load();
     } catch {
-      setError("Bağlantı eklenemedi. Tekrar dene.");
+      setError(t("Bağlantı eklenemedi. Tekrar dene."));
     } finally {
       setBusy(false);
     }
@@ -89,7 +91,7 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <label style={{ fontSize: 15, color: c.textSecondary }}>Bağlantılar</label>
+        <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bağlantılar")}</label>
         <button
           type="button"
           onClick={() => setAddingLink((v) => !v)}
@@ -107,7 +109,7 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
           }}
         >
           <IconPlus size={13} color={c.textSecondary} />
-          Bağlantı ekle
+          {t("Bağlantı ekle")}
         </button>
       </div>
 
@@ -132,7 +134,7 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="Görünen ad (opsiyonel)"
+            placeholder={t("Görünen ad (opsiyonel)")}
             style={{ width: "100%" }}
           />
           <div style={{ display: "flex", gap: 6 }}>
@@ -149,7 +151,7 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
                 cursor: "pointer",
               }}
             >
-              Ekle
+              {t("Ekle")}
             </button>
             <button
               type="button"
@@ -168,7 +170,7 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
                 cursor: "pointer",
               }}
             >
-              Vazgeç
+              {t("Vazgeç")}
             </button>
           </div>
         </form>
@@ -178,8 +180,7 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
 
       {items.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
-          Henüz bağlantı yok. Çıktının adresini buraya bırak — dosyalar aşağıdaki
-          Dosyalar bölümünden Drive/OneDrive'a eklenir.
+          {t("Henüz bağlantı yok. Çıktının adresini buraya bırak — dosyalar aşağıdaki Dosyalar bölümünden Drive/OneDrive'a eklenir.")}
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -217,7 +218,7 @@ export default function TaskAttachmentsPanel({ taskId, onChanged }: Props) {
               <button
                 type="button"
                 onClick={() => remove(a.id)}
-                aria-label="Eki kaldır"
+                aria-label={t("Eki kaldır")}
                 style={{ background: "transparent", border: "none", padding: 4, display: "flex", cursor: "pointer" }}
               >
                 <IconTrash size={13} color={c.textSecondary} />

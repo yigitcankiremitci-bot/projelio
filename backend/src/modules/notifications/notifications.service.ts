@@ -4,6 +4,9 @@ import type { NotificationPayload, PushSubscriptionPayload } from "@projelio/sha
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsGateway } from "./notifications.gateway";
 import { WhatsappService } from "../whatsapp/whatsapp.service";
+import { cevir } from "../../common/i18n";
+import type { Metin } from "../../common/i18n";
+import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 
 function mapNotification(row: any): NotificationPayload {
   return {
@@ -29,7 +32,8 @@ export class NotificationsService {
     // forwardRef: WhatsApp modülü bağlantı durumunu tarayıcıya iletmek için bu
     // modülün gateway'ini kullanıyor; biz de bildirimi WhatsApp'a vermek için
     // onu — iki yönlü bağımlılık Nest'te ancak böyle çözülüyor.
-    @Inject(forwardRef(() => WhatsappService)) private whatsapp: WhatsappService
+    @Inject(forwardRef(() => WhatsappService)) private whatsapp: WhatsappService,
+    private readonly diller: KullaniciDiliService
   ) {
     const publicKey = process.env.VAPID_PUBLIC_KEY;
     const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -42,17 +46,37 @@ export class NotificationsService {
     }
   }
 
-  // Bildirim oluşturur: veritabanına yazar, açık soketlere anlık iletir, push abonelerine gönderir.
+  /**
+   * Bildirim oluşturur: veritabanına yazar, açık soketlere anlık iletir,
+   * push abonelerine ve WhatsApp'a gönderir.
+   *
+   * Metin ALICININ dilinde yazılır ve veritabanına ÇEVRİLMİŞ hâlde girer.
+   * Çeviriyi okuma anında yapmak daha esnek olurdu (kullanıcı dilini
+   * değiştirince eski bildirimler de dönerdi) ama bildirim yalnızca ekranda
+   * yaşamıyor: aynı metin push bildirimi ve WhatsApp mesajı olarak da gidiyor,
+   * onlar geri dönüp çevrilemez. Tek bir doğru metin olsun diye burada çözülüyor.
+   *
+   * Değişken içeren metinler `{ metin, params }` biçiminde geçilmeli — şablon
+   * dizesi (`${ad} seni ekledi`) sözlükte hiçbir zaman bulunamaz, çünkü her
+   * çağrıda farklı bir dize üretir (bkz. common/i18n/index.ts).
+   */
   async notifyUser(
     userId: string,
     type: NotificationPayload["type"],
-    title: string,
-    body: string,
+    title: Metin,
+    body: Metin,
     link?: string
   ): Promise<NotificationPayload> {
+    const locale = await this.diller.diliniBul(userId);
     const { data: row, error } = await this.supabase.client
       .from("notifications")
-      .insert({ user_id: userId, type, title, body, link: link ?? null })
+      .insert({
+        user_id: userId,
+        type,
+        title: cevir(locale, title),
+        body: cevir(locale, body),
+        link: link ?? null,
+      })
       .select()
       .single();
     if (error) throw error;
@@ -82,8 +106,8 @@ export class NotificationsService {
   notifyUserSafe(
     userId: string,
     type: NotificationPayload["type"],
-    title: string,
-    body: string,
+    title: Metin,
+    body: Metin,
     link?: string
   ): void {
     void this.notifyUser(userId, type, title, body, link).catch((error) =>

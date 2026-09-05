@@ -344,8 +344,18 @@ export class WhatsappWebhookService {
       void this.notifications.notifyUser(
         userId,
         "whatsapp_inbound",
-        `WhatsApp · ${who}`,
-        thread.owner_user_id ? preview : `Sahipsiz konuşma (${conn.label ?? "havuz"}): ${preview}`,
+        // "WhatsApp" marka adı, {kisi} müşterinin adı — ikisi de çevrilmiyor;
+        // metin yine de anahtar olarak duruyor ki ayraç gerekirse değişebilsin.
+        { metin: "WhatsApp · {kisi}", params: { kisi: who } },
+        // Müşterinin kendi mesajı ÇEVRİLMEZ: preview onun yazdığı metin.
+        // Çevrilen yalnızca çevresindeki "sahipsiz konuşma" kalıbı.
+        thread.owner_user_id
+          ? preview
+          : conn.label
+          ? { metin: "Sahipsiz konuşma ({hat}): {mesaj}", params: { hat: conn.label, mesaj: preview } }
+          // Hattın adı yoksa AYRI metin: yedek sözcük parametreye konsa
+          // İngilizce cümlenin ortasında Türkçe kalırdı (params çevrilmez).
+          : { metin: "Sahipsiz konuşma (havuz): {mesaj}", params: { mesaj: preview } },
         "/settings?tab=baglantilar"
       );
     }

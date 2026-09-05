@@ -3,6 +3,7 @@ import { AI_PANEL_WIDTH, Z } from "../lib/layout";
 import { useNavigate } from "react-router-dom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { parseMessageLinks } from "../lib/messageLinks";
+import { useT } from "../lib/i18n";
 import { IconSparkle, IconX, IconPlus, IconTrash, IconSend, IconPaperclip, IconFile } from "./icons";
 import { aiChat } from "../api/aiChat";
 import { filesApi } from "../api/files";
@@ -151,6 +152,7 @@ export default function AiAssistantPanel({
   onInitialMessageSent,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
 
@@ -977,11 +979,11 @@ export default function AiAssistantPanel({
           </div>
 
           {voiceSupported && (
-            <HeaderButton title="Ses ayarları" onClick={() => setVoiceMenu((v) => !v)} active={voiceMenu}>
+            <HeaderButton title={t("Ses ayarları")} onClick={() => setVoiceMenu((v) => !v)} active={voiceMenu}>
               <IconSpeaker size={17} color="#fff" muted={!autoSpeak} />
             </HeaderButton>
           )}
-          <HeaderButton title="Sohbet geçmişi" onClick={() => setShowHistory((v) => !v)} active={showHistory}>
+          <HeaderButton title={t("Sohbet geçmişi")} onClick={() => setShowHistory((v) => !v)} active={showHistory}>
             <IconMessagesGlyph color="#fff" />
           </HeaderButton>
           <HeaderButton title="Yeni sohbet" onClick={startNewConversation}>
@@ -1024,7 +1026,7 @@ export default function AiAssistantPanel({
                   color: c.textPrimary,
                 }}
               >
-                <option value="browser">Tarayıcı sesi · ücretsiz</option>
+                <option value="browser">{t("Tarayıcı sesi · ücretsiz")}</option>
                 <option value="server">
                   Doğal ses · ~{SERVER_VOICE_CREDITS_PER_100_CHARS} kredi/100 karakter
                 </option>
@@ -1122,7 +1124,7 @@ export default function AiAssistantPanel({
               <input type="checkbox" checked={autoSpeak} onChange={toggleAutoSpeak} />
               Yeni yanıtları kendiliğinden oku
               {voiceEngine === "server" && (
-                <span style={{ color: c.warning, fontSize: 11 }}>(her yanıt kredi harcar)</span>
+                <span style={{ color: c.warning, fontSize: 11 }}>{t("(her yanıt kredi harcar)")}</span>
               )}
             </label>
           </div>
@@ -1140,7 +1142,7 @@ export default function AiAssistantPanel({
             }}
           >
             {conversations.length === 0 ? (
-              <p style={{ padding: 16, margin: 0, fontSize: 13, color: c.textSecondary }}>Henüz sohbet yok.</p>
+              <p style={{ padding: 16, margin: 0, fontSize: 13, color: c.textSecondary }}>{t("Henüz sohbet yok.")}</p>
             ) : (
               conversations.map((conv) => (
                 <div
@@ -1195,7 +1197,7 @@ export default function AiAssistantPanel({
               flexShrink: 0,
             }}
           >
-            <span style={{ fontSize: 11.5, color: c.textSecondary, flexShrink: 0 }}>Sohbette açık:</span>
+            <span style={{ fontSize: 11.5, color: c.textSecondary, flexShrink: 0 }}>{t("Sohbette açık:")}</span>
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
               {activeFiles.map((file) => (
                 <span
@@ -1223,7 +1225,7 @@ export default function AiAssistantPanel({
             <button
               type="button"
               onClick={clearActiveFiles}
-              title="Dosyaları bırak"
+              title={t("Dosyaları bırak")}
               style={{
                 background: "transparent",
                 border: "none",
@@ -1269,7 +1271,7 @@ export default function AiAssistantPanel({
             </>
           )}
 
-          {loadingHistory && <p style={{ fontSize: 13, color: c.textSecondary }}>Sohbet yükleniyor…</p>}
+          {loadingHistory && <p style={{ fontSize: 13, color: c.textSecondary }}>{t("Sohbet yükleniyor…")}</p>}
 
           {messages.map((m) => (
             <Bubble
@@ -1376,7 +1378,7 @@ export default function AiAssistantPanel({
                   <button
                     type="button"
                     onClick={() => removeAttachment(attachment.id)}
-                    aria-label="Dosyayı çıkar"
+                    aria-label={t("Dosyayı çıkar")}
                     style={{ background: "transparent", border: "none", padding: 0, display: "flex", cursor: "pointer" }}
                   >
                     <IconX size={12} color={c.textSecondary} />
@@ -1425,10 +1427,10 @@ export default function AiAssistantPanel({
                 }}
               >
                 {cameraSupported && (
-                  <MenuItem onClick={() => cameraInputRef.current?.click()}>Fotoğraf çek</MenuItem>
+                  <MenuItem onClick={() => cameraInputRef.current?.click()}>{t("Fotoğraf çek")}</MenuItem>
                 )}
-                <MenuItem onClick={() => fileInputRef.current?.click()}>Bilgisayardan yükle</MenuItem>
-                <MenuItem onClick={() => void handleCloudPick()}>Drive / OneDrive'dan seç</MenuItem>
+                <MenuItem onClick={() => fileInputRef.current?.click()}>{t("Bilgisayardan yükle")}</MenuItem>
+                <MenuItem onClick={() => void handleCloudPick()}>{t("Drive / OneDrive'dan seç")}</MenuItem>
               </div>
             </>
           )}
@@ -1568,7 +1570,7 @@ export default function AiAssistantPanel({
             <button
               onClick={() => void send(input)}
               disabled={sending || (!input.trim() && attachments.length === 0)}
-              aria-label="Gönder"
+              aria-label={t("Gönder")}
               style={{
                 width: 42,
                 height: 42,
@@ -1618,7 +1620,7 @@ export default function AiAssistantPanel({
           title="Onay gerekiyor"
           message={confirmation.summary}
           confirmLabel="Onayla"
-          cancelLabel="Vazgeç"
+          cancelLabel={t("Vazgeç")}
           danger
           onConfirm={handleConfirmAction}
           onCancel={handleCancelAction}
@@ -1728,6 +1730,7 @@ function Bubble({
   onOpenFile?: (fileId: string) => void;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const isUser = role === "user";
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start" }}>
@@ -1811,7 +1814,7 @@ function Bubble({
                   key={i}
                   type="button"
                   onClick={() => onOpenFile?.(segment.fileId)}
-                  title="Dosyayı önizle"
+                  title={t("Dosyayı önizle")}
                   style={{
                     ...linkStyle,
                     // Balonun içinde metnin AKIŞINDA durmalı: varsayılan düğme

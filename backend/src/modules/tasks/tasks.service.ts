@@ -6,6 +6,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { applyOrder } from "../../common/reorder.util";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
+import type { Metin } from "../../common/i18n";
 import {
   assertConvertToSubtaskAllowed,
   assertConvertToTaskAllowed,
@@ -253,8 +254,11 @@ export class TasksService {
           "task_assigned",
           "Yeni Görev Atandı",
           assigner
-            ? `${assigner}, sizi "${notifyContext.title}" görevine atadı.`
-            : `"${notifyContext.title}" görevine atandınız.`,
+            ? {
+                metin: '{atayan}, seni "{gorev}" görevine atadı.',
+                params: { atayan: assigner, gorev: notifyContext.title },
+              }
+            : { metin: '"{gorev}" görevine atandın.', params: { gorev: notifyContext.title } },
           notifyContext.link
         );
       }
@@ -739,9 +743,9 @@ export class TasksService {
       if (createdBy) recipients.delete(createdBy);
       if (task.assignedTo) recipients.delete(task.assignedTo);
 
-      const body = creatorName
-        ? `${creatorName}, "${task.title}" görevini ekledi.`
-        : `"${task.title}" görevi eklendi.`;
+      const body: Metin = creatorName
+        ? { metin: '{ekleyen}, "{gorev}" görevini ekledi.', params: { ekleyen: creatorName, gorev: task.title } }
+        : { metin: '"{gorev}" görevi eklendi.', params: { gorev: task.title } };
       await Promise.all(
         [...recipients].map((userId) => this.notificationsService.notifyUser(userId, "task_updated", "Yeni Görev", body, link))
       );
@@ -828,7 +832,7 @@ export class TasksService {
           (r as any).user_id,
           "task_updated",
           "Görev Güncellendi",
-          `"${task.title}" görevinde güncelleme var.`,
+          { metin: '"{gorev}" görevinde güncelleme var.', params: { gorev: task.title } },
           taskLink(task)
         );
       }
@@ -1111,7 +1115,7 @@ export class TasksService {
         task.assignedTo,
         "task_updated",
         "Görev Güncellendi",
-        `"${task.title}" görevinin durumu değişti.`,
+        { metin: '"{gorev}" görevinin durumu değişti.', params: { gorev: task.title } },
         taskLink(task)
       );
     }
@@ -1140,9 +1144,9 @@ export class TasksService {
       // için kendine bildirim almamalı.
       if (completedBy) recipients.delete(completedBy);
 
-      const body = completerName
-        ? `${completerName}, "${task.title}" görevini tamamladı.`
-        : `"${task.title}" görevi tamamlandı.`;
+      const body: Metin = completerName
+        ? { metin: '{kisi}, "{gorev}" görevini tamamladı.', params: { kisi: completerName, gorev: task.title } }
+        : { metin: '"{gorev}" görevi tamamlandı.', params: { gorev: task.title } };
       await Promise.all(
         [...recipients].map((userId) => this.notificationsService.notifyUser(userId, "task_updated", "Görev Tamamlandı", body, link))
       );
@@ -1172,7 +1176,7 @@ export class TasksService {
         task.assignedTo,
         "task_updated",
         "Görev Güncellendi",
-        `"${task.title}" görevinin tarihi değişti.`,
+        { metin: '"{gorev}" görevinin tarihi değişti.', params: { gorev: task.title } },
         taskLink(task)
       );
     }

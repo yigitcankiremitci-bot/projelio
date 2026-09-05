@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { aiChat } from "../api/aiChat";
 import type { AiAttachment, AiCloudEntry } from "../api/aiChat";
+import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconChevronRight, IconFile, IconFolder } from "./icons";
@@ -28,6 +29,7 @@ interface Crumb {
  */
 export default function AiCloudPickerModal({ conversationId, onClose, onPicked }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [crumbs, setCrumbs] = useState<Crumb[]>([{ id: undefined, name: "OneDrive" }]);
   const [entries, setEntries] = useState<AiCloudEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,13 +56,13 @@ export default function AiCloudPickerModal({ conversationId, onClose, onPicked }
       onPicked(attachment);
       onClose();
     } catch (e: any) {
-      setError(e?.message ?? "Dosya okunamadı.");
+      setError(e?.message ?? t("Dosya okunamadı."));
       setPickingId(null);
     }
   };
 
   return (
-    <Modal title="OneDrive'dan seç" onClose={onClose} maxWidth={480}>
+    <Modal title={t("OneDrive'dan seç")} onClose={onClose} maxWidth={480}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10, fontSize: 12 }}>
         {crumbs.map((crumb, index) => (
           <span key={`${crumb.id ?? "root"}-${index}`} style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -87,9 +89,9 @@ export default function AiCloudPickerModal({ conversationId, onClose, onPicked }
 
       <div style={{ maxHeight: 340, overflowY: "auto", border: `1px solid ${c.border}`, borderRadius: 10 }}>
         {loading ? (
-          <p style={{ padding: 16, margin: 0, fontSize: 13, color: c.textSecondary }}>Yükleniyor…</p>
+          <p style={{ padding: 16, margin: 0, fontSize: 13, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
         ) : entries.length === 0 ? (
-          <p style={{ padding: 16, margin: 0, fontSize: 13, color: c.textSecondary }}>Bu klasör boş.</p>
+          <p style={{ padding: 16, margin: 0, fontSize: 13, color: c.textSecondary }}>{t("Bu klasör boş.")}</p>
         ) : (
           entries.map((entry) => (
             <button
@@ -131,7 +133,7 @@ export default function AiCloudPickerModal({ conversationId, onClose, onPicked }
                 {entry.name}
               </span>
               {pickingId === entry.id && (
-                <span style={{ fontSize: 12, color: c.textSecondary }}>okunuyor…</span>
+                <span style={{ fontSize: 12, color: c.textSecondary }}>{t("okunuyor…")}</span>
               )}
             </button>
           ))

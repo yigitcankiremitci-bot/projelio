@@ -2,6 +2,7 @@ import { randomBytes, createHash } from "crypto";
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { hashPassword } from "../../common/password.util";
 import { SupabaseService } from "../../database/supabase.service";
+import { istekDili } from "../../common/i18n";
 import { UsersService, normalizeEmail } from "../users/users.service";
 import { EmailService } from "./email.service";
 import { getWebAppUrl } from "../../common/config/env";
@@ -63,7 +64,11 @@ export class PasswordResetService {
 
     const webAppUrl = getWebAppUrl();
     const resetUrl = `${webAppUrl}/reset-password?token=${token}`;
-    await this.emailService.sendPasswordResetEmail(user.email, resetUrl);
+    // Şifresini sıfırlayan kullanıcının hesabı zaten var; dili oradan okunur.
+    // Hiç seçim yapmamışsa (locale null) varsayılana düşülür — bu akışta
+    // tarayıcı ipucu yok, istek giriş ekranından geliyor ve kullanıcının
+    // hangi dili kullandığını yalnızca hesabı biliyor.
+    await this.emailService.sendPasswordResetEmail(user.email, resetUrl, istekDili(user.locale));
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {

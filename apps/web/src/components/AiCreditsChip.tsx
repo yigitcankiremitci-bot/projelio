@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { aiChat } from "../api/aiChat";
 import type { AiCredits } from "../api/aiChat";
+import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconSparkle } from "./icons";
 
@@ -25,6 +26,7 @@ interface Props {
  */
 export default function AiCreditsChip({ compact = false }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const navigate = useNavigate();
   const [credits, setCredits] = useState<AiCredits | null>(null);
   const [failed, setFailed] = useState(false);
@@ -58,8 +60,10 @@ export default function AiCreditsChip({ compact = false }: Props) {
       // Yükleme sözü verilmiyor: kredi yüklemeyi yönetici yapıyor
       // (bkz. AiCreditAdminPanel), kullanıcı burada bakiyesini ve nasıl
       // yükletebileceğini görüyor.
-      title={isLow ? "Lio kredin azaldı — kredi sayfasını aç" : "Lio kredilerin — kredi sayfasını aç"}
-      aria-label={`Lio kredisi: ${balance}. Kredi sayfasını aç.`}
+      title={
+        isLow ? t("Lio kredin azaldı — kredi sayfasını aç") : t("Lio kredilerin — kredi sayfasını aç")
+      }
+      aria-label={t("Lio kredisi: {bakiye}. Kredi sayfasını aç.", { bakiye: balance })}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -80,7 +84,7 @@ export default function AiCreditsChip({ compact = false }: Props) {
     >
       <IconSparkle size={compact ? 13 : 15} color={isLow ? c.accentDark : c.accent} />
       <span style={{ fontWeight: 500 }}>{balance}</span>
-      <span style={{ color: c.textSecondary, fontSize: compact ? 11.5 : 13 }}>Lio kredisi</span>
+      <span style={{ color: c.textSecondary, fontSize: compact ? 11.5 : 13 }}>{t("Lio kredisi")}</span>
     </button>
   );
 }

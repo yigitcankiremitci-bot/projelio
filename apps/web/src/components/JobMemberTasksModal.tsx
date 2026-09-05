@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconCheck } from "./icons";
 import { isAssignedTo } from "../lib/taskAssignees";
+import { useT } from "../lib/i18n";
 
 interface Props {
   member: JobMember;
@@ -16,6 +17,7 @@ interface Props {
 
 export default function JobMemberTasksModal({ member, tasks, projects, onClose, onTaskUpdated }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const projectTitle = (projectId?: string) => projects.find((p) => p.id === projectId)?.title ?? "";
@@ -42,22 +44,22 @@ export default function JobMemberTasksModal({ member, tasks, projects, onClose, 
   });
 
   return (
-    <Modal title={member.fullName ?? "Ekip üyesi"} onClose={onClose} maxWidth={440}>
+    <Modal title={member.fullName ?? t("Ekip üyesi")} onClose={onClose} maxWidth={440}>
       <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 14px" }}>
-        Bu kişiye atamak istediğin görevleri işaretle. Bir görev yalnızca tek kişiye atanabilir.
+        {t("Bu kişiye atamak istediğin görevleri işaretle. Bir görev yalnızca tek kişiye atanabilir.")}
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 400, overflowY: "auto" }}>
         {sorted.length === 0 ? (
-          <p style={{ fontSize: 15, color: c.textSecondary }}>Bu işte henüz görev yok.</p>
+          <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Bu işte henüz görev yok.")}</p>
         ) : (
-          sorted.map((t) => {
-            const mine = isAssignedTo(t, member.userId);
-            const takenByOther = !!t.assignedTo && !mine;
+          sorted.map((gorev) => {
+            const mine = isAssignedTo(gorev, member.userId);
+            const takenByOther = !!gorev.assignedTo && !mine;
             return (
               <button
-                key={t.id}
-                onClick={() => toggle(t)}
-                disabled={busyId === t.id}
+                key={gorev.id}
+                onClick={() => toggle(gorev)}
+                disabled={busyId === gorev.id}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -67,7 +69,7 @@ export default function JobMemberTasksModal({ member, tasks, projects, onClose, 
                   border: `1px solid ${c.border}`,
                   background: mine ? c.background : "transparent",
                   textAlign: "left",
-                  opacity: t.parentTaskId ? 0.85 : 1,
+                  opacity: gorev.parentTaskId ? 0.85 : 1,
                 }}
               >
                 <span
@@ -87,12 +89,12 @@ export default function JobMemberTasksModal({ member, tasks, projects, onClose, 
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {t.parentTaskId ? "↳ " : ""}
-                    {t.title}
+                    {gorev.parentTaskId ? "↳ " : ""}
+                    {gorev.title}
                   </div>
-                  <div style={{ fontSize: 12, color: c.textSecondary }}>{projectTitle(t.projectId)}</div>
+                  <div style={{ fontSize: 12, color: c.textSecondary }}>{projectTitle(gorev.projectId)}</div>
                 </div>
-                {takenByOther && <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>atanmış</span>}
+                {takenByOther && <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{t("atanmış")}</span>}
               </button>
             );
           })

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { getWebAppUrl, isProduction } from "../../common/config/env";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
+import { cevirmen } from "../../common/i18n";
+import type { Locale, Translate } from "@projelio/shared";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -15,6 +17,14 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
  * sunucu loguna yazılır ve yerel geliştirmede oradan kopyalanabilir. Bu, projedeki
  * diğer opsiyonel entegrasyonlarla aynı desen (ör. VAPID anahtarları yoksa push
  * bildirimleri sessizce devre dışı kalıyor, bkz. notifications.service.ts).
+ *
+ * ## Dil
+ *
+ * Her gönderim metodu ALICININ dilini parametre olarak alır; servis bunu kendi
+ * başına bulmaya çalışmaz. Sebep doğrulama e-postası: kullanıcı o an yeni
+ * oluşturulmuştur, `users.locale` boştur ve elde tek ipucu isteğin
+ * `Accept-Language` başlığıdır — o da yalnızca çağıranın elindedir.
+ * Dili çözmek için `istekDili()` kullan (bkz. common/i18n).
  */
 @Injectable()
 export class EmailService {
@@ -22,31 +32,33 @@ export class EmailService {
   private readonly apiKey = process.env.RESEND_API_KEY?.trim() ?? "";
   private readonly from = process.env.EMAIL_FROM?.trim() || "Projelio <onboarding@resend.dev>";
 
-  async sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
+  async sendPasswordResetEmail(to: string, resetUrl: string, locale: Locale): Promise<void> {
     if (!this.apiKey) {
       this.logUndeliverable("şifre sıfırlama", to, resetUrl);
       return;
     }
 
+    const t = cevirmen(locale);
     await this.send({
       to,
-      subject: "Projelio şifre sıfırlama",
-      html: passwordResetHtml(resetUrl),
-      text: passwordResetText(resetUrl),
+      subject: t("Projelio şifre sıfırlama"),
+      html: passwordResetHtml(resetUrl, t, locale),
+      text: passwordResetText(resetUrl, t),
     });
   }
 
-  async sendVerificationEmail(to: string, verifyUrl: string): Promise<void> {
+  async sendVerificationEmail(to: string, verifyUrl: string, locale: Locale): Promise<void> {
     if (!this.apiKey) {
       this.logUndeliverable("e-posta doğrulama", to, verifyUrl);
       return;
     }
 
+    const t = cevirmen(locale);
     await this.send({
       to,
-      subject: "Projelio hesabını doğrula",
-      html: verificationHtml(verifyUrl),
-      text: verificationText(verifyUrl),
+      subject: t("Projelio hesabını doğrula"),
+      html: verificationHtml(verifyUrl, t, locale),
+      text: verificationText(verifyUrl, t),
     });
   }
 
@@ -68,7 +80,7 @@ export class EmailService {
    * kullanıcıya faydalı: adresini unutup tekrar kayıt olmaya çalışan kişi
    * "zaten hesabın var, giriş yap" bilgisini alıyor.
    */
-  async sendExistingAccountNotice(to: string, loginUrl: string): Promise<void> {
+  async sendExistingAccountNotice(to: string, loginUrl: string, locale: Locale): Promise<void> {
     if (!this.apiKey) {
       this.logger.warn(
         `E-posta sağlayıcısı yapılandırılmadı (RESEND_API_KEY yok) — ` +
@@ -77,11 +89,12 @@ export class EmailService {
       return;
     }
 
+    const t = cevirmen(locale);
     await this.send({
       to,
-      subject: "Projelio hesabın zaten var",
-      html: existingAccountHtml(loginUrl),
-      text: existingAccountText(loginUrl),
+      subject: t("Projelio hesabın zaten var"),
+      html: existingAccountHtml(loginUrl, t, locale),
+      text: existingAccountText(loginUrl, t),
     });
   }
 
@@ -109,18 +122,29 @@ export class EmailService {
    * olacağı ve nasıl geri dönüleceği. Kullanıcı bu e-postayı sakladığı sürece
    * fikrini değiştirme imkânı elinde kalıyor.
    */
-  async sendAccountDeletionScheduled(to: string, purgeAt: Date, graceDays: number): Promise<void> {
-    const tarih = purgeAt.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+  async sendAccountDeletionScheduled(
+    to: string,
+    purgeAt: Date,
+    graceDays: number,
+    locale: Locale
+  ): Promise<void> {
+    // Tarih biçimi de dile bağlı: "5 Eylül 2026" ile "5 September 2026".
+    const tarih = purgeAt.toLocaleDateString(locale === "en" ? "en-GB" : "tr-TR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
     if (!this.apiKey) {
       this.logger.warn(`E-posta sağlayıcısı yapılandırılmadı — hesap silme bildirimi gönderilemedi. Alıcı: ${to}`);
       return;
     }
 
+    const t = cevirmen(locale);
     await this.send({
       to,
-      subject: "Projelio hesabın silinmek üzere",
-      html: accountDeletionHtml(tarih, graceDays, getWebAppUrl()),
-      text: accountDeletionText(tarih, graceDays, getWebAppUrl()),
+      subject: t("Projelio hesabın silinmek üzere"),
+      html: accountDeletionHtml(tarih, graceDays, getWebAppUrl(), t, locale),
+      text: accountDeletionText(tarih, graceDays, getWebAppUrl(), t),
     });
   }
 
@@ -164,9 +188,17 @@ export class EmailService {
  * NOT: stiller bilerek satır içi (inline) — e-posta istemcilerinin çoğu
  * <style> bloklarını ve harici CSS'i yok sayar.
  */
-function emailLayout(params: { heading: string; intro: string; ctaLabel: string; url: string; footer: string }): string {
+function emailLayout(params: {
+  heading: string;
+  intro: string;
+  ctaLabel: string;
+  url: string;
+  footer: string;
+  t: Translate;
+  locale: Locale;
+}): string {
   return `<!doctype html>
-<html lang="tr">
+<html lang="${params.locale}">
   <body style="margin:0;padding:24px;background:#F4F5F7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:14px;padding:32px;">
       <tr>
@@ -180,7 +212,7 @@ function emailLayout(params: { heading: string; intro: string; ctaLabel: string;
             </a>
           </p>
           <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#8A929E;">
-            Düğme çalışmazsa bu adresi tarayıcına yapıştırabilirsin:
+            ${params.t("Düğme çalışmazsa bu adresi tarayıcına yapıştırabilirsin:")}
           </p>
           <p style="margin:0 0 24px;font-size:13px;line-height:1.6;word-break:break-all;color:#C0813F;">
             ${params.url}
@@ -195,117 +227,147 @@ function emailLayout(params: { heading: string; intro: string; ctaLabel: string;
 </html>`;
 }
 
-function passwordResetHtml(resetUrl: string): string {
+function passwordResetHtml(resetUrl: string, t: Translate, locale: Locale): string {
   return emailLayout({
-    heading: "Şifreni sıfırla",
-    intro:
+    heading: t("Şifreni sıfırla"),
+    intro: t(
       "Projelio hesabın için şifre sıfırlama talebinde bulunuldu. Yeni şifreni belirlemek " +
-      "için aşağıdaki düğmeye tıkla. Bu bağlantı <strong>1 saat</strong> boyunca geçerli.",
-    ctaLabel: "Yeni şifre belirle",
+        "için aşağıdaki düğmeye tıkla. Bu bağlantı <strong>1 saat</strong> boyunca geçerli."
+    ),
+    ctaLabel: t("Yeni şifre belirle"),
     url: resetUrl,
-    footer: "Bu talebi sen yapmadıysan bu e-postayı yok sayabilirsin — şifren değişmeyecek.",
+    footer: t("Bu talebi sen yapmadıysan bu e-postayı yok sayabilirsin — şifren değişmeyecek."),
+    t,
+    locale,
   });
 }
 
 // Düz metin sürümü: HTML göstermeyen istemciler için ve spam puanını düşürmek adına.
-function passwordResetText(resetUrl: string): string {
+function passwordResetText(resetUrl: string, t: Translate): string {
   return [
-    "Şifreni sıfırla",
+    t("Şifreni sıfırla"),
     "",
-    "Projelio hesabın için şifre sıfırlama talebinde bulunuldu.",
-    "Yeni şifreni belirlemek için aşağıdaki adresi tarayıcına yapıştır:",
+    t("Projelio hesabın için şifre sıfırlama talebinde bulunuldu."),
+    t("Yeni şifreni belirlemek için aşağıdaki adresi tarayıcına yapıştır:"),
     "",
     resetUrl,
     "",
-    "Bu bağlantı 1 saat boyunca geçerlidir.",
-    "Bu talebi sen yapmadıysan bu e-postayı yok sayabilirsin — şifren değişmeyecek.",
+    t("Bu bağlantı 1 saat boyunca geçerlidir."),
+    t("Bu talebi sen yapmadıysan bu e-postayı yok sayabilirsin — şifren değişmeyecek."),
   ].join("\n");
 }
 
-function verificationHtml(verifyUrl: string): string {
+function verificationHtml(verifyUrl: string, t: Translate, locale: Locale): string {
   return emailLayout({
-    heading: "Hesabını doğrula",
-    intro:
+    heading: t("Hesabını doğrula"),
+    intro: t(
       "Projelio'ya hoş geldin! Hesabını kullanmaya başlamak için e-posta adresini " +
-      "doğrulaman gerekiyor. Bu bağlantı <strong>24 saat</strong> boyunca geçerli.",
-    ctaLabel: "E-postamı doğrula",
+        "doğrulaman gerekiyor. Bu bağlantı <strong>24 saat</strong> boyunca geçerli."
+    ),
+    ctaLabel: t("E-postamı doğrula"),
     url: verifyUrl,
-    footer: "Bu hesabı sen açmadıysan bu e-postayı yok sayabilirsin.",
+    footer: t("Bu hesabı sen açmadıysan bu e-postayı yok sayabilirsin."),
+    t,
+    locale,
   });
 }
 
-function verificationText(verifyUrl: string): string {
+function verificationText(verifyUrl: string, t: Translate): string {
   return [
-    "Hesabını doğrula",
+    t("Hesabını doğrula"),
     "",
-    "Projelio'ya hoş geldin! Hesabını kullanmaya başlamak için e-posta adresini doğrulaman gerekiyor.",
-    "Aşağıdaki adresi tarayıcına yapıştır:",
+    t("Projelio'ya hoş geldin! Hesabını kullanmaya başlamak için e-posta adresini doğrulaman gerekiyor."),
+    t("Aşağıdaki adresi tarayıcına yapıştır:"),
     "",
     verifyUrl,
     "",
-    "Bu bağlantı 24 saat boyunca geçerlidir.",
-    "Bu hesabı sen açmadıysan bu e-postayı yok sayabilirsin.",
+    t("Bu bağlantı 24 saat boyunca geçerlidir."),
+    t("Bu hesabı sen açmadıysan bu e-postayı yok sayabilirsin."),
   ].join("\n");
 }
 
 
-function existingAccountHtml(loginUrl: string): string {
+function existingAccountHtml(loginUrl: string, t: Translate, locale: Locale): string {
   return emailLayout({
-    heading: "Bu adresle zaten bir hesabın var",
-    intro:
+    heading: t("Bu adresle zaten bir hesabın var"),
+    intro: t(
       "Az önce bu e-posta adresiyle Projelio'da yeni bir hesap açılmaya çalışıldı. " +
-      "Adres zaten kayıtlı olduğu için <strong>yeni bir hesap oluşturulmadı</strong> ve " +
-      "mevcut hesabında hiçbir şey değişmedi.",
-    ctaLabel: "Giriş yap",
+        "Adres zaten kayıtlı olduğu için <strong>yeni bir hesap oluşturulmadı</strong> ve " +
+        "mevcut hesabında hiçbir şey değişmedi."
+    ),
+    ctaLabel: t("Giriş yap"),
     url: loginUrl,
-    footer:
+    footer: t(
       "Şifreni hatırlamıyorsan giriş ekranındaki \"Şifremi unuttum\" ile sıfırlayabilirsin. " +
-      "Bunu sen yapmadıysan bu e-postayı yok sayabilirsin.",
+        "Bunu sen yapmadıysan bu e-postayı yok sayabilirsin."
+    ),
+    t,
+    locale,
   });
 }
 
-function existingAccountText(loginUrl: string): string {
+function existingAccountText(loginUrl: string, t: Translate): string {
   return [
-    "Bu adresle zaten bir hesabın var",
+    t("Bu adresle zaten bir hesabın var"),
     "",
-    "Az önce bu e-posta adresiyle Projelio'da yeni bir hesap açılmaya çalışıldı.",
-    "Adres zaten kayıtlı olduğu için yeni bir hesap oluşturulmadı ve mevcut hesabında hiçbir şey değişmedi.",
+    t("Az önce bu e-posta adresiyle Projelio'da yeni bir hesap açılmaya çalışıldı."),
+    t("Adres zaten kayıtlı olduğu için yeni bir hesap oluşturulmadı ve mevcut hesabında hiçbir şey değişmedi."),
     "",
-    "Giriş yapmak için:",
+    t("Giriş yapmak için:"),
     loginUrl,
     "",
-    'Şifreni hatırlamıyorsan giriş ekranındaki "Şifremi unuttum" ile sıfırlayabilirsin.',
-    "Bunu sen yapmadıysan bu e-postayı yok sayabilirsin.",
+    t('Şifreni hatırlamıyorsan giriş ekranındaki "Şifremi unuttum" ile sıfırlayabilirsin.'),
+    t("Bunu sen yapmadıysan bu e-postayı yok sayabilirsin."),
   ].join("\n");
 }
 
 
-function accountDeletionHtml(tarih: string, graceDays: number, loginUrl: string): string {
+function accountDeletionHtml(
+  tarih: string,
+  graceDays: number,
+  loginUrl: string,
+  t: Translate,
+  locale: Locale
+): string {
   return emailLayout({
-    heading: "Hesabın silinmek üzere",
+    heading: t("Hesabın silinmek üzere"),
+    // Gün sayısı ve tarih yer tutucuyla geçiyor: şablon dizesi sözlükte
+    // hiçbir zaman bulunamazdı (bkz. docs/dil-cevirisi.md).
     intro:
-      `Hesabını silme talebini aldık. Verilerin <strong>${graceDays} gün</strong> daha duracak ve ` +
-      `<strong>${tarih}</strong> tarihinde kalıcı olarak silinecek.<br><br>` +
-      "Fikrin değişirse bir şey yapmana gerek yok: bu tarihe kadar aynı e-posta ve şifreyle giriş yapman " +
-      "yeterli, hesabın olduğu gibi geri açılır.",
-    ctaLabel: "Giriş yap ve hesabımı geri al",
+      t(
+        "Hesabını silme talebini aldık. Verilerin <strong>{gun} gün</strong> daha duracak ve " +
+          "<strong>{tarih}</strong> tarihinde kalıcı olarak silinecek.",
+        { gun: graceDays, tarih, n: graceDays }
+      ) +
+      "<br><br>" +
+      t(
+        "Fikrin değişirse bir şey yapmana gerek yok: bu tarihe kadar aynı e-posta ve şifreyle giriş yapman " +
+          "yeterli, hesabın olduğu gibi geri açılır."
+      ),
+    ctaLabel: t("Giriş yap ve hesabımı geri al"),
     url: `${loginUrl}/login`,
-    footer:
+    footer: t(
       "Bu talebi sen yapmadıysan hemen giriş yap — girişin kendisi silme talebini iptal eder. " +
-      "Tarih geçtikten sonra veriler geri getirilemez.",
+        "Tarih geçtikten sonra veriler geri getirilemez."
+    ),
+    t,
+    locale,
   });
 }
 
-function accountDeletionText(tarih: string, graceDays: number, loginUrl: string): string {
+function accountDeletionText(tarih: string, graceDays: number, loginUrl: string, t: Translate): string {
   return [
-    "Hesabın silinmek üzere",
+    t("Hesabın silinmek üzere"),
     "",
-    `Hesabını silme talebini aldık. Verilerin ${graceDays} gün daha duracak ve ${tarih} tarihinde kalıcı olarak silinecek.`,
+    t(
+      "Hesabını silme talebini aldık. Verilerin {gun} gün daha duracak ve {tarih} tarihinde kalıcı olarak silinecek.",
+      { gun: graceDays, tarih, n: graceDays }
+    ),
     "",
-    "Fikrin değişirse bir şey yapmana gerek yok: bu tarihe kadar aynı e-posta ve şifreyle giriş yapman yeterli.",
+    t("Fikrin değişirse bir şey yapmana gerek yok: bu tarihe kadar aynı e-posta ve şifreyle giriş yapman yeterli."),
     `${loginUrl}/login`,
     "",
-    "Bu talebi sen yapmadıysan hemen giriş yap — girişin kendisi silme talebini iptal eder.",
-    "Tarih geçtikten sonra veriler geri getirilemez.",
+    t("Bu talebi sen yapmadıysan hemen giriş yap — girişin kendisi silme talebini iptal eder."),
+    t("Tarih geçtikten sonra veriler geri getirilemez."),
   ].join("\n");
 }

@@ -6,14 +6,14 @@ export type JobTab = "projects" | "programs" | "team" | "tasks" | "files" | "mod
 // ve tekrarlayan işleri tutar. İkisi de bu işin altında yaşadığı için sekmeler
 // yan yana durur.
 const tabs: { key: JobTab; label: string }[] = [
-  { key: "projects", label: "Projeler" },
-  { key: "programs", label: "Rutinler" },
-  { key: "team", label: "Ekip" },
-  { key: "tasks", label: "İşler" },
+  { key: "projects", label: "Projeler" }, // dil:anahtar
+  { key: "programs", label: "Rutinler" }, // dil:anahtar
+  { key: "team", label: "Ekip" }, // dil:anahtar
+  { key: "tasks", label: "İşler" }, // dil:anahtar
   // Dosyalar işe aittir: iş sahibi altındaki tüm projelerin dosyalarını burada görür.
-  { key: "files", label: "Dosyalar" },
+  { key: "files", label: "Dosyalar" }, // dil:anahtar
   // Modüller de işe aittir: anasayfadan bu işe atanan modüller burada açılır.
-  { key: "modules", label: "Modüller" },
+  { key: "modules", label: "Modüller" }, // dil:anahtar
 ];
 
 /**

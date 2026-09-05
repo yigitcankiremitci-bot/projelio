@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import type { AiContinuation, AiModelTier, AiModelTierInfo } from "../api/aiChat";
@@ -26,6 +27,7 @@ interface Props {
  */
 export default function AiContinueDialog({ continuation, onContinue, onStop }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   /**
    * Varsayılan olarak AÇIK.
@@ -51,13 +53,13 @@ export default function AiContinueDialog({ continuation, onContinue, onStop }: P
   };
 
   return (
-    <Modal title={upfront ? "Bu istek pahalı görünüyor" : "Devam edeyim mi?"} onClose={onStop} maxWidth={420}>
+    <Modal title={upfront ? t("Bu istek pahalı görünüyor") : t("Devam edeyim mi?")} onClose={onStop} maxWidth={420}>
       <p style={{ fontSize: 15, color: c.textPrimary, margin: "0 0 14px", lineHeight: 1.5 }}>
         {upfront
-          ? "Bu isteği yapmaya başlamadan önce onayını almak istedim; tahmini bedeli yüksek."
+          ? t("Bu isteği yapmaya başlamadan önce onayını almak istedim; tahmini bedeli yüksek.")
           : continuation.reason === "budget"
-            ? "Bu istek beklediğimden uzun sürdü ve kredi eşiğine geldi."
-            : "Bu istek adım sınırına geldi ama henüz bitmedi."}
+            ? t("Bu istek beklediğimden uzun sürdü ve kredi eşiğine geldi.")
+            : t("Bu istek adım sınırına geldi ama henüz bitmedi.")}
       </p>
 
       <div
@@ -71,25 +73,29 @@ export default function AiContinueDialog({ continuation, onContinue, onStop }: P
       >
         {upfront ? (
           <>
-            <Row label="Şimdiye kadar harcanan" value="0 kredi" c={c} />
+            <Row label={t("Şimdiye kadar harcanan")} value={t("{n} kredi", { n: 0 })} c={c} />
             <Row
-              label="Tahmini bedel"
-              value={`~${Math.round(continuation.estimatedNextCredits).toLocaleString("tr-TR")} kredi`}
+              label={t("Tahmini bedel")}
+              value={t("~{n} kredi", {
+                n: Math.round(continuation.estimatedNextCredits).toLocaleString("tr-TR"),
+              })}
               c={c}
               last
             />
           </>
         ) : (
           <>
-            <Row label="Şimdiye kadar yapılan" value={continuation.doneSummary} c={c} />
+            <Row label={t("Şimdiye kadar yapılan")} value={continuation.doneSummary} c={c} />
             <Row
-              label="Harcanan kredi"
+              label={t("Harcanan kredi")}
               value={`${Math.round(continuation.spentCredits).toLocaleString("tr-TR")}`}
               c={c}
             />
             <Row
-              label="Devam edersem (adım başına)"
-              value={`~${Math.round(continuation.estimatedNextCredits).toLocaleString("tr-TR")} kredi`}
+              label={t("Devam edersem (adım başına)")}
+              value={t("~{n} kredi", {
+                n: Math.round(continuation.estimatedNextCredits).toLocaleString("tr-TR"),
+              })}
               c={c}
               last
             />
@@ -120,9 +126,9 @@ export default function AiContinueDialog({ continuation, onContinue, onStop }: P
           style={{ marginTop: 2 }}
         />
         <span>
-          Bu istek boyunca tekrar sorma
+          {t("Bu istek boyunca tekrar sorma")}
           <span style={{ display: "block", fontSize: 11.5, opacity: 0.8 }}>
-            Kredi biterse yine durulur; bu seçenek yalnızca onay pencerelerini kapatır.
+            {t("Kredi biterse yine durulur; bu seçenek yalnızca onay pencerelerini kapatır.")}
           </span>
         </span>
       </label>
@@ -142,7 +148,7 @@ export default function AiContinueDialog({ continuation, onContinue, onStop }: P
             cursor: busy ? "default" : "pointer",
           }}
         >
-          {upfront ? "Vazgeç" : "Dur, yeter"}
+          {upfront ? t("Vazgeç") : t("Dur, yeter")}
         </button>
         <button
           type="button"
@@ -161,7 +167,7 @@ export default function AiContinueDialog({ continuation, onContinue, onStop }: P
             opacity: busy ? 0.7 : 1,
           }}
         >
-          {busy ? "Çalışıyor…" : upfront ? "Onaylıyorum, yap" : "Devam et"}
+          {busy ? t("Çalışıyor…") : upfront ? t("Onaylıyorum, yap") : t("Devam et")}
         </button>
       </div>
     </Modal>

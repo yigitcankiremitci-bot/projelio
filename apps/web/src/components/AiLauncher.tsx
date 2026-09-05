@@ -5,6 +5,7 @@ import { onAskLio } from "../lib/askLio";
 import { setLioPanelOpen } from "../lib/lioPanel";
 import type { AskLioRequest } from "../lib/askLio";
 import { tourAnchor } from "../lib/tour/types";
+import { useT } from "../lib/i18n";
 import AiAssistantPanel from "./AiAssistantPanel";
 
 // Lio'nun düğme boyutu ve ekrandaki yeri artık layout.ts'te (bkz. LIO_LAUNCHER):
@@ -25,6 +26,7 @@ const HOVER_BLINK_RANGE: [number, number] = [4000, 6000];
  * Klavye kısayolu: Cmd/Ctrl + K
  */
 export default function AiLauncher() {
+  const t = useT();
   const isDesktop = useIsDesktop();
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -105,7 +107,7 @@ export default function AiLauncher() {
           onClick={() => setOpen(true)}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
-          aria-label="Lio'yu aç"
+          aria-label={t("Lio'yu aç")}
           title="Lio (⌘K)"
           style={{
             position: "fixed",

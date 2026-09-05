@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { JobMember } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { fetchPendingJobInvites, onJobInvitesChanged, respondToJobInvite } from "../lib/jobInvites";
+import { useT } from "../lib/i18n";
 
 /**
  * İş detay sayfasının üstünde beliren davet şeridi.
@@ -12,6 +13,7 @@ import { fetchPendingJobInvites, onJobInvitesChanged, respondToJobInvite } from 
  */
 export default function JobInviteBanner({ jobId }: { jobId: string }) {
   const c = useThemeColors();
+  const t = useT();
   const [invite, setInvite] = useState<JobMember | null>(null);
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState<"approved" | "rejected" | null>(null);
@@ -50,8 +52,8 @@ export default function JobInviteBanner({ jobId }: { jobId: string }) {
         }}
       >
         {answer === "approved"
-          ? "Daveti kabul ettin — bu iş artık anasayfandaki “Katıldıklarım” listesinde."
-          : "Daveti reddettin. İş sahibi bilgilendirildi."}
+          ? t("Daveti kabul ettin — bu iş artık anasayfandaki “Katıldıklarım” listesinde.")
+          : t("Daveti reddettin. İş sahibi bilgilendirildi.")}
       </div>
     );
   }
@@ -73,10 +75,12 @@ export default function JobInviteBanner({ jobId }: { jobId: string }) {
       }}
     >
       <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary }}>Bu işe davet edildin</div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary }}>{t("Bu işe davet edildin")}</div>
         <div style={{ fontSize: 15, color: c.textSecondary }}>
-          {invite.invitedByName ?? "Bir kullanıcı"} seni bu işin ekibine ekledi
-          {invite.title ? ` (${invite.title})` : ""}. Kabul edene kadar iş anasayfanda görünmez.
+          {t("{kisi} seni bu işin ekibine ekledi{unvan}. Kabul edene kadar iş anasayfanda görünmez.", {
+            kisi: invite.invitedByName ?? t("Bir kullanıcı"),
+            unvan: invite.title ? ` (${invite.title})` : "",
+          })}
         </div>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
@@ -92,7 +96,7 @@ export default function JobInviteBanner({ jobId }: { jobId: string }) {
             fontSize: 15,
           }}
         >
-          Reddet
+          {t("Reddet")}
         </button>
         <button
           onClick={() => respond(true)}
@@ -107,7 +111,7 @@ export default function JobInviteBanner({ jobId }: { jobId: string }) {
             fontWeight: 500,
           }}
         >
-          Kabul et
+          {t("Kabul et")}
         </button>
       </div>
     </div>

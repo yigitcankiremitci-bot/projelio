@@ -12,27 +12,27 @@ import type { ModuleFormConfig } from "./types";
 //
 // Bkz. docs/moduller/20-motor-a1-form.md §6.2
 
-const STATUS = { draft: "Taslak", approved: "Onaylandı", outdated: "Güncellenmeli" };
+const STATUS = { draft: "Taslak", approved: "Onaylandı", outdated: "Güncellenmeli" }; // dil:anahtar
 const CHANNELS = {
-  direct: "Doğrudan satış",
-  dealer: "Bayi / distribütör",
+  direct: "Doğrudan satış", // dil:anahtar
+  dealer: "Bayi / distribütör", // dil:anahtar
   marketplace: "Pazaryeri",
   web: "Kendi web sitemiz",
-  export: "İhracat",
+  export: "İhracat", // dil:anahtar
   retail: "Perakende",
 };
 
 export const urunStratejileriConfig: ModuleFormConfig = {
   kind: "form",
-  title: "Ürün Stratejisi",
+  title: "Ürün Stratejisi", // dil:anahtar
   scope: "entity",
   scopeEntity: "product",
   scopeFieldKey: "productId",
 
   groups: [
-    { key: "konum", label: "Konumlandırma", hint: "Bu ürün kime, neden?" },
-    { key: "pazar", label: "Pazar", hint: "Kiminle yarışıyor, nasıl fiyatlanıyor?" },
-    { key: "plan", label: "Plan", hint: "Nereden satılacak, başarısı nasıl ölçülecek?" },
+    { key: "konum", label: "Konumlandırma", hint: "Bu ürün kime, neden?" }, // dil:anahtar
+    { key: "pazar", label: "Pazar", hint: "Kiminle yarışıyor, nasıl fiyatlanıyor?" }, // dil:anahtar
+    { key: "plan", label: "Plan", hint: "Nereden satılacak, başarısı nasıl ölçülecek?" }, // dil:anahtar
     { key: "durum", label: "Durum" },
   ],
 
@@ -42,19 +42,19 @@ export const urunStratejileriConfig: ModuleFormConfig = {
     // kayıt açıldıktan sonra değiştirilemez (bkz. ModuleFormConfig.scopeFieldKey).
     {
       key: "positioning",
-      label: "Konumlandırma",
+      label: "Konumlandırma", // dil:anahtar
       type: "longtext",
       group: "konum",
       requiredForApproval: true,
-      placeholder: "Bu ürün kimin hangi sorununu çözüyor?",
+      placeholder: "Bu ürün kimin hangi sorununu çözüyor?", // dil:anahtar
     },
     {
       key: "differentiator",
-      label: "Farklılaştırıcı",
+      label: "Farklılaştırıcı", // dil:anahtar
       type: "longtext",
       group: "konum",
-      placeholder: "Rakipten ayıran tek şey",
-      help: "Birden fazla yazılıyorsa muhtemelen hiçbiri gerçek farklılaştırıcı değil.",
+      placeholder: "Rakipten ayıran tek şey", // dil:anahtar
+      help: "Birden fazla yazılıyorsa muhtemelen hiçbiri gerçek farklılaştırıcı değil.", // dil:anahtar
     },
 
     {
@@ -63,43 +63,43 @@ export const urunStratejileriConfig: ModuleFormConfig = {
       type: "text",
       group: "pazar",
       requiredForApproval: true,
-      help: "Hedef kitle modülü açıksa oradaki personalardan biri seçilebilir.",
+      help: "Hedef kitle modülü açıksa oradaki personalardan biri seçilebilir.", // dil:anahtar
     },
     {
       key: "pricingNote",
-      label: "Fiyatlandırma yaklaşımı",
+      label: "Fiyatlandırma yaklaşımı", // dil:anahtar
       type: "longtext",
       group: "pazar",
-      placeholder: "Maliyet artı mı, değer bazlı mı, rakip referanslı mı?",
-      help: "Fiyatın kendisi ürün kaydında durur; burada duran gerekçesi.",
+      placeholder: "Maliyet artı mı, değer bazlı mı, rakip referanslı mı?", // dil:anahtar
+      help: "Fiyatın kendisi ürün kaydında durur; burada duran gerekçesi.", // dil:anahtar
     },
     { key: "competitors", label: "Rakipler", type: "tags", group: "pazar" },
 
     {
       key: "channels",
-      label: "Satış kanalları",
+      label: "Satış kanalları", // dil:anahtar
       type: "multiselect",
       group: "plan",
       options: opts(CHANNELS),
     },
     {
       key: "roadmapNote",
-      label: "Yol haritası",
+      label: "Yol haritası", // dil:anahtar
       type: "longtext",
       group: "plan",
-      placeholder: "Önümüzdeki dönemde ürün nasıl gelişecek?",
+      placeholder: "Önümüzdeki dönemde ürün nasıl gelişecek?", // dil:anahtar
     },
     {
       key: "successMetric",
-      label: "Başarı ölçütü",
+      label: "Başarı ölçütü", // dil:anahtar
       type: "text",
       group: "plan",
-      placeholder: "Örn. çeyrekte 40 adet satış",
-      help: "Hedef yönetimi modülü açıksa buradan bir hedef kaydı açılabilir.",
+      placeholder: "Örn. çeyrekte 40 adet satış", // dil:anahtar
+      help: "Hedef yönetimi modülü açıksa buradan bir hedef kaydı açılabilir.", // dil:anahtar
     },
 
-    { key: "effectiveFrom", label: "Geçerlilik tarihi", type: "date", group: "durum" },
-    { key: "reviewAt", label: "Sonraki gözden geçirme", type: "date", group: "durum" },
+    { key: "effectiveFrom", label: "Geçerlilik tarihi", type: "date", group: "durum" }, // dil:anahtar
+    { key: "reviewAt", label: "Sonraki gözden geçirme", type: "date", group: "durum" }, // dil:anahtar
     {
       key: "status",
       label: "Durum",
@@ -108,7 +108,7 @@ export const urunStratejileriConfig: ModuleFormConfig = {
       defaultValue: "draft",
       options: opts(STATUS),
     },
-    { key: "notes", label: "İç not", type: "longtext", group: "durum" },
+    { key: "notes", label: "İç not", type: "longtext", group: "durum" }, // dil:anahtar
   ],
 
   // Ürün stratejisi yılda iki kez gözden geçirilir: pazar, kimlik metninden
@@ -116,10 +116,10 @@ export const urunStratejileriConfig: ModuleFormConfig = {
   reviewIntervalMonths: 6,
 
   empty: {
-    title: "Bu ürün için strateji yaz",
+    title: "Bu ürün için strateji yaz", // dil:anahtar
     body:
-      "Kime sattığını, rakipten farkını ve başarı ölçütünü bir kez netleştir. " +
-      "Pazarlama ve satış modülleri bu cümlelere dayanır.",
+      "Kime sattığını, rakipten farkını ve başarı ölçütünü bir kez netleştir. " + // dil:anahtar
+      "Pazarlama ve satış modülleri bu cümlelere dayanır.", // dil:anahtar
     action: "Stratejiyi yaz",
   },
 };

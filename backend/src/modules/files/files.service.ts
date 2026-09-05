@@ -2152,7 +2152,13 @@ export class FilesService {
 
       await Promise.all(
         [...recipients].map((userId) =>
-          this.notifications.notifyUser(userId, "task_updated", "Yeni Dosya", `"${fileName}" eklendi.`, link)
+          this.notifications.notifyUser(
+            userId,
+            "task_updated",
+            "Yeni Dosya",
+            { metin: '"{dosya}" eklendi.', params: { dosya: fileName } },
+            link
+          )
         )
       );
     } catch {

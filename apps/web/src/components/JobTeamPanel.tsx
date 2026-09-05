@@ -10,6 +10,7 @@ import HireMemberModal from "./HireMemberModal";
 import CreateTaskModal from "./CreateTaskModal";
 import { isAssignedTo } from "../lib/taskAssignees";
 import { backState } from "../lib/backTarget";
+import { useT } from "../lib/i18n";
 
 interface Props {
   jobId: string;
@@ -35,6 +36,7 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
   ref
 ) {
   const c = useThemeColors();
+  const t = useT();
   const navigate = useNavigate();
   const [members, setMembers] = useState<JobMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,19 +89,19 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
       state: {
         highlightTaskId: task.id,
         // Geri bağlantısı işin Ekip sekmesine dönsün (bkz. lib/backTarget.ts).
-        ...backState({ to: `/jobs/${jobId}?tab=team`, label: jobTitle || "Ekip" }),
+        ...backState({ to: `/jobs/${jobId}?tab=team`, label: jobTitle || t("Ekip") }),
       },
     });
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>İş ekibi</h4>
+      <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("İş ekibi")}</h4>
 
       {loading ? (
-        <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
       ) : members.length === 0 ? (
-        <p style={{ fontSize: 15, color: c.textSecondary }}>Bu işte henüz kimse yok. "+" düğmesiyle birini davet edebilirsin.</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Bu işte henüz kimse yok. \"+\" düğmesiyle birini davet edebilirsin.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {members.map((m) => {
@@ -149,11 +151,11 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ fontSize: 16, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {m.fullName ?? "Bilinmeyen kullanıcı"}
+                        {m.fullName ?? t("Bilinmeyen kullanıcı")}
                       </span>
                       {m.userId === ownerId && (
                         <span style={{ fontSize: 12, color: c.accentDark, background: `${c.accent}22`, borderRadius: 20, padding: "1px 7px" }}>
-                          Yönetici
+                          {t("Yönetici")}
                         </span>
                       )}
                       {/* İşe alma bir davettir: kişi kabul edene kadar ekipten
@@ -161,12 +163,12 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
                           görsün ki boşuna beklemesin. */}
                       {m.status === "pending" && (
                         <span style={{ fontSize: 12, color: c.textSecondary, background: c.background, border: `1px solid ${c.border}`, borderRadius: 20, padding: "1px 7px" }}>
-                          Yanıt bekliyor
+                          {t("Yanıt bekliyor")}
                         </span>
                       )}
                       {m.status === "rejected" && (
                         <span style={{ fontSize: 12, color: c.danger, background: `${c.danger}14`, borderRadius: 20, padding: "1px 7px" }}>
-                          Reddetti
+                          {t("Reddetti")}
                         </span>
                       )}
                     </div>
@@ -176,7 +178,7 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
                           <IconActivity size={11} color={c.accentDark} filled />
                         </span>
                         <span style={{ fontSize: 13, color: c.accentDark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          şu an: {activeTask.title}
+                          {t("şu an: {gorev}", { gorev: activeTask.title })}
                         </span>
                       </div>
                     ) : (
@@ -184,14 +186,14 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
                     )}
                   </div>
                   <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
-                    {done}/{total} görev
+                    {t("{done}/{total} görev", { done, total })}
                   </span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setAssigningTo(m);
                     }}
-                    aria-label={`${m.fullName ?? "Kişi"} için görev ata`}
+                    aria-label={t("{kisi} için görev ata", { kisi: m.fullName ?? t("Kişi") })}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -227,15 +229,15 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
                 >
                   <div style={{ borderTop: `1px solid ${c.border}`, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
                     <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>
-                      Bu kişiye atanmış görevler. Birine dokunarak ilgili proje ve çıktıya gidebilirsin.
+                      {t("Bu kişiye atanmış görevler. Birine dokunarak ilgili proje ve çıktıya gidebilirsin.")}
                     </p>
                     {memberTasks.length === 0 ? (
-                      <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>Henüz atanmış görevi yok.</p>
+                      <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>{t("Henüz atanmış görevi yok.")}</p>
                     ) : (
-                      memberTasks.map((t) => (
+                      memberTasks.map((gorev) => (
                         <button
-                          key={t.id}
-                          onClick={() => goToTask(t)}
+                          key={gorev.id}
+                          onClick={() => goToTask(gorev)}
                           style={{
                             display: "flex",
                             alignItems: "center",
@@ -243,9 +245,9 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
                             padding: "8px 10px",
                             borderRadius: 8,
                             border: `1px solid ${c.border}`,
-                            background: t.status === "completed" ? c.background : "transparent",
+                            background: gorev.status === "completed" ? c.background : "transparent",
                             textAlign: "left",
-                            opacity: t.parentTaskId ? 0.85 : 1,
+                            opacity: gorev.parentTaskId ? 0.85 : 1,
                           }}
                         >
                           <span
@@ -254,32 +256,32 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
                               height: 16,
                               borderRadius: "50%",
                               flexShrink: 0,
-                              border: t.status === "completed" ? "none" : `1.5px solid ${c.border}`,
-                              background: t.status === "completed" ? c.success : "transparent",
+                              border: gorev.status === "completed" ? "none" : `1.5px solid ${c.border}`,
+                              background: gorev.status === "completed" ? c.success : "transparent",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
                             }}
                           >
-                            {t.status === "completed" && <IconCheck size={10} color="#fff" />}
+                            {gorev.status === "completed" && <IconCheck size={10} color="#fff" />}
                           </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div
                               style={{
                                 fontSize: 15,
                                 color: c.textPrimary,
-                                textDecoration: t.status === "completed" ? "line-through" : "none",
+                                textDecoration: gorev.status === "completed" ? "line-through" : "none",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
                               }}
                             >
-                              {t.parentTaskId ? "↳ " : ""}
-                              {t.title}
+                              {gorev.parentTaskId ? "↳ " : ""}
+                              {gorev.title}
                             </div>
-                            <div style={{ fontSize: 12, color: c.textSecondary }}>{projectTitle(t.projectId)}</div>
+                            <div style={{ fontSize: 12, color: c.textSecondary }}>{projectTitle(gorev.projectId)}</div>
                           </div>
-                          {t.id === m.activeTaskId && (
+                          {gorev.id === m.activeTaskId && (
                             <span className="active-task-pulse" style={{ display: "inline-flex", borderRadius: "50%", flexShrink: 0 }}>
                               <IconActivity size={12} color={c.accentDark} filled />
                             </span>

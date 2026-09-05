@@ -74,13 +74,30 @@ export class RecurringPaymentsProcessor {
 
       await this.recurringPaymentsService.markProcessed(payment.id, dueDate);
 
-      const label = payment.type === "income" ? "Gelir" : "Ödeme";
-      const suffix = created > 1 ? ` (${created} dönem birlikte işlendi)` : "";
+      // Başlık ve gövde AYRI anahtarlar: "Gelir"/"Ödeme" sözcüğünü cümlenin
+      // içine gömmek İngilizcede işlemiyor (sözcük sırası ve büyük harf farklı),
+      // bu yüzden gelir ve gider için ayrı metinler var.
+      const gelir = payment.type === "income";
+      const tutar = formatAmount(payment.amount);
+      // Açıklama yoksa metnin KENDİSİ değişiyor. Yedek sözcüğü parametre
+      // olarak geçmek İngilizce cümlenin ortasında Türkçe bırakırdı: params
+      // çevrilmiyor, yalnızca kalıp çevriliyor.
+      const aciklama = payment.description;
       await this.notificationsService.notifyUser(
         payment.ownerId,
         "recurring_payment_due",
-        `${label} bütçeye işlendi`,
-        `${payment.description ?? "Düzenli " + label.toLowerCase()} — ${formatAmount(payment.amount)}${suffix}`,
+        gelir ? "Gelir bütçeye işlendi" : "Ödeme bütçeye işlendi",
+        aciklama
+          ? created > 1
+            ? { metin: "{aciklama} — {tutar} ({n} dönem birlikte işlendi)", params: { aciklama, tutar, n: created } }
+            : { metin: "{aciklama} — {tutar}", params: { aciklama, tutar } }
+          : created > 1
+          ? gelir
+            ? { metin: "Düzenli gelir — {tutar} ({n} dönem birlikte işlendi)", params: { tutar, n: created } }
+            : { metin: "Düzenli ödeme — {tutar} ({n} dönem birlikte işlendi)", params: { tutar, n: created } }
+          : gelir
+          ? { metin: "Düzenli gelir — {tutar}", params: { tutar } }
+          : { metin: "Düzenli ödeme — {tutar}", params: { tutar } },
         "/"
       );
     } catch (err) {
@@ -90,13 +107,26 @@ export class RecurringPaymentsProcessor {
 
   private async sendReminder(payment: RecurringPayment, remainingDays: number): Promise<void> {
     try {
-      const label = payment.type === "income" ? "Tahsilat" : "Ödeme";
-      const when = remainingDays === 1 ? "yarın" : `${remainingDays} gün sonra`;
+      const tahsilat = payment.type === "income";
+      const tutar = formatAmount(payment.amount);
+      const aciklama = payment.description;
       await this.notificationsService.notifyUser(
         payment.ownerId,
         "recurring_payment_reminder",
-        `${label} yaklaşıyor`,
-        `${payment.description ?? "Düzenli " + label.toLowerCase()} — ${formatAmount(payment.amount)}, ${when}`,
+        tahsilat ? "Tahsilat yaklaşıyor" : "Ödeme yaklaşıyor",
+        // "yarın" ile "{n} gün sonra" ayrı anahtarlar: İngilizcede gün sayısı
+        // çoğul eki gerektiriyor ve "tomorrow" hiç sayı içermiyor.
+        aciklama
+          ? remainingDays === 1
+            ? { metin: "{aciklama} — {tutar}, yarın", params: { aciklama, tutar } }
+            : { metin: "{aciklama} — {tutar}, {n} gün sonra", params: { aciklama, tutar, n: remainingDays } }
+          : remainingDays === 1
+          ? tahsilat
+            ? { metin: "Düzenli tahsilat — {tutar}, yarın", params: { tutar } }
+            : { metin: "Düzenli ödeme — {tutar}, yarın", params: { tutar } }
+          : tahsilat
+          ? { metin: "Düzenli tahsilat — {tutar}, {n} gün sonra", params: { tutar, n: remainingDays } }
+          : { metin: "Düzenli ödeme — {tutar}, {n} gün sonra", params: { tutar, n: remainingDays } },
         "/"
       );
     } catch (err) {

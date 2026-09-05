@@ -12,6 +12,7 @@ import {
 } from "../api/aiChat";
 import { IconSparkle } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useT } from "../lib/i18n";
 
 interface UserRow {
   id: string;
@@ -38,6 +39,7 @@ interface MarginReport {
  */
 export default function AiCreditAdminPanel() {
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
 
   const [query, setQuery] = useState("");
@@ -81,7 +83,7 @@ export default function AiCreditAdminPanel() {
         setUserBalances(rows);
         setUserBalancesError(null);
       })
-      .catch((err: any) => setUserBalancesError(err?.message ?? "Kullanıcı listesi yüklenemedi."));
+      .catch((err: any) => setUserBalancesError(err?.message ?? t("Kullanıcı listesi yüklenemedi.")));
   };
 
   useEffect(() => {
@@ -130,9 +132,9 @@ export default function AiCreditAdminPanel() {
     try {
       await aiChat.setModelSetting({ tier, modelKey: modelKey || null });
       loadModelSettings();
-      setModelFeedback({ ok: true, text: "Model güncellendi." });
+      setModelFeedback({ ok: true, text: t("Model güncellendi.") });
     } catch (err: any) {
-      setModelFeedback({ ok: false, text: err?.message ?? "Model kaydedilemedi." });
+      setModelFeedback({ ok: false, text: err?.message ?? t("Model kaydedilemedi.") });
     } finally {
       setModelSaving(null);
     }
@@ -144,9 +146,9 @@ export default function AiCreditAdminPanel() {
     try {
       await aiChat.setModelSetting({ defaultTier: tier });
       loadModelSettings();
-      setModelFeedback({ ok: true, text: "Varsayılan kademe güncellendi." });
+      setModelFeedback({ ok: true, text: t("Varsayılan kademe güncellendi.") });
     } catch (err: any) {
-      setModelFeedback({ ok: false, text: err?.message ?? "Kaydedilemedi." });
+      setModelFeedback({ ok: false, text: err?.message ?? t("Kaydedilemedi.") });
     } finally {
       setModelSaving(null);
     }
@@ -155,7 +157,7 @@ export default function AiCreditAdminPanel() {
   const handleProviderTopUp = async () => {
     const amountUsd = Number(topupAmount);
     if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
-      setTopupFeedback({ ok: false, text: "Geçerli bir tutar gir." });
+      setTopupFeedback({ ok: false, text: t("Geçerli bir tutar gir.") });
       return;
     }
     setTopupSaving(true);
@@ -165,11 +167,14 @@ export default function AiCreditAdminPanel() {
       setProviderBalance(result);
       setTopupFeedback({
         ok: true,
-        text: `$${amountUsd.toFixed(2)} kaydedildi. Kalan bakiye: ${result.remainingCredits.toLocaleString("tr-TR")} kredi karşılığı.`,
+        text: t("${tutar} kaydedildi. Kalan bakiye: {bakiye} kredi karşılığı.", {
+          tutar: amountUsd.toFixed(2),
+          bakiye: result.remainingCredits.toLocaleString("tr-TR"),
+        }),
       });
       setTopupNote("");
     } catch (err: any) {
-      setTopupFeedback({ ok: false, text: err?.message ?? "Kaydedilemedi." });
+      setTopupFeedback({ ok: false, text: err?.message ?? t("Kaydedilemedi.") });
     } finally {
       setTopupSaving(false);
     }
@@ -178,7 +183,7 @@ export default function AiCreditAdminPanel() {
   const handleSetCheckpoint = async () => {
     const amountUsd = Number(checkpointAmount);
     if (!Number.isFinite(amountUsd) || amountUsd < 0) {
-      setCheckpointFeedback({ ok: false, text: "Geçerli bir tutar gir (Console > Cost sayfasındaki toplam)." });
+      setCheckpointFeedback({ ok: false, text: t("Geçerli bir tutar gir (Console > Cost sayfasındaki toplam).") });
       return;
     }
     setCheckpointSaving(true);
@@ -186,10 +191,13 @@ export default function AiCreditAdminPanel() {
     try {
       const result = await aiChat.setProviderCostCheckpoint(amountUsd);
       setProviderBalance(result);
-      setCheckpointFeedback({ ok: true, text: `Referans nokta $${amountUsd.toFixed(2)} olarak kaydedildi.` });
+      setCheckpointFeedback({
+        ok: true,
+        text: t("Referans nokta ${tutar} olarak kaydedildi.", { tutar: amountUsd.toFixed(2) }),
+      });
       setCheckpointAmount("");
     } catch (err: any) {
-      setCheckpointFeedback({ ok: false, text: err?.message ?? "Kaydedilemedi." });
+      setCheckpointFeedback({ ok: false, text: err?.message ?? t("Kaydedilemedi.") });
     } finally {
       setCheckpointSaving(false);
     }
@@ -215,7 +223,7 @@ export default function AiCreditAdminPanel() {
     if (!selected) return;
     const credits = Number(amount);
     if (!Number.isFinite(credits) || credits <= 0) {
-      setFeedback({ ok: false, text: "Geçerli bir kredi miktarı gir." });
+      setFeedback({ ok: false, text: t("Geçerli bir kredi miktarı gir.") });
       return;
     }
     setSaving(true);
@@ -224,14 +232,16 @@ export default function AiCreditAdminPanel() {
       const result = await aiChat.topUp(selected.id, credits, note.trim() || undefined);
       setFeedback({
         ok: true,
-        text: `${selected.fullName} hesabına ${credits.toLocaleString("tr-TR")} kredi yüklendi. Yeni bakiye: ${Math.round(
-          result.balance
-        ).toLocaleString("tr-TR")}.`,
+        text: t("{ad} hesabına {kredi} kredi yüklendi. Yeni bakiye: {bakiye}.", {
+          ad: selected.fullName,
+          kredi: credits.toLocaleString("tr-TR"),
+          bakiye: Math.round(result.balance).toLocaleString("tr-TR"),
+        }),
       });
       setNote("");
       loadUserBalances();
     } catch (err: any) {
-      setFeedback({ ok: false, text: err?.message ?? "Kredi yüklenemedi." });
+      setFeedback({ ok: false, text: err?.message ?? t("Kredi yüklenemedi.") });
     } finally {
       setSaving(false);
     }
@@ -251,7 +261,7 @@ export default function AiCreditAdminPanel() {
         }}
       >
         <IconSparkle size={18} color={c.accent} />
-        AI kredi yönetimi
+        {t("AI kredi yönetimi")}
       </h2>
 
       {/* Marj raporu + Anthropic bakiyesi: masaüstünde yan yana, mobilde alt alta. */}
@@ -274,18 +284,21 @@ export default function AiCreditAdminPanel() {
           }}
         >
           <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 10 }}>
-            Son {margin.days} gün · {margin.requestCount} istek · %
-            {Math.round((margin.commissionRate ?? 0.2) * 100)} komisyon
+            {t("Son {gun} gün · {istek} istek · %{komisyon} komisyon", {
+              gun: margin.days,
+              istek: margin.requestCount,
+              komisyon: Math.round((margin.commissionRate ?? 0.2) * 100),
+            })}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
-            <Metric label="Anthropic maliyeti" value={`$${margin.anthropicCostUsd?.toFixed(2) ?? "0.00"}`} />
-            <Metric label="Kullanıcıya yansıyan" value={`$${margin.userChargedUsd?.toFixed(2) ?? "0.00"}`} />
+            <Metric label={t("Anthropic maliyeti")} value={`$${margin.anthropicCostUsd?.toFixed(2) ?? "0.00"}`} />
+            <Metric label={t("Kullanıcıya yansıyan")} value={`$${margin.userChargedUsd?.toFixed(2) ?? "0.00"}`} />
             <Metric
-              label="Brüt kâr"
+              label={t("Brüt kâr")}
               value={`$${margin.grossProfitUsd?.toFixed(2) ?? "0.00"}`}
               highlight={c.success}
             />
-            <Metric label="Harcanan kredi" value={Math.round(margin.creditsSpent ?? 0).toLocaleString("tr-TR")} />
+            <Metric label={t("Harcanan kredi")} value={Math.round(margin.creditsSpent ?? 0).toLocaleString("tr-TR")} />
           </div>
 
           <div
@@ -299,18 +312,18 @@ export default function AiCreditAdminPanel() {
             }}
           >
             <Metric
-              label="İstek başı maliyet"
+              label={t("İstek başı maliyet")}
               value={`$${(margin.avgCostPerRequestUsd ?? 0).toFixed(4)}`}
             />
             <Metric
-              label="İstek başı kredi"
+              label={t("İstek başı kredi")}
               value={Math.round(margin.avgCreditsPerRequest ?? 0).toLocaleString("tr-TR")}
             />
           </div>
           <p style={{ fontSize: 11.5, color: c.textSecondary, margin: "10px 0 0", lineHeight: 1.5 }}>
-            Bu tutarlar, Anthropic'in her yanıtta bildirdiği gerçek token sayılarından hesaplanır.
-            Doğrulamak için console.anthropic.com'daki kullanım ekranıyla karşılaştırın; ciddi bir
-            fark varsa fiyat tablosu güncellenmelidir.
+            {t(
+              "Bu tutarlar, Anthropic'in her yanıtta bildirdiği gerçek token sayılarından hesaplanır. Doğrulamak için console.anthropic.com'daki kullanım ekranıyla karşılaştırın; ciddi bir fark varsa fiyat tablosu güncellenmelidir."
+            )}
           </p>
         </div>
       )}
@@ -329,54 +342,64 @@ export default function AiCreditAdminPanel() {
             marginBottom: isDesktop ? 0 : 18,
           }}
         >
-          <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 10 }}>Anthropic bakiyesi</div>
+          <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 10 }}>{t("Anthropic bakiyesi")}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 14 }}>
-            <Metric label="Yüklenen (ömür boyu)" value={`$${providerBalance.toppedUpUsd.toFixed(2)}`} />
-            <Metric label="Kullanılan (gerçek maliyet)" value={`$${providerBalance.spentUsd.toFixed(2)}`} />
+            <Metric label={t("Yüklenen (ömür boyu)")} value={`$${providerBalance.toppedUpUsd.toFixed(2)}`} />
+            <Metric label={t("Kullanılan (gerçek maliyet)")} value={`$${providerBalance.spentUsd.toFixed(2)}`} />
             <Metric
-              label="Kalan kredi"
+              label={t("Kalan kredi")}
               value={providerBalance.remainingCredits.toLocaleString("tr-TR")}
               highlight={providerBalance.remainingCredits < 20000 ? c.danger : c.success}
             />
           </div>
           <p style={{ fontSize: 11.5, color: c.textSecondary, margin: "0 0 6px", lineHeight: 1.5 }}>
-            "Kalan kredi", Anthropic'e yüklediğin gerçek bakiyenin ne kadarının kaldığını, aşağıdaki
-            kullanıcı kredisi ile aynı birimde gösterir — kullanıcılara ne kadar kredi dağıtabileceğine
-            karar vermek için buna bak. Anthropic konsolunda bakiye yükledikçe aşağıdan buraya ekle.
+            {t(
+              "\"Kalan kredi\", Anthropic'e yüklediğin gerçek bakiyenin ne kadarının kaldığını, aşağıdaki kullanıcı kredisi ile aynı birimde gösterir — kullanıcılara ne kadar kredi dağıtabileceğine karar vermek için buna bak. Anthropic konsolunda bakiye yükledikçe aşağıdan buraya ekle."
+            )}
           </p>
           <p style={{ fontSize: 11.5, color: c.textSecondary, margin: "0 0 14px", lineHeight: 1.5 }}>
             {providerBalance.spentUsdSource === "manual_checkpoint" ? (
               <>
-                "Kullanılan" rakamı, {providerBalance.lastCheckpoint &&
-                  new Date(providerBalance.lastCheckpoint.createdAt).toLocaleDateString("tr-TR")}{" "}
-                tarihinde Console'dan girdiğin ${providerBalance.lastCheckpoint?.amountUsd.toFixed(2)} referans
-                noktası + o tarihten sonraki kendi tahminimiz. Yeni bir referans noktası girersen bunun
-                üzerine yazılır.
+                {t(
+                  "\"Kullanılan\" rakamı, {tarih} tarihinde Console'dan girdiğin ${tutar} referans noktası + o tarihten sonraki kendi tahminimiz. Yeni bir referans noktası girersen bunun üzerine yazılır.",
+                  {
+                    tarih: providerBalance.lastCheckpoint
+                      ? new Date(providerBalance.lastCheckpoint.createdAt).toLocaleDateString("tr-TR")
+                      : "—",
+                    tutar: providerBalance.lastCheckpoint?.amountUsd.toFixed(2) ?? "0.00",
+                  }
+                )}
               </>
             ) : providerBalance.spentUsdSource === "anthropic_api" ? (
               <>
-                "Kullanılan" rakamı doğrudan Anthropic'in Cost Report API'sinden geliyor (gerçek fatura).
-                Kendi token bazlı tahminimiz: ${providerBalance.internalEstimateUsd.toFixed(2)}.
+                {t(
+                  "\"Kullanılan\" rakamı doğrudan Anthropic'in Cost Report API'sinden geliyor (gerçek fatura). Kendi token bazlı tahminimiz: ${tahmin}.",
+                  { tahmin: providerBalance.internalEstimateUsd.toFixed(2) }
+                )}
               </>
             ) : (
               <>
-                "Kullanılan" rakamı şu an kendi token bazlı tahminimiz (${providerBalance.internalEstimateUsd.toFixed(2)}) —
-                Anthropic'in gerçek verisine bağlanmak için backend/.env'e <code>ANTHROPIC_ADMIN_API_KEY</code> eklenmeli,
-                ya da aşağıdan Console'daki gerçek rakamla elle eşitleyebilirsin.
+                {t(
+                  "\"Kullanılan\" rakamı şu an kendi token bazlı tahminimiz (${tahmin}) — Anthropic'in gerçek verisine bağlanmak için backend/.env'e",
+                  { tahmin: providerBalance.internalEstimateUsd.toFixed(2) }
+                )}{" "}
+                {/* Ortam değişkeni adı çevrilmez; dize olarak yazılıyor ki dil denetimi de metin sanmasın. */}
+                <code>{"ANTHROPIC_ADMIN_API_KEY"}</code>{" "}
+                {t("eklenmeli, ya da aşağıdan Console'daki gerçek rakamla elle eşitleyebilirsin.")}
               </>
             )}
           </p>
 
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 14 }}>
             <div style={{ flex: "1 1 160px" }}>
-              <label style={labelStyle(c)}>Console'daki gerçek "Total cost" ($)</label>
+              <label style={labelStyle(c)}>{t("Console'daki gerçek \"Total cost\" ($)")}</label>
               <input
                 type="number"
                 min={0}
                 step="0.01"
                 value={checkpointAmount}
                 onChange={(e) => setCheckpointAmount(e.target.value)}
-                placeholder="Ör. 0.55"
+                placeholder={t("Ör. 0.55")}
                 style={inputStyle(c)}
               />
             </div>
@@ -396,7 +419,7 @@ export default function AiCreditAdminPanel() {
                 whiteSpace: "nowrap",
               }}
             >
-              {checkpointSaving ? "Kaydediliyor…" : "Bu rakamla eşitle"}
+              {checkpointSaving ? t("Kaydediliyor…") : t("Bu rakamla eşitle")}
             </button>
           </div>
           {checkpointFeedback && (
@@ -414,7 +437,7 @@ export default function AiCreditAdminPanel() {
 
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 120px" }}>
-              <label style={labelStyle(c)}>Yüklenen tutar (USD)</label>
+              <label style={labelStyle(c)}>{t("Yüklenen tutar (USD)")}</label>
               <input
                 type="number"
                 min={0.01}
@@ -425,11 +448,11 @@ export default function AiCreditAdminPanel() {
               />
             </div>
             <div style={{ flex: "2 1 160px" }}>
-              <label style={labelStyle(c)}>Not (opsiyonel)</label>
+              <label style={labelStyle(c)}>{t("Not (opsiyonel)")}</label>
               <input
                 value={topupNote}
                 onChange={(e) => setTopupNote(e.target.value)}
-                placeholder="Ör. Ağustos yüklemesi"
+                placeholder={t("Ör. Ağustos yüklemesi")}
                 style={inputStyle(c)}
               />
             </div>
@@ -449,7 +472,7 @@ export default function AiCreditAdminPanel() {
                 whiteSpace: "nowrap",
               }}
             >
-              {topupSaving ? "Kaydediliyor…" : "Anthropic'e yükledim"}
+              {topupSaving ? t("Kaydediliyor…") : t("Anthropic'e yükledim")}
             </button>
           </div>
           {topupFeedback && (
@@ -484,17 +507,17 @@ export default function AiCreditAdminPanel() {
             marginBottom: 18,
           }}
         >
-          <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 10 }}>AI sağlayıcıları</div>
+          <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 10 }}>{t("AI sağlayıcıları")}</div>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 14 }}>
-            <Metric label="Kullanılan model" value={health.model} />
+            <Metric label={t("Kullanılan model")} value={health.model} />
             <Metric
-              label="Birincil sağlayıcı"
+              label={t("Birincil sağlayıcı")}
               value={health.providers.find((p) => p.id === health.provider)?.label ?? "—"}
             />
             <Metric
-              label="Erişim"
-              value={health.reachable ? "Çalışıyor" : "Ulaşılamıyor"}
+              label={t("Erişim")}
+              value={health.reachable ? t("Çalışıyor") : t("Ulaşılamıyor")}
               highlight={health.reachable ? c.success : c.danger}
             />
           </div>
@@ -504,10 +527,10 @@ export default function AiCreditAdminPanel() {
               // Üç durum var ve ayrımı önemli: etkin (kullanılıyor), anahtarı var
               // ama listede yok (kapalı), anahtarı bile yok (kurulmamış).
               const durum = p.active
-                ? { metin: "Etkin", renk: c.success }
+                ? { metin: t("Etkin"), renk: c.success }
                 : p.configured
-                  ? { metin: "Kapalı", renk: c.textSecondary }
-                  : { metin: "Anahtar yok", renk: c.textSecondary };
+                  ? { metin: t("Kapalı"), renk: c.textSecondary }
+                  : { metin: t("Anahtar yok"), renk: c.textSecondary };
               return (
                 <div
                   key={p.id}
@@ -525,8 +548,8 @@ export default function AiCreditAdminPanel() {
                   <span style={{ fontWeight: 600, fontSize: 14, color: c.textPrimary }}>{p.label}</span>
                   <span style={{ fontSize: 12, color: durum.renk, fontWeight: 600 }}>{durum.metin}</span>
                   <span style={{ fontSize: 12, color: c.textSecondary }}>
-                    {p.models.length} model
-                    {p.active && p.models.some((m) => m.vision) ? " · görsel okuyabilir" : ""}
+                    {t("{n} model", { n: p.models.length })}
+                    {p.active && p.models.some((m) => m.vision) ? t(" · görsel okuyabilir") : ""}
                   </span>
                 </div>
               );
@@ -539,15 +562,15 @@ export default function AiCreditAdminPanel() {
           {modelSettings && (
             <div style={{ marginTop: 18, borderTop: `1px solid ${c.border}`, paddingTop: 16 }}>
               <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 4 }}>
-                Kademe ve model seçimi
+                {t("Kademe ve model seçimi")}
               </div>
               <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 12, lineHeight: 1.5 }}>
-                Bu kararlar tüm kullanıcılar için geçerlidir; kullanıcılar model seçemez.
+                {t("Bu kararlar tüm kullanıcılar için geçerlidir; kullanıcılar model seçemez.")}
               </div>
 
               <div style={{ marginBottom: 14 }}>
                 <label style={{ fontSize: 12, color: c.textSecondary, display: "block", marginBottom: 6 }}>
-                  Herkesin kullandığı kademe
+                  {t("Herkesin kullandığı kademe")}
                 </label>
                 <select
                   value={modelSettings.defaultTier}
@@ -563,16 +586,17 @@ export default function AiCreditAdminPanel() {
                     minWidth: 260,
                   }}
                 >
-                  {modelSettings.tierInfo.map((t) => (
-                    <option key={t.tier} value={t.tier}>
-                      {t.label} — {t.description}
+                  {/* Değişken adı `kademe`: `t` çevirmene ait, gölgelenmemeli. */}
+                  {modelSettings.tierInfo.map((kademe) => (
+                    <option key={kademe.tier} value={kademe.tier}>
+                      {kademe.label} — {kademe.description}
                     </option>
                   ))}
                 </select>
               </div>
 
               {modelSettings.tierInfo.map((info) => {
-                const row = modelSettings.tiers.find((t) => t.tier === info.tier);
+                const row = modelSettings.tiers.find((r) => r.tier === info.tier);
                 const aktifKademe = modelSettings.defaultTier === info.tier;
                 return (
                   <div key={info.tier} style={{ marginBottom: 12 }}>
@@ -584,9 +608,9 @@ export default function AiCreditAdminPanel() {
                         marginBottom: 6,
                       }}
                     >
-                      {info.label} kademesinde çalışacak model
+                      {t("{kademe} kademesinde çalışacak model", { kademe: info.label })}
                       {aktifKademe && (
-                        <span style={{ color: c.success, fontWeight: 600 }}> · şu an kullanılan</span>
+                        <span style={{ color: c.success, fontWeight: 600 }}> {t("· şu an kullanılan")}</span>
                       )}
                     </label>
                     <select
@@ -604,7 +628,7 @@ export default function AiCreditAdminPanel() {
                         maxWidth: "100%",
                       }}
                     >
-                      <option value="">Varsayılan ({info.model})</option>
+                      <option value="">{t("Varsayılan ({model})", { model: info.model })}</option>
                       {modelSettings.available.map((m) => (
                         <option key={m.key} value={m.key}>
                           {m.providerLabel} · {m.label} (${m.price.input}/${m.price.output} · 1M token)
@@ -630,10 +654,11 @@ export default function AiCreditAdminPanel() {
           )}
 
           <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 12, lineHeight: 1.5 }}>
-            Sıra öncelik demektir: birincil sağlayıcı geçici olarak yanıt vermezse (hız
-            sınırı, sunucu hatası, bağlantı) istek sıradakine devredilir ve kredi
-            gerçekten kullanılan modelin fiyatından kesilir. Sağlayıcı açıp kapatmak ya da
-            sırayı değiştirmek için sunucudaki <code>AI_PROVIDERS</code> değişkenini düzenle.
+            {t(
+              "Sıra öncelik demektir: birincil sağlayıcı geçici olarak yanıt vermezse (hız sınırı, sunucu hatası, bağlantı) istek sıradakine devredilir ve kredi gerçekten kullanılan modelin fiyatından kesilir. Sağlayıcı açıp kapatmak ya da sırayı değiştirmek için sunucudaki"
+            )}{" "}
+            {/* Ortam değişkeni adı çevrilmez; bkz. yukarıdaki not. */}
+            <code>{"AI_PROVIDERS"}</code> {t("değişkenini düzenle.")}
           </div>
         </div>
       )}
@@ -664,12 +689,12 @@ export default function AiCreditAdminPanel() {
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 10 }}>
           <div style={{ fontSize: 13, color: c.textSecondary }}>
-            Kullanıcılar {userBalances ? `(${userBalances.length})` : ""}
+            {t("Kullanıcılar")} {userBalances ? `(${userBalances.length})` : ""}
           </div>
           <input
             value={userListFilter}
             onChange={(e) => setUserListFilter(e.target.value)}
-            placeholder="Ada, kullanıcı adına veya e-postaya göre filtrele…"
+            placeholder={t("Ada, kullanıcı adına veya e-postaya göre filtrele…")}
             style={{ ...inputStyle(c), width: "auto", flex: 1, maxWidth: 280, padding: "6px 10px", fontSize: 13 }}
           />
         </div>
@@ -677,7 +702,7 @@ export default function AiCreditAdminPanel() {
         {userBalancesError && <p style={{ fontSize: 13, color: c.danger, margin: 0 }}>{userBalancesError}</p>}
 
         {!userBalancesError && !userBalances && (
-          <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
+          <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
         )}
 
         {!userBalancesError && userBalances && (
@@ -692,10 +717,10 @@ export default function AiCreditAdminPanel() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
               <thead>
                 <tr style={{ background: c.background, position: "sticky", top: 0 }}>
-                  <th style={thStyle(c)}>Kullanıcı</th>
-                  <th style={thStyle(c, "right")}>Bakiye</th>
-                  <th style={thStyle(c, "right")}>Ömür boyu yüklenen</th>
-                  <th style={thStyle(c, "right")}>Ömür boyu harcanan</th>
+                  <th style={thStyle(c)}>{t("Kullanıcı")}</th>
+                  <th style={thStyle(c, "right")}>{t("Bakiye")}</th>
+                  <th style={thStyle(c, "right")}>{t("Ömür boyu yüklenen")}</th>
+                  <th style={thStyle(c, "right")}>{t("Ömür boyu harcanan")}</th>
                   <th style={thStyle(c, "right")}></th>
                 </tr>
               </thead>
@@ -736,7 +761,7 @@ export default function AiCreditAdminPanel() {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        Kredi yükle
+                        {t("Kredi yükle")}
                       </button>
                     </td>
                   </tr>
@@ -744,7 +769,7 @@ export default function AiCreditAdminPanel() {
                 {filteredUserBalances.length === 0 && (
                   <tr>
                     <td colSpan={5} style={{ ...tdStyle(c), textAlign: "center", color: c.textSecondary }}>
-                      Sonuç yok.
+                      {t("Sonuç yok.")}
                     </td>
                   </tr>
                 )}
@@ -756,7 +781,7 @@ export default function AiCreditAdminPanel() {
 
       {/* Kredi yükleme */}
       <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: 16 }}>
-        <label style={labelStyle(c)}>Kullanıcı</label>
+        <label style={labelStyle(c)}>{t("Kullanıcı")}</label>
         {selected ? (
           <div
             style={{
@@ -781,7 +806,7 @@ export default function AiCreditAdminPanel() {
               }}
               style={{ background: "transparent", border: "none", color: c.textSecondary, fontSize: 13, cursor: "pointer" }}
             >
-              Değiştir
+              {t("Değiştir")}
             </button>
           </div>
         ) : (
@@ -789,7 +814,7 @@ export default function AiCreditAdminPanel() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="İsim veya kullanıcı adı ara…"
+              placeholder={t("İsim veya kullanıcı adı ara…")}
               style={{ ...inputStyle(c), marginBottom: results.length ? 0 : 12 }}
             />
             {results.length > 0 && (
@@ -831,7 +856,7 @@ export default function AiCreditAdminPanel() {
           </>
         )}
 
-        <label style={labelStyle(c)}>Kredi miktarı</label>
+        <label style={labelStyle(c)}>{t("Kredi miktarı")}</label>
         <input
           type="number"
           min={1}
@@ -840,14 +865,14 @@ export default function AiCreditAdminPanel() {
           style={{ ...inputStyle(c), marginBottom: 4 }}
         />
         <p style={{ fontSize: 12, color: c.textSecondary, margin: "0 0 12px" }}>
-          10.000 kredi ≈ 1 USD satış bedeli (%20 komisyon dahil) ≈ 70 asistan işlemi.
+          {t("10.000 kredi ≈ 1 USD satış bedeli (%20 komisyon dahil) ≈ 70 asistan işlemi.")}
         </p>
 
-        <label style={labelStyle(c)}>Açıklama (opsiyonel)</label>
+        <label style={labelStyle(c)}>{t("Açıklama (opsiyonel)")}</label>
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Ör. Ocak ayı paketi"
+          placeholder={t("Ör. Ocak ayı paketi")}
           style={{ ...inputStyle(c), marginBottom: 14 }}
         />
 
@@ -867,7 +892,7 @@ export default function AiCreditAdminPanel() {
             opacity: !selected || saving ? 0.55 : 1,
           }}
         >
-          {saving ? "Yükleniyor…" : "Kredi yükle"}
+          {saving ? t("Yükleniyor…") : t("Kredi yükle")}
         </button>
 
         {feedback && (

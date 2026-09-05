@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import { aiChat } from "../api/aiChat";
 import type { AiCreditOrder, AiCreditPackage } from "../api/aiChat";
+import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconSparkle, IconCheck } from "./icons";
 
+// Modül düzeyinde kanca çağrılamaz: Türkçe metin ANAHTAR olarak duruyor,
+// çeviri kullanıldığı yerde (t(STATUS_LABEL[...])) yapılıyor.
 const STATUS_LABEL: Record<AiCreditOrder["status"], string> = {
-  pending_payment: "Ödeme bekleniyor",
-  paid: "Ödendi",
-  cancelled: "İptal edildi",
-  failed: "Ödeme başarısız",
+  pending_payment: "Ödeme bekleniyor", // dil:anahtar
+  paid: "Ödendi", // dil:anahtar
+  cancelled: "İptal edildi", // dil:anahtar
+  failed: "Ödeme başarısız", // dil:anahtar
 };
 
 function formatTry(amount: number): string {
@@ -33,6 +36,7 @@ interface Props {
  */
 export default function AiCreditTopUp({ onChanged }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [packages, setPackages] = useState<AiCreditPackage[]>([]);
   const [paymentConfigured, setPaymentConfigured] = useState(false);
   const [orders, setOrders] = useState<AiCreditOrder[]>([]);
@@ -50,7 +54,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
         setPaymentConfigured(pkgs.paymentConfigured);
         setOrders(ords);
       })
-      .catch(() => setError("Kredi paketleri yüklenemedi. Sayfayı yenilemeyi dene."))
+      .catch(() => setError(t("Kredi paketleri yüklenemedi. Sayfayı yenilemeyi dene.")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -69,7 +73,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
       await reloadOrders();
       onChanged?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sipariş oluşturulamadı.");
+      setError(err instanceof Error ? err.message : t("Sipariş oluşturulamadı."));
     } finally {
       setBusy(false);
     }
@@ -80,7 +84,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
       await aiChat.cancelCreditOrder(id);
       await reloadOrders();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sipariş iptal edilemedi.");
+      setError(err instanceof Error ? err.message : t("Sipariş iptal edilemedi."));
     }
   };
 
@@ -88,10 +92,10 @@ export default function AiCreditTopUp({ onChanged }: Props) {
 
   return (
     <section style={{ maxWidth: 480, marginBottom: 22 }}>
-      <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 10px" }}>Kredi yükle</h2>
+      <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 10px" }}>{t("Kredi yükle")}</h2>
 
       {loading ? (
-        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
       ) : (
         <>
           <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
@@ -115,7 +119,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
                   <IconSparkle size={17} color={active ? c.accentDark : c.accent} />
                   <span style={{ flex: 1 }}>
                     <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: c.textPrimary }}>
-                      {p.label} — {p.credits.toLocaleString("tr-TR")} kredi
+                      {p.label} — {t("{n} kredi", { n: p.credits.toLocaleString("tr-TR") })}
                     </span>
                     <span style={{ display: "block", fontSize: 13, color: c.textSecondary }}>{p.description}</span>
                   </span>
@@ -141,8 +145,9 @@ export default function AiCreditTopUp({ onChanged }: Props) {
                 lineHeight: 1.5,
               }}
             >
-              Çevrim içi ödeme henüz açık değil. Siparişi oluşturduğunda ödeme talimatları için seninle iletişime
-              geçilir; ödeme onaylandıktan sonra kredilerin hesabına yüklenir.
+              {t(
+                "Çevrim içi ödeme henüz açık değil. Siparişi oluşturduğunda ödeme talimatları için seninle iletişime geçilir; ödeme onaylandıktan sonra kredilerin hesabına yüklenir."
+              )}
             </p>
           )}
 
@@ -162,13 +167,13 @@ export default function AiCreditTopUp({ onChanged }: Props) {
               fontWeight: 500,
             }}
           >
-            {busy ? "Oluşturuluyor…" : paymentConfigured ? "Ödemeye geç" : "Sipariş oluştur"}
+            {busy ? t("Oluşturuluyor…") : paymentConfigured ? t("Ödemeye geç") : t("Sipariş oluştur")}
           </button>
 
           {openOrders.length > 0 && (
             <div style={{ marginTop: 16 }}>
               <h3 style={{ fontSize: 14, fontWeight: 500, color: c.textSecondary, margin: "0 0 8px" }}>
-                Bekleyen siparişlerin
+                {t("Bekleyen siparişlerin")}
               </h3>
               <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, overflow: "hidden", background: c.surface }}>
                 {openOrders.map((o, i) => (
@@ -184,10 +189,10 @@ export default function AiCreditTopUp({ onChanged }: Props) {
                     }}
                   >
                     <span style={{ flex: 1, color: c.textPrimary }}>
-                      {o.credits.toLocaleString("tr-TR")} kredi
+                      {t("{n} kredi", { n: o.credits.toLocaleString("tr-TR") })}
                       <span style={{ color: c.textSecondary }}> · {formatTry(o.priceAmount)}</span>
                       <span style={{ display: "block", fontSize: 12.5, color: c.textSecondary }}>
-                        {STATUS_LABEL[o.status]} · {new Date(o.createdAt).toLocaleDateString("tr-TR")}
+                        {t(STATUS_LABEL[o.status])} · {new Date(o.createdAt).toLocaleDateString("tr-TR")}
                       </span>
                     </span>
                     <button
@@ -201,7 +206,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
                         fontSize: 13,
                       }}
                     >
-                      İptal
+                      {t("İptal")}
                     </button>
                   </div>
                 ))}
@@ -214,7 +219,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
           {orders.some((o) => o.status === "paid" && o.creditedAt) && (
             <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: c.textSecondary, marginTop: 12 }}>
               <IconCheck size={13} color={c.success} />
-              Tamamlanan yüklemelerin aşağıdaki hareketler listesinde.
+              {t("Tamamlanan yüklemelerin aşağıdaki hareketler listesinde.")}
             </p>
           )}
         </>

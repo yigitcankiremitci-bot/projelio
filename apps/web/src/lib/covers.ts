@@ -43,61 +43,61 @@ const PRESET_PREFIX = "preset:";
 export const COVER_PRESETS: CoverPreset[] = [
   {
     key: "arduvaz",
-    name: "Arduvaz",
+    name: "Arduvaz", // dil:anahtar
     background: "linear-gradient(135deg, #4A5567 0%, #1C222C 100%)",
     darkest: "#1C222C",
   },
   {
     key: "bronz",
-    name: "Bronz",
+    name: "Bronz", // dil:anahtar
     background: "linear-gradient(135deg, #D2A063 0%, #8C5A28 100%)",
     darkest: "#8C5A28",
   },
   {
     key: "safak",
-    name: "Şafak",
+    name: "Şafak", // dil:anahtar
     background: "linear-gradient(135deg, #F6E0BC 0%, #C0813F 100%)",
     darkest: "#C0813F",
   },
   {
     key: "sis",
-    name: "Sis",
+    name: "Sis", // dil:anahtar
     background: "linear-gradient(135deg, #EEF1F6 0%, #B9C4D3 100%)",
     darkest: "#B9C4D3",
   },
   {
     key: "okyanus",
-    name: "Okyanus",
+    name: "Okyanus", // dil:anahtar
     background: "linear-gradient(135deg, #3C6D88 0%, #16323F 100%)",
     darkest: "#16323F",
   },
   {
     key: "orman",
-    name: "Orman",
+    name: "Orman", // dil:anahtar
     background: "linear-gradient(135deg, #4B8163 0%, #1E3A2C 100%)",
     darkest: "#1E3A2C",
   },
   {
     key: "kiremit",
-    name: "Kiremit",
+    name: "Kiremit", // dil:anahtar
     background: "linear-gradient(135deg, #B06A55 0%, #5B2C24 100%)",
     darkest: "#5B2C24",
   },
   {
     key: "mor",
-    name: "Mor",
+    name: "Mor", // dil:anahtar
     background: "linear-gradient(135deg, #6F5D93 0%, #2C2440 100%)",
     darkest: "#2C2440",
   },
   {
     key: "kum",
-    name: "Kum",
+    name: "Kum", // dil:anahtar
     background: "linear-gradient(135deg, #F4EADA 0%, #C9B189 100%)",
     darkest: "#C9B189",
   },
   {
     key: "dalga",
-    name: "Dalga",
+    name: "Dalga", // dil:anahtar
     background:
       "radial-gradient(120% 85% at 8% 100%, rgba(192,129,63,0.60) 0%, rgba(192,129,63,0) 62%), " +
       "radial-gradient(100% 70% at 92% 0%, rgba(133,147,168,0.55) 0%, rgba(133,147,168,0) 58%), " +
@@ -106,7 +106,7 @@ export const COVER_PRESETS: CoverPreset[] = [
   },
   {
     key: "izgara",
-    name: "Izgara",
+    name: "Izgara", // dil:anahtar
     background:
       "repeating-linear-gradient(0deg, rgba(255,255,255,0.22) 0 1px, rgba(255,255,255,0) 1px 26px), " +
       "repeating-linear-gradient(90deg, rgba(255,255,255,0.22) 0 1px, rgba(255,255,255,0) 1px 26px), " +
@@ -115,7 +115,7 @@ export const COVER_PRESETS: CoverPreset[] = [
   },
   {
     key: "benek",
-    name: "Benek",
+    name: "Benek", // dil:anahtar
     background:
       "radial-gradient(rgba(255,255,255,0.26) 1.5px, rgba(255,255,255,0) 1.6px) 0 0/18px 18px, " +
       "linear-gradient(135deg, #55617A 0%, #2A3241 100%)",
@@ -129,7 +129,7 @@ export const COVER_PRESETS: CoverPreset[] = [
  */
 export const DEFAULT_COVER: CoverPreset = {
   key: "__default",
-  name: "Varsayılan",
+  name: "Varsayılan", // dil:anahtar
   background: "linear-gradient(135deg, #E7EBF1 0%, #C6CFDC 55%, #AEB9CA 100%)",
   darkest: "#AEB9CA",
 };

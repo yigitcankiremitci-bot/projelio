@@ -108,7 +108,7 @@ export class PostCommentsService {
             organizationId: post.organization_id ?? undefined,
           });
           const actorName = members.find((m) => m.userId === userId)?.fullName ?? "Bir ekip üyesi";
-          await this.notificationsService.notifyUser(comment.user_id, "comment_like", "Yorumun beğenildi", `${actorName} yorumunu beğendi.`, link);
+          await this.notificationsService.notifyUser(comment.user_id, "comment_like", "Yorumun beğenildi", { metin: "{kisi} yorumunu beğendi.", params: { kisi: actorName } }, link);
         }
       }
     }
@@ -143,7 +143,7 @@ export class PostCommentsService {
         post.user_id,
         "post_comment",
         "Paylaşımına yorum yapıldı",
-        `${actorName} paylaşımına yorum yaptı: "${body.slice(0, 80)}"`,
+        { metin: '{kisi} paylaşımına yorum yaptı: "{alinti}"', params: { kisi: actorName, alinti: body.slice(0, 80) } },
         link
       );
     }
@@ -154,7 +154,7 @@ export class PostCommentsService {
       (m) => m.username && handles.includes(m.username.toLowerCase()) && m.userId !== actingUserId
     );
     for (const m of mentioned) {
-      await this.notificationsService.notifyUser(m.userId, "post_mention", "Bir yorumda etiketlendin", `${actorName} seni bir yorumda etiketledi.`, link);
+      await this.notificationsService.notifyUser(m.userId, "post_mention", "Bir yorumda etiketlendin", { metin: "{kisi} seni bir yorumda etiketledi.", params: { kisi: actorName } }, link);
     }
   }
 }

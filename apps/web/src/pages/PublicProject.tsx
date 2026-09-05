@@ -6,6 +6,7 @@ import { parseServerDate } from "../lib/dates";
 import { PROJECT_STATUS_LABELS, PROJECT_STATUS_STYLE } from "../lib/projectStatus";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useT } from "../lib/i18n";
 
 /**
  * Paylaşım linkinin açtığı sayfa — ÜYELİK GEREKTİRMEZ.
@@ -30,6 +31,7 @@ const YENILEME_MS = 15_000;
 export default function PublicProject() {
   const { token } = useParams();
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
   const [view, setView] = useState<PublicProjectView | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "gate" | "gone" | "error">("loading");
@@ -119,7 +121,7 @@ export default function PublicProject() {
       apply(res);
     } catch (err) {
       // Tek beklenen hata deneme sınırı (bkz. ShareUnlockRateLimitGuard).
-      setGateError(err instanceof Error ? err.message : "Bağlantı kurulamadı.");
+      setGateError(err instanceof Error ? err.message : t("Bağlantı kurulamadı."));
     } finally {
       setUnlocking(false);
     }
@@ -138,8 +140,9 @@ export default function PublicProject() {
         }}
       >
         <img src="/logo.png" alt="Projelio" style={{ width: 32, height: 32 }} />
+        {/* dil:atla — marka adı hiçbir dilde çevrilmez */}
         <span style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary }}>Projelio</span>
-        <span style={{ marginLeft: "auto", fontSize: 12, color: c.textSecondary }}>Proje takip sayfası</span>
+        <span style={{ marginLeft: "auto", fontSize: 12, color: c.textSecondary }}>{t("Proje takip sayfası")}</span>
       </header>
       <main style={{ maxWidth: 880, margin: "0 auto", padding: isDesktop ? "28px 24px 64px" : "18px 16px 48px" }}>
         {children}
@@ -148,7 +151,7 @@ export default function PublicProject() {
   );
 
   if (state === "loading") {
-    return shell(<p style={{ color: c.textSecondary, fontSize: 14 }}>Yükleniyor…</p>);
+    return shell(<p style={{ color: c.textSecondary, fontSize: 14 }}>{t("Yükleniyor…")}</p>);
   }
 
   // ---------------------------------------------------------- E-posta kapısı
@@ -166,16 +169,16 @@ export default function PublicProject() {
           margin: "0 auto",
         }}
       >
-        <h1 style={{ fontSize: 20, color: c.textPrimary, margin: 0 }}>Bu bağlantı size özel</h1>
+        <h1 style={{ fontSize: 20, color: c.textPrimary, margin: 0 }}>{t("Bu bağlantı size özel")}</h1>
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, lineHeight: 1.6 }}>
-          Devam etmek için bağlantının gönderildiği e-posta adresini yazın.
+          {t("Devam etmek için bağlantının gönderildiği e-posta adresini yazın.")}
         </p>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !unlocking && submitEmail()}
-          placeholder="ornek@firma.com"
+          placeholder={t("ornek@firma.com")}
           autoComplete="email"
           autoFocus
           style={{
@@ -190,7 +193,7 @@ export default function PublicProject() {
         />
         {rejected && (
           <span style={{ fontSize: 13, color: c.danger }}>
-            Bu adres bu bağlantıya tanımlı değil. Bağlantıyı paylaşan kişiden doğru adresi teyit edebilirsiniz.
+            {t("Bu adres bu bağlantıya tanımlı değil. Bağlantıyı paylaşan kişiden doğru adresi teyit edebilirsiniz.")}
           </span>
         )}
         {gateError && <span style={{ fontSize: 13, color: c.danger }}>{gateError}</span>}
@@ -209,10 +212,10 @@ export default function PublicProject() {
             opacity: unlocking || !email.trim() ? 0.6 : 1,
           }}
         >
-          {unlocking ? "Kontrol ediliyor…" : "Devam et"}
+          {unlocking ? t("Kontrol ediliyor…") : t("Devam et")}
         </button>
         <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.6 }}>
-          Adresiniz yalnızca bu bağlantıyı açmak için kullanılır; kaydedilmez ve size e-posta gönderilmez.
+          {t("Adresiniz yalnızca bu bağlantıyı açmak için kullanılır; kaydedilmez ve size e-posta gönderilmez.")}
         </span>
       </div>
     );
@@ -221,9 +224,9 @@ export default function PublicProject() {
   if (state === "error") {
     return shell(
       <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 40, textAlign: "center" }}>
-        <h1 style={{ fontSize: 20, color: c.textPrimary, margin: 0 }}>Sayfa açılamadı</h1>
+        <h1 style={{ fontSize: 20, color: c.textPrimary, margin: 0 }}>{t("Sayfa açılamadı")}</h1>
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-          Bağlantı kurulamadı. Sayfayı yenilemeyi dene.
+          {t("Bağlantı kurulamadı. Sayfayı yenilemeyi dene.")}
         </p>
       </div>
     );
@@ -249,9 +252,9 @@ export default function PublicProject() {
           textAlign: "center",
         }}
       >
-        <h1 style={{ fontSize: 20, color: c.textPrimary, margin: 0 }}>Bu bağlantı artık aktif değil</h1>
+        <h1 style={{ fontSize: 20, color: c.textPrimary, margin: 0 }}>{t("Bu bağlantı artık aktif değil")}</h1>
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, lineHeight: 1.6 }}>
-          Takip penceresi kapanmış. Projeyi paylaşan kişiden yeni bir bağlantı isteyebilirsiniz.
+          {t("Takip penceresi kapanmış. Projeyi paylaşan kişiden yeni bir bağlantı isteyebilirsiniz.")}
         </p>
 
         <div
@@ -268,12 +271,12 @@ export default function PublicProject() {
           }}
         >
           <span style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary }}>
-            Projelerinizi de böyle paylaşın
+            {t("Projelerinizi de böyle paylaşın")}
           </span>
           <span style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.7 }}>
-            Projelio, ekiplerin işlerini tek yerden yürüttüğü bir çalışma alanı. Müşterinize
-            durum raporu hazırlamak yerine, göstermek istediğiniz kadarını gösteren bir bağlantı
-            paylaşırsınız — karşı tarafın hesap açmasına gerek kalmadan.
+            {t(
+              "Projelio, ekiplerin işlerini tek yerden yürüttüğü bir çalışma alanı. Müşterinize durum raporu hazırlamak yerine, göstermek istediğiniz kadarını gösteren bir bağlantı paylaşırsınız — karşı tarafın hesap açmasına gerek kalmadan."
+            )}
           </span>
           <ul
             style={{
@@ -284,9 +287,9 @@ export default function PublicProject() {
               lineHeight: 1.9,
             }}
           >
-            <li>Görev, çıktı, bütçe ve dosyalar tek panoda</li>
-            <li>Hangi bölümün paylaşılacağına bağlantı başına siz karar verirsiniz</li>
-            <li>Proje bitince bağlantı kendiliğinden kapanır</li>
+            <li>{t("Görev, çıktı, bütçe ve dosyalar tek panoda")}</li>
+            <li>{t("Hangi bölümün paylaşılacağına bağlantı başına siz karar verirsiniz")}</li>
+            <li>{t("Proje bitince bağlantı kendiliğinden kapanır")}</li>
           </ul>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
             <Link
@@ -300,7 +303,7 @@ export default function PublicProject() {
                 textDecoration: "none",
               }}
             >
-              Ücretsiz deneyin
+              {t("Ücretsiz deneyin")}
             </Link>
             <a
               href="https://projelio.app"
@@ -315,7 +318,7 @@ export default function PublicProject() {
                 textDecoration: "none",
               }}
             >
-              Projelio nedir?
+              {t("Projelio nedir?")}
             </a>
           </div>
         </div>
@@ -362,7 +365,7 @@ export default function PublicProject() {
               color: statusStyle.text,
             }}
           >
-            {PROJECT_STATUS_LABELS[v.status]}
+            {t(PROJECT_STATUS_LABELS[v.status])}
           </span>
         </div>
 
@@ -371,21 +374,21 @@ export default function PublicProject() {
         )}
 
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 13, color: c.textSecondary }}>
-          <span>Başlangıç: {new Date(v.startDate).toLocaleDateString("tr-TR")}</span>
-          <span>Bitiş: {new Date(v.deadline).toLocaleDateString("tr-TR")}</span>
-          {v.ownerName && <span>Sorumlu: {v.ownerName}</span>}
+          <span>{t("Başlangıç: {tarih}", { tarih: new Date(v.startDate).toLocaleDateString("tr-TR") })}</span>
+          <span>{t("Bitiş: {tarih}", { tarih: new Date(v.deadline).toLocaleDateString("tr-TR") })}</span>
+          {v.ownerName && <span>{t("Sorumlu: {kisi}", { kisi: v.ownerName })}</span>}
         </div>
 
         <ProgressBar view={v} />
       </section>
 
       {v.budget && (
-        <Card title="Bütçe">
+        <Card title={t("Bütçe")}>
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            <Figure label="Toplam" value={`${v.budget.total.toLocaleString("tr-TR")} ₺`} />
-            <Figure label="Harcanan" value={`${v.budget.spent.toLocaleString("tr-TR")} ₺`} />
+            <Figure label={t("Toplam")} value={`${v.budget.total.toLocaleString("tr-TR")} ₺`} />
+            <Figure label={t("Harcanan")} value={`${v.budget.spent.toLocaleString("tr-TR")} ₺`} />
             <Figure
-              label="Kalan"
+              label={t("Kalan")}
               value={`${Math.max(0, v.budget.total - v.budget.spent).toLocaleString("tr-TR")} ₺`}
             />
           </div>
@@ -393,9 +396,9 @@ export default function PublicProject() {
       )}
 
       {v.outputs && (
-        <Card title={`Çıktılar (${v.outputs.length})`}>
+        <Card title={t("Çıktılar ({n})", { n: v.outputs.length })}>
           {v.outputs.length === 0 ? (
-            <Empty>Henüz çıktı eklenmemiş.</Empty>
+            <Empty>{t("Henüz çıktı eklenmemiş.")}</Empty>
           ) : (
             <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 }}>
               {v.outputs.map((o) => (
@@ -412,9 +415,9 @@ export default function PublicProject() {
       )}
 
       {v.tasks && (
-        <Card title={`Görevler (${v.tasks.length})`}>
+        <Card title={t("Görevler ({n})", { n: v.tasks.length })}>
           {v.tasks.length === 0 ? (
-            <Empty>Henüz görev eklenmemiş.</Empty>
+            <Empty>{t("Henüz görev eklenmemiş.")}</Empty>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {v.tasks.map((t) => (
@@ -459,9 +462,9 @@ export default function PublicProject() {
       )}
 
       {v.team && (
-        <Card title={`Ekip (${v.team.length})`}>
+        <Card title={t("Ekip ({n})", { n: v.team.length })}>
           {v.team.length === 0 ? (
-            <Empty>Ekip bilgisi yok.</Empty>
+            <Empty>{t("Ekip bilgisi yok.")}</Empty>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {v.team.map((m, i) => (
@@ -476,9 +479,9 @@ export default function PublicProject() {
       )}
 
       {v.feed && (
-        <Card title="Proje akışı">
+        <Card title={t("Proje akışı")}>
           {v.feed.length === 0 ? (
-            <Empty>Henüz paylaşım yok.</Empty>
+            <Empty>{t("Henüz paylaşım yok.")}</Empty>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {v.feed.map((p) => (
@@ -497,16 +500,16 @@ export default function PublicProject() {
       )}
 
       {v.files && (
-        <Card title={`Dosyalar (${v.files.length})`}>
+        <Card title={t("Dosyalar ({n})", { n: v.files.length })}>
           {v.files.length === 0 ? (
-            <Empty>Dosya yok.</Empty>
+            <Empty>{t("Dosya yok.")}</Empty>
           ) : (
             <>
               {/* Dosyalar indirilemez: liste bilerek yalnızca isim taşıyor
                   (bkz. ProjectSharesService.fetchFiles). Ziyaretçi "tıklayamıyorum"
                   diye düşünmesin diye sebebini yazıyoruz. */}
               <p style={{ fontSize: 12, color: c.textSecondary, margin: "0 0 8px" }}>
-                Yalnızca dosya adları paylaşılıyor; dosyalar bu sayfadan indirilemez.
+                {t("Yalnızca dosya adları paylaşılıyor; dosyalar bu sayfadan indirilemez.")}
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {v.files.map((f) => (
@@ -540,10 +543,11 @@ export default function PublicProject() {
       >
         <img src="/logo.png" alt="" style={{ width: 28, height: 28, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-          <span style={{ fontSize: 13, color: c.textPrimary }}>Bu sayfa Projelio ile hazırlandı</span>
+          <span style={{ fontSize: 13, color: c.textPrimary }}>{t("Bu sayfa Projelio ile hazırlandı")}</span>
           <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.6 }}>
-            Ekipler projelerini Projelio'da yürütür, müşterisine durum raporu yazmak yerine
-            böyle canlı bir bağlantı paylaşır — karşı tarafın hesap açmasına gerek kalmadan.
+            {t(
+              "Ekipler projelerini Projelio'da yürütür, müşterisine durum raporu yazmak yerine böyle canlı bir bağlantı paylaşır — karşı tarafın hesap açmasına gerek kalmadan."
+            )}
           </span>
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -561,7 +565,7 @@ export default function PublicProject() {
               whiteSpace: "nowrap",
             }}
           >
-            Projelio nedir?
+            {t("Projelio nedir?")}
           </a>
           <Link
             to="/register"
@@ -575,13 +579,13 @@ export default function PublicProject() {
               whiteSpace: "nowrap",
             }}
           >
-            Ücretsiz deneyin
+            {t("Ücretsiz deneyin")}
           </Link>
         </div>
       </section>
 
       <footer style={{ fontSize: 12, color: c.textSecondary, textAlign: "center", paddingTop: 4 }}>
-        Bu sayfa salt okunurdur ve proje sorumlusunun paylaştığı bölümleri gösterir.
+        {t("Bu sayfa salt okunurdur ve proje sorumlusunun paylaştığı bölümleri gösterir.")}
       </footer>
     </div>
   );
@@ -597,10 +601,11 @@ export default function PublicProject() {
  */
 function LiveBadge({ refreshedAt }: { refreshedAt: Date | null }) {
   const c = useThemeColors();
+  const t = useT();
   if (!refreshedAt) return null;
   return (
     <span
-      title="Bu sayfa açık kaldığı sürece kendini günceller; yenilemeniz gerekmez."
+      title={t("Bu sayfa açık kaldığı sürece kendini günceller; yenilemeniz gerekmez.")}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -618,7 +623,7 @@ function LiveBadge({ refreshedAt }: { refreshedAt: Date | null }) {
           display: "inline-block",
         }}
       />
-      Canlı · {refreshedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+      {t("Canlı · {saat}", { saat: refreshedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) })}
     </span>
   );
 }
@@ -626,11 +631,12 @@ function LiveBadge({ refreshedAt }: { refreshedAt: Date | null }) {
 /** İlerleme: yüzde + durum kırılımı. Görev yoksa çubuk hiç çizilmez. */
 function ProgressBar({ view }: { view: PublicProjectView }) {
   const c = useThemeColors();
+  const t = useT();
   const counts = view.taskCounts;
   if (!counts || counts.total === 0) {
     return (
       <div style={{ fontSize: 13, color: c.textSecondary }}>
-        Görev eklendiğinde ilerleme burada görünecek.
+        {t("Görev eklendiğinde ilerleme burada görünecek.")}
       </div>
     );
   }
@@ -640,14 +646,14 @@ function ProgressBar({ view }: { view: PublicProjectView }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <span style={{ fontSize: 24, fontWeight: 600, color: c.textPrimary }}>%{percent}</span>
         <span style={{ fontSize: 13, color: c.textSecondary }}>
-          {counts.completed}/{counts.total} görev tamamlandı
+          {t("{done}/{total} görev tamamlandı", { done: counts.completed, total: counts.total })}
         </span>
       </div>
       <div style={{ height: 10, borderRadius: 999, background: c.border, overflow: "hidden" }}>
         <div style={{ width: `${percent}%`, height: "100%", background: c.accent }} />
       </div>
       <div style={{ fontSize: 12, color: c.textSecondary }}>
-        {counts.inProgress} devam ediyor · {counts.todo} bekliyor
+        {t("{devam} devam ediyor · {bekleyen} bekliyor", { devam: counts.inProgress, bekleyen: counts.todo })}
       </div>
     </div>
   );

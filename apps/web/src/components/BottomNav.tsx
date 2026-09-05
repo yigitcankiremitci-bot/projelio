@@ -15,10 +15,13 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { tourAnchor } from "../lib/tour/types";
 import { SIDEBAR_WIDTH, Z, BOTTOM_NAV_HEIGHT } from "../lib/layout";
 import { useHomeTarget } from "../lib/homeTarget";
+import { useT } from "../lib/i18n";
 
+// Etiketler modül düzeyinde duruyor, yani burada t() çağrılamaz; Türkçe metin
+// ANAHTAR olarak kalıyor ve çeviri kullanıldığı yerde yapılıyor (aşağıda).
 const rightItems = [
-  { to: "/tasks", label: "Yapılacaklar", icon: IconListCheck },
-  { to: "/settings", label: "Ayarlar", icon: IconSettings },
+  { to: "/tasks", label: "Yapılacaklar", icon: IconListCheck }, // dil:anahtar
+  { to: "/settings", label: "Ayarlar", icon: IconSettings }, // dil:anahtar
 ];
 
 type ModalKind = "job" | "project" | "operation" | "task" | "organization" | "group" | "organization-in-group";
@@ -37,6 +40,7 @@ interface Props {
 
 export default function BottomNav({ sidebarOpen }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const location = useLocation();
   const isDesktop = useIsDesktop();
   const [modal, setModal] = useState<ModalKind | null>(null);
@@ -83,7 +87,7 @@ export default function BottomNav({ sidebarOpen }: Props) {
   let createAction: "job" | "job-choice" | "home-choice" | "custom" | ModalKind | null = null;
   let jobId: string | null = null;
   let groupIdForOrg: string | null = null;
-  let fabLabel = "Oluştur";
+  let fabLabel = t("Oluştur");
 
   // Bir sayfa kendi eylemini kaydettiyse (useProjectFabAction) her zaman o kazanır.
   // Eskiden bu yalnızca iş/proje/rutin/organizasyon/departman detaylarında
@@ -97,7 +101,7 @@ export default function BottomNav({ sidebarOpen }: Props) {
   } else if (jobMatch) {
     createAction = "job-choice";
     jobId = jobMatch[1];
-    fabLabel = "Proje, rutin veya görev ekle";
+    fabLabel = t("Proje, rutin veya görev ekle");
   } else if (location.pathname === "/organizations") {
     createAction = "organization";
     fabLabel = "Yeni organizasyon";
@@ -125,7 +129,7 @@ export default function BottomNav({ sidebarOpen }: Props) {
     // göremeyen hesaplarda (çalışan/taşeron) "+" eskisi gibi doğrudan iş açar,
     // araya gereksiz bir menü girmez.
     createAction = canFoundOrg ? "home-choice" : "job";
-    fabLabel = canFoundOrg ? "İş, şirket veya işletme ekle" : "Yeni iş";
+    fabLabel = canFoundOrg ? t("İş, şirket veya işletme ekle") : t("Yeni iş");
   } else {
     // Kalan sayfalarda (Ayarlar, Arşiv, Lio kredisi, yönetim paneli…) eklenecek
     // bir şey yok. Eskiden buraya da "Yeni iş" düşüyordu: kullanıcı Ayarlar'da
@@ -187,16 +191,16 @@ export default function BottomNav({ sidebarOpen }: Props) {
   // özel bir fabAction birden fazla seçenek kaydettiyse (bkz. options) onlar kullanılır.
   const choiceMenuItems: { label: string; icon: typeof IconFolder; onClick: () => void }[] = createAction === "home-choice"
     ? [
-        { label: "Yeni iş", icon: IconFolder, onClick: () => setModal("job") },
-        { label: "Şirket kur", icon: IconBuilding, onClick: () => openOrgModal("sirket") },
-        { label: "İşletme aç", icon: IconBuilding, onClick: () => openOrgModal("isletme") },
+        { label: t("Yeni iş"), icon: IconFolder, onClick: () => setModal("job") },
+        { label: t("Şirket kur"), icon: IconBuilding, onClick: () => openOrgModal("sirket") },
+        { label: t("İşletme aç"), icon: IconBuilding, onClick: () => openOrgModal("isletme") },
       ]
     : jobId
     ? [
         { label: "Yeni proje", icon: IconFolder, onClick: () => setModal("project") },
         // Rutin: süresi olmayan, tekrarlayan işlerden oluşan çalışma (kodda "operation").
         { label: "Yeni rutin", icon: IconActivity, onClick: () => setModal("operation") },
-        { label: "Yeni görev", icon: IconListCheck, onClick: () => setModal("task") },
+        { label: t("Yeni görev"), icon: IconListCheck, onClick: () => setModal("task") },
       ]
     : hasCustomOptions
     ? fabAction!.options!.map((opt) => ({ label: opt.label, icon: IconPlus, onClick: opt.onClick }))
@@ -344,7 +348,7 @@ export default function BottomNav({ sidebarOpen }: Props) {
                   maxWidth: "100%",
                 }}
               >
-                {item.label}
+                {t(item.label)}
               </span>
             </Link>
           );

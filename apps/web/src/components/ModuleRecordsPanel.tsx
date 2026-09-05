@@ -14,6 +14,7 @@ import TaskFromRecordModal from "./TaskFromRecordModal";
 import ModuleFieldInput from "./ModuleFieldInput";
 import { IconEdit, IconListCheck, IconTrash } from "./icons";
 import { useDragScroll } from "../lib/useDragScroll";
+import { useT } from "../lib/i18n";
 
 // Kayıtların sahibi iki türlü olabilir (bkz. 037_freelancer_modules.sql):
 // bir organizasyon (şirket/işletme departman modülleri) ya da bir iş (serbest
@@ -94,6 +95,7 @@ export default function ModuleRecordsPanel({
   canWrite = true,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const sutunScrollRef = useDragScroll<HTMLDivElement>();
   const [records, setRecords] = useState<ModuleRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -265,7 +267,7 @@ export default function ModuleRecordsPanel({
   // orada satır içi düğme geri gelir.
   const fabAvailable = useFabAvailable();
   useProjectFabAction(
-    canWrite && fabAvailable ? { label: config.addLabel, onClick: openCreate } : null,
+    canWrite && fabAvailable ? { label: t(config.addLabel), onClick: openCreate } : null,
     [canWrite, fabAvailable, config.addLabel, moduleKey],
     FAB_PRIORITY.panel
   );
@@ -291,7 +293,7 @@ export default function ModuleRecordsPanel({
       await api
         .post(`/party/${partyId}/activities`, {
           type: "sistem",
-          summary: `${config.title}: ${config.summary(data) || "yeni kayıt"}`,
+          summary: t("{modul}: {ozet}", { modul: t(config.title), ozet: config.summary(data) || t("yeni kayıt") }),
         })
         .catch(() => {});
     }
@@ -303,7 +305,7 @@ export default function ModuleRecordsPanel({
     // bir alan varsa kullanıcı "Tüm alanlar"a yönlendirilir.
     for (const field of config.fields) {
       if (field.required && !form[field.key]?.trim()) {
-        setError(`${field.label} gerekli`);
+        setError(t("{alan} gerekli", { alan: t(field.label) }));
         setShowAllFields(true);
         return;
       }
@@ -347,7 +349,7 @@ export default function ModuleRecordsPanel({
     await api.delete(`/module-records/${record.id}`).catch(() => {});
     load();
     pushUndo({
-      label: "Kayıt arşivleme",
+      label: t("Kayıt arşivleme"),
       run: async () => {
         await api.patch(`/module-records/${record.id}/restore`, {});
         load();
@@ -387,8 +389,12 @@ export default function ModuleRecordsPanel({
           // Sayı rozeti, aynı kayıttan kaç görev doğduğunu gösterir.
           <button
             onClick={() => setTaskFor(r)}
-            aria-label="Göreve dönüştür"
-            title={taskCount > 0 ? `${taskCount} görev oluşturulmuş — bir tane daha ekle` : "Göreve dönüştür"}
+            aria-label={t("Göreve dönüştür")}
+            title={
+              taskCount > 0
+                ? t("{n} görev oluşturulmuş — bir tane daha ekle", { n: taskCount })
+                : t("Göreve dönüştür")
+            }
             style={{
               display: "flex",
               alignItems: "center",
@@ -412,16 +418,16 @@ export default function ModuleRecordsPanel({
                 açıyordu ve hangi eylemin ne yapacağı belirsizdi. */}
             <button
               onClick={() => openEdit(r)}
-              aria-label="Kaydı düzenle"
-              title="Düzenle"
+              aria-label={t("Kaydı düzenle")}
+              title={t("Düzenle")}
               style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2, flexShrink: 0 }}
             >
               <IconEdit size={14} color={c.textSecondary} />
             </button>
             <button
               onClick={() => handleArchive(r)}
-              aria-label="Kaydı arşivle"
-              title="Arşivle"
+              aria-label={t("Kaydı arşivle")}
+              title={t("Arşivle")}
               style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2, flexShrink: 0 }}
             >
               <IconTrash size={14} color={c.textSecondary} />
@@ -437,9 +443,9 @@ export default function ModuleRecordsPanel({
     // satır başını kaybediyor. Pano görünümü sütunlara bölündüğü için sınırdan muaf.
     <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: view === "board" ? "none" : 920 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{config.title}</h5>
+        <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t(config.title)}</h5>
         {!canWrite ? (
-          <span style={{ fontSize: 12, color: c.textSecondary }} title="Bu modüle atanan kişiler kayıt ekleyebilir">
+          <span style={{ fontSize: 12, color: c.textSecondary }} title={t("Bu modüle atanan kişiler kayıt ekleyebilir")}>
             Salt görüntüleme
           </span>
         ) : (
@@ -448,7 +454,7 @@ export default function ModuleRecordsPanel({
               onClick={openCreate}
               style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
             >
-              {`+ ${config.addLabel}`}
+              {`+ ${t(config.addLabel)}`}
             </button>
           )
         )}
@@ -492,10 +498,10 @@ export default function ModuleRecordsPanel({
               onChange={(e) => setFilters((f) => ({ ...f, [field.key]: e.target.value }))}
               style={{ fontSize: 13, padding: "5px 6px" }}
             >
-              <option value="">{field.label}: tümü</option>
+              <option value="">{t("{alan}: tümü", { alan: t(field.label) })}</option>
               {field.options?.map((o) => (
                 <option key={o.value} value={o.value}>
-                  {o.label}
+                  {t(o.label)}
                 </option>
               ))}
             </select>
@@ -506,13 +512,13 @@ export default function ModuleRecordsPanel({
               onChange={(e) => setSortKey(e.target.value)}
               style={{ fontSize: 13, padding: "5px 6px" }}
             >
-              <option value="">Sıralama: eklenme</option>
+              <option value="">{t("Sıralama: eklenme")}</option>
               {sortableFields.map((field) => [
                 <option key={`${field.key}:desc`} value={`${field.key}:desc`}>
-                  {field.label} ↓
+                  {t(field.label)} ↓
                 </option>,
                 <option key={`${field.key}:asc`} value={`${field.key}:asc`}>
-                  {field.label} ↑
+                  {t(field.label)} ↑
                 </option>,
               ])}
             </select>
@@ -560,7 +566,9 @@ export default function ModuleRecordsPanel({
           taşıyordu. */}
       {formMode && (
         <Modal
-          title={formMode.kind === "edit" ? `${config.title} — düzenle` : config.addLabel}
+          title={
+            formMode.kind === "edit" ? t("{modul} — düzenle", { modul: t(config.title) }) : t(config.addLabel)
+          }
           onClose={closeForm}
           maxWidth={560}
           mobileFullScreen
@@ -569,7 +577,7 @@ export default function ModuleRecordsPanel({
           {visibleFields.map((field) => (
             <div key={field.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <label style={{ fontSize: 12, color: c.textSecondary }}>
-                {field.label}
+                {t(field.label)}
                 {field.required ? " *" : ""}
               </label>
               <ModuleFieldInput
@@ -615,7 +623,7 @@ export default function ModuleRecordsPanel({
                 fontSize: 14,
               }}
             >
-              {saving ? "Kaydediliyor…" : formMode.kind === "edit" ? "Güncelle" : "Kaydet"}
+              {saving ? t("Kaydediliyor…") : formMode.kind === "edit" ? t("Güncelle") : t("Kaydet")}
             </button>
             <button onClick={closeForm} disabled={saving} style={{ padding: "8px 16px", fontSize: 14 }}>
               Vazgeç
@@ -626,14 +634,14 @@ export default function ModuleRecordsPanel({
       )}
 
       {loading ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
       ) : records.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
-          {config.emptyLabel}
-          {canWrite && fabAvailable ? ' Eklemek için sayfadaki "+" düğmesini kullan.' : ""}
+          {t(config.emptyLabel)}
+          {canWrite && fabAvailable ? ` ${t('Eklemek için sayfadaki "+" düğmesini kullan.')}` : ""}
         </p>
       ) : visible.length === 0 ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Aramanla eşleşen kayıt yok.</p>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Aramanla eşleşen kayıt yok.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {hasActiveFilter && (
@@ -662,7 +670,7 @@ export default function ModuleRecordsPanel({
                 ...(boardField.options ?? []),
                 // Alanı boş bırakılmış kayıtlar da bir sütunda görünmeli, yoksa
                 // pano görünümünde sessizce kaybolurlardı.
-                { value: "", label: "Belirtilmemiş" },
+                { value: "", label: t("Belirtilmemiş") },
               ]
                 .map((option) => ({
                   option,
@@ -691,9 +699,9 @@ export default function ModuleRecordsPanel({
         <TaskFromRecordModal
           departmentId={departmentId}
           moduleKey={moduleKey}
-          moduleTitle={config.title}
+          moduleTitle={t(config.title)}
           recordId={taskFor.id}
-          defaultTitle={config.summary(displayOf(taskFor.data)) || config.title}
+          defaultTitle={config.summary(displayOf(taskFor.data)) || t(config.title)}
           defaultDeadline={config.periodKey ? (taskFor.data[config.periodKey] as string | undefined) : undefined}
           existingCount={taskCounts[taskFor.id] ?? 0}
           onClose={() => setTaskFor(null)}
@@ -728,6 +736,7 @@ function BoardColumn({
   children: React.ReactNode;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const listRef = useRef<HTMLDivElement>(null);
 
   useSortableList(
@@ -784,7 +793,7 @@ function BoardColumn({
       >
         {children}
       </div>
-      {count === 0 && <span style={{ fontSize: 12, color: c.textSecondary, padding: "0 2px" }}>Buraya sürükle</span>}
+      {count === 0 && <span style={{ fontSize: 12, color: c.textSecondary, padding: "0 2px" }}>{t("Buraya sürükle")}</span>}
     </div>
   );
 }

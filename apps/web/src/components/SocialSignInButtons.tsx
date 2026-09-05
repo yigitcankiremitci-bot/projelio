@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { driveApi, oneDriveApi } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 /**
  * Giriş/kayıt ekranlarındaki sağlayıcı düğmeleri (Google, Microsoft).
@@ -12,8 +13,16 @@ import { useThemeColors } from "../theme/useThemeColors";
  * Düğmeler tek bileşende toplandı: ayrı ayrı olduklarında her biri kendi "veya"
  * ayracını çiziyordu ve iki sağlayıcı açıkken ekranda iki ayraç görünüyordu.
  */
-export default function SocialSignInButtons({ verb }: { verb: "giriş yap" | "kayıt ol" }) {
+/**
+ * `verb` bir SÖZCÜK değil, bir KİP.
+ *
+ * Eskiden `Google ile ${verb}` diye cümleye gömülüyordu. İngilizcede sözcük
+ * sırası ters ("Sign in with Google"), yani yer tutucu yetmiyor: her sağlayıcı
+ * ve kip için tam cümle gerekiyor.
+ */
+export default function SocialSignInButtons({ verb }: { verb: "giris" | "kayit" }) {
   const c = useThemeColors();
+  const t = useT();
   const [googleReady, setGoogleReady] = useState(false);
   const [microsoftReady, setMicrosoftReady] = useState(false);
   const [error, setError] = useState("");
@@ -35,7 +44,7 @@ export default function SocialSignInButtons({ verb }: { verb: "giriş yap" | "ka
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0 14px" }}>
         <div style={{ flex: 1, height: 1, background: c.border }} />
-        <span style={{ fontSize: 14, color: c.textSecondary }}>veya</span>
+        <span style={{ fontSize: 14, color: c.textSecondary }}>{t("veya")}</span>
         <div style={{ flex: 1, height: 1, background: c.border }} />
       </div>
 
@@ -43,7 +52,7 @@ export default function SocialSignInButtons({ verb }: { verb: "giriş yap" | "ka
         {googleReady && (
           <ProviderButton
             requestUrl={() => driveApi.loginUrl()}
-            label={`Google ile ${verb}`}
+            label={verb === "giris" ? t("Google ile giriş yap") : t("Google ile kayıt ol")}
             glyph={<GoogleGlyph />}
             onError={setError}
           />
@@ -51,10 +60,10 @@ export default function SocialSignInButtons({ verb }: { verb: "giriş yap" | "ka
         {microsoftReady && (
           <ProviderButton
             requestUrl={() => oneDriveApi.loginUrl()}
-            label={`Microsoft ile ${verb}`}
+            label={verb === "giris" ? t("Microsoft ile giriş yap") : t("Microsoft ile kayıt ol")}
             // Kullanıcı çoğu zaman hesabını "Outlook hesabı" diye biliyor;
             // düğmenin markası Microsoft olmak zorunda (marka kuralları).
-            hint="Outlook, Hotmail, Live ya da iş/okul hesabı"
+            hint={t("Outlook, Hotmail, Live ya da iş/okul hesabı")}
             glyph={<MicrosoftGlyph />}
             onError={setError}
           />
@@ -84,6 +93,7 @@ function ProviderButton({
   glyph: React.ReactNode;
   onError: (message: string) => void;
 }) {
+  const t = useT();
   const c = useThemeColors();
   const [busy, setBusy] = useState(false);
 
@@ -95,11 +105,11 @@ function ProviderButton({
       if (url) window.location.href = url;
       else {
         setBusy(false);
-        onError("Bu giriş yöntemi şu anda kullanılamıyor.");
+        onError(t("Bu giriş yöntemi şu anda kullanılamıyor."));
       }
     } catch (e: any) {
       setBusy(false);
-      onError(e?.message ?? "Giriş başlatılamadı.");
+      onError(e?.message ?? t("Giriş başlatılamadı."));
     }
   };
 
@@ -126,7 +136,7 @@ function ProviderButton({
       }}
     >
       {glyph}
-      {busy ? "Yönlendiriliyor…" : label}
+      {busy ? t("Yönlendiriliyor…") : label}
     </button>
   );
 }

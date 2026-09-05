@@ -7,13 +7,17 @@ export type TaskSortMode = "manual" | "priority" | "due" | "created" | "title";
 /**
  * "manual" kullanıcının sürükleyerek kurduğu düzen — listenin asıl sıralaması
  * budur, diğerleri geçici bir bakış açısı. Bu yüzden varsayılan odur ve başta durur.
+ *
+ * Etiketler modül düzeyinde, yani t() burada çağrılamaz (kanca yok). Türkçe
+ * metin ANAHTAR olarak duruyor, çeviri kullanıldığı yerde yapılıyor —
+ * bkz. TaskSortMenu içindeki `t(s.label)`.
  */
 export const TASK_SORTS: { value: TaskSortMode; label: string }[] = [
-  { value: "manual", label: "Kendi sıram" },
-  { value: "priority", label: "Önceliğe göre" },
-  { value: "due", label: "Tarihe göre" },
-  { value: "created", label: "Eklenme sırasına göre" },
-  { value: "title", label: "Ada göre" },
+  { value: "manual", label: "Kendi sıram" }, // dil:anahtar
+  { value: "priority", label: "Önceliğe göre" }, // dil:anahtar
+  { value: "due", label: "Tarihe göre" }, // dil:anahtar
+  { value: "created", label: "Eklenme sırasına göre" }, // dil:anahtar
+  { value: "title", label: "Ada göre" }, // dil:anahtar
 ];
 
 /** Sıralama için gereken en küçük görev şekli. */

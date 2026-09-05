@@ -31,8 +31,10 @@ import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/
 import { useIsSubcontractor } from "../lib/useCurrentUser";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { isProjectInSidebar } from "../lib/useSidebarHierarchy";
+import { useT } from "../lib/i18n";
 
 export default function ProjectDetail() {
+  const t = useT();
   const { id } = useParams();
   // Aynı sayfadaki kullanıcılar: canlı tazeleme + "kim burada" (bkz. lib/liveRoom.ts).
   useLiveRoom(id ? `project:${id}` : null);
@@ -90,22 +92,22 @@ export default function ProjectDetail() {
       ? {
           // Sekme hem görev hem çıktı barındırıyor; "+" hangisini eklediğini
           // sormalı (bkz. BottomNav'daki seçim menüsü deseni).
-          label: "Görev veya çıktı ekle",
+          label: t("Görev veya çıktı ekle"),
           options: [
-            { label: "Yeni görev", onClick: () => outputsRef.current?.openCreateTask() },
-            { label: "Yeni çıktı", onClick: () => outputsRef.current?.openCreateOutput() },
+            { label: t("Yeni görev"), onClick: () => outputsRef.current?.openCreateTask() },
+            { label: t("Yeni çıktı"), onClick: () => outputsRef.current?.openCreateOutput() },
           ],
         }
       : activeTab === "feed"
-      ? { label: "Yeni paylaşım", onClick: () => feedRef.current?.openCreate() }
+      ? { label: t("Yeni paylaşım"), onClick: () => feedRef.current?.openCreate() }
       : activeTab === "team"
-      ? { label: "Üye ekle", onClick: () => teamRef.current?.openCreate() }
+      ? { label: t("Üye ekle"), onClick: () => teamRef.current?.openCreate() }
       : activeTab === "budget"
-      ? { label: "Ödeme / gider ekle", onClick: () => budgetRef.current?.openCreate() }
+      ? { label: t("Ödeme / gider ekle"), onClick: () => budgetRef.current?.openCreate() }
       : activeTab === "files"
       ? // Dosyalar sekmesinin "+" eylemi panelin kendisinde (bkz. FilesPanel).
         null
-      : { label: "Deadline'ı değiştir", onClick: () => setExtendingDeadline(true) },
+      : { label: t("Deadline'ı değiştir"), onClick: () => setExtendingDeadline(true) },
     [activeTab, project, id]
   );
 
@@ -283,7 +285,7 @@ export default function ProjectDetail() {
   const registerTaskCreateUndo = (createdId: string, payload: Record<string, unknown>) => {
     let currentId = createdId;
     pushUndo({
-      label: "Görev oluşturma",
+      label: t("Görev oluşturma"),
       run: async () => {
         await api.delete(`/tasks/${currentId}`);
         reloadTasks();
@@ -346,7 +348,7 @@ export default function ProjectDetail() {
     // tamamlanınca alt görevlerin de kapanması) — yığında ayrı adım olmamalı.
     if (registerUndo && previousStatus && previousStatus !== status) {
       pushUndo({
-        label: "Görev durumu",
+        label: t("Görev durumu"),
         run: async () => {
           await api.patch(`/tasks/${taskId}/status`, { status: previousStatus });
           reloadTasks();
@@ -420,7 +422,7 @@ export default function ProjectDetail() {
   // Projeler sekmesine (bkz. lib/backTarget.ts).
   const back = useBackTarget({
     to: project ? `/jobs/${project.jobId}` : "/",
-    label: "Projeler",
+    label: t("Projeler"),
   });
 
   usePageHeader(project?.title, coverRef, [project?.title, project?.jobId, back.to, back.label], {
@@ -456,7 +458,7 @@ export default function ProjectDetail() {
       {!project && (
         <div style={{ padding: 28 }}>
           <Link to="/" style={{ fontSize: 15, color: c.textSecondary, marginBottom: 4, display: "inline-block" }}>
-            ← Projeler
+            {t("← Projeler")}
           </Link>
         </div>
       )}
@@ -556,13 +558,13 @@ export default function ProjectDetail() {
                 }}
               >
                 <span style={{ whiteSpace: "nowrap" }}>
-                  Ücret: <span style={{ color: c.accentDark, fontWeight: 500 }}>{project.totalBudget.toLocaleString("tr-TR")} ₺</span>
+                  {t("Ücret:")} <span style={{ color: c.accentDark, fontWeight: 500 }}>{project.totalBudget.toLocaleString("tr-TR")} ₺</span>
                 </span>
                 {/* Başlangıç ve bitiş tek blok: satır kırılırsa birlikte iner, asla
                     birbirinden ayrılıp alt alta düşmez. */}
                 <div style={{ display: "flex", columnGap: isDesktop ? 24 : 12, whiteSpace: "nowrap" }}>
-                  <span>Başlangıç: {new Date(project.startDate).toLocaleDateString("tr-TR")}</span>
-                  <span>Bitiş: {new Date(project.deadline).toLocaleDateString("tr-TR")}</span>
+                  <span>{t("Başlangıç: {tarih}", { tarih: new Date(project.startDate).toLocaleDateString("tr-TR") })}</span>
+                  <span>{t("Bitiş: {tarih}", { tarih: new Date(project.deadline).toLocaleDateString("tr-TR") })}</span>
                 </div>
               </div>
 
@@ -578,8 +580,8 @@ export default function ProjectDetail() {
               {currentUserId && currentUserId === project.ownerId && (
                 <button
                   onClick={() => setSharing(true)}
-                  aria-label="Takip linki oluştur"
-                  title="Takip linki"
+                  aria-label={t("Takip linki oluştur")}
+                  title={t("Takip linki")}
                   style={{
                     flexShrink: 0,
                     display: "flex",
@@ -599,7 +601,7 @@ export default function ProjectDetail() {
               {currentUserId && currentUserId === project.ownerId && (
                 <button
                   onClick={() => setEditing(true)}
-                  aria-label="Projeyi düzenle"
+                  aria-label={t("Projeyi düzenle")}
                   style={{
                     flexShrink: 0,
                     display: "flex",
@@ -725,17 +727,17 @@ export default function ProjectDetail() {
       )}
 
       {parentCompletePrompt && (
-        <Modal title="Görevi tamamla" onClose={() => setParentCompletePrompt(null)}>
+        <Modal title={t("Görevi tamamla")} onClose={() => setParentCompletePrompt(null)}>
           <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
-            <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{parentCompletePrompt.title}</strong> görevinin tüm alt
-            görevleri tamamlandı. Bu görevi de tamamlandı olarak işaretlemek ister misin?
+            <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{parentCompletePrompt.title}</strong>{" "}
+            {t("görevinin tüm alt görevleri tamamlandı. Bu görevi de tamamlandı olarak işaretlemek ister misin?")}
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button
               onClick={() => setParentCompletePrompt(null)}
               style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 16 }}
             >
-              Hayır
+              {t("Hayır")}
             </button>
             <button
               data-primary
@@ -745,7 +747,7 @@ export default function ProjectDetail() {
               }}
               style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 16, fontWeight: 500 }}
             >
-              Evet, tamamla
+              {t("Evet, tamamla")}
             </button>
           </div>
         </Modal>

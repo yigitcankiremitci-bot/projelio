@@ -25,7 +25,7 @@ export class AuthController {
   @Post("register")
   @UseGuards(AuthRateLimitGuard)
   register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto.fullName, dto.email, dto.password, dto.username);
+    return this.authService.register(dto.fullName, dto.email, dto.password, dto.username, dto.locale);
   }
 
   @Post("login")

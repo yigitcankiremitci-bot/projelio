@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
+import { hataMetni } from "./i18n";
 
 /**
  * Şifre hash'leme — tek kaynak.
@@ -85,8 +86,11 @@ function assertHashable(plain: string): void {
   const bytes = Buffer.byteLength(plain, "utf8");
   if (bytes > MAX_PASSWORD_BYTES) {
     throw new BadRequestException(
-      `Şifre çok uzun (${bytes} bayt). En fazla ${MAX_PASSWORD_BYTES} bayt olabilir; ` +
-        "Türkçe karakterler 2 bayt yer kaplar."
+      hataMetni(
+        "Şifre çok uzun ({bayt} bayt). En fazla {sinir} bayt olabilir; " +
+          "Türkçe karakterler 2 bayt yer kaplar.",
+        { bayt: bytes, sinir: MAX_PASSWORD_BYTES }
+      )
     );
   }
 }

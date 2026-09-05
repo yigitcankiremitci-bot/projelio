@@ -11,6 +11,7 @@ import StatusBadge from "./StatusBadge";
 import AskLioButton from "./AskLioButton";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { isProjectInSidebar } from "../lib/useSidebarHierarchy";
+import { useT } from "../lib/i18n";
 
 interface Props {
   project: Project;
@@ -39,6 +40,7 @@ const CARD_HEIGHT = 280;
 
 export default function ProjectCard({ project, canManage, onStatusChanged }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [coverUrl, setCoverUrl] = useState(project.coverImageUrl);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
@@ -109,7 +111,7 @@ export default function ProjectCard({ project, canManage, onStatusChanged }: Pro
             type="button"
             onClick={handleAddCoverClick}
             disabled={uploading}
-            aria-label="Kapak fotoğrafı ekle"
+            aria-label={t("Kapak fotoğrafı ekle")}
             className="entity-card-cover-add"
             style={{
               position: "absolute",
@@ -143,7 +145,7 @@ export default function ProjectCard({ project, canManage, onStatusChanged }: Pro
               textAlign: "center",
             }}
           >
-            Yüklenemedi, tekrar dene
+            {t("Yüklenemedi, tekrar dene")}
           </div>
         )}
 

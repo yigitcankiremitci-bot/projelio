@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "./notifications.service";
+import type { Metin } from "../../common/i18n";
 
 function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -71,8 +72,17 @@ export class DigestProcessor {
     await Promise.all(
       Array.from(tasksByUser.entries()).map(([userId, titles]) => {
         const preview = titles.slice(0, 5).join(", ");
-        const extra = titles.length > 5 ? ` ve ${titles.length - 5} görev daha` : "";
-        const body = `${titles.length} göreviniz var: ${preview}${extra}`;
+        // Uzun liste için AYRI bir metin, kuyruğu gövdeye çeviri sonucu olarak
+        // gömmek yerine. İç içe çeviri burada iki şeyi bozardı: alıcının dilini
+        // bu satırda bilmiyoruz (notifyUser onu kendi çözüyor) ve İngilizcede
+        // "{kalan} more task/tasks" çoğul eki ancak kendi anahtarında seçilebilir.
+        const body: Metin =
+          titles.length > 5
+            ? {
+                metin: "{n} görevin var: {liste} ve {kalan} görev daha",
+                params: { n: titles.length, liste: preview, kalan: titles.length - 5 },
+              }
+            : { metin: "{n} görevin var: {liste}", params: { n: titles.length, liste: preview } };
         return this.notificationsService.notifyUser(userId, type, title, body, "/tasks");
       })
     );

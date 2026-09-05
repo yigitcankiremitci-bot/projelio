@@ -5,6 +5,7 @@ import { backState } from "../lib/backTarget";
 import SocialSignInButtons from "../components/SocialSignInButtons";
 import { demoHesap } from "../lib/demoHesap";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 /** 905 -> "15:05". Geri sayım dakika:saniye okunması en kolay biçim. */
 function formatSure(saniye: number): string {
@@ -33,12 +34,13 @@ export default function Login() {
    */
   const [lockSeconds, setLockSeconds] = useState(0);
   const c = useThemeColors();
+  const t = useT();
   // Oturumu geçersizleşen kullanıcı buraya sebepsizce fırlatılmasın: neden
   // çıkarıldığını bilmezse "verilerim silindi" sanıyor (bkz. api/client.ts
   // handleExpiredSession).
   const sessionExpired = new URLSearchParams(window.location.search).get("session") === "expired";
   // Yasal metinlerin geri bağlantısı buraya dönsün (bkz. lib/backTarget.ts).
-  const loginBack = { to: "/login", label: "Giriş sayfası" };
+  const loginBack = { to: "/login", label: t("Giriş sayfası") };
 
   useEffect(() => {
     if (lockSeconds <= 0) return;
@@ -68,7 +70,7 @@ export default function Login() {
       // Backend bazı durumlarda (ör. Google ile kaydolmuş bir hesaba şifreyle
       // giriş denemesi) özel, yardımcı bir mesaj döndürüyor — genel "hatalı"
       // mesajıyla ezmeyip onu göstermeliyiz.
-      setError(err instanceof Error ? err.message : "E-posta veya şifre hatalı.");
+      setError(err instanceof Error ? err.message : t("E-posta veya şifre hatalı."));
       if (err instanceof ApiError && err.status === 403) setNeedsVerification(true);
       if (err instanceof ApiError && err.status === 429) setLockSeconds(err.retryAfterSeconds ?? 0);
     } finally {
@@ -114,9 +116,10 @@ export default function Login() {
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
           <img src="/logo.png" alt="Projelio" style={{ width: 48, height: 48, marginBottom: 14 }} />
-          <h1 style={{ color: c.textPrimary, fontSize: 25, fontWeight: 600, margin: 0 }}>Projelio</h1>
+          {/* Marka adı çevrilmez; süslü parantez t() denetiminden muaf tutmak için. */}
+          <h1 style={{ color: c.textPrimary, fontSize: 25, fontWeight: 600, margin: 0 }}>{"Projelio"}</h1>
           <p style={{ color: c.textSecondary, fontSize: 16, margin: "6px 0 0" }}>
-            Freelance proje &amp; görev yönetimi
+            {t("Freelance proje & görev yönetimi")}
           </p>
         </div>
 
@@ -131,16 +134,16 @@ export default function Login() {
               borderRadius: 8,
             }}
           >
-            Oturumun sona erdi. Verilerin yerinde — tekrar giriş yaptığında hepsi karşında olacak.
+            {t("Oturumun sona erdi. Verilerin yerinde — tekrar giriş yaptığında hepsi karşında olacak.")}
           </p>
         )}
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>E-posta</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("E-posta")}</label>
             <input
               type="email"
-              placeholder="ad.soyad@sirket.com"
+              placeholder={t("ad.soyad@sirket.com")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -149,9 +152,9 @@ export default function Login() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <label style={{ fontSize: 15, color: c.textSecondary }}>Şifre</label>
+              <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Şifre")}</label>
               <Link to="/forgot-password" style={{ fontSize: 14, color: c.textSecondary }}>
-                Şifremi unuttum
+                {t("Şifremi unuttum")}
               </Link>
             </div>
             <input
@@ -171,7 +174,7 @@ export default function Login() {
                 <>
                   {" "}
                   <strong style={{ fontVariantNumeric: "tabular-nums" }}>
-                    Kalan süre {formatSure(lockSeconds)}.
+                    {t("Kalan süre {sure}.", { sure: formatSure(lockSeconds) })}
                   </strong>
                 </>
               )}
@@ -181,7 +184,7 @@ export default function Login() {
           {needsVerification &&
             (resendState === "sent" ? (
               <p style={{ color: c.textSecondary, fontSize: 14, margin: 0 }}>
-                Yeni doğrulama bağlantısı gönderildi. E-postanı kontrol et.
+                {t("Yeni doğrulama bağlantısı gönderildi. E-postanı kontrol et.")}
               </p>
             ) : (
               <button
@@ -197,7 +200,7 @@ export default function Login() {
                   fontSize: 15,
                 }}
               >
-                {resendState === "sending" ? "Gönderiliyor…" : "Doğrulama bağlantısını tekrar gönder"}
+                {resendState === "sending" ? t("Gönderiliyor…") : t("Doğrulama bağlantısını tekrar gönder")}
               </button>
             ))}
 
@@ -215,15 +218,15 @@ export default function Login() {
               fontWeight: 500,
             }}
           >
-            {loading ? "Giriş yapılıyor…" : "Giriş yap"}
+            {loading ? t("Giriş yapılıyor…") : t("Giriş yap")}
           </button>
 
           <Link to="/register" style={{ fontSize: 16, color: c.textSecondary, textAlign: "center", marginTop: 4 }}>
-            Hesabın yok mu? Kayıt ol
+            {t("Hesabın yok mu? Kayıt ol")}
           </Link>
         </form>
 
-        <SocialSignInButtons verb="giriş yap" />
+        <SocialSignInButtons verb="giris" />
 
         {/*
           DEMO HESABI — üye olmadan içeriyi gezmek isteyenler için.
@@ -242,11 +245,12 @@ export default function Login() {
           }}
         >
           <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: c.textPrimary }}>
-            Üye olmadan gezmek ister misin?
+            {t("Üye olmadan gezmek ister misin?")}
           </p>
           <p style={{ margin: "6px 0 0", fontSize: 14, lineHeight: 1.5, color: c.textSecondary }}>
-            Hazır bir demo hesabı var: örnek bir şirketin projeleri, görevleri, bütçesi ve
-            raporlarıyla birlikte her yeri dolaşabilirsin.
+            {t(
+              "Hazır bir demo hesabı var: örnek bir şirketin projeleri, görevleri, bütçesi ve raporlarıyla birlikte her yeri dolaşabilirsin."
+            )}
           </p>
           <p
             style={{
@@ -275,12 +279,12 @@ export default function Login() {
               fontWeight: 500,
             }}
           >
-            {loading ? "Giriş yapılıyor…" : "Demo hesabıyla gir"}
+            {loading ? t("Giriş yapılıyor…") : t("Demo hesabıyla gir")}
           </button>
           <p style={{ margin: "10px 0 0", fontSize: 13, lineHeight: 1.5, color: c.textSecondary }}>
-            Her şeyi deneyebilirsin: eklediğin, değiştirdiğin, sildiğin ne varsa bir sonraki
-            girişte ilk haline döner. Hesap herkese açık olduğu için aynı anda başkaları da
-            içeride olabilir — gerçek veri ya da kişisel bilgi girme.
+            {t(
+              "Her şeyi deneyebilirsin: eklediğin, değiştirdiğin, sildiğin ne varsa bir sonraki girişte ilk haline döner. Hesap herkese açık olduğu için aynı anda başkaları da içeride olabilir — gerçek veri ya da kişisel bilgi girme."
+            )}
           </p>
         </div>
 
@@ -289,6 +293,8 @@ export default function Login() {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
+            // Üç bağlantı dar ekranda tek satıra sığmıyor; sarmalı.
+            flexWrap: "wrap",
             gap: 10,
             marginTop: 20,
             fontSize: 14,
@@ -296,11 +302,15 @@ export default function Login() {
           }}
         >
           <Link to="/terms" state={backState(loginBack)} style={{ color: c.textSecondary }}>
-            Kullanıcı Sözleşmesi
+            {t("Kullanıcı Sözleşmesi")}
           </Link>
           <span aria-hidden>·</span>
           <Link to="/privacy" state={backState(loginBack)} style={{ color: c.textSecondary }}>
-            Gizlilik Politikası
+            {t("Gizlilik Politikası")}
+          </Link>
+          <span aria-hidden>·</span>
+          <Link to="/kvkk" state={backState(loginBack)} style={{ color: c.textSecondary }}>
+            {t("KVKK Aydınlatma Metni")}
           </Link>
         </div>
       </div>

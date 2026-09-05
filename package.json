@@ -13,6 +13,7 @@
     "dev:canli": "concurrently -n tunel,backend,web -c yellow,blue,green \"ssh -N -L 8081:127.0.0.1:8081 projelio@100.111.242.24\" \"npm run start:dev --workspace=backend\" \"npm run dev --workspace=@projelio/web\"",
     "yayinla": "bash deploy/yayinla.sh",
     "test": "node scripts/run-tests.mjs",
+    "dil": "node scripts/dil-denetimi.mjs",
     "check-env": "node --no-warnings scripts/check-env.mjs",
     "typecheck": "tsc --noEmit -p backend/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json"
   },

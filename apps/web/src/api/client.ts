@@ -1,4 +1,5 @@
 import { getSocketId } from "../lib/socketId";
+import { getLocale } from "../lib/i18n/depo";
 
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -112,6 +113,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // ve backend realtime.interceptor.ts). Yoksa (soket kapalı) sinyal gitmez,
   // istek normal çalışır.
   const socketId = getSocketId();
+  // Sunucunun ürettiği hata mesajları arayüzle AYNI dilde dönmeli. Sunucu bunu
+  // veritabanından okuyamıyor (hata yolunda sorgu istemiyoruz) ve jetondan da
+  // okuyamıyor (jeton 7 gün yaşıyor, dil değişirse bayatlar) — istemci hangi
+  // dili gösterdiğini zaten biliyor, o yüzden burada yazılıyor.
+  // Bkz. backend common/filters/all-exceptions.filter.ts.
+  const locale = getLocale();
   const timeout = signalWithTimeout(options.signal);
   let res: Response;
   try {
@@ -122,6 +129,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(socketId ? { "X-Socket-Id": socketId } : {}),
+        ...(locale ? { "X-Projelio-Locale": locale } : {}),
         ...options.headers,
       },
     });

@@ -67,6 +67,15 @@ export class UsersController {
     return this.usersService.updateProfile(req.user.userId, body);
   }
 
+  /**
+   * Arayüz dili. `null` göndermek "otomatik algıla"ya dönmek demek — geçerli
+   * bir istek, hata değil (bkz. UsersService.updateLocale).
+   */
+  @Patch("me/locale")
+  updateLocale(@Req() req: any, @Body("locale") locale: unknown) {
+    return this.usersService.updateLocale(req.user.userId, locale);
+  }
+
   // Ayarlar > Hesap. Şifresini UNUTANLAR buradan geçmez — o akış giriş ekranındaki
   // /auth/forgot-password (bkz. password-reset.service.ts).
   @Patch("me/password")

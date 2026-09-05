@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import type { SidebarColorKey, SidebarPatternKey, ThemeColors, User } from "@projelio/shared";
+import type { Locale, SidebarColorKey, SidebarPatternKey, ThemeColors, User } from "@projelio/shared";
 import { accentPresets, sidebarColorPresets, sidebarPatterns } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -12,6 +12,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { backState } from "../lib/backTarget";
 import { demoHesap } from "../lib/demoHesap";
+import { useLocale, useT } from "../lib/i18n";
 import TabBar from "../components/TabBar";
 import GoogleDriveCard from "../components/GoogleDriveCard";
 import OneDriveCard from "../components/OneDriveCard";
@@ -63,13 +64,18 @@ const NAV_WIDTH = 190;
 
 type SettingsTab = "hesap" | "gorunum" | "gezinme" | "yardimcilar" | "ritim" | "baglantilar" | "destek";
 
+/**
+ * Sekme etiketleri modül düzeyinde, yani t() burada çağrılamaz (kanca yok).
+ * Türkçe metin ANAHTAR olarak duruyor ve çeviri kullanıldığı yerde yapılıyor —
+ * bkz. aşağıda TabBar'a verilen liste.
+ */
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: "hesap", label: "Hesap" },
-  { key: "gorunum", label: "Görünüm" },
+  { key: "gorunum", label: "Görünüm" }, // dil:anahtar
   { key: "gezinme", label: "Gezinme" },
-  { key: "yardimcilar", label: "Yardımcılar" },
-  { key: "ritim", label: "Çalışma ritmi" },
-  { key: "baglantilar", label: "Bağlı hesaplar" },
+  { key: "yardimcilar", label: "Yardımcılar" }, // dil:anahtar
+  { key: "ritim", label: "Çalışma ritmi" }, // dil:anahtar
+  { key: "baglantilar", label: "Bağlı hesaplar" }, // dil:anahtar
   { key: "destek", label: "Destek" },
 ];
 
@@ -110,6 +116,20 @@ const swatchBtnStyle = (active: boolean, c: ThemeColors): CSSProperties => ({
 });
 
 /** Sekme içindeki kartların ortak kabuğu: başlık + açıklama + gövde. */
+/**
+ * Dil seçenekleri. "Otomatik" ayrı bir dil değil, seçimin SİLİNMESİ: tercih
+ * kaldırılınca tarayıcının diline geri dönülür (bkz. lib/i18n).
+ *
+ * Dil adları KENDİ dillerinde yazılı ve çeviriden geçmiyor: "Türkçe" arayüz
+ * İngilizceyken de "Türkçe" olarak görünmeli, yoksa o dili arayan kullanıcı
+ * listede kendi dilini tanıyamaz.
+ */
+const DIL_SECENEKLERI: { value: Locale | null; kisa: string; ad: string }[] = [
+  { value: null, kisa: "A", ad: "Otomatik" },
+  { value: "tr", kisa: "TR", ad: "Türkçe" }, // dil:atla — dil adı kendi dilinde kalır
+  { value: "en", kisa: "EN", ad: "English" },
+];
+
 function SettingCard({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   const c = useThemeColors();
   return (
@@ -162,6 +182,7 @@ function SwatchRow({ children }: { children: ReactNode }) {
 /** Aç/kapa ayarı — WorkRhythmSettings'teki onay kutusu deseniyle aynı. */
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (on: boolean) => void }) {
   const c = useThemeColors();
+  const t = useT();
   return (
     <label style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer" }}>
       <input
@@ -170,7 +191,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (on: boolea
         onChange={(e) => onChange(e.target.checked)}
         style={{ width: 17, height: 17 }}
       />
-      <span style={{ fontSize: 14, color: c.textPrimary }}>{checked ? "Açık" : "Kapalı"}</span>
+      <span style={{ fontSize: 14, color: c.textPrimary }}>{checked ? t("Açık") : t("Kapalı")}</span>
     </label>
   );
 }
@@ -178,6 +199,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (on: boolea
 export default function Settings() {
   const c = useThemeColors();
   const theme = useTheme();
+  const t = useT();
+  const { locale, setLocale, chosen } = useLocale();
   // Admin paneli bağlantısını yalnızca yöneticiye göstermek için.
   const { user: currentUser } = useCurrentUser();
   const [hesapSiliniyor, setHesapSiliniyor] = useState(false);
@@ -191,7 +214,7 @@ export default function Settings() {
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get("sekme");
   const [tab, setTab] = useState<SettingsTab>(
-    TABS.some((t) => t.key === requestedTab) ? (requestedTab as SettingsTab) : "hesap"
+    TABS.some((sekme) => sekme.key === requestedTab) ? (requestedTab as SettingsTab) : "hesap"
   );
   const [fontScale, setFontScale] = useState<FontScaleOption>(getFontScaleOption());
   const homeTarget = useHomeTarget();
@@ -237,7 +260,7 @@ export default function Settings() {
       setUsername(updated.username);
       setUsernameSaved(true);
     } catch (err) {
-      setUsernameError(err instanceof Error ? err.message : "Kullanıcı adı güncellenemedi.");
+      setUsernameError(err instanceof Error ? err.message : t("Kullanıcı adı güncellenemedi."));
     } finally {
       setSavingUsername(false);
     }
@@ -266,11 +289,11 @@ export default function Settings() {
     setPasswordError("");
     setPasswordSaved(false);
     if (newPassword.length < 8) {
-      setPasswordError("Yeni şifre en az 8 karakter olmalı.");
+      setPasswordError(t("Yeni şifre en az 8 karakter olmalı."));
       return;
     }
     if (newPassword !== newPasswordAgain) {
-      setPasswordError("Yeni şifreler birbirini tutmuyor.");
+      setPasswordError(t("Yeni şifreler birbirini tutmuyor."));
       return;
     }
     setSavingPassword(true);
@@ -285,7 +308,7 @@ export default function Settings() {
       setPasswordSaved(true);
       await loadMe();
     } catch (err) {
-      setPasswordError(err instanceof Error ? err.message : "Şifre değiştirilemedi.");
+      setPasswordError(err instanceof Error ? err.message : t("Şifre değiştirilemedi."));
     } finally {
       setSavingPassword(false);
     }
@@ -301,7 +324,7 @@ export default function Settings() {
     <>
       <SettingCard
         title="Profil"
-        description="Ad soyad, unvan, kısa açıklama ve profil fotoğrafın — anasayfadaki kişi kartında görünür."
+        description={t("Ad soyad, unvan, kısa açıklama ve profil fotoğrafın — anasayfadaki kişi kartında görünür.")}
       >
         <button
           type="button"
@@ -371,13 +394,13 @@ export default function Settings() {
       </SettingCard>
 
       <SettingCard
-        title="WhatsApp numarası"
-        description="Doğrulanmış numaran — elle yazılmaz, telefonundan gönderdiğin kodla eşleşir (Bağlı hesaplar sekmesi)."
+        title={t("WhatsApp numarası")}
+        description={t("Doğrulanmış numaran — elle yazılmaz, telefonundan gönderdiğin kodla eşleşir (Bağlı hesaplar sekmesi).")}
       >
         <WhatsappProfileCard />
       </SettingCard>
 
-      <SettingCard title="Kullanıcı adı" description="Ekip üyesi eklerken seni bu kullanıcı adıyla arayabilirler.">
+      <SettingCard title={t("Kullanıcı adı")} description={t("Ekip üyesi eklerken seni bu kullanıcı adıyla arayabilirler.")}>
         <form onSubmit={handleUsernameSubmit} style={{ display: "flex", gap: 8 }}>
           <div style={{ position: "relative", flex: 1 }}>
             <span
@@ -417,24 +440,26 @@ export default function Settings() {
         </form>
         {usernameError && <p style={{ color: c.danger, fontSize: 14, margin: "8px 0 0" }}>{usernameError}</p>}
         {usernameSaved && !usernameError && (
-          <p style={{ color: c.success, fontSize: 14, margin: "8px 0 0" }}>Kullanıcı adı güncellendi.</p>
+          <p style={{ color: c.success, fontSize: 14, margin: "8px 0 0" }}>{t("Kullanıcı adı güncellendi.")}</p>
         )}
       </SettingCard>
 
       {demoHesabi ? (
         <SettingCard
-          title="Demo hesabı"
-          description="Bu hesap üye olmadan gezmek isteyenler için herkese açık. Şifresi değiştirilemez, hesap silinemez ve içeride yaptığın her değişiklik bir sonraki girişte geri alınır — istediğin gibi kurcalayabilirsin."
+          title={t("Demo hesabı")}
+          description={t("Bu hesap üye olmadan gezmek isteyenler için herkese açık. Şifresi değiştirilemez, hesap silinemez ve içeride yaptığın her değişiklik bir sonraki girişte geri alınır — istediğin gibi kurcalayabilirsin.")}
         >
           <span />
         </SettingCard>
       ) : (
       <SettingCard
-        title={hasPassword ? "Şifre değiştir" : "Şifre belirle"}
+        title={hasPassword ? t("Şifre değiştir") : t("Şifre belirle")}
         description={
           hasPassword
-            ? "En az 8 karakter. Değişiklikten sonra açık oturumların kapanmaz."
-            : "Hesabın Google ile açılmış, henüz şifresi yok. Bir şifre belirlersen e-posta ve şifreyle de giriş yapabilirsin."
+            ? t("En az 8 karakter. Değişiklikten sonra açık oturumların kapanmaz.")
+            : t(
+                "Hesabın Google ile açılmış, henüz şifresi yok. Bir şifre belirlersen e-posta ve şifreyle de giriş yapabilirsin."
+              )
         }
       >
         <form onSubmit={handlePasswordSubmit} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -446,7 +471,7 @@ export default function Settings() {
                 setCurrentPassword(e.target.value);
                 setPasswordSaved(false);
               }}
-              placeholder="Mevcut şifren"
+              placeholder={t("Mevcut şifren")}
               autoComplete="current-password"
               style={{ width: "100%" }}
               disabled={!me}
@@ -459,7 +484,7 @@ export default function Settings() {
               setNewPassword(e.target.value);
               setPasswordSaved(false);
             }}
-            placeholder="Yeni şifre"
+            placeholder={t("Yeni şifre")}
             autoComplete="new-password"
             minLength={8}
             style={{ width: "100%" }}
@@ -472,7 +497,7 @@ export default function Settings() {
               setNewPasswordAgain(e.target.value);
               setPasswordSaved(false);
             }}
-            placeholder="Yeni şifre (tekrar)"
+            placeholder={t("Yeni şifre (tekrar)")}
             autoComplete="new-password"
             minLength={8}
             style={{ width: "100%" }}
@@ -492,17 +517,17 @@ export default function Settings() {
               fontWeight: 500,
             }}
           >
-            {savingPassword ? "Kaydediliyor…" : hasPassword ? "Şifreyi değiştir" : "Şifreyi belirle"}
+            {savingPassword ? t("Kaydediliyor…") : hasPassword ? t("Şifreyi değiştir") : t("Şifreyi belirle")}
           </button>
         </form>
         {passwordError && <p style={{ color: c.danger, fontSize: 14, margin: "8px 0 0" }}>{passwordError}</p>}
         {passwordSaved && !passwordError && (
-          <p style={{ color: c.success, fontSize: 14, margin: "8px 0 0" }}>Şifren güncellendi.</p>
+          <p style={{ color: c.success, fontSize: 14, margin: "8px 0 0" }}>{t("Şifren güncellendi.")}</p>
         )}
       </SettingCard>
       )}
 
-      <CardGroup label="Hesabına bağlı sayfalar">
+      <CardGroup label={t("Hesabına bağlı sayfalar")}>
         <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, overflow: "hidden" }}>
           {/*
             Yalnızca yöneticiye gösterilir. Arka uç zaten rol denetimi yapıyor
@@ -538,7 +563,7 @@ export default function Settings() {
           <button onClick={() => navigate("/settings/archive")} style={linkRowStyle}>
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <IconArchive size={17} color={c.textSecondary} />
-              <span style={{ fontSize: 17, color: c.textPrimary }}>Arşiv</span>
+              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("Arşiv")}</span>
             </span>
             <IconChevronRight size={16} color={c.textSecondary} />
           </button>
@@ -551,11 +576,11 @@ export default function Settings() {
         (bkz. DeleteAccountModal) — buradaki düğme yalnızca kapıyı açıyor.
       */}
       {!demoHesabi && (
-        <CardGroup label="Tehlikeli bölge">
+        <CardGroup label={t("Tehlikeli bölge")}>
           <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, overflow: "hidden" }}>
             <button onClick={() => setHesapSiliniyor(true)} style={linkRowStyle}>
               <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 17, color: c.danger }}>Hesabımı sil</span>
+                <span style={{ fontSize: 17, color: c.danger }}>{t("Hesabımı sil")}</span>
               </span>
               <IconChevronRight size={16} color={c.textSecondary} />
             </button>
@@ -574,7 +599,7 @@ export default function Settings() {
           <button onClick={() => openLegal("/terms")} style={linkRowStyle}>
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <IconFile size={17} color={c.textSecondary} />
-              <span style={{ fontSize: 17, color: c.textPrimary }}>Kullanıcı Sözleşmesi</span>
+              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("Kullanıcı Sözleşmesi")}</span>
             </span>
             <IconChevronRight size={16} color={c.textSecondary} />
           </button>
@@ -584,7 +609,17 @@ export default function Settings() {
           <button onClick={() => openLegal("/privacy")} style={linkRowStyle}>
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <IconShield size={17} color={c.textSecondary} />
-              <span style={{ fontSize: 17, color: c.textPrimary }}>Gizlilik Politikası</span>
+              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("Gizlilik Politikası")}</span>
+            </span>
+            <IconChevronRight size={16} color={c.textSecondary} />
+          </button>
+
+          <div style={{ borderTop: `1px solid ${c.border}` }} />
+
+          <button onClick={() => openLegal("/kvkk")} style={linkRowStyle}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <IconFile size={17} color={c.textSecondary} />
+              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("KVKK Aydınlatma Metni")}</span>
             </span>
             <IconChevronRight size={16} color={c.textSecondary} />
           </button>
@@ -595,7 +630,7 @@ export default function Settings() {
         <button onClick={handleLogout} style={linkRowStyle}>
           <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <IconLogout size={17} color={c.danger} />
-            <span style={{ fontSize: 17, color: c.danger }}>Çıkış yap</span>
+            <span style={{ fontSize: 17, color: c.danger }}>{t("Çıkış yap")}</span>
           </span>
         </button>
       </div>
@@ -604,10 +639,55 @@ export default function Settings() {
 
   const gorunumTab = (
     <>
-      <CardGroup label="Erişilebilirlik">
+      <CardGroup label={t("Dil")}>
         <SettingCard
-          title="Yazı boyutu"
-          description="Görme zorluğu yaşıyorsan uygulamadaki yazıları ve arayüzü büyütebilirsin."
+          title={t("Arayüz dili")}
+          description={t(
+            "Varsayılan olarak tarayıcının dili kullanılır. Seçim yaptığında hesabına kaydedilir ve e-postalar, bildirimler ve Lio da o dile geçer."
+          )}
+        >
+          <SwatchRow>
+            {DIL_SECENEKLERI.map((secenek) => {
+              // "Otomatik" seçiliyken kullanıcı bir seçim YAPMAMIŞTIR (chosen=false);
+              // hangi dile düştüğü ayrıca yazılıyor ki ekranın neden bu dilde
+              // olduğu belli olsun.
+              const active = secenek.value === null ? !chosen : chosen && locale === secenek.value;
+              return (
+                <button
+                  key={secenek.value ?? "otomatik"}
+                  onClick={() => setLocale(secenek.value)}
+                  aria-pressed={active}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: `1.5px solid ${active ? c.primary : c.border}`,
+                    background: active ? c.background : "transparent",
+                    minWidth: 92,
+                  }}
+                >
+                  <span style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary, lineHeight: 1 }}>
+                    {secenek.kisa}
+                  </span>
+                  <span
+                    style={{ fontSize: 11, color: active ? c.primary : c.textSecondary, fontWeight: active ? 500 : 400 }}
+                  >
+                    {secenek.value === null ? t("Otomatik") : secenek.ad}
+                  </span>
+                </button>
+              );
+            })}
+          </SwatchRow>
+        </SettingCard>
+      </CardGroup>
+
+      <CardGroup label={t("Erişilebilirlik")}>
+        <SettingCard
+          title={t("Yazı boyutu")}
+          description={t("Görme zorluğu yaşıyorsan uygulamadaki yazıları ve arayüzü büyütebilirsin.")}
         >
           <SwatchRow>
             {FONT_SCALE_OPTIONS.map((option) => {
@@ -650,25 +730,25 @@ export default function Settings() {
 
         <SettingCard
           title="Hareketi azalt"
-          description="Geçiş ve animasyonları neredeyse tamamen kapatır. Baş dönmesi/odaklanma sorunu yaşıyorsan ya da arayüzün daha hızlı hissettirmesini istiyorsan aç."
+          description={t("Geçiş ve animasyonları neredeyse tamamen kapatır. Baş dönmesi/odaklanma sorunu yaşıyorsan ya da arayüzün daha hızlı hissettirmesini istiyorsan aç.")}
         >
           <Toggle checked={prefs.reduceMotion} onChange={prefs.setReduceMotion} />
         </SettingCard>
       </CardGroup>
 
       <CardGroup label="Tema ve renkler">
-        <SettingCard title="Tema" description="Aydınlık veya karanlık görünümü seç. Tercih bu cihazda saklanır.">
+        <SettingCard title="Tema" description={t("Aydınlık veya karanlık görünümü seç. Tercih bu cihazda saklanır.")}>
           <SwatchRow>
             <SwatchButton
               active={theme.mode === "light"}
               onClick={() => theme.setMode("light")}
-              label="Aydınlık"
+              label={t("Aydınlık")}
               swatch={{ background: "#F7F8FA", border: "1px solid #E3E6EB" }}
             />
             <SwatchButton
               active={theme.mode === "dark"}
               onClick={() => theme.setMode("dark")}
-              label="Karanlık"
+              label={t("Karanlık")}
               swatch={{ background: "#12151B", border: "1px solid #2A3140" }}
             />
           </SwatchRow>
@@ -676,7 +756,7 @@ export default function Settings() {
 
         <SettingCard
           title="Vurgu rengi"
-          description="Düğmelerde ve seçili öğelerde kullanılan rengi Projelio paletinden değiştir."
+          description={t("Düğmelerde ve seçili öğelerde kullanılan rengi Projelio paletinden değiştir.")}
         >
           <SwatchRow>
             {(Object.keys(accentPresets) as (keyof typeof accentPresets)[]).map((key) => (
@@ -691,12 +771,12 @@ export default function Settings() {
           </SwatchRow>
         </SettingCard>
 
-        <SettingCard title="Kenar çubuğu rengi" description="Soldaki menünün rengini kişiselleştir.">
+        <SettingCard title={t("Kenar çubuğu rengi")} description={t("Soldaki menünün rengini kişiselleştir.")}>
           <SwatchRow>
             <SwatchButton
               active={theme.sidebarColorKey === "default"}
               onClick={() => theme.setSidebarColorKey("default")}
-              label="Varsayılan"
+              label={t("Varsayılan")}
               swatch={{ background: c.primaryDark }}
             />
             {(Object.keys(sidebarColorPresets) as Exclude<SidebarColorKey, "default">[]).map((key) => (
@@ -711,7 +791,7 @@ export default function Settings() {
           </SwatchRow>
         </SettingCard>
 
-        <SettingCard title="Kenar çubuğu deseni" description="Soldaki menünün arkasına ince bir doku ekle.">
+        <SettingCard title={t("Kenar çubuğu deseni")} description={t("Soldaki menünün arkasına ince bir doku ekle.")}>
           <SwatchRow>
             {(Object.keys(sidebarPatterns) as SidebarPatternKey[]).map((key) => (
               <SwatchButton
@@ -739,8 +819,8 @@ export default function Settings() {
   const gezinmeTab = (
     <>
       <SettingCard
-        title="Ana Sayfa düğmesi"
-        description="Menüdeki Ana Sayfa düğmesine bastığında nereye gideceğini seçebilirsin. Bu tercih yalnızca bu cihazda geçerlidir."
+        title={t("Ana Sayfa düğmesi")}
+        description={t("Menüdeki Ana Sayfa düğmesine bastığında nereye gideceğini seçebilirsin. Bu tercih yalnızca bu cihazda geçerlidir.")}
       >
         <button
           type="button"
@@ -765,17 +845,17 @@ export default function Settings() {
         </button>
       </SettingCard>
 
-      <CardGroup label="Açılış">
+      <CardGroup label={t("Açılış")}>
         <SettingCard
-          title="Kenar çubuğu açık başlasın"
-          description="Bilgisayarda uygulamayı açtığında soldaki menü açık mı gelsin? Kapalı seçersen sol üstteki okla açarsın. Telefonda menü her zaman kapalı başlar."
+          title={t("Kenar çubuğu açık başlasın")}
+          description={t("Bilgisayarda uygulamayı açtığında soldaki menü açık mı gelsin? Kapalı seçersen sol üstteki okla açarsın. Telefonda menü her zaman kapalı başlar.")}
         >
           <Toggle checked={prefs.sidebarDefaultOpen} onChange={prefs.setSidebarDefaultOpen} />
         </SettingCard>
 
         <SettingCard
-          title="Özet sayılar açık başlasın"
-          description="İş ve rutin sayfalarındaki proje/görev sayıları kutusu (dar ekranda katlanan özet) açık mı gelsin?"
+          title={t("Özet sayılar açık başlasın")}
+          description={t("İş ve rutin sayfalarındaki proje/görev sayıları kutusu (dar ekranda katlanan özet) açık mı gelsin?")}
         >
           <Toggle checked={prefs.statsOpen} onChange={prefs.setStatsOpen} />
         </SettingCard>
@@ -786,22 +866,22 @@ export default function Settings() {
   const yardimcilarTab = (
     <>
       <SettingCard
-        title="Lio yardımcısı"
-        description="Sağ altta duran Lio balonu. Kapatırsan düğme gizlenir; Lio'yu Cmd/Ctrl + K ile yine açabilirsin."
+        title={t("Lio yardımcısı")}
+        description={t("Sağ altta duran Lio balonu. Kapatırsan düğme gizlenir; Lio'yu Cmd/Ctrl + K ile yine açabilirsin.")}
       >
         <Toggle checked={prefs.showLio} onChange={prefs.setShowLio} />
       </SettingCard>
 
       <SettingCard
-        title="Kim bu sayfada şeridi"
-        description="Aynı sayfada çalışan ekip arkadaşlarını sol altta gösteren ince şerit."
+        title={t("Kim bu sayfada şeridi")}
+        description={t("Aynı sayfada çalışan ekip arkadaşlarını sol altta gösteren ince şerit.")}
       >
         <Toggle checked={prefs.showPresence} onChange={prefs.setShowPresence} />
       </SettingCard>
 
       <SettingCard
-        title="Kullanım turu"
-        description="Uygulamayı tanıtan sesli turu baştan izle. Tur, bulunduğun sayfadaki öğeleri işaret ederek ilerler."
+        title={t("Kullanım turu")}
+        description={t("Uygulamayı tanıtan sesli turu baştan izle. Tur, bulunduğun sayfadaki öğeleri işaret ederek ilerler.")}
       >
         <button
           type="button"
@@ -816,7 +896,7 @@ export default function Settings() {
             fontWeight: 500,
           }}
         >
-          Turu yeniden başlat
+          {t("Turu yeniden başlat")}
         </button>
       </SettingCard>
     </>
@@ -840,7 +920,9 @@ export default function Settings() {
     destek: <SupportPanel me={me} />,
   };
 
-  const activeLabel = TABS.find((t) => t.key === tab)?.label ?? "";
+  // Etiketler TABS içinde Türkçe duruyor ve orada t() çağrılamıyor (modül
+  // düzeyi, kanca yok); çeviri kullanıldığı yerde, yani burada yapılıyor.
+  const activeLabel = t(TABS.find((sekme) => sekme.key === tab)?.label ?? "");
 
   // Sekme gövdesi: tüm kartlar aynı dikey boşlukla dizilir — kartların tek tek
   // marginTop taşıması bölümler arasında tutarsız aralıklara yol açıyordu.
@@ -850,14 +932,19 @@ export default function Settings() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: `${isDesktop ? 32 : 20}px ${gutter}px 40px` }}>
-      <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>Ayarlar</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>{t("Ayarlar")}</h1>
 
       {isDesktop ? (
         <div style={{ display: "flex", gap: 32, alignItems: "flex-start" }}>
           <nav style={{ width: NAV_WIDTH, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2, position: "sticky", top: 96 }}>
-            {TABS.map((t) => (
-              <button key={t.key} type="button" onClick={() => setTab(t.key)} style={navItemStyle(tab === t.key, c)}>
-                {t.label}
+            {TABS.map((sekme) => (
+              <button
+                key={sekme.key}
+                type="button"
+                onClick={() => setTab(sekme.key)}
+                style={navItemStyle(tab === sekme.key, c)}
+              >
+                {t(sekme.label)}
               </button>
             ))}
           </nav>
@@ -870,7 +957,11 @@ export default function Settings() {
         <>
           {/* Sekmeler dar ekranda sarmasın diye ortak TabBar: mobilde tek satır,
               yana kaydırmalı (bkz. components/TabBar.tsx). */}
-          <TabBar tabs={TABS} active={tab} onChange={(key) => setTab(key as SettingsTab)} />
+          <TabBar
+            tabs={TABS.map((sekme) => ({ ...sekme, label: t(sekme.label) }))}
+            active={tab}
+            onChange={(key) => setTab(key as SettingsTab)}
+          />
           {contentColumn}
         </>
       )}

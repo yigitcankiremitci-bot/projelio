@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 type Status = "checking" | "success" | "error";
 
@@ -11,6 +12,7 @@ export default function VerifyEmail() {
   const [status, setStatus] = useState<Status>("checking");
   const [message, setMessage] = useState("");
   const c = useThemeColors();
+  const t = useT();
 
   // React StrictMode geliştirmede effect'leri iki kez çalıştırıyor; doğrulama
   // isteği iki kez giderse ikincisi "token kullanılmış" hatası alabilir.
@@ -20,7 +22,7 @@ export default function VerifyEmail() {
   useEffect(() => {
     if (!token) {
       setStatus("error");
-      setMessage("Bağlantı geçersiz. E-postandaki bağlantıyı kullandığından emin ol.");
+      setMessage(t("Bağlantı geçersiz. E-postandaki bağlantıyı kullandığından emin ol."));
       return;
     }
     if (sentRef.current) return;
@@ -30,11 +32,11 @@ export default function VerifyEmail() {
       .post<{ message: string }>("/auth/verify-email", { token })
       .then((res) => {
         setStatus("success");
-        setMessage(res?.message ?? "E-posta adresin doğrulandı.");
+        setMessage(res?.message ?? t("E-posta adresin doğrulandı."));
       })
       .catch((err) => {
         setStatus("error");
-        setMessage(err instanceof Error ? err.message : "Doğrulama başarısız oldu.");
+        setMessage(err instanceof Error ? err.message : t("Doğrulama başarısız oldu."));
       });
   }, [token]);
 
@@ -65,16 +67,16 @@ export default function VerifyEmail() {
         {status === "checking" && (
           <>
             <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 600, margin: "0 0 8px" }}>
-              Doğrulanıyor…
+              {t("Doğrulanıyor…")}
             </h1>
-            <p style={{ color: c.textSecondary, fontSize: 15, margin: 0 }}>Bir saniye.</p>
+            <p style={{ color: c.textSecondary, fontSize: 15, margin: 0 }}>{t("Bir saniye.")}</p>
           </>
         )}
 
         {status === "success" && (
           <>
             <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 600, margin: "0 0 8px" }}>
-              Hesabın hazır
+              {t("Hesabın hazır")}
             </h1>
             <p style={{ color: c.textSecondary, fontSize: 15, margin: "0 0 22px", lineHeight: 1.6 }}>{message}</p>
             <Link
@@ -90,7 +92,7 @@ export default function VerifyEmail() {
                 fontWeight: 500,
               }}
             >
-              Giriş yap
+              {t("Giriş yap")}
             </Link>
           </>
         )}
@@ -98,11 +100,11 @@ export default function VerifyEmail() {
         {status === "error" && (
           <>
             <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 600, margin: "0 0 8px" }}>
-              Doğrulanamadı
+              {t("Doğrulanamadı")}
             </h1>
             <p style={{ color: c.danger, fontSize: 15, margin: "0 0 22px", lineHeight: 1.6 }}>{message}</p>
             <Link to="/login" style={{ fontSize: 16, color: c.primary }}>
-              Giriş ekranına dön
+              {t("Giriş ekranına dön")}
             </Link>
           </>
         )}

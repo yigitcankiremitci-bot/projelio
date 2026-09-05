@@ -3,14 +3,14 @@ import TabBar from "./TabBar";
 export type ProjectTab = "feed" | "team" | "tasks" | "files" | "budget" | "process";
 
 const tabs: { key: ProjectTab; label: string }[] = [
-  { key: "feed", label: "Sosyal" },
-  { key: "team", label: "Ekip" },
+  { key: "feed", label: "Sosyal" }, // dil:anahtar
+  { key: "team", label: "Ekip" }, // dil:anahtar
   // Sekme hem düz görev listesini hem çıktı katmanını barındırıyor; yalnızca
   // "Çıktılar" yazdığında insanlar sekmenin ne işe yaradığını anlamıyordu.
-  { key: "tasks", label: "Görev/Çıktı" },
-  { key: "files", label: "Dosyalar" },
-  { key: "budget", label: "Bütçe" },
-  { key: "process", label: "Süreç" },
+  { key: "tasks", label: "Görev/Çıktı" }, // dil:anahtar
+  { key: "files", label: "Dosyalar" }, // dil:anahtar
+  { key: "budget", label: "Bütçe" }, // dil:anahtar
+  { key: "process", label: "Süreç" }, // dil:anahtar
 ];
 
 interface Props {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import { aiChat } from "../api/aiChat";
 import type { AiCredits as AiCreditsData, AiCreditTransaction } from "../api/aiChat";
@@ -7,16 +8,19 @@ import AiCreditTopUp from "../components/AiCreditTopUp";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { demoHesap } from "../lib/demoHesap";
 
+// Modül düzeyinde kanca çağrılamaz: Türkçe metin ANAHTAR olarak duruyor,
+// çeviri kullanıldığı yerde (t(TYPE_LABELS[...])) yapılıyor.
 const TYPE_LABELS: Record<AiCreditTransaction["type"], string> = {
-  topup: "Kredi yüklemesi",
-  usage: "AI kullanımı",
-  refund: "İade",
-  adjustment: "Düzeltme",
-  welcome: "Hoş geldin kredisi",
+  topup: "Kredi yüklemesi", // dil:anahtar
+  usage: "AI kullanımı", // dil:anahtar
+  refund: "İade", // dil:anahtar
+  adjustment: "Düzeltme", // dil:anahtar
+  welcome: "Hoş geldin kredisi", // dil:anahtar
 };
 
 export default function AiCreditsPage() {
   const c = useThemeColors();
+  const t = useT();
   const [credits, setCredits] = useState<AiCreditsData | null>(null);
   const [transactions, setTransactions] = useState<AiCreditTransaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +50,7 @@ export default function AiCreditsPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>AI Kredilerim</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>{t("AI Kredilerim")}</h1>
 
       {/* Bakiye kartı */}
       <div
@@ -61,17 +65,17 @@ export default function AiCreditsPage() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 9, opacity: 0.8, fontSize: 13 }}>
           <IconSparkle size={16} color={c.accent} />
-          Kullanılabilir bakiye
+          {t("Kullanılabilir bakiye")}
         </div>
         <div style={{ fontSize: 38, fontWeight: 600, margin: "8px 0 2px", letterSpacing: -0.5 }}>
           {loading ? "…" : Math.round(credits?.balance ?? 0).toLocaleString("tr-TR")}
         </div>
-        <div style={{ fontSize: 13, opacity: 0.75 }}>Projelio Kredisi</div>
+        <div style={{ fontSize: 13, opacity: 0.75 }}>{t("Projelio Kredisi")}</div>
 
         {credits && (
           <div style={{ display: "flex", gap: 22, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.15)" }}>
-            <Stat label="Toplam yüklenen" value={credits.lifetimePurchased} />
-            <Stat label="Toplam harcanan" value={credits.lifetimeSpent} />
+            <Stat label={t("Toplam yüklenen")} value={credits.lifetimePurchased} />
+            <Stat label={t("Toplam harcanan")} value={credits.lifetimeSpent} />
           </div>
         )}
       </div>
@@ -90,9 +94,9 @@ export default function AiCreditsPage() {
             lineHeight: 1.5,
           }}
         >
-          Demo hesabındasın: Lio ücretsiz, krediden düşmüyor. Yukarıdaki sayı, bütün ziyaretçilerin
-          paylaştığı saatlik deneme hakkından kalan kısım — dolarsa bir süre sonra kendiliğinden
-          yenileniyor. Kendi hesabında böyle bir sınır yok.
+          {t(
+            "Demo hesabındasın: Lio ücretsiz, krediden düşmüyor. Yukarıdaki sayı, bütün ziyaretçilerin paylaştığı saatlik deneme hakkından kalan kısım — dolarsa bir süre sonra kendiliğinden yenileniyor. Kendi hesabında böyle bir sınır yok."
+          )}
         </div>
       )}
 
@@ -110,14 +114,14 @@ export default function AiCreditsPage() {
             lineHeight: 1.5,
           }}
         >
-          Krediniz azaldı. Asistanı kesintisiz kullanmak için aşağıdan kredi yükleyebilirsiniz.
+          {t("Krediniz azaldı. Asistanı kesintisiz kullanmak için aşağıdan kredi yükleyebilirsiniz.")}
         </div>
       )}
 
       {!demoHesabi && <AiCreditTopUp onChanged={reload} />}
 
       <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 10px", maxWidth: 480 }}>
-        Hareketler
+        {t("Hareketler")}
       </h2>
 
       <div
@@ -130,9 +134,9 @@ export default function AiCreditsPage() {
         }}
       >
         {loading ? (
-          <p style={{ padding: 16, margin: 0, fontSize: 14, color: c.textSecondary }}>Yükleniyor…</p>
+          <p style={{ padding: 16, margin: 0, fontSize: 14, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
         ) : transactions.length === 0 ? (
-          <p style={{ padding: 16, margin: 0, fontSize: 14, color: c.textSecondary }}>Henüz hareket yok.</p>
+          <p style={{ padding: 16, margin: 0, fontSize: 14, color: c.textSecondary }}>{t("Henüz hareket yok.")}</p>
         ) : (
           transactions.map((tx, i) => {
             const positive = tx.credits > 0;
@@ -148,7 +152,7 @@ export default function AiCreditsPage() {
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, color: c.textPrimary }}>{TYPE_LABELS[tx.type] ?? tx.type}</div>
+                  <div style={{ fontSize: 15, color: c.textPrimary }}>{t(TYPE_LABELS[tx.type] ?? tx.type)}</div>
                   <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
                     {new Date(tx.createdAt).toLocaleString("tr-TR", {
                       day: "2-digit",

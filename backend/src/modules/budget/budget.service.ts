@@ -120,7 +120,13 @@ export class BudgetService {
         tx.userId,
         "budget_changed",
         "Bütçe Güncellendi",
-        `${tx.type}: ${tx.amount} ₺`
+        // Hareketin türü ("income"/"expense") bir enum; cümleye yer tutucu
+        // olarak geçilse İngilizce arayüzde de İngilizce görünürdü ama
+        // kullanıcıya "income" diye ham bir sözcük göstermek istemiyoruz.
+        // Bu yüzden iki ayrı metin.
+        tx.type === "income"
+          ? { metin: "Gelir: {tutar} ₺", params: { tutar: tx.amount } }
+          : { metin: "Gider: {tutar} ₺", params: { tutar: tx.amount } }
       );
     }
     return tx;

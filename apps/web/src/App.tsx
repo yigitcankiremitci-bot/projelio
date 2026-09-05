@@ -23,6 +23,7 @@ import UploadTray, { UPLOAD_TRAY_HEIGHT } from "./components/UploadTray";
 import { useUploads } from "./lib/uploadQueue";
 import { CoverBackLink } from "./components/EntityCover";
 import { IconChevronRight, IconUser } from "./components/icons";
+import { useT } from "./lib/i18n";
 
 // SAYFALAR AYRI PAKETLERE BÖLÜNÜYOR. Hepsi doğrudan import edilirken Vite
 // 27 sayfayı tek dosyada topluyordu (1,29 MB): giriş ekranını görmek için bile
@@ -642,6 +643,7 @@ export default function App() {
     isCoverPage || location.pathname === "/tasks" || location.pathname === "/";
 
   const c = useThemeColors();
+  const t = useT();
 
   return (
     // Geri alma (Cmd/Ctrl+Z) tüm sayfaları kapsadığı için sağlayıcı en dışta;
@@ -705,8 +707,8 @@ export default function App() {
           <>
             <button
               onClick={() => setSidebarOpen(true)}
-              aria-label="Sidebar'ı aç"
-              title="Sidebar'ı aç"
+              aria-label={t("Sidebar'ı aç")}
+              title={t("Sidebar'ı aç")}
               style={{
                 position: "fixed",
                 top: TOP_CHROME.top,

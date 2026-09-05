@@ -2,11 +2,12 @@ import { randomUUID } from "crypto";
 import { hashPassword, verifyPassword } from "../../common/password.util";
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
+import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 import { demoHesabindaYasak } from "../../common/demo-hesap";
-import type { Sector, TeamSize, UseCase } from "@projelio/shared";
-import { SECTORS, TEAM_SIZES, USE_CASES } from "@projelio/shared";
+import type { Locale, Sector, TeamSize, UseCase } from "@projelio/shared";
+import { isLocale, SECTORS, TEAM_SIZES, USE_CASES } from "@projelio/shared";
 
 const AVATAR_BUCKET = "avatars";
 
@@ -39,6 +40,8 @@ export interface UserRecord {
   teamSize?: TeamSize;
   useCases?: UseCase[];
   onboardingModules?: string[];
+  // Arayüz dili. Boşsa kullanıcı seçim yapmamıştır; bkz. migration 087.
+  locale?: Locale;
 }
 
 // Dışarıya (frontend'e) dönülen güvenli kullanıcı görünümü - şifre hash'i içermez.
@@ -98,6 +101,7 @@ function mapUser(row: any): UserRecord {
     teamSize: row.team_size ?? undefined,
     useCases: row.use_cases ?? undefined,
     onboardingModules: row.onboarding_modules ?? undefined,
+    locale: row.locale ?? undefined,
   };
 }
 
@@ -110,6 +114,9 @@ function toPublicUser(user: UserRecord): PublicUser {
     teamSize: _teamSize,
     useCases: _useCases,
     onboardingModules: _onboardingModules,
+    // Dil de kişisel bir tercih: başkasının hangi dilde çalıştığı kimseyi
+    // ilgilendirmiyor. Kişinin kendisi bunu /auth/me'den alıyor.
+    locale: _locale,
     ...publicUser
   } = user;
   return publicUser;
@@ -139,7 +146,10 @@ export function assertValidUsername(username: string): void {
 
 @Injectable()
 export class UsersService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private readonly diller: KullaniciDiliService
+  ) {}
 
   /**
    * Kullanıcı adı alınmış mı?
@@ -161,7 +171,14 @@ export class UsersService {
     return Boolean(data);
   }
 
-  async create(data: { fullName: string; email: string; passwordHash: string; username: string }): Promise<UserRecord> {
+  async create(data: {
+    fullName: string;
+    email: string;
+    passwordHash: string;
+    username: string;
+    /** Kayıt ekranındaki dil. Gelmezse null kalır: "seçim yapılmadı" demektir. */
+    locale?: Locale;
+  }): Promise<UserRecord> {
     const username = normalizeUsername(data.username);
     assertValidUsername(username);
     const email = normalizeEmail(data.email);
@@ -173,6 +190,8 @@ export class UsersService {
         email,
         password_hash: data.passwordHash,
         username,
+        // undefined ise null yazılır — bkz. migration 087, null "seçilmedi".
+        locale: data.locale ?? null,
       })
       .select()
       .single();
@@ -457,6 +476,37 @@ export class UsersService {
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new ConflictException("Kullanıcı bulunamadı");
+    return toPublicUser(mapUser(row));
+  }
+
+  /**
+   * Arayüz dili tercihi.
+   *
+   * Kolon NULL kalabilir ve bu "Türkçe" demek DEĞİL, "kullanıcı henüz seçmedi"
+   * demektir: o hâlde dil tarayıcıdan (web) ya da Accept-Language'den (e-posta,
+   * bildirim) çıkarılır. Bu yüzden `null` göndermek geçerli bir istektir —
+   * kullanıcı "otomatik"e geri dönebiliyor.
+   *
+   * Desteklenmeyen bir kod veritabanı kısıtına takılır (migration 087) ama
+   * oradan dönen hata kullanıcıya anlaşılmaz görünürdü; burada erken kesiyoruz.
+   */
+  async updateLocale(userId: string, locale: unknown): Promise<PublicUser> {
+    if (locale !== null && locale !== undefined && !isLocale(locale)) {
+      throw new BadRequestException("Desteklenmeyen dil");
+    }
+
+    const { data: row, error } = await this.supabase.client
+      .from("users")
+      .update({ locale: locale ?? null })
+      .eq("id", userId)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new ConflictException("Kullanıcı bulunamadı");
+    // Bildirim/e-posta tarafındaki dil önbelleği beş dakika ömürlü; kullanıcı
+    // az önce dilini değiştirdiğine göre o gecikmeyi burada iptal ediyoruz,
+    // yoksa hemen ardından gelen bildirim eski dilde giderdi.
+    this.diller.unut(userId);
     return toPublicUser(mapUser(row));
   }
 

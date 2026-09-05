@@ -27,6 +27,7 @@ import { useUndo } from "../lib/undo";
 import { formatTaskDuration } from "../lib/dates";
 import { coverBackground } from "../lib/covers";
 import { assigneeLabels } from "../lib/taskAssignees";
+import { useT } from "../lib/i18n";
 
 
 export interface TaskColumnHandle {
@@ -156,10 +157,16 @@ const SUBTASK_DRAG_EVENT = "projelio:subtask-drag";
 /** Kapalı kartın kendiliğinden açılması için üzerinde beklenmesi gereken süre (ms). */
 const SUBTASK_HOVER_EXPAND_DELAY = 450;
 
+/**
+ * Sütun başlıkları modül düzeyinde, yani t() burada çağrılamaz (kanca yok).
+ * Türkçe metin ANAHTAR olarak duruyor, çeviri kullanıldığı yerde yapılıyor —
+ * bkz. aşağıda `t(columnLabel[status])`. Bu değerler yalnızca GÖRÜNEN metin;
+ * karşılaştırmalar her yerde TaskStatus anahtarıyla ("completed") yapılıyor.
+ */
 const columnLabel: Record<TaskStatus, string> = {
-  todo: "Yapılacak",
-  in_progress: "Devam eden",
-  completed: "Tamamlandı",
+  todo: "Yapılacak", // dil:anahtar
+  in_progress: "Devam eden", // dil:anahtar
+  completed: "Tamamlandı", // dil:anahtar
 };
 
 /**
@@ -199,6 +206,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   onOpenSource,
 }, ref) {
   const c = useThemeColors();
+  const t = useT();
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
 
@@ -617,7 +625,10 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
       await writeOrder(finalOrder);
 
       undo?.({
-        label: movingIds.length > 1 ? `${movingIds.length} görev alt göreve alındı` : "Alt göreve dönüştürüldü",
+        label:
+          movingIds.length > 1
+            ? t("{n} görev alt göreve alındı", { n: movingIds.length })
+            : t("Alt göreve dönüştürüldü"),
         // Geri alırken her kayıt KENDİ eski üst görevine döner; birlikte taşınan
         // kartlar farklı yerlerden gelmiş olabilir.
         run: async () => {
@@ -636,7 +647,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
       reload?.();
     } catch (err: any) {
       // Sunucu kuralı reddedebilir (ör. kaydın kendi alt görevleri var).
-      window.alert(err?.message ?? "Alt göreve dönüştürülemedi.");
+      window.alert(err?.message ?? t("Alt göreve dönüştürülemedi."));
       reload?.();
     }
   };
@@ -700,7 +711,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
         // sırayı çekiyor (bkz. convertToSubtaskByDrop'taki aynı gerekçe).
         await api.patch("/tasks/reorder", { ids });
         undo?.({
-          label: "Göreve dönüştürüldü",
+          label: t("Göreve dönüştürüldü"),
           run: async () => {
             if (previousParent) {
               await api.patch(`/tasks/${subtaskId}/hierarchy`, { parentTaskId: previousParent });
@@ -712,7 +723,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
           },
         });
       } catch (err: any) {
-        window.alert(err?.message ?? "Göreve dönüştürülemedi.");
+        window.alert(err?.message ?? t("Göreve dönüştürülemedi."));
       }
       reload();
       return;
@@ -734,7 +745,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
       // taşımayı geri alır. Ters sırada olsaydı ikinci geri alma, artık başka bir
       // üst görevin altında olan kayıtları tek liste sanıp sunucuda reddedilirdi.
       undo({
-        label: "Alt görev taşıma",
+        label: t("Alt görev taşıma"),
         run: () => applyParent(previousParentId),
         redo: () => applyParent(newParentId),
       });
@@ -836,7 +847,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     try {
       await applyTitle(trimmed);
       pushUndo({
-        label: task.parentTaskId ? "Alt görev adı" : "Görev adı",
+        label: task.parentTaskId ? t("Alt görev adı") : t("Görev adı"),
         run: () => applyTitle(previousTitle),
         redo: () => applyTitle(trimmed),
       });
@@ -892,7 +903,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
               onBlur={() => void commitRename(task)}
               onSubmit={() => void commitRename(task)}
               onCancel={() => setRenamingId(null)}
-              ariaLabel="Görev adı"
+              ariaLabel={t("Görev adı")}
               fontSize={fontSize}
               // Ölçüler yerini aldığı metinle aynı olsun diye: kutu görünümü
               // .autogrow-inline ile sıfırlanıyor, asgari yükseklik de satırın
@@ -911,7 +922,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
           e.stopPropagation();
           startRename(task);
         }}
-        title={onTaskRenamed && !selectionMode ? "Adı değiştirmek için çift tıkla" : undefined}
+        title={onTaskRenamed && !selectionMode ? t("Adı değiştirmek için çift tıkla") : undefined}
         style={{
           fontSize,
           color,
@@ -947,7 +958,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     try {
       await request(priority);
       pushUndo({
-        label: "Görev önceliği",
+        label: t("Görev önceliği"),
         run: () => request(previous),
         redo: () => request(priority),
       });
@@ -962,7 +973,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
       if (current === 0) return null;
       return (
         <div
-          aria-label={`Öncelik ${current}/${MAX_TASK_PRIORITY}`}
+          aria-label={t("Öncelik {n}/{toplam}", { n: current, toplam: MAX_TASK_PRIORITY })}
           style={{ display: "flex", gap: 1, marginTop: 5 }}
         >
           {Array.from({ length: current }, (_, i) => (
@@ -976,7 +987,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     return (
       <div
         role="radiogroup"
-        aria-label="Öncelik"
+        aria-label={t("Öncelik")}
         onMouseLeave={() => setHoverStar(null)}
         style={{ display: "flex", gap: 1, marginTop: 5 }}
       >
@@ -989,8 +1000,8 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
               type="button"
               role="radio"
               aria-checked={current === value}
-              aria-label={`${value} yıldız`}
-              title={current === value ? "Önceliği kaldır" : `${value} yıldız`}
+              aria-label={t("{n} yıldız", { n: value })}
+              title={current === value ? t("Önceliği kaldır") : t("{n} yıldız", { n: value })}
               onMouseEnter={() => setHoverStar({ taskId: task.id, value })}
               onClick={(e) => {
                 e.stopPropagation();
@@ -1085,33 +1096,33 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <h4 style={{ color: c.textPrimary, fontSize: 16, fontWeight: 500, margin: 0 }}>{columnLabel[status]}</h4>
+        <h4 style={{ color: c.textPrimary, fontSize: 16, fontWeight: 500, margin: 0 }}>{t(columnLabel[status])}</h4>
         <span style={{ fontSize: 13, color: c.textSecondary, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 20, padding: "1px 7px" }}>
           {realTopLevel.length}
         </span>
       </div>
 
       <div ref={topListRef} data-status={status}>
-        {realTopLevel.map((t) => {
-          const subtasks = subtasksOf(t.id);
-          const isOpen = subtasksEnabled && expanded.has(t.id);
-          const stats = subtaskStats(t.id);
+        {realTopLevel.map((gorev) => {
+          const subtasks = subtasksOf(gorev.id);
+          const isOpen = subtasksEnabled && expanded.has(gorev.id);
+          const stats = subtaskStats(gorev.id);
           // Gün bazlı karşılaştırma: son günü bugün olan görevler gün bitmeden
           // "gecikmiş" (kırmızı) görünmesin — sadece tarihi gerçekten geçmişse.
           // "Bugün" döngü DIŞINDA bir kez hesaplanıyor (bkz. bugunBaslangici):
           // burada kurulunca her render'da kart başına iki Date nesnesi daha
           // yaratılıyordu ve değeri zaten hepsinde aynı.
-          const deadlineDate = new Date(t.deadline);
+          const deadlineDate = new Date(gorev.deadline);
           const deadlineDay = new Date(deadlineDate.getFullYear(), deadlineDate.getMonth(), deadlineDate.getDate());
-          const isOverdue = t.status !== "completed" && deadlineDay < bugunBaslangici;
+          const isOverdue = gorev.status !== "completed" && deadlineDay < bugunBaslangici;
           const isOverdueWithPendingSubtasks = isOverdue && stats.total > 0 && stats.remaining > 0;
           return (
-            <div key={t.id} data-id={t.id} style={{ marginBottom: 8 }}>
+            <div key={gorev.id} data-id={gorev.id} style={{ marginBottom: 8 }}>
               <div
-                className={`task-drag-handle${highlightTaskId === t.id ? " task-highlight-flash" : ""}`}
+                className={`task-drag-handle${highlightTaskId === gorev.id ? " task-highlight-flash" : ""}`}
                 // Alt görev sürüklenirken imlecin altındaki kart bu işaretle
                 // bulunur ve kapalıysa kendiliğinden açılır (bkz. handleSubtaskDragMove).
-                data-task-card-id={subtasksEnabled ? t.id : undefined}
+                data-task-card-id={subtasksEnabled ? gorev.id : undefined}
                 // Tek tıklama alt görevleri açar/kapar, çift tıklama görevin
                 // kaynağına gider. Çift tıklamada tarayıcı önce İKİ `click`
                 // gönderdiği için tek tıklama işi doğrudan burada yapılamaz:
@@ -1120,16 +1131,16 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                 // geri alınması gereken iki tık vardı, üçüncü çağrı listeyi açık
                 // bırakıp gözle görülür bir açılıp-kapanmaya yol açıyordu.
                 // Artık tek tıklama kısa bir süre bekletiliyor (bkz. clickIntent).
-                onClick={() => (onOpenSource ? click.single(() => toggleExpand(t.id)) : toggleExpand(t.id))}
+                onClick={() => (onOpenSource ? click.single(() => toggleExpand(gorev.id)) : toggleExpand(gorev.id))}
                 onDoubleClick={
                   onOpenSource
                     ? (e) => {
                         e.stopPropagation();
-                        click.double(() => onOpenSource(t));
+                        click.double(() => onOpenSource(gorev));
                       }
                     : undefined
                 }
-                title={onOpenSource ? "Çift tıkla: görevin bulunduğu sayfaya git" : undefined}
+                title={onOpenSource ? t("Çift tıkla: görevin bulunduğu sayfaya git") : undefined}
                 style={{
                   background: c.surface,
                   border: `1px solid ${c.border}`,
@@ -1144,16 +1155,16 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onToggleSelect?.(t.id);
+                        onToggleSelect?.(gorev.id);
                       }}
-                      aria-label={selectedIds?.has(t.id) ? "Seçimi kaldır" : "Seç"}
+                      aria-label={selectedIds?.has(gorev.id) ? t("Seçimi kaldır") : t("Seç")}
                       style={{
                         width: 18,
                         height: 18,
                         borderRadius: 5,
                         flexShrink: 0,
-                        border: `1.5px solid ${selectedIds?.has(t.id) ? c.primary : c.border}`,
-                        background: selectedIds?.has(t.id) ? c.primary : "transparent",
+                        border: `1.5px solid ${selectedIds?.has(gorev.id) ? c.primary : c.border}`,
+                        background: selectedIds?.has(gorev.id) ? c.primary : "transparent",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1161,19 +1172,19 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                         cursor: "pointer",
                       }}
                     >
-                      {selectedIds?.has(t.id) && <IconCheck size={11} color="#fff" />}
+                      {selectedIds?.has(gorev.id) && <IconCheck size={11} color="#fff" />}
                     </button>
                   )}
                   <button
-                    onClick={(e) => handleCheckboxClick(e, t.id, t.status, t.title)}
-                    aria-label={t.status === "completed" ? "Tamamlandıyı geri al" : "Tamamlandı olarak işaretle"}
+                    onClick={(e) => handleCheckboxClick(e, gorev.id, gorev.status, gorev.title)}
+                    aria-label={gorev.status === "completed" ? t("Tamamlandıyı geri al") : t("Tamamlandı olarak işaretle")}
                     style={{
                       width: 18,
                       height: 18,
                       borderRadius: "50%",
                       flexShrink: 0,
-                      border: t.status === "completed" ? "none" : `1.5px solid ${c.border}`,
-                      background: t.status === "completed" ? c.accent : "transparent",
+                      border: gorev.status === "completed" ? "none" : `1.5px solid ${c.border}`,
+                      background: gorev.status === "completed" ? c.accent : "transparent",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -1181,10 +1192,10 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                       cursor: "pointer",
                     }}
                   >
-                    {t.status === "completed" && <IconCheck size={10} color="#fff" />}
+                    {gorev.status === "completed" && <IconCheck size={10} color="#fff" />}
                   </button>
                   {(() => {
-                    const avatar = getTaskAvatar?.(t);
+                    const avatar = getTaskAvatar?.(gorev);
                     if (!avatar) return null;
                     // Kapak değeri her zaman bir URL değil: hazır kapaklar
                     // "preset:<anahtar>" olarak saklanıyor (bkz. lib/covers).
@@ -1229,9 +1240,9 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                     }}
                   >
                     {renderTitle(
-                      t,
+                      gorev,
                       16,
-                      t.status === "completed"
+                      gorev.status === "completed"
                         ? c.textSecondary
                         : isOverdueWithPendingSubtasks
                         ? c.danger
@@ -1247,10 +1258,10 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                         {/* Ek rozetleri başlığın YANINDA kalır: görevi
                             tanımlayan bilgi, ona uygulanan bir eylem değil. */}
                         <TaskAttachmentBadges
-                          taskId={t.id}
-                          links={t.attachments}
-                          files={t.files}
-                          onOpenDetail={() => onEditTask(t)}
+                          taskId={gorev.id}
+                          links={gorev.attachments}
+                          files={gorev.files}
+                          onOpenDetail={() => onEditTask(gorev)}
                           size={13}
                         />
                         {/* Eylem düğmeleri her kartta AYNI hizada dursun diye
@@ -1270,24 +1281,24 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onEditTask(t);
+                              onEditTask(gorev);
                             }}
-                            aria-label="Görevi düzenle"
+                            aria-label={t("Görevi düzenle")}
                             style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
                           >
                             <IconEdit size={13} color={c.textSecondary} />
                           </button>
-                          {onToggleActive && (canToggleActive?.(t) ?? true) && (
+                          {onToggleActive && (canToggleActive?.(gorev) ?? true) && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onToggleActive(t.id);
+                                onToggleActive(gorev.id);
                               }}
-                              aria-label={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
-                              title={activeTaskId === t.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
-                              className={activeTaskId === t.id ? "active-task-pulse" : undefined}
+                              aria-label={activeTaskId === gorev.id ? t("Üzerinde çalışmayı bırak") : t("Üzerinde çalışıyorum")}
+                              title={activeTaskId === gorev.id ? t("Üzerinde çalışmayı bırak") : t("Üzerinde çalışıyorum")}
+                              className={activeTaskId === gorev.id ? "active-task-pulse" : undefined}
                               style={{
-                                background: activeTaskId === t.id ? `${c.accent}22` : "transparent",
+                                background: activeTaskId === gorev.id ? `${c.accent}22` : "transparent",
                                 border: "none",
                                 borderRadius: "50%",
                                 padding: 3,
@@ -1295,10 +1306,10 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                                 flexShrink: 0,
                               }}
                             >
-                              <IconActivity size={13} color={activeTaskId === t.id ? c.accentDark : c.textSecondary} filled={activeTaskId === t.id} />
+                              <IconActivity size={13} color={activeTaskId === gorev.id ? c.accentDark : c.textSecondary} filled={activeTaskId === gorev.id} />
                             </button>
                           )}
-                          <AskLioButton subject={{ kind: "gorev", title: t.title, id: t.id }} size={20} />
+                          <AskLioButton subject={{ kind: "gorev", title: gorev.title, id: gorev.id }} size={20} />
                         </span>
                       </>
                   </div>
@@ -1330,7 +1341,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                         <IconChevronRight size={13} color={c.textSecondary} />
                       </span>
                     )}
-                    {subtasksEnabled && subtaskStats(t.id).total > 0 && (
+                    {subtasksEnabled && subtaskStats(gorev.id).total > 0 && (
                       <span
                         style={{
                           fontSize: 12,
@@ -1348,14 +1359,14 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {subtaskStats(t.id).remaining}/{subtaskStats(t.id).total}
+                        {subtaskStats(gorev.id).remaining}/{subtaskStats(gorev.id).total}
                       </span>
                     )}
                   </div>
                 </div>
-                {getTaskMeta?.(t) && (
+                {getTaskMeta?.(gorev) && (
                   <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 3, overflowWrap: "break-word", wordBreak: "break-word" }}>
-                    {getTaskMeta(t)}
+                    {getTaskMeta(gorev)}
                   </div>
                 )}
                 {/* Kartta yalnızca TEK SATIR: uzun bir not kartı şişirip panodaki
@@ -1363,14 +1374,14 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                     modalinde okunur — açıklamaya çift tıklamak oraya götürür.
                     Tek tıklama burada durdurulur, yoksa çift tıklamanın ilk
                     tıklaması alt görev listesini açıp kapatırdı. */}
-                {t.description && (
+                {gorev.description && (
                   <div
                     onClick={(e) => e.stopPropagation()}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
-                      onEditTask(t);
+                      onEditTask(gorev);
                     }}
-                    title={t.description}
+                    title={gorev.description}
                     style={{
                       fontSize: 13,
                       color: c.textSecondary,
@@ -1381,12 +1392,12 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                       cursor: "pointer",
                     }}
                   >
-                    {t.description}
+                    {gorev.description}
                   </div>
                 )}
-                {(assigneeLabels(t).length > 0 || formatTaskDuration(t.estimatedDurationValue, t.estimatedDurationUnit)) && (
+                {(assigneeLabels(gorev).length > 0 || formatTaskDuration(gorev.estimatedDurationValue, gorev.estimatedDurationUnit)) && (
                   <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    {assigneeLabels(t).map((name) => (
+                    {assigneeLabels(gorev).map((name) => (
                       <span
                         key={name}
                         style={{
@@ -1404,7 +1415,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                         {name}
                       </span>
                     ))}
-                    {formatTaskDuration(t.estimatedDurationValue, t.estimatedDurationUnit) && (
+                    {formatTaskDuration(gorev.estimatedDurationValue, gorev.estimatedDurationUnit) && (
                       <span
                         style={{
                           display: "inline-flex",
@@ -1418,21 +1429,21 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                           padding: "1px 8px",
                         }}
                       >
-                        {formatTaskDuration(t.estimatedDurationValue, t.estimatedDurationUnit)}
+                        {formatTaskDuration(gorev.estimatedDurationValue, gorev.estimatedDurationUnit)}
                       </span>
                     )}
                   </div>
                 )}
-                {renderPriority(t)}
+                {renderPriority(gorev)}
                 {(() => {
-                  const { total, remaining } = subtaskStats(t.id);
+                  const { total, remaining } = subtaskStats(gorev.id);
                   const progressPct = total > 0 ? Math.round(((total - remaining) / total) * 100) : 0;
-                  const start = formatDay(t.startDate ?? t.createdAt);
+                  const start = formatDay(gorev.startDate ?? gorev.createdAt);
                   // Yapılacaklar panosundaki kişisel görevlerin tarihi olmayabilir;
                   // "Invalid Date" basmak yerine o ucu boş bırakıyoruz.
                   // Bitiş saati opsiyonel (bkz. migration 057); varsa tarihin
                   // yanına eklenir, yoksa görünüm eskisiyle birebir aynı kalır.
-                  const due = formatDay(t.deadline) + (t.deadlineTime ? ` ${t.deadlineTime}` : "");
+                  const due = formatDay(gorev.deadline) + (gorev.deadlineTime ? ` ${gorev.deadlineTime}` : "");
                   // İlerleme çubuğu alt görev tamamlanmasını gösterir. Alt görevi
                   // olmayan bir görevde hep boş durup "%0 bitti" gibi yanlış bir
                   // sinyal veriyordu; artık yalnızca gösterecek bir şey varken çıkıyor.
@@ -1474,10 +1485,10 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                   }}
                 >
                   <div
-                    ref={subtaskListRef(t.id)}
+                    ref={subtaskListRef(gorev.id)}
                     // Hedef üst görevin kimliği: alt görev başka bir karta
                     // bırakıldığında yeni üst görev buradan okunuyor.
-                    data-parent-id={t.id}
+                    data-parent-id={gorev.id}
                     style={{
                       display: "flex",
                       flexDirection: "column",
@@ -1509,7 +1520,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                           e.stopPropagation();
                           onEditTask(sub);
                         }}
-                        title="Çift tıkla: alt görevi düzenle"
+                        title={t("Çift tıkla: alt görevi düzenle")}
                         style={{
                           display: "flex",
                           alignItems: "center",
@@ -1526,7 +1537,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                               e.stopPropagation();
                               onToggleSelect?.(sub.id);
                             }}
-                            aria-label={selectedIds?.has(sub.id) ? "Seçimi kaldır" : "Seç"}
+                            aria-label={selectedIds?.has(sub.id) ? t("Seçimi kaldır") : t("Seç")}
                             style={{
                               width: 14,
                               height: 14,
@@ -1549,7 +1560,11 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                             e.stopPropagation();
                             onToggleComplete(sub.id);
                           }}
-                          aria-label={sub.status === "completed" ? "Alt görev tamamlandıyı geri al" : "Alt görevi tamamlandı olarak işaretle"}
+                          aria-label={
+                            sub.status === "completed"
+                              ? t("Alt görev tamamlandıyı geri al")
+                              : t("Alt görevi tamamlandı olarak işaretle")
+                          }
                           style={{
                             width: 14,
                             height: 14,
@@ -1636,7 +1651,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                                     e.stopPropagation();
                                     onEditTask(sub);
                                   }}
-                                  aria-label="Alt görevi düzenle"
+                                  aria-label={t("Alt görevi düzenle")}
                                   style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
                                 >
                                   <IconEdit size={11} color={c.textSecondary} />
@@ -1647,8 +1662,8 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                                       e.stopPropagation();
                                       onToggleActive(sub.id);
                                     }}
-                                    aria-label={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
-                                    title={activeTaskId === sub.id ? "Üzerinde çalışmayı bırak" : "Üzerinde çalışıyorum"}
+                                    aria-label={activeTaskId === sub.id ? t("Üzerinde çalışmayı bırak") : t("Üzerinde çalışıyorum")}
+                                    title={activeTaskId === sub.id ? t("Üzerinde çalışmayı bırak") : t("Üzerinde çalışıyorum")}
                                     className={activeTaskId === sub.id ? "active-task-pulse" : undefined}
                                     style={{
                                       background: activeTaskId === sub.id ? `${c.accent}22` : "transparent",
@@ -1676,26 +1691,26 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                     ))}
                   </div>
 
-                  {subtaskParent === t.id ? (
-                    <form ref={addSubtaskFormRef} onSubmit={(e) => handleAddSubtask(e, t.id)}>
+                  {subtaskParent === gorev.id ? (
+                    <form ref={addSubtaskFormRef} onSubmit={(e) => handleAddSubtask(e, gorev.id)}>
                       <AutoGrowTextarea
                         autoFocus
                         value={subtaskTitle}
                         onChange={setSubtaskTitle}
-                        onSubmit={() => commitAddSubtask(t.id)}
+                        onSubmit={() => commitAddSubtask(gorev.id)}
                         onCancel={() => {
                           setSubtaskParent(null);
                           setSubtaskTitle("");
                         }}
-                        onBlur={() => commitAddSubtask(t.id)}
-                        placeholder="Alt görev başlığı, Enter'a bas"
+                        onBlur={() => commitAddSubtask(gorev.id)}
+                        placeholder={t("Alt görev başlığı, Enter'a bas")}
                         maxLength={200}
                         minHeight={32}
                       />
                     </form>
                   ) : (
                     <button
-                      onClick={() => setSubtaskParent(t.id)}
+                      onClick={() => setSubtaskParent(gorev.id)}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -1710,7 +1725,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                       }}
                     >
                       <IconPlus size={12} color={c.textSecondary} />
-                      Alt görev ekle
+                      {t("Alt görev ekle")}
                     </button>
                   )}
                 </div>
@@ -1736,7 +1751,9 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
             }}
           >
             <span style={{ fontSize: 15, color: c.textSecondary, fontStyle: "italic", flex: 1, minWidth: 0, overflowWrap: "break-word", wordBreak: "break-word" }}>{parent.title}</span>
-            <span style={{ fontSize: 12, color: c.textSecondary, whiteSpace: "nowrap" }}>{columnLabel[parent.status]}'de</span>
+            <span style={{ fontSize: 12, color: c.textSecondary, whiteSpace: "nowrap" }}>
+              {t("{sutun}'de", { sutun: t(columnLabel[parent.status]) })}
+            </span>
           </div>
 
           <div
@@ -1765,7 +1782,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
               >
                 <button
                   onClick={() => onToggleComplete(sub.id)}
-                  aria-label="Alt görev tamamlandıyı geri al"
+                  aria-label={t("Alt görev tamamlandıyı geri al")}
                   style={{
                     width: 14,
                     height: 14,
@@ -1796,7 +1813,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                   </span>
                   <button
                     onClick={() => onEditTask(sub)}
-                    aria-label="Alt görevi düzenle"
+                    aria-label={t("Alt görevi düzenle")}
                     style={{ background: "transparent", border: "none", padding: 2, display: "flex", flexShrink: 0 }}
                   >
                     <IconEdit size={11} color={c.textSecondary} />
@@ -1821,7 +1838,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                 setTitle("");
               }}
               onBlur={commitAddTask}
-              placeholder="Görev başlığı yaz, Enter'a bas"
+              placeholder={t("Görev başlığı yaz, Enter'a bas")}
               maxLength={200}
               minHeight={34}
             />
@@ -1843,28 +1860,30 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
             }}
           >
             <IconPlus size={14} color={c.textSecondary} />
-            Görev ekle
+            {t("Görev ekle")}
           </button>
         ))}
 
       {confirmTarget && (
-        <Modal title="Görevi tamamla" onClose={() => setConfirmTarget(null)}>
+        <Modal title={t("Görevi tamamla")} onClose={() => setConfirmTarget(null)}>
           <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
-            <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{confirmTarget.title}</strong> görevini tamamlandı
-            olarak işaretleyip "Tamamlandı" bölümüne taşımak istiyor musun?
+            <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{confirmTarget.title}</strong>{" "}
+            {t('görevini tamamlandı olarak işaretleyip "{sutun}" bölümüne taşımak istiyor musun?', {
+              sutun: t(columnLabel.completed),
+            })}
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button
               onClick={() => setConfirmTarget(null)}
               style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 16 }}
             >
-              Vazgeç
+              {t("Vazgeç")}
             </button>
             <button
               onClick={confirmComplete}
               style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 16, fontWeight: 500 }}
             >
-              Tamamlandı olarak işaretle
+              {t("Tamamlandı olarak işaretle")}
             </button>
           </div>
         </Modal>

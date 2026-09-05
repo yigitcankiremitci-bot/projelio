@@ -20,6 +20,7 @@ import TaskSortMenu from "../components/TaskSortMenu";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { backState } from "../lib/backTarget";
 import { useDragScroll } from "../lib/useDragScroll";
+import { useT } from "../lib/i18n";
 
 // Sıra, uygulamadaki diğer tüm kanbanlarla aynı: önce üzerinde çalışılan işler.
 // (bkz. DepartmentTasksPanel, JobTasksPanel, OutputsPanel, ProcessPanel)
@@ -34,10 +35,12 @@ type Filter = "all" | PersonalBoardSource;
 // atadığı görevleri değil, kullanıcının kendi açtığı (atama yapılmadığında
 // kendisine atanan, bkz. tasks.service createForProject) proje görevlerini de
 // içeriyor — eski etiket yanıltıcı kalıyordu.
+// Etiketler modül düzeyinde: t() burada çağrılamaz, Türkçe metin ANAHTAR olarak
+// duruyor ve çeviri kullanıldığı yerde yapılıyor (bkz. aşağıda `t(f.label)`).
 const FILTERS: { value: Filter; label: string }[] = [
-  { value: "personal", label: "Kişisel" },
-  { value: "assigned", label: "İş görevlerim" },
-  { value: "all", label: "Tümü" },
+  { value: "personal", label: "Kişisel" }, // dil:anahtar
+  { value: "assigned", label: "İş görevlerim" }, // dil:anahtar
+  { value: "all", label: "Tümü" }, // dil:anahtar
 ];
 
 // Sayfa her zaman "Kişisel" ile açılır: burası önce kullanıcının kendi çalışma
@@ -62,6 +65,7 @@ const DEFAULT_FILTER: Filter = "personal";
  */
 export default function TasksOverview() {
   const c = useThemeColors();
+  const t = useT();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   // Pano yalnızca masaüstünde yana kayıyor; dar ekranda sütunlar alt alta.
@@ -215,7 +219,7 @@ export default function TasksOverview() {
       const params = new URLSearchParams();
       if (filter !== DEFAULT_FILTER) params.set("filter", filter);
       params.set("focus", task.id);
-      const from = { to: `/tasks?${params.toString()}`, label: "Yapılacaklar" };
+      const from = { to: `/tasks?${params.toString()}`, label: t("Yapılacaklar") };
       if (item.projectId) {
         navigate(`/projects/${item.projectId}`, {
           state: { highlightTaskId: task.id, ...backState(from) },
@@ -251,11 +255,11 @@ export default function TasksOverview() {
       const item = items.find((i) => i.itemId === task.id);
       if (!item) return undefined;
       if (item.source === "personal") {
-        return { url: me?.avatarUrl, label: me?.fullName ?? "Kişisel görev" };
+        return { url: me?.avatarUrl, label: me?.fullName ?? t("Kişisel görev") };
       }
       return {
         url: item.coverImageUrl,
-        label: item.projectTitle ?? item.operationTitle ?? item.departmentName ?? "Atanan görev",
+        label: item.projectTitle ?? item.operationTitle ?? item.departmentName ?? t("Atanan görev"),
       };
     },
     [items, me]
@@ -272,7 +276,7 @@ export default function TasksOverview() {
   const registerTodoCreateUndo = (createdId: string, payload: { title: string; status: TaskStatus }) => {
     let currentId = createdId;
     pushUndo({
-      label: "Görev oluşturma",
+      label: t("Görev oluşturma"),
       run: async () => {
         await api.delete(`/todos/${currentId}`);
         load();
@@ -307,7 +311,7 @@ export default function TasksOverview() {
       // registerUndo=false: bu çağrı zaten bir geri alma işleminin kendisi.
       if (registerUndo && previousStatus && previousStatus !== status) {
         pushUndo({
-          label: "Görev durumu",
+          label: t("Görev durumu"),
           run: async () => {
             await api.patch("/todos/status", { source, itemId, status: previousStatus });
             load();
@@ -349,7 +353,7 @@ export default function TasksOverview() {
     // Diğer kanbanlarla aynı geri alma davranışı; yalnızca gövde şekli farklı
     // olduğu için ortak yardımcı yerine elle kaydediyoruz.
     pushUndo({
-      label: "Görev sırası",
+      label: t("Görev sırası"),
       run: async () => {
         await api.patch("/todos/reorder", { items: toPayload(previousIds) });
         load();
@@ -384,7 +388,7 @@ export default function TasksOverview() {
       ]);
       removeItemsFromState(ids);
       pushUndo({
-        label: `${ids.length} görev arşivleme`,
+        label: t("{n} görev arşivleme", { n: ids.length }),
         run: async () => {
           await Promise.all([
             ...personalIds.map((id) => api.patch(`/todos/${id}/restore`, {})),
@@ -426,7 +430,7 @@ export default function TasksOverview() {
     if (personalIds.length > 0) {
       Promise.all(personalIds.map((id) => api.delete(`/todos/${id}`))).catch(() => load());
       pushUndo({
-        label: `${personalIds.length} kişisel görev silme`,
+        label: t("{n} kişisel görev silme", { n: personalIds.length }),
         run: async () => {
           await Promise.all(personalIds.map((id) => api.patch(`/todos/${id}/restore`, {})));
           load();
@@ -440,7 +444,7 @@ export default function TasksOverview() {
 
     if (assignedIds.length > 0) {
       pushDestructive({
-        label: `${assignedIds.length} görev silme`,
+        label: t("{n} görev silme", { n: assignedIds.length }),
         commit: () => api.post("/tasks/bulk-delete", { ids: assignedIds }),
         restore: () => {},
         entityIds: assignedIds,
@@ -540,7 +544,7 @@ export default function TasksOverview() {
     if (filter === "assigned") setFilter("all");
     columnRefs.current.todo?.openCreate();
   }, [filter]);
-  useProjectFabAction({ label: "Yeni görev", onClick: startQuickAdd }, [startQuickAdd]);
+  useProjectFabAction({ label: t("Yeni görev"), onClick: startQuickAdd }, [startQuickAdd]);
 
   // Tek çağrı iki işe yarıyor: aktif görev işareti (users.active_task_id, diğer
   // sayfalarla aynı kaynak) ve kişisel kartlarda gösterilen profil fotoğrafı.
@@ -600,7 +604,7 @@ export default function TasksOverview() {
             color: filter === f.value ? c.textPrimary : c.textSecondary,
           }}
         >
-          {f.label}
+          {t(f.label)}
         </button>
       ))}
     </div>
@@ -632,7 +636,7 @@ export default function TasksOverview() {
   // kendi başlık satırı üstleniyor — o satır yukarı kayınca filtreler ve
   // Sırala/Seç şeritte yeniden beliriyor, aksi halde uzun bir panoda aşağı
   // inildiğinde bu kontrollere hiç erişilemiyordu.
-  usePageHeader("Yapılacaklar", headerRef, []);
+  usePageHeader(t("Yapılacaklar"), headerRef, []);
   usePageHeaderTabs(filterButtons, [filter, selection.selectionMode], filtersRef);
   usePageHeaderActions(
     { right: sortAndSelect, sourceRef: toolbarRef },
@@ -645,7 +649,7 @@ export default function TasksOverview() {
         ref={headerRef}
         style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}
       >
-        <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Yapılacaklar</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Yapılacaklar")}</h1>
 
         <div ref={filtersRef} style={{ marginLeft: 8 }}>
           {filterButtons}
@@ -664,15 +668,15 @@ export default function TasksOverview() {
       {!selection.selectionMode && (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 18px" }}>
           {sort !== "manual"
-            ? "Kartlar seçtiğin ölçüte göre sıralı; kendi sıranı düzenlemek için “Kendi sıram”a dön."
+            ? t("Kartlar seçtiğin ölçüte göre sıralı; kendi sıranı düzenlemek için “Kendi sıram”a dön.")
             : filter === "assigned"
-            ? "Sana atanmış görevler. Buradaki sıralama yalnızca sana görünür."
-            : "Kişisel görevlerini senden başkası görmez."}
+            ? t("Sana atanmış görevler. Buradaki sıralama yalnızca sana görünür.")
+            : t("Kişisel görevlerini senden başkası görmez.")}
         </p>
       )}
 
       {loading ? (
-        <p style={{ fontSize: 15, color: c.textSecondary }}>Yükleniyor…</p>
+        <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
       ) : (
         // Masaüstünde üç sütun yan yana, dar ekranda alt alta — diğer kanbanlarla
         // aynı yerleşim (bkz. DepartmentTasksPanel).
@@ -784,9 +788,9 @@ export default function TasksOverview() {
 
       {confirmingBulkAction === "archive" && (
         <ConfirmDialog
-          title="Görevleri arşivle"
-          message={`${selection.selectedIds.size} görevi arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
-          confirmLabel="Arşivle"
+          title={t("Görevleri arşivle")}
+          message={t("{n} görevi arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.", { n: selection.selectedIds.size })}
+          confirmLabel={t("Arşivle")}
           danger={false}
           onCancel={() => setConfirmingBulkAction(null)}
           onConfirm={handleArchiveSelected}
@@ -794,9 +798,9 @@ export default function TasksOverview() {
       )}
       {confirmingBulkAction === "delete" && (
         <ConfirmDialog
-          title="Görevleri sil"
-          message={`${selection.selectedIds.size} görevi silmek istediğine emin misin? Kişisel görevler arşivlenir ve istediğin zaman geri getirebilirsin; atanmış görevler birkaç saniye içinde Cmd/Ctrl+Z ile geri alınabilir, sonrasında kalıcı olarak silinir.`}
-          confirmLabel="Sil"
+          title={t("Görevleri sil")}
+          message={t("{n} görevi silmek istediğine emin misin? Kişisel görevler arşivlenir ve istediğin zaman geri getirebilirsin; atanmış görevler birkaç saniye içinde Cmd/Ctrl+Z ile geri alınabilir, sonrasında kalıcı olarak silinir.", { n: selection.selectedIds.size })}
+          confirmLabel={t("Sil")}
           danger
           onCancel={() => setConfirmingBulkAction(null)}
           onConfirm={handleDeleteSelected}

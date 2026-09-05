@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -12,12 +13,13 @@ export default function ResetPassword() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const c = useThemeColors();
+  const t = useT();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (password !== confirmPassword) {
-      setError("Şifreler eşleşmiyor.");
+      setError(t("Şifreler eşleşmiyor."));
       return;
     }
     setLoading(true);
@@ -25,7 +27,7 @@ export default function ResetPassword() {
       await api.post("/auth/reset-password", { token, password });
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Şifre güncellenemedi. Bağlantının süresi dolmuş olabilir.");
+      setError(err instanceof Error ? err.message : t("Şifre güncellenemedi. Bağlantının süresi dolmuş olabilir."));
     } finally {
       setLoading(false);
     }
@@ -54,34 +56,34 @@ export default function ResetPassword() {
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
           <img src="/logo.png" alt="Projelio" style={{ width: 48, height: 48, marginBottom: 14 }} />
-          <h1 style={{ color: c.textPrimary, fontSize: 25, fontWeight: 600, margin: 0 }}>Yeni şifre belirle</h1>
+          <h1 style={{ color: c.textPrimary, fontSize: 25, fontWeight: 600, margin: 0 }}>{t("Yeni şifre belirle")}</h1>
         </div>
 
         {!token ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 16, textAlign: "center" }}>
             <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>
-              Bağlantı geçersiz. Sıfırlama e-postasındaki bağlantıyı kullandığından emin ol.
+              {t("Bağlantı geçersiz. Sıfırlama e-postasındaki bağlantıyı kullandığından emin ol.")}
             </p>
             <Link to="/forgot-password" style={{ fontSize: 16, color: c.primary, textAlign: "center" }}>
-              Yeni bağlantı iste
+              {t("Yeni bağlantı iste")}
             </Link>
           </div>
         ) : done ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 16, textAlign: "center" }}>
             <p style={{ color: c.textPrimary, fontSize: 16, margin: 0 }}>
-              Şifren güncellendi. Artık yeni şifrenle giriş yapabilirsin.
+              {t("Şifren güncellendi. Artık yeni şifrenle giriş yapabilirsin.")}
             </p>
             <Link to="/login" style={{ fontSize: 16, color: c.primary, textAlign: "center" }}>
-              Girişe git
+              {t("Girişe git")}
             </Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 15, color: c.textSecondary }}>Yeni şifre</label>
+              <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Yeni şifre")}</label>
               <input
                 type="password"
-                placeholder="En az 8 karakter"
+                placeholder={t("En az 8 karakter")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -90,10 +92,10 @@ export default function ResetPassword() {
               />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 15, color: c.textSecondary }}>Yeni şifre (tekrar)</label>
+              <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Yeni şifre (tekrar)")}</label>
               <input
                 type="password"
-                placeholder="En az 8 karakter"
+                placeholder={t("En az 8 karakter")}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
@@ -118,7 +120,7 @@ export default function ResetPassword() {
                 fontWeight: 500,
               }}
             >
-              {loading ? "Güncelleniyor…" : "Şifreyi güncelle"}
+              {loading ? t("Güncelleniyor…") : t("Şifreyi güncelle")}
             </button>
           </form>
         )}

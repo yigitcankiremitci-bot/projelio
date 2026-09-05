@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 /**
  * Habie'ye bağlanma köprüsü.
@@ -23,6 +24,7 @@ const HABIE_URL =
 
 export default function HabieConnect() {
   const c = useThemeColors();
+  const t = useT();
   const [error, setError] = useState("");
   // React 18 StrictMode effect'i iki kez çalıştırır; kod tek kullanımlık.
   const handled = useRef(false);
@@ -42,7 +44,7 @@ export default function HabieConnect() {
         const { code } = await api.post<{ code: string }>("/habie/handoff", {});
         window.location.replace(`${HABIE_URL}/?code=${encodeURIComponent(code)}`);
       } catch (e: any) {
-        setError(e?.message ?? "Habie bağlantısı kurulamadı.");
+        setError(e?.message ?? t("Habie bağlantısı kurulamadı."));
       }
     })();
   }, []);
@@ -51,16 +53,16 @@ export default function HabieConnect() {
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, background: c.background }}>
       <div style={{ textAlign: "center", maxWidth: 340 }}>
         <h2 style={{ margin: "0 0 8px", color: c.textPrimary, fontSize: 20 }}>
-          {error ? "Bağlanılamadı" : "Habie'ye bağlanılıyor…"}
+          {error ? t("Bağlanılamadı") : t("Habie'ye bağlanılıyor…")}
         </h2>
         {error ? (
           <>
             <p style={{ color: "#b91c1c", fontSize: 14, lineHeight: 1.5 }}>{error}</p>
-            <a href="/" style={{ color: c.primary, fontSize: 14 }}>Panele dön</a>
+            <a href="/" style={{ color: c.primary, fontSize: 14 }}>{t("Panele dön")}</a>
           </>
         ) : (
           <p style={{ color: c.textSecondary, fontSize: 14, lineHeight: 1.5 }}>
-            Birkaç saniye sürebilir, otomatik yönlendirileceksin.
+            {t("Birkaç saniye sürebilir, otomatik yönlendirileceksin.")}
           </p>
         )}
       </div>

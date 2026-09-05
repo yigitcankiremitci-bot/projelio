@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { oneDriveApi } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 /**
  * Microsoft akışından dönüş ekranı. GoogleReturn.tsx ile aynı desende iki mod:
@@ -15,6 +16,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 export default function MicrosoftReturn() {
   const [params] = useSearchParams();
   const c = useThemeColors();
+  const t = useT();
   const [error, setError] = useState("");
   // Giriş denemesi mi OneDrive bağlama denemesi mi: hata kartının metnini ve
   // "geri dön" hedefini bu belirliyor.
@@ -35,7 +37,7 @@ export default function MicrosoftReturn() {
     if (errorParam) {
       setError(
         errorParam === "access_denied"
-          ? "Microsoft izni verilmedi. Devam etmek için izin vermeniz gerekiyor."
+          ? t("Microsoft izni verilmedi. Devam etmek için izin vermeniz gerekiyor.")
           : errorParam
       );
       return;
@@ -57,7 +59,7 @@ export default function MicrosoftReturn() {
       return;
     }
 
-    setError("Microsoft'tan beklenen yanıt gelmedi.");
+    setError(t("Microsoft'tan beklenen yanıt gelmedi."));
   }, [params]);
 
   return (
@@ -86,7 +88,7 @@ export default function MicrosoftReturn() {
         {error ? (
           <>
             <h1 style={{ fontSize: 19, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>
-              {isLogin ? "Microsoft ile devam edilemedi" : "OneDrive bağlanamadı"}
+              {isLogin ? t("Microsoft ile devam edilemedi") : t("OneDrive bağlanamadı")}
             </h1>
             <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
               {error}
@@ -104,12 +106,12 @@ export default function MicrosoftReturn() {
                 textDecoration: "none",
               }}
             >
-              {isLogin ? "Girişe dön" : "Ayarlara dön"}
+              {isLogin ? t("Girişe dön") : t("Ayarlara dön")}
             </a>
           </>
         ) : (
           <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>
-            {isLogin ? "Giriş yapılıyor…" : "Bağlanıyor…"}
+            {isLogin ? t("Giriş yapılıyor…") : t("Bağlanıyor…")}
           </p>
         )}
       </div>

@@ -170,16 +170,28 @@ export class CreationRequestsService {
   private async notifyApprovers(request: CreationRequest): Promise<void> {
     try {
       const approvers = await this.approversFor(request);
-      const what = request.kind === "job" ? "iş" : "proje";
-      const title = String(request.payload?.title ?? "").trim() || `(başlıksız ${what})`;
-      const who = request.requesterName ?? "Bir taşeron";
+      const isIsTalebi = request.kind === "job";
+      // Yedek "—": talep başlıksız açılamıyor (arayüz zorunlu tutuyor), bu
+      // yüzden burası ancak bozuk bir kayıtta görünür. Türkçe bir yedek
+      // sözcük yazmıyoruz — params ÇEVRİLMEZ, İngilizce cümlenin ortasında
+      // Türkçe kalırdı; çizgi her dilde aynı okunur.
+      const title = String(request.payload?.title ?? "").trim() || "—";
+      // Ad yoksa metnin kendisi değişiyor (bkz. aşağısı), yedek değer
+      // parametreye konmuyor: params çevrilmiyor, Türkçe sızardı.
+      const who = request.requesterName;
       await Promise.all(
         approvers.map((userId) =>
           this.notifications.notifyUser(
             userId,
             "creation_request",
             "Onay Bekleyen Talep",
-            `${who}, "${title}" adlı ${what} açmak için onayınızı bekliyor.`,
+            isIsTalebi
+              ? who
+                ? { metin: '{kisi}, "{ad}" adlı işi açmak için onayını bekliyor.', params: { kisi: who, ad: title } }
+                : { metin: 'Bir taşeron, "{ad}" adlı işi açmak için onayını bekliyor.', params: { ad: title } }
+              : who
+              ? { metin: '{kisi}, "{ad}" adlı projeyi açmak için onayını bekliyor.', params: { kisi: who, ad: title } }
+              : { metin: 'Bir taşeron, "{ad}" adlı projeyi açmak için onayını bekliyor.', params: { ad: title } },
             "/?tab=jobs"
           )
         )
@@ -308,8 +320,7 @@ export class CreationRequestsService {
 
   private async notifyRequester(request: CreationRequest, approved: boolean): Promise<void> {
     try {
-      const what = request.kind === "job" ? "iş" : "proje";
-      const title = String(request.payload?.title ?? "").trim() || `(başlıksız ${what})`;
+      const title = String(request.payload?.title ?? "").trim() || (request.kind === "job" ? "(başlıksız iş)" : "(başlıksız proje)");
       const link = approved
         ? request.kind === "job"
           ? `/jobs/${request.createdEntityId}`
@@ -319,9 +330,16 @@ export class CreationRequestsService {
         request.requesterId,
         "creation_request_answered",
         approved ? "Talebiniz Onaylandı" : "Talebiniz Reddedildi",
+        // Gerekçe varsa AYRI bir metin: cümlenin sonuna koşullu bir parça
+        // eklemek, çeviride cümle yapısını çağıranın eline bırakır.
         approved
-          ? `"${title}" açıldı.`
-          : `"${title}" talebi reddedildi.${request.decisionNote ? ` Gerekçe: ${request.decisionNote}` : ""}`,
+          ? { metin: '"{ad}" açıldı.', params: { ad: title } }
+          : request.decisionNote
+          ? {
+              metin: '"{ad}" talebi reddedildi. Gerekçe: {gerekce}',
+              params: { ad: title, gerekce: request.decisionNote },
+            }
+          : { metin: '"{ad}" talebi reddedildi.', params: { ad: title } },
         link
       );
     } catch (err) {

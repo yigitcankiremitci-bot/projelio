@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AccountType } from "@projelio/shared";
+import type { AccountType, Locale } from "@projelio/shared";
 import { api } from "../api/client";
 
 export interface CurrentUser {
@@ -10,6 +10,8 @@ export interface CurrentUser {
   role?: string;
   accountType?: AccountType;
   activeTaskId?: string;
+  /** Hesaba kayıtlı arayüz dili. Boşsa kullanıcı seçim yapmamıştır. */
+  locale?: Locale;
 }
 
 // /auth/me her sayfada ayrı ayrı çekiliyordu; taşeron kısıtı neredeyse her

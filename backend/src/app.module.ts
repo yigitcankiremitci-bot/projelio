@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { APP_INTERCEPTOR } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
 import { DatabaseModule } from "./database/database.module";
+import { KullaniciDiliModule } from "./common/i18n/kullanici-dili.service";
 import { AccessModule } from "./common/access/access.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
@@ -54,6 +55,8 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
   imports: [
     ScheduleModule.forRoot(),
     DatabaseModule,
+    // Arayüz dili her modülden soruluyor; DatabaseModule gibi global.
+    KullaniciDiliModule,
     // Görünürlüğün tek kapısı (bkz. common/access/access.service.ts).
     AccessModule,
     AuthModule,

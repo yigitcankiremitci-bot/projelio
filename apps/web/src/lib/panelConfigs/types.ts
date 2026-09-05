@@ -37,15 +37,15 @@ export function buildPeriod(key: PeriodKey, today = new Date()): Period {
     case "this_month":
       return { key, label: "Bu ay", from: iso(new Date(y, m, 1)), to: iso(new Date(y, m + 1, 0)) };
     case "last_month":
-      return { key, label: "Geçen ay", from: iso(new Date(y, m - 1, 1)), to: iso(new Date(y, m, 0)) };
+      return { key, label: "Geçen ay", from: iso(new Date(y, m - 1, 1)), to: iso(new Date(y, m, 0)) }; // dil:anahtar
     case "this_quarter": {
       const q = Math.floor(m / 3) * 3;
-      return { key, label: "Bu çeyrek", from: iso(new Date(y, q, 1)), to: iso(new Date(y, q + 3, 0)) };
+      return { key, label: "Bu çeyrek", from: iso(new Date(y, q, 1)), to: iso(new Date(y, q + 3, 0)) }; // dil:anahtar
     }
     case "this_year":
-      return { key, label: "Bu yıl", from: iso(new Date(y, 0, 1)), to: iso(new Date(y, 11, 31)) };
+      return { key, label: "Bu yıl", from: iso(new Date(y, 0, 1)), to: iso(new Date(y, 11, 31)) }; // dil:anahtar
     default:
-      return { key: "all", label: "Tüm zamanlar" };
+      return { key: "all", label: "Tüm zamanlar" }; // dil:anahtar
   }
 }
 
@@ -166,12 +166,12 @@ export function groupBy(
   const totals = new Map<string, number>();
   for (const r of rows) {
     const raw = r.data[field];
-    const key = typeof raw === "string" && raw ? raw : "(belirtilmemiş)";
+    const key = typeof raw === "string" && raw ? raw : "(belirtilmemiş)"; // dil:anahtar
     const add = options.sumField ? Number(r.data[options.sumField]) || 0 : 1;
     totals.set(key, (totals.get(key) ?? 0) + add);
   }
   return Array.from(totals.entries())
-    .map(([key, value]) => ({ label: key === "(belirtilmemiş)" ? key : labelOf(key), value }))
+    .map(([key, value]) => ({ label: key === "(belirtilmemiş)" ? key : labelOf(key), value })) // dil:anahtar
     .sort((a, b) => b.value - a.value);
 }
 

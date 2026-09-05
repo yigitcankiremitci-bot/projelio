@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import type { Department, Job } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useSidebarHierarchy, SidebarGroupNode, SidebarOrgNode } from "../lib/useSidebarHierarchy";
+import { useT } from "../lib/i18n";
 import {
   IconBuilding,
   IconBriefcase,
@@ -43,6 +44,7 @@ const INACTIVE_TEXT = "#C7CCD6";
  */
 export default function SidebarTree() {
   const location = useLocation();
+  const t = useT();
   const { groups, standaloneOrgs, standaloneJobs, openProjectsByJobId, openOperationsByJobId, loading } =
     useSidebarHierarchy();
   // "Gruplar" ve "Organizasyonlar" kategori başlıkları, eski düz linklerin yerini
@@ -429,7 +431,7 @@ export default function SidebarTree() {
           <Row
             to="/"
             icon={IconBriefcase}
-            label="İşlerim"
+            label={t("İşlerim")}
             depth={0}
             active={location.pathname === "/"}
             expandable
@@ -477,6 +479,7 @@ function Row({
   onLabelDoubleClick?: () => void;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const [imageFailed, setImageFailed] = useState(false);
   // Hazır kapaklar (preset:...) bir dosya değil CSS gradyanıdır; <img> ile
   // gösterilemez, küçük renkli bir kare olarak çizilir.
@@ -547,7 +550,7 @@ function Row({
         <button
           type="button"
           onClick={onToggle}
-          aria-label={expanded ? "Daralt" : "Genişlet"}
+          aria-label={expanded ? t("Daralt") : t("Genişlet")}
           style={{
             width: 20,
             height: 30,
@@ -602,6 +605,7 @@ function LeafRow({
   active: boolean;
 }) {
   const c = useThemeColors();
+  const t = useT();
   return (
     <div style={{ display: "flex", alignItems: "center" }}>
       <span style={{ width: 20, marginLeft: depth * 14, flexShrink: 0 }} />

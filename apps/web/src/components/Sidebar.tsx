@@ -8,6 +8,7 @@ import SidebarTree from "./SidebarTree";
 import HomeTargetModal from "./HomeTargetModal";
 import { useHomeTarget, DEFAULT_HOME_TARGET } from "../lib/homeTarget";
 import { tourAnchor } from "../lib/tour/types";
+import { useT } from "../lib/i18n";
 
 interface Props {
   // Kapalıyken sidebar hiç render edilmez (App.tsx'te bunun yerine küçük bir
@@ -27,6 +28,7 @@ interface Props {
 
 export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const sidebarStyle = useSidebarStyle();
   const location = useLocation();
   // Bütçe ve Dosyalar, Ana Sayfa'nın kendi sekmeleridir (bkz. Dashboard.tsx ?tab=);
@@ -41,23 +43,23 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
   const navItems: { to: string; label: string; active: boolean; isHome?: boolean }[] = [
     {
       to: homeTarget.path,
-      label: "Ana Sayfa",
+      label: t("Ana Sayfa"),
       isHome: true,
       active: homeIsDefault
         ? location.pathname === "/" && !searchTab
         : location.pathname + location.search === homeTarget.path,
     },
-    { to: "/?tab=budget", label: "Bütçe", active: location.pathname === "/" && searchTab === "budget" },
-    { to: "/?tab=files", label: "Dosyalar", active: location.pathname === "/" && searchTab === "files" },
-    { to: "/calendar", label: "Takvim", active: location.pathname.startsWith("/calendar") },
+    { to: "/?tab=budget", label: t("Bütçe"), active: location.pathname === "/" && searchTab === "budget" },
+    { to: "/?tab=files", label: t("Dosyalar"), active: location.pathname === "/" && searchTab === "files" },
+    { to: "/calendar", label: t("Takvim"), active: location.pathname.startsWith("/calendar") },
     // Mobilde BottomNav'da olan "Yapılacaklar" (/tasks) masaüstünde hiçbir yerden
     // erişilebilir değildi; aynı sayfa buraya da bağlandı.
-    { to: "/tasks", label: "Yapılacaklar", active: location.pathname.startsWith("/tasks") },
+    { to: "/tasks", label: t("Yapılacaklar"), active: location.pathname.startsWith("/tasks") },
     // Ayarlar diğer sayfalarla aynı listede, Yapılacaklar'ın hemen altında.
     // Önceden en altta, gezinme ağacından sonra, "Çıkış yap" ile birlikte ayrı
     // bir öbekteydi; orada bir sayfa değil bir "kapanış" gibi duruyordu.
-    { to: "/settings", label: "Ayarlar", active: location.pathname.startsWith("/settings") },
-    ...(isAdmin ? [{ to: "/admin", label: "Admin", active: location.pathname.startsWith("/admin") }] : []),
+    { to: "/settings", label: t("Ayarlar"), active: location.pathname.startsWith("/settings") },
+    ...(isAdmin ? [{ to: "/admin", label: t("Admin"), active: location.pathname.startsWith("/admin") }] : []),
   ];
 
   if (!open) return null;
@@ -131,12 +133,13 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
             >
               <img src="/logo.png" alt="Projelio" style={{ width: 24, height: 24 }} />
             </span>
+            {/* dil:atla — marka adı hiçbir dilde çevrilmez */}
             <span style={{ color: c.accent, fontSize: 20, fontWeight: 600 }}>Projelio</span>
           </Link>
           <button
             onClick={onClose}
-            aria-label="Sidebar'ı kapat"
-            title="Sidebar'ı kapat"
+            aria-label={t("Sidebar'ı kapat")}
+            title={t("Sidebar'ı kapat")}
             style={{
               width: 28,
               height: 28,
@@ -162,7 +165,7 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
               to={item.to}
               className={`sidebar-nav-btn${item.active ? " is-active" : ""}`}
               aria-current={item.active ? "page" : undefined}
-              title={item.isHome && !homeIsDefault ? `Ana Sayfa → ${homeTarget.label}` : undefined}
+              title={item.isHome && !homeIsDefault ? t("Ana Sayfa → {hedef}", { hedef: homeTarget.label }) : undefined}
             >
               {item.label}
             </Link>
@@ -180,8 +183,8 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
                 type="button"
                 className="sidebar-nav-gear"
                 onClick={() => setHomeTargetModalOpen(true)}
-                aria-label="Ana Sayfa düğmesinin gideceği yeri değiştir"
-                title="Ana Sayfa düğmesini ayarla"
+                aria-label={t("Ana Sayfa düğmesinin gideceği yeri değiştir")}
+                title={t("Ana Sayfa düğmesini ayarla")}
               >
                 <IconSettings size={14} color="#C7CCD6" />
               </button>

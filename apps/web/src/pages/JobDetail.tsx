@@ -28,8 +28,10 @@ import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
+import { useT } from "../lib/i18n";
 
 export default function JobDetail() {
+  const t = useT();
   const { id } = useParams();
   // Aynı sayfadaki kullanıcılar: canlı tazeleme + "kim burada" (bkz. lib/liveRoom.ts).
   useLiveRoom(id ? `job:${id}` : null);
@@ -85,13 +87,13 @@ export default function JobDetail() {
   // çağrılmalı (bkz. lib/projectFab.ts).
   useProjectFabAction(
     activeTab === "tasks"
-      ? { label: "Görev ekle", onClick: () => tasksPanelRef.current?.openCreate() }
+      ? { label: t("Görev ekle"), onClick: () => tasksPanelRef.current?.openCreate() }
       : activeTab === "programs"
-      ? { label: "Yeni rutin", onClick: () => setCreatingOperation(true) }
+      ? { label: t("Yeni rutin"), onClick: () => setCreatingOperation(true) }
       : activeTab === "team"
-      ? { label: "İşe al", onClick: () => teamRef.current?.openHire() }
+      ? { label: t("İşe al"), onClick: () => teamRef.current?.openHire() }
       : activeTab === "modules"
-      ? { label: "Modül ekle", onClick: () => modulesRef.current?.openAdd() }
+      ? { label: t("Modül ekle"), onClick: () => modulesRef.current?.openAdd() }
       : // Dosyalar sekmesinin "+" eylemini FilesPanel'in kendisi kaydediyor
         // (bkz. components/FilesPanel.tsx) — seçenekler bağlı buluta göre
         // değiştiği için o bilgi yalnızca panelin içinde var.
@@ -144,7 +146,9 @@ export default function JobDetail() {
       return;
     }
     Promise.all(
-      projects.map((p) => api.get<Task[]>(`/projects/${p.id}/tasks`).catch(() => [] as Task[]))
+      // "=> api.get<" dizisi denetim betiğinin JSX metin taramasına takılıyor;
+      // burada çevrilecek bir metin yok.
+      projects.map((p) => api.get<Task[]>(`/projects/${p.id}/tasks`).catch(() => [] as Task[])) // dil:atla
     ).then((lists) => setTasks(lists.flat()));
   };
 
@@ -188,7 +192,7 @@ export default function JobDetail() {
     if (!task.projectId) return;
     let currentId = task.id;
     pushUndo({
-      label: "Görev oluşturma",
+      label: t("Görev oluşturma"),
       run: async () => {
         await api.delete(`/tasks/${currentId}`);
         reloadTasks();
@@ -227,7 +231,7 @@ export default function JobDetail() {
     // tamamlanınca alt görevlerin de kapanması) — yığında ayrı adım olmamalı.
     if (registerUndo && previousStatus && previousStatus !== status) {
       pushUndo({
-        label: "Görev durumu",
+        label: t("Görev durumu"),
         run: async () => {
           await api.patch(`/tasks/${taskId}/status`, { status: previousStatus });
           reloadTasks();
@@ -300,7 +304,7 @@ export default function JobDetail() {
   const coverRef = useRef<HTMLDivElement>(null);
   // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
   const backRef = useRef<HTMLDivElement>(null);
-  usePageHeader(job?.title, coverRef, [job?.title], { to: "/", label: "İşler", sourceRef: backRef });
+  usePageHeader(job?.title, coverRef, [job?.title], { to: "/", label: t("İşler"), sourceRef: backRef });
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
   // (bkz. ProjectDetail'deki aynı desen).
   // Akıştaki sekme çubuğunun DOM öğesi: sabit şerit ancak bu çubuk yukarı kayıp
@@ -335,10 +339,10 @@ export default function JobDetail() {
   // Tek dizi, iki yerleşim: geniş ekranda kapağın içinde, dar ekranda akışta
   // (bkz. StatGrid — hangisinin çizileceğine bileşenler karar veriyor).
   const stats: StatItem[] = [
-    { label: "Proje", value: activeProjects.length },
-    { label: "Rutin", value: activeOperations.length },
-    { label: "Bekleyen", value: pendingTasksCount },
-    { label: "Biten", value: completedTasksCount },
+    { label: t("Proje"), value: activeProjects.length },
+    { label: t("Rutin"), value: activeOperations.length },
+    { label: t("Bekleyen"), value: pendingTasksCount },
+    { label: t("Biten"), value: completedTasksCount },
   ];
 
   return (
@@ -347,7 +351,7 @@ export default function JobDetail() {
         coverRef={coverRef}
         back={
           <div ref={backRef}>
-            <CoverBackLink to="/" label="İşler" />
+            <CoverBackLink to="/" label={t("İşler")} />
           </div>
         }
         coverImageUrl={job?.coverImageUrl}
@@ -369,7 +373,7 @@ export default function JobDetail() {
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <IconCalendar size={12} color={cover.secondary} />
-                {new Date(job.createdAt).toLocaleDateString("tr-TR")} kuruldu
+                {t("{tarih} kuruldu", { tarih: new Date(job.createdAt).toLocaleDateString("tr-TR") })}
               </span>
             </>
           )
@@ -379,7 +383,7 @@ export default function JobDetail() {
           job && currentUser?.id === job.ownerId ? (
             <button
               onClick={() => setEditing(true)}
-              aria-label="İşi düzenle"
+              aria-label={t("İşi düzenle")}
               style={coverActionButton(c)}
             >
               <IconSettings size={20} color={c.textSecondary} />
@@ -433,7 +437,7 @@ export default function JobDetail() {
                   fontSize: 16,
                 }}
               >
-                Bu işte henüz proje yok.
+                {t("Bu işte henüz proje yok.")}
               </div>
             ) : (
               <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
@@ -466,11 +470,12 @@ export default function JobDetail() {
                   lineHeight: 1.6,
                 }}
               >
-                Bu işte henüz rutin yok.
+                {t("Bu işte henüz rutin yok.")}
                 <br />
                 <span style={{ fontSize: 14 }}>
-                  Rutin, bitişi olmayan ve tekrarlayan işler içindir — aylık bakım, haftalık
-                  raporlama, sosyal medya yönetimi gibi. Bitişi olan işler proje olarak açılır.
+                  {t(
+                    "Rutin, bitişi olmayan ve tekrarlayan işler içindir — aylık bakım, haftalık raporlama, sosyal medya yönetimi gibi. Bitişi olan işler proje olarak açılır."
+                  )}
                 </span>
               </div>
             ) : (
@@ -509,9 +514,9 @@ export default function JobDetail() {
                   color: c.textPrimary,
                 }}
               >
-                Kapatılmış rutinler
+                {t("Kapatılmış rutinler")}
                 <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 400 }}>
-                  {endedOperations.length} rutin · {endedOpen ? "gizle" : "göster"}
+                  {t("{n} rutin", { n: endedOperations.length })} · {endedOpen ? t("gizle") : t("göster")}
                 </span>
               </button>
 
@@ -604,17 +609,17 @@ export default function JobDetail() {
       )}
 
       {parentCompletePrompt && (
-        <Modal title="Görevi tamamla" onClose={() => setParentCompletePrompt(null)}>
+        <Modal title={t("Görevi tamamla")} onClose={() => setParentCompletePrompt(null)}>
           <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
-            <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{parentCompletePrompt.title}</strong> görevinin tüm alt
-            görevleri tamamlandı. Bu görevi de tamamlandı olarak işaretlemek ister misin?
+            <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{parentCompletePrompt.title}</strong>{" "}
+            {t("görevinin tüm alt görevleri tamamlandı. Bu görevi de tamamlandı olarak işaretlemek ister misin?")}
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button
               onClick={() => setParentCompletePrompt(null)}
               style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 16 }}
             >
-              Hayır
+              {t("Hayır")}
             </button>
             <button
               data-primary
@@ -624,7 +629,7 @@ export default function JobDetail() {
               }}
               style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 16, fontWeight: 500 }}
             >
-              Evet, tamamla
+              {t("Evet, tamamla")}
             </button>
           </div>
         </Modal>

@@ -54,6 +54,27 @@ toplam_sha() {
   sha256sum "$1" | cut -d' ' -f1
 }
 
+# Milisaniye cinsinden şimdi.
+#
+# NEDEN BÖYLE: `date +%s%3N` yalnızca GNU date'te çalışıyor. macOS'un BSD
+# date'i `%3N`i tanımıyor ama HATA DA VERMİYOR — çıktıya olduğu gibi
+# ekliyor ve "1788601930" yerine "17886019303N" basıyor. Exit kodu 0 olduğu
+# için `|| date +%s000` yedeği hiç devreye girmiyordu; hata ancak bir sonraki
+# satırdaki `$((bitti - basladi))` aritmetiğinde patlıyordu.
+#
+# Bu, migration UYGULANDIKTAN sonra ama kaydı DÜŞMEDEN önce oluyordu: şema
+# değişmiş, schema_migrations boş, PostgREST önbelleği tazelenmemiş kalıyordu.
+# Bir kez böyle oldu (087_kullanici_dili). Bu yüzden çıktı artık sayı mı diye
+# kontrol ediliyor; değilse saniye çözünürlüğüne düşülüyor.
+simdi_ms() {
+  local t
+  t=$(date +%s%3N 2>/dev/null || true)
+  case "$t" in
+    "" | *[!0-9]*) echo "$(date +%s)000" ;;
+    *) echo "$t" ;;
+  esac
+}
+
 if [ "$(kayit_var_mi)" != "t" ]; then
   echo "HATA: schema_migrations tablosu yok." >&2
   echo "Önce 083_migration_kaydi.sql dosyasını uygula:" >&2
@@ -115,12 +136,12 @@ case "$komut" in
     for ad in "${bekleyen[@]}"; do
       yol="$DIZIN/$ad"
       echo "→ $ad"
-      basladi=$(date +%s%3N 2>/dev/null || date +%s000)
+      basladi=$(simdi_ms)
       if ! psql_dosya < "$yol"; then
         echo "HATA: $ad uygulanamadı. Transaction geri alındı, sonraki dosyalara geçilmedi." >&2
         exit 1
       fi
-      bitti=$(date +%s%3N 2>/dev/null || date +%s000)
+      bitti=$(simdi_ms)
       sha="$(toplam_sha "$yol")"
       printf "insert into public.schema_migrations(version, checksum, duration_ms) values ('%s','%s',%s);\n" \
         "$ad" "$sha" "$((bitti - basladi))" | psql_calistir >/dev/null

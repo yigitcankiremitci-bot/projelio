@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { todayISO } from "../lib/moduleConfigs";
 import AssigneePicker from "./AssigneePicker";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   departmentId: string;
@@ -44,6 +45,7 @@ export default function TaskFromRecordModal({
   onCreated,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [title, setTitle] = useState(defaultTitle);
   const [description, setDescription] = useState("");
   // Çoklu atama (bkz. migration 053).
@@ -56,7 +58,7 @@ export default function TaskFromRecordModal({
 
   const save = async () => {
     if (!title.trim()) {
-      setError("Görev başlığı gerekli");
+      setError(t("Görev başlığı gerekli"));
       return;
     }
     setSaving(true);
@@ -64,7 +66,8 @@ export default function TaskFromRecordModal({
     try {
       await api.post<Task>(`/departments/${departmentId}/tasks`, {
         title: title.trim(),
-        description: description.trim() || `${moduleTitle} kaydından oluşturuldu.`,
+        // Veritabanına yazılan metin: kaydın kendi dilinde kalır, çevrilmez.
+        description: description.trim() || `${moduleTitle} kaydından oluşturuldu.`, // dil:atla
         deadline,
         assignedToIds: assigneeIds,
         sourceModuleKey: moduleKey,
@@ -73,41 +76,41 @@ export default function TaskFromRecordModal({
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Görev oluşturulamadı");
+      setError(err instanceof Error ? err.message : t("Görev oluşturulamadı"));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal title="Göreve dönüştür" onClose={onClose} maxWidth={520} mobileFullScreen>
+    <Modal title={t("Göreve dönüştür")} onClose={onClose} maxWidth={520} mobileFullScreen>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {existingCount > 0 && (
           // Aynı kayıttan ikinci görev açmak yasak değil (bir plan birden fazla
           // kişiye bölünebilir) ama kullanıcı bilmeli.
           <div style={{ fontSize: 12, color: c.textSecondary, background: c.background, borderRadius: 8, padding: "8px 10px" }}>
-            Bu kayıttan daha önce {existingCount} görev oluşturulmuş.
+            {t("Bu kayıttan daha önce {n} görev oluşturulmuş.", { n: existingCount })}
           </div>
         )}
 
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontSize: 12, color: c.textSecondary }}>Görev başlığı</span>
+          <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Görev başlığı")}</span>
           <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: "100%" }} />
         </label>
 
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontSize: 12, color: c.textSecondary }}>Açıklama</span>
+          <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Açıklama")}</span>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            placeholder={`${moduleTitle} kaydından oluşturuldu.`}
+            placeholder={t("{modul} kaydından oluşturuldu.", { modul: moduleTitle })}
             style={{ width: "100%", resize: "vertical", fontFamily: "inherit" }}
           />
         </label>
 
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontSize: 12, color: c.textSecondary }}>Kime</span>
+          <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Kime")}</span>
           <AssigneePicker
             departmentId={departmentId}
             multiple
@@ -119,7 +122,7 @@ export default function TaskFromRecordModal({
         </label>
 
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontSize: 12, color: c.textSecondary }}>Teslim tarihi</span>
+          <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Teslim tarihi")}</span>
           <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} style={{ width: "100%" }} />
         </label>
 
@@ -140,10 +143,10 @@ export default function TaskFromRecordModal({
               fontSize: 14,
             }}
           >
-            {saving ? "Oluşturuluyor…" : "Görevi oluştur"}
+            {saving ? t("Oluşturuluyor…") : t("Görevi oluştur")}
           </button>
           <button onClick={onClose} disabled={saving} style={{ padding: "8px 16px", fontSize: 14 }}>
-            Vazgeç
+            {t("Vazgeç")}
           </button>
         </div>
       </div>

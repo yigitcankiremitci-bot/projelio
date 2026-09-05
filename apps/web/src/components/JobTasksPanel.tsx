@@ -20,6 +20,7 @@ import { useClickIntent } from "../lib/clickIntent";
 import { backState } from "../lib/backTarget";
 import { focusParams, resolveTaskFocus, type FocusWhere, type TaskFocus } from "../lib/taskFocus";
 import { useDragScroll } from "../lib/useDragScroll";
+import { useT } from "../lib/i18n";
 
 const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
 
@@ -86,6 +87,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
   ref
 ) {
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
   // Pano yalnızca masaüstünde yana kayıyor; dar ekranda sütunlar alt alta.
   const boardScrollRef = useDragScroll<HTMLDivElement>(isDesktop);
@@ -153,7 +155,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
       // Geri alma sonrası liste tazelemesini JobDetail.tsx'teki
       // useRefreshOnUndo(reload) üstlenir, burada tekrarlamaya gerek yok.
       pushUndo({
-        label: `${ids.length} görev arşivleme`,
+        label: t("{n} görev arşivleme", { n: ids.length }),
         run: async () => {
           await Promise.all(ids.map((id) => api.patch(`/tasks/${id}/restore`, {})));
         },
@@ -177,7 +179,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
     if (ids.length === 0) return;
     onTasksDeleted?.(ids);
     pushDestructive({
-      label: `${ids.length} görev silme`,
+      label: t("{n} görev silme", { n: ids.length }),
       commit: () => api.post("/tasks/bulk-delete", { ids }),
       restore: () => {},
       entityIds: ids,
@@ -202,7 +204,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
       estimatedDurationUnit: task.estimatedDurationUnit,
     };
     pushUndo({
-      label: "Görev oluşturma",
+      label: t("Görev oluşturma"),
       run: async () => {
         await api.delete(`/tasks/${currentId}`);
         onTasksReload();
@@ -221,7 +223,9 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
       return;
     }
     Promise.all(
-      projects.map((p) => api.get<Output[]>(`/projects/${p.id}/outputs`).catch(() => [] as Output[]))
+      // "=> api.get<" dizisi denetim betiğinin JSX metin taramasına takılıyor;
+      // burada çevrilecek bir metin yok.
+      projects.map((p) => api.get<Output[]>(`/projects/${p.id}/outputs`).catch(() => [] as Output[])) // dil:atla
     ).then((lists) => setOutputs(lists.flat()));
   }, [projects]);
 
@@ -253,8 +257,8 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
   // tetiklenebilsin diye bir süre sonra temizleniyor.
   useEffect(() => {
     if (!focusTarget) return;
-    const t = window.setTimeout(() => setFocusTarget(undefined), 2500);
-    return () => window.clearTimeout(t);
+    const zaman = window.setTimeout(() => setFocusTarget(undefined), 2500);
+    return () => window.clearTimeout(zaman);
   }, [focusTarget]);
 
   /**
@@ -272,7 +276,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
     // dönülmeli (bkz. lib/taskFocus.ts).
     const from = {
       to: `/jobs/${jobId}?tab=tasks&${focusParams(task.id, where)}`,
-      label: jobTitle || "İşler",
+      label: jobTitle || t("İşler"),
     };
     if (task.projectId) {
       navigate(`/projects/${task.projectId}`, {
@@ -369,7 +373,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
           kopuk duruyordu. Seçim modu açıldığında TaskSelectionBar tam genişlik
           isteyip flexWrap ile alta kayıyor — başlık yine üstte kalıyor. */}
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-        <h3 style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary, margin: 0 }}>İşler</h3>
+        <h3 style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("İşler")}</h3>
 
         {tasks.length > 0 && (
           <>
@@ -405,32 +409,32 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
             fontSize: 16,
           }}
         >
-          Bu işte henüz görev yok.
+          {t("Bu işte henüz görev yok.")}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {todayTasks.length > 0 && (
             <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <h4 style={{ color: c.textPrimary, fontSize: 16, fontWeight: 500, margin: 0 }}>Bugün yapılacaklar</h4>
+                <h4 style={{ color: c.textPrimary, fontSize: 16, fontWeight: 500, margin: 0 }}>{t("Bugün yapılacaklar")}</h4>
                 <span style={{ fontSize: 13, color: c.textSecondary, background: c.background, border: `1px solid ${c.border}`, borderRadius: 20, padding: "1px 7px" }}>
                   {todayTasks.length}
                 </span>
               </div>
               <div ref={todayListRef} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {todayTasks.map((t) => (
+                {todayTasks.map((gorev) => (
                   <button
-                    key={t.id}
-                    data-id={t.id}
+                    key={gorev.id}
+                    data-id={gorev.id}
                     className={
-                      focusTarget?.where === "today" && focusTarget.id === t.id ? "task-highlight-flash" : undefined
+                      focusTarget?.where === "today" && focusTarget.id === gorev.id ? "task-highlight-flash" : undefined
                     }
-                    onClick={() => click.single(() => onEditTask(t))}
+                    onClick={() => click.single(() => onEditTask(gorev))}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
-                      click.double(() => openTaskSource(t, "today"));
+                      click.double(() => openTaskSource(gorev, "today"));
                     }}
-                    title="Tıkla: görevi aç · Çift tıkla: görevin bulunduğu sayfaya git"
+                    title={t("Tıkla: görevi aç · Çift tıkla: görevin bulunduğu sayfaya git")}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -443,10 +447,10 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
                     }}
                   >
                     <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, minWidth: 0, overflowWrap: "break-word", wordBreak: "break-word" }}>
-                      {t.title}
+                      {gorev.title}
                     </span>
-                    {getTaskMeta(t) && (
-                      <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{getTaskMeta(t)}</span>
+                    {getTaskMeta(gorev) && (
+                      <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{getTaskMeta(gorev)}</span>
                     )}
                   </button>
                 ))}
@@ -477,7 +481,7 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
               cursor: "pointer",
             }}
           >
-            Tüm görevler
+            {t("Tüm görevler")}
             <span
               style={{
                 fontSize: 13,
@@ -584,9 +588,12 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
 
       {confirmingBulkAction === "archive" && (
         <ConfirmDialog
-          title="Görevleri arşivle"
-          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
-          confirmLabel="Arşivle"
+          title={t("Görevleri arşivle")}
+          message={t(
+            "{n} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.",
+            { n: selection.selectedIds.size }
+          )}
+          confirmLabel={t("Arşivle")}
           danger={false}
           onCancel={() => setConfirmingBulkAction(null)}
           onConfirm={handleArchiveSelected}
@@ -594,9 +601,12 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
       )}
       {confirmingBulkAction === "delete" && (
         <ConfirmDialog
-          title="Görevleri sil"
-          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`}
-          confirmLabel="Sil"
+          title={t("Görevleri sil")}
+          message={t(
+            "{n} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.",
+            { n: selection.selectedIds.size }
+          )}
+          confirmLabel={t("Sil")}
           danger
           onCancel={() => setConfirmingBulkAction(null)}
           onConfirm={handleDeleteSelected}

@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { AppPrefsProvider } from "./lib/appPrefs";
+import { I18nProvider } from "./lib/i18n";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import "./index.css";
 
@@ -14,9 +15,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <AppErrorBoundary scope="root">
       <ThemeProvider>
         <AppPrefsProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
+          <I18nProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </I18nProvider>
         </AppPrefsProvider>
       </ThemeProvider>
     </AppErrorBoundary>

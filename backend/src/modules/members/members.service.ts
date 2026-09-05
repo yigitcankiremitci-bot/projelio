@@ -234,8 +234,8 @@ export class MembersService {
         "role_updated",
         "Ekipten ayrılma",
         name
-          ? `${name}, "${project.title}" projesinden ayrıldı.`
-          : `Bir ekip üyesi "${project.title}" projesinden ayrıldı.`,
+          ? { metin: '{kisi}, "{proje}" projesinden ayrıldı.', params: { kisi: name, proje: project.title } }
+          : { metin: 'Bir ekip üyesi "{proje}" projesinden ayrıldı.', params: { proje: project.title } },
         `/projects/${projectId}`
       );
     }

@@ -3,6 +3,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { IconChevronLeft, IconChevronRight } from "./icons";
 import { useDragScroll } from "../lib/useDragScroll";
+import { useT } from "../lib/i18n";
 
 export interface TabBarItem {
   key: string;
@@ -40,6 +41,7 @@ interface Props {
  */
 export default function TabBar({ tabs, active, onChange, style, scrollable }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
   // Masaüstünde daha geniş bir taban: sekmeler tek satırda kalmayı denesin ama
   // sıkışıp okunmaz hale gelmesin. Mobilde eşik düşük, çünkü orada iki-üç satır
@@ -78,10 +80,10 @@ export default function TabBar({ tabs, active, onChange, style, scrollable }: Pr
         ...style,
       }}
     >
-      {tabs.map((t) => (
+      {tabs.map((sekme) => (
         <button
-          key={t.key}
-          onClick={() => onChange(t.key)}
+          key={sekme.key}
+          onClick={() => onChange(sekme.key)}
           style={{
             display: "flex",
             alignItems: "center",
@@ -97,24 +99,24 @@ export default function TabBar({ tabs, active, onChange, style, scrollable }: Pr
             textAlign: "center",
             borderRadius: 7,
             border: "none",
-            background: active === t.key ? c.primary : "transparent",
-            color: active === t.key ? "#fff" : c.textSecondary,
+            background: active === sekme.key ? c.primary : "transparent",
+            color: active === sekme.key ? "#fff" : c.textSecondary,
             fontSize: isDesktop ? 16 : 15,
             fontWeight: 500,
             cursor: "pointer",
             transition: "background 0.12s ease, color 0.12s ease",
           }}
         >
-          {t.label}
-          {t.isNew && (
+          {t(sekme.label)}
+          {sekme.isNew && (
             <span
-              title="Sık kullandığın için üste alındı"
+              title={t("Sık kullandığın için üste alındı")}
               style={{
                 width: 6,
                 height: 6,
                 borderRadius: "50%",
                 flexShrink: 0,
-                background: active === t.key ? "#fff" : c.accent,
+                background: active === sekme.key ? "#fff" : c.accent,
               }}
             />
           )}
@@ -134,6 +136,7 @@ export default function TabBar({ tabs, active, onChange, style, scrollable }: Pr
  */
 function FittedTabBar({ tabs, active, onChange, style }: Props) {
   const c = useThemeColors();
+  const t = useT();
   return (
     <div
       style={{
@@ -147,11 +150,11 @@ function FittedTabBar({ tabs, active, onChange, style }: Props) {
         ...style,
       }}
     >
-      {tabs.map((t) => (
+      {tabs.map((sekme) => (
         <button
-          key={t.key}
-          onClick={() => onChange(t.key)}
-          title={t.label}
+          key={sekme.key}
+          onClick={() => onChange(sekme.key)}
+          title={t(sekme.label)}
           style={{
             flex: "1 1 0",
             // Varsayılan `min-width: auto` uzun etiketin düğmeyi germesine izin
@@ -164,8 +167,8 @@ function FittedTabBar({ tabs, active, onChange, style }: Props) {
             padding: "8px 6px",
             borderRadius: 7,
             border: "none",
-            background: active === t.key ? c.primary : "transparent",
-            color: active === t.key ? "#fff" : c.textSecondary,
+            background: active === sekme.key ? c.primary : "transparent",
+            color: active === sekme.key ? "#fff" : c.textSecondary,
             fontSize: 15,
             fontWeight: 500,
             cursor: "pointer",
@@ -173,17 +176,17 @@ function FittedTabBar({ tabs, active, onChange, style }: Props) {
           }}
         >
           <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {t.label}
+            {t(sekme.label)}
           </span>
-          {t.isNew && (
+          {sekme.isNew && (
             <span
-              title="Sık kullandığın için üste alındı"
+              title={t("Sık kullandığın için üste alındı")}
               style={{
                 width: 6,
                 height: 6,
                 borderRadius: "50%",
                 flexShrink: 0,
-                background: active === t.key ? "#fff" : c.accent,
+                background: active === sekme.key ? "#fff" : c.accent,
               }}
             />
           )}
@@ -203,6 +206,7 @@ function FittedTabBar({ tabs, active, onChange, style }: Props) {
  */
 function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
   const c = useThemeColors();
+  const t = useT();
   // `HTMLDivElement | null` yazımı bilerek: useDragScroll düğümü bu ref'e
   // KENDİ yazıyor, o yüzden değiştirilebilir olmalı. Çubuk aynı düğümü ok
   // düğmelerinin kaydırma konumunu ölçmek için kullanmayı sürdürüyor.
@@ -266,11 +270,11 @@ function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
           paddingRight: edges.atEnd ? 4 : 30,
         }}
       >
-        {tabs.map((t) => (
+        {tabs.map((sekme) => (
           <button
-            key={t.key}
-            data-active={active === t.key}
-            onClick={() => onChange(t.key)}
+            key={sekme.key}
+            data-active={active === sekme.key}
+            onClick={() => onChange(sekme.key)}
             style={{
               // Sekmeler sığıyorsa artan yeri EŞİT paylaşıp satırı doldurur
               // (grow: 1); sığmıyorsa kendi genişliklerinde kalıp çubuğu
@@ -285,24 +289,24 @@ function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
               whiteSpace: "nowrap",
               borderRadius: 7,
               border: "none",
-              background: active === t.key ? c.primary : "transparent",
-              color: active === t.key ? "#fff" : c.textSecondary,
+              background: active === sekme.key ? c.primary : "transparent",
+              color: active === sekme.key ? "#fff" : c.textSecondary,
               fontSize: 15,
               fontWeight: 500,
               cursor: "pointer",
               transition: "background 0.12s ease, color 0.12s ease",
             }}
           >
-            {t.label}
-            {t.isNew && (
+            {t(sekme.label)}
+            {sekme.isNew && (
               <span
-                title="Sık kullandığın için üste alındı"
+                title={t("Sık kullandığın için üste alındı")}
                 style={{
                   width: 6,
                   height: 6,
                   borderRadius: "50%",
                   flexShrink: 0,
-                  background: active === t.key ? "#fff" : c.accent,
+                  background: active === sekme.key ? "#fff" : c.accent,
                 }}
               />
             )}
@@ -313,7 +317,7 @@ function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
       {!edges.atStart && (
         <button
           type="button"
-          aria-label="Sekmeleri sola kaydır"
+          aria-label={t("Sekmeleri sola kaydır")}
           onClick={() => scrollerRef.current?.scrollBy({ left: -140, behavior: "smooth" })}
           style={{
             position: "absolute",
@@ -339,7 +343,7 @@ function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
       {!edges.atEnd && (
         <button
           type="button"
-          aria-label="Sekmeleri sağa kaydır"
+          aria-label={t("Sekmeleri sağa kaydır")}
           onClick={() => scrollerRef.current?.scrollBy({ left: 140, behavior: "smooth" })}
           style={{
             position: "absolute",

@@ -22,6 +22,7 @@ import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
 import { tourAnchor } from "../lib/tour/types";
 import { useDragScroll } from "../lib/useDragScroll";
+import { useT } from "../lib/i18n";
 
 // Sabit sekmeler + (varsa) terfi etmiş modül sekmeleri. Modül sekmeleri
 // "Modüller"in soluna girer: kullanıcı en sık kullandığı modülü çekirdek
@@ -29,13 +30,15 @@ import { useDragScroll } from "../lib/useDragScroll";
 // Bkz. docs/moduller/24-yerlesim-modul-yuzeyleri.md §3
 type DashboardTab = "jobs" | "budget" | "files" | "modules" | (string & {});
 
+// Etiketler modül düzeyinde durduğu için burada çevrilemez; Türkçe metin
+// anahtar olarak kalır, çeviri kullanıldığı yerde (t(sekme.label)) yapılır.
 const coreTabs: { key: DashboardTab; label: string; icon: typeof IconFolder }[] = [
-  { key: "jobs", label: "İşler", icon: IconFolder },
-  { key: "budget", label: "Bütçe", icon: IconActivity },
-  { key: "files", label: "Dosyalar", icon: IconFile },
+  { key: "jobs", label: "İşler", icon: IconFolder }, // dil:anahtar
+  { key: "budget", label: "Bütçe", icon: IconActivity }, // dil:anahtar
+  { key: "files", label: "Dosyalar", icon: IconFile }, // dil:anahtar
 ];
 
-const catalogTab = { key: "modules" as DashboardTab, label: "Modüller", icon: IconSparkle };
+const catalogTab = { key: "modules" as DashboardTab, label: "Modüller", icon: IconSparkle }; // dil:anahtar
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
@@ -131,6 +134,7 @@ export default function Dashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const c = useThemeColors();
+  const t = useT();
   const gridRef = useRef<HTMLDivElement>(null);
   const joinedGridRef = useRef<HTMLDivElement>(null);
   // Sabit şeridin ölçtüğü öğeler (bkz. lib/pageHeader): başlık satırı "kapak"
@@ -209,23 +213,23 @@ export default function Dashboard() {
   const pageTitle = openModuleTab
     ? openModuleTab.name
     : tab === "jobs"
-      ? "İşlerim"
+      ? t("İşlerim")
       : tab === "budget"
-        ? "Bütçem"
+        ? t("Bütçem")
         : tab === "files"
-          ? "Dosyalarım"
-          : "Modüller";
+          ? t("Dosyalarım")
+          : t("Modüller");
 
   // Sekme düğmeleri tek yerde üretilir: hem sayfadaki çubuk hem kaydırınca beliren
   // şerit aynı diziyi kullanır, böylece ikisi hiçbir zaman ayrışmaz.
-  const tabButtons = tabs.map((t) => {
-    const isActive = tab === t.key;
+  const tabButtons = tabs.map((sekme) => {
+    const isActive = tab === sekme.key;
     return (
       <button
-        key={t.key}
+        key={sekme.key}
         type="button"
-        {...tourAnchor(`dashboard-tab-${t.key}`)}
-        onClick={() => setTab(t.key)}
+        {...tourAnchor(`dashboard-tab-${sekme.key}`)}
+        onClick={() => setTab(sekme.key)}
         style={{
           display: "flex",
           alignItems: "center",
@@ -244,13 +248,13 @@ export default function Dashboard() {
           marginBottom: -1,
         }}
       >
-        <t.icon size={15} color={isActive ? c.accentDark : c.textSecondary} />
-        {t.label}
+        <sekme.icon size={15} color={isActive ? c.accentDark : c.textSecondary} />
+        {t(sekme.label)}
         {/* Terfi görünür olur, düşüş sessizdir: yeni gelen sekme tek
             seferlik bir noktayla kendini tanıtır. */}
-        {t.isNew && (
+        {sekme.isNew && (
           <span
-            title="Sık kullandığın için üste alındı"
+            title={t("Sık kullandığın için üste alındı")}
             style={{ width: 6, height: 6, borderRadius: "50%", background: c.accent, flexShrink: 0 }}
           />
         )}
@@ -385,7 +389,7 @@ export default function Dashboard() {
               }}
             >
               <IconBuilding size={17} color={c.textSecondary} />
-              <span style={{ flex: 1, fontSize: 15, color: c.textPrimary, fontWeight: 500 }}>Organizasyonlar</span>
+              <span style={{ flex: 1, fontSize: 15, color: c.textPrimary, fontWeight: 500 }}>{t("Organizasyonlar")}</span>
               <IconChevronRight size={14} color={c.textSecondary} />
             </Link>
           )}
@@ -404,7 +408,7 @@ export default function Dashboard() {
               }}
             >
               <IconLayers size={17} color={c.textSecondary} />
-              <span style={{ flex: 1, fontSize: 15, color: c.textPrimary, fontWeight: 500 }}>Gruplar</span>
+              <span style={{ flex: 1, fontSize: 15, color: c.textPrimary, fontWeight: 500 }}>{t("Gruplar")}</span>
               <IconChevronRight size={14} color={c.textSecondary} />
             </Link>
           )}
@@ -423,7 +427,7 @@ export default function Dashboard() {
               fontSize: 16,
             }}
           >
-            Henüz iş yok.
+            {t("Henüz iş yok.")}
           </div>
         ) : (
           <>
@@ -433,8 +437,8 @@ export default function Dashboard() {
                 gereksiz gürültü olacağından tek ızgara olarak kalır. */}
             {splitView && (
               <SectionHeading
-                title="Kurduklarım"
-                hint="Sahibi sensin — düzenleyebilir, ekip kurabilirsin"
+                title={t("Kurduklarım")}
+                hint={t("Sahibi sensin — düzenleyebilir, ekip kurabilirsin")}
                 count={ownedJobs.length}
               />
             )}
@@ -449,8 +453,8 @@ export default function Dashboard() {
 
             {splitView && (
               <SectionHeading
-                title="Katıldıklarım"
-                hint="Ekibinde yer aldığın, başkasının yürüttüğü işler"
+                title={t("Katıldıklarım")}
+                hint={t("Ekibinde yer aldığın, başkasının yürüttüğü işler")}
                 count={joinedJobs.length}
                 style={{ marginTop: 28 }}
               />

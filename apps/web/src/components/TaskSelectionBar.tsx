@@ -5,6 +5,7 @@ import { LioMascotIcon } from "./AskLioButton";
 import { askLioAboutMany } from "../lib/askLio";
 import type { LioSubject } from "../lib/askLio";
 import { useAppPrefs } from "../lib/appPrefs";
+import { useT } from "../lib/i18n";
 
 interface Props {
   selectionMode: boolean;
@@ -74,6 +75,7 @@ export default function TaskSelectionBar({
   inline,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const { showLio } = useAppPrefs();
 
   if (!selectionMode) {
@@ -81,8 +83,8 @@ export default function TaskSelectionBar({
       <button
         type="button"
         onClick={onEnable}
-        aria-label="Görev seçimini aç"
-        title="Seç"
+        aria-label={t("Görev seçimini aç")}
+        title={t("Seç")}
         style={{
           display: "flex",
           alignItems: "center",
@@ -158,36 +160,36 @@ export default function TaskSelectionBar({
       lioTasks &&
       actionButton(
         "lio",
-        "Lio'ya sor",
-        "Seçilenleri Lio'ya sor",
+        t("Lio'ya sor"),
+        t("Seçilenleri Lio'ya sor"),
         <LioMascotIcon size={iconSize + 2} />,
         () => askLioAboutMany(lioTasks)
       ),
     onDuplicate &&
-      actionButton("dup", "Çoğalt", "Seçilenleri çoğalt", <IconCopy size={iconSize} color={c.textSecondary} />, onDuplicate),
+      actionButton("dup", t("Çoğalt"), t("Seçilenleri çoğalt"), <IconCopy size={iconSize} color={c.textSecondary} />, onDuplicate),
     onMove &&
-      actionButton("move", "Taşı", "Seçilenleri taşı", <IconMove size={iconSize} color={c.textSecondary} />, onMove),
+      actionButton("move", t("Taşı"), t("Seçilenleri taşı"), <IconMove size={iconSize} color={c.textSecondary} />, onMove),
     onConvert &&
       actionButton(
         "conv",
-        "Seviye",
-        "Seçilenleri göreve / alt göreve dönüştür",
+        t("Seviye"),
+        t("Seçilenleri göreve / alt göreve dönüştür"),
         <IconIndent size={iconSize} color={c.textSecondary} />,
         onConvert
       ),
     onArchive &&
       actionButton(
         "arch",
-        "Arşivle",
-        "Seçilenleri arşivle",
+        t("Arşivle"),
+        t("Seçilenleri arşivle"),
         <IconArchive size={iconSize} color={c.textSecondary} />,
         onArchive
       ),
     onDelete &&
-      actionButton("del", "Sil", "Seçilenleri sil", <IconTrash size={iconSize} color={c.danger} />, onDelete, {
+      actionButton("del", t("Sil"), t("Seçilenleri sil"), <IconTrash size={iconSize} color={c.danger} />, onDelete, {
         danger: true,
       }),
-    actionButton("cancel", "Vazgeç", "Seçimi iptal et", <IconX size={iconSize} color={c.textSecondary} />, onCancel, {
+    actionButton("cancel", t("Vazgeç"), t("Seçimi iptal et"), <IconX size={iconSize} color={c.textSecondary} />, onCancel, {
       borderless: true,
       alwaysEnabled: true,
     }),
@@ -198,7 +200,7 @@ export default function TaskSelectionBar({
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
         {selectedCount > 0 && (
-          <span style={{ fontSize: 14, color: c.textSecondary, whiteSpace: "nowrap" }}>{selectedCount} seçili</span>
+          <span style={{ fontSize: 14, color: c.textSecondary, whiteSpace: "nowrap" }}>{t("{n} seçili", { n: selectedCount })}</span>
         )}
         {actions}
       </div>

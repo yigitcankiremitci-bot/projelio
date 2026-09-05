@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { backState } from "../lib/backTarget";
 import SocialSignInButtons from "../components/SocialSignInButtons";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 export default function Register() {
   const [fullName, setFullName] = useState("");
@@ -17,8 +18,9 @@ export default function Register() {
   const [registered, setRegistered] = useState(false);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
   const c = useThemeColors();
+  const t = useT();
   // Yasal metinlerin geri bağlantısı buraya dönsün (bkz. lib/backTarget.ts).
-  const registerBack = { to: "/register", label: "Kayıt sayfası" };
+  const registerBack = { to: "/register", label: t("Kayıt sayfası") };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +34,7 @@ export default function Register() {
       // yeni kayıtla aynı yanıtı döndürüp gerçek sahibine bildirim e-postası atıyor
       // (hesap varlığını sızdırmamak için, bkz. backend AuthService.register).
       // Buraya düşen tek beklenen durum kullanıcı adı çakışması.
-      setError(err instanceof Error ? err.message : "Kayıt oluşturulamadı, tekrar dener misin?");
+      setError(err instanceof Error ? err.message : t("Kayıt oluşturulamadı, tekrar dener misin?"));
     } finally {
       setLoading(false);
     }
@@ -73,14 +75,17 @@ export default function Register() {
         >
           <img src="/logo.png" alt="Projelio" style={{ width: 48, height: 48, marginBottom: 14 }} />
           <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 600, margin: "0 0 10px" }}>
-            E-postanı kontrol et
+            {t("E-postanı kontrol et")}
           </h1>
           <p style={{ color: c.textSecondary, fontSize: 15, margin: "0 0 6px", lineHeight: 1.6 }}>
-            <strong style={{ color: c.textPrimary }}>{email}</strong> adresine bir doğrulama bağlantısı gönderdik.
-            Bağlantıya tıkladıktan sonra giriş yapabilirsin.
+            {/* Adres cümlenin İÇİNDE yer tutucu: İngilizcede başa değil sonuna
+                geliyor, iki parçaya bölünseydi sıra bozulurdu. */}
+            {t("{eposta} adresine bir doğrulama bağlantısı gönderdik. Bağlantıya tıkladıktan sonra giriş yapabilirsin.", {
+              eposta: email,
+            })}
           </p>
           <p style={{ color: c.textSecondary, fontSize: 13, margin: "0 0 6px", lineHeight: 1.6 }}>
-            Bağlantı 24 saat geçerli. E-posta birkaç dakika içinde gelmezse spam klasörüne de bak.
+            {t("Bağlantı 24 saat geçerli. E-posta birkaç dakika içinde gelmezse spam klasörüne de bak.")}
           </p>
           {/*
             Bu cümle, kayıt ucunun bilerek sessiz kalmasının karşılığı: adres ZATEN
@@ -91,13 +96,14 @@ export default function Register() {
             ayırt edemesin, gerçek kullanıcı da şaşırmasın.
           */}
           <p style={{ color: c.textSecondary, fontSize: 13, margin: "0 0 22px", lineHeight: 1.6 }}>
-            Bu adresle zaten bir hesabın varsa yeni hesap açılmadı; onun yerine giriş
-            yapmanı hatırlatan bir e-posta gönderdik.
+            {t(
+              "Bu adresle zaten bir hesabın varsa yeni hesap açılmadı; onun yerine giriş yapmanı hatırlatan bir e-posta gönderdik."
+            )}
           </p>
 
           {resendState === "sent" ? (
             <p style={{ color: c.textSecondary, fontSize: 14, margin: "0 0 18px" }}>
-              Yeni bağlantı gönderildi.
+              {t("Yeni bağlantı gönderildi.")}
             </p>
           ) : (
             <button
@@ -113,13 +119,13 @@ export default function Register() {
                 marginBottom: 18,
               }}
             >
-              {resendState === "sending" ? "Gönderiliyor…" : "Bağlantıyı tekrar gönder"}
+              {resendState === "sending" ? t("Gönderiliyor…") : t("Bağlantıyı tekrar gönder")}
             </button>
           )}
 
           <div>
             <Link to="/login" style={{ fontSize: 16, color: c.primary }}>
-              Giriş ekranına dön
+              {t("Giriş ekranına dön")}
             </Link>
           </div>
         </div>
@@ -150,18 +156,18 @@ export default function Register() {
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
           <img src="/logo.png" alt="Projelio" style={{ width: 48, height: 48, marginBottom: 14 }} />
-          <h1 style={{ color: c.textPrimary, fontSize: 25, fontWeight: 600, margin: 0 }}>Kayıt ol</h1>
+          <h1 style={{ color: c.textPrimary, fontSize: 25, fontWeight: 600, margin: 0 }}>{t("Kayıt ol")}</h1>
           <p style={{ color: c.textSecondary, fontSize: 16, margin: "6px 0 0" }}>
-            Freelance proje &amp; görev yönetimi
+            {t("Freelance proje & görev yönetimi")}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Ad Soyad</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Ad Soyad")}</label>
             <input
               type="text"
-              placeholder="Ad Soyad"
+              placeholder={t("Ad Soyad")}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
@@ -169,10 +175,10 @@ export default function Register() {
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>E-posta</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("E-posta")}</label>
             <input
               type="email"
-              placeholder="ad.soyad@sirket.com"
+              placeholder={t("ad.soyad@sirket.com")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -180,7 +186,7 @@ export default function Register() {
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Kullanıcı adı</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Kullanıcı adı")}</label>
             <div style={{ position: "relative" }}>
               <span
                 style={{
@@ -197,7 +203,7 @@ export default function Register() {
               </span>
               <input
                 type="text"
-                placeholder="kullaniciadi"
+                placeholder={t("kullaniciadi")}
                 value={username}
                 onChange={(e) => setUsername(e.target.value.replace(/^@/, ""))}
                 required
@@ -208,14 +214,14 @@ export default function Register() {
               />
             </div>
             <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
-              Ekip üyesi eklerken seni bu kullanıcı adıyla arayabilirler.
+              {t("Ekip üyesi eklerken seni bu kullanıcı adıyla arayabilirler.")}
             </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Şifre</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Şifre")}</label>
             <input
               type="password"
-              placeholder="En az 8 karakter"
+              placeholder={t("En az 8 karakter")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -240,15 +246,15 @@ export default function Register() {
               fontWeight: 500,
             }}
           >
-            {loading ? "Kayıt oluşturuluyor…" : "Kayıt ol"}
+            {loading ? t("Kayıt oluşturuluyor…") : t("Kayıt ol")}
           </button>
 
           <Link to="/login" style={{ fontSize: 16, color: c.textSecondary, textAlign: "center", marginTop: 4 }}>
-            Zaten hesabın var mı? Giriş yap
+            {t("Zaten hesabın var mı? Giriş yap")}
           </Link>
         </form>
 
-        <SocialSignInButtons verb="kayıt ol" />
+        <SocialSignInButtons verb="kayit" />
 
         {/* Kayıt ekranında politikaya bağlantı vermek hem KVKK aydınlatma
             yükümlülüğü hem de Meta/Google uygulama incelemeleri için gerekli. */}
@@ -262,15 +268,19 @@ export default function Register() {
             color: c.textSecondary,
           }}
         >
-          Kayıt olarak{" "}
+          {t("Kayıt olarak")}{" "}
           <Link to="/terms" state={backState(registerBack)} style={{ color: c.primary }}>
-            Kullanıcı Sözleşmesi
+            {t("Kullanıcı Sözleşmesi")}
           </Link>
-          'ni ve{" "}
+          {t("'ni ve")}{" "}
           <Link to="/privacy" state={backState(registerBack)} style={{ color: c.primary }}>
-            Gizlilik Politikası
+            {t("Gizlilik Politikası")}
           </Link>
-          'nı okuduğunu ve kabul ettiğini beyan etmiş olursun.
+          {t("'nı okuduğunu ve kabul ettiğini,")}{" "}
+          <Link to="/kvkk" state={backState(registerBack)} style={{ color: c.primary }}>
+            {t("KVKK Aydınlatma Metni")}
+          </Link>
+          {t("'ni okuduğunu beyan etmiş olursun.")}
         </p>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
 import { TASK_SORTS, type TaskSortMode } from "../lib/taskSort";
 import { IconCheck, IconSortDescending } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   value: TaskSortMode;
@@ -18,6 +19,7 @@ interface Props {
  */
 export default function TaskSortMenu({ value, onChange }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const active = TASK_SORTS.find((s) => s.value === value)!;
@@ -46,8 +48,8 @@ export default function TaskSortMenu({ value, onChange }: Props) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Sıralama ölçütü"
-        title={`Sıralama: ${active.label}`}
+        aria-label={t("Sıralama ölçütü")}
+        title={t("Sıralama: {olcut}", { olcut: t(active.label) })}
         style={{
           display: "flex",
           alignItems: "center",
@@ -62,7 +64,7 @@ export default function TaskSortMenu({ value, onChange }: Props) {
         }}
       >
         <IconSortDescending size={17} color={isDefault ? c.textSecondary : c.primary} />
-        {!isDefault && active.label}
+        {!isDefault && t(active.label)}
       </button>
 
       {open && (
@@ -108,7 +110,7 @@ export default function TaskSortMenu({ value, onChange }: Props) {
               <span style={{ width: 14, display: "flex", flexShrink: 0 }}>
                 {value === s.value && <IconCheck size={14} color={c.primary} />}
               </span>
-              {s.label}
+              {t(s.label)}
             </button>
           ))}
         </div>

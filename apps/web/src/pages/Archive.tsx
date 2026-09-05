@@ -1,24 +1,35 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { ArchiveSummary, ArchivedTaskEntry, ThemeColors } from "@projelio/shared";
+import type { ArchiveSummary, ArchivedTaskEntry, ThemeColors, Translate } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useRefreshOnUndo, useUndo } from "../lib/undo";
 import { IconArchive, IconRestore, IconTrash } from "../components/icons";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { useT } from "../lib/i18n";
 
 type EntityKind = "jobs" | "projects" | "tasks" | "outputs";
 
-function permanentDeleteMessage(kind: EntityKind, title: string): string {
+// Çevirmen dışarıdan veriliyor: modül düzeyinde kanca çağrılamaz.
+function permanentDeleteMessage(kind: EntityKind, title: string, t: Translate): string {
   switch (kind) {
     case "jobs":
-      return `"${title}" işini kalıcı olarak silmek istediğine emin misin? Bu işe bağlı tüm projeler, görevler ve çıktılar da kalıcı olarak silinecek. Bu işlem geri alınamaz.`;
+      return t(
+        '"{ad}" işini kalıcı olarak silmek istediğine emin misin? Bu işe bağlı tüm projeler, görevler ve çıktılar da kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+        { ad: title }
+      );
     case "projects":
-      return `"${title}" projesini kalıcı olarak silmek istediğine emin misin? Bu projeye bağlı tüm görevler, alt görevler ve çıktılar da kalıcı olarak silinecek. Bu işlem geri alınamaz.`;
+      return t(
+        '"{ad}" projesini kalıcı olarak silmek istediğine emin misin? Bu projeye bağlı tüm görevler, alt görevler ve çıktılar da kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+        { ad: title }
+      );
     case "tasks":
-      return `"${title}" görevini kalıcı olarak silmek istediğine emin misin? Varsa bu göreve bağlı alt görevler de kalıcı olarak silinecek. Bu işlem geri alınamaz.`;
+      return t(
+        '"{ad}" görevini kalıcı olarak silmek istediğine emin misin? Varsa bu göreve bağlı alt görevler de kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+        { ad: title }
+      );
     case "outputs":
-      return `"${title}" çıktısını kalıcı olarak silmek istediğine emin misin? Bu işlem geri alınamaz.`;
+      return t('"{ad}" çıktısını kalıcı olarak silmek istediğine emin misin? Bu işlem geri alınamaz.', { ad: title });
   }
 }
 
@@ -98,6 +109,7 @@ function buildGroups(data: ArchiveSummary): JobGroup[] {
 
 export default function Archive() {
   const c = useThemeColors();
+  const t = useT();
   const [data, setData] = useState<ArchiveSummary | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ kind: EntityKind; id: string; title: string } | null>(null);
@@ -130,7 +142,7 @@ export default function Archive() {
     setConfirmDelete(null);
     setPendingDeleteIds((prev) => [...prev, id]);
     pushDestructive({
-      label: "Kalıcı silme",
+      label: t("Kalıcı silme"),
       commit: async () => {
         await api.delete(`/${kind}/${id}`).catch(() => {});
         setPendingDeleteIds((prev) => prev.filter((x) => x !== id));
@@ -161,15 +173,15 @@ export default function Archive() {
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
       <Link to="/settings" style={{ fontSize: 15, color: c.textSecondary, display: "inline-block", marginBottom: 14 }}>
-        ← Ayarlar
+        {t("← Ayarlar")}
       </Link>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
         <IconArchive size={20} color={c.textPrimary} />
-        <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Arşiv</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Arşiv")}</h1>
       </div>
 
-      {!data && <p style={{ fontSize: 16, color: c.textSecondary }}>Yükleniyor…</p>}
+      {!data && <p style={{ fontSize: 16, color: c.textSecondary }}>{t("Yükleniyor…")}</p>}
 
       {isEmpty && (
         <div
@@ -182,8 +194,9 @@ export default function Archive() {
             fontSize: 16,
           }}
         >
-          Arşivde henüz bir şey yok. Sildiğin yerine arşive eklediğin işler, projeler, görevler ve çıktılar burada
-          görünecek.
+          {t(
+            "Arşivde henüz bir şey yok. Sildiğin yerine arşive eklediğin işler, projeler, görevler ve çıktılar burada görünecek."
+          )}
         </div>
       )}
 
@@ -191,7 +204,7 @@ export default function Archive() {
         {groups.map((job) => (
           <div key={job.jobId} style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: 16 }}>
             <Row
-              label="İş"
+              label={t("İş")}
               title={job.jobTitle}
               archived={Boolean(job.jobArchivedAt)}
               archivedAt={job.jobArchivedAt}
@@ -205,7 +218,7 @@ export default function Archive() {
             {Array.from(job.projects.values()).map((project) => (
               <div key={project.projectId} style={{ marginTop: 10, marginLeft: 16, paddingLeft: 14, borderLeft: `2px solid ${c.border}` }}>
                 <Row
-                  label="Proje"
+                  label={t("Proje")}
                   title={project.projectTitle}
                   archived={Boolean(project.projectArchivedAt)}
                   archivedAt={project.projectArchivedAt}
@@ -223,7 +236,7 @@ export default function Archive() {
                 {project.outputs.map((o) => (
                   <div key={o.id} style={{ marginTop: 8, marginLeft: 16, paddingLeft: 14, borderLeft: `2px solid ${c.border}` }}>
                     <Row
-                      label="Çıktı"
+                      label={t("Çıktı")}
                       title={o.title}
                       archived
                       archivedAt={o.archivedAt}
@@ -235,22 +248,22 @@ export default function Archive() {
                   </div>
                 ))}
 
-                {project.topTasks.map((t) => (
-                  <div key={t.id} style={{ marginTop: 8, marginLeft: 16, paddingLeft: 14, borderLeft: `2px solid ${c.border}` }}>
+                {project.topTasks.map((gorev) => (
+                  <div key={gorev.id} style={{ marginTop: 8, marginLeft: 16, paddingLeft: 14, borderLeft: `2px solid ${c.border}` }}>
                     <Row
-                      label="Görev"
-                      title={t.title}
+                      label={t("Görev")}
+                      title={gorev.title}
                       archived
-                      archivedAt={t.archivedAt}
-                      restoring={restoringId === t.id}
-                      onRestore={() => restore("tasks", t.id)}
-                      onRequestDelete={() => setConfirmDelete({ kind: "tasks", id: t.id, title: t.title })}
+                      archivedAt={gorev.archivedAt}
+                      restoring={restoringId === gorev.id}
+                      onRestore={() => restore("tasks", gorev.id)}
+                      onRequestDelete={() => setConfirmDelete({ kind: "tasks", id: gorev.id, title: gorev.title })}
                       c={c}
                     />
-                    {(project.subtasksByParent.get(t.id) ?? []).map((sub) => (
+                    {(project.subtasksByParent.get(gorev.id) ?? []).map((sub) => (
                       <div key={sub.id} style={{ marginTop: 6, marginLeft: 16, paddingLeft: 14, borderLeft: `2px solid ${c.border}` }}>
                         <Row
-                          label="Alt görev"
+                          label={t("Alt görev")}
                           title={sub.title}
                           archived
                           archivedAt={sub.archivedAt}
@@ -267,10 +280,10 @@ export default function Archive() {
                 {project.orphanSubtasks.map((sub) => (
                   <div key={sub.id} style={{ marginTop: 8, marginLeft: 16, paddingLeft: 14, borderLeft: `2px solid ${c.border}` }}>
                     <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 3 }}>
-                      {sub.parentTaskTitle ?? "Üst görev"} içinde alt görev
+                      {t("{ust} içinde alt görev", { ust: sub.parentTaskTitle ?? t("Üst görev") })}
                     </div>
                     <Row
-                      label="Alt görev"
+                      label={t("Alt görev")}
                       title={sub.title}
                       archived
                       archivedAt={sub.archivedAt}
@@ -289,9 +302,9 @@ export default function Archive() {
 
       {confirmDelete && (
         <ConfirmDialog
-          title="Kalıcı olarak sil"
-          message={permanentDeleteMessage(confirmDelete.kind, confirmDelete.title)}
-          confirmLabel="Kalıcı olarak sil"
+          title={t("Kalıcı olarak sil")}
+          message={permanentDeleteMessage(confirmDelete.kind, confirmDelete.title, t)}
+          confirmLabel={t("Kalıcı olarak sil")}
           onCancel={() => setConfirmDelete(null)}
           onConfirm={handlePermanentDelete}
         />
@@ -321,6 +334,7 @@ function Row({
   c: ThemeColors;
   titleSize?: number;
 }) {
+  const t = useT();
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
       <div style={{ minWidth: 0 }}>
@@ -353,7 +367,7 @@ function Row({
         </div>
         {archived && archivedAt && (
           <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 2 }}>
-            {new Date(archivedAt).toLocaleDateString("tr-TR")} tarihinde arşivlendi
+            {t("{tarih} tarihinde arşivlendi", { tarih: new Date(archivedAt).toLocaleDateString("tr-TR") })}
           </div>
         )}
       </div>
@@ -377,14 +391,14 @@ function Row({
             }}
           >
             <IconRestore size={12} color={c.textPrimary} />
-            {restoring ? "Getiriliyor…" : "Geri getir"}
+            {restoring ? t("Getiriliyor…") : t("Geri getir")}
           </button>
         )}
 
         {onRequestDelete && (
           <button
             onClick={onRequestDelete}
-            aria-label={`${title} - kalıcı olarak sil`}
+            aria-label={t("{ad} - kalıcı olarak sil", { ad: title })}
             style={{
               display: "flex",
               alignItems: "center",
@@ -399,7 +413,7 @@ function Row({
             }}
           >
             <IconTrash size={12} color={c.danger} />
-            Sil
+            {t("Sil")}
           </button>
         )}
       </div>

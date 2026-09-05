@@ -1,3 +1,11 @@
+// dil:anahtar-dosya
+//
+// Bu dosyadaki metinlerin tamamı arayüzde görünen etiket: modül başlıkları,
+// alan adları, seçenek adları, boş durum cümleleri. Hepsi modül düzeyinde
+// sabit olduğu için burada t() çağrılamıyor; Türkçe metin sözlük ANAHTARI
+// olarak kalıyor ve çeviri render anında yapılıyor (bkz. ModuleRecordsPanel).
+// Karşılıkları: apps/web/src/lib/i18n/en/moduller.ts
+
 import {
   countBy,
   countWhere,

@@ -42,7 +42,7 @@ function formatTotals(totals: Map<string, number>): string {
 // ============================================================ Analiz ve Rapor
 export const financeAnalysisPanel: PanelConfig = {
   title: "Finansal Analiz",
-  purpose: "Seçilen dönemde ne kazanıldı, ne harcandı ve para nereye gitti.",
+  purpose: "Seçilen dönemde ne kazanıldı, ne harcandı ve para nereye gitti.", // dil:anahtar
   sources: [LEDGER, INVOICES, RECEIVABLES],
   metrics: [
     {
@@ -63,7 +63,7 @@ export const financeAnalysisPanel: PanelConfig = {
         const rows = recordsOf(ctx, LEDGER);
         const income = rows.filter((r) => isIncome(r.data)).length;
         const expense = rows.filter((r) => isExpense(r.data)).length;
-        return rows.length ? `${income} gelir · ${expense} gider kaydı` : undefined;
+        return rows.length ? `${income} gelir · ${expense} gider kaydı` : undefined; // dil:atla
       },
     },
     {
@@ -73,7 +73,7 @@ export const financeAnalysisPanel: PanelConfig = {
       hint: (ctx) => {
         const bekleyen = recordsOf(ctx, INVOICES).filter((r) => r.data.status === "pending");
         if (bekleyen.length === 0) return undefined;
-        return formatTotals(sumByCurrency(bekleyen)) + " tutarında";
+        return formatTotals(sumByCurrency(bekleyen)) + " tutarında"; // dil:atla
       },
     },
   ],
@@ -81,7 +81,7 @@ export const financeAnalysisPanel: PanelConfig = {
     {
       title: "Gider kategorileri",
       sources: [LEDGER],
-      emptyLabel: "Bu dönemde gider kaydı yok.",
+      emptyLabel: "Bu dönemde gider kaydı yok.", // dil:anahtar
       compute: (ctx) =>
         groupBy(
           recordsOf(ctx, LEDGER).filter((r) => isExpense(r.data)),
@@ -93,7 +93,7 @@ export const financeAnalysisPanel: PanelConfig = {
     {
       title: "Gelir kategorileri",
       sources: [LEDGER],
-      emptyLabel: "Bu dönemde gelir kaydı yok.",
+      emptyLabel: "Bu dönemde gelir kaydı yok.", // dil:anahtar
       compute: (ctx) =>
         groupBy(
           recordsOf(ctx, LEDGER).filter((r) => isIncome(r.data)),
@@ -107,8 +107,8 @@ export const financeAnalysisPanel: PanelConfig = {
 
 // ============================================================ Nakit Akış
 export const cashFlowPanel: PanelConfig = {
-  title: "Nakit Akış",
-  purpose: "Paranın ne zaman girip ne zaman çıktığı; yaklaşan tahsilat ve ödemeler.",
+  title: "Nakit Akış", // dil:anahtar
+  purpose: "Paranın ne zaman girip ne zaman çıktığı; yaklaşan tahsilat ve ödemeler.", // dil:anahtar
   sources: [LEDGER, RECEIVABLES],
   metrics: [
     {
@@ -117,18 +117,18 @@ export const cashFlowPanel: PanelConfig = {
       compute: (ctx) => sumMoney(ctx, [LEDGER], "amount", isIncome),
     },
     {
-      label: "Çıkan",
+      label: "Çıkan", // dil:anahtar
       sources: [LEDGER],
       compute: (ctx) => sumMoney(ctx, [LEDGER], "amount", isExpense),
     },
     {
-      label: "Açık alacak",
+      label: "Açık alacak", // dil:anahtar
       sources: [RECEIVABLES],
       compute: (ctx) =>
         sumMoney(ctx, [RECEIVABLES], "amount", (d) => d.type !== "payable" && d.status !== "settled"),
     },
     {
-      label: "Açık borç",
+      label: "Açık borç", // dil:anahtar
       sources: [RECEIVABLES],
       compute: (ctx) => sumMoney(ctx, [RECEIVABLES], "amount", (d) => d.type === "payable" && d.status !== "settled"),
       hint: (ctx) => {
@@ -141,15 +141,15 @@ export const cashFlowPanel: PanelConfig = {
             typeof r.data.dueDate === "string" &&
             r.data.dueDate < today
         );
-        return geciken.length ? `${geciken.length} tanesinin vadesi geçti` : undefined;
+        return geciken.length ? `${geciken.length} tanesinin vadesi geçti` : undefined; // dil:atla
       },
     },
   ],
   breakdowns: [
     {
-      title: "Aylık hareket",
+      title: "Aylık hareket", // dil:anahtar
       sources: [LEDGER],
-      emptyLabel: "Bu dönemde para hareketi yok.",
+      emptyLabel: "Bu dönemde para hareketi yok.", // dil:anahtar
       compute: (ctx) => {
         // Ay bazında net; hangi ay artıda hangi ay ekside görünsün.
         const byMonth = new Map<string, number>();
@@ -170,8 +170,8 @@ export const cashFlowPanel: PanelConfig = {
 
 // ============================================================ Bütçe Yönetimi
 export const budgetPanel: PanelConfig = {
-  title: "Bütçe Yönetimi",
-  purpose: "Planlanan ile gerçekleşen arasındaki fark; nerede sapma var.",
+  title: "Bütçe Yönetimi", // dil:anahtar
+  purpose: "Planlanan ile gerçekleşen arasındaki fark; nerede sapma var.", // dil:anahtar
   sources: [BUDGET_PLAN, LEDGER],
   metrics: [
     {
@@ -180,12 +180,12 @@ export const budgetPanel: PanelConfig = {
       compute: (ctx) => sumMoney(ctx, [BUDGET_PLAN], "plannedAmount", (d) => d.direction !== "income"),
     },
     {
-      label: "Gerçekleşen gider",
+      label: "Gerçekleşen gider", // dil:anahtar
       sources: [LEDGER],
       compute: (ctx) => sumMoney(ctx, [LEDGER], "amount", isExpense),
     },
     {
-      label: "Kullanım",
+      label: "Kullanım", // dil:anahtar
       sources: [BUDGET_PLAN, LEDGER],
       compute: (ctx) => {
         // Yalnızca TRY üzerinden: farklı para birimlerini oranlamak kur
@@ -198,19 +198,19 @@ export const budgetPanel: PanelConfig = {
         if (!planned) return NA;
         return percent(actual ?? 0, planned);
       },
-      hint: () => "TRY kalemleri üzerinden",
+      hint: () => "TRY kalemleri üzerinden", // dil:anahtar
     },
     {
-      label: "Bütçe kalemi",
+      label: "Bütçe kalemi", // dil:anahtar
       sources: [BUDGET_PLAN],
       compute: (ctx) => String(countRecords(ctx, [BUDGET_PLAN])),
     },
   ],
   breakdowns: [
     {
-      title: "Kalem bazında plan",
+      title: "Kalem bazında plan", // dil:anahtar
       sources: [BUDGET_PLAN],
-      emptyLabel: "Henüz bütçe kalemi girilmemiş.",
+      emptyLabel: "Henüz bütçe kalemi girilmemiş.", // dil:anahtar
       compute: (ctx) =>
         groupBy(recordsOf(ctx, BUDGET_PLAN), "category", (v) => v, { sumField: "plannedAmount" }),
     },
@@ -220,11 +220,11 @@ export const budgetPanel: PanelConfig = {
 // ============================================================ Finansal Planlama
 export const financialPlanningPanel: PanelConfig = {
   title: "Finansal Planlama",
-  purpose: "Mevcut gidişata göre dönem sonunda nerede olunacağı.",
+  purpose: "Mevcut gidişata göre dönem sonunda nerede olunacağı.", // dil:anahtar
   sources: [LEDGER, RECEIVABLES],
   metrics: [
     {
-      label: "Dönem neti",
+      label: "Dönem neti", // dil:anahtar
       sources: [LEDGER],
       compute: (ctx) => formatTotals(netByCurrency(recordsOf(ctx, LEDGER))),
     },
@@ -233,10 +233,10 @@ export const financialPlanningPanel: PanelConfig = {
       sources: [RECEIVABLES],
       compute: (ctx) =>
         sumMoney(ctx, [RECEIVABLES], "amount", (d) => d.type !== "payable" && d.status !== "settled"),
-      hint: () => "Henüz tahsil edilmemiş alacaklar",
+      hint: () => "Henüz tahsil edilmemiş alacaklar", // dil:anahtar
     },
     {
-      label: "Beklenen ödeme",
+      label: "Beklenen ödeme", // dil:anahtar
       sources: [RECEIVABLES],
       compute: (ctx) => sumMoney(ctx, [RECEIVABLES], "amount", (d) => d.type === "payable" && d.status !== "settled"),
     },
@@ -254,7 +254,7 @@ export const financialPlanningPanel: PanelConfig = {
         }
         return formatTotals(totals);
       },
-      hint: () => "Net + açık alacak − açık borç",
+      hint: () => "Net + açık alacak − açık borç", // dil:anahtar
     },
   ],
 };
@@ -262,18 +262,18 @@ export const financialPlanningPanel: PanelConfig = {
 // ============================================================ Denetim
 export const auditPanel: PanelConfig = {
   title: "Denetim",
-  purpose: "Eksik kalan, gecikmiş ve dikkat isteyen kayıtlar.",
+  purpose: "Eksik kalan, gecikmiş ve dikkat isteyen kayıtlar.", // dil:anahtar
   sources: [LEDGER, RECEIVABLES, INVOICES, "hud_sozlesme", "fm_vergi_takip", "fm_risk_yonetimi"],
   metrics: [
     {
-      label: "Kategorisiz kayıt",
+      label: "Kategorisiz kayıt", // dil:anahtar
       sources: [LEDGER],
       // Kategorisi olmayan kayıt hiçbir kırılımda görünmez; analiz eksik kalır.
       compute: (ctx) => String(countRecords(ctx, [LEDGER], (d) => !d.category)),
-      hint: () => "Kategori girilmemiş gelir/gider",
+      hint: () => "Kategori girilmemiş gelir/gider", // dil:anahtar
     },
     {
-      label: "Vadesi geçen",
+      label: "Vadesi geçen", // dil:anahtar
       sources: [RECEIVABLES, "fm_vergi_takip"],
       compute: (ctx) => {
         const today = todayISO();
@@ -288,12 +288,12 @@ export const auditPanel: PanelConfig = {
       },
     },
     {
-      label: "Süresi dolan sözleşme",
+      label: "Süresi dolan sözleşme", // dil:anahtar
       sources: ["hud_sozlesme"],
       compute: (ctx) => String(countRecords(ctx, ["hud_sozlesme"], (d) => d.status === "expired")),
     },
     {
-      label: "Açık kritik risk",
+      label: "Açık kritik risk", // dil:anahtar
       sources: ["fm_risk_yonetimi"],
       compute: (ctx) =>
         String(

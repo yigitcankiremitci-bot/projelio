@@ -8,6 +8,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
 import { IconFolder, IconUser, IconCalendar, IconPlus } from "./icons";
 import AskLioButton from "./AskLioButton";
+import { useT } from "../lib/i18n";
 
 interface Props {
   job: Job;
@@ -25,6 +26,7 @@ const CARD_HEIGHT = 296;
 
 export default function JobCard({ job, projectCount }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [coverUrl, setCoverUrl] = useState(job.coverImageUrl);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
@@ -86,7 +88,7 @@ export default function JobCard({ job, projectCount }: Props) {
             type="button"
             onClick={handleAddCoverClick}
             disabled={uploading}
-            aria-label="Kapak fotoğrafı ekle"
+            aria-label={t("Kapak fotoğrafı ekle")}
             className="entity-card-cover-add"
             style={{
               position: "absolute",
@@ -120,7 +122,7 @@ export default function JobCard({ job, projectCount }: Props) {
               textAlign: "center",
             }}
           >
-            Yüklenemedi, tekrar dene
+            {t("Yüklenemedi, tekrar dene")}
           </div>
         )}
 
@@ -169,7 +171,7 @@ export default function JobCard({ job, projectCount }: Props) {
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <IconCalendar size={12} color={c.textSecondary} />
-            <span>{new Date(job.createdAt).toLocaleDateString("tr-TR")} kuruldu</span>
+            <span>{t("{tarih} kuruldu", { tarih: new Date(job.createdAt).toLocaleDateString("tr-TR") })}</span>
           </div>
         </div>
 
@@ -186,7 +188,7 @@ export default function JobCard({ job, projectCount }: Props) {
           }}
         >
           <IconFolder size={13} color={c.textSecondary} />
-          <span>{projectCount} proje</span>
+          <span>{t("{n} proje", { n: projectCount })}</span>
         </div>
       </div>
     </Link>

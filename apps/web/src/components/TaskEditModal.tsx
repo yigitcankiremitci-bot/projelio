@@ -13,6 +13,7 @@ import AutoGrowNotes from "./AutoGrowNotes";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { IconIndent, IconOutdent } from "./icons";
 import { useUndo } from "../lib/undo";
+import { useT } from "../lib/i18n";
 
 interface Props {
   task: Task;
@@ -81,6 +82,7 @@ export default function TaskEditModal({
   onArchived,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const { pushUndo } = useUndo();
   const formRef = useRef<HTMLFormElement>(null);
   // Kaydet butonu formun dışında, alttaki yapışkan çubukta duruyor; forma bu
@@ -160,7 +162,7 @@ export default function TaskEditModal({
 
   const handleLeaveTask = async () => {
     if (!currentUser) return;
-    if (!window.confirm("Bu görevden ayrılmak istiyor musun? Görev silinmez, üzerinden düşersin.")) return;
+    if (!window.confirm(t("Bu görevden ayrılmak istiyor musun? Görev silinmez, üzerinden düşersin."))) return;
     const updated = await api.delete<Task>(`/tasks/${task.id}/assignees/me`).catch(() => null);
     if (updated) {
       setAssigneeIds(updated.assignees?.map((a) => a.userId) ?? []);
@@ -207,7 +209,7 @@ export default function TaskEditModal({
       });
       onSaved(updated);
     } catch {
-      setError("Görev güncellenemedi. Tekrar dene.");
+      setError(t("Görev güncellenemedi. Tekrar dene."));
       setSaving(false);
     }
   };
@@ -250,7 +252,7 @@ export default function TaskEditModal({
       const updated = await api.patch<Task>(`/tasks/${task.id}`, { outputId: nextId || null });
       onTaskPatched?.(updated);
       pushUndo({
-        label: "Görevin çıktısı değişti",
+        label: t("Görevin çıktısı değişti"),
         run: async () => {
           const reverted = await api.patch<Task>(`/tasks/${task.id}`, { outputId: previous || null });
           onTaskPatched?.(reverted);
@@ -279,7 +281,7 @@ export default function TaskEditModal({
     try {
       const updated = await api.patch<Task>(`/tasks/${task.id}/hierarchy`, { parentTaskId: parentId });
       pushUndo({
-        label: parentId ? "Alt göreve dönüştürüldü" : "Göreve dönüştürüldü",
+        label: parentId ? t("Alt göreve dönüştürüldü") : t("Göreve dönüştürüldü"),
         run: async () => {
           await api.patch(`/tasks/${task.id}/hierarchy`, { parentTaskId: previousParent });
         },
@@ -291,7 +293,7 @@ export default function TaskEditModal({
       // seviyesinde yeniden çizilsin diye burada kapanması doğru.
       onSaved(updated);
     } catch (err: any) {
-      setConvertError(err?.message ?? "Dönüştürme başarısız oldu.");
+      setConvertError(err?.message ?? t("Dönüştürme başarısız oldu."));
       setConverting(false);
     }
   };
@@ -308,19 +310,19 @@ export default function TaskEditModal({
         ? `/departments/${task.departmentId}/tasks`
         : null;
     if (!path) {
-      setConvertError("Bu görevin bağlı olduğu bir proje ya da departman yok.");
+      setConvertError(t("Bu görevin bağlı olduğu bir proje ya da departman yok."));
       return;
     }
     try {
       setSiblings(await api.get<Task[]>(path));
     } catch (err: any) {
-      setConvertError(err?.message ?? "Görev listesi alınamadı.");
+      setConvertError(err?.message ?? t("Görev listesi alınamadı."));
     }
   };
 
   return (
     <Modal
-      title="Görevi düzenle"
+      title={t("Görevi düzenle")}
       onClose={onClose}
       maxWidth={1280}
       // Kaydet, modalin alt kenarına yapışır: altında ekler, dosyalar, yorumlar
@@ -332,13 +334,13 @@ export default function TaskEditModal({
           disabled={saving}
           style={{ width: "100%", background: c.primary, color: c.onPrimary, padding: "10px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {saving ? "Kaydediliyor…" : "Kaydet"}
+          {saving ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       }
     >
       <form id={formId} ref={formRef} onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlık")}</label>
           {/* Uzun başlık tek satırda yatay kayıp okunmaz hale gelmesin diye
               sararak büyüyen alan; Enter yine kaydeder (bkz. AutoGrowTextarea). */}
           <AutoGrowTextarea
@@ -346,7 +348,7 @@ export default function TaskEditModal({
             onChange={setTitle}
             onSubmit={() => formRef.current?.requestSubmit()}
             onCancel={onClose}
-            ariaLabel="Başlık"
+            ariaLabel={t("Başlık")}
             maxLength={200}
             required
             minHeight={42}
@@ -354,15 +356,15 @@ export default function TaskEditModal({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Notlar</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Notlar")}</label>
           {/* Dört satır yüksekliğinde durur, not uzadıkça kendiliğinden büyür:
               sabit yükseklikte uzun not kendi içinde kayan bir kutuya hapsoluyor
               ve yazılanın tamamı görünmüyordu (bkz. AutoGrowNotes). */}
           <AutoGrowNotes
             value={description}
             onChange={setDescription}
-            placeholder="Görevle ilgili notlar (opsiyonel)"
-            ariaLabel="Notlar"
+            placeholder={t("Görevle ilgili notlar (opsiyonel)")}
+            ariaLabel={t("Notlar")}
             maxLength={2000}
             rows={4}
           />
@@ -370,11 +372,11 @@ export default function TaskEditModal({
 
         <div style={twoColumnRow}>
           <div style={halfField}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Başlangıç tarihi</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlangıç tarihi")}</label>
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ width: "100%" }} />
           </div>
           <div style={halfField}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş tarihi</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bitiş tarihi")}</label>
             <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} required style={{ width: "100%" }} />
           </div>
         </div>
@@ -384,7 +386,7 @@ export default function TaskEditModal({
             seçeneği açılır — saat yokken "ne kadar önce" sorusunun karşılığı yok. */}
         <div style={twoColumnRow}>
           <div style={halfField}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş saati (opsiyonel)</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bitiş saati (opsiyonel)")}</label>
             <input
               type="time"
               value={deadlineTime}
@@ -398,25 +400,25 @@ export default function TaskEditModal({
             />
           </div>
           <div style={halfField}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Hatırlat</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Hatırlat")}</label>
             <select
               value={reminderLead}
               onChange={(e) => setReminderLead(e.target.value)}
               disabled={!deadlineTime}
               style={{ width: "100%" }}
             >
-              <option value="">Hatırlatma yok</option>
-              <option value="0">Tam saatinde</option>
-              <option value="15">15 dakika önce</option>
-              <option value="60">1 saat önce</option>
-              <option value="1440">1 gün önce</option>
+              <option value="">{t("Hatırlatma yok")}</option>
+              <option value="0">{t("Tam saatinde")}</option>
+              <option value="15">{t("15 dakika önce")}</option>
+              <option value="60">{t("1 saat önce")}</option>
+              <option value="1440">{t("1 gün önce")}</option>
             </select>
           </div>
         </div>
 
         <div style={twoColumnRow}>
           <div style={halfField}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Ekip</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Ekip")}</label>
             {/* Tüm kullanıcılar yerine yalnızca proje ekibi/departman kadrosu, arama ile.
                 Çoklu: bir görevi birden fazla kişi birlikte yürütebilir. */}
             <AssigneePicker
@@ -430,13 +432,13 @@ export default function TaskEditModal({
             />
           </div>
           <div style={halfField}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Bütçe (₺)</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bütçe (₺)")}</label>
             <input type="number" min={0} value={budget} onChange={(e) => setBudget(e.target.value)} style={{ width: "100%" }} />
           </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Tahmini süre (opsiyonel)</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tahmini süre (opsiyonel)")}</label>
           {/* Süre ve birimi tek bir alanın iki parçası; sarmalarına izin verilmez.
               Birim kutusu yalnızca "Saat"/"Gün" kadar yer tutar (eskiden yarım
               satır kaplıyor, dar ekranda sayı alanını dışarı itiyordu). */}
@@ -447,7 +449,7 @@ export default function TaskEditModal({
               step="0.5"
               value={durationValue}
               onChange={(e) => setDurationValue(e.target.value)}
-              placeholder="Örn. 4"
+              placeholder={t("Örn. 4")}
               style={{ flex: "1 1 0", minWidth: 0 }}
             />
             <select
@@ -455,8 +457,8 @@ export default function TaskEditModal({
               onChange={(e) => setDurationUnit(e.target.value as "hours" | "days")}
               style={{ flex: "0 0 auto" }}
             >
-              <option value="hours">Saat</option>
-              <option value="days">Gün</option>
+              <option value="hours">{t("Saat")}</option>
+              <option value="days">{t("Gün")}</option>
             </select>
           </div>
         </div>
@@ -479,7 +481,7 @@ export default function TaskEditModal({
               cursor: "pointer",
             }}
           >
-            Görevden ayrıl
+            {t("Görevden ayrıl")}
           </button>
         </div>
       )}
@@ -488,7 +490,7 @@ export default function TaskEditModal({
           anında kaydedilir — açılır kutuda "kaydet"i beklemek doğal değil. */}
       {outputs !== null && outputs.length > 0 && (
         <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Çıktı</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>{t("Çıktı")}</h3>
           <select
             value={outputId}
             onChange={(e) => void changeOutput(e.target.value)}
@@ -503,7 +505,7 @@ export default function TaskEditModal({
               color: c.textPrimary,
             }}
           >
-            <option value="">Çıktı yok</option>
+            <option value="">{t("Çıktı yok")}</option>
             {outputs.map((output) => (
               <option key={output.id} value={output.id}>
                 {output.title}
@@ -517,11 +519,11 @@ export default function TaskEditModal({
           Kartların üstünde değil burada: satırdaki eylem şeridi zaten kalabalıktı
           ve bu, günlük değil ara sıra yapılan bir işlem. */}
       <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Seviye</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>{t("Seviye")}</h3>
 
         {task.parentTaskId ? (
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 14, color: c.textSecondary }}>Bu kayıt bir alt görev.</span>
+            <span style={{ fontSize: 14, color: c.textSecondary }}>{t("Bu kayıt bir alt görev.")}</span>
             <button
               type="button"
               onClick={() => void convertHierarchy(null)}
@@ -541,12 +543,12 @@ export default function TaskEditModal({
               }}
             >
               <IconOutdent size={14} color={c.textSecondary} />
-              {converting ? "Dönüştürülüyor…" : "Göreve dönüştür"}
+              {converting ? t("Dönüştürülüyor…") : t("Göreve dönüştür")}
             </button>
           </div>
         ) : !pickingParent ? (
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 14, color: c.textSecondary }}>Bu kayıt bir görev.</span>
+            <span style={{ fontSize: 14, color: c.textSecondary }}>{t("Bu kayıt bir görev.")}</span>
             <button
               type="button"
               onClick={() => void openParentPicker()}
@@ -564,7 +566,7 @@ export default function TaskEditModal({
               }}
             >
               <IconIndent size={14} color={c.textSecondary} />
-              Alt göreve dönüştür
+              {t("Alt göreve dönüştür")}
             </button>
           </div>
         ) : (
@@ -594,7 +596,7 @@ export default function TaskEditModal({
           ikisi de yoksa (departman görevi) bölüm hiç açılmaz. */}
       {(task.projectId || fileJobId) && (
         <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Dosyalar</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>{t("Dosyalar")}</h3>
           {task.projectId ? (
             <FilesPanel
               projectId={task.projectId}
@@ -614,10 +616,10 @@ export default function TaskEditModal({
       )}
 
       <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>Yorumlar</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>{t("Yorumlar")}</h3>
 
         {comments.length === 0 ? (
-          <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 12px" }}>Henüz yorum yok.</p>
+          <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 12px" }}>{t("Henüz yorum yok.")}</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12, maxHeight: 180, overflowY: "auto" }}>
             {comments.map((cm) => (
@@ -640,7 +642,7 @@ export default function TaskEditModal({
           <input
             value={commentBody}
             onChange={(e) => setCommentBody(e.target.value)}
-            placeholder="Yorum yaz…"
+            placeholder={t("Yorum yaz…")}
             style={{ flex: "1 1 0", minWidth: 0 }}
           />
           <button
@@ -648,25 +650,25 @@ export default function TaskEditModal({
             disabled={postingComment || !commentBody.trim()}
             style={{ flexShrink: 0, padding: "0 16px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 16, fontWeight: 500 }}
           >
-            Gönder
+            {t("Gönder")}
           </button>
         </form>
       </div>
 
       <EntityDangerZone
-        entityLabel={isSubtask ? "Alt görevi" : "Görevi"}
+        entityLabel={isSubtask ? t("Alt görevi") : t("Görevi")}
         resourcePath={`/tasks/${task.id}`}
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
         archiveMessage={
           isSubtask
-            ? `"${task.title}" alt görevini arşive eklemek istediğine emin misin? İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`
-            : `"${task.title}" görevini arşive eklemek istediğine emin misin? Varsa bu göreve bağlı tüm alt görevler de arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`
+            ? t('"{baslik}" alt görevini arşive eklemek istediğine emin misin? İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.', { baslik: task.title })
+            : t('"{baslik}" görevini arşive eklemek istediğine emin misin? Varsa bu göreve bağlı tüm alt görevler de arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.', { baslik: task.title })
         }
         deleteMessage={
           isSubtask
-            ? `"${task.title}" alt görevini silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`
-            : `"${task.title}" görevini silmek istediğine emin misin? Varsa bu göreve bağlı tüm alt görevler de silinecek. Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`
+            ? t('"{baslik}" alt görevini silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.', { baslik: task.title })
+            : t('"{baslik}" görevini silmek istediğine emin misin? Varsa bu göreve bağlı tüm alt görevler de silinecek. Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.', { baslik: task.title })
         }
       />
     </Modal>
@@ -695,9 +697,10 @@ function ParentPicker({
   onCancel: () => void;
 }) {
   const c = useThemeColors();
+  const t = useT();
 
   if (!siblings) {
-    return <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Görevler yükleniyor…</p>;
+    return <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Görevler yükleniyor…")}</p>;
   }
 
   // Alt görevleri olan bir görev indirilemez: sonuç üçüncü bir seviye olurdu
@@ -706,8 +709,7 @@ function ParentPicker({
   if (hasSubtasks) {
     return (
       <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
-        Bu görevin kendi alt görevleri var, bu yüzden alt göreve dönüştürülemez. Önce alt görevlerini
-        başka bir göreve taşı ya da üst seviyeye çıkar.
+        {t("Bu görevin kendi alt görevleri var, bu yüzden alt göreve dönüştürülemez. Önce alt görevlerini başka bir göreve taşı ya da üst seviyeye çıkar.")}
       </p>
     );
   }
@@ -718,7 +720,7 @@ function ParentPicker({
   if (candidates.length === 0) {
     return (
       <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-        Alt görev yapılabileceği başka bir görev yok.
+        {t("Alt görev yapılabileceği başka bir görev yok.")}
       </p>
     );
   }
@@ -726,7 +728,7 @@ function ParentPicker({
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-        <span style={{ fontSize: 14, color: c.textSecondary }}>Hangi görevin altına girsin?</span>
+        <span style={{ fontSize: 14, color: c.textSecondary }}>{t("Hangi görevin altına girsin?")}</span>
         <button
           type="button"
           onClick={onCancel}
@@ -740,7 +742,7 @@ function ParentPicker({
             cursor: "pointer",
           }}
         >
-          Vazgeç
+          {t("Vazgeç")}
         </button>
       </div>
 

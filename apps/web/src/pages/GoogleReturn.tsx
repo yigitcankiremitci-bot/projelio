@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { driveApi } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 /**
  * Google akışından dönüş ekranı.
@@ -14,6 +15,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 export default function GoogleReturn() {
   const [params] = useSearchParams();
   const c = useThemeColors();
+  const t = useT();
   const [error, setError] = useState("");
   // React 18 StrictMode geliştirmede effect'i iki kez çalıştırır; kod tek
   // kullanımlık olduğu için ikinci çağrı "geçersiz kod" hatası verirdi.
@@ -31,7 +33,7 @@ export default function GoogleReturn() {
     if (errorParam) {
       setError(
         errorParam === "access_denied"
-          ? "Google izni verilmedi. Devam etmek için izin vermeniz gerekiyor."
+          ? t("Google izni verilmedi. Devam etmek için izin vermeniz gerekiyor.")
           : errorParam
       );
       return;
@@ -44,7 +46,7 @@ export default function GoogleReturn() {
     }
 
     if (!code) {
-      setError("Google'dan beklenen yanıt gelmedi.");
+      setError(t("Google'dan beklenen yanıt gelmedi."));
       return;
     }
 
@@ -83,7 +85,7 @@ export default function GoogleReturn() {
         {error ? (
           <>
             <h1 style={{ fontSize: 19, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>
-              Google ile devam edilemedi
+              {t("Google ile devam edilemedi")}
             </h1>
             <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
               {error}
@@ -101,11 +103,11 @@ export default function GoogleReturn() {
                 textDecoration: "none",
               }}
             >
-              Girişe dön
+              {t("Girişe dön")}
             </a>
           </>
         ) : (
-          <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>Giriş yapılıyor…</p>
+          <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>{t("Giriş yapılıyor…")}</p>
         )}
       </div>
     </div>

@@ -9,6 +9,7 @@ import { moduleSurface } from "../lib/moduleSurfaces";
 import { useUndo } from "../lib/undo";
 import ModuleCard from "./ModuleCard";
 import ModuleModal from "./ModuleModal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   jobId: string;
@@ -36,6 +37,7 @@ export interface JobModulesPanelHandle {
 
 const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobModulesPanel({ jobId }, ref) {
   const c = useThemeColors();
+  const t = useT();
   const navigate = useNavigate();
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
   const [assigned, setAssigned] = useState<JobModule[]>([]);
@@ -70,7 +72,7 @@ const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobMod
       setAdding(false);
       load();
       pushUndo({
-        label: "Modül atama",
+        label: t("Modül atama"),
         run: async () => {
           await api.delete(`/jobs/${jobId}/modules/${moduleKey}`);
           load();
@@ -93,7 +95,7 @@ const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobMod
       await api.delete(`/jobs/${jobId}/modules/${moduleKey}`);
       load();
       pushUndo({
-        label: "Modül kaldırma",
+        label: t("Modül kaldırma"),
         run: async () => {
           await api.post(`/jobs/${jobId}/modules`, { moduleKey });
           load();
@@ -112,7 +114,7 @@ const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobMod
   // Tek yönlü açma, listeyi kapatmanın tek yolunu "Vazgeç" bağlantısı yapıyordu.
   useImperativeHandle(ref, () => ({ openAdd: () => setAdding((v) => !v) }));
 
-  if (loading) return <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>;
+  if (loading) return <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>;
 
   const activeEntries = catalog.filter((e) => isAssigned(e.key));
   const availableEntries = catalog.filter((e) => !isAssigned(e.key));
@@ -120,23 +122,23 @@ const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobMod
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: c.textPrimary }}>Modüller</h3>
+      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: c.textPrimary }}>{t("Modüller")}</h3>
 
       {adding && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, background: c.background, borderRadius: 12, padding: 12 }}>
           {/* Kapatma düğmesi listenin kendi başlığında: açan düğme artık burada
               değil, sayfanın "+" düğmesinde. */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ flex: 1, fontSize: 13, color: c.textSecondary }}>Bu işe eklenebilecek modüller</span>
+            <span style={{ flex: 1, fontSize: 13, color: c.textSecondary }}>{t("Bu işe eklenebilecek modüller")}</span>
             <button
               onClick={() => setAdding(false)}
               style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
             >
-              Vazgeç
+              {t("Vazgeç")}
             </button>
           </div>
           {availableEntries.length === 0 ? (
-            <span style={{ fontSize: 13, color: c.textSecondary }}>Eklenebilecek başka modül yok.</span>
+            <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Eklenebilecek başka modül yok.")}</span>
           ) : (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {availableEntries.map((entry) => (
@@ -174,7 +176,7 @@ const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobMod
             fontSize: 15,
           }}
         >
-          Bu işe henüz modül eklenmedi. "+" düğmesiyle başlayabilirsin.
+          {t('Bu işe henüz modül eklenmedi. "+" düğmesiyle başlayabilirsin.')}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>

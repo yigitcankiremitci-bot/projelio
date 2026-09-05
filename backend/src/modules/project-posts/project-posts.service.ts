@@ -214,7 +214,7 @@ export class ProjectPostsService {
           organizationId: post.organization_id ?? undefined,
         });
         const actorName = members.find((m) => m.userId === userId)?.fullName ?? "Bir ekip üyesi";
-        await this.notificationsService.notifyUser(post.user_id, "post_like", "Paylaşımın beğenildi", `${actorName} paylaşımını beğendi.`, link);
+        await this.notificationsService.notifyUser(post.user_id, "post_like", "Paylaşımın beğenildi", { metin: "{kisi} paylaşımını beğendi.", params: { kisi: actorName } }, link);
       }
     }
 
@@ -239,7 +239,7 @@ export class ProjectPostsService {
     );
 
     for (const m of mentioned) {
-      await this.notificationsService.notifyUser(m.userId, "post_mention", "Bir paylaşımda etiketlendin", `${actorName} seni bir paylaşımda etiketledi.`, link);
+      await this.notificationsService.notifyUser(m.userId, "post_mention", "Bir paylaşımda etiketlendin", { metin: "{kisi} seni bir paylaşımda etiketledi.", params: { kisi: actorName } }, link);
     }
   }
 

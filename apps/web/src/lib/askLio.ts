@@ -58,17 +58,19 @@ export type LioSubjectKind =
   | "grup"
   | "modul";
 
+// Modül düzeyinde kanca çağrılamaz: Türkçe metin ANAHTAR olarak duruyor,
+// çeviri kullanıldığı yerde yapılır (bkz. lioSubjectLabel çağıranları).
 const KIND_LABEL: Record<LioSubjectKind, string> = {
-  gorev: "görev",
-  altgorev: "alt görev",
-  proje: "proje",
-  is: "iş",
-  rutin: "rutin",
-  cikti: "çıktı",
-  departman: "departman",
-  organizasyon: "organizasyon",
-  grup: "grup",
-  modul: "modül",
+  gorev: "görev", // dil:anahtar
+  altgorev: "alt görev", // dil:anahtar
+  proje: "proje", // dil:anahtar
+  is: "iş", // dil:anahtar
+  rutin: "rutin", // dil:anahtar
+  cikti: "çıktı", // dil:anahtar
+  departman: "departman", // dil:anahtar
+  organizasyon: "organizasyon", // dil:anahtar
+  grup: "grup", // dil:anahtar
+  modul: "modül", // dil:anahtar
 };
 
 export interface LioSubject {
@@ -94,13 +96,20 @@ export function askLioAbout(subject: LioSubject): void {
   askLioDraft(lioSubjectMessage(subject));
 }
 
-/** Tek bir varlık için açılış cümlesi. */
+/**
+ * Tek bir varlık için açılış cümlesi.
+ *
+ * Cümle ÇEVRİLMİYOR: burası bir React bileşeni değil, kanca çağrılamıyor ve
+ * modül düzeyinde geçerli dili okuyan bir yol yok. Metin kullanıcının kendi
+ * sohbet balonunda görünüyor; İngilizce arayüzde de Türkçe kalıyor. Düzeltmek
+ * için kancasız bir çevirmen erişimi (lib/i18n) gerekiyor.
+ */
 export function lioSubjectMessage(subject: LioSubject): string {
   const label = KIND_LABEL[subject.kind];
-  const parts = [`"${subject.title}" adlı ${label} hakkında konuşmak istiyorum.`];
+  const parts = [`"${subject.title}" adlı ${label} hakkında konuşmak istiyorum.`]; // dil:atla
   if (subject.id) parts.push(`(${label} id: ${subject.id})`);
   if (subject.note) parts.push(subject.note);
-  parts.push("Önce durumunu kısaca özetle, sonra ne yapmamı önerdiğini söyle.");
+  parts.push("Önce durumunu kısaca özetle, sonra ne yapmamı önerdiğini söyle."); // dil:atla
   return parts.join(" ");
 }
 
@@ -118,9 +127,10 @@ export function askLioAboutMany(subjects: LioSubject[]): void {
   const list = subjects
     .map((s) => `- "${s.title}"${s.id ? ` (id: ${s.id})` : ""}${s.note ? ` — ${s.note}` : ""}`)
     .join("\n");
+  // Çevrilmiyor — gerekçesi lioSubjectMessage'ın başında.
   askLioDraft(
-    `Şu ${subjects.length} ${label} hakkında konuşmak istiyorum:\n${list}\n\n` +
-      "Hepsini birlikte değerlendir: durumlarını özetle ve nasıl bir sıra izlemem gerektiğini söyle."
+    `Şu ${subjects.length} ${label} hakkında konuşmak istiyorum:\n${list}\n\n` + // dil:atla
+      "Hepsini birlikte değerlendir: durumlarını özetle ve nasıl bir sıra izlemem gerektiğini söyle." // dil:atla
   );
 }
 

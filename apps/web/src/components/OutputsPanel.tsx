@@ -20,6 +20,7 @@ import { selectedLioTasks } from "../lib/askLio";
 import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { usePageHeaderActions } from "../lib/pageHeader";
 import { useDragScroll } from "../lib/useDragScroll";
+import { useT } from "../lib/i18n";
 
 const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
 
@@ -101,6 +102,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
   onTasksDeleted,
 }, ref) {
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
   // Pano yalnızca masaüstünde yana kayıyor; dar ekranda sütunlar alt alta.
   const boardScrollRef = useDragScroll<HTMLDivElement>(isDesktop);
@@ -155,7 +157,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
       // Arşivleme geri alınabilir: her görev zaten tekil /restore uç noktasına
       // sahip ve o uç nokta alt görevleri de kendiliğinden geri getiriyor.
       pushUndo({
-        label: `${ids.length} görev arşivleme`,
+        label: t("{n} görev arşivleme", { n: ids.length }),
         run: async () => {
           await Promise.all(ids.map((id) => api.patch(`/tasks/${id}/restore`, {})));
         },
@@ -179,7 +181,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
     if (ids.length === 0) return;
     onTasksDeleted?.(ids);
     pushDestructive({
-      label: `${ids.length} görev silme`,
+      label: t("{n} görev silme", { n: ids.length }),
       commit: () => api.post("/tasks/bulk-delete", { ids }),
       restore: () => {},
       entityIds: ids,
@@ -341,32 +343,32 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
    */
   const toolbar = (
     <div ref={toolbarRef} style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-      <div role="group" aria-label="Görünüm" style={{ display: "flex", gap: 4 }}>
+      <div role="group" aria-label={t("Görünüm")} style={{ display: "flex", gap: 4 }}>
         {(
           [
-            { value: "tasks", label: "Görevler" },
-            { value: "outputs", label: "Çıktılar" },
+            { value: "tasks", label: t("Görevler") },
+            { value: "outputs", label: t("Çıktılar") },
           ] as { value: OutputsView; label: string }[]
-        ).map((t) => (
+        ).map((sekme) => (
           <button
-            key={t.value}
+            key={sekme.value}
             type="button"
             onClick={() => {
               selection.clear();
               setSelectedOutputId(null);
-              setView(t.value);
+              setView(sekme.value);
             }}
-            aria-pressed={view === t.value}
+            aria-pressed={view === sekme.value}
             style={{
               padding: "8px 16px",
               fontSize: 15,
               borderRadius: 8,
-              border: `1px solid ${view === t.value ? c.primary : c.border}`,
-              background: view === t.value ? `${c.primary}12` : c.surface,
-              color: view === t.value ? c.textPrimary : c.textSecondary,
+              border: `1px solid ${view === sekme.value ? c.primary : c.border}`,
+              background: view === sekme.value ? `${c.primary}12` : c.surface,
+              color: view === sekme.value ? c.textPrimary : c.textSecondary,
             }}
           >
-            {t.label}
+            {sekme.label}
           </button>
         ))}
       </div>
@@ -402,33 +404,33 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
    * indirgenir (bkz. TaskSelectionBar inline).
    */
   const headerViewToggle = (
-    <div role="group" aria-label="Görünüm" style={{ display: "flex", gap: 4 }}>
+    <div role="group" aria-label={t("Görünüm")} style={{ display: "flex", gap: 4 }}>
       {(
         [
-          { value: "tasks", label: "Görevler" },
-          { value: "outputs", label: "Çıktılar" },
+          { value: "tasks", label: t("Görevler") },
+          { value: "outputs", label: t("Çıktılar") },
         ] as { value: OutputsView; label: string }[]
-      ).map((t) => (
+      ).map((sekme) => (
         <button
-          key={t.value}
+          key={sekme.value}
           type="button"
           onClick={() => {
             selection.clear();
             setSelectedOutputId(null);
-            setView(t.value);
+            setView(sekme.value);
           }}
-          aria-pressed={view === t.value}
+          aria-pressed={view === sekme.value}
           style={{
             padding: "7px 14px",
             fontSize: 14,
             borderRadius: 8,
-            border: `1px solid ${view === t.value ? c.primary : c.border}`,
-            background: view === t.value ? `${c.primary}12` : c.surface,
-            color: view === t.value ? c.textPrimary : c.textSecondary,
+            border: `1px solid ${view === sekme.value ? c.primary : c.border}`,
+            background: view === sekme.value ? `${c.primary}12` : c.surface,
+            color: view === sekme.value ? c.textPrimary : c.textSecondary,
             whiteSpace: "nowrap",
           }}
         >
-          {t.label}
+          {sekme.label}
         </button>
       ))}
     </div>
@@ -496,9 +498,12 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
       )}
       {confirmingBulkAction === "archive" && (
         <ConfirmDialog
-          title="Görevleri arşivle"
-          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
-          confirmLabel="Arşivle"
+          title={t("Görevleri arşivle")}
+          message={t(
+            "{n} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.",
+            { n: selection.selectedIds.size }
+          )}
+          confirmLabel={t("Arşivle")}
           danger={false}
           onCancel={() => setConfirmingBulkAction(null)}
           onConfirm={handleArchiveSelected}
@@ -506,9 +511,12 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
       )}
       {confirmingBulkAction === "delete" && (
         <ConfirmDialog
-          title="Görevleri sil"
-          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`}
-          confirmLabel="Sil"
+          title={t("Görevleri sil")}
+          message={t(
+            "{n} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.",
+            { n: selection.selectedIds.size }
+          )}
+          confirmLabel={t("Sil")}
           danger
           onCancel={() => setConfirmingBulkAction(null)}
           onConfirm={handleDeleteSelected}
@@ -569,7 +577,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
           }}
           style={{ fontSize: 15, color: c.textSecondary, background: "transparent", border: "none", padding: 0, marginBottom: 10 }}
         >
-          ← Çıktılar
+          {t("← Çıktılar")}
         </button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
@@ -585,7 +593,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
           />
           <button
             onClick={() => setEditingOutput(selectedOutput)}
-            aria-label="Çıktıyı düzenle"
+            aria-label={t("Çıktıyı düzenle")}
             style={{ background: "transparent", border: "none", padding: 4, display: "flex", flexShrink: 0 }}
           >
             <IconEdit size={14} color={c.textSecondary} />
@@ -621,9 +629,9 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
             lineHeight: 1.5,
           }}
         >
-          Çıktı, projenin ortaya çıkaracağı somut şey — bir müzik projesinde "Sözler", "Master dosyası", "Albüm
-          kapağı" gibi. Görevleri bunların altında toplayabilirsin; zorunlu değil, istersen görevler sekmesinde
-          düz liste olarak da çalışabilirsin.
+          {t(
+            'Çıktı, projenin ortaya çıkaracağı somut şey — bir müzik projesinde "Sözler", "Master dosyası", "Albüm kapağı" gibi. Görevleri bunların altında toplayabilirsin; zorunlu değil, istersen görevler sekmesinde düz liste olarak da çalışabilirsin.'
+          )}
         </div>
       ) : (
         <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -671,7 +679,7 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
                       e.stopPropagation();
                       setEditingOutput(o);
                     }}
-                    aria-label="Çıktıyı düzenle"
+                    aria-label={t("Çıktıyı düzenle")}
                     style={{ background: "transparent", border: "none", padding: 2, display: "flex" }}
                   >
                     <IconEdit size={13} color={c.textSecondary} />

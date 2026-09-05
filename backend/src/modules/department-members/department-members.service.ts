@@ -249,7 +249,12 @@ export class DepartmentMembersService {
         member.invitedBy,
         "member_joined",
         "Kadro Onayı",
-        `${member.fullName ?? "Bir kullanıcı"} departman davetini onayladı ve kadroya katıldı.`,
+        // Adı bilinmiyorsa AYRI bir metin: yedek değeri parametre olarak
+        // geçmek, İngilizce cümlenin ortasında Türkçe bir sözcük bırakırdı
+        // (params çevrilmez, yalnızca kalıp çevrilir).
+        member.fullName
+          ? { metin: "{kisi} departman davetini onayladı ve kadroya katıldı.", params: { kisi: member.fullName } }
+          : "Bir kullanıcı departman davetini onayladı ve kadroya katıldı.",
         `/departments/${member.departmentId}`
       );
     }
@@ -331,7 +336,15 @@ export class DepartmentMembersService {
       org.owner_id,
       "role_updated",
       "Ayrılma onayı bekliyor",
-      `${user?.full_name ?? "Bir yönetici"}, "${dept.name}" departmanının son yöneticisi ve ayrılmak istiyor. Onaylamadan ayrılamaz.`,
+      user?.full_name
+        ? {
+            metin: '{kisi}, "{departman}" departmanının son yöneticisi ve ayrılmak istiyor. Onaylamadan ayrılamaz.',
+            params: { kisi: user.full_name, departman: dept.name },
+          }
+        : {
+            metin: 'Bir yönetici, "{departman}" departmanının son yöneticisi ve ayrılmak istiyor. Onaylamadan ayrılamaz.',
+            params: { departman: dept.name },
+          },
       `/departments/${departmentId}?tab=team`
     );
   }

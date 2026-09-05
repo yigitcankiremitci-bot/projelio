@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { aiChat } from "../api/aiChat";
 import type { AiCreditOrder } from "../api/aiChat";
+import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 
 function formatTry(amount: number): string {
@@ -26,6 +27,7 @@ interface Props {
  */
 export default function AiCreditOrdersAdmin({ onCredited }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [orders, setOrders] = useState<AiCreditOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
     aiChat
       .getAllCreditOrders()
       .then(setOrders)
-      .catch(() => setError("Siparişler yüklenemedi."))
+      .catch(() => setError(t("Siparişler yüklenemedi.")))
       .finally(() => setLoading(false));
   };
 
@@ -50,7 +52,7 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
       load();
       onCredited?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "İşlem tamamlanamadı.");
+      setError(err instanceof Error ? err.message : t("İşlem tamamlanamadı."));
     } finally {
       setBusyId(null);
     }
@@ -81,9 +83,9 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
 
   return (
     <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: 16, marginBottom: 18 }}>
-      <h3 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 4px" }}>Kredi siparişleri</h3>
+      <h3 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 4px" }}>{t("Kredi siparişleri")}</h3>
       <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>
-        Ödemesi alınan siparişi onayla — kredi ancak onaydan sonra kullanıcının bakiyesine geçer.
+        {t("Ödemesi alınan siparişi onayla — kredi ancak onaydan sonra kullanıcının bakiyesine geçer.")}
       </p>
 
       {error && <p style={{ color: c.danger, fontSize: 13.5, margin: "0 0 10px" }}>{error}</p>}
@@ -99,19 +101,20 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
           }}
         >
           <p style={{ margin: 0, padding: "9px 12px", fontSize: 13.5, color: c.danger, lineHeight: 1.5 }}>
-            Ödemesi onaylanmış ama kredisi yüklenememiş sipariş var. Yükleme yeniden denenmeli.
+            {t("Ödemesi onaylanmış ama kredisi yüklenememiş sipariş var. Yükleme yeniden denenmeli.")}
           </p>
           {stuck.map((o) => (
             <div key={o.id} style={{ ...rowStyle, borderTop: `1px solid ${c.danger}44` }}>
               <span style={{ flex: 1, color: c.textPrimary }}>
-                {o.userFullName ?? o.userEmail ?? o.userId} · {o.credits.toLocaleString("tr-TR")} kredi
+                {o.userFullName ?? o.userEmail ?? o.userId} ·{" "}
+                {t("{n} kredi", { n: o.credits.toLocaleString("tr-TR") })}
               </span>
               <button
                 onClick={() => act(o.id, () => aiChat.retryCreditOrder(o.id))}
                 disabled={busyId === o.id}
                 style={buttonStyle(true)}
               >
-                {busyId === o.id ? "Yükleniyor…" : "Krediyi yükle"}
+                {busyId === o.id ? t("Yükleniyor…") : t("Krediyi yükle")}
               </button>
             </div>
           ))}
@@ -119,9 +122,9 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
       )}
 
       {loading ? (
-        <p style={{ fontSize: 13.5, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
+        <p style={{ fontSize: 13.5, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
       ) : pending.length === 0 ? (
-        <p style={{ fontSize: 13.5, color: c.textSecondary, margin: 0 }}>Ödeme bekleyen sipariş yok.</p>
+        <p style={{ fontSize: 13.5, color: c.textSecondary, margin: 0 }}>{t("Ödeme bekleyen sipariş yok.")}</p>
       ) : (
         <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, overflow: "hidden" }}>
           {pending.map((o, i) => (
@@ -129,7 +132,7 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
               <span style={{ flex: 1, minWidth: 160, color: c.textPrimary }}>
                 {o.userFullName ?? o.userEmail ?? o.userId}
                 <span style={{ display: "block", fontSize: 12.5, color: c.textSecondary }}>
-                  {o.credits.toLocaleString("tr-TR")} kredi · {formatTry(o.priceAmount)} ·{" "}
+                  {t("{n} kredi", { n: o.credits.toLocaleString("tr-TR") })} · {formatTry(o.priceAmount)} ·{" "}
                   {new Date(o.createdAt).toLocaleDateString("tr-TR")}
                 </span>
               </span>
@@ -138,7 +141,7 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
                 disabled={busyId === o.id}
                 style={buttonStyle(true)}
               >
-                {busyId === o.id ? "İşleniyor…" : "Ödemeyi onayla"}
+                {busyId === o.id ? t("İşleniyor…") : t("Ödemeyi onayla")}
               </button>
             </div>
           ))}

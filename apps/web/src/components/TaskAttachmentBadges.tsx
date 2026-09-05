@@ -1,10 +1,11 @@
 import { useState } from "react";
-import type { TaskAttachment } from "@projelio/shared";
+import type { TaskAttachment, Translate } from "@projelio/shared";
 import { safeExternalUrl } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconExternalLink, IconFile } from "./icons";
 import Modal from "./Modal";
 import { useTaskAttachmentSnapshot, type AttachedFile } from "../lib/taskAttachmentEvents";
+import { useT } from "../lib/i18n";
 
 /**
  * Bağlantı ekleri kullanıcı tarafından yazılıyor. `javascript:` ile başlayan bir
@@ -15,10 +16,10 @@ import { useTaskAttachmentSnapshot, type AttachedFile } from "../lib/taskAttachm
  * ama bu kural eklenmeden ÖNCE kaydedilmiş adresler veritabanında olabilir; burası
  * onlara karşı ikinci katman.
  */
-function openLink(url: string): void {
+function openLink(url: string, t: Translate): void {
   const safe = safeExternalUrl(url);
   if (!safe) {
-    alert("Bu bağlantı açılamıyor: adres geçerli bir web adresi değil.");
+    alert(t("Bu bağlantı açılamıyor: adres geçerli bir web adresi değil."));
     return;
   }
   window.open(safe, "_blank", "noreferrer");
@@ -55,6 +56,7 @@ export default function TaskAttachmentBadges({
   size?: number;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const [picker, setPicker] = useState<"links" | "files" | null>(null);
   // Pano listesi sunucudan geldiği gibi duruyor; bu oturumda ek eklendiyse
   // defterdeki taze liste onun yerine geçer. Böylece rozet, modalı hangi
@@ -83,15 +85,15 @@ export default function TaskAttachmentBadges({
         <button
           onClick={(e) => {
             stop(e);
-            if (linkList.length === 1) openLink(linkList[0].url);
+            if (linkList.length === 1) openLink(linkList[0].url, t);
             else setPicker("links");
           }}
           onDoubleClick={stop}
-          aria-label={linkList.length === 1 ? "Bağlantıyı aç" : `${linkList.length} bağlantı`}
+          aria-label={linkList.length === 1 ? t("Bağlantıyı aç") : t("{n} bağlantı", { n: linkList.length })}
           title={
             linkList.length === 1
               ? linkList[0].label || linkList[0].url
-              : `${linkList.length} bağlantı — açmak için tıkla`
+              : t("{n} bağlantı — açmak için tıkla", { n: linkList.length })
           }
           style={badgeStyle}
         >
@@ -111,8 +113,8 @@ export default function TaskAttachmentBadges({
             else setPicker("files");
           }}
           onDoubleClick={stop}
-          aria-label={fileList.length === 1 ? "Dosyayı aç" : `${fileList.length} dosya`}
-          title={fileList.length === 1 ? fileList[0].name : `${fileList.length} dosya — açmak için tıkla`}
+          aria-label={fileList.length === 1 ? t("Dosyayı aç") : t("{n} dosya", { n: fileList.length })}
+          title={fileList.length === 1 ? fileList[0].name : t("{n} dosya — açmak için tıkla", { n: fileList.length })}
           style={badgeStyle}
         >
           <IconFile size={size} color={c.primary} />
@@ -126,7 +128,7 @@ export default function TaskAttachmentBadges({
         // değiştirir).
         <div onClick={stop} onDoubleClick={stop}>
           <Modal
-            title={picker === "links" ? "Bağlantılar" : "Dosyalar"}
+            title={picker === "links" ? t("Bağlantılar") : t("Dosyalar")}
             onClose={() => setPicker(null)}
             maxWidth={420}
           >
@@ -139,7 +141,7 @@ export default function TaskAttachmentBadges({
                       title={a.label || a.url}
                       subtitle={a.label ? a.url : undefined}
                       onOpen={() => {
-                        openLink(a.url);
+                        openLink(a.url, t);
                         setPicker(null);
                       }}
                     />
@@ -149,7 +151,7 @@ export default function TaskAttachmentBadges({
                       key={f.id}
                       icon={<IconFile size={15} color={c.primary} />}
                       title={f.name}
-                      subtitle={f.webViewLink ? undefined : "Bu dosya açılamıyor (erişim yok)"}
+                      subtitle={f.webViewLink ? undefined : t("Bu dosya açılamıyor (erişim yok)")}
                       disabled={!f.webViewLink}
                       onOpen={() => {
                         if (!f.webViewLink) return;

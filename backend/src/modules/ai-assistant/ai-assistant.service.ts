@@ -71,6 +71,9 @@ import {
 import { LlmProviderRegistry, type ProviderChoice } from "./providers/provider-registry";
 import { AiModelSettingsService } from "./ai-model-settings.service";
 import type { LlmRequest, LlmResponse } from "./providers/llm-provider";
+import type { Locale } from "@projelio/shared";
+import { DIL_KURALLARI } from "./lio-dil-kurallari";
+import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 
 const DEFAULT_MODEL = MODEL_TIERS.fast.model;
 const PENDING_ACTION_TTL_MS = 10 * 60 * 1000; // 10 dakika
@@ -277,6 +280,11 @@ interface PendingRun {
   id: string;
   userId: string;
   userRole: string;
+  /**
+   * Yanıtın dili. Koşunun BAŞINDA sabitleniyor: kullanıcı ortasında dilini
+   * değiştirirse aynı koşunun turları iki dilde karışmasın.
+   */
+  locale: Locale;
   conversationId: string;
   tier: ModelTier;
   /** Kullanıcının açıkça seçtiği model ("saglayici:model"); yoksa kademe kararı geçerli. */
@@ -603,6 +611,7 @@ export class AiAssistantService {
 
   constructor(
     private supabase: SupabaseService,
+    private readonly diller: KullaniciDiliService,
     private tasksService: TasksService,
     private projectsService: ProjectsService,
     private jobsService: JobsService,
@@ -879,7 +888,8 @@ export class AiAssistantService {
    * Buraya kullanıcıya/tarihe özel hiçbir bilgi konulmamalıdır — aksi halde önbellek
    * her istekte ıskalar ve maliyet düşmez.
    */
-  private static readonly STATIC_SYSTEM_PROMPT = [
+  private static promptSatirlari(locale: Locale): string[] {
+    return [
     "Sen Projelio'nun içine gömülü yapay zeka asistanısın. Adın \"Projelio Asistan\".",
       "Projelio; iş (job) > proje (project) > görev (task) hiyerarşisiyle çalışan bir proje ve serbest çalışan yönetim uygulamasıdır.",
       "Projelerin bütçesi, ekip üyeleri (sahip / üye / taşeron) ve teslim tarihleri vardır. Görevlerin alt görevleri olabilir.",
@@ -891,22 +901,7 @@ export class AiAssistantService {
       "Sadece komut çalıştıran bir arayüz değilsin — kullanıcının işini kolaylaştıran, öngörülü bir yardımcısın.",
       "",
       "## Davranış kuralları",
-      "- Her zaman Türkçe yaz. Kısa, net ve doğal konuş; gereksiz dolgu cümlesi kurma.",
-      "",
-      "### Türkçe kuralları",
-      "Yazdığın Türkçe, İngilizceden çevrilmiş gibi DEĞİL, Türkçe düşünen birinin yazdığı gibi olmalı.",
-      "- SEN diye hitap et, siz değil. Tek bir yanıtın içinde ikisini karıştırma: " +
-        "\"ekledim, istersen bakabilirsin\" evet; \"ekledim, isterseniz bakabilirsiniz\" hayır.",
-      "- Özel ada ve yabancı sözcüğe gelen ek kesme işaretiyle ve ünlü uyumuna göre yazılır: " +
-        "\"Rundeer'e\", \"Excel'den\", \"Lio'ya\", \"API'ye\". \"Rundeer'ye\", \"Excel'dan\" yanlış.",
-      "- Sayıdan sonra çoğul eki gelmez: \"3 görev\" doğru, \"3 görevler\" yanlış.",
-      "- Edilgen çatıyı azalt: \"görev oluşturuldu\" yerine \"görevi ekledim\". Ne yaptığını birinci tekil kişiyle söyle.",
-      "- İngilizce kalıpları çevirme: \"Bu size yardımcı olur mu?\", \"Şunu yapmama izin ver\", " +
-        "\"Harika bir soru\", \"Umarım bu yardımcı olur\" gibi cümleler kurma.",
-      "- Yüklem sonda: \"Ekledim üç görevi projeye\" değil, \"Projeye üç görev ekledim\".",
-      "- Teknik terimi Türkçesi yerleşmişse Türkçe yaz (görev, alt görev, çıktı, bütçe); " +
-        "yerleşmemişse olduğu gibi bırak. Uydurma karşılık türetme.",
-      "- Ünlem ve emoji kullanma. Övgü cümlesiyle başlama, doğrudan işe gir.",
+      ...DIL_KURALLARI[locale],
       "- KAPSAMINDAKİ bir iş için araçları denemeden \"yapamıyorum\" deme. Önce ilgili list_*/get_*/search_* aracını dene; " +
         "gerekli id'yi bilmiyorsan önce onunla bul. Kullanıcıya asla id sorma; isimden eşleştir. " +
         "(Kapsam dışı alanlar için bunun tersi geçerli: aşağıdaki \"Sınırların\" bölümüne bak.)",
@@ -1210,7 +1205,21 @@ export class AiAssistantService {
       "",
       "Aşağıda sana kullanıcının bugünkü bağlamı verilecek. Oradaki id'leri doğrudan kullanabilirsin;",
       "listede olmayan bir şey için list_* araçlarına başvur.",
-  ].join("\n");
+    ];
+  }
+
+  /**
+   * Dil başına bir kez kurulan statik prompt.
+   *
+   * Önceden tek bir dizeydi. Artık dile göre iki sürümü var (bkz.
+   * lio-dil-kurallari.ts): yalnızca yazım kuralları bölümü değişiyor, alan
+   * bilgisi ortak kalıyor. Her istekte yeniden birleştirmemek için burada
+   * bir kez hesaplanıyor — 300 satırlık bir join, istek başına yapılacak iş değil.
+   */
+  private static readonly STATIC_SYSTEM_PROMPT: Record<Locale, string> = {
+    tr: AiAssistantService.promptSatirlari("tr").join("\n"),
+    en: AiAssistantService.promptSatirlari("en").join("\n"),
+  };
 
   /**
    * Sistem promptunun isteğe/kullanıcıya özel (önbelleklenmeyen) kısmı.
@@ -1449,6 +1458,7 @@ export class AiAssistantService {
       id: randomUUID(),
       userId,
       userRole,
+      locale: await this.diller.diliniBul(userId),
       conversationId: convId,
       tier,
       preferredModel,
@@ -1884,7 +1894,7 @@ export class AiAssistantService {
         system: [
           {
             type: "text",
-            text: AiAssistantService.STATIC_SYSTEM_PROMPT,
+            text: AiAssistantService.STATIC_SYSTEM_PROMPT[run.locale],
             // Önbellek işareti yalnızca destekleyen sağlayıcıya konur; desteklemeyen
             // sağlayıcılarda bu alan bilinmeyen bir anahtar olarak reddedilebilir.
             ...(CACHING_ENABLED && choice.provider.capabilities.promptCaching

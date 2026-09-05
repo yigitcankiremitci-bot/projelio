@@ -132,7 +132,7 @@ export class PartnersService {
         data.userId,
         "team_invite",
         "Ortaklık Daveti",
-        `%${data.equityPercent} hisse ile ortaklığa davet edildin.`
+        { metin: "%{pay} hisse ile ortaklığa davet edildin.", params: { pay: data.equityPercent } }
       );
     }
 

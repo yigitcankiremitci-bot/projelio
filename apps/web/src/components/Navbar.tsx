@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconDashboard, IconCalendar, IconShield, IconLogout, IconCheck } from "./icons";
+import { useT } from "../lib/i18n";
 
 const navItems = [
   { to: "/", label: "Ana sayfa", icon: IconDashboard },
@@ -10,6 +11,7 @@ const navItems = [
 
 export default function Navbar() {
   const c = useThemeColors();
+  const t = useT();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -45,6 +47,7 @@ export default function Navbar() {
         >
           <IconCheck size={13} color={c.primaryDark} />
         </span>
+        {/* dil:atla — marka adı hiçbir dilde çevrilmez */}
         <span style={{ color: "#fff", fontSize: 19, fontWeight: 600 }}>Projelio</span>
       </Link>
 
@@ -85,7 +88,7 @@ export default function Navbar() {
           }}
         >
           <IconLogout size={15} color="#9AA6B4" />
-          <span style={{ fontSize: 16, color: "#C7CCD6" }}>Çıkış</span>
+          <span style={{ fontSize: 16, color: "#C7CCD6" }}>{t("Çıkış")}</span>
         </button>
       </div>
     </nav>

@@ -9,6 +9,7 @@ import AddBudgetEntryModal from "./AddBudgetEntryModal";
 import AddRecurringPaymentModal from "./AddRecurringPaymentModal";
 import { useUndo } from "../lib/undo";
 import { IconTrash, IconEdit, IconCalendar, IconFolder } from "./icons";
+import { useT } from "../lib/i18n";
 
 function formatMoney(amount: number): string {
   return `${amount.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
@@ -18,16 +19,18 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" });
 }
 
+// Metinler t() ile burada değil, kullanıldıkları yerde çevriliyor: modül
+// düzeyinde kanca çağrılamaz, Türkçe metin anahtar olarak kalır.
 const intervalLabels: Record<string, string> = {
-  weekly: "Her hafta",
-  monthly: "Her ay",
-  yearly: "Her yıl",
+  weekly: "Her hafta", // dil:anahtar
+  monthly: "Her ay", // dil:anahtar
+  yearly: "Her yıl", // dil:anahtar
 };
 
 const typeLabels: Record<string, string> = {
-  income: "Gelen ödeme",
-  expense: "Gider",
-  payout: "Hakediş ödemesi",
+  income: "Gelen ödeme", // dil:anahtar
+  expense: "Gider", // dil:anahtar
+  payout: "Hakediş ödemesi", // dil:anahtar
 };
 
 /**
@@ -62,6 +65,7 @@ function ozettenDus(ozet: BudgetOverview, tx: BudgetTransaction): BudgetOverview
 
 export default function BudgetPanel() {
   const c = useThemeColors();
+  const t = useT();
   const [overview, setOverview] = useState<BudgetOverview | null>(null);
   const [transactions, setTransactions] = useState<BudgetTransaction[]>([]);
   const [recurring, setRecurring] = useState<RecurringPayment[]>([]);
@@ -81,10 +85,10 @@ export default function BudgetPanel() {
   // bölüm başlıklarında ayrı düğmelerdeydi, artık tek "+" menüsünde.
   useProjectFabAction(
     {
-      label: "Ekle",
+      label: t("Ekle"),
       options: [
-        { label: "Gelir / gider ekle", onClick: () => setAddingEntry(true) },
-        { label: "Düzenli ödeme ekle", onClick: () => setAddingRecurring(true) },
+        { label: t("Gelir / gider ekle"), onClick: () => setAddingEntry(true) },
+        { label: t("Düzenli ödeme ekle"), onClick: () => setAddingRecurring(true) },
       ],
     },
     [],
@@ -114,7 +118,7 @@ export default function BudgetPanel() {
     // sunucudaki gerçek değerle üzerine yazacak.
     if (silinen) setOverview((prev) => (prev ? ozettenDus(prev, silinen) : prev));
     pushDestructive({
-      label: "Kayıt silme",
+      label: t("Kayıt silme"),
       commit: async () => {
         await api.delete(`/budget/transactions/${id}`).catch(() => {});
         reload();
@@ -144,7 +148,7 @@ export default function BudgetPanel() {
     reload();
     if (previous) {
       pushUndo({
-        label: "Bütçe kaydı düzenlendi",
+        label: t("Bütçe kaydı düzenlendi"),
         run: () => applyValues(previous),
         redo: () => applyValues(saved),
       });
@@ -158,7 +162,7 @@ export default function BudgetPanel() {
       occurredAt: saved.occurredAt,
     };
     pushUndo({
-      label: "Bütçe kaydı eklendi",
+      label: t("Bütçe kaydı eklendi"),
       run: async () => {
         await api.delete(`/budget/transactions/${saved.id}`).catch(() => {});
         reload();
@@ -173,7 +177,7 @@ export default function BudgetPanel() {
   const deleteRecurring = async (id: string) => {
     setRecurring((prev) => prev.filter((r) => r.id !== id));
     pushDestructive({
-      label: "Düzenli ödeme silme",
+      label: t("Düzenli ödeme silme"),
       commit: async () => {
         await api.delete(`/budget/recurring/${id}`).catch(() => {});
         reload();
@@ -219,24 +223,24 @@ export default function BudgetPanel() {
       {/* Özet kartları — "gelen" ve "beklenen" ayrı ayrı; tahsil edilen para
           anlaşılan ücretin içinden düşer, üstüne eklenmez. */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-        <SummaryCard label="Anlaşılan ücret" value={overview?.totalAgreedFee ?? 0} color={c.textPrimary} />
-        <SummaryCard label="Gelen ödeme" value={overview?.totalReceived ?? 0} color={c.success} />
-        <SummaryCard label="Beklenen ödeme" value={overview?.totalExpected ?? 0} color={c.warning} />
-        <SummaryCard label="Gider" value={overview?.totalExpense ?? 0} color={c.danger} />
+        <SummaryCard label={t("Anlaşılan ücret")} value={overview?.totalAgreedFee ?? 0} color={c.textPrimary} />
+        <SummaryCard label={t("Gelen ödeme")} value={overview?.totalReceived ?? 0} color={c.success} />
+        <SummaryCard label={t("Beklenen ödeme")} value={overview?.totalExpected ?? 0} color={c.warning} />
+        <SummaryCard label={t("Gider")} value={overview?.totalExpense ?? 0} color={c.danger} />
         <SummaryCard
-          label="Net kazanç"
+          label={t("Net kazanç")}
           value={overview?.netEarned ?? 0}
           color={(overview?.netEarned ?? 0) < 0 ? c.danger : c.success}
-          hint="Gelen ödeme − gider"
+          hint={t("Gelen ödeme − gider")}
         />
       </div>
 
       {/* Proje bazlı tahsilat durumu */}
       <section>
-        <h2 style={sectionTitle}>Projelere göre tahsilat</h2>
+        <h2 style={sectionTitle}>{t("Projelere göre tahsilat")}</h2>
         {!overview || overview.projects.length === 0 ? (
           <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 15, padding: 28 }}>
-            Henüz bütçesi olan bir projen yok.
+            {t("Henüz bütçesi olan bir projen yok.")}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -260,12 +264,12 @@ export default function BudgetPanel() {
                           borderRadius: 999,
                         }}
                       >
-                        Tahsilat tamam
-                        {p.overpaid > 0 && ` · +${formatMoney(p.overpaid)} fazla`}
+                        {t("Tahsilat tamam")}
+                        {p.overpaid > 0 && t(" · +{tutar} fazla", { tutar: formatMoney(p.overpaid) })}
                       </span>
                     ) : (
                       <span style={{ fontSize: 14, color: c.textSecondary }}>
-                        {formatMoney(p.agreedFee)} anlaşıldı
+                        {t("{tutar} anlaşıldı", { tutar: formatMoney(p.agreedFee) })}
                       </span>
                     )}
                   </div>
@@ -277,21 +281,21 @@ export default function BudgetPanel() {
 
                   <div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 14 }}>
                     <span style={{ color: c.textSecondary }}>
-                      Gelen <strong style={{ color: c.success, fontWeight: 500 }}>{formatMoney(p.received)}</strong>
+                      {t("Gelen")} <strong style={{ color: c.success, fontWeight: 500 }}>{formatMoney(p.received)}</strong>
                     </span>
                     <span style={{ color: c.textSecondary }}>
-                      Beklenen{" "}
+                      {t("Beklenen")}{" "}
                       <strong style={{ color: p.expected > 0 ? c.warning : c.textSecondary, fontWeight: 500 }}>
                         {formatMoney(p.expected)}
                       </strong>
                     </span>
                     {p.expense > 0 && (
                       <span style={{ color: c.textSecondary }}>
-                        Gider <strong style={{ color: c.danger, fontWeight: 500 }}>{formatMoney(p.expense)}</strong>
+                        {t("Gider")} <strong style={{ color: c.danger, fontWeight: 500 }}>{formatMoney(p.expense)}</strong>
                       </span>
                     )}
                     <span style={{ color: c.textSecondary }}>
-                      Net{" "}
+                      {t("Net")}{" "}
                       <strong style={{ color: p.netEarned < 0 ? c.danger : c.textPrimary, fontWeight: 500 }}>
                         {formatMoney(p.netEarned)}
                       </strong>
@@ -306,12 +310,13 @@ export default function BudgetPanel() {
 
       {/* Düzenli ödemeler */}
       <section>
-        <h2 style={sectionTitle}>Düzenli ödemeler</h2>
+        <h2 style={sectionTitle}>{t("Düzenli ödemeler")}</h2>
 
         {recurring.length === 0 ? (
           <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 15, padding: 28 }}>
-            Kira, abonelik gibi tekrar eden ödemeleri sayfadaki "+" ile ekle. Vadesi gelince bütçene otomatik işlenir ve
-            bildirim gönderilir.
+            {t(
+              'Kira, abonelik gibi tekrar eden ödemeleri sayfadaki "+" ile ekle. Vadesi gelince bütçene otomatik işlenir ve bildirim gönderilir.'
+            )}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -319,12 +324,15 @@ export default function BudgetPanel() {
               <div key={r.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", opacity: r.active ? 1 : 0.55 }}>
                 <div style={{ flex: 1, minWidth: 160 }}>
                   <div style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>
-                    {r.description || (r.type === "income" ? "Düzenli gelir" : "Düzenli gider")}
+                    {r.description || (r.type === "income" ? t("Düzenli gelir") : t("Düzenli gider"))}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: c.textSecondary, marginTop: 3 }}>
                     <IconCalendar size={12} color={c.textSecondary} />
                     <span>
-                      {intervalLabels[r.interval]} · sonraki {formatDate(r.nextDueDate)}
+                      {t("{aralik} · sonraki {tarih}", {
+                        aralik: t(intervalLabels[r.interval]),
+                        tarih: formatDate(r.nextDueDate),
+                      })}
                     </span>
                     {r.projectTitle && <span>· {r.projectTitle}</span>}
                   </div>
@@ -340,12 +348,12 @@ export default function BudgetPanel() {
                   onClick={() => toggleRecurring(r)}
                   style={{ ...addButton, padding: "5px 10px", fontSize: 13 }}
                 >
-                  {r.active ? "Duraklat" : "Sürdür"}
+                  {r.active ? t("Duraklat") : t("Sürdür")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditingRecurring(r)}
-                  aria-label="Düzenle"
+                  aria-label={t("Düzenle")}
                   style={{ background: "transparent", border: "none", padding: 4, display: "flex" }}
                 >
                   <IconEdit size={15} color={c.textSecondary} />
@@ -353,7 +361,7 @@ export default function BudgetPanel() {
                 <button
                   type="button"
                   onClick={() => deleteRecurring(r.id)}
-                  aria-label="Sil"
+                  aria-label={t("Sil")}
                   style={{ background: "transparent", border: "none", padding: 4, display: "flex" }}
                 >
                   <IconTrash size={15} color={c.danger} />
@@ -366,41 +374,41 @@ export default function BudgetPanel() {
 
       {/* Hareketler */}
       <section>
-        <h2 style={sectionTitle}>Hareketler</h2>
+        <h2 style={sectionTitle}>{t("Hareketler")}</h2>
 
         {transactions.length === 0 ? (
           <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 15, padding: 28 }}>
-            Henüz bir hareket yok. Gelir/gider eklemek için sayfadaki "+" düğmesini kullan.
+            {t('Henüz bir hareket yok. Gelir/gider eklemek için sayfadaki "+" düğmesini kullan.')}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {transactions.map((t) => (
-              <div key={t.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            {transactions.map((hareket) => (
+              <div key={hareket.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 160 }}>
                   <div style={{ fontSize: 15, color: c.textPrimary }}>
-                    {t.description || typeLabels[t.type]}
-                    {t.recurringPaymentId && (
-                      <span style={{ fontSize: 12, color: c.textSecondary, marginLeft: 8 }}>otomatik</span>
+                    {hareket.description || t(typeLabels[hareket.type])}
+                    {hareket.recurringPaymentId && (
+                      <span style={{ fontSize: 12, color: c.textSecondary, marginLeft: 8 }}>{t("otomatik")}</span>
                     )}
                   </div>
                   <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 3 }}>
-                    {formatDate(t.occurredAt)}
-                    {t.projectTitle ? ` · ${t.projectTitle}` : " · genel"}
+                    {formatDate(hareket.occurredAt)}
+                    {hareket.projectTitle ? ` · ${hareket.projectTitle}` : t(" · genel")}
                   </div>
                 </div>
 
-                <span style={{ fontSize: 15, fontWeight: 500, color: t.type === "income" ? c.success : c.danger }}>
-                  {t.type === "income" ? "+" : "−"}
-                  {formatMoney(t.amount)}
+                <span style={{ fontSize: 15, fontWeight: 500, color: hareket.type === "income" ? c.success : c.danger }}>
+                  {hareket.type === "income" ? "+" : "−"}
+                  {formatMoney(hareket.amount)}
                 </span>
 
                 {/* Otomatik işlenen kayıt elle düzenlenmez: kaynağı düzenli
                     ödeme kuralıdır, oradan yönetilir. */}
-                {!t.recurringPaymentId && (
+                {!hareket.recurringPaymentId && (
                   <button
                     type="button"
-                    onClick={() => setEditingTransaction(t)}
-                    aria-label="Düzenle"
+                    onClick={() => setEditingTransaction(hareket)}
+                    aria-label={t("Düzenle")}
                     style={{ background: "transparent", border: "none", padding: 4, display: "flex" }}
                   >
                     <IconEdit size={15} color={c.textSecondary} />
@@ -408,8 +416,8 @@ export default function BudgetPanel() {
                 )}
                 <button
                   type="button"
-                  onClick={() => deleteTransaction(t.id)}
-                  aria-label="Sil"
+                  onClick={() => deleteTransaction(hareket.id)}
+                  aria-label={t("Sil")}
                   style={{ background: "transparent", border: "none", padding: 4, display: "flex" }}
                 >
                   <IconTrash size={15} color={c.danger} />

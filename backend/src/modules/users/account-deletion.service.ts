@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import { istekDili } from "../../common/i18n";
 import { SupabaseService } from "../../database/supabase.service";
 import { verifyPassword } from "../../common/password.util";
 import { demoHesabindaYasak } from "../../common/demo-hesap";
@@ -108,7 +109,12 @@ export class AccountDeletionService {
     // döneceğini bilmeli. Gönderilemezse talep yine de geçerli — e-posta
     // sağlayıcı arızası hesabı kilitli bırakmamalı.
     try {
-      await this.emailService.sendAccountDeletionScheduled(user.email, purgeAt, GRACE_PERIOD_DAYS);
+      await this.emailService.sendAccountDeletionScheduled(
+        user.email,
+        purgeAt,
+        GRACE_PERIOD_DAYS,
+        istekDili(user.locale)
+      );
     } catch {
       // EmailService kendi hatasını logluyor.
     }

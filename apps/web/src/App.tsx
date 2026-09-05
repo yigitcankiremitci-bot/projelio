@@ -57,6 +57,7 @@ const HabieConnect = lazy(() => import("./pages/HabieConnect"));
 const MicrosoftReturn = lazy(() => import("./pages/MicrosoftReturn"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
+const Kvkk = lazy(() => import("./pages/Kvkk"));
 const JobDetail = lazy(() => import("./pages/JobDetail"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const OperationDetail = lazy(() => import("./pages/OperationDetail"));
@@ -545,6 +546,9 @@ export default function App() {
     // (kabul ettiği metni okumak için hesap açmak zorunda kalmasın).
     location.pathname === "/privacy" ||
     location.pathname === "/terms" ||
+    // KVKK aydınlatma metni: Kanun aydınlatmayı veri işlemeden ÖNCE arıyor,
+    // yani kayıt ekranındaki kişi henüz hesabı yokken okuyabilmeli.
+    location.pathname === "/kvkk" ||
     // Proje takip linki (bkz. pages/PublicProject.tsx). Buraya gelen kişinin
     // hesabı YOK: uygulama kabuğu kurulmamalı, /login'e de atılmamalı. Diğerleri
     // gibi tam eşleşme değil, çünkü adres token taşıyor.
@@ -608,6 +612,7 @@ export default function App() {
           <Route path="/microsoft/return" element={<MicrosoftReturn />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
+          <Route path="/kvkk" element={<Kvkk />} />
           <Route path="/takip/:token" element={<PublicProject />} />
         </Routes>
       </Suspense>

@@ -46,6 +46,7 @@ import { CreationRequestsModule } from "./modules/creation-requests/creation-req
 import { SocialMediaModule } from "./modules/social-media/social-media.module";
 import { MailboxModule } from "./modules/mailbox/mailbox.module";
 import { WhatsappModule } from "./modules/whatsapp/whatsapp.module";
+import { DataRetentionModule } from "./modules/data-retention/data-retention.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
 import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.interceptor";
 
@@ -105,6 +106,8 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     // Aynı sayfadaki kullanıcıların birbirini görmesi ve değişikliklerin anında
     // yansıması (bkz. realtime.gateway.ts).
     RealtimeModule,
+    // Saklama süresi dolmuş kayıtların gece temizliği (gizlilik politikası §12).
+    DataRetentionModule,
   ],
   providers: [
     // Her başarılı değiştirme isteğinden sonra, isteği yapanın bulunduğu sayfaya

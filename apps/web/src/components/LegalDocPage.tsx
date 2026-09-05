@@ -44,10 +44,11 @@ export default function LegalDocPage({ kind }: { kind: LegalDocKind }) {
   const doc = legalDocs[kind];
   const text = doc.text[lang];
   const ui = LEGAL_UI[lang];
-  // Diğer metne köprü: iki belge birbirine atıf yapıyor, okuyanın adresi elle
-  // yazmasına gerek kalmasın.
-  const otherKind: LegalDocKind = kind === "privacy" ? "terms" : "privacy";
-  const other = legalDocs[otherKind];
+  // Diğer metinlere köprü: belgeler birbirine atıf yapıyor, okuyanın adresi
+  // elle yazmasına gerek kalmasın. Üç belge var (politika, sözleşme,
+  // aydınlatma metni); hangisindeysek kalan ikisi listelenir — eskiden tek bir
+  // "diğeri" vardı ve üçüncü belge eklenince biri hep erişilemez kalıyordu.
+  const others = (Object.keys(legalDocs) as LegalDocKind[]).filter((k) => k !== kind);
 
   const h2 = {
     color: c.textPrimary,
@@ -155,9 +156,13 @@ export default function LegalDocPage({ kind }: { kind: LegalDocKind }) {
           </Link>
           {/* Diğer metne geçerken geri hedefi de taşınır: sözleşmeden politikaya
               atlayan kullanıcı yine Ayarlar'a döner, giriş ekranına düşmez. */}
-          <Link to={other.path} state={backState(back)} style={{ fontSize: 15.5, color: c.primary }}>
-            {other.text[lang].title} →
-          </Link>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {others.map((k) => (
+              <Link key={k} to={legalDocs[k].path} state={backState(back)} style={{ fontSize: 15.5, color: c.primary }}>
+                {legalDocs[k].text[lang].title} →
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </div>

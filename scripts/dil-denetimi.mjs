@@ -231,6 +231,24 @@ for (const kok of TARANAN) {
     // DOMException DIŞARIDA: o bir tarayıcı ilkelinin taklidi, HTTP yanıtına
     // hiç dönüşmüyor. Tek kullanımı iptal sinyali ve mesajı zaten yutuluyor
     // (bkz. web api/client.ts `ignoreAbort`).
+    // Log çağrıları: metni geliştirici okuyor, çevrilmez. Şablon dizesi
+    // olduklarından "sarılmamış metin" diye sayılıyor ve gerçek işi
+    // olduğundan büyük gösteriyorlardı.
+    const logAraliklari = [];
+    for (const eslesme of maskeli.matchAll(/\blogger\.(?:log|warn|error|debug|verbose)\s*\(/g)) {
+      let derinlik = 0;
+      let i = eslesme.index + eslesme[0].length - 1;
+      for (; i < maskeli.length; i++) {
+        if (maskeli[i] === "(") derinlik++;
+        else if (maskeli[i] === ")") {
+          derinlik--;
+          if (derinlik === 0) break;
+        }
+      }
+      logAraliklari.push([eslesme.index, i]);
+    }
+    const logIcinde = (konum) => logAraliklari.some(([a, b]) => konum > a && konum < b);
+
     const bildirimAraliklari = [];
     for (const eslesme of maskeli.matchAll(/\b(?:notifyUser(?:Safe)?|new (?!DOMException)\w*Exception)\s*\(/g)) {
       let derinlik = 0;
@@ -251,12 +269,19 @@ for (const kok of TARANAN) {
       if (dize.baslangic < zincirSonu) continue;
       // `dil:atla-baslangic`/`-bitis` arasındaki blok: modele giden metin.
       if (atlanmis(dize.baslangic)) continue;
+      if (logIcinde(dize.baslangic)) continue;
 
       const metin = coz(dize.govde);
 
       // Bu dize bir t(...) çağrısının ilk argümanı mı?
       const once = kaynak.slice(Math.max(0, dize.baslangic - 40), dize.baslangic);
-      const sarili = /\bt\(\s*$/.test(once) || /\bt\(\s*$/.test(once.replace(/\s+$/, " "));
+      // `t("…")` ya da anında çağrılan çevirmen: `cevirmen(locale)("…")`.
+      // İkincisi, çevirmeni bir kez kurmanın anlamsız olduğu tek kullanımlık
+      // yerlerde geçiyor; denetim onu görmezse metin "artık anahtar" sanılır.
+      const sarili =
+        /\bt\(\s*$/.test(once) ||
+        /\bt\(\s*$/.test(once.replace(/\s+$/, " ")) ||
+        /\bcevirmen\([^)]*\)\(\s*$/.test(once);
 
       // Bildirim çağrısının içindeki metin de anahtardır (yukarıdaki gerekçe).
       // Ama çağrının son argümanı bir BAĞLANTI ("/projects/…") ve o çevrilmez;

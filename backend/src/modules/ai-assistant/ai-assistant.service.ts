@@ -429,7 +429,8 @@ const RESULT_LABELS: Record<string, string> = {
  * Yalnızca KALICI değişiklik yapan araçlar burada listelenir; okuma araçları özete
  * girmemeli, yoksa hiçbir şey değişmediği halde iş yapılmış gibi görünür.
  */
-/** Ek türlerinin modele ve kullanıcıya gösterilen Türkçe adı. */
+/** Ek türlerinin modele ve kullanıcıya gösterilen adı. */
+// dil:anahtar-baslangic
 const ATTACHMENT_LABELS: Record<string, string> = {
   image: "Görsel",
   pdf: "PDF",
@@ -438,6 +439,7 @@ const ATTACHMENT_LABELS: Record<string, string> = {
   text: "Metin dosyası",
   audio: "Ses kaydı (yazıya çevrildi)",
 };
+// dil:anahtar-bitis
 
 /**
  * Bir sohbette aynı anda sabit tutulabilecek azami dosya.
@@ -449,7 +451,10 @@ const ATTACHMENT_LABELS: Record<string, string> = {
 const MAX_ACTIVE_FILES = 5;
 
 /** Yalnızca dosya gönderilip hiçbir şey yazılmadığında kullanılan varsayılan istek. */
-const EMPTY_MESSAGE_WITH_FILE = "Bu dosyayı incele ve ne olduğunu özetle.";
+// Modele giden varsayılan istek; kullanıcının kendi yazdığı metnin yerine
+// geçiyor ve sohbette onun mesajı olarak görünüyor — bu yüzden dile bağlı
+// değil, kullanıcının o an yazdığı dilde olması gereken bir şey de değil.
+const EMPTY_MESSAGE_WITH_FILE = "Bu dosyayı incele ve ne olduğunu özetle."; // dil:atla
 
 /**
  * WhatsApp kanalının ek talimatı. Statik (önbelleğe alınan) blokta DEĞİL,
@@ -467,6 +472,7 @@ const EMPTY_MESSAGE_WITH_FILE = "Bu dosyayı incele ve ne olduğunu özetle.";
  */
 const AI_TIMEZONE = process.env.TZ?.trim() || "Europe/Istanbul";
 
+// dil:atla-baslangic — modele giden kanal talimatı, kullanıcıya görünmüyor.
 const WHATSAPP_CHANNEL_PROMPT = [
   "### Bu istek WhatsApp'tan geldi",
   "",
@@ -490,7 +496,10 @@ const WHATSAPP_CHANNEL_PROMPT = [
   "   İstenirse yapamayacağını söyle; yapmış gibi davranma.",
   "2. O iş için elinde hiçbir araç yoksa.",
 ].join("\n");
+// dil:atla-bitis
 
+// dil:anahtar-baslangic — duraklatma mesajındaki "şimdiye kadar ne yapıldı"
+// özeti kullanıcıya gösteriliyor; çeviri kullanım yerinde yapılıyor.
 const ACTION_LABELS: Record<string, string> = {
   create_job: "iş oluşturuldu",
   update_job: "iş güncellendi",
@@ -535,6 +544,7 @@ const ACTION_LABELS: Record<string, string> = {
   import_tasks_from_sheet: "dosyadan toplu görev eklendi",
   import_module_records_from_sheet: "dosyadan toplu modül kaydı eklendi",
 };
+// dil:anahtar-bitis
 
 export function toActiveFileInfo(files: { id: string; name: string; kind: string; detail: string }[]) {
   return files.map(({ id, name, kind, detail }) => ({ id, name, kind, detail }));
@@ -584,6 +594,9 @@ function clearMidRunFlag(file: ActiveFile): ActiveFile {
  * çağrısı yirmi görev demek olabilir. "2 toplu görev eklendi" hem yanlış hem de
  * Türkçe olarak tuhaf; o yüzden bu etiketler sayısız yazılır.
  */
+// dil:atla-baslangic — bunlar ACTION_LABELS'ın Türkçe DEĞERLERİ; küme
+// eşleşmesi çeviriden ÖNCE yapılıyor (bkz. summarizeExecuted), o yüzden
+// burada Türkçe kalmaları şart, çevrilecek metin değiller.
 const COUNTLESS_ACTIONS = new Set([
   "toplu görev eklendi",
   "toplu yapılacak eklendi",
@@ -591,17 +604,26 @@ const COUNTLESS_ACTIONS = new Set([
   "dosyadan toplu görev eklendi",
   "dosyadan toplu modül kaydı eklendi",
 ]);
+// dil:atla-bitis
 
-function summarizeExecuted(executed: string[]): string {
+/**
+ * "Şimdiye kadar ne yapıldı" özeti — duraklatma ve onay mesajlarında geçiyor.
+ *
+ * Sayım TÜRKÇE etiket üzerinden yapılıp çeviri en sonda uygulanıyor:
+ * COUNTLESS_ACTIONS de Türkçe etiketlerle kurulu, önce çevirseydik o küme
+ * hiçbir şeyle eşleşmez ve "3 yapılacaklar sıralandı" gibi ifadeler çıkardı.
+ */
+function summarizeExecuted(executed: string[], locale: Locale): string {
+  const t = cevirmen(locale);
   const counts = new Map<string, number>();
   for (const name of executed) {
     const label = ACTION_LABELS[name];
     if (!label) continue;
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
-  if (counts.size === 0) return "Henüz kalıcı bir değişiklik yapılmadı";
+  if (counts.size === 0) return t("Henüz kalıcı bir değişiklik yapılmadı");
   return [...counts.entries()]
-    .map(([label, n]) => (n > 1 && !COUNTLESS_ACTIONS.has(label) ? `${n} ${label}` : label))
+    .map(([label, n]) => (n > 1 && !COUNTLESS_ACTIONS.has(label) ? `${n} ${t(label)}` : t(label)))
     .join(", ");
 }
 
@@ -760,7 +782,11 @@ export class AiAssistantService {
     // Statü yoksa bağlantı kurulamamıştır ("fetch failed" bu dalda düşer).
     const { code, detail, message } = this.describeConnectionError(err);
     this.logger.error(`AI sağlayıcı bağlantı hatası [${code}]: ${detail}`);
-    return new ServiceUnavailableException(`${message} (teknik detay: ${code})`);
+    // Mesaj kullanıcıya çıkıyor; çeviri HTTP sınırındaki filtreye bırakılıyor
+    // (hataMetni ile anahtar + parametre ayrı taşınıyor, bkz. common/i18n).
+    return new ServiceUnavailableException(
+      hataMetni("{aciklama} (teknik detay: {kod})", { aciklama: message, kod: code })
+    );
   }
 
   /**
@@ -779,6 +805,8 @@ export class AiAssistantService {
     }
     const detail = chain.join(" <- ");
 
+    // dil:anahtar-baslangic — bu metinler kullanıcıya gösteriliyor; çeviri
+    // dönüş noktasında yapılıyor (aşağıda), sözlükte karşılıkları var.
     const hints: Record<string, string> = {
       ENOTFOUND:
         "api.anthropic.com adresi çözümlenemedi (DNS sorunu). İnternet bağlantınızı, VPN'i ya da DNS ayarlarınızı kontrol edin.",
@@ -794,10 +822,11 @@ export class AiAssistantService {
       SELF_SIGNED_CERT_IN_CHAIN:
         "TLS zincirinde kendinden imzalı sertifika var. Kurumsal proxy/antivirüs araya giriyor olabilir.",
     };
+    // dil:anahtar-bitis
 
     const hint =
       hints[code] ??
-      "Sunucu api.anthropic.com adresine ulaşamadı. İnternet bağlantısı, VPN, güvenlik duvarı veya proxy ayarlarını kontrol edin.";
+      "Sunucu api.anthropic.com adresine ulaşamadı. İnternet bağlantısı, VPN, güvenlik duvarı veya proxy ayarlarını kontrol edin."; // dil:anahtar
 
     return { code: code || "UNKNOWN", detail, message: hint };
   }
@@ -853,6 +882,7 @@ export class AiAssistantService {
    * Böylece asistan "hangi projeler var?" diye ilk turu araç çağrısıyla harcamaz —
    * hem daha hızlı yanıt verir hem de kullanıcının kredisi boşa gitmez.
    */
+  // dil:atla-baslangic — modele verilen çalışma alanı özeti.
   private async buildWorkspaceContext(userId: string): Promise<string> {
     try {
       const [jobs, projects] = await Promise.all([
@@ -894,6 +924,8 @@ export class AiAssistantService {
    * Buraya kullanıcıya/tarihe özel hiçbir bilgi konulmamalıdır — aksi halde önbellek
    * her istekte ıskalar ve maliyet düşmez.
    */
+  // dil:atla-bitis
+
   // dil:atla-baslangic — buradan aşağısı MODELE yazılıyor, kullanıcıya değil.
   // Çevirisi yok ve olmayacak; dile göre değişen tek bölüm ayrı bir dosyada
   // (lio-dil-kurallari.ts), gerekçesi orada yazılı. Denetim bu bloğu atlıyor
@@ -1236,6 +1268,8 @@ export class AiAssistantService {
    * Sistem promptunun isteğe/kullanıcıya özel (önbelleklenmeyen) kısmı.
    * Kasıtlı olarak kısa tutulur.
    */
+  // dil:atla-baslangic — buradan aşağısı modele yazılıyor (dinamik bağlam,
+  // açık dosya bildirimi, dosya bırakma notları). Kullanıcı bunları görmüyor.
   private async buildDynamicSystemPrompt(userId: string, userRole: string): Promise<string> {
     const context = await this.buildWorkspaceContext(userId);
     // Yerel saate göre, UTC'ye göre DEĞİL. İki ayrı hata düzeltiyor:
@@ -1302,6 +1336,8 @@ export class AiAssistantService {
       "yukarıdaki içeriğe bak.",
     ].join("\n");
   }
+  // dil:atla-bitis
+
 
   /**
    * Kullanıcının mesajını işler.
@@ -1531,6 +1567,8 @@ export class AiAssistantService {
    * böylece katlanılabilir kalıyor. Geçmiş mesajların arasına serpiştirilseydi
    * önek her turda değişir ve önbellek hiç tutmazdı.
    */
+  // dil:atla-baslangic — dosya içeriğinin modele nasıl sunulduğu; bu metinler
+  // konuşmanın içine mesaj olarak giriyor ama muhatabı model.
   private activeFileMessages(userId: string, files: ActiveFile[]): Anthropic.MessageParam[] {
     if (!files.length) return [];
 
@@ -1591,6 +1629,8 @@ export class AiAssistantService {
   }
 
   /** Görselin MIME'ı sabit dosya kaydında tutulmuyor; uzantıdan yeter. */
+  // dil:atla-bitis
+
   private imageMediaType(name: string): any {
     const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
     if (ext === "png") return "image/png";
@@ -1639,9 +1679,10 @@ export class AiAssistantService {
     if (!confirmed) {
       // Durdurmak kredi harcamaz; yapılanın ne olduğunu söylemek ise şart —
       // kullanıcı yarım kalan işi elle tamamlayacaksa nereden devam edeceğini bilmeli.
-      const text =
-        `Durdurdum. ${summarizeExecuted(run.executed)}. ` +
-        `Bu istek toplam ${this.formatCredits(run.spentCredits)} kredi harcadı.`;
+      const text = cevir(run.locale, {
+        metin: "Durdurdum. {yapilan}. Bu istek toplam {harcanan} kredi harcadı.",
+        params: { yapilan: summarizeExecuted(run.executed, run.locale), harcanan: this.formatCredits(run.spentCredits) },
+      });
       await this.safeRecord(run.conversationId, text);
       const { balance } = await this.creditsService.getBalance(userId);
       return {
@@ -1733,7 +1774,12 @@ export class AiAssistantService {
       // olduğu için eklenmez, gereksiz tekrar olurdu.
       const multiSegment = run.spentCredits - credits > 0;
       if (multiSegment && (result as any).text) {
-        const note = ` (Bu isteğin toplam bedeli: ${this.formatCredits(run.spentCredits)} kredi.)`;
+        const note =
+          " " +
+          cevir(run.locale, {
+            metin: "(Bu isteğin toplam bedeli: {harcanan} kredi.)",
+            params: { harcanan: this.formatCredits(run.spentCredits) },
+          });
         (result as any).text = `${(result as any).text}${note}`;
         assistantText = `${assistantText}${note}`;
       }
@@ -1771,7 +1817,7 @@ export class AiAssistantService {
       run.createdAt = Date.now();
       this.pendingRuns.set(run.id, run);
 
-      const done = summarizeExecuted(run.executed);
+      const done = summarizeExecuted(run.executed, run.locale);
       const spent = run.spentCredits + segmentCredits();
       const estimate = Math.max(
         1,
@@ -1780,26 +1826,27 @@ export class AiAssistantService {
 
       // Üç farklı durum, üç farklı cümle: hiç başlamadan uyarı, yarıda bütçe
       // uyarısı ve adım sınırı. Aynı metni kullanmak kullanıcıyı yanıltıyordu.
+      const t = cevirmen(run.locale);
       const text =
         reason === "estimate"
-          ? [
-              `Bu istek tahminen ${this.formatCredits(estimate)} kredi tutacak — bu, tek seferde harcanması için`,
-              `yüksek bir tutar (eşik ${this.formatCredits(run.creditCeiling)} kredi).`,
-              "Henüz hiçbir kredi harcamadım. Devam edeyim mi?",
-            ].join(" ")
+          ? t(
+              "Bu istek tahminen {tahmin} kredi tutacak — bu, tek seferde harcanması için yüksek bir tutar (eşik {esik} kredi). Henüz hiçbir kredi harcamadım. Devam edeyim mi?",
+              { tahmin: this.formatCredits(estimate), esik: this.formatCredits(run.creditCeiling) }
+            )
           : reason === "budget"
-            ? [
-                `Bu istek şu ana kadar ${this.formatCredits(spent)} kredi harcadı ve henüz bitmedi.`,
-                `Şimdiye kadar: ${done}.`,
-                `Devam edersem her adım yaklaşık ${this.formatCredits(estimate)} kredi daha götürür.`,
-                "Devam edeyim mi?",
-              ].join(" ")
-            : [
-                `Bu istek ${run.iterationsUsed} adım sürdü ve hâlâ bitmedi (${this.formatCredits(spent)} kredi).`,
-                `Şimdiye kadar: ${done}.`,
-                `Devam edersem her adım yaklaşık ${this.formatCredits(estimate)} kredi daha götürür.`,
-                "Devam edeyim mi?",
-              ].join(" ");
+            ? t(
+                "Bu istek şu ana kadar {harcanan} kredi harcadı ve henüz bitmedi. Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} kredi daha götürür. Devam edeyim mi?",
+                { harcanan: this.formatCredits(spent), yapilan: done, tahmin: this.formatCredits(estimate) }
+              )
+            : t(
+                "Bu istek {n} adım sürdü ve hâlâ bitmedi ({harcanan} kredi). Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} kredi daha götürür. Devam edeyim mi?",
+                {
+                  n: run.iterationsUsed,
+                  harcanan: this.formatCredits(spent),
+                  yapilan: done,
+                  tahmin: this.formatCredits(estimate),
+                }
+              );
 
       return finish(
         {
@@ -1824,12 +1871,18 @@ export class AiAssistantService {
      * kullanıcı nerede kaldığını bilsin.
      */
     const outOfCredits = async (required: number, remaining: number): Promise<ChatResult> => {
-      const done = summarizeExecuted(run.executed);
-      const text =
-        `AI kredin bu isteği sürdürmeye yetmiyor, bu yüzden burada durdum. ${done}. ` +
-        `Kalan kredin ${this.formatCredits(Math.max(0, remaining))}, devam etmek için ` +
-        `en az ${this.formatCredits(required)} gerekiyor. ` +
-        "Ayarlar > AI Kredileri sayfasından kredi yükleyip tekrar yazabilirsin.";
+      const done = summarizeExecuted(run.executed, run.locale);
+      const text = cevir(run.locale, {
+        metin:
+          "AI kredin bu isteği sürdürmeye yetmiyor, bu yüzden burada durdum. {yapilan}. " +
+          "Kalan kredin {kalan}, devam etmek için en az {gereken} gerekiyor. " +
+          "Ayarlar > AI Kredileri sayfasından kredi yükleyip tekrar yazabilirsin.",
+        params: {
+          yapilan: done,
+          kalan: this.formatCredits(Math.max(0, remaining)),
+          gereken: this.formatCredits(required),
+        },
+      });
       return finish(
         {
           type: "out_of_credits",
@@ -1961,6 +2014,8 @@ export class AiAssistantService {
         // O turun bedeli zaten ödendi; pes etmek yerine bir kez daha, işi küçültmesi
         // söylenerek denenir. Aksi halde kullanıcı yüzlerce kredi ödeyip elinde
         // hiçbir şey olmadan kalıyordu.
+        // dil:atla-baslangic — buradan aşağıdaki metinler MODELE yazılıyor
+        // (araç sonuçları, yönlendirmeler, dosya hazırlama notları).
         if (truncated && truncatedRetries < 1) {
           truncatedRetries += 1;
           run.messages.push({
@@ -1980,15 +2035,26 @@ export class AiAssistantService {
         // - Ama işler yapıldıysa "yanıt üretemedim" demek YANLIŞ olur: kullanıcı
         //   işin başarısız olduğunu sanıp aynı isteği tekrar yazar ve iki kez öder.
         //   Bu durumda son cümlenin eksikliği yalnızca bir özet eksikliğidir.
-        const done = summarizeExecuted(run.executed);
+        const done = summarizeExecuted(run.executed, run.locale);
         const didWork = run.executed.some((name) => ACTION_LABELS[name]);
         const failText = didWork
-          ? `Son adımda özet cümlesi üretemedim, ama yapılanlar duruyor: ${done}. ` +
-            "Eksik kalan bir şey varsa söyle, tamamlayayım."
+          ? cevir(run.locale, {
+              metin:
+                "Son adımda özet cümlesi üretemedim, ama yapılanlar duruyor: {yapilan}. " +
+                "Eksik kalan bir şey varsa söyle, tamamlayayım.",
+              params: { yapilan: done },
+            })
           : truncated
-            ? `Yanıtım uzunluk sınırına takıldığı için isteği tamamlayamadım. ${done}. ` +
-              "İsteği daha küçük parçalara bölerek tekrar yazar mısın?"
-            : `Bu isteğe yanıt üretemedim. ${done}. Ne yapmamı istediğini biraz daha açık yazar mısın?`;
+            ? cevir(run.locale, {
+                metin:
+                  "Yanıtım uzunluk sınırına takıldığı için isteği tamamlayamadım. {yapilan}. " +
+                  "İsteği daha küçük parçalara bölerek tekrar yazar mısın?",
+                params: { yapilan: done },
+              })
+            : cevir(run.locale, {
+                metin: "Bu isteğe yanıt üretemedim. {yapilan}. Ne yapmamı istediğini biraz daha açık yazar mısın?",
+                params: { yapilan: done },
+              });
         return finish({ type: "message", text: failText }, failText);
       }
 
@@ -2054,7 +2120,7 @@ export class AiAssistantService {
           assistantContent: response.content as any[],
           criticalUseId: criticalUse.id,
         });
-        const summary = await this.summarizeAction(criticalUse.name, input, run.userId);
+        const summary = await this.summarizeAction(criticalUse.name, input, run.userId, run.locale);
         return finish(
           { type: "confirmation", actionId, toolName: criticalUse.name, summary, text: text || undefined },
           text || summary
@@ -2138,8 +2204,12 @@ export class AiAssistantService {
     if (run.iterationsUsed < MAX_TOTAL_ITERATIONS) return pause("iterations");
 
     const fallback =
-      `Bu isteği tamamlayamadım, adım sınırına takıldım. ${summarizeExecuted(run.executed)}. ` +
-      "Kalan kısmı için isteği daha küçük parçalara bölerek yazar mısın?";
+      cevir(run.locale, {
+        metin:
+          "Bu isteği tamamlayamadım, adım sınırına takıldım. {yapilan}. " +
+          "Kalan kısmı için isteği daha küçük parçalara bölerek yazar mısın?",
+        params: { yapilan: summarizeExecuted(run.executed, run.locale) },
+      });
     return finish({ type: "message", text: fallback }, fallback);
   }
 
@@ -2432,6 +2502,8 @@ export class AiAssistantService {
    * Hiçbir hata asıl işi bozmamalı: bildirim gönderilemezse iş yine yapılmıştır,
    * yalnızca kullanıcı sonucu canlı görmez.
    */
+  // dil:atla-bitis
+
   private async emitActivity(
     userId: string,
     toolName: string,
@@ -2543,10 +2615,10 @@ export class AiAssistantService {
         if (!id) return null;
         const label =
           toolName === "create_group"
-            ? "Grup oluşturuldu"
+            ? t("Grup oluşturuldu")
             : toolName === "update_group"
-              ? "Grup güncellendi"
-              : "Grup arşivlendi";
+              ? t("Grup güncellendi")
+              : t("Grup arşivlendi");
         return make(label, `/groups/${id}`, `group:${id}`, id);
       }
 
@@ -2561,7 +2633,7 @@ export class AiAssistantService {
             ? t("Organizasyon oluşturuldu") + ad
             : toolName === "update_organization"
               ? t("Organizasyon güncellendi") + ad
-              : "Organizasyon arşivlendi";
+              : t("Organizasyon arşivlendi");
         return make(label, `/organizations/${id}`, `organization:${id}`, id);
       }
 
@@ -2571,10 +2643,10 @@ export class AiAssistantService {
         const id = result?.departmentId ?? input.departmentId;
         const label =
           toolName === "create_department"
-            ? `Departman açıldı${result?.ad ? `: ${result.ad}` : ""}`
+            ? t("Departman açıldı") + (result?.ad ? `: ${result.ad}` : "")
             : toolName === "update_department"
-              ? "Departman güncellendi"
-              : "Departman arşivlendi";
+              ? t("Departman güncellendi")
+              : t("Departman arşivlendi");
         // Yeni açılan departmanda kullanıcı organizasyon sayfasına değil
         // departmanın kendi sayfasına gitmeli; arşivlenende de sayfa duruyor.
         return id ? make(label, `/departments/${id}`, `department:${id}`, id) : null;
@@ -2587,10 +2659,10 @@ export class AiAssistantService {
         if (!id) return null;
         const label =
           toolName === "create_operation"
-            ? `Rutin oluşturuldu${result?.ad ? `: ${result.ad}` : ""}`
+            ? t("Rutin oluşturuldu") + (result?.ad ? `: ${result.ad}` : "")
             : toolName === "update_operation"
-              ? "Rutin güncellendi"
-              : "Rutin arşivlendi";
+              ? t("Rutin güncellendi")
+              : t("Rutin arşivlendi");
         return make(label, `/operations/${id}`, `operation:${id}`, id);
       }
 
@@ -2601,8 +2673,8 @@ export class AiAssistantService {
         if (!organizationId) return null;
         const label =
           toolName === "create_product"
-            ? `Ürün eklendi${result?.ad ? `: ${result.ad}` : ""}`
-            : "Ürün güncellendi";
+            ? t("Ürün eklendi") + (result?.ad ? `: ${result.ad}` : "")
+            : t("Ürün güncellendi");
         return make(
           label,
           `/organizations/${organizationId}?tab=products`,
@@ -2612,7 +2684,7 @@ export class AiAssistantService {
       }
 
       case "create_task": {
-        const label = `Görev oluşturuldu${result?.title ? `: ${result.title}` : ""}`;
+        const label = t("Görev oluşturuldu") + (result?.title ? `: ${result.title}` : "");
         return input.departmentId
           ? departmentActivity(label, input.departmentId, result?.id)
           : projectActivity(label, input.projectId, result?.id);
@@ -2621,7 +2693,7 @@ export class AiAssistantService {
       case "create_tasks": {
         const count = Number(result?.createdCount ?? 0);
         if (!count) return null;
-        const label = `${count} görev eklendi`;
+        const label = t("{n} görev eklendi", { n: count });
         return input.departmentId
           ? departmentActivity(label, input.departmentId)
           : projectActivity(label, input.projectId);
@@ -2631,7 +2703,7 @@ export class AiAssistantService {
         // Önizleme hiçbir şey yazmıyor; bildirim yalnızca gerçekten yazılınca.
         const count = Number(result?.olusturulan ?? 0);
         if (!count) return null;
-        const label = `Dosyadan ${count} görev eklendi`;
+        const label = t("Dosyadan {n} görev eklendi", { n: count });
         // Tek hedefe gittiyse oraya götür; dağıtıldıysa götürülecek tek sayfa yok.
         if (input.hedef?.projectId) return projectActivity(label, input.hedef.projectId);
         if (input.hedef?.departmentId) return departmentActivity(label, input.hedef.departmentId);
@@ -2641,7 +2713,7 @@ export class AiAssistantService {
       case "import_module_records_from_sheet": {
         const count = Number(result?.olusturulan ?? 0);
         if (!count) return null;
-        const label = `Dosyadan ${count} modül kaydı eklendi`;
+        const label = t("Dosyadan {n} modül kaydı eklendi", { n: count });
         const moduleKey = input.moduleKey;
         if (input.jobId && moduleKey) {
           return make(label, `/jobs/${input.jobId}/modules/${moduleKey}`, `job:${input.jobId}/module/${moduleKey}`);
@@ -2657,18 +2729,18 @@ export class AiAssistantService {
       }
 
       case "add_budget_transaction":
-        return projectActivity("Bütçe hareketi eklendi", input.projectId);
+        return projectActivity(t("Bütçe hareketi eklendi"), input.projectId);
 
       case "create_output":
         return projectActivity(
-          `Çıktı oluşturuldu${result?.title ? `: ${result.title}` : ""}`,
+          t("Çıktı oluşturuldu") + (result?.title ? `: ${result.title}` : ""),
           input.projectId,
           result?.id
         );
 
       case "update_output":
         // Çıktının projesi girdide yok; sonuçtan okunuyor.
-        return projectActivity("Çıktı güncellendi", result?.projectId, input.outputId);
+        return projectActivity(t("Çıktı güncellendi"), result?.projectId, input.outputId);
 
       case "update_task":
       case "update_task_status":
@@ -2679,10 +2751,10 @@ export class AiAssistantService {
         const projectId = result?.projectId ?? scope.projectId;
         const label =
           toolName === "add_task_comment"
-            ? "Göreve yorum eklendi"
+            ? t("Göreve yorum eklendi")
             : toolName === "update_task_status"
-              ? "Görev durumu değişti"
-              : "Görev güncellendi";
+              ? t("Görev durumu değişti")
+              : t("Görev güncellendi");
         return projectId
           ? projectActivity(label, projectId, input.taskId)
           : departmentActivity(label, scope.departmentId, input.taskId);
@@ -2695,7 +2767,7 @@ export class AiAssistantService {
       case "update_module_record": {
         const moduleKey = input.moduleKey ?? result?.moduleKey;
         if (!moduleKey) return null;
-        const label = toolName === "create_module_record" ? "Modüle kayıt eklendi" : "Modül kaydı güncellendi";
+        const label = toolName === "create_module_record" ? t("Modüle kayıt eklendi") : t("Modül kaydı güncellendi");
         // Güncellemede hedef girdide yok (yalnızca recordId var); kaydın
         // kendisinden okunuyor — bkz. update_task'taki aynı desen.
         let jobId = input.jobId as string | undefined;
@@ -2727,12 +2799,12 @@ export class AiAssistantService {
       case "complete_ritual": {
         const label =
           toolName === "set_period_plan"
-            ? "Dönem planı kaydedildi"
+            ? t("Dönem planı kaydedildi")
             : toolName === "create_time_blocks"
-              ? "Takvime zaman bloğu eklendi"
+              ? t("Takvime zaman bloğu eklendi")
               : toolName === "update_time_block_status"
-                ? "Zaman bloğu güncellendi"
-                : "Planlama oturumu tamamlandı";
+                ? t("Zaman bloğu güncellendi")
+                : t("Planlama oturumu tamamlandı");
         return make(label, "/calendar");
       }
 
@@ -2978,39 +3050,57 @@ export class AiAssistantService {
     throw new BadRequestException("Görevin bağlı olduğu proje ya da departman bulunamadı.");
   }
 
-  private async safeLabel(fn: () => Promise<string>): Promise<string> {
+  /**
+   * Kaydın adını okur; okunamazsa nötr bir yedek döndürür.
+   *
+   * Yedek metin ÇEVRİLİYOR: onay cümlesinin içine giriyor ve İngilizce bir
+   * cümlenin ortasında Türkçe kalması kabul edilemez.
+   */
+  private async safeLabel(fn: () => Promise<string>, locale: Locale): Promise<string> {
     try {
       return await fn();
     } catch {
-      return "seçili öğe";
+      return cevirmen(locale)("seçili öğe");
     }
   }
 
-  private async summarizeAction(name: string, input: Record<string, any>, userId: string): Promise<string> {
+  /**
+   * Onay penceresinde gösterilen cümle. Kullanıcı silme/arşivleme kararını
+   * BUNA bakarak veriyor, o yüzden dili doğru olmalı.
+   *
+   * Kaydın ADI yer tutucudan geliyor ve çevrilmiyor — kullanıcının kendi verisi.
+   */
+  private async summarizeAction(
+    name: string,
+    input: Record<string, any>,
+    userId: string,
+    locale: Locale
+  ): Promise<string> {
+    const t = cevirmen(locale);
     switch (name) {
       case "delete_task": {
-        const title = await this.safeLabel(() => this.getTaskOrThrow(input.taskId).then((t) => t.title));
-        return `"${title}" görevini KALICI olarak silmek üzeresin. Bu işlem geri alınamaz.`;
+        const title = await this.safeLabel(() => this.getTaskOrThrow(input.taskId).then((t) => t.title), locale);
+        return t("\"{ad}\" görevini KALICI olarak silmek üzeresin. Bu işlem geri alınamaz.", { ad: title });
       }
       case "archive_task": {
-        const title = await this.safeLabel(() => this.getTaskOrThrow(input.taskId).then((t) => t.title));
-        return `"${title}" görevini arşivlemek üzeresin.`;
+        const title = await this.safeLabel(() => this.getTaskOrThrow(input.taskId).then((t) => t.title), locale);
+        return t("\"{ad}\" görevini arşivlemek üzeresin.", { ad: title });
       }
       case "delete_project": {
-        const title = await this.safeLabel(() => this.projectsService.findOne(input.projectId).then((p) => p.title));
-        return `"${title}" projesini KALICI olarak silmek üzeresin. Projeye ait tüm görevler de etkilenir. Bu işlem geri alınamaz.`;
+        const title = await this.safeLabel(() => this.projectsService.findOne(input.projectId).then((p) => p.title), locale);
+        return t("\"{ad}\" projesini KALICI olarak silmek üzeresin. Projeye ait tüm görevler de etkilenir. Bu işlem geri alınamaz.", { ad: title });
       }
       case "archive_project": {
-        const title = await this.safeLabel(() => this.projectsService.findOne(input.projectId).then((p) => p.title));
-        return `"${title}" projesini arşivlemek üzeresin.`;
+        const title = await this.safeLabel(() => this.projectsService.findOne(input.projectId).then((p) => p.title), locale);
+        return t("\"{ad}\" projesini arşivlemek üzeresin.", { ad: title });
       }
       case "delete_job": {
-        const title = await this.safeLabel(() => this.jobsService.findOne(input.jobId).then((j) => j.title));
-        return `"${title}" işini KALICI olarak silmek üzeresin. Bu işlem geri alınamaz.`;
+        const title = await this.safeLabel(() => this.jobsService.findOne(input.jobId).then((j) => j.title), locale);
+        return t("\"{ad}\" işini KALICI olarak silmek üzeresin. Bu işlem geri alınamaz.", { ad: title });
       }
       case "archive_job": {
-        const title = await this.safeLabel(() => this.jobsService.findOne(input.jobId).then((j) => j.title));
-        return `"${title}" işini arşivlemek üzeresin.`;
+        const title = await this.safeLabel(() => this.jobsService.findOne(input.jobId).then((j) => j.title), locale);
+        return t("\"{ad}\" işini arşivlemek üzeresin.", { ad: title });
       }
       case "archive_output":
       case "delete_output": {
@@ -3023,10 +3113,10 @@ export class AiAssistantService {
             .eq("id", input.outputId)
             .maybeSingle();
           return (data?.title as string | undefined) ?? "";
-        });
+        }, locale);
         return name === "delete_output"
-          ? `"${title}" çıktısı silinecek. Onaylıyor musun?`
-          : `"${title}" çıktısı arşivlenecek. Onaylıyor musun?`;
+          ? t("\"{ad}\" çıktısı silinecek. Onaylıyor musun?", { ad: title })
+          : t("\"{ad}\" çıktısı arşivlenecek. Onaylıyor musun?", { ad: title });
       }
 
       case "archive_todo": {
@@ -3035,8 +3125,8 @@ export class AiAssistantService {
         // başlığı görünürdü.
         const title = await this.safeLabel(() =>
           this.personalTodosService.findOne(userId, input.todoId).then((t) => t.title)
-        );
-        return `"${title}" yapılacağını listenden kaldırmak üzeresin. (Geri alınabilir.)`;
+        , locale);
+        return t("\"{ad}\" yapılacağını listenden kaldırmak üzeresin. (Geri alınabilir.)", { ad: title });
       }
 
       case "archive_module_record": {
@@ -3047,64 +3137,74 @@ export class AiAssistantService {
           const moduleName = await this.moduleDisplayName(record.moduleKey);
           const config = getModuleRecordConfig(record.moduleKey, moduleName);
           const summary = config.summary(record.data);
-          return summary ? `${moduleName} · ${summary}` : moduleName;
-        });
-        return `"${label}" kaydını arşivlemek üzeresin. Listeden düşer, veritabanında kalır (geri alınabilir).`;
+          return summary ? t("{moduleName} · {summary}", { moduleName: moduleName, summary: summary }) : moduleName;
+        }, locale);
+        return t("\"{ad}\" kaydını arşivlemek üzeresin. Listeden düşer, veritabanında kalır (geri alınabilir).", { ad: label });
       }
 
       case "disable_module": {
-        const label = await this.safeLabel(() => this.moduleDisplayName(input.moduleKey));
+        const label = await this.safeLabel(() => this.moduleDisplayName(input.moduleKey), locale);
         return (
-          `"${label}" modülünü kapatmak üzeresin. Kayıtlar silinmez ama modül ` +
-          `${input.jobId ? "işin" : "organizasyonun"} ekranlarından kaldırılır.`
+          // "işin"/"organizasyonun" cümlenin içinde çekimleniyor; yer tutucuya
+          // konsa İngilizce cümlede Türkçe kalırdı. İki ayrı metin.
+          input.jobId
+            ? t('"{ad}" modülünü kapatmak üzeresin. Kayıtlar silinmez ama modül işin ekranlarından kaldırılır.', {
+                ad: label,
+              })
+            : t(
+                '"{ad}" modülünü kapatmak üzeresin. Kayıtlar silinmez ama modül organizasyonun ekranlarından kaldırılır.',
+                { ad: label }
+              )
         );
       }
 
       case "archive_group":
       case "delete_group": {
-        const label = await this.safeLabel(() => this.groupsService.findOne(input.groupId).then((g) => g.name));
+        const label = await this.safeLabel(() => this.groupsService.findOne(input.groupId).then((g) => g.name), locale);
         return name === "delete_group"
-          ? `"${label}" grubunu KALICI olarak silmek üzeresin. Bu işlem geri alınamaz.`
-          : `"${label}" grubunu arşivlemek üzeresin. Gruba bağlı organizasyonlar ve işler de arşivlenir.`;
+          ? t("\"{ad}\" grubunu KALICI olarak silmek üzeresin. Bu işlem geri alınamaz.", { ad: label })
+          : t("\"{ad}\" grubunu arşivlemek üzeresin. Gruba bağlı organizasyonlar ve işler de arşivlenir.", { ad: label });
       }
 
       case "archive_organization":
       case "delete_organization": {
         const label = await this.safeLabel(() =>
           this.organizationsService.findOne(input.organizationId).then((o) => o.name)
-        );
+        , locale);
         return name === "delete_organization"
-          ? `"${label}" organizasyonunu KALICI olarak silmek üzeresin. Departmanları, ürünleri ve ` +
-              "modül kayıtları da gider. Bu işlem geri alınamaz."
-          : `"${label}" organizasyonunu arşivlemek üzeresin. Bağlı işler de (projeleri ve görevleriyle) arşivlenir.`;
+          ? t(
+              '"{ad}" organizasyonunu KALICI olarak silmek üzeresin. Departmanları, ürünleri ve modül kayıtları da gider. Bu işlem geri alınamaz.',
+              { ad: label }
+            )
+          : t("\"{ad}\" organizasyonunu arşivlemek üzeresin. Bağlı işler de (projeleri ve görevleriyle) arşivlenir.", { ad: label });
       }
 
       case "archive_department":
       case "delete_department": {
         const label = await this.safeLabel(() =>
           this.departmentsService.findOne(input.departmentId).then((d) => d.name)
-        );
+        , locale);
         return name === "delete_department"
-          ? `"${label}" departmanını KALICI olarak silmek üzeresin. Görevleri ve modül kayıtları da gider.`
-          : `"${label}" departmanını arşivlemek üzeresin. Kayıtlar durur, departman ekranlardan kalkar.`;
+          ? t("\"{ad}\" departmanını KALICI olarak silmek üzeresin. Görevleri ve modül kayıtları da gider.", { ad: label })
+          : t("\"{ad}\" departmanını arşivlemek üzeresin. Kayıtlar durur, departman ekranlardan kalkar.", { ad: label });
       }
 
       case "archive_operation":
       case "delete_operation": {
         const label = await this.safeLabel(() =>
           this.operationsService.findOne(input.operationId).then((o) => o.title)
-        );
+        , locale);
         return name === "delete_operation"
-          ? `"${label}" rutinini KALICI olarak silmek üzeresin. Tekrarları ve geçmişi de gider.`
-          : `"${label}" rutinini arşivlemek üzeresin. (Geri alınabilir.)`;
+          ? t("\"{ad}\" rutinini KALICI olarak silmek üzeresin. Tekrarları ve geçmişi de gider.", { ad: label })
+          : t("\"{ad}\" rutinini arşivlemek üzeresin. (Geri alınabilir.)", { ad: label });
       }
 
       case "archive_product":
       case "delete_product": {
-        const label = await this.safeLabel(() => this.productsService.findOne(input.productId).then((p) => p.name));
+        const label = await this.safeLabel(() => this.productsService.findOne(input.productId).then((p) => p.name), locale);
         return name === "delete_product"
-          ? `"${label}" ürününü KALICI olarak silmek üzeresin. Fotoğrafları da gider.`
-          : `"${label}" ürününü arşivlemek üzeresin. (Geri alınabilir.)`;
+          ? t("\"{ad}\" ürününü KALICI olarak silmek üzeresin. Fotoğrafları da gider.", { ad: label })
+          : t("\"{ad}\" ürününü arşivlemek üzeresin. (Geri alınabilir.)", { ad: label });
       }
 
       case "create_support_request": {
@@ -3112,17 +3212,26 @@ export class AiAssistantService {
         // geri alınamıyor ve karşı tarafta bir insan okuyor.
         const mesaj = String(input.message ?? "");
         const kisa = mesaj.length > 300 ? `${mesaj.slice(0, 300)}…` : mesaj;
-        return `Projelio ekibine destek talebi gönderilecek.\nKonu: ${input.subject}\nMesaj: ${kisa}`;
+        return t("Projelio ekibine destek talebi gönderilecek.\nKonu: {konu}\nMesaj: {mesaj}", {
+          konu: input.subject,
+          mesaj: kisa,
+        });
       }
 
       case "add_budget_transaction": {
-        const typeLabel = input.type === "income" ? "gelir" : input.type === "payout" ? "ödeme" : "gider";
-        return `Projeye ${input.amount} ₺ tutarında "${typeLabel}" kaydı eklemek üzeresin${
-          input.description ? ` (${input.description})` : ""
-        }.`;
+        // Tür sözcüğü cümlenin İÇİNDE çekimleniyor; yer tutucuya konsa
+        // İngilizce cümlede Türkçe kalırdı (params çevrilmiyor). Üç ayrı metin.
+        const aciklama = input.description ? ` (${input.description})` : "";
+        return (
+          input.type === "income"
+            ? t("Projeye {tutar} ₺ tutarında gelir kaydı eklemek üzeresin", { tutar: input.amount })
+            : input.type === "payout"
+              ? t("Projeye {tutar} ₺ tutarında ödeme kaydı eklemek üzeresin", { tutar: input.amount })
+              : t("Projeye {tutar} ₺ tutarında gider kaydı eklemek üzeresin", { tutar: input.amount })
+        ) + `${aciklama}.`;
       }
       default:
-        return "Bu işlemi onaylamak üzeresin.";
+        return t("Bu işlemi onaylamak üzeresin.");
     }
   }
 

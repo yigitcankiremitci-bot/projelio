@@ -444,4 +444,31 @@ export const hatalar: TranslationDict = {
     "That password is too long ({bayt} bytes). The limit is {sinir} bytes; Turkish characters take 2 bytes each.",
   "Bilinmeyen araç: {ad}": "Unknown tool: {ad}",
   "Bilinmeyen modül: {anahtar}": "Unknown module: {anahtar}",
+  // ─────────────────────────────────────────────── AI sağlayıcısına bağlanamama
+  //
+  // Sağlayıcıya hiç ulaşılamadığında kullanıcıya gösterilen tanı metinleri.
+  // "api.anthropic.com" bir alan adı, çevrilmiyor.
+  "{aciklama} (teknik detay: {kod})": "{aciklama} (technical detail: {kod})",
+  "api.anthropic.com adresi çözümlenemedi (DNS sorunu). İnternet bağlantınızı, VPN'i ya da DNS ayarlarınızı kontrol edin.":
+    "api.anthropic.com could not be resolved (a DNS problem). Check your internet connection, VPN or DNS settings.",
+  "Geçici DNS hatası. İnternet bağlantınızı veya DNS ayarlarınızı kontrol edin.":
+    "Temporary DNS error. Check your internet connection or DNS settings.",
+  "Bağlantı reddedildi. Bir güvenlik duvarı ya da proxy engelliyor olabilir.":
+    "Connection refused. A firewall or proxy may be blocking it.",
+  "Bağlantı karşı taraf tarafından kesildi. VPN/proxy ya da ağ filtresi engelliyor olabilir.":
+    "The connection was reset by the other side. A VPN, proxy or network filter may be blocking it.",
+  "Bağlantı zaman aşımına uğradı. Ağınız api.anthropic.com adresine erişemiyor olabilir.":
+    "The connection timed out. Your network may not be able to reach api.anthropic.com.",
+  "TLS sertifika hatası. Kurumsal bir ağ/antivirüs trafiği araya girip bozuyor olabilir.":
+    "TLS certificate error. A corporate network or antivirus may be intercepting the traffic.",
+  "TLS sertifikası doğrulanamadı. Kurumsal proxy/antivirüs araya giriyor olabilir.":
+    "The TLS certificate could not be verified. A corporate proxy or antivirus may be intercepting.",
+  "TLS zincirinde kendinden imzalı sertifika var. Kurumsal proxy/antivirüs araya giriyor olabilir.":
+    "There's a self-signed certificate in the TLS chain. A corporate proxy or antivirus may be intercepting.",
+  "Sunucu api.anthropic.com adresine ulaşamadı. İnternet bağlantısı, VPN, güvenlik duvarı veya proxy ayarlarını kontrol edin.":
+    "The server could not reach api.anthropic.com. Check the internet connection, VPN, firewall or proxy settings.",
+  // Global filtrenin kendi ürettiği iki mesaj (bkz. all-exceptions.filter.ts).
+  "Veritabanına şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene.":
+    "The database can't be reached right now. Check your connection and try again.",
+  "Beklenmeyen bir hata oluştu.": "Something unexpected went wrong.",
 };

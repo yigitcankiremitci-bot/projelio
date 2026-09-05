@@ -203,4 +203,162 @@ export const bildirimler: TranslationDict = {
   "Ürün silindi.": "Product deleted.",
   "Ürün arşivlendi.": "Product archived.",
   "Destek talebin Projelio ekibine iletildi.": "Your support request has been sent to the Projelio team.",
+  // ─────────────────────────────────────────────── Lio: "şimdiye kadar ne yapıldı"
+  //
+  // Duraklatma ve onay mesajlarında cümlenin içine dizilen eylem adları
+  // ("Şimdiye kadar: iş oluşturuldu, görev eklendi"). Bu yüzden hepsi küçük
+  // harfle ve edilgen: cümlenin ortasında duruyorlar, başında değil.
+  "iş oluşturuldu": "job created",
+  "iş güncellendi": "job updated",
+  "proje oluşturuldu": "project created",
+  "proje güncellendi": "project updated",
+  "görev oluşturuldu": "task created",
+  "görev güncellendi": "task updated",
+  "görev durumu değiştirildi": "task status changed",
+  "toplu görev eklendi": "tasks added in bulk",
+  "dosyadan toplu görev eklendi": "tasks added in bulk from a file",
+  "çıktı oluşturuldu": "output created",
+  "çıktı güncellendi": "output updated",
+  "yorum eklendi": "comment added",
+  "grup oluşturuldu": "group created",
+  "grup güncellendi": "group updated",
+  "organizasyon oluşturuldu": "organization created",
+  "organizasyon güncellendi": "organization updated",
+  "departman açıldı": "department opened",
+  "departman güncellendi": "department updated",
+  "modül açıldı": "module turned on",
+  "modül kapatıldı": "module turned off",
+  "modül kaydı eklendi": "module record added",
+  "modül kaydı güncellendi": "module record updated",
+  "modül kaydı arşivlendi": "module record archived",
+  "dosyadan toplu modül kaydı eklendi": "module records added in bulk from a file",
+  "rutin oluşturuldu": "routine created",
+  "rutin güncellendi": "routine updated",
+  "ürün eklendi": "product added",
+  "ürün güncellendi": "product updated",
+  "dönem planı kaydedildi": "period plan saved",
+  "zaman bloğu eklendi": "time block added",
+  "zaman bloğu güncellendi": "time block updated",
+  "planlama oturumu kapatıldı": "planning session closed",
+  "pano kartı güncellendi": "board card updated",
+  "yapılacak eklendi": "to-do added",
+  "yapılacak güncellendi": "to-do updated",
+  "yapılacak kaldırıldı": "to-do removed",
+  "yapılacak geri alındı": "to-do restored",
+  "yapılacak durumu değiştirildi": "to-do status changed",
+  "toplu yapılacak eklendi": "to-dos added in bulk",
+  "yapılacaklar sıralandı": "to-dos reordered",
+  "rapor dosyası üretildi": "report file generated",
+
+  // Ek türleri (Lio panelinde ve WhatsApp'ta görünür)
+  "Metin dosyası": "Text file",
+  "Word belgesi": "Word document",
+  "Ses kaydı (yazıya çevrildi)": "Voice note (transcribed)",
+  // ─────────────────────────────────────────────── Lio etkinlik akışı (devam)
+  "Grup oluşturuldu": "Group created",
+  "Grup güncellendi": "Group updated",
+  "Grup arşivlendi": "Group archived",
+  "Organizasyon arşivlendi": "Organization archived",
+  "Departman açıldı": "Department opened",
+  "Departman güncellendi": "Department updated",
+  "Departman arşivlendi": "Department archived",
+  "Rutin oluşturuldu": "Routine created",
+  "Rutin güncellendi": "Routine updated",
+  "Rutin arşivlendi": "Routine archived",
+  "Ürün eklendi": "Product added",
+  "Ürün güncellendi": "Product updated",
+  "Görev oluşturuldu": "Task created",
+  "Görev güncellendi": "Task updated",
+  "Görev durumu değişti": "Task status changed",
+  "Göreve yorum eklendi": "Comment added to the task",
+  "Çıktı oluşturuldu": "Output created",
+  "Çıktı güncellendi": "Output updated",
+  "Bütçe hareketi eklendi": "Budget entry added",
+  "Modüle kayıt eklendi": "Record added to the module",
+  "Modül kaydı güncellendi": "Module record updated",
+  "Dönem planı kaydedildi": "Period plan saved",
+  "Takvime zaman bloğu eklendi": "Time block added to the calendar",
+  "Zaman bloğu güncellendi": "Time block updated",
+  "Planlama oturumu tamamlandı": "Planning session completed",
+  "{n} görev eklendi": { one: "{n} task added", other: "{n} tasks added" },
+  "Dosyadan {n} görev eklendi": {
+    one: "{n} task added from a file",
+    other: "{n} tasks added from a file",
+  },
+  "Dosyadan {n} modül kaydı eklendi": {
+    one: "{n} module record added from a file",
+    other: "{n} module records added from a file",
+  },
+
+  // ─────────────────────────────────────────────── Lio: duraklatma ve kredi
+  //
+  // Lio bir isteği yarıda kestiğinde kullanıcıya gösterdiği metinler. Üç farklı
+  // sebep, üç farklı cümle — aynı metni kullanmak kullanıcıyı yanıltıyordu.
+  "Henüz kalıcı bir değişiklik yapılmadı": "Nothing has been changed yet",
+  "Durdurdum. {yapilan}. Bu istek toplam {harcanan} kredi harcadı.":
+    "Stopped. {yapilan}. This request used {harcanan} credits in total.",
+  "(Bu isteğin toplam bedeli: {harcanan} kredi.)": "(Total cost of this request: {harcanan} credits.)",
+  "Bu istek tahminen {tahmin} kredi tutacak — bu, tek seferde harcanması için yüksek bir tutar (eşik {esik} kredi). Henüz hiçbir kredi harcamadım. Devam edeyim mi?":
+    "This request is estimated at {tahmin} credits — a lot to spend in one go (the threshold is {esik}). I haven't spent anything yet. Shall I continue?",
+  "Bu istek şu ana kadar {harcanan} kredi harcadı ve henüz bitmedi. Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} kredi daha götürür. Devam edeyim mi?":
+    "This request has used {harcanan} credits so far and isn't finished. So far: {yapilan}. Each further step costs roughly {tahmin} more. Shall I continue?",
+  "Bu istek {n} adım sürdü ve hâlâ bitmedi ({harcanan} kredi). Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} kredi daha götürür. Devam edeyim mi?":
+    "This request has taken {n} steps and still isn't finished ({harcanan} credits). So far: {yapilan}. Each further step costs roughly {tahmin} more. Shall I continue?",
+  "AI kredin bu isteği sürdürmeye yetmiyor, bu yüzden burada durdum. {yapilan}. Kalan kredin {kalan}, devam etmek için en az {gereken} gerekiyor. Ayarlar > AI Kredileri sayfasından kredi yükleyip tekrar yazabilirsin.":
+    "You don't have enough AI credit to carry on, so I stopped here. {yapilan}. You have {kalan} left and need at least {gereken} to continue. You can top up from Settings > AI Credits and write again.",
+  // ─────────────────────────────────────────────── Lio: onay pencereleri
+  //
+  // Kullanıcı silme/arşivleme kararını BU cümleye bakarak veriyor. Kaydın adı
+  // yer tutucudan geliyor ve çevrilmiyor — kullanıcının kendi verisi.
+  // "KALICI" vurgusu İngilizcede de korunuyor: geri alınamaz bir işlem.
+  '"{ad}" görevini KALICI olarak silmek üzeresin. Bu işlem geri alınamaz.':
+    'You\'re about to PERMANENTLY delete the task "{ad}". This can\'t be undone.',
+  '"{ad}" görevini arşivlemek üzeresin.': 'You\'re about to archive the task "{ad}".',
+  '"{ad}" projesini KALICI olarak silmek üzeresin. Projeye ait tüm görevler de etkilenir. Bu işlem geri alınamaz.':
+    'You\'re about to PERMANENTLY delete the project "{ad}". Every task in it is affected too. This can\'t be undone.',
+  '"{ad}" projesini arşivlemek üzeresin.': 'You\'re about to archive the project "{ad}".',
+  '"{ad}" işini KALICI olarak silmek üzeresin. Bu işlem geri alınamaz.':
+    'You\'re about to PERMANENTLY delete the job "{ad}". This can\'t be undone.',
+  '"{ad}" işini arşivlemek üzeresin.': 'You\'re about to archive the job "{ad}".',
+  '"{ad}" çıktısı silinecek. Onaylıyor musun?': 'The output "{ad}" will be deleted. Do you confirm?',
+  '"{ad}" çıktısı arşivlenecek. Onaylıyor musun?': 'The output "{ad}" will be archived. Do you confirm?',
+  '"{ad}" grubunu KALICI olarak silmek üzeresin. Bu işlem geri alınamaz.':
+    'You\'re about to PERMANENTLY delete the group "{ad}". This can\'t be undone.',
+  '"{ad}" grubunu arşivlemek üzeresin. Gruba bağlı organizasyonlar ve işler de arşivlenir.':
+    'You\'re about to archive the group "{ad}". The organizations and jobs under it are archived too.',
+  '"{ad}" organizasyonunu arşivlemek üzeresin. Bağlı işler de (projeleri ve görevleriyle) arşivlenir.':
+    'You\'re about to archive the organization "{ad}". Its jobs — with their projects and tasks — are archived too.',
+  '"{ad}" departmanını KALICI olarak silmek üzeresin. Görevleri ve modül kayıtları da gider.':
+    'You\'re about to PERMANENTLY delete the department "{ad}". Its tasks and module records go too.',
+  '"{ad}" departmanını arşivlemek üzeresin. Kayıtlar durur, departman ekranlardan kalkar.':
+    'You\'re about to archive the department "{ad}". The records stay; the department leaves the screens.',
+  '"{ad}" rutinini KALICI olarak silmek üzeresin. Tekrarları ve geçmişi de gider.':
+    'You\'re about to PERMANENTLY delete the routine "{ad}". Its occurrences and history go too.',
+  '"{ad}" rutinini arşivlemek üzeresin. (Geri alınabilir.)':
+    'You\'re about to archive the routine "{ad}". (This can be undone.)',
+  '"{ad}" ürününü KALICI olarak silmek üzeresin. Fotoğrafları da gider.':
+    'You\'re about to PERMANENTLY delete the product "{ad}". Its photos go too.',
+  '"{ad}" ürününü arşivlemek üzeresin. (Geri alınabilir.)':
+    'You\'re about to archive the product "{ad}". (This can be undone.)',
+  '"{ad}" kaydını arşivlemek üzeresin. Listeden düşer, veritabanında kalır (geri alınabilir).':
+    'You\'re about to archive the record "{ad}". It leaves the list but stays in the database (this can be undone).',
+  '"{ad}" yapılacağını listenden kaldırmak üzeresin. (Geri alınabilir.)':
+    'You\'re about to remove the to-do "{ad}" from your list. (This can be undone.)',
+  "Bu işlemi onaylamak üzeresin.": "You're about to confirm this action.",
+  "Projelio ekibine destek talebi gönderilecek.\nKonu: {konu}\nMesaj: {mesaj}":
+    "A support request will be sent to the Projelio team.\nSubject: {konu}\nMessage: {mesaj}",
+  '"{ad}" modülünü kapatmak üzeresin. Kayıtlar silinmez ama modül işin ekranlarından kaldırılır.':
+    'You\'re about to turn off the module "{ad}". Records aren\'t deleted, but the module leaves the job\'s screens.',
+  '"{ad}" modülünü kapatmak üzeresin. Kayıtlar silinmez ama modül organizasyonun ekranlarından kaldırılır.':
+    'You\'re about to turn off the module "{ad}". Records aren\'t deleted, but the module leaves the organization\'s screens.',
+  '"{ad}" organizasyonunu KALICI olarak silmek üzeresin. Departmanları, ürünleri ve modül kayıtları da gider. Bu işlem geri alınamaz.':
+    'You\'re about to PERMANENTLY delete the organization "{ad}". Its departments, products and module records go too. This can\'t be undone.',
+  "Projeye {tutar} ₺ tutarında gelir kaydı eklemek üzeresin":
+    "You're about to add an income entry of ₺{tutar} to the project",
+  "Projeye {tutar} ₺ tutarında gider kaydı eklemek üzeresin":
+    "You're about to add an expense entry of ₺{tutar} to the project",
+  "Projeye {tutar} ₺ tutarında ödeme kaydı eklemek üzeresin":
+    "You're about to add a payout entry of ₺{tutar} to the project",
+  "{moduleName} · {summary}": "{moduleName} · {summary}",
+  "seçili öğe": "the selected item",
 };

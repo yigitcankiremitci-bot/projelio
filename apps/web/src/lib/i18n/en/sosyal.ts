@@ -266,4 +266,42 @@ export const sosyal: TranslationDict = {
     "Warm but understated; few emoji; no jargon",
   "Haftada 3, hafta içi 19:00": "3× a week, weekdays at 19:00",
   "Sosyal medya yönetimi": "Social media management",
+  // ─────────────────────────────────────────────── Durum ve tür etiketleri
+  // (lib/socialMedia.ts — modül düzeyi sabitler, çeviri render anında)
+  "Havuzda bekleyen içerik fikri": "Idea waiting in the pool",
+  "Metin/görsel hazırlanıyor": "Text/visual in preparation",
+  "Onaya hazır": "Ready for approval",
+  "Yayın için onay bekliyor": "Waiting for publish approval",
+  "Onaylandı, yayın saati bekleniyor": "Approved, waiting for its slot",
+  "Yayın tarihi belirlendi": "Publish date set",
+  "Kanallarda yayında": "Live on the channels",
+  "Yayımlanmayacak": "Won't be published",
+  "Başarısız": "Failed",
+  "Sırada": "Queued",
+  Atlandı: "Skipped",
+
+  // Bağlantı durumları
+  "Elle yönetiliyor": "Managed manually",
+  "Yayını siz yapıyorsunuz": "You publish it yourself",
+  "Bağlı": "Connected",
+  "Projelio bu hesaba doğrudan yayımlayabilir": "Projelio can publish to this account directly",
+  "Bağlantıyı yenilemek için tekrar bağlanın": "Reconnect to refresh the link",
+  "Instagram tarafında erişim kaldırılmış": "Access was revoked on Instagram's side",
+
+  // Gönderi türleri
+  "Görsel": "Image",
+  "Reels / kısa video": "Reels / short video",
+  "Yalnızca metin": "Text only",
+  "Yazı / blog": "Article / blog",
+  "Blog / web": "Blog / web",
+  "Hikâye": "Story",
+  Karusel: "Carousel",
+
+  // Platform adları marka; İngilizcede de aynı kalıyorlar ama sözlükte
+  // bulunmaları gerekiyor, yoksa "eksik çeviri" sayılırlar.
+  Instagram: "Instagram",
+  Facebook: "Facebook",
+  Threads: "Threads",
+  Pinterest: "Pinterest",
+  YouTube: "YouTube",
 };

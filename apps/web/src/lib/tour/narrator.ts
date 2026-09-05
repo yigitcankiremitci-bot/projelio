@@ -13,15 +13,26 @@
  */
 
 import type { TourStep } from "./types";
+import { getLocale } from "../i18n/depo";
 
 export type NarrationSource = "audio" | "tts" | "none";
 
 const AUDIO_BASE = "/tour-audio";
-export const NARRATION_LANG = "tr";
+
+/**
+ * Kaydın dili. Yol zaten dil segmenti taşıyordu (`/tour-audio/tr/…`), ama sabit
+ * "tr" yazılıydı: İngilizce arayüzde İngilizce metin TÜRKÇE sesle okunurdu.
+ * Artık arayüzün diline bakılıyor; o dilde kayıt yoksa dosya bulunamıyor ve
+ * anlatım cihazın kendi sesine düşüyor (bkz. aşağıdaki üç kademeli akış).
+ * İngilizce kayıtlar yüklendiğinde KOD DEĞİŞMEDEN devreye girer.
+ */
+export function narrationLang(): string {
+  return getLocale() ?? (navigator.language?.toLowerCase().startsWith("tr") ? "tr" : "en");
+}
 
 /** Bu adımın kaydedilmiş ses dosyasının beklendiği yol. */
 export function stepAudioUrl(tourId: string, stepId: string): string {
-  return `${AUDIO_BASE}/${NARRATION_LANG}/${tourId}/${stepId}.mp3`;
+  return `${AUDIO_BASE}/${narrationLang()}/${tourId}/${stepId}.mp3`;
 }
 
 export function speechTextOf(step: TourStep): string {
@@ -84,11 +95,18 @@ let cachedVoice: SpeechSynthesisVoice | null = null;
 let preferredVoiceName: string | null = null;
 
 /** Cihazdaki Türkçe sesler — kullanıcıya seçtirmek için. */
-export function turkishVoices(): { name: string; lang: string }[] {
+/**
+ * Cihazda arayüz dilinde okuyabilen sesler.
+ *
+ * Eskiden yalnızca Türkçe seslere bakıyordu; İngilizce arayüzde hiç ses
+ * bulunamıyor ve anlatım tamamen sessiz kalıyordu.
+ */
+export function narrationVoices(): { name: string; lang: string }[] {
   if (!ttsSupported()) return [];
+  const dil = narrationLang();
   return window.speechSynthesis
     .getVoices()
-    .filter((v) => v.lang?.toLowerCase().startsWith("tr"))
+    .filter((v) => v.lang?.toLowerCase().startsWith(dil))
     .map((v) => ({ name: v.name, lang: v.lang }));
 }
 
@@ -109,18 +127,19 @@ function pickVoice(): SpeechSynthesisVoice | null {
   if (!ttsSupported()) return null;
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
-  const turkish = voices.filter((v) => v.lang?.toLowerCase().startsWith("tr"));
+  const dil = narrationLang();
+  const dildekiler = voices.filter((v) => v.lang?.toLowerCase().startsWith(dil));
 
   const chosen = preferredVoiceName
-    ? turkish.find((v) => v.name === preferredVoiceName)
+    ? dildekiler.find((v) => v.name === preferredVoiceName)
     : undefined;
 
   // Aynı dilde birden çok ses varsa "gelişmiş" olanlar belirgin biçimde daha
   // doğal okuyor; adlarında genelde bu sözcükler geçiyor.
   cachedVoice =
     chosen ??
-    turkish.find((v) => /google|natural|premium|enhanced|gelişmiş|siri/i.test(v.name)) ??
-    turkish[0] ??
+    dildekiler.find((v) => /google|natural|premium|enhanced|gelişmiş|siri/i.test(v.name)) ??
+    dildekiler[0] ??
     null;
   return cachedVoice;
 }

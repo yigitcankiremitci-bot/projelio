@@ -254,7 +254,7 @@ export default function TourOverlay() {
         ref={bubbleRef}
         role="dialog"
         aria-live="polite"
-        aria-label={`${tour.title} — adım ${stepIndex + 1} / ${stepCount}`}
+        aria-label={t("{tur} — adım {n} / {toplam}", { tur: t(tour.title), n: stepIndex + 1, toplam: stepCount })}
         style={{
           ...bubbleStyle,
           zIndex: OVERLAY_Z + 1,
@@ -269,22 +269,22 @@ export default function TourOverlay() {
           <img src="/lio-base.png" alt="" aria-hidden style={{ width: 30, height: 30, objectFit: "contain" }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, color: c.textSecondary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {tour.title} · {stepIndex + 1}/{stepCount}
+              {t(tour.title)} · {stepIndex + 1}/{stepCount}
             </div>
           </div>
           <button
             type="button"
             onClick={() => stop()}
             aria-label="Turu kapat"
-            title="Turu kapat (Esc)"
+            title={t("Turu kapat (Esc)")}
             style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4, lineHeight: 0 }}
           >
             <IconX size={16} color={c.textSecondary} />
           </button>
         </div>
 
-        <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 600, color: c.textPrimary }}>{step.title}</h3>
-        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5, color: c.textSecondary }}>{step.text}</p>
+        <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 600, color: c.textPrimary }}>{t(step.title)}</h3>
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5, color: c.textSecondary }}>{t(step.text)}</p>
 
         {/* İlerleme noktaları: tıklanabilir, istenen adıma atlar. */}
         <div style={{ display: "flex", gap: 6, margin: "14px 0 12px", flexWrap: "wrap" }}>
@@ -294,7 +294,7 @@ export default function TourOverlay() {
               type="button"
               onClick={() => goTo(i)}
               aria-label={`${i + 1}. adım: ${s.title}`}
-              title={s.title}
+              title={t(s.title)}
               style={{
                 width: i === stepIndex ? 22 : 8,
                 height: 8,
@@ -316,7 +316,7 @@ export default function TourOverlay() {
             onClick={() => setVoiceEnabled(!voiceEnabled)}
             style={{ ...controlBtn, width: 38, padding: 0 }}
             aria-label={voiceEnabled ? "Sesi kapat" : "Sesi aç"}
-            title={voiceEnabled ? "Sesi kapat" : "Sesi aç"}
+            title={voiceEnabled ? t("Sesi kapat") : t("Sesi aç")}
           >
             <span aria-hidden style={{ fontSize: 15 }}>{voiceEnabled ? "🔊" : "🔇"}</span>
           </button>
@@ -327,7 +327,7 @@ export default function TourOverlay() {
               onClick={togglePlay}
               style={{ ...controlBtn, width: 38, padding: 0 }}
               aria-label={speaking ? "Duraklat" : "Devam et"}
-              title={speaking ? "Duraklat" : "Devam et"}
+              title={speaking ? t("Duraklat") : t("Devam et")}
             >
               <span aria-hidden style={{ fontSize: 13 }}>{speaking ? "❚❚" : "▶"}</span>
             </button>

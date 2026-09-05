@@ -1,3 +1,10 @@
+// dil:anahtar-dosya
+//
+// Bu dosyadaki metinlerin tamamı arayüzde görünen etiket: içerik durumları,
+// gönderi türleri, bağlantı durumları. Modül düzeyinde sabit oldukları için
+// burada t() çağrılamıyor; çeviri kullanıldıkları yerde yapılıyor.
+// Karşılıkları: apps/web/src/lib/i18n/en/
+
 import type {
   SocialAccount,
   SocialConnectionStatus,

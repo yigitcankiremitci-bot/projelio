@@ -1,3 +1,10 @@
+// dil:anahtar-dosya
+//
+// Turun adım metinleri. Modül düzeyinde sabit; çeviri TourOverlay'de,
+// render anında yapılıyor. Ses kaydı ayrı: /tour-audio/<dil>/… altında
+// aranır, o dilde kayıt yoksa cihazın kendi sesine düşülür (narrator.ts).
+// Karşılıkları: apps/web/src/lib/i18n/en/
+
 /**
  * Turların içeriği (senaryo/metin).
  *

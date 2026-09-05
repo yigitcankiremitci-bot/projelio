@@ -168,7 +168,7 @@ export default function TourLauncher() {
               <div style={{ fontSize: 11.5, letterSpacing: 0.3, textTransform: "uppercase", color: c.textSecondary, padding: "6px 10px 4px" }}>
                 {t("Bu sayfa")}
               </div>
-              {toursHere.map((t) => renderRow(t.id, t.title, t.description, AREA_LABELS[t.area]))}
+              {toursHere.map((tur) => renderRow(tur.id, t(tur.title), t(tur.description), t(AREA_LABELS[tur.area])))}
             </>
           )}
 
@@ -177,7 +177,7 @@ export default function TourLauncher() {
               <div style={{ fontSize: 11.5, letterSpacing: 0.3, textTransform: "uppercase", color: c.textSecondary, padding: "10px 10px 4px" }}>
                 {t("Diğer anlatımlar")}
               </div>
-              {others.map((t) => renderRow(t.id, t.title, t.description, AREA_LABELS[t.area]))}
+              {others.map((tur) => renderRow(tur.id, t(tur.title), t(tur.description), t(AREA_LABELS[tur.area])))}
             </>
           )}
         </div>

@@ -350,6 +350,9 @@ for (const kok of TARANAN) {
           if (dize.tirnak === "`") continue;
           if (metin.includes("${")) continue;
           if (/^\.\.?\//.test(metin)) continue;
+          // Renk kodu (#C0813F), paket adı (@projelio/shared), CSS değeri.
+          // Dosya düzeyi işaret bütün dosyayı kapsadığı için bunlar da geliyor.
+          if (/^[#@]/.test(metin)) continue;
           // Sayı ve ayraçlar: "0", " · ", " → ", "—". Bunlar metin değil,
           // biçimlendirme; çeviride de aynı kalırlar.
           if (/^[\d.,%\s+\-−·—→/]*$/.test(metin)) continue;
@@ -358,7 +361,9 @@ for (const kok of TARANAN) {
           // Anahtar adı ("durum") arayüz metni değil. Tanımlayıcı ve yol
           // görünümlü dizeler eleniyor; gerçek arayüz metni ya büyük harfle
           // başlıyor, ya birden fazla sözcük, ya da Türkçe karakter taşıyor.
-          if (/^[a-z][a-zA-Z0-9_]*$/.test(metin)) continue;
+          // Tanımlayıcılar: camelCase, snake_case ve kebab-case
+          // (tur adım kimlikleri böyle: "ana-sayfa-sekmeleri").
+          if (/^[a-z][a-zA-Z0-9_-]*$/.test(metin)) continue;
           if (/^\/|^https?:\/\//.test(metin)) continue;
           if (!kullanilan.has(anahtarMetni)) kullanilan.set(anahtarMetni, []);
           kullanilan.get(anahtarMetni).push(`${goreli}:${dize.satir}`);
@@ -409,9 +414,15 @@ for (const kok of TARANAN) {
     // karşılık kırpılmış metnin İÇİNDE satır sonu kalıyorsa bu bir metin değil,
     // araya giren koddur (`</>` ile aşağıdaki bir `<` eşleşmiş demektir) —
     // aşağıda eleniyor.
-    for (const eslesme of maskeli.matchAll(/>([^<>{}]*)</g)) {
-      const metin = eslesme[1].trim();
+    // Açan `>`ın öncesi `=` ya da `]` ise bu bir JSX etiketi değil: ok
+    // fonksiyonu (`map((k) =>`) ya da jenerik tip kapanışı (`Promise<T[]>`).
+    // Aynı kurallar dil-sar.mjs'te de var; ikisi de gerçek derleme hatalarından
+    // sonra eklendi.
+    for (const eslesme of maskeli.matchAll(/(^|[^=\]])>([^<>{}]*)</g)) {
+      const metin = eslesme[2].trim();
       if (metin.includes("\n")) continue;
+      // Görünen metin harf ya da rakamla başlar.
+      if (!/^[\p{L}\p{N}"'“(]/u.test(metin)) continue;
       // Harf içermeyen (boşluk, noktalama, tire) düğümler metin değil.
       if (!metin || !/[a-zA-ZçğıöşüÇĞİÖŞÜ]/.test(metin)) continue;
       // JSX metni ararken `>`...`<` deseni TypeScript'in jeneriklerine

@@ -9,6 +9,7 @@
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useTour } from "../../lib/tour/TourContext";
 import { getTour } from "../../lib/tour/tours";
+import { useT } from "../../lib/i18n";
 
 interface Props {
   tour: string;
@@ -19,11 +20,12 @@ interface Props {
 
 export default function TourHelpDot({ tour, step, size = 17, label }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const { start } = useTour();
   const target = getTour(tour);
   if (!target) return null;
 
-  const title = label ?? `${target.title} — sesli anlat`;
+  const title = label ?? t("{tur} — sesli anlat", { tur: t(target.title) });
 
   return (
     <button

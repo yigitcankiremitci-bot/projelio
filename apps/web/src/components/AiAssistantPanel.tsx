@@ -37,7 +37,7 @@ import {
   sanitizeForSpeech,
   setPreferredVoice,
   stop as stopSpeaking,
-  turkishVoices,
+  narrationVoices,
 } from "../lib/tour/narrator";
 import { IconMic, IconSpeaker } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -324,7 +324,7 @@ export default function AiAssistantPanel({
 
   useEffect(() => {
     if (!open || !voiceSupported) return;
-    const read = () => setVoiceList(turkishVoices());
+    const read = () => setVoiceList(narrationVoices());
     read();
     // Liste boş geldiyse sesler henüz yüklenmemiştir; kısa bir süre sonra tekrar bak.
     const timer = setTimeout(read, 600);

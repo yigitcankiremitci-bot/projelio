@@ -47,7 +47,7 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
       if (onCreated) onCreated(created);
       else window.location.reload();
     } catch {
-      setError("Rutin oluşturulamadı. Tekrar dene.");
+      setError(t("Rutin oluşturulamadı. Tekrar dene."));
       setLoading(false);
     }
   };

@@ -81,7 +81,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
 
   const save = async () => {
     if (!form.handle.trim()) {
-      setError("Hesap adı gerekli");
+      setError(t("Hesap adı gerekli"));
       return;
     }
     setSaving(true);

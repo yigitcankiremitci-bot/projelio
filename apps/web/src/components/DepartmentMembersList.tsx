@@ -141,7 +141,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
 
   const handleInvite = async () => {
     if (mode === "user" && !selectedUser) {
-      setError("Bir kullanıcı seç");
+      setError(t("Bir kullanıcı seç"));
       return;
     }
     if (mode === "email" && !email.trim()) {

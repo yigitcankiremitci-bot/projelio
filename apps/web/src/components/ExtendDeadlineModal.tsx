@@ -26,7 +26,7 @@ export default function ExtendDeadlineModal({ project, onClose, onSaved }: Props
     e.preventDefault();
     const newDeadline = new Date(deadline);
     if (newDeadline.getTime() < new Date(project.startDate).getTime()) {
-      setError("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+      setError(t("Bitiş tarihi başlangıç tarihinden önce olamaz."));
       return;
     }
     setError("");
@@ -37,7 +37,7 @@ export default function ExtendDeadlineModal({ project, onClose, onSaved }: Props
       });
       onSaved(updated);
     } catch {
-      setError("Deadline güncellenemedi. Tekrar dene.");
+      setError(t("Deadline güncellenemedi. Tekrar dene."));
       setLoading(false);
     }
   };

@@ -42,7 +42,7 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
 
   const save = async () => {
     if (minutes <= 0) {
-      setError("Bitiş saati başlangıçtan sonra olmalı.");
+      setError(t("Bitiş saati başlangıçtan sonra olmalı."));
       return;
     }
     setSaving(true);

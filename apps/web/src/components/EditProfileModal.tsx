@@ -50,7 +50,7 @@ export default function EditProfileModal({ user, onClose, onSaved }: Props) {
       onSaved();
       onClose();
     } catch {
-      setError("Profil güncellenemedi. Tekrar dene.");
+      setError(t("Profil güncellenemedi. Tekrar dene."));
       setLoading(false);
     }
   };

@@ -63,7 +63,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
     setSearchParams(next, { replace: true });
 
     if (!isOpenableModule(requested, Boolean(MODULE_RECORD_CONFIGS[requested]))) {
-      setNotice("Bu modül henüz veri girişine açık değil — diğer modüllerin verisinden gösterge üretecek.");
+      setNotice(t("Bu modül henüz veri girişine açık değil — diğer modüllerin verisinden gösterge üretecek."));
       return;
     }
     // Sayfa yüzeyli modül kendi sayfasında açılır; modal yüzeyli olan burada.
@@ -297,7 +297,7 @@ function AddModulesForm({
 
   const handleSave = async () => {
     if (selectedKeys.length === 0) {
-      setError("En az bir modül seç");
+      setError(t("En az bir modül seç"));
       return;
     }
     setError("");

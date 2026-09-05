@@ -77,7 +77,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
       onSaved();
       onClose();
     } catch {
-      setError("Organizasyon güncellenemedi. Tekrar dene.");
+      setError(t("Organizasyon güncellenemedi. Tekrar dene."));
       setLoading(false);
     }
   };

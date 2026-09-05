@@ -30,7 +30,7 @@ export default function CreateOutputModal({ projectId, departmentId, onClose, on
       onCreated();
       onClose();
     } catch {
-      setError("Çıktı oluşturulamadı. Tekrar dene.");
+      setError(t("Çıktı oluşturulamadı. Tekrar dene."));
       setLoading(false);
     }
   };

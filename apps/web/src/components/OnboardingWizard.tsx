@@ -40,6 +40,8 @@ interface Props {
   onCompleted: () => void;
 }
 
+// dil:anahtar-baslangic — modül düzeyi etiket sabitleri: burada t()
+// çağrılamaz, çeviri render anında yapılıyor.
 const OPTIONS: { type: AccountType; title: string; description: string; icon: typeof IconUser }[] = [
   {
     type: "freelancer",
@@ -77,6 +79,7 @@ const ORG_TYPE_OPTIONS: { type: OrgType; title: string; description: string }[] 
   { type: "sirket", title: "Şirket", description: "Büyük ölçekli, çok departmanlı bir yapı." },
   { type: "isletme", title: "İşletme", description: "Daha küçük ölçekli bir yapı." },
 ];
+// dil:anahtar-bitis
 
 // Sihirbazın adımları. Hangilerinin gösterileceği hesap tipine göre değişir:
 // kendi yapısını kuranlara (organization_owner/group_owner) org adımı, yalnızca
@@ -405,10 +408,10 @@ export default function OnboardingWizard({ onCompleted }: Props) {
                     </span>
                     <span>
                       <span style={{ display: "block", fontSize: 16, fontWeight: 500, color: c.textPrimary, marginBottom: 2 }}>
-                        {opt.title}
+                        {t(opt.title)}
                       </span>
                       <span style={{ display: "block", fontSize: 14, color: c.textSecondary, lineHeight: 1.4 }}>
-                        {opt.description}
+                        {t(opt.description)}
                       </span>
                     </span>
                   </button>
@@ -574,8 +577,8 @@ export default function OnboardingWizard({ onCompleted }: Props) {
                 <div style={{ display: "flex", gap: 8 }}>
                   {ORG_TYPE_OPTIONS.map((opt) => (
                     <button key={opt.type} onClick={() => setOrgType(opt.type)} style={{ ...cardStyle(orgType === opt.type), flex: 1 }}>
-                      <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{opt.title}</span>
-                      <span style={{ display: "block", fontSize: 13, color: c.textSecondary }}>{opt.description}</span>
+                      <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{t(opt.title)}</span>
+                      <span style={{ display: "block", fontSize: 13, color: c.textSecondary }}>{t(opt.description)}</span>
                     </button>
                   ))}
                 </div>
@@ -672,7 +675,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
                     <button key={m.key} onClick={() => toggle(setSelectedModuleKeys, m.key)} style={cardStyle(active)}>
                       <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: c.textPrimary, marginBottom: 2 }}>{m.name}</span>
                       {m.description && (
-                        <span style={{ display: "block", fontSize: 13, color: c.textSecondary, lineHeight: 1.4 }}>{m.description}</span>
+                        <span style={{ display: "block", fontSize: 13, color: c.textSecondary, lineHeight: 1.4 }}>{t(m.description)}</span>
                       )}
                     </button>
                   );

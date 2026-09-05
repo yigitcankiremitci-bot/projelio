@@ -122,7 +122,7 @@ export default function CreateTaskModal({
         window.location.href = `/projects/${projectId}`;
       }
     } catch {
-      setError("Görev oluşturulamadı. Tekrar dene.");
+      setError(t("Görev oluşturulamadı. Tekrar dene."));
       setLoading(false);
     }
   };

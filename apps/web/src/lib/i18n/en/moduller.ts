@@ -939,4 +939,6 @@ export const moduller: TranslationDict = {
   "İkincil": "Secondary",
   "Her ikisi": "Both",
   "Yatırım": "Investment",
+  "Bu modül henüz veri girişine açık değil — diğer modüllerin verisinden gösterge üretecek.":
+    "This module isn't open for data entry yet — it will build indicators from other modules' data.",
 };

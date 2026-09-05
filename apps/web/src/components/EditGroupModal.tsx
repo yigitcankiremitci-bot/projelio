@@ -65,7 +65,7 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
       onSaved();
       onClose();
     } catch {
-      setError("Grup güncellenemedi. Tekrar dene.");
+      setError(t("Grup güncellenemedi. Tekrar dene."));
       setLoading(false);
     }
   };

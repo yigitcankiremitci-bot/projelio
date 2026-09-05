@@ -185,4 +185,44 @@ export const kurumsal: TranslationDict = {
   "Admin paneli yalnızca yönetici hesapları içindir.": "The admin panel is for administrator accounts only.",
   "Kullanıcılar, proje istatistikleri ve sistem durumu burada listelenir.":
     "Users, project statistics and system status are listed here.",
+  // ─────────────────────────────────────────────── Kurulum: hesap tipi seçimi
+  "Bireysel çalışıyorum": "I work on my own",
+  "Serbest çalışan olarak kendi işlerini/projelerini yönetmek istiyorsun.":
+    "You want to manage your own jobs and projects as a freelancer.",
+  "Bir şirket/işletme yönetiyorum": "I run a company or business",
+  "İşlerini bir şirket ya da işletme çatısı altında toplamak istiyorsun.":
+    "You want to bring your work together under a company or business.",
+  "Birden fazla şirketim var": "I have more than one company",
+  "Bir holding gibi birden çok organizasyonu tek yerden yönetmek istiyorsun.":
+    "You want to run several organizations from one place, like a holding company.",
+  "Bir şirkette çalışıyorum": "I work at a company",
+  "Bir departmanın kadrosuna davetle bağlanacaksın; işvereninin sana göndereceği daveti bekleyebilirsin.":
+    "You'll join a department's staff by invitation; wait for the one your employer sends you.",
+  "Taşeronum": "I'm a subcontractor",
+  "Bağlı olacağın departmanın yalnızca ilgili modülünü yöneteceksin.":
+    "You'll manage only the relevant module of the department you're attached to.",
+  "Şirket": "Company",
+  "Büyük ölçekli, çok departmanlı bir yapı.": "A larger structure with several departments.",
+  "İşletme": "Business",
+  "Daha küçük ölçekli bir yapı.": "A smaller structure.",
+
+  // Modül ekibi rolleri
+  "Modül yöneticisi": "Module manager",
+  "Dış kaynak": "External",
+  "Kayıtları ve modül ekibini yönetir": "Manages the records and the module team",
+  "Kayıt ekler ve düzenler": "Adds and edits records",
+  "Kayıt ekler ve düzenler, ekibi göremez": "Adds and edits records; can't see the team",
+
+  // Hesap silme: alternatif öneriler
+  "Bildirimler mi çok geliyor?": "Too many notifications?",
+  "Günlük özet ve hatırlatmaları ayarlardan tek tek kapatabilirsin; hesabını silmene gerek yok.":
+    "You can turn the daily digest and reminders off one by one in Settings — no need to delete your account.",
+  "Bildirim ayarları": "Notification settings",
+  "Bir sorun mu yaşadın?": "Ran into a problem?",
+  "Yaşadığın şeyi bize yaz — çoğu şey çözülebiliyor ve cevabı ayarlardaki destek bölümünden görürsün.":
+    "Tell us what happened — most things can be sorted out, and you'll see the reply in the support section of Settings.",
+  "Destek'e yaz": "Write to support",
+  "Sadece ara mı vermek istiyorsun?": "Just want a break?",
+  "Hesabını silmeden de uzak durabilirsin: veri kaybı olmaz, döndüğünde her şey yerinde olur.":
+    "You can step away without deleting your account: nothing is lost and everything is where you left it when you come back.",
 };

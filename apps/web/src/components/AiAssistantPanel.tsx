@@ -88,9 +88,10 @@ interface ViewMessage {
  * Sunucudaki karşılığıyla (EMPTY_MESSAGE_WITH_FILE) aynı olmalı: yeniden
  * yüklendiğinde balonun metni değişmesin.
  */
-const EMPTY_MESSAGE_WITH_FILE = "Bu dosyayı incele ve ne olduğunu özetle.";
+const EMPTY_MESSAGE_WITH_FILE = "Bu dosyayı incele ve ne olduğunu özetle."; // dil:anahtar
 
 /** Ek türlerinin balonda ve çipte gösterilen kısa adı. */
+// dil:anahtar-baslangic
 const ATTACHMENT_LABELS: Record<string, string> = {
   image: "Görsel",
   pdf: "PDF",
@@ -99,13 +100,16 @@ const ATTACHMENT_LABELS: Record<string, string> = {
   text: "Metin",
   audio: "Ses",
 };
+// dil:anahtar-bitis
 
+// dil:anahtar-baslangic
 const SUGGESTIONS = [
   "Durumumu özetle",
   "Geciken görevlerim neler?",
   "Bu hafta neler teslim edilecek?",
   "Bana atanmış açık işleri listele",
 ];
+// dil:anahtar-bitis
 
 /** Seçilen model kademesi oturumlar arasında hatırlanır. */
 const TIER_STORAGE_KEY = "projelio.lio.tier";
@@ -134,15 +138,17 @@ const SERVER_VOICE_KEY = "projelio.lio.serverVoice";
  * Kısa tutuldu çünkü deneme de ücretli: 46 karakter ≈ 9 kredi. Yine de gerekli,
  * altı sesi mesajları tekrar tekrar okutarak denemek çok daha pahalı olurdu.
  */
-const VOICE_SAMPLE = "Merhaba, ben Lio. Sesim böyle duyuluyor.";
+const VOICE_SAMPLE = "Merhaba, ben Lio. Sesim böyle duyuluyor."; // dil:anahtar
 
 function readStoredTier(): AiModelTier {
   const raw = typeof localStorage !== "undefined" ? localStorage.getItem(TIER_STORAGE_KEY) : null;
   return raw === "smart" || raw === "max" ? raw : "fast";
 }
 
+// dil:anahtar-baslangic — modül düzeyi metinler; çeviri kullanım yerinde.
 const GREETING =
   "Merhaba! Ben Lio. Projelerini, görevlerini ve bütçeni buradan yönetebilirsin — yazman yeterli.";
+// dil:anahtar-bitis
 
 export default function AiAssistantPanel({
   open,
@@ -418,7 +424,7 @@ export default function AiAssistantPanel({
         }))
       );
     } catch {
-      setError("Sohbet yüklenemedi.");
+      setError(t("Sohbet yüklenemedi."));
     } finally {
       setLoadingHistory(false);
     }
@@ -515,7 +521,7 @@ export default function AiAssistantPanel({
     try {
       const { provider } = await aiChat.attachmentSource();
       if (!provider) {
-        setError("Bağlı bir Google Drive ya da OneDrive hesabın yok. Ayarlardan bir hesap bağlayabilirsin.");
+        setError(t("Bağlı bir Google Drive ya da OneDrive hesabın yok. Ayarlardan bir hesap bağlayabilirsin."));
         return;
       }
       if (provider === "microsoft") {
@@ -652,7 +658,7 @@ export default function AiAssistantPanel({
 
     const file = await recorder.stop();
     if (!file) {
-      setError("Kayıt çok kısa, bir şey duyamadım.");
+      setError(t("Kayıt çok kısa, bir şey duyamadım."));
       return;
     }
 
@@ -1247,12 +1253,14 @@ export default function AiAssistantPanel({
         >
           {messages.length === 0 && !loadingHistory && (
             <>
-              <Bubble role="assistant" text={GREETING} />
+              <Bubble role="assistant" text={t(GREETING)} />
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                {/* Çipte ÇEVRİLMİŞ metin görünür ama Lio'ya gönderilen metin,
+                    kullanıcının kendi dilinde olmalı: t(s) gönderilir. */}
                 {SUGGESTIONS.map((s) => (
                   <button
                     key={s}
-                    onClick={() => void send(s)}
+                    onClick={() => void send(t(s))}
                     disabled={sending}
                     style={{
                       padding: "7px 12px",
@@ -1264,7 +1272,7 @@ export default function AiAssistantPanel({
                       cursor: "pointer",
                     }}
                   >
-                    {s}
+                    {t(s)}
                   </button>
                 ))}
               </div>
@@ -1775,7 +1783,7 @@ function Bubble({
               >
                 {attachment.name}
               </span>
-              <span>{ATTACHMENT_LABELS[attachment.kind] ?? "Dosya"}</span>
+              <span>{t(ATTACHMENT_LABELS[attachment.kind] ?? "Dosya")}</span>
             </span>
           ))}
         </div>

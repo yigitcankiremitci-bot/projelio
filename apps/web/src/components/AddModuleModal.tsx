@@ -65,7 +65,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded }: Pro
 
   const handleSave = async () => {
     if (selectedKeys.length === 0) {
-      setError("En az bir modül seç");
+      setError(t("En az bir modül seç"));
       return;
     }
     setError("");

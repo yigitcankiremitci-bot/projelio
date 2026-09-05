@@ -48,7 +48,7 @@ export default function EditOutputModal({ output, onClose, onSaved, onDeleted, o
       onSaved(updated);
       onClose();
     } catch {
-      setError("Çıktı güncellenemedi. Tekrar dene.");
+      setError(t("Çıktı güncellenemedi. Tekrar dene."));
       setLoading(false);
     }
   };

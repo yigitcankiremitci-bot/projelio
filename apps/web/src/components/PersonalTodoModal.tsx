@@ -55,7 +55,7 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
       });
       onChanged();
     } catch {
-      setError("Görev güncellenemedi. Tekrar dene.");
+      setError(t("Görev güncellenemedi. Tekrar dene."));
       setSaving(false);
     }
   };
@@ -79,7 +79,7 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
       });
       onChanged();
     } catch {
-      setError("Görev silinemedi. Tekrar dene.");
+      setError(t("Görev silinemedi. Tekrar dene."));
       setSaving(false);
     }
   };

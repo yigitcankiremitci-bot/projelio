@@ -74,7 +74,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
       onSaved();
       onClose();
     } catch {
-      setError("İş güncellenemedi. Tekrar dene.");
+      setError(t("İş güncellenemedi. Tekrar dene."));
       setLoading(false);
     }
   };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useT } from "./i18n";
 
 /**
  * Tarayıcı sesi kayıtları için MIME adayları.
@@ -42,6 +43,7 @@ export interface VoiceRecorder {
  * tarayıcı sekmesinde kayıt göstergesi yanık kalıyor.
  */
 export function useVoiceRecorder(): VoiceRecorder {
+  const t = useT();
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export function useVoiceRecorder(): VoiceRecorder {
 
   const start = useCallback(async () => {
     if (!supported) {
-      setError("Bu tarayıcı ses kaydını desteklemiyor.");
+      setError(t("Bu tarayıcı ses kaydını desteklemiyor."));
       return;
     }
     setError(null);

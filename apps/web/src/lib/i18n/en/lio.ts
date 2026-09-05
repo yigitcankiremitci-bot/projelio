@@ -201,4 +201,23 @@ export const lio: TranslationDict = {
     "This step's recording isn't uploaded yet; the text is read with your device's voice.",
   "Her yanıtın yanındaki hoparlöre basarak dinleyebilirsin.":
     "Tap the speaker next to any reply to listen to it.",
+  // Karşılama ve öneri çipleri. Çipe tıklandığında GÖNDERİLEN metin de bu
+  // çeviridir — Lio kullanıcının dilinde yanıt veriyor, isteği de o dilde
+  // alması doğru.
+  "Merhaba! Ben Lio. Projelerini, görevlerini ve bütçeni buradan yönetebilirsin — yazman yeterli.":
+    "Hi, I'm Lio. You can manage your projects, tasks and budget from here — just type.",
+  "Merhaba, ben Lio. Sesim böyle duyuluyor.": "Hi, I'm Lio. This is what my voice sounds like.",
+  "Durumumu özetle": "Summarise where I stand",
+  "Geciken görevlerim neler?": "Which of my tasks are overdue?",
+  "Bu hafta neler teslim edilecek?": "What's due this week?",
+  "Bana atanmış açık işleri listele": "List the open work assigned to me",
+  "Bu dosyayı incele ve ne olduğunu özetle.": "Look at this file and summarise what it is.",
+
+  // Ek türleri
+  PDF: "PDF",
+  Word: "Word",
+  Tablo: "Spreadsheet",
+  Metin: "Text",
+  Ses: "Audio",
+  "Önizleme yüklenemedi.": "Could not load the preview.",
 };

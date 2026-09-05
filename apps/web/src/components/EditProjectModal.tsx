@@ -91,7 +91,7 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
         window.location.reload();
       }
     } catch {
-      setError("Proje güncellenemedi. Tekrar dene.");
+      setError(t("Proje güncellenemedi. Tekrar dene."));
       setLoading(false);
     }
   };

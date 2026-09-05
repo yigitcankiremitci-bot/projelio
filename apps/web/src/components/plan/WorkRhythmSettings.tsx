@@ -43,7 +43,7 @@ export default function WorkRhythmSettings() {
         setSaved(p);
         setDraft(p);
       })
-      .catch(() => setError("Çalışma ritmi ayarları yüklenemedi."));
+      .catch(() => setError(t("Çalışma ritmi ayarları yüklenemedi.")));
   }, []);
 
   const dirty = useMemo(

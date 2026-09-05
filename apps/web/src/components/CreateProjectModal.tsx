@@ -52,7 +52,7 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
       if (onCreated) onCreated();
       else window.location.reload();
     } catch {
-      setError("Proje oluşturulamadı. Tekrar dene.");
+      setError(t("Proje oluşturulamadı. Tekrar dene."));
       setLoading(false);
     }
   };

@@ -27,7 +27,7 @@ export default function CreateBudgetTransactionModal({ projectId, transaction, o
     e.preventDefault();
     const parsedAmount = Number(amount);
     if (!parsedAmount || parsedAmount <= 0) {
-      setError("Geçerli bir tutar gir.");
+      setError(t("Geçerli bir tutar gir."));
       return;
     }
     setError("");

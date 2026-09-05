@@ -29,7 +29,7 @@ export default function CreateGroupModal({ onClose, onCreated }: Props) {
       if (onCreated) onCreated();
       else window.location.reload();
     } catch {
-      setError("Grup oluşturulamadı. Tekrar dene.");
+      setError(t("Grup oluşturulamadı. Tekrar dene."));
       setLoading(false);
     }
   };

@@ -52,7 +52,7 @@ export default function CreateOrganizationModal({ onClose, onCreated, fixedGroup
       if (onCreated) onCreated(created);
       else window.location.reload();
     } catch {
-      setError("Organizasyon oluşturulamadı. Tekrar dene.");
+      setError(t("Organizasyon oluşturulamadı. Tekrar dene."));
       setLoading(false);
     }
   };

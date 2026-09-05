@@ -115,7 +115,7 @@ export const filesApi = {
   /**
    * İçerik adresi üretir.
    *
-   * <img src> ve <iframe src> Authorization başlığı gönderemez; bu yüzden önce
+   * <img src> {t("ve")} <iframe src> Authorization başlığı gönderemez; bu yüzden önce
    * 5 dakikalık, tek dosyaya bağlı imzalı bir jeton alıp adrese ekliyoruz.
    */
   contentUrl: async (fileId: string, options: { download?: boolean } = {}) => {

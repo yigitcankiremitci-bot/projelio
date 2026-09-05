@@ -42,6 +42,8 @@ const ONAY_METNI = "HESABIMI SİL";
  * Kullanıcıyı tutmak için engel koymuyoruz; sadece daha ucuz seçenekleri
  * gösteriyoruz. "Devam et" düğmesi her zaman görünür ve tek tık uzakta.
  */
+// dil:anahtar-baslangic — modül düzeyi etiket sabitleri: burada t()
+// çağrılamaz, çeviri render anında yapılıyor.
 const TEKLIFLER = [
   {
     baslik: "Bildirimler mi çok geliyor?",
@@ -62,6 +64,7 @@ const TEKLIFLER = [
     hedef: null,
   },
 ];
+// dil:anahtar-bitis
 
 export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
   const c = useThemeColors();
@@ -141,16 +144,16 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
             {t("Gitmeden önce: aşağıdakilerden biri işine yarayabilir. Hiçbiri değilse aşağıdan devam et.")}
           </p>
 
-          {TEKLIFLER.map((t) => (
-            <div key={t.baslik} style={{ border: `1px solid ${c.border}`, borderRadius: 10, padding: "11px 13px" }}>
-              <p style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{t.baslik}</p>
-              <p style={{ margin: 0, fontSize: 14, color: c.textSecondary, lineHeight: 1.6 }}>{t.metin}</p>
-              {t.dugme && t.hedef && (
+          {TEKLIFLER.map((teklif) => (
+            <div key={t(teklif.baslik)} style={{ border: `1px solid ${c.border}`, borderRadius: 10, padding: "11px 13px" }}>
+              <p style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{t(teklif.baslik)}</p>
+              <p style={{ margin: 0, fontSize: 14, color: c.textSecondary, lineHeight: 1.6 }}>{t(teklif.metin)}</p>
+              {teklif.dugme && teklif.hedef && (
                 <a
-                  href={t.hedef}
+                  href={teklif.hedef}
                   style={{ display: "inline-block", marginTop: 8, fontSize: 14, color: c.primary }}
                 >
-                  {t.dugme} →
+                  {t(teklif.dugme)} →
                 </a>
               )}
             </div>

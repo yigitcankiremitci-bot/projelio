@@ -146,7 +146,7 @@ const DepartmentBudgetPanel = forwardRef<DepartmentBudgetPanelHandle, Props>(fun
     setError("");
     const n = Number(amount);
     if (!amount || Number.isNaN(n) || n <= 0) {
-      setError("Geçerli bir tutar gir");
+      setError(t("Geçerli bir tutar gir"));
       return;
     }
     setSaving(true);

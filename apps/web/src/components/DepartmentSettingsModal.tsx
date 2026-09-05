@@ -72,7 +72,7 @@ export default function DepartmentSettingsModal({
       formData.append("file", resized);
       applyCover(await api.uploadFile<Department>(`/departments/${department.id}/cover`, formData));
     } catch {
-      setCoverError("Kapak yüklenemedi. Tekrar dene.");
+      setCoverError(t("Kapak yüklenemedi. Tekrar dene."));
     } finally {
       setCoverBusy(false);
     }
@@ -84,7 +84,7 @@ export default function DepartmentSettingsModal({
     try {
       applyCover(await api.delete<Department>(`/departments/${department.id}/cover`));
     } catch {
-      setCoverError("Kapak kaldırılamadı. Tekrar dene.");
+      setCoverError(t("Kapak kaldırılamadı. Tekrar dene."));
     } finally {
       setCoverBusy(false);
     }

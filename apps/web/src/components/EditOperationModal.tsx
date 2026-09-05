@@ -97,7 +97,7 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
         window.location.reload();
       }
     } catch {
-      setError("Rutin güncellenemedi. Tekrar dene.");
+      setError(t("Rutin güncellenemedi. Tekrar dene."));
       setLoading(false);
     }
   };

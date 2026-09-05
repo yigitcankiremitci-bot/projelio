@@ -198,7 +198,7 @@ function AddDepartmentForm({
 
   const handleSave = async () => {
     if (selectedKeys.length === 0 && !customName.trim()) {
-      setError("En az bir departman seç ya da özel bir isim gir");
+      setError(t("En az bir departman seç ya da özel bir isim gir"));
       return;
     }
     setError("");

@@ -17,6 +17,8 @@ interface Props {
   access?: ModuleAccess;
 }
 
+// dil:anahtar-baslangic — modül düzeyi etiket sabitleri: burada t()
+// çağrılamaz, çeviri render anında yapılıyor.
 const ROLE_LABELS: Record<ModuleMemberRole, string> = {
   manager: "Modül yöneticisi",
   employee: "Çalışan",
@@ -28,6 +30,8 @@ const ROLE_HINTS: Record<ModuleMemberRole, string> = {
   employee: "Kayıt ekler ve düzenler",
   subcontractor: "Kayıt ekler ve düzenler, ekibi göremez",
 };
+
+// dil:anahtar-bitis
 
 function displayName(m: { fullName?: string; username?: string; email?: string; inviteEmail?: string }): string {
   return m.fullName ?? m.username ?? m.email ?? m.inviteEmail ?? "İsimsiz";
@@ -262,7 +266,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
                   value={m.role}
                   disabled={busyId === m.id}
                   onChange={(e) => changeRole(m.id, e.target.value as ModuleMemberRole)}
-                  title={ROLE_HINTS[m.role]}
+                  title={t(ROLE_HINTS[m.role])}
                   style={{
                     fontSize: 12,
                     color: c.textSecondary,
@@ -274,12 +278,12 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
                 >
                   {(Object.keys(ROLE_LABELS) as ModuleMemberRole[]).map((r) => (
                     <option key={r} value={r}>
-                      {ROLE_LABELS[r]}
+                      {t(ROLE_LABELS[r])}
                     </option>
                   ))}
                 </select>
               ) : (
-                <span style={{ fontSize: 12, color: c.textSecondary }}>{ROLE_LABELS[m.role]}</span>
+                <span style={{ fontSize: 12, color: c.textSecondary }}>{t(ROLE_LABELS[m.role])}</span>
               )}
 
               {canManage && (

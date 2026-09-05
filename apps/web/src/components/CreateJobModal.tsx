@@ -45,7 +45,7 @@ export default function CreateJobModal({ onClose, onCreated }: Props) {
       if (onCreated) onCreated();
       else window.location.reload();
     } catch {
-      setError("İş oluşturulamadı. Tekrar dene.");
+      setError(t("İş oluşturulamadı. Tekrar dene."));
       setLoading(false);
     }
   };

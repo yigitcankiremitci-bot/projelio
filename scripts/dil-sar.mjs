@@ -101,6 +101,21 @@ function sar(kaynak) {
     }
   );
 
+  // 3) Hata/durum ayarlayıcıları: setError("…") → setError(t("…"))
+  //
+  // Bu çağrıların argümanı tanım gereği ekrana çıkan metin; adları da bunu
+  // söylüyor. JSX metni ve görünen öznitelik gibi güvenli bir desen.
+  // `setError(err.message)` gibi değişken alanlara dokunulmuyor: yalnızca
+  // düz dize sabitleri sarılıyor.
+  // `set` + büyük harf: React'in durum ayarlayıcı kuralı. Türkçe bir dize
+  // sabiti veriliyorsa o metin ekrana çıkıyor demektir — değişken alanlara
+  // (setError(err.message)) dokunulmuyor, yalnızca düz dizeler sarılıyor.
+  const durumDeseni = /\b(set[A-Z]\w*|onError)\(\s*"([^"\n]*[çğıöşüÇĞİÖŞÜ][^"\n]*)"\s*\)/g;
+  sonuc = sonuc.replace(durumDeseni, (tam, ad, metin) => {
+    sayac++;
+    return `${ad}(t("${anahtarla(metin)}"))`;
+  });
+
   return { sonuc, sayac };
 }
 

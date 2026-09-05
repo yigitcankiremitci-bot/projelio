@@ -40,7 +40,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
         if (!cancelled) setLocalUrl(url);
       })
       .catch(() => {
-        if (!cancelled) setLoadError("Önizleme yüklenemedi.");
+        if (!cancelled) setLoadError(t("Önizleme yüklenemedi."));
       });
     return () => {
       cancelled = true;

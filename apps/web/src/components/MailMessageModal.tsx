@@ -88,7 +88,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
   const send = async () => {
     if (!replyMode) return;
     if (!replyText.trim()) {
-      setError("Yanıt metni boş olamaz");
+      setError(t("Yanıt metni boş olamaz"));
       return;
     }
     setSending(true);

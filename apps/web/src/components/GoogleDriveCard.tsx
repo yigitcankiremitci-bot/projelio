@@ -32,11 +32,11 @@ export default function GoogleDriveCard() {
     try {
       const { configured, url, blockedBy } = await driveApi.connectUrl("/settings");
       if (blockedBy) {
-        setError("Zaten OneDrive bağlısınız. Değiştirmek için önce OneDrive bağlantısını kaldırın.");
+        setError(t("Zaten OneDrive bağlısınız. Değiştirmek için önce OneDrive bağlantısını kaldırın."));
         return;
       }
       if (!configured || !url) {
-        setError("Google entegrasyonu sunucuda yapılandırılmamış.");
+        setError(t("Google entegrasyonu sunucuda yapılandırılmamış."));
         return;
       }
       window.location.href = url;

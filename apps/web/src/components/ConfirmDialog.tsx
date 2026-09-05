@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   title: string;
@@ -31,6 +32,7 @@ export default function ConfirmDialog({
   onCancel,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -40,7 +42,7 @@ export default function ConfirmDialog({
     try {
       await onConfirm();
     } catch {
-      setError("İşlem gerçekleştirilemedi. Tekrar dene.");
+      setError(t("İşlem gerçekleştirilemedi. Tekrar dene."));
       setLoading(false);
     }
   };

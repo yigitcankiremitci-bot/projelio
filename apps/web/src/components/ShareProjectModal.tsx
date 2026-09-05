@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ProjectShareLink, ProjectShareVisibility } from "@projelio/shared";
 import { projectSharesApi } from "../api/projectShares";
 import { parseServerDate } from "../lib/dates";
+import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
@@ -27,6 +28,8 @@ interface Props {
  * çok daha yüksek.
  */
 
+// dil:anahtar-baslangic — modül düzeyinde sabit, burada t() çağrılamıyor;
+// Türkçe metin ANAHTAR olarak duruyor, çeviri kullanıldığı yerde yapılıyor.
 const SECTIONS: { key: keyof ProjectShareVisibility; label: string; hint: string }[] = [
   { key: "tasks", label: "Görevler", hint: "Görev başlıkları, durumları ve tarihleri" },
   { key: "outputs", label: "Çıktılar", hint: "Projenin çıktı başlıkları" },
@@ -35,6 +38,7 @@ const SECTIONS: { key: keyof ProjectShareVisibility; label: string; hint: string
   { key: "files", label: "Dosya adları", hint: "Yalnızca isim listesi — dosyalar indirilemez" },
   { key: "budget", label: "Bütçe", hint: "Toplam ve harcanan tutar" },
 ];
+// dil:anahtar-bitis
 
 const DEFAULT_VISIBILITY: ProjectShareVisibility = {
   tasks: true,
@@ -46,6 +50,7 @@ const DEFAULT_VISIBILITY: ProjectShareVisibility = {
 };
 
 /** Linkin neden kapandığı — yalnızca sahibin listesinde görünür. */
+// dil:anahtar-baslangic
 const CLOSED_LABEL: Record<NonNullable<ProjectShareLink["closedReason"]>, string> = {
   revoked: "Kapatıldı",
   expired: "Süresi doldu",
@@ -58,9 +63,11 @@ const EXPIRY_OPTIONS: { label: string; days?: number }[] = [
   { label: "30 gün", days: 30 },
   { label: "90 gün", days: 90 },
 ];
+// dil:anahtar-bitis
 
 export default function ShareProjectModal({ projectId, projectTitle, onClose }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [links, setLinks] = useState<ProjectShareLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -83,7 +90,7 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
     projectSharesApi
       .list(projectId)
       .then(setLinks)
-      .catch(() => setError("Linkler yüklenemedi."))
+      .catch(() => setError(t("Linkler yüklenemedi.")))
       .finally(() => setLoading(false));
   };
 
@@ -109,7 +116,7 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
     } catch (err) {
       // Sunucunun mesajı korunuyor: "Geçerli bir e-posta adresi girin" gibi
       // düzeltilebilir hataları "tekrar dene" ile örtmek kullanıcıyı çıkmaza sokar.
-      setError(err instanceof Error && err.message ? err.message : "Link oluşturulamadı. Tekrar dene.");
+      setError(err instanceof Error && err.message ? err.message : t("Link oluşturulamadı. Tekrar dene."));
     } finally {
       setCreating(false);
     }
@@ -123,14 +130,14 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
   };
 
   const sectionSummary = (v: ProjectShareVisibility) => {
-    const on = SECTIONS.filter((s) => v[s.key]).map((s) => s.label);
-    return on.length === 0 ? "Yalnızca özet" : `Özet + ${on.join(", ")}`;
+    const on = SECTIONS.filter((s) => v[s.key]).map((s) => t(s.label));
+    return on.length === 0 ? t("Yalnızca özet") : t("Özet + {bolumler}", { bolumler: on.join(", ") });
   };
 
   return (
     <Modal
-      title="Takip linki"
-      subtitle={`"${projectTitle}" projesini hesabı olmayan kişilere göster. Link salt okunur.`}
+      title={t("Takip linki")}
+      subtitle={t('"{ad}" projesini hesabı olmayan kişilere göster. Link salt okunur.', { ad: projectTitle })}
       onClose={onClose}
       maxWidth={640}
       mobileFullScreen
@@ -140,21 +147,21 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
 
         {/* -------------------------------------------------- Yeni link */}
         <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <h3 style={{ margin: 0, fontSize: 14, color: c.textPrimary }}>Yeni link oluştur</h3>
+          <h3 style={{ margin: 0, fontSize: 14, color: c.textPrimary }}>{t("Yeni link oluştur")}</h3>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 12, color: c.textSecondary }}>Bu link kimin için? (yalnızca sen görürsün)</label>
+            <label style={{ fontSize: 12, color: c.textSecondary }}>{t("Bu link kimin için? (yalnızca sen görürsün)")}</label>
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder="Örn. Müşteri — Ahmet Bey"
+              placeholder={t("Örn. Müşteri — Ahmet Bey")}
               style={{ width: "100%", fontSize: 13, padding: "6px 8px" }}
             />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 12, color: c.textSecondary }}>
-              E-posta sorulsun mu? (isteğe bağlı)
+              {t("E-posta sorulsun mu? (isteğe bağlı)")}
             </label>
             <input
               type="email"
@@ -167,13 +174,14 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
             {/* Kapının ne olduğu ve ne OLMADIĞI burada yazılı: sahibi bunu bir
                 kimlik doğrulaması sanıp bütçeyi açarsa yanlış bir güven kurmuş olur. */}
             <span style={{ fontSize: 11, color: c.textSecondary, lineHeight: 1.6 }}>
-              Doldurursan sayfa açılmadan önce bu adres sorulur; link başkasına iletilse de
-              adresi bilmeyen açamaz. Bir şifre değildir — adresi bilen herkes geçer.
+              {t(
+                "Doldurursan sayfa açılmadan önce bu adres sorulur; link başkasına iletilse de adresi bilmeyen açamaz. Bir şifre değildir — adresi bilen herkes geçer."
+              )}
             </span>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 12, color: c.textSecondary }}>Neler görünsün?</label>
+            <label style={{ fontSize: 12, color: c.textSecondary }}>{t("Neler görünsün?")}</label>
             {/* Özet her linkte var: kapatılabilseydi geriye boş bir sayfa kalırdı. */}
             <div
               style={{
@@ -185,7 +193,7 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
                 padding: "6px 10px",
               }}
             >
-              Proje adı, durumu, tarihleri ve ilerleme yüzdesi her linkte görünür.
+              {t("Proje adı, durumu, tarihleri ve ilerleme yüzdesi her linkte görünür.")}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>
               {SECTIONS.map((s) => (
@@ -208,8 +216,8 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
                     style={{ marginTop: 2 }}
                   />
                   <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <span style={{ fontSize: 13, color: c.textPrimary }}>{s.label}</span>
-                    <span style={{ fontSize: 11, color: c.textSecondary }}>{s.hint}</span>
+                    <span style={{ fontSize: 13, color: c.textPrimary }}>{t(s.label)}</span>
+                    <span style={{ fontSize: 11, color: c.textSecondary }}>{t(s.hint)}</span>
                   </span>
                 </label>
               ))}
@@ -217,7 +225,7 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 12, color: c.textSecondary }}>Geçerlilik</label>
+            <label style={{ fontSize: 12, color: c.textSecondary }}>{t("Geçerlilik")}</label>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {EXPIRY_OPTIONS.map((o, i) => (
                 <button
@@ -233,12 +241,12 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
                     color: c.textPrimary,
                   }}
                 >
-                  {o.label}
+                  {t(o.label)}
                 </button>
               ))}
             </div>
             <span style={{ fontSize: 11, color: c.textSecondary }}>
-              Süreden bağımsız olarak, proje tamamlandığında link kendiliğinden kapanır.
+              {t("Süreden bağımsız olarak, proje tamamlandığında link kendiliğinden kapanır.")}
             </span>
           </div>
 
@@ -259,17 +267,17 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
               cursor: creating ? "default" : "pointer",
             }}
           >
-            {creating ? "Oluşturuluyor…" : "Link oluştur"}
+            {creating ? t("Oluşturuluyor…") : t("Link oluştur")}
           </button>
         </section>
 
         {/* -------------------------------------------------- Mevcut linkler */}
         <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <h3 style={{ margin: 0, fontSize: 14, color: c.textPrimary }}>Oluşturulmuş linkler</h3>
+          <h3 style={{ margin: 0, fontSize: 14, color: c.textPrimary }}>{t("Oluşturulmuş linkler")}</h3>
           {loading ? (
-            <span style={{ fontSize: 13, color: c.textSecondary }}>Yükleniyor…</span>
+            <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Yükleniyor…")}</span>
           ) : links.length === 0 ? (
-            <span style={{ fontSize: 13, color: c.textSecondary }}>Henüz link oluşturmadın.</span>
+            <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Henüz link oluşturmadın.")}</span>
           ) : (
             links.map((link) => (
               <div
@@ -287,16 +295,16 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 13, color: c.textPrimary, flex: 1, minWidth: 0 }}>
-                    {link.label ?? "Adsız link"}
+                    {link.label ?? t("Adsız link")}
                   </span>
                   {!link.active && (
-                    <span style={{ fontSize: 11, color: c.danger }}>{CLOSED_LABEL[link.closedReason ?? "expired"]}</span>
+                    <span style={{ fontSize: 11, color: c.danger }}>{t(CLOSED_LABEL[link.closedReason ?? "expired"])}</span>
                   )}
                   {link.active && (
                     <button
                       onClick={() => setRevoking(link)}
-                      title="Linki kapat"
-                      aria-label="Linki kapat"
+                      title={t("Linki kapat")}
+                      aria-label={t("Linki kapat")}
                       style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}
                     >
                       <IconTrash size={15} color={c.textSecondary} />
@@ -308,18 +316,24 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
 
                 <div style={{ fontSize: 11, color: c.textSecondary, display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <span>{sectionSummary(link.visibility)}</span>
-                  {link.recipientEmail && <span>Kapı: {link.recipientEmail}</span>}
+                  {link.recipientEmail && <span>{t("Kapı: {adres}", { adres: link.recipientEmail })}</span>}
                   <span>
-                    {link.viewCount === 0
-                      ? "Henüz açılmadı"
-                      : `${link.viewCount} kez açıldı${
-                          link.lastViewedAt
-                            ? ` · son: ${parseServerDate(link.lastViewedAt).toLocaleDateString("tr-TR")}`
-                            : ""
-                        }`}
+                    {link.viewCount === 0 ? (
+                      t("Henüz açılmadı")
+                    ) : (
+                      <>
+                        {t("{n} kez açıldı", { n: link.viewCount })}
+                        {link.lastViewedAt &&
+                          ` · ${t("son: {tarih}", {
+                            tarih: parseServerDate(link.lastViewedAt).toLocaleDateString("tr-TR"),
+                          })}`}
+                      </>
+                    )}
                   </span>
                   {link.expiresAt && link.active && (
-                    <span>Bitiş: {parseServerDate(link.expiresAt).toLocaleDateString("tr-TR")}</span>
+                    <span>
+                      {t("Bitiş: {tarih}", { tarih: parseServerDate(link.expiresAt).toLocaleDateString("tr-TR") })}
+                    </span>
                   )}
                 </div>
               </div>
@@ -330,11 +344,12 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
 
       {revoking && (
         <ConfirmDialog
-          title="Link kapatılsın mı?"
-          message={`${
-            revoking.label ? `"${revoking.label}" ` : ""
-          }linkini kapatırsan, bu adresi daha önce gönderdiğin kişiler projeyi artık göremez. Bu işlem geri alınamaz; gerekirse yeni bir link oluşturabilirsin.`}
-          confirmLabel="Linki kapat"
+          title={t("Link kapatılsın mı?")}
+          message={t(
+            "{ad}linkini kapatırsan, bu adresi daha önce gönderdiğin kişiler projeyi artık göremez. Bu işlem geri alınamaz; gerekirse yeni bir link oluşturabilirsin.",
+            { ad: revoking.label ? `"${revoking.label}" ` : "" }
+          )}
+          confirmLabel={t("Linki kapat")}
           onConfirm={() => handleRevoke(revoking)}
           onCancel={() => setRevoking(null)}
         />
@@ -346,6 +361,7 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
 /** Az önce oluşturulan link — kullanıcının aradığı tek şey bu, en üstte durur. */
 function CreatedLinkBox({ link }: { link: ProjectShareLink }) {
   const c = useThemeColors();
+  const t = useT();
   return (
     <div
       style={{
@@ -358,7 +374,7 @@ function CreatedLinkBox({ link }: { link: ProjectShareLink }) {
         gap: 8,
       }}
     >
-      <span style={{ fontSize: 13, color: c.textPrimary }}>Link hazır — kopyalayıp gönderebilirsin.</span>
+      <span style={{ fontSize: 13, color: c.textPrimary }}>{t("Link hazır — kopyalayıp gönderebilirsin.")}</span>
       <CopyRow url={link.url} />
     </div>
   );
@@ -373,6 +389,7 @@ function CreatedLinkBox({ link }: { link: ProjectShareLink }) {
  */
 function CopyRow({ url }: { url: string }) {
   const c = useThemeColors();
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -418,7 +435,7 @@ function CopyRow({ url }: { url: string }) {
         }}
       >
         <IconCopy size={14} color={c.textSecondary} />
-        {copied ? "Kopyalandı" : "Kopyala"}
+        {copied ? t("Kopyalandı") : t("Kopyala")}
       </button>
     </div>
   );

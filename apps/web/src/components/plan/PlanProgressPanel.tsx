@@ -1,6 +1,7 @@
 import type { PlanPeriodProgress } from "@projelio/shared";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { formatDuration } from "../../lib/planGrid";
+import { useT } from "../../lib/i18n";
 
 interface Props {
   progress: PlanPeriodProgress;
@@ -21,6 +22,7 @@ interface Props {
  */
 export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const rows = progress.rows;
   const hasTargets = rows.some((r) => r.sharePct != null || r.targetMinutes != null || r.targetCount != null);
 
@@ -34,7 +36,7 @@ export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: c.textPrimary }}>Dağılım</h2>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{t("Dağılım")}</h2>
         <button
           onClick={onEditTargets}
           style={{
@@ -47,7 +49,7 @@ export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount
             cursor: "pointer",
           }}
         >
-          Hedefleri düzenle
+          {t("Hedefleri düzenle")}
         </button>
       </div>
 
@@ -92,7 +94,7 @@ export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 5 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 4, background: color, flexShrink: 0 }} />
                 <span style={{ fontSize: 13, color: c.textPrimary, fontWeight: 500 }}>{name}</span>
-                {unplanned && <span style={{ fontSize: 11, color: c.textSecondary }}>plan dışı</span>}
+                {unplanned && <span style={{ fontSize: 11, color: c.textSecondary }}>{t("plan dışı")}</span>}
                 <span style={{ marginLeft: "auto", fontSize: 12, color: c.textSecondary }}>
                   {row.sharePct != null && `hedef %${Math.round(row.sharePct)} · `}
                   {formatDuration(row.doneMinutes)} / {formatDuration(row.plannedMinutes)}
@@ -109,7 +111,7 @@ export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount
                 color={color}
                 muted
               />
-              <Bar label="yapılan" pct={row.doneSharePct ?? 0} targetPct={row.sharePct} color={color} />
+              <Bar label={t("yapılan")} pct={row.doneSharePct ?? 0} targetPct={row.sharePct} color={color} />
 
               {row.targetCount != null && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7 }}>

@@ -18,6 +18,7 @@ import {
   tightestLimit,
   toDateTimeLocal,
 } from "../lib/socialMedia";
+import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
@@ -94,10 +95,15 @@ export default function SocialPostComposer({
   onDeleted,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [form, setForm] = useState<FormState>(() => initialForm(post, defaultDate));
-  const [selected, setSelected] = useState<string[]>(() => (post?.targets ?? []).map((t) => t.accountId));
+  const [selected, setSelected] = useState<string[]>(() => (post?.targets ?? []).map((hedef) => hedef.accountId));
   const [overrides, setOverrides] = useState<Record<string, string>>(() =>
-    Object.fromEntries((post?.targets ?? []).filter((t) => t.captionOverride).map((t) => [t.accountId, t.captionOverride as string]))
+    Object.fromEntries(
+      (post?.targets ?? [])
+        .filter((hedef) => hedef.captionOverride)
+        .map((hedef) => [hedef.accountId, hedef.captionOverride as string])
+    )
   );
   const [openOverride, setOpenOverride] = useState<string | null>(null);
   // Kaydedilmiş gönderi: yeni içerikte medya yüklenince burada doğar.
@@ -180,7 +186,7 @@ export default function SocialPostComposer({
 
   /** Kayıt yoksa açar, varsa günceller. Medya yüklemesi de bunu kullanır. */
   const persist = async (): Promise<SocialPost> => {
-    if (!form.title.trim()) throw new Error("Başlık gerekli");
+    if (!form.title.trim()) throw new Error(t("Başlık gerekli"));
     const next = saved
       ? await socialMediaApi.updatePost(saved.id, body())
       : await socialMediaApi.createPost(scope, body());
@@ -201,7 +207,7 @@ export default function SocialPostComposer({
       }
       setSaved(current);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Dosya yüklenemedi");
+      setError(err instanceof Error ? err.message : t("Dosya yüklenemedi"));
     } finally {
       setUploading(false);
       setUploadPct(0);
@@ -216,7 +222,7 @@ export default function SocialPostComposer({
       // Bağ koptu, dosya Drive'da duruyor: listeden düşürmek yeterli.
       setSaved({ ...saved, media: saved.media.filter((m) => m.id !== mediaId) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Medya kaldırılamadı");
+      setError(err instanceof Error ? err.message : t("Medya kaldırılamadı"));
     }
   };
 
@@ -227,7 +233,7 @@ export default function SocialPostComposer({
       onSaved(await persist());
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "İçerik kaydedilemedi");
+      setError(err instanceof Error ? err.message : t("İçerik kaydedilemedi"));
     } finally {
       setSaving(false);
     }
@@ -252,11 +258,11 @@ export default function SocialPostComposer({
       onSaved(refreshed);
       setNotice(
         failed === 0
-          ? `${published} kanalda yayımlandı.`
-          : `${published} kanalda yayımlandı, ${failed} kanalda hata var.`
+          ? t("{n} kanalda yayımlandı.", { n: published })
+          : t("{n} kanalda yayımlandı, {hata} kanalda hata var.", { n: published, hata: failed })
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Yayımlanamadı");
+      setError(err instanceof Error ? err.message : t("Yayımlanamadı"));
     } finally {
       setPublishing(false);
     }
@@ -264,7 +270,7 @@ export default function SocialPostComposer({
 
   /** Hesap → yayın hedefi. Bağlı kanalların durumu chip'lerde gösteriliyor. */
   const targetByAccount = useMemo(
-    () => new Map((saved?.targets ?? []).map((t) => [t.accountId, t])),
+    () => new Map((saved?.targets ?? []).map((hedef) => [hedef.accountId, hedef])),
     [saved]
   );
 
@@ -309,8 +315,8 @@ export default function SocialPostComposer({
 
   return (
     <Modal
-      title={post ? "İçeriği düzenle" : "Yeni içerik"}
-      subtitle="Metin, görsel ve yayın planı. Kanal seçtikçe karakter sınırı ona göre uyarır."
+      title={post ? t("İçeriği düzenle") : t("Yeni içerik")}
+      subtitle={t("Metin, görsel ve yayın planı. Kanal seçtikçe karakter sınırı ona göre uyarır.")}
       onClose={onClose}
       // Bu pencere bir form değil bir çalışma alanı: metin, etiketler, kanal
       // başına ayrı metinler ve medya aynı anda görünmeli. Dar ekranda zaten
@@ -322,10 +328,10 @@ export default function SocialPostComposer({
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {/* ---------------------------------------------- Kanallar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {label("Kanallar")}
+          {label(t("Kanallar"))}
           {accounts.length === 0 ? (
             <span style={{ fontSize: 12, color: c.textSecondary }}>
-              Henüz hesap yok. "Hesaplar" sekmesinden ekleyince burada seçilebilir.
+              {t('Henüz hesap yok. "Hesaplar" sekmesinden ekleyince burada seçilebilir.')}
             </span>
           ) : (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -363,13 +369,13 @@ export default function SocialPostComposer({
                       }}
                     />
                     {accountLabel(a)}
-                    <span style={{ color: c.textSecondary }}>{SOCIAL_PLATFORMS[a.platform].label}</span>
+                    <span style={{ color: c.textSecondary }}>{t(SOCIAL_PLATFORMS[a.platform].label)}</span>
                     {target && target.status !== "pending" && (
                       <span style={{ color: TARGET_STATUS[target.status].color }}>
-                        · {TARGET_STATUS[target.status].label}
+                        · {t(TARGET_STATUS[target.status].label)}
                       </span>
                     )}
-                    {canAutoPublish(a) && !target && <span style={{ color: c.success }}>· bağlı</span>}
+                    {canAutoPublish(a) && !target && <span style={{ color: c.success }}>{t("· bağlı")}</span>}
                   </button>
                 );
               })}
@@ -380,24 +386,24 @@ export default function SocialPostComposer({
         {/* ---------------------------------------------- Başlık + tür */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <div style={{ flex: "2 1 240px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("Başlık * (iç kullanım — takvimde görünür)")}
+            {label(t("Başlık * (iç kullanım — takvimde görünür)"))}
             <input
               value={form.title}
               onChange={(e) => set("title", e.target.value)}
-              placeholder="Ağustos kampanyası — 2. gönderi"
+              placeholder={t("Ağustos kampanyası — 2. gönderi")}
               style={field}
             />
           </div>
           <div style={{ flex: "1 1 150px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("İçerik türü")}
+            {label(t("İçerik türü"))}
             <select
               value={form.contentType}
               onChange={(e) => set("contentType", e.target.value as SocialContentType)}
               style={field}
             >
-              {CONTENT_TYPE_ORDER.map((t) => (
-                <option key={t} value={t}>
-                  {CONTENT_TYPES[t]}
+              {CONTENT_TYPE_ORDER.map((tur) => (
+                <option key={tur} value={tur}>
+                  {t(CONTENT_TYPES[tur])}
                 </option>
               ))}
             </select>
@@ -407,17 +413,18 @@ export default function SocialPostComposer({
         {/* ---------------------------------------------- Metin */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-            {label("Açıklama metni")}
+            {label(t("Açıklama metni"))}
             <span style={{ fontSize: 11, color: overLimit ? c.danger : c.textSecondary }}>
-              {length}
-              {limit !== undefined ? ` / ${limit}` : ""} karakter
-              {overLimit ? " — en dar kanalın sınırı aşıldı" : ""}
+              {limit !== undefined
+                ? t("{n} / {sinir} karakter", { n: length, sinir: limit })
+                : t("{n} karakter", { n: length })}
+              {overLimit ? " — " + t("en dar kanalın sınırı aşıldı") : ""}
             </span>
           </div>
           <textarea
             value={form.caption}
             onChange={(e) => set("caption", e.target.value)}
-            placeholder="Yayımlanacak metin…"
+            placeholder={t("Yayımlanacak metin…")}
             // Asıl yazılan alan burası: 6 satırda uzun bir gönderi metni
             // kutuya sığmıyor, kullanıcı kendi yazdığını görmek için kutunun
             // içinde kaydırmak zorunda kalıyordu.
@@ -429,8 +436,10 @@ export default function SocialPostComposer({
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <div style={{ flex: "2 1 240px", display: "flex", flexDirection: "column", gap: 4 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-              {label("Etiketler")}
-              <span style={{ fontSize: 11, color: c.textSecondary }}>{hashtagCount(form.hashtags)} etiket</span>
+              {label(t("Etiketler"))}
+              <span style={{ fontSize: 11, color: c.textSecondary }}>
+                {t("{n} etiket", { n: hashtagCount(form.hashtags) })}
+              </span>
             </div>
             <input
               value={form.hashtags}
@@ -440,7 +449,7 @@ export default function SocialPostComposer({
             />
           </div>
           <div style={{ flex: "1 1 180px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("Bağlantı")}
+            {label(t("Bağlantı"))}
             <input
               value={form.linkUrl}
               onChange={(e) => set("linkUrl", e.target.value)}
@@ -453,11 +462,11 @@ export default function SocialPostComposer({
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {/* Etiketleri gövdeden ayırıp ilk yoruma taşımak yaygın bir düzen;
               alanı ayrı tutmak yayımlarken kes-yapıştır hatasını önlüyor. */}
-          {label("İlk yorum (isteğe bağlı)")}
+          {label(t("İlk yorum (isteğe bağlı)"))}
           <textarea
             value={form.firstComment}
             onChange={(e) => set("firstComment", e.target.value)}
-            placeholder="Etiketler ya da ek bilgi — gönderiden hemen sonra yorum olarak eklenir"
+            placeholder={t("Etiketler ya da ek bilgi — gönderiden hemen sonra yorum olarak eklenir")}
             rows={3}
             style={cokSatirli}
           />
@@ -466,7 +475,7 @@ export default function SocialPostComposer({
         {/* ---------------------------------------------- Kanala özel metin */}
         {selected.length > 1 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {label("Kanala özel metin (boşsa ortak metin kullanılır)")}
+            {label(t("Kanala özel metin (boşsa ortak metin kullanılır)"))}
             {accounts
               .filter((a) => selected.includes(a.id))
               .map((a) => {
@@ -493,7 +502,7 @@ export default function SocialPostComposer({
                       <span style={{ width: 8, height: 8, borderRadius: 999, background: accountColor(a) }} />
                       {accountLabel(a)}
                       <span style={{ marginLeft: "auto", color: value ? c.primary : c.textSecondary }}>
-                        {value ? `özel metin · ${value.length}` : "ortak metin"}
+                        {value ? t("özel metin · {n}", { n: value.length }) : t("ortak metin")}
                       </span>
                     </button>
                     {open && (
@@ -501,7 +510,12 @@ export default function SocialPostComposer({
                         value={value}
                         onChange={(e) => setOverrides((o) => ({ ...o, [a.id]: e.target.value }))}
                         placeholder={
-                          platformLimit ? `${SOCIAL_PLATFORMS[a.platform].label} için (en fazla ${platformLimit})` : "Bu kanal için metin"
+                          platformLimit
+                            ? t("{kanal} için (en fazla {sinir})", {
+                                kanal: t(SOCIAL_PLATFORMS[a.platform].label),
+                                sinir: platformLimit,
+                              })
+                            : t("Bu kanal için metin")
                         }
                         rows={5}
                         style={{ ...cokSatirli, marginTop: 6 }}
@@ -515,7 +529,7 @@ export default function SocialPostComposer({
 
         {/* ---------------------------------------------- Medya */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {label("Görsel / video")}
+          {label(t("Görsel / video"))}
           {media.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {media.map((m) => (
@@ -546,7 +560,7 @@ export default function SocialPostComposer({
                       />
                     ) : (
                       <span style={{ fontSize: 11, color: c.textSecondary, padding: 6, textAlign: "center" }}>
-                        {m.mimeType?.startsWith("video/") ? "Video" : "Dosya"}
+                        {m.mimeType?.startsWith("video/") ? t("Video") : t("Dosya")}
                       </span>
                     )}
                   </div>
@@ -562,7 +576,7 @@ export default function SocialPostComposer({
                         flex: 1,
                       }}
                     >
-                      {m.name ?? "dosya"}
+                      {m.name ?? t("dosya")}
                     </span>
                     {m.webViewLink && (
                       <a href={m.webViewLink} target="_blank" rel="noreferrer" style={{ display: "flex" }}>
@@ -571,8 +585,8 @@ export default function SocialPostComposer({
                     )}
                     <button
                       onClick={() => removeMedia(m.id)}
-                      aria-label="Medyayı kaldır"
-                      title="Gönderiden kaldır (dosya silinmez)"
+                      aria-label={t("Medyayı kaldır")}
+                      title={t("Gönderiden kaldır (dosya silinmez)")}
                       style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, display: "flex" }}
                     >
                       <IconTrash size={12} color={c.textSecondary} />
@@ -610,15 +624,19 @@ export default function SocialPostComposer({
                 }}
               >
                 <IconUpload size={14} color={c.textSecondary} />
-                {uploading ? `Yükleniyor… %${uploadPct}` : "Dosya yükle"}
+                {uploading ? t("Yükleniyor… %{n}", { n: uploadPct }) : t("Dosya yükle")}
               </button>
               <span style={{ fontSize: 11, color: c.textSecondary }}>
-                Dosyalar {"jobId" in scope ? "işin" : "departmanın"} dosya alanına yüklenir, buraya bağlanır.
+                {"jobId" in scope
+                  ? t("Dosyalar işin dosya alanına yüklenir, buraya bağlanır.")
+                  : t("Dosyalar departmanın dosya alanına yüklenir, buraya bağlanır.")}
               </span>
             </div>
           ) : (
             <span style={{ fontSize: 12, color: c.textSecondary }}>
-              Dosya yüklemek için modülün bir departmanda etkin olması gerekiyor — dosyalar departmanın klasörüne gider.
+              {t(
+                "Dosya yüklemek için modülün bir departmanda etkin olması gerekiyor — dosyalar departmanın klasörüne gider."
+              )}
             </span>
           )}
         </div>
@@ -626,7 +644,7 @@ export default function SocialPostComposer({
         {/* ---------------------------------------------- Plan */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 190px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("Yayın zamanı")}
+            {label(t("Yayın zamanı"))}
             <input
               type="datetime-local"
               value={form.scheduledAt}
@@ -635,7 +653,7 @@ export default function SocialPostComposer({
             />
           </div>
           <div style={{ flex: "1 1 150px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("Durum")}
+            {label(t("Durum"))}
             <select
               value={form.status}
               onChange={(e) => set("status", e.target.value as SocialPostStatus)}
@@ -643,16 +661,16 @@ export default function SocialPostComposer({
             >
               {STATUS_ORDER.map((s) => (
                 <option key={s} value={s}>
-                  {SOCIAL_STATUS[s].label}
+                  {t(SOCIAL_STATUS[s].label)}
                 </option>
               ))}
             </select>
-            <span style={{ fontSize: 11, color: c.textSecondary }}>{SOCIAL_STATUS[form.status].hint}</span>
+            <span style={{ fontSize: 11, color: c.textSecondary }}>{t(SOCIAL_STATUS[form.status].hint)}</span>
           </div>
           <div style={{ flex: "1 1 150px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("Sorumlu")}
+            {label(t("Sorumlu"))}
             <select value={form.assigneeId} onChange={(e) => set("assigneeId", e.target.value)} style={field}>
-              <option value="">Belirtilmedi</option>
+              <option value="">{t("Belirtilmedi")}</option>
               {members.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.label}
@@ -661,11 +679,11 @@ export default function SocialPostComposer({
             </select>
           </div>
           <div style={{ flex: "1 1 150px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("Kampanya")}
+            {label(t("Kampanya"))}
             <input
               value={form.campaign}
               onChange={(e) => set("campaign", e.target.value)}
-              placeholder="Ağustos indirimi"
+              placeholder={t("Ağustos indirimi")}
               style={field}
             />
           </div>
@@ -691,7 +709,7 @@ export default function SocialPostComposer({
                 color: c.danger,
               }}
             >
-              Kaldır
+              {t("Kaldır")}
             </button>
           )}
           {/* Doğrudan yayın yalnızca bağlı kanal varken görünür; elle yönetilen
@@ -713,7 +731,7 @@ export default function SocialPostComposer({
                 opacity: publishing || saving || uploading ? 0.6 : 1,
               }}
             >
-              {publishing ? "Yayımlanıyor…" : `Şimdi paylaş (${publishableAccounts.length})`}
+              {publishing ? t("Yayımlanıyor…") : t("Şimdi paylaş ({n})", { n: publishableAccounts.length })}
             </button>
           )}
           <button
@@ -728,7 +746,7 @@ export default function SocialPostComposer({
               color: c.textSecondary,
             }}
           >
-            Vazgeç
+            {t("Vazgeç")}
           </button>
           <button
             data-primary
@@ -745,16 +763,19 @@ export default function SocialPostComposer({
               opacity: saving || uploading ? 0.6 : 1,
             }}
           >
-            {saving ? "Kaydediliyor…" : "Kaydet"}
+            {saving ? t("Kaydediliyor…") : t("Kaydet")}
           </button>
         </div>
       </div>
 
       {silinecek && post && (
         <ConfirmDialog
-          title="İçerik kaldırılsın mı?"
-          message={`"${post.title}" listeden kaldırılacak. Kayıt siliniyor değil arşivleniyor; gerekirse geri alınabilir.`}
-          confirmLabel="Kaldır"
+          title={t("İçerik kaldırılsın mı?")}
+          message={t(
+            '"{ad}" listeden kaldırılacak. Kayıt siliniyor değil arşivleniyor; gerekirse geri alınabilir.',
+            { ad: post.title }
+          )}
+          confirmLabel={t("Kaldır")}
           onConfirm={remove}
           onCancel={() => setSilinecek(false)}
         />

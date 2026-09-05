@@ -3,6 +3,7 @@ import type { PersonalBoardItem, SchedulableTask } from "@projelio/shared";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { planning } from "../../api/planning";
 import { DRAG_ITEM, shortDayLabel, type DraggedItem } from "../../lib/planGrid";
+import { useT } from "../../lib/i18n";
 
 interface Props {
   /** Kişisel pano: kullanıcının kendi görevleri + kendisine atananlar. */
@@ -29,6 +30,7 @@ type Tab = "mine" | "projects";
  */
 export default function SchedulePickerPanel({ unscheduled }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [tab, setTab] = useState<Tab>("mine");
   const [query, setQuery] = useState("");
   const [tasks, setTasks] = useState<SchedulableTask[] | null>(null);
@@ -64,12 +66,12 @@ export default function SchedulePickerPanel({ unscheduled }: Props) {
   return (
     <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: 16 }}>
       <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
-        <TabButton active={tab === "mine"} onClick={() => setTab("mine")} label="İşlerim" count={unscheduled.length} />
-        <TabButton active={tab === "projects"} onClick={() => setTab("projects")} label="Proje görevleri" />
+        <TabButton active={tab === "mine"} onClick={() => setTab("mine")} label={t("İşlerim")} count={unscheduled.length} />
+        <TabButton active={tab === "projects"} onClick={() => setTab("projects")} label={t("Proje görevleri")} />
       </div>
 
       <p style={{ margin: "0 0 10px", fontSize: 12, color: c.textSecondary }}>
-        Takvime sürükleyerek zaman ayır.
+        {t("Takvime sürükleyerek zaman ayır.")}
       </p>
 
       {tab === "mine" ? (
@@ -120,11 +122,12 @@ function TabButton({
 
 function MineList({ items }: { items: PersonalBoardItem[] }) {
   const c = useThemeColors();
+  const t = useT();
 
   if (items.length === 0) {
     return (
       <p style={{ margin: 0, fontSize: 13, color: c.textSecondary }}>
-        Açık işlerinin hepsine zaman ayırmışsın.
+        {t("Açık işlerinin hepsine zaman ayırmışsın.")}
       </p>
     );
   }
@@ -166,6 +169,7 @@ function ProjectTaskList({
   onQueryChange: (v: string) => void;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Görevler işe göre gruplanıyor: "Pist Prodüksiyon" altında hangi projelerin
@@ -190,7 +194,7 @@ function ProjectTaskList({
         ref={inputRef}
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
-        placeholder="Görev ara…"
+        placeholder={t("Görev ara…")}
         style={{
           width: "100%",
           boxSizing: "border-box",
@@ -205,7 +209,7 @@ function ProjectTaskList({
       />
 
       {loading && tasks === null && (
-        <p style={{ margin: 0, fontSize: 13, color: c.textSecondary }}>Görevler yükleniyor…</p>
+        <p style={{ margin: 0, fontSize: 13, color: c.textSecondary }}>{t("Görevler yükleniyor…")}</p>
       )}
 
       {tasks !== null && tasks.length === 0 && (

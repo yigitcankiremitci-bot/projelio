@@ -5,6 +5,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { planning, type PlanBlockInput } from "../../api/planning";
 import { formatDuration, timeToMinutes } from "../../lib/planGrid";
 import { inputStyle, labelStyle, primaryButton, secondaryButton } from "./PlanTargetsModal";
+import { useT } from "../../lib/i18n";
 
 interface Props {
   /** Var olan blok düzenleniyorsa dolu; yeni blokta boş. */
@@ -25,6 +26,7 @@ interface Props {
  */
 export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSaved }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const editing = Boolean(block);
 
   const [blockDate, setBlockDate] = useState(block?.blockDate ?? draft?.blockDate ?? "");
@@ -97,11 +99,11 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
             marginBottom: 14,
           }}
         >
-          Bağlı iş: <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{block.linkedTitle}</strong>
+          {t("Bağlı iş:")} <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{block.linkedTitle}</strong>
         </div>
       )}
 
-      <label style={labelStyle(c)}>Başlık</label>
+      <label style={labelStyle(c)}>{t("Başlık")}</label>
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
@@ -111,15 +113,15 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
 
       <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
         <div style={{ flex: 1.4 }}>
-          <label style={labelStyle(c)}>Tarih</label>
+          <label style={labelStyle(c)}>{t("Tarih")}</label>
           <input type="date" value={blockDate} onChange={(e) => setBlockDate(e.target.value)} style={inputStyle(c)} />
         </div>
         <div style={{ flex: 1 }}>
-          <label style={labelStyle(c)}>Başlangıç</label>
+          <label style={labelStyle(c)}>{t("Başlangıç")}</label>
           <input type="time" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} style={inputStyle(c)} />
         </div>
         <div style={{ flex: 1 }}>
-          <label style={labelStyle(c)}>Bitiş</label>
+          <label style={labelStyle(c)}>{t("Bitiş")}</label>
           <input type="time" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} style={inputStyle(c)} />
         </div>
       </div>
@@ -127,9 +129,9 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
         {minutes > 0 ? formatDuration(minutes) : "Bitiş saati başlangıçtan sonra olmalı"}
       </div>
 
-      <label style={{ ...labelStyle(c), marginTop: 14 }}>Odak alanı</label>
+      <label style={{ ...labelStyle(c), marginTop: 14 }}>{t("Odak alanı")}</label>
       <select value={focusAreaId} onChange={(e) => setFocusAreaId(e.target.value)} style={inputStyle(c)}>
-        <option value="">— seçilmedi —</option>
+        <option value="">{t("— seçilmedi —")}</option>
         {focusAreas.map((a) => (
           <option key={a.id} value={a.id}>
             {a.name}
@@ -137,10 +139,10 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
         ))}
       </select>
       <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 4 }}>
-        Odak alanı seçilmeyen bloklar dağılım raporunda "plan dışı" görünür.
+        {t("Odak alanı seçilmeyen bloklar dağılım raporunda \"plan dışı\" görünür.")}
       </div>
 
-      <label style={{ ...labelStyle(c), marginTop: 14 }}>Not</label>
+      <label style={{ ...labelStyle(c), marginTop: 14 }}>{t("Not")}</label>
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
@@ -153,12 +155,12 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 18 }}>
         {editing && (
           <button onClick={remove} disabled={saving} style={{ ...secondaryButton(c), color: c.danger, marginRight: "auto" }}>
-            Bloğu sil
+            {t("Bloğu sil")}
           </button>
         )}
         <div style={{ display: "flex", gap: 8, marginLeft: editing ? 0 : "auto" }}>
           <button onClick={onClose} style={secondaryButton(c)}>
-            Vazgeç
+            {t("Vazgeç")}
           </button>
           <button onClick={save} disabled={saving} style={primaryButton(c, saving)}>
             data-primary

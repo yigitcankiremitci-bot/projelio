@@ -166,4 +166,41 @@ export const bildirimler: TranslationDict = {
     one: "Recurring payment — {tutar}, in {n} day",
     other: "Recurring payment — {tutar}, in {n} days",
   },
+  // ─────────────────────────────────────────────── Lio etkinlik akışı
+  //
+  // Lio bir araç çalıştırdıktan sonra panelde beliren satırlar ve onay sonrası
+  // gösterilen sonuç metinleri. Kaydın ADI etiketin dışında birleştiriliyor
+  // ("İş oluşturuldu" + ": Kapak tasarımı"), o yüzden burada yer tutucu yok.
+  "İş oluşturuldu": "Job created",
+  "İş güncellendi": "Job updated",
+  "İş arşivlendi": "Job archived",
+  "Proje oluşturuldu": "Project created",
+  "Proje güncellendi": "Project updated",
+  "Proje arşivlendi": "Project archived",
+  "Organizasyon oluşturuldu": "Organization created",
+  "Organizasyon güncellendi": "Organization updated",
+
+  // Onay gerektiren araçların sonuç metinleri (RESULT_LABELS).
+  "Görev silindi.": "Task deleted.",
+  "Görev arşivlendi.": "Task archived.",
+  "Proje silindi.": "Project deleted.",
+  "Proje arşivlendi.": "Project archived.",
+  "İş silindi.": "Job deleted.",
+  "İş arşivlendi.": "Job archived.",
+  "Çıktı silindi.": "Output deleted.",
+  "Çıktı arşivlendi.": "Output archived.",
+  "Bütçe hareketi eklendi.": "Budget entry added.",
+  "Modül kaydı arşivlendi.": "Module record archived.",
+  "Modül kapatıldı.": "Module turned off.",
+  "Grup silindi.": "Group deleted.",
+  "Grup arşivlendi.": "Group archived.",
+  "Organizasyon silindi.": "Organization deleted.",
+  "Organizasyon arşivlendi.": "Organization archived.",
+  "Departman silindi.": "Department deleted.",
+  "Departman arşivlendi.": "Department archived.",
+  "Rutin silindi.": "Routine deleted.",
+  "Rutin arşivlendi.": "Routine archived.",
+  "Ürün silindi.": "Product deleted.",
+  "Ürün arşivlendi.": "Product archived.",
+  "Destek talebin Projelio ekibine iletildi.": "Your support request has been sent to the Projelio team.",
 };

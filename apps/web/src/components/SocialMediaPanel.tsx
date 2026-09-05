@@ -24,6 +24,7 @@ import {
   postTime,
 } from "../lib/socialMedia";
 import { parseServerDate } from "../lib/dates";
+import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import SocialAccountModal from "./SocialAccountModal";
 import SocialCredentialsModal from "./SocialCredentialsModal";
@@ -56,6 +57,7 @@ type View = "calendar" | "list" | "accounts";
  */
 export default function SocialMediaPanel({ organizationId, departmentId, jobId, canWrite = true }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const havuzScrollRef = useDragScroll<HTMLDivElement>();
   const panoScrollRef = useDragScroll<HTMLDivElement>();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -91,10 +93,10 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   useProjectFabAction(
     canWrite && fabAvailable
       ? {
-          label: "Ekle",
+          label: t("Ekle"),
           options: [
-            { label: "İçerik ekle", onClick: () => setComposer({}) },
-            { label: "Hesap ekle", onClick: () => setAccountModal({}) },
+            { label: t("İçerik ekle"), onClick: () => setComposer({}) },
+            { label: t("Hesap ekle"), onClick: () => setAccountModal({}) },
           ],
         }
       : null,
@@ -111,7 +113,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         setPosts(data.posts);
         setError("");
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Veriler yüklenemedi"))
+      .catch((err) => setError(err instanceof Error ? err.message : t("Veriler yüklenemedi")))
       .finally(() => setLoading(false));
   };
 
@@ -141,8 +143,11 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     const detail = rest.join(":");
     setBanner(
       kind === "connected"
-        ? { kind: "ok", text: `@${detail} hesabı bağlandı. Artık bu hesaba doğrudan yayımlayabilirsiniz.` }
-        : { kind: "error", text: detail || "Instagram bağlantısı tamamlanamadı." }
+        ? {
+            kind: "ok",
+            text: t("@{hesap} hesabı bağlandı. Artık bu hesaba doğrudan yayımlayabilirsiniz.", { hesap: detail }),
+          }
+        : { kind: "error", text: detail || t("Instagram bağlantısı tamamlanamadı.") }
     );
     if (kind === "connected") load();
 
@@ -164,7 +169,10 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         setMembers(
           rows
             .filter((x: any) => x.userId && (x.status ?? "approved") === "approved")
-            .map((x: any) => ({ id: x.userId as string, label: x.fullName ?? x.username ?? x.email ?? "İsimsiz" }))
+            .map((x: any) => ({
+              id: x.userId as string,
+              label: x.fullName ?? x.username ?? x.email ?? t("İsimsiz"),
+            }))
         );
       })
       .catch(() => setMembers([]));
@@ -180,7 +188,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     return posts.filter((p) => {
       if (statusFilter && p.status !== statusFilter) return false;
       if (platformFilter) {
-        const platforms = p.targets.map((t) => accountById.get(t.accountId)?.platform);
+        const platforms = p.targets.map((hedef) => accountById.get(hedef.accountId)?.platform);
         if (!platforms.includes(platformFilter as SocialAccount["platform"])) return false;
       }
       return true;
@@ -200,12 +208,12 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     const waiting = posts.filter((p) => p.status === "ready").length;
     const unscheduled = posts.filter((p) => !p.scheduledAt && p.status !== "published").length;
     return [
-      { label: `${MONTH_LABELS[month]} planı`, value: String(inMonth.length) },
+      { label: t("{ay} planı", { ay: t(MONTH_LABELS[month]) }), value: String(inMonth.length) },
       // "Planlanandan kaçı çıktı" sorusu ancak ikisi yan yana durunca okunur.
-      { label: "Yayımlandı", value: `${published}/${inMonth.length}` },
-      { label: "Onay bekliyor", value: String(waiting) },
-      { label: "Tarihsiz fikir", value: String(unscheduled) },
-      { label: "Hesap", value: String(accounts.filter((a) => a.active).length) },
+      { label: t("Yayımlandı"), value: `${published}/${inMonth.length}` },
+      { label: t("Onay bekliyor"), value: String(waiting) },
+      { label: t("Tarihsiz fikir"), value: String(unscheduled) },
+      { label: t("Hesap"), value: String(accounts.filter((a) => a.active).length) },
     ];
   }, [posts, accounts, cursor]);
 
@@ -218,7 +226,12 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   };
 
   const archivePost = async (post: SocialPost) => {
-    if (!window.confirm(`"${post.title}" kaldırılsın mı? Kayıt arşivlenir, gerekirse geri alınabilir.`)) return;
+    if (
+      !window.confirm(
+        t('"{ad}" kaldırılsın mı? Kayıt arşivlenir, gerekirse geri alınabilir.', { ad: post.title })
+      )
+    )
+      return;
     setPosts((ps) => ps.filter((p) => p.id !== post.id));
     await socialMediaApi.archivePost(post.id).catch(() => load());
   };
@@ -239,24 +252,29 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         `${window.location.pathname}${window.location.search}`
       );
       if (!configured || !url) {
-        setBanner({ kind: "error", text: "Instagram entegrasyonu bu kurulumda yapılandırılmamış." });
+        setBanner({ kind: "error", text: t("Instagram entegrasyonu bu kurulumda yapılandırılmamış.") });
         return;
       }
       window.location.href = url;
     } catch (err) {
-      setBanner({ kind: "error", text: err instanceof Error ? err.message : "Bağlantı başlatılamadı" });
+      setBanner({ kind: "error", text: err instanceof Error ? err.message : t("Bağlantı başlatılamadı") });
     } finally {
       setConnecting(false);
     }
   };
 
   const disconnectInstagram = async (account: SocialAccount) => {
-    if (!window.confirm(`@${account.handle} bağlantısı kesilsin mi? Hesap kaydı ve geçmiş gönderiler kalır.`)) return;
+    if (
+      !window.confirm(
+        t("@{hesap} bağlantısı kesilsin mi? Hesap kaydı ve geçmiş gönderiler kalır.", { hesap: account.handle })
+      )
+    )
+      return;
     try {
       await socialMediaApi.disconnectInstagram(account.id);
       load();
     } catch (err) {
-      setBanner({ kind: "error", text: err instanceof Error ? err.message : "Bağlantı kesilemedi" });
+      setBanner({ kind: "error", text: err instanceof Error ? err.message : t("Bağlantı kesilemedi") });
     }
   };
 
@@ -267,15 +285,20 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
    * çıktığını bilmeli. Bu yüzden mesaj "yayımlandı" değil, sayılarla.
    */
   const publishNow = async (post: SocialPost) => {
-    const connected = post.targets.filter((t) => {
-      const a = accountById.get(t.accountId);
+    const connected = post.targets.filter((hedef) => {
+      const a = accountById.get(hedef.accountId);
       return a && canAutoPublish(a);
     });
     if (connected.length === 0) {
-      setBanner({ kind: "error", text: "Bu içeriğin kanallarından hiçbiri Instagram'a bağlı değil." });
+      setBanner({ kind: "error", text: t("Bu içeriğin kanallarından hiçbiri Instagram'a bağlı değil.") });
       return;
     }
-    if (!window.confirm(`"${post.title}" şimdi ${connected.length} kanalda yayımlansın mı?`)) return;
+    if (
+      !window.confirm(
+        t('"{ad}" şimdi {n} kanalda yayımlansın mı?', { ad: post.title, n: connected.length })
+      )
+    )
+      return;
 
     setPublishing(post.id);
     setBanner(null);
@@ -283,19 +306,30 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       const { published, failed } = await socialMediaApi.publishPost(post.id);
       setBanner(
         failed === 0
-          ? { kind: "ok", text: `${published} kanalda yayımlandı.` }
-          : { kind: "error", text: `${published} kanalda yayımlandı, ${failed} kanalda hata var — içeriği açıp sebebini görebilirsiniz.` }
+          ? { kind: "ok", text: t("{n} kanalda yayımlandı.", { n: published }) }
+          : {
+              kind: "error",
+              text: t("{n} kanalda yayımlandı, {hata} kanalda hata var — içeriği açıp sebebini görebilirsiniz.", {
+                n: published,
+                hata: failed,
+              }),
+            }
       );
       load();
     } catch (err) {
-      setBanner({ kind: "error", text: err instanceof Error ? err.message : "Yayımlanamadı" });
+      setBanner({ kind: "error", text: err instanceof Error ? err.message : t("Yayımlanamadı") });
     } finally {
       setPublishing(null);
     }
   };
 
   const archiveAccount = async (account: SocialAccount) => {
-    if (!window.confirm(`${accountLabel(account)} hesabı arşivlensin mi? Geçmiş gönderiler korunur.`)) return;
+    if (
+      !window.confirm(
+        t("{hesap} hesabı arşivlensin mi? Geçmiş gönderiler korunur.", { hesap: accountLabel(account) })
+      )
+    )
+      return;
     setAccounts((as) => as.filter((a) => a.id !== account.id));
     await socialMediaApi.archiveAccount(account.id).catch(() => load());
   };
@@ -335,20 +369,20 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           whiteSpace: "nowrap",
         }}
       >
-        {meta.label}
+        {t(meta.label)}
       </span>
     );
   };
 
   const channelDots = (post: SocialPost) => (
     <span style={{ display: "inline-flex", gap: 3, alignItems: "center" }}>
-      {post.targets.map((t) => {
-        const a = accountById.get(t.accountId);
+      {post.targets.map((hedef) => {
+        const a = accountById.get(hedef.accountId);
         if (!a) return null;
         return (
           <span
-            key={t.id}
-            title={`${accountLabel(a)} · ${SOCIAL_PLATFORMS[a.platform].label}`}
+            key={hedef.id}
+            title={`${accountLabel(a)} · ${t(SOCIAL_PLATFORMS[a.platform].label)}`}
             style={{ width: 7, height: 7, borderRadius: 999, background: accountColor(a) }}
           />
         );
@@ -413,7 +447,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     const adet = (post.media ?? []).length;
     return (
       <span
-        title={adet > 1 ? `${adet} medya` : (medya.name ?? "medya")}
+        title={adet > 1 ? t("{n} medya", { n: adet }) : (medya.name ?? t("medya"))}
         style={{
           position: "relative",
           flexShrink: 0,
@@ -527,7 +561,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   }[] = [
     ...HAVUZ_STATUSLERI.map((status) => ({
       anahtar: status,
-      baslik: SOCIAL_STATUS[status].label,
+      baslik: t(SOCIAL_STATUS[status].label),
       renk: SOCIAL_STATUS[status].color,
       status,
       tutar: (s: SocialPostStatus) => s === status,
@@ -536,7 +570,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       ? [
           {
             anahtar: "diger",
-            baslik: "Diğer",
+            baslik: t("Diğer"),
             renk: c.textSecondary,
             // Bırakılamaz: "Diğer" bir aşama değil, artakalanların yeri.
             status: null,
@@ -585,17 +619,17 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
             onClick={() => setCursor(new Date(year, month - 1, 1))}
-            aria-label="Önceki ay"
+            aria-label={t("Önceki ay")}
             style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex" }}
           >
             <IconChevronLeft size={16} color={c.textSecondary} />
           </button>
           <span style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, minWidth: 130, textAlign: "center" }}>
-            {MONTH_LABELS[month]} {year}
+            {t(MONTH_LABELS[month])} {year}
           </span>
           <button
             onClick={() => setCursor(new Date(year, month + 1, 1))}
-            aria-label="Sonraki ay"
+            aria-label={t("Sonraki ay")}
             style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, display: "flex" }}
           >
             <IconChevronRight size={16} color={c.textSecondary} />
@@ -604,14 +638,14 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
             onClick={() => setCursor(new Date())}
             style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
           >
-            Bugün
+            {t("Bugün")}
           </button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 1 }}>
           {WEEKDAY_LABELS.map((w) => (
             <div key={w} style={{ fontSize: 11, color: c.textSecondary, padding: "2px 4px" }}>
-              {w}
+              {t(w)}
             </div>
           ))}
           {days.map((d) => {
@@ -667,8 +701,10 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           }}
         >
           <span style={{ fontSize: 12, color: c.textSecondary }}>
-            Fikir havuzu ({unscheduled.length}) — takvimden buraya sürükleyerek tarihi kaldırır,
-            sütunlar arasında sürükleyerek durumunu değiştirirsin
+            {t(
+              "Fikir havuzu ({n}) — takvimden buraya sürükleyerek tarihi kaldırır, sütunlar arasında sürükleyerek durumunu değiştirirsin",
+              { n: unscheduled.length }
+            )}
           </span>
           <div ref={havuzScrollRef} style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
             {havuzSutunlari.map((sutun) => {
@@ -700,7 +736,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                     <span style={{ fontSize: 11, color: c.textSecondary }}>{items.length}</span>
                   </div>
                   {items.length === 0 && (
-                    <span style={{ fontSize: 11, color: c.textSecondary }}>Buraya sürükle</span>
+                    <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Buraya sürükle")}</span>
                   )}
                   {items.map((p) => (
                     <div key={p.id} style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
@@ -708,8 +744,8 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                       {canWrite && (
                         <button
                           onClick={() => archivePost(p)}
-                          aria-label="Kaldır"
-                          title="Kaldır"
+                          aria-label={t("Kaldır")}
+                          title={t("Kaldır")}
                           style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
                         >
                           <IconTrash size={12} color={c.textSecondary} />
@@ -734,43 +770,49 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
    * hesaplarda ekranı anlamsız yere doldururdu.
    */
   const publishRow = (post: SocialPost) => {
-    const auto = post.targets.filter((t) => {
-      const a = accountById.get(t.accountId);
+    const auto = post.targets.filter((hedef) => {
+      const a = accountById.get(hedef.accountId);
       return a && canAutoPublish(a);
     });
-    const failed = post.targets.filter((t) => t.status === "failed");
-    const published = post.targets.filter((t) => t.status === "published");
+    const failed = post.targets.filter((hedef) => hedef.status === "failed");
+    const published = post.targets.filter((hedef) => hedef.status === "published");
     if (auto.length === 0 && failed.length === 0 && published.length === 0) return null;
 
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", paddingLeft: 6 }}>
-        {published.map((t) => {
-          const a = accountById.get(t.accountId);
-          return t.externalUrl ? (
+        {published.map((hedef) => {
+          const a = accountById.get(hedef.accountId);
+          const etiket = t("{kanal} yayında", { kanal: a ? `@${a.handle}` : t("Kanal") });
+          return hedef.externalUrl ? (
             <a
-              key={t.id}
-              href={safeExternalUrl(t.externalUrl) ?? undefined}
+              key={hedef.id}
+              href={safeExternalUrl(hedef.externalUrl) ?? undefined}
               target="_blank"
               rel="noreferrer"
               style={{ fontSize: 10, color: TARGET_STATUS.published.color, display: "flex", alignItems: "center", gap: 3 }}
             >
-              {a ? `@${a.handle}` : "Kanal"} yayında
+              {etiket}
               <IconExternalLink size={10} color={TARGET_STATUS.published.color} />
             </a>
           ) : (
-            <span key={t.id} style={{ fontSize: 10, color: TARGET_STATUS.published.color }}>
-              {a ? `@${a.handle}` : "Kanal"} yayında
+            <span key={hedef.id} style={{ fontSize: 10, color: TARGET_STATUS.published.color }}>
+              {etiket}
             </span>
           );
         })}
 
-        {failed.map((t) => (
-          <span key={t.id} title={t.errorMessage} style={{ fontSize: 10, color: TARGET_STATUS.failed.color }}>
-            {accountById.get(t.accountId)?.handle ?? "kanal"}: {t.errorMessage ?? "yayımlanamadı"}
+        {failed.map((hedef) => (
+          <span
+            key={hedef.id}
+            title={hedef.errorMessage}
+            style={{ fontSize: 10, color: TARGET_STATUS.failed.color }}
+          >
+            {accountById.get(hedef.accountId)?.handle ?? t("kanal")}:{" "}
+            {hedef.errorMessage ?? t("yayımlanamadı")}
           </span>
         ))}
 
-        {canWrite && auto.some((t) => t.status !== "published") && (
+        {canWrite && auto.some((hedef) => hedef.status !== "published") && (
           <button
             onClick={() => publishNow(post)}
             disabled={publishing === post.id}
@@ -784,7 +826,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               color: c.primary,
             }}
           >
-            {publishing === post.id ? "Yayımlanıyor…" : "Şimdi paylaş"}
+            {publishing === post.id ? t("Yayımlanıyor…") : t("Şimdi paylaş")}
           </button>
         )}
       </div>
@@ -817,7 +859,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
             >
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 12, fontWeight: 500, color: SOCIAL_STATUS[status].color }}>
-                  {SOCIAL_STATUS[status].label}
+                  {t(SOCIAL_STATUS[status].label)}
                 </span>
                 <span style={{ fontSize: 11, color: c.textSecondary }}>{items.length}</span>
               </div>
@@ -828,8 +870,8 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                     {canWrite && (
                       <button
                         onClick={() => archivePost(p)}
-                        aria-label="Arşivle"
-                        title="Arşivle"
+                        aria-label={t("Arşivle")}
+                        title={t("Arşivle")}
                         style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
                       >
                         <IconTrash size={12} color={c.textSecondary} />
@@ -852,7 +894,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 720 }}>
       {accounts.length === 0 && (
         <span style={{ fontSize: 13, color: c.textSecondary }}>
-          Henüz hesap eklenmedi. İçerik planlamadan önce en az bir kanal ekleyin.
+          {t("Henüz hesap eklenmedi. İçerik planlamadan önce en az bir kanal ekleyin.")}
         </span>
       )}
 
@@ -872,9 +914,9 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           }}
         >
           <span style={{ fontSize: 13, color: c.textPrimary, flex: "1 1 260px", lineHeight: 1.5 }}>
-            Instagram hesabınızı bağlayın — planladığınız içerikler saati gelince kendiliğinden yayımlansın.
+            {t("Instagram hesabınızı bağlayın — planladığınız içerikler saati gelince kendiliğinden yayımlansın.")}
             <span style={{ display: "block", fontSize: 12, color: c.textSecondary }}>
-              Instagram'ın profesyonel (işletme/içerik üretici) hesabı gerekiyor.
+              {t("Instagram'ın profesyonel (işletme/içerik üretici) hesabı gerekiyor.")}
             </span>
           </span>
           <button
@@ -891,7 +933,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               opacity: connecting ? 0.6 : 1,
             }}
           >
-            {connecting ? "Yönlendiriliyor…" : "Instagram'ı bağla"}
+            {connecting ? t("Yönlendiriliyor…") : t("Instagram'ı bağla")}
           </button>
         </div>
       )}
@@ -924,15 +966,17 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               flexShrink: 0,
             }}
           >
-            {SOCIAL_PLATFORMS[a.platform].label.slice(0, 2)}
+            {t(SOCIAL_PLATFORMS[a.platform].label).slice(0, 2)}
           </span>
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <span style={{ fontSize: 14, color: c.textPrimary }}>{accountLabel(a)}</span>
               <span style={{ fontSize: 12, color: c.textSecondary }}>
-                @{a.handle} · {SOCIAL_PLATFORMS[a.platform].label}
+                @{a.handle} · {t(SOCIAL_PLATFORMS[a.platform].label)}
               </span>
-              {!a.active && <span style={{ fontSize: 11, color: c.textSecondary }}>· pasif</span>}
+              {!a.active && (
+                <span style={{ fontSize: 11, color: c.textSecondary }}>· {t("pasif")}</span>
+              )}
               {a.profileUrl && (
                 <a href={safeExternalUrl(a.profileUrl) ?? undefined} target="_blank" rel="noreferrer" style={{ display: "flex" }}>
                   <IconExternalLink size={12} color={c.textSecondary} />
@@ -941,18 +985,22 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
             </div>
             <span style={{ fontSize: 12, color: c.textSecondary }}>
               {[
-                a.followerCount !== undefined ? `${a.followerCount.toLocaleString("tr-TR")} takipçi` : null,
+                a.followerCount !== undefined
+                  ? t("{n} takipçi", { n: a.followerCount.toLocaleString("tr-TR") })
+                  : null,
                 a.postingFrequency,
-                a.ownerName ? `Sorumlu: ${a.ownerName}` : null,
-                `${posts.filter((p) => p.targets.some((t) => t.accountId === a.id)).length} içerik`,
+                a.ownerName ? t("Sorumlu: {kisi}", { kisi: a.ownerName }) : null,
+                t("{n} içerik", {
+                  n: posts.filter((p) => p.targets.some((hedef) => hedef.accountId === a.id)).length,
+                }),
               ]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
             {(a.audienceNote || a.toneNote) && (
               <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.5 }}>
-                {a.audienceNote && <>Kitle: {a.audienceNote}. </>}
-                {a.toneNote && <>Ton: {a.toneNote}</>}
+                {a.audienceNote && <>{t("Kitle: {not}.", { not: a.audienceNote })} </>}
+                {a.toneNote && <>{t("Ton: {not}", { not: a.toneNote })}</>}
               </span>
             )}
 
@@ -960,7 +1008,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                 çalışma biçimi — bu yüzden nötr renkte. */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
               <span
-                title={CONNECTION_STATUS[a.connectionStatus].hint}
+                title={t(CONNECTION_STATUS[a.connectionStatus].hint)}
                 style={{
                   fontSize: 10,
                   padding: "1px 7px",
@@ -969,7 +1017,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                   color: CONNECTION_STATUS[a.connectionStatus].color,
                 }}
               >
-                {CONNECTION_STATUS[a.connectionStatus].label}
+                {t(CONNECTION_STATUS[a.connectionStatus].label)}
               </span>
 
               {a.connectionError && (
@@ -990,7 +1038,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                   color: c.textSecondary,
                 }}
               >
-                Giriş bilgileri
+                {t("Giriş bilgileri")}
               </button>
 
               {canWrite && igConfigured && a.platform === "instagram" && (
@@ -1005,7 +1053,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                     color: a.connectionStatus === "connected" ? c.textSecondary : c.primary,
                   }}
                 >
-                  {a.connectionStatus === "connected" ? "Bağlantıyı kes" : "Instagram'a bağla"}
+                  {a.connectionStatus === "connected" ? t("Bağlantıyı kes") : t("Instagram'a bağla")}
                 </button>
               )}
             </div>
@@ -1014,16 +1062,16 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
             <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
               <button
                 onClick={() => setAccountModal({ account: a })}
-                aria-label="Hesabı düzenle"
-                title="Düzenle"
+                aria-label={t("Hesabı düzenle")}
+                title={t("Düzenle")}
                 style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
               >
                 <IconEdit size={14} color={c.textSecondary} />
               </button>
               <button
                 onClick={() => archiveAccount(a)}
-                aria-label="Hesabı arşivle"
-                title="Arşivle"
+                aria-label={t("Hesabı arşivle")}
+                title={t("Arşivle")}
                 style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
               >
                 <IconTrash size={14} color={c.textSecondary} />
@@ -1057,9 +1105,9 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Sosyal Medya</h5>
+        <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Sosyal Medya")}</h5>
         {!canWrite ? (
-          <span style={{ fontSize: 12, color: c.textSecondary }}>Salt görüntüleme</span>
+          <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Salt görüntüleme")}</span>
         ) : (
           // Satır içi düğmeler yalnızca "+"ın ulaşılamadığı yerde (modal içi).
           !fabAvailable && (
@@ -1068,13 +1116,13 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                 onClick={() => setAccountModal({})}
                 style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
               >
-                + Hesap ekle
+                + {t("Hesap ekle")}
               </button>
               <button
                 onClick={() => setComposer({})}
                 style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
               >
-                + İçerik ekle
+                + {t("İçerik ekle")}
               </button>
             </div>
           )
@@ -1105,9 +1153,9 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       )}
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-        {tab("calendar", "Takvim")}
-        {tab("list", "Akış")}
-        {tab("accounts", `Hesaplar · ${accounts.length}`)}
+        {tab("calendar", t("Takvim"))}
+        {tab("list", t("Akış"))}
+        {tab("accounts", `${t("Hesaplar")} · ${accounts.length}`)}
 
         {view !== "accounts" && (
           <>
@@ -1116,10 +1164,10 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               onChange={(e) => setPlatformFilter(e.target.value)}
               style={{ fontSize: 12, padding: "4px 6px", marginLeft: "auto" }}
             >
-              <option value="">Tüm kanallar</option>
+              <option value="">{t("Tüm kanallar")}</option>
               {Array.from(new Set(accounts.map((a) => a.platform))).map((p) => (
                 <option key={p} value={p}>
-                  {SOCIAL_PLATFORMS[p].label}
+                  {t(SOCIAL_PLATFORMS[p].label)}
                 </option>
               ))}
             </select>
@@ -1128,10 +1176,10 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{ fontSize: 12, padding: "4px 6px" }}
             >
-              <option value="">Tüm durumlar</option>
+              <option value="">{t("Tüm durumlar")}</option>
               {STATUS_ORDER.map((s) => (
                 <option key={s} value={s}>
-                  {SOCIAL_STATUS[s].label}
+                  {t(SOCIAL_STATUS[s].label)}
                 </option>
               ))}
             </select>
@@ -1157,7 +1205,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           <span style={{ flex: 1 }}>{banner.text}</span>
           <button
             onClick={() => setBanner(null)}
-            aria-label="Kapat"
+            aria-label={t("Kapat")}
             style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, color: "inherit" }}
           >
             ×
@@ -1168,7 +1216,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       {error && <span style={{ fontSize: 12, color: c.danger }}>{error}</span>}
 
       {loading ? (
-        <span style={{ fontSize: 13, color: c.textSecondary }}>Yükleniyor…</span>
+        <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Yükleniyor…")}</span>
       ) : accounts.length === 0 && posts.length === 0 ? (
         // Boş kutu yerine ilk adımı söylüyoruz: kanal olmadan içerik planlamak
         // anlamsız, kullanıcı ekrana bakıp nereden başlayacağını aramasın.
@@ -1183,15 +1231,16 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
             maxWidth: 520,
           }}
         >
-          <span style={{ fontSize: 14, color: c.textPrimary }}>Kanallarınızı ekleyerek başlayın</span>
+          <span style={{ fontSize: 14, color: c.textPrimary }}>{t("Kanallarınızı ekleyerek başlayın")}</span>
           <span style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
-            Her hesabın kitlesi, tonu ve yayın ritmi kayıtlı olur; içerik yazarken karakter sınırı ve kanal
-            listesi buradan gelir. Sonra takvime içerik ekleyip görsellerini yükleyebilirsiniz.
+            {t(
+              "Her hesabın kitlesi, tonu ve yayın ritmi kayıtlı olur; içerik yazarken karakter sınırı ve kanal listesi buradan gelir. Sonra takvime içerik ekleyip görsellerini yükleyebilirsiniz."
+            )}
           </span>
           {canWrite &&
             (fabAvailable ? (
               <span style={{ fontSize: 13, color: c.textSecondary }}>
-                Hesap eklemek için sayfadaki "+" düğmesini kullan.
+                {t('Hesap eklemek için sayfadaki "+" düğmesini kullan.')}
               </span>
             ) : (
               <button
@@ -1207,7 +1256,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                   cursor: "pointer",
                 }}
               >
-                Hesap ekle
+                {t("Hesap ekle")}
               </button>
             ))}
         </div>

@@ -4,6 +4,7 @@ import { mailboxApi, type MailScope } from "../api/mailbox";
 import { useThemeColors } from "../theme/useThemeColors";
 import MailMessageModal from "./MailMessageModal";
 import { IconTrash } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   organizationId?: string;
@@ -39,6 +40,7 @@ function formatDate(iso: string): string {
  */
 export default function MailboxPanel({ organizationId, departmentId, jobId, canWrite = true }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const scope: MailScope = useMemo(
     () => (jobId ? { jobId } : { organizationId: organizationId as string, departmentId }),
     [jobId, organizationId, departmentId]
@@ -192,7 +194,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
 
   // ============================================================ Boş durumlar
   if (loadingAccounts) {
-    return <span style={{ fontSize: 13, color: c.textSecondary }}>Yükleniyor…</span>;
+    return <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Yükleniyor…")}</span>;
   }
 
   if (accounts.length === 0) {
@@ -209,9 +211,9 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
             gap: 10,
           }}
         >
-          <span style={{ fontSize: 14, color: c.textPrimary }}>Bir Outlook kutusu bağlayın</span>
+          <span style={{ fontSize: 14, color: c.textPrimary }}>{t("Bir Outlook kutusu bağlayın")}</span>
           <span style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
-            Bağladığınız kutuyu <strong>bu modüle atanmış herkes</strong> okuyabilir ve o kutudan yanıt
+            {t("Bağladığınız kutuyu")} <strong>{t("bu modüle atanmış herkes")}</strong> okuyabilir ve o kutudan yanıt
             yazabilir. Kişisel postanızı değil, ekibin ortak kutusunu (info@, satis@ gibi) bağlamanız önerilir.
           </span>
           {!configured && (
@@ -232,7 +234,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
                 style={{ fontSize: 13, padding: "6px 8px" }}
               />
               <span style={{ fontSize: 11, color: c.textSecondary }}>
-                Bu kutuda Exchange tarafında "tam erişim" yetkiniz olmalı.
+                {t("Bu kutuda Exchange tarafında \"tam erişim\" yetkiniz olmalı.")}
               </span>
             </div>
           )}
@@ -302,7 +304,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
             }}
             style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
           >
-            Aramayı temizle
+            {t("Aramayı temizle")}
           </button>
         )}
 
@@ -314,8 +316,8 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
         {canWrite && account && (
           <button
             onClick={() => unlink(account)}
-            aria-label="Kutuyu kaldır"
-            title="Kutuyu modülden kaldır"
+            aria-label={t("Kutuyu kaldır")}
+            title={t("Kutuyu modülden kaldır")}
             style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
           >
             <IconTrash size={14} color={c.textSecondary} />
@@ -370,7 +372,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
           }}
         >
           {loadingList && (
-            <div style={{ padding: 10, fontSize: 12, color: c.textSecondary }}>İletiler yükleniyor…</div>
+            <div style={{ padding: 10, fontSize: 12, color: c.textSecondary }}>{t("İletiler yükleniyor…")}</div>
           )}
           {!loadingList && messages.length === 0 && (
             <div style={{ padding: 10, fontSize: 12, color: c.textSecondary }}>
@@ -439,7 +441,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
           ))}
           {hasMore && (
             <div style={{ padding: 8, fontSize: 11, color: c.textSecondary, textAlign: "center" }}>
-              Daha fazlası var — aramayı daraltın
+              {t("Daha fazlası var — aramayı daraltın")}
             </div>
           )}
         </div>

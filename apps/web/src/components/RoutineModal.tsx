@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useUndo } from "../lib/undo";
 import Modal from "./Modal";
+import { useT } from "../lib/i18n";
 
 interface Props {
   operationId: string;
@@ -43,6 +44,7 @@ type MonthlyMode = "day-of-month" | "nth-weekday";
 
 export default function RoutineModal({ operationId, routine, onClose, onSaved, onDeleted }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const editing = !!routine;
 
   const [title, setTitle] = useState(routine?.title ?? "");
@@ -180,18 +182,18 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
     <Modal title={editing ? "Rutini düzenle" : "Yeni rutin"} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={label}>Başlık</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Haftalık içerik planı" style={{ width: "100%" }} />
+          <label style={label}>{t("Başlık")}</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder={t("Haftalık içerik planı")} style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={label}>Açıklama</label>
+          <label style={label}>{t("Açıklama")}</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opsiyonel" style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={label}>Tekrar</label>
+            <label style={label}>{t("Tekrar")}</label>
             <select value={freq} onChange={(e) => setFreq(e.target.value as RoutineFreq)} style={{ width: "100%" }}>
               {freqOptions.map((f) => (
                 <option key={f.value} value={f.value}>{f.label}</option>
@@ -199,7 +201,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
             </select>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 110 }}>
-            <label style={label}>Her</label>
+            <label style={label}>{t("Her")}</label>
             <input type="number" min={1} value={intervalN} onChange={(e) => setIntervalN(e.target.value)} style={{ width: "100%" }} />
           </div>
           <span style={{ fontSize: 14, color: c.textSecondary, paddingBottom: 10 }}>
@@ -209,7 +211,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
 
         {freq === "weekly" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={label}>Hangi günler</label>
+            <label style={label}>{t("Hangi günler")}</label>
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
               {weekdays.map((d) => (
                 <button key={d.value} type="button" onClick={() => toggleWeekday(d.value)} style={chip(byWeekday.includes(d.value))}>
@@ -222,13 +224,13 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
 
         {freq === "monthly" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={label}>Ayın hangi günü</label>
+            <label style={label}>{t("Ayın hangi günü")}</label>
             <div style={{ display: "flex", gap: 5 }}>
               <button type="button" onClick={() => setMonthlyMode("day-of-month")} style={chip(monthlyMode === "day-of-month")}>
-                Ayın X. günü
+                {t("Ayın X. günü")}
               </button>
               <button type="button" onClick={() => setMonthlyMode("nth-weekday")} style={chip(monthlyMode === "nth-weekday")}>
-                Ayın X. haftasının Y günü
+                {t("Ayın X. haftasının Y günü")}
               </button>
             </div>
 
@@ -238,10 +240,10 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
                   {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
                     <option key={d} value={d}>{d}. gün</option>
                   ))}
-                  <option value={-1}>Ayın son günü</option>
+                  <option value={-1}>{t("Ayın son günü")}</option>
                 </select>
                 <span style={{ fontSize: 13, color: c.textSecondary }}>
-                  29–31 arası günler o ayda yoksa atlanır. Her ayda çalışması için "Ayın son günü" seç.
+                  {t("29–31 arası günler o ayda yoksa atlanır. Her ayda çalışması için \"Ayın son günü\" seç.")}
                 </span>
               </div>
             ) : (
@@ -263,47 +265,47 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
 
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={label}>Başlangıç</label>
+            <label style={label}>{t("Başlangıç")}</label>
             <input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} required style={{ width: "100%" }} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={label}>Bitiş (boş = süresiz)</label>
+            <label style={label}>{t("Bitiş (boş = süresiz)")}</label>
             <input type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} style={{ width: "100%" }} />
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={label}>Saat</label>
+            <label style={label}>{t("Saat")}</label>
             <input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} style={{ width: "100%" }} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={label}>Kaç gün önce açılsın</label>
+            <label style={label}>{t("Kaç gün önce açılsın")}</label>
             <input type="number" min={0} value={leadDays} onChange={(e) => setLeadDays(e.target.value)} style={{ width: "100%" }} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-            <label style={label}>Tolerans (gün)</label>
+            <label style={label}>{t("Tolerans (gün)")}</label>
             <input type="number" min={0} value={graceDays} onChange={(e) => setGraceDays(e.target.value)} style={{ width: "100%" }} />
           </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={label}>Tekrar başına ücret (₺)</label>
+          <label style={label}>{t("Tekrar başına ücret (₺)")}</label>
           <input type="number" min={0} value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="0" style={{ width: "100%" }} />
         </div>
 
         {editing && (
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, color: c.textPrimary }}>
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-            Aktif — kapatırsan gelecekteki tekrarlar geri çekilir, geçmiş kalır
+            {t("Aktif — kapatırsan gelecekteki tekrarlar geri çekilir, geçmiş kalır")}
           </label>
         )}
 
         {/* Kaydetmeden önce kuralın gerçekten ne ürettiğini göster. */}
         <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, padding: 12, background: c.background }}>
-          <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 8 }}>Sıradaki tekrarlar</div>
+          <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 8 }}>{t("Sıradaki tekrarlar")}</div>
           {preview.length === 0 ? (
-            <div style={{ fontSize: 14, color: c.textSecondary }}>Bu kural hiçbir tarihe denk gelmiyor.</div>
+            <div style={{ fontSize: 14, color: c.textSecondary }}>{t("Bu kural hiçbir tarihe denk gelmiyor.")}</div>
           ) : (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {preview.map((d) => (
@@ -342,7 +344,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
             disabled={loading}
             style={{ background: "transparent", color: c.danger, padding: "8px 0", borderRadius: 8, border: `1px solid ${c.border}`, fontSize: 15 }}
           >
-            Rutini sil
+            {t("Rutini sil")}
           </button>
         )}
       </form>

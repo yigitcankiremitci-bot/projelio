@@ -57,15 +57,28 @@ function sar(kaynak) {
   // Kenarlardaki boşluk KORUNUYOR: JSX'te satır başındaki girinti render'a
   // girmiyor ama iki öğe arasındaki tek boşluk giriyor. Boşluğu t()'nin içine
   // almak da yanlış olurdu — sözlükte "Kaydet " diye bir anahtar aranırdı.
-  // Satır sonu İÇERMEYEN gövde: `[^<>{}\n]`. Newline'a izin verilirse `</>`
-  // ile çok aşağıdaki bir `<` eşleşiyor ve arada kalan KOD (yorumlar, ifadeler)
-  // t()'nin içine giriyor. Bir kez oldu, dosya derlenmez hâle geldi.
-  // Çok satırlı JSX metni bu yüzden elle sarılır; sayıları az.
+  // Satır sonuna İZİN VAR ama kırpılmış metnin İÇİNDE satır sonu kalmamalı.
+  //
+  // JSX metni çoğu zaman kendi satırında durur:
+  //     <h3>
+  //       Dosyalar
+  //     </h3>
+  // Satır sonunu tümden yasaklarken bunlar atlanıyordu. Sınırsız izin vermek de
+  // olmuyor: `</>` ile çok aşağıdaki bir `<` eşleşip arada kalan KODU t()'nin
+  // içine alıyor ve dosya derlenmez hâle geliyor (bir kez oldu). İkisinin
+  // ortası: kırpılınca tek satır kalan metinler sarılır, kalmayanlar elde.
   sonuc = sonuc.replace(
-    /(>)([^<>{}\n]*[çğıöşüÇĞİÖŞÜ][^<>{}\n]*)(<)/g,
+    /(>)([^<>{}]*)(<)/g,
     (tam, ac, govde, kapa) => {
       const metin = govde.trim();
-      if (!metin || !TURKCE.test(metin)) return tam;
+      // Türkçeye özgü karakter ARANMIYOR: etiketler arasına yazılan her şey
+      // tanım gereği ekrana çıkıyor ve "Kapat" da "Vazgeç" kadar çevrilmeli.
+      // Harf içermeyen düğümler (boşluk, tire, nokta) metin değildir.
+      if (!metin || !/[a-zA-ZçğıöşüÇĞİÖŞÜ]/.test(metin)) return tam;
+      if (metin.includes("\n")) return tam;
+      // Kod noktalaması taşıyan "metin" aslında bir ifadedir: `a > b && c < d`
+      // ya da `Record<string, unknown>` gibi. Sarılırsa kod bozulur.
+      if (/[(){}=;&|?]|=>|::/.test(metin)) return tam;
       // Zaten sarılmışsa dokunma.
       if (metin.startsWith("{")) return tam;
       const onBosluk = govde.slice(0, govde.indexOf(metin[0]));

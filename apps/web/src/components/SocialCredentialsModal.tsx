@@ -6,10 +6,12 @@ import type {
   SocialCredentialGrant,
   SocialCredentialSecret,
   SocialCredentialView,
+  Translate,
 } from "@projelio/shared";
 import { api } from "../api/client";
 import { socialCredentialsApi, type SocialCredentialInput } from "../api/socialCredentials";
 import type { SocialScope } from "../api/socialMedia";
+import { useT } from "../lib/i18n";
 import { SOCIAL_PLATFORMS } from "../lib/socialMedia";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
@@ -23,11 +25,16 @@ interface Props {
 /** Gösterilen şifrenin ekranda kalma süresi. */
 const REVEAL_SECONDS = 45;
 
-const REASON_LABEL: Record<SocialCredentialView["reason"], string> = {
-  admin: "yönetici",
-  creator: "kaydı giren",
-  grant: "izinli",
-};
+/**
+ * Şifrenin neden görülebildiği. Cümlenin İÇİNDE geçiyor ("… izinli yetkisiyle"),
+ * bu yüzden küçük harf. Sabit bir tabloda değil fonksiyonda: modül düzeyinde
+ * t() çağrılamıyor, üç metnin de sözlükte aranabilir kalması gerekiyor.
+ */
+function reasonLabel(t: Translate, reason: SocialCredentialView["reason"]): string {
+  if (reason === "admin") return t("yönetici");
+  if (reason === "creator") return t("kaydı giren");
+  return t("izinli");
+}
 
 function formatDate(value?: string): string {
   if (!value) return "—";
@@ -47,6 +54,7 @@ function formatDate(value?: string): string {
  */
 export default function SocialCredentialsModal({ scope, account, onClose }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [rows, setRows] = useState<SocialCredential[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [canCreate, setCanCreate] = useState(false);
@@ -73,7 +81,7 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
         setCanCreate(res.canCreate);
         setError("");
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Kayıtlar yüklenemedi"))
+      .catch((err) => setError(err instanceof Error ? err.message : t("Kayıtlar yüklenemedi")))
       .finally(() => setLoading(false));
   };
 
@@ -97,7 +105,7 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
     try {
       setSecret(await socialCredentialsApi.reveal(row.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Şifre gösterilemedi");
+      setError(err instanceof Error ? err.message : t("Şifre gösterilemedi"));
     } finally {
       setBusyId(null);
     }
@@ -106,7 +114,7 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
   const save = async () => {
     if (!form) return;
     if (!form.id && !form.password.trim()) {
-      setError("Şifre gerekli");
+      setError(t("Şifre gerekli"));
       return;
     }
     const body: SocialCredentialInput = {
@@ -125,21 +133,22 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
       setForm(null);
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kaydedilemedi");
+      setError(err instanceof Error ? err.message : t("Kaydedilemedi"));
     } finally {
       setBusyId(null);
     }
   };
 
   const remove = async (row: SocialCredential) => {
-    if (!window.confirm(`"${row.label}" girişi silinsin mi? Şifre kalıcı olarak silinir.`)) return;
+    if (!window.confirm(t('"{etiket}" girişi silinsin mi? Şifre kalıcı olarak silinir.', { etiket: row.label })))
+      return;
     setBusyId(row.id);
     try {
       await socialCredentialsApi.remove(row.id);
       if (secret?.id === row.id) setSecret(null);
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Silinemedi");
+      setError(err instanceof Error ? err.message : t("Silinemedi"));
     } finally {
       setBusyId(null);
     }
@@ -159,19 +168,22 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
 
   return (
     <Modal
-      title={`${SOCIAL_PLATFORMS[account.platform].label} · @${account.handle} giriş bilgileri`}
-      subtitle="Şifreler sunucuda şifreli saklanır. Yalnızca yöneticiler, şifreyi giren kişi ve izin verilenler görebilir; her gösterim kaydedilir."
+      title={t("{kanal} · @{hesap} giriş bilgileri", {
+        kanal: SOCIAL_PLATFORMS[account.platform].label,
+        hesap: account.handle,
+      })}
+      subtitle={t("Şifreler sunucuda şifreli saklanır. Yalnızca yöneticiler, şifreyi giren kişi ve izin verilenler görebilir; her gösterim kaydedilir.")}
       onClose={onClose}
       maxWidth={620}
       mobileFullScreen
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {loading && <span style={{ fontSize: 13, color: c.textSecondary }}>Yükleniyor…</span>}
+        {loading && <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Yükleniyor…")}</span>}
 
         {!loading && rows.length === 0 && (
           <span style={{ fontSize: 13, color: c.textSecondary }}>
-            Bu hesap için kayıtlı giriş yok.
-            {canCreate ? " Aşağıdan ekleyebilirsiniz." : " Ekleme yetkiniz yok."}
+            {t("Bu hesap için kayıtlı giriş yok.")}{" "}
+            {canCreate ? t("Aşağıdan ekleyebilirsiniz.") : t("Ekleme yetkiniz yok.")}
           </span>
         )}
 
@@ -192,10 +204,10 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
               <span style={{ fontSize: 14, color: c.textPrimary, flex: 1, minWidth: 120 }}>{row.label}</span>
               {row.canReveal ? (
                 <button onClick={() => reveal(row)} disabled={busyId === row.id} style={ghostButton}>
-                  {busyId === row.id ? "Açılıyor…" : secret?.id === row.id ? "Yenile" : "Göster"}
+                  {busyId === row.id ? t("Açılıyor…") : secret?.id === row.id ? t("Yenile") : t("Göster")}
                 </button>
               ) : (
-                <span style={{ fontSize: 11, color: c.textSecondary }}>Görme izniniz yok</span>
+                <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Görme izniniz yok")}</span>
               )}
               {row.canEdit && (
                 <>
@@ -205,10 +217,10 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
                     }
                     style={ghostButton}
                   >
-                    Düzenle
+                    {t("Düzenle")}
                   </button>
                   <button onClick={() => remove(row)} style={{ ...ghostButton, color: c.danger }}>
-                    Sil
+                    {t("Sil")}
                   </button>
                 </>
               )}
@@ -217,16 +229,17 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
                   onClick={() => setPermsFor(permsFor === row.id ? null : row.id)}
                   style={ghostButton}
                 >
-                  İzinler{row.grantCount ? ` · ${row.grantCount}` : ""}
+                  {t("İzinler")}
+                  {row.grantCount ? ` · ${row.grantCount}` : ""}
                 </button>
               )}
             </div>
 
             <span style={{ fontSize: 12, color: c.textSecondary }}>
               {[
-                row.createdByName ? `Giren: ${row.createdByName}` : null,
-                `Şifre güncellenme: ${formatDate(row.passwordChangedAt)}`,
-                row.hasNote ? "Not var" : null,
+                row.createdByName ? t("Giren: {kisi}", { kisi: row.createdByName }) : null,
+                t("Şifre güncellenme: {tarih}", { tarih: formatDate(row.passwordChangedAt) }),
+                row.hasNote ? t("Not var") : null,
               ]
                 .filter(Boolean)
                 .join(" · ")}
@@ -255,16 +268,16 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
           >
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <div style={{ flex: "1 1 160px", display: "flex", flexDirection: "column", gap: 4 }}>
-                {label("Etiket")}
+                {label(t("Etiket"))}
                 <input
                   value={form.label}
                   onChange={(e) => setForm({ ...form, label: e.target.value })}
-                  placeholder="Ana giriş"
+                  placeholder={t("Ana giriş")}
                   style={field}
                 />
               </div>
               <div style={{ flex: "1 1 160px", display: "flex", flexDirection: "column", gap: 4 }}>
-                {label("Kullanıcı adı / e-posta")}
+                {label(t("Kullanıcı adı / e-posta"))}
                 <input
                   value={form.username}
                   onChange={(e) => setForm({ ...form, username: e.target.value })}
@@ -274,7 +287,7 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {label(form.id ? "Yeni şifre (boş bırakılırsa değişmez)" : "Şifre *")}
+              {label(form.id ? t("Yeni şifre (boş bırakılırsa değişmez)") : t("Şifre *"))}
               {/* type=password + autoComplete=new-password: tarayıcı bunu kendi
                   şifre kasasına kaydetmeye çalışmasın, sır tek yerde dursun. */}
               <input
@@ -286,7 +299,7 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
               />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {label("Not (kurtarma e-postası, 2FA'nın hangi telefonda olduğu…)")}
+              {label(t("Not (kurtarma e-postası, 2FA'nın hangi telefonda olduğu…)"))}
               <textarea
                 value={form.note}
                 onChange={(e) => setForm({ ...form, note: e.target.value })}
@@ -296,12 +309,12 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
             </div>
             {form.id && (
               <span style={{ fontSize: 11, color: c.textSecondary }}>
-                Kullanıcı adı ve not, kaydedildiğinde yazdığınızla değiştirilir; boş bırakırsanız temizlenir.
+                {t("Kullanıcı adı ve not, kaydedildiğinde yazdığınızla değiştirilir; boş bırakırsanız temizlenir.")}
               </span>
             )}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button onClick={() => setForm(null)} style={ghostButton}>
-                Vazgeç
+                {t("Vazgeç")}
               </button>
               <button
                 data-primary
@@ -318,7 +331,7 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
                   opacity: busyId === "form" ? 0.6 : 1,
                 }}
               >
-                {busyId === "form" ? "Kaydediliyor…" : "Kaydet"}
+                {busyId === "form" ? t("Kaydediliyor…") : t("Kaydet")}
               </button>
             </div>
           </div>
@@ -328,7 +341,7 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
               onClick={() => setForm({ id: null, label: "", username: "", password: "", note: "" })}
               style={{ ...ghostButton, alignSelf: "flex-start", color: c.primary }}
             >
-              + Giriş ekle
+              + {t("Giriş ekle")}
             </button>
           )
         )}
@@ -342,6 +355,7 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
 /** Açılan sır — süreli, kopyalanabilir, hiçbir yere yazılmaz. */
 function SecretBox({ secret, countdown }: { secret: SocialCredentialSecret; countdown: number }) {
   const c = useThemeColors();
+  const t = useT();
   const [copied, setCopied] = useState("");
   const timer = useRef<number | null>(null);
 
@@ -383,7 +397,7 @@ function SecretBox({ secret, countdown }: { secret: SocialCredentialSecret; coun
           color: c.textSecondary,
         }}
       >
-        {copied === title ? "Kopyalandı" : "Kopyala"}
+        {copied === title ? t("Kopyalandı") : t("Kopyala")}
       </button>
     </div>
   );
@@ -400,12 +414,12 @@ function SecretBox({ secret, countdown }: { secret: SocialCredentialSecret; coun
         background: `${c.accent}0F`,
       }}
     >
-      {secret.username && line("Kullanıcı adı", secret.username)}
-      {line("Şifre", secret.password, true)}
-      {secret.note && line("Not", secret.note)}
+      {secret.username && line(t("Kullanıcı adı"), secret.username)}
+      {line(t("Şifre"), secret.password, true)}
+      {secret.note && line(t("Not"), secret.note)}
       <span style={{ fontSize: 11, color: c.textSecondary }}>
-        {countdown > 0 ? `${countdown} saniye sonra gizlenecek.` : "Gizleniyor…"} Bu gösterim kaydedildi
-        ({REASON_LABEL[secret.reason]} yetkisiyle).
+        {countdown > 0 ? t("{n} saniye sonra gizlenecek.", { n: countdown }) : t("Gizleniyor…")}{" "}
+        {t("Bu gösterim kaydedildi ({yetki} yetkisiyle).", { yetki: reasonLabel(t, secret.reason) })}
       </span>
     </div>
   );
@@ -428,6 +442,7 @@ function GrantPanel({
   onChanged: () => void;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const [grants, setGrants] = useState<SocialCredentialGrant[]>([]);
   const [views, setViews] = useState<SocialCredentialView[]>([]);
   const [members, setMembers] = useState<ModuleMember[]>([]);
@@ -472,7 +487,7 @@ function GrantPanel({
       load();
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "İzin verilemedi");
+      setError(err instanceof Error ? err.message : t("İzin verilemedi"));
     } finally {
       setBusy(false);
     }
@@ -485,7 +500,7 @@ function GrantPanel({
       load();
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "İzin geri alınamadı");
+      setError(err instanceof Error ? err.message : t("İzin geri alınamadı"));
     } finally {
       setBusy(false);
     }
@@ -505,11 +520,11 @@ function GrantPanel({
         background: c.background,
       }}
     >
-      <span style={{ fontSize: 12, color: c.textPrimary }}>Şifreyi görebilenler</span>
+      <span style={{ fontSize: 12, color: c.textPrimary }}>{t("Şifreyi görebilenler")}</span>
 
       {grants.filter((g) => g.active).length === 0 && (
         <span style={{ fontSize: 12, color: c.textSecondary }}>
-          Kimseye izin verilmedi. Şu an yalnızca yöneticiler ve şifreyi giren kişi görebiliyor.
+          {t("Kimseye izin verilmedi. Şu an yalnızca yöneticiler ve şifreyi giren kişi görebiliyor.")}
         </span>
       )}
 
@@ -518,11 +533,11 @@ function GrantPanel({
         .map((g) => (
           <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 12, color: c.textPrimary, flex: 1, minWidth: 120 }}>
-              {g.userName ?? "İsimsiz"}
+              {g.userName ?? t("İsimsiz")}
               <span style={{ color: c.textSecondary }}>
                 {" · "}
-                {g.grantedByName ? `${g.grantedByName} verdi` : "izinli"}
-                {g.expiresAt ? ` · ${formatDate(g.expiresAt)}'a kadar` : ""}
+                {g.grantedByName ? t("{kisi} verdi", { kisi: g.grantedByName }) : t("izinli")}
+                {g.expiresAt ? ` · ${t("{tarih} tarihine kadar", { tarih: formatDate(g.expiresAt) })}` : ""}
               </span>
             </span>
             <button
@@ -538,17 +553,17 @@ function GrantPanel({
                 color: c.danger,
               }}
             >
-              Geri al
+              {t("Geri al")}
             </button>
           </div>
         ))}
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
         <select value={userId} onChange={(e) => setUserId(e.target.value)} style={{ ...field, flex: "1 1 160px" }}>
-          <option value="">Modül ekibinden seçin…</option>
+          <option value="">{t("Modül ekibinden seçin…")}</option>
           {candidates.map((m) => (
             <option key={m.id} value={m.userId}>
-              {m.fullName ?? m.username ?? m.email ?? "İsimsiz"}
+              {m.fullName ?? m.username ?? m.email ?? t("İsimsiz")}
             </option>
           ))}
         </select>
@@ -557,7 +572,7 @@ function GrantPanel({
           type="date"
           value={expiresAt}
           onChange={(e) => setExpiresAt(e.target.value)}
-          title="Bitiş tarihi (boşsa süresiz)"
+          title={t("Bitiş tarihi (boşsa süresiz)")}
           style={field}
         />
         <button
@@ -574,25 +589,25 @@ function GrantPanel({
             opacity: busy || !userId ? 0.6 : 1,
           }}
         >
-          İzin ver
+          {t("İzin ver")}
         </button>
       </div>
 
       {candidates.length === 0 && members.length === 0 && (
         <span style={{ fontSize: 11, color: c.textSecondary }}>
-          Modül ekibi boş. Önce Ekip sekmesinden kişileri sosyal medya modülüne ekleyin.
+          {t("Modül ekibi boş. Önce Ekip sekmesinden kişileri sosyal medya modülüne ekleyin.")}
         </span>
       )}
 
       {views.length > 0 && (
         <details>
           <summary style={{ fontSize: 12, color: c.textSecondary, cursor: "pointer" }}>
-            Son görüntülemeler ({views.length})
+            {t("Son görüntülemeler ({n})", { n: views.length })}
           </summary>
           <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>
             {views.slice(0, 20).map((v) => (
               <span key={v.id} style={{ fontSize: 11, color: c.textSecondary }}>
-                {formatDate(v.viewedAt)} · {v.userName ?? "Silinmiş kullanıcı"} ({REASON_LABEL[v.reason]})
+                {formatDate(v.viewedAt)} · {v.userName ?? t("Silinmiş kullanıcı")} ({reasonLabel(t, v.reason)})
               </span>
             ))}
           </div>

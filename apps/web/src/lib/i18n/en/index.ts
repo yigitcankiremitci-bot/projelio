@@ -11,6 +11,7 @@ import { lio } from "./lio";
 import { dosyalar } from "./dosyalar";
 import { takvim } from "./takvim";
 import { hatalar } from "./hatalar";
+import { sosyal } from "./sosyal";
 
 /**
  * Türkçe → İngilizce sözlük.
@@ -53,5 +54,6 @@ export const en: TranslationDict = {
   ...lio,
   ...dosyalar,
   ...takvim,
+  ...sosyal,
   ...hatalar,
 };

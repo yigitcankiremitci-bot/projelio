@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { PlanPreferences, ThemeColors } from "@projelio/shared";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { planning } from "../../api/planning";
+import { useT } from "../../lib/i18n";
 
 /** 0 = Pazar … 6 = Cumartesi (JS getDay() ile aynı ölçek, sunucu da öyle bekliyor). */
 const DAYS: { value: number; label: string }[] = [
@@ -28,6 +29,7 @@ const DAYS: { value: number; label: string }[] = [
  */
 export default function WorkRhythmSettings() {
   const c = useThemeColors();
+  const t = useT();
   const [saved, setSaved] = useState<PlanPreferences | null>(null);
   const [draft, setDraft] = useState<PlanPreferences | null>(null);
   const [saving, setSaving] = useState(false);
@@ -94,8 +96,8 @@ export default function WorkRhythmSettings() {
   return (
     <div style={cardStyle(c)}>
       <Field
-        label="Çalışma günleri"
-        hint="Takvimde plan yalnızca bu günlere dağıtılır; diğerleri soluk görünür."
+        label={t("Çalışma günleri")}
+        hint={t("Takvimde plan yalnızca bu günlere dağıtılır; diğerleri soluk görünür.")}
       >
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
           {DAYS.map((d) => {
@@ -122,7 +124,7 @@ export default function WorkRhythmSettings() {
         </div>
       </Field>
 
-      <Field label="Mesai saatleri" hint="Takvim gridi bu aralıkta çizilir. Dışına taşan bloklar yine görünür.">
+      <Field label="Mesai saatleri" hint={t("Takvim gridi bu aralıkta çizilir. Dışına taşan bloklar yine görünür.")}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input
             type="time"
@@ -141,8 +143,8 @@ export default function WorkRhythmSettings() {
       </Field>
 
       <Field
-        label="Günlük çalışma hedefi"
-        hint="Dönem kapasitesi bundan hesaplanır — yüzdelerin paydası budur."
+        label={t("Günlük çalışma hedefi")}
+        hint={t("Dönem kapasitesi bundan hesaplanır — yüzdelerin paydası budur.")}
       >
         <NumberInput
           value={draft.dailyTargetMinutes / 60}
@@ -155,8 +157,8 @@ export default function WorkRhythmSettings() {
       </Field>
 
       <Field
-        label="Odak bloğu ve mola"
-        hint="Otomatik dağıtımın ürettiği blokların boyu ve aralarındaki boşluk."
+        label={t("Odak bloğu ve mola")}
+        hint={t("Otomatik dağıtımın ürettiği blokların boyu ve aralarındaki boşluk.")}
       >
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <NumberInput
@@ -181,8 +183,8 @@ export default function WorkRhythmSettings() {
       <div style={{ borderTop: `1px solid ${c.border}`, margin: "18px 0" }} />
 
       <Field
-        label="Planlama sihirbazı"
-        hint="Lio dönem başlarında seni karşılayıp planı birlikte kurar."
+        label={t("Planlama sihirbazı")}
+        hint={t("Lio dönem başlarında seni karşılayıp planı birlikte kurar.")}
       >
         <label style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer" }}>
           <input
@@ -199,7 +201,7 @@ export default function WorkRhythmSettings() {
 
       {draft.ritualsEnabled && (
         <>
-          <Field label="Haftalık planlama günü" hint="Bu güne gelince haftalık sihirbaz seni karşılar.">
+          <Field label={t("Haftalık planlama günü")} hint={t("Bu güne gelince haftalık sihirbaz seni karşılar.")}>
             <select
               value={draft.weeklyRitualWeekday}
               onChange={(e) => patch({ weeklyRitualWeekday: Number(e.target.value) })}
@@ -213,7 +215,7 @@ export default function WorkRhythmSettings() {
             </select>
           </Field>
 
-          <Field label="Günlük plan saati" hint="Gün başında kısa bir plan oturumu.">
+          <Field label={t("Günlük plan saati")} hint={t("Gün başında kısa bir plan oturumu.")}>
             <input
               type="time"
               value={draft.dailyRitualTime}
@@ -223,8 +225,8 @@ export default function WorkRhythmSettings() {
           </Field>
 
           <Field
-            label="Aylık planlama günü"
-            hint="Her ayda karşılığı olsun diye en fazla 28 seçilebilir."
+            label={t("Aylık planlama günü")}
+            hint={t("Her ayda karşılığı olsun diye en fazla 28 seçilebilir.")}
           >
             <NumberInput
               value={draft.monthlyRitualDay}
@@ -240,7 +242,7 @@ export default function WorkRhythmSettings() {
 
       {error && <p style={{ color: c.danger, fontSize: 14, margin: "4px 0 0" }}>{error}</p>}
       {justSaved && !error && (
-        <p style={{ color: c.success, fontSize: 14, margin: "4px 0 0" }}>Çalışma ritmin güncellendi.</p>
+        <p style={{ color: c.success, fontSize: 14, margin: "4px 0 0" }}>{t("Çalışma ritmin güncellendi.")}</p>
       )}
 
       <button

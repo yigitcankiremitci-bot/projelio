@@ -442,4 +442,6 @@ export const hatalar: TranslationDict = {
   // aranır ve hiçbir zaman bulunamazlardı (bkz. common/i18n/index.ts).
   "Şifre çok uzun ({bayt} bayt). En fazla {sinir} bayt olabilir; Türkçe karakterler 2 bayt yer kaplar.":
     "That password is too long ({bayt} bytes). The limit is {sinir} bytes; Turkish characters take 2 bytes each.",
+  "Bilinmeyen araç: {ad}": "Unknown tool: {ad}",
+  "Bilinmeyen modül: {anahtar}": "Unknown module: {anahtar}",
 };

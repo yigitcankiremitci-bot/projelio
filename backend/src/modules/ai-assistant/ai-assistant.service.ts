@@ -73,6 +73,7 @@ import { AiModelSettingsService } from "./ai-model-settings.service";
 import type { LlmRequest, LlmResponse } from "./providers/llm-provider";
 import type { Locale } from "@projelio/shared";
 import { DIL_KURALLARI } from "./lio-dil-kurallari";
+import { cevir, cevirmen, hataMetni } from "../../common/i18n";
 import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 
 const DEFAULT_MODEL = MODEL_TIERS.fast.model;
@@ -393,6 +394,10 @@ function compactTask(task: any): Record<string, unknown> {
   });
 }
 
+// dil:anahtar-baslangic
+// Onay gerektiren bir araç çalıştıktan sonra kullanıcıya gösterilen metinler.
+// Modül düzeyinde sabit oldukları için burada t() çağrılamıyor; çeviri
+// kullanıldıkları yerde, cevir(locale, ...) ile yapılıyor.
 const RESULT_LABELS: Record<string, string> = {
   delete_task: "Görev silindi.",
   archive_task: "Görev arşivlendi.",
@@ -417,6 +422,7 @@ const RESULT_LABELS: Record<string, string> = {
   delete_product: "Ürün silindi.",
   create_support_request: "Destek talebin Projelio ekibine iletildi.",
 };
+// dil:anahtar-bitis
 
 /**
  * Duraklatma mesajlarında "şimdiye kadar ne yapıldı" özetini kurmak için kullanılır.
@@ -888,6 +894,10 @@ export class AiAssistantService {
    * Buraya kullanıcıya/tarihe özel hiçbir bilgi konulmamalıdır — aksi halde önbellek
    * her istekte ıskalar ve maliyet düşmez.
    */
+  // dil:atla-baslangic — buradan aşağısı MODELE yazılıyor, kullanıcıya değil.
+  // Çevirisi yok ve olmayacak; dile göre değişen tek bölüm ayrı bir dosyada
+  // (lio-dil-kurallari.ts), gerekçesi orada yazılı. Denetim bu bloğu atlıyor
+  // ki dosyanın geri kalanındaki GERÇEK arayüz metinleri görünür kalsın.
   private static promptSatirlari(locale: Locale): string[] {
     return [
     "Sen Projelio'nun içine gömülü yapay zeka asistanısın. Adın \"Projelio Asistan\".",
@@ -1220,6 +1230,7 @@ export class AiAssistantService {
     tr: AiAssistantService.promptSatirlari("tr").join("\n"),
     en: AiAssistantService.promptSatirlari("en").join("\n"),
   };
+  // dil:atla-bitis
 
   /**
    * Sistem promptunun isteğe/kullanıcıya özel (önbelleklenmeyen) kısmı.
@@ -2100,7 +2111,7 @@ export class AiAssistantService {
           );
           // Yalnızca BAŞARILI çağrılar özete girer; hata alan bir araç iş yapmadı.
           run.executed.push(use.name);
-          await this.emitActivity(run.userId, use.name, (use.input as Record<string, any>) ?? {}, result);
+          await this.emitActivity(run.userId, use.name, (use.input as Record<string, any>) ?? {}, result, run.locale);
           toolResults.push({
             type: "tool_result",
             tool_use_id: use.id,
@@ -2425,10 +2436,11 @@ export class AiAssistantService {
     userId: string,
     toolName: string,
     input: Record<string, any>,
-    result: unknown
+    result: unknown,
+    locale: Locale
   ): Promise<void> {
     try {
-      const activity = await this.describeActivity(toolName, input ?? {}, result);
+      const activity = await this.describeActivity(toolName, input ?? {}, result, locale);
       if (!activity) return;
 
       this.realtime.emitToUser(userId, "lio-activity", activity);
@@ -2453,8 +2465,13 @@ export class AiAssistantService {
   private async describeActivity(
     toolName: string,
     input: Record<string, any>,
-    result: any
+    result: any,
+    locale: Locale
   ): Promise<LioActivityPayload | null> {
+    // Etiketler kullanıcının Lio panelinde görünüyor, yani çevrilmeli.
+    // Kaydın ADI (": Kapak tasarımı") etiketin DIŞINDA birleştiriliyor:
+    // kullanıcının kendi verisi, çevrilmez ve yer tutucuya gerek yok.
+    const t = cevirmen(locale);
     const at = new Date().toISOString();
     const make = (
       label: string,
@@ -2497,10 +2514,10 @@ export class AiAssistantService {
         const title = result?.title ? `: ${result.title}` : "";
         const label =
           toolName === "create_job"
-            ? `İş oluşturuldu${title}`
+            ? t("İş oluşturuldu") + title
             : toolName === "update_job"
-              ? `İş güncellendi${title}`
-              : `İş arşivlendi${title}`;
+              ? t("İş güncellendi") + title
+              : t("İş arşivlendi") + title;
         return make(label, `/jobs/${id}`, `job:${id}`, id);
       }
 
@@ -2512,10 +2529,10 @@ export class AiAssistantService {
         const title = result?.title ? `: ${result.title}` : "";
         const label =
           toolName === "create_project"
-            ? `Proje oluşturuldu${title}`
+            ? t("Proje oluşturuldu") + title
             : toolName === "update_project"
-              ? `Proje güncellendi${title}`
-              : `Proje arşivlendi${title}`;
+              ? t("Proje güncellendi") + title
+              : t("Proje arşivlendi") + title;
         return make(label, `/projects/${id}`, `project:${id}`, id);
       }
 
@@ -2541,9 +2558,9 @@ export class AiAssistantService {
         const ad = result?.ad ? `: ${result.ad}` : "";
         const label =
           toolName === "create_organization"
-            ? `Organizasyon oluşturuldu${ad}`
+            ? t("Organizasyon oluşturuldu") + ad
             : toolName === "update_organization"
-              ? `Organizasyon güncellendi${ad}`
+              ? t("Organizasyon güncellendi") + ad
               : "Organizasyon arşivlendi";
         return make(label, `/organizations/${id}`, `organization:${id}`, id);
       }
@@ -2811,11 +2828,11 @@ export class AiAssistantService {
             pending.userRole
           );
           run.executed.push(pending.toolName);
-          await this.emitActivity(pending.userId, pending.toolName, pending.input, critical);
+          await this.emitActivity(pending.userId, pending.toolName, pending.input, critical, run.locale);
           toolResults.push({
             type: "tool_result",
             tool_use_id: use.id,
-            content: RESULT_LABELS[pending.toolName] ?? "İşlem tamamlandı.",
+            content: cevir(run.locale, RESULT_LABELS[pending.toolName] ?? "İşlem tamamlandı."),
           });
         } catch (err: any) {
           toolResults.push({
@@ -2833,7 +2850,7 @@ export class AiAssistantService {
       try {
         const result = await this.executeTool(use.name, use.input ?? {}, run.userId, run.userRole);
         run.executed.push(use.name);
-        await this.emitActivity(run.userId, use.name, use.input ?? {}, result);
+        await this.emitActivity(run.userId, use.name, use.input ?? {}, result, run.locale);
         toolResults.push({ type: "tool_result", tool_use_id: use.id, content: this.serializeToolResult(result) });
       } catch (err: any) {
         toolResults.push({
@@ -2853,6 +2870,9 @@ export class AiAssistantService {
 
   /** Koşu düşmüşse yalnızca onaylanan işlemi yapar; devam edilemediği söylenir. */
   private async confirmWithoutRun(pending: PendingAction, confirmed: boolean): Promise<ChatResult> {
+    // Koşu artık yok (süresi dolmuş), yani run.locale de yok; dil kullanıcının
+    // hesabından okunuyor. Önbellekli, ek bir sorgu maliyeti yok.
+    const locale = await this.diller.diliniBul(pending.userId);
     const record = async (text: string): Promise<ChatResult> => {
       await this.safeRecord(pending.conversationId, text);
       const { balance } = await this.creditsService.getBalance(pending.userId);
@@ -2870,7 +2890,7 @@ export class AiAssistantService {
     try {
       await this.executeTool(pending.toolName, pending.input, pending.userId, pending.userRole);
       return record(
-        `✅ ${RESULT_LABELS[pending.toolName] ?? "İşlem tamamlandı."} ` +
+        `✅ ${cevir(locale, RESULT_LABELS[pending.toolName] ?? "İşlem tamamlandı.")} ` +
           "(Bu isteğin geri kalanına devam edemedim, süresi dolmuştu — kalan kısmı tekrar yazar mısın?)"
       );
     } catch (err: any) {
@@ -4345,7 +4365,7 @@ export class AiAssistantService {
         });
 
       default:
-        throw new BadRequestException(`Bilinmeyen araç: ${name}`);
+        throw new BadRequestException(hataMetni("Bilinmeyen araç: {ad}", { ad: name }));
     }
   }
 
@@ -4929,7 +4949,7 @@ export class AiAssistantService {
     if (!moduleKey) throw new BadRequestException("moduleKey gerekli");
     const modules = await this.catalogService.findModules();
     const found = modules.find((m) => m.key === moduleKey);
-    if (!found) throw new BadRequestException(`Bilinmeyen modül: ${moduleKey}`);
+    if (!found) throw new BadRequestException(hataMetni("Bilinmeyen modül: {anahtar}", { anahtar: moduleKey }));
     return found.name;
   }
 

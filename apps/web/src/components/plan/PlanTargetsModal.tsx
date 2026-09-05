@@ -3,6 +3,7 @@ import type { PlanFocusArea, PlanPeriod, PlanTarget, ThemeColors } from "@projel
 import Modal from "../Modal";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { planning, type PlanTargetInput } from "../../api/planning";
+import { useT } from "../../lib/i18n";
 
 interface Props {
   period: PlanPeriod;
@@ -34,6 +35,7 @@ interface Row {
  */
 export default function PlanTargetsModal({ period, targets, focusAreas, onClose, onSaved }: Props) {
   const c = useThemeColors();
+  const t = useT();
 
   const [theme, setTheme] = useState(period.theme ?? "");
   const [rows, setRows] = useState<Row[]>(() =>
@@ -99,20 +101,24 @@ export default function PlanTargetsModal({ period, targets, focusAreas, onClose,
   };
 
   return (
-    <Modal title="Dönem hedefleri" onClose={onClose} maxWidth={560}>
-      <label style={labelStyle(c)}>Bu dönemin niyeti</label>
+    <Modal title={t("Dönem hedefleri")} onClose={onClose} maxWidth={560}>
+      <label style={labelStyle(c)}>{t("Bu dönemin niyeti")}</label>
       <input
         value={theme}
         onChange={(e) => setTheme(e.target.value)}
-        placeholder="Tek cümle: bu dönem ağırlığı neye vereceksin?"
+        placeholder={t("Tek cümle: bu dönem ağırlığı neye vereceksin?")}
         style={inputStyle(c)}
       />
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "18px 0 8px" }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>Odak alanları</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>{t("Odak alanları")}</span>
         <span style={{ fontSize: 12, color: total > 100 ? c.danger : c.textSecondary }}>
-          toplam %{Math.round(total)}
-          {total > 100 ? " — dönemde olmayan bir zamanı bölüştürüyorsun" : total < 100 ? ` · %${Math.round(100 - total)} esneklik payı` : ""}
+          {t("toplam %{yuzde}", { yuzde: Math.round(total) })}
+          {total > 100
+            ? t(" — dönemde olmayan bir zamanı bölüştürüyorsun")
+            : total < 100
+              ? ` · ${t("%{yuzde} esneklik payı", { yuzde: Math.round(100 - total) })}`
+              : ""}
         </span>
       </div>
 
@@ -146,7 +152,7 @@ export default function PlanTargetsModal({ period, targets, focusAreas, onClose,
             />
             <button
               onClick={() => setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.key !== row.key) : prev))}
-              aria-label="Satırı sil"
+              aria-label={t("Satırı sil")}
               style={{
                 width: 28,
                 height: 32,
@@ -177,7 +183,7 @@ export default function PlanTargetsModal({ period, targets, focusAreas, onClose,
           cursor: "pointer",
         }}
       >
-        + Alan ekle
+        {t("+ Alan ekle")}
       </button>
 
       <p style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.5, margin: "14px 0 0" }}>
@@ -189,7 +195,7 @@ export default function PlanTargetsModal({ period, targets, focusAreas, onClose,
 
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 18 }}>
         <button onClick={onClose} style={secondaryButton(c)}>
-          Vazgeç
+          {t("Vazgeç")}
         </button>
         <button onClick={save} disabled={saving} style={primaryButton(c, saving)}>
           data-primary
@@ -221,6 +227,7 @@ function AreaPicker({
   onChange: (focusAreaId?: string, newAreaName?: string) => void;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const listId = "plan-focus-areas";
 
   const text = value ? (focusAreas.find((a) => a.id === value)?.name ?? "") : (customName ?? "");
@@ -235,7 +242,7 @@ function AreaPicker({
       <input
         list={listId}
         value={text}
-        placeholder="Yazılım, Müzik…"
+        placeholder={t("Yazılım, Müzik…")}
         onChange={(e) => {
           const typed = e.target.value;
           const match = focusAreas.find((a) => a.name.toLocaleLowerCase("tr") === typed.trim().toLocaleLowerCase("tr"));

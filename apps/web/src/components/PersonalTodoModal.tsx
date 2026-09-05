@@ -6,6 +6,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconStar } from "./icons";
 import { useUndo } from "../lib/undo";
+import { useT } from "../lib/i18n";
 
 function toDateInputValue(iso?: string) {
   return iso ? new Date(iso).toISOString().slice(0, 10) : "";
@@ -25,6 +26,7 @@ interface Props {
  */
 export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const { pushUndo } = useUndo();
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description ?? "");
@@ -83,17 +85,17 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
   };
 
   return (
-    <Modal title="Kişisel görevi düzenle" onClose={onClose} maxWidth={520}>
+    <Modal title={t("Kişisel görevi düzenle")} onClose={onClose} maxWidth={520}>
       <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Bu görevi senden başkası görmez.</p>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Bu görevi senden başkası görmez.")}</p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Başlık</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlık")}</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Notlar</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Notlar")}</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -104,9 +106,9 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 180px" }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Öncelik</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Öncelik")}</label>
             {/* Kanban kartlarındakiyle aynı 0-5 yıldız ölçeği. */}
-            <div role="radiogroup" aria-label="Öncelik" style={{ display: "flex", gap: 2, alignItems: "center", height: 34 }}>
+            <div role="radiogroup" aria-label={t("Öncelik")} style={{ display: "flex", gap: 2, alignItems: "center", height: 34 }}>
               {Array.from({ length: MAX_TASK_PRIORITY }, (_, i) => {
                 const value = (i + 1) as TaskPriority;
                 const filled = value <= priority;
@@ -130,7 +132,7 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 160px" }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Tarih</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tarih")}</label>
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: "100%" }} />
           </div>
         </div>
@@ -138,7 +140,7 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
         {/* Saat opsiyonel; girilince hatırlatma seçeneği açılır. */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 140px" }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş saati (opsiyonel)</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bitiş saati (opsiyonel)")}</label>
             <input
               type="time"
               value={dueTime}
@@ -150,18 +152,18 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
             />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 140px" }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Hatırlat</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Hatırlat")}</label>
             <select
               value={reminderLead}
               onChange={(e) => setReminderLead(e.target.value)}
               disabled={!dueTime}
               style={{ width: "100%" }}
             >
-              <option value="">Hatırlatma yok</option>
-              <option value="0">Tam saatinde</option>
-              <option value="15">15 dakika önce</option>
-              <option value="60">1 saat önce</option>
-              <option value="1440">1 gün önce</option>
+              <option value="">{t("Hatırlatma yok")}</option>
+              <option value="0">{t("Tam saatinde")}</option>
+              <option value="15">{t("15 dakika önce")}</option>
+              <option value="60">{t("1 saat önce")}</option>
+              <option value="1440">{t("1 gün önce")}</option>
             </select>
           </div>
         </div>
@@ -178,14 +180,14 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
                 disabled={saving}
                 style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.danger, color: "#fff", fontSize: 15 }}
               >
-                Evet, sil
+                {t("Evet, sil")}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmingDelete(false)}
                 style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 15 }}
               >
-                Vazgeç
+                {t("Vazgeç")}
               </button>
             </>
           ) : (
@@ -194,7 +196,7 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
               onClick={() => setConfirmingDelete(true)}
               style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.danger, fontSize: 15 }}
             >
-              Sil
+              {t("Sil")}
             </button>
           )}
 

@@ -160,6 +160,34 @@ for (const kok of TARANAN) {
     // Satır işaretiyle aynı anlam: SUSTURUCU DEĞİL, yükümlülük. İçerideki her
     // metin sözlükte aranıyor, bulunamazsa "eksik çeviri" raporlanıyor.
     const dosyaAnahtar = /\/\/\s*dil:anahtar-dosya/.test(kaynak.slice(0, 2000));
+
+    // Blok işareti: `// dil:atla-baslangic` … `// dil:atla-bitis`
+    //
+    // Bazı dosyalar KARIŞIK. ai-assistant.service.ts hem Lio'nun kullanıcıya
+    // gösterdiği onay metinlerini ("Görev silindi.") hem de 330 satırlık
+    // sistem promptunu taşıyor. Prompt modele yazılıyor, çevrilmiyor; ama
+    // dosyanın tamamını dışlamak gerçek arayüz metinlerini de gizlerdi.
+    // Aynı mekanizmanın ikinci hâli: `dil:anahtar-baslangic`/`-bitis`.
+    // Arada kalan metinler ANAHTAR sayılır — modül düzeyindeki etiket
+    // sabitleri için (t() orada çağrılamıyor, çeviri kullanım yerinde).
+    const bloklar = (bas, bit) => {
+      const sonuc = [];
+      let acik = null;
+      let konum = 0;
+      for (const satir of kaynak.split("\n")) {
+        if (bas.test(satir)) acik = konum;
+        else if (bit.test(satir) && acik !== null) {
+          sonuc.push([acik, konum + satir.length]);
+          acik = null;
+        }
+        konum += satir.length + 1;
+      }
+      return sonuc;
+    };
+    const atlanan = bloklar(/\/\/\s*dil:atla-baslangic/, /\/\/\s*dil:atla-bitis/);
+    const anahtarBloklari = bloklar(/\/\/\s*dil:anahtar-baslangic/, /\/\/\s*dil:anahtar-bitis/);
+    const atlanmis = (konum) => atlanan.some(([a, b]) => konum >= a && konum <= b);
+    const anahtarBlogunda = (konum) => anahtarBloklari.some(([a, b]) => konum >= a && konum <= b);
     if (!TURKCE.test(kaynak) && !kaynak.includes("t(")) continue;
 
     const { bulunan, maskeli } = dizeler(kaynak);
@@ -206,6 +234,8 @@ for (const kok of TARANAN) {
     for (const dize of bulunan) {
       // Bir önceki zincirin içinde kalan parça: anahtarı zaten yazıldı.
       if (dize.baslangic < zincirSonu) continue;
+      // `dil:atla-baslangic`/`-bitis` arasındaki blok: modele giden metin.
+      if (atlanmis(dize.baslangic)) continue;
 
       const metin = coz(dize.govde);
 
@@ -297,7 +327,7 @@ for (const kok of TARANAN) {
         // yani sözlükte karşılığı yoksa "eksik çeviri" olarak raporlanıyor.
         // Aksi halde işaret koymak işi bitirmiş gibi gösterirdi — bir kez
         // öyle oldu, 111 çevrilmemiş metin "tamam" görünüyordu.
-        if (dosyaAnahtar || /\/\/\s*dil:anahtar/.test(satirMetni)) {
+        if (dosyaAnahtar || anahtarBlogunda(dize.baslangic) || /\/\/\s*dil:anahtar/.test(satirMetni)) {
           // Dosya düzeyi işaret bütün dosyayı kapsıyor, yani içindeki her dizeyi
           // görüyor — import yollarını, hesaplanan özet şablonlarını, sayıları da.
           // Bunlar etiket değil; elenmezlerse sözlüğe çevrilemeyecek anahtarlar

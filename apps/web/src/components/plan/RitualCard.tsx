@@ -3,6 +3,7 @@ import type { PlanRitualPrompt } from "@projelio/shared";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { planning } from "../../api/planning";
 import { askLio } from "../../lib/askLio";
+import { useT } from "../../lib/i18n";
 
 interface Props {
   ritual: PlanRitualPrompt;
@@ -35,6 +36,7 @@ const KIND_INTRO: Record<string, string> = {
  */
 export default function RitualCard({ ritual, onDone }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [busy, setBusy] = useState(false);
 
   const skip = async () => {
@@ -92,7 +94,7 @@ export default function RitualCard({ ritual, onDone }: Props) {
               lineHeight: 1.5,
             }}
           >
-            <strong style={{ color: c.textPrimary, fontWeight: 500 }}>Geçen sefer:</strong> {ritual.previousSummary}
+            <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{t("Geçen sefer:")}</strong> {ritual.previousSummary}
           </p>
         )}
 
@@ -109,7 +111,7 @@ export default function RitualCard({ ritual, onDone }: Props) {
               cursor: "pointer",
             }}
           >
-            Lio ile planla
+            {t("Lio ile planla")}
           </button>
           <button
             onClick={onDone}
@@ -123,7 +125,7 @@ export default function RitualCard({ ritual, onDone }: Props) {
               cursor: "pointer",
             }}
           >
-            Kendim yaparım
+            {t("Kendim yaparım")}
           </button>
           <button
             onClick={skip}
@@ -138,7 +140,7 @@ export default function RitualCard({ ritual, onDone }: Props) {
               cursor: "pointer",
             }}
           >
-            Şimdi değil
+            {t("Şimdi değil")}
           </button>
         </div>
       </div>

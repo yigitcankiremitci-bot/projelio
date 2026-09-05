@@ -21,6 +21,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import CreateNativeFileMenu from "./CreateNativeFileMenu";
 import type { CreateNativeFileMenuHandle } from "./CreateNativeFileMenu";
 import FilePreviewModal from "./FilePreviewModal";
+import { useT } from "../lib/i18n";
 import {
   IconDownload,
   IconExternalLink,
@@ -103,6 +104,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   ref
 ) {
   const c = useThemeColors();
+  const t = useT();
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [googleStatus, setGoogleStatus] = useState<GoogleDriveStatus | null>(null);
   const [msStatus, setMsStatus] = useState<GoogleDriveStatus | null>(null);
@@ -206,7 +208,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       await filesApi.remove(victim.id, alsoTrash);
       setFiles((prev) => prev.filter((f) => f.id !== victim.id));
     } catch (e: any) {
-      setError(e?.message ?? "Dosya kaldırılamadı");
+      setError(e?.message ?? t("Dosya kaldırılamadı"));
     }
   };
 
@@ -256,7 +258,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           const created = await filesApi.importFromDrive(target, { sourceFileId: id, name, taskId, outputId });
           handleFileAdded(created);
         } catch (e: any) {
-          setPickerError(e?.message ?? "Dosya içe aktarılamadı");
+          setPickerError(e?.message ?? t("Dosya içe aktarılamadı"));
         }
       }).catch((e: Error) => setPickerError(e.message));
       return;
@@ -275,7 +277,9 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       if (createMenuRef.current) {
         createMenuRef.current.openMenu();
       } else {
-        setPickerError("Yeni dosya oluşturmak için önce Google Drive ya da OneDrive hesabınızı bağlayın (Ayarlar > Bağlı hesaplar).");
+        setPickerError(
+          t("Yeni dosya oluşturmak için önce Google Drive ya da OneDrive hesabınızı bağlayın (Ayarlar > Bağlı hesaplar).")
+        );
       }
     },
   }));
@@ -290,14 +294,14 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   useProjectFabAction(
     fabInHeader && !driveMissing
       ? {
-          label: "Dosya ekle",
+          label: t("Dosya ekle"),
           options: [
-            { label: "Dosya yükle", onClick: () => inputRef.current?.click() },
+            { label: t("Dosya yükle"), onClick: () => inputRef.current?.click() },
             ...(connectedProvider
               ? [
-                  { label: "Yeni dosya oluştur", onClick: () => createMenuRef.current?.openMenu() },
+                  { label: t("Yeni dosya oluştur"), onClick: () => createMenuRef.current?.openMenu() },
                   {
-                    label: connectedProvider === "microsoft" ? "OneDrive'dan seç" : "Drive'dan seç",
+                    label: connectedProvider === "microsoft" ? t("OneDrive'dan seç") : t("Drive'dan seç"),
                     onClick: () => handleBrowseDriveClick(),
                   },
                 ]
@@ -314,7 +318,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       {!compact && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
           <h3 style={{ fontSize: 19, fontWeight: 500, color: c.textPrimary, margin: 0, flex: 1 }}>
-            Dosyalar
+            {t("Dosyalar")}
           </h3>
           {/* CreateNativeFileMenu, düğmeler "+"a taşınsa da MONTE KALMALI:
               "Yeni dosya oluştur" seçeneği onun imperatif metodunu çağırıyor.
@@ -339,7 +343,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 }}
               >
                 <IconFolder size={16} color={c.textPrimary} />
-                {connectedProvider === "microsoft" ? "OneDrive'dan seç" : "Drive'dan seç"}
+                {connectedProvider === "microsoft" ? t("OneDrive'dan seç") : t("Drive'dan seç")}
               </button>
               )}
               <CreateNativeFileMenu
@@ -372,7 +376,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             }}
           >
             <IconUpload size={16} color={driveMissing ? c.textSecondary : "#fff"} />
-            Dosya yükle
+            {t("Dosya yükle")}
           </button>
           )}
         </div>
@@ -421,12 +425,12 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       >
         <IconUpload size={20} color={c.textSecondary} />
         <div style={{ marginTop: 6 }}>
-          {dragging ? "Bırakın, yükleyelim" : "Dosyaları buraya sürükleyin veya tıklayın"}
+          {dragging ? t("Bırakın, yükleyelim") : t("Dosyaları buraya sürükleyin veya tıklayın")}
         </div>
         <div style={{ fontSize: 13, marginTop: 3 }}>
           {departmentId
-            ? "Departmanın bağlı Drive/OneDrive klasöründe saklanır"
-            : "İşin bağlı Drive/OneDrive klasöründe saklanır"}
+            ? t("Departmanın bağlı Drive/OneDrive klasöründe saklanır")
+            : t("İşin bağlı Drive/OneDrive klasöründe saklanır")}
         </div>
       </div>
       )}
@@ -457,7 +461,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 onClick={() => dismissUpload(u.id)}
                 style={{ background: "transparent", border: "none", color: c.textSecondary, cursor: "pointer" }}
               >
-                Kapat
+                {t("Kapat")}
               </button>
             ) : (
               // Yükleme sürerken vazgeçilebilir: yanlış dosya seçildiğinde
@@ -467,7 +471,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 onClick={() => cancelUpload(u.id)}
                 style={{ background: "transparent", border: "none", color: c.textSecondary, cursor: "pointer", fontSize: 14 }}
               >
-                Vazgeç
+                {t("Vazgeç")}
               </button>
             )}
           </div>
@@ -489,12 +493,14 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       {error && <div style={{ color: c.danger, fontSize: 15, marginBottom: 10 }}>{error}</div>}
 
       {loading ? (
-        <div style={{ color: c.textSecondary, fontSize: 15 }}>Yükleniyor…</div>
+        <div style={{ color: c.textSecondary, fontSize: 15 }}>{t("Yükleniyor…")}</div>
       ) : files.length === 0 ? (
         <div style={{ color: c.textSecondary, fontSize: 15 }}>
           {readOnly
-            ? "Bağlı işlerde henüz dosya yok. Dosyalar işlere yüklenir; bir işi buraya bağlamak için \"İşi düzenle\" ekranını kullanın."
-            : "Henüz dosya eklenmemiş."}
+            ? t(
+                'Bağlı işlerde henüz dosya yok. Dosyalar işlere yüklenir; bir işi buraya bağlamak için "İşi düzenle" ekranını kullanın.'
+              )
+            : t("Henüz dosya eklenmemiş.")}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -534,11 +540,11 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                   </div>
                   <div style={{ fontSize: 13, color: c.textSecondary }}>
                     {file.status === "missing"
-                      ? `${driveProviderLabel(file)}'da bulunamadı`
+                      ? t("{saglayici}'da bulunamadı", { saglayici: driveProviderLabel(file) })
                       : [
                           // Üst kademede dosyanın hangi işten geldiği kritik bilgi.
                           readOnly ? file.jobTitle : null,
-                          showOrigin ? (file.projectId ? "Proje dosyası" : "İş geneli") : null,
+                          showOrigin ? (file.projectId ? t("Proje dosyası") : t("İş geneli")) : null,
                           fileKindLabel(file),
                           file.sizeBytes ? formatFileSize(file.sizeBytes) : null,
                         ]
@@ -548,17 +554,17 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 </div>
               </div>
 
-              <IconButton title="İndir" onClick={() => void handleDownload(file)}>
+              <IconButton title={t("İndir")} onClick={() => void handleDownload(file)}>
                 <IconDownload size={16} color={c.textSecondary} />
               </IconButton>
               <IconButton
-                title={`${driveProviderLabel(file)}'da düzenle`}
+                title={t("{saglayici}'da düzenle", { saglayici: driveProviderLabel(file) })}
                 onClick={() => window.open(driveEditUrl(file), "_blank", "noopener,noreferrer")}
               >
                 <IconExternalLink size={16} color={c.textSecondary} />
               </IconButton>
               {!readOnly && (
-                <IconButton title="Kaldır" onClick={() => setPendingDelete(file)}>
+                <IconButton title={t("Kaldır")} onClick={() => setPendingDelete(file)}>
                   <IconTrash size={16} color={c.danger} />
                 </IconButton>
               )}
@@ -583,8 +589,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
       {pendingDelete && (
         <ConfirmDialog
-          title="Dosyayı kaldır"
-          message={`"${pendingDelete.name}" Projelio'dan kaldırılacak.`}
+          title={t("Dosyayı kaldır")}
+          message={t('"{dosya}" Projelio\'dan kaldırılacak.', { dosya: pendingDelete.name })}
           extra={
             // Eskiden dosya Drive'da OLDUĞU GİBİ kalıyordu ve pencere bunu
             // yazıyordu; kullanıcı için sonuç, sildiğini sandığı dosyanın
@@ -592,10 +598,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             // kaldır" — çöp kutusuna taşındığı için geri alınabilir.
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, color: c.textSecondary }}>
               <input type="checkbox" checked={alsoTrash} onChange={(e) => setAlsoTrash(e.target.checked)} />
-              {driveProviderLabel(pendingDelete)}'da da çöp kutusuna taşı
+              {t("{saglayici}'da da çöp kutusuna taşı", { saglayici: driveProviderLabel(pendingDelete) })}
             </label>
           }
-          confirmLabel="Kaldır"
+          confirmLabel={t("Kaldır")}
           onConfirm={handleDelete}
           onCancel={() => setPendingDelete(null)}
         />
@@ -641,10 +647,11 @@ function IconButton({
 
 function DriveNotice({ google, microsoft }: { google: GoogleDriveStatus | null; microsoft: GoogleDriveStatus | null }) {
   const c = useThemeColors();
+  const t = useT();
   const needsReconnect = Boolean(google?.needsReconnect || microsoft?.needsReconnect);
   const message = needsReconnect
-    ? "Bulut depolama erişiminiz sona ermiş. Dosya yüklemek için yeniden bağlanın."
-    : "Dosya yükleyebilmek için önce Google Drive ya da OneDrive hesabınızı bağlayın.";
+    ? t("Bulut depolama erişiminiz sona ermiş. Dosya yüklemek için yeniden bağlanın.")
+    : t("Dosya yükleyebilmek için önce Google Drive ya da OneDrive hesabınızı bağlayın.");
 
   return (
     <div
@@ -671,7 +678,7 @@ function DriveNotice({ google, microsoft }: { google: GoogleDriveStatus | null; 
         href="/settings"
         style={{ fontSize: 15, fontWeight: 500, color: c.primary, textDecoration: "none", whiteSpace: "nowrap" }}
       >
-        Ayarlar'a git
+        {t("Ayarlar'a git")}
       </a>
     </div>
   );

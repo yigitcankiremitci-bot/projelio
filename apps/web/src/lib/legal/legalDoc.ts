@@ -1,3 +1,5 @@
+import { getLocale } from "../i18n/depo";
+
 /**
  * Yasal metinlerin ortak iskeleti.
  *
@@ -47,6 +49,15 @@ export function initialLegalLang(): LegalLang {
   if (fromQuery === "en" || fromQuery === "tr") return fromQuery;
   const saved = localStorage.getItem(LEGAL_LANG_KEY);
   if (saved === "en" || saved === "tr") return saved;
+  // Uygulamanın dili: kullanıcı Ayarlar'dan İngilizce seçtiyse belge de
+  // İngilizce açılmalı. Tarayıcı dilinden ÖNCE bakılıyor çünkü bu açık bir
+  // seçim, o ise tahmin (bkz. lib/i18n).
+  //
+  // Belgenin kendi TR/EN düğmesi DURUYOR ve bunu ezebiliyor: metnin Türkçesi
+  // hukuken bağlayıcı olan sürüm, İngilizce arayüz kullanan birinin de aslına
+  // bakabilmesi gerekiyor.
+  const uygulamaDili = getLocale();
+  if (uygulamaDili) return uygulamaDili;
   // Tarayıcısı Türkçe olmayan ziyaretçiye İngilizce açılsın.
   return navigator.language?.toLowerCase().startsWith("tr") ? "tr" : "en";
 }

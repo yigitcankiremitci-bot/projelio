@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { useUndo } from "../lib/undo";
+import { useT } from "../lib/i18n";
 
 export type MoveTarget = "project" | "department" | "output";
 type TargetType = MoveTarget;
@@ -32,6 +33,7 @@ interface Props {
 // projeler/departmanlar (iş/organizasyon sınırı olmadan) döner.
 export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const { pushUndo } = useUndo();
   const [targetType, setTargetType] = useState<TargetType>("project");
   const [outputs, setOutputs] = useState<Output[]>([]);
@@ -153,7 +155,7 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
   };
 
   return (
-    <Modal title="Görevi taşı" onClose={onClose}>
+    <Modal title={t("Görevi taşı")} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
           {taskIds.length > 1 ? `${taskIds.length} görev` : "Görev"} seçtiğin hedefe taşınacak (varsa alt görevleriyle birlikte).
@@ -174,7 +176,7 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
               fontWeight: 500,
             }}
           >
-            Proje
+            {t("Proje")}
           </button>
           <button
             type="button"
@@ -190,7 +192,7 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
               fontWeight: 500,
             }}
           >
-            Departman
+            {t("Departman")}
           </button>
           {canTargetOutput && (
             <button
@@ -207,16 +209,16 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
                 fontWeight: 500,
               }}
             >
-              Çıktı
+              {t("Çıktı")}
             </button>
           )}
         </div>
 
         {targetType === "output" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Hedef çıktı</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Hedef çıktı")}</label>
             <select value={targetId} onChange={(e) => setTargetId(e.target.value)} style={{ width: "100%" }}>
-              <option value="">Çıktıdan çıkar</option>
+              <option value="">{t("Çıktıdan çıkar")}</option>
               {outputs.map((output) => (
                 <option key={output.id} value={output.id}>
                   {output.title}
@@ -233,14 +235,14 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
             {targetType === "project" ? "Hedef proje" : "Hedef departman"}
           </label>
           {loading ? (
-            <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Yükleniyor…</p>
+            <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
           ) : options.length === 0 ? (
             <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
               {targetType === "project" ? "Erişebildiğin proje yok." : "Erişebildiğin departman yok."}
             </p>
           ) : (
             <select value={targetId} onChange={(e) => setTargetId(e.target.value)} style={{ width: "100%" }}>
-              <option value="">Seç…</option>
+              <option value="">{t("Seç…")}</option>
               {options.map((o) => (
                 <option key={o.id} value={o.id}>
                   {targetType === "project" ? (o as Project).title : (o as Department).name}

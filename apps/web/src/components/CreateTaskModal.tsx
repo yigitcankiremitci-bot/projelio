@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import AssigneePicker from "./AssigneePicker";
 import AutoGrowTextarea from "./AutoGrowTextarea";
+import { useT } from "../lib/i18n";
 
 interface Props {
   // Sabit bir proje verilirse proje seçimi gösterilmez (ör. proje sayfasından açılınca).
@@ -35,6 +36,7 @@ export default function CreateTaskModal({
   onCreated,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const formRef = useRef<HTMLFormElement>(null);
   const [projects, setProjects] = useState<Project[]>(projectsProp ?? []);
   const [projectId, setProjectId] = useState(fixedProjectId ?? "");
@@ -132,16 +134,16 @@ export default function CreateTaskModal({
   return (
     <Modal title={fixedAssignedToName ? `${fixedAssignedToName} için yeni görev` : "Yeni görev"} onClose={onClose}>
       {loadingProjects ? (
-        <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>Projeler yükleniyor…</p>
+        <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>{t("Projeler yükleniyor…")}</p>
       ) : noProjects ? (
         <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>
-          Görev eklemek için önce bir proje oluşturman gerekiyor.
+          {t("Görev eklemek için önce bir proje oluşturman gerekiyor.")}
         </p>
       ) : (
         <form ref={formRef} onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {showProjectSelect && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 15, color: c.textSecondary }}>Proje</label>
+              <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Proje")}</label>
               <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={{ width: "100%" }}>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -153,14 +155,14 @@ export default function CreateTaskModal({
           )}
 
           {loadingOutputs ? (
-            <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>Çıktılar yükleniyor…</p>
+            <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>{t("Çıktılar yükleniyor…")}</p>
           ) : (
             <>
               {!noOutputs && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ fontSize: 15, color: c.textSecondary }}>Çıktı (opsiyonel)</label>
+                  <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Çıktı (opsiyonel)")}</label>
                   <select value={outputId} onChange={(e) => setOutputId(e.target.value)} style={{ width: "100%" }}>
-                    <option value="">Çıktısız — proje görevi</option>
+                    <option value="">{t("Çıktısız — proje görevi")}</option>
                     {outputs.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.title}
@@ -171,7 +173,7 @@ export default function CreateTaskModal({
               )}
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 15, color: c.textSecondary }}>Görev başlığı</label>
+                <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Görev başlığı")}</label>
                 {/* Uzun başlık tek satırda yatay kayıp okunmaz hale gelmesin
                     diye sararak büyüyen alan (bkz. AutoGrowTextarea). */}
                 <AutoGrowTextarea
@@ -180,7 +182,7 @@ export default function CreateTaskModal({
                   onSubmit={() => formRef.current?.requestSubmit()}
                   onCancel={onClose}
                   ariaLabel="Görev başlığı"
-                  placeholder="Örn. Logo revizyonu"
+                  placeholder={t("Örn. Logo revizyonu")}
                   maxLength={200}
                   required
                   minHeight={42}
@@ -188,12 +190,12 @@ export default function CreateTaskModal({
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 15, color: c.textSecondary }}>Bitiş tarihi</label>
+                <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bitiş tarihi")}</label>
                 <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} required style={{ width: "100%" }} />
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 15, color: c.textSecondary }}>Tahmini süre (opsiyonel)</label>
+                <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tahmini süre (opsiyonel)")}</label>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
                     type="number"
@@ -201,7 +203,7 @@ export default function CreateTaskModal({
                     step="0.5"
                     value={durationValue}
                     onChange={(e) => setDurationValue(e.target.value)}
-                    placeholder="Örn. 4"
+                    placeholder={t("Örn. 4")}
                     style={{ flex: 1 }}
                   />
                   <select
@@ -209,14 +211,14 @@ export default function CreateTaskModal({
                     onChange={(e) => setDurationUnit(e.target.value as "hours" | "days")}
                     style={{ flex: 1 }}
                   >
-                    <option value="hours">Saat</option>
-                    <option value="days">Gün</option>
+                    <option value="hours">{t("Saat")}</option>
+                    <option value="days">{t("Gün")}</option>
                   </select>
                 </div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 15, color: c.textSecondary }}>İlgili kişi</label>
+                <label style={{ fontSize: 15, color: c.textSecondary }}>{t("İlgili kişi")}</label>
                 {fixedAssignedTo ? (
                   <div
                     style={{

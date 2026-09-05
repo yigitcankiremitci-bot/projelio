@@ -163,7 +163,7 @@ export const hatalar: TranslationDict = {
   "Kayıt kendisiyle birleştirilemez": "A record can't be merged with itself",
   "Kişi adı gerekli": "The contact name is required",
   "Kişi seçin": "Select a person",
-  "Kullanıcı adı 3-30 karakter olmalı; sadece küçük harf, rakam, nokta ve alt çizgi içerebilir.": "A username must be 3-30 characters and can contain only lowercase letters, digits, dots and underscores.",
+  "Kullanıcı adı 3-30 karakter olmalı; sadece harf, rakam, nokta ve alt çizgi içerebilir.": "A username must be 3-30 characters and can contain only lowercase letters, digits, dots and underscores.",
   "Mesai bitişi başlangıcından sonra olmalı.": "The end of the workday must be after its start.",
   "Modül anahtarı gerekli": "The module key is required",
   "Numara için bir etiket girin": "Enter a label for the number",
@@ -471,4 +471,20 @@ export const hatalar: TranslationDict = {
   "Veritabanına şu an ulaşılamıyor. Bağlantını kontrol edip tekrar dene.":
     "The database can't be reached right now. Check your connection and try again.",
   "Beklenmeyen bir hata oluştu.": "Something unexpected went wrong.",
+  // ─────────────────────────────────────────────── DTO doğrulama mesajları
+  //
+  // class-validator dekoratörlerinin `message:` alanı. Doğrudan kullanıcının
+  // ekranına çıkıyorlar ama ne t() ne istisna oldukları için denetimden uzun
+  // süre kaçtılar; biri sözlükte tek sözcük farkla duruyordu ve sessizce
+  // Türkçe kalıyordu (bkz. scripts/dil-denetimi.mjs, `message:` kuralı).
+  "Proje başlığı boş olamaz": "The project title can't be empty",
+  "Bütçe bir sayı olmalı": "The budget must be a number",
+  "Bütçe negatif olamaz": "The budget can't be negative",
+  "Hatırlatma süresi bir sayı olmalı": "The reminder time must be a number",
+  "Hatırlatma süresi negatif olamaz": "The reminder time can't be negative",
+  // Aynı kuralın iki ifadesi: DTO "sadece harf" diyor (regex a-zA-Z kabul
+  // ediyor), servis ise "sadece küçük harf" (normalizeUsername küçültüyor).
+  // İkisi de kullanıcıya çıkabildiği için ikisi de sözlükte.
+  "Kullanıcı adı 3-30 karakter olmalı; sadece küçük harf, rakam, nokta ve alt çizgi içerebilir.":
+    "A username must be 3-30 characters and can contain only lowercase letters, digits, dots and underscores.",
 };

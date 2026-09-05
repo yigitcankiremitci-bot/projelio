@@ -295,9 +295,15 @@ for (const kok of TARANAN) {
       // ve o hâlde notifyUser aralığına düşmüyor.
       // Yalnızca backend'de: `Metin` tipi orada tanımlı (common/i18n). Web'de
       // "metin" yaygın bir alan adı ve alakasız nesnelere takılıyordu.
+      // `metin:` → bildirim gövdesi (Metin tipi).
+      // `message:` → class-validator doğrulama mesajı (@Matches, @MinLength…).
+      //   Bunlar da doğrudan kullanıcının ekranına çıkıyor ve çevirisi HTTP
+      //   sınırındaki filtrede yapılıyor — yani sözlük ANAHTARI. Denetim bunu
+      //   görmediği sürece kaynakla sözlük arasındaki tek sözcüklük bir fark
+      //   sessizce metni Türkçe bırakıyordu; bir kez öyle oldu.
       const metinAlani =
         goreli.startsWith("backend/") &&
-        /\bmetin:\s*$/.test(kaynak.slice(Math.max(0, dize.baslangic - 20), dize.baslangic));
+        /\b(metin|message):\s*$/.test(kaynak.slice(Math.max(0, dize.baslangic - 20), dize.baslangic));
 
       const yolGibi = /^\/|^https?:\/\//.test(metin);
       const turGibi = /^[a-z][a-z0-9_]*$/.test(metin);

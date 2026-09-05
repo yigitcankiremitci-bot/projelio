@@ -110,18 +110,45 @@ for r in runs:
 done
 [ "$sonuc" = "success" ] || vazgec "CI 15 dakikada bitmedi; Actions sayfasına bak."
 
-# Canlıdaki giriş paketinin adı her derlemede değişir — dağıtımın gerçekten
-# yayına çıktığını anlamanın dışarıdan tek yolu bu.
-onceki="$(curl -fsS --max-time 15 https://app.projelio.app/ | grep -oE 'index-[A-Za-z0-9_-]+\.js' | head -1 || true)"
+# Dağıtımın gerçekten çıktığını dışarıdan nasıl anlıyoruz:
+#
+#  · Web değiştiyse giriş paketinin adı değişir (her derlemede yeni hash).
+#  · Web DEĞİŞMEDİYSE paket adı da değişmez — bu doğru davranıştır, arıza değil.
+#    Eskiden bu ayrım yoktu ve backend'e dokunan her yayın 15 dakika bekleyip
+#    "yeni paket görünmedi" diye yanlış alarm veriyordu. Bir kez öyle oldu,
+#    dağıtım sağlamken sunucuda arıza arandı.
+#  · O durumda backend'in yeniden başlamasına bakılıyor: /health/ready
+#    uptimeSeconds'ı düşerse yeni sürüm ayağa kalkmış demektir.
+# `gidecek` push'tan ÖNCE hesaplandı (origin/main..HEAD), yani gönderilen
+# commit'lerin listesi elimizde. Web derlemesini etkileyen yollar: uygulamanın
+# kendisi ve ondan derlenen paylaşılan paket.
+web_degisti=0
+if git diff --name-only origin/main HEAD 2>/dev/null | grep -qE '^(apps/web|packages/shared)/'; then
+  web_degisti=1
+fi
+
+paket() { curl -fsS --max-time 15 https://app.projelio.app/ | grep -oE 'index-[A-Za-z0-9_-]+\.js' | head -1 || true; }
+uptime_sn() { curl -fsS --max-time 15 https://api.projelio.app/health/ready | grep -oE '"uptimeSeconds":[0-9]+' | grep -oE '[0-9]+' || echo 999999; }
+
+onceki="$(paket)"
+onceki_uptime="$(uptime_sn)"
 echo "Dağıtım bekleniyor (VPS dakikada bir bakıyor)…"
 for _ in $(seq 1 60); do
   sleep 15
-  simdi="$(curl -fsS --max-time 15 https://app.projelio.app/ | grep -oE 'index-[A-Za-z0-9_-]+\.js' | head -1 || true)"
-  if [ -n "$simdi" ] && [ "$simdi" != "$onceki" ]; then
-    echo "✓ Yayında: $onceki → $simdi"
-    echo "  Tarayıcıda eski paket önbellekte kalmış olabilir: Cmd+Shift+R."
-    exit 0
+  if [ "$web_degisti" = "1" ]; then
+    simdi="$(paket)"
+    if [ -n "$simdi" ] && [ "$simdi" != "$onceki" ]; then
+      echo "✓ Yayında: $onceki → $simdi"
+      echo "  Tarayıcıda eski paket önbellekte kalmış olabilir: Cmd+Shift+R."
+      exit 0
+    fi
+  else
+    simdi_uptime="$(uptime_sn)"
+    if [ "$simdi_uptime" -lt "$onceki_uptime" ]; then
+      echo "✓ Yayında: backend yeniden başladı (bu yayın web'e dokunmuyor, paket adı aynı kalır)."
+      exit 0
+    fi
   fi
 done
-echo "⚠ 15 dakikada yeni paket görünmedi. CI yeşildi, yani sorun dağıtım tarafında:"
-echo "  ssh projelio@100.111.242.24 'journalctl -u projelio-deploy -n 50 --no-pager'"
+echo "⚠ 15 dakikada dağıtım görünmedi. CI yeşildi, yani sorun dağıtım tarafında:"
+echo "  ssh projelio@100.111.242.24 'journalctl -u projelio-deploy.service -n 50 --no-pager'"

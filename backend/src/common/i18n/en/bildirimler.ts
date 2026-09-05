@@ -361,4 +361,15 @@ export const bildirimler: TranslationDict = {
     "You're about to add a payout entry of ₺{tutar} to the project",
   "{moduleName} · {summary}": "{moduleName} · {summary}",
   "seçili öğe": "the selected item",
+  // ─────────────────────────────────────────────── Kimlik akışı yanıtları
+  //
+  // Bunlar hesap VARLIĞINI sızdırmamak için bilerek belirsiz yazılmış
+  // ("kayıtlıysa"); çeviride de o belirsizlik korunmalı.
+  "Hesabın oluşturuldu. Girişten önce e-postana gönderdiğimiz bağlantıyla adresini doğrula.":
+    "Your account has been created. Verify your address with the link we emailed you before signing in.",
+  "Bu e-posta adresi kayıtlıysa, şifre sıfırlama bağlantısı gönderildi.":
+    "If that email address is registered, a password reset link has been sent.",
+  "Bu adres kayıtlı ve henüz doğrulanmamışsa, yeni bir doğrulama bağlantısı gönderildi.":
+    "If that address is registered and not yet verified, a new verification link has been sent.",
+  "Şifreniz güncellendi. Şimdi giriş yapabilirsiniz.": "Your password has been updated. You can sign in now.",
 };

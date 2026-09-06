@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import type { DepartmentMember, JobMember, SocialAccount, SocialPost, SocialPostStatus } from "@projelio/shared";
 import { safeExternalUrl } from "@projelio/shared";
 import { api } from "../api/client";
@@ -33,7 +34,6 @@ import SocialCredentialsModal from "./SocialCredentialsModal";
 import SocialPostComposer from "./SocialPostComposer";
 import { IconChevronLeft, IconChevronRight, IconEdit, IconExternalLink, IconTrash } from "./icons";
 import { useDragScroll } from "../lib/useDragScroll";
-import { useIsDesktop } from "../lib/useIsDesktop";
 
 interface Props {
   organizationId?: string;
@@ -61,7 +61,6 @@ type View = "calendar" | "list" | "accounts";
 export default function SocialMediaPanel({ organizationId, departmentId, jobId, canWrite = true }: Props) {
   const c = useThemeColors();
   const t = useT();
-  const isDesktop = useIsDesktop();
   const havuzScrollRef = useDragScroll<HTMLDivElement>();
   const panoScrollRef = useDragScroll<HTMLDivElement>();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -75,14 +74,14 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   // Giriş bilgileri ayrı bir modalde: şifre hesap formunun bir alanı DEĞİL.
   // Hesabı düzenleyen herkes şifreyi görmüyor (bkz. SocialCredentialsModal).
   const [credentialsFor, setCredentialsFor] = useState<SocialAccount | null>(null);
-  // Telefonda hepsini birden açmak işe yaramıyor (bkz. openAccounts): orada
-  // düğme bu listeyi açar, kullanıcı hangi hesaba gideceğini kendisi seçer.
+  // Hesap seçme listesi. Düğme hesapları KENDİSİ açmıyor; sebebi tarayıcının
+  // kuralı: window.open kullanıcı hareketini tüketiyor, yani tek tıklamadan
+  // yalnızca BİR sekme açılabiliyor, kalanı engelleniyordu ("1 sekme
+  // engellendi" uyarısı). Listede her satır kullanıcının kendi tıklamasıyla
+  // açıldığı için engel hiç devreye girmiyor, açılır pencere izni de
+  // gerekmiyor. Telefonda ayrıca doğru davranış: sekmeler birbirinin üstüne
+  // binmiyor, kullanıcı hangi uygulamaya gideceğini seçiyor.
   const [accountLinks, setAccountLinks] = useState(false);
-  // Tarayıcı bir kez engellediyse aynı sayfada tekrar denemenin anlamı yok:
-  // ikinci tıklama da aynı uyarıyı üretirdi. Bilgi bilerek kalıcı DEĞİL
-  // (localStorage değil, state) — kullanıcı açılır pencere iznini verip
-  // sayfayı yenilediğinde "hepsini aç" kendiliğinden geri gelsin.
-  const [popupsBlocked, setPopupsBlocked] = useState(false);
   const [platformFilter, setPlatformFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [error, setError] = useState("");
@@ -343,49 +342,6 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         .filter((x): x is { account: SocialAccount; url: string } => x.url !== null),
     [accounts]
   );
-
-  /**
-   * Hesapları yeni sekmelerde açar — YALNIZCA masaüstünde.
-   *
-   * Telefonda anlamsız: sekmeler arka arkaya açılıp birbirinin üstüne biniyor,
-   * üstelik her adres kendi uygulamasına (Instagram, Facebook) atladığı için
-   * kullanıcı ilk uygulamada kalıyor, kalanlar arkada kayboluyor. Orada düğme
-   * bunun yerine hesap listesini açar (bkz. accountLinks).
-   *
-   * Tarayıcılar tek bir tıklamadan doğan İKİNCİ pencereden itibaren engel
-   * çıkarabiliyor; engellenen sekme sessizce kaybolduğu için kullanıcı
-   * "düğme çalışmıyor" sanıyordu. Bu yüzden açılamayanları sayıp söylüyoruz.
-   *
-   * `noopener` seçenek dizesiyle verilmiyor: o hâlde window.open şartname
-   * gereği null döner ve başarılı açılışları da engellenmiş sayardık. Bunun
-   * yerine pencere referansındaki opener elle koparılıyor.
-   */
-  const openAccountsInBrowser = (urls: string[]) => {
-    let blocked = 0;
-    for (const url of urls) {
-      const w = window.open(url, "_blank");
-      if (w) w.opener = null;
-      else blocked++;
-    }
-    // Engel çıktıysa kullanıcıyı hata mesajıyla baş başa bırakmıyoruz: Chrome
-    // tek tıklamadan doğan İLK pencereyi geçirip kalanını engelliyor, yani
-    // "2 hesap" diyen düğme bir hesabı açıp diğerine hata veriyordu. Aynı
-    // listeyi modalde açmak, kullanıcının kalanları tek tıkla (kendi
-    // hareketiyle, dolayısıyla engelsiz) açmasını sağlıyor.
-    if (blocked > 0) {
-      setPopupsBlocked(true);
-      setAccountLinks(true);
-      setBanner({
-        kind: "error",
-        text: t(
-          "Tarayıcı {n} sekmeyi engelledi. Listeden tek tek açabilir ya da adres çubuğundaki engellenen pencere simgesinden bu siteye izin verebilirsiniz.",
-          { n: blocked }
-        ),
-      });
-    } else {
-      setBanner(null);
-    }
-  };
 
   const archiveAccount = async (account: SocialAccount) => {
     if (
@@ -1158,6 +1114,23 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   );
 
   // ============================================================ Yerleşim
+
+  /** Hesap açma düğmesinin stili — tek hesapta <a>, çoklu hesapta <button>. */
+  const accountsButtonStyle: CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 7,
+    fontSize: 13,
+    fontWeight: 600,
+    padding: "8px 14px",
+    borderRadius: 9,
+    cursor: "pointer",
+    background: c.accent,
+    border: "none",
+    color: "#fff",
+    boxShadow: `0 1px 4px ${c.accent}55`,
+  };
+
   const tab = (value: View, text: string) => (
     <button
       key={value}
@@ -1204,45 +1177,38 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
             )
           )}
 
-          {/* Kanalları tek tıkla açmak, sosyal medya sorumlusunun gün içinde EN
-              ÇOK yaptığı iş — bu yüzden Hesaplar sekmesinin içinde değil,
-              modülün başlık satırının SAĞ ucunda: görünüm (takvim/akış/
-              hesaplar) fark etmeksizin hep aynı yerde, modüle girer girmez
-              göz hizasında. Paneldeki tek accent renkli düğme olduğu için
-              çevresindeki çerçeveli düğmelerle karışmıyor.
+          {/* Kanallara gitmek, sosyal medya sorumlusunun gün içinde EN ÇOK
+              yaptığı iş — bu yüzden Hesaplar sekmesinin içinde değil, modülün
+              başlık satırının SAĞ ucunda: görünüm (takvim/akış/hesaplar) fark
+              etmeksizin hep aynı yerde, modüle girer girmez göz hizasında.
+              Paneldeki tek accent renkli düğme olduğu için çevresindeki
+              çerçeveli düğmelerle karışmıyor.
               Adresi olmayan kanal (blog/diğer, adres girilmemiş) sayıya
               girmediği için accounts.length kullanılmıyor. */}
-          {openableAccounts.length > 0 && (
-            <button
-              onClick={() =>
-                isDesktop && !popupsBlocked
-                  ? openAccountsInBrowser(openableAccounts.map((x) => x.url))
-                  : setAccountLinks(true)
-              }
-              title={openableAccounts.map((x) => `${accountLabel(x.account)} — ${x.url}`).join("\n")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-                fontSize: 13,
-                fontWeight: 600,
-                padding: "8px 14px",
-                borderRadius: 9,
-                cursor: "pointer",
-                background: c.accent,
-                border: "none",
-                color: "#fff",
-                boxShadow: `0 1px 4px ${c.accent}55`,
-              }}
-            >
-              <IconExternalLink size={15} color="#fff" />
-              {!isDesktop
-                ? t("Hesapları aç")
-                : openableAccounts.length === 1
-                  ? t("Hesabı tarayıcıda aç")
-                  : t("{n} hesabı tarayıcıda aç", { n: openableAccounts.length })}
-            </button>
-          )}
+          {openableAccounts.length > 0 &&
+            // Tek hesapta araya liste koymak gereksiz bir tık: düğme doğrudan
+            // o hesabın bağlantısı oluyor.
+            (openableAccounts.length === 1 ? (
+              <a
+                href={openableAccounts[0].url}
+                target="_blank"
+                rel="noreferrer"
+                title={`${accountLabel(openableAccounts[0].account)} — ${openableAccounts[0].url}`}
+                style={{ ...accountsButtonStyle, textDecoration: "none" }}
+              >
+                <IconExternalLink size={15} color="#fff" />
+                {t("Hesabı tarayıcıda aç")}
+              </a>
+            ) : (
+              <button
+                onClick={() => setAccountLinks(true)}
+                title={openableAccounts.map((x) => `${accountLabel(x.account)} — ${x.url}`).join("\n")}
+                style={accountsButtonStyle}
+              >
+                <IconExternalLink size={15} color="#fff" />
+                {t("{n} hesabı aç", { n: openableAccounts.length })}
+              </button>
+            ))}
         </div>
       </div>
 
@@ -1416,8 +1382,8 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         />
       )}
 
-      {/* Telefonda "hepsini aç"ın karşılığı: hesabı kullanıcı seçer, satır
-          doğrudan o kanalın uygulamasına gider. Satırlar buton değil <a>:
+      {/* Hesap seçme listesi: satır doğrudan o kanalın adresine gider.
+          Satırlar buton değil <a>:
           telefonda bağlantıyı uygulamaya yönlendiren şey (universal link)
           tarayıcının kendi gezinmesi, window.open'la açılan sekme çoğu zaman
           uygulamayı değil web sürümünü açıyor. */}
@@ -1425,11 +1391,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         <Modal title={t("Hesapları aç")} onClose={() => setAccountLinks(false)} maxWidth={420}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.5 }}>
-              {popupsBlocked
-                ? t(
-                    "Açmak istediğiniz hesabı seçin. Hepsinin tek tıkla açılması için adres çubuğundaki engellenen pencere simgesinden bu siteye açılır pencere izni verip sayfayı yenileyin."
-                  )
-                : t("Açmak istediğiniz hesabı seçin.")}
+              {t("Açmak istediğiniz hesabı seçin. Her hesap yeni sekmede açılır.")}
             </span>
             {openableAccounts.map(({ account: a, url }) => (
               <a

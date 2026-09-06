@@ -7,6 +7,7 @@ import { useLiveRoom } from "../lib/liveRoom";
 import EditOrganizationModal from "../components/EditOrganizationModal";
 import FilesPanel from "../components/FilesPanel";
 import DepartmentsPanel, { DepartmentsPanelHandle } from "../components/DepartmentsPanel";
+import OrgTasksPanel from "../components/OrgTasksPanel";
 import ProductsPanel, { ProductsPanelHandle } from "../components/ProductsPanel";
 import ModulesPanel from "../components/ModulesPanel";
 import OrgBudgetPanel, { OrgBudgetPanelHandle } from "../components/OrgBudgetPanel";
@@ -29,11 +30,11 @@ import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings, IconLayers } from "../components/icons";
 import { useT } from "../lib/i18n";
 
-// Şirket akışında görev/tamamlanan-görev karışımı yok — organizasyon seviyesinde
-// tek bir görev listesi kavramı yok (görevler departmanlara özgü, kendi Sosyal
-// sekmelerinde zaten gösteriliyor). Sabit boş dizi, her render'da yeni referans
-// oluşup FeedPanel'in gereksiz yeniden yüklenmesine yol açmasın diye modül
-// seviyesinde tutuluyor.
+// Şirket AKIŞINDA görev/tamamlanan-görev karışımı yok: paylaşımlar ile görevler
+// ayrı şeyler ve akışın altına görev listesi asmak ikisini karıştırıyordu.
+// Görevler kendi sekmesinde duruyor (bkz. "tasks" / OrgTasksPanel). Sabit boş
+// dizi, her render'da yeni referans oluşup FeedPanel'in gereksiz yeniden
+// yüklenmesine yol açmasın diye modül seviyesinde tutuluyor.
 const NO_TASKS: Task[] = [];
 
 // Not: bir organizasyonun (şirket/işletme) "İşler" görünümü yoktur — iş (job) kavramı
@@ -73,7 +74,9 @@ export default function OrganizationDetail() {
   // yetkisi olmayan ?tab=budget ile gelse bile Anasayfa'ya düşer.
   // Sekme yetkileri sunucudan gelir (bkz. OrganizationAccess); istemci çıkarım yapmaz.
   const access = organization?.viewerAccess;
-  const openCoreTabs = visibleOrgTabs(access).map((t) => t.key);
+  // Sahibinin ayarlardan kapattığı sekmeler de daraltır (bkz. Organization.hiddenTabs).
+  const hiddenTabs = organization?.hiddenTabs;
+  const openCoreTabs = visibleOrgTabs(access, hiddenTabs).map((t) => t.key);
   const requestedTab: OrgTab =
     CORE_ORG_TABS.includes(tabParam ?? "") || openModuleTab ? (tabParam as OrgTab) : "home";
   // Kapalı bir çekirdek sekme istendiyse Anasayfa'ya düş (modül sekmeleri kendi
@@ -140,10 +143,11 @@ export default function OrganizationDetail() {
       onChange={setActiveTab}
       moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
       access={access}
+      hiddenTabs={hiddenTabs}
       style={{ marginBottom: 0 }}
       scrollable
     />,
-    [activeTab, moduleTabs, access],
+    [activeTab, moduleTabs, access, hiddenTabs],
     tabsRef
   );
 
@@ -246,6 +250,7 @@ export default function OrganizationDetail() {
             onChange={setActiveTab}
             moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
             access={access}
+            hiddenTabs={hiddenTabs}
           />
         </div>
 
@@ -280,6 +285,7 @@ export default function OrganizationDetail() {
           </>
         )}
         {activeTab === "departments" && <DepartmentsPanel organizationId={id} layout="grid" />}
+        {activeTab === "tasks" && <OrgTasksPanel organizationId={id} organizationName={organization?.name} />}
         {/* Sekme zaten gizli; ?tab= ile zorlansa da panel açılmasın (sunucu 403 döner). */}
         {activeTab === "products" && access?.canViewCommercial !== false && (
           <ProductsPanel organizationId={id} departmentId={productDepartmentId} layout="grid" />

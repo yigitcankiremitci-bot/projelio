@@ -33,6 +33,13 @@ export class TasksController {
     return this.tasksService.findByDepartment(departmentId, req.user.userId);
   }
 
+  // Şirket sayfasındaki "Görevler" sekmesi: organizasyona bağlı tüm
+  // departmanların görevleri tek listede (bkz. findByOrganization).
+  @Get("organizations/:organizationId/tasks")
+  findByOrganization(@Param("organizationId") organizationId: string, @Req() req: any) {
+    return this.tasksService.findByOrganization(organizationId, req.user.userId);
+  }
+
   @Post("departments/:departmentId/tasks")
   createForDepartment(@Param("departmentId") departmentId: string, @Body() body: CreateTaskDto, @Req() req: any) {
     return this.tasksService.createForDepartment(departmentId, body, req.user.userId);

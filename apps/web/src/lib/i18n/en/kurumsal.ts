@@ -2,6 +2,14 @@ import type { TranslationDict } from "@projelio/shared";
 
 /** Organizasyon, departman, grup, kadro. */
 export const kurumsal: TranslationDict = {
+  // ─────────────────────────────────────────────── Sekme görünürlüğü ayarı
+  "Görünecek sekmeler": "Visible tabs",
+  "Sayfanın açılış sekmesi kapatılamaz": "The page's opening tab cannot be turned off",
+  "Kapattığın sekme bu sayfada hiç görünmez. İçerik silinmez; sekmeyi geri açtığında yerinde durur.":
+    "A tab you turn off never appears on this page. Nothing is deleted — turn it back on and the content is still there.",
+  "Departmanlarda henüz görev yok. Görevler departman sayfalarından eklenir.":
+    "No tasks in any department yet. Tasks are added from the department pages.",
+
   // ─────────────────────────────────────────────── Departman kadrosu
   Kadro: "Staff",
   "Bu departmanda henüz kadro yok.": "No staff in this department yet.",

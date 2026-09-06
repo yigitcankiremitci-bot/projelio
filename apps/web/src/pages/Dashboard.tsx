@@ -34,7 +34,10 @@ type DashboardTab = "jobs" | "budget" | "files" | "modules" | (string & {});
 // anahtar olarak kalır, çeviri kullanıldığı yerde (t(sekme.label)) yapılır.
 const coreTabs: { key: DashboardTab; label: string; icon: typeof IconFolder }[] = [
   { key: "jobs", label: "İşler", icon: IconFolder }, // dil:anahtar
-  { key: "budget", label: "Bütçe", icon: IconActivity }, // dil:anahtar
+  // Etiket "Kasa": sayfa bir plan değil, gerçekleşen gelir/gider defteri.
+  // Anahtar "budget" olarak KALDI — adresler (?tab=budget), kayıtlı "Ana Sayfa"
+  // hedefleri ve tur çapaları o değere bağlı.
+  { key: "budget", label: "Kasa", icon: IconActivity }, // dil:anahtar
   { key: "files", label: "Dosyalar", icon: IconFile }, // dil:anahtar
 ];
 
@@ -215,7 +218,7 @@ export default function Dashboard() {
     : tab === "jobs"
       ? t("İşlerim")
       : tab === "budget"
-        ? t("Bütçem")
+        ? t("Kasam")
         : tab === "files"
           ? t("Dosyalarım")
           : t("Modüller");
@@ -337,7 +340,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* İşler / Bütçe sekmeleri.
+      {/* İşler / Kasa sekmeleri.
           flexWrap: sekmeler sığmadığında (dar ekran ya da Ayarlar'dan büyütülmüş
           yazı ölçeği) yan yana ezilip üst üste binmek yerine alt satıra geçer.
           Ekran genişliğine göre değil, gerçekten yer kalmadığında kırıldığı için

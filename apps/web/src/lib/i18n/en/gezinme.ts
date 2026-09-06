@@ -11,7 +11,11 @@ export const gezinme: TranslationDict = {
   // ─────────────────────────────────────────────── Ana bağlantılar
   "Ana Sayfa": "Home",
   "İşlerim": "My jobs",
+  // "Bütçe" hâlâ kullanılıyor: proje/departman/şirket sekme çubukları.
   "Bütçe": "Budget",
+  // Kenar çubuğu ve anasayfadaki sekme "Kasa" oldu: orası bir plan değil,
+  // gerçekleşen gelir/gider defteri.
+  Kasa: "Cash",
   Dosyalar: "Files",
   Takvim: "Calendar",
   Yapılacaklar: "To do",
@@ -63,10 +67,10 @@ export const gezinme: TranslationDict = {
     "Welcome to Projelio. We'll walk through the screen together. The narration runs as both audio and text. You can pause at any point, step back, or close the tour entirely.",
 
   "Sol menü": "The left menu",
-  "Uygulamanın ana gezinme alanı burası. Ana Sayfa, Bütçe, Dosyalar, Takvim ve Yapılacaklar tek tıkla buradan açılır.":
-    "This is the app's main navigation. Home, Budget, Files, Calendar and To do are one click away.",
-  "Solda gördüğün menü, uygulamanın ana gezinme alanı. Ana Sayfa, Bütçe, Dosyalar, Takvim ve Yapılacaklar sayfalarına buradan tek tıkla geçebilirsin. Dar ekranda bu menü gizlenir; sol üstteki oka basınca bir çekmece gibi açılır.":
-    "The menu on the left is the app's main navigation. Home, Budget, Files, Calendar and To do are one click away. On a narrow screen it's hidden; the arrow at the top left slides it open like a drawer.",
+  "Uygulamanın ana gezinme alanı burası. Ana Sayfa, Kasa, Dosyalar, Takvim ve Yapılacaklar tek tıkla buradan açılır.":
+    "This is the app's main navigation. Home, Cash, Files, Calendar and To do are one click away.",
+  "Solda gördüğün menü, uygulamanın ana gezinme alanı. Ana Sayfa, Kasa, Dosyalar, Takvim ve Yapılacaklar sayfalarına buradan tek tıkla geçebilirsin. Dar ekranda bu menü gizlenir; sol üstteki oka basınca bir çekmece gibi açılır.":
+    "The menu on the left is the app's main navigation. Home, Cash, Files, Calendar and To do are one click away. On a narrow screen it's hidden; the arrow at the top left slides it open like a drawer.",
 
   "Yapı ağacı": "The structure tree",
   "Gruplarını, organizasyonlarını ve işlerini iç içe gösteren ağaç. Bir satırı açınca altındaki departmanlar ve projeler görünür.":
@@ -75,10 +79,10 @@ export const gezinme: TranslationDict = {
     "The tree below the menu shows your groups, organizations and jobs nested together. Click the arrow in front of a row to open the departments and projects under it. It's the fastest way to see what belongs where.",
 
   "Ana sayfa sekmeleri": "The home tabs",
-  "Ana sayfa dört sekmeden oluşur: İşler, Bütçe, Dosyalar ve Modüller. Hepsi aynı sayfada, sekme değiştirerek geçersin.":
-    "The home page has four tabs: Jobs, Budget, Files and Modules. They're all on the same page; you switch between them.",
-  "Ana sayfan dört sekmeden oluşuyor: İşler, Bütçe, Dosyalar ve Modüller. Dördü de aynı sayfada duruyor, aralarında sekme değiştirerek geçiyorsun. Birazdan her birini ayrı ayrı anlatan turları da görebileceksin.":
-    "Your home page has four tabs: Jobs, Budget, Files and Modules. All four live on the same page and you switch between them. In a moment you'll also see separate tours for each one.",
+  "Ana sayfa dört sekmeden oluşur: İşler, Kasa, Dosyalar ve Modüller. Hepsi aynı sayfada, sekme değiştirerek geçersin.":
+    "The home page has four tabs: Jobs, Cash, Files and Modules. They're all on the same page; you switch between them.",
+  "Ana sayfan dört sekmeden oluşuyor: İşler, Kasa, Dosyalar ve Modüller. Dördü de aynı sayfada duruyor, aralarında sekme değiştirerek geçiyorsun. Birazdan her birini ayrı ayrı anlatan turları da görebileceksin.":
+    "Your home page has four tabs: Jobs, Cash, Files and Modules. All four live on the same page and you switch between them. In a moment you'll also see separate tours for each one.",
 
   "Yeni bir şey oluştur": "Create something new",
   "Ortadaki artı düğmesi bulunduğun sayfaya göre iş, proje, görev ya da kayıt ekler. Ana sayfada ayrıca şirket kurma ve işletme açma seçenekleri de buradan çıkar.":
@@ -105,16 +109,16 @@ export const gezinme: TranslationDict = {
 
   // ─────────────────────────────────────────────── Ana sayfa sekmeleri turu
   "Ana sayfadaki dört sekme": "The four tabs on the home page",
-  "İşler, Bütçe, Dosyalar ve Modüller sekmeleri ne gösterir?":
-    "What do the Jobs, Budget, Files and Modules tabs show?",
+  "İşler, Kasa, Dosyalar ve Modüller sekmeleri ne gösterir?":
+    "What do the Jobs, Cash, Files and Modules tabs show?",
   "Erişebildiğin tüm işler burada kart olarak listelenir. Kartın üstündeki göstergeler işin ilerlemesini ve gecikmiş görevlerini özetler.":
     "Every job you can reach is listed here as a card. The indicators on a card summarise its progress and any overdue tasks.",
   "İşler sekmesi, erişebildiğin bütün işleri kart olarak listeler. Her kartın üstündeki göstergeler o işin ilerlemesini ve varsa gecikmiş görevlerini özetler. Bir karta tıkladığında işin kendi sayfası açılır.":
     "The Jobs tab lists every job you can reach as a card. The indicators on each card summarise that job's progress and any overdue tasks. Click a card to open the job's own page.",
   "Gelir ve giderlerini tek yerde toplar. Kayıtları iş, proje ya da departman bazında ayırabilirsin.":
     "Gathers your income and spending in one place. You can break the records down by job, project or department.",
-  "Bütçe sekmesi gelir ve giderlerini tek yerde toplar. Kayıtları iş, proje ya da departman bazında ayırabilir; tekrarlayan ödemeleri bir kez tanımlayıp otomatik işlemesini sağlayabilirsin.":
-    "The Budget tab gathers your income and spending in one place. You can break the records down by job, project or department, and define a recurring payment once so it records itself from then on.",
+  "Kasa sekmesi gelir ve giderlerini tek yerde toplar. Kayıtları iş, proje ya da departman bazında ayırabilir; tekrarlayan ödemeleri bir kez tanımlayıp otomatik işlemesini sağlayabilirsin.":
+    "The Cash tab gathers your income and spending in one place. You can break the records down by job, project or department, and define a recurring payment once so it records itself from then on.",
   "İşlerine yüklenmiş bütün dosyalar tek listede. Google Drive ya da OneDrive bağlıysa oradaki klasörlere de buradan ulaşırsın.":
     "Every file uploaded to your jobs in one list. If Google Drive or OneDrive is connected, you can reach those folders from here too.",
   "Dosyalar sekmesinde, işlerine yüklenmiş bütün dosyalar tek bir listede toplanır. Google Drive ya da OneDrive hesabını bağladıysan, oradaki klasörlerine de buradan ulaşabilir, dosyayı uygulamadan çıkmadan önizleyebilirsin.":
@@ -124,15 +128,15 @@ export const gezinme: TranslationDict = {
   "Modüller sekmesi, Finans, İnsan Kaynakları, Satış gibi hazır çalışma alanlarını gösterir. Bir modülü departmanına eklediğinde, o alana ait kayıt ekranları hazır olarak gelir; sıfırdan tablo kurmana gerek kalmaz.":
     "The Modules tab shows ready-made work areas like Finance, Human Resources and Sales. Add a module to a department and its record screens come ready — you don't have to build a table from scratch.",
 
-  // ─────────────────────────────────────────────── Bütçe turu
-  "Bütçeyi kullanmak": "Using the budget",
+  // ─────────────────────────────────────────────── Kasa turu
+  "Kasayı kullanmak": "Using the cash book",
   "Gelir-gider girmek, tekrarlayan ödemeler ve bütçe özetleri.":
     "Entering income and expenses, recurring payments and budget summaries.",
-  "Bütçe sekmesi": "The Budget tab",
-  "Bütçe, girdiğin her gelir ve gideri işlerine bağlar. Böylece hangi işin ne kazandırdığını ayrı ayrı görürsün.":
-    "The budget ties every income and expense you enter to a job, so you can see what each one earns you.",
-  "Bütçe sekmesi, girdiğin her gelir ve gideri bir işe ya da departmana bağlar. Bu sayede toplam rakamın yanında, hangi işin ne kazandırdığını da ayrı ayrı görebilirsin.":
-    "The Budget tab ties every income and expense you enter to a job or a department. Alongside the overall figure, you can see what each job brings in.",
+  "Kasa sekmesi": "The Cash tab",
+  "Kasa, girdiğin her gelir ve gideri işlerine bağlar. Böylece hangi işin ne kazandırdığını ayrı ayrı görürsün.":
+    "The cash book ties every income and expense you enter to a job, so you can see what each one earns you.",
+  "Kasa sekmesi, girdiğin her gelir ve gideri bir işe ya da departmana bağlar. Bu sayede toplam rakamın yanında, hangi işin ne kazandırdığını da ayrı ayrı görebilirsin.":
+    "The Cash tab ties every income and expense you enter to a job or a department. Alongside the overall figure, you can see what each job brings in.",
   "Kayıt eklemek": "Adding a record",
   "Yeni bir gelir ya da gider eklerken tutar, tarih ve bağlı olduğu işi seçersin. Tekrarlayan bir ödemeyse bir kez tanımlaman yeterli.":
     "When you add income or an expense you pick the amount, the date and the job it belongs to. For a recurring payment you only define it once.",

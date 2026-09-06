@@ -39,9 +39,9 @@ export const TOURS: Tour[] = [
       {
         id: "sidebar",
         title: "Sol menü",
-        text: "Uygulamanın ana gezinme alanı burası. Ana Sayfa, Bütçe, Dosyalar, Takvim ve Yapılacaklar tek tıkla buradan açılır.",
+        text: "Uygulamanın ana gezinme alanı burası. Ana Sayfa, Kasa, Dosyalar, Takvim ve Yapılacaklar tek tıkla buradan açılır.",
         speech:
-          "Solda gördüğün menü, uygulamanın ana gezinme alanı. Ana Sayfa, Bütçe, Dosyalar, Takvim ve Yapılacaklar sayfalarına buradan tek tıkla geçebilirsin. Dar ekranda bu menü gizlenir; sol üstteki oka basınca bir çekmece gibi açılır.",
+          "Solda gördüğün menü, uygulamanın ana gezinme alanı. Ana Sayfa, Kasa, Dosyalar, Takvim ve Yapılacaklar sayfalarına buradan tek tıkla geçebilirsin. Dar ekranda bu menü gizlenir; sol üstteki oka basınca bir çekmece gibi açılır.",
         anchor: "sidebar",
         placement: "right",
         optional: true,
@@ -59,9 +59,9 @@ export const TOURS: Tour[] = [
       {
         id: "dashboard-tabs",
         title: "Ana sayfa sekmeleri",
-        text: "Ana sayfa dört sekmeden oluşur: İşler, Bütçe, Dosyalar ve Modüller. Hepsi aynı sayfada, sekme değiştirerek geçersin.",
+        text: "Ana sayfa dört sekmeden oluşur: İşler, Kasa, Dosyalar ve Modüller. Hepsi aynı sayfada, sekme değiştirerek geçersin.",
         speech:
-          "Ana sayfan dört sekmeden oluşuyor: İşler, Bütçe, Dosyalar ve Modüller. Dördü de aynı sayfada duruyor, aralarında sekme değiştirerek geçiyorsun. Birazdan her birini ayrı ayrı anlatan turları da görebileceksin.",
+          "Ana sayfan dört sekmeden oluşuyor: İşler, Kasa, Dosyalar ve Modüller. Dördü de aynı sayfada duruyor, aralarında sekme değiştirerek geçiyorsun. Birazdan her birini ayrı ayrı anlatan turları da görebileceksin.",
         anchor: "dashboard-tabs",
         placement: "bottom",
       },
@@ -109,7 +109,7 @@ export const TOURS: Tour[] = [
   {
     id: "ana-sayfa-sekmeleri",
     title: "Ana sayfadaki dört sekme",
-    description: "İşler, Bütçe, Dosyalar ve Modüller sekmeleri ne gösterir?",
+    description: "İşler, Kasa, Dosyalar ve Modüller sekmeleri ne gösterir?",
     area: "isler",
     match: /^\/$/,
     steps: [
@@ -125,10 +125,10 @@ export const TOURS: Tour[] = [
       },
       {
         id: "butce",
-        title: "Bütçe",
+        title: "Kasa",
         text: "Gelir ve giderlerini tek yerde toplar. Kayıtları iş, proje ya da departman bazında ayırabilirsin.",
         speech:
-          "Bütçe sekmesi gelir ve giderlerini tek yerde toplar. Kayıtları iş, proje ya da departman bazında ayırabilir; tekrarlayan ödemeleri bir kez tanımlayıp otomatik işlemesini sağlayabilirsin.",
+          "Kasa sekmesi gelir ve giderlerini tek yerde toplar. Kayıtları iş, proje ya da departman bazında ayırabilir; tekrarlayan ödemeleri bir kez tanımlayıp otomatik işlemesini sağlayabilirsin.",
         navigateTo: "/?tab=budget",
         anchor: "dashboard-tab-budget",
         placement: "bottom",
@@ -158,17 +158,17 @@ export const TOURS: Tour[] = [
 
   {
     id: "butce-nasil-calisir",
-    title: "Bütçeyi kullanmak",
+    title: "Kasayı kullanmak",
     description: "Gelir-gider girmek, tekrarlayan ödemeler ve bütçe özetleri.",
     area: "butce",
     match: /^\/(\?.*)?$/,
     steps: [
       {
         id: "butce-genel",
-        title: "Bütçe sekmesi",
-        text: "Bütçe, girdiğin her gelir ve gideri işlerine bağlar. Böylece hangi işin ne kazandırdığını ayrı ayrı görürsün.",
+        title: "Kasa sekmesi",
+        text: "Kasa, girdiğin her gelir ve gideri işlerine bağlar. Böylece hangi işin ne kazandırdığını ayrı ayrı görürsün.",
         speech:
-          "Bütçe sekmesi, girdiğin her gelir ve gideri bir işe ya da departmana bağlar. Bu sayede toplam rakamın yanında, hangi işin ne kazandırdığını da ayrı ayrı görebilirsin.",
+          "Kasa sekmesi, girdiğin her gelir ve gideri bir işe ya da departmana bağlar. Bu sayede toplam rakamın yanında, hangi işin ne kazandırdığını da ayrı ayrı görebilirsin.",
         navigateTo: "/?tab=budget",
         anchor: "dashboard-tab-budget",
         placement: "bottom",

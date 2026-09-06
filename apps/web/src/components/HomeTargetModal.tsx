@@ -27,11 +27,11 @@ interface Section {
   options: Option[];
 }
 
-// Sabit uygulama sayfaları. Bütçe ve Dosyalar anasayfanın sekmeleridir (bkz.
+// Sabit uygulama sayfaları. Kasa ve Dosyalar anasayfanın sekmeleridir (bkz.
 // Dashboard.tsx ?tab=), bu yüzden yolları sorgu parametreli.
 const PAGE_OPTIONS: Option[] = [
   { path: "/", label: "Ana Sayfa", icon: IconDashboard },
-  { path: "/?tab=budget", label: "Bütçe", icon: IconActivity },
+  { path: "/?tab=budget", label: "Kasa", icon: IconActivity },
   { path: "/?tab=files", label: "Dosyalar", icon: IconFile },
   { path: "/calendar", label: "Takvim", icon: IconCalendar },
   { path: "/tasks", label: "Yapılacaklar", icon: IconListCheck },

@@ -142,6 +142,69 @@ export interface User {
   locale?: Locale;
 }
 
+// ============================================================ Sekme görünürlüğü
+
+/**
+ * Sekme çubuğu olan dört ekran. Anahtarlar arayüzdeki sekme anahtarlarıyla
+ * BİREBİR aynı (bkz. apps/web OrgTabs / JobTabs / DepartmentTabs / ProjectTabs).
+ */
+export type TabScope = "organization" | "job" | "department" | "project";
+
+/**
+ * Her ekranın kapatılabilir sekmeleri, çubuktaki sırayla.
+ *
+ * Liste burada duruyor çünkü iki taraf da aynı kümeye ihtiyaç duyuyor: sunucu
+ * gelen değeri doğrulamak için (uydurma bir anahtar kaydedilirse ayarlar
+ * ekranında görünmez ama veritabanında yaşar), arayüz de ayar ekranındaki
+ * anahtar listesini üretmek için. ETİKETLER burada YOK: onlar sekme
+ * bileşenlerinde duruyor ve çeviri denetimi (bkz. scripts/dil-denetimi.mjs)
+ * onları orada arıyor.
+ *
+ * Modül sekmeleri (terfi etmiş modüller, bkz. useModuleTabs) bu listede yok:
+ * onlar sabit değil, modülün kendi yetkisiyle gelip gidiyor.
+ */
+export const ENTITY_TAB_KEYS: Record<TabScope, string[]> = {
+  organization: ["home", "flow", "departments", "tasks", "products", "budget", "files"],
+  job: ["projects", "programs", "team", "tasks", "files", "modules"],
+  department: ["flow", "team", "tasks", "budget", "modules", "files"],
+  project: ["feed", "team", "tasks", "files", "budget", "process"],
+};
+
+/**
+ * Kapatılamayan sekmeler: sayfanın AÇILIŞ sekmesi.
+ *
+ * Kapatılabilseydi sayfa, adres çubuğunda hiçbir sekme yokken boş bir gövdeye
+ * düşerdi. Departmanda kilitli sekme yok — orada açılış sekmesi zaten ayardan
+ * seçiliyor (bkz. Department.defaultTab) ve DepartmentDetail açık kalan ilk
+ * sekmeye düşüyor.
+ */
+export const LOCKED_TABS: Record<TabScope, string[]> = {
+  organization: ["home"],
+  job: ["projects"],
+  department: [],
+  project: ["tasks"],
+};
+
+/** Bir ekranda kapatılabilen sekme anahtarları. */
+export function hideableTabs(scope: TabScope): string[] {
+  return ENTITY_TAB_KEYS[scope].filter((key) => !LOCKED_TABS[scope].includes(key));
+}
+
+/**
+ * Kaydedilmeye/uygulanmaya hazır "gizli sekme" listesi.
+ *
+ * Hem sunucu (kayıttan önce) hem arayüz (çizmeden önce) buradan geçiriyor:
+ * tanınmayan anahtarlar, kilitli sekmeler ve tekrarlar düşer. TÜM sekmeleri
+ * gizleyen bir liste de yok sayılır (boş dizi döner) — kilitli sekmesi olmayan
+ * departmanda mümkün ve geriye gövdesiz bir sayfa bırakırdı.
+ */
+export function sanitizeHiddenTabs(scope: TabScope, hidden: unknown): string[] {
+  if (!Array.isArray(hidden)) return [];
+  const allowed = new Set(hideableTabs(scope));
+  const temiz = Array.from(new Set(hidden.filter((k): k is string => typeof k === "string" && allowed.has(k))));
+  return temiz.length >= ENTITY_TAB_KEYS[scope].length ? [] : temiz;
+}
+
 export interface Job {
   id: string;
   ownerId: string;
@@ -162,6 +225,8 @@ export interface Job {
   // İşteki gerçek (arşivlenmemiş) proje sayısı — anasayfadaki gösterge için
   // sunucu tarafında hesaplanır (kullanıcının görebildiği projelerle sınırlı değildir).
   projectCount?: number;
+  // Sahibinin kapattığı sekmeler (bkz. hiddenTabs açıklaması / TabScope).
+  hiddenTabs?: string[];
 }
 
 // Holding katmanı. Tamamen opsiyonel — bir Grup birden çok Organization'a ve/veya
@@ -201,6 +266,8 @@ export interface Organization {
   // Sunucu tarafında eklenir: İSTEYEN kullanıcının bu organizasyondaki
   // görünürlüğü. Arayüz sekmeleri buna göre gizler (bkz. OrgTabs).
   viewerAccess?: OrganizationAccess;
+  // Sahibinin kapattığı sekmeler (bkz. hiddenTabs açıklaması / TabScope).
+  hiddenTabs?: string[];
 }
 
 // ============================================================ Departmanlar / Kadro
@@ -243,6 +310,8 @@ export interface Department {
   // Departman sayfası açıldığında öntanımlı gelecek sekme. Organizasyon sahibi
   // departman ayarlarından değiştirebilir; boşsa "tasks" (Görevler) varsayılır.
   defaultTab?: string;
+  // Sahibinin kapattığı sekmeler (bkz. hiddenTabs açıklaması / TabScope).
+  hiddenTabs?: string[];
   createdAt: string;
   archivedAt?: string;
   // Sunucu tarafında eklenir: bu departmandaki (removed hariç) kadro sayısı.
@@ -722,6 +791,8 @@ export interface Project {
   createdAt: string;
   archivedAt?: string;
   sortOrder?: number;
+  // Sahibinin kapattığı sekmeler (bkz. hiddenTabs açıklaması / TabScope).
+  hiddenTabs?: string[];
 }
 
 // --- Proje paylaşım linki (üyelik gerektirmeyen takip) -----------------------
@@ -1166,6 +1237,10 @@ export interface Task {
   completedByName?: string;
   // Görevin bağlı olduğu projenin başlığı (arşivlenmiş projeler dahil, sunucu tarafında eklenir).
   projectTitle?: string;
+  // Yalnızca organizasyon geneli görev listesinde (bkz. GET /organizations/:id/tasks)
+  // doldurulur: kart hangi departmandan geldiğini yazsın diye. Tek departmanlık
+  // listelerde boş bırakılır — orada zaten bilinen bir bilgi.
+  departmentName?: string;
   // Görev bir modül kaydından doğduysa kaynağı. Bağ tek yönlü ve gevşektir:
   // kayıt arşivlense de görev yaşar. Bkz. 051_task_module_source.sql
   sourceModuleKey?: string;
@@ -1481,6 +1556,8 @@ export interface ProjectFile {
   driveFileId: string;
   webViewLink?: string;
   iconLink?: string;
+  /** Önizlemesi var mı; adres imzalı proxy'den alınır (bkz. filesApi.thumbnailUrl). */
+  hasThumbnail?: boolean;
   /** Google Dokümanlar/E-Tablolar/Sunular: ikili içeriği yoktur, dışa aktarılır. */
   isGoogleDoc: boolean;
   /** Dosyanın gerçek içeriği hangi bulut sağlayıcısında: Google Drive ya da OneDrive. */

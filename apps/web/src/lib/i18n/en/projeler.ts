@@ -27,7 +27,8 @@ export const projeler: TranslationDict = {
   İşler: "Jobs",
   Modüller: "Modules",
   İşlerim: "My jobs",
-  Bütçem: "My budget",
+  // Anasayfadaki "Kasa" sekmesinin sayfa başlığı (bkz. Dashboard pageTitle).
+  Kasam: "My cash",
   Dosyalarım: "My files",
   Organizasyonlar: "Organizations",
   Gruplar: "Groups",

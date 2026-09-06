@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Project } from "@projelio/shared";
+import { sanitizeHiddenTabs } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { TasksService } from "../tasks/tasks.service";
@@ -26,6 +27,8 @@ function mapProject(row: any): Project {
     createdAt: row.created_at,
     archivedAt: row.archived_at ?? undefined,
     sortOrder: row.sort_order ?? 0,
+    // Kolon yoksa (migration 091 uygulanmadan) boş dizi: hiçbir sekme kapalı değil.
+    hiddenTabs: sanitizeHiddenTabs("project", row.hidden_tabs),
   };
 }
 
@@ -222,6 +225,8 @@ export class ProjectsService {
     if (data.deadline !== undefined) patch.deadline = data.deadline.slice(0, 10);
     if (data.status !== undefined) patch.status = data.status;
     if (data.coverImageUrl !== undefined) patch.cover_image_url = data.coverImageUrl;
+    // Tanınmayan/kilitli anahtarlar ve "hepsini gizle" listesi kayıttan önce elenir.
+    if (data.hiddenTabs !== undefined) patch.hidden_tabs = sanitizeHiddenTabs("project", data.hiddenTabs);
 
     const { data: row, error } = await this.supabase.client
       .from("projects")

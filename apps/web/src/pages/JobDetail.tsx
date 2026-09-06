@@ -60,7 +60,9 @@ export default function JobDetail() {
   // aynı kuralı uyguluyor (JobsService.assertOwner). Ekip üyesi ve taşeron için
   // dişli hiç render edilmez.
   const { user: currentUser } = useCurrentUser();
-  const validTabs: JobTab[] = visibleJobTabs(isSubcontractor).map((t) => t.key);
+  // Sahibinin ayarlardan kapattığı sekmeler de daraltır (bkz. Job.hiddenTabs).
+  const hiddenTabs = job?.hiddenTabs;
+  const validTabs: JobTab[] = visibleJobTabs(isSubcontractor, hiddenTabs).map((t) => t.key);
   const activeTab: JobTab = validTabs.includes(tabParam as JobTab) ? (tabParam as JobTab) : "projects";
   const setActiveTab = (next: JobTab) => {
     setSearchParams(next === "projects" ? {} : { tab: next }, { replace: true });
@@ -319,10 +321,11 @@ export default function JobDetail() {
       active={activeTab}
       onChange={setActiveTab}
       isSubcontractor={isSubcontractor}
+      hiddenTabs={hiddenTabs}
       style={{ marginBottom: 0 }}
       scrollable
     />,
-    [activeTab, isSubcontractor],
+    [activeTab, isSubcontractor, hiddenTabs],
     tabsRef
   );
 
@@ -417,6 +420,7 @@ export default function JobDetail() {
               active={activeTab}
               onChange={setActiveTab}
               isSubcontractor={isSubcontractor}
+              hiddenTabs={hiddenTabs}
               style={{ marginBottom: 0 }}
             />
           </div>

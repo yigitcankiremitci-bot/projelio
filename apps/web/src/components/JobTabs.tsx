@@ -5,7 +5,7 @@ export type JobTab = "projects" | "programs" | "team" | "tasks" | "files" | "mod
 // Projeler süreli ve biten işleri, Rutinler (kodda "program"/"operation") süresiz
 // ve tekrarlayan işleri tutar. İkisi de bu işin altında yaşadığı için sekmeler
 // yan yana durur.
-const tabs: { key: JobTab; label: string }[] = [
+export const JOB_TABS: { key: JobTab; label: string }[] = [
   { key: "projects", label: "Projeler" }, // dil:anahtar
   { key: "programs", label: "Rutinler" }, // dil:anahtar
   { key: "team", label: "Ekip" }, // dil:anahtar
@@ -24,9 +24,17 @@ const tabs: { key: JobTab; label: string }[] = [
  */
 const SUBCONTRACTOR_HIDDEN: JobTab[] = ["team", "modules"];
 
-export function visibleJobTabs(isSubcontractor: boolean): { key: JobTab; label: string }[] {
-  if (!isSubcontractor) return tabs;
-  return tabs.filter((t) => !SUBCONTRACTOR_HIDDEN.includes(t.key));
+/**
+ * Önce YETKİ (taşerona kapalı olanlar), sonra SAHİBİN TERCİHİ (iş ayarlarından
+ * kapattığı sekmeler, bkz. Job.hiddenTabs). Kapatma tercihi yetki değildir:
+ * taşerona kapalı bir sekmeyi açamaz.
+ */
+export function visibleJobTabs(isSubcontractor: boolean, hiddenTabs?: string[]): { key: JobTab; label: string }[] {
+  const hidden = new Set(hiddenTabs ?? []);
+  return JOB_TABS.filter((t) => {
+    if (hidden.has(t.key)) return false;
+    return !(isSubcontractor && SUBCONTRACTOR_HIDDEN.includes(t.key));
+  });
 }
 
 interface Props {
@@ -39,12 +47,14 @@ interface Props {
   style?: React.CSSProperties;
   /** Tek satır + yana kaydırma (bkz. TabBar): sabit şeritteki kopya kullanır. */
   scrollable?: boolean;
+  /** Sahibinin ayarlardan kapattığı sekmeler (Job.hiddenTabs). */
+  hiddenTabs?: string[];
 }
 
-export default function JobTabs({ active, onChange, style, scrollable, isSubcontractor = false }: Props) {
+export default function JobTabs({ active, onChange, style, scrollable, isSubcontractor = false, hiddenTabs }: Props) {
   return (
     <TabBar
-      tabs={visibleJobTabs(isSubcontractor)}
+      tabs={visibleJobTabs(isSubcontractor, hiddenTabs)}
       active={active}
       onChange={(k) => onChange(k as JobTab)}
       style={style}

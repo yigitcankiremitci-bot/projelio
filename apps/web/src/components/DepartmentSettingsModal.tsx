@@ -6,7 +6,8 @@ import { resizeCoverImage } from "../lib/imageProcessing";
 import { getDepartmentCoverUrl, hasCustomDepartmentCover } from "../lib/departmentCovers";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
-import type { DepartmentTab } from "./DepartmentTabs";
+import TabVisibilitySection from "./TabVisibilitySection";
+import { DEPARTMENT_TABS, type DepartmentTab } from "./DepartmentTabs";
 import { useT } from "../lib/i18n";
 
 interface Props {
@@ -22,15 +23,6 @@ interface Props {
   onArchived?: () => void;
 }
 
-const TAB_OPTIONS: { key: DepartmentTab; label: string }[] = [
-  { key: "flow", label: "Sosyal" },
-  { key: "team", label: "Ekip" },
-  { key: "tasks", label: "Görevler" },
-  { key: "budget", label: "Bütçe" },
-  { key: "modules", label: "Modüller" },
-  { key: "files", label: "Dosyalar" },
-];
-
 // Departman sayfası her açıldığında hangi sekmenin gelmesini istediğini
 // organizasyon sahibi burada seçer. Varsayılan "Görevler" — departman
 // kurulduğunda hiç değiştirilmemişse öyle açılır.
@@ -45,6 +37,8 @@ export default function DepartmentSettingsModal({
   const c = useThemeColors();
   const t = useT();
   const [defaultTab, setDefaultTab] = useState<DepartmentTab>((department.defaultTab as DepartmentTab) || "tasks");
+  // Kapatılan sekmeler (bkz. TabVisibilitySection).
+  const [hiddenTabs, setHiddenTabs] = useState<string[]>(department.hiddenTabs ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   // Kapak, sayfa başlığındaki kalem simgesi yerine artık buradan yönetiliyor:
@@ -56,6 +50,15 @@ export default function DepartmentSettingsModal({
   const fileRef = useRef<HTMLInputElement>(null);
   const coverUrl = getDepartmentCoverUrl(current);
   const isCustomCover = hasCustomDepartmentCover(current);
+
+  // Açılış sekmesi yalnızca AÇIK sekmelerden seçilebilir: kapattığı sekmeyi
+  // açılış olarak bırakmak, sayfayı hiç görünmeyen bir sekmeyle açmak demekti
+  // (DepartmentDetail açık kalan ilk sekmeye düşerdi ve seçim sessizce boşa
+  // giderdi). Kutuyu kapatan kişi seçimini de burada güncellemiş oluyor.
+  const acikSekmeler = DEPARTMENT_TABS.filter((sekme) => !hiddenTabs.includes(sekme.key));
+  const gecerliDefaultTab: DepartmentTab = acikSekmeler.some((sekme) => sekme.key === defaultTab)
+    ? defaultTab
+    : (acikSekmeler[0]?.key ?? "tasks");
 
   const applyCover = (updated: Department) => {
     setCurrent(updated);
@@ -95,7 +98,7 @@ export default function DepartmentSettingsModal({
     setError("");
     setLoading(true);
     try {
-      const updated = await api.patch<Department>(`/departments/${department.id}`, { defaultTab });
+      const updated = await api.patch<Department>(`/departments/${department.id}`, { defaultTab: gecerliDefaultTab, hiddenTabs });
       onSaved(updated);
     } catch {
       setError("Kaydedilemedi. Tekrar dene.");
@@ -192,7 +195,7 @@ export default function DepartmentSettingsModal({
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açılış sekmesi")}</label>
           <select
-            value={defaultTab}
+            value={gecerliDefaultTab}
             onChange={(e) => setDefaultTab(e.target.value as DepartmentTab)}
             style={{
               width: "100%",
@@ -204,9 +207,9 @@ export default function DepartmentSettingsModal({
               background: c.surface,
             }}
           >
-            {TAB_OPTIONS.map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.label}
+            {acikSekmeler.map((sekme) => (
+              <option key={sekme.key} value={sekme.key}>
+                {t(sekme.label)}
               </option>
             ))}
           </select>
@@ -214,6 +217,8 @@ export default function DepartmentSettingsModal({
             {t("Bu departman sayfası her açıldığında seçtiğin sekmeyle başlar.")}
           </p>
         </div>
+
+        <TabVisibilitySection scope="department" value={hiddenTabs} onChange={setHiddenTabs} />
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
 

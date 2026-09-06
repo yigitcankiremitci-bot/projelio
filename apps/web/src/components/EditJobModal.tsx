@@ -6,6 +6,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
+import TabVisibilitySection from "./TabVisibilitySection";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import HireMemberModal from "./HireMemberModal";
 import { IconUser } from "./icons";
@@ -32,6 +33,9 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
   const [coverValue, setCoverValue] = useState<string | undefined>(job.coverImageUrl);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  // Kapatılan sekmeler (bkz. TabVisibilitySection). Kaydedene kadar yalnızca
+  // burada durur; sayfadaki çubuk "Kaydet"ten sonra tazelenir.
+  const [hiddenTabs, setHiddenTabs] = useState<string[]>(job.hiddenTabs ?? []);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [hiring, setHiring] = useState(false);
@@ -60,6 +64,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
       await api.patch(`/jobs/${job.id}`, {
         title,
         description: description || undefined,
+        hiddenTabs,
         // Hazır kapak seçimi (ya da kapağı kaldırma) doğrudan bu alanla kaydedilir;
         // dosya yüklemesi ayrı uçtan gider. Değişmediyse hiç gönderilmez.
         ...(coverValue !== job.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
@@ -119,6 +124,8 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}
         />
+
+        <TabVisibilitySection scope="job" value={hiddenTabs} onChange={setHiddenTabs} />
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
       </form>

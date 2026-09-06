@@ -2,7 +2,7 @@ import TabBar from "./TabBar";
 
 export type ProjectTab = "feed" | "team" | "tasks" | "files" | "budget" | "process";
 
-const tabs: { key: ProjectTab; label: string }[] = [
+export const PROJECT_TABS: { key: ProjectTab; label: string }[] = [
   { key: "feed", label: "Sosyal" }, // dil:anahtar
   { key: "team", label: "Ekip" }, // dil:anahtar
   // Sekme hem düz görev listesini hem çıktı katmanını barındırıyor; yalnızca
@@ -33,12 +33,18 @@ interface Props {
    * çalıştığını, ücretlerini ve e-postalarını görmemeli.
    */
   isSubcontractor?: boolean;
+  /** Sahibinin ayarlardan kapattığı sekmeler (Project.hiddenTabs). */
+  hiddenTabs?: string[];
 }
 
 // Görünüm ve taşma kuralı TabBar'da (bkz. components/TabBar.tsx): sekmeler
 // sığdığı kadar yan yana dizilir, sığmayan alt satıra iner.
-export function visibleProjectTabs(showBudget: boolean, isSubcontractor: boolean) {
-  return tabs.filter((t) => {
+export function visibleProjectTabs(showBudget: boolean, isSubcontractor: boolean, hiddenTabs?: string[]) {
+  // Sahibinin ayarlardan kapattıkları (bkz. Project.hiddenTabs) yetki
+  // kontrolünden ÖNCE düşer; kapatma bir sadeleştirmedir, yetki açamaz.
+  const hidden = new Set(hiddenTabs ?? []);
+  return PROJECT_TABS.filter((t) => {
+    if (hidden.has(t.key)) return false;
     if (t.key === "budget") return showBudget;
     if (t.key === "team") return !isSubcontractor;
     return true;
@@ -52,10 +58,11 @@ export default function ProjectTabs({
   scrollable,
   showBudget = true,
   isSubcontractor = false,
+  hiddenTabs,
 }: Props) {
   return (
     <TabBar
-      tabs={visibleProjectTabs(showBudget, isSubcontractor)}
+      tabs={visibleProjectTabs(showBudget, isSubcontractor, hiddenTabs)}
       active={active}
       onChange={(k) => onChange(k as ProjectTab)}
       style={style}

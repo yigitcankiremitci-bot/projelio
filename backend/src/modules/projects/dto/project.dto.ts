@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { IsArray, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from "class-validator";
 
 // @projelio/shared'daki ProjectStatus ile aynı küme (bkz. migration 063).
 // class-validator'ın çalışma zamanında bir diziye ihtiyacı olduğu için burada
@@ -71,4 +71,12 @@ export class UpdateProjectDto {
   @IsOptional()
   @IsString()
   coverImageUrl?: string;
+
+  // Kapatılan sekmeler. Doğrulama burada yalnızca "string dizisi mi" düzeyinde:
+  // anahtarların geçerliliğine servis karar veriyor (bkz. sanitizeHiddenTabs) —
+  // tanınmayan anahtar hata değil, sessizce elenen bir gürültü.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  hiddenTabs?: string[];
 }

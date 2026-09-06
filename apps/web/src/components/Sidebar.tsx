@@ -31,7 +31,7 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
   const t = useT();
   const sidebarStyle = useSidebarStyle();
   const location = useLocation();
-  // Bütçe ve Dosyalar, Ana Sayfa'nın kendi sekmeleridir (bkz. Dashboard.tsx ?tab=);
+  // Kasa ve Dosyalar, Ana Sayfa'nın kendi sekmeleridir (bkz. Dashboard.tsx ?tab=);
   // buradan doğrudan o sekmeyle açılacak şekilde bağlanır.
   const searchTab = new URLSearchParams(location.search).get("tab");
   // "Ana Sayfa" düğmesinin hedefi kullanıcı tarafından değiştirilebilir
@@ -49,7 +49,9 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
         ? location.pathname === "/" && !searchTab
         : location.pathname + location.search === homeTarget.path,
     },
-    { to: "/?tab=budget", label: t("Bütçe"), active: location.pathname === "/" && searchTab === "budget" },
+    // Etiket "Kasa": sayfanın kendisi gelir/gider defteri, plan anlamındaki
+    // "bütçe" değil — sekme anahtarı (?tab=budget) adres uyumluluğu için aynı kaldı.
+    { to: "/?tab=budget", label: t("Kasa"), active: location.pathname === "/" && searchTab === "budget" },
     { to: "/?tab=files", label: t("Dosyalar"), active: location.pathname === "/" && searchTab === "files" },
     { to: "/calendar", label: t("Takvim"), active: location.pathname.startsWith("/calendar") },
     // Mobilde BottomNav'da olan "Yapılacaklar" (/tasks) masaüstünde hiçbir yerden

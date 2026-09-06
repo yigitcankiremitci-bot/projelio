@@ -174,6 +174,68 @@ export class TasksService {
     return (data ?? []).map(mapTask);
   }
 
+  /**
+   * Bir organizasyonun TÜM departman görevleri, tek listede.
+   *
+   * Şirket sayfasındaki "Görevler" sekmesinin kaynağı: departman departman
+   * gezmeden bütün kadronun ne yaptığını görebilmek için. Görevler yine kendi
+   * departmanlarında yaşıyor; burada yalnızca birleştiriliyorlar, o yüzden her
+   * göreve geldiği departmanın adı ekleniyor (bkz. Task.departmentName).
+   *
+   * Görünürlük findByDepartment ile AYNI daireden geçer, tek tek yerine toplu:
+   * organizasyon sahibi tüm departmanları, diğerleri yalnızca onaylı kadrosunda
+   * oldukları departmanları görür. Hiçbirine erişimi olmayan kullanıcıya 403
+   * yerine BOŞ liste dönülüyor — sekme zaten yalnızca organizasyonu görebilen
+   * kişide açılıyor ve "görebildiğin görev yok" hata değil, doğru cevaptır.
+   */
+  async findByOrganization(organizationId: string, requestingUserId?: string): Promise<Task[]> {
+    const { data: depts, error: deptsError } = await this.supabase.client
+      .from("departments")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null);
+    if (deptsError) throw deptsError;
+
+    const deptNameById = new Map<string, string>((depts ?? []).map((d: any) => [d.id, d.name]));
+    let visibleIds = Array.from(deptNameById.keys());
+
+    if (requestingUserId) {
+      const { data: org } = await this.supabase.client
+        .from("organizations")
+        .select("owner_id")
+        .eq("id", organizationId)
+        .maybeSingle();
+      if (!org) throw new NotFoundException("Organizasyon bulunamadı");
+      if (org.owner_id !== requestingUserId) {
+        const { data: memberRows } = await this.supabase.client
+          .from("department_members")
+          .select("department_id")
+          .eq("user_id", requestingUserId)
+          .eq("status", "approved")
+          .in("department_id", visibleIds.length > 0 ? visibleIds : ["00000000-0000-0000-0000-000000000000"]);
+        const uyeOlunan = new Set((memberRows ?? []).map((m: any) => m.department_id));
+        visibleIds = visibleIds.filter((id) => uyeOlunan.has(id));
+      }
+    }
+
+    if (visibleIds.length === 0) return [];
+
+    const { data, error } = await this.supabase.client
+      .from("tasks")
+      .select(TASK_SELECT)
+      .in("department_id", visibleIds)
+      .is("archived_at", null)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(LISTE_TAVANI);
+    if (error) throw error;
+
+    return (data ?? []).map((row: any) => ({
+      ...mapTask(row),
+      departmentName: row.department_id ? deptNameById.get(row.department_id) : undefined,
+    }));
+  }
+
   // Departman kaynaklarını yalnızca organizasyon sahibi ya da o departmanın
   // onaylı bir kadro üyesi görebilir/yönetebilir (bkz. ModuleRecordsService ile aynı desen).
   private async assertDepartmentAccess(departmentId: string, userId?: string): Promise<void> {

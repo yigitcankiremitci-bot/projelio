@@ -8,6 +8,7 @@ import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import OrganizationStorageSection from "./OrganizationStorageSection";
 import EntityDangerZone from "./EntityDangerZone";
+import TabVisibilitySection from "./TabVisibilitySection";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { useT } from "../lib/i18n";
 
@@ -31,6 +32,9 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
   const [coverValue, setCoverValue] = useState<string | undefined>(organization.coverImageUrl);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  // Kapatılan sekmeler (bkz. TabVisibilitySection). Kaydedene kadar yalnızca
+  // burada durur; sayfadaki çubuk "Kaydet"ten sonra tazelenir.
+  const [hiddenTabs, setHiddenTabs] = useState<string[]>(organization.hiddenTabs ?? []);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -64,6 +68,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
         description: description || undefined,
         groupId: groupId || null,
         orgType,
+        hiddenTabs,
         // Hazır kapak seçimi / kapağı kaldırma doğrudan bu alanla kaydedilir;
         // dosya yüklemesi ayrı uçtan gider. Değişmediyse hiç gönderilmez.
         ...(coverValue !== organization.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
@@ -130,6 +135,18 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
           filePreview={coverPreview}
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}
+        />
+
+        {/* Yetki gereği zaten kapalı sekmeler listelenmez: onları açıp
+            kapatmanın bir karşılığı yok (bkz. OrgTabs.visibleOrgTabs). */}
+        <TabVisibilitySection
+          scope="organization"
+          value={hiddenTabs}
+          onChange={setHiddenTabs}
+          unavailable={[
+            ...(organization.viewerAccess?.canViewBudget === true ? [] : ["budget"]),
+            ...(organization.viewerAccess?.canViewCommercial === false ? ["products"] : []),
+          ]}
         />
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}

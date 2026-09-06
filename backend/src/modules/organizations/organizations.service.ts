@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Organization } from "@projelio/shared";
+import { sanitizeHiddenTabs } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { JobsService } from "../jobs/jobs.service";
@@ -24,6 +25,9 @@ function mapOrganization(row: any): Organization {
     createdAt: row.created_at,
     archivedAt: row.archived_at ?? undefined,
     sortOrder: row.sort_order ?? 0,
+    // Kolon eski kayıtlarda ya da migration uygulanmadan önce yoksa boş dizi:
+    // "hiçbir sekme kapalı değil" eski davranışın aynısıdır.
+    hiddenTabs: sanitizeHiddenTabs("organization", row.hidden_tabs),
   };
 }
 
@@ -224,6 +228,8 @@ export class OrganizationsService {
     if (data.groupId !== undefined) patch.group_id = data.groupId ?? null;
     if (data.coverImageUrl !== undefined) patch.cover_image_url = data.coverImageUrl;
     if (data.orgType !== undefined) patch.org_type = data.orgType === "isletme" ? "isletme" : "sirket";
+    // Tanınmayan/kilitli anahtarlar ve "hepsini gizle" listesi kayıttan önce elenir.
+    if (data.hiddenTabs !== undefined) patch.hidden_tabs = sanitizeHiddenTabs("organization", data.hiddenTabs);
 
     const { data: row, error } = await this.supabase.client
       .from("organizations")

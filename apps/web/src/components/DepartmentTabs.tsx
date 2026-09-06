@@ -8,7 +8,7 @@ export type DepartmentTab = "flow" | "team" | "tasks" | "budget" | "modules" | "
 // "Çıktılar" ara katmanı yok), Bütçe (görev bütçesi onay akışı + otomatik
 // hesaplanan özetler + genel defter), Modüller (departmana özel etkinleştirilen
 // araçlar), Dosyalar (departmana özel Drive klasörü).
-const tabs: { key: DepartmentTab; label: string }[] = [
+export const DEPARTMENT_TABS: { key: DepartmentTab; label: string }[] = [
   { key: "flow", label: "Sosyal" },
   { key: "team", label: "Ekip" },
   { key: "tasks", label: "Görevler" },
@@ -27,9 +27,17 @@ const tabs: { key: DepartmentTab; label: string }[] = [
  * access verilmemişse (ör. departman henüz yüklenmedi) hepsi gösterilir —
  * yükleme sırasında sekmelerin sırayla belirip kaymasını engeller.
  */
-export function visibleDepartmentTabs(access?: DepartmentAccess): { key: DepartmentTab; label: string }[] {
-  if (!access) return tabs;
-  return tabs.filter((t) => {
+export function visibleDepartmentTabs(
+  access?: DepartmentAccess,
+  hiddenTabs?: string[]
+): { key: DepartmentTab; label: string }[] {
+  // Sahibinin kapattıkları (bkz. Department.hiddenTabs) yetkiden BAĞIMSIZ olarak
+  // düşer; access henüz gelmemişken bile uygulanır, çünkü bu bilgi departmanın
+  // kendi kaydından geliyor ve yüklemeye bağlı değil.
+  const hidden = new Set(hiddenTabs ?? []);
+  const acik = DEPARTMENT_TABS.filter((t) => !hidden.has(t.key));
+  if (!access) return acik;
+  return acik.filter((t) => {
     if (t.key === "budget") return access.canViewBudget;
     if (t.key === "team") return access.canViewTeam;
     return true;
@@ -46,12 +54,14 @@ interface Props {
   scrollable?: boolean;
   /** İsteyen kullanıcının bu departmandaki görünürlüğü (sunucudan gelir). */
   access?: DepartmentAccess;
+  /** Organizasyon sahibinin ayarlardan kapattığı sekmeler (Department.hiddenTabs). */
+  hiddenTabs?: string[];
 }
 
-export default function DepartmentTabs({ active, onChange, style, scrollable, access }: Props) {
+export default function DepartmentTabs({ active, onChange, style, scrollable, access, hiddenTabs }: Props) {
   return (
     <TabBar
-      tabs={visibleDepartmentTabs(access)}
+      tabs={visibleDepartmentTabs(access, hiddenTabs)}
       active={active}
       onChange={(k) => onChange(k as DepartmentTab)}
       style={style}

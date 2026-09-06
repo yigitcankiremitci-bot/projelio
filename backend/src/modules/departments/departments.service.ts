@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import type { Department, DepartmentAccess, DepartmentMemberRole } from "@projelio/shared";
+import { ENTITY_TAB_KEYS, sanitizeHiddenTabs } from "@projelio/shared";
 import { applyOrder } from "../../common/reorder.util";
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
@@ -9,7 +10,10 @@ import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-ima
 
 const COVER_BUCKET = "department-covers";
 
-const VALID_DEFAULT_TABS = ["flow", "team", "tasks", "budget", "modules", "files"];
+// Açılış sekmesi ile gizlenebilir sekmeler AYNI kümeden gelir (bkz. shared
+// ENTITY_TAB_KEYS): iki liste ayrı tutulduğunda birine eklenen sekme
+// diğerinde eksik kalıyordu.
+const VALID_DEFAULT_TABS = ENTITY_TAB_KEYS.department;
 
 function mapDepartment(row: any): Department {
   return {
@@ -23,6 +27,8 @@ function mapDepartment(row: any): Department {
     coverImageUrl: row.cover_image_url ?? undefined,
     sortOrder: row.sort_order ?? 0,
     defaultTab: row.default_tab ?? "tasks",
+    // Kolon yoksa (migration 091 uygulanmadan) boş dizi: hiçbir sekme kapalı değil.
+    hiddenTabs: sanitizeHiddenTabs("department", row.hidden_tabs),
     createdAt: row.created_at,
     archivedAt: row.archived_at ?? undefined,
   };
@@ -289,7 +295,7 @@ export class DepartmentsService {
 
   async update(
     id: string,
-    data: { name?: string; description?: string; defaultTab?: string },
+    data: { name?: string; description?: string; defaultTab?: string; hiddenTabs?: string[] },
     requestingUserId?: string
   ): Promise<Department> {
     const existing = await this.findOne(id);
@@ -304,6 +310,10 @@ export class DepartmentsService {
       }
       patch.default_tab = data.defaultTab;
     }
+    // Tanınmayan/kilitli anahtarlar ve "hepsini gizle" listesi kayıttan önce elenir.
+    // Açılış sekmesinin gizlenmesi ENGELLENMİYOR: departmanda kilitli sekme yok
+    // ve sayfa açık kalan ilk sekmeye düşüyor (bkz. DepartmentDetail defaultTab).
+    if (data.hiddenTabs !== undefined) patch.hidden_tabs = sanitizeHiddenTabs("department", data.hiddenTabs);
 
     const { data: row, error } = await this.supabase.client
       .from("departments")

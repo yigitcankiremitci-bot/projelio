@@ -67,7 +67,9 @@ export default function ProjectDetail() {
   // bile yetki yoksa Görev/Çıktı'ya düşer (asıl kısıt zaten sunucuda).
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const validTabs: ProjectTab[] = visibleProjectTabs(canViewBudget, isSubcontractor).map((t) => t.key);
+  // Sahibinin ayarlardan kapattığı sekmeler de daraltır (bkz. Project.hiddenTabs).
+  const hiddenTabs = project?.hiddenTabs;
+  const validTabs: ProjectTab[] = visibleProjectTabs(canViewBudget, isSubcontractor, hiddenTabs).map((t) => t.key);
   const activeTab: ProjectTab = validTabs.includes(tabParam as ProjectTab) ? (tabParam as ProjectTab) : "tasks";
   const setActiveTab = (next: ProjectTab) => {
     setSearchParams(next === "tasks" ? {} : { tab: next }, { replace: true });
@@ -446,10 +448,11 @@ export default function ProjectDetail() {
       onChange={setActiveTab}
       showBudget={canViewBudget}
       isSubcontractor={isSubcontractor}
+      hiddenTabs={hiddenTabs}
       style={{ marginBottom: 0 }}
       scrollable
     />,
-    [activeTab, canViewBudget, isSubcontractor],
+    [activeTab, canViewBudget, isSubcontractor, hiddenTabs],
     tabsRef
   );
 
@@ -642,6 +645,7 @@ export default function ProjectDetail() {
                 onChange={setActiveTab}
                 showBudget={canViewBudget}
                 isSubcontractor={isSubcontractor}
+                hiddenTabs={hiddenTabs}
               />
             </div>
           </div>

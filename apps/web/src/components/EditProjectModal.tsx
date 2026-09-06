@@ -7,6 +7,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
+import TabVisibilitySection from "./TabVisibilitySection";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { useT } from "../lib/i18n";
 
@@ -42,6 +43,8 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
   const [coverValue, setCoverValue] = useState<string | undefined>(project.coverImageUrl);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  // Kapatılan sekmeler (bkz. TabVisibilitySection).
+  const [hiddenTabs, setHiddenTabs] = useState<string[]>(project.hiddenTabs ?? []);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -73,6 +76,7 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
         startDate: new Date(startDate).toISOString(),
         deadline: new Date(deadline).toISOString(),
         status,
+        hiddenTabs,
         // Hazır kapak seçimi / kapağı kaldırma doğrudan bu alanla kaydedilir;
         // dosya yüklemesi ayrı uçtan gider. Değişmediyse hiç gönderilmez.
         ...(coverValue !== project.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
@@ -148,6 +152,8 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}
         />
+
+        <TabVisibilitySection scope="project" value={hiddenTabs} onChange={setHiddenTabs} />
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
 

@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { Job } from "@projelio/shared";
+import { sanitizeHiddenTabs } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { ProjectsService } from "../projects/projects.service";
@@ -27,6 +28,8 @@ function mapJob(row: any): Job {
     createdAt: row.created_at,
     archivedAt: row.archived_at ?? undefined,
     sortOrder: row.sort_order ?? 0,
+    // Kolon yoksa (migration 091 uygulanmadan) boş dizi: hiçbir sekme kapalı değil.
+    hiddenTabs: sanitizeHiddenTabs("job", row.hidden_tabs),
   };
 }
 
@@ -279,6 +282,8 @@ export class JobsService {
     if (data.title !== undefined) patch.title = data.title;
     if (data.description !== undefined) patch.description = data.description;
     if (data.coverImageUrl !== undefined) patch.cover_image_url = data.coverImageUrl;
+    // Tanınmayan/kilitli anahtarlar ve "hepsini gizle" listesi kayıttan önce elenir.
+    if (data.hiddenTabs !== undefined) patch.hidden_tabs = sanitizeHiddenTabs("job", data.hiddenTabs);
     if (data.organizationId !== undefined || data.groupId !== undefined) {
       const nextOrgId = data.organizationId !== undefined ? data.organizationId : undefined;
       const nextGroupId = data.groupId !== undefined ? data.groupId : undefined;

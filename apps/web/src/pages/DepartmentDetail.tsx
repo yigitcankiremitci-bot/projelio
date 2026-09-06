@@ -52,7 +52,10 @@ export default function DepartmentDetail() {
   // ile doğrudan gelinse bile aşağıdaki fallback devreye girer — sunucu da zaten
   // 403 döner, bu yalnızca boş ekran göstermemek için.
   const access = department?.viewerAccess;
-  const validTabs: DepartmentTab[] = visibleDepartmentTabs(access).map((t) => t.key);
+  // Organizasyon sahibinin ayarlardan kapattığı sekmeler de daraltır
+  // (bkz. Department.hiddenTabs).
+  const hiddenTabs = department?.hiddenTabs;
+  const validTabs: DepartmentTab[] = visibleDepartmentTabs(access, hiddenTabs).map((t) => t.key);
   // ?tab= yoksa departmanın kendi açılış tercihi kullanılır (ayarlardan
   // kişiselleştirilebilir); departman henüz yüklenmediyse "tasks" varsayılır.
   // Tercih edilen sekme kullanıcıya kapalıysa ilk açık sekmeye düşülür.
@@ -142,10 +145,11 @@ export default function DepartmentDetail() {
       active={activeTab}
       onChange={setActiveTab}
       access={access}
+      hiddenTabs={hiddenTabs}
       style={{ marginBottom: 0 }}
       scrollable
     />,
-    [activeTab, access],
+    [activeTab, access, hiddenTabs],
     tabsRef
   );
 
@@ -239,7 +243,7 @@ export default function DepartmentDetail() {
         {department && (
           <>
             <div ref={tabsRef}>
-              <DepartmentTabs active={activeTab} onChange={setActiveTab} access={access} />
+              <DepartmentTabs active={activeTab} onChange={setActiveTab} access={access} hiddenTabs={hiddenTabs} />
             </div>
 
             {activeTab === "flow" && <FeedPanel ref={feedRef} departmentId={department.id} tasks={tasks} />}

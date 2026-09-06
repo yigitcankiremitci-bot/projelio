@@ -17,6 +17,7 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { AuthGuard } from "@nestjs/passport";
 import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guard";
 import { JwtService } from "@nestjs/jwt";
@@ -36,6 +37,11 @@ interface FileAccessClaims {
  * Proje ekranından gelen istekler için de kısayol uç noktaları var; bunlar işi
  * projeden türetip aynı servise düşer.
  */
+function normalizeOwnerKind(value: string): "job" | "department" | "organization" {
+  // İstemciden gelen değer; tanınmayan her şey en dar kapsama düşer.
+  return value === "job" || value === "organization" ? value : "department";
+}
+
 @Controller()
 export class FilesController {
   constructor(
@@ -58,9 +64,15 @@ export class FilesController {
   uploadToOrganization(
     @Param("organizationId") organizationId: string,
     @UploadedFile() file: Express.Multer.File,
+    @Body() body: { folderId?: string; relativePath?: string },
     @Req() req: any
   ) {
-    return this.filesService.uploadInlineForFlat({ kind: "organization", id: organizationId }, req.user.userId, file);
+    return this.filesService.uploadInlineForFlat(
+      { kind: "organization", id: organizationId },
+      req.user.userId,
+      file,
+      { folderId: body?.folderId || undefined, relativePath: body?.relativePath || undefined }
+    );
   }
 
   @Post("organizations/:organizationId/files/upload-session")
@@ -99,14 +111,15 @@ export class FilesController {
   @UseGuards(AuthGuard("jwt"))
   importToOrganization(
     @Param("organizationId") organizationId: string,
-    @Body() body: { sourceFileId: string; name?: string },
+    @Body() body: { sourceFileId: string; name?: string; folderId?: string },
     @Req() req: any
   ) {
     return this.filesService.importForFlat(
       { kind: "organization", id: organizationId },
       req.user.userId,
       body?.sourceFileId,
-      body?.name
+      body?.name,
+      body?.folderId || undefined
     );
   }
 
@@ -114,21 +127,26 @@ export class FilesController {
   @UseGuards(AuthGuard("jwt"))
   createNativeInOrganization(
     @Param("organizationId") organizationId: string,
-    @Body() body: { kind: NativeFileKind; name: string },
+    @Body() body: { kind: NativeFileKind; name: string; folderId?: string },
     @Req() req: any
   ) {
     return this.filesService.createNativeForFlat(
       { kind: "organization", id: organizationId },
       req.user.userId,
       body?.kind,
-      body?.name
+      body?.name,
+      body?.folderId || undefined
     );
   }
 
   @Get("departments/:departmentId/files")
   @UseGuards(AuthGuard("jwt"))
-  listByDepartment(@Param("departmentId") departmentId: string, @Req() req: any) {
-    return this.filesService.listByDepartment(departmentId, req.user.userId);
+  listByDepartment(
+    @Param("departmentId") departmentId: string,
+    @Query("folderId") folderId: string | undefined,
+    @Req() req: any
+  ) {
+    return this.filesService.listByDepartment(departmentId, req.user.userId, folderId || undefined);
   }
 
   @Post("departments/:departmentId/files")
@@ -139,9 +157,13 @@ export class FilesController {
   uploadToDepartment(
     @Param("departmentId") departmentId: string,
     @UploadedFile() file: Express.Multer.File,
+    @Body() body: { folderId?: string; relativePath?: string },
     @Req() req: any
   ) {
-    return this.filesService.uploadInlineForDepartment(departmentId, req.user.userId, file);
+    return this.filesService.uploadInlineForFlat({ kind: "department", id: departmentId }, req.user.userId, file, {
+      folderId: body?.folderId || undefined,
+      relativePath: body?.relativePath || undefined,
+    });
   }
 
   @Post("departments/:departmentId/files/upload-session")
@@ -177,20 +199,32 @@ export class FilesController {
   @UseGuards(AuthGuard("jwt"))
   importToDepartment(
     @Param("departmentId") departmentId: string,
-    @Body() body: { sourceFileId: string; name?: string },
+    @Body() body: { sourceFileId: string; name?: string; folderId?: string },
     @Req() req: any
   ) {
-    return this.filesService.importForDepartment(departmentId, req.user.userId, body?.sourceFileId, body?.name);
+    return this.filesService.importForFlat(
+      { kind: "department", id: departmentId },
+      req.user.userId,
+      body?.sourceFileId,
+      body?.name,
+      body?.folderId || undefined
+    );
   }
 
   @Post("departments/:departmentId/files/create-native")
   @UseGuards(AuthGuard("jwt"))
   createNativeInDepartment(
     @Param("departmentId") departmentId: string,
-    @Body() body: { kind: NativeFileKind; name: string },
+    @Body() body: { kind: NativeFileKind; name: string; folderId?: string },
     @Req() req: any
   ) {
-    return this.filesService.createNativeForDepartment(departmentId, req.user.userId, body?.kind, body?.name);
+    return this.filesService.createNativeForFlat(
+      { kind: "department", id: departmentId },
+      req.user.userId,
+      body?.kind,
+      body?.name,
+      body?.folderId || undefined
+    );
   }
 
   /**
@@ -213,6 +247,60 @@ export class FilesController {
     return this.filesService.pickerTokenForTarget(req.user.userId, { jobId, departmentId, organizationId });
   }
 
+  // ---------------------------------------------------------------- klasörler
+  // Üç kapsam da (iş, departman, şirket) aynı klasör ağacını kullanıyor
+  // (bkz. migration 090), bu yüzden kapsam yol parçası değil sorgu parametresi:
+  // üç ayrı uç üçlemesi yerine tek uç kümesi.
+
+  @Get("file-folders")
+  @UseGuards(AuthGuard("jwt"))
+  listFolders(
+    @Query("ownerKind") ownerKind: "job" | "department" | "organization",
+    @Query("ownerId") ownerId: string,
+    @Query("parentId") parentId: string | undefined,
+    @Req() req: any
+  ) {
+    return this.filesService.listFolders(
+      { kind: normalizeOwnerKind(ownerKind), id: ownerId },
+      req.user.userId,
+      parentId || undefined
+    );
+  }
+
+  /** Ekmek kırıntısı: klasörün kökten kendisine kadar olan yolu. */
+  @Get("file-folders/:id/path")
+  @UseGuards(AuthGuard("jwt"))
+  folderPath(@Param("id") id: string, @Req() req: any) {
+    return this.filesService.folderPath(id, req.user.userId);
+  }
+
+  @Post("file-folders")
+  @UseGuards(AuthGuard("jwt"))
+  createFolder(
+    @Body() body: { ownerKind: "job" | "department" | "organization"; ownerId: string; name: string; parentFolderId?: string },
+    @Req() req: any
+  ) {
+    return this.filesService.createFolder(
+      { kind: normalizeOwnerKind(body?.ownerKind), id: body?.ownerId },
+      req.user.userId,
+      body?.name,
+      body?.parentFolderId || undefined
+    );
+  }
+
+  @Patch("file-folders/:id")
+  @UseGuards(AuthGuard("jwt"))
+  renameFolder(@Param("id") id: string, @Body() body: { name: string }, @Req() req: any) {
+    return this.filesService.renameFolder(id, req.user.userId, body?.name);
+  }
+
+  @Delete("file-folders/:id")
+  @UseGuards(AuthGuard("jwt"))
+  async removeFolder(@Param("id") id: string, @Req() req: any) {
+    await this.filesService.removeFolder(id, req.user.userId);
+    return { ok: true as const };
+  }
+
   // -------------------------------------------------------------- listeleme
 
   @Get("jobs/:jobId/files")
@@ -223,9 +311,18 @@ export class FilesController {
     @Query("scope") scope?: "all" | "general" | "project",
     @Query("projectId") projectId?: string,
     @Query("taskId") taskId?: string,
-    @Query("outputId") outputId?: string
+    @Query("outputId") outputId?: string,
+    @Query("folderId") folderId?: string,
+    @Query("atRoot") atRoot?: string
   ) {
-    return this.filesService.listByJob(jobId, req.user.userId, { scope, projectId, taskId, outputId });
+    return this.filesService.listByJob(jobId, req.user.userId, {
+      scope,
+      projectId,
+      taskId,
+      outputId,
+      folderId: folderId || undefined,
+      atRoot: atRoot === "1",
+    });
   }
 
   @Get("projects/:projectId/files")
@@ -244,8 +341,12 @@ export class FilesController {
 
   @Get("organizations/:organizationId/files")
   @UseGuards(AuthGuard("jwt"))
-  listByOrganization(@Param("organizationId") organizationId: string, @Req() req: any) {
-    return this.filesService.listByOrganization(organizationId, req.user.userId);
+  listByOrganization(
+    @Param("organizationId") organizationId: string,
+    @Query("folderId") folderId: string | undefined,
+    @Req() req: any
+  ) {
+    return this.filesService.listByOrganization(organizationId, req.user.userId, folderId || undefined);
   }
 
   @Get("groups/:groupId/files")
@@ -264,14 +365,27 @@ export class FilesController {
   upload(
     @Param("jobId") jobId: string,
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: { projectId?: string; taskId?: string; outputId?: string },
+    @Body()
+    body: {
+      projectId?: string;
+      taskId?: string;
+      outputId?: string;
+      folderId?: string;
+      relativePath?: string;
+    },
     @Req() req: any
   ) {
-    return this.filesService.uploadInline(jobId, req.user.userId, file, {
-      projectId: body?.projectId || undefined,
-      taskId: body?.taskId || undefined,
-      outputId: body?.outputId || undefined,
-    });
+    return this.filesService.uploadInline(
+      jobId,
+      req.user.userId,
+      file,
+      {
+        projectId: body?.projectId || undefined,
+        taskId: body?.taskId || undefined,
+        outputId: body?.outputId || undefined,
+      },
+      { folderId: body?.folderId || undefined, relativePath: body?.relativePath || undefined }
+    );
   }
 
   /**
@@ -435,6 +549,42 @@ export class FilesController {
   // kullanılamaz. Bunun yerine 5 dakika ömürlü, tek bir dosyaya bağlı imzalı bir
   // jeton üretilir; içerik uç noktası yalnızca onu kabul eder.
 
+  /**
+   * Birden çok dosya için tek seferde imzalı jeton.
+   *
+   * Simge görünümünde ekranda onlarca önizleme var; her biri için ayrı bir
+   * jeton isteği atmak sunucuya gereksiz yük, kullanıcıya da gecikme demekti.
+   * Güvenlik aynı: jetonlar yine DOSYA BAŞINA imzalanıyor ve her biri için
+   * erişim ayrı ayrı doğrulanıyor — erişilemeyen dosya listede hiç dönmüyor.
+   */
+  @Post("files/access-tokens")
+  @UseGuards(AuthGuard("jwt"))
+  async accessTokens(@Body("ids") ids: string[], @Req() req: any) {
+    const benzersiz = Array.from(new Set(Array.isArray(ids) ? ids : [])).slice(0, LISTE_TAVANI);
+
+    const entries = await Promise.all(
+      benzersiz.map(async (id) => {
+        try {
+          await this.filesService.findById(id, req.user.userId);
+        } catch {
+          // Erişimi olmayan dosya sessizce atlanır: burada hata döndürmek,
+          // tek bir eskimiş kimlik yüzünden bütün ızgarayı önizlemesiz bırakırdı.
+          return null;
+        }
+        const token = this.jwtService.sign(
+          { typ: "file_access", fileId: id, sub: req.user.userId } satisfies FileAccessClaims,
+          { expiresIn: "5m" }
+        );
+        return [id, token] as const;
+      })
+    );
+
+    return {
+      tokens: Object.fromEntries(entries.filter(Boolean) as (readonly [string, string])[]),
+      expiresInSeconds: 300,
+    };
+  }
+
   @Post("files/:id/access-token")
   @UseGuards(AuthGuard("jwt"))
   async accessToken(@Param("id") id: string, @Req() req: any) {
@@ -446,6 +596,33 @@ export class FilesController {
       { expiresIn: "5m" }
     );
     return { token, expiresInSeconds: 300 };
+  }
+
+  /**
+   * Dosyanın önizlemesi.
+   *
+   * `content`ten ayrı bir uç: orada Content-Type kullanıcının yüklediği
+   * değerden geliyor ve bu yüzden uzun bir güvenlik gerekçesi var. Burada
+   * içerik HER ZAMAN sağlayıcının ürettiği bir görsel — türü biz sabitliyoruz,
+   * kullanıcı etkileyemiyor.
+   */
+  @Get("files/:id/thumbnail")
+  async thumbnail(@Param("id") id: string, @Query("t") accessToken: string, @Res() res: Response) {
+    const claims = this.verifyAccessToken(accessToken, id);
+    const upstream = await this.filesService.openThumbnail(id, claims.sub);
+
+    // Önizleme yoksa 404: arayüz tür ikonuna düşer, hata göstermez.
+    if (!upstream?.body) return res.status(404).end();
+
+    const type = upstream.headers.get("content-type") ?? "";
+    // Sağlayıcı beklenmedik bir tür döndürürse görsel diye servis etmeyiz.
+    res.setHeader("Content-Type", type.startsWith("image/") ? type : "image/jpeg");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Security-Policy", "default-src 'none'");
+    // Önizleme adresi imzalı ve kısa ömürlü; aracıların paylaşmaması için private.
+    res.setHeader("Cache-Control", "private, max-age=300");
+
+    Readable.fromWeb(upstream.body as any).pipe(res);
   }
 
   @Get("files/:id/content")

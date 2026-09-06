@@ -14,6 +14,8 @@ export interface CreateNativeFileMenuHandle {
 
 interface Props {
   target: FileTarget;
+  /** Bulunulan klasör; yeni dosya oraya iner. */
+  folderId?: string;
   taskId?: string;
   outputId?: string;
   /** Hangi sağlayıcı bağlı: seçenek listesi buna göre değişir (bkz. backend NativeFileKind). */
@@ -54,7 +56,7 @@ const MICROSOFT_KINDS: { kind: NativeFileKind; label: string }[] = [
  * edilir, ayrılmak tamamen kullanıcının tercihi olur.
  */
 const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(function CreateNativeFileMenu(
-  { target, taskId, outputId, provider, hideTrigger = false, onCreated },
+  { target, folderId, taskId, outputId, provider, hideTrigger = false, onCreated },
   ref
 ) {
   const c = useThemeColors();
@@ -91,7 +93,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
     setSaving(true);
     setError("");
     try {
-      const created = await filesApi.createNativeFile(target, { kind: pendingKind.kind, name: name.trim(), taskId, outputId });
+      const created = await filesApi.createNativeFile(target, { kind: pendingKind.kind, name: name.trim(), taskId, outputId, folderId });
       onCreated(created);
       setPendingKind(null);
     } catch (e: any) {

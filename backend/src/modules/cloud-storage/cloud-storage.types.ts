@@ -9,6 +9,11 @@ export interface CloudFile {
   size?: number;
   webViewLink?: string;
   iconLink?: string;
+  /**
+   * Önizleme adresi. Kısa ömürlü ve kimlik ister; tarayıcıya doğrudan
+   * verilmez, imzalı proxy üzerinden servis edilir (bkz. migration 090).
+   */
+  thumbnailLink?: string;
   md5Checksum?: string;
   trashed?: boolean;
   /**

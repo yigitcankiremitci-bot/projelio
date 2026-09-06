@@ -38,6 +38,8 @@ export interface DriveFile {
   size?: number;
   webViewLink?: string;
   iconLink?: string;
+  /** Küçük önizleme adresi; kısa ömürlü ve kimlik ister (bkz. FILE_FIELDS notu). */
+  thumbnailLink?: string;
   md5Checksum?: string;
   trashed?: boolean;
   /** Dosyanın içinde bulunduğu klasör(ler) — bkz. CloudFile.parentIds. */
@@ -65,7 +67,11 @@ export const GOOGLE_NATIVE_MIME: Record<"gdoc" | "gsheet" | "gslide", string> = 
   gslide: "application/vnd.google-apps.presentation",
 };
 
-const FILE_FIELDS = "id,name,mimeType,size,webViewLink,iconLink,md5Checksum,trashed,parents";
+// thumbnailLink: dosyanın küçük önizlemesi. KISA ÖMÜRLÜ ve kimlik ister —
+// tarayıcıya doğrudan verilemez, imzalı proxy üzerinden servis edilir
+// (bkz. migration 090, files.thumbnail_link).
+const FILE_FIELDS =
+  "id,name,mimeType,size,webViewLink,iconLink,thumbnailLink,md5Checksum,trashed,parents";
 
 function mapFile(json: any): DriveFile {
   return {
@@ -75,6 +81,7 @@ function mapFile(json: any): DriveFile {
     size: json.size !== undefined ? Number(json.size) : undefined,
     webViewLink: json.webViewLink ?? undefined,
     iconLink: json.iconLink ?? undefined,
+    thumbnailLink: json.thumbnailLink ?? undefined,
     md5Checksum: json.md5Checksum ?? undefined,
     trashed: json.trashed ?? undefined,
     parentIds: Array.isArray(json.parents) ? json.parents : undefined,

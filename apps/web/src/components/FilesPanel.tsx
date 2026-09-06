@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import type { GoogleDriveStatus, ProjectFile } from "@projelio/shared";
 import { driveApi, filesApi, oneDriveApi } from "../api/files";
 import { useRefreshOnUndo } from "../lib/undo";
-import type { FileScope } from "../api/files";
+import type { FileFolder, FileFolderOwner, FileScope } from "../api/files";
 import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
 import {
   cancelUpload,
@@ -20,6 +20,7 @@ import BrowseDriveModal from "./BrowseDriveModal";
 import ConfirmDialog from "./ConfirmDialog";
 import CreateNativeFileMenu from "./CreateNativeFileMenu";
 import type { CreateNativeFileMenuHandle } from "./CreateNativeFileMenu";
+import FileContextMenu from "./FileContextMenu";
 import FilePreviewModal from "./FilePreviewModal";
 import { useT } from "../lib/i18n";
 import {
@@ -83,6 +84,25 @@ export interface FilesPanelHandle {
   openBrowseDrive: () => void;
 }
 
+/** Sağ tık menüsünün hedefi: bir dosya ya da bir klasör. */
+type MenuState = { x: number; y: number; file?: ProjectFile; folder?: FileFolder };
+
+const GORUNUM_ANAHTARI = "projelio.dosya-gorunumu";
+
+/**
+ * Görünüm tercihi tarayıcıda saklanıyor: kullanıcı bir kez simge görünümünü
+ * seçtiyse her sayfada yeniden seçmek zorunda kalmasın. Sunucuya taşımak için
+ * fazla önemsiz bir tercih.
+ */
+function readStoredView(): "list" | "grid" {
+  try {
+    return localStorage.getItem(GORUNUM_ANAHTARI) === "grid" ? "grid" : "list";
+  } catch {
+    // Gizli sekmede / depolama kapalıyken erişim hata fırlatabiliyor.
+    return "list";
+  }
+}
+
 /** Yüzde, satırda iki yerde (yazı ve çubuk) kullanılıyor. */
 function ratioPct(u: { uploadedBytes: number; sizeBytes: number }): number {
   return u.sizeBytes > 0 ? Math.min(100, Math.round((u.uploadedBytes / u.sizeBytes) * 100)) : 0;
@@ -123,7 +143,22 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   // "anyReady=false" görünüp driveMissing uyarısı bir anlığına yanıp söner.
   // İkisi de dönene kadar bekleyip uyarıyı ona göre göstermek bunu önler.
   const [statusLoading, setStatusLoading] = useState(true);
+
+  // ── Klasör gezinme ve görünüm
+  const [folders, setFolders] = useState<FileFolder[]>([]);
+  const [folderId, setFolderId] = useState<string | undefined>(undefined);
+  // Ekmek kırıntısı: kökten bulunulan klasöre kadar. Sunucudan geliyor, çünkü
+  // kullanıcı derin bir klasöre bağlantıyla da girebilir.
+  const [crumbs, setCrumbs] = useState<FileFolder[]>([]);
+  const [viewMode, setViewMode] = useState<"list" | "grid">(readStoredView);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  // Önizleme jetonları: dosya başına imzalı, tek istekte toplu alınır.
+  const [thumbTokens, setThumbTokens] = useState<Record<string, string>>({});
+
   const inputRef = useRef<HTMLInputElement>(null);
+  // Ayrı bir input: webkitdirectory aynı elemanda açılıp kapatılamıyor
+  // (tarayıcı özniteliği okuduktan sonra değiştirmek seçiciyi bozuyor).
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const createMenuRef = useRef<CreateNativeFileMenuHandle>(null);
 
   // GRUP ekranı salt okunur: grubun kendi dosya alanı yok, yalnızca altındaki
@@ -139,6 +174,27 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   // Üst kademe listesi: satırlar başka kapsamlardan (işlerden) da geliyor,
   // o yüzden her satırda kaynağını yazmak gerekiyor.
   const aggregated = Boolean(organizationId || groupId);
+
+  const folderOwner: FileFolderOwner | undefined = useMemo(
+    () =>
+      departmentId
+        ? { kind: "department", id: departmentId }
+        : organizationId
+        ? { kind: "organization", id: organizationId }
+        : jobId
+        ? { kind: "job", id: jobId }
+        : undefined,
+    [departmentId, organizationId, jobId]
+  );
+
+  /**
+   * Klasör gezinme yalnızca "tarayıcı" bağlamında açık.
+   *
+   * Görev eki, çıktı eki ya da proje sekmesi zaten SÜZÜLMÜŞ bir liste: orada
+   * klasör ağacı göstermek, kullanıcının aradığı dosyayı gizlerdi. Grup ekranı
+   * da salt okunur bir toplama.
+   */
+  const canBrowse = Boolean(folderOwner) && !compact && !taskId && !outputId && !projectId && !groupId;
 
   const target = useMemo(
     () =>
@@ -172,20 +228,40 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const load = useCallback(() => {
     setError("");
     const request = organizationId
-      ? filesApi.listByOrganization(organizationId)
+      ? filesApi.listByOrganization(organizationId, folderId)
       : groupId
       ? filesApi.listByGroup(groupId)
       : departmentId
-      ? filesApi.listByDepartment(departmentId)
+      ? filesApi.listByDepartment(departmentId, folderId)
       : jobId
-      ? filesApi.listByJob(jobId, { scope: scope ?? "all", projectId, taskId, outputId })
+      ? filesApi.listByJob(jobId, {
+          scope: scope ?? "all",
+          projectId,
+          taskId,
+          outputId,
+          folderId,
+          // İş kapsamında her dosyanın bir klasörü var (Genel/Proje/…), bu yüzden
+          // kök "klasörsüz dosyalar" demek: gezinme açıkken liste klasörlerden
+          // oluşur, kapalıyken eski düz liste korunur.
+          atRoot: canBrowse && !folderId ? "1" : undefined,
+        })
       : filesApi.listByProject(projectId!, { taskId, outputId });
 
-    return request
-      .then(setFiles)
+    // Klasörler ayrı uçtan; ikisi paralel gidiyor.
+    const folderRequest =
+      canBrowse && folderOwner
+        ? filesApi.folders(folderOwner, folderId).catch(() => [] as FileFolder[])
+        : Promise.resolve([] as FileFolder[]);
+
+    return Promise.all([request, folderRequest])
+      .then(([list, klasorler]) => {
+        setFiles(list);
+        setFolders(klasorler);
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [organizationId, groupId, departmentId, jobId, projectId, taskId, outputId, scope]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, groupId, departmentId, jobId, projectId, taskId, outputId, scope, folderId, canBrowse]);
 
   useEffect(() => {
     void load();
@@ -209,7 +285,102 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     if (!selected?.length) return;
     // Kuyruk sıralı ilerliyor, hız sınırını ve hataları da o yönetiyor
     // (bkz. lib/uploadQueue). Panel yalnızca işi teslim ediyor.
-    enqueueUploads({ target, files: Array.from(selected), context: { taskId, outputId } });
+    enqueueUploads({
+      target,
+      files: Array.from(selected),
+      // Klasör yüklemesinde göreli yolu kuyruk dosyanın kendisinden okuyor
+      // (webkitRelativePath); burada yalnızca bulunulan klasörü veriyoruz.
+      context: { taskId, outputId, folderId },
+    });
+  };
+
+  // Önizlemesi olan dosyalar için tek istekte jeton alınır (bkz. filesApi.accessTokens).
+  useEffect(() => {
+    const ids = files.filter((f) => f.hasThumbnail).map((f) => f.id);
+    if (!ids.length) {
+      setThumbTokens({});
+      return;
+    }
+    let iptal = false;
+    filesApi
+      .accessTokens(ids)
+      .then(({ tokens }) => {
+        if (!iptal) setThumbTokens(tokens);
+      })
+      // Önizleme kritik değil: alınamazsa tür ikonu gösterilir.
+      .catch(() => undefined);
+    return () => {
+      iptal = true;
+    };
+  }, [files]);
+
+  // Ekmek kırıntısı sunucudan: kullanıcı derin bir klasöre doğrudan da girebilir.
+  useEffect(() => {
+    if (!folderId) {
+      setCrumbs([]);
+      return;
+    }
+    let iptal = false;
+    filesApi
+      .folderPath(folderId)
+      .then((yol) => {
+        if (!iptal) setCrumbs(yol);
+      })
+      .catch(() => undefined);
+    return () => {
+      iptal = true;
+    };
+  }, [folderId]);
+
+  const handleCreateFolder = async () => {
+    if (!folderOwner) return;
+    const ad = window.prompt(t("Klasör adı:"))?.trim();
+    if (!ad) return;
+    try {
+      const klasor = await filesApi.createFolder(folderOwner, ad, folderId);
+      setFolders((prev) => [...prev, klasor].sort((a, b) => a.name.localeCompare(b.name, "tr")));
+    } catch (e: any) {
+      setError(e?.message ?? t("Klasör oluşturulamadı"));
+    }
+  };
+
+  const handleRenameFolder = async (folder: FileFolder) => {
+    const ad = window.prompt(t("Yeni ad:"), folder.name)?.trim();
+    if (!ad || ad === folder.name) return;
+    try {
+      const guncel = await filesApi.renameFolder(folder.id, ad);
+      setFolders((prev) => prev.map((f) => (f.id === folder.id ? guncel : f)));
+    } catch (e: any) {
+      setError(e?.message ?? t("Klasör yeniden adlandırılamadı"));
+    }
+  };
+
+  const handleRemoveFolder = async (folder: FileFolder) => {
+    // İçindekilerle birlikte gittiği için onay şart; bulutta çöp kutusuna
+    // taşındığı için geri alınabilir olduğunu da söylüyoruz.
+    const onay = window.confirm(
+      t('"{ad}" klasörü içindekilerle birlikte kaldırılsın mı? Bulutta çöp kutusuna taşınır.', {
+        ad: folder.name,
+      })
+    );
+    if (!onay) return;
+    try {
+      await filesApi.removeFolder(folder.id);
+      setFolders((prev) => prev.filter((f) => f.id !== folder.id));
+    } catch (e: any) {
+      setError(e?.message ?? t("Klasör kaldırılamadı"));
+    }
+  };
+
+  const handleRenameFile = async (file: ProjectFile) => {
+    const ad = window.prompt(t("Yeni ad:"), file.name)?.trim();
+    if (!ad || ad === file.name) return;
+    try {
+      const guncel = await filesApi.rename(file.id, ad);
+      setFiles((prev) => prev.map((f) => (f.id === file.id ? guncel : f)));
+    } catch (e: any) {
+      setError(e?.message ?? t("Dosya yeniden adlandırılamadı"));
+    }
   };
 
   const handleDelete = async () => {
@@ -268,7 +439,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       openGooglePicker(
         async ({ id, name }) => {
           try {
-            const created = await filesApi.importFromDrive(target, { sourceFileId: id, name, taskId, outputId });
+            const created = await filesApi.importFromDrive(target, { sourceFileId: id, name, taskId, outputId, folderId });
             handleFileAdded(created);
           } catch (e: any) {
             setPickerError(e?.message ?? t("Dosya içe aktarılamadı"));
@@ -320,6 +491,14 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           label: t("Dosya ekle"),
           options: [
             { label: t("Dosya yükle"), onClick: () => inputRef.current?.click() },
+            // Klasör yükleme ve yeni klasör yalnızca gezinilebilir ekranlarda:
+            // görev eki bağlamında klasör açmanın karşılığı yok.
+            ...(canBrowse
+              ? [
+                  { label: t("Klasör yükle"), onClick: () => folderInputRef.current?.click() },
+                  { label: t("Yeni klasör"), onClick: () => void handleCreateFolder() },
+                ]
+              : []),
             ...(connectedProvider
               ? [
                   { label: t("Yeni dosya oluştur"), onClick: () => createMenuRef.current?.openMenu() },
@@ -332,7 +511,19 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           ],
         }
       : null,
-    [fabInHeader, driveMissing, connectedProvider, departmentId, organizationId, jobId, projectId, taskId, outputId],
+    [
+      fabInHeader,
+      driveMissing,
+      connectedProvider,
+      canBrowse,
+      folderId,
+      departmentId,
+      organizationId,
+      jobId,
+      projectId,
+      taskId,
+      outputId,
+    ],
     FAB_PRIORITY.panel
   );
 
@@ -343,6 +534,35 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           <h3 style={{ fontSize: 19, fontWeight: 500, color: c.textPrimary, margin: 0, flex: 1 }}>
             {t("Dosyalar")}
           </h3>
+
+          {/* Görünüm anahtarı: tercih tarayıcıda saklanıyor (bkz. readStoredView). */}
+          <button
+            type="button"
+            title={viewMode === "grid" ? t("Liste görünümü") : t("Simge görünümü")}
+            onClick={() => {
+              const sonraki = viewMode === "grid" ? "list" : "grid";
+              setViewMode(sonraki);
+              try {
+                localStorage.setItem(GORUNUM_ANAHTARI, sonraki);
+              } catch {
+                // Depolama kapalıysa tercih oturumluk kalır; işlevi bozmaz.
+              }
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "9px 13px",
+              borderRadius: 9,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textPrimary,
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            {viewMode === "grid" ? t("Liste") : t("Simge")}
+          </button>
           {/* CreateNativeFileMenu, düğmeler "+"a taşınsa da MONTE KALMALI:
               "Yeni dosya oluştur" seçeneği onun imperatif metodunu çağırıyor.
               Yalnızca tetikleyici düğmesi gizleniyor. */}
@@ -372,6 +592,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               <CreateNativeFileMenu
                 ref={createMenuRef}
                 target={target}
+                folderId={folderId}
                 taskId={taskId}
                 outputId={outputId}
                 provider={connectedProvider}
@@ -411,6 +632,24 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
         ref={inputRef}
         type="file"
         multiple
+        onChange={(e) => {
+          void handleFiles(e.target.files);
+          e.target.value = "";
+        }}
+        style={{ display: "none" }}
+      />
+
+      {/* Klasör yükleme. webkitdirectory standart dışı ama üç büyük tarayıcıda
+          da çalışan tek yol; React öznitelikleri tanımadığı için küçük harfle
+          ve string olarak veriliyor. Seçilen her dosya webkitRelativePath
+          taşıyor, ağacı sunucu ondan kuruyor (bkz. lib/uploadQueue). */}
+      <input
+        ref={folderInputRef}
+        type="file"
+        multiple
+        // @ts-expect-error webkitdirectory React'in bildiği öznitelikler arasında yok
+        webkitdirectory=""
+        directory=""
         onChange={(e) => {
           void handleFiles(e.target.files);
           e.target.value = "";
@@ -515,21 +754,193 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
       {error && <div style={{ color: c.danger, fontSize: 15, marginBottom: 10 }}>{error}</div>}
 
+      {/* Ekmek kırıntısı: kökten bulunulan klasöre. Kök her zaman tıklanabilir,
+          çünkü en sık istenen "başa dön". */}
+      {canBrowse && crumbs.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12, fontSize: 15 }}>
+          <button
+            type="button"
+            onClick={() => setFolderId(undefined)}
+            style={{ background: "transparent", border: "none", color: c.accent, cursor: "pointer", padding: 0, fontSize: 15 }}
+          >
+            {t("Dosyalar")}
+          </button>
+          {crumbs.map((k, i) => (
+            <span key={k.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ color: c.textSecondary }}>/</span>
+              {i === crumbs.length - 1 ? (
+                <span style={{ color: c.textPrimary }}>{k.name}</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setFolderId(k.id)}
+                  style={{ background: "transparent", border: "none", color: c.accent, cursor: "pointer", padding: 0, fontSize: 15 }}
+                >
+                  {k.name}
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <div style={{ color: c.textSecondary, fontSize: 15 }}>{t("Yükleniyor…")}</div>
-      ) : files.length === 0 ? (
+      ) : files.length === 0 && folders.length === 0 ? (
         <div style={{ color: c.textSecondary, fontSize: 15 }}>
           {readOnly
             ? t(
                 'Bağlı işlerde henüz dosya yok. Dosyalar işlere yüklenir; bir işi buraya bağlamak için "İşi düzenle" ekranını kullanın.'
               )
+            : folderId
+            ? t("Bu klasör boş.")
             : t("Henüz dosya eklenmemiş.")}
         </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      ) : viewMode === "grid" ? (
+        // Simge görünümü: önizlemesi olan dosya önizlemesiyle, olmayan tür
+        // ikonuyla. Sabit oran, farklı boyuttaki önizlemeler ızgarayı bozmasın.
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+            gap: 12,
+          }}
+        >
+          {folders.map((folder) => (
+            <div
+              key={folder.id}
+              onDoubleClick={() => setFolderId(folder.id)}
+              onClick={() => setFolderId(folder.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ x: e.clientX, y: e.clientY, folder });
+              }}
+              style={{
+                border: `1px solid ${c.border}`,
+                borderRadius: 10,
+                background: c.surface,
+                padding: 12,
+                cursor: "pointer",
+                textAlign: "center",
+              }}
+            >
+              <div style={{ height: 74, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <IconFolder size={40} color={c.accent} />
+              </div>
+              <div
+                title={folder.name}
+                style={{
+                  fontSize: 14,
+                  color: c.textPrimary,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {folder.name}
+              </div>
+            </div>
+          ))}
+
           {files.map((file) => (
             <div
               key={file.id}
+              onClick={() => setPreview(file)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ x: e.clientX, y: e.clientY, file });
+              }}
+              style={{
+                border: `1px solid ${c.border}`,
+                borderRadius: 10,
+                background: c.surface,
+                padding: 12,
+                cursor: "pointer",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  height: 74,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  borderRadius: 6,
+                  background: c.background,
+                  marginBottom: 8,
+                }}
+              >
+                {thumbTokens[file.id] ? (
+                  <img
+                    src={filesApi.thumbnailUrlWithToken(file.id, thumbTokens[file.id])}
+                    alt=""
+                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "cover" }}
+                  />
+                ) : file.iconLink ? (
+                  <img src={file.iconLink} alt="" width={28} height={28} />
+                ) : (
+                  <IconFile size={28} color={c.textSecondary} />
+                )}
+              </div>
+              <div
+                title={file.name}
+                style={{
+                  fontSize: 14,
+                  color: file.status === "missing" ? c.danger : c.textPrimary,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {file.name}
+              </div>
+              <div style={{ fontSize: 12, color: c.textSecondary }}>
+                {file.sizeBytes ? formatFileSize(file.sizeBytes) : fileKindLabel(file)}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {folders.map((folder) => (
+            <div
+              key={folder.id}
+              onClick={() => setFolderId(folder.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ x: e.clientX, y: e.clientY, folder });
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "11px 14px",
+                borderRadius: 10,
+                border: `1px solid ${c.border}`,
+                background: c.surface,
+                cursor: "pointer",
+              }}
+            >
+              <IconFolder size={18} color={c.accent} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 16, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {folder.name}
+                </div>
+                <div style={{ fontSize: 13, color: c.textSecondary }}>
+                  {folder.managed ? t("Projelio klasörü") : t("Klasör")}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {files.map((file) => (
+            <div
+              key={file.id}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ x: e.clientX, y: e.clientY, file });
+              }}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -544,7 +955,15 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 onClick={() => setPreview(file)}
                 style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}
               >
-                {file.iconLink ? (
+                {/* Önizleme liste görünümünde de gösteriliyor: küçük bir kare
+                    yeter, ama "hangi görsel bu?" sorusunu ikon cevaplayamıyor. */}
+                {thumbTokens[file.id] ? (
+                  <img
+                    src={filesApi.thumbnailUrlWithToken(file.id, thumbTokens[file.id])}
+                    alt=""
+                    style={{ width: 34, height: 34, objectFit: "cover", borderRadius: 5, flexShrink: 0 }}
+                  />
+                ) : file.iconLink ? (
                   <img src={file.iconLink} alt="" width={18} height={18} />
                 ) : (
                   <IconFile size={18} color={c.textSecondary} />
@@ -594,6 +1013,52 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             </div>
           ))}
         </div>
+      )}
+
+      {menu && (
+        <FileContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={
+            menu.folder
+              ? [
+                  { label: t("Aç"), onClick: () => setFolderId(menu.folder!.id) },
+                  {
+                    label: t("Yeniden adlandır"),
+                    // Projelio üretimi klasörün adı projeden/görevden geliyor;
+                    // burada değiştirmek yanıltıcı olurdu (bkz. FileFolder.managed).
+                    disabled: menu.folder.managed || readOnly,
+                    onClick: () => void handleRenameFolder(menu.folder!),
+                  },
+                  {
+                    label: t("Kaldır"),
+                    danger: true,
+                    disabled: menu.folder.managed || readOnly,
+                    onClick: () => void handleRemoveFolder(menu.folder!),
+                  },
+                ]
+              : [
+                  { label: t("Önizle"), onClick: () => setPreview(menu.file!) },
+                  { label: t("İndir"), onClick: () => void handleDownload(menu.file!) },
+                  {
+                    label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file!) }),
+                    onClick: () => window.open(driveEditUrl(menu.file!), "_blank", "noopener,noreferrer"),
+                  },
+                  {
+                    label: t("Yeniden adlandır"),
+                    disabled: readOnly,
+                    onClick: () => void handleRenameFile(menu.file!),
+                  },
+                  {
+                    label: t("Kaldır"),
+                    danger: true,
+                    disabled: readOnly,
+                    onClick: () => setPendingDelete(menu.file!),
+                  },
+                ]
+          }
+        />
       )}
 
       {browsing && (

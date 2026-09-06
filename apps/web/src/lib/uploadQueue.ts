@@ -40,7 +40,7 @@ export interface UploadJob {
 interface QueueEntry extends UploadJob {
   file: File;
   target: UploadTarget;
-  context: Omit<FileContext, "projectId">;
+  context: Omit<FileContext, "projectId"> & { folderId?: string; relativePath?: string };
   controller: AbortController;
   /**
    * Parçalı yüklemenin sunucudaki oturumu.
@@ -202,11 +202,16 @@ async function work(): Promise<void> {
 export function enqueueUploads(params: {
   target: UploadTarget;
   files: File[];
-  context?: Omit<FileContext, "projectId">;
+  context?: Omit<FileContext, "projectId"> & { folderId?: string };
 }): void {
   const context = params.context ?? {};
-  const scope = uploadScope(params.target, context);
+  // Kapsam anahtarı klasöre göre AYRIŞMAZ: kullanıcı yükleme sürerken başka bir
+  // klasöre geçtiğinde satırların tepsiden kaybolmasını istemiyoruz.
+  const scope = uploadScope(params.target, { taskId: context.taskId, outputId: context.outputId });
   for (const file of params.files) {
+    // Klasör yüklemesinde tarayıcı göreli yolu dosyanın kendisinde veriyor;
+    // ağacı sunucu buna bakarak kuruyor (bkz. FilesService.ensureUserFolderPath).
+    const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || undefined;
     queue.push({
       id: `${file.name}-${Date.now()}-${Math.random()}`,
       name: file.name,
@@ -216,7 +221,7 @@ export function enqueueUploads(params: {
       scope,
       file,
       target: params.target,
-      context,
+      context: { ...context, relativePath },
       controller: new AbortController(),
     });
   }

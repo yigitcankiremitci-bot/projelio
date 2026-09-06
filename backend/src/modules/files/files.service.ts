@@ -20,6 +20,7 @@ import { OrganizationStorageService } from "../cloud-storage/organization-storag
 import { NotificationsService } from "../notifications/notifications.service";
 import { decodeUploadFileName } from "../../common/upload-filename.util";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 export type { NativeFileKind };
 
@@ -75,6 +76,12 @@ export interface ProjectFile {
   driveFileId: string;
   webViewLink?: string;
   iconLink?: string;
+  /**
+   * Önizleme var mı. Adresin KENDİSİ gönderilmez: kısa ömürlü ve kimlik
+   * istiyor — istemciye vermek hem işe yaramaz hem sızıntı olurdu. İstemci
+   * önizlemeyi imzalı proxy'den ister (bkz. GET /files/:id/content?thumb=1).
+   */
+  hasThumbnail?: boolean;
   isGoogleDoc: boolean;
   /** Dosyanın gerçek içeriği hangi bulut sağlayıcısında: Google Drive ya da OneDrive. */
   storageProvider: StorageProvider;
@@ -161,6 +168,7 @@ function mapFile(row: any, canEditInDrive: boolean): ProjectFile {
     driveFileId: row.drive_file_id,
     webViewLink: row.web_view_link ?? undefined,
     iconLink: row.icon_link ?? undefined,
+    hasThumbnail: Boolean(row.thumbnail_link),
     isGoogleDoc: row.is_google_doc ?? false,
     storageProvider: (row.storage_provider as StorageProvider) ?? "google",
     status: row.status,
@@ -198,11 +206,57 @@ function storageOwner(row: {
  * yalnızca birine uygulanır ve aradaki fark sessizce büyürdü.
  *
  * İŞLER (job) bu kapsamın DIŞINDA: onların altında proje/görev/çıktı hiyerarşisi
- * ve ona karşılık gelen bir klasör ağacı var (bkz. job_folders).
+ * ve ona karşılık gelen bir klasör ağacı var (bkz. file_folders).
  */
 export interface FlatScope {
   kind: "department" | "organization";
   id: string;
+}
+
+/**
+ * Dosyanın/klasörün sahibi: iş, departman ya da şirket.
+ *
+ * FlatScope'un iş kapsamını da içeren hâli. Klasör ağacı üç kapsamda da aynı
+ * çalıştığı için (bkz. migration 090) klasör uçları bunu kullanıyor.
+ */
+export interface FileOwner {
+  kind: "job" | "department" | "organization";
+  id: string;
+}
+
+export interface FileFolderEntry {
+  id: string;
+  name: string;
+  kind: "general" | "user" | "project" | "task" | "output";
+  parentFolderId?: string;
+  driveFolderId: string;
+  /**
+   * Projelio üretimi mi. true ise ad projeden/görevden geliyor: yeniden
+   * adlandırılamaz ve silinemez, arayüz de bu yüzden seçenekleri kapatıyor.
+   */
+  managed: boolean;
+}
+
+function mapFolder(row: any): FileFolderEntry {
+  return {
+    id: row.id,
+    name: row.name,
+    kind: row.kind,
+    parentFolderId: row.parent_folder_id ?? undefined,
+    driveFolderId: row.drive_folder_id,
+    managed: row.kind !== "user",
+  };
+}
+
+function ownerOfFolderRow(row: {
+  job_id?: string | null;
+  department_id?: string | null;
+  organization_id?: string | null;
+}): FileOwner {
+  if (row.job_id) return { kind: "job", id: row.job_id };
+  if (row.department_id) return { kind: "department", id: row.department_id };
+  if (row.organization_id) return { kind: "organization", id: row.organization_id };
+  throw new BadRequestException("Klasörün kapsamı çözülemedi.");
 }
 
 /**
@@ -749,8 +803,9 @@ export class FilesService {
    * ve DÜZ (alt klasörsüz) klasörünü döndürür; yoksa kurar.
    *
    * İş modelinden farkı: bu kapsamların altında proje/görev/çıktı hiyerarşisi
-   * yok, bu yüzden tek bir klasör yeterli — job_folders'a karşılık gelen bir
-   * tabloya gerek kalmıyor.
+   * yok, bu yüzden Projelio kendiliğinden alt klasör AÇMAZ — burada dönen tek
+   * klasör kapsamın köküdür. Kullanıcı kendi klasörlerini bunun altında açar
+   * (kind='user', bkz. createFolder).
    *
    * Hesap seçimi sırası: şirketin AÇIK seçimi (organization_storage) > şirket
    * sahibinin varsayılan hesabı > işlemi yapan kullanıcınınki.
@@ -872,6 +927,33 @@ export class FilesService {
    *        Projelio / {İş} / {Proje} / Görevler / {Görev}
    *        Projelio / {İş} / {Proje} / Çıktılar / {Çıktı}
    */
+  /**
+   * İş kapsamında yüklemenin ineceği klasör.
+   *
+   * İki kaynak var ve sıra önemli: kullanıcı bir klasörün İÇİNDEYKEN yüklüyorsa
+   * (ya da klasör yüklüyorsa) dosya oraya iner. Aksi halde eski davranış sürer:
+   * Projelio dosyanın bağlamına göre kendi klasörünü seçer (Genel / Proje /
+   * Görev / Çıktı).
+   */
+  private async jobUploadTarget(
+    jobId: string,
+    userId: string,
+    provider: StorageProvider,
+    accountId: string,
+    rootFolderId: string,
+    context: FileContext,
+    resolvedProjectId: string | undefined,
+    placement?: { folderId?: string; relativePath?: string }
+  ): Promise<{ folderRowId?: string; driveFolderId: string }> {
+    if (placement?.folderId || placement?.relativePath) {
+      return this.resolvePlacement({ kind: "job", id: jobId }, userId, rootFolderId, placement);
+    }
+    return this.ensureContextFolder(jobId, provider, accountId, rootFolderId, {
+      ...context,
+      resolvedProjectId,
+    });
+  }
+
   private async ensureContextFolder(
     jobId: string,
     provider: StorageProvider,
@@ -956,7 +1038,7 @@ export class FilesService {
     }
   ): Promise<{ folderRowId: string; driveFolderId: string }> {
     const { data: existing, error } = await spec
-      .match(this.supabase.client.from("job_folders").select().eq("job_id", jobId))
+      .match(this.supabase.client.from("file_folders").select().eq("job_id", jobId))
       .maybeSingle();
     if (error) throw error;
     if (existing) return { folderRowId: existing.id, driveFolderId: existing.drive_folder_id };
@@ -964,7 +1046,7 @@ export class FilesService {
     const folder = await this.cloudStorage.findOrCreateFolder(provider, accessToken, spec.name, spec.parentDriveId);
 
     const { data: row, error: insertError } = await this.supabase.client
-      .from("job_folders")
+      .from("file_folders")
       .insert({
         job_id: jobId,
         parent_folder_id: spec.parentRowId ?? null,
@@ -982,7 +1064,7 @@ export class FilesService {
       // Yarış durumu: aynı anda başka bir istek klasörü oluşturmuş olabilir.
       if ((insertError as any).code === "23505") {
         const { data: raced } = await spec
-          .match(this.supabase.client.from("job_folders").select().eq("job_id", jobId))
+          .match(this.supabase.client.from("file_folders").select().eq("job_id", jobId))
           .maybeSingle();
         if (raced) return { folderRowId: raced.id, driveFolderId: raced.drive_folder_id };
       }
@@ -990,6 +1072,302 @@ export class FilesService {
     }
 
     return { folderRowId: row.id, driveFolderId: folder.id };
+  }
+
+  // ============================================================ klasörler
+  // Klasör ağacı `file_folders` tablosunda (bkz. migration 090). İki tür var ve
+  // fark KULLANICIYA GÖRÜNÜR:
+  //
+  //   * Projelio üretimi (general/project/task/output) — adı projeden/görevden
+  //     geliyor, elle silinemez ve yeniden adlandırılamaz. Adı değiştirmenin
+  //     yolu projenin adını değiştirmek.
+  //   * Kullanıcı klasörü (kind='user') — elle açılan ya da klasör yükleyerek
+  //     oluşan; her şeyi yapılabilir.
+  //
+  // Ağaç bulutta ZATEN vardı; arayüz göstermiyordu. Burası onu görünür kılıyor.
+
+  private ownerColumn(owner: FileOwner): "job_id" | "department_id" | "organization_id" {
+    return owner.kind === "job" ? "job_id" : owner.kind === "department" ? "department_id" : "organization_id";
+  }
+
+  /** Kapsamın erişim kontrolü; klasör uçları da dosya uçlarıyla aynı kapıdan geçer. */
+  private async assertOwnerAccess(owner: FileOwner, userId: string): Promise<void> {
+    if (owner.kind === "job") {
+      await this.assertJobAccess(owner.id, userId);
+      return;
+    }
+    await this.assertFlatAccess({ kind: owner.kind, id: owner.id }, userId);
+  }
+
+  /** Kapsamın kök klasörü (bulut tarafındaki kimlik) ve depo hesabı. */
+  private async ownerRoot(
+    owner: FileOwner,
+    userId: string
+  ): Promise<{ provider: StorageProvider; accountId: string; rootFolderId: string }> {
+    if (owner.kind === "job") return this.ensureJobStorage(owner.id, userId);
+    const flat = await this.ensureFlatStorage({ kind: owner.kind, id: owner.id }, userId);
+    return { provider: flat.provider, accountId: flat.accountId, rootFolderId: flat.folderId };
+  }
+
+  async listFolders(owner: FileOwner, userId: string, parentFolderId?: string): Promise<FileFolderEntry[]> {
+    await this.assertOwnerAccess(owner, userId);
+
+    let query = this.supabase.client
+      .from("file_folders")
+      .select()
+      .eq(this.ownerColumn(owner), owner.id)
+      .order("name", { ascending: true })
+      .limit(LISTE_TAVANI);
+
+    query = parentFolderId ? query.eq("parent_folder_id", parentFolderId) : query.is("parent_folder_id", null);
+
+    const { data, error } = await query;
+    // Migration 090 uygulanmadan dağıtım olursa tablo eski adında kalır; dosya
+    // listesi klasörsüz çalışmaya devam etsin.
+    if (error) {
+      this.logger.warn(`Klasörler okunamadı (migration 090 uygulandı mı?): ${error.message}`);
+      return [];
+    }
+
+    return (data ?? []).map(mapFolder);
+  }
+
+  /** Klasörün kök'e kadar olan yolu — ekmek kırıntısı için (en üstteki başta). */
+  async folderPath(folderId: string, userId: string): Promise<FileFolderEntry[]> {
+    const chain: FileFolderEntry[] = [];
+    let current: string | undefined = folderId;
+
+    // Döngü koruması: parent zinciri bozuksa (elle düzenlenmiş veri) sonsuza
+    // kadar dönmesin.
+    for (let i = 0; current && i < 32; i += 1) {
+      const { data, error } = await this.supabase.client
+        .from("file_folders")
+        .select()
+        .eq("id", current)
+        .maybeSingle();
+      if (error || !data) break;
+
+      if (i === 0) {
+        await this.assertOwnerAccess(ownerOfFolderRow(data), userId);
+      }
+      chain.unshift(mapFolder(data));
+      current = data.parent_folder_id ?? undefined;
+    }
+
+    return chain;
+  }
+
+  async createFolder(
+    owner: FileOwner,
+    userId: string,
+    name: string,
+    parentFolderId?: string
+  ): Promise<FileFolderEntry> {
+    const temiz = this.safeFileName(name ?? "");
+    if (!temiz.trim()) throw new BadRequestException("Klasör adı gerekli");
+    await this.assertOwnerAccess(owner, userId);
+
+    const { provider, accountId, rootFolderId } = await this.ownerRoot(owner, userId);
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+
+    let parentDriveId = rootFolderId;
+    if (parentFolderId) {
+      const { data: parent } = await this.supabase.client
+        .from("file_folders")
+        .select()
+        .eq("id", parentFolderId)
+        .maybeSingle();
+      if (!parent) throw new NotFoundException("Üst klasör bulunamadı");
+      // Başka bir kapsamın klasörünün altına yazmak: kimlik istemciden geliyor.
+      if (parent[this.ownerColumn(owner)] !== owner.id) {
+        throw new ForbiddenException("Bu klasör bu alana ait değil");
+      }
+      parentDriveId = parent.drive_folder_id;
+    }
+
+    const folder = await this.cloudStorage.findOrCreateFolder(provider, accessToken, temiz, parentDriveId);
+
+    const { data: row, error } = await this.supabase.client
+      .from("file_folders")
+      .insert({
+        [this.ownerColumn(owner)]: owner.id,
+        parent_folder_id: parentFolderId ?? null,
+        kind: "user",
+        name: temiz,
+        drive_folder_id: folder.id,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      // Aynı adla ikinci klasör (migration 090'daki kısmi unique index): zaten
+      // varsa onu döndürmek, klasör yüklemesini idempotent kılıyor.
+      if ((error as any).code === "23505") {
+        const { data: raced } = await this.supabase.client
+          .from("file_folders")
+          .select()
+          .eq(this.ownerColumn(owner), owner.id)
+          .eq("kind", "user")
+          .ilike("name", temiz)
+          .maybeSingle();
+        if (raced) return mapFolder(raced);
+      }
+      throw error;
+    }
+
+    return mapFolder(row);
+  }
+
+  /**
+   * "Fotoğraflar/2026/Ocak" gibi bir yolu klasör klasör kurar ve en alttakini döndürür.
+   *
+   * Klasör yüklemesi bunu kullanıyor: tarayıcı her dosya için yalnızca göreli
+   * yolu veriyor (webkitRelativePath), ağacı biz kurmak zorundayız. Aynı yol
+   * ikinci kez gelirse yeni klasör açılmaz (bkz. createFolder'daki 23505 dalı).
+   */
+  async ensureUserFolderPath(
+    owner: FileOwner,
+    userId: string,
+    segments: string[],
+    startFolderId?: string
+  ): Promise<string | undefined> {
+    let parentId = startFolderId;
+    // 12 kademe: gerçek bir klasör ağacı için fazlasıyla yeterli, bozuk/kötü
+    // niyetli bir yolun binlerce klasör açmasını da engelliyor.
+    for (const segment of segments.slice(0, 12)) {
+      const temiz = this.safeFileName(segment).trim();
+      if (!temiz || temiz === "." || temiz === "..") continue;
+      const folder = await this.createFolder(owner, userId, temiz, parentId);
+      parentId = folder.id;
+    }
+    return parentId;
+  }
+
+  /**
+   * Yüklemenin ineceği klasör.
+   *
+   * İki girdi var ve ikisi de isteğe bağlı:
+   *   * `folderId` — kullanıcının o an içinde bulunduğu klasör.
+   *   * `relativePath` — KLASÖR yüklemesinde tarayıcının verdiği göreli yol
+   *     ("Fotoğraflar/2026/kapak.jpg"). Dosya adı atılır, kalan kademeler
+   *     `folderId`'nin altına kurulur.
+   *
+   * İkisi de yoksa dosya kapsamın köküne iner (bugünkü davranış).
+   */
+  private async resolvePlacement(
+    owner: FileOwner,
+    userId: string,
+    rootDriveId: string,
+    placement?: { folderId?: string; relativePath?: string }
+  ): Promise<{ folderRowId?: string; driveFolderId: string }> {
+    let folderId = placement?.folderId;
+
+    if (placement?.relativePath) {
+      const segments = placement.relativePath.split("/").filter(Boolean).slice(0, -1);
+      if (segments.length) folderId = await this.ensureUserFolderPath(owner, userId, segments, folderId);
+    }
+
+    if (!folderId) return { driveFolderId: rootDriveId };
+
+    const { data: row } = await this.supabase.client
+      .from("file_folders")
+      .select()
+      .eq("id", folderId)
+      .maybeSingle();
+    if (!row) throw new NotFoundException("Klasör bulunamadı");
+    // Kimlik istemciden geliyor: başka bir kapsamın klasörüne yazılamamalı.
+    if (row[this.ownerColumn(owner)] !== owner.id) {
+      throw new ForbiddenException("Bu klasör bu alana ait değil");
+    }
+
+    return { folderRowId: row.id, driveFolderId: row.drive_folder_id };
+  }
+
+  async renameFolder(folderId: string, userId: string, name: string): Promise<FileFolderEntry> {
+    const { row, owner } = await this.folderForWrite(folderId, userId);
+
+    const temiz = this.safeFileName(name ?? "").trim();
+    if (!temiz) throw new BadRequestException("Klasör adı gerekli");
+
+    const { provider, accountId } = await this.ownerRoot(owner, userId);
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    await this.cloudStorage.renameFile(provider, accessToken, row.drive_folder_id, temiz);
+
+    const { data: updated, error } = await this.supabase.client
+      .from("file_folders")
+      .update({ name: temiz })
+      .eq("id", folderId)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapFolder(updated);
+  }
+
+  /**
+   * Klasörü kaldırır.
+   *
+   * Bulut tarafında ÇÖP KUTUSUNA taşınır (silinmez): geri alınabilir olması,
+   * yanlışlıkla bir ağacı yok etmenin bedelini düşürüyor. Projelio tarafında
+   * içindeki dosyalar arşivlenir — satırları silmek, "dosya kayboldu" diye
+   * geri dönülemez bir durum yaratırdı.
+   */
+  async removeFolder(folderId: string, userId: string): Promise<void> {
+    const { row, owner } = await this.folderForWrite(folderId, userId);
+
+    const { provider, accountId } = await this.ownerRoot(owner, userId);
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    try {
+      await this.cloudStorage.trashFile(provider, accessToken, row.drive_folder_id);
+    } catch (err) {
+      this.logger.warn(`Klasör buluta taşınamadı (folder=${folderId}): ${String(err)}`);
+    }
+
+    const ids = await this.folderSubtreeIds(folderId);
+    await this.supabase.client
+      .from("files")
+      .update({ archived_at: new Date().toISOString() })
+      .in("folder_id", ids);
+    // Alt klasör satırları parent_folder_id cascade ile gidiyor (migration 023).
+    const { error } = await this.supabase.client.from("file_folders").delete().eq("id", folderId);
+    if (error) throw error;
+  }
+
+  /** Klasör ve altındaki tüm klasörlerin kimlikleri. */
+  private async folderSubtreeIds(folderId: string): Promise<string[]> {
+    const ids = [folderId];
+    let frontier = [folderId];
+
+    // Genişlik öncelikli, 12 kademeyle sınırlı (bkz. ensureUserFolderPath).
+    for (let depth = 0; depth < 12 && frontier.length; depth += 1) {
+      const { data } = await this.supabase.client
+        .from("file_folders")
+        .select("id")
+        .in("parent_folder_id", frontier);
+      frontier = (data ?? []).map((r: any) => r.id);
+      ids.push(...frontier);
+    }
+    return ids;
+  }
+
+  /** Yazma işlemleri için klasörü çözer: yalnızca kullanıcı klasörleri değiştirilebilir. */
+  private async folderForWrite(folderId: string, userId: string): Promise<{ row: any; owner: FileOwner }> {
+    const { data: row, error } = await this.supabase.client
+      .from("file_folders")
+      .select()
+      .eq("id", folderId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Klasör bulunamadı");
+
+    const owner = ownerOfFolderRow(row);
+    await this.assertOwnerAccess(owner, userId);
+
+    if (row.kind !== "user") {
+      throw new BadRequestException(
+        "Bu klasörü Projelio yönetiyor; adı bağlı olduğu proje/görev değiştiğinde değişir."
+      );
+    }
+    return { row, owner };
   }
 
   // ============================================================ paylaşım
@@ -1091,7 +1469,7 @@ export class FilesService {
         // Proje klasörü henüz yoksa (o projeye hiç dosya yüklenmemişse) izin
         // verecek bir hedef de yok. İlk yüklemede tekrar eşitlenecek.
         const { data: folder } = await this.supabase.client
-          .from("job_folders")
+          .from("file_folders")
           .select("drive_folder_id")
           .eq("job_id", jobId)
           .eq("kind", "project")
@@ -1309,7 +1687,16 @@ export class FilesService {
   async listByJob(
     jobId: string,
     userId: string,
-    filter: { scope?: "all" | "general" | "project"; projectId?: string; taskId?: string; outputId?: string } = {}
+    filter: {
+      scope?: "all" | "general" | "project";
+      projectId?: string;
+      taskId?: string;
+      outputId?: string;
+      /** Klasör gezinme: verilirse yalnızca o klasörün dosyaları. */
+      folderId?: string;
+      /** true ise klasörsüz (kök) dosyalar — iş kapsamında pratikte boş çıkar. */
+      atRoot?: boolean;
+    } = {}
   ): Promise<ProjectFile[]> {
     const access = await this.assertJobAccess(jobId, userId);
 
@@ -1321,7 +1708,11 @@ export class FilesService {
       .order("created_at", { ascending: false })
       .limit(LISTE_TAVANI);
 
-    if (filter.taskId) query = query.eq("task_id", filter.taskId);
+    // Klasör gezinmesi diğer süzgeçlerin ÖNÜNDE: kullanıcı bir klasörün içine
+    // girdiyse gördüğü şey o klasörün içeriğidir, proje/görev süzgeci değil.
+    if (filter.folderId) query = query.eq("folder_id", filter.folderId);
+    else if (filter.atRoot) query = query.is("folder_id", null);
+    else if (filter.taskId) query = query.eq("task_id", filter.taskId);
     else if (filter.outputId) query = query.eq("output_id", filter.outputId);
     else if (filter.projectId) {
       this.assertContextAllowed(access, filter.projectId);
@@ -1352,25 +1743,33 @@ export class FilesService {
   }
 
   /** Departman ekranı: dosyalar düz bir listedir, iş hiyerarşisindeki alt bağlam yok. */
-  async listByFlat(scope: FlatScope, userId: string): Promise<ProjectFile[]> {
+  /**
+   * `folderId` verilmezse KÖK listelenir (klasörü olmayan dosyalar), verilirse o
+   * klasörün içi. Klasörlerin kendisi ayrı uçtan geliyor (bkz. listFolders):
+   * yanıt tipini bozmamak için ikisi ayrı istek — arayüz ikisini paralel çekiyor.
+   */
+  async listByFlat(scope: FlatScope, userId: string, folderId?: string): Promise<ProjectFile[]> {
     await this.assertFlatAccess(scope, userId);
     const tables = this.flatTables(scope);
 
-    const { data, error } = await this.supabase.client
+    let query = this.supabase.client
       .from("files")
       .select()
       .eq(tables.idColumn, scope.id)
       .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(LISTE_TAVANI);
+    query = folderId ? query.eq("folder_id", folderId) : query.is("folder_id", null);
+
+    const { data, error } = await query;
     if (error) throw error;
 
     const canEdit = await this.canEditInDriveForFlat(scope, userId);
     return (data ?? []).map((row: any) => mapFile(row, canEdit));
   }
 
-  async listByDepartment(departmentId: string, userId: string): Promise<ProjectFile[]> {
-    return this.listByFlat({ kind: "department", id: departmentId }, userId);
+  async listByDepartment(departmentId: string, userId: string, folderId?: string): Promise<ProjectFile[]> {
+    return this.listByFlat({ kind: "department", id: departmentId }, userId, folderId);
   }
 
   // ------------------------------------------------- hiyerarşi: org / grup
@@ -1381,7 +1780,15 @@ export class FilesService {
    * Erişim: organizasyon sahibi, onaylı üyeleri ve — organizasyon bir gruba
    * bağlıysa — o grubun sahibi/üyeleri.
    */
-  async listByOrganization(organizationId: string, userId: string): Promise<ProjectFile[]> {
+  async listByOrganization(
+    organizationId: string,
+    userId: string,
+    folderId?: string
+  ): Promise<ProjectFile[]> {
+    // Bir klasörün içindeyken toplama liste anlamsız: kullanıcı o klasörün
+    // içeriğini görmek istiyor, şirketin altındaki işlerin dosyalarını değil.
+    if (folderId) return this.listByFlat({ kind: "organization", id: organizationId }, userId, folderId);
+
     const { data: org, error } = await this.supabase.client
       .from("organizations")
       .select("owner_id, group_id")
@@ -1411,6 +1818,8 @@ export class FilesService {
         .select()
         .eq("organization_id", organizationId)
         .is("archived_at", null)
+        // Kökteki dosyalar; klasörlerin içi ancak o klasöre girilince listelenir.
+        .is("folder_id", null)
         .order("created_at", { ascending: false })
         .limit(LISTE_TAVANI)
         .then(({ data, error }) => {
@@ -1666,7 +2075,8 @@ export class FilesService {
     jobId: string,
     userId: string,
     file: Express.Multer.File,
-    context: FileContext
+    context: FileContext,
+    placement?: { folderId?: string; relativePath?: string }
   ): Promise<ProjectFile> {
     if (!file) throw new BadRequestException("Dosya gönderilmedi");
     if (file.size > INLINE_UPLOAD_LIMIT) {
@@ -1680,10 +2090,9 @@ export class FilesService {
     this.assertContextAllowed(access, resolvedProjectId);
 
     const { provider, accountId, rootFolderId } = await this.ensureJobStorage(jobId, userId);
-    const target = await this.ensureContextFolder(jobId, provider, accountId, rootFolderId, {
-      ...context,
-      resolvedProjectId,
-    });
+    // Kullanıcı bir klasörün içindeyken yüklüyorsa oraya iner; yoksa dosya
+    // bağlamına göre Projelio'nun kendi klasörüne (Genel / Proje / Görev).
+    const target = await this.jobUploadTarget(jobId, userId, provider, accountId, rootFolderId, context, resolvedProjectId, placement);
 
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
     const uploaded = await this.cloudStorage.uploadMultipart(
@@ -1732,7 +2141,8 @@ export class FilesService {
   async uploadInlineForFlat(
     scope: FlatScope,
     userId: string,
-    file: Express.Multer.File
+    file: Express.Multer.File,
+    placement?: { folderId?: string; relativePath?: string }
   ): Promise<ProjectFile> {
     if (!file) throw new BadRequestException("Dosya gönderilmedi");
     if (file.size > INLINE_UPLOAD_LIMIT) {
@@ -1743,6 +2153,8 @@ export class FilesService {
     await this.assertFlatAccess(scope, userId);
 
     const { provider, accountId, folderId } = await this.ensureFlatStorage(scope, userId);
+    const target = await this.resolvePlacement({ kind: scope.kind, id: scope.id }, userId, folderId, placement);
+
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
     const uploaded = await this.cloudStorage.uploadMultipart(
       provider,
@@ -1750,12 +2162,12 @@ export class FilesService {
       {
         name: this.safeFileName(decodeUploadFileName(file.originalname)),
         mimeType: file.mimetype || "application/octet-stream",
-        parentId: folderId,
+        parentId: target.driveFolderId,
       },
       file.buffer
     );
 
-    return this.persistFlatFile(scope, userId, provider, accountId, uploaded);
+    return this.persistFlatFile(scope, userId, provider, accountId, uploaded, target.folderRowId);
   }
 
   async uploadInlineForDepartment(
@@ -1769,17 +2181,19 @@ export class FilesService {
   async createUploadSessionForFlat(
     scope: FlatScope,
     userId: string,
-    payload: { name: string; mimeType: string; sizeBytes?: number }
+    payload: { name: string; mimeType: string; sizeBytes?: number; folderId?: string; relativePath?: string }
   ): Promise<{ sessionId: string; uploadUrl: string }> {
     if (!payload?.name) throw new BadRequestException("Dosya adı gerekli");
     await this.assertFlatAccess(scope, userId);
 
     const { provider, accountId, folderId } = await this.ensureFlatStorage(scope, userId);
+    const target = await this.resolvePlacement({ kind: scope.kind, id: scope.id }, userId, folderId, payload);
+
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
     const uploadUrl = await this.cloudStorage.createResumableSession(provider, accessToken, {
       name: this.safeFileName(payload.name),
       mimeType: payload.mimeType || "application/octet-stream",
-      parentId: folderId,
+      parentId: target.driveFolderId,
       sizeBytes: payload.sizeBytes,
     });
 
@@ -1788,6 +2202,7 @@ export class FilesService {
       .from("file_upload_sessions")
       .insert({
         [tables.idColumn]: scope.id,
+        folder_id: target.folderRowId ?? null,
         user_id: userId,
         resumable_uri: uploadUrl,
         name: payload.name,
@@ -1812,7 +2227,8 @@ export class FilesService {
   async createUploadSession(
     jobId: string,
     userId: string,
-    payload: { name: string; mimeType: string; sizeBytes?: number } & FileContext
+    payload: { name: string; mimeType: string; sizeBytes?: number; folderId?: string; relativePath?: string } &
+      FileContext
   ): Promise<{ sessionId: string; uploadUrl: string }> {
     if (!payload?.name) throw new BadRequestException("Dosya adı gerekli");
 
@@ -1821,10 +2237,16 @@ export class FilesService {
     this.assertContextAllowed(access, resolvedProjectId);
 
     const { provider, accountId, rootFolderId } = await this.ensureJobStorage(jobId, userId);
-    const target = await this.ensureContextFolder(jobId, provider, accountId, rootFolderId, {
-      ...payload,
+    const target = await this.jobUploadTarget(
+      jobId,
+      userId,
+      provider,
+      accountId,
+      rootFolderId,
+      payload,
       resolvedProjectId,
-    });
+      payload
+    );
 
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
     const uploadUrl = await this.cloudStorage.createResumableSession(provider, accessToken, {
@@ -1842,7 +2264,7 @@ export class FilesService {
         task_id: payload.taskId ?? null,
         output_id: payload.outputId ?? null,
         user_id: userId,
-        folder_id: target.folderRowId,
+        folder_id: target.folderRowId ?? null,
         resumable_uri: uploadUrl,
         name: payload.name,
         mime_type: payload.mimeType || "application/octet-stream",
@@ -2034,14 +2456,17 @@ export class FilesService {
       size?: number;
       webViewLink?: string;
       iconLink?: string;
+      thumbnailLink?: string;
       md5Checksum?: string;
-    }
+    },
+    folderRowId?: string
   ): Promise<ProjectFile> {
     const tables = this.flatTables(scope);
     const { data: row, error } = await this.supabase.client
       .from("files")
       .insert({
         [tables.idColumn]: scope.id,
+        folder_id: folderRowId ?? null,
         uploaded_by: userId,
         ...storageAccountColumns(provider, accountId),
         name: driveFile.name,
@@ -2050,6 +2475,7 @@ export class FilesService {
         drive_file_id: driveFile.id,
         web_view_link: driveFile.webViewLink ?? null,
         icon_link: driveFile.iconLink ?? null,
+        thumbnail_link: driveFile.thumbnailLink ?? null,
         md5_checksum: driveFile.md5Checksum ?? null,
         is_google_doc: isGoogleDocMime(driveFile.mimeType),
         status: "ready",
@@ -2077,6 +2503,7 @@ export class FilesService {
       size?: number;
       webViewLink?: string;
       iconLink?: string;
+      thumbnailLink?: string;
       md5Checksum?: string;
     },
     context: FileContext,
@@ -2099,6 +2526,7 @@ export class FilesService {
         drive_file_id: driveFile.id,
         web_view_link: driveFile.webViewLink ?? null,
         icon_link: driveFile.iconLink ?? null,
+        thumbnail_link: driveFile.thumbnailLink ?? null,
         md5_checksum: driveFile.md5Checksum ?? null,
         is_google_doc: isGoogleDocMime(driveFile.mimeType),
         status: "ready",
@@ -2258,7 +2686,8 @@ export class FilesService {
     scope: FlatScope,
     userId: string,
     sourceFileId: string,
-    name?: string
+    name?: string,
+    folderId?: string
   ): Promise<ProjectFile> {
     if (!sourceFileId) throw new BadRequestException("sourceFileId gerekli");
     await this.assertFlatAccess(scope, userId);
@@ -2268,22 +2697,27 @@ export class FilesService {
       return mapFile(existing, await this.canEditInDriveForFlat(scope, userId));
     }
 
-    const { provider, accountId, folderId } = await this.ensureFlatStorage(scope, userId);
+    const storage = await this.ensureFlatStorage(scope, userId);
+    const { provider, accountId } = storage;
+    const target = await this.resolvePlacement({ kind: scope.kind, id: scope.id }, userId, storage.folderId, {
+      folderId,
+    });
+
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
     const source = await this.cloudStorage.getFile(provider, accessToken, sourceFileId);
 
     // Dosya zaten hedef klasördeyse kopyalanmıyor (bkz. importForJob).
-    const stored = source.parentIds?.includes(folderId)
+    const stored = source.parentIds?.includes(target.driveFolderId)
       ? source
       : await this.cloudStorage.copyFile(
           provider,
           accessToken,
           sourceFileId,
-          folderId,
+          target.driveFolderId,
           name ? this.safeFileName(name) : undefined
         );
 
-    return this.persistFlatFile(scope, userId, provider, accountId, stored);
+    return this.persistFlatFile(scope, userId, provider, accountId, stored, target.folderRowId);
   }
 
   async importForDepartment(
@@ -2340,22 +2774,28 @@ export class FilesService {
     scope: FlatScope,
     userId: string,
     kind: NativeFileKind,
-    name: string
+    name: string,
+    folderId?: string
   ): Promise<ProjectFile> {
     if (!name?.trim()) throw new BadRequestException("Dosya adı gerekli");
     await this.assertFlatAccess(scope, userId);
 
-    const { provider, accountId, folderId } = await this.ensureFlatStorage(scope, userId);
+    const storage = await this.ensureFlatStorage(scope, userId);
+    const { provider, accountId } = storage;
+    const target = await this.resolvePlacement({ kind: scope.kind, id: scope.id }, userId, storage.folderId, {
+      folderId,
+    });
+
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
     const created = await this.cloudStorage.createNativeFile(
       provider,
       accessToken,
       kind,
       this.safeFileName(name),
-      folderId
+      target.driveFolderId
     );
 
-    return this.persistFlatFile(scope, userId, provider, accountId, created);
+    return this.persistFlatFile(scope, userId, provider, accountId, created, target.folderRowId);
   }
 
   async createNativeForDepartment(
@@ -2376,6 +2816,45 @@ export class FilesService {
    * dosyaya ancak buradan ulaşır: yetki Projelio'nun kendi üyelik kontrolüyle
    * verilir, bulut isteği depolama sahibinin token'ıyla yapılır.
    */
+  /**
+   * Dosyanın önizlemesini sağlayıcıdan çeker.
+   *
+   * Neden proxy: Drive'ın thumbnailLink'i KISA ÖMÜRLÜ ve kimlik ister — adresi
+   * tarayıcıya vermek hem çalışmaz hem de erişim jetonunu sızdırırdı. OneDrive
+   * adresi kendi içinde imzalıdır, orada başlık gönderilmez (gönderilirse Graph
+   * isteği reddediyor).
+   *
+   * Adres bayatlamışsa künye bir kez tazelenip yeniden denenir; yine olmazsa
+   * `null` döner ve arayüz tür ikonuna düşer — önizleme kritik değil.
+   */
+  async openThumbnail(fileId: string, userId: string): Promise<Response | null> {
+    const { row } = await this.findById(fileId, userId);
+    if (!row.thumbnail_link) return null;
+
+    const { provider, accountId } = storageOwner(row);
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+
+    const iste = (url: string) =>
+      fetchWithTimeout(url, provider === "google" ? { headers: { Authorization: `Bearer ${accessToken}` } } : {});
+
+    let response = await iste(row.thumbnail_link).catch(() => null);
+    if (response?.ok) return response;
+
+    try {
+      const fresh = await this.cloudStorage.getFile(provider, accessToken, row.drive_file_id);
+      if (!fresh.thumbnailLink) return null;
+      await this.supabase.client
+        .from("files")
+        .update({ thumbnail_link: fresh.thumbnailLink })
+        .eq("id", fileId);
+      response = await iste(fresh.thumbnailLink).catch(() => null);
+    } catch {
+      return null;
+    }
+
+    return response?.ok ? response : null;
+  }
+
   async openDownload(
     fileId: string,
     userId: string

@@ -19,6 +19,22 @@ export interface FileContext {
 /** Dosya listeleme kapsamı. */
 export type FileScope = "all" | "general" | "project";
 
+/** Klasörün sahibi; üç kapsam da aynı ağacı kullanıyor. */
+export interface FileFolderOwner {
+  kind: "job" | "department" | "organization";
+  id: string;
+}
+
+export interface FileFolder {
+  id: string;
+  name: string;
+  kind: "general" | "user" | "project" | "task" | "output";
+  parentFolderId?: string;
+  driveFolderId: string;
+  /** Projelio üretimi: adı projeden/görevden gelir, silinemez ve yeniden adlandırılamaz. */
+  managed: boolean;
+}
+
 /**
  * Dosyanın ekleneceği yer.
  *
@@ -65,7 +81,10 @@ export interface DriveBrowseEntry {
 
 export const filesApi = {
   /** İş ekranı: kapsamı seçerek listeler. */
-  listByJob: (jobId: string, filter: FileContext & { scope?: FileScope } = {}) =>
+  listByJob: (
+    jobId: string,
+    filter: FileContext & { scope?: FileScope; folderId?: string; atRoot?: string } = {}
+  ) =>
     api.get<ProjectFile[]>(`/jobs/${jobId}/files${query(filter as Record<string, string | undefined>)}`),
 
   /** Proje/görev/çıktı ekranı: işi backend projeden türetir. */
@@ -75,14 +94,15 @@ export const filesApi = {
     ),
 
   /** Hiyerarşi: organizasyona bağlı bütün işlerin dosyaları. */
-  listByOrganization: (organizationId: string) =>
-    api.get<ProjectFile[]>(`/organizations/${organizationId}/files`),
+  listByOrganization: (organizationId: string, folderId?: string) =>
+    api.get<ProjectFile[]>(`/organizations/${organizationId}/files${query({ folderId })}`),
 
   /** Hiyerarşi: gruba bağlı işler + gruba bağlı organizasyonların işleri. */
   listByGroup: (groupId: string) => api.get<ProjectFile[]>(`/groups/${groupId}/files`),
 
   /** Departman ekranı: dosyalar düz bir listedir, iş hiyerarşisi yok. */
-  listByDepartment: (departmentId: string) => api.get<ProjectFile[]>(`/departments/${departmentId}/files`),
+  listByDepartment: (departmentId: string, folderId?: string) =>
+    api.get<ProjectFile[]>(`/departments/${departmentId}/files${query({ folderId })}`),
 
   rename: (fileId: string, name: string) => api.patch<ProjectFile>(`/files/${fileId}`, { name }),
 
@@ -101,13 +121,13 @@ export const filesApi = {
   /** Sağlayıcının kendi Drive'ında var olan bir dosyayı Projelio'nun klasörüne kopyalar ve kaydeder. */
   importFromDrive: (
     target: FileTarget,
-    body: { sourceFileId: string; name?: string; taskId?: string; outputId?: string }
+    body: { sourceFileId: string; name?: string; taskId?: string; outputId?: string; folderId?: string }
   ) => api.post<ProjectFile>(`${targetBase(target)}/files/import`, body),
 
   /** Boş bir Doküman/Tablo/Sunum ya da Word/Excel/PowerPoint oluşturur. */
   createNativeFile: (
     target: FileTarget,
-    body: { kind: NativeFileKind; name: string; taskId?: string; outputId?: string }
+    body: { kind: NativeFileKind; name: string; taskId?: string; outputId?: string; folderId?: string }
   ) => api.post<ProjectFile>(`${targetBase(target)}/files/create-native`, body),
 
   /**
@@ -122,6 +142,50 @@ export const filesApi = {
       `/files/sessions/${sessionId}/reconcile`,
       { cancel }
     ),
+
+  /**
+   * Klasörler. Kapsam (iş/departman/şirket) sorgu parametresi: üçü de aynı
+   * ağacı kullanıyor (bkz. migration 090).
+   */
+  folders: (owner: FileFolderOwner, parentId?: string) =>
+    api.get<FileFolder[]>(
+      `/file-folders${query({ ownerKind: owner.kind, ownerId: owner.id, parentId })}`
+    ),
+  folderPath: (folderId: string) => api.get<FileFolder[]>(`/file-folders/${folderId}/path`),
+  createFolder: (owner: FileFolderOwner, name: string, parentFolderId?: string) =>
+    api.post<FileFolder>("/file-folders", {
+      ownerKind: owner.kind,
+      ownerId: owner.id,
+      name,
+      parentFolderId,
+    }),
+  renameFolder: (folderId: string, name: string) =>
+    api.patch<FileFolder>(`/file-folders/${folderId}`, { name }),
+  removeFolder: (folderId: string) => api.delete<{ ok: boolean }>(`/file-folders/${folderId}`),
+
+  /**
+   * Önizlemeler için toplu imzalı jeton.
+   *
+   * Simge görünümünde onlarca önizleme var; her biri için ayrı jeton isteği
+   * atmak gereksiz gecikme demekti. Erişilemeyen dosya yanıtta hiç dönmez.
+   */
+  accessTokens: (ids: string[]) =>
+    api.post<{ tokens: Record<string, string>; expiresInSeconds: number }>("/files/access-tokens", { ids }),
+
+  /** Jetonu elde olan bir dosyanın önizleme adresi (bkz. accessTokens). */
+  thumbnailUrlWithToken: (fileId: string, token: string) =>
+    `${API_URL}/files/${fileId}/thumbnail?t=${encodeURIComponent(token)}`,
+
+  /**
+   * Önizleme adresi.
+   *
+   * Sağlayıcının kendi adresi KULLANILAMAZ: kısa ömürlü ve kimlik istiyor.
+   * İçerik adresiyle aynı imzalı jeton düzeni (bkz. contentUrl).
+   */
+  thumbnailUrl: async (fileId: string) => {
+    const { token } = await api.post<{ token: string }>(`/files/${fileId}/access-token`, {});
+    return `${API_URL}/files/${fileId}/thumbnail?t=${encodeURIComponent(token)}`;
+  },
 
   /** Tek dosyanın künyesi — önizleme penceresini elde yalnızca kimlik varken açmak için. */
   getById: (fileId: string) => api.get<ProjectFile>(`/files/${fileId}`),
@@ -268,7 +332,12 @@ export type UploadTarget = FileTarget;
 export async function uploadFile(
   target: UploadTarget,
   file: File,
-  context: Omit<FileContext, "projectId"> = {},
+  /**
+   * `folderId`: kullanıcının içinde bulunduğu klasör.
+   * `relativePath`: KLASÖR yüklemesinde tarayıcının verdiği göreli yol
+   * ("Fotoğraflar/2026/kapak.jpg"); sunucu eksik klasörleri kurar.
+   */
+  context: Omit<FileContext, "projectId"> & { folderId?: string; relativePath?: string } = {},
   onProgress?: (ratio: number) => void,
   /** Verilirse yükleme iptal edilebilir; iptalde AbortError fırlar. */
   signal?: AbortSignal,
@@ -292,6 +361,8 @@ export async function uploadFile(
     form.append("file", file);
     if (!isDepartment && context.taskId) form.append("taskId", context.taskId);
     if (!isDepartment && context.outputId) form.append("outputId", context.outputId);
+    if (context.folderId) form.append("folderId", context.folderId);
+    if (context.relativePath) form.append("relativePath", context.relativePath);
     onProgress?.(0.1);
     const result = await api.uploadFile<ProjectFile>(`${base}/files`, form, signal);
     onProgress?.(1);
@@ -306,6 +377,8 @@ export async function uploadFile(
       sizeBytes: file.size,
       taskId: isDepartment ? undefined : context.taskId,
       outputId: isDepartment ? undefined : context.outputId,
+      folderId: context.folderId,
+      relativePath: context.relativePath,
     }
   );
 

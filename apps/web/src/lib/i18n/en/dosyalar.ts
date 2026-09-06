@@ -93,4 +93,28 @@ export const dosyalar: TranslationDict = {
   "Öneri, dilek ya da şikâyetini buradan iletebilirsin. Yanıtladığımızda sana bildirim gelir.":
     "Send us a suggestion, request or complaint here. You'll be notified when we reply.",
   "Menüdeki": "In the menu",
+
+  // ─────────────────────────────────────────────── Klasörler ve görünüm
+  Klasör: "Folder",
+  "Projelio klasörü": "Projelio folder",
+  "Klasör adı:": "Folder name:",
+  "Yeni ad:": "New name:",
+  "Yeni klasör": "New folder",
+  "Klasör yükle": "Upload folder",
+  "Klasör oluşturulamadı": "The folder couldn't be created",
+  "Klasör yeniden adlandırılamadı": "The folder couldn't be renamed",
+  "Klasör kaldırılamadı": "The folder couldn't be removed",
+  "Dosya yeniden adlandırılamadı": "The file couldn't be renamed",
+  '"{ad}" klasörü içindekilerle birlikte kaldırılsın mı? Bulutta çöp kutusuna taşınır.':
+    'Remove the folder "{ad}" together with its contents? It is moved to the trash in the cloud.',
+  // Görünüm anahtarının üstündeki yazı ile ipucu: biri düğmenin metni, diğeri title.
+  Liste: "List",
+  Simge: "Icons",
+  "Liste görünümü": "List view",
+  "Simge görünümü": "Icon view",
+  // Sağ tık menüsü
+  Aç: "Open",
+  Önizle: "Preview",
+  "Yeniden adlandır": "Rename",
+  "{saglayici}'da aç": "Open in {saglayici}",
 };

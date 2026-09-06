@@ -520,4 +520,11 @@ export const hatalar: TranslationDict = {
   "Bu organizasyonun dosyalarına erişim yetkiniz yok":
     "You don't have permission to access this organization's files",
   "Bu grubun dosyalarına erişim yetkiniz yok": "You don't have permission to access this group's files",
+  // Klasörler (migration 090).
+  "Klasör adı gerekli": "A folder name is required",
+  "Klasör bulunamadı": "Folder not found",
+  "Bu klasör bu alana ait değil": "This folder doesn't belong to this area",
+  "Bu klasörü Projelio yönetiyor; adı bağlı olduğu proje/görev değiştiğinde değişir.":
+    "Projelio manages this folder; its name changes when the project/task it belongs to changes.",
+  "Üst klasör bulunamadı": "Parent folder not found",
 };

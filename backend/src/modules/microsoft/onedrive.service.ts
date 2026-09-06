@@ -33,6 +33,8 @@ export interface DriveFile {
   size?: number;
   webViewLink?: string;
   iconLink?: string;
+  /** Önizleme adresi; kısa ömürlü (bkz. migration 090, files.thumbnail_link). */
+  thumbnailLink?: string;
   md5Checksum?: string;
   trashed?: boolean;
   /** Dosyanın içinde bulunduğu klasör(ler) — bkz. CloudFile.parentIds. */
@@ -63,6 +65,9 @@ function mapItem(json: any): DriveFile {
     size: json.size !== undefined ? Number(json.size) : undefined,
     webViewLink: json.webUrl ?? undefined,
     iconLink: json.thumbnails?.[0]?.small?.url ?? undefined,
+    // medium: liste ve simge görünümündeki önizleme için yeterli, small ise
+    // ikon boyutunda kalıyor. Graph adresleri de kısa ömürlü (bkz. migration 090).
+    thumbnailLink: json.thumbnails?.[0]?.medium?.url ?? json.thumbnails?.[0]?.large?.url ?? undefined,
     md5Checksum: json.file?.hashes?.quickXorHash ?? undefined,
     trashed: json.deleted !== undefined,
     // Graph'ta tek ebeveyn var; Google ile aynı şekli taşısın diye diziye alınıyor.
@@ -154,7 +159,7 @@ export class OneDriveService {
   }
 
   async renameFile(accessToken: string, itemId: string, name: string): Promise<DriveFile> {
-    const json = await this.call<any>(accessToken, `/me/drive/items/${itemId}`, {
+    const json = await this.call<any>(accessToken, `/me/drive/items/${itemId}?$expand=thumbnails`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
@@ -243,7 +248,8 @@ export class OneDriveService {
   // ------------------------------------------------------------------- okuma
 
   async getFile(accessToken: string, itemId: string): Promise<DriveFile> {
-    const json = await this.call<any>(accessToken, `/me/drive/items/${itemId}`);
+    // $expand=thumbnails: önizleme adresi ancak böyle geliyor (bkz. mapItem).
+    const json = await this.call<any>(accessToken, `/me/drive/items/${itemId}?$expand=thumbnails`);
     return mapItem(json);
   }
 
@@ -341,8 +347,8 @@ export class OneDriveService {
    */
   async listFiles(accessToken: string, folderId?: string): Promise<DriveFile[]> {
     const path = folderId
-      ? `/me/drive/items/${folderId}/children?$select=id,name,folder,file,size,webUrl&$orderby=folder desc,name`
-      : `/me/drive/root/children?$select=id,name,folder,file,size,webUrl&$orderby=folder desc,name`;
+      ? `/me/drive/items/${folderId}/children?$select=id,name,folder,file,size,webUrl&$expand=thumbnails&$orderby=folder desc,name`
+      : `/me/drive/root/children?$select=id,name,folder,file,size,webUrl&$expand=thumbnails&$orderby=folder desc,name`;
     const json = await this.call<any>(accessToken, path);
     return ((json?.value ?? []) as any[]).map(mapItem);
   }

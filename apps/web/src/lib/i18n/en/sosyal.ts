@@ -134,25 +134,20 @@ export const sosyal: TranslationDict = {
   "Tarayıcıda aç": "Open in the browser",
   "{n} hesabı aç": { one: "Open {n} account", other: "Open {n} accounts" },
   "Hesapları aç": "Open accounts",
-  "Açmak istediğiniz hesabı seçin. Her hesap yeni sekmede açılır.":
-    "Pick the account you want to open. Each account opens in a new tab.",
-  "Tarayıcı {n} sekmeyi engelledi.": { one: "The browser blocked {n} tab.", other: "The browser blocked {n} tabs." },
-  "Bir tıklamadan yalnızca bir sekme açılabiliyor; hepsinin birden açılması için bu siteye açılır pencere izni vermeniz gerekiyor. İzni tarayıcı veriyor, site isteyemiyor.":
-    "A single click can open only one tab; to open them all at once you need to allow pop-ups for this site. The browser grants that permission — a site cannot ask for it.",
-  "{tarayici}: aşağıdaki adresi adres çubuğuna yapıştırın, açılan sayfada “İzin verilenler” bölümünde Ekle deyip {site} adresini yazın.":
-    "{tarayici}: paste the address below into the address bar, then under “Allowed to send pop-ups” choose Add and enter {site}.",
-  "Firefox: aşağıdaki adresi adres çubuğuna yapıştırın, “Açılır pencereleri engelle” satırındaki İstisnalar düğmesinden {site} adresini ekleyin.":
-    "Firefox: paste the address below into the address bar, then use the Exceptions button next to “Block pop-up windows” to add {site}.",
-  "Safari: menü çubuğundan Safari → Ayarlar → Web Siteleri → Açılır Pencereler yolunu izleyip {site} için “İzin Ver” seçin.":
-    "Safari: from the menu bar go to Safari → Settings → Websites → Pop-up Windows and choose “Allow” for {site}.",
-  "Tarayıcınızın site ayarlarından {site} adresine açılır pencere (pop-up) izni verin.":
-    "Allow pop-ups for {site} in your browser's site settings.",
-  "Ayar adresini kopyala": "Copy the settings address",
-  "Kopyalandı — adres çubuğuna yapıştırın": "Copied — paste it into the address bar",
-  "İzni verdikten sonra sayfayı yenileyin; düğme hepsini tek tıkla açar.":
-    "Reload the page after allowing it; the button will then open them all with one click.",
-  "Aşağıdaki hesaplar açılamadı — tek tek açabilirsiniz.":
-    "The accounts below couldn't be opened — you can open them one by one.",
+  "Tarayıcı yeni sekmeleri engelliyor.": "Your browser is blocking new tabs.",
+  "{tarayici}: ayar sayfasını adres çubuğuna yapıştırın → İzin verilenler → Ekle.":
+    "{tarayici}: paste the settings page into the address bar → Allowed to send pop-ups → Add.",
+  "Firefox: ayar sayfasını yapıştırın → “Açılır pencereleri engelle” → İstisnalar.":
+    "Firefox: paste the settings page → “Block pop-up windows” → Exceptions.",
+  "Safari → Ayarlar → Web Siteleri → Açılır Pencereler → İzin Ver.":
+    "Safari → Settings → Websites → Pop-up Windows → Allow.",
+  "Tarayıcınızın site ayarlarından bu siteye açılır pencere izni verin.":
+    "Allow pop-ups for this site in your browser's site settings.",
+  "Ayar sayfası": "Settings page",
+  "İzin verilecek site": "Site to allow",
+  "İzinden sonra sayfayı yenileyin.": "Reload the page once you've allowed it.",
+  "Hesabı açmak için tıklayın, sırayı değiştirmek için sürükleyin.":
+    "Click an account to open it; drag to change the order.",
   "Hesabı arşivle": "Archive account",
   "İçerik ekle": "Add content",
   "Şimdi paylaş": "Publish now",

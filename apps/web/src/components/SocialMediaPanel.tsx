@@ -36,6 +36,7 @@ import { IconChevronLeft, IconChevronRight, IconEdit, IconExternalLink, IconTras
 import { useDragScroll } from "../lib/useDragScroll";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { popupSettingsHint } from "../lib/popupSettings";
+import { getAccountOrder, moveItem, setAccountOrder, sortByOrder } from "../lib/socialAccountOrder";
 
 interface Props {
   organizationId?: string;
@@ -88,7 +89,11 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   // ekleniyor ve liste YALNIZCA açılamayanları gösteriyor — açılmış olanı
   // tekrar sunmak kullanıcıyı aynı sekmeyi ikinci kez açmaya davet ediyordu.
   const [blockedAccounts, setBlockedAccounts] = useState<{ account: SocialAccount; url: string }[]>([]);
-  const [settingsCopied, setSettingsCopied] = useState(false);
+  /** Hangi adres kopyalandı — iki kopyala düğmesi var (ayar adresi, site adresi). */
+  const [copied, setCopied] = useState<"settings" | "site" | null>(null);
+  /** Kullanıcının sürükleyerek verdiği hesap sırası (cihazda saklanır). */
+  const [accountOrder, setAccountOrderState] = useState<string[]>([]);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [platformFilter, setPlatformFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [error, setError] = useState("");
@@ -104,6 +109,11 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     () => (jobId ? { jobId } : { organizationId: organizationId as string, departmentId }),
     [jobId, organizationId, departmentId]
   );
+
+  // Sıra kapsam başına saklanıyor: aynı kullanıcı bir işte 2, bir şirkette 6
+  // hesap görüyor (bkz. socialAccountOrder.ts).
+  const scopeKey = jobId ?? `${organizationId ?? ""}:${departmentId ?? ""}`;
+  useEffect(() => setAccountOrderState(getAccountOrder(scopeKey)), [scopeKey]);
 
   // İki ekleme eylemi de sayfanın "+" düğmesinde toplanıyor: başlıkta iki ayrı
   // düğme dururken kullanıcı hangisinin "asıl" ekleme olduğunu ayırt edemiyordu.
@@ -341,54 +351,90 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     }
   };
 
-  /** Tarayıcıda açılabilen hesaplar — "tümünü aç" bu listeyi kullanır. */
+  /**
+   * Tarayıcıda açılabilen hesaplar — düğme ve liste bunu kullanır.
+   *
+   * Kullanıcının sürükleyerek verdiği sıra uygulanıyor; sekmeler de o sırayla
+   * açılıyor, yani liste neyi vaat ediyorsa tarayıcıda o çıkıyor.
+   */
   const openableAccounts = useMemo(
     () =>
-      accounts
-        .map((a) => ({ account: a, url: accountProfileUrl(a) }))
-        .filter((x): x is { account: SocialAccount; url: string } => x.url !== null),
-    [accounts]
+      sortByOrder(
+        accounts.filter((a) => accountProfileUrl(a) !== null),
+        accountOrder
+      ).map((a) => ({ account: a, url: accountProfileUrl(a) as string })),
+    [accounts, accountOrder]
   );
+
+  /** Sürükleme bittiğinde yeni sırayı hem ekrana hem cihaza yazar. */
+  const reorderAccounts = (from: number, to: number) => {
+    const yeni = moveItem(openableAccounts.map((x) => x.account.id), from, to);
+    setAccountOrderState(yeni);
+    setAccountOrder(scopeKey, yeni);
+  };
 
   /**
    * Hesapları aynı anda yeni sekmelerde açar.
    *
-   * `noopener` seçenek dizesiyle verilmiyor: o hâlde window.open şartname
-   * gereği null döner ve başarılı açılışları da engellenmiş sayardık. Bunun
-   * yerine pencere referansındaki opener elle koparılıyor.
+   * ÖNCE BOŞ SEKMELER açılıyor, sonra adresler yükleniyor. Sebep: tarayıcı bir
+   * tıklamadan doğan İLK pencereyi her hâlükârda geçiriyor, kalanını siteye
+   * açılır pencere izni verilmemişse engelliyor. Doğrudan adreslerle açılsaydı
+   * (eski hâli) izin yokken bir hesap açılır, diğerleri açılmaz, kullanıcı
+   * yarım bir sonuçla kalırdı. Boş sekmeler hiçbir yere gitmediği için engel
+   * görüldüğünde hepsi anında kapatılıyor: ya hepsi açılır ya hiçbiri.
    *
-   * Engellenen sekme sessizce kaybolduğu için sayılıyor: tarayıcı tek
-   * tıklamadan doğan İLK pencereyi geçirip kalanını engelliyor (window.open
-   * kullanıcı hareketini tüketiyor). Engel varsa liste modali açılıyor —
-   * hem kalanlar tek tek açılabilsin hem de iznin nereden verileceği yazsın.
+   * `opener` elle koparılıyor; `noopener` seçenek dizesiyle verilemiyor çünkü
+   * o hâlde window.open null döner ve başarılı açılışı engellenmiş sayardık.
    */
   const openAccountsInBrowser = (hedefler: { account: SocialAccount; url: string }[]) => {
-    const blocked: { account: SocialAccount; url: string }[] = [];
-    for (const hedef of hedefler) {
-      const w = window.open(hedef.url, "_blank");
-      if (w) w.opener = null;
-      else blocked.push(hedef);
+    const pencereler = hedefler.map(() => {
+      try {
+        return window.open("", "_blank");
+      } catch {
+        return null;
+      }
+    });
+
+    if (pencereler.some((w) => !w)) {
+      for (const w of pencereler) {
+        try {
+          w?.close();
+        } catch {
+          // Kapatılamayan boş sekme kullanıcıyı rahatsız etmez, sessiz geç.
+        }
+      }
+      setBlockedAccounts(hedefler);
+      setCopied(null);
+      setAccountLinks(true);
+      return;
     }
-    setBlockedAccounts(blocked);
-    setSettingsCopied(false);
-    if (blocked.length > 0) setAccountLinks(true);
+
+    pencereler.forEach((w, i) => {
+      if (!w) return;
+      try {
+        w.opener = null;
+      } catch {
+        // Bazı tarayıcılar opener'a yazdırmıyor; sekme yine açılıyor.
+      }
+      w.location.replace(hedefler[i].url);
+    });
+    setBlockedAccounts([]);
   };
 
   /**
-   * Ayar adresini panoya kopyalar.
+   * Adresi panoya kopyalar.
    *
-   * Adresi AÇAMIYORUZ: tarayıcılar chrome:// ve about: şemalarına sayfadan
-   * gezinmeyi güvenlik gereği engelliyor, bağlantı tıklandığında hiçbir şey
-   * olmuyor. Kullanıcının adres çubuğuna yapıştırması gerekiyor; adres
-   * ekranda ayrıca yazılı duruyor ki kopyalama başarısız olsa da elle
-   * yazılabilsin.
+   * Ayar adresini AÇAMIYORUZ: tarayıcılar chrome:// ve about: şemalarına
+   * sayfadan gezinmeyi güvenlik gereği engelliyor, bağlantı tıklandığında
+   * hiçbir şey olmuyor. Adresler ekranda ayrıca yazılı ki kopyalama başarısız
+   * olsa da elle yazılabilsin.
    */
-  const copySettingsUrl = async (url: string) => {
+  const copyText = async (text: string, hangi: "settings" | "site") => {
     try {
-      await navigator.clipboard.writeText(url);
-      setSettingsCopied(true);
+      await navigator.clipboard.writeText(text);
+      setCopied(hangi);
     } catch {
-      setSettingsCopied(false);
+      setCopied(null);
     }
   };
 
@@ -1191,36 +1237,74 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   const popupHint = useMemo(() => popupSettingsHint(), []);
 
   /**
-   * İzin adımları — tarayıcıya göre değişiyor.
+   * İzin adımları — tarayıcıya göre tek satır.
    *
    * Chromium türevlerinin ayar sayfası aynı yapıda, yalnızca şeması farklı
    * (chrome://, edge://, brave://, opera://); metin de bu yüzden ortak.
+   * Site adresi cümlenin içinde DEĞİL: aşağıda kopyalanabilir bir satır olarak
+   * duruyor, çünkü kullanıcının yapacağı iş onu yapıştırmak.
    */
   const permissionSteps = () => {
-    const site = typeof window !== "undefined" ? window.location.origin : "";
     switch (popupHint.key) {
       case "chrome":
       case "edge":
       case "brave":
       case "opera":
-        return t(
-          "{tarayici}: aşağıdaki adresi adres çubuğuna yapıştırın, açılan sayfada “İzin verilenler” bölümünde Ekle deyip {site} adresini yazın.",
-          { tarayici: popupHint.label, site }
-        );
+        return t("{tarayici}: ayar sayfasını adres çubuğuna yapıştırın → İzin verilenler → Ekle.", {
+          tarayici: popupHint.label,
+        });
       case "firefox":
-        return t(
-          "Firefox: aşağıdaki adresi adres çubuğuna yapıştırın, “Açılır pencereleri engelle” satırındaki İstisnalar düğmesinden {site} adresini ekleyin.",
-          { site }
-        );
+        return t("Firefox: ayar sayfasını yapıştırın → “Açılır pencereleri engelle” → İstisnalar.");
       case "safari":
-        return t(
-          "Safari: menü çubuğundan Safari → Ayarlar → Web Siteleri → Açılır Pencereler yolunu izleyip {site} için “İzin Ver” seçin.",
-          { site }
-        );
+        return t("Safari → Ayarlar → Web Siteleri → Açılır Pencereler → İzin Ver.");
       default:
-        return t("Tarayıcınızın site ayarlarından {site} adresine açılır pencere (pop-up) izni verin.", { site });
+        return t("Tarayıcınızın site ayarlarından bu siteye açılır pencere izni verin.");
     }
   };
+
+  const siteAdresi = typeof window !== "undefined" ? window.location.origin : "";
+
+  /** Kopyalanabilir adres satırı: etiket + adres + kopyala düğmesi. */
+  const adresSatiri = (etiket: string, adres: string, hangi: "settings" | "site") => (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ fontSize: 11, color: c.textSecondary, minWidth: 96, flexShrink: 0 }}>{etiket}</span>
+      <code
+        title={adres}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          fontSize: 12,
+          padding: "4px 8px",
+          borderRadius: 6,
+          background: c.surface,
+          border: `1px solid ${c.border}`,
+          color: c.textPrimary,
+          userSelect: "all",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {adres}
+      </code>
+      <button
+        onClick={() => copyText(adres, hangi)}
+        style={{
+          fontSize: 11,
+          fontWeight: 500,
+          padding: "5px 10px",
+          borderRadius: 7,
+          cursor: "pointer",
+          background: copied === hangi ? "transparent" : c.accent,
+          border: copied === hangi ? `1px solid ${c.border}` : "none",
+          color: copied === hangi ? c.textSecondary : "#fff",
+          flexShrink: 0,
+        }}
+      >
+        {copied === hangi ? t("Kopyalandı") : t("Kopyala")}
+      </button>
+    </div>
+  );
 
   /** Hesap açma düğmesinin stili — tek hesapta <a>, çoklu hesapta <button>. */
   const accountsButtonStyle: CSSProperties = {
@@ -1508,6 +1592,10 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {blockedAccounts.length > 0 ? (
+              // İzin verilmediğinde: kısa bir sebep, tarayıcıya göre tek satır
+              // yol tarifi ve iki kopyalanabilir adres (ayar sayfası + izin
+              // listesine eklenecek site). Uzun anlatım buradaydı, kullanıcı
+              // asıl işi (adresleri) metnin içinde kaybediyordu.
               <div
                 style={{
                   display: "flex",
@@ -1519,67 +1607,60 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                   border: `1px solid ${c.warning}33`,
                 }}
               >
-                <span style={{ fontSize: 13, color: c.textPrimary, lineHeight: 1.5 }}>
-                  {t("Tarayıcı {n} sekmeyi engelledi.", { n: blockedAccounts.length })}{" "}
-                  <span style={{ color: c.textSecondary }}>
-                    {t(
-                      "Bir tıklamadan yalnızca bir sekme açılabiliyor; hepsinin birden açılması için bu siteye açılır pencere izni vermeniz gerekiyor. İzni tarayıcı veriyor, site isteyemiyor."
-                    )}
-                  </span>
+                <span style={{ fontSize: 13, color: c.textPrimary, lineHeight: 1.4 }}>
+                  {t("Tarayıcı yeni sekmeleri engelliyor.")}
                 </span>
+                <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.5 }}>{permissionSteps()}</span>
 
-                <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.6 }}>{permissionSteps()}</span>
+                {popupHint.settingsUrl && adresSatiri(t("Ayar sayfası"), popupHint.settingsUrl, "settings")}
+                {adresSatiri(t("İzin verilecek site"), siteAdresi, "site")}
 
-                {popupHint.settingsUrl && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <code
-                      style={{
-                        fontSize: 12,
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                        background: c.background,
-                        border: `1px solid ${c.border}`,
-                        color: c.textPrimary,
-                        userSelect: "all",
-                      }}
-                    >
-                      {popupHint.settingsUrl}
-                    </code>
-                    <button
-                      onClick={() => copySettingsUrl(popupHint.settingsUrl as string)}
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 500,
-                        padding: "6px 12px",
-                        borderRadius: 8,
-                        cursor: "pointer",
-                        background: c.accent,
-                        border: "none",
-                        color: "#fff",
-                      }}
-                    >
-                      {settingsCopied ? t("Kopyalandı — adres çubuğuna yapıştırın") : t("Ayar adresini kopyala")}
-                    </button>
-                  </div>
-                )}
-
-                <span style={{ fontSize: 11, color: c.textSecondary, lineHeight: 1.5 }}>
-                  {t("İzni verdikten sonra sayfayı yenileyin; düğme hepsini tek tıkla açar.")}{" "}
-                  {t("Aşağıdaki hesaplar açılamadı — tek tek açabilirsiniz.")}
+                <span style={{ fontSize: 11, color: c.textSecondary }}>
+                  {t("İzinden sonra sayfayı yenileyin.")}
                 </span>
               </div>
             ) : (
               <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.5 }}>
-                {t("Açmak istediğiniz hesabı seçin. Her hesap yeni sekmede açılır.")}
+                {t("Hesabı açmak için tıklayın, sırayı değiştirmek için sürükleyin.")}
               </span>
             )}
-            {(blockedAccounts.length > 0 ? blockedAccounts : openableAccounts).map(({ account: a, url }) => (
+            {(blockedAccounts.length > 0 ? blockedAccounts : openableAccounts).map(({ account: a, url }, i) => (
               <a
                 key={a.id}
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                onClick={() => {
+                // Sıra yalnızca tam listede değiştirilebiliyor: engellenenler
+                // listesi hesapların bir ALT KÜMESİ, oradaki indeks tam
+                // listeninkiyle örtüşmez ve yanlış hesabı taşırdı.
+                draggable={blockedAccounts.length === 0}
+                onDragStart={(e) => {
+                  setDragIndex(i);
+                  // Çapa varsayılan olarak adresini sürüklüyor; bırakıldığında
+                  // tarayıcı o adrese gidiyordu.
+                  e.dataTransfer.setData("text/plain", "");
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDragOver={(e) => {
+                  if (dragIndex === null) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(e) => {
+                  if (dragIndex === null) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  reorderAccounts(dragIndex, i);
+                  setDragIndex(null);
+                }}
+                onDragEnd={() => setDragIndex(null)}
+                onClick={(e) => {
+                  // Sürükleme bittiğinde tarayıcı tıklama da üretebiliyor;
+                  // hesabı yanlışlıkla açmasın.
+                  if (dragIndex !== null) {
+                    e.preventDefault();
+                    return;
+                  }
                   setAccountLinks(false);
                   setBlockedAccounts([]);
                 }}
@@ -1589,9 +1670,11 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                   gap: 10,
                   padding: "10px 12px",
                   borderRadius: 10,
-                  border: `1px solid ${c.border}`,
+                  border: `1px solid ${dragIndex === i ? c.accent : c.border}`,
                   background: c.surface,
                   textDecoration: "none",
+                  opacity: dragIndex === i ? 0.6 : 1,
+                  cursor: blockedAccounts.length === 0 ? "grab" : "pointer",
                 }}
               >
                 <span

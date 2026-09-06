@@ -40,6 +40,17 @@ function fetchMe(): Promise<CurrentUser | null> {
   return inflight;
 }
 
+/**
+ * Önbellekteki dil tercihini günceller.
+ *
+ * Dil değiştirilince /auth/me yeniden çekilmiyor — önbellek oturum boyunca
+ * duruyor. Güncellenmezse hesabın dili burada eski değerinde kalır ve onu
+ * okuyan her yer yanlış cevap alır (bkz. lib/i18n useAccountLocale).
+ */
+export function setCachedLocale(locale: Locale | null): void {
+  if (cached) cached = { ...cached, locale: locale ?? undefined };
+}
+
 export function useCurrentUser(): { user: CurrentUser | null; loading: boolean } {
   const [user, setUser] = useState<CurrentUser | null>(cached ?? null);
   const [loading, setLoading] = useState(cached === undefined);

@@ -1,9 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createTranslator, defaultLocale, isLocale, resolveLocale } from "@projelio/shared";
 import type { Locale, Translate } from "@projelio/shared";
 import { api } from "../../api/client";
-import { useCurrentUser } from "../useCurrentUser";
+import { setCachedLocale, useCurrentUser } from "../useCurrentUser";
 import { en } from "./en/index";
 import { getLocale as readStored, setStoredLocale as writeStored } from "./depo";
 
@@ -80,6 +80,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     setLocaleState(next ?? browserLocale());
     setChosen(next !== null);
     writeStored(next);
+    // /auth/me önbelleği oturum boyunca duruyor; hesaptaki dil orada eski
+    // kalmasın (bkz. useCurrentUser setCachedLocale).
+    setCachedLocale(next);
     // Sunucunun da bilmesi gerekiyor: e-posta ve push bildirimi tarayıcı
     // kapalıyken gidiyor, orada localStorage diye bir şey yok.
     // Oturum yoksa (giriş/kayıt ekranı) çağrı anlamsız, atlanır.
@@ -168,12 +171,21 @@ export function useLocale(): { locale: Locale; setLocale: (l: Locale | null) => 
  * neyse o kalır.
  */
 export function useAccountLocale(accountLocale: Locale | null | undefined) {
-  const { locale, applyFromAccount } = useI18n();
+  const { applyFromAccount } = useI18n();
+  // Hesaptan gelen dil yalnızca DEĞİŞTİĞİNDE uygulanır; geçerli dille
+  // karşılaştırılmaz. Eskiden karşılaştırılıyordu ve dil değiştirmeyi tümden
+  // bozuyordu: /auth/me modül düzeyinde önbelleklenmiş (bkz. useCurrentUser),
+  // yani hesaptaki dil sayfa yenilenene kadar eski değerinde kalıyor.
+  // Kullanıcı Türkçe'den İngilizce'ye geçtiğinde efekt "hesapta tr yazıyor,
+  // ekranda en var" deyip seçimi anında geri alıyordu — dil ancak sayfa
+  // yenilendikten sonra değişmiş görünüyordu.
+  const uygulanan = useRef<Locale | null>(null);
   useEffect(() => {
     if (!isLocale(accountLocale)) return;
-    if (accountLocale === locale) return;
+    if (uygulanan.current === accountLocale) return;
+    uygulanan.current = accountLocale;
     applyFromAccount(accountLocale);
-  }, [accountLocale, locale, applyFromAccount]);
+  }, [accountLocale, applyFromAccount]);
 }
 
 /**

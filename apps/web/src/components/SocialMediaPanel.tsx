@@ -938,36 +938,6 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         </span>
       )}
 
-      {/* Tek düğmeyle bütün kanalları açmak, gün başında hesapları tek tek
-          gezen sosyal medya sorumlusunun asıl istediği şey. Adresi olmayan
-          hesap (blog/diğer) listeye girmiyor; sayı da o yüzden accounts.length
-          değil. */}
-      {openableAccounts.length > 0 && (
-        <div style={{ display: "flex" }}>
-          <button
-            onClick={() => openAccountsInBrowser(openableAccounts.map((x) => x.url))}
-            title={openableAccounts.map((x) => x.url).join("\n")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 12,
-              padding: "5px 10px",
-              borderRadius: 8,
-              cursor: "pointer",
-              background: "transparent",
-              border: `1px solid ${c.border}`,
-              color: c.textPrimary,
-            }}
-          >
-            <IconExternalLink size={13} color={c.textSecondary} />
-            {openableAccounts.length === 1
-              ? t("Hesabı tarayıcıda aç")
-              : t("{n} hesabı tarayıcıda aç", { n: openableAccounts.length })}
-          </button>
-        </div>
-      )}
-
       {/* Bağlama daveti yalnızca entegrasyon yapılandırılmışsa ve henüz bağlı
           bir Instagram hesabı yokken görünür. */}
       {igConfigured && canWrite && !accounts.some((a) => a.connectionStatus === "connected") && (
@@ -1184,29 +1154,66 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Sosyal Medya")}</h5>
-        {!canWrite ? (
-          <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Salt görüntüleme")}</span>
-        ) : (
-          // Satır içi düğmeler yalnızca "+"ın ulaşılamadığı yerde (modal içi).
-          !fabAvailable && (
-            <div style={{ display: "flex", gap: 12 }}>
-              <button
-                onClick={() => setAccountModal({})}
-                style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
-              >
-                + {t("Hesap ekle")}
-              </button>
-              <button
-                onClick={() => setComposer({})}
-                style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
-              >
-                + {t("İçerik ekle")}
-              </button>
-            </div>
-          )
-        )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginLeft: "auto", flexWrap: "wrap" }}>
+          {!canWrite ? (
+            <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Salt görüntüleme")}</span>
+          ) : (
+            // Satır içi düğmeler yalnızca "+"ın ulaşılamadığı yerde (modal içi).
+            !fabAvailable && (
+              <div style={{ display: "flex", gap: 12 }}>
+                <button
+                  onClick={() => setAccountModal({})}
+                  style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+                >
+                  + {t("Hesap ekle")}
+                </button>
+                <button
+                  onClick={() => setComposer({})}
+                  style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+                >
+                  + {t("İçerik ekle")}
+                </button>
+              </div>
+            )
+          )}
+
+          {/* Kanalları tek tıkla açmak, sosyal medya sorumlusunun gün içinde EN
+              ÇOK yaptığı iş — bu yüzden Hesaplar sekmesinin içinde değil,
+              modülün başlık satırının SAĞ ucunda: görünüm (takvim/akış/
+              hesaplar) fark etmeksizin hep aynı yerde, modüle girer girmez
+              göz hizasında. Paneldeki tek accent renkli düğme olduğu için
+              çevresindeki çerçeveli düğmelerle karışmıyor.
+              Adresi olmayan kanal (blog/diğer, adres girilmemiş) sayıya
+              girmediği için accounts.length kullanılmıyor. */}
+          {openableAccounts.length > 0 && (
+            <button
+              onClick={() => openAccountsInBrowser(openableAccounts.map((x) => x.url))}
+              title={openableAccounts.map((x) => `${accountLabel(x.account)} — ${x.url}`).join("\n")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 15,
+                fontWeight: 600,
+                padding: "11px 20px",
+                borderRadius: 10,
+                cursor: "pointer",
+                background: c.accent,
+                border: "none",
+                color: "#fff",
+                boxShadow: `0 2px 6px ${c.accent}55`,
+              }}
+            >
+              <IconExternalLink size={18} color="#fff" />
+              {openableAccounts.length === 1
+                ? t("Hesabı tarayıcıda aç")
+                : t("{n} hesabı tarayıcıda aç", { n: openableAccounts.length })}
+            </button>
+          )}
+        </div>
       </div>
 
       {!loading && (posts.length > 0 || accounts.length > 0) && (

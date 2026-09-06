@@ -14,6 +14,7 @@ import type {
   SocialPostStatus,
   SocialTargetStatus,
 } from "@projelio/shared";
+import { safeExternalUrl } from "@projelio/shared";
 import { parseServerDate } from "./dates";
 
 /**
@@ -174,6 +175,31 @@ export function accountLabel(account: SocialAccount): string {
 
 export function accountColor(account: SocialAccount): string {
   return account.color || SOCIAL_PLATFORMS[account.platform]?.color || "#66707F";
+}
+
+/**
+ * Hesabın tarayıcıda açılacak adresi.
+ *
+ * Profil adresi elle girilmemişse platformun ön ekinden ve kullanıcı adından
+ * türetilir: hesapların çoğu modalde adres alanı boş bırakılarak ekleniyor ve
+ * "aç" düğmesinin hesapların yalnızca bir kısmında görünmesi, hiç
+ * görünmemesinden daha kafa karıştırıcı.
+ *
+ * Adres kullanıcı girdisi olduğu için safeExternalUrl'den geçer — profil
+ * alanına `javascript:` yazılabilir ve düğme onu tıklanabilir yapardı.
+ * Adresi türetilemeyen kanallar (blog/diğer, adres yazılmamışsa) null döner.
+ */
+export function accountProfileUrl(account: SocialAccount): string | null {
+  const direct = safeExternalUrl(account.profileUrl);
+  if (direct) return direct;
+
+  const prefix = SOCIAL_PLATFORMS[account.platform]?.profilePrefix;
+  // Kullanıcı adı "@projelio" diye de giriliyor; ön ekin sonundaki @ ile
+  // birleşince "https://tiktok.com/@@projelio" oluyordu.
+  const handle = account.handle?.trim().replace(/^@+/, "") ?? "";
+  if (!prefix || !handle) return null;
+
+  return safeExternalUrl(`${prefix}${encodeURIComponent(handle)}`);
 }
 
 /**

@@ -21,6 +21,7 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | SQL migration'lar | `database/migrations/NNN_ad.sql` |
 | Geri alma betikleri | `database/geri-al/` — migrations'ın DIŞINDA, bilerek |
 | Dağıtım/yedek/migration betikleri | `deploy/` |
+| Bulut depolama (Drive/OneDrive) | `backend/src/modules/cloud-storage/` — iki sağlayıcının önündeki tek kapı |
 | API referansı | `docs/api-endpoints.md` (seçilmiş uçlar) + `node scripts/uc-listesi.mjs` (tam liste) |
 | Modül sistemi tasarımı | `docs/moduller/` — 20 belge; README'de faz tablosu |
 | Tanıtım sitesi (Next.js) | `landing/` |
@@ -47,6 +48,20 @@ Sağlayıcı listesi, öncelik sırası, model seçimi ve KVKK notu için aşağ
 Kanonik istek biçimi **Anthropic Messages biçimidir**: 68 araç tanımı ve tüm
 servis kodu o dilde yazılmış, çeviri yükü yalnızca onu gerektiren sağlayıcıya
 biniyor (`providers/openai-format.ts`, testleri `openai-format.test.ts`).
+
+**Dosyanın sahibi üç şeyden biridir: iş, departman ya da şirket.** İş kapsamının
+altında proje/görev/çıktı hiyerarşisi ve ona karşılık gelen klasör ağacı var;
+departman ile şirket ise "düz kapsam" (`FlatScope`, `files.service.ts`): tek,
+alt klasörsüz bir klasör + kadroya verilen bulut izinleri. İkisinin gövdeleri
+ORTAK — departman için bir düzeltme yazıp şirketi unutmak mümkün değil.
+
+**Bir kullanıcı birden fazla Drive/OneDrive hesabı bağlayabilir** (migration 088).
+Hangi hesabın kullanılacağı şirket bazında seçilir (`organization_storage`,
+Organizasyonu düzenle > Dosya deposu); seçim yoksa eski davranış sürer: sahibin
+varsayılan hesabı. Bir hesabın giriş kimliği mi yoksa yalnızca depo mu olduğu
+`is_login_identity` ile ayrılır — depo hesabıyla Projelio'ya GİRİŞ YAPILAMAZ,
+aksi hâlde şirketine Drive bağlayan herkes hesabına ikinci bir anahtar takmış
+olurdu.
 
 `apps/mobile` (Expo) neredeyse boş — asıl istemci `apps/web`.
 

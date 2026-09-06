@@ -87,6 +87,8 @@ export interface MicrosoftOAuthStatePayload {
    * Microsoft'un döndürdüğü id_token'dan anlaşılır.
    */
   userId?: string;
+  /** drive modunda: yeni bağlanan hesaba verilecek ad ("Şirket OneDrive'ı"). */
+  label?: string;
   /**
    * Ne yapılıyor: depolama mı bağlanıyor, posta mı, yoksa "Microsoft ile giriş" mi.
    *

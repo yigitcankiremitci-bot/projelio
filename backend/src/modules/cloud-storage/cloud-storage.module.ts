@@ -1,7 +1,10 @@
 import { Module } from "@nestjs/common";
+import { PassportModule } from "@nestjs/passport";
 import { GoogleCoreModule } from "../google/google-core.module";
 import { MicrosoftCoreModule } from "../microsoft/microsoft-core.module";
 import { CloudStorageService } from "./cloud-storage.service";
+import { OrganizationStorageService } from "./organization-storage.service";
+import { CloudStorageController } from "./cloud-storage.controller";
 
 /**
  * FilesModule'ün önünde tuttuğu tek kapı: Google Drive'ın ve OneDrive'ın "boru
@@ -15,8 +18,9 @@ import { CloudStorageService } from "./cloud-storage.service";
  * da çekirdek hâli kullanılıyor.
  */
 @Module({
-  imports: [GoogleCoreModule, MicrosoftCoreModule],
-  providers: [CloudStorageService],
-  exports: [CloudStorageService],
+  imports: [GoogleCoreModule, MicrosoftCoreModule, PassportModule],
+  controllers: [CloudStorageController],
+  providers: [CloudStorageService, OrganizationStorageService],
+  exports: [CloudStorageService, OrganizationStorageService],
 })
 export class CloudStorageModule {}

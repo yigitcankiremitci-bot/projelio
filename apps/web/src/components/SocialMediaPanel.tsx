@@ -16,6 +16,7 @@ import {
   WEEKDAY_LABELS,
   accountColor,
   accountLabel,
+  accountProfileUrl,
   canAutoPublish,
   localDay,
   monthGrid,
@@ -320,6 +321,45 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       setBanner({ kind: "error", text: err instanceof Error ? err.message : t("Yayımlanamadı") });
     } finally {
       setPublishing(null);
+    }
+  };
+
+  /** Tarayıcıda açılabilen hesaplar — "tümünü aç" bu listeyi kullanır. */
+  const openableAccounts = useMemo(
+    () =>
+      accounts
+        .map((a) => ({ account: a, url: accountProfileUrl(a) }))
+        .filter((x): x is { account: SocialAccount; url: string } => x.url !== null),
+    [accounts]
+  );
+
+  /**
+   * Hesapları yeni sekmelerde açar.
+   *
+   * Tarayıcılar tek bir tıklamadan doğan İKİNCİ pencereden itibaren engel
+   * çıkarabiliyor; engellenen sekme sessizce kaybolduğu için kullanıcı
+   * "düğme çalışmıyor" sanıyordu. Bu yüzden açılamayanları sayıp söylüyoruz.
+   *
+   * `noopener` seçenek dizesiyle verilmiyor: o hâlde window.open şartname
+   * gereği null döner ve başarılı açılışları da engellenmiş sayardık. Bunun
+   * yerine pencere referansındaki opener elle koparılıyor.
+   */
+  const openAccountsInBrowser = (urls: string[]) => {
+    let blocked = 0;
+    for (const url of urls) {
+      const w = window.open(url, "_blank");
+      if (w) w.opener = null;
+      else blocked++;
+    }
+    if (blocked > 0) {
+      setBanner({
+        kind: "error",
+        text: t("{n} hesap açılamadı — tarayıcı yeni sekmeleri engelledi. Bu site için açılır pencere iznini verin.", {
+          n: blocked,
+        }),
+      });
+    } else {
+      setBanner(null);
     }
   };
 
@@ -898,6 +938,36 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         </span>
       )}
 
+      {/* Tek düğmeyle bütün kanalları açmak, gün başında hesapları tek tek
+          gezen sosyal medya sorumlusunun asıl istediği şey. Adresi olmayan
+          hesap (blog/diğer) listeye girmiyor; sayı da o yüzden accounts.length
+          değil. */}
+      {openableAccounts.length > 0 && (
+        <div style={{ display: "flex" }}>
+          <button
+            onClick={() => openAccountsInBrowser(openableAccounts.map((x) => x.url))}
+            title={openableAccounts.map((x) => x.url).join("\n")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              padding: "5px 10px",
+              borderRadius: 8,
+              cursor: "pointer",
+              background: "transparent",
+              border: `1px solid ${c.border}`,
+              color: c.textPrimary,
+            }}
+          >
+            <IconExternalLink size={13} color={c.textSecondary} />
+            {openableAccounts.length === 1
+              ? t("Hesabı tarayıcıda aç")
+              : t("{n} hesabı tarayıcıda aç", { n: openableAccounts.length })}
+          </button>
+        </div>
+      )}
+
       {/* Bağlama daveti yalnızca entegrasyon yapılandırılmışsa ve henüz bağlı
           bir Instagram hesabı yokken görünür. */}
       {igConfigured && canWrite && !accounts.some((a) => a.connectionStatus === "connected") && (
@@ -977,11 +1047,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               {!a.active && (
                 <span style={{ fontSize: 11, color: c.textSecondary }}>· {t("pasif")}</span>
               )}
-              {a.profileUrl && (
-                <a href={safeExternalUrl(a.profileUrl) ?? undefined} target="_blank" rel="noreferrer" style={{ display: "flex" }}>
-                  <IconExternalLink size={12} color={c.textSecondary} />
-                </a>
-              )}
+
             </div>
             <span style={{ fontSize: 12, color: c.textSecondary }}>
               {[
@@ -1058,26 +1124,40 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               )}
             </div>
           </div>
-          {canWrite && (
-            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-              <button
-                onClick={() => setAccountModal({ account: a })}
-                aria-label={t("Hesabı düzenle")}
-                title={t("Düzenle")}
-                style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
+          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            {accountProfileUrl(a) && (
+              <a
+                href={accountProfileUrl(a) ?? undefined}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={t("Hesabı tarayıcıda aç")}
+                title={t("Tarayıcıda aç")}
+                style={{ display: "flex", alignItems: "center", padding: 2 }}
               >
-                <IconEdit size={14} color={c.textSecondary} />
-              </button>
-              <button
-                onClick={() => archiveAccount(a)}
-                aria-label={t("Hesabı arşivle")}
-                title={t("Arşivle")}
-                style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
-              >
-                <IconTrash size={14} color={c.textSecondary} />
-              </button>
-            </div>
-          )}
+                <IconExternalLink size={14} color={c.textSecondary} />
+              </a>
+            )}
+            {canWrite && (
+              <>
+                <button
+                  onClick={() => setAccountModal({ account: a })}
+                  aria-label={t("Hesabı düzenle")}
+                  title={t("Düzenle")}
+                  style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
+                >
+                  <IconEdit size={14} color={c.textSecondary} />
+                </button>
+                <button
+                  onClick={() => archiveAccount(a)}
+                  aria-label={t("Hesabı arşivle")}
+                  title={t("Arşivle")}
+                  style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
+                >
+                  <IconTrash size={14} color={c.textSecondary} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       ))}
     </div>

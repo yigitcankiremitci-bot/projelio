@@ -163,7 +163,13 @@ export const hatalar: TranslationDict = {
   "Kayıt kendisiyle birleştirilemez": "A record can't be merged with itself",
   "Kişi adı gerekli": "The contact name is required",
   "Kişi seçin": "Select a person",
-  "Kullanıcı adı 3-30 karakter olmalı; sadece harf, rakam, nokta ve alt çizgi içerebilir.": "A username must be 3-30 characters and can contain only lowercase letters, digits, dots and underscores.",
+  // DİKKAT: bu metin ile bir alttaki BİLEREK farklı değil — kaynaktaki iki
+  // Türkçe cümle gerçekten farklı ve biri yanıltıcı. DTO "sadece harf" diyor
+  // ama servis kullanıcı adını küçültüyor (normalizeUsername), yani büyük harf
+  // yazan kullanıcı hata almıyor, sessizce küçültülüyor. Çeviri kaynağa SADIK
+  // tutuldu; asıl düzeltme Türkçe metinde yapılmalı.
+  "Kullanıcı adı 3-30 karakter olmalı; sadece harf, rakam, nokta ve alt çizgi içerebilir.":
+    "A username must be 3-30 characters and can contain only letters, digits, dots and underscores.",
   "Mesai bitişi başlangıcından sonra olmalı.": "The end of the workday must be after its start.",
   "Modül anahtarı gerekli": "The module key is required",
   "Numara için bir etiket girin": "Enter a label for the number",
@@ -487,4 +493,28 @@ export const hatalar: TranslationDict = {
   // İkisi de kullanıcıya çıkabildiği için ikisi de sözlükte.
   "Kullanıcı adı 3-30 karakter olmalı; sadece küçük harf, rakam, nokta ve alt çizgi içerebilir.":
     "A username must be 3-30 characters and can contain only lowercase letters, digits, dots and underscores.",
+
+  // Şirket başına ayrı bulut deposu (bkz. migration 088/089).
+  "Bu hesap size ait değil.": "This account isn't yours.",
+  "Bu hesapta saklanan dosyalar var. Önce ilgili şirket/departman için başka bir depo hesabı seçin.":
+    "This account still stores files. Choose another storage account for the company/department first.",
+  "Bu Google hesabı Projelio'ya yalnızca dosya deposu olarak bağlı; giriş için kullanılamaz.":
+    "This Google account is connected to Projelio for file storage only; it can't be used to sign in.",
+  "Bu Microsoft hesabı Projelio'ya yalnızca dosya deposu/posta için bağlı; giriş için kullanılamaz.":
+    "This Microsoft account is connected to Projelio for storage/mail only; it can't be used to sign in.",
+  "Şirketin depo hesabını yalnızca şirket sahibi seçebilir":
+    "Only the company owner can choose the company's storage account",
+  "Şirketin depo hesabını yalnızca şirket sahibi değiştirebilir":
+    "Only the company owner can change the company's storage account",
+  "Bulut hesabı bulunamadı": "Cloud account not found",
+  "Bu bulut hesabı size ait değil": "This cloud account isn't yours",
+  "Bu hesabın dosya erişimi hazır değil; Ayarlar'dan yeniden bağlayın.":
+    "This account's file access isn't ready; reconnect it from Settings.",
+  "Bu şirketin dosyalarını yalnızca ekibi görebilir": "Only this company's team can see its files",
+  "Bu şirkette dosya saklamak için önce bir Google Drive ya da OneDrive hesabı bağlanmalı. Ayarlar > Bağlı hesaplar.":
+    "To store files for this company, connect a Google Drive or OneDrive account first. Settings > Connected accounts.",
+  "Bu alanın dosya deposu bulunamadı": "No file storage found for this area",
+  "jobId, departmentId ya da organizationId gerekli": "jobId, departmentId or organizationId is required",
+  "Bu hedef OneDrive kullanıyor; dosya seçimi OneDrive penceresiyle yapılır.":
+    "This target uses OneDrive; pick files through the OneDrive window.",
 };

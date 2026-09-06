@@ -50,6 +50,48 @@ export class CloudStorageService {
     return undefined;
   }
 
+  /**
+   * Kullanıcının bağlı BÜTÜN bulut hesapları, iki sağlayıcıdan da.
+   *
+   * Ayarlar ekranı ve "şirketin depo hesabını seç" listesi buradan beslenir.
+   * Yalnızca dosya işlemine hazır olanlar işaretlenir — hazır olmayan bir hesap
+   * listeden gizlenmez, çünkü kullanıcının "yeniden bağlan" diyebilmesi gerekir.
+   */
+  async listAccountsForUser(userId: string): Promise<
+    Array<{
+      provider: StorageProvider;
+      account: CloudAccount;
+      driveReady: boolean;
+      isLoginIdentity: boolean;
+    }>
+  > {
+    const [google, microsoft] = await Promise.all([
+      this.googleAccounts.listByUserId(userId),
+      this.msAccounts.listByUserId(userId),
+    ]);
+
+    return [
+      ...google.map((account) => ({
+        provider: "google" as const,
+        account,
+        driveReady: this.googleAccounts.isDriveReady(account),
+        isLoginIdentity: account.isLoginIdentity,
+      })),
+      ...microsoft.map((account) => ({
+        provider: "microsoft" as const,
+        account,
+        driveReady: this.msAccounts.isDriveReady(account),
+        isLoginIdentity: account.isLoginIdentity,
+      })),
+    ];
+  }
+
+  async setLabel(provider: StorageProvider, accountId: string, label: string): Promise<void> {
+    return provider === "google"
+      ? this.googleAccounts.setLabel(accountId, label)
+      : this.msAccounts.setLabel(accountId, label);
+  }
+
   async findById(provider: StorageProvider, accountId: string) {
     return provider === "google" ? this.googleAccounts.findById(accountId) : this.msAccounts.findById(accountId);
   }

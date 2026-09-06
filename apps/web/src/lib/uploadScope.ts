@@ -21,7 +21,9 @@ export function uploadScope(
       ? `job:${target.jobId}`
       : "projectId" in target
         ? `project:${target.projectId}`
-        : `department:${target.departmentId}`;
+        : "departmentId" in target
+          ? `department:${target.departmentId}`
+          : `organization:${target.organizationId}`;
   return [
     base,
     context.taskId ? `task:${context.taskId}` : "",

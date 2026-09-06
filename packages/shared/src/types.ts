@@ -1463,11 +1463,13 @@ export interface ArchiveSummary {
 
 export interface ProjectFile {
   id: string;
-  /** Dosya ya bir İŞE ya bir DEPARTMANA aittir (ikisinden tam biri dolu). */
+  /** Dosya bir İŞE, bir DEPARTMANA ya da bir ŞİRKETE aittir (üçünden tam biri dolu). */
   jobId?: string;
   /** Organizasyon/grup listelerinde dosyanın hangi işten geldiğini göstermek için. */
   jobTitle?: string;
   departmentId?: string;
+  /** Şirketin kendi dosya alanı (bkz. migration 089). */
+  organizationId?: string;
   /** Boşsa dosya işin geneline aittir; doluysa o projeye iliştirilmiştir. */
   projectId?: string;
   taskId?: string;

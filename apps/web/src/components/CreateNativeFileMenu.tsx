@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { ProjectFile } from "@projelio/shared";
-import { filesApi } from "../api/files";
+import { filesApi, type FileTarget } from "../api/files";
 import type { NativeFileKind } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
@@ -13,7 +13,7 @@ export interface CreateNativeFileMenuHandle {
 }
 
 interface Props {
-  target: { jobId: string } | { projectId: string } | { departmentId: string };
+  target: FileTarget;
   taskId?: string;
   outputId?: string;
   /** Hangi sağlayıcı bağlı: seçenek listesi buna göre değişir (bkz. backend NativeFileKind). */

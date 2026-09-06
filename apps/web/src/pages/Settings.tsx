@@ -14,8 +14,10 @@ import { backState } from "../lib/backTarget";
 import { demoHesap } from "../lib/demoHesap";
 import { useLocale, useT } from "../lib/i18n";
 import TabBar from "../components/TabBar";
-import GoogleDriveCard from "../components/GoogleDriveCard";
-import OneDriveCard from "../components/OneDriveCard";
+// Tek kart: Drive ve OneDrive hesaplarının hepsi burada listeleniyor. Ayrı
+// "Google Drive" / "OneDrive" kartları, kullanıcı başına tek hesap
+// varsayımının kalıntısıydı (bkz. CloudAccountsCard).
+import CloudAccountsCard from "../components/CloudAccountsCard";
 import WhatsappCard from "../components/WhatsappCard";
 import WhatsappProfileCard from "../components/WhatsappProfileCard";
 import {
@@ -912,8 +914,7 @@ export default function Settings() {
     ritim: <WorkRhythmSettings />,
     baglantilar: (
       <>
-        <GoogleDriveCard />
-        <OneDriveCard />
+        <CloudAccountsCard />
         <WhatsappCard />
       </>
     ),

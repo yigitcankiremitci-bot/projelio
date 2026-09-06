@@ -42,6 +42,13 @@ export class MicrosoftAuthService {
     let isNewUser = false;
 
     if (existingAccount) {
+      // Depo/posta için eklenmiş ikinci hesapla giriş yapılamaz (bkz. migration 088,
+      // GoogleAuthService.loginWithGoogle ile aynı gerekçe).
+      if (!existingAccount.isLoginIdentity) {
+        throw new UnauthorizedException(
+          "Bu Microsoft hesabı Projelio'ya yalnızca dosya deposu/posta için bağlı; giriş için kullanılamaz."
+        );
+      }
       userId = existingAccount.userId;
     } else {
       const byEmail = await this.usersService.findByEmail(identity.verifiedEmail ?? identity.email);
@@ -69,11 +76,9 @@ export class MicrosoftAuthService {
       }
     }
 
-    // Bir Projelio kullanıcısına yalnızca tek Microsoft hesabı bağlanabilir:
-    // microsoft_accounts'ta kullanıcı başına tek satır varsayılıyor
-    // (findByUserId .maybeSingle() ile okuyor) ve ikinci bir hesap gelirse
-    // OneDrive/posta hangisinden gideceği belirsizleşir.
-    const currentForUser = await this.accounts.findByUserId(userId);
+    // GİRİŞ kimliği kullanıcı başına tektir. Depo hesabı çoğul olabilir
+    // (bkz. migration 088) ama giriş yolu değil.
+    const currentForUser = await this.accounts.findLoginIdentity(userId);
     if (currentForUser && currentForUser.msSub !== identity.sub) {
       throw new ConflictException(
         `Bu Projelio hesabına zaten ${currentForUser.email} Microsoft hesabı bağlı. Önce mevcut bağlantıyı kaldırın.`
@@ -89,6 +94,7 @@ export class MicrosoftAuthService {
       msSub: identity.sub,
       email: identity.email,
       scopes: [],
+      isLoginIdentity: true,
     });
 
     const user = await this.usersService.findById(userId);

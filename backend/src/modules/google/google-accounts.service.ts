@@ -15,6 +15,10 @@ export interface GoogleAccount {
   hasRefreshToken: boolean;
   driveRevokedAt?: string;
   connectedAt: string;
+  /** Kullanıcının verdiği ad ("Şirket Drive'ı"). Birden fazla hesap bağlıyken ayırt etmek için. */
+  label?: string;
+  /** Bu hesapla Google ile giriş yapılabilir mi (bkz. migration 088). */
+  isLoginIdentity: boolean;
 }
 
 function mapAccount(row: any): GoogleAccount {
@@ -29,6 +33,10 @@ function mapAccount(row: any): GoogleAccount {
     hasRefreshToken: Boolean(row.refresh_token_enc),
     driveRevokedAt: row.drive_revoked_at ?? undefined,
     connectedAt: row.connected_at,
+    label: row.label ?? undefined,
+    // Migration 088 uygulanmadan önceki satırlarda kolon yok: eski davranış
+    // "bağlı olan hesap giriş kimliğidir" olduğu için varsayılan true.
+    isLoginIdentity: row.is_login_identity ?? true,
   };
 }
 
@@ -70,11 +78,55 @@ export class GoogleAccountsService {
     return data ? mapAccount(data) : undefined;
   }
 
+  /**
+   * Kullanıcının VARSAYILAN Google hesabı.
+   *
+   * Artık kullanıcı başına birden fazla hesap olabildiği için (migration 088)
+   * bu metot "tek satır" varsaymaz; giriş kimliğini, o da yoksa ilk bağlananı
+   * döndürür. Sıralama sabit tutulmak zorunda: kullanıcı bir gün bir hesabı,
+   * ertesi gün diğerini "varsayılan" görürse dosyaları farklı Drive'lara
+   * dağılırdı.
+   *
+   * Belirli bir şirketin deposu için bu metot DEĞİL, organization_storage
+   * üzerinden çözümleme kullanılır (bkz. CloudStorageService.resolveAccount).
+   */
   async findByUserId(userId: string): Promise<GoogleAccount | undefined> {
     const { data, error } = await this.supabase.client
       .from("google_accounts")
       .select()
       .eq("user_id", userId)
+      .order("is_login_identity", { ascending: false })
+      .order("connected_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapAccount(data) : undefined;
+  }
+
+  /** Kullanıcının bağlı BÜTÜN Google hesapları (Ayarlar > Bağlı hesaplar listesi). */
+  async listByUserId(userId: string): Promise<GoogleAccount[]> {
+    const { data, error } = await this.supabase.client
+      .from("google_accounts")
+      .select()
+      .eq("user_id", userId)
+      .order("connected_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(mapAccount);
+  }
+
+  /**
+   * Kullanıcının GİRİŞ kimliği olan Google hesabı.
+   *
+   * "Google ile giriş" yalnızca bunun üzerinden çalışır: depo olarak eklenen
+   * ikinci bir hesap giriş yolu AÇMAMALI, yoksa şirketine Drive bağlayan
+   * herkes farkında olmadan hesabına ikinci bir anahtar takmış olur.
+   */
+  async findLoginIdentity(userId: string): Promise<GoogleAccount | undefined> {
+    const { data, error } = await this.supabase.client
+      .from("google_accounts")
+      .select()
+      .eq("user_id", userId)
+      .eq("is_login_identity", true)
       .maybeSingle();
     if (error) throw error;
     return data ? mapAccount(data) : undefined;
@@ -104,6 +156,13 @@ export class GoogleAccountsService {
     pictureUrl?: string;
     refreshToken?: string;
     scopes: string[];
+    /**
+     * Bu hesapla giriş yapılabilsin mi. Verilmezse: kullanıcının başka giriş
+     * kimliği YOKSA true (eski davranış — ilk bağlanan hesap giriş kimliğidir),
+     * varsa false (depo olarak eklenen ikinci hesap giriş yolu açmaz).
+     */
+    isLoginIdentity?: boolean;
+    label?: string;
   }): Promise<GoogleAccount> {
     const existing = await this.findByGoogleSub(params.googleSub);
 
@@ -121,6 +180,8 @@ export class GoogleAccountsService {
       patch.last_refreshed_at = new Date().toISOString();
     }
 
+    if (params.label !== undefined) patch.label = params.label || null;
+
     if (existing) {
       // Scope'lar birikimlidir: kullanıcı önce girişle gelir, sonra Drive'ı
       // bağlar. Yeni istek eski izinleri kapsamıyorsa da kaybetmemeliyiz.
@@ -137,6 +198,11 @@ export class GoogleAccountsService {
       return mapAccount(data);
     }
 
+    // Giriş kimliği kullanıcı başına tek: ilk hesap onu üstlenir, sonrakiler
+    // yalnızca depo olur. Veritabanında da kısmi unique index var (mig. 088),
+    // yani bu karar atlansa bile ikinci giriş kimliği yazılamaz.
+    patch.is_login_identity = params.isLoginIdentity ?? !(await this.findLoginIdentity(params.userId));
+
     const { data, error } = await this.supabase.client
       .from("google_accounts")
       .insert(patch)
@@ -144,6 +210,14 @@ export class GoogleAccountsService {
       .single();
     if (error) throw error;
     return mapAccount(data);
+  }
+
+  async setLabel(accountId: string, label: string): Promise<void> {
+    const { error } = await this.supabase.client
+      .from("google_accounts")
+      .update({ label: label.trim() || null })
+      .eq("id", accountId);
+    if (error) throw error;
   }
 
   async setRootFolderId(accountId: string, folderId: string): Promise<void> {
@@ -163,15 +237,42 @@ export class GoogleAccountsService {
     if (error) throw error;
   }
 
-  /** Drive bağlantısını keser; giriş kimliği korunur, böylece kullanıcı giriş yapmaya devam edebilir. */
-  async disconnectDrive(userId: string): Promise<void> {
-    const account = await this.findByUserId(userId);
+  /**
+   * Drive bağlantısını keser.
+   *
+   * İki farklı sonuç var ve fark önemli:
+   *   * Giriş kimliği olan hesapta SATIR KALIR, yalnızca token ve Drive izni
+   *     silinir — aksi hâlde kullanıcı "Google ile giriş" yolunu da kaybederdi.
+   *   * Yalnızca depo için eklenen ikinci hesapta satır tamamen SİLİNİR; giriş
+   *     kimliği olmadığı için boş kabuk tutmanın anlamı yok.
+   *
+   * `accountId` verilmezse kullanıcının varsayılan hesabı kesilir (eski
+   * davranış, tek hesabı olan kullanıcılar için aynı sonuç).
+   */
+  async disconnectDrive(userId: string, accountId?: string): Promise<void> {
+    const account = accountId ? await this.findById(accountId) : await this.findByUserId(userId);
     if (!account) return;
+    // Başkasının hesabını kesmek: kimlik doğrulanmış bir istekte bile id
+    // istemciden geliyor, sahiplik burada teyit edilmek zorunda.
+    if (account.userId !== userId) throw new BadRequestException("Bu hesap size ait değil.");
 
     const refreshToken = await this.readRefreshToken(account.id);
     if (refreshToken) await this.oauth.revokeToken(refreshToken);
 
     this.accessTokenCache.delete(account.id);
+
+    if (!account.isLoginIdentity) {
+      const { error } = await this.supabase.client.from("google_accounts").delete().eq("id", account.id);
+      // 23503: hesap hâlâ bir işin/departmanın/şirketin deposu olarak kullanılıyor
+      // (on delete restrict). Sessizce yutmak, dosyaları erişilemez bırakırdı.
+      if (error && (error as any).code === "23503") {
+        throw new BadRequestException(
+          "Bu hesapta saklanan dosyalar var. Önce ilgili şirket/departman için başka bir depo hesabı seçin."
+        );
+      }
+      if (error) throw error;
+      return;
+    }
 
     const { error } = await this.supabase.client
       .from("google_accounts")

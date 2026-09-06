@@ -8,6 +8,7 @@ import {
   STATUS_ORDER,
   accountColor,
   accountLabel,
+  accountProfileUrl,
   captionLength,
   fromDateTimeLocal,
   hashtagCount,
@@ -49,6 +50,34 @@ function post(over: Partial<SocialPost> = {}): SocialPost {
     ...over,
   };
 }
+
+describe("hesap adresi", () => {
+  test("elle yazılan profil adresi olduğu gibi kullanılır", () => {
+    assert.equal(
+      accountProfileUrl(account({ profileUrl: "https://instagram.com/projelio.app" })),
+      "https://instagram.com/projelio.app"
+    );
+  });
+
+  test("adres yoksa platform ön ekinden türetilir", () => {
+    assert.equal(accountProfileUrl(account()), "https://instagram.com/projelio");
+    assert.equal(accountProfileUrl(account({ platform: "tiktok" })), "https://tiktok.com/@projelio");
+  });
+
+  test("kullanıcı adının başındaki @ ön eke eklenmez", () => {
+    assert.equal(accountProfileUrl(account({ platform: "tiktok", handle: "@projelio" })), "https://tiktok.com/@projelio");
+  });
+
+  test("ön eki olmayan kanal adressiz kalır", () => {
+    assert.equal(accountProfileUrl(account({ platform: "blog" })), null);
+    assert.equal(accountProfileUrl(account({ platform: "blog", profileUrl: "ornek.com" })), "https://ornek.com/");
+  });
+
+  // Profil alanı serbest metin: düğmeyi tıklanabilir bir XSS'e çevirmesin.
+  test("javascript: adresi reddedilir", () => {
+    assert.equal(accountProfileUrl(account({ platform: "blog", profileUrl: "javascript:alert(1)" })), null);
+  });
+});
 
 describe("sözlük bütünlüğü", () => {
   test("her platformun sırası ve etiketi var", () => {

@@ -15,7 +15,8 @@ import {
   isGoogleDocMime,
   type NativeFileKind,
 } from "../cloud-storage/cloud-storage.service";
-import type { CloudFile, StorageProvider } from "../cloud-storage/cloud-storage.types";
+import type { CloudAccount, CloudFile, StorageProvider } from "../cloud-storage/cloud-storage.types";
+import { OrganizationStorageService } from "../cloud-storage/organization-storage.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { decodeUploadFileName } from "../../common/upload-filename.util";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
@@ -57,11 +58,13 @@ export const INLINE_UPLOAD_LIMIT = 8 * 1024 * 1024;
 
 export interface ProjectFile {
   id: string;
-  /** Dosya ya bir İŞE ya bir DEPARTMANA aittir (ikisinden tam biri dolu). */
+  /** Dosya bir İŞE, bir DEPARTMANA ya da bir ŞİRKETE aittir (üçünden tam biri dolu). */
   jobId?: string;
   /** Organizasyon/grup listelerinde dosyanın hangi işten geldiğini göstermek için. */
   jobTitle?: string;
   departmentId?: string;
+  /** Şirketin kendi dosya alanı (bkz. migration 089). */
+  organizationId?: string;
   projectId?: string;
   taskId?: string;
   outputId?: string;
@@ -147,6 +150,7 @@ function mapFile(row: any, canEditInDrive: boolean): ProjectFile {
     id: row.id,
     jobId: row.job_id ?? undefined,
     departmentId: row.department_id ?? undefined,
+    organizationId: row.organization_id ?? undefined,
     projectId: row.project_id ?? undefined,
     taskId: row.task_id ?? undefined,
     outputId: row.output_id ?? undefined,
@@ -184,6 +188,35 @@ function storageOwner(row: {
   return { provider, accountId };
 }
 
+/**
+ * "Düz kapsam": departman ya da şirket.
+ *
+ * İkisinin de dosyaları TEK, alt klasörsüz bir bulut klasöründe durur ve
+ * yükleme/izin eşitleme/listeleme akışları birebir aynıdır — tek farkları hangi
+ * tabloya baktıkları ve kimin erişebildiği. Bu yüzden iki ayrı kopya yerine
+ * ortak gövdeler + kapsam tanımı var; ikisi ayrı yazılsaydı bir düzeltme
+ * yalnızca birine uygulanır ve aradaki fark sessizce büyürdü.
+ *
+ * İŞLER (job) bu kapsamın DIŞINDA: onların altında proje/görev/çıktı hiyerarşisi
+ * ve ona karşılık gelen bir klasör ağacı var (bkz. job_folders).
+ */
+export interface FlatScope {
+  kind: "department" | "organization";
+  id: string;
+}
+
+/**
+ * `files`/`file_upload_sessions` satırının düz kapsamı — yoksa (iş kapsamı) undefined.
+ *
+ * Satırda job_id, department_id ve organization_id'den tam olarak biri dolu
+ * (bkz. migration 089 files_scope kısıtı).
+ */
+function flatScopeOfRow(row: { department_id?: string | null; organization_id?: string | null }): FlatScope | undefined {
+  if (row.department_id) return { kind: "department", id: row.department_id };
+  if (row.organization_id) return { kind: "organization", id: row.organization_id };
+  return undefined;
+}
+
 /** provider'a göre insert/update payload'ına doğru hesap kolonunu yazar. */
 function storageAccountColumns(provider: StorageProvider, accountId: string) {
   return {
@@ -200,6 +233,7 @@ export class FilesService {
   constructor(
     private supabase: SupabaseService,
     private cloudStorage: CloudStorageService,
+    private orgStorage: OrganizationStorageService,
     private notifications: NotificationsService
   ) {}
 
@@ -385,12 +419,77 @@ export class FilesService {
     return data?.owner_id === userId;
   }
 
-  // ============================================================ departman erişimi
+  // ============================================================ düz kapsam erişimi
   // Departman kaynaklarını yalnızca organizasyon sahibi ya da o departmanın
   // onaylı bir kadro üyesi görebilir/yönetebilir (bkz. TasksService/OutputsService
   // ile aynı desen — Dosyalar sekmesi de aynı yetki modelini paylaşır).
+  //
+  // Şirket kapsamı aynı deseni bir üst kademede tekrarlar: sahibi, onaylı
+  // üyeleri ve — şirket bir gruba bağlıysa — grubun sahibi/üyeleri.
 
-  async assertDepartmentAccess(departmentId: string, userId: string): Promise<void> {
+  /** Kapsamın hangi tablolarda yaşadığı (bkz. FlatScope). */
+  private flatTables(scope: FlatScope) {
+    return scope.kind === "department"
+      ? { storage: "department_storage", grants: "department_folder_grants", idColumn: "department_id" }
+      : { storage: "organization_storage", grants: "organization_folder_grants", idColumn: "organization_id" };
+  }
+
+  /** Kapsamın klasörüne erişebilmesi gereken kullanıcılar (izin eşitlemesi ve bildirim aynı listeden beslenir). */
+  private async flatEligibleUserIds(scope: FlatScope): Promise<Set<string>> {
+    const ids = new Set<string>();
+
+    if (scope.kind === "organization") {
+      const [{ data: org }, { data: members }] = await Promise.all([
+        this.supabase.client.from("organizations").select("owner_id").eq("id", scope.id).maybeSingle(),
+        this.supabase.client
+          .from("organization_members")
+          .select("user_id")
+          .eq("organization_id", scope.id)
+          .eq("status", "approved"),
+      ]);
+      if (org?.owner_id) ids.add(org.owner_id);
+      for (const m of members ?? []) if (m.user_id) ids.add(m.user_id);
+      return ids;
+    }
+
+    const { data: dept } = await this.supabase.client
+      .from("departments")
+      .select("organization_id")
+      .eq("id", scope.id)
+      .maybeSingle();
+
+    const [{ data: org }, { data: members }] = await Promise.all([
+      dept
+        ? this.supabase.client.from("organizations").select("owner_id").eq("id", dept.organization_id).maybeSingle()
+        : Promise.resolve({ data: null as any }),
+      this.supabase.client
+        .from("department_members")
+        .select("user_id")
+        .eq("department_id", scope.id)
+        .eq("status", "approved"),
+    ]);
+    if (org?.owner_id) ids.add(org.owner_id);
+    for (const m of members ?? []) if (m.user_id) ids.add(m.user_id);
+    return ids;
+  }
+
+  async assertFlatAccess(scope: FlatScope, userId: string): Promise<void> {
+    if (scope.kind === "organization") {
+      // listByOrganization ile AYNI liste olmak zorunda: "Projelio'da görüyorum
+      // ama açamıyorum" (ya da tersi) tutarsızlığı buradan doğuyordu.
+      const { data: org } = await this.supabase.client
+        .from("organizations")
+        .select("owner_id, group_id")
+        .eq("id", scope.id)
+        .maybeSingle();
+      if (!org) throw new NotFoundException("Organizasyon bulunamadı");
+      if (org.owner_id === userId) return;
+      if (await this.isApprovedOrgMember(scope.id, userId)) return;
+      if (org.group_id && (await this.hasGroupAccess(org.group_id, userId))) return;
+      throw new ForbiddenException("Bu şirketin dosyalarını yalnızca ekibi görebilir");
+    }
+
+    const departmentId = scope.id;
     const { data: dept } = await this.supabase.client
       .from("departments")
       .select("organization_id")
@@ -414,8 +513,24 @@ export class FilesService {
     throw new ForbiddenException("Bu departmanın dosyalarını yalnızca kadrosundaki kişiler görebilir");
   }
 
+  /** Eski ad; denetleyici ve findById bunu çağırıyor. */
+  async assertDepartmentAccess(departmentId: string, userId: string): Promise<void> {
+    return this.assertFlatAccess({ kind: "department", id: departmentId }, userId);
+  }
+
   /** Silme yetkisi: yükleyen kişi, organizasyon sahibi ya da departman yöneticisi. */
-  private async isDepartmentManagerOrOwner(departmentId: string, userId: string): Promise<boolean> {
+  private async isFlatManagerOrOwner(scope: FlatScope, userId: string): Promise<boolean> {
+    if (scope.kind === "organization") {
+      // Şirket kapsamında "yönetici" ayrı bir rol değil: sahibi tek yetkilidir.
+      const { data: org } = await this.supabase.client
+        .from("organizations")
+        .select("owner_id")
+        .eq("id", scope.id)
+        .maybeSingle();
+      return org?.owner_id === userId;
+    }
+
+    const departmentId = scope.id;
     const { data: dept } = await this.supabase.client
       .from("departments")
       .select("organization_id")
@@ -439,6 +554,43 @@ export class FilesService {
     return Boolean(managerRow);
   }
 
+  /**
+   * Hedefin (iş/departman) deposu için kısa ömürlü erişim jetonu.
+   *
+   * Google Picker tarayıcıda çalışıyor ve seçilen dosya hedef klasöre KOPYALANIRKEN
+   * hedefin jetonu kullanılıyor (bkz. importForDepartment). İki jeton farklı
+   * hesaplara aitse kopyalama kaynağı göremez — bu yüzden Picker da hedefin
+   * hesabıyla açılmak zorunda.
+   */
+  async pickerTokenForTarget(
+    userId: string,
+    target: { jobId?: string; departmentId?: string; organizationId?: string }
+  ): Promise<{ accessToken: string; expiresInSeconds: number; provider: StorageProvider }> {
+    let provider: StorageProvider;
+    let accountId: string;
+
+    if (target.departmentId || target.organizationId) {
+      const scope: FlatScope = target.departmentId
+        ? { kind: "department", id: target.departmentId }
+        : { kind: "organization", id: target.organizationId! };
+      await this.assertFlatAccess(scope, userId);
+      ({ provider, accountId } = await this.ensureFlatStorage(scope, userId));
+    } else if (target.jobId) {
+      await this.assertJobAccess(target.jobId, userId);
+      ({ provider, accountId } = await this.ensureJobStorage(target.jobId, userId));
+    } else {
+      throw new BadRequestException("jobId, departmentId ya da organizationId gerekli");
+    }
+
+    if (provider !== "google") {
+      throw new BadRequestException("Bu hedef OneDrive kullanıyor; dosya seçimi OneDrive penceresiyle yapılır.");
+    }
+
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    // 3000 sn: jetonun ömrü 1 saat, Picker açıkken sona ermesin diye pay bırakılıyor.
+    return { accessToken, expiresInSeconds: 3000, provider };
+  }
+
   // ============================================================ depolama sahibi
 
   /**
@@ -447,10 +599,80 @@ export class FilesService {
    * İş başına TEK hesap: her üye kendi Drive'ına/OneDrive'ına yükleseydi, o üye
    * ekipten ayrıldığında işin dosyalarının bir kısmı erişilemez hâle gelirdi.
    *
-   * Sağlayıcı seçimi (Google mı OneDrive mı) iş kurulurken bir kez belirlenir:
-   * aday kullanıcının hangi sağlayıcıda hazır bir hesabı varsa o kullanılır
-   * (bkz. CloudStorageService.findAccountForUser — Google öncelikli).
+   * Sağlayıcı ve hesap seçimi iş kurulurken bir kez belirlenir, sırayla:
+   *   1. İş bir şirkete bağlıysa ŞİRKETİN seçtiği depo hesabı (organization_storage)
+   *   2. Yoksa iş sahibinin varsayılan hesabı
+   *   3. O da yoksa işlemi yapan kullanıcınınki
+   * (2 ve 3'te sağlayıcı CloudStorageService.findAccountForUser ile, Google öncelikli.)
    */
+  /**
+   * Şirketin seçtiği depo hesabı (varsa) — bkz. OrganizationStorageService.
+   *
+   * Seçim var ama hesap kullanılamaz durumdaysa (kullanıcı Drive iznini
+   * geri çekmiş) `undefined` döner ve çağıran eski akışa düşer. Alternatif,
+   * şirketin bütün dosya işlemlerinin durması olurdu.
+   */
+  private async resolveOrganizationAccount(
+    organizationId?: string
+  ): Promise<{ provider: StorageProvider; account: CloudAccount } | undefined> {
+    if (!organizationId) return undefined;
+
+    const binding = await this.orgStorage.find(organizationId);
+    if (!binding) return undefined;
+
+    const account = await this.cloudStorage.findById(binding.provider, binding.accountId);
+    if (!this.cloudStorage.isDriveReady(binding.provider, account)) {
+      this.logger.warn(
+        `Şirketin depo hesabı kullanılamıyor (organization=${organizationId}); varsayılan hesaba düşülüyor.`
+      );
+      return undefined;
+    }
+    return { provider: binding.provider, account: account! };
+  }
+
+  /**
+   * İş/departman klasörünün açılacağı kök klasör.
+   *
+   * Şirketin AÇIK bir depo seçimi varsa kök, o hesabın "Projelio" klasörünün
+   * altındaki ŞİRKET klasörüdür: kullanıcı zaten dosyalarını ayırmak istediği
+   * için bu seçimi yapmıştır, hepsini tek düzlemde toplamak amacı boşa
+   * çıkarırdı. Seçim yoksa eski davranış — doğrudan "Projelio" kökü.
+   */
+  private async ensureScopeRoot(params: {
+    provider: StorageProvider;
+    account: CloudAccount;
+    accessToken: string;
+    organizationId?: string;
+  }): Promise<string> {
+    const { provider, account, accessToken, organizationId } = params;
+
+    const root =
+      account.rootFolderId ?? (await this.cloudStorage.ensureRootFolder(provider, accessToken)).id;
+    if (!account.rootFolderId) await this.cloudStorage.setRootFolderId(provider, account.id, root);
+
+    if (!organizationId) return root;
+    const binding = await this.orgStorage.find(organizationId);
+    // Seçim yoksa ya da bu hesap şirketin seçtiği hesap değilse şirket klasörü
+    // açılmaz: başka bir hesaba şirket adında klasör açmak kafa karıştırırdı.
+    if (!binding || binding.accountId !== account.id) return root;
+    if (binding.folderId) return binding.folderId;
+
+    const { data: org } = await this.supabase.client
+      .from("organizations")
+      .select("name")
+      .eq("id", organizationId)
+      .maybeSingle();
+
+    const folder = await this.cloudStorage.findOrCreateFolder(
+      provider,
+      accessToken,
+      org?.name || "Şirket",
+      root
+    );
+    await this.orgStorage.setFolder(organizationId, folder.id, folder.webViewLink);
+    return folder.id;
+  }
+
   private async ensureJobStorage(
     jobId: string,
     actingUserId: string
@@ -468,16 +690,19 @@ export class FilesService {
 
     const { data: job, error: jobError } = await this.supabase.client
       .from("jobs")
-      .select("owner_id, title")
+      .select("owner_id, title, organization_id")
       .eq("id", jobId)
       .maybeSingle();
     if (jobError) throw jobError;
     if (!job) throw new NotFoundException("İş bulunamadı");
 
-    // Önce iş sahibinin bulut hesabı; bağlı değilse işlemi yapan kullanıcınınki.
+    // Şirketin açık depo seçimi her şeyin önünde: "şirketimin dosyaları benim
+    // kişisel Drive'ıma düşmesin" talebinin karşılığı burası.
+    let resolved = await this.resolveOrganizationAccount(job.organization_id ?? undefined);
+
+    // Seçim yoksa eski davranış: önce iş sahibinin hesabı, sonra işlemi yapanınki.
     const candidates = [job.owner_id, actingUserId].filter(Boolean) as string[];
-    let resolved;
-    for (const candidateId of candidates) {
+    for (const candidateId of resolved ? [] : candidates) {
       const found = await this.cloudStorage.findAccountForUser(candidateId);
       if (found) {
         resolved = found;
@@ -493,9 +718,12 @@ export class FilesService {
 
     const accessToken = await this.cloudStorage.getAccessToken(provider, account.id);
 
-    const root =
-      account.rootFolderId ?? (await this.cloudStorage.ensureRootFolder(provider, accessToken)).id;
-    if (!account.rootFolderId) await this.cloudStorage.setRootFolderId(provider, account.id, root);
+    const root = await this.ensureScopeRoot({
+      provider,
+      account,
+      accessToken,
+      organizationId: job.organization_id ?? undefined,
+    });
 
     const jobFolder = await this.cloudStorage.findOrCreateFolder(provider, accessToken, job.title || "İş", root);
 
@@ -517,46 +745,62 @@ export class FilesService {
   }
 
   /**
-   * Departmanın dosyalarının tutulacağı bulut hesabını ve DÜZ (alt klasörsüz)
-   * klasörünü döndürür; yoksa kurar.
+   * Düz kapsamın (departman ya da şirket) dosyalarının tutulacağı bulut hesabını
+   * ve DÜZ (alt klasörsüz) klasörünü döndürür; yoksa kurar.
    *
-   * İş modelinden farkı: departmanın altında proje/görev/çıktı hiyerarşisi yok,
-   * bu yüzden tek bir klasör yeterli — job_folders'a karşılık gelen bir tabloya
-   * gerek kalmıyor.
+   * İş modelinden farkı: bu kapsamların altında proje/görev/çıktı hiyerarşisi
+   * yok, bu yüzden tek bir klasör yeterli — job_folders'a karşılık gelen bir
+   * tabloya gerek kalmıyor.
+   *
+   * Hesap seçimi sırası: şirketin AÇIK seçimi (organization_storage) > şirket
+   * sahibinin varsayılan hesabı > işlemi yapan kullanıcınınki.
    */
-  private async ensureDepartmentStorage(
-    departmentId: string,
+  private async ensureFlatStorage(
+    scope: FlatScope,
     actingUserId: string
   ): Promise<{ provider: StorageProvider; accountId: string; folderId: string }> {
+    const tables = this.flatTables(scope);
+
     const { data: existing, error } = await this.supabase.client
-      .from("department_storage")
+      .from(tables.storage)
       .select()
-      .eq("department_id", departmentId)
+      .eq(tables.idColumn, scope.id)
       .maybeSingle();
     if (error) throw error;
-    if (existing) {
+
+    // Şirkette satırın VARLIĞI yetmez: kullanıcı hesabı seçmiş ama henüz dosya
+    // eklememiş olabilir, o durumda klasör hâlâ açılmamıştır (bkz. migration 088).
+    if (existing && (scope.kind === "department" || existing.drive_folder_id)) {
       const owner = storageOwner(existing);
       return { ...owner, folderId: existing.drive_folder_id };
     }
 
-    const { data: dept, error: deptError } = await this.supabase.client
-      .from("departments")
-      .select("name, organization_id")
-      .eq("id", departmentId)
-      .maybeSingle();
-    if (deptError) throw deptError;
-    if (!dept) throw new NotFoundException("Departman bulunamadı");
+    // Kapsamın bağlı olduğu şirket ve o şirketin "sahibi" — hesap adaylarının sırası buradan çıkıyor.
+    let organizationId: string | undefined;
+    let folderName = "Departman";
+    if (scope.kind === "organization") {
+      organizationId = scope.id;
+    } else {
+      const { data: dept, error: deptError } = await this.supabase.client
+        .from("departments")
+        .select("name, organization_id")
+        .eq("id", scope.id)
+        .maybeSingle();
+      if (deptError) throw deptError;
+      if (!dept) throw new NotFoundException("Departman bulunamadı");
+      organizationId = dept.organization_id ?? undefined;
+      folderName = dept.name || "Departman";
+    }
 
-    const { data: org } = await this.supabase.client
-      .from("organizations")
-      .select("owner_id")
-      .eq("id", dept.organization_id)
-      .maybeSingle();
+    const { data: org } = organizationId
+      ? await this.supabase.client.from("organizations").select("owner_id").eq("id", organizationId).maybeSingle()
+      : { data: null as any };
 
-    // Önce organizasyon sahibinin bulut hesabı; bağlı değilse işlemi yapan kullanıcınınki.
+    // Şirketin açık depo seçimi önce gelir; yoksa eski davranış (sahibin hesabı).
+    let resolved = await this.resolveOrganizationAccount(organizationId);
+
     const candidates = [org?.owner_id, actingUserId].filter(Boolean) as string[];
-    let resolved;
-    for (const candidateId of candidates) {
+    for (const candidateId of resolved ? [] : candidates) {
       const found = await this.cloudStorage.findAccountForUser(candidateId);
       if (found) {
         resolved = found;
@@ -565,38 +809,60 @@ export class FilesService {
     }
     if (!resolved) {
       throw new DriveNotConnectedError(
-        "Bu departmanda dosya saklamak için önce bir Google Drive ya da OneDrive hesabı bağlanmalı. Ayarlar > Bağlı hesaplar."
+        scope.kind === "organization"
+          ? "Bu şirkette dosya saklamak için önce bir Google Drive ya da OneDrive hesabı bağlanmalı. Ayarlar > Bağlı hesaplar."
+          : "Bu departmanda dosya saklamak için önce bir Google Drive ya da OneDrive hesabı bağlanmalı. Ayarlar > Bağlı hesaplar."
       );
     }
     const { provider, account } = resolved;
 
     const accessToken = await this.cloudStorage.getAccessToken(provider, account.id);
 
-    const root =
-      account.rootFolderId ?? (await this.cloudStorage.ensureRootFolder(provider, accessToken)).id;
-    if (!account.rootFolderId) await this.cloudStorage.setRootFolderId(provider, account.id, root);
+    if (scope.kind === "organization") {
+      // Seçim yapılmamışsa burada ÖRTÜK olarak yapılır: ilk dosyanın düştüğü
+      // hesap şirketin hesabı sayılır. Eskiden bu karar da örtüktü ama hiçbir
+      // yerde görünmüyordu; artık şirket ayarlarında görünüp değiştirilebiliyor.
+      if (!existing) {
+        const { error: bindError } = await this.supabase.client.from("organization_storage").insert({
+          organization_id: scope.id,
+          ...storageAccountColumns(provider, account.id),
+        });
+        if (bindError && (bindError as any).code !== "23505") throw bindError;
+      }
 
-    const deptFolder = await this.cloudStorage.findOrCreateFolder(
-      provider,
-      accessToken,
-      dept.name || "Departman",
-      root
-    );
+      // ensureScopeRoot, şirketin adını taşıyan klasörü açar ve kimliğini
+      // organization_storage'a yazar — şirket kapsamında HEDEF klasör budur.
+      const folderId = await this.ensureScopeRoot({
+        provider,
+        account,
+        accessToken,
+        organizationId: scope.id,
+      });
+
+      void this.syncFlatShares(scope).catch((err) =>
+        this.logger.warn(`Bulut paylaşımları eşitlenemedi (organization=${scope.id}): ${String(err)}`)
+      );
+
+      return { provider, accountId: account.id, folderId };
+    }
+
+    const root = await this.ensureScopeRoot({ provider, account, accessToken, organizationId });
+    const folder = await this.cloudStorage.findOrCreateFolder(provider, accessToken, folderName, root);
 
     const { error: insertError } = await this.supabase.client.from("department_storage").insert({
-      department_id: departmentId,
+      department_id: scope.id,
       ...storageAccountColumns(provider, account.id),
-      drive_folder_id: deptFolder.id,
-      folder_web_view_link: deptFolder.webViewLink ?? null,
+      drive_folder_id: folder.id,
+      folder_web_view_link: folder.webViewLink ?? null,
     });
     // Eşzamanlı iki yükleme aynı anda kurulum yapmış olabilir; ilk kazananın kaydıyla devam ederiz.
     if (insertError && (insertError as any).code !== "23505") throw insertError;
 
-    void this.syncDepartmentShares(departmentId).catch((err) =>
-      this.logger.warn(`Bulut paylaşımları eşitlenemedi (department=${departmentId}): ${String(err)}`)
+    void this.syncFlatShares(scope).catch((err) =>
+      this.logger.warn(`Bulut paylaşımları eşitlenemedi (department=${scope.id}): ${String(err)}`)
     );
 
-    return { provider, accountId: account.id, folderId: deptFolder.id };
+    return { provider, accountId: account.id, folderId: folder.id };
   }
 
   /**
@@ -918,36 +1184,28 @@ export class FilesService {
    * İş modelinden farkı: tek seviye — departmanın onaylı her kadro üyesi (+
    * organizasyon sahibi) klasörün TAMAMINA izinlidir, proje bazlı alt izin yok.
    */
-  async syncDepartmentShares(departmentId: string): Promise<{ granted: number; revoked: number }> {
+  async syncFlatShares(scope: FlatScope): Promise<{ granted: number; revoked: number }> {
+    const tables = this.flatTables(scope);
+
     const { data: storage } = await this.supabase.client
-      .from("department_storage")
+      .from(tables.storage)
       .select()
-      .eq("department_id", departmentId)
+      .eq(tables.idColumn, scope.id)
       .maybeSingle();
-    if (!storage) return { granted: 0, revoked: 0 };
+    // Şirkette satır klasörsüz olabilir (hesap seçilmiş, henüz dosya eklenmemiş):
+    // paylaşılacak bir klasör yoksa yapacak bir şey de yok.
+    if (!storage?.drive_folder_id) return { granted: 0, revoked: 0 };
 
     const { provider, accountId } = storageOwner(storage);
     const ownerAccount = await this.cloudStorage.findById(provider, accountId);
     if (!this.cloudStorage.isDriveReady(provider, ownerAccount)) return { granted: 0, revoked: 0 };
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
 
-    const { data: dept } = await this.supabase.client
-      .from("departments")
-      .select("organization_id")
-      .eq("id", departmentId)
-      .maybeSingle();
-
-    const [{ data: org }, { data: members }, { data: grants }] = await Promise.all([
-      dept
-        ? this.supabase.client.from("organizations").select("owner_id").eq("id", dept.organization_id).maybeSingle()
-        : Promise.resolve({ data: null as any }),
-      this.supabase.client.from("department_members").select("user_id").eq("department_id", departmentId).eq("status", "approved"),
-      this.supabase.client.from("department_folder_grants").select().eq("department_id", departmentId),
+    const [eligible, { data: grants }] = await Promise.all([
+      this.flatEligibleUserIds(scope),
+      this.supabase.client.from(tables.grants).select().eq(tables.idColumn, scope.id),
     ]);
 
-    const eligible = new Set<string>();
-    if (org?.owner_id) eligible.add(org.owner_id);
-    for (const m of members ?? []) if (m.user_id) eligible.add(m.user_id);
     // Depolama sahibi dosyaların gerçek sahibi; kendine izin vermeye gerek yok.
     eligible.delete(ownerAccount!.userId);
 
@@ -961,15 +1219,15 @@ export class FilesService {
       } catch (err) {
         this.logger.warn(`İzin geri alınamadı (grant=${grant.id}): ${String(err)}`);
       }
-      await this.supabase.client.from("department_folder_grants").delete().eq("id", grant.id);
+      await this.supabase.client.from(tables.grants).delete().eq("id", grant.id);
       revoked += 1;
     }
 
     const existingGrants = new Set((grants ?? []).map((g: any) => g.user_id));
     for (const userId of eligible) {
       if (existingGrants.has(userId)) continue;
-      granted += await this.grantOneDepartment(provider, accessToken, {
-        departmentId,
+      granted += await this.grantOneFlat(provider, accessToken, {
+        scope,
         userId,
         driveFileId: storage.drive_folder_id,
       });
@@ -978,14 +1236,20 @@ export class FilesService {
     return { granted, revoked };
   }
 
-  private async grantOneDepartment(
+  /** Eski ad; denetleyici bunu çağırıyor. */
+  async syncDepartmentShares(departmentId: string): Promise<{ granted: number; revoked: number }> {
+    return this.syncFlatShares({ kind: "department", id: departmentId });
+  }
+
+  private async grantOneFlat(
     provider: StorageProvider,
     accessToken: string,
-    params: { departmentId: string; userId: string; driveFileId: string }
+    params: { scope: FlatScope; userId: string; driveFileId: string }
   ): Promise<number> {
     const account = await this.cloudStorage.findByUserId(provider, params.userId);
     if (!account) return 0; // Bu sağlayıcıda hesabı yok: proxy ile erişmeye devam eder
 
+    const tables = this.flatTables(params.scope);
     try {
       const { permissionId } = await this.cloudStorage.grantPermission(
         provider,
@@ -994,8 +1258,8 @@ export class FilesService {
         account.email,
         "writer"
       );
-      await this.supabase.client.from("department_folder_grants").insert({
-        department_id: params.departmentId,
+      await this.supabase.client.from(tables.grants).insert({
+        [tables.idColumn]: params.scope.id,
         user_id: params.userId,
         granted_email: account.email,
         drive_file_id: params.driveFileId,
@@ -1009,11 +1273,13 @@ export class FilesService {
     }
   }
 
-  private async canEditInDriveForDepartment(departmentId: string, userId: string): Promise<boolean> {
+  private async canEditInDriveForFlat(scope: FlatScope, userId: string): Promise<boolean> {
+    const tables = this.flatTables(scope);
+
     const { data: storage } = await this.supabase.client
-      .from("department_storage")
+      .from(tables.storage)
       .select("storage_provider, google_account_id, microsoft_account_id")
-      .eq("department_id", departmentId)
+      .eq(tables.idColumn, scope.id)
       .maybeSingle();
     if (!storage) return false;
 
@@ -1022,9 +1288,9 @@ export class FilesService {
     if (ownerAccount?.userId === userId) return true;
 
     const { data: grant } = await this.supabase.client
-      .from("department_folder_grants")
+      .from(tables.grants)
       .select("id")
-      .eq("department_id", departmentId)
+      .eq(tables.idColumn, scope.id)
       .eq("user_id", userId)
       .maybeSingle();
     return Boolean(grant);
@@ -1086,20 +1352,25 @@ export class FilesService {
   }
 
   /** Departman ekranı: dosyalar düz bir listedir, iş hiyerarşisindeki alt bağlam yok. */
-  async listByDepartment(departmentId: string, userId: string): Promise<ProjectFile[]> {
-    await this.assertDepartmentAccess(departmentId, userId);
+  async listByFlat(scope: FlatScope, userId: string): Promise<ProjectFile[]> {
+    await this.assertFlatAccess(scope, userId);
+    const tables = this.flatTables(scope);
 
     const { data, error } = await this.supabase.client
       .from("files")
       .select()
-      .eq("department_id", departmentId)
+      .eq(tables.idColumn, scope.id)
       .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(LISTE_TAVANI);
     if (error) throw error;
 
-    const canEdit = await this.canEditInDriveForDepartment(departmentId, userId);
+    const canEdit = await this.canEditInDriveForFlat(scope, userId);
     return (data ?? []).map((row: any) => mapFile(row, canEdit));
+  }
+
+  async listByDepartment(departmentId: string, userId: string): Promise<ProjectFile[]> {
+    return this.listByFlat({ kind: "department", id: departmentId }, userId);
   }
 
   // ------------------------------------------------- hiyerarşi: org / grup
@@ -1125,12 +1396,38 @@ export class FilesService {
       (org.group_id ? await this.hasGroupAccess(org.group_id, userId) : false);
     if (!allowed) throw new ForbiddenException("Bu organizasyonun dosyalarına erişim yetkiniz yok");
 
-    const { data: jobs } = await this.supabase.client
-      .from("jobs")
-      .select("id")
-      .eq("organization_id", organizationId);
+    const scope: FlatScope = { kind: "organization", id: organizationId };
 
-    return this.listForJobIds((jobs ?? []).map((j: any) => j.id), userId);
+    const [{ data: jobs }, own, canEdit] = await Promise.all([
+      this.supabase.client.from("jobs").select("id").eq("organization_id", organizationId),
+      // Şirketin KENDİ dosyaları (migration 089). Erişim yukarıda doğrulandı;
+      // listByFlat'ı çağırmak aynı kontrolü ikinci kez yapardı.
+      //
+      // Migration uygulanmadan dağıtım yapılırsa `files.organization_id` kolonu
+      // yoktur. Bu sekme eskiden de çalışıyordu (işlerin dosyalarını topluyordu);
+      // kolon yok diye tamamen patlaması, çalışan bir ekranı bozmak olurdu.
+      this.supabase.client
+        .from("files")
+        .select()
+        .eq("organization_id", organizationId)
+        .is("archived_at", null)
+        .order("created_at", { ascending: false })
+        .limit(LISTE_TAVANI)
+        .then(({ data, error }) => {
+          if (error) {
+            this.logger.warn(`Şirket dosyaları okunamadı (migration 089 uygulandı mı?): ${error.message}`);
+            return [] as any[];
+          }
+          return data ?? [];
+        }),
+      this.canEditInDriveForFlat(scope, userId).catch(() => false),
+    ]);
+
+    const jobFiles = await this.listForJobIds((jobs ?? []).map((j: any) => j.id), userId);
+
+    // Şirketin kendi dosyaları önce: sekmeyi açan kişi çoğu zaman oraya koyduğu
+    // dosyayı arıyor, işlerin dosyaları arasında kaybolmasın.
+    return [...own.map((row: any) => mapFile(row, canEdit)), ...jobFiles];
   }
 
   /**
@@ -1347,9 +1644,11 @@ export class FilesService {
     if (error) throw error;
     if (!row) throw new NotFoundException("Dosya bulunamadı");
 
-    if (row.department_id) {
-      await this.assertDepartmentAccess(row.department_id, userId);
-      return { row, file: mapFile(row, await this.canEditInDriveForDepartment(row.department_id, userId)) };
+    // Düz kapsam (departman ya da şirket): erişim ve düzenleme hakkı aynı yoldan.
+    const flat = flatScopeOfRow(row);
+    if (flat) {
+      await this.assertFlatAccess(flat, userId);
+      return { row, file: mapFile(row, await this.canEditInDriveForFlat(flat, userId)) };
     }
 
     const access = await this.assertJobAccess(row.job_id, userId);
@@ -1430,8 +1729,8 @@ export class FilesService {
    * Departman ekranından yükleme. İş modelinden farkı: bağlam yok (proje/görev/
    * çıktı), dosya doğrudan departmanın düz klasörüne gider.
    */
-  async uploadInlineForDepartment(
-    departmentId: string,
+  async uploadInlineForFlat(
+    scope: FlatScope,
     userId: string,
     file: Express.Multer.File
   ): Promise<ProjectFile> {
@@ -1441,9 +1740,9 @@ export class FilesService {
         "Bu dosya doğrudan yükleme için çok büyük; parçalı yükleme akışını kullanın."
       );
     }
-    await this.assertDepartmentAccess(departmentId, userId);
+    await this.assertFlatAccess(scope, userId);
 
-    const { provider, accountId, folderId } = await this.ensureDepartmentStorage(departmentId, userId);
+    const { provider, accountId, folderId } = await this.ensureFlatStorage(scope, userId);
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
     const uploaded = await this.cloudStorage.uploadMultipart(
       provider,
@@ -1456,18 +1755,26 @@ export class FilesService {
       file.buffer
     );
 
-    return this.persistDepartmentFile(departmentId, userId, provider, accountId, uploaded);
+    return this.persistFlatFile(scope, userId, provider, accountId, uploaded);
   }
 
-  async createUploadSessionForDepartment(
+  async uploadInlineForDepartment(
     departmentId: string,
+    userId: string,
+    file: Express.Multer.File
+  ): Promise<ProjectFile> {
+    return this.uploadInlineForFlat({ kind: "department", id: departmentId }, userId, file);
+  }
+
+  async createUploadSessionForFlat(
+    scope: FlatScope,
     userId: string,
     payload: { name: string; mimeType: string; sizeBytes?: number }
   ): Promise<{ sessionId: string; uploadUrl: string }> {
     if (!payload?.name) throw new BadRequestException("Dosya adı gerekli");
-    await this.assertDepartmentAccess(departmentId, userId);
+    await this.assertFlatAccess(scope, userId);
 
-    const { provider, accountId, folderId } = await this.ensureDepartmentStorage(departmentId, userId);
+    const { provider, accountId, folderId } = await this.ensureFlatStorage(scope, userId);
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
     const uploadUrl = await this.cloudStorage.createResumableSession(provider, accessToken, {
       name: this.safeFileName(payload.name),
@@ -1476,10 +1783,11 @@ export class FilesService {
       sizeBytes: payload.sizeBytes,
     });
 
+    const tables = this.flatTables(scope);
     const { data: row, error } = await this.supabase.client
       .from("file_upload_sessions")
       .insert({
-        department_id: departmentId,
+        [tables.idColumn]: scope.id,
         user_id: userId,
         resumable_uri: uploadUrl,
         name: payload.name,
@@ -1491,6 +1799,14 @@ export class FilesService {
     if (error) throw error;
 
     return { sessionId: row.id, uploadUrl };
+  }
+
+  async createUploadSessionForDepartment(
+    departmentId: string,
+    userId: string,
+    payload: { name: string; mimeType: string; sizeBytes?: number }
+  ): Promise<{ sessionId: string; uploadUrl: string }> {
+    return this.createUploadSessionForFlat({ kind: "department", id: departmentId }, userId, payload);
   }
 
   async createUploadSession(
@@ -1586,12 +1902,13 @@ export class FilesService {
     // bir hata göstermek olurdu.
     if (session.completed_at) return { status: "discarded" };
 
-    const storage = session.department_id
+    const flat = flatScopeOfRow(session);
+    const storage = flat
       ? (
           await this.supabase.client
-            .from("department_storage")
+            .from(this.flatTables(flat).storage)
             .select()
-            .eq("department_id", session.department_id)
+            .eq(this.flatTables(flat).idColumn, flat.id)
             .maybeSingle()
         ).data
       : (
@@ -1650,15 +1967,17 @@ export class FilesService {
     if (session.user_id !== userId) throw new ForbiddenException("Bu yükleme oturumu size ait değil");
     if (session.completed_at) throw new BadRequestException("Bu yükleme zaten tamamlanmış");
 
-    if (session.department_id) {
-      await this.assertDepartmentAccess(session.department_id, userId);
+    const flat = flatScopeOfRow(session);
+    if (flat) {
+      await this.assertFlatAccess(flat, userId);
 
+      const tables = this.flatTables(flat);
       const { data: storage } = await this.supabase.client
-        .from("department_storage")
+        .from(tables.storage)
         .select()
-        .eq("department_id", session.department_id)
+        .eq(tables.idColumn, flat.id)
         .maybeSingle();
-      if (!storage) throw new BadRequestException("Departman depolaması bulunamadı");
+      if (!storage?.drive_folder_id) throw new BadRequestException("Bu alanın dosya deposu bulunamadı");
 
       const { provider, accountId } = storageOwner(storage);
       const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
@@ -1669,7 +1988,7 @@ export class FilesService {
         .update({ completed_at: new Date().toISOString() })
         .eq("id", sessionId);
 
-      return this.persistDepartmentFile(session.department_id, userId, provider, accountId, driveFile);
+      return this.persistFlatFile(flat, userId, provider, accountId, driveFile);
     }
 
     const access = await this.assertJobAccess(session.job_id, userId);
@@ -1703,8 +2022,8 @@ export class FilesService {
     );
   }
 
-  private async persistDepartmentFile(
-    departmentId: string,
+  private async persistFlatFile(
+    scope: FlatScope,
     userId: string,
     provider: StorageProvider,
     accountId: string,
@@ -1718,10 +2037,11 @@ export class FilesService {
       md5Checksum?: string;
     }
   ): Promise<ProjectFile> {
+    const tables = this.flatTables(scope);
     const { data: row, error } = await this.supabase.client
       .from("files")
       .insert({
-        department_id: departmentId,
+        [tables.idColumn]: scope.id,
         uploaded_by: userId,
         ...storageAccountColumns(provider, accountId),
         name: driveFile.name,
@@ -1739,10 +2059,10 @@ export class FilesService {
       .single();
     if (error) throw error;
 
-    void this.notifyDepartmentNewFile(departmentId, driveFile.name, userId);
-    void this.syncDepartmentShares(departmentId).catch(() => undefined);
+    void this.notifyFlatNewFile(scope, driveFile.name, userId);
+    void this.syncFlatShares(scope).catch(() => undefined);
 
-    return mapFile(row, await this.canEditInDriveForDepartment(departmentId, userId));
+    return mapFile(row, await this.canEditInDriveForFlat(scope, userId));
   }
 
   private async persist(
@@ -1828,16 +2148,24 @@ export class FilesService {
     return this.browseForJob(jobId, userId, folderId);
   }
 
+  async browseForFlat(
+    scope: FlatScope,
+    userId: string,
+    folderId?: string
+  ): Promise<{ provider: StorageProvider; entries: DriveBrowseEntry[] }> {
+    await this.assertFlatAccess(scope, userId);
+    const { provider, accountId } = await this.ensureFlatStorage(scope, userId);
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    const files = await this.cloudStorage.listFiles(provider, accessToken, folderId);
+    return { provider, entries: files.map(toBrowseEntry) };
+  }
+
   async browseForDepartment(
     departmentId: string,
     userId: string,
     folderId?: string
   ): Promise<{ provider: StorageProvider; entries: DriveBrowseEntry[] }> {
-    await this.assertDepartmentAccess(departmentId, userId);
-    const { provider, accountId } = await this.ensureDepartmentStorage(departmentId, userId);
-    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
-    const files = await this.cloudStorage.listFiles(provider, accessToken, folderId);
-    return { provider, entries: files.map(toBrowseEntry) };
+    return this.browseForFlat({ kind: "department", id: departmentId }, userId, folderId);
   }
 
   /**
@@ -1849,12 +2177,12 @@ export class FilesService {
    * kaldırdığı dosyayı yeniden eklemek istemiştir.
    */
   private async existingImport(
-    scope: { jobId?: string; departmentId?: string },
+    scope: { jobId?: string; flat?: FlatScope },
     driveFileId: string
   ): Promise<any | null> {
     let query = this.supabase.client.from("files").select().eq("drive_file_id", driveFileId);
-    query = scope.departmentId
-      ? query.eq("department_id", scope.departmentId)
+    query = scope.flat
+      ? query.eq(this.flatTables(scope.flat).idColumn, scope.flat.id)
       : query.eq("job_id", scope.jobId!);
 
     const { data, error } = await query.limit(1).maybeSingle();
@@ -1926,25 +2254,25 @@ export class FilesService {
     return this.importForJob(jobId, userId, sourceFileId, { ...opts, projectId });
   }
 
-  async importForDepartment(
-    departmentId: string,
+  async importForFlat(
+    scope: FlatScope,
     userId: string,
     sourceFileId: string,
     name?: string
   ): Promise<ProjectFile> {
     if (!sourceFileId) throw new BadRequestException("sourceFileId gerekli");
-    await this.assertDepartmentAccess(departmentId, userId);
+    await this.assertFlatAccess(scope, userId);
 
-    const existing = await this.existingImport({ departmentId }, sourceFileId);
+    const existing = await this.existingImport({ flat: scope }, sourceFileId);
     if (existing) {
-      return mapFile(existing, await this.canEditInDriveForDepartment(departmentId, userId));
+      return mapFile(existing, await this.canEditInDriveForFlat(scope, userId));
     }
 
-    const { provider, accountId, folderId } = await this.ensureDepartmentStorage(departmentId, userId);
+    const { provider, accountId, folderId } = await this.ensureFlatStorage(scope, userId);
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
     const source = await this.cloudStorage.getFile(provider, accessToken, sourceFileId);
 
-    // Dosya zaten departman klasöründeyse kopyalanmıyor (bkz. importForJob).
+    // Dosya zaten hedef klasördeyse kopyalanmıyor (bkz. importForJob).
     const stored = source.parentIds?.includes(folderId)
       ? source
       : await this.cloudStorage.copyFile(
@@ -1955,7 +2283,16 @@ export class FilesService {
           name ? this.safeFileName(name) : undefined
         );
 
-    return this.persistDepartmentFile(departmentId, userId, provider, accountId, stored);
+    return this.persistFlatFile(scope, userId, provider, accountId, stored);
+  }
+
+  async importForDepartment(
+    departmentId: string,
+    userId: string,
+    sourceFileId: string,
+    name?: string
+  ): Promise<ProjectFile> {
+    return this.importForFlat({ kind: "department", id: departmentId }, userId, sourceFileId, name);
   }
 
   async createNativeForJob(
@@ -1999,16 +2336,16 @@ export class FilesService {
     return this.createNativeForJob(jobId, userId, kind, name, { ...opts, projectId });
   }
 
-  async createNativeForDepartment(
-    departmentId: string,
+  async createNativeForFlat(
+    scope: FlatScope,
     userId: string,
     kind: NativeFileKind,
     name: string
   ): Promise<ProjectFile> {
     if (!name?.trim()) throw new BadRequestException("Dosya adı gerekli");
-    await this.assertDepartmentAccess(departmentId, userId);
+    await this.assertFlatAccess(scope, userId);
 
-    const { provider, accountId, folderId } = await this.ensureDepartmentStorage(departmentId, userId);
+    const { provider, accountId, folderId } = await this.ensureFlatStorage(scope, userId);
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
     const created = await this.cloudStorage.createNativeFile(
       provider,
@@ -2018,7 +2355,16 @@ export class FilesService {
       folderId
     );
 
-    return this.persistDepartmentFile(departmentId, userId, provider, accountId, created);
+    return this.persistFlatFile(scope, userId, provider, accountId, created);
+  }
+
+  async createNativeForDepartment(
+    departmentId: string,
+    userId: string,
+    kind: NativeFileKind,
+    name: string
+  ): Promise<ProjectFile> {
+    return this.createNativeForFlat({ kind: "department", id: departmentId }, userId, kind, name);
   }
 
   // ============================================================ indirme
@@ -2095,8 +2441,9 @@ export class FilesService {
     const { row } = await this.findById(fileId, userId);
 
     const isUploader = row.uploaded_by === userId;
-    const isOwner = row.department_id
-      ? await this.isDepartmentManagerOrOwner(row.department_id, userId)
+    const flat = flatScopeOfRow(row);
+    const isOwner = flat
+      ? await this.isFlatManagerOrOwner(flat, userId)
       : await this.isJobOwner(row.job_id, userId);
     if (!isUploader && !isOwner) {
       throw new ForbiddenException("Bu dosyayı yalnızca yükleyen kişi veya sahibi/yöneticisi kaldırabilir");
@@ -2166,35 +2513,19 @@ export class FilesService {
     }
   }
 
-  private async notifyDepartmentNewFile(departmentId: string, fileName: string, uploaderId: string): Promise<void> {
+  private async notifyFlatNewFile(scope: FlatScope, fileName: string, uploaderId: string): Promise<void> {
     try {
-      const { data: dept } = await this.supabase.client
-        .from("departments")
-        .select("organization_id")
-        .eq("id", departmentId)
-        .maybeSingle();
-
-      const [{ data: org }, { data: members }] = await Promise.all([
-        dept
-          ? this.supabase.client.from("organizations").select("owner_id").eq("id", dept.organization_id).maybeSingle()
-          : Promise.resolve({ data: null as any }),
-        this.supabase.client.from("department_members").select("user_id").eq("department_id", departmentId).eq("status", "approved"),
-      ]);
-
-      const recipients = new Set<string>();
-      if (org?.owner_id) recipients.add(org.owner_id);
-      for (const m of members ?? []) if (m.user_id) recipients.add(m.user_id);
+      const recipients = await this.flatEligibleUserIds(scope);
       recipients.delete(uploaderId);
+
+      const path =
+        scope.kind === "organization"
+          ? `/organizations/${scope.id}?tab=files`
+          : `/departments/${scope.id}?tab=files`;
 
       await Promise.all(
         [...recipients].map((userId) =>
-          this.notifications.notifyUser(
-            userId,
-            "task_updated",
-            "Yeni Dosya",
-            `"${fileName}" eklendi.`,
-            `/departments/${departmentId}?tab=files`
-          )
+          this.notifications.notifyUserSafe(userId, "task_updated", "Yeni Dosya", `"${fileName}" eklendi.`, path)
         )
       );
     } catch {

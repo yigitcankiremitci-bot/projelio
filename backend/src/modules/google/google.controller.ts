@@ -35,32 +35,41 @@ export class GoogleController {
     };
   }
 
-  /** Giriş yapmış kullanıcı Drive'ı bağlarken kullanılır (incremental authorization). */
+  /**
+   * Giriş yapmış kullanıcı Drive'ı bağlarken kullanılır (incremental authorization).
+   *
+   * Sağlayıcılar artık BİRBİRİNİ DIŞLAMIYOR: kullanıcı hem Drive hem OneDrive
+   * bağlayabilir, hangisinin kullanılacağı şirket/departman/iş bazında seçilir
+   * (bkz. migration 088, organization_storage). Eskiden burada "OneDrive bağlıysa
+   * Drive'ı bağlayamazsın" kilidi vardı; tek depo hesabı varsayımıyla birlikte
+   * o kilit de kalktı.
+   *
+   * `label`: ikinci bir hesap bağlarken kullanıcının verdiği ad ("Şirket Drive'ı").
+   */
   @Get("google/connect-url")
   @UseGuards(AuthGuard("jwt"))
-  async connectUrl(@Req() req: any, @Query("next") next?: string) {
+  async connectUrl(@Req() req: any, @Query("next") next?: string, @Query("label") label?: string) {
     if (!this.oauth.isDriveConfigured()) {
       return { configured: false as const, url: null };
     }
 
-    // Depolama sağlayıcısı yalnızca biri olabilir: OneDrive zaten bağlıysa
-    // kullanıcı önce onu kaldırmadan Drive'ı bağlayamaz.
-    const msAccount = await this.msAccounts.findByUserId(req.user.userId);
-    if (this.msAccounts.isDriveReady(msAccount)) {
-      return { configured: true as const, url: null, blockedBy: "microsoft" as const };
-    }
-
-    const existing = await this.accounts.findByUserId(req.user.userId);
-    const state = this.oauth.signState({ mode: "connect", userId: req.user.userId, next });
+    const existing = await this.accounts.listByUserId(req.user.userId);
+    const state = this.oauth.signState({
+      mode: "connect",
+      userId: req.user.userId,
+      next,
+      label: label?.trim() || undefined,
+    });
 
     return {
       configured: true as const,
       url: this.oauth.buildAuthUrl({
         scopes: [...LOGIN_SCOPES, DRIVE_SCOPE],
         state,
-        // Hesap seçme ekranında doğru hesabı öne çıkarır; kullanıcı yanlışlıkla
-        // ikinci bir Google hesabıyla bağlanmaya çalışmasın.
-        loginHint: existing?.email,
+        // Zaten bir hesabı varsa hesap seçme ekranı ZORUNLU: Google aksi hâlde
+        // tek oturumlu kullanıcıyı sormadan aynı hesapla geçirir ve kullanıcı
+        // "ikinci hesabı bağlayamıyorum" sanır.
+        selectAccount: existing.length > 0,
       }),
     };
   }
@@ -96,20 +105,16 @@ export class GoogleController {
       const next = parsed.next && parsed.next.startsWith("/") ? parsed.next : undefined;
 
       if (parsed.mode === "connect" && parsed.userId) {
-        // Yarış durumuna karşı: kullanıcı bu ekrana geldikten sonra başka bir
-        // sekmede OneDrive'ı bağlamış olabilir.
-        const msAccount = await this.msAccounts.findByUserId(parsed.userId);
-        if (this.msAccounts.isDriveReady(msAccount)) {
-          throw new Error(
-            "Zaten OneDrive bağlısınız. Depolama sağlayıcısını değiştirmek için önce Ayarlar'dan OneDrive bağlantısını kaldırın."
-          );
-        }
-
-        await this.googleAuth.connectToExistingUser(parsed.userId, identity, {
-          refreshToken: tokens.refresh_token,
-          scopes,
-        });
-        await this.ensureRootFolder(parsed.userId);
+        const account = await this.googleAuth.connectToExistingUser(
+          parsed.userId,
+          identity,
+          { refreshToken: tokens.refresh_token, scopes },
+          { label: parsed.label }
+        );
+        // Kök klasör YENİ bağlanan hesapta açılır. Kullanıcının varsayılan
+        // hesabına bakmak, ikinci hesap bağlayan kullanıcıda yanlış Drive'a
+        // klasör açardı.
+        await this.ensureRootFolder(account.id);
 
         const params = new URLSearchParams({ connected: "1" });
         if (next) params.set("next", next);
@@ -161,28 +166,26 @@ export class GoogleController {
       }
     }
 
-    // Depolama sağlayıcısı yalnızca biri olabilir: OneDrive zaten kullanılıyorsa
-    // ön yüz "Drive'ı bağla" düğmesini kilitli göstermeli.
-    const msAccount = driveReady ? undefined : await this.msAccounts.findByUserId(req.user.userId);
-    const lockedByOtherProvider = !driveReady && this.msAccounts.isDriveReady(msAccount);
-
     return {
       configured,
       connected: Boolean(account),
       email: account?.email,
       pictureUrl: account?.pictureUrl,
       driveReady,
-      lockedByOtherProvider,
+      // Sağlayıcılar artık birbirini dışlamıyor (bkz. connectUrl). Alan, eski
+      // istemciler "kilitli" sanmasın diye sabit false dönüyor.
+      lockedByOtherProvider: false,
       // Kullanıcı Drive'ı bağlamıştı ama erişim koptu (iptal/invalid_grant).
       needsReconnect: Boolean(account && account.driveRevokedAt),
       quota,
     };
   }
 
+  /** Belirli bir hesabı keser; gövde boşsa varsayılan hesap (eski davranış). */
   @Post("google/disconnect")
   @UseGuards(AuthGuard("jwt"))
-  async disconnect(@Req() req: any) {
-    await this.accounts.disconnectDrive(req.user.userId);
+  async disconnect(@Req() req: any, @Body("accountId") accountId?: string) {
+    await this.accounts.disconnectDrive(req.user.userId, accountId);
     return { ok: true };
   }
 
@@ -209,9 +212,9 @@ export class GoogleController {
 
   // ----------------------------------------------------------------- yardımcı
 
-  /** Kullanıcının Drive'ında "Projelio" kök klasörünü hazırlar. */
-  private async ensureRootFolder(userId: string): Promise<void> {
-    const account = await this.accounts.findByUserId(userId);
+  /** Belirtilen Drive hesabında "Projelio" kök klasörünü hazırlar. */
+  private async ensureRootFolder(accountId: string): Promise<void> {
+    const account = await this.accounts.findById(accountId);
     if (!this.accounts.isDriveReady(account)) return;
     if (account.rootFolderId) return;
 
@@ -228,6 +231,9 @@ export class GoogleController {
 
   private async ensureRootFolderByToken(jwt: string): Promise<void> {
     const payload = JSON.parse(Buffer.from(jwt.split(".")[1], "base64url").toString("utf8"));
-    if (payload?.sub) await this.ensureRootFolder(String(payload.sub));
+    if (!payload?.sub) return;
+    // Giriş akışı: izin her zaman giriş kimliği olan hesaba verilir.
+    const account = await this.accounts.findLoginIdentity(String(payload.sub));
+    if (account) await this.ensureRootFolder(account.id);
   }
 }

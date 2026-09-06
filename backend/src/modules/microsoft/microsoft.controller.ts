@@ -57,24 +57,26 @@ export class MicrosoftController {
   /** Ayarlar ekranındaki "OneDrive'ı bağla" düğmesi buradan yönlendirme adresini alır. */
   @Get("microsoft/connect-url")
   @UseGuards(AuthGuard("jwt"))
-  async connectUrl(@Req() req: any, @Query("next") next?: string) {
+  async connectUrl(@Req() req: any, @Query("next") next?: string, @Query("label") label?: string) {
     if (!this.oauth.isDriveConfigured()) {
       return { configured: false as const, url: null };
     }
 
-    // Depolama sağlayıcısı yalnızca biri olabilir: Google Drive zaten
-    // bağlıysa kullanıcı önce onu kaldırmadan OneDrive'ı bağlayamaz.
-    const googleAccount = await this.googleAccounts.findByUserId(req.user.userId);
-    if (this.googleAccounts.isDriveReady(googleAccount)) {
-      return { configured: true as const, url: null, blockedBy: "google" as const };
-    }
-
-    const existing = await this.accounts.findByUserId(req.user.userId);
-    const state = this.oauth.signState({ userId: req.user.userId, next });
+    // Sağlayıcılar artık birbirini DIŞLAMIYOR: kullanıcı hem Drive hem OneDrive
+    // bağlayabilir, hangisinin kullanılacağını şirket/departman/iş bazında seçer
+    // (bkz. migration 088). Buradaki "Google bağlıysa OneDrive'ı bağlayamazsın"
+    // kilidi tek depo hesabı varsayımının kalıntısıydı, kaldırıldı.
+    const existing = await this.accounts.listByUserId(req.user.userId);
+    const state = this.oauth.signState({ userId: req.user.userId, next, label: label?.trim() || undefined });
 
     return {
       configured: true as const,
-      url: this.oauth.buildAuthUrl({ state, loginHint: existing?.email }),
+      url: this.oauth.buildAuthUrl({
+        state,
+        // Zaten bir hesabı varsa hesap seçme ekranı zorunlu; aksi hâlde Microsoft
+        // tek oturumu sormadan kullanır ve ikinci hesap hiç bağlanamaz.
+        prompt: existing.length > 0 ? "select_account" : "consent",
+      }),
     };
   }
 
@@ -133,28 +135,16 @@ export class MicrosoftController {
       if (ownedBySomeoneElse && ownedBySomeoneElse.userId !== parsed.userId) {
         throw new Error("Bu Microsoft hesabı başka bir Projelio kullanıcısına bağlı.");
       }
-      const current = await this.accounts.findByUserId(parsed.userId);
-      if (current && current.msSub !== identity.sub) {
-        throw new Error(`Hesabınıza zaten ${current.email} bağlı. Önce mevcut bağlantıyı kaldırın.`);
-      }
-
-      // Yarış durumuna karşı: kullanıcı bu ekrana geldikten sonra başka bir
-      // sekmede Google Drive'ı bağlamış olabilir.
-      const googleAccount = await this.googleAccounts.findByUserId(parsed.userId);
-      if (this.googleAccounts.isDriveReady(googleAccount)) {
-        throw new Error(
-          "Zaten Google Drive bağlısınız. Depolama sağlayıcısını değiştirmek için önce Ayarlar'dan Drive bağlantısını kaldırın."
-        );
-      }
-
-      await this.accounts.upsert({
+      const account = await this.accounts.upsert({
         userId: parsed.userId,
         msSub: identity.sub,
         email: identity.email,
         refreshToken: tokens.refresh_token,
         scopes,
+        label: parsed.label,
       });
-      await this.ensureRootFolder(parsed.userId);
+      // Kök klasör YENİ bağlanan hesapta açılır (varsayılan hesap başkası olabilir).
+      await this.ensureRootFolder(account.id);
 
       const params = new URLSearchParams({ connected: "1" });
       if (next) params.set("next", next);
@@ -188,13 +178,9 @@ export class MicrosoftController {
       }
     }
 
-    // Depolama sağlayıcısı yalnızca biri olabilir: Google Drive zaten
-    // kullanılıyorsa ön yüz "OneDrive'ı bağla" düğmesini kilitli göstermeli.
-    const googleAccount = driveReady ? undefined : await this.googleAccounts.findByUserId(req.user.userId);
-    const lockedByOtherProvider = !driveReady && this.googleAccounts.isDriveReady(googleAccount);
-
     return {
-      lockedByOtherProvider,
+      // Sağlayıcılar artık birbirini dışlamıyor; alan eski istemciler için sabit false.
+      lockedByOtherProvider: false,
       configured,
       connected: Boolean(account),
       email: account?.email,
@@ -204,10 +190,11 @@ export class MicrosoftController {
     };
   }
 
+  /** Belirli bir hesabı keser; gövde boşsa varsayılan hesap (eski davranış). */
   @Post("microsoft/disconnect")
   @UseGuards(AuthGuard("jwt"))
-  async disconnect(@Req() req: any) {
-    await this.accounts.disconnectDrive(req.user.userId);
+  async disconnect(@Req() req: any, @Body("accountId") accountId?: string) {
+    await this.accounts.disconnectDrive(req.user.userId, accountId);
     return { ok: true };
   }
 
@@ -228,8 +215,8 @@ export class MicrosoftController {
   }
 
   /** Kullanıcının OneDrive'ında uygulama klasörünü hazırlar (approot'un id'sini çözüp saklar). */
-  private async ensureRootFolder(userId: string): Promise<void> {
-    const account = await this.accounts.findByUserId(userId);
+  private async ensureRootFolder(accountId: string): Promise<void> {
+    const account = await this.accounts.findById(accountId);
     if (!this.accounts.isDriveReady(account)) return;
     if (account.rootFolderId) return;
 

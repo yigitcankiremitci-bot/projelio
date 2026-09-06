@@ -61,7 +61,16 @@ export interface PickedDriveFile {
  * Picker'ı açar; kullanıcı bir dosya seçince `onPicked` çağrılır. Kullanıcı
  * pencereyi kapatırsa hiçbir şey olmaz.
  */
-export async function openGooglePicker(onPicked: (file: PickedDriveFile) => void): Promise<void> {
+export async function openGooglePicker(
+  onPicked: (file: PickedDriveFile) => void,
+  /**
+   * Dosyanın ekleneceği yer. Jeton O HEDEFİN depo hesabından alınır: şirketler
+   * ayrı Drive hesabı seçebildiği için (bkz. migration 088), varsayılan hesabın
+   * jetonuyla açılan Picker'da seçilen dosyayı hedef hesap göremez ve kopyalama
+   * "Dosya içe aktarılamadı" ile biter.
+   */
+  target?: { jobId?: string; departmentId?: string; organizationId?: string }
+): Promise<void> {
   // Picker tarayıcıda çalışır ve doğrudan Google'a gider; backend'deki
   // GOOGLE_CLIENT_ID/SECRET buraya yetmez, kendi tarayıcı anahtarını ister.
   const apiKey = import.meta.env.VITE_GOOGLE_PICKER_API_KEY as string | undefined;
@@ -77,7 +86,7 @@ export async function openGooglePicker(onPicked: (file: PickedDriveFile) => void
   // seçebiliyor ama sonraki istekler 404 dönüyor.
   const appId = import.meta.env.VITE_GOOGLE_PICKER_APP_ID as string | undefined;
 
-  const [{ accessToken }] = await Promise.all([driveApi.pickerToken(), loadGapiScript()]);
+  const [{ accessToken }] = await Promise.all([driveApi.pickerToken(target), loadGapiScript()]);
   await loadPickerModule();
 
   const google = window.google;

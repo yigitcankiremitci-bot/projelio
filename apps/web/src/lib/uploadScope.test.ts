@@ -9,6 +9,9 @@ describe("yükleme kapsam anahtarı", () => {
     const id = "a1";
     assert.notEqual(uploadScope({ jobId: id }), uploadScope({ projectId: id }));
     assert.notEqual(uploadScope({ projectId: id }), uploadScope({ departmentId: id }));
+    // Şirket kapsamı (bkz. migration 089): departmanla aynı kimliği taşıyabilir,
+    // ayrışmazsa şirketin yüklemesi departmanın listesinde belirirdi.
+    assert.notEqual(uploadScope({ departmentId: id }), uploadScope({ organizationId: id }));
   });
 
   test("görev/çıktı bağlamı anahtara girer", () => {

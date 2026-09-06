@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ProjectFile } from "@projelio/shared";
-import { filesApi } from "../api/files";
+import { filesApi, type FileTarget } from "../api/files";
 import type { DriveBrowseEntry } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
@@ -8,7 +8,7 @@ import { IconChevronRight, IconFile, IconFolder } from "./icons";
 import { useT } from "../lib/i18n";
 
 interface Props {
-  target: { jobId: string } | { projectId: string } | { departmentId: string };
+  target: FileTarget;
   taskId?: string;
   outputId?: string;
   onClose: () => void;

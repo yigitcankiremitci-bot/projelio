@@ -30,6 +30,8 @@ export interface OAuthStatePayload {
   userId?: string;
   /** Akış bitince kullanıcının döneceği ön yüz yolu. */
   next?: string;
+  /** connect modunda: yeni bağlanan hesaba verilecek ad ("Şirket Drive'ı"). */
+  label?: string;
 }
 
 export interface GoogleTokenResponse {
@@ -116,7 +118,18 @@ export class GoogleOAuthService {
     return decoded;
   }
 
-  buildAuthUrl(options: { scopes: string[]; state: string; loginHint?: string }): string {
+  buildAuthUrl(options: {
+    scopes: string[];
+    state: string;
+    loginHint?: string;
+    /**
+     * Google'ın hesap seçme ekranını zorlar. Kullanıcı artık birden fazla Drive
+     * hesabı bağlayabildiği için (bkz. migration 088) ikinci hesabı bağlarken
+     * bu şart: aksi hâlde Google tek oturumu olan kullanıcıyı sormadan aynı
+     * hesapla geçirir ve "ikinci hesap bağlayamıyorum" hissi doğar.
+     */
+    selectAccount?: boolean;
+  }): string {
     this.assertConfigured();
 
     const params = new URLSearchParams({
@@ -128,7 +141,7 @@ export class GoogleOAuthService {
       // yalnızca ilk onayda döndürür; consent'i zorlamazsak kullanıcı ikinci kez
       // bağlandığında elimizde token olmaz.
       access_type: "offline",
-      prompt: "consent",
+      prompt: options.selectAccount ? "consent select_account" : "consent",
       include_granted_scopes: "true",
       state: options.state,
     });

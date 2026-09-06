@@ -27,6 +27,8 @@ export interface CloudAccount {
   userId: string;
   email: string;
   pictureUrl?: string;
+  /** Kullanıcının hesaba verdiği ad; birden fazla hesap bağlıyken ayırt etmek için. */
+  label?: string;
   rootFolderId?: string;
   hasRefreshToken: boolean;
   driveRevokedAt?: string;

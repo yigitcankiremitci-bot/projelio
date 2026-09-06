@@ -126,18 +126,30 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const inputRef = useRef<HTMLInputElement>(null);
   const createMenuRef = useRef<CreateNativeFileMenuHandle>(null);
 
-  // Organizasyon/grup ekranı salt okunurdur: dosya bir işe ait olmak zorunda,
-  // "hangi işe?" sorusunun cevabı burada yok.
-  const readOnly = Boolean(organizationId || groupId);
+  // GRUP ekranı salt okunur: grubun kendi dosya alanı yok, yalnızca altındaki
+  // şirketlerin/işlerin dosyalarını topluyor — "bu dosya nereye ait olsun?"
+  // sorusunun cevabı orada yok.
+  //
+  // ŞİRKET ekranı ARTIK YAZILABİLİR (bkz. migration 089): şirketin kendi düz
+  // klasörü var. Eskiden burası da salt okunurdu ve yeni şirket kuran kullanıcı
+  // hiçbir yere dosya koyamıyordu — departman açması gerektiğini hiçbir yer
+  // söylemiyordu.
+  const readOnly = Boolean(groupId);
+
+  // Üst kademe listesi: satırlar başka kapsamlardan (işlerden) da geliyor,
+  // o yüzden her satırda kaynağını yazmak gerekiyor.
+  const aggregated = Boolean(organizationId || groupId);
 
   const target = useMemo(
     () =>
       departmentId
         ? ({ departmentId } as const)
+        : organizationId
+        ? ({ organizationId } as const)
         : jobId
         ? ({ jobId } as const)
         : ({ projectId: projectId! } as const),
-    [departmentId, jobId, projectId]
+    [departmentId, organizationId, jobId, projectId]
   );
 
   // Yükleme durumu bu bileşende TUTULMUYOR: kullanıcı yükleme sürerken başka
@@ -253,14 +265,25 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const handleBrowseDriveClick = () => {
     setPickerError("");
     if (connectedProvider === "google") {
-      openGooglePicker(async ({ id, name }) => {
-        try {
-          const created = await filesApi.importFromDrive(target, { sourceFileId: id, name, taskId, outputId });
-          handleFileAdded(created);
-        } catch (e: any) {
-          setPickerError(e?.message ?? t("Dosya içe aktarılamadı"));
-        }
-      }).catch((e: Error) => setPickerError(e.message));
+      openGooglePicker(
+        async ({ id, name }) => {
+          try {
+            const created = await filesApi.importFromDrive(target, { sourceFileId: id, name, taskId, outputId });
+            handleFileAdded(created);
+          } catch (e: any) {
+            setPickerError(e?.message ?? t("Dosya içe aktarılamadı"));
+          }
+        },
+        // Picker, hedefin depo hesabıyla açılmalı (bkz. lib/googlePicker.ts).
+        // Proje hedefinde iş kimliği yok; o durumda varsayılan hesap kullanılır.
+        departmentId
+          ? { departmentId }
+          : organizationId
+          ? { organizationId }
+          : jobId
+          ? { jobId }
+          : undefined
+      ).catch((e: Error) => setPickerError(e.message));
       return;
     }
     if (connectedProvider === "microsoft") setBrowsing(true);
@@ -309,7 +332,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           ],
         }
       : null,
-    [fabInHeader, driveMissing, connectedProvider, departmentId, jobId, projectId, taskId, outputId],
+    [fabInHeader, driveMissing, connectedProvider, departmentId, organizationId, jobId, projectId, taskId, outputId],
     FAB_PRIORITY.panel
   );
 
@@ -543,7 +566,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                       ? t("{saglayici}'da bulunamadı", { saglayici: driveProviderLabel(file) })
                       : [
                           // Üst kademede dosyanın hangi işten geldiği kritik bilgi.
-                          readOnly ? file.jobTitle : null,
+                          aggregated ? file.jobTitle : null,
                           showOrigin ? (file.projectId ? t("Proje dosyası") : t("İş geneli")) : null,
                           fileKindLabel(file),
                           file.sizeBytes ? formatFileSize(file.sizeBytes) : null,

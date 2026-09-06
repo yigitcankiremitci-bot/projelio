@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
+import OrganizationStorageSection from "./OrganizationStorageSection";
 import EntityDangerZone from "./EntityDangerZone";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { useT } from "../lib/i18n";
@@ -141,6 +142,8 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
           {loading ? "Kaydediliyor…" : "Kaydet"}
         </button>
       </form>
+
+      <OrganizationStorageSection organizationId={organization.id} />
 
       <EntityDangerZone
         entityLabel="Organizasyonu"

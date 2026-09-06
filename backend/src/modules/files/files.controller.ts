@@ -45,6 +45,86 @@ export class FilesController {
 
   // -------------------------------------------------------------- departman
 
+  // ------------------------------------------------------- şirketin dosyaları
+  // Departman uçlarının birebir aynısı, kapsam farkıyla. Servis tarafında
+  // gövdeler de ortak (bkz. FilesService, FlatScope): şirket ve departman
+  // dosyaları aynı modeli kullanıyor — tek düz klasör + kadroya verilen izinler.
+
+  @Post("organizations/:organizationId/files")
+  @UseGuards(AuthGuard("jwt"), UploadRateLimitGuard)
+  @UseInterceptors(
+    FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: INLINE_UPLOAD_LIMIT } })
+  )
+  uploadToOrganization(
+    @Param("organizationId") organizationId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any
+  ) {
+    return this.filesService.uploadInlineForFlat({ kind: "organization", id: organizationId }, req.user.userId, file);
+  }
+
+  @Post("organizations/:organizationId/files/upload-session")
+  @UseGuards(AuthGuard("jwt"), UploadRateLimitGuard)
+  createOrganizationUploadSession(
+    @Param("organizationId") organizationId: string,
+    @Body() body: { name: string; mimeType: string; sizeBytes?: number },
+    @Req() req: any
+  ) {
+    return this.filesService.createUploadSessionForFlat(
+      { kind: "organization", id: organizationId },
+      req.user.userId,
+      body
+    );
+  }
+
+  @Post("organizations/:organizationId/files/sync-shares")
+  @UseGuards(AuthGuard("jwt"))
+  async syncOrganizationShares(@Param("organizationId") organizationId: string, @Req() req: any) {
+    const scope = { kind: "organization" as const, id: organizationId };
+    await this.filesService.assertFlatAccess(scope, req.user.userId);
+    return this.filesService.syncFlatShares(scope);
+  }
+
+  @Get("organizations/:organizationId/files/browse")
+  @UseGuards(AuthGuard("jwt"))
+  browseOrganization(
+    @Param("organizationId") organizationId: string,
+    @Query("folderId") folderId: string | undefined,
+    @Req() req: any
+  ) {
+    return this.filesService.browseForFlat({ kind: "organization", id: organizationId }, req.user.userId, folderId);
+  }
+
+  @Post("organizations/:organizationId/files/import")
+  @UseGuards(AuthGuard("jwt"))
+  importToOrganization(
+    @Param("organizationId") organizationId: string,
+    @Body() body: { sourceFileId: string; name?: string },
+    @Req() req: any
+  ) {
+    return this.filesService.importForFlat(
+      { kind: "organization", id: organizationId },
+      req.user.userId,
+      body?.sourceFileId,
+      body?.name
+    );
+  }
+
+  @Post("organizations/:organizationId/files/create-native")
+  @UseGuards(AuthGuard("jwt"))
+  createNativeInOrganization(
+    @Param("organizationId") organizationId: string,
+    @Body() body: { kind: NativeFileKind; name: string },
+    @Req() req: any
+  ) {
+    return this.filesService.createNativeForFlat(
+      { kind: "organization", id: organizationId },
+      req.user.userId,
+      body?.kind,
+      body?.name
+    );
+  }
+
   @Get("departments/:departmentId/files")
   @UseGuards(AuthGuard("jwt"))
   listByDepartment(@Param("departmentId") departmentId: string, @Req() req: any) {
@@ -111,6 +191,26 @@ export class FilesController {
     @Req() req: any
   ) {
     return this.filesService.createNativeForDepartment(departmentId, req.user.userId, body?.kind, body?.name);
+  }
+
+  /**
+   * Google Picker'ın kullanacağı erişim jetonu — HEDEFİN deposu üzerinden.
+   *
+   * NEDEN /google/picker-token YETMİYOR: o uç kullanıcının VARSAYILAN Drive
+   * hesabını kullanıyor. Kullanıcı artık birden fazla hesap bağlayabildiği ve
+   * şirketler ayrı hesap seçebildiği için (bkz. migration 088), seçim ekranı
+   * yanlış hesabın Drive'ını açabiliyordu: seçilen dosyayı hedef hesabın jetonu
+   * göremediği için "Dosya içe aktarılamadı" ile bitiyordu.
+   */
+  @Get("files/picker-token")
+  @UseGuards(AuthGuard("jwt"))
+  pickerToken(
+    @Req() req: any,
+    @Query("jobId") jobId?: string,
+    @Query("departmentId") departmentId?: string,
+    @Query("organizationId") organizationId?: string
+  ) {
+    return this.filesService.pickerTokenForTarget(req.user.userId, { jobId, departmentId, organizationId });
   }
 
   // -------------------------------------------------------------- listeleme

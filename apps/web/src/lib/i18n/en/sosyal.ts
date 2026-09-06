@@ -130,6 +130,13 @@ export const sosyal: TranslationDict = {
   Hesap: "Account",
   "Hesap ekle": "Add account",
   "Hesabı düzenle": "Edit account",
+  "Hesabı tarayıcıda aç": "Open account in the browser",
+  "Tarayıcıda aç": "Open in the browser",
+  "{n} hesabı tarayıcıda aç": { one: "Open {n} account in the browser", other: "Open {n} accounts in the browser" },
+  "{n} hesap açılamadı — tarayıcı yeni sekmeleri engelledi. Bu site için açılır pencere iznini verin.": {
+    one: "{n} account couldn't be opened — the browser blocked the new tab. Allow pop-ups for this site.",
+    other: "{n} accounts couldn't be opened — the browser blocked the new tabs. Allow pop-ups for this site.",
+  },
   "Hesabı arşivle": "Archive account",
   "İçerik ekle": "Add content",
   "Şimdi paylaş": "Publish now",

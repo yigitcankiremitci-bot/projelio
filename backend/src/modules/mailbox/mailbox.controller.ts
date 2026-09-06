@@ -138,17 +138,10 @@ export class MailboxController {
         );
       }
 
-      // Ters durum: bu Projelio kullanıcısının BAŞKA bir Microsoft hesabı bağlı.
-      // Şema kullanıcı başına tek hesap varsayıyor (findByUserId maybeSingle);
-      // sessizce ikinci satır açmak sonraki her okumayı patlatırdı.
-      const currentAccount = await this.msAccounts.findByUserId(parsed.userId);
-      if (currentAccount && currentAccount.msSub !== identity.sub) {
-        throw new Error(
-          `Projelio hesabınıza zaten ${currentAccount.email} Microsoft hesabı bağlı. ` +
-            `${identity.email} ile bağlanmak için önce Ayarlar'dan mevcut bağlantıyı kaldırın.`
-        );
-      }
-
+      // Kullanıcı birden fazla Microsoft hesabı bağlayabilir (bkz. migration 088):
+      // kişisel kutusu bir hesapta, şirketin info@ kutusu başka bir hesapta
+      // olabilir. Kutunun hangi hesaptan okunacağı `mail_accounts.microsoft_account_id`
+      // ile zaten satır bazında tutuluyor, burada tekilliğe gerek yok.
       const account = await this.msAccounts.upsert({
         userId: parsed.userId,
         msSub: identity.sub,
@@ -288,10 +281,9 @@ export class MailboxController {
         state,
         scopes: MAIL_CONNECT_SCOPES,
         redirectUri: this.oauth.mailRedirectUri,
-        // Kullanıcının zaten bağlı bir Microsoft hesabı varsa onay ekranında
-        // öne çıksın: yanlışlıkla ikinci bir hesapla bağlanmak, kutunun
-        // hiç açılmamasına yol açıyor.
-        loginHint: existing?.email,
+        // Zaten bağlı bir hesap varsa hesap seçme ekranı gösterilir: kutu
+        // başka bir Microsoft hesabında olabilir (ör. şirketin info@ kutusu).
+        prompt: existing ? "select_account" : "consent",
       }),
     };
   }

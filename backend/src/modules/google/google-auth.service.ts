@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { UsersService } from "../users/users.service";
-import { GoogleAccountsService } from "./google-accounts.service";
+import { GoogleAccount, GoogleAccountsService } from "./google-accounts.service";
 import { GoogleIdentity } from "./google-oauth.service";
 import { nowInSeconds } from "../auth/session-payload";
 import { OAuthHandoffStore } from "../../common/auth/oauth-handoff";
@@ -38,6 +38,14 @@ export class GoogleAuthService {
     let isNewUser = false;
 
     if (existingAccount) {
+      // Depo olarak eklenmiş hesapla giriş YAPILAMAZ (bkz. migration 088).
+      // Şirketine ikinci bir Drive bağlayan kullanıcı, farkında olmadan
+      // hesabına ikinci bir giriş anahtarı takmış olmamalı.
+      if (!existingAccount.isLoginIdentity) {
+        throw new UnauthorizedException(
+          "Bu Google hesabı Projelio'ya yalnızca dosya deposu olarak bağlı; giriş için kullanılamaz."
+        );
+      }
       userId = existingAccount.userId;
     } else {
       const byEmail = await this.usersService.findByEmail(identity.email);
@@ -64,9 +72,11 @@ export class GoogleAuthService {
       }
     }
 
-    // Bir Projelio kullanıcısına yalnızca tek Google hesabı bağlanabilir; ikinci
-    // bir hesapla gelinirse hangisinin Drive'ı kullanılacağı belirsizleşir.
-    const currentForUser = await this.googleAccounts.findByUserId(userId);
+    // Bir Projelio kullanıcısının GİRİŞ kimliği tektir. Depo hesabı çoğul
+    // olabilir (bkz. connectToExistingUser) ama giriş yolu değil: aksi hâlde
+    // e-postası ele geçen biri kendi Google hesabını ikinci bir anahtar olarak
+    // takabilirdi.
+    const currentForUser = await this.googleAccounts.findLoginIdentity(userId);
     if (currentForUser && currentForUser.googleSub !== identity.sub) {
       throw new ConflictException(
         `Bu Projelio hesabına zaten ${currentForUser.email} Google hesabı bağlı. Önce mevcut bağlantıyı kaldırın.`
@@ -80,6 +90,7 @@ export class GoogleAuthService {
       pictureUrl: identity.picture,
       refreshToken: tokens.refreshToken,
       scopes: tokens.scopes,
+      isLoginIdentity: true,
     });
 
     if (identity.picture) {
@@ -100,12 +111,19 @@ export class GoogleAuthService {
     return { token, isNewUser };
   }
 
-  /** Zaten giriş yapmış bir kullanıcının Google hesabını bağlar (Drive izni için). */
+  /**
+   * Zaten giriş yapmış bir kullanıcının Google hesabını bağlar (Drive izni için).
+   *
+   * Kullanıcı BİRDEN FAZLA hesap bağlayabilir: kişisel Drive'ı ile şirketinin
+   * Drive'ını ayrı tutmak isteyen kullanıcı için tek yol bu (bkz. migration 088).
+   * Ek hesaplar yalnızca depodur — `upsert` onları giriş kimliği yapmaz.
+   */
   async connectToExistingUser(
     userId: string,
     identity: GoogleIdentity,
-    tokens: { refreshToken?: string; scopes: string[] }
-  ): Promise<void> {
+    tokens: { refreshToken?: string; scopes: string[] },
+    options: { label?: string } = {}
+  ): Promise<GoogleAccount> {
     const ownedBySomeoneElse = await this.googleAccounts.findByGoogleSub(identity.sub);
     if (ownedBySomeoneElse && ownedBySomeoneElse.userId !== userId) {
       throw new ConflictException(
@@ -113,20 +131,14 @@ export class GoogleAuthService {
       );
     }
 
-    const current = await this.googleAccounts.findByUserId(userId);
-    if (current && current.googleSub !== identity.sub) {
-      throw new ConflictException(
-        `Hesabınıza zaten ${current.email} bağlı. Önce mevcut bağlantıyı kaldırın.`
-      );
-    }
-
-    await this.googleAccounts.upsert({
+    return this.googleAccounts.upsert({
       userId,
       googleSub: identity.sub,
       email: identity.email,
       pictureUrl: identity.picture,
       refreshToken: tokens.refreshToken,
       scopes: tokens.scopes,
+      label: options.label,
     });
   }
 

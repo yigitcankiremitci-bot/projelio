@@ -19,12 +19,26 @@ export interface FileContext {
 /** Dosya listeleme kapsamı. */
 export type FileScope = "all" | "general" | "project";
 
-function targetBase(target: { jobId: string } | { projectId: string } | { departmentId: string }): string {
+/**
+ * Dosyanın ekleneceği yer.
+ *
+ * Şirket (organizationId) de bir hedef: departmanla birebir aynı uçları
+ * kullanır, çünkü sunucuda gövdeler de ortak (bkz. FilesService, FlatScope).
+ */
+export type FileTarget =
+  | { jobId: string }
+  | { projectId: string }
+  | { departmentId: string }
+  | { organizationId: string };
+
+function targetBase(target: FileTarget): string {
   return "jobId" in target
     ? `/jobs/${target.jobId}`
     : "projectId" in target
     ? `/projects/${target.projectId}`
-    : `/departments/${target.departmentId}`;
+    : "departmentId" in target
+    ? `/departments/${target.departmentId}`
+    : `/organizations/${target.organizationId}`;
 }
 
 function query(params: Record<string, string | undefined>): string {
@@ -79,20 +93,20 @@ export const filesApi = {
     api.post<{ granted: number; revoked: number }>(`/jobs/${jobId}/files/sync-shares`, {}),
 
   /** OneDrive'da bir klasörün alt öğelerini listeler ("Drive'dan seç" akışı). Google Picker kullandığı için buraya düşmez. */
-  browse: (target: { jobId: string } | { projectId: string } | { departmentId: string }, folderId?: string) =>
+  browse: (target: FileTarget, folderId?: string) =>
     api.get<{ provider: "google" | "microsoft"; entries: DriveBrowseEntry[] }>(
       `${targetBase(target)}/files/browse${folderId ? `?folderId=${encodeURIComponent(folderId)}` : ""}`
     ),
 
   /** Sağlayıcının kendi Drive'ında var olan bir dosyayı Projelio'nun klasörüne kopyalar ve kaydeder. */
   importFromDrive: (
-    target: { jobId: string } | { projectId: string } | { departmentId: string },
+    target: FileTarget,
     body: { sourceFileId: string; name?: string; taskId?: string; outputId?: string }
   ) => api.post<ProjectFile>(`${targetBase(target)}/files/import`, body),
 
   /** Boş bir Doküman/Tablo/Sunum ya da Word/Excel/PowerPoint oluşturur. */
   createNativeFile: (
-    target: { jobId: string } | { projectId: string } | { departmentId: string },
+    target: FileTarget,
     body: { kind: NativeFileKind; name: string; taskId?: string; outputId?: string }
   ) => api.post<ProjectFile>(`${targetBase(target)}/files/create-native`, body),
 
@@ -129,17 +143,89 @@ export const filesApi = {
 export const driveApi = {
   status: () => api.get<GoogleDriveStatus>("/google/status"),
   disconnect: () => api.post<{ ok: boolean }>("/google/disconnect", {}),
-  connectUrl: (next?: string) =>
+  disconnectAccount: (accountId: string) => api.post<{ ok: boolean }>("/google/disconnect", { accountId }),
+  /**
+   * `label`: ikinci bir hesap bağlanırken verilen ad ("Şirket Drive'ı").
+   * Kullanıcı birden fazla Drive hesabı bağlayabiliyor; ad olmadan Ayarlar
+   * ekranında iki satır birbirinden ayırt edilemiyor.
+   */
+  connectUrl: (next?: string, label?: string) =>
     api.get<{ configured: boolean; url: string | null; blockedBy?: "google" | "microsoft" }>(
-      `/google/connect-url${next ? `?next=${encodeURIComponent(next)}` : ""}`
+      `/google/connect-url?${new URLSearchParams({
+        ...(next ? { next } : {}),
+        ...(label ? { label } : {}),
+      }).toString()}`
     ),
   loginUrl: (next?: string) =>
     api.get<{ configured: boolean; url: string | null }>(
       `/auth/google/url${next ? `?next=${encodeURIComponent(next)}` : ""}`
     ),
   exchange: (code: string) => api.post<{ token: string }>("/auth/google/exchange", { code }),
-  /** Frontend'de açılan resmi Google Picker widget'ı için kısa ömürlü Drive erişim jetonu. */
-  pickerToken: () => api.get<{ accessToken: string; expiresInSeconds: number }>("/google/picker-token"),
+  /**
+   * Frontend'de açılan resmi Google Picker widget'ı için kısa ömürlü Drive erişim jetonu.
+   *
+   * Hedef (iş/departman) verilirse jeton O HEDEFİN depo hesabından alınır.
+   * Verilmezse kullanıcının varsayılan hesabı kullanılır — hedefi başka bir
+   * Drive hesabında olan bir departmanda bu, seçilen dosyanın kopyalanamamasına
+   * yol açar (bkz. FilesService.pickerTokenForTarget).
+   */
+  pickerToken: (target?: { jobId?: string; departmentId?: string; organizationId?: string }) => {
+    if (!target?.jobId && !target?.departmentId && !target?.organizationId) {
+      return api.get<{ accessToken: string; expiresInSeconds: number }>("/google/picker-token");
+    }
+    const params = new URLSearchParams(
+      target.departmentId
+        ? { departmentId: target.departmentId }
+        : target.organizationId
+        ? { organizationId: target.organizationId }
+        : { jobId: target.jobId! }
+    );
+    return api.get<{ accessToken: string; expiresInSeconds: number }>(`/files/picker-token?${params.toString()}`);
+  },
+};
+
+/** Bulut hesabı — Ayarlar > Bağlı hesaplar listesinin satırı. */
+export interface CloudAccountRow {
+  provider: "google" | "microsoft";
+  id: string;
+  email: string;
+  label?: string;
+  pictureUrl?: string;
+  driveReady: boolean;
+  /** Bu hesapla Projelio'ya giriş yapılabiliyor mu; kesilirse giriş yolu da gider. */
+  isLoginIdentity: boolean;
+  needsReconnect: boolean;
+  connectedAt: string;
+}
+
+export type OrganizationStorageInfo =
+  | { selected: false }
+  | {
+      selected: true;
+      provider: "google" | "microsoft";
+      accountId: string;
+      email?: string;
+      label?: string;
+      driveReady: boolean;
+      folderWebViewLink?: string;
+    };
+
+/**
+ * Bulut hesaplarının tamamı ve şirketlerin depo seçimi.
+ *
+ * driveApi/oneDriveApi sağlayıcıya özgü işleri (bağla, kes, kota) yapmaya
+ * devam ediyor; buradakiler iki sağlayıcıyı da kapsayan SEÇİM işleri.
+ */
+export const cloudStorageApi = {
+  accounts: () => api.get<CloudAccountRow[]>("/cloud-storage/accounts"),
+  rename: (provider: "google" | "microsoft", accountId: string, label: string) =>
+    api.patch<{ ok: boolean }>(`/cloud-storage/accounts/${provider}/${accountId}`, { label }),
+  organizationStorage: (organizationId: string) =>
+    api.get<OrganizationStorageInfo>(`/organizations/${organizationId}/storage`),
+  setOrganizationStorage: (organizationId: string, provider: "google" | "microsoft", accountId: string) =>
+    api.post<{ ok: boolean }>(`/organizations/${organizationId}/storage`, { provider, accountId }),
+  clearOrganizationStorage: (organizationId: string) =>
+    api.delete<{ ok: boolean }>(`/organizations/${organizationId}/storage`),
 };
 
 /**
@@ -153,9 +239,13 @@ export const driveApi = {
 export const oneDriveApi = {
   status: () => api.get<GoogleDriveStatus>("/microsoft/status"),
   disconnect: () => api.post<{ ok: boolean }>("/microsoft/disconnect", {}),
-  connectUrl: (next?: string) =>
+  disconnectAccount: (accountId: string) => api.post<{ ok: boolean }>("/microsoft/disconnect", { accountId }),
+  connectUrl: (next?: string, label?: string) =>
     api.get<{ configured: boolean; url: string | null; blockedBy?: "google" | "microsoft" }>(
-      `/microsoft/connect-url${next ? `?next=${encodeURIComponent(next)}` : ""}`
+      `/microsoft/connect-url?${new URLSearchParams({
+        ...(next ? { next } : {}),
+        ...(label ? { label } : {}),
+      }).toString()}`
     ),
   loginUrl: (next?: string) =>
     api.get<{ configured: boolean; url: string | null }>(
@@ -173,7 +263,7 @@ export const oneDriveApi = {
  * genişliğinden geçmez, bağlantı koparsa kaldığı yerden devam edebilir.
  */
 /** Dosyanın yükleneceği yer. Kuyruk da aynı tipi taşıyor (bkz. lib/uploadQueue). */
-export type UploadTarget = { jobId: string } | { projectId: string } | { departmentId: string };
+export type UploadTarget = FileTarget;
 
 export async function uploadFile(
   target: UploadTarget,
@@ -193,9 +283,9 @@ export async function uploadFile(
 ): Promise<ProjectFile> {
   // Proje ekranından yüklerken işi backend türetir; ön yüzün bilmesine gerek yok.
   const base = targetBase(target);
-  // Departmanın bağlamı (proje/görev/çıktı) olmadığı için taskId/outputId yalnızca
-  // iş/proje hedeflerinde anlamlı.
-  const isDepartment = "departmentId" in target;
+  // Departmanın ve şirketin altında proje/görev/çıktı hiyerarşisi yok; taskId/outputId
+  // yalnızca iş/proje hedeflerinde anlamlı.
+  const isDepartment = "departmentId" in target || "organizationId" in target;
 
   if (file.size <= INLINE_LIMIT) {
     const form = new FormData();

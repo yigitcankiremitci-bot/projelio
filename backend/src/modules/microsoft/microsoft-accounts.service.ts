@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { DriveNotConnectedError, DriveReauthRequiredError } from "../google/google-accounts.service";
 import {
@@ -22,6 +22,10 @@ export interface MicrosoftAccount {
   hasRefreshToken: boolean;
   driveRevokedAt?: string;
   connectedAt: string;
+  /** Kullanıcının verdiği ad ("Şirket OneDrive'ı"). */
+  label?: string;
+  /** Bu hesapla Microsoft ile giriş yapılabilir mi (bkz. migration 088). */
+  isLoginIdentity: boolean;
 }
 
 function mapAccount(row: any): MicrosoftAccount {
@@ -36,6 +40,9 @@ function mapAccount(row: any): MicrosoftAccount {
     hasRefreshToken: Boolean(row.refresh_token_enc),
     driveRevokedAt: row.drive_revoked_at ?? undefined,
     connectedAt: row.connected_at,
+    label: row.label ?? undefined,
+    // Migration 088 öncesi satırlarda kolon yok; eski davranış "tek hesap = giriş kimliği".
+    isLoginIdentity: row.is_login_identity ?? true,
   };
 }
 
@@ -71,11 +78,44 @@ export class MicrosoftAccountsService {
     return data ? mapAccount(data) : undefined;
   }
 
+  /**
+   * Kullanıcının VARSAYILAN Microsoft hesabı (bkz. GoogleAccountsService.findByUserId
+   * — aynı gerekçe: artık kullanıcı başına birden fazla hesap olabilir).
+   *
+   * Posta modülü de buradan besleniyor: kutu bağlanırken hangi hesabın
+   * kullanılacağı bu sıralamaya göre belirlenir.
+   */
   async findByUserId(userId: string): Promise<MicrosoftAccount | undefined> {
     const { data, error } = await this.supabase.client
       .from("microsoft_accounts")
       .select()
       .eq("user_id", userId)
+      .order("is_login_identity", { ascending: false })
+      .order("connected_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapAccount(data) : undefined;
+  }
+
+  /** Kullanıcının bağlı BÜTÜN Microsoft hesapları. */
+  async listByUserId(userId: string): Promise<MicrosoftAccount[]> {
+    const { data, error } = await this.supabase.client
+      .from("microsoft_accounts")
+      .select()
+      .eq("user_id", userId)
+      .order("connected_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(mapAccount);
+  }
+
+  /** Kullanıcının GİRİŞ kimliği olan Microsoft hesabı (depo hesapları giriş açmaz). */
+  async findLoginIdentity(userId: string): Promise<MicrosoftAccount | undefined> {
+    const { data, error } = await this.supabase.client
+      .from("microsoft_accounts")
+      .select()
+      .eq("user_id", userId)
+      .eq("is_login_identity", true)
       .maybeSingle();
     if (error) throw error;
     return data ? mapAccount(data) : undefined;
@@ -99,6 +139,9 @@ export class MicrosoftAccountsService {
     pictureUrl?: string;
     refreshToken?: string;
     scopes: string[];
+    /** Bkz. GoogleAccountsService.upsert — verilmezse ilk hesap giriş kimliği olur. */
+    isLoginIdentity?: boolean;
+    label?: string;
   }): Promise<MicrosoftAccount> {
     const existing = await this.findByMsSub(params.msSub);
 
@@ -112,6 +155,7 @@ export class MicrosoftAccountsService {
     // basılsaydı, fotoğraf taşımayan bir akış (ör. giriş) daha önce kaydedilmiş
     // fotoğrafı silerdi.
     if (params.pictureUrl !== undefined) patch.picture_url = params.pictureUrl;
+    if (params.label !== undefined) patch.label = params.label || null;
 
     if (params.refreshToken) {
       patch.refresh_token_enc = encryptMicrosoftToken(params.refreshToken);
@@ -133,6 +177,8 @@ export class MicrosoftAccountsService {
       return mapAccount(data);
     }
 
+    patch.is_login_identity = params.isLoginIdentity ?? !(await this.findLoginIdentity(params.userId));
+
     const { data, error } = await this.supabase.client
       .from("microsoft_accounts")
       .insert(patch)
@@ -140,6 +186,14 @@ export class MicrosoftAccountsService {
       .single();
     if (error) throw error;
     return mapAccount(data);
+  }
+
+  async setLabel(accountId: string, label: string): Promise<void> {
+    const { error } = await this.supabase.client
+      .from("microsoft_accounts")
+      .update({ label: label.trim() || null })
+      .eq("id", accountId);
+    if (error) throw error;
   }
 
   async setRootFolderId(accountId: string, folderId: string): Promise<void> {
@@ -168,15 +222,37 @@ export class MicrosoftAccountsService {
    * "gelen kutumu da kapat" demek değildir. Yalnızca depolamaya ait izinler ve
    * kök klasör temizlenir.
    */
-  async disconnectDrive(userId: string): Promise<void> {
-    const account = await this.findByUserId(userId);
+  async disconnectDrive(userId: string, accountId?: string): Promise<void> {
+    const account = accountId ? await this.findById(accountId) : await this.findByUserId(userId);
     if (!account) return;
+    if (account.userId !== userId) throw new BadRequestException("Bu hesap size ait değil.");
 
-    const mailStillConnected = this.isMailReady(account);
-    const refreshToken = await this.readRefreshToken(account.id);
+    // `: boolean` şart: isMailReady bir tip koruyucusu (`account is MicrosoftAccount`)
+    // ve TS bunu takma ad üzerinden daraltıyor — açık anotasyon olmadan
+    // `!mailStillConnected` dalında hesap never'a düşüyor.
+    const target: MicrosoftAccount = account;
+    const mailStillConnected: boolean = this.isMailReady(target);
+    const refreshToken = await this.readRefreshToken(target.id);
     if (refreshToken && !mailStillConnected) await this.oauth.revokeToken(refreshToken);
 
-    this.clearTokenCache(account.id);
+    this.clearTokenCache(target.id);
+
+    // Ne giriş kimliği ne de posta için gerekli olan bir depo hesabı: satırı
+    // tutmanın anlamı yok. FK kısıtı (on delete restrict) hâlâ dosya saklayan
+    // bir hesabı silmemizi engeller.
+    if (!target.isLoginIdentity && !mailStillConnected) {
+      const { error: delError } = await this.supabase.client
+        .from("microsoft_accounts")
+        .delete()
+        .eq("id", target.id);
+      if (delError && (delError as any).code === "23503") {
+        throw new BadRequestException(
+          "Bu hesapta saklanan dosyalar var. Önce ilgili şirket/departman için başka bir depo hesabı seçin."
+        );
+      }
+      if (delError) throw delError;
+      return;
+    }
 
     const { error } = await this.supabase.client
       .from("microsoft_accounts")
@@ -184,9 +260,9 @@ export class MicrosoftAccountsService {
         refresh_token_enc: mailStillConnected ? undefined : null,
         root_folder_id: null,
         drive_revoked_at: mailStillConnected ? null : new Date().toISOString(),
-        scopes: account.scopes.filter((s) => s !== ONEDRIVE_SCOPE),
+        scopes: target.scopes.filter((s) => s !== ONEDRIVE_SCOPE),
       })
-      .eq("id", account.id);
+      .eq("id", target.id);
     if (error) throw error;
   }
 

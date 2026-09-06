@@ -517,4 +517,7 @@ export const hatalar: TranslationDict = {
   "jobId, departmentId ya da organizationId gerekli": "jobId, departmentId or organizationId is required",
   "Bu hedef OneDrive kullanıyor; dosya seçimi OneDrive penceresiyle yapılır.":
     "This target uses OneDrive; pick files through the OneDrive window.",
+  "Bu organizasyonun dosyalarına erişim yetkiniz yok":
+    "You don't have permission to access this organization's files",
+  "Bu grubun dosyalarına erişim yetkiniz yok": "You don't have permission to access this group's files",
 };

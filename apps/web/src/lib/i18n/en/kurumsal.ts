@@ -225,4 +225,16 @@ export const kurumsal: TranslationDict = {
   "Sadece ara mı vermek istiyorsun?": "Just want a break?",
   "Hesabını silmeden de uzak durabilirsin: veri kaybı olmaz, döndüğünde her şey yerinde olur.":
     "You can step away without deleting your account: nothing is lost and everything is where you left it when you come back.",
+
+  // ─────────────────────────────────────────────── Şirketin dosya deposu
+  "Dosya deposu": "File storage",
+  "Bu şirketin dosyaları seçtiğiniz hesapta, şirket adını taşıyan bir klasörde toplanır. Seçim yalnızca bundan sonra açılacak klasörler için geçerlidir; hâlihazırdaki dosyalar bulundukları hesapta kalır.":
+    "This company's files are collected in the account you choose, in a folder named after the company. The choice applies only to folders created from now on; existing files stay where they are.",
+  "Seçim yok — varsayılan hesabım kullanılsın": "No choice — use my default account",
+  "Önce Ayarlar > Bağlantılar ekranından bir Drive ya da OneDrive hesabı bağlayın.":
+    "Connect a Drive or OneDrive account from Settings > Connections first.",
+  "Seçili hesabın erişimi sona ermiş. Yeniden bağlanana kadar yeni dosyalar varsayılan hesaba düşer.":
+    "The selected account's access has expired. Until it is reconnected, new files go to the default account.",
+  "Depo hesabı kaydedilemedi.": "The storage account couldn't be saved.",
+  "Kaydedildi.": "Saved.",
 };

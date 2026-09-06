@@ -102,4 +102,29 @@ export const ayarlar: TranslationDict = {
   "Kullanıcı Sözleşmesi": "Terms of Service",
   "Gizlilik Politikası": "Privacy Policy",
   "KVKK Aydınlatma Metni": "Data Protection Notice",
+
+  // ─────────────────────────────────────────────── Bulut depolama hesapları
+  "Bulut depolama hesapları": "Cloud storage accounts",
+  "Dosyalar kendi Drive/OneDrive hesabınızda saklanır. Birden fazla hesap bağlayıp şirketlerinizi ayrı hesaplarda tutabilirsiniz.":
+    "Files are stored in your own Drive/OneDrive account. Connect more than one account to keep your companies separate.",
+  "Dosya ekleyebilmek için önce bir bulut hesabı bağlayın.":
+    "Connect a cloud account before you can add files.",
+  "Google Drive hesabı bağla": "Connect a Google Drive account",
+  "OneDrive hesabı bağla": "Connect a OneDrive account",
+  "Bu hesaba bir ad verin (örn. Şirket Drive'ı):": "Name this account (e.g. Company Drive):",
+  "Örn. Şirket Drive'ı": "e.g. Company Drive",
+  "Ad ver": "Name it",
+  "Ad kaydedilemedi.": "The name couldn't be saved.",
+  "Bağlantı başlatılamadı.": "The connection couldn't be started.",
+  "Bağlantı kaldırılamadı.": "The connection couldn't be removed.",
+  "Bu sağlayıcı sunucuda yapılandırılmamış.": "This provider isn't configured on the server.",
+  // Hesap satırının altındaki durum yazısı; cümle ortasında geçtiği için küçük harf.
+  "dosya erişimi hazır": "file access ready",
+  "erişim sona ermiş, yeniden bağlayın": "access expired, reconnect",
+  "yalnızca giriş için bağlı": "connected for sign-in only",
+  "giriş hesabı": "sign-in account",
+  "Projelio'nun bu hesaptaki dosya erişimi kaldırılacak. Dosyalarınız yerinde kalır ama Projelio içinden açılamaz. Bu hesapla girişe devam edebilirsiniz.":
+    "Projelio's file access to this account will be removed. Your files stay where they are but can't be opened from Projelio. You can still sign in with this account.",
+  "Bu hesabın bağlantısı tamamen kaldırılacak. Hesapta saklanan Projelio dosyası varsa önce ilgili şirket için başka bir depo hesabı seçmeniz gerekir.":
+    "This account will be disconnected completely. If it still stores Projelio files, choose another storage account for the company first.",
 };

@@ -24,7 +24,10 @@ export const ORG_TABS = [
   // Departmanlarda dağınık duran görevlerin tek panosu (bkz. OrgTasksPanel).
   { key: "tasks", label: "Görevler" },
   { key: "products", label: "Ürün/Hizmet" },
-  { key: "budget", label: "Bütçe" },
+  // Etiket "Kasa": sayfa bir plan değil, gerçekleşen gelir/gider defteri
+  // (bkz. Dashboard.tsx'teki aynı gerekçe). Anahtar "budget" KALDI —
+  // adresler (?tab=budget), kayıtlı hedefler ve tur çapaları ona bağlı.
+  { key: "budget", label: "Kasa" },
   { key: "files", label: "Dosyalar" },
 ];
 

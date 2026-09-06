@@ -12,7 +12,10 @@ export const DEPARTMENT_TABS: { key: DepartmentTab; label: string }[] = [
   { key: "flow", label: "Sosyal" },
   { key: "team", label: "Ekip" },
   { key: "tasks", label: "Görevler" },
-  { key: "budget", label: "Bütçe" },
+  // Etiket "Kasa": sayfa bir plan değil, gerçekleşen gelir/gider defteri
+  // (bkz. Dashboard.tsx'teki aynı gerekçe). Anahtar "budget" KALDI —
+  // adresler (?tab=budget), kayıtlı hedefler ve tur çapaları ona bağlı.
+  { key: "budget", label: "Kasa" },
   { key: "modules", label: "Modüller" },
   { key: "files", label: "Dosyalar" },
 ];

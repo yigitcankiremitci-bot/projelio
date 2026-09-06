@@ -1086,6 +1086,32 @@ export class FilesService {
   //
   // Ağaç bulutta ZATEN vardı; arayüz göstermiyordu. Burası onu görünür kılıyor.
 
+  /**
+   * Klasör tablosu kullanılabilir mi (migration 090 uygulandı mı).
+   *
+   * NEDEN VAR: migration'lar elle uygulanıyor ve koddan geride kalabiliyor.
+   * Bir kez geride kaldığında iş ekranında dosyalar KAYBOLDU: klasör listesi
+   * boş dönüyor, dosya listesi de "yalnızca kökteki dosyalar" diye süzülüyordu
+   * — iş kapsamında her dosyanın klasörü olduğu için sonuç bomboş bir ekrandı,
+   * üstelik dosyalar Drive'da duruyordu. Tablo yoksa klasör süzgeçleri hiç
+   * uygulanmıyor ve eski düz liste davranışı geri geliyor.
+   *
+   * Yalnızca OLUMLU sonuç önbelleğe alınır: tablo sonradan gelirse (migration
+   * uygulanınca) süreç yeniden başlatılmadan kendiliğinden düzelsin.
+   */
+  private foldersReady = false;
+
+  private async foldersAvailable(): Promise<boolean> {
+    if (this.foldersReady) return true;
+    const { error } = await this.supabase.client.from("file_folders").select("id").limit(1);
+    if (error) {
+      this.logger.warn(`Klasör tablosu kullanılamıyor (migration 090 uygulandı mı?): ${error.message}`);
+      return false;
+    }
+    this.foldersReady = true;
+    return true;
+  }
+
   private ownerColumn(owner: FileOwner): "job_id" | "department_id" | "organization_id" {
     return owner.kind === "job" ? "job_id" : owner.kind === "department" ? "department_id" : "organization_id";
   }
@@ -1111,6 +1137,7 @@ export class FilesService {
 
   async listFolders(owner: FileOwner, userId: string, parentFolderId?: string): Promise<FileFolderEntry[]> {
     await this.assertOwnerAccess(owner, userId);
+    if (!(await this.foldersAvailable())) return [];
 
     let query = this.supabase.client
       .from("file_folders")
@@ -1710,8 +1737,12 @@ export class FilesService {
 
     // Klasör gezinmesi diğer süzgeçlerin ÖNÜNDE: kullanıcı bir klasörün içine
     // girdiyse gördüğü şey o klasörün içeriğidir, proje/görev süzgeci değil.
-    if (filter.folderId) query = query.eq("folder_id", filter.folderId);
-    else if (filter.atRoot) query = query.is("folder_id", null);
+    //
+    // Klasör tablosu yoksa hiçbir klasör süzgeci uygulanmaz (bkz. foldersAvailable):
+    // aksi halde ekran boş görünüyordu.
+    const klasorlerHazir = filter.folderId || filter.atRoot ? await this.foldersAvailable() : false;
+    if (klasorlerHazir && filter.folderId) query = query.eq("folder_id", filter.folderId);
+    else if (klasorlerHazir && filter.atRoot) query = query.is("folder_id", null);
     else if (filter.taskId) query = query.eq("task_id", filter.taskId);
     else if (filter.outputId) query = query.eq("output_id", filter.outputId);
     else if (filter.projectId) {

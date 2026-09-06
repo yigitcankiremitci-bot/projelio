@@ -117,4 +117,13 @@ export const dosyalar: TranslationDict = {
   Önizle: "Preview",
   "Yeniden adlandır": "Rename",
   "{saglayici}'da aç": "Open in {saglayici}",
+  // ─────────────────────────────────────────────── Boş durum / bırakma kutusu
+  "Bilgisayardan seç": "Choose from computer",
+  "veya sürükleyip bırakın": "or drag and drop",
+  "Dosya ekleyebilmek için önce bir Drive ya da OneDrive hesabı bağlayın.":
+    "Connect a Drive or OneDrive account before you can add files.",
+  "Drive bağla": "Connect Drive",
+  "Bırakın, nereye ekleneceğini soralım": "Drop it and we'll ask where it goes",
+  "Buraya yükle": "Upload here",
+  "{n} dosya seçildi": { one: "{n} file selected", other: "{n} files selected" },
 };

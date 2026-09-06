@@ -25,6 +25,13 @@ interface Props {
   emptyMessage: string;
   onClose: () => void;
   onUploaded: () => void;
+  /**
+   * Sürükleyip bırakılan dosyalar.
+   *
+   * Verilirse pencere dosya seçtirmez — kullanıcı dosyayı zaten seçti, geriye
+   * yalnızca "nereye?" sorusu kalıyor.
+   */
+  pendingFiles?: File[];
 }
 
 /**
@@ -41,6 +48,7 @@ export default function QuickFileUploadModal({
   emptyMessage,
   onClose,
   onUploaded,
+  pendingFiles,
 }: Props) {
   const c = useThemeColors();
   const t = useT();
@@ -67,14 +75,16 @@ export default function QuickFileUploadModal({
    * daha göremiyordu. Artık ilerleme köşedeki tepside (bkz. UploadTray) ve
    * sayfa değiştirmek onu etkilemiyor.
    */
-  const handleFile = (file: File | null) => {
+  const handleFiles = (files: File[]) => {
     const selected = targets.find((t) => t.id === targetId);
-    if (!file || !selected) return;
+    if (!files.length || !selected) return;
     setError("");
-    enqueueUploads({ target: selected.target, files: [file] });
+    enqueueUploads({ target: selected.target, files });
     onUploaded();
     onClose();
   };
+
+  const handleFile = (file: File | null) => handleFiles(file ? [file] : []);
 
   // Gruplar ilk görüldükleri sırayı korur: seçenek listesi çağıranın verdiği
   // sırayla aynı kalsın (işler anasayfadaki sırasıyla gelir).
@@ -110,12 +120,40 @@ export default function QuickFileUploadModal({
               </select>
             </div>
 
+            {/* Bırakılan dosyalar: seçim adımı atlanır, yalnızca hedef sorulur. */}
+            {pendingFiles?.length ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>
+                  {pendingFiles.length === 1
+                    ? pendingFiles[0].name
+                    : t("{n} dosya seçildi", { n: pendingFiles.length })}
+                </p>
+                <button
+                  type="button"
+                  disabled={driveMissing}
+                  onClick={() => handleFiles(pendingFiles)}
+                  style={{
+                    padding: "11px 0",
+                    borderRadius: 9,
+                    border: "none",
+                    background: c.primary,
+                    color: c.onPrimary,
+                    fontSize: 16,
+                    fontWeight: 500,
+                    cursor: driveMissing ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {t("Buraya yükle")}
+                </button>
+              </div>
+            ) : null}
+
             {driveMissing ? (
               <p style={{ fontSize: 15, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
                 Dosya yükleyebilmek için önce Google Drive ya da OneDrive hesabını bağla (Ayarlar &gt; Bağlı
                 hesaplar).
               </p>
-            ) : (
+            ) : pendingFiles?.length ? null : (
               <>
                 <input
                   ref={inputRef}

@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { GoogleDriveStatus, ProjectFile } from "@projelio/shared";
 import { driveApi, filesApi, oneDriveApi } from "../api/files";
 import { useRefreshOnUndo } from "../lib/undo";
@@ -13,6 +14,7 @@ import {
   useUploads,
 } from "../lib/uploadQueue";
 import { openGooglePicker } from "../lib/googlePicker";
+import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useThemeColors } from "../theme/useThemeColors";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { publishTaskAttachments } from "../lib/taskAttachmentEvents";
@@ -125,6 +127,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 ) {
   const c = useThemeColors();
   const t = useT();
+  const navigate = useNavigate();
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [googleStatus, setGoogleStatus] = useState<GoogleDriveStatus | null>(null);
   const [msStatus, setMsStatus] = useState<GoogleDriveStatus | null>(null);
@@ -281,7 +284,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     ]).finally(() => setStatusLoading(false));
   }, []);
 
-  const handleFiles = (selected: FileList | null) => {
+  const handleFiles = useCallback((selected: FileList | null) => {
     if (!selected?.length) return;
     // Kuyruk sıralı ilerliyor, hız sınırını ve hataları da o yönetiyor
     // (bkz. lib/uploadQueue). Panel yalnızca işi teslim ediyor.
@@ -292,7 +295,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       // (webkitRelativePath); burada yalnızca bulunulan klasörü veriyoruz.
       context: { taskId, outputId, folderId },
     });
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, taskId, outputId, folderId]);
 
   // Önizlemesi olan dosyalar için tek istekte jeton alınır (bkz. filesApi.accessTokens).
   useEffect(() => {
@@ -416,6 +420,19 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     : msStatus?.driveReady
     ? "microsoft"
     : undefined;
+
+  /**
+   * Sayfanın her yerine bırakılan dosya da yüklenir.
+   *
+   * Kesik çizgili kutu duruyor (nereye bırakılacağını öğreten işaret o), ama
+   * ıskalayan bırakma artık dosyayı yeni sekmede açmıyor — tarayıcının
+   * varsayılanı buydu ve kullanıcıyı uygulamadan atıyordu.
+   *
+   * Modal içinde (görev eki) ve salt okunur ekranlarda kapalı: orada sayfanın
+   * geri kalanı bu panele ait değil.
+   */
+  const pageDropEnabled = !readOnly && !driveMissing && !compact && !taskId && !outputId;
+  const { dragging: pageDragging } = usePageFileDrop(pageDropEnabled, handleFiles);
 
   // Yeni oluşturulan/içe aktarılan dosya listeye eklenir VE hemen geniş önizleme
   // modalında açılır — kullanıcı Projelio'dan hiç ayrılmadan görür; ayrılmak
@@ -659,42 +676,107 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
       {driveMissing && !readOnly && <DriveNotice google={googleStatus} microsoft={msStatus} />}
 
-      {!readOnly && (
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          if (!driveMissing) setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          if (!driveMissing) void handleFiles(e.dataTransfer.files);
-        }}
-        onClick={() => !driveMissing && inputRef.current?.click()}
-        style={{
-          border: `1.5px dashed ${dragging ? c.accent : c.border}`,
-          borderRadius: 12,
-          background: dragging ? "rgba(192,129,63,0.06)" : "transparent",
-          padding: compact ? "16px 14px" : "22px 18px",
-          textAlign: "center",
-          color: c.textSecondary,
-          fontSize: 15,
-          cursor: driveMissing ? "not-allowed" : "pointer",
-          marginBottom: 14,
-          transition: "border-color 0.12s ease, background 0.12s ease",
-        }}
-      >
-        <IconUpload size={20} color={c.textSecondary} />
-        <div style={{ marginTop: 6 }}>
-          {dragging ? t("Bırakın, yükleyelim") : t("Dosyaları buraya sürükleyin veya tıklayın")}
+      {/*
+        Bırakma kutusu YALNIZCA ekran boşken.
+
+        Dosya varken de duruyordu ve listenin üstünde sürekli yer kaplayan bir
+        kutuydu; oysa asıl işlevi "buraya dosya koyabilirsin" demek ve bunu bir
+        kez söylemek yeterli. Dosya varken sürükleyip bırakma yine çalışıyor —
+        artık sayfanın her yerinde (bkz. usePageFileDrop).
+      */}
+      {!readOnly && !loading && files.length === 0 && folders.length === 0 && (
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!driveMissing) setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (!driveMissing) void handleFiles(e.dataTransfer.files);
+          }}
+          style={{
+            border: `1.5px dashed ${dragging ? c.accent : c.border}`,
+            borderRadius: 12,
+            background: dragging ? "rgba(192,129,63,0.06)" : "transparent",
+            padding: compact ? "16px 14px" : "26px 18px",
+            textAlign: "center",
+            color: c.textSecondary,
+            fontSize: 15,
+            marginBottom: 14,
+            transition: "border-color 0.12s ease, background 0.12s ease",
+          }}
+        >
+          <IconUpload size={20} color={c.textSecondary} />
+
+          {driveMissing ? (
+            // Bağlı hesap yokken "sürükleyin" demek boşa umut: dosya bırakılsa
+            // da yüklenemez. Tek anlamlı eylem bağlantıyı kurmak.
+            <>
+              <div style={{ marginTop: 8, marginBottom: 12 }}>
+                {t("Dosya ekleyebilmek için önce bir Drive ya da OneDrive hesabı bağlayın.")}
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate("/settings?sekme=baglantilar")}
+                style={{
+                  padding: "9px 16px",
+                  borderRadius: 9,
+                  border: "none",
+                  background: c.primary,
+                  color: c.onPrimary,
+                  fontSize: 15,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                {t("Drive bağla")}
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ marginTop: 8, marginBottom: 12 }}>
+                {dragging ? t("Bırakın, yükleyelim") : folderId ? t("Bu klasör boş.") : t("Henüz dosya yok.")}
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                {connectedProvider && (
+                  <button
+                    type="button"
+                    onClick={handleBrowseDriveClick}
+                    style={{
+                      padding: "9px 14px",
+                      borderRadius: 9,
+                      border: `1px solid ${c.border}`,
+                      background: "transparent",
+                      color: c.textPrimary,
+                      fontSize: 15,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {connectedProvider === "microsoft" ? t("OneDrive'dan yükle") : t("Drive'dan yükle")}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  style={{
+                    padding: "9px 14px",
+                    borderRadius: 9,
+                    border: `1px solid ${c.border}`,
+                    background: "transparent",
+                    color: c.textPrimary,
+                    fontSize: 15,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t("Bilgisayardan seç")}
+                </button>
+              </div>
+              <div style={{ fontSize: 13, marginTop: 10 }}>{t("veya sürükleyip bırakın")}</div>
+            </>
+          )}
         </div>
-        <div style={{ fontSize: 13, marginTop: 3 }}>
-          {departmentId
-            ? t("Departmanın bağlı Drive/OneDrive klasöründe saklanır")
-            : t("İşin bağlı Drive/OneDrive klasöründe saklanır")}
-        </div>
-      </div>
       )}
 
       {uploads.map((u) => (
@@ -787,15 +869,15 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       {loading ? (
         <div style={{ color: c.textSecondary, fontSize: 15 }}>{t("Yükleniyor…")}</div>
       ) : files.length === 0 && folders.length === 0 ? (
-        <div style={{ color: c.textSecondary, fontSize: 15 }}>
-          {readOnly
-            ? t(
-                'Bağlı işlerde henüz dosya yok. Dosyalar işlere yüklenir; bir işi buraya bağlamak için "İşi düzenle" ekranını kullanın.'
-              )
-            : folderId
-            ? t("Bu klasör boş.")
-            : t("Henüz dosya eklenmemiş.")}
-        </div>
+        // Yazılabilir ekranlarda boş durumu yukarıdaki bırakma kutusu anlatıyor;
+        // burada ikinci kez yazmak aynı şeyi üst üste söylemek olurdu.
+        readOnly ? (
+          <div style={{ color: c.textSecondary, fontSize: 15 }}>
+            {t(
+              'Bağlı işlerde henüz dosya yok. Dosyalar işlere yüklenir; bir işi buraya bağlamak için "İşi düzenle" ekranını kullanın.'
+            )}
+          </div>
+        ) : null
       ) : viewMode === "grid" ? (
         // Simge görünümü: önizlemesi olan dosya önizlemesiyle, olmayan tür
         // ikonuyla. Sabit oran, farklı boyuttaki önizlemeler ızgarayı bozmasın.
@@ -1012,6 +1094,38 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Sayfa geneline sürüklerken tek bir örtü: kullanıcı bırakmanın
+          çalışacağını görsün. Tıklamayı engellememesi için pointerEvents kapalı. */}
+      {pageDragging && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 900,
+            pointerEvents: "none",
+            background: "rgba(192,129,63,0.10)",
+            border: `2px dashed ${c.accent}`,
+            borderRadius: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              padding: "12px 20px",
+              borderRadius: 10,
+              background: c.surface,
+              border: `1px solid ${c.border}`,
+              color: c.textPrimary,
+              fontSize: 16,
+            }}
+          >
+            {t("Bırakın, yükleyelim")}
+          </div>
         </div>
       )}
 

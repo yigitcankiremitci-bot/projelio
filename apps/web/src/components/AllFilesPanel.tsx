@@ -3,6 +3,7 @@ import type { Job, Project, ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
 import { driveEditUrl, fileKindLabel, formatFileSize } from "../lib/driveLinks";
 import { useProjectFabAction } from "../lib/projectFab";
+import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useThemeColors } from "../theme/useThemeColors";
 import FilePreviewModal from "./FilePreviewModal";
 import QuickFileUploadModal, { type UploadTargetOption } from "./QuickFileUploadModal";
@@ -33,6 +34,8 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<ProjectFile | null>(null);
   const [adding, setAdding] = useState(false);
+  // Sürükleyip bırakılan dosyalar: hedefi kullanıcı pencerede seçecek.
+  const [dropped, setDropped] = useState<File[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
 
   // İşin geneline yükleme yalnızca iş ekibine açık (bkz. backend files.service.ts
@@ -59,6 +62,17 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
 
     return out;
   }, [jobs, projects, myUserId]);
+
+  /**
+   * Bu liste birden çok işi birleştiriyor, yani bırakılan dosyanın hedefi
+   * belirsiz. Bu yüzden bırakma doğrudan yüklemiyor: dosyaları tutup "nereye?"
+   * penceresini açıyoruz — kullanıcı yine sürükleyip bırakabiliyor, tek fark
+   * bir seçim adımı.
+   */
+  const { dragging } = usePageFileDrop(uploadTargets.length > 0, (files) =>
+    setDropped(Array.from(files))
+  );
+
 
   useProjectFabAction({ label: "Dosya ekle", onClick: () => setAdding(true) }, []);
 
@@ -187,14 +201,51 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   return (
     <>
       {body}
-      {adding && (
+
+      {/* Sayfaya bırakılan dosya için tam sayfa gösterge (bkz. FilesPanel'deki eşi). */}
+      {dragging && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 900,
+            pointerEvents: "none",
+            background: "rgba(192,129,63,0.10)",
+            border: `2px dashed ${c.accent}`,
+            borderRadius: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              padding: "12px 20px",
+              borderRadius: 10,
+              background: c.surface,
+              border: `1px solid ${c.border}`,
+              color: c.textPrimary,
+              fontSize: 16,
+            }}
+          >
+            {t("Bırakın, nereye ekleneceğini soralım")}
+          </div>
+        </div>
+      )}
+
+      {(adding || dropped.length > 0) && (
         <QuickFileUploadModal
           targets={uploadTargets}
           pickerLabel="Nereye"
           emptyMessage="Dosya yükleyebilmek için önce bir işe ya da projeye eklenmen gerekiyor."
-          onClose={() => setAdding(false)}
+          pendingFiles={dropped.length ? dropped : undefined}
+          onClose={() => {
+            setAdding(false);
+            setDropped([]);
+          }}
           onUploaded={() => {
             setAdding(false);
+            setDropped([]);
             setReloadKey((k) => k + 1);
           }}
         />

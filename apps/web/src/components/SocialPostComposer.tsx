@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SocialAccount, SocialContentType, SocialPost, SocialPostStatus } from "@projelio/shared";
-import { filesApi, uploadFile } from "../api/files";
+import type { ProjectFile } from "@projelio/shared";
+import { driveApi, filesApi, oneDriveApi, uploadFile } from "../api/files";
+import { openGooglePicker } from "../lib/googlePicker";
+import BrowseDriveModal from "./BrowseDriveModal";
 import { socialMediaApi, type SocialPostInput, type SocialScope } from "../api/socialMedia";
 import {
   CONTENT_TYPES,
@@ -110,6 +113,11 @@ export default function SocialPostComposer({
   const [saved, setSaved] = useState<SocialPost | null>(post ?? null);
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
+  // Pencereye dosya sürükleniyor mu (bırakma alanı vurgusu için).
+  const [dropping, setDropping] = useState(false);
+  // OneDrive kullanıcısında Drive seçici yerine gezinme penceresi açılır.
+  const [browsingDrive, setBrowsingDrive] = useState(false);
+  const [cloudProvider, setCloudProvider] = useState<"google" | "microsoft" | undefined>(undefined);
   const [uploadPct, setUploadPct] = useState(0);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -213,6 +221,65 @@ export default function SocialPostComposer({
       setUploadPct(0);
       if (fileInput.current) fileInput.current.value = "";
     }
+  };
+
+  /**
+   * Hangi bulut hesabı bağlı: "Drive'dan yükle" düğmesinin hangi seçiciyi
+   * açacağını belirler (Google resmi Picker, Microsoft kendi penceremiz).
+   * Bağlı hesap yoksa düğme hiç çıkmaz.
+   */
+  useEffect(() => {
+    let iptal = false;
+    void Promise.allSettled([driveApi.status(), oneDriveApi.status()]).then(([g, m]) => {
+      if (iptal) return;
+      const google = g.status === "fulfilled" && g.value.driveReady;
+      const microsoft = m.status === "fulfilled" && m.value.driveReady;
+      setCloudProvider(google ? "google" : microsoft ? "microsoft" : undefined);
+    });
+    return () => {
+      iptal = true;
+    };
+  }, []);
+
+  /**
+   * Buluttaki mevcut bir dosyayı içeriğe ekler.
+   *
+   * Yükleme akışıyla aynı yere varıyor: dosya önce işin/departmanın dosya
+   * alanına kopyalanır, sonra gönderiye bağlanır. Böylece "Drive'da duruyor
+   * ama Projelio bilmiyor" durumu oluşmuyor ve medya listesi tek yerden geliyor.
+   */
+  const attachExisting = async (file: ProjectFile) => {
+    setUploading(true);
+    setError("");
+    try {
+      const target = saved ?? (await persist());
+      setSaved(await socialMediaApi.attachMedia(target.id, file.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("Dosya eklenemedi"));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const openCloudPicker = () => {
+    if (!uploadTarget) return;
+    if (cloudProvider === "microsoft") {
+      setBrowsingDrive(true);
+      return;
+    }
+    void openGooglePicker(
+      async ({ id, name }) => {
+        try {
+          const imported = await filesApi.importFromDrive(uploadTarget, { sourceFileId: id, name });
+          await attachExisting(imported);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : t("Dosya içe aktarılamadı"));
+        }
+      },
+      // Seçici HEDEFİN depo hesabıyla açılmalı; şirketler ayrı hesap
+      // seçebiliyor (bkz. lib/googlePicker.ts).
+      uploadTarget
+    ).catch((err: Error) => setError(err.message));
   };
 
   const removeMedia = async (mediaId: string) => {
@@ -325,7 +392,38 @@ export default function SocialPostComposer({
       maxWidth={1100}
       mobileFullScreen
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/*
+        Pencerenin TAMAMI bırakma alanı: kullanıcı görseli buraya sürükleyip
+        bırakıyor, küçük bir düğmeyi hedeflemek zorunda kalmıyor.
+
+        stopPropagation ŞART: arkadaki dosyalar paneli de sayfa geneline
+        bırakmayı dinliyor (bkz. lib/usePageFileDrop). Olay oraya ulaşırsa dosya
+        içeriğe eklenmek yerine sessizce dosya alanına yüklenirdi.
+      */}
+      <div
+        onDragOver={(e) => {
+          if (!uploadTarget || !Array.from(e.dataTransfer.types).includes("Files")) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setDropping(true);
+        }}
+        onDragLeave={() => setDropping(false)}
+        onDrop={(e) => {
+          if (!uploadTarget || !Array.from(e.dataTransfer.types).includes("Files")) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setDropping(false);
+          void handleUpload(e.dataTransfer.files);
+        }}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          outline: dropping ? `2px dashed ${c.accent}` : "none",
+          outlineOffset: 6,
+          borderRadius: 8,
+        }}
+      >
         {/* ---------------------------------------------- Kanallar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {label(t("Kanallar"))}
@@ -626,6 +724,29 @@ export default function SocialPostComposer({
                 <IconUpload size={14} color={c.textSecondary} />
                 {uploading ? t("Yükleniyor… %{n}", { n: uploadPct }) : t("Dosya yükle")}
               </button>
+
+              {/* Buluttaki mevcut görseli getirmek: içerik ekibi çoğu zaman
+                  görseli zaten Drive'da hazırlıyor, yeniden yüklemek gereksiz. */}
+              {cloudProvider && (
+                <button
+                  onClick={openCloudPicker}
+                  disabled={uploading}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 13,
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${c.border}`,
+                    background: "transparent",
+                    cursor: uploading ? "default" : "pointer",
+                    color: c.textPrimary,
+                  }}
+                >
+                  {cloudProvider === "microsoft" ? t("OneDrive'dan yükle") : t("Drive'dan yükle")}
+                </button>
+              )}
               <span style={{ fontSize: 11, color: c.textSecondary }}>
                 {"jobId" in scope
                   ? t("Dosyalar işin dosya alanına yüklenir, buraya bağlanır.")
@@ -778,6 +899,16 @@ export default function SocialPostComposer({
           confirmLabel={t("Kaldır")}
           onConfirm={remove}
           onCancel={() => setSilinecek(false)}
+        />
+      )}
+      {browsingDrive && uploadTarget && (
+        <BrowseDriveModal
+          target={uploadTarget}
+          onClose={() => setBrowsingDrive(false)}
+          onImported={(file) => {
+            setBrowsingDrive(false);
+            void attachExisting(file);
+          }}
         />
       )}
     </Modal>

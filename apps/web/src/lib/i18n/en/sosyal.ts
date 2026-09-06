@@ -125,7 +125,7 @@ export const sosyal: TranslationDict = {
     '"{ad}" will be removed from the list. The record is archived, not deleted; it can be restored.',
   // ─────────────────────────────────────────────── Sosyal medya paneli
   "Sosyal Medya": "Social media",
-  "Akış": "Feed",
+  "Takvim ve akış": "Calendar and feed",
   Hesaplar: "Accounts",
   Hesap: "Account",
   "Hesap ekle": "Add account",
@@ -136,6 +136,23 @@ export const sosyal: TranslationDict = {
   "Hesapları aç": "Open accounts",
   "Açmak istediğiniz hesabı seçin. Her hesap yeni sekmede açılır.":
     "Pick the account you want to open. Each account opens in a new tab.",
+  "Tarayıcı {n} sekmeyi engelledi.": { one: "The browser blocked {n} tab.", other: "The browser blocked {n} tabs." },
+  "Bir tıklamadan yalnızca bir sekme açılabiliyor; hepsinin birden açılması için bu siteye açılır pencere izni vermeniz gerekiyor. İzni tarayıcı veriyor, site isteyemiyor.":
+    "A single click can open only one tab; to open them all at once you need to allow pop-ups for this site. The browser grants that permission — a site cannot ask for it.",
+  "{tarayici}: aşağıdaki adresi adres çubuğuna yapıştırın, açılan sayfada “İzin verilenler” bölümünde Ekle deyip {site} adresini yazın.":
+    "{tarayici}: paste the address below into the address bar, then under “Allowed to send pop-ups” choose Add and enter {site}.",
+  "Firefox: aşağıdaki adresi adres çubuğuna yapıştırın, “Açılır pencereleri engelle” satırındaki İstisnalar düğmesinden {site} adresini ekleyin.":
+    "Firefox: paste the address below into the address bar, then use the Exceptions button next to “Block pop-up windows” to add {site}.",
+  "Safari: menü çubuğundan Safari → Ayarlar → Web Siteleri → Açılır Pencereler yolunu izleyip {site} için “İzin Ver” seçin.":
+    "Safari: from the menu bar go to Safari → Settings → Websites → Pop-up Windows and choose “Allow” for {site}.",
+  "Tarayıcınızın site ayarlarından {site} adresine açılır pencere (pop-up) izni verin.":
+    "Allow pop-ups for {site} in your browser's site settings.",
+  "Ayar adresini kopyala": "Copy the settings address",
+  "Kopyalandı — adres çubuğuna yapıştırın": "Copied — paste it into the address bar",
+  "İzni verdikten sonra sayfayı yenileyin; düğme hepsini tek tıkla açar.":
+    "Reload the page after allowing it; the button will then open them all with one click.",
+  "Aşağıdaki hesaplar açılamadı — tek tek açabilirsiniz.":
+    "The accounts below couldn't be opened — you can open them one by one.",
   "Hesabı arşivle": "Archive account",
   "İçerik ekle": "Add content",
   "Şimdi paylaş": "Publish now",
@@ -162,8 +179,8 @@ export const sosyal: TranslationDict = {
   "Tüm kanallar": "All channels",
   "Tüm durumlar": "All statuses",
   "Tarihsiz fikir": "Undated idea",
-  "Fikir havuzu ({n}) — takvimden buraya sürükleyerek tarihi kaldırır, sütunlar arasında sürükleyerek durumunu değiştirirsin":
-    "Idea pool ({n}) — drag from the calendar here to clear the date, or between columns to change the status",
+  "Akış — sütunlar arasında sürükleyerek durumu değiştirirsin. Fikir, taslak ve onaya hazır sütunlarına bırakılan içeriğin tarihi kalkar ({n} içerik tarihsiz).":
+    "Feed — drag between columns to change the status. Items dropped into idea, draft or ready lose their date ({n} undated).",
   "{n} içerik": { one: "{n} item", other: "{n} items" },
   "{n} medya": { one: "{n} media file", other: "{n} media files" },
   "Yayımlandı": "Published",
@@ -310,4 +327,8 @@ export const sosyal: TranslationDict = {
   Threads: "Threads",
   Pinterest: "Pinterest",
   YouTube: "YouTube",
+  // İçeriğe buluttaki mevcut dosyayı getirme (yeniden yüklemeye gerek yok).
+  "Drive'dan yükle": "Add from Drive",
+  "OneDrive'dan yükle": "Add from OneDrive",
+  "Dosya eklenemedi": "The file couldn't be added",
 };

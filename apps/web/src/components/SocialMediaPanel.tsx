@@ -34,6 +34,8 @@ import SocialCredentialsModal from "./SocialCredentialsModal";
 import SocialPostComposer from "./SocialPostComposer";
 import { IconChevronLeft, IconChevronRight, IconEdit, IconExternalLink, IconTrash } from "./icons";
 import { useDragScroll } from "../lib/useDragScroll";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { popupSettingsHint } from "../lib/popupSettings";
 
 interface Props {
   organizationId?: string;
@@ -42,7 +44,7 @@ interface Props {
   canWrite?: boolean;
 }
 
-type View = "calendar" | "list" | "accounts";
+type View = "calendar" | "accounts";
 
 /**
  * Sosyal Medya modülünün çalışma alanı.
@@ -61,7 +63,7 @@ type View = "calendar" | "list" | "accounts";
 export default function SocialMediaPanel({ organizationId, departmentId, jobId, canWrite = true }: Props) {
   const c = useThemeColors();
   const t = useT();
-  const havuzScrollRef = useDragScroll<HTMLDivElement>();
+  const isDesktop = useIsDesktop();
   const panoScrollRef = useDragScroll<HTMLDivElement>();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [posts, setPosts] = useState<SocialPost[]>([]);
@@ -82,6 +84,11 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   // gerekmiyor. Telefonda ayrıca doğru davranış: sekmeler birbirinin üstüne
   // binmiyor, kullanıcı hangi uygulamaya gideceğini seçiyor.
   const [accountLinks, setAccountLinks] = useState(false);
+  // Açılamayan hesaplar. Doluysa listeye "izni nereden verirsiniz" bloğu
+  // ekleniyor ve liste YALNIZCA açılamayanları gösteriyor — açılmış olanı
+  // tekrar sunmak kullanıcıyı aynı sekmeyi ikinci kez açmaya davet ediyordu.
+  const [blockedAccounts, setBlockedAccounts] = useState<{ account: SocialAccount; url: string }[]>([]);
+  const [settingsCopied, setSettingsCopied] = useState(false);
   const [platformFilter, setPlatformFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [error, setError] = useState("");
@@ -343,6 +350,48 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     [accounts]
   );
 
+  /**
+   * Hesapları aynı anda yeni sekmelerde açar.
+   *
+   * `noopener` seçenek dizesiyle verilmiyor: o hâlde window.open şartname
+   * gereği null döner ve başarılı açılışları da engellenmiş sayardık. Bunun
+   * yerine pencere referansındaki opener elle koparılıyor.
+   *
+   * Engellenen sekme sessizce kaybolduğu için sayılıyor: tarayıcı tek
+   * tıklamadan doğan İLK pencereyi geçirip kalanını engelliyor (window.open
+   * kullanıcı hareketini tüketiyor). Engel varsa liste modali açılıyor —
+   * hem kalanlar tek tek açılabilsin hem de iznin nereden verileceği yazsın.
+   */
+  const openAccountsInBrowser = (hedefler: { account: SocialAccount; url: string }[]) => {
+    const blocked: { account: SocialAccount; url: string }[] = [];
+    for (const hedef of hedefler) {
+      const w = window.open(hedef.url, "_blank");
+      if (w) w.opener = null;
+      else blocked.push(hedef);
+    }
+    setBlockedAccounts(blocked);
+    setSettingsCopied(false);
+    if (blocked.length > 0) setAccountLinks(true);
+  };
+
+  /**
+   * Ayar adresini panoya kopyalar.
+   *
+   * Adresi AÇAMIYORUZ: tarayıcılar chrome:// ve about: şemalarına sayfadan
+   * gezinmeyi güvenlik gereği engelliyor, bağlantı tıklandığında hiçbir şey
+   * olmuyor. Kullanıcının adres çubuğuna yapıştırması gerekiyor; adres
+   * ekranda ayrıca yazılı duruyor ki kopyalama başarısız olsa da elle
+   * yazılabilsin.
+   */
+  const copySettingsUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setSettingsCopied(true);
+    } catch {
+      setSettingsCopied(false);
+    }
+  };
+
   const archiveAccount = async (account: SocialAccount) => {
     if (
       !window.confirm(
@@ -457,11 +506,16 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     };
   }, [posts]);
 
-  /** Kartın solundaki kare önizleme. Medyası olmayan içerikte hiç çizilmez. */
+  /**
+   * Kartın solundaki kare önizleme. Medyası olmayan içerikte hiç çizilmez.
+   *
+   * 18px'ti: görselin ne olduğu anlaşılmıyordu, "medya var" bilgisinden
+   * ötesini vermiyordu. Takvim hücresi buna göre yükseltildi.
+   */
   const kapakKutusu = (post: SocialPost, compact: boolean) => {
     const medya = kapakMedya(post);
     if (!medya) return null;
-    const boy = compact ? 18 : 30;
+    const boy = compact ? 32 : 40;
     const adres = kapakAdresleri[medya.fileId];
     const video = (medya.mimeType ?? "").startsWith("video/");
     const adet = (post.media ?? []).length;
@@ -479,7 +533,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: compact ? 9 : 11,
+          fontSize: compact ? 11 : 13,
           color: c.textSecondary,
         }}
       >
@@ -501,7 +555,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               borderTopLeftRadius: 4,
               background: "rgba(26,31,41,0.72)",
               color: "#fff",
-              fontSize: compact ? 8 : 9,
+              fontSize: compact ? 9 : 10,
               lineHeight: 1.4,
             }}
           >
@@ -512,6 +566,77 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     );
   };
 
+  /**
+   * Pano kartının üstündeki geniş kapak.
+   *
+   * Kare önizleme sütunda işe yaramıyordu: 30px'lik bir kutuda görselin ne
+   * olduğu seçilmiyor, kullanıcı "bu hangi içerikti" sorusunu ancak kartı
+   * açarak cevaplıyordu. Panoda yatayda yer var, kapak da asıl ayırt edici
+   * bilgi — bu yüzden kartın tepesine tam genişlikte konuyor.
+   */
+  const kapakSeridi = (post: SocialPost) => {
+    const medya = kapakMedya(post);
+    if (!medya) return null;
+    const adres = kapakAdresleri[medya.fileId];
+    const video = (medya.mimeType ?? "").startsWith("video/");
+    const adet = (post.media ?? []).length;
+    return (
+      <span
+        title={adet > 1 ? t("{n} medya", { n: adet }) : (medya.name ?? t("medya"))}
+        style={{
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          height: 104,
+          borderRadius: 6,
+          overflow: "hidden",
+          background: "#0000000F",
+          fontSize: 20,
+          color: c.textSecondary,
+        }}
+      >
+        {adres ? (
+          <img src={adres} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <span>{video ? "▶" : "🖼"}</span>
+        )}
+        {adet > 1 && (
+          <span
+            style={{
+              position: "absolute",
+              right: 0,
+              bottom: 0,
+              padding: "1px 5px",
+              borderTopLeftRadius: 4,
+              background: "rgba(26,31,41,0.72)",
+              color: "#fff",
+              fontSize: 10,
+              lineHeight: 1.4,
+            }}
+          >
+            {adet}
+          </span>
+        )}
+      </span>
+    );
+  };
+
+  /** Panoda kartın tarihi — takvimdeki gün artık kartın kendisinde yazmıyor. */
+  const kartTarihi = (post: SocialPost): string | null => {
+    if (!post.scheduledAt) return null;
+    const d = parseServerDate(post.scheduledAt);
+    return `${d.getDate()} ${t(MONTH_LABELS[d.getMonth()])} · ${postTime(post)}`;
+  };
+
+  /**
+   * İçerik kartı.
+   *
+   * `compact` takvim hücresindeki dar hâli (kare önizleme + tek satır),
+   * geniş hâli ise panoda kullanılıyor: kapak şeridi üstte, başlık iki satıra
+   * kadar, altında kanal noktaları ve durum.
+   */
   const postCard = (post: SocialPost, compact: boolean) => (
     <div
       key={post.id}
@@ -521,100 +646,99 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       title={post.caption ?? post.title}
       style={{
         display: "flex",
-        alignItems: compact ? "center" : "flex-start",
-        gap: 6,
-        padding: compact ? "3px 6px" : "6px 8px",
+        flexDirection: compact ? "row" : "column",
+        alignItems: compact ? "center" : "stretch",
+        gap: compact ? 6 : 5,
+        padding: compact ? "4px 6px" : "6px 7px",
         borderRadius: 6,
         cursor: "pointer",
         background: `${postColor(post, accounts)}14`,
         borderLeft: `3px solid ${postColor(post, accounts)}`,
-        fontSize: compact ? 11 : 12,
+        fontSize: compact ? 12 : 13,
         color: c.textPrimary,
       }}
     >
-      {kapakKutusu(post, compact)}
+      {compact ? kapakKutusu(post, true) : kapakSeridi(post)}
       {/* minWidth: 0 — yazı sütununun taşmak yerine kısalması için (flex
           çocuğu varsayılan olarak içeriğinden küçülmüyor). */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 0 }}>
         <span
           style={{
             overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
             fontWeight: 500,
+            lineHeight: 1.35,
             textDecoration: post.status === "cancelled" ? "line-through" : undefined,
+            // Takvim hücresi dar: tek satır ve üç nokta. Panoda başlık iki
+            // satıra kadar açılıyor — kırpılmış başlıktan hangi içerik olduğu
+            // anlaşılmıyordu.
+            ...(compact
+              ? { textOverflow: "ellipsis", whiteSpace: "nowrap" as const }
+              : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }),
           }}
         >
-          {postTime(post) ? `${postTime(post)} · ` : ""}
+          {compact && postTime(post) ? `${postTime(post)} · ` : ""}
           {post.title}
         </span>
         {!compact && (
-          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {channelDots(post)}
-            {statusBadge(post)}
-          </span>
+          <>
+            {kartTarihi(post) && (
+              <span style={{ fontSize: 11, color: c.textSecondary }}>{kartTarihi(post)}</span>
+            )}
+            <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              {channelDots(post)}
+              {statusBadge(post)}
+            </span>
+          </>
         )}
       </div>
     </div>
   );
 
   /**
-   * Fikir havuzunun sütunları — takvime girmeden önceki hazırlık yolu.
+   * Akış panosunun sütunları — içeriğin durumu.
    *
-   * Etiketler uydurulmadı, modülün KENDİ durum sözlüğünden geliyor
-   * (bkz. lib/socialMedia.ts SOCIAL_STATUS): aynı içerik listede ve takvimde de
-   * durumuyla etiketleniyor, havuzda başka bir ad taşısaydı tek bir durum için
-   * iki sözcük dolaşırdı.
+   * Eskiden takvimin altında YALNIZCA "fikir havuzu" vardı (fikir/taslak/onaya
+   * hazır + artakalanlar için "Diğer") ve pano ayrı bir sekmedeydi. İki sorun
+   * çıkıyordu: bir içeriği onaylayınca kart "Onaylandı" sütunu olmadığı için
+   * "Diğer"e düşüyordu — kullanıcı onayladığı içeriği yanlış kutuda görüyordu;
+   * ayrıca aynı akışı görmek için sekme değiştirmek gerekiyordu. Artık tek
+   * görünüm: takvim üstte, TÜM durum sütunları altında.
    *
-   * "Diğer" sütunu yalnızca DOLUYSA çizilir. Onaylanmış ama tarihi olmayan bir
-   * içerik üç sütuna da girmiyor; sütun olmasaydı kart ekrandan kaybolurdu —
-   * kullanıcı onu sildiğimizi sanardı.
+   * Sütunlar modülün kendi durum sözlüğünden geliyor (bkz. lib/socialMedia.ts).
+   * Pasif durumlar (iptal, başarısız) yalnızca o durumda içerik varsa çizilir.
    */
-  const HAVUZ_STATUSLERI: SocialPostStatus[] = ["idea", "draft", "ready"];
+  const panoSutunlari = STATUS_ORDER.filter(
+    (s) => ACTIVE_STATUSES.includes(s) || visiblePosts.some((p) => p.status === s)
+  );
 
-  const havuzSutunlari: {
-    anahtar: string;
-    baslik: string;
-    renk: string;
-    status: SocialPostStatus | null;
-    tutar: (s: SocialPostStatus) => boolean;
-  }[] = [
-    ...HAVUZ_STATUSLERI.map((status) => ({
-      anahtar: status,
-      baslik: t(SOCIAL_STATUS[status].label),
-      renk: SOCIAL_STATUS[status].color,
-      status,
-      tutar: (s: SocialPostStatus) => s === status,
-    })),
-    ...(visiblePosts.some((p) => !p.scheduledAt && !HAVUZ_STATUSLERI.includes(p.status))
-      ? [
-          {
-            anahtar: "diger",
-            baslik: t("Diğer"),
-            renk: c.textSecondary,
-            // Bırakılamaz: "Diğer" bir aşama değil, artakalanların yeri.
-            status: null,
-            tutar: (s: SocialPostStatus) => !HAVUZ_STATUSLERI.includes(s),
-          },
-        ]
-      : []),
-  ];
+  /** Tarihi olmayan, yani takvimde görünmeyen aşamalar. */
+  const TARIHSIZ_STATUSLER: SocialPostStatus[] = ["idea", "draft", "ready"];
 
   /**
-   * Kartı havuzun bir sütununa bırakmak: durumu değiştirir VE tarihi kaldırır.
+   * Kartı panonun bir sütununa bırakmak: durumu değiştirir.
    *
-   * İkisi tek istekte gidiyor; takvimden sürüklenen bir kart için "önce tarihi
-   * sil, sonra durumu değiştir" iki ayrı yazma demekti ve ilki başarılıp
-   * ikincisi düşerse içerik yarım bir durumda kalırdı.
+   * Fikir/taslak/onaya hazır sütunlarına bırakmak AYRICA tarihi kaldırır —
+   * bu üçü "henüz takvimde değil" demek; tarih kalsaydı içerik takvimde
+   * durup panoda "hazırlanıyor" görünürdü. Diğer sütunlarda tarihe
+   * dokunulmuyor: planlanmış bir içeriği onaya geri almak tarihini
+   * silmemeli.
+   *
+   * Durum ve tarih TEK istekte gidiyor; "önce tarihi sil, sonra durumu
+   * değiştir" ikiye bölünürse ilki başarılıp ikincisi düştüğünde içerik yarım
+   * bir durumda kalır.
    */
-  const havuzaTasi = async (postId: string, status: SocialPostStatus | null) => {
-    if (!status) return;
+  const panoyaTasi = async (postId: string, status: SocialPostStatus) => {
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
-    if (post.status === status && !post.scheduledAt) return;
-    setPosts((ps) => ps.map((p) => (p.id === postId ? { ...p, status, scheduledAt: undefined } : p)));
+    const tarihiKaldir = TARIHSIZ_STATUSLER.includes(status);
+    if (post.status === status && (!tarihiKaldir || !post.scheduledAt)) return;
+    setPosts((ps) =>
+      ps.map((p) => (p.id === postId ? { ...p, status, scheduledAt: tarihiKaldir ? undefined : p.scheduledAt } : p))
+    );
     try {
-      upsertPost(await socialMediaApi.updatePost(postId, { status, scheduledAt: null }));
+      upsertPost(
+        await socialMediaApi.updatePost(postId, { status, ...(tarihiKaldir ? { scheduledAt: null } : {}) })
+      );
     } catch {
       load();
     }
@@ -684,7 +808,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                 }}
                 onDoubleClick={() => canWrite && setComposer({ date: day })}
                 style={{
-                  minHeight: 92,
+                  minHeight: 118,
                   padding: 4,
                   display: "flex",
                   flexDirection: "column",
@@ -704,12 +828,11 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           })}
         </div>
 
-        {/* Fikir havuzu: tarihi olmayan içerikler.
-            Eskiden tek bir yığındı ve "burada bekliyor" demekten başka bir şey
-            söylemiyordu; hangi içeriğin yazılmayı beklediği, hangisinin
-            gönderilmeye hazır olduğu ancak kartlar tek tek açılarak
-            anlaşılıyordu. Artık hazırlık aşamasına göre üç sütun — takvime
-            girmeden önceki yol. */}
+        {/* Akış panosu: içeriğin durumu. Takvimin ALTINDA, aynı sekmede —
+            takvim "ne zaman", pano "hangi aşamada" sorusunu cevaplıyor ve
+            ikisi arasında sekme değiştirmek akışı kopartıyordu.
+            Takvimden bir kartı fikir/taslak/onaya hazır sütununa bırakmak
+            tarihini kaldırır (bkz. panoyaTasi). */}
         <div
           style={{
             border: `1px dashed ${c.border}`,
@@ -722,26 +845,26 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         >
           <span style={{ fontSize: 12, color: c.textSecondary }}>
             {t(
-              "Fikir havuzu ({n}) — takvimden buraya sürükleyerek tarihi kaldırır, sütunlar arasında sürükleyerek durumunu değiştirirsin",
+              "Akış — sütunlar arasında sürükleyerek durumu değiştirirsin. Fikir, taslak ve onaya hazır sütunlarına bırakılan içeriğin tarihi kalkar ({n} içerik tarihsiz).",
               { n: unscheduled.length }
             )}
           </span>
-          <div ref={havuzScrollRef} style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
-            {havuzSutunlari.map((sutun) => {
-              const items = unscheduled.filter((p) => sutun.tutar(p.status));
+          <div ref={panoScrollRef} style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
+            {panoSutunlari.map((status) => {
+              const items = visiblePosts.filter((p) => p.status === status);
               return (
                 <div
-                  key={sutun.anahtar}
+                  key={status}
                   onDragOver={(e) => canWrite && e.preventDefault()}
                   onDrop={(e) => {
                     if (!canWrite) return;
                     e.stopPropagation();
                     const id = e.dataTransfer.getData("text/plain");
-                    if (id) havuzaTasi(id, sutun.status);
+                    if (id) panoyaTasi(id, status);
                   }}
                   style={{
-                    minWidth: 190,
-                    flex: "1 1 190px",
+                    minWidth: 200,
+                    flex: "1 1 200px",
                     background: c.background,
                     border: `1px solid ${c.border}`,
                     borderRadius: 8,
@@ -752,25 +875,30 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 500, color: sutun.renk }}>{sutun.baslik}</span>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: SOCIAL_STATUS[status].color }}>
+                      {t(SOCIAL_STATUS[status].label)}
+                    </span>
                     <span style={{ fontSize: 11, color: c.textSecondary }}>{items.length}</span>
                   </div>
                   {items.length === 0 && (
                     <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Buraya sürükle")}</span>
                   )}
                   {items.map((p) => (
-                    <div key={p.id} style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>{postCard(p, false)}</div>
-                      {canWrite && (
-                        <button
-                          onClick={() => archivePost(p)}
-                          aria-label={t("Kaldır")}
-                          title={t("Kaldır")}
-                          style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
-                        >
-                          <IconTrash size={12} color={c.textSecondary} />
-                        </button>
-                      )}
+                    <div key={p.id} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>{postCard(p, false)}</div>
+                        {canWrite && (
+                          <button
+                            onClick={() => archivePost(p)}
+                            aria-label={t("Kaldır")}
+                            title={t("Kaldır")}
+                            style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
+                          >
+                            <IconTrash size={12} color={c.textSecondary} />
+                          </button>
+                        )}
+                      </div>
+                      {publishRow(p)}
                     </div>
                   ))}
                 </div>
@@ -849,62 +977,6 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
             {publishing === post.id ? t("Yayımlanıyor…") : t("Şimdi paylaş")}
           </button>
         )}
-      </div>
-    );
-  };
-
-  // ============================================================ Liste (durum panosu)
-  const list = () => {
-    const columns = STATUS_ORDER.filter(
-      (s) => ACTIVE_STATUSES.includes(s) || visiblePosts.some((p) => p.status === s)
-    );
-    return (
-      <div ref={panoScrollRef} style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
-        {columns.map((status) => {
-          const items = visiblePosts.filter((p) => p.status === status);
-          return (
-            <div
-              key={status}
-              style={{
-                minWidth: 200,
-                flex: "1 1 200px",
-                background: c.background,
-                border: `1px solid ${c.border}`,
-                borderRadius: 8,
-                padding: 8,
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: SOCIAL_STATUS[status].color }}>
-                  {t(SOCIAL_STATUS[status].label)}
-                </span>
-                <span style={{ fontSize: 11, color: c.textSecondary }}>{items.length}</span>
-              </div>
-              {items.map((p) => (
-                <div key={p.id} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>{postCard(p, false)}</div>
-                    {canWrite && (
-                      <button
-                        onClick={() => archivePost(p)}
-                        aria-label={t("Arşivle")}
-                        title={t("Arşivle")}
-                        style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
-                      >
-                        <IconTrash size={12} color={c.textSecondary} />
-                      </button>
-                    )}
-                  </div>
-                  {publishRow(p)}
-                </div>
-              ))}
-              {items.length === 0 && <span style={{ fontSize: 11, color: c.textSecondary }}>—</span>}
-            </div>
-          );
-        })}
       </div>
     );
   };
@@ -1115,6 +1187,41 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
 
   // ============================================================ Yerleşim
 
+  // Tarayıcı bir kez algılanır; user-agent oturum içinde değişmiyor.
+  const popupHint = useMemo(() => popupSettingsHint(), []);
+
+  /**
+   * İzin adımları — tarayıcıya göre değişiyor.
+   *
+   * Chromium türevlerinin ayar sayfası aynı yapıda, yalnızca şeması farklı
+   * (chrome://, edge://, brave://, opera://); metin de bu yüzden ortak.
+   */
+  const permissionSteps = () => {
+    const site = typeof window !== "undefined" ? window.location.origin : "";
+    switch (popupHint.key) {
+      case "chrome":
+      case "edge":
+      case "brave":
+      case "opera":
+        return t(
+          "{tarayici}: aşağıdaki adresi adres çubuğuna yapıştırın, açılan sayfada “İzin verilenler” bölümünde Ekle deyip {site} adresini yazın.",
+          { tarayici: popupHint.label, site }
+        );
+      case "firefox":
+        return t(
+          "Firefox: aşağıdaki adresi adres çubuğuna yapıştırın, “Açılır pencereleri engelle” satırındaki İstisnalar düğmesinden {site} adresini ekleyin.",
+          { site }
+        );
+      case "safari":
+        return t(
+          "Safari: menü çubuğundan Safari → Ayarlar → Web Siteleri → Açılır Pencereler yolunu izleyip {site} için “İzin Ver” seçin.",
+          { site }
+        );
+      default:
+        return t("Tarayıcınızın site ayarlarından {site} adresine açılır pencere (pop-up) izni verin.", { site });
+    }
+  };
+
   /** Hesap açma düğmesinin stili — tek hesapta <a>, çoklu hesapta <button>. */
   const accountsButtonStyle: CSSProperties = {
     display: "flex",
@@ -1201,7 +1308,13 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               </a>
             ) : (
               <button
-                onClick={() => setAccountLinks(true)}
+                // Masaüstünde hepsi birden açılır; engel çıkarsa modal devreye
+                // girer. Telefonda hiç denenmiyor: sekmeler birbirinin üstüne
+                // biniyor ve her adres kendi uygulamasına atladığı için
+                // kullanıcı ilkinde kalıyor, kalanlar arkada kayboluyor.
+                onClick={() =>
+                  isDesktop ? openAccountsInBrowser(openableAccounts) : setAccountLinks(true)
+                }
                 title={openableAccounts.map((x) => `${accountLabel(x.account)} — ${x.url}`).join("\n")}
                 style={accountsButtonStyle}
               >
@@ -1236,8 +1349,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       )}
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-        {tab("calendar", t("Takvim"))}
-        {tab("list", t("Akış"))}
+        {tab("calendar", t("Takvim ve akış"))}
         {tab("accounts", `${t("Hesaplar")} · ${accounts.length}`)}
 
         {view !== "accounts" && (
@@ -1345,8 +1457,6 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         </div>
       ) : view === "calendar" ? (
         calendar()
-      ) : view === "list" ? (
-        list()
       ) : (
         accountList()
       )}
@@ -1388,18 +1498,91 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           tarayıcının kendi gezinmesi, window.open'la açılan sekme çoğu zaman
           uygulamayı değil web sürümünü açıyor. */}
       {accountLinks && (
-        <Modal title={t("Hesapları aç")} onClose={() => setAccountLinks(false)} maxWidth={420}>
+        <Modal
+          title={t("Hesapları aç")}
+          onClose={() => {
+            setAccountLinks(false);
+            setBlockedAccounts([]);
+          }}
+          maxWidth={460}
+        >
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.5 }}>
-              {t("Açmak istediğiniz hesabı seçin. Her hesap yeni sekmede açılır.")}
-            </span>
-            {openableAccounts.map(({ account: a, url }) => (
+            {blockedAccounts.length > 0 ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  background: `${c.warning}14`,
+                  border: `1px solid ${c.warning}33`,
+                }}
+              >
+                <span style={{ fontSize: 13, color: c.textPrimary, lineHeight: 1.5 }}>
+                  {t("Tarayıcı {n} sekmeyi engelledi.", { n: blockedAccounts.length })}{" "}
+                  <span style={{ color: c.textSecondary }}>
+                    {t(
+                      "Bir tıklamadan yalnızca bir sekme açılabiliyor; hepsinin birden açılması için bu siteye açılır pencere izni vermeniz gerekiyor. İzni tarayıcı veriyor, site isteyemiyor."
+                    )}
+                  </span>
+                </span>
+
+                <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.6 }}>{permissionSteps()}</span>
+
+                {popupHint.settingsUrl && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <code
+                      style={{
+                        fontSize: 12,
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                        background: c.background,
+                        border: `1px solid ${c.border}`,
+                        color: c.textPrimary,
+                        userSelect: "all",
+                      }}
+                    >
+                      {popupHint.settingsUrl}
+                    </code>
+                    <button
+                      onClick={() => copySettingsUrl(popupHint.settingsUrl as string)}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        background: c.accent,
+                        border: "none",
+                        color: "#fff",
+                      }}
+                    >
+                      {settingsCopied ? t("Kopyalandı — adres çubuğuna yapıştırın") : t("Ayar adresini kopyala")}
+                    </button>
+                  </div>
+                )}
+
+                <span style={{ fontSize: 11, color: c.textSecondary, lineHeight: 1.5 }}>
+                  {t("İzni verdikten sonra sayfayı yenileyin; düğme hepsini tek tıkla açar.")}{" "}
+                  {t("Aşağıdaki hesaplar açılamadı — tek tek açabilirsiniz.")}
+                </span>
+              </div>
+            ) : (
+              <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.5 }}>
+                {t("Açmak istediğiniz hesabı seçin. Her hesap yeni sekmede açılır.")}
+              </span>
+            )}
+            {(blockedAccounts.length > 0 ? blockedAccounts : openableAccounts).map(({ account: a, url }) => (
               <a
                 key={a.id}
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                onClick={() => setAccountLinks(false)}
+                onClick={() => {
+                  setAccountLinks(false);
+                  setBlockedAccounts([]);
+                }}
                 style={{
                   display: "flex",
                   alignItems: "center",

@@ -133,9 +133,13 @@ export const sosyal: TranslationDict = {
   "Hesabı tarayıcıda aç": "Open account in the browser",
   "Tarayıcıda aç": "Open in the browser",
   "{n} hesabı tarayıcıda aç": { one: "Open {n} account in the browser", other: "Open {n} accounts in the browser" },
-  "{n} hesap açılamadı — tarayıcı yeni sekmeleri engelledi. Bu site için açılır pencere iznini verin.": {
-    one: "{n} account couldn't be opened — the browser blocked the new tab. Allow pop-ups for this site.",
-    other: "{n} accounts couldn't be opened — the browser blocked the new tabs. Allow pop-ups for this site.",
+  "Hesapları aç": "Open accounts",
+  "Açmak istediğiniz hesabı seçin.": "Pick the account you want to open.",
+  "Açmak istediğiniz hesabı seçin. Hepsinin tek tıkla açılması için adres çubuğundaki engellenen pencere simgesinden bu siteye açılır pencere izni verip sayfayı yenileyin.":
+    "Pick the account you want to open. To open them all with one click, allow pop-ups for this site from the blocked-window icon in the address bar, then reload the page.",
+  "Tarayıcı {n} sekmeyi engelledi. Listeden tek tek açabilir ya da adres çubuğundaki engellenen pencere simgesinden bu siteye izin verebilirsiniz.": {
+    one: "The browser blocked {n} tab. Open them one by one from the list, or allow pop-ups for this site from the blocked-window icon in the address bar.",
+    other: "The browser blocked {n} tabs. Open them one by one from the list, or allow pop-ups for this site from the blocked-window icon in the address bar.",
   },
   "Hesabı arşivle": "Archive account",
   "İçerik ekle": "Add content",

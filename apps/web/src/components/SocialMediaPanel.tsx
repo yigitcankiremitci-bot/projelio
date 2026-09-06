@@ -27,11 +27,13 @@ import {
 import { parseServerDate } from "../lib/dates";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
+import Modal from "./Modal";
 import SocialAccountModal from "./SocialAccountModal";
 import SocialCredentialsModal from "./SocialCredentialsModal";
 import SocialPostComposer from "./SocialPostComposer";
 import { IconChevronLeft, IconChevronRight, IconEdit, IconExternalLink, IconTrash } from "./icons";
 import { useDragScroll } from "../lib/useDragScroll";
+import { useIsDesktop } from "../lib/useIsDesktop";
 
 interface Props {
   organizationId?: string;
@@ -59,6 +61,7 @@ type View = "calendar" | "list" | "accounts";
 export default function SocialMediaPanel({ organizationId, departmentId, jobId, canWrite = true }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const isDesktop = useIsDesktop();
   const havuzScrollRef = useDragScroll<HTMLDivElement>();
   const panoScrollRef = useDragScroll<HTMLDivElement>();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -72,6 +75,14 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   // Giriş bilgileri ayrı bir modalde: şifre hesap formunun bir alanı DEĞİL.
   // Hesabı düzenleyen herkes şifreyi görmüyor (bkz. SocialCredentialsModal).
   const [credentialsFor, setCredentialsFor] = useState<SocialAccount | null>(null);
+  // Telefonda hepsini birden açmak işe yaramıyor (bkz. openAccounts): orada
+  // düğme bu listeyi açar, kullanıcı hangi hesaba gideceğini kendisi seçer.
+  const [accountLinks, setAccountLinks] = useState(false);
+  // Tarayıcı bir kez engellediyse aynı sayfada tekrar denemenin anlamı yok:
+  // ikinci tıklama da aynı uyarıyı üretirdi. Bilgi bilerek kalıcı DEĞİL
+  // (localStorage değil, state) — kullanıcı açılır pencere iznini verip
+  // sayfayı yenilediğinde "hepsini aç" kendiliğinden geri gelsin.
+  const [popupsBlocked, setPopupsBlocked] = useState(false);
   const [platformFilter, setPlatformFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [error, setError] = useState("");
@@ -334,7 +345,12 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   );
 
   /**
-   * Hesapları yeni sekmelerde açar.
+   * Hesapları yeni sekmelerde açar — YALNIZCA masaüstünde.
+   *
+   * Telefonda anlamsız: sekmeler arka arkaya açılıp birbirinin üstüne biniyor,
+   * üstelik her adres kendi uygulamasına (Instagram, Facebook) atladığı için
+   * kullanıcı ilk uygulamada kalıyor, kalanlar arkada kayboluyor. Orada düğme
+   * bunun yerine hesap listesini açar (bkz. accountLinks).
    *
    * Tarayıcılar tek bir tıklamadan doğan İKİNCİ pencereden itibaren engel
    * çıkarabiliyor; engellenen sekme sessizce kaybolduğu için kullanıcı
@@ -351,12 +367,20 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       if (w) w.opener = null;
       else blocked++;
     }
+    // Engel çıktıysa kullanıcıyı hata mesajıyla baş başa bırakmıyoruz: Chrome
+    // tek tıklamadan doğan İLK pencereyi geçirip kalanını engelliyor, yani
+    // "2 hesap" diyen düğme bir hesabı açıp diğerine hata veriyordu. Aynı
+    // listeyi modalde açmak, kullanıcının kalanları tek tıkla (kendi
+    // hareketiyle, dolayısıyla engelsiz) açmasını sağlıyor.
     if (blocked > 0) {
+      setPopupsBlocked(true);
+      setAccountLinks(true);
       setBanner({
         kind: "error",
-        text: t("{n} hesap açılamadı — tarayıcı yeni sekmeleri engelledi. Bu site için açılır pencere iznini verin.", {
-          n: blocked,
-        }),
+        text: t(
+          "Tarayıcı {n} sekmeyi engelledi. Listeden tek tek açabilir ya da adres çubuğundaki engellenen pencere simgesinden bu siteye izin verebilirsiniz.",
+          { n: blocked }
+        ),
       });
     } else {
       setBanner(null);
@@ -1190,27 +1214,33 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               girmediği için accounts.length kullanılmıyor. */}
           {openableAccounts.length > 0 && (
             <button
-              onClick={() => openAccountsInBrowser(openableAccounts.map((x) => x.url))}
+              onClick={() =>
+                isDesktop && !popupsBlocked
+                  ? openAccountsInBrowser(openableAccounts.map((x) => x.url))
+                  : setAccountLinks(true)
+              }
               title={openableAccounts.map((x) => `${accountLabel(x.account)} — ${x.url}`).join("\n")}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
-                fontSize: 15,
+                gap: 7,
+                fontSize: 13,
                 fontWeight: 600,
-                padding: "11px 20px",
-                borderRadius: 10,
+                padding: "8px 14px",
+                borderRadius: 9,
                 cursor: "pointer",
                 background: c.accent,
                 border: "none",
                 color: "#fff",
-                boxShadow: `0 2px 6px ${c.accent}55`,
+                boxShadow: `0 1px 4px ${c.accent}55`,
               }}
             >
-              <IconExternalLink size={18} color="#fff" />
-              {openableAccounts.length === 1
-                ? t("Hesabı tarayıcıda aç")
-                : t("{n} hesabı tarayıcıda aç", { n: openableAccounts.length })}
+              <IconExternalLink size={15} color="#fff" />
+              {!isDesktop
+                ? t("Hesapları aç")
+                : openableAccounts.length === 1
+                  ? t("Hesabı tarayıcıda aç")
+                  : t("{n} hesabı tarayıcıda aç", { n: openableAccounts.length })}
             </button>
           )}
         </div>
@@ -1384,6 +1414,77 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           onClose={() => setAccountModal(null)}
           onSaved={load}
         />
+      )}
+
+      {/* Telefonda "hepsini aç"ın karşılığı: hesabı kullanıcı seçer, satır
+          doğrudan o kanalın uygulamasına gider. Satırlar buton değil <a>:
+          telefonda bağlantıyı uygulamaya yönlendiren şey (universal link)
+          tarayıcının kendi gezinmesi, window.open'la açılan sekme çoğu zaman
+          uygulamayı değil web sürümünü açıyor. */}
+      {accountLinks && (
+        <Modal title={t("Hesapları aç")} onClose={() => setAccountLinks(false)} maxWidth={420}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.5 }}>
+              {popupsBlocked
+                ? t(
+                    "Açmak istediğiniz hesabı seçin. Hepsinin tek tıkla açılması için adres çubuğundaki engellenen pencere simgesinden bu siteye açılır pencere izni verip sayfayı yenileyin."
+                  )
+                : t("Açmak istediğiniz hesabı seçin.")}
+            </span>
+            {openableAccounts.map(({ account: a, url }) => (
+              <a
+                key={a.id}
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setAccountLinks(false)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: `1px solid ${c.border}`,
+                  background: c.surface,
+                  textDecoration: "none",
+                }}
+              >
+                <span
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 9,
+                    background: `${accountColor(a)}22`,
+                    color: accountColor(a),
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    flexShrink: 0,
+                  }}
+                >
+                  {t(SOCIAL_PLATFORMS[a.platform].label).slice(0, 2)}
+                </span>
+                <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                  <span style={{ fontSize: 14, color: c.textPrimary }}>{accountLabel(a)}</span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: c.textSecondary,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    @{a.handle} · {t(SOCIAL_PLATFORMS[a.platform].label)}
+                  </span>
+                </span>
+                <IconExternalLink size={15} color={c.textSecondary} />
+              </a>
+            ))}
+          </div>
+        </Modal>
       )}
     </div>
   );

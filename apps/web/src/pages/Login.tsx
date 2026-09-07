@@ -65,7 +65,7 @@ export default function Login() {
         password: girisSifre,
       });
       localStorage.setItem("projelio_token", token);
-      window.location.href = "/";
+      window.location.href = guvenliHedef();
     } catch (err) {
       // Backend bazı durumlarda (ör. Google ile kaydolmuş bir hesaba şifreyle
       // giriş denemesi) özel, yardımcı bir mesaj döndürüyor — genel "hatalı"
@@ -316,4 +316,17 @@ export default function Login() {
       </div>
     </div>
   );
+}
+
+/**
+ * Girişten sonra gidilecek adres.
+ *
+ * Yalnızca UYGULAMA İÇİ bir yol kabul edilir: "/" ile başlamalı ve "//" ile
+ * başlamamalı. Aksi halde `?hedef=https://baska-site` ile açık yönlendirme
+ * (open redirect) yapılabilir ve kimlik avı için birebir kullanılırdı.
+ */
+function guvenliHedef(): string {
+  const hedef = new URLSearchParams(window.location.search).get("hedef");
+  if (!hedef || !hedef.startsWith("/") || hedef.startsWith("//")) return "/";
+  return hedef;
 }

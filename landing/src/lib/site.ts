@@ -57,6 +57,21 @@ export const appLinks = {
   demo: process.env.NEXT_PUBLIC_DEMO_URL || `${site.appUrl}/login?demo=1`,
 };
 
+/**
+ * "Bu paketi seç" bağlantısı — panelin paket ekranına, seçim önceden işaretli
+ * olarak gider. Giriş yapılmamışsa panel kişiyi giriş ekranına yollar ve
+ * girişten sonra BU adrese geri getirir (bkz. apps/web/src/App.tsx hedef).
+ *
+ * Ödeme formu kendiliğinden açılmaz: kullanıcı ne satın aldığını panelde bir
+ * kez daha görüp onaylar.
+ */
+export function checkoutHref(planKey: string, period: "monthly" | "yearly"): string {
+  return `${site.appUrl}/settings/billing?plan=${encodeURIComponent(planKey)}&period=${period}`;
+}
+
+/** Panelin herkese açık fiyat ucu (bkz. backend billing-public.controller.ts). */
+export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.projelio.app";
+
 export const legalSlugs = ["privacy", "terms", "kvkk", "distance", "refund"] as const;
 export type LegalSlug = (typeof legalSlugs)[number];
 
@@ -76,6 +91,19 @@ export function formatTRY(value: number, locale: Locale | string = "tr"): string
     style: "currency",
     currency: "TRY",
     maximumFractionDigits: 0,
+  }).format(value);
+}
+
+/**
+ * Vitrin fiyatı ABD doları olarak gösterilir (tahsilat TL).
+ * Kuruş her zaman yazılır: "$4.99" yerine "$5" göstermek fiyatı yanlış aktarır.
+ */
+export function formatUSD(value: number, locale: Locale | string = "tr"): string {
+  return new Intl.NumberFormat(locale === "en" ? "en-US" : "tr-TR", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 

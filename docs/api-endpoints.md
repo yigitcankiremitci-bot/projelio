@@ -25,7 +25,7 @@ Aksi belirtilmedikçe tüm uçlar `Authorization: Bearer <JWT>` başlığı gere
 
 ## Kimlik doğrulaması gerektirmeyen uçlar
 
-Kodda **6 tane** var, hepsi kasıtlı (`node scripts/uc-listesi.mjs` ile doğrulanır):
+Hepsi kasıtlı (`node scripts/uc-listesi.mjs` ile doğrulanır):
 
 | Uç | Neden açık |
 |---|---|
@@ -35,6 +35,11 @@ Kodda **6 tane** var, hepsi kasıtlı (`node scripts/uc-listesi.mjs` ile doğrul
 | `POST /public/projects/:token/unlock` | Paylaşımın e-posta kapısı |
 | `GET /social/instagram/callback` | OAuth dönüşü (Meta çağırır) |
 | `POST /whatsapp/webhook` | WAHA çağırır; HMAC imzasıyla doğrulanır |
+| `GET /billing/public/plans` | Tanıtım sitesi fiyat listesini buradan okur (fiyat zaten kamuya açık) |
+| `POST /billing/iyzico/callback` | Ödeme formunun tarayıcı dönüşü; hiçbir şeye "ödendi" demez, sonucu iyzico'ya sorar |
+| `POST /billing/iyzico/webhook` | iyzico çağırır; `X-IYZ-SIGNATURE-V3` ile doğrulanır |
+| `POST /billing/apple/notifications` | App Store bildirimi — yalnızca ipucu, durum Apple'a sorulur |
+| `POST /billing/google/notifications` | Google Play RTDN — yalnızca ipucu, durum Google'a sorulur |
 
 ## Auth (`/auth`)
 
@@ -141,6 +146,39 @@ koşulda dönmez.
 | Method | Path | Açıklama | Query |
 |---|---|---|---|
 | GET | `/calendar` | Filtrelenmiş görev listesi | `?projectId=<id>&scope=mine\|team` |
+
+## Abonelik / paketler (`/billing`)
+
+Kurulum ve iyzico paneli adımları: `docs/odeme-kurulumu.md`.
+
+| Method | Path | Açıklama | Body |
+|---|---|---|---|
+| GET | `/billing/plans` | Paket listesi + mevcut abonelik + sağlayıcı durumu | — |
+| GET | `/billing/subscription` | Yürürlükteki plan (kendi aboneliğin yoksa şirketinki) | — |
+| POST | `/billing/checkout` | iyzico ödeme formunu başlatır | `{ planKey, period, scope?, organizationId? }` |
+| POST | `/billing/checkout/confirm` | Ödeme sonucunu iyzico'ya sorar (iki kez çağrılabilir) | `{ token }` |
+| POST | `/billing/subscription/:id/cancel` | İptal — erişim dönem sonuna kadar sürer | — |
+| POST | `/billing/subscription/:id/card-update` | Kart güncelleme formu | — |
+| GET | `/billing/store/status` | Apple/Google doğrulaması açık mı | — |
+| POST | `/billing/store/apple` | iOS satın almasını doğrular | `{ originalTransactionId }` |
+| POST | `/billing/store/google` | Android satın almasını doğrular | `{ purchaseToken }` |
+| GET | `/billing/admin/settings` | Katalog + sağlayıcıdaki plan kodları | — |
+| PATCH | `/billing/admin/settings/plan-ref` | Plan kodu/tutarını yazar | `{ provider, planKey, period, referenceCode, priceAmount, currency }` |
+| PATCH | `/billing/admin/settings/usd-try` | Vitrin kuru (tahsilatta kullanılmaz) | `{ rate }` |
+| GET | `/billing/admin/subscriptions` | Tüm abonelikler (`?status=`) | — |
+| POST | `/billing/admin/run-renewals` | Gecelik dönem bakımını elle tetikler | — |
+
+Fiyat ve kredi miktarı **istemciden alınmaz**: yalnızca `planKey` + `period`
+gönderilir, değerler sunucudaki katalogdan (`billing.plans.ts`) ve sağlayıcıdaki
+plandan (`billing_plan_refs`) okunur.
+
+Abonelik satırı açmak **kredi yüklemez**. Kredi tek yoldan geçer ve dönem başına
+bir kez yüklenir: `subscription_credit_grants(subscription_id, period_start)`
+tekil indeksi ikinci yüklemeyi veritabanı düzeyinde reddeder. Yıllık abone parayı
+yılda bir öder ama krediyi her ay alır; ay sınırını gecelik iş geçirir.
+
+`past_due` (çekim başarısız) durumu **hak vermeye devam eder**: tek bir banka
+hatası yüzünden erişimi kesmek geri kazanılamayan bir müşteri kaybıdır.
 
 ## AI Kredileri (`/ai`)
 

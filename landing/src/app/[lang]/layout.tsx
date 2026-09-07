@@ -81,7 +81,7 @@ export default async function LangLayout({
       "@type": "Offer",
       price: "0",
       priceCurrency: "TRY",
-      description: dict.pricing.personal[0].name,
+      description: dict.pricing.plans[0].name,
     },
     publisher: {
       "@type": "Organization",

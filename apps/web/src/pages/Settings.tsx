@@ -26,6 +26,7 @@ import {
   IconChevronRight,
   IconArchive,
   IconSparkle,
+  IconStar,
   IconUser,
   IconFile,
 } from "../components/icons";
@@ -551,6 +552,16 @@ export default function Settings() {
               <div style={{ borderTop: `1px solid ${c.border}` }} />
             </>
           )}
+
+          <button onClick={() => navigate("/settings/billing")} style={linkRowStyle}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <IconStar size={17} color={c.accent} filled />
+              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("Paketim")}</span>
+            </span>
+            <IconChevronRight size={16} color={c.textSecondary} />
+          </button>
+
+          <div style={{ borderTop: `1px solid ${c.border}` }} />
 
           <button onClick={() => navigate("/settings/ai-credits")} style={linkRowStyle}>
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>

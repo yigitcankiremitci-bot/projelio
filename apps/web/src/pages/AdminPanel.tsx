@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconShield } from "../components/icons";
 import AiCreditAdminPanel from "../components/AiCreditAdminPanel";
+import BillingAdminPanel from "../components/BillingAdminPanel";
 import SupportAdminPanel from "../components/SupportAdminPanel";
 import DemoAdminPanel from "../components/DemoAdminPanel";
 import WhatsappNumbersPanel from "../components/WhatsappNumbersPanel";
@@ -87,6 +88,10 @@ export default function AdminPanel() {
       </p>
 
       <AiCreditAdminPanel />
+
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
+        <BillingAdminPanel />
+      </div>
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
         <SupportAdminPanel />

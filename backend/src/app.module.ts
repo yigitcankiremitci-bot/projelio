@@ -26,6 +26,7 @@ import { AdminModule } from "./modules/admin/admin.module";
 import { SupportModule } from "./modules/support/support.module";
 import { ArchiveModule } from "./modules/archive/archive.module";
 import { AiAssistantModule } from "./modules/ai-assistant/ai-assistant.module";
+import { BillingModule } from "./modules/billing/billing.module";
 import { HabieModule } from "./modules/habie/habie.module";
 import { GoogleModule } from "./modules/google/google.module";
 import { MicrosoftModule } from "./modules/microsoft/microsoft.module";
@@ -81,6 +82,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     SupportModule,
     ArchiveModule,
     AiAssistantModule,
+    BillingModule,
     HabieModule,
     GoogleModule,
     MicrosoftModule,

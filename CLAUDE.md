@@ -25,9 +25,10 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | API referansı | `docs/api-endpoints.md` (seçilmiş uçlar) + `node scripts/uc-listesi.mjs` (tam liste) |
 | Modül sistemi tasarımı | `docs/moduller/` — 20 belge; README'de faz tablosu |
 | Tanıtım sitesi (Next.js) | `landing/` |
+| Abonelik / ödeme (iyzico + mağazalar) | `backend/src/modules/billing/` — kurulum `docs/odeme-kurulumu.md` |
 | WhatsApp köprüsü (WAHA yan-servisi + modül) | `backend/src/modules/whatsapp/`, `deploy/docker-compose.prod.yml` `waha` servisi, tasarım `docs/whatsapp-qr-plan.md` |
 
-Backend'de 46 modül, 450'den fazla HTTP ucu var (`node scripts/uc-listesi.mjs` ile
+Backend'de 48 modül, 500'den fazla HTTP ucu var (`node scripts/uc-listesi.mjs` ile
 listelenir — elle yazılmış liste bayatlıyor). Lio =
 `modules/ai-assistant/`; araç tanımları `ai-assistant.tools.ts`, kredi sistemi
 `ai-credits.service.ts` + `ai-credits.config.ts`, sağlayıcı katmanı
@@ -121,6 +122,8 @@ Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 | Yedek yaşam sinyali | `PROJELIO_YEDEK_PING` | aynı dosya |
 | WhatsApp'tan Lio'ya komut | `WHATSAPP_LIO_KOMUT=1` | `backend/.env` |
 | Lio'nun AI sağlayıcı sırası | `AI_PROVIDERS` | `backend/.env` (ya da Admin paneli) |
+| Abonelik tahsilatı | `IYZICO_API_KEY` + `IYZICO_SECRET_KEY` | `backend/.env` (plan kodları Admin panelinde) |
+| Mağaza abonelikleri | `APPSTORE_*` / `PLAY_*` | `backend/.env` |
 
 `AI_PROVIDERS` sağlayıcıları hem **açar** hem **sıralar** — virgülle ayrılmış,
 soldan sağa öncelikli:
@@ -212,6 +215,44 @@ veritabanı ölüyken bile 200 döner.
 
 Değişiklik sonrası **her zaman `npm run typecheck` çalıştır.** Tüm test setini
 değil, dokunduğun alanın testlerini `--filter` ile koştur.
+
+## Abonelik ve ödeme
+
+Paketler (Starter / Pro / Business) `backend/src/modules/billing/`'de. Kurulum
+adımları ve iyzico paneli işleri: `docs/odeme-kurulumu.md`.
+
+**Fiyatın tek kaynağı `billing.plans.ts`.** Vitrin fiyatı USD; tahsilat TRY ve o
+tutar **iyzico'nun ödeme planında sabittir**, canlı kurla hesaplanmaz. Kur canlı
+olsaydı kullanıcıya gösterilen tutarla çekilen tutar her an ayrışırdı; abonelikte
+fiyat bir kez sabitlenir. Fiyat değiştirmek = iyzico'da **yeni plan açmak**; yeni
+referans kodu Admin panelinden `billing_plan_refs`'e yazılır, eski aboneler eski
+tutarla devam eder.
+
+Tanıtım sitesi (`landing/`) npm workspace'i olmadığı için kataloğu içe aktaramaz;
+fiyatı `GET /billing/public/plans` ucundan okur ve API kapalıysa sözlükteki yedek
+kopyaya düşer. **Fiyatı landing'e elle yazma.**
+
+Değişmez kurallar:
+
+- **Abonelik satırı açmak kredi yüklemez.** Kredi tek yoldan geçer ve dönem
+  başına bir kez yüklenir — `subscription_credit_grants(subscription_id,
+  period_start)` tekil indeksi ikinciyi veritabanı düzeyinde reddeder.
+- **Yıllık abone parayı yılda bir öder, krediyi her ay alır.** Ay sınırını
+  gecelik iş geçirir (`billing-renewal.processor.ts`, 03:20). Kredi ayı abonelik
+  tarihine sabitlenir (ayın 7'sinde abone olan her ayın 7'sinde alır).
+- **`past_due` hak vermeye devam eder.** Tek bir başarısız çekim yüzünden erişimi
+  kesmek geri kazanılamayan bir müşteri kaybıdır; iyzico zaten yeniden deniyor.
+- **Ödemenin kanıtı sağlayıcının API'sidir**, tarayıcının callback'e dönmesi
+  değil — o adrese elle de gidilebilir.
+- **Mağaza (Apple/Google) doğrulaması bildirimle değil, mağazaya sorularak
+  yapılır.** İstemciden gelen `originalTransactionId` / `purchaseToken` bir
+  kimliktir, kanıt değil. Bu yüzden mağaza bildirimlerinin imzası doğrulanmıyor:
+  karar zaten bildirime dayanmıyor.
+- **`IYZICO_BASE_URL` tanımsızsa kum havuzu** kullanılır. Varsayılanı üretim
+  yapmak, yarım kalmış bir kurulumda gerçek kartlardan para çekmek demekti.
+
+Kredi *paketleri* (tek seferlik yükleme, `ai_credit_orders`) ayrı ve duruyor:
+abonelik onun yerine değil, yanına geldi.
 
 ## Bu repoda geçerli konvansiyonlar
 

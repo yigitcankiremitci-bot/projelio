@@ -22,12 +22,12 @@ export const privacyDoc: LegalDoc = {
     tr: {
       title: "Gizlilik Politikası",
       lede: "Hangi veriyi neden topladığımızı, kimlerle paylaştığımızı ve haklarınızı nasıl kullanacağınızı anlatır.",
-      effective: "4 Eylül 2026",
+      effective: "7 Eylül 2026",
     },
     en: {
       title: "Privacy Policy",
       lede: "What data we collect and why, who we share it with, and how you can exercise your rights.",
-      effective: "4 September 2026",
+      effective: "7 September 2026",
     },
   },
   sections: {
@@ -59,7 +59,7 @@ export const privacyDoc: LegalDoc = {
           "Sosyal medya hesap bilgileri: sosyal medya modülünde bir hesabın kullanıcı adı ve parolasını saklamayı seçerseniz, parola veritabanına şifrelenmiş olarak yazılır. Varsayılan kapalıdır: modülü görebilen biri parolanın varlığını görür, değerini görmez. Parolayı yalnızca kaydı giren kişi, ilgili yönetici ve yöneticinin açıkça izin verdiği kişiler görüntüleyebilir; her görüntüleme kim, ne zaman ve hangi hakla sorularının cevabıyla birlikte kaydedilir.",
           "İletişim ve destek bilgileri: bize gönderdiğiniz e-postalar, destek talepleri, hata bildirimleri, ekran görüntüleri, anket ve geri bildirim yanıtları.",
           "Lio'ya yazdıklarınız: asistana gönderdiğiniz mesajların içeriği, varsa ilettiğiniz dosya ve görseller ve asistanın verdiği yanıtlar.",
-          "Faturalandırma bilgileri: fatura unvanı, adres, vergi dairesi ve vergi numarası ile satın alma kayıtlarınız. Kart bilgilerini hiç toplamıyoruz: şu anda ödemeler banka havalesi/EFT ile alınıyor, sistemde yalnızca siparişin kaydı tutuluyor. Bir ödeme kuruluşu entegrasyonu devreye girdiğinde de kart bilgileri sunucularımıza uğramayacak, doğrudan lisanslı kuruluşun altyapısında işlenecek ve bu politika güncellenecektir.",
+          "Faturalandırma bilgileri: fatura unvanı, adres, vergi dairesi ve vergi numarası ile satın alma ve abonelik kayıtlarınız. Kart bilgilerini hiç toplamıyoruz ve sunucularımızda saklamıyoruz: ödeme, lisanslı ödeme kuruluşu iyzico'nun kendi ödeme formu üzerinden alınır ve kart bilgisi doğrudan onların altyapısında işlenir. Bize yalnızca ödemenin sonucu ve aboneliğin referans numarası döner. Aboneliğinizin yenilenmesi ve kartınızın saklanması da iyzico tarafında yürür; kartınızı değiştirmek istediğinizde yine onların formu açılır.",
         ],
       },
       {
@@ -233,7 +233,7 @@ export const privacyDoc: LegalDoc = {
           "Veri sorumlusu: [ŞİRKET UNVANI], [ADRES], [VERBİS KAYIT NUMARASI].",
           "Gizlilikle ilgili tüm sorularınız, talepleriniz ve şikâyetleriniz için: info@projelio.app",
           "Avrupa Ekonomik Alanı ve Birleşik Krallık'taki ilgili kişiler için temsilcimiz: [AB/BK TEMSİLCİSİ — İSİM VE ADRES].",
-          "Yürürlük tarihi: 4 Eylül 2026.",
+          "Yürürlük tarihi: 7 Eylül 2026.",
         ],
       },
     ],
@@ -265,7 +265,7 @@ export const privacyDoc: LegalDoc = {
           "Social media account credentials: if you choose to store an account's username and password in the social media module, the password is written to the database encrypted. It is closed by default: someone who can see the module sees that a password exists, not its value. Only the person who entered it, the relevant administrator and people the administrator has explicitly authorised can reveal it, and every reveal is logged with who, when and under which right.",
           "Communication and support information: emails you send us, support requests, bug reports, screenshots, survey and feedback responses.",
           "What you write to Lio: the content of the messages you send the assistant, any files or images you attach, and the answers it returns.",
-          "Billing information: billing name, address, tax office and tax number, and your purchase records. We do not collect card details at all: payments are currently taken by bank transfer and only the order record is kept in the system. When a payment provider is integrated, card details still will not reach our servers — they will be processed on the licensed provider's own infrastructure — and this policy will be updated.",
+          "Billing information: billing name, address, tax office and tax number, and your purchase and subscription records. We do not collect or store card details at all: payment is taken through the payment form of iyzico, a licensed payment institution, and card details are processed directly on their infrastructure. Only the payment result and the subscription reference number come back to us. Renewals and card storage also run on iyzico's side; when you want to change your card, their form opens again.",
         ],
       },
       {
@@ -439,7 +439,7 @@ export const privacyDoc: LegalDoc = {
           "Data controller: [COMPANY LEGAL NAME], [ADDRESS], [VERBIS REGISTRATION NUMBER].",
           "For any privacy question, request or complaint: info@projelio.app",
           "Our representative for individuals in the European Economic Area and the United Kingdom: [EU/UK REPRESENTATIVE — NAME AND ADDRESS].",
-          "Effective date: 4 September 2026.",
+          "Effective date: 7 September 2026.",
         ],
       },
     ],

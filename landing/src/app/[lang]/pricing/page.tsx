@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getDict, type Locale } from "@/i18n";
 import { appLinks, path, site } from "@/lib/site";
 import PricingTables from "@/components/PricingTables";
+import { canliFiyatlar } from "@/lib/plans";
 import Faq from "@/components/Faq";
 import { ArrowRight, CheckSmall } from "@/components/Icons";
 
@@ -25,6 +26,8 @@ export default async function PricingPage({ params }: { params: Promise<{ lang: 
   const locale = lang as Locale;
   const dict = getDict(lang);
   const pricingFaq = dict.faq.categories[2].items;
+  // Fiyatın tek kaynağı panel; ulaşılamazsa sözlükteki yedek kopya kullanılır.
+  const canli = await canliFiyatlar();
 
   return (
     <>
@@ -38,7 +41,7 @@ export default async function PricingPage({ params }: { params: Promise<{ lang: 
             <p className="lede">{dict.pricing.hero.lede}</p>
           </div>
 
-          <PricingTables dict={dict} locale={locale} />
+          <PricingTables dict={dict} locale={locale} canli={canli} />
         </div>
       </section>
 

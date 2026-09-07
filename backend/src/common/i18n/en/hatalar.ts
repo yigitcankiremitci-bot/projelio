@@ -527,4 +527,46 @@ export const hatalar: TranslationDict = {
   "Bu klasörü Projelio yönetiyor; adı bağlı olduğu proje/görev değiştiğinde değişir.":
     "Projelio manages this folder; its name changes when the project/task it belongs to changes.",
   "Üst klasör bulunamadı": "Parent folder not found",
+  // Abonelik / ödeme (migration 092, modules/billing).
+  "Geçersiz paket.": "Invalid plan.",
+  "Geçersiz ödeme dönemi.": "Invalid billing period.",
+  "Şirket aboneliği için şirket seçilmeli.": "Pick a company for a company subscription.",
+  "Şirket aboneliğini yalnızca şirket sahibi satın alabilir.":
+    "Only the company owner can buy a company subscription.",
+  "Şirket bulunamadı.": "Company not found.",
+  "Abonelik bulunamadı.": "Subscription not found.",
+  "Bu abonelik sana ait değil.": "This subscription isn't yours.",
+  "Bu abonelik zaten iptal edilmiş.": "This subscription is already cancelled.",
+  "Bu abonelik için kart güncellenemiyor.": "The card can't be updated for this subscription.",
+  "Zaten bir paketin var. Değiştirmek için önce mevcut aboneliği iptal et ya da destekten yardım iste.":
+    "You already have a plan. To switch, cancel the current one first or ask support for help.",
+  "Bu paket şu an satın alınamıyor. Lütfen bizimle iletişime geç.":
+    "This plan can't be purchased right now. Please get in touch with us.",
+  "Ödeme sağlayıcısı henüz yapılandırılmamış.": "The payment provider isn't configured yet.",
+  "Ödeme sağlayıcısı yapılandırılmamış.": "The payment provider isn't configured.",
+  "Ödeme sağlayıcısına ulaşılamadı, biraz sonra tekrar dene.":
+    "Couldn't reach the payment provider, please try again shortly.",
+  "Ödeme sağlayıcısından beklenmeyen yanıt.": "Unexpected response from the payment provider.",
+  "Ödeme jetonu eksik.": "The payment token is missing.",
+  // Mağazalar (App Store / Google Play).
+  "İşlem kimliği eksik.": "The transaction id is missing.",
+  "Satın alma jetonu eksik.": "The purchase token is missing.",
+  "Mağaza ürün kimliği okunamadı.": "Couldn't read the store product id.",
+  "Bu ürün henüz tanımlı değil. Lütfen destek ile iletişime geç.":
+    "This product isn't set up yet. Please contact support.",
+  "Bu satın alma App Store'da bulunamadı.": "This purchase wasn't found in the App Store.",
+  "Bu satın alma Google Play'de bulunamadı.": "This purchase wasn't found on Google Play.",
+  "Bu abonelik App Store'da etkin değil.": "This subscription isn't active in the App Store.",
+  "Bu abonelik Google Play'de etkin değil.": "This subscription isn't active on Google Play.",
+  "App Store doğrulaması yapılandırılmamış.": "App Store verification isn't configured.",
+  "Google Play doğrulaması yapılandırılmamış.": "Google Play verification isn't configured.",
+  "App Store'a ulaşılamadı.": "Couldn't reach the App Store.",
+  "Google Play'e ulaşılamadı.": "Couldn't reach Google Play.",
+  "Google Play kimlik doğrulaması başarısız.": "Google Play authentication failed.",
+  "Bu abonelik App Store üzerinden alınmış; iptali iPhone Ayarlar > Apple Kimliği > Abonelikler'den yapılır.":
+    "This subscription was bought through the App Store; cancel it in iPhone Settings > Apple Account > Subscriptions.",
+  "Bu abonelik Google Play üzerinden alınmış; iptali Play Store > Abonelikler'den yapılır.":
+    "This subscription was bought through Google Play; cancel it in Play Store > Subscriptions.",
+  "Bu abonelik elle tanımlanmış; iptal için destek ile iletişime geç.":
+    "This subscription was set up manually; contact support to cancel it.",
 };

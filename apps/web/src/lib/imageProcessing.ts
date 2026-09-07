@@ -1,9 +1,15 @@
 // Kapak fotoğraflarını sunucuya göndermeden önce sabit boyuta kırpıp
 // sıkıştırır, böylece depolamada gereksiz yer kaplamazlar.
 
-const TARGET_WIDTH = 1200;
-const TARGET_HEIGHT = 400;
-const JPEG_QUALITY = 0.8;
+// Kapak ölçüsü 1200×400'dü ve "kapaklar çok kalitesiz" şikayetinin sebebi buydu:
+// kapak masaüstünde sayfanın tam genişliğini kaplıyor (~1400 CSS px) ve retina
+// ekranda bunun iki katı gerçek piksel isteniyor. 1200 piksellik bir görsel
+// oraya gerilince belirgin şekilde bulanıklaşıyordu. 2000×667 aynı 3:1 oranı
+// koruyor, %0.82 kalitede dosya birkaç yüz KB'de kalıyor — kapaklar zaten
+// kullanıcının kendi bulut deposunda değil, sunucuda ve sayfa başına bir tane.
+const TARGET_WIDTH = 2000;
+const TARGET_HEIGHT = 667;
+const JPEG_QUALITY = 0.82;
 
 function loadImageElement(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -97,7 +103,7 @@ export async function resizeCoverImage(file: File): Promise<File> {
 /**
  * Ürün fotoğrafı — kapak fotoğrafından oranıyla ayrılır.
  *
- * ORAN. Kapaklar 1200×400 (3:1) bir afiş şeridi; sayfanın tepesinde bir doku
+ * ORAN. Kapaklar 2000×667 (3:1) bir afiş şeridi; sayfanın tepesinde bir doku
  * olmaları yeterli. Ürün fotoğrafı ise ürünün KENDİSİ: 3:1'e sıkıştırılan bir
  * sandalye fotoğrafından geriye oturma yeri kalmıyordu. Burada 4:3 kullanılıyor,
  * kart da bu orana göre yükseltildi (bkz. ProductCard COVER_HEIGHT).

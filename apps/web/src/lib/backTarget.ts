@@ -78,6 +78,54 @@ export function nextBackMemo(prev: BackMemo | null, pathname: string, from: unkn
   return null;
 }
 
+/**
+ * Sabit uygulama sayfalarının adları. Yalnızca ADI VERİLERİ OLMADAN BİLİNEN
+ * sayfalar var: `/jobs/:id` gibi detay sayfalarının adı ancak kayıt yüklenince
+ * belli olur, o yüzden onlar burada YOK — `hereAsBack` null döner ve hedef
+ * sayfa kendi sabit ebeveynine düşer (zaten doğru olan davranış).
+ */
+const SAYFA_ADLARI: Record<string, string> = {
+  "/": "Ana Sayfa",
+  "/tasks": "Yapılacaklar",
+  "/calendar": "Takvim",
+  "/organizations": "Şirketler",
+  "/groups": "Gruplar",
+  "/archive": "Arşiv",
+  "/settings": "Ayarlar",
+};
+
+/** Anasayfanın sekmeleri ayrı birer sayfa gibi geziliyor (bkz. Dashboard ?tab=). */
+const ANASAYFA_SEKMELERI: Record<string, string> = {
+  budget: "Kasa",
+  files: "Dosyalar",
+  modules: "Modüller",
+};
+
+/**
+ * Şu an bulunulan sayfayı bir geri hedefi olarak paketler.
+ *
+ * NEDEN: departman sayfasına sidebar'dan girildiğinde geri bağlantısı hep
+ * "← Departmanlar" (şirketin departman sekmesi) diyordu — kullanıcı anasayfadan
+ * gelmişse hiç görmediği bir sayfaya düşüyordu. Atlamayı yapan taraf nereden
+ * gelindiğini söylemediği sürece hedef sayfanın bunu bilmesinin yolu yok.
+ *
+ * Adı bilinmeyen sayfalarda null döner: yanlış bir etiketle geri göndermektense
+ * sayfanın kendi sabit ebeveynine düşmek daha doğru.
+ */
+export function hereAsBack(pathname: string, search: string): BackTarget | null {
+  const label =
+    pathname === "/"
+      ? ANASAYFA_SEKMELERI[new URLSearchParams(search).get("tab") ?? ""] ?? SAYFA_ADLARI["/"]
+      : SAYFA_ADLARI[pathname];
+  if (!label) return null;
+  return { to: `${pathname}${search}`, label };
+}
+
+export function useHereAsBack(): BackTarget | null {
+  const location = useLocation();
+  return hereAsBack(location.pathname, location.search);
+}
+
 export function useBackTarget(fallback: BackTarget): BackTarget {
   const location = useLocation();
   const memo = useRef<BackMemo | null>(null);

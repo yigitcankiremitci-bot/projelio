@@ -74,6 +74,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Archive = lazy(() => import("./pages/Archive"));
 const TasksOverview = lazy(() => import("./pages/TasksOverview"));
 const AiCreditsPage = lazy(() => import("./pages/AiCredits"));
+const BillingPage = lazy(() => import("./pages/Billing"));
 
 const HEADER_HEIGHT = 76;
 
@@ -621,7 +622,13 @@ export default function App() {
   }
 
   if (!hasToken) {
-    return <Navigate to="/login" replace />;
+    // Gitmek istediği adres kaybolmasın: tanıtım sitesinden "paket seç" ile
+    // gelen kişi henüz giriş yapmamış olabilir ve girişten sonra ana sayfaya
+    // düşerse seçtiği paket unutulur. Hedef adres yalnızca uygulama içi bir
+    // yol olarak taşınıyor (bkz. Login.tsx guvenliHedef) — dışarıdan gelen
+    // adresle açık yönlendirme yapılmasın.
+    const hedef = `${location.pathname}${location.search}`;
+    return <Navigate to={`/login?hedef=${encodeURIComponent(hedef)}`} replace />;
   }
 
   // İş/Proje/Rutin/Organizasyon/Departman/Grup detay sayfaları en üstte tam
@@ -653,7 +660,7 @@ export default function App() {
     {/* Sesli + yazılı kullanım turu. Kurulum sihirbazı hâlâ açıkken kendiliğinden
         başlamaz (autoStartEnabled); kullanıcı isterse sağ üstteki "?" düğmesinden
         her an başlatabilir. */}
-    <TourProvider autoStartEnabled={Boolean(me?.onboardingCompletedAt)}>
+    <TourProvider autoStartEnabled={Boolean(me?.onboardingCompletedAt)} serverSeen={me?.toursSeen}>
     <div style={{ minHeight: "100vh" }}>
       {/* fallback={null}: bu üç parça arka planda inerken ekranda bir şey
           göstermeye gerek yok — kabuk zaten çizilmiş durumda. */}
@@ -806,6 +813,7 @@ export default function App() {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/settings/archive" element={<Archive />} />
                 <Route path="/settings/ai-credits" element={<AiCreditsPage />} />
+                <Route path="/settings/billing" element={<BillingPage />} />
                 <Route path="/admin" element={<AdminPanel />} />
               </Routes>
             </Suspense>

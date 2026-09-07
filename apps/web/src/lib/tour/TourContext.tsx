@@ -13,6 +13,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import type { Tour, TourStep } from "./types";
 import { TOURS, getTour, toursForPath } from "./tours";
 import * as narrator from "./narrator";
+import { api } from "../../api/client";
 
 const STORAGE_SEEN = "projelio_tour_seen_v1";
 const STORAGE_VOICE = "projelio_tour_voice_v1";
@@ -76,6 +77,7 @@ export function useTour(): TourApi {
 export function TourProvider({
   children,
   autoStartEnabled = false,
+  serverSeen,
 }: {
   children: ReactNode;
   /**
@@ -83,6 +85,15 @@ export function TourProvider({
    * (Kurulum sihirbazı açıkken ya da kullanıcı henüz yüklenmemişken false.)
    */
   autoStartEnabled?: boolean;
+  /**
+   * Sunucudaki "görüldü" listesi (bkz. /auth/me toursSeen, migration 093).
+   *
+   * NEDEN GEREKLİ: liste eskiden yalnızca localStorage'daydı, yani kullanıcıya
+   * değil TARAYICIYA aitti — evdeki bilgisayarda, telefonda ya da gizli sekmede
+   * eğitim baştan açılıyordu. Tanımsız gelmesi "kullanıcı henüz yüklenmedi"
+   * demek (hata değil): o hâlde yalnızca yereldeki liste kullanılır.
+   */
+  serverSeen?: string[];
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -98,6 +109,23 @@ export function TourProvider({
     return Number.isFinite(raw) && raw >= 0.5 && raw <= 2 ? raw : 1;
   });
   const [seen, setSeen] = useState<string[]>(() => readSeen());
+
+  // Sunucudan gelen liste yereldekiyle BİRLEŞTİRİLİYOR, üzerine yazılmıyor:
+  // kullanıcı bu tarayıcıda turu bitirip henüz sunucuya yazılmadan sayfayı
+  // yenilemiş olabilir; o durumda eski liste geri gelip eğitimi tekrar açardı.
+  useEffect(() => {
+    if (!serverSeen) return;
+    setSeen((prev) => {
+      const birlesik = Array.from(new Set([...prev, ...serverSeen]));
+      if (birlesik.length === prev.length) return prev;
+      try {
+        localStorage.setItem(STORAGE_SEEN, JSON.stringify(birlesik));
+      } catch {
+        /* depolama kapalıysa liste yalnızca bu oturumda yaşar */
+      }
+      return birlesik;
+    });
+  }, [serverSeen]);
   /** Son yön: eksik (optional) adım atlanırken hangi tarafa gidileceğini belirler. */
   const directionRef = useRef<1 | -1>(1);
 
@@ -113,6 +141,11 @@ export function TourProvider({
       } catch {
         /* depolama kapalıysa tur yine çalışsın, sadece "görüldü" hatırlanmaz */
       }
+      // Asıl kayıt sunucuda: yereldeki kopya yalnızca aynı sekmede anında
+      // etkili olsun diye duruyor. Hata yutuluyor — turu bitirmiş bir kullanıcıya
+      // "kaydedilemedi" demenin bir karşılığı yok, en kötü ihtimalle başka bir
+      // tarayıcıda bir kez daha görür.
+      void api.patch("/users/me/tours-seen", { toursSeen: next }).catch(() => {});
       return next;
     });
   }, []);

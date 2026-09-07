@@ -76,6 +76,15 @@ export class UsersController {
     return this.usersService.updateLocale(req.user.userId, locale);
   }
 
+  /**
+   * Görülen eğitim turları. Eskiden yalnızca localStorage'daydı, yani her yeni
+   * tarayıcıda eğitim baştan açılıyordu (bkz. migration 093).
+   */
+  @Patch("me/tours-seen")
+  updateToursSeen(@Req() req: any, @Body("toursSeen") toursSeen: unknown) {
+    return this.usersService.updateToursSeen(req.user.userId, toursSeen);
+  }
+
   // Ayarlar > Hesap. Şifresini UNUTANLAR buradan geçmez — o akış giriş ekranındaki
   // /auth/forgot-password (bkz. password-reset.service.ts).
   @Patch("me/password")

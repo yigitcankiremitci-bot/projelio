@@ -29,8 +29,8 @@ import { IconLayers, IconSettings } from "../components/icons";
 import { useT } from "../lib/i18n";
 
 // Bir departmanın kendi sayfası: iç dinamikler üstteki sekmelerle ayrılır —
-// Sosyal (Twitter mantığında paylaşım/yorum/beğeni akışı), Görevler (doğrudan
-// kanban — "Çıktılar" ara katmanı yok), Ekip (kadro), Bütçe (görev bütçesi
+// Sosyal (Twitter mantığında paylaşım/yorum/beğeni akışı), Görevler (projedeki
+// panonun aynısı — Görevler/Çıktılar geçişi dahil), Ekip (kadro), Bütçe (görev bütçesi
 // onayları + otomatik hesaplanan özetler + genel gelir/gider defteri), Modüller
 // (departmana özel etkinleştirilen araçlar). Bkz. ProjectDetail/ProjectTabs ile
 // birebir aynı desen; sekmeler ?tab= sorgu parametresiyle tutulur.
@@ -106,7 +106,15 @@ export default function DepartmentDetail() {
         ? null
         : { label: "Kişi davet et", onClick: () => teamRef.current?.openCreate() }
       : activeTab === "tasks"
-      ? { label: "Görev ekle", onClick: () => tasksRef.current?.openCreate() }
+      ? {
+          // Sekme artık hem görev hem çıktı barındırıyor; "+" hangisini
+          // eklediğini sormalı (bkz. ProjectDetail'deki aynı menü).
+          label: "Görev veya çıktı ekle",
+          options: [
+            { label: "Yeni görev", onClick: () => tasksRef.current?.openCreate() },
+            { label: "Yeni çıktı", onClick: () => tasksRef.current?.openCreateOutput() },
+          ],
+        }
       : activeTab === "budget"
       ? access?.canManage === false
         ? null

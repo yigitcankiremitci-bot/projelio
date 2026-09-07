@@ -42,6 +42,8 @@ export interface UserRecord {
   onboardingModules?: string[];
   // Arayüz dili. Boşsa kullanıcı seçim yapmamıştır; bkz. migration 087.
   locale?: Locale;
+  // Kullanıcıya bir kez gösterilmiş eğitim turları; bkz. migration 093.
+  toursSeen?: string[];
 }
 
 // Dışarıya (frontend'e) dönülen güvenli kullanıcı görünümü - şifre hash'i içermez.
@@ -102,6 +104,7 @@ function mapUser(row: any): UserRecord {
     useCases: row.use_cases ?? undefined,
     onboardingModules: row.onboarding_modules ?? undefined,
     locale: row.locale ?? undefined,
+    toursSeen: row.tours_seen ?? undefined,
   };
 }
 
@@ -117,6 +120,9 @@ function toPublicUser(user: UserRecord): PublicUser {
     // Dil de kişisel bir tercih: başkasının hangi dilde çalıştığı kimseyi
     // ilgilendirmiyor. Kişinin kendisi bunu /auth/me'den alıyor.
     locale: _locale,
+    // Kimin hangi eğitimi izlediği de yalnızca kişinin kendisini ilgilendiriyor;
+    // /auth/me'den geliyor, başkasının görünümünde yok.
+    toursSeen: _toursSeen,
     ...publicUser
   } = user;
   return publicUser;
@@ -508,6 +514,29 @@ export class UsersService {
     // yoksa hemen ardından gelen bildirim eski dilde giderdi.
     this.diller.unut(userId);
     return toPublicUser(mapUser(row));
+  }
+
+  /**
+   * Görülen eğitim turlarını kaydeder (bkz. migration 093).
+   *
+   * Liste İSTEMCİDEN OLDUĞU GİBİ alınıyor, birleştirme yapılmıyor: tur durumu
+   * tek bir yerde (istemcideki TourContext) tutuluyor ve orada zaten sunucudan
+   * gelen listenin üstüne ekleniyor. Sunucuda ikinci bir birleştirme mantığı
+   * kurmak, iki tarafın da "doğru liste bende" sandığı bir durum yaratırdı.
+   *
+   * Tur kimlikleri kod tarafında tanımlı (bkz. apps/web lib/tour/tours.ts);
+   * burada içerik doğrulanmıyor, yalnızca boyut sınırlanıyor — bilinmeyen bir
+   * kimlik hiçbir şeye zarar vermez, sadece hiçbir tura karşılık gelmez.
+   */
+  async updateToursSeen(userId: string, ids: unknown): Promise<{ toursSeen: string[] }> {
+    if (!Array.isArray(ids)) throw new BadRequestException("Tur listesi bekleniyor");
+    const temiz = Array.from(
+      new Set(ids.filter((x): x is string => typeof x === "string" && x.length > 0 && x.length <= 80))
+    ).slice(0, 200);
+
+    const { error } = await this.supabase.client.from("users").update({ tours_seen: temiz }).eq("id", userId);
+    if (error) throw error;
+    return { toursSeen: temiz };
   }
 
   /**

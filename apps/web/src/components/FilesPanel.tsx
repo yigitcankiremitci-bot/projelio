@@ -643,6 +643,63 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
         </div>
       )}
 
+      {/*
+        Görev/çıktı ekleri (compact) için ince araç çubuğu.
+
+        SORUN: compact modda başlık satırı hiç çizilmiyor ve "+" düğmesi de
+        modalın içinde erişilemiyor (bkz. fabInHeader). Dosya ekleme seçenekleri
+        yalnızca BOŞ durum kutusunda duruyordu; göreve bir dosya ekledikten
+        sonra ikincisini Drive'dan seçmenin hiçbir yolu kalmıyordu — geriye
+        yalnızca sürükleyip bırakmak vardı.
+
+        Boşken çizilmiyor: aynı iki düğme boş durum kutusunda zaten var, küçük
+        bir modalda iki kez göstermek kalabalık yaratıyordu.
+      */}
+      {compact && !readOnly && !driveMissing && (files.length > 0 || folders.length > 0) && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          {connectedProvider && (
+            <button
+              type="button"
+              onClick={handleBrowseDriveClick}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 12px",
+                borderRadius: 8,
+                border: `1px solid ${c.border}`,
+                background: "transparent",
+                color: c.textPrimary,
+                fontSize: 14,
+                cursor: "pointer",
+              }}
+            >
+              <IconFolder size={14} color={c.textSecondary} />
+              {connectedProvider === "microsoft" ? t("OneDrive'dan seç") : t("Drive'dan seç")}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 12px",
+              borderRadius: 8,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textPrimary,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            <IconUpload size={14} color={c.textSecondary} />
+            {t("Bilgisayardan seç")}
+          </button>
+        </div>
+      )}
+
       {pickerError && <div style={{ color: c.danger, fontSize: 14, marginBottom: 10 }}>{pickerError}</div>}
 
       <input

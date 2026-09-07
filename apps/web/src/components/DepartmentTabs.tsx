@@ -4,8 +4,8 @@ import TabBar from "./TabBar";
 export type DepartmentTab = "flow" | "team" | "tasks" | "budget" | "modules" | "files";
 
 // Bir departmanın iç dinamikleri: Sosyal (Twitter mantığında paylaşım/yorum/
-// beğeni), Ekip (kadro), Görevler (doğrudan kanban — projedeki gibi ayrı bir
-// "Çıktılar" ara katmanı yok), Bütçe (görev bütçesi onay akışı + otomatik
+// beğeni), Ekip (kadro), Görevler (projedekiyle aynı pano — Görevler/Çıktılar
+// geçişi dahil, bkz. DepartmentTasksPanel), Bütçe (görev bütçesi onay akışı + otomatik
 // hesaplanan özetler + genel defter), Modüller (departmana özel etkinleştirilen
 // araçlar), Dosyalar (departmana özel Drive klasörü).
 export const DEPARTMENT_TABS: { key: DepartmentTab; label: string }[] = [

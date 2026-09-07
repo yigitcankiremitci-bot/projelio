@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { BudgetOverview, BudgetTransaction, RecurringPayment } from "@projelio/shared";
 import { api } from "../api/client";
 import { useRefreshOnUndo } from "../lib/undo";
 import { FAB_PRIORITY, useProjectFabAction } from "../lib/projectFab";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useIsDesktop, useIsWide } from "../lib/useIsDesktop";
 import AddBudgetEntryModal from "./AddBudgetEntryModal";
 import AddRecurringPaymentModal from "./AddRecurringPaymentModal";
 import { useUndo } from "../lib/undo";
@@ -26,6 +27,42 @@ const intervalLabels: Record<string, string> = {
   monthly: "Her ay", // dil:anahtar
   yearly: "Her yıl", // dil:anahtar
 };
+
+// Kasa listelerinin sıralaması. Etiketler t() ile kullanıldıkları yerde
+// çevriliyor (bkz. intervalLabels'daki not).
+type SiralamaKey = "tarih-yeni" | "tarih-eski" | "tutar-cok" | "tutar-az";
+
+const siralamaSecenekleri: { key: SiralamaKey; label: string }[] = [
+  { key: "tarih-yeni", label: "Yeni → eski" }, // dil:anahtar
+  { key: "tarih-eski", label: "Eski → yeni" }, // dil:anahtar
+  { key: "tutar-cok", label: "Tutar: çok → az" }, // dil:anahtar
+  { key: "tutar-az", label: "Tutar: az → çok" }, // dil:anahtar
+];
+
+/**
+ * Listeyi seçilen ölçüte göre sıralar.
+ *
+ * Kopya üzerinde çalışıyor: gelen dizi doğrudan sunucu yanıtının state'i ve
+ * sort() yerinde sıralar — kaynağı bozarsak sıralamayı değiştirmek eski sırayı
+ * geri getiremez hale gelir.
+ */
+function sirala<T extends { amount: number }>(
+  liste: T[],
+  key: SiralamaKey,
+  tarihAl: (kayit: T) => string
+): T[] {
+  const kopya = [...liste];
+  switch (key) {
+    case "tarih-eski":
+      return kopya.sort((a, b) => tarihAl(a).localeCompare(tarihAl(b)));
+    case "tutar-cok":
+      return kopya.sort((a, b) => Number(b.amount) - Number(a.amount));
+    case "tutar-az":
+      return kopya.sort((a, b) => Number(a.amount) - Number(b.amount));
+    default:
+      return kopya.sort((a, b) => tarihAl(b).localeCompare(tarihAl(a)));
+  }
+}
 
 const typeLabels: Record<string, string> = {
   income: "Gelen ödeme", // dil:anahtar
@@ -74,6 +111,9 @@ export default function BudgetPanel() {
   const [editingTransaction, setEditingTransaction] = useState<BudgetTransaction | null>(null);
   const [addingRecurring, setAddingRecurring] = useState(false);
   const [editingRecurring, setEditingRecurring] = useState<RecurringPayment | null>(null);
+  const [siralama, setSiralama] = useState<SiralamaKey>("tarih-yeni");
+  const isDesktop = useIsDesktop();
+  const isWide = useIsWide();
   const { pushUndo, pushDestructive } = useUndo();
   // Anasayfadaki "+" düğmesi, sayfa kendi eylemini KAYDETMEZSE varsayılana —
   // "Yeni iş"e — düşüyor (bkz. BottomNav.tsx). Bütçe sekmesi bunu kaydetmediği
@@ -191,6 +231,25 @@ export default function BudgetPanel() {
     reload();
   };
 
+  // Kasa listeleri tek sütunda çok uzuyordu: geniş ekranda üç sütun, masaüstünde
+  // iki, telefonda tek. Kartların içi zaten flexWrap ile sarıyor.
+  const listeIzgarasi = {
+    display: "grid",
+    gridTemplateColumns: isWide ? "repeat(3, 1fr)" : isDesktop ? "repeat(2, 1fr)" : "1fr",
+    gap: 8,
+    alignItems: "start",
+  } as const;
+
+  const siraliHareketler = useMemo(
+    () => sirala(transactions, siralama, (h) => h.occurredAt),
+    [transactions, siralama]
+  );
+  // Düzenli ödemelerde "tarih" vadesi: sıralamanın karşılığı bir sonraki ödeme günü.
+  const siraliDuzenli = useMemo(
+    () => sirala(recurring, siralama, (r) => r.nextDueDate),
+    [recurring, siralama]
+  );
+
   const cardStyle = {
     border: `1px solid ${c.border}`,
     borderRadius: 12,
@@ -243,7 +302,7 @@ export default function BudgetPanel() {
             {t("Henüz bütçesi olan bir projen yok.")}
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={listeIzgarasi}>
             {overview.projects.map((p) => {
               const progress = p.agreedFee > 0 ? Math.min(100, (p.received / p.agreedFee) * 100) : 0;
               return (
@@ -308,6 +367,34 @@ export default function BudgetPanel() {
         )}
       </section>
 
+      {/* Sıralama iki listeyi birden yönetir: kullanıcı "ödemeler" derken
+          düzenli olanla gerçekleşeni ayırmıyor, iki ayrı menü koymak da aynı
+          soruyu iki kez sordurur. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Sırala")}</span>
+        {siralamaSecenekleri.map((secenek) => {
+          const secili = secenek.key === siralama;
+          return (
+            <button
+              key={secenek.key}
+              type="button"
+              onClick={() => setSiralama(secenek.key)}
+              style={{
+                padding: "5px 11px",
+                borderRadius: 999,
+                fontSize: 13,
+                fontWeight: 500,
+                border: `1px solid ${secili ? c.accent : c.border}`,
+                background: secili ? `${c.accent}1a` : c.surface,
+                color: secili ? c.accent : c.textSecondary,
+              }}
+            >
+              {t(secenek.label)}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Düzenli ödemeler */}
       <section>
         <h2 style={sectionTitle}>{t("Düzenli ödemeler")}</h2>
@@ -319,8 +406,8 @@ export default function BudgetPanel() {
             )}
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {recurring.map((r) => (
+          <div style={listeIzgarasi}>
+            {siraliDuzenli.map((r) => (
               <div key={r.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", opacity: r.active ? 1 : 0.55 }}>
                 <div style={{ flex: 1, minWidth: 160 }}>
                   <div style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>
@@ -381,8 +468,8 @@ export default function BudgetPanel() {
             {t('Henüz bir hareket yok. Gelir/gider eklemek için sayfadaki "+" düğmesini kullan.')}
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {transactions.map((hareket) => (
+          <div style={listeIzgarasi}>
+            {siraliHareketler.map((hareket) => (
               <div key={hareket.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 160 }}>
                   <div style={{ fontSize: 15, color: c.textPrimary }}>

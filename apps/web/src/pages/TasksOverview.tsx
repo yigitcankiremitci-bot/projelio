@@ -627,6 +627,9 @@ export default function TasksOverview() {
         onArchive={() => setConfirmingBulkAction("archive")}
         onDelete={() => setConfirmingBulkAction("delete")}
         lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
+        onSelectAll={() => selection.selectAll(tasks.map((g) => g.id))}
+        onDeselectAll={selection.deselectAll}
+        selectableCount={tasks.length}
       />
     </>
   );

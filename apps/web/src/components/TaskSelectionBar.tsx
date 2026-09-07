@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconArchive, IconCheck, IconCopy, IconIndent, IconMove, IconTrash, IconX } from "./icons";
+import { IconArchive, IconCheck, IconCopy, IconIndent, IconListCheck, IconMove, IconTrash, IconX } from "./icons";
 import { LioMascotIcon } from "./AskLioButton";
 import { askLioAboutMany } from "../lib/askLio";
 import type { LioSubject } from "../lib/askLio";
@@ -40,6 +40,19 @@ interface Props {
    */
   lioTasks?: LioSubject[];
   /**
+   * Tek hamlede "hepsini seç" / "seçimi boşalt". İkisi de verilmezse düğme
+   * çizilmez — bazı listelerde (ör. karışık kaynaklı Yapılacaklar) "tümü"nün
+   * karşılığı belirsiz.
+   *
+   * Neden var: kullanıcı bir sürü görev seçip vazgeçtiğinde işaretleri TEK TEK
+   * kaldırmak zorunda kalıyordu; "Vazgeç" ise seçim modunu da kapatıp
+   * baştan başlatıyordu.
+   */
+  onSelectAll?: () => void;
+  onDeselectAll?: () => void;
+  /** Seçilebilir toplam öğe sayısı — düğmenin hangi yöne çalışacağını belirler. */
+  selectableCount?: number;
+  /**
    * Panolardaki tek satırlık araç çubuğunun (ve kaydırınca beliren sabit
    * şeridin) içine yerleşmek için.
    *
@@ -72,6 +85,9 @@ export default function TaskSelectionBar({
   onArchive,
   onDelete,
   lioTasks,
+  onSelectAll,
+  onDeselectAll,
+  selectableCount = 0,
   inline,
 }: Props) {
   const c = useThemeColors();
@@ -119,12 +135,26 @@ export default function TaskSelectionBar({
     ariaLabel: string,
     icon: ReactNode,
     onClick: () => void,
-    options: { danger?: boolean; borderless?: boolean; alwaysEnabled?: boolean } = {}
+    options: { danger?: boolean; borderless?: boolean; alwaysEnabled?: boolean; alwaysLabel?: boolean } = {}
   ) => {
     const off = options.alwaysEnabled ? false : disabled;
     const border = options.borderless ? "none" : `1px solid ${options.danger ? c.danger : c.border}`;
-    const style: CSSProperties = inline
+    const style: CSSProperties = inline && !options.alwaysLabel
       ? { display: "flex", padding: 8, borderRadius: 7, border, background: "transparent", flexShrink: 0 }
+      : inline
+      ? {
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          padding: "7px 11px",
+          borderRadius: 7,
+          border,
+          background: "transparent",
+          color: options.danger ? c.danger : c.textSecondary,
+          fontSize: 13,
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+        }
       : {
           display: "flex",
           alignItems: "center",
@@ -147,13 +177,27 @@ export default function TaskSelectionBar({
         style={{ ...style, opacity: off ? 0.5 : 1, cursor: off ? "default" : "pointer" }}
       >
         {icon}
-        {!inline && label}
+        {(!inline || options.alwaysLabel) && label}
       </button>
     );
   };
 
   const iconSize = inline ? 15 : 14;
+  // Hepsi zaten seçiliyse düğme ters yöne döner. Satır içi modda bile YAZILI:
+  // "tümünü seç" ile "seçimi kaldır" birbirinin tersi, ikisini ayırt eden bir
+  // ikon çifti yok — ikon-only hâli kullanıcıyı kumar oynatırdı.
+  const hepsiSecili = selectableCount > 0 && selectedCount >= selectableCount;
   const actions = [
+    selectableCount > 0 &&
+      (hepsiSecili ? onDeselectAll : onSelectAll) &&
+      actionButton(
+        "all",
+        hepsiSecili ? t("Temizle") : t("Tümü"),
+        hepsiSecili ? t("Seçimi kaldır") : t("Tümünü seç"),
+        <IconListCheck size={iconSize} color={c.textSecondary} />,
+        () => (hepsiSecili ? onDeselectAll?.() : onSelectAll?.()),
+        { alwaysEnabled: true, alwaysLabel: true }
+      ),
     // Lio ilk sırada: tek "okuma" eylemi, geri kalanların hepsi veriyi değiştiriyor.
     // Lio gizliyken çizilmez (bkz. AskLioButton — dinleyen panel mount edilmiyor).
     showLio &&

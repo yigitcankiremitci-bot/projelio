@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { parseMessageLinks } from "../lib/messageLinks";
 import { useT } from "../lib/i18n";
+import { COARSE_POINTER } from "./AutoGrowTextarea";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { IconSparkle, IconX, IconPlus, IconTrash, IconSend, IconPaperclip, IconFile } from "./icons";
 import { aiChat } from "../api/aiChat";
 import { filesApi } from "../api/files";
@@ -798,6 +800,17 @@ export default function AiAssistantPanel({
     setCredits((prev) => (prev ? { ...prev, balance: result.usage.balance } : prev));
     setActiveFiles(result.activeFiles ?? []);
 
+    // Lio bir tur boyunca iş/şirket/grup/proje kurabiliyor ya da arşivleyebiliyor
+    // ve sidebar ağacı yalnızca uygulama açılırken çekiliyor (bkz.
+    // lib/sidebarEvents.ts). Haber verilmezse "organizasyonu arşive ekle dedim,
+    // yapıldı dedi ama hâlâ sidebarda duruyor" oluyor — üstelik kullanıcı tekrar
+    // deneyince Lio haklı olarak "zaten arşivde" diyor ve hiçbir şey değişmiyor.
+    //
+    // Yanıtta hangi araçların çalıştığı bilgisi YOK, o yüzden her tamamlanan
+    // turda haber veriliyor: tek bir liste isteği, kredi harcayan bir turun
+    // yanında ölçülemeyecek kadar ucuz.
+    if (result.type !== "confirmation") notifySidebarChanged();
+
     const pushBubble = (text: string) =>
       setMessages((prev) => [
         ...prev,
@@ -1018,13 +1031,17 @@ export default function AiAssistantPanel({
               {t("Her yanıtın yanındaki hoparlöre basarak dinleyebilirsin.")}
             </div>
 
+            {/* Buradaki ve aşağıdaki seçim kutularının yazı boyu dokunmatik
+                cihazda 16'ya çıkıyor: iOS Safari daha küçük bir alana
+                odaklanınca sayfayı yakınlaştırıyor ve Lio'nun ayarlarına her
+                dokunuşta ekran zıplıyordu (bkz. COARSE_POINTER). */}
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: c.textSecondary }}>
               {t("Ses kaynağı")}
               <select
                 value={voiceEngine}
                 onChange={(e) => chooseVoiceEngine(e.target.value as VoiceEngine)}
                 style={{
-                  fontSize: 13,
+                  fontSize: COARSE_POINTER ? 16 : 13,
                   padding: "6px 8px",
                   borderRadius: 8,
                   border: `1px solid ${voiceEngine === "server" ? c.warning : c.border}`,
@@ -1050,7 +1067,7 @@ export default function AiAssistantPanel({
                     value={serverVoice}
                     onChange={(e) => chooseServerVoice(e.target.value)}
                     style={{
-                      fontSize: 13,
+                      fontSize: COARSE_POINTER ? 16 : 13,
                       padding: "6px 8px",
                       borderRadius: 8,
                       border: `1px solid ${c.border}`,
@@ -1101,7 +1118,7 @@ export default function AiAssistantPanel({
                   value={voiceName}
                   onChange={(e) => chooseVoiceName(e.target.value)}
                   style={{
-                    fontSize: 13,
+                    fontSize: COARSE_POINTER ? 16 : 13,
                     padding: "6px 8px",
                     borderRadius: 8,
                     border: `1px solid ${c.border}`,
@@ -1522,7 +1539,17 @@ export default function AiAssistantPanel({
                 `overflow: hidden` taşıyor ve içine konan mutlak konumlu
                 düğmeler kırpılabilirdi. */}
             <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
-              <div className="autogrow autogrow-chat autogrow-chat--icons" data-replica={input} style={{ fontSize: 14 }}>
+              {/* Yazı boyu dokunmatik cihazda 16'ya çıkıyor: iOS Safari daha
+                  küçük bir alana odaklanınca sayfayı yakınlaştırıyor ve
+                  kullanıcı Lio'ya her yazdığında ekran zıplıyordu. Kutunun
+                  ölçüsü CSS'te değil burada veriliyor (.autogrow `font: inherit`
+                  kullanıyor), o yüzden koruma da burada — AutoGrowTextarea'daki
+                  aynı taban (bkz. COARSE_POINTER). Masaüstünde 14 kalıyor. */}
+              <div
+                className="autogrow autogrow-chat autogrow-chat--icons"
+                data-replica={input}
+                style={{ fontSize: COARSE_POINTER ? 16 : 14 }}
+              >
                 <textarea
                   ref={inputRef}
                   value={input}

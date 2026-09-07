@@ -222,6 +222,9 @@ export class AuthService {
       // Arayüz dili. Boş dönerse istemci tarayıcı diline bakar — "Türkçe"
       // varsayımı YAPMAZ (bkz. migration 087).
       locale: user.locale,
+      // Görülen eğitim turları. Boş dizi "hiç görülmedi" demek; istemci buna
+      // bakarak kendiliğinden başlayan turu bir kez gösteriyor (bkz. migration 093).
+      toursSeen: user.toursSeen ?? [],
     };
   }
 }

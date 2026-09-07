@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { backState, nextBackMemo, resolveBackTarget, type BackTarget } from "./backTarget";
+import { backState, hereAsBack, nextBackMemo, resolveBackTarget, type BackTarget } from "./backTarget";
 
 const FALLBACK: BackTarget = { to: "/jobs/abc", label: "Projeler" };
 
@@ -62,6 +62,23 @@ describe("geri hedefi", () => {
     it("bozuk from hatırayı bozmaz", () => {
       const memo = nextBackMemo(null, "/projects/p1", from);
       assert.deepEqual(nextBackMemo(memo, "/projects/p1", { to: "http://x", label: "Dış" })?.from, from);
+    });
+  });
+
+  describe("bulunulan sayfayı geri hedefi yapmak", () => {
+    it("adı bilinen sayfayı sorgusuyla birlikte paketler", () => {
+      assert.deepEqual(hereAsBack("/tasks", ""), { to: "/tasks", label: "Yapılacaklar" });
+      assert.deepEqual(hereAsBack("/", "?tab=budget"), { to: "/?tab=budget", label: "Kasa" });
+      assert.deepEqual(hereAsBack("/", ""), { to: "/", label: "Ana Sayfa" });
+    });
+
+    it("adı bilinmeyen sayfada null döner — sabit ebeveyn devrede kalsın", () => {
+      assert.equal(hereAsBack("/jobs/abc", ""), null);
+      assert.equal(hereAsBack("/departments/d1", "?tab=tasks"), null);
+    });
+
+    it("anasayfanın tanınmayan sekmesi yine anasayfa sayılır", () => {
+      assert.deepEqual(hereAsBack("/", "?tab=jobs"), { to: "/?tab=jobs", label: "Ana Sayfa" });
     });
   });
 

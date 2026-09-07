@@ -8,6 +8,17 @@ export interface TaskSelection {
   toggleSelect: (id: string) => void;
   // Seçimi temizler ve seçim modundan çıkar (bkz. çoğaltma/taşıma sonrası).
   clear: () => void;
+  /** Verilen kimliklerin tamamını seçili yapar (bkz. TaskSelectionBar "Tümü"). */
+  selectAll: (ids: string[]) => void;
+  /**
+   * Seçimi boşaltır ama seçim MODUNDAN ÇIKMAZ.
+   *
+   * `clear`den farkı bu: kullanıcı yanlış seçim yaptığında modun kapanıp
+   * yeniden "Seç"e basmak zorunda kalmasın diye. Tek tek işareti kaldırınca
+   * modun kapanması (toggleSelect) bilinçli — orada kullanıcı zaten sıfıra
+   * doğru gidiyor; burada ise tek hamlede baştan başlıyor.
+   */
+  deselectAll: () => void;
 }
 
 // Görev sütunlarında (bkz. TaskColumn) çoklu seçim durumunu tutan paylaşılan hook —
@@ -41,5 +52,14 @@ export function useTaskSelection(): TaskSelection {
     setSelectionMode(false);
   }, []);
 
-  return { selectionMode, selectedIds, toggleSelectionMode, toggleSelect, clear };
+  const selectAll = useCallback((ids: string[]) => {
+    setSelectionMode(true);
+    setSelectedIds(new Set(ids));
+  }, []);
+
+  const deselectAll = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  return { selectionMode, selectedIds, toggleSelectionMode, toggleSelect, clear, selectAll, deselectAll };
 }

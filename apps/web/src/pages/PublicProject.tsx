@@ -438,8 +438,7 @@ export default function PublicProject() {
                       flex: 1,
                       minWidth: 0,
                       fontSize: 14,
-                      color: c.textPrimary,
-                      textDecoration: t.status === "completed" ? "line-through" : "none",
+                      color: t.status === "completed" ? c.success : c.textPrimary,
                     }}
                   >
                     {t.title}

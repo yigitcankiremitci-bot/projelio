@@ -5,6 +5,7 @@ import type { Department, Job } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useSidebarHierarchy, SidebarGroupNode, SidebarOrgNode } from "../lib/useSidebarHierarchy";
 import { useT } from "../lib/i18n";
+import { backState, useHereAsBack } from "../lib/backTarget";
 import {
   IconBuilding,
   IconBriefcase,
@@ -44,6 +45,7 @@ const INACTIVE_TEXT = "#C7CCD6";
  */
 export default function SidebarTree() {
   const location = useLocation();
+  const hereBack = useHereAsBack();
   const t = useT();
   const { groups, standaloneOrgs, standaloneJobs, openProjectsByJobId, openOperationsByJobId, loading } =
     useSidebarHierarchy();
@@ -294,6 +296,11 @@ export default function SidebarTree() {
       <Row
         key={dept.id}
         to={`/departments/${dept.id}`}
+        // Departman sayfasının geri bağlantısı, `from` gelmezse SABİT olarak
+        // şirketin departman sekmesine bakıyor. Sidebar her sayfada durduğu
+        // için kullanıcı anasayfadan girip "← Departmanlar" ile hiç görmediği
+        // bir sayfaya düşüyordu; bulunduğu yeri de yanına koyuyoruz.
+        linkState={hereBack ? backState(hereBack) : undefined}
         icon={IconListCheck}
         label={dept.name}
         depth={depth}
@@ -448,6 +455,7 @@ export default function SidebarTree() {
 
 function Row({
   to,
+  linkState,
   icon: Icon,
   imageUrl,
   label,
@@ -461,6 +469,11 @@ function Row({
   // Verilmezse satır bir link değil, sadece alt öğeleri açıp kapatan bir başlık
   // olur (örn. gidilecek bir sayfası olmayan "İşler" toplayıcısı).
   to?: string;
+  /**
+   * Bağlantıyla taşınan react-router state'i (bkz. lib/backTarget backState).
+   * Hedef sayfanın "← geri" bağlantısı nereden gelindiğini böyle öğreniyor.
+   */
+  linkState?: unknown;
   icon: IconComp;
   // Varsa ikon yerine gösterilen minik kapak resmi (örn. organizasyonun kapağı).
   // Yüklenemezse sessizce ikona geri düşülür.
@@ -569,7 +582,7 @@ function Row({
         <span style={{ width: 20, marginLeft: depth * 14, flexShrink: 0 }} />
       )}
       {to ? (
-        <Link to={to} title={label} onDoubleClick={onLabelDoubleClick} style={contentStyle}>
+        <Link to={to} state={linkState} title={label} onDoubleClick={onLabelDoubleClick} style={contentStyle}>
           {content}
         </Link>
       ) : (

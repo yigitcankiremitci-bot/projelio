@@ -390,6 +390,9 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
         onArchive={() => setConfirmingBulkAction("archive")}
         onDelete={() => setConfirmingBulkAction("delete")}
         lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
+        onSelectAll={() => selection.selectAll(tasks.map((g) => g.id))}
+        onDeselectAll={selection.deselectAll}
+        selectableCount={tasks.length}
       />
     </div>
   );
@@ -455,6 +458,9 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
         onArchive={() => setConfirmingBulkAction("archive")}
         onDelete={() => setConfirmingBulkAction("delete")}
         lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
+        onSelectAll={() => selection.selectAll(tasks.map((g) => g.id))}
+        onDeselectAll={selection.deselectAll}
+        selectableCount={tasks.length}
       />
     </>
   );
@@ -629,9 +635,13 @@ const OutputsPanel = forwardRef<OutputsPanelHandle, Props>(function OutputsPanel
             lineHeight: 1.5,
           }}
         >
-          {t(
-            'Çıktı, projenin ortaya çıkaracağı somut şey — bir müzik projesinde "Sözler", "Master dosyası", "Albüm kapağı" gibi. Görevleri bunların altında toplayabilirsin; zorunlu değil, istersen görevler sekmesinde düz liste olarak da çalışabilirsin.'
-          )}
+          {departmentId
+            ? t(
+                'Çıktı, departmanın ortaya çıkaracağı somut şey — pazarlamada "Kampanya görselleri", "Aylık rapor" gibi. Görevleri bunların altında toplayabilirsin; zorunlu değil, istersen görevler görünümünde düz liste olarak da çalışabilirsin.'
+              )
+            : t(
+                'Çıktı, projenin ortaya çıkaracağı somut şey — bir müzik projesinde "Sözler", "Master dosyası", "Albüm kapağı" gibi. Görevleri bunların altında toplayabilirsin; zorunlu değil, istersen görevler sekmesinde düz liste olarak da çalışabilirsin.'
+              )}
         </div>
       ) : (
         <div ref={listRef} style={{ display: "flex", flexDirection: "column", gap: 8 }}>

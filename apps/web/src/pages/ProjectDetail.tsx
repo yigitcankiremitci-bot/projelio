@@ -79,6 +79,16 @@ export default function ProjectDetail() {
   const [highlightTaskId, setHighlightTaskId] = useState<string | undefined>(undefined);
   const c = useThemeColors();
   const cover = useCoverTheme();
+  // Kapağın üstünde duran yuvarlak düğmeler (takip linki, proje ayarı).
+  // Renkleri SABİT açık tondaydı: beyaz zemin + koyu kenarlık. Karanlık modda
+  // ikon rengi de açığa döndüğü için düğmeler görünmez oluyordu (beyaz üstüne
+  // beyaz). Zemin artık kapak temasından geliyor — kapağın kendi görseli
+  // değişmiyor, değişen yalnızca üstüne binen katman.
+  const kapakDugmesi = {
+    border: `1px solid ${cover.dark ? "rgba(255,255,255,0.22)" : "rgba(26,31,41,0.2)"}`,
+    background: cover.dark ? "rgba(20,24,32,0.62)" : "rgba(255,255,255,0.7)",
+    boxShadow: cover.dark ? "0 2px 8px rgba(0,0,0,0.4)" : "0 2px 8px rgba(26,31,41,0.12)",
+  } as const;
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
   const outputsRef = useRef<OutputsPanelHandle>(null);
   const feedRef = useRef<FeedPanelHandle>(null);
@@ -593,12 +603,10 @@ export default function ProjectDetail() {
                     width: 40,
                     height: 40,
                     borderRadius: 10,
-                    border: "1px solid rgba(26,31,41,0.2)",
-                    background: "rgba(255,255,255,0.7)",
-                    boxShadow: "0 2px 8px rgba(26,31,41,0.12)",
+                    ...kapakDugmesi,
                   }}
                 >
-                  <IconExternalLink size={17} color={c.textSecondary} />
+                  <IconExternalLink size={17} color={cover.secondary} />
                 </button>
               )}
               {currentUserId && currentUserId === project.ownerId && (
@@ -613,12 +621,10 @@ export default function ProjectDetail() {
                     width: 40,
                     height: 40,
                     borderRadius: 10,
-                    border: "1px solid rgba(26,31,41,0.2)",
-                    background: "rgba(255,255,255,0.7)",
-                    boxShadow: "0 2px 8px rgba(26,31,41,0.12)",
+                    ...kapakDugmesi,
                   }}
                 >
-                  <IconSettings size={17} color={c.textSecondary} />
+                  <IconSettings size={17} color={cover.secondary} />
                 </button>
               )}
             </div>

@@ -140,6 +140,10 @@ export interface User {
   // (web) ya da Accept-Language başlığından (e-posta/bildirim) çıkarılır.
   // Seçim yapıldığı anda dolar ve artık tarayıcı diline bakılmaz.
   locale?: Locale;
+  // Kullanıcıya bir kez gösterilmiş eğitim turlarının kimlikleri (bkz.
+  // migration 093). Eskiden yalnızca localStorage'daydı ve her yeni tarayıcıda
+  // eğitim baştan açılıyordu. Yalnızca /auth/me'de dolu gelir.
+  toursSeen?: string[];
 }
 
 // ============================================================ Sekme görünürlüğü
@@ -2507,4 +2511,65 @@ export interface WhatsappStatusEvent {
   connectionId: string;
   status: WhatsappConnectionStatus;
   phoneMasked?: string;
+}
+
+// ============================================================================
+// Abonelik (paket) — web + mobil ortak tipleri
+// ============================================================================
+// Plan KATALOĞU burada değil: fiyat ve kredi miktarı sunucudan gelir
+// (GET /billing/plans). İstemciye gömülen bir fiyat listesi, sunucudaki gerçek
+// tutarla ayrışır ve kullanıcıya yanlış tutar gösterirdi.
+
+export type BillingPlanKey = "free" | "starter" | "pro" | "business";
+export type BillingPeriod = "monthly" | "yearly";
+export type SubscriptionStatus = "pending" | "trialing" | "active" | "past_due" | "canceled" | "expired";
+export type SubscriptionSource = "iyzico" | "app_store" | "play_store" | "manual";
+
+export interface Subscription {
+  id: string;
+  scope: "user" | "organization";
+  userId: string;
+  organizationId?: string;
+  planKey: BillingPlanKey;
+  period: BillingPeriod;
+  status: SubscriptionStatus;
+  source: SubscriptionSource;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd: boolean;
+  canceledAt?: string;
+  /** Sağlayıcıda tahsil edilen tutar (genelde TRY). */
+  priceAmount?: number;
+  currency: string;
+  /** Vitrin fiyatı (USD) — ilanla karşılaştırmak için. */
+  priceUsd?: number;
+  createdAt: string;
+}
+
+/** Sağlayıcıda tanımlı gerçek tahsilat; null ise o dönem satın alınamaz. */
+export interface BillingCharge {
+  amount: number;
+  currency: string;
+}
+
+export interface BillingPlanView {
+  key: BillingPlanKey;
+  name: string;
+  priceUsd: { monthly: number; yearly: number };
+  charge: { monthly: BillingCharge | null; yearly: BillingCharge | null };
+  monthlyCredits: number;
+  featured: boolean;
+  seats: number;
+  features: string[];
+}
+
+export interface BillingOverview {
+  plans: BillingPlanView[];
+  subscription: Subscription | null;
+  /** Ödeme sağlayıcısı bağlı mı; değilse satın alma düğmeleri kapalı. */
+  paymentConfigured: boolean;
+  /** Kum havuzuna bağlıyız — arayüz test uyarısı gösterir. */
+  testMode: boolean;
+  /** Vitrinde $ tutarını ₺ göstermek için kur; tahsilatta kullanılmaz. */
+  usdTryRate: number | null;
 }

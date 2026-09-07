@@ -2,59 +2,51 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import type { Task, TaskStatus, User } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import TaskColumn, { TaskColumnHandle } from "./TaskColumn";
+import OutputsPanel, { OutputsPanelHandle } from "./OutputsPanel";
 import TaskEditModal from "./TaskEditModal";
-import TaskSelectionBar from "./TaskSelectionBar";
-import TaskSortMenu from "./TaskSortMenu";
-import MoveTaskModal from "./MoveTaskModal";
-import BulkConvertHierarchyModal from "./BulkConvertHierarchyModal";
-import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
-import { useIsDesktop } from "../lib/useIsDesktop";
-import { useTaskSelection } from "../lib/useTaskSelection";
-import { selectedLioTasks } from "../lib/askLio";
-import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
-import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
 
 export interface DepartmentTasksPanelHandle {
+  /** "Görevler" görünümünde "Yapılacak" sütununun hızlı ekleme kutusunu açar. */
   openCreate: () => void;
+  /** "Çıktılar" görünümüne geçip yeni çıktı modalını açar. */
+  openCreateOutput: () => void;
 }
 
 interface Props {
   departmentId: string;
 }
 
-const columns: TaskStatus[] = ["in_progress", "todo", "completed"];
-
-// Departmanın "Görevler" sekmesi: "Çıktılar" ara katmanı OLMADAN doğrudan
-// kanban (görev/alt görev) tahtası — bir departmanın günlük işleri proje
-// çıktısı gibi gruplanmaya ihtiyaç duymuyor, doğrudan iş listesi yeterli.
-// FAB (üst sayfada — DepartmentDetail — merkezi olarak kayıt edilir) burada
-// "Görev ekle" yerine "Yapılacak" sütununun hızlı ekleme kutusunu açar.
+/**
+ * Departmanın "Görevler" sekmesi.
+ *
+ * ÇIKTI KATMANI: eskiden bu panoda YOKTU — "bir departmanın günlük işleri proje
+ * çıktısı gibi gruplanmaya ihtiyaç duymuyor" varsayımıyla doğrudan kanban
+ * çiziliyordu. Varsayım tutmadı: departmanlar da teslim edilebilir parçalar
+ * (kampanya, rapor, tasarım seti) üretiyor ve kullanıcı bunları gruplayacak yer
+ * arıyordu. Sunucu tarafı zaten hazırdı (outputs.department_id + /departments/
+ * :id/outputs uçları), eksik olan yalnızca arayüzdü.
+ *
+ * Bu yüzden pano artık projeninkiyle AYNI bileşeni (OutputsPanel) kullanıyor:
+ * Görevler/Çıktılar geçişi, sıralama, çoklu seçim, toplu çoğaltma/taşıma/
+ * arşivleme/silme ve kaydırınca sabit şeritte beliren araç çubuğu oradan geliyor.
+ * Burada kalan tek iş verinin sahipliği — ProjectDetail'in oynadığı rolün aynısı.
+ */
 const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(function DepartmentTasksPanel(
   { departmentId },
   ref
 ) {
   const c = useThemeColors();
   const t = useT();
-  const isDesktop = useIsDesktop();
-  // Pano yalnızca masaüstünde yana kayıyor; dar ekranda sütunlar alt alta.
-  const boardScrollRef = useDragScroll<HTMLDivElement>(isDesktop);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [parentCompletePrompt, setParentCompletePrompt] = useState<Task | null>(null);
   const previousStatusRef = useRef<Record<string, TaskStatus>>({});
-  const columnRefs = useRef<Partial<Record<TaskStatus, TaskColumnHandle | null>>>({});
-  const selection = useTaskSelection();
-  const [sort, setSort] = useState<TaskSortMode>("manual");
-  const [duplicating, setDuplicating] = useState(false);
-  const [archiving, setArchiving] = useState(false);
-  const [movingOpen, setMovingOpen] = useState(false);
-  const [confirmingBulkAction, setConfirmingBulkAction] = useState<"archive" | "delete" | null>(null);
-  const { pushUndo, pushDestructive } = useUndo();
+  const outputsRef = useRef<OutputsPanelHandle>(null);
+  const { pushUndo } = useUndo();
   const registerReorderUndo = useReorderUndo();
   const tasksRef = useLatestRef(tasks);
   // "Üzerinde çalışıyorum" işareti — diğer kanbanlarla aynı kaynak
@@ -62,7 +54,8 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
   const [activeTaskId, setActiveTaskId] = useState<string | undefined>(undefined);
 
   useImperativeHandle(ref, () => ({
-    openCreate: () => columnRefs.current.todo?.openCreate(),
+    openCreate: () => outputsRef.current?.openCreateTask(),
+    openCreateOutput: () => outputsRef.current?.openCreateOutput(),
   }));
 
   useEffect(() => {
@@ -81,15 +74,31 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
     });
   };
 
+  /**
+   * Görevleri sunucudan çeker.
+   *
+   * "Yükleniyor…" yalnızca İLK yüklemede gösteriliyor: bu fonksiyon aynı zamanda
+   * `onTasksReload` olarak da kullanılıyor (alt görevi sütuna ya da başka bir
+   * göreve sürükleyip bırakınca sıra numaraları sunucuda değiştiği için tazeleme
+   * şart). Her tazelemede tüm pano bir anlığına yerini yükleme yazısına
+   * bırakıyordu ve kullanıcı bunu "sayfa yenilendi" diye okuyordu — kaydırma
+   * konumu da başa dönüyordu.
+   */
   const load = () => {
-    setLoading(true);
     api
       .get<Task[]>(`/departments/${departmentId}/tasks`)
       .then(setTasks)
       .catch(() => setTasks([]))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [departmentId]);
+  // Başka bir departmana geçildiğinde yükleme yazısı YENİDEN gösterilir:
+  // bileşen aynı rotada kaldığı için unmount olmuyor ve eski departmanın
+  // görevleri bir an ekranda kalıyordu.
+  useEffect(() => {
+    setLoading(true);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departmentId]);
   // Geri/ileri alma sunucu durumunu değiştirir; liste kendini tazelemeli.
   useRefreshOnUndo(load);
 
@@ -127,9 +136,24 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
     });
   };
 
-  const handleCreateTask = async (status: TaskStatus, title: string) => {
-    const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    const payload = { title, status, deadline };
+  /**
+   * Görev oluşturma. `options.outputId` çıktı görünümünden geliyor: görev o
+   * çıktının altına açılıyor (bkz. OutputsPanel). Diğer alanlar da aynı yerden
+   * geçiyor, ProjectDetail'deki imzanın aynısı.
+   */
+  const handleCreateTask = async (
+    status: TaskStatus,
+    title: string,
+    options?: { weekNumber?: number; deadline?: string; startDate?: string; outputId?: string }
+  ) => {
+    const payload = {
+      title,
+      status,
+      deadline: options?.deadline ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      ...(options?.startDate ? { startDate: options.startDate } : {}),
+      ...(options?.weekNumber !== undefined ? { weekNumber: options.weekNumber } : {}),
+      ...(options?.outputId ? { outputId: options.outputId } : {}),
+    };
     try {
       const created = await api.post<Task>(`/departments/${departmentId}/tasks`, payload);
       setTasks((prev) => [...prev, created]);
@@ -140,9 +164,17 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
   };
 
   const handleCreateSubtask = async (parentTaskId: string, title: string) => {
-    const parent = tasks.find((t) => t.id === parentTaskId);
+    const parent = tasksRef.current.find((t) => t.id === parentTaskId);
     if (!parent) return;
-    const payload = { title, status: parent.status, deadline: parent.deadline, parentTaskId };
+    // Alt görev üstünün çıktısında kalmalı: aksi halde çıktı görünümünde
+    // üst görev bir yerde, alt görevi başka bir yerde görünür.
+    const payload = {
+      title,
+      status: parent.status,
+      deadline: parent.deadline,
+      parentTaskId,
+      ...(parent.outputId ? { outputId: parent.outputId } : {}),
+    };
     try {
       const created = await api.post<Task>(`/departments/${departmentId}/tasks`, payload);
       setTasks((prev) => [...prev, created]);
@@ -190,7 +222,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
   };
 
   const handleToggleComplete = (taskId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
+    const task = tasksRef.current.find((t) => t.id === taskId);
     if (!task) return;
     if (task.status === "completed") {
       const previous = previousStatusRef.current[taskId] ?? "todo";
@@ -198,7 +230,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
       handleMoveTask(taskId, previous);
 
       if (task.parentTaskId) {
-        const parent = tasks.find((p) => p.id === task.parentTaskId);
+        const parent = tasksRef.current.find((p) => p.id === task.parentTaskId);
         if (parent && parent.status === "completed") {
           // Yan etki: geri alma yığınında ayrı bir adım olmasın.
           handleMoveTask(parent.id, "in_progress", false);
@@ -207,7 +239,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
     } else {
       previousStatusRef.current[taskId] = task.status;
       handleMoveTask(taskId, "completed");
-      tasks
+      tasksRef.current
         .filter((t) => t.parentTaskId === taskId && t.status !== "completed")
         .forEach((sub) => {
           previousStatusRef.current[sub.id] = sub.status;
@@ -215,9 +247,9 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
         });
 
       if (task.parentTaskId) {
-        const parent = tasks.find((p) => p.id === task.parentTaskId);
+        const parent = tasksRef.current.find((p) => p.id === task.parentTaskId);
         if (parent && parent.status !== "completed") {
-          const siblings = tasks.filter((t) => t.parentTaskId === parent.id);
+          const siblings = tasksRef.current.filter((t) => t.parentTaskId === parent.id);
           const allDone = siblings.every((s) => s.id === taskId || s.status === "completed");
           if (allDone) setParentCompletePrompt(parent);
         }
@@ -225,141 +257,33 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
     }
   };
 
-  /** Toplu seviye dönüştürme penceresi (bkz. BulkConvertHierarchyModal). */
-  const [convertOpen, setConvertOpen] = useState(false);
-
-  const handleDuplicateSelected = async () => {
-    if (selection.selectedIds.size === 0) return;
-    setDuplicating(true);
-    try {
-      const created = await api.post<Task[]>("/tasks/duplicate", { ids: Array.from(selection.selectedIds) });
-      setTasks((prev) => [...prev, ...created]);
-      selection.clear();
-    } catch {
-      // çoğaltılamadı, kullanıcı tekrar deneyebilir
-    } finally {
-      setDuplicating(false);
-    }
-  };
-
-  // Seçili görevleri (ve üst seviye olanlarınsa alt görevlerini) toplu arşivler.
-  // ConfirmDialog'un onConfirm'ü olarak kullanılır — hata fırlatırsa modal açık
-  // kalıp hata mesajı gösterir, o yüzden hatayı yutmuyoruz.
-  const handleArchiveSelected = async () => {
-    const ids = Array.from(selection.selectedIds);
-    if (ids.length === 0) return;
-    setArchiving(true);
-    try {
-      await api.patch<Task[]>("/tasks/bulk-archive", { ids });
-      removeTasksFromState(ids);
-      // Arşivleme geri alınabilir: her görev zaten tekil /restore uç noktasına
-      // sahip ve o uç nokta alt görevleri de kendiliğinden geri getiriyor.
-      pushUndo({
-        label: `${ids.length} görev arşivleme`,
-        run: async () => {
-          await Promise.all(ids.map((id) => api.patch(`/tasks/${id}/restore`, {})));
-          load();
-        },
-        redo: async () => {
-          await api.patch("/tasks/bulk-archive", { ids });
-          removeTasksFromState(ids);
-        },
-      });
-      selection.clear();
-      setConfirmingBulkAction(null);
-    } finally {
-      setArchiving(false);
-    }
-  };
-
-  // Seçili görevleri (ve alt görevlerini) toplu siler. Kalıcı silme sunucuda
-  // geri alınamadığı için hemen yapılmaz: arayüzden hemen kaldırılır ama gerçek
-  // istek birkaç saniye ertelenir (bkz. lib/undo pushDestructive) — bu pencerede
-  // Cmd/Ctrl+Z ile iptal edilebilir.
-  const handleDeleteSelected = () => {
-    const ids = Array.from(selection.selectedIds);
-    if (ids.length === 0) return;
-    removeTasksFromState(ids);
-    pushDestructive({
-      label: `${ids.length} görev silme`,
-      commit: () => api.post("/tasks/bulk-delete", { ids }),
-      restore: () => load(),
-      entityIds: ids,
-    });
-    selection.clear();
-    setConfirmingBulkAction(null);
-  };
-
   if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
 
   return (
     <div>
-
-      {/* Tek satırlık araç çubuğu: sağda sıralama ve seçim. Seçim modu
-          açıldığında bar tam genişlik alıp alta kayar. */}
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-        <div style={{ marginLeft: "auto" }}>
-          <TaskSortMenu value={sort} onChange={setSort} />
-        </div>
-        <TaskSelectionBar
-          inline
-          selectionMode={selection.selectionMode}
-          selectedCount={selection.selectedIds.size}
-          busy={duplicating || archiving}
-          onEnable={selection.toggleSelectionMode}
-          onCancel={selection.clear}
-          onDuplicate={handleDuplicateSelected}
-          onMove={() => setMovingOpen(true)}
-          onConvert={() => setConvertOpen(true)}
-          onArchive={() => setConfirmingBulkAction("archive")}
-          onDelete={() => setConfirmingBulkAction("delete")}
-          lioTasks={selectedLioTasks(tasks, selection.selectedIds)}
-        />
-      </div>
-
-      {/* Masaüstünde üç sütun (Devam eden/Yapılacak/Tamamlandı) yan yana, dar ekranda
-          (mobil) alt alta — bkz. useIsDesktop. */}
-      <div
-        ref={boardScrollRef}
-        style={{
-          display: "flex",
-          flexDirection: isDesktop ? "row" : "column",
-          alignItems: isDesktop ? "flex-start" : undefined,
-          gap: 14,
-          overflowX: isDesktop ? "auto" : undefined,
+      <OutputsPanel
+        ref={outputsRef}
+        departmentId={departmentId}
+        tasks={tasks}
+        onCreateTask={handleCreateTask}
+        onCreateSubtask={handleCreateSubtask}
+        onMoveTask={handleMoveTask}
+        onToggleComplete={handleToggleComplete}
+        onEditTask={setEditingTask}
+        onTaskRenamed={updateTask}
+        onReorderTasks={handleReorderTasks}
+        activeTaskId={activeTaskId}
+        onToggleActive={handleToggleActive}
+        onTasksDuplicated={(created) => setTasks((prev) => [...prev, ...created])}
+        // Taşınan görevler başka bir kapsama gittiyse bu listeden düşer.
+        onTasksMoved={(moved) => {
+          const movedIds = new Set(moved.map((task) => task.id));
+          setTasks((prev) => prev.filter((task) => !movedIds.has(task.id)));
         }}
-      >
-        {columns.map((status) => (
-          <div
-            key={status}
-            style={isDesktop ? { flex: "1 1 260px", minWidth: 260 } : { width: "100%" }}
-          >
-            <TaskColumn
-              ref={(el) => {
-                columnRefs.current[status] = el;
-              }}
-              status={status}
-              allTasks={sortTasks(tasks, sort)}
-              onCreate={handleCreateTask}
-              onCreateSubtask={handleCreateSubtask}
-              onTasksReload={load}
-              onMove={handleMoveTask}
-              onToggleComplete={handleToggleComplete}
-              onEditTask={setEditingTask}
-              onTaskRenamed={updateTask}
-              // Başka bir ölçütle sıralıyken sürükleyip sıra değiştirmek anlamsız:
-              // kart bırakıldığı yerde durmaz, ölçüte göre geri sıçrar.
-              onReorderTasks={sort === "manual" ? handleReorderTasks : undefined}
-              group={`dept-tasks-${departmentId}`}
-              selectionMode={selection.selectionMode}
-              selectedIds={selection.selectedIds}
-              onToggleSelect={selection.toggleSelect}
-              activeTaskId={activeTaskId}
-              onToggleActive={handleToggleActive}
-            />
-          </div>
-        ))}
-      </div>
+        onTasksArchived={removeTasksFromState}
+        onTasksDeleted={removeTasksFromState}
+        onTasksReload={load}
+      />
 
       {parentCompletePrompt && (
         <Modal title={t("Görevi tamamla")} onClose={() => setParentCompletePrompt(null)}>
@@ -406,56 +330,6 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
             removeTaskFromState(archivedTaskId);
             setEditingTask(null);
           }}
-        />
-      )}
-
-      {convertOpen && (
-        <BulkConvertHierarchyModal
-          tasks={tasks}
-          selectedIds={selection.selectedIds}
-          onClose={() => setConvertOpen(false)}
-          onDone={() => {
-            // Yerel yama YETMEZ: yükseltilen kayıt eski üst görevinin altına
-            // sokulurken altındaki kardeşlerin sıra numaraları da kayıyor
-            // (bkz. migration 069). Doğru sıra ancak sunucudan gelir.
-            load();
-            selection.clear();
-            setConvertOpen(false);
-          }}
-        />
-      )}
-
-      {movingOpen && (
-        <MoveTaskModal
-          taskIds={Array.from(selection.selectedIds)}
-          // Çıktı hedefinin listelenebilmesi için seçimin kapsamı.
-          scopeTasks={tasks.filter((task) => selection.selectedIds.has(task.id))}
-          onClose={() => setMovingOpen(false)}
-          onMoved={() => {
-            selection.clear();
-            load();
-          }}
-        />
-      )}
-
-      {confirmingBulkAction === "archive" && (
-        <ConfirmDialog
-          title={t("Görevleri arşivle")}
-          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
-          confirmLabel={t("Arşivle")}
-          danger={false}
-          onCancel={() => setConfirmingBulkAction(null)}
-          onConfirm={handleArchiveSelected}
-        />
-      )}
-      {confirmingBulkAction === "delete" && (
-        <ConfirmDialog
-          title={t("Görevleri sil")}
-          message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`}
-          confirmLabel="Sil"
-          danger
-          onCancel={() => setConfirmingBulkAction(null)}
-          onConfirm={handleDeleteSelected}
         />
       )}
     </div>

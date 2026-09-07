@@ -35,10 +35,15 @@ interface Props {
  *
  * İKİ BİLİNÇLİ EKSİK:
  *
- *  - Görev EKLEME yok. Yeni görev bir departmana ait olmak zorunda ve bu panoda
- *    "hangi departman" sorusunun cevabı yok; sütun altındaki hızlı ekleme kutusu
- *    burada kartı sessizce yanlış yere koyardı. Ekleme departman sayfasında —
- *    karta çift tıklamak oraya götürür.
+ *  - ÜST DÜZEY görev EKLEME yok. Yeni görev bir departmana ait olmak zorunda ve
+ *    bu panoda "hangi departman" sorusunun cevabı yok; sütun altındaki hızlı
+ *    ekleme kutusu burada kartı sessizce yanlış yere koyardı. Ekleme departman
+ *    sayfasında — karta çift tıklamak oraya götürür.
+ *
+ *    ALT görev bunun istisnası: departmanı belirsiz değil, üst görevinkinden
+ *    geliyor. Eskiden alt görev katmanı bu panoda tamamen KAPALIYDI (TaskColumn
+ *    onu yalnızca onCreateSubtask verilince çiziyor), yani kullanıcı şirket
+ *    görünümünde alt görevleri hiç göremiyordu.
  *  - Elle SIRALAMA yok. sort_order departman panosunun kendi sırası; burada
  *    departmanları karıştırarak sürüklemek o sıraları bozardı (JobTasksPanel'de
  *    aynı gerekçeyle kapalı). Sıralama ölçütleri (tarih, öncelik…) çalışıyor.
@@ -61,15 +66,23 @@ export default function OrgTasksPanel({ organizationId, organizationName }: Prop
   const { pushUndo } = useUndo();
   const tasksRef = useLatestRef(tasks);
 
+  // "Yükleniyor…" yalnızca ilk yüklemede: bu fonksiyon `onTasksReload` olarak da
+  // çağrılıyor ve her sürükle-bırak sonrası panoyu yükleme yazısına çevirmesi
+  // "sayfa yenilendi" hissi veriyordu (bkz. DepartmentTasksPanel'deki aynı not).
   const load = () => {
-    setLoading(true);
     api
       .get<Task[]>(`/organizations/${organizationId}/tasks`)
       .then(setTasks)
       .catch(() => setTasks([]))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [organizationId]);
+  // Başka bir şirkete geçildiğinde yükleme yazısı yeniden gösterilir
+  // (bkz. DepartmentTasksPanel'deki aynı not).
+  useEffect(() => {
+    setLoading(true);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId]);
   // Geri/ileri alma sunucu durumunu değiştirir; liste kendini tazelemeli.
   useRefreshOnUndo(load);
 
@@ -102,6 +115,29 @@ export default function OrgTasksPanel({ organizationId, organizationName }: Prop
 
   const removeTaskFromState = (taskId: string) => {
     setTasks((prev) => prev.filter((task) => task.id !== taskId && task.parentTaskId !== taskId));
+  };
+
+  /**
+   * Alt görev ekleme. Departman panosundakiyle aynı uç kullanılıyor; departman
+   * kimliği ÜST GÖREVDEN okunuyor — bu panoda "hangi departman" sorusunun başka
+   * bir cevabı yok, alt görev üstünün yanında yaşamak zorunda.
+   */
+  const handleCreateSubtask = async (parentTaskId: string, title: string) => {
+    const parent = tasksRef.current.find((task) => task.id === parentTaskId);
+    if (!parent?.departmentId) return;
+    try {
+      const created = await api.post<Task>(`/departments/${parent.departmentId}/tasks`, {
+        title,
+        status: parent.status,
+        deadline: parent.deadline,
+        parentTaskId,
+      });
+      // departmentName tekil yanıtta gelmiyor (bkz. updateTask'taki aynı not);
+      // üst görevinkini veriyoruz, alt görev zaten onun departmanında.
+      setTasks((prev) => [...prev, { departmentName: parent.departmentName, ...created }]);
+    } catch {
+      // alt görev oluşturulamadı, kullanıcı tekrar deneyebilir
+    }
   };
 
   const handleMoveTask = (taskId: string, status: TaskStatus, registerUndo = true) => {
@@ -233,6 +269,7 @@ export default function OrgTasksPanel({ organizationId, organizationName }: Prop
             <TaskColumn
               status={status}
               allTasks={sortTasks(tasks, sort)}
+              onCreateSubtask={handleCreateSubtask}
               onTasksReload={load}
               onMove={handleMoveTask}
               onToggleComplete={handleToggleComplete}

@@ -926,7 +926,6 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
         style={{
           fontSize,
           color,
-          textDecoration: task.status === "completed" ? "line-through" : "none",
           overflowWrap: "break-word",
           wordBreak: "break-word",
         }}
@@ -1243,7 +1242,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                       gorev,
                       16,
                       gorev.status === "completed"
-                        ? c.textSecondary
+                        ? c.success
                         : isOverdueWithPendingSubtasks
                         ? c.danger
                         : c.textPrimary
@@ -1583,7 +1582,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                         </button>
                         <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
-                            {renderTitle(sub, 15, sub.status === "completed" ? c.textSecondary : c.textPrimary)}
+                            {renderTitle(sub, 15, sub.status === "completed" ? c.success : c.textPrimary)}
                             {/* Alt görevin açıklaması artık satırda görünür; rengi
                                 bilinçli olarak farklı, yoksa altındaki atanan/süre
                                 bilgisiyle aynı griye karışıyordu. Üst görev kartında
@@ -1803,8 +1802,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                   <span
                     style={{
                       fontSize: 15,
-                      color: c.textSecondary,
-                      textDecoration: "line-through",
+                      color: c.success,
                       overflowWrap: "break-word",
                       wordBreak: "break-word",
                     }}

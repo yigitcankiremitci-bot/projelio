@@ -425,8 +425,7 @@ function BlockCard({
             style={{
               fontSize: 12,
               lineHeight: "15px",
-              color: c.textPrimary,
-              textDecoration: done ? "line-through" : undefined,
+              color: done ? c.success : c.textPrimary,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",

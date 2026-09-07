@@ -5,9 +5,11 @@ import type { JobMember, Project, Task } from "@projelio/shared";
 import { api } from "../api/client";
 import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconPlus, IconChevronRight, IconCheck, IconActivity } from "./icons";
+import { IconPlus, IconChevronRight, IconCheck, IconActivity, IconLogout } from "./icons";
 import HireMemberModal from "./HireMemberModal";
 import CreateTaskModal from "./CreateTaskModal";
+import ConfirmDialog from "./ConfirmDialog";
+import { useCurrentUser } from "../lib/useCurrentUser";
 import { isAssignedTo } from "../lib/taskAssignees";
 import { backState } from "../lib/backTarget";
 import { useT } from "../lib/i18n";
@@ -43,6 +45,12 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
   const [hiring, setHiring] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [assigningTo, setAssigningTo] = useState<JobMember | null>(null);
+  // Ekipten çıkarma / işten ayrılma onayı. Sunucu ikisine de aynı uçtan izin
+  // veriyor (bkz. job-members.service remove: kişinin kendisi ya da iş sahibi);
+  // eksik olan yalnızca arayüzdü — kadroya alınan kişinin işten ayrılmasının
+  // hiçbir yolu yoktu.
+  const [removing, setRemoving] = useState<JobMember | null>(null);
+  const { user: currentUser } = useCurrentUser();
 
   const load = () => {
     setLoading(true);
@@ -208,6 +216,38 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
                   >
                     <IconPlus size={13} color={c.textSecondary} />
                   </button>
+                  {/* İşten ayrılma / ekipten çıkarma.
+                      İş SAHİBİ satırında hiç çıkmaz: sahibi kendi işinden
+                      ayrılamaz, job_members kaydı da yoktur. Diğer satırlarda
+                      yalnızca ilgili kişinin kendisine (ayrıl) ya da iş
+                      sahibine (çıkar) görünür — sunucudaki kuralın aynısı. */}
+                  {m.userId !== ownerId && (currentUser?.id === m.userId || currentUser?.id === ownerId) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRemoving(m);
+                      }}
+                      aria-label={
+                        currentUser?.id === m.userId
+                          ? t("İşten ayrıl")
+                          : t("{kisi} kişisini ekipten çıkar", { kisi: m.fullName ?? t("Kişi") })
+                      }
+                      title={currentUser?.id === m.userId ? t("İşten ayrıl") : t("Ekipten çıkar")}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 26,
+                        height: 26,
+                        borderRadius: "50%",
+                        border: `1px solid ${c.border}`,
+                        background: c.background,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <IconLogout size={13} color={c.danger} />
+                    </button>
+                  )}
                   <span
                     style={{
                       display: "inline-flex",
@@ -269,8 +309,7 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
                             <div
                               style={{
                                 fontSize: 15,
-                                color: c.textPrimary,
-                                textDecoration: gorev.status === "completed" ? "line-through" : "none",
+                                color: gorev.status === "completed" ? c.success : c.textPrimary,
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
@@ -322,6 +361,37 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
           fixedAssignedToName={assigningTo.fullName}
           onClose={() => setAssigningTo(null)}
           onCreated={onTasksReload}
+        />
+      )}
+
+      {removing && (
+        <ConfirmDialog
+          title={currentUser?.id === removing.userId ? t("İşten ayrıl") : t("Ekipten çıkar")}
+          message={
+            currentUser?.id === removing.userId
+              ? t(
+                  "Bu işin ekibinden ayrılacaksın. İşin projelerine ve dosyalarına erişimin kalkar; sana atanmış görevler işte kalır."
+                )
+              : t(
+                  "{kisi} ekipten çıkarılacak. İşin projelerine ve dosyalarına erişimi kalkar; ona atanmış görevler işte kalır.",
+                  { kisi: removing.fullName ?? t("Kişi") }
+                )
+          }
+          confirmLabel={currentUser?.id === removing.userId ? t("Ayrıl") : t("Çıkar")}
+          danger
+          onCancel={() => setRemoving(null)}
+          onConfirm={async () => {
+            await api.delete(`/job-members/${removing.id}`);
+            // Kendisi ayrıldıysa bu sayfayı görme yetkisi de kalkmış olabilir;
+            // listede kalmasındansa anasayfaya dönmek doğru olan.
+            if (currentUser?.id === removing.userId) {
+              setRemoving(null);
+              navigate("/");
+              return;
+            }
+            setMembers((prev) => prev.filter((uye) => uye.id !== removing.id));
+            setRemoving(null);
+          }}
         />
       )}
     </div>

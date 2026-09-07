@@ -30,7 +30,7 @@ interface Props {
  * çekiliyor. Masaüstünde ise böyle bir sorun yok ve tabanı orada da zorlamak,
  * yerinde düzenleme kutusunu yerini aldığı metinden BÜYÜK gösteriyordu.
  */
-const COARSE_POINTER =
+export const COARSE_POINTER =
   typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
 
 /**

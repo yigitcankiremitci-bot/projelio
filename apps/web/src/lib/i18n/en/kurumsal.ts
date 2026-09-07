@@ -245,4 +245,15 @@ export const kurumsal: TranslationDict = {
     "The selected account's access has expired. Until it is reconnected, new files go to the default account.",
   "Depo hesabı kaydedilemedi.": "The storage account couldn't be saved.",
   "Kaydedildi.": "Saved.",
+
+  // ─────────────────────────────────────────────── İş ekibinden ayrılma
+  "İşten ayrıl": "Leave job",
+  "Ekipten çıkar": "Remove from team",
+  "{kisi} kişisini ekipten çıkar": "Remove {kisi} from the team",
+  Ayrıl: "Leave",
+  "Çıkar": "Remove",
+  "Bu işin ekibinden ayrılacaksın. İşin projelerine ve dosyalarına erişimin kalkar; sana atanmış görevler işte kalır.":
+    "You'll leave this job's team. You'll lose access to its projects and files; tasks assigned to you stay with the job.",
+  "{kisi} ekipten çıkarılacak. İşin projelerine ve dosyalarına erişimi kalkar; ona atanmış görevler işte kalır.":
+    "{kisi} will be removed from the team. They'll lose access to the job's projects and files; tasks assigned to them stay with the job.",
 };

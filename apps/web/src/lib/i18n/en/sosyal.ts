@@ -326,4 +326,11 @@ export const sosyal: TranslationDict = {
   "Drive'dan yükle": "Add from Drive",
   "OneDrive'dan yükle": "Add from OneDrive",
   "Dosya eklenemedi": "The file couldn't be added",
+
+  // ─────────────────────────────────────────────── Tekrar paylaş
+  "Tekrar paylaş": "Share again",
+  "Çoğaltılıyor…": "Duplicating…",
+  "İçerik çoğaltılamadı": "Couldn't duplicate the post",
+  "İçeriği yeni bir taslak olarak çoğaltır; metin, görseller ve hesaplar taşınır.":
+    "Copies the post into a new draft; text, images and accounts come along.",
 };

@@ -322,4 +322,16 @@ export const projeler: TranslationDict = {
     "Saving doesn't publish: the reading view keeps the old text until it's approved.",
   "Kayıtlı bir ilk hâl bulunamadı.": "No saved original was found.",
   "Düzenleme kipi açık.": "Edit mode is on.",
+
+  // ─────────────────────────────────────────────── Kasa sıralaması
+  // Oklar İngilizcede de aynen kalıyor: yön bilgisi dilden bağımsız.
+  Sırala: "Sort",
+  "Yeni → eski": "Newest → oldest",
+  "Eski → yeni": "Oldest → newest",
+  "Tutar: çok → az": "Amount: high → low",
+  "Tutar: az → çok": "Amount: low → high",
+
+  // ─────────────────────────────────────────────── Departman çıktıları
+  'Çıktı, departmanın ortaya çıkaracağı somut şey — pazarlamada "Kampanya görselleri", "Aylık rapor" gibi. Görevleri bunların altında toplayabilirsin; zorunlu değil, istersen görevler görünümünde düz liste olarak da çalışabilirsin.':
+    'A deliverable is something concrete the department produces — in marketing, "Campaign visuals" or "Monthly report". You can group tasks under them; it is optional, and you can keep working from a flat list in the tasks view.',
 };

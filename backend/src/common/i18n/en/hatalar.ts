@@ -569,4 +569,10 @@ export const hatalar: TranslationDict = {
     "This subscription was bought through Google Play; cancel it in Play Store > Subscriptions.",
   "Bu abonelik elle tanımlanmış; iptal için destek ile iletişime geç.":
     "This subscription was set up manually; contact support to cancel it.",
+
+  // ─────────────────────────────────────────────── Görev bağımlılıkları (094)
+  "Bir görev kendini bekleyemez": "A task can't wait for itself",
+  "Bu bağ bir döngü oluşturur: iki görev birbirini beklerdi":
+    "That link would create a cycle: the two tasks would wait for each other",
+  "Tur listesi bekleniyor": "A list of tours is expected",
 };

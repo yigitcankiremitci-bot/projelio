@@ -220,4 +220,23 @@ export const gorevler: TranslationDict = {
   "— seçilmedi —": "— not selected —",
   Not: "Note",
   Departman: "Department",
+  // ─────────────────────────────────────────────── Bağımlılıklar (migration 094)
+  // "Bekliyor" kart rozeti: küçük harfli, çünkü başlığın yanında bir etiket
+  // olarak duruyor, cümle başı değil.
+  "Bağımlılıklar": "Dependencies",
+  "Bağımlılık ekle": "Add dependency",
+  "Bağımlılığı kaldır": "Remove dependency",
+  "Bağımlılık eklenemedi.": "Couldn't add the dependency.",
+  "Bağımlılık kaldırılamadı.": "Couldn't remove the dependency.",
+  "Buraya eklenen görevler bitmeden bu görev başlatılamaz.":
+    "This task can't start until the tasks listed here are done.",
+  "Bu görev başka bir görevi beklemiyor.": "This task isn't waiting on anything.",
+  "Bu görevin bağlı olduğu bir proje ya da departman yok; bağımlılık kurulamaz.":
+    "This task belongs to no project or department, so it can't have dependencies.",
+  "Beklenecek görevi seç…": "Pick a task to wait for…",
+  "Beklediği görevler bitmeden başlatılamaz": "Can't start until the tasks it waits for are done",
+  bekliyor: "waiting",
+
+  // ─────────────────────────────────────────────── Toplu seçim
+  "Tümünü seç": "Select all",
 };

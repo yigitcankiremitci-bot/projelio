@@ -95,6 +95,15 @@ export class SocialMediaController {
     return this.social.updatePost(id, body, req.user.userId);
   }
 
+  /**
+   * "Tekrar paylaş": gönderiyi yeni bir taslak olarak çoğaltır (bkz.
+   * duplicatePost). scheduledAt verilirse kopya o tarihe konur.
+   */
+  @Post("social-posts/:id/duplicate")
+  duplicatePost(@Param("id") id: string, @Body("scheduledAt") scheduledAt: string | undefined, @Req() req: any) {
+    return this.social.duplicatePost(id, scheduledAt, req.user.userId);
+  }
+
   /** Takvimde sürükleme: yalnızca tarih değişir, formun tamamı gönderilmez. */
   @Patch("social-posts/:id/schedule")
   reschedule(@Param("id") id: string, @Body("scheduledAt") scheduledAt: string | null, @Req() req: any) {

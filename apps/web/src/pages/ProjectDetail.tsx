@@ -32,6 +32,7 @@ import { useIsSubcontractor } from "../lib/useCurrentUser";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { isProjectInSidebar } from "../lib/useSidebarHierarchy";
 import { useT } from "../lib/i18n";
+import { gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
 
 export default function ProjectDetail() {
   const t = useT();
@@ -355,7 +356,10 @@ export default function ProjectDetail() {
   const handleMoveTask = (taskId: string, status: TaskStatus, registerUndo = true) => {
     const previousStatus = tasksRef.current.find((t) => t.id === taskId)?.status;
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
-    api.patch(`/tasks/${taskId}/status`, { status }).catch(reloadTasks);
+    api.patch(`/tasks/${taskId}/status`, { status }).catch((err) => {
+      gorevDurumHatasiniBildir(err);
+      reloadTasks();
+    });
     // registerUndo=false: bu çağrı başka bir işlemin yan etkisi (örn. üst görev
     // tamamlanınca alt görevlerin de kapanması) — yığında ayrı adım olmamalı.
     if (registerUndo && previousStatus && previousStatus !== status) {

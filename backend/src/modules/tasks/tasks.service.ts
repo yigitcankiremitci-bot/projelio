@@ -29,6 +29,10 @@ import {
  * (`files.task_id`). İkisi de görevle BİRLİKTE geliyor — ayrı uçtan çekmek
  * pano başına görev sayısı kadar istek demekti (bkz. operations.service.ts).
  */
+// Bağımlılıklar bilerek BURADA DEĞİL, ayrı bir sorguda (bkz. attachDependencies):
+// gömülü ilişki, tablo henüz yokken (migration 094 uygulanmadan) TÜM görev
+// sorgularını hataya düşürürdü. Ayrı sorgu hata verirse yalnızca bağımlılık
+// bilgisi eksik kalır, pano çalışmaya devam eder.
 const TASK_SELECT =
   "*, completed_by_user:users!tasks_completed_by_fkey(full_name), assigned_user:users!tasks_assigned_to_fkey(full_name), task_assignees(user_id, assigned_at, users!task_assignees_user_id_fkey(full_name, avatar_url)), projects(title), task_attachments(id, kind, url, label, created_at), files(id, name, web_view_link)";
 
@@ -103,6 +107,7 @@ function mapTask(row: any): Task {
     projectTitle: row.projects?.title ?? undefined,
     sourceModuleKey: row.source_module_key ?? undefined,
     sourceRecordId: row.source_record_id ?? undefined,
+
     // Ekler TASK_SELECT ile her görev yanıtında gelir. Dizi değilse alan
     // undefined kalır ("bilgi çekilmedi"), boş dizi ise "ek yok" — ikisi
     // arayüzde aynı görünse de karıştırılmasın.
@@ -153,10 +158,10 @@ export class TasksService {
     if (error) throw error;
     const tasks = (data ?? []).map(mapTask);
 
-    if (!requestingUserId) return tasks;
+    if (!requestingUserId) return this.attachDependencies(tasks);
     const visibleIds = await this.getVisibleTaskIdsForSubcontractor(projectId, requestingUserId);
-    if (!visibleIds) return tasks;
-    return tasks.filter((t) => visibleIds.has(t.id));
+    if (!visibleIds) return this.attachDependencies(tasks);
+    return this.attachDependencies(tasks.filter((t) => visibleIds.has(t.id)));
   }
 
   async findByDepartment(departmentId: string, requestingUserId?: string): Promise<Task[]> {
@@ -171,7 +176,7 @@ export class TasksService {
       .order("created_at", { ascending: true })
       .limit(LISTE_TAVANI);
     if (error) throw error;
-    return (data ?? []).map(mapTask);
+    return this.attachDependencies((data ?? []).map(mapTask));
   }
 
   /**
@@ -230,10 +235,12 @@ export class TasksService {
       .limit(LISTE_TAVANI);
     if (error) throw error;
 
-    return (data ?? []).map((row: any) => ({
-      ...mapTask(row),
-      departmentName: row.department_id ? deptNameById.get(row.department_id) : undefined,
-    }));
+    return this.attachDependencies(
+      (data ?? []).map((row: any) => ({
+        ...mapTask(row),
+        departmentName: row.department_id ? deptNameById.get(row.department_id) : undefined,
+      }))
+    );
   }
 
   // Departman kaynaklarını yalnızca organizasyon sahibi ya da o departmanın
@@ -443,7 +450,10 @@ export class TasksService {
       .eq("id", id)
       .maybeSingle();
     if (!row) throw new NotFoundException("Görev bulunamadı");
-    return mapTask(row);
+    // Tekil görev de bağımlılıklarını taşır: düzenleme penceresi ve bağ
+    // ekleme/kaldırma yanıtları buradan dönüyor.
+    const [task] = await this.attachDependencies([mapTask(row)]);
+    return task;
   }
 
   /** İstekteki atama alanlarını tek bir listeye indirger. */
@@ -1150,6 +1160,13 @@ export class TasksService {
   async updateStatus(id: string, status: Task["status"], requestingUserId?: string): Promise<Task> {
     await this.assertTaskAccess(await this.getTaskScope(id), requestingUserId);
 
+    // Bağımlılık kuralı: bekleyen görev, beklediği görevler bitmeden "todo"dan
+    // çıkamaz (bkz. migration 094 — klasik bitir-başla ilişkisi).
+    //
+    // Neden yalnızca ileri yön: geri almak (tamamlanmışı "todo"ya çekmek) her
+    // zaman serbest — kural bir yanlışı düzeltmenin önüne geçmemeli.
+    if (status !== "todo") await this.assertNotBlocked(id);
+
     // "Bugün yapılanlar" gibi ekip aktivite özetlerinde kimin ne zaman
     // tamamladığını gösterebilmek için, tamamlanınca damga atıyor,
     // geri alınırsa temizliyoruz.
@@ -1182,6 +1199,150 @@ export class TasksService {
       );
     }
     return task;
+  }
+
+  // ============================================================ Bağımlılıklar
+
+  /**
+   * Verilen görevlere `dependsOn` alanını ekler (bkz. migration 094).
+   *
+   * TASK_SELECT'e gömülü bir ilişki OLARAK DEĞİL, ayrı bir sorgu olarak: tablo
+   * henüz yokken gömülü ilişki tüm görev sorgularını hataya düşürür ve panolar
+   * tamamen kararırdı. Burada hata yalnızca bağımlılık bilgisini eksiltiyor —
+   * aynı yaklaşım ai-model-settings'te de var.
+   *
+   * Tek sorgu: görev başına ayrı istek atmak, 200 görevlik bir panoda 200 gidiş
+   * dönüş demekti.
+   */
+  private async attachDependencies(tasks: Task[]): Promise<Task[]> {
+    if (tasks.length === 0) return tasks;
+
+    const { data, error } = await this.supabase.client
+      .from("task_dependencies")
+      .select("task_id, depends_on_task_id")
+      .in(
+        "task_id",
+        tasks.map((gorev) => gorev.id)
+      );
+    if (error) return tasks;
+
+    const harita = new Map<string, string[]>();
+    for (const satir of (data ?? []) as any[]) {
+      const liste = harita.get(satir.task_id);
+      if (liste) liste.push(satir.depends_on_task_id);
+      else harita.set(satir.task_id, [satir.depends_on_task_id]);
+    }
+    // Bağımlılığı olmayan göreve de BOŞ DİZİ veriliyor: istemci "undefined =
+    // bu uç bağımlılık çekmiyor" ayrımına bakıyor (bkz. Task.dependsOn).
+    return tasks.map((gorev) => ({ ...gorev, dependsOn: harita.get(gorev.id) ?? [] }));
+  }
+
+  /**
+   * Görevin beklediği, henüz tamamlanmamış görevleri döner.
+   *
+   * Yalnızca DOĞRUDAN bağımlılıklara bakılıyor, zincirin tamamına değil: A, B'yi
+   * bekliyorsa ve B de C'yi bekliyorsa, B zaten kendi kuralı yüzünden
+   * tamamlanamıyor — dolaylı engeli ayrıca hesaplamak aynı sonucu iki kez
+   * üretmek olurdu.
+   */
+  private async openBlockers(taskId: string): Promise<{ id: string; title: string }[]> {
+    const { data, error } = await this.supabase.client
+      .from("task_dependencies")
+      .select("depends_on:tasks!task_dependencies_depends_on_task_id_fkey(id, title, status, archived_at)")
+      .eq("task_id", taskId);
+    // Tablo yoksa (migration uygulanmadıysa) görev akışı DURMAMALI: bağımlılık
+    // bir güvenlik kuralı değil, bir kolaylık. Aynı yaklaşım ai-model-settings'te
+    // de var.
+    if (error) return [];
+
+    return (data ?? [])
+      .map((satir: any) => satir.depends_on)
+      .filter((gorev: any) => gorev && !gorev.archived_at && gorev.status !== "completed")
+      .map((gorev: any) => ({ id: gorev.id, title: gorev.title }));
+  }
+
+  private async assertNotBlocked(taskId: string): Promise<void> {
+    const engeller = await this.openBlockers(taskId);
+    if (engeller.length === 0) return;
+    const adlar = engeller.map((g) => `"${g.title}"`).join(", ");
+    throw new BadRequestException(
+      engeller.length === 1
+        ? `Bu görev ${adlar} bitmeden başlayamaz.`
+        : `Bu görev şunlar bitmeden başlayamaz: ${adlar}`
+    );
+  }
+
+  /**
+   * Bağımlılık ekler.
+   *
+   * ÇEVRİM KONTROLÜ burada: A→B varken B→A eklenirse iki görev de birbirini
+   * bekler ve ikisi de sonsuza kadar "todo"da kalırdı. Şema kısıtıyla
+   * engellenemediği için (özyineleme gerekiyor) beklenen görevin bağımlılık
+   * ağacı geriye doğru taranıyor. Ağaçlar küçük — bir görevin doğrudan
+   * bağımlılığı tipik olarak bir elin parmakları kadar.
+   */
+  async addDependency(taskId: string, dependsOnTaskId: string, requestingUserId?: string): Promise<Task> {
+    await this.assertTaskAccess(await this.getTaskScope(taskId), requestingUserId);
+    if (taskId === dependsOnTaskId) throw new BadRequestException("Bir görev kendini bekleyemez");
+    // Beklenen görevi de görebilmeli: başka bir işin görevine bağ kurup o işin
+    // görev başlıklarını dolaylı olarak okumak mümkün olmamalı.
+    await this.assertTaskAccess(await this.getTaskScope(dependsOnTaskId), requestingUserId);
+
+    if (await this.wouldCycle(taskId, dependsOnTaskId)) {
+      throw new BadRequestException("Bu bağ bir döngü oluşturur: iki görev birbirini beklerdi");
+    }
+
+    const { error } = await this.supabase.client
+      .from("task_dependencies")
+      .upsert(
+        { task_id: taskId, depends_on_task_id: dependsOnTaskId, created_by: requestingUserId ?? null },
+        { onConflict: "task_id,depends_on_task_id" }
+      );
+    if (error) throw error;
+    return this.findById(taskId, requestingUserId);
+  }
+
+  async removeDependency(taskId: string, dependsOnTaskId: string, requestingUserId?: string): Promise<Task> {
+    await this.assertTaskAccess(await this.getTaskScope(taskId), requestingUserId);
+    const { error } = await this.supabase.client
+      .from("task_dependencies")
+      .delete()
+      .eq("task_id", taskId)
+      .eq("depends_on_task_id", dependsOnTaskId);
+    if (error) throw error;
+    return this.findById(taskId, requestingUserId);
+  }
+
+  /**
+   * `taskId` → `dependsOnTaskId` bağı bir çevrim yaratır mı?
+   *
+   * Beklenen görevden başlayıp "o ne bekliyor" diye ilerliyoruz; yolda
+   * `taskId`'ye varırsak çevrim var demektir. Ziyaret edilenler tutuluyor:
+   * veritabanında zaten bir çevrim varsa (eski kayıt, elle müdahale) tarama
+   * sonsuza kadar dönmesin.
+   */
+  private async wouldCycle(taskId: string, dependsOnTaskId: string): Promise<boolean> {
+    const gorulen = new Set<string>();
+    let sira = [dependsOnTaskId];
+
+    while (sira.length > 0) {
+      const yeni: string[] = [];
+      for (const id of sira) {
+        if (id === taskId) return true;
+        if (gorulen.has(id)) continue;
+        gorulen.add(id);
+        yeni.push(id);
+      }
+      if (yeni.length === 0) return false;
+
+      const { data, error } = await this.supabase.client
+        .from("task_dependencies")
+        .select("depends_on_task_id")
+        .in("task_id", yeni);
+      if (error) return false;
+      sira = (data ?? []).map((satir: any) => satir.depends_on_task_id);
+    }
+    return false;
   }
 
   // Proje/departman sahibi + onaylı üyelerden oluşan ekibe, görevi tamamlayan kişinin

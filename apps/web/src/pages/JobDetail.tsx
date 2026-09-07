@@ -23,6 +23,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
+import { gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -228,7 +229,10 @@ export default function JobDetail() {
       // Tamamlanma zamanı/kişisi sunucuda hesaplanıyor ("Bugün yapılanlar" için);
       // gerçek değeri almak üzere görevleri yeniden çekiyoruz.
       .then(() => reloadTasks())
-      .catch(() => reloadTasks());
+      .catch((err) => {
+        gorevDurumHatasiniBildir(err);
+        reloadTasks();
+      });
     // registerUndo=false: bu çağrı başka bir işlemin yan etkisi (örn. üst görev
     // tamamlanınca alt görevlerin de kapanması) — yığında ayrı adım olmamalı.
     if (registerUndo && previousStatus && previousStatus !== status) {

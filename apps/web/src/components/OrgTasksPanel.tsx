@@ -13,6 +13,7 @@ import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { backState } from "../lib/backTarget";
 import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
+import { gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
 
 // Sıra, uygulamadaki diğer tüm kanbanlarla aynı: önce üzerinde çalışılan işler.
 // (bkz. DepartmentTasksPanel, JobTasksPanel, TasksOverview)
@@ -143,7 +144,10 @@ export default function OrgTasksPanel({ organizationId, organizationName }: Prop
   const handleMoveTask = (taskId: string, status: TaskStatus, registerUndo = true) => {
     const previousStatus = tasksRef.current.find((task) => task.id === taskId)?.status;
     setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status } : task)));
-    api.patch(`/tasks/${taskId}/status`, { status }).catch(() => load());
+    api.patch(`/tasks/${taskId}/status`, { status }).catch((err) => {
+      gorevDurumHatasiniBildir(err);
+      load();
+    });
     // registerUndo=false: bu çağrı zaten bir geri alma işleminin kendisi ya da
     // başka bir işlemin yan etkisi (örn. üst görev tamamlanınca alt görevler).
     if (registerUndo && previousStatus && previousStatus !== status) {

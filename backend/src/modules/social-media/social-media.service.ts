@@ -493,6 +493,89 @@ export class SocialMediaService {
     return this.findPost(data.id, userId);
   }
 
+  /**
+   * Yayımlanmış (ya da herhangi bir) gönderiyi yeni bir taslak olarak çoğaltır.
+   *
+   * NEDEN: bir içerik bir kez yayımlandıktan sonra onu tekrar göstermenin yolu
+   * yoktu — kullanıcı aynı metni, aynı görselleri, aynı hesapları elle yeniden
+   * giriyordu. Düzenli tekrarlanan içerikler (hatırlatma, kampanya tekrarı,
+   * "en çok okunan" paylaşımları) bu yüzden pratikte imkânsızdı.
+   *
+   * KOPYA NEYİ TAŞIR: metin, etiketler, bağlantı, ilk yorum, içerik türü,
+   * kampanya, görseller ve HEDEF HESAPLAR (hesaba özel metin geçersiz kılmaları
+   * dahil). NEYİ TAŞIMAZ: yayın damgası, onay bilgisi, sonuç ölçümleri
+   * (erişim/etkileşim/tıklama) ve yayımlanan gönderinin kanal bağlantıları —
+   * bunlar ESKİ paylaşıma ait, kopyaya taşınırsa sonuçlar iki kez sayılırdı.
+   *
+   * Kopya her zaman "draft" doğar: yeni tarih verilse bile kullanıcı göndermeden
+   * önce bir kez bakmalı. Zamanlanmış bir gönderi, taslakken de takvimde görünür.
+   */
+  async duplicatePost(id: string, scheduledAt: string | undefined, userId?: string): Promise<SocialPost> {
+    const existing = await this.rawPost(id);
+    const scope = this.scopeOf(existing);
+    await this.assertCanWrite(scope, userId);
+
+    const { data: created, error } = await this.supabase.client
+      .from("social_posts")
+      .insert({
+        ...this.scopeColumns(scope),
+        title: existing.title,
+        caption: existing.caption ?? null,
+        hashtags: existing.hashtags ?? null,
+        link_url: existing.link_url ?? null,
+        first_comment: existing.first_comment ?? null,
+        content_type: existing.content_type,
+        campaign: existing.campaign ?? null,
+        status: "draft",
+        scheduled_at: scheduledAt || null,
+        assignee_id: existing.assignee_id ?? null,
+        created_by: userId ?? null,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+
+    // Hedef hesaplar: yayımlanmış kayıtların kendi durumları/kanal bağlantıları
+    // kopyalanmıyor, yalnızca "hangi hesaplara gidecekti" bilgisi ve varsa
+    // hesaba özel metin.
+    const { data: targets } = await this.supabase.client
+      .from("social_post_targets")
+      .select("account_id, caption_override")
+      .eq("post_id", id);
+    if (targets?.length) {
+      const overrides: Record<string, string> = {};
+      for (const hedef of targets as any[]) {
+        if (hedef.caption_override) overrides[hedef.account_id] = hedef.caption_override;
+      }
+      await this.replaceTargets(
+        created.id,
+        (targets as any[]).map((hedef) => hedef.account_id),
+        overrides
+      );
+    }
+
+    // Görseller aynı dosyalara bağlanıyor (kopyalanmıyor): dosya kullanıcının
+    // bulut deposunda yaşıyor ve ikinci bir kopya orada da yer kaplardı.
+    const { data: media } = await this.supabase.client
+      .from("social_post_media")
+      .select("file_id, sort_order, alt_text")
+      .eq("post_id", id);
+    if (media?.length) {
+      const { error: mediaError } = await this.supabase.client.from("social_post_media").insert(
+        (media as any[]).map((m) => ({
+          post_id: created.id,
+          file_id: m.file_id,
+          sort_order: m.sort_order,
+          alt_text: m.alt_text ?? null,
+        }))
+      );
+      if (mediaError) throw mediaError;
+    }
+
+    await this.syncTargetSchedule(created.id, scheduledAt || null, "draft");
+    return this.findPost(created.id, userId);
+  }
+
   async updatePost(id: string, input: SocialPostInput, userId?: string): Promise<SocialPost> {
     const existing = await this.rawPost(id);
     await this.assertCanWrite(this.scopeOf(existing), userId);

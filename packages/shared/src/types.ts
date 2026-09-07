@@ -1249,6 +1249,16 @@ export interface Task {
   // kayıt arşivlense de görev yaşar. Bkz. 051_task_module_source.sql
   sourceModuleKey?: string;
   sourceRecordId?: string;
+  /**
+   * Bu görevin BEKLEDİĞİ görevlerin kimlikleri (bkz. migration 094).
+   *
+   * Yalnızca kimlik dönüyor, başlık değil: bağımlılıklar hemen her zaman aynı
+   * panodaki başka görevler ve arayüz başlığı elindeki listeden çözüyor.
+   * Başlığı da göndermek her görev yanıtını iki katına çıkarırdı.
+   *
+   * Boş dizi "bağımlılığı yok", undefined "bu uç bağımlılık çekmiyor" demek.
+   */
+  dependsOn?: string[];
 }
 
 export interface TaskComment {

@@ -90,6 +90,13 @@ export const socialMediaApi = {
 
   updatePost: (id: string, body: SocialPostInput) => api.patch<SocialPost>(`/social-posts/${id}`, body),
 
+  /**
+   * "Tekrar paylaş": gönderiyi yeni bir TASLAK olarak çoğaltır. Metin, görseller
+   * ve hedef hesaplar taşınır; yayın damgası ve sonuç ölçümleri taşınmaz.
+   */
+  duplicatePost: (id: string, scheduledAt?: string) =>
+    api.post<SocialPost>(`/social-posts/${id}/duplicate`, { scheduledAt }),
+
   /** Takvimde sürükleme: yalnızca tarih gider, formun tamamı değil. */
   reschedule: (id: string, scheduledAt: string | null) =>
     api.patch<SocialPost>(`/social-posts/${id}/schedule`, { scheduledAt }),

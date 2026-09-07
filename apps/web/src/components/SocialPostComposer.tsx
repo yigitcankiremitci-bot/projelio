@@ -124,6 +124,8 @@ export default function SocialPostComposer({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [silinecek, setSilinecek] = useState(false);
+  // "Tekrar paylaş": yayımlanmış içeriği yeni bir taslak olarak çoğaltır.
+  const [cogaltiliyor, setCogaltiliyor] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
@@ -303,6 +305,31 @@ export default function SocialPostComposer({
       setError(err instanceof Error ? err.message : t("İçerik kaydedilemedi"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  /**
+   * "Tekrar paylaş".
+   *
+   * NEDEN VAR: bir içerik yayımlandıktan sonra onu yeniden göstermenin yolu
+   * yoktu — aynı metni, görselleri ve hesapları elle baştan girmek gerekiyordu.
+   *
+   * Kopya TASLAK doğar ve tarihi boş gelir: kullanıcı yeni tarihi bilinçli
+   * seçsin. Pencere kopyanın üstüne geçmiyor, kapanıyor — açık kalsaydı
+   * kullanıcı hangi kaydı düzenlediğini karıştırırdı; kopya panoda "Taslak"
+   * sütununda görünür.
+   */
+  const tekrarPaylas = async () => {
+    if (!post) return;
+    setCogaltiliyor(true);
+    setError("");
+    try {
+      onSaved(await socialMediaApi.duplicatePost(post.id));
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("İçerik çoğaltılamadı"));
+    } finally {
+      setCogaltiliyor(false);
     }
   };
 
@@ -831,6 +858,28 @@ export default function SocialPostComposer({
               }}
             >
               {t("Kaldır")}
+            </button>
+          )}
+          {/* Çoğaltma yalnızca KAYITLI içerikte anlamlı. Yayımlanmışla sınırlı
+              DEĞİL: iyi çalışan bir taslağı şablon gibi kullanmak da aynı
+              ihtiyaç. */}
+          {post && (
+            <button
+              onClick={tekrarPaylas}
+              disabled={cogaltiliyor || saving || uploading}
+              title={t("İçeriği yeni bir taslak olarak çoğaltır; metin, görseller ve hesaplar taşınır.")}
+              style={{
+                fontSize: 13,
+                padding: "6px 12px",
+                background: "transparent",
+                border: `1px solid ${c.border}`,
+                borderRadius: 8,
+                cursor: cogaltiliyor ? "default" : "pointer",
+                color: c.textPrimary,
+                opacity: cogaltiliyor || saving || uploading ? 0.6 : 1,
+              }}
+            >
+              {cogaltiliyor ? t("Çoğaltılıyor…") : t("Tekrar paylaş")}
             </button>
           )}
           {/* Doğrudan yayın yalnızca bağlı kanal varken görünür; elle yönetilen

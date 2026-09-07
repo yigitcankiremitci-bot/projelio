@@ -7,6 +7,7 @@ import TaskEditModal from "./TaskEditModal";
 import Modal from "./Modal";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 import { useT } from "../lib/i18n";
+import { gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
 
 export interface DepartmentTasksPanelHandle {
   /** "Görevler" görünümünde "Yapılacak" sütununun hızlı ekleme kutusunu açar. */
@@ -187,7 +188,10 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
   const handleMoveTask = (taskId: string, status: TaskStatus, registerUndo = true) => {
     const previousStatus = tasksRef.current.find((t) => t.id === taskId)?.status;
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
-    api.patch(`/tasks/${taskId}/status`, { status }).catch(() => load());
+    api.patch(`/tasks/${taskId}/status`, { status }).catch((err) => {
+      gorevDurumHatasiniBildir(err);
+      load();
+    });
     // registerUndo=false: bu çağrı zaten bir geri alma işleminin kendisi ya da
     // başka bir işlemin yan etkisi (örn. üst görev tamamlanınca alt görevler).
     if (registerUndo && previousStatus && previousStatus !== status) {

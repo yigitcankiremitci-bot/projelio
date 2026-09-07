@@ -168,6 +168,25 @@ export class TasksController {
     return this.tasksService.addLinkAttachment(id, body, req.user.userId);
   }
 
+  /**
+   * Bağımlılık ekleme/kaldırma: "bu görev şu bitmeden başlayamaz"
+   * (bkz. migration 094). Yanıt güncellenmiş görev — kart `dependsOn`u
+   * doğrudan oradan tazeler.
+   */
+  @Post("tasks/:id/dependencies")
+  addDependency(@Param("id") id: string, @Body("dependsOnTaskId") dependsOnTaskId: string, @Req() req: any) {
+    return this.tasksService.addDependency(id, dependsOnTaskId, req.user.userId);
+  }
+
+  @Delete("tasks/:id/dependencies/:dependsOnTaskId")
+  removeDependency(
+    @Param("id") id: string,
+    @Param("dependsOnTaskId") dependsOnTaskId: string,
+    @Req() req: any
+  ) {
+    return this.tasksService.removeDependency(id, dependsOnTaskId, req.user.userId);
+  }
+
   // Görevden ayrılma: kullanıcı kendini atananlar listesinden çıkarır.
   @Delete("tasks/:id/assignees/me")
   leaveTask(@Param("id") id: string, @Req() req: any) {

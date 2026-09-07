@@ -8,6 +8,7 @@ import AssigneePicker from "./AssigneePicker";
 import EntityDangerZone from "./EntityDangerZone";
 import FilesPanel from "./FilesPanel";
 import TaskAttachmentsPanel from "./TaskAttachmentsPanel";
+import TaskDependenciesPanel from "./TaskDependenciesPanel";
 import AutoGrowTextarea from "./AutoGrowTextarea";
 import AutoGrowNotes from "./AutoGrowNotes";
 import { useCurrentUser } from "../lib/useCurrentUser";
@@ -589,6 +590,13 @@ export default function TaskEditModal({
           gerektirir; bu ise göreve doğrudan bağlı, bağlamsız bir ek listesi. */}
       <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
         <TaskAttachmentsPanel taskId={task.id} onChanged={(attachments) => patchAttachments({ attachments })} />
+      </div>
+
+      {/* Bağımlılıklar: "şu bitmeden bu başlayamaz". Ekler gibi kaydetmeyi
+          BEKLEMEZ — bağ kurulduğu anda sunucuya yazılır, kart rozeti de hemen
+          güncellenir (bkz. onTaskPatched). */}
+      <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
+        <TaskDependenciesPanel task={task} onChanged={(updated) => onTaskPatched?.(updated)} />
       </div>
 
       {/* Dosyalar Drive/OneDrive'da yaşar; kendi veritabanımıza dosya yazılmaz.

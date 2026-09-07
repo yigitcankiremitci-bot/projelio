@@ -28,6 +28,7 @@ import { formatTaskDuration } from "../lib/dates";
 import { coverBackground } from "../lib/covers";
 import { assigneeLabels } from "../lib/taskAssignees";
 import { useT } from "../lib/i18n";
+import { isTaskBlocked } from "../lib/taskDependencies";
 
 
 export interface TaskColumnHandle {
@@ -337,6 +338,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   // Üst görevi kimlikten bulmak için harita: aşağıdaki döngü her alt görev için
   // allTasks.find çağırıyordu, yani yine O(n²). Harita tek geçişte kuruluyor.
   const gorevById = useMemo(() => new Map(allTasks.map((t) => [t.id, t])), [allTasks]);
+
 
   const ghostGroups: { parent: Task; subtasks: Task[] }[] = [];
   if (isCompletedColumn) {
@@ -1263,6 +1265,28 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                           onOpenDetail={() => onEditTask(gorev)}
                           size={13}
                         />
+                        {/* "Bekliyor" rozeti: görevin beklediği görevlerden en az
+                            biri hâlâ açık (bkz. migration 094). Sunucu zaten
+                            başlatmayı reddediyor; rozet bunu DENEMEDEN ÖNCE
+                            söylüyor — aksi halde kullanıcı kartı sürükleyip
+                            neden geri sıçradığını anlamıyor. Kaç tane olduğu
+                            yazılmıyor: karttaki yer dar, ayrıntı modalde. */}
+                        {isTaskBlocked(gorev, gorevById) && (
+                          <span
+                            title={t("Beklediği görevler bitmeden başlatılamaz")}
+                            style={{
+                              flexShrink: 0,
+                              fontSize: 11,
+                              lineHeight: 1.5,
+                              padding: "0 6px",
+                              borderRadius: 999,
+                              color: c.warning,
+                              background: `${c.warning}1f`,
+                            }}
+                          >
+                            {t("bekliyor")}
+                          </span>
+                        )}
                         {/* Eylem düğmeleri her kartta AYNI hizada dursun diye
                             sağa itiliyor (marginLeft: auto). Başlığın hemen
                             ardına bırakıldıklarında yerleri başlığın uzunluğuna

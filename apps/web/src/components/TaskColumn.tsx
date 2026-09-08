@@ -266,7 +266,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   const columnAccent: Record<TaskStatus, string> = {
     todo: c.textSecondary,
     in_progress: c.primary,
-    completed: c.success,
+    completed: c.completed,
   };
 
   // Bu kolonda gerçekten yaşayan üst görevler (kendi statüsü bu kolonla eşleşen).
@@ -1244,7 +1244,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                       gorev,
                       16,
                       gorev.status === "completed"
-                        ? c.success
+                        ? c.completed
                         : isOverdueWithPendingSubtasks
                         ? c.danger
                         : c.textPrimary
@@ -1606,7 +1606,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                         </button>
                         <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
-                            {renderTitle(sub, 15, sub.status === "completed" ? c.success : c.textPrimary)}
+                            {renderTitle(sub, 15, sub.status === "completed" ? c.completed : c.textPrimary)}
                             {/* Alt görevin açıklaması artık satırda görünür; rengi
                                 bilinçli olarak farklı, yoksa altındaki atanan/süre
                                 bilgisiyle aynı griye karışıyordu. Üst görev kartında
@@ -1826,7 +1826,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                   <span
                     style={{
                       fontSize: 15,
-                      color: c.success,
+                      color: c.completed,
                       overflowWrap: "break-word",
                       wordBreak: "break-word",
                     }}

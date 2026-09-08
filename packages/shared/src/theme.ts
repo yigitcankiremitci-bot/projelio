@@ -21,6 +21,19 @@ export const colors = {
     textSecondary: "#66707F",
     border: "#E3E6EB",
     success: "#2E9E5B",
+    // Tamamlanmış görevin başlığı. `success`ten AYRI bir anahtar, çünkü ikisi
+    // farklı şeyler söylüyor: success "para/işlem yolunda" (bütçe rakamları,
+    // yayımlanan kanal, ilerleme çubuğu), completed ise "bu iş bitti". Aynı
+    // anahtara bindirilseydi biri değiştiğinde diğeri de sessizce değişirdi.
+    //
+    // Ton, accent seçeneklerindeki "Çam Yeşili" ile aynı aileden (bkz.
+    // accentPresets.pine): success'in parlak yeşili görev listesinde fazla
+    // dikkat çekiyordu — tamamlanmış iş sakin durmalı, bitmemiş olanın önüne
+    // geçmemeli. Kontrast beyaz zeminde 5.2:1, koyu zeminde 7.2:1 (AA).
+    //
+    // Accent'e BAĞLI DEĞİL: kullanıcı bronz/lacivert/bordo seçse de tamamlanma
+    // rengi yeşil kalmalı, yoksa bordo temada "bitti" ile "hata" aynı renk olur.
+    completed: "#2F7A5B",
     danger: "#C13434",
     warning: "#C0813F",
   },
@@ -36,6 +49,8 @@ export const colors = {
     textSecondary: "#9AA2B0",
     border: "#2A3140",
     success: "#3FBE73",
+    // bkz. light.completed — koyu temadaki karşılığı (accentPresets.pine.dark).
+    completed: "#5FBE94",
     danger: "#E5605F",
     warning: "#D9A868",
   },

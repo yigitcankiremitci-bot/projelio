@@ -414,8 +414,8 @@ function BlockCard({
             marginTop: 2,
             flexShrink: 0,
             borderRadius: 4,
-            border: `1.5px solid ${done ? c.success : c.border}`,
-            background: done ? c.success : "transparent",
+            border: `1.5px solid ${done ? c.completed : c.border}`,
+            background: done ? c.completed : "transparent",
             padding: 0,
             cursor: "pointer",
           }}
@@ -425,7 +425,7 @@ function BlockCard({
             style={{
               fontSize: 12,
               lineHeight: "15px",
-              color: done ? c.success : c.textPrimary,
+              color: done ? c.completed : c.textPrimary,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",

@@ -137,7 +137,7 @@ export default function TaskDependenciesPanel({ task, onChanged }: Props) {
                     "bunu beklemiyorum artık" demenin en kısa yolu. */}
                 <span style={{ display: "flex", flexShrink: 0 }}>
                   {bitti ? (
-                    <IconCheck size={14} color={c.success} />
+                    <IconCheck size={14} color={c.completed} />
                   ) : (
                     <span
                       aria-hidden
@@ -155,7 +155,7 @@ export default function TaskDependenciesPanel({ task, onChanged }: Props) {
                   style={{
                     flex: 1,
                     minWidth: 0,
-                    color: bitti ? c.success : c.textPrimary,
+                    color: bitti ? c.completed : c.textPrimary,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",

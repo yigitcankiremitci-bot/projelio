@@ -438,7 +438,7 @@ export default function PublicProject() {
                       flex: 1,
                       minWidth: 0,
                       fontSize: 14,
-                      color: t.status === "completed" ? c.success : c.textPrimary,
+                      color: t.status === "completed" ? c.completed : c.textPrimary,
                     }}
                   >
                     {t.title}
@@ -660,7 +660,7 @@ function ProgressBar({ view }: { view: PublicProjectView }) {
 
 function StatusDot({ status }: { status: TaskStatus }) {
   const c = useThemeColors();
-  const color = status === "completed" ? c.success : status === "in_progress" ? c.accent : c.border;
+  const color = status === "completed" ? c.completed : status === "in_progress" ? c.accent : c.border;
   return <span style={{ width: 9, height: 9, borderRadius: 999, background: color, flexShrink: 0 }} />;
 }
 

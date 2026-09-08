@@ -297,7 +297,7 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
                               borderRadius: "50%",
                               flexShrink: 0,
                               border: gorev.status === "completed" ? "none" : `1.5px solid ${c.border}`,
-                              background: gorev.status === "completed" ? c.success : "transparent",
+                              background: gorev.status === "completed" ? c.completed : "transparent",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
@@ -309,7 +309,7 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
                             <div
                               style={{
                                 fontSize: 15,
-                                color: gorev.status === "completed" ? c.success : c.textPrimary,
+                                color: gorev.status === "completed" ? c.completed : c.textPrimary,
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",

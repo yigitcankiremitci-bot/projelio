@@ -21,6 +21,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { decodeUploadFileName } from "../../common/upload-filename.util";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
+import { previewableMime } from "./onizleme-turleri";
 
 export type { NativeFileKind };
 
@@ -69,6 +70,8 @@ export interface ProjectFile {
   projectId?: string;
   taskId?: string;
   outputId?: string;
+  /** İçinde bulunduğu kullanıcı klasörü; boşsa kapsamın kökünde (bkz. file_folders). */
+  folderId?: string;
   uploadedBy: string;
   name: string;
   mimeType: string;
@@ -161,6 +164,7 @@ function mapFile(row: any, canEditInDrive: boolean): ProjectFile {
     projectId: row.project_id ?? undefined,
     taskId: row.task_id ?? undefined,
     outputId: row.output_id ?? undefined,
+    folderId: row.folder_id ?? undefined,
     uploadedBy: row.uploaded_by,
     name: row.name,
     mimeType: row.mime_type,
@@ -168,7 +172,7 @@ function mapFile(row: any, canEditInDrive: boolean): ProjectFile {
     driveFileId: row.drive_file_id,
     webViewLink: row.web_view_link ?? undefined,
     iconLink: row.icon_link ?? undefined,
-    hasThumbnail: Boolean(row.thumbnail_link),
+    hasThumbnail: Boolean(row.thumbnail_link) || previewableMime(row.mime_type),
     isGoogleDoc: row.is_google_doc ?? false,
     storageProvider: (row.storage_provider as StorageProvider) ?? "google",
     status: row.status,
@@ -246,6 +250,18 @@ function mapFolder(row: any): FileFolderEntry {
     driveFolderId: row.drive_folder_id,
     managed: row.kind !== "user",
   };
+}
+
+/** `files` satırının kapsam sahibi — klasör satırlarındaki eşinin aynısı. */
+function ownerOfFileRow(row: {
+  job_id?: string | null;
+  department_id?: string | null;
+  organization_id?: string | null;
+}): FileOwner {
+  if (row.job_id) return { kind: "job", id: row.job_id };
+  if (row.department_id) return { kind: "department", id: row.department_id };
+  if (row.organization_id) return { kind: "organization", id: row.organization_id };
+  throw new BadRequestException("Dosyanın kapsamı çözülemedi.");
 }
 
 function ownerOfFolderRow(row: {
@@ -1229,14 +1245,20 @@ export class FilesService {
     if (error) {
       // Aynı adla ikinci klasör (migration 090'daki kısmi unique index): zaten
       // varsa onu döndürmek, klasör yüklemesini idempotent kılıyor.
+      //
+      // ÜST KLASÖRE GÖRE ARANIR. Tekillik (kapsam, üst klasör, ad) üçlüsünde;
+      // yalnızca ada bakmak "Fotoğraflar/2026" ile "Belgeler/2026" gibi iki
+      // ayrı dala aynı adı koyan bir klasör yüklemesinde ya yanlış klasörü ya
+      // da birden fazla satır döndürüp yüklemeyi düşürüyordu.
       if ((error as any).code === "23505") {
-        const { data: raced } = await this.supabase.client
+        let arama = this.supabase.client
           .from("file_folders")
           .select()
           .eq(this.ownerColumn(owner), owner.id)
           .eq("kind", "user")
-          .ilike("name", temiz)
-          .maybeSingle();
+          .ilike("name", temiz);
+        arama = parentFolderId ? arama.eq("parent_folder_id", parentFolderId) : arama.is("parent_folder_id", null);
+        const { data: raced } = await arama.maybeSingle();
         if (raced) return mapFolder(raced);
       }
       throw error;
@@ -1357,6 +1379,124 @@ export class FilesService {
     // Alt klasör satırları parent_folder_id cascade ile gidiyor (migration 023).
     const { error } = await this.supabase.client.from("file_folders").delete().eq("id", folderId);
     if (error) throw error;
+  }
+
+  /**
+   * Dosyayı başka bir klasöre (ya da köke) taşır.
+   *
+   * Klasör sistemi bunsuz yarım kalıyordu: yüklendikten sonra bir dosyayı
+   * düzenlemenin tek yolu silip yeniden yüklemekti. Taşıma HEM Projelio'da hem
+   * bulutta yapılır — ikisi ayrışırsa kullanıcı Drive'da dosyayı bambaşka bir
+   * yerde bulur.
+   *
+   * `folderId` verilmezse dosya kapsamın köküne çıkar.
+   */
+  async moveFile(fileId: string, userId: string, folderId?: string): Promise<ProjectFile> {
+    const { row } = await this.findById(fileId, userId);
+
+    const owner = ownerOfFileRow(row);
+    // Erişim findById'de doğrulandı; burada asıl mesele hedefin AYNI kapsamda
+    // olması — klasör kimliği istemciden geliyor.
+    const { provider, accountId, rootFolderId } = await this.ownerRoot(owner, userId);
+    const hedef = await this.resolvePlacement(owner, userId, rootFolderId, { folderId });
+
+    // Bulunulan yer: Google'da eski ebeveyni çıkarmak için gerekiyor.
+    let mevcutDriveKlasoru = rootFolderId;
+    if (row.folder_id) {
+      const { data: mevcut } = await this.supabase.client
+        .from("file_folders")
+        .select("drive_folder_id")
+        .eq("id", row.folder_id)
+        .maybeSingle();
+      if (mevcut?.drive_folder_id) mevcutDriveKlasoru = mevcut.drive_folder_id;
+    }
+
+    if (hedef.driveFolderId !== mevcutDriveKlasoru) {
+      const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+      await this.cloudStorage.moveFile(
+        provider,
+        accessToken,
+        row.drive_file_id,
+        hedef.driveFolderId,
+        mevcutDriveKlasoru
+      );
+    }
+
+    const { data: updated, error } = await this.supabase.client
+      .from("files")
+      .update({ folder_id: hedef.folderRowId ?? null })
+      .eq("id", fileId)
+      .select()
+      .single();
+    if (error) throw error;
+
+    return mapFile(updated, await this.canEditInDrive(row.job_id, userId, row.project_id ?? undefined));
+  }
+
+  /**
+   * Klasörü başka bir klasörün altına (ya da köke) taşır.
+   *
+   * Kendi altına taşımak ağacı koparıp erişilemez bir döngü bırakırdı; bu
+   * yüzden hedefin, taşınan klasörün alt ağacında olmadığı kontrol ediliyor.
+   */
+  async moveFolder(folderId: string, userId: string, parentFolderId?: string): Promise<FileFolderEntry> {
+    const { row, owner } = await this.folderForWrite(folderId, userId);
+    if (parentFolderId === folderId) throw new BadRequestException("Bir klasör kendi içine taşınamaz");
+
+    const { provider, accountId, rootFolderId } = await this.ownerRoot(owner, userId);
+
+    let hedefDriveKlasoru = rootFolderId;
+    if (parentFolderId) {
+      if ((await this.folderSubtreeIds(folderId)).includes(parentFolderId)) {
+        throw new BadRequestException("Bir klasör kendi alt klasörüne taşınamaz");
+      }
+      const { data: parent } = await this.supabase.client
+        .from("file_folders")
+        .select()
+        .eq("id", parentFolderId)
+        .maybeSingle();
+      if (!parent) throw new NotFoundException("Üst klasör bulunamadı");
+      if (parent[this.ownerColumn(owner)] !== owner.id) {
+        throw new ForbiddenException("Bu klasör bu alana ait değil");
+      }
+      hedefDriveKlasoru = parent.drive_folder_id;
+    }
+
+    let mevcutDriveKlasoru = rootFolderId;
+    if (row.parent_folder_id) {
+      const { data: mevcut } = await this.supabase.client
+        .from("file_folders")
+        .select("drive_folder_id")
+        .eq("id", row.parent_folder_id)
+        .maybeSingle();
+      if (mevcut?.drive_folder_id) mevcutDriveKlasoru = mevcut.drive_folder_id;
+    }
+
+    if (hedefDriveKlasoru !== mevcutDriveKlasoru) {
+      const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+      await this.cloudStorage.moveFile(
+        provider,
+        accessToken,
+        row.drive_folder_id,
+        hedefDriveKlasoru,
+        mevcutDriveKlasoru
+      );
+    }
+
+    const { data: updated, error } = await this.supabase.client
+      .from("file_folders")
+      .update({ parent_folder_id: parentFolderId ?? null })
+      .eq("id", folderId)
+      .select()
+      .single();
+    if (error) {
+      // Hedefte aynı adda bir klasör zaten var (migration 090 tekillik indeksi).
+      if ((error as any).code === "23505") {
+        throw new BadRequestException("Hedefte aynı adda bir klasör zaten var.");
+      }
+      throw error;
+    }
+    return mapFolder(updated);
   }
 
   /** Klasör ve altındaki tüm klasörlerin kimlikleri. */
@@ -2857,10 +2997,15 @@ export class FilesService {
    *
    * Adres bayatlamışsa künye bir kez tazelenip yeniden denenir; yine olmazsa
    * `null` döner ve arayüz tür ikonuna düşer — önizleme kritik değil.
+   *
+   * KOLON BOŞKEN DE ÇALIŞIR. Eskiden `thumbnail_link` yoksa hemen `null`
+   * dönüyordu ve bu, önizlemenin HİÇ görünmemesi demekti: kolon yalnızca
+   * yükleme yanıtından dolduruluyor, iki sağlayıcı da orada önizleme adresi
+   * vermiyor (bkz. previewableMime). Artık kolon boşsa künye sağlayıcıdan
+   * çekilip yazılıyor — ilk istek biraz yavaş, sonrakiler önbellekten.
    */
   async openThumbnail(fileId: string, userId: string): Promise<Response | null> {
     const { row } = await this.findById(fileId, userId);
-    if (!row.thumbnail_link) return null;
 
     const { provider, accountId } = storageOwner(row);
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
@@ -2868,9 +3013,12 @@ export class FilesService {
     const iste = (url: string) =>
       fetchWithTimeout(url, provider === "google" ? { headers: { Authorization: `Bearer ${accessToken}` } } : {});
 
-    let response = await iste(row.thumbnail_link).catch(() => null);
-    if (response?.ok) return response;
+    if (row.thumbnail_link) {
+      const response = await iste(row.thumbnail_link).catch(() => null);
+      if (response?.ok) return response;
+    }
 
+    // Kolon boş ya da adres bayatlamış: künyeyi tazele.
     try {
       const fresh = await this.cloudStorage.getFile(provider, accessToken, row.drive_file_id);
       if (!fresh.thumbnailLink) return null;
@@ -2878,12 +3026,11 @@ export class FilesService {
         .from("files")
         .update({ thumbnail_link: fresh.thumbnailLink })
         .eq("id", fileId);
-      response = await iste(fresh.thumbnailLink).catch(() => null);
+      const response = await iste(fresh.thumbnailLink).catch(() => null);
+      return response?.ok ? response : null;
     } catch {
       return null;
     }
-
-    return response?.ok ? response : null;
   }
 
   async openDownload(

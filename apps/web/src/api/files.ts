@@ -106,6 +106,10 @@ export const filesApi = {
 
   rename: (fileId: string, name: string) => api.patch<ProjectFile>(`/files/${fileId}`, { name }),
 
+  /** Dosyayı başka bir klasöre taşır; `folderId` verilmezse kapsamın köküne. */
+  move: (fileId: string, folderId?: string) =>
+    api.patch<ProjectFile>(`/files/${fileId}/folder`, { folderId: folderId ?? null }),
+
   remove: (fileId: string, alsoTrash = false) =>
     api.delete<{ ok: boolean }>(`/files/${fileId}${alsoTrash ? "?trash=1" : ""}`),
 
@@ -161,6 +165,9 @@ export const filesApi = {
     }),
   renameFolder: (folderId: string, name: string) =>
     api.patch<FileFolder>(`/file-folders/${folderId}`, { name }),
+  /** Klasörü başka bir klasörün altına taşır; `parentFolderId` yoksa köke. */
+  moveFolder: (folderId: string, parentFolderId?: string) =>
+    api.patch<FileFolder>(`/file-folders/${folderId}/parent`, { parentFolderId: parentFolderId ?? null }),
   removeFolder: (folderId: string) => api.delete<{ ok: boolean }>(`/file-folders/${folderId}`),
 
   /**

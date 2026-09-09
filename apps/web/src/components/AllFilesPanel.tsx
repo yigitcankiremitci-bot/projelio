@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { Job, Project, ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
 import { driveEditUrl, fileKindLabel, formatFileSize } from "../lib/driveLinks";
+import { useFileThumbnails } from "../lib/fileThumbnails";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useThemeColors } from "../theme/useThemeColors";
 import FilePreviewModal from "./FilePreviewModal";
+import FileThumb from "./FileThumb";
 import QuickFileUploadModal, { type UploadTargetOption } from "./QuickFileUploadModal";
-import { IconDownload, IconExternalLink, IconFile } from "./icons";
+import { IconDownload, IconExternalLink } from "./icons";
 import { useT } from "../lib/i18n";
 
 /**
@@ -69,9 +71,13 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
    * penceresini açıyoruz — kullanıcı yine sürükleyip bırakabiliyor, tek fark
    * bir seçim adımı.
    */
-  const { dragging } = usePageFileDrop(uploadTargets.length > 0, (files) =>
-    setDropped(Array.from(files))
+  // Klasör bırakılırsa ağaçtaki dosyalar düz listeye açılır (bkz. lib/dropFiles.ts);
+  // hedef seçimi yapıldıktan sonra klasör yapısını sunucu kuruyor.
+  const { dragging } = usePageFileDrop(uploadTargets.length > 0, (dosyalar) =>
+    setDropped(dosyalar.map((d) => d.file))
   );
+
+  const thumbs = useFileThumbnails(files);
 
 
   useProjectFabAction({ label: "Dosya ekle", onClick: () => setAdding(true) }, []);
@@ -155,11 +161,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
             onClick={() => setPreview(file)}
             style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}
           >
-            {file.iconLink ? (
-              <img src={file.iconLink} alt="" width={18} height={18} />
-            ) : (
-              <IconFile size={18} color={c.textSecondary} />
-            )}
+            <FileThumb file={file} thumbs={thumbs} variant="row" />
             <div style={{ minWidth: 0 }}>
               <div
                 style={{

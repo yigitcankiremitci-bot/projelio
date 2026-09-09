@@ -185,6 +185,29 @@ export class DriveService {
     return mapFile(json);
   }
 
+  /**
+   * Dosyayı (ya da klasörü) başka bir klasöre taşır.
+   *
+   * Drive'da bir öğe birden fazla klasörde durabildiği için taşıma "ekle/çıkar"
+   * biçiminde ifade ediliyor: eski ebeveyn verilmezse öğe İKİ yerde birden
+   * görünmeye devam ederdi.
+   */
+  async moveFile(
+    accessToken: string,
+    fileId: string,
+    newParentId: string,
+    oldParentId?: string
+  ): Promise<DriveFile> {
+    const params = new URLSearchParams({ fields: FILE_FIELDS, addParents: newParentId });
+    if (oldParentId) params.set("removeParents", oldParentId);
+    const json = await this.call<any>(accessToken, `/files/${fileId}?${params.toString()}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    return mapFile(json);
+  }
+
   // ------------------------------------------------------- göz atma / içe aktarma
   //
   // `drive.file` scope'u normalde yalnızca uygulamanın oluşturduğu dosyaları

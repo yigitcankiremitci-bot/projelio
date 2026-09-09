@@ -1563,6 +1563,8 @@ export interface ProjectFile {
   projectId?: string;
   taskId?: string;
   outputId?: string;
+  /** İçinde bulunduğu kullanıcı klasörü; boşsa kapsamın kökünde (bkz. FileFolder). */
+  folderId?: string;
   uploadedBy: string;
   name: string;
   mimeType: string;

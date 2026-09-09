@@ -294,6 +294,19 @@ export class FilesController {
     return this.filesService.renameFolder(id, req.user.userId, body?.name);
   }
 
+  /**
+   * Klasörü başka bir klasörün altına taşır; `parentFolderId` boşsa köke.
+   *
+   * Yeniden adlandırmadan AYRI uç: `PATCH` gövdesinde "alan yok" ile "alan
+   * null" ayrımı istemciden gelen JSON'da güvenilir değil, oysa burada
+   * "köke taşı" tam olarak o ayrımdır.
+   */
+  @Patch("file-folders/:id/parent")
+  @UseGuards(AuthGuard("jwt"))
+  moveFolder(@Param("id") id: string, @Body() body: { parentFolderId?: string | null }, @Req() req: any) {
+    return this.filesService.moveFolder(id, req.user.userId, body?.parentFolderId || undefined);
+  }
+
   @Delete("file-folders/:id")
   @UseGuards(AuthGuard("jwt"))
   async removeFolder(@Param("id") id: string, @Req() req: any) {
@@ -728,6 +741,13 @@ export class FilesController {
   @UseGuards(AuthGuard("jwt"))
   rename(@Param("id") id: string, @Body("name") name: string, @Req() req: any) {
     return this.filesService.rename(id, req.user.userId, name);
+  }
+
+  /** Dosyayı başka bir klasöre taşır; `folderId` boşsa kapsamın köküne. */
+  @Patch("files/:id/folder")
+  @UseGuards(AuthGuard("jwt"))
+  moveFile(@Param("id") id: string, @Body() body: { folderId?: string | null }, @Req() req: any) {
+    return this.filesService.moveFile(id, req.user.userId, body?.folderId || undefined);
   }
 
   @Delete("files/:id")

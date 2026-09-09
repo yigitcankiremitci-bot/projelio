@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { readDroppedFiles, type DroppedFile } from "./dropFiles";
 
 /**
  * Sayfanın HER YERİNE bırakılan dosyaları yakalar.
@@ -14,10 +15,14 @@ import { useEffect, useState } from "react";
  *
  * Yalnızca gerçek DOSYA sürüklemeleri sayılır: uygulama içinde kart sürüklemek
  * (`text/plain`) yükleme başlatmamalı.
+ *
+ * KLASÖR de bırakılabilir: ağaç `webkitGetAsEntry` ile geziliyor ve her dosya
+ * göreli yoluyla birlikte veriliyor (bkz. lib/dropFiles.ts). Eskiden bırakılan
+ * klasör 0 baytlık tek bir dosyaya dönüşüyordu.
  */
 export function usePageFileDrop(
   enabled: boolean,
-  onFiles: (files: FileList) => void
+  onFiles: (files: DroppedFile[]) => void
 ): { dragging: boolean } {
   const [dragging, setDragging] = useState(false);
 
@@ -55,8 +60,11 @@ export function usePageFileDrop(
       e.preventDefault();
       derinlik = 0;
       setDragging(false);
-      const files = e.dataTransfer?.files;
-      if (files?.length) onFiles(files);
+      // Ağaç okuması asenkron; `dataTransfer` olay bittikten sonra boşaldığı
+      // için kayıtlar okumanın İÇİNDE, ilk adımda senkron toplanıyor.
+      void readDroppedFiles(e.dataTransfer).then((files) => {
+        if (files.length) onFiles(files);
+      });
     };
 
     document.addEventListener("dragenter", girdi);

@@ -104,6 +104,10 @@ export const dosyalar: TranslationDict = {
   "Klasör oluşturulamadı": "The folder couldn't be created",
   "Klasör yeniden adlandırılamadı": "The folder couldn't be renamed",
   "Klasör kaldırılamadı": "The folder couldn't be removed",
+  // Klasöre sürükleyerek ya da sağ tık menüsünden taşıma.
+  Taşınamadı: "Couldn't be moved",
+  "Üst klasöre taşı": "Move to parent folder",
+  "Köke taşı": "Move to the top level",
   "Dosya yeniden adlandırılamadı": "The file couldn't be renamed",
   '"{ad}" klasörü içindekilerle birlikte kaldırılsın mı? Bulutta çöp kutusuna taşınır.':
     'Remove the folder "{ad}" together with its contents? It is moved to the trash in the cloud.',

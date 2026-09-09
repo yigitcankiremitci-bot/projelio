@@ -220,6 +220,22 @@ export class CloudStorageService {
       : this.oneDrive.renameFile(accessToken, fileId, name);
   }
 
+  /**
+   * Öğeyi başka bir klasöre taşır. `oldParentId` yalnızca Google'da anlamlı
+   * (orada bir öğe birden fazla klasörde durabiliyor).
+   */
+  async moveFile(
+    provider: StorageProvider,
+    accessToken: string,
+    fileId: string,
+    newParentId: string,
+    oldParentId?: string
+  ): Promise<CloudFile> {
+    return provider === "google"
+      ? this.googleDrive.moveFile(accessToken, fileId, newParentId, oldParentId)
+      : this.oneDrive.moveFile(accessToken, fileId, newParentId);
+  }
+
   async trashFile(provider: StorageProvider, accessToken: string, fileId: string): Promise<void> {
     return provider === "google"
       ? this.googleDrive.trashFile(accessToken, fileId)

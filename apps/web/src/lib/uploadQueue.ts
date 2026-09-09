@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ProjectFile } from "@projelio/shared";
 import { filesApi, uploadFile, type FileContext, type UploadTarget } from "../api/files";
+import { toDroppedFiles, type DroppedFile } from "./dropFiles";
 import { uploadScope } from "./uploadScope";
 
 /**
@@ -198,20 +199,23 @@ async function work(): Promise<void> {
   }
 }
 
-/** Dosyaları kuyruğa alır ve (çalışmıyorsa) işlemeyi başlatır. */
+/**
+ * Dosyaları kuyruğa alır ve (çalışmıyorsa) işlemeyi başlatır.
+ *
+ * `files` iki biçim kabul eder: `<input>` seçimi (File) ve sürükle-bırak
+ * sonucu (DroppedFile, göreli yolu kendi taşır). İkisi de aynı yere iniyor,
+ * çağıranın hangi yoldan geldiğini bilmesi gerekmesin (bkz. lib/dropFiles.ts).
+ */
 export function enqueueUploads(params: {
   target: UploadTarget;
-  files: File[];
+  files: File[] | DroppedFile[] | FileList;
   context?: Omit<FileContext, "projectId"> & { folderId?: string };
 }): void {
   const context = params.context ?? {};
   // Kapsam anahtarı klasöre göre AYRIŞMAZ: kullanıcı yükleme sürerken başka bir
   // klasöre geçtiğinde satırların tepsiden kaybolmasını istemiyoruz.
   const scope = uploadScope(params.target, { taskId: context.taskId, outputId: context.outputId });
-  for (const file of params.files) {
-    // Klasör yüklemesinde tarayıcı göreli yolu dosyanın kendisinde veriyor;
-    // ağacı sunucu buna bakarak kuruyor (bkz. FilesService.ensureUserFolderPath).
-    const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || undefined;
+  for (const { file, relativePath } of toDroppedFiles(params.files)) {
     queue.push({
       id: `${file.name}-${Date.now()}-${Math.random()}`,
       name: file.name,
@@ -221,6 +225,8 @@ export function enqueueUploads(params: {
       scope,
       file,
       target: params.target,
+      // Klasör yüklemesinde göreli yola bakarak eksik klasörleri sunucu kuruyor
+      // (bkz. FilesService.ensureUserFolderPath).
       context: { ...context, relativePath },
       controller: new AbortController(),
     });

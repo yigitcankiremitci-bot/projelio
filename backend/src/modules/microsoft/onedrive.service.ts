@@ -167,6 +167,21 @@ export class OneDriveService {
     return mapItem(json);
   }
 
+  /**
+   * Öğeyi başka bir klasöre taşır.
+   *
+   * Graph'ta ebeveyn tek olduğu için Google'daki gibi "eski ebeveyni çıkar"
+   * adımı yok; parentReference yazmak yeterli.
+   */
+  async moveFile(accessToken: string, itemId: string, newParentId: string): Promise<DriveFile> {
+    const json = await this.call<any>(accessToken, `/me/drive/items/${itemId}?$expand=thumbnails`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parentReference: { id: newParentId } }),
+    });
+    return mapItem(json);
+  }
+
   // ------------------------------------------------------------------- yükleme
 
   /** Küçük dosyalar (<4MB) için tek istekli yükleme. */

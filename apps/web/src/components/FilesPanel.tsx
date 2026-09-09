@@ -14,6 +14,8 @@ import {
   useUploads,
 } from "../lib/uploadQueue";
 import { openGooglePicker } from "../lib/googlePicker";
+import { readDroppedFiles, type DroppedFile } from "../lib/dropFiles";
+import { useFileThumbnails } from "../lib/fileThumbnails";
 import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useThemeColors } from "../theme/useThemeColors";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
@@ -24,11 +26,11 @@ import CreateNativeFileMenu from "./CreateNativeFileMenu";
 import type { CreateNativeFileMenuHandle } from "./CreateNativeFileMenu";
 import FileContextMenu from "./FileContextMenu";
 import FilePreviewModal from "./FilePreviewModal";
+import FileThumb from "./FileThumb";
 import { useT } from "../lib/i18n";
 import {
   IconDownload,
   IconExternalLink,
-  IconFile,
   IconFolder,
   IconGoogleDrive,
   IconOneDrive,
@@ -155,8 +157,15 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const [crumbs, setCrumbs] = useState<FileFolder[]>([]);
   const [viewMode, setViewMode] = useState<"list" | "grid">(readStoredView);
   const [menu, setMenu] = useState<MenuState | null>(null);
-  // Önizleme jetonları: dosya başına imzalı, tek istekte toplu alınır.
-  const [thumbTokens, setThumbTokens] = useState<Record<string, string>>({});
+  // Önizleme jetonları: dosya başına imzalı, tek istekte toplu alınır
+  // (bkz. lib/fileThumbnails.ts).
+  const thumbs = useFileThumbnails(files);
+  // Uygulama İÇİ sürükleme: satırı klasöre bırakarak taşıma. Bilgisayardan
+  // dosya sürüklemekle karışmıyor — o sürüklemede dataTransfer türü "Files",
+  // bunda kendi türümüz (bkz. usePageFileDrop'taki denetim).
+  const [dragItem, setDragItem] = useState<{ kind: "file" | "folder"; id: string } | null>(null);
+  // Üzerine bırakılabilecek hedefin vurgusu; "root" ekmek kırıntısındaki kök.
+  const [dropOver, setDropOver] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   // Ayrı bir input: webkitdirectory aynı elemanda açılıp kapatılamıyor
@@ -219,15 +228,6 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const queueScope = useMemo(() => uploadScope(target, { taskId, outputId }), [target, taskId, outputId]);
   const uploads = useUploads(queueScope);
 
-  // Kuyruk panelin dışında olduğu için biten dosyayı listeye o haber veriyor.
-  useEffect(
-    () =>
-      subscribeUploadDone((doneScope, created) => {
-        if (doneScope === queueScope) setFiles((prev) => [created, ...prev]);
-      }),
-    [queueScope]
-  );
-
   const load = useCallback(() => {
     setError("");
     const request = organizationId
@@ -270,6 +270,35 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     void load();
   }, [load]);
 
+  /**
+   * Klasör yüklemesinden sonra ağacı tazelemek için gecikmeli tetikleyici.
+   *
+   * Bir klasör yüklemesi onlarca dosya demek ve her biri ayrı ayrı bitiyor;
+   * her bitişte listeyi yeniden çekmek aynı isteği onlarca kez atardı.
+   */
+  const folderRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Kuyruk panelin dışında olduğu için biten dosyayı listeye o haber veriyor.
+  useEffect(() => {
+    const cikis = subscribeUploadDone((doneScope, created) => {
+      if (doneScope !== queueScope) return;
+
+      // Klasör yüklemesinde dosya bir ALT klasöre iniyor: açık olan listeye
+      // eklemek onu bulunduğu yerden başka bir yerde göstermek olurdu. O
+      // durumda klasör ağacı tazelenir, yeni klasörler orada belirir.
+      if ((created.folderId ?? undefined) !== folderId) {
+        if (folderRefreshTimer.current) clearTimeout(folderRefreshTimer.current);
+        folderRefreshTimer.current = setTimeout(() => void load(), 700);
+        return;
+      }
+      setFiles((prev) => [created, ...prev]);
+    });
+    return () => {
+      cikis();
+      if (folderRefreshTimer.current) clearTimeout(folderRefreshTimer.current);
+    };
+  }, [queueScope, folderId, load]);
+
   // Aynı sayfadaki başka biri dosya eklediğinde/sildiğinde de tazelenir
   // (bkz. lib/liveRoom.ts).
   useRefreshOnUndo(load);
@@ -284,39 +313,20 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     ]).finally(() => setStatusLoading(false));
   }, []);
 
-  const handleFiles = useCallback((selected: FileList | null) => {
+  const handleFiles = useCallback((selected: FileList | DroppedFile[] | null) => {
     if (!selected?.length) return;
     // Kuyruk sıralı ilerliyor, hız sınırını ve hataları da o yönetiyor
     // (bkz. lib/uploadQueue). Panel yalnızca işi teslim ediyor.
     enqueueUploads({
       target,
-      files: Array.from(selected),
+      files: selected,
       // Klasör yüklemesinde göreli yolu kuyruk dosyanın kendisinden okuyor
-      // (webkitRelativePath); burada yalnızca bulunulan klasörü veriyoruz.
+      // (webkitRelativePath ya da bırakılan ağaçtaki yol); burada yalnızca
+      // bulunulan klasörü veriyoruz.
       context: { taskId, outputId, folderId },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target, taskId, outputId, folderId]);
-
-  // Önizlemesi olan dosyalar için tek istekte jeton alınır (bkz. filesApi.accessTokens).
-  useEffect(() => {
-    const ids = files.filter((f) => f.hasThumbnail).map((f) => f.id);
-    if (!ids.length) {
-      setThumbTokens({});
-      return;
-    }
-    let iptal = false;
-    filesApi
-      .accessTokens(ids)
-      .then(({ tokens }) => {
-        if (!iptal) setThumbTokens(tokens);
-      })
-      // Önizleme kritik değil: alınamazsa tür ikonu gösterilir.
-      .catch(() => undefined);
-    return () => {
-      iptal = true;
-    };
-  }, [files]);
 
   // Ekmek kırıntısı sunucudan: kullanıcı derin bir klasöre doğrudan da girebilir.
   useEffect(() => {
@@ -375,6 +385,86 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       setError(e?.message ?? t("Klasör kaldırılamadı"));
     }
   };
+
+  /**
+   * Satır bu panelden TAŞINABİLİR mi.
+   *
+   * Üst kademe listeleri (şirket ekranı) altındaki işlerin dosyalarını da
+   * gösteriyor; onları şirketin klasörüne taşımak kapsam değiştirmek olurdu ve
+   * sunucu zaten reddediyor (bkz. FilesService.resolvePlacement). Sürüklemeyi
+   * hiç başlatmamak, kullanıcıya hata göstermekten iyi.
+   */
+  const canMoveFile = (file: ProjectFile): boolean => {
+    if (!canBrowse || readOnly || !folderOwner) return false;
+    if (folderOwner.kind === "job") return file.jobId === folderOwner.id;
+    if (folderOwner.kind === "department") return file.departmentId === folderOwner.id;
+    return file.organizationId === folderOwner.id;
+  };
+
+  const beginDrag = (e: React.DragEvent, kind: "file" | "folder", id: string) => {
+    // Kendi türümüz: sayfanın geneline kurulu DOSYA bırakma dinleyicisi
+    // yalnızca "Files" taşıyan sürüklemelere bakıyor (bkz. usePageFileDrop).
+    e.dataTransfer.setData("text/x-projelio-dosya", `${kind}:${id}`);
+    e.dataTransfer.effectAllowed = "move";
+    setDragItem({ kind, id });
+  };
+
+  /** `hedef` verilmezse kapsamın kökü. */
+  const handleInternalDrop = async (hedef?: FileFolder) => {
+    const item = dragItem;
+    setDragItem(null);
+    setDropOver(null);
+    if (!item) return;
+    // Klasörü kendi üstüne bırakmak ve zaten bulunulan yere taşımak işlemsiz.
+    if (item.kind === "folder" && item.id === hedef?.id) return;
+
+    try {
+      if (item.kind === "file") {
+        await filesApi.move(item.id, hedef?.id);
+        setFiles((prev) => prev.filter((f) => f.id !== item.id));
+      } else {
+        await filesApi.moveFolder(item.id, hedef?.id);
+        setFolders((prev) => prev.filter((f) => f.id !== item.id));
+      }
+    } catch (e: any) {
+      setError(e?.message ?? t("Taşınamadı"));
+    }
+  };
+
+  /** Bir üst klasör — sağ tık menüsündeki "Üst klasöre taşı" için (dokunmatikte sürükleme yok). */
+  const parentFolderId = crumbs.length > 1 ? crumbs[crumbs.length - 2].id : undefined;
+
+  const moveToParent = async (item: { kind: "file" | "folder"; id: string }) => {
+    try {
+      if (item.kind === "file") {
+        await filesApi.move(item.id, parentFolderId);
+        setFiles((prev) => prev.filter((f) => f.id !== item.id));
+      } else {
+        await filesApi.moveFolder(item.id, parentFolderId);
+        setFolders((prev) => prev.filter((f) => f.id !== item.id));
+      }
+    } catch (e: any) {
+      setError(e?.message ?? t("Taşınamadı"));
+    }
+  };
+
+  /** Bırakma hedeflerinin ortak olay bağlantıları. */
+  const dropTargetProps = (anahtar: string, hedef?: FileFolder) =>
+    dragItem
+      ? {
+          onDragOver: (e: React.DragEvent) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move" as const;
+            setDropOver(anahtar);
+          },
+          onDragLeave: () => setDropOver((prev) => (prev === anahtar ? null : prev)),
+          onDrop: (e: React.DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void handleInternalDrop(hedef);
+          },
+        }
+      : {};
 
   const handleRenameFile = async (file: ProjectFile) => {
     const ad = window.prompt(t("Yeni ad:"), file.name)?.trim();
@@ -751,7 +841,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           onDrop={(e) => {
             e.preventDefault();
             setDragging(false);
-            if (!driveMissing) void handleFiles(e.dataTransfer.files);
+            // Klasör bırakılabilsin diye ağaç okunuyor (bkz. lib/dropFiles.ts).
+            if (!driveMissing) void readDroppedFiles(e.dataTransfer).then(handleFiles);
           }}
           style={{
             border: `1.5px dashed ${dragging ? c.accent : c.border}`,
@@ -897,10 +988,21 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           çünkü en sık istenen "başa dön". */}
       {canBrowse && crumbs.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12, fontSize: 15 }}>
+          {/* Kök de bir bırakma hedefi: klasörün dışına çıkarmanın yolu bu. */}
           <button
             type="button"
             onClick={() => setFolderId(undefined)}
-            style={{ background: "transparent", border: "none", color: c.accent, cursor: "pointer", padding: 0, fontSize: 15 }}
+            {...dropTargetProps("root")}
+            style={{
+              background: dropOver === "root" ? `${c.accent}22` : "transparent",
+              border: "none",
+              borderRadius: 6,
+              color: c.accent,
+              cursor: "pointer",
+              padding: "2px 6px",
+              margin: "0 -6px",
+              fontSize: 15,
+            }}
           >
             {t("Dosyalar")}
           </button>
@@ -913,7 +1015,16 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 <button
                   type="button"
                   onClick={() => setFolderId(k.id)}
-                  style={{ background: "transparent", border: "none", color: c.accent, cursor: "pointer", padding: 0, fontSize: 15 }}
+                  {...dropTargetProps(`crumb:${k.id}`, k)}
+                  style={{
+                    background: dropOver === `crumb:${k.id}` ? `${c.accent}22` : "transparent",
+                    border: "none",
+                    borderRadius: 6,
+                    color: c.accent,
+                    cursor: "pointer",
+                    padding: "2px 6px",
+                    fontSize: 15,
+                  }}
                 >
                   {k.name}
                 </button>
@@ -948,16 +1059,20 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           {folders.map((folder) => (
             <div
               key={folder.id}
+              draggable={canBrowse && !readOnly && !folder.managed}
+              onDragStart={(e) => beginDrag(e, "folder", folder.id)}
+              onDragEnd={() => setDragItem(null)}
               onDoubleClick={() => setFolderId(folder.id)}
               onClick={() => setFolderId(folder.id)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setMenu({ x: e.clientX, y: e.clientY, folder });
               }}
+              {...dropTargetProps(`folder:${folder.id}`, folder)}
               style={{
-                border: `1px solid ${c.border}`,
+                border: `1px solid ${dropOver === `folder:${folder.id}` ? c.accent : c.border}`,
                 borderRadius: 10,
-                background: c.surface,
+                background: dropOver === `folder:${folder.id}` ? `${c.accent}14` : c.surface,
                 padding: 12,
                 cursor: "pointer",
                 textAlign: "center",
@@ -984,6 +1099,9 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           {files.map((file) => (
             <div
               key={file.id}
+              draggable={canMoveFile(file)}
+              onDragStart={(e) => beginDrag(e, "file", file.id)}
+              onDragEnd={() => setDragItem(null)}
               onClick={() => setPreview(file)}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -1010,17 +1128,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                   marginBottom: 8,
                 }}
               >
-                {thumbTokens[file.id] ? (
-                  <img
-                    src={filesApi.thumbnailUrlWithToken(file.id, thumbTokens[file.id])}
-                    alt=""
-                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "cover" }}
-                  />
-                ) : file.iconLink ? (
-                  <img src={file.iconLink} alt="" width={28} height={28} />
-                ) : (
-                  <IconFile size={28} color={c.textSecondary} />
-                )}
+                <FileThumb file={file} thumbs={thumbs} variant="tile" />
               </div>
               <div
                 title={file.name}
@@ -1045,19 +1153,23 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           {folders.map((folder) => (
             <div
               key={folder.id}
+              draggable={canBrowse && !readOnly && !folder.managed}
+              onDragStart={(e) => beginDrag(e, "folder", folder.id)}
+              onDragEnd={() => setDragItem(null)}
               onClick={() => setFolderId(folder.id)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setMenu({ x: e.clientX, y: e.clientY, folder });
               }}
+              {...dropTargetProps(`folder:${folder.id}`, folder)}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
                 padding: "11px 14px",
                 borderRadius: 10,
-                border: `1px solid ${c.border}`,
-                background: c.surface,
+                border: `1px solid ${dropOver === `folder:${folder.id}` ? c.accent : c.border}`,
+                background: dropOver === `folder:${folder.id}` ? `${c.accent}14` : c.surface,
                 cursor: "pointer",
               }}
             >
@@ -1076,6 +1188,9 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           {files.map((file) => (
             <div
               key={file.id}
+              draggable={canMoveFile(file)}
+              onDragStart={(e) => beginDrag(e, "file", file.id)}
+              onDragEnd={() => setDragItem(null)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setMenu({ x: e.clientX, y: e.clientY, file });
@@ -1096,17 +1211,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               >
                 {/* Önizleme liste görünümünde de gösteriliyor: küçük bir kare
                     yeter, ama "hangi görsel bu?" sorusunu ikon cevaplayamıyor. */}
-                {thumbTokens[file.id] ? (
-                  <img
-                    src={filesApi.thumbnailUrlWithToken(file.id, thumbTokens[file.id])}
-                    alt=""
-                    style={{ width: 34, height: 34, objectFit: "cover", borderRadius: 5, flexShrink: 0 }}
-                  />
-                ) : file.iconLink ? (
-                  <img src={file.iconLink} alt="" width={18} height={18} />
-                ) : (
-                  <IconFile size={18} color={c.textSecondary} />
-                )}
+                <FileThumb file={file} thumbs={thumbs} variant="row" />
                 <div style={{ minWidth: 0 }}>
                   <div
                     style={{
@@ -1202,6 +1307,16 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     disabled: menu.folder.managed || readOnly,
                     onClick: () => void handleRenameFolder(menu.folder!),
                   },
+                  // Dokunmatikte sürükleme yok: klasörden çıkarmanın menüdeki
+                  // karşılığı. Yalnızca bir klasörün İÇİNDEYKEN anlamlı.
+                  ...(folderId && !readOnly && !menu.folder.managed
+                    ? [
+                        {
+                          label: parentFolderId ? t("Üst klasöre taşı") : t("Köke taşı"),
+                          onClick: () => void moveToParent({ kind: "folder" as const, id: menu.folder!.id }),
+                        },
+                      ]
+                    : []),
                   {
                     label: t("Kaldır"),
                     danger: true,
@@ -1221,6 +1336,14 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     disabled: readOnly,
                     onClick: () => void handleRenameFile(menu.file!),
                   },
+                  ...(folderId && canMoveFile(menu.file!)
+                    ? [
+                        {
+                          label: parentFolderId ? t("Üst klasöre taşı") : t("Köke taşı"),
+                          onClick: () => void moveToParent({ kind: "file" as const, id: menu.file!.id }),
+                        },
+                      ]
+                    : []),
                   {
                     label: t("Kaldır"),
                     danger: true,

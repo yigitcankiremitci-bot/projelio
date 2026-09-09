@@ -527,6 +527,10 @@ export const hatalar: TranslationDict = {
   "Bu klasörü Projelio yönetiyor; adı bağlı olduğu proje/görev değiştiğinde değişir.":
     "Projelio manages this folder; its name changes when the project/task it belongs to changes.",
   "Üst klasör bulunamadı": "Parent folder not found",
+  // Klasöre sürükleyerek taşıma.
+  "Bir klasör kendi içine taşınamaz": "A folder can't be moved into itself",
+  "Bir klasör kendi alt klasörüne taşınamaz": "A folder can't be moved into its own subfolder",
+  "Hedefte aynı adda bir klasör zaten var.": "A folder with the same name already exists there.",
   // Abonelik / ödeme (migration 092, modules/billing).
   "Geçersiz paket.": "Invalid plan.",
   "Geçersiz ödeme dönemi.": "Invalid billing period.",

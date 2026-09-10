@@ -232,6 +232,15 @@ export const moduller: TranslationDict = {
     "When money comes in and goes out; upcoming collections and payments.",
   "Çıkan": "Out",
   "Açık alacak": "Open receivables",
+  // Şirket kasası: süzgeç çubuğu ve özet şeridi (bkz. OrgBudgetPanel).
+  "Toplam gelir": "Total income",
+  "Toplam gider": "Total expense",
+  Kapananlar: "Closed",
+  "Tahsil edilmiş/ödenmiş alacak-borçlar ve deftere işlenmiş gelir/giderler":
+    "Receivables and payables that are settled, plus income and expenses already in the ledger",
+  "Vadesi dolmuş, hâlâ açık alacak ve borçlar": "Receivables and payables past their due date and still open",
+  "Önümüzdeki 7 gün içinde vadesi dolacak alacak ve borçlar":
+    "Receivables and payables falling due within the next 7 days",
   "Açık borç": "Open payables",
   "Aylık hareket": "Monthly movement",
   "Bu dönemde para hareketi yok.": "No money movement in this period.",

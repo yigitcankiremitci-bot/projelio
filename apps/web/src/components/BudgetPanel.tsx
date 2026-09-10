@@ -6,7 +6,8 @@ import { useRefreshOnUndo } from "../lib/undo";
 import { FAB_PRIORITY, useProjectFabAction } from "../lib/projectFab";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { kalanGun, YAKLASAN_GUN } from "../lib/butceOzeti";
+import { kalanGun, sirala, YAKLASAN_GUN, type SiralamaKey } from "../lib/butceOzeti";
+import KasaFiltreCubugu, { type OdakSecenegi } from "./KasaFiltreCubugu";
 import VadeRozeti from "./VadeRozeti";
 import BudgetTrendChart from "./BudgetTrendChart";
 import AddBudgetEntryModal from "./AddBudgetEntryModal";
@@ -32,24 +33,6 @@ const intervalLabels: Record<string, string> = {
 };
 
 /**
- * Sıralama ölçütü.
- *
- * "yakin"/"uzak", "yeni"/"eski" yerine geçti çünkü sayfadaki iki listenin
- * tarihi ZITTIR: hareketlerinki geçmişte (en yakın tarih = en yeni), düzenli
- * ödemelerinki gelecekte (en yakın tarih = ilk vade). Tek bir "yeni → eski"
- * seçeneği vade listesini ters çeviriyordu — en uzak vade en üstte duruyordu.
- * Şimdi ölçüt "şu ana yakınlık" ve iki listede de doğru anlamı veriyor.
- */
-type SiralamaKey = "yakin" | "uzak" | "tutar-cok" | "tutar-az";
-
-const siralamaSecenekleri: { key: SiralamaKey; label: string }[] = [
-  { key: "yakin", label: "Yakın tarih önce" }, // dil:anahtar
-  { key: "uzak", label: "Uzak tarih önce" }, // dil:anahtar
-  { key: "tutar-cok", label: "Tutar: çok → az" }, // dil:anahtar
-  { key: "tutar-az", label: "Tutar: az → çok" }, // dil:anahtar
-];
-
-/**
  * Sayfanın odağı: hangi kayıtların gösterileceği.
  *
  * Kasa sayfasında sorulan soru "hangi kayıt daha yeni" değil, "neyi ödemem
@@ -58,44 +41,12 @@ const siralamaSecenekleri: { key: SiralamaKey; label: string }[] = [
  */
 type OdakKey = "tumu" | "gecikmis" | "yaklasan" | "gerceklesen";
 
-const odakSecenekleri: { key: OdakKey; label: string; ipucu: string }[] = [
+const odakSecenekleri: OdakSecenegi<OdakKey>[] = [
   { key: "tumu", label: "Tümü", ipucu: "Her şey" }, // dil:anahtar
   { key: "gecikmis", label: "Vadesi geçen", ipucu: "Vadesi dolmuş düzenli ödemeler ve tahsil edilmemiş alacaklar" }, // dil:anahtar
   { key: "yaklasan", label: "Vadesi yaklaşan", ipucu: "Önümüzdeki 7 gün içinde ödenecekler" }, // dil:anahtar
   { key: "gerceklesen", label: "Ödenenler", ipucu: "Deftere işlenmiş gelir/giderler ve tahsilatı biten projeler" }, // dil:anahtar
 ];
-
-/**
- * Listeyi seçilen ölçüte göre sıralar.
- *
- * `gecmis`, tarihin hangi yöne baktığını söyler: hareketlerde tarih geçmişte
- * (yakın = en yeni, azalan), düzenli ödemelerde gelecekte (yakın = ilk vade,
- * artan). Bkz. SiralamaKey üstündeki not.
- *
- * Kopya üzerinde çalışıyor: gelen dizi doğrudan sunucu yanıtının state'i ve
- * sort() yerinde sıralar — kaynağı bozarsak sıralamayı değiştirmek eski sırayı
- * geri getiremez hale gelir.
- */
-function sirala<T extends { amount: number }>(
-  liste: T[],
-  key: SiralamaKey,
-  tarihAl: (kayit: T) => string,
-  gecmis: boolean
-): T[] {
-  const kopya = [...liste];
-  const artan = (a: T, b: T) => tarihAl(a).localeCompare(tarihAl(b));
-  const azalan = (a: T, b: T) => tarihAl(b).localeCompare(tarihAl(a));
-  switch (key) {
-    case "uzak":
-      return kopya.sort(gecmis ? artan : azalan);
-    case "tutar-cok":
-      return kopya.sort((a, b) => Number(b.amount) - Number(a.amount));
-    case "tutar-az":
-      return kopya.sort((a, b) => Number(a.amount) - Number(b.amount));
-    default:
-      return kopya.sort(gecmis ? azalan : artan);
-  }
-}
 
 const typeLabels: Record<string, string> = {
   income: "Gelen ödeme", // dil:anahtar
@@ -313,11 +264,11 @@ export default function BudgetPanel() {
   };
 
   const siraliHareketler = useMemo(
-    () => sirala(transactions, siralama, (h) => h.occurredAt, true),
+    () => sirala(transactions, siralama, (h) => h.occurredAt, (h) => Number(h.amount), true),
     [transactions, siralama]
   );
   const siraliDuzenli = useMemo(
-    () => sirala(recurring, siralama, (r) => r.nextDueDate, false),
+    () => sirala(recurring, siralama, (r) => r.nextDueDate, (r) => Number(r.amount), false),
     [recurring, siralama]
   );
 
@@ -388,55 +339,19 @@ export default function BudgetPanel() {
 
       {/* Süzgeç ve sıralama sayfanın ÜSTÜNDE, listelerin hepsinden önce:
           aşağıdaki her bölüm bu iki denetime bağlı. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        {odakSecenekleri.map((secenek) => {
-          const secili = secenek.key === odak;
-          const sayi = odakSayilari[secenek.key];
-          // Gecikmiş kayıt varsa süzgeç, seçili olmasa bile uyarı rengini taşır:
-          // kullanıcının o listeyi açmak için önce tıklaması gerekmesin.
-          const uyari = secenek.key === "gecikmis" && gecikmisSayisi > 0;
-          const renk = secili ? c.accent : uyari ? c.danger : c.textSecondary;
-          return (
-            <button
-              key={secenek.key}
-              type="button"
-              title={t(secenek.ipucu)}
-              onClick={() => setOdak(secenek.key)}
-              style={{
-                padding: "5px 11px",
-                borderRadius: 999,
-                fontSize: 13,
-                fontWeight: 500,
-                border: `1px solid ${secili ? c.accent : uyari ? c.danger : c.border}`,
-                background: secili ? `${c.accent}1a` : uyari ? `${c.danger}12` : c.surface,
-                color: renk,
-                cursor: "pointer",
-              }}
-            >
-              {t(secenek.label)}
-              {sayi ? ` (${sayi})` : ""}
-            </button>
-          );
-        })}
-
-        <span style={{ flex: 1 }} />
-
-        <label htmlFor="kasa-sirala" style={{ fontSize: 13, color: c.textSecondary }}>
-          {t("Sırala")}
-        </label>
-        <select
-          id="kasa-sirala"
-          value={siralama}
-          onChange={(e) => setSiralama(e.target.value as SiralamaKey)}
-          style={{ width: "auto", minWidth: 168, fontSize: 13 }}
-        >
-          {siralamaSecenekleri.map((secenek) => (
-            <option key={secenek.key} value={secenek.key}>
-              {t(secenek.label)}
-            </option>
-          ))}
-        </select>
-      </div>
+      <KasaFiltreCubugu
+        odaklar={odakSecenekleri.map((secenek) => ({
+          ...secenek,
+          sayi: odakSayilari[secenek.key] ?? undefined,
+          // Gecikmiş kayıt varsa süzgeç, seçili olmasa bile uyarı rengini
+          // taşır: kullanıcının o listeyi açmak için önce tıklaması gerekmesin.
+          uyari: secenek.key === "gecikmis" && gecikmisSayisi > 0,
+        }))}
+        odak={odak}
+        onOdak={setOdak}
+        siralama={siralama}
+        onSiralama={setSiralama}
+      />
 
       {bosSuzgec && (
         <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 14, padding: 24 }}>

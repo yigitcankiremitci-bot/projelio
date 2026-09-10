@@ -173,6 +173,14 @@ export const projeler: TranslationDict = {
   "Deftere işlenmiş gelir/giderler ve tahsilatı biten projeler":
     "Income and expenses already recorded, and fully collected projects",
   "Bu süzgece uyan kayıt yok.": "No entries match this filter.",
+  // Departman kasası: süzgeçler görev bütçesinin onay durumu üzerinden.
+  "Onay bekleyen": "Awaiting approval",
+  "Bütçesi girilmiş, henüz onaylanmamış görevler": "Tasks with a budget that is not approved yet",
+  Planlanan: "Planned",
+  "Onaylanmış ama henüz ödenmemiş görev bütçeleri": "Task budgets approved but not paid yet",
+  "Ödenmiş görev bütçeleri ve deftere işlenmiş gelir/giderler":
+    "Paid task budgets, plus income and expenses already in the ledger",
+  Onaylanan: "Approved",
   "{gun} gün gecikti": "{gun} days overdue",
   "Bugün ödenecek": "Due today",
   "{gun} gün kaldı": "{gun} days left",

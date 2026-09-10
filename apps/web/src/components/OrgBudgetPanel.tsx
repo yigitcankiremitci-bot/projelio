@@ -1,8 +1,13 @@
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import type { ModuleRecord } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { kalanGun, sirala, YAKLASAN_GUN, type KasaHareketi, type SiralamaKey } from "../lib/butceOzeti";
 import AddModuleRecordModal from "./AddModuleRecordModal";
+import BudgetTrendChart from "./BudgetTrendChart";
+import KasaFiltreCubugu, { type OdakSecenegi } from "./KasaFiltreCubugu";
+import VadeRozeti from "./VadeRozeti";
 import { useUndo } from "../lib/undo";
 import { IconEdit, IconTrash } from "./icons";
 import { useT } from "../lib/i18n";
@@ -20,9 +25,27 @@ interface Props {
 const LEDGER_KEY = "fm_gelir_gider";
 const RP_KEY = "fm_alacak_borc";
 
-function fmtMoney(amount: number, currency: string): string {
+/**
+ * Sayfanın odağı. Kişisel kasadakiyle aynı fikir (bkz. BudgetPanel.tsx) ama
+ * buradaki vade kaynağı alacak/borç kayıtlarının `dueDate`i.
+ */
+type OdakKey = "tumu" | "gecikmis" | "yaklasan" | "kapanan";
+
+const odakSecenekleri: OdakSecenegi<OdakKey>[] = [
+  { key: "tumu", label: "Tümü", ipucu: "Her şey" }, // dil:anahtar
+  { key: "gecikmis", label: "Vadesi geçen", ipucu: "Vadesi dolmuş, hâlâ açık alacak ve borçlar" }, // dil:anahtar
+  { key: "yaklasan", label: "Vadesi yaklaşan", ipucu: "Önümüzdeki 7 gün içinde vadesi dolacak alacak ve borçlar" }, // dil:anahtar
+  { key: "kapanan", label: "Kapananlar", ipucu: "Tahsil edilmiş/ödenmiş alacak-borçlar ve deftere işlenmiş gelir/giderler" }, // dil:anahtar
+];
+
+function fmtMoney(amount: number, currency: string, kisa = false): string {
   try {
-    return new Intl.NumberFormat("tr-TR", { style: "currency", currency }).format(amount);
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency,
+      // Grafiğin tavan etiketi dar bir şeride sığmalı: "₺42 B".
+      ...(kisa ? { notation: "compact" as const, maximumFractionDigits: 1 } : {}),
+    }).format(amount);
   } catch {
     return `${amount} ${currency}`;
   }
@@ -45,50 +68,55 @@ function sumByCurrency(records: ModuleRecord[]): Map<string, number> {
   return totals;
 }
 
-function SummaryCard({ label, value, tone }: { label: string; value: string; tone?: "positive" | "negative" }) {
+const tutarAl = (r: ModuleRecord) => Number(r.data.amount) || 0;
+const paraBirimiAl = (r: ModuleRecord) => (r.data.currency as string) || "TRY";
+/** Defterde tarih `entryDate`; girilmemişse kaydın açılma günü. */
+const defterTarihi = (r: ModuleRecord) => String(r.data.entryDate ?? r.createdAt).slice(0, 10);
+/** Alacak/borçta tarih VADE; girilmemişse çok uzak sayılır ki listenin sonuna düşsün. */
+const vadeTarihi = (r: ModuleRecord) => String(r.data.dueDate ?? "9999-12-31").slice(0, 10);
+
+function SummaryCard({ label, value, tone, vurgulu }: { label: string; value: string; tone?: "positive" | "negative"; vurgulu?: boolean }) {
   const c = useThemeColors();
-  const t = useT();
   return (
     <div
       style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-        padding: "10px 16px",
+        background: vurgulu ? `${c.accent}12` : c.surface,
+        border: `1px solid ${vurgulu ? c.accent : c.border}`,
         borderRadius: 10,
-        background: c.surface,
-        border: `1px solid ${c.border}`,
-        minWidth: 140,
-        flex: "1 1 140px",
+        padding: "9px 11px",
       }}
     >
-      <span style={{ fontSize: 12, color: c.textSecondary }}>{label}</span>
-      <span
+      <div style={{ fontSize: 11.5, color: c.textSecondary, marginBottom: 3 }}>{label}</div>
+      <div
         style={{
-          fontSize: 18,
-          fontWeight: 500,
+          fontSize: 17,
+          fontWeight: 600,
           color: tone === "positive" ? c.success : tone === "negative" ? c.danger : c.textPrimary,
         }}
       >
         {value}
-      </span>
+      </div>
     </div>
   );
 }
 
 /**
- * Şirket "Bütçe" sekmesi: gelir/gider defteri + alacak/borç takibi.
+ * Şirket "Kasa" sekmesi: gelir/gider defteri + alacak/borç takibi.
  *
- * Departman bütçe panelinden farkı — burada görev bazlı bir bütçe onay akışı
- * yok (organizasyonların kendine ait bir "İşler" listesi olmadığı için, bkz.
+ * Departman kasasından farkı — burada görev bazlı bir bütçe onay akışı yok
+ * (organizasyonların kendine ait bir "İşler" listesi olmadığı için, bkz.
  * OrganizationDetail'deki aynı not); yalnızca genel gelir/gider defteri + henüz
  * tahsil/ödeme yapılmamış alacak-borç kayıtları var. İkisi de generic
  * module-records sistemi üzerinden tutulur (bkz. moduleRecordConfigs.ts
  * fm_gelir_gider / fm_alacak_borc) — yeni bir tablo/migration gerekmedi.
+ *
+ * Düzen kişisel kasayla aynı (özet şeridi → grafik → süzgeç çubuğu → listeler);
+ * üç kasa arasında gezinen kullanıcı her seferinde yeni bir ekran öğrenmesin.
  */
 const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudgetPanel({ organizationId }, ref) {
   const c = useThemeColors();
   const t = useT();
+  const isDesktop = useIsDesktop();
   const [ledger, setLedger] = useState<ModuleRecord[]>([]);
   const [rp, setRp] = useState<ModuleRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +125,8 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
   // hangi modülün alanlarının çizileceği kaydın kendi moduleKey'inden gelir.
   const [editing, setEditing] = useState<ModuleRecord | null>(null);
   const [settlingId, setSettlingId] = useState<string | null>(null);
+  const [siralama, setSiralama] = useState<SiralamaKey>("yakin");
+  const [odak, setOdak] = useState<OdakKey>("tumu");
   const { pushUndo, pushDestructive } = useUndo();
 
   const load = () => {
@@ -162,25 +192,77 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
     }
   };
 
+  const gelirKayitlari = useMemo(
+    () => sirala(ledger.filter((r) => r.data.type === "income"), siralama, defterTarihi, tutarAl, true),
+    [ledger, siralama]
+  );
+  const giderKayitlari = useMemo(
+    () => sirala(ledger.filter((r) => r.data.type === "expense"), siralama, defterTarihi, tutarAl, true),
+    [ledger, siralama]
+  );
+  const siraliRp = useMemo(() => sirala(rp, siralama, vadeTarihi, tutarAl, false), [rp, siralama]);
+
+  const acikRp = siraliRp.filter((r) => r.data.status !== "settled");
+  const openReceivables = acikRp.filter((r) => r.data.type !== "payable");
+  const openPayables = acikRp.filter((r) => r.data.type === "payable");
+  const settledRp = siraliRp.filter((r) => r.data.status === "settled");
+
+  // Vadesi geçmiş / yaklaşan yalnızca AÇIK kayıtlar için sorulur: kapanmış bir
+  // borcun vadesi geçmiş olsa da yapılacak bir şey kalmamıştır.
+  const gecikmisler = acikRp.filter((r) => r.data.dueDate && kalanGun(vadeTarihi(r)) < 0);
+  const yaklasanlar = acikRp.filter((r) => {
+    if (!r.data.dueDate) return false;
+    const kalan = kalanGun(vadeTarihi(r));
+    return kalan >= 0 && kalan <= YAKLASAN_GUN;
+  });
+
+  const odakSayilari: Record<OdakKey, number | undefined> = {
+    tumu: undefined,
+    gecikmis: gecikmisler.length,
+    yaklasan: yaklasanlar.length,
+    kapanan: settledRp.length + ledger.length,
+  };
+
+  // Grafik tek para birimi gösterir: farklı birimleri toplamak yanlış bir
+  // rakam üretirdi. En çok kaydı olan birim seçilir, çoklu ise başlıkta yazar.
+  const defterBirimleri = sumByCurrency(ledger);
+  const grafikBirimi =
+    Array.from(defterBirimleri.keys()).sort(
+      (a, b) => ledger.filter((r) => paraBirimiAl(r) === b).length - ledger.filter((r) => paraBirimiAl(r) === a).length
+    )[0] ?? "TRY";
+  const grafikHareketleri: KasaHareketi[] = ledger
+    .filter((r) => paraBirimiAl(r) === grafikBirimi)
+    .map((r) => ({
+      occurredAt: defterTarihi(r),
+      type: r.data.type === "expense" ? "expense" : "income",
+      amount: tutarAl(r),
+    }));
+
   if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
 
-  const incomeRecords = ledger
-    .filter((r) => r.data.type === "income")
-    .sort((a, b) => String(b.data.entryDate ?? b.createdAt).localeCompare(String(a.data.entryDate ?? a.createdAt)));
-  const expenseRecords = ledger
-    .filter((r) => r.data.type === "expense")
-    .sort((a, b) => String(b.data.entryDate ?? b.createdAt).localeCompare(String(a.data.entryDate ?? a.createdAt)));
-
-  const openReceivables = rp.filter((r) => r.data.type !== "payable" && r.data.status !== "settled");
-  const openPayables = rp.filter((r) => r.data.type === "payable" && r.data.status !== "settled");
-  const settledRp = rp.filter((r) => r.data.status === "settled");
-
-  const incomeTotals = sumByCurrency(incomeRecords);
-  const expenseTotals = sumByCurrency(expenseRecords);
+  const incomeTotals = sumByCurrency(gelirKayitlari);
+  const expenseTotals = sumByCurrency(giderKayitlari);
   const receivableTotals = sumByCurrency(openReceivables);
   const payableTotals = sumByCurrency(openPayables);
   const currencies = new Set([...incomeTotals.keys(), ...expenseTotals.keys(), ...receivableTotals.keys(), ...payableTotals.keys()]);
   if (currencies.size === 0) currencies.add("TRY");
+
+  // Odak süzgeçleri. Bir bölüme uyan kayıt kalmadıysa bölüm hiç çizilmiyor;
+  // "Tümü"de ise boş bölümler kendi açıklamalarıyla durur.
+  // "Tümü"de açık kayıtlar TÜRE GÖRE değil VADEYE göre sıralı duruyor: seçilen
+  // sıralama "yakın tarih önce" derken alacakları öne alıp aradaki borcu geriye
+  // atmak listeyi yalancı yapıyordu. Türü zaten satırdaki rozet söylüyor.
+  // Kapanmışlar en sona: üzerlerinde yapılacak iş kalmadı.
+  const gorunenRp =
+    odak === "tumu"
+      ? [...acikRp, ...settledRp]
+      : odak === "gecikmis"
+        ? gecikmisler
+        : odak === "yaklasan"
+          ? yaklasanlar
+          : settledRp;
+  const defterGorunur = odak === "tumu" || odak === "kapanan";
+  const bosSuzgec = odak !== "tumu" && gorunenRp.length === 0 && (!defterGorunur || ledger.length === 0);
 
   const quickAddConfig: Record<BudgetQuickAddKind, { moduleKey: string; title: string; preset: Record<string, string> }> = {
     income: { moduleKey: LEDGER_KEY, title: "Gelir ekle", preset: { type: "income" } },
@@ -189,10 +271,22 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
     payable: { moduleKey: RP_KEY, title: "Borç ekle", preset: { type: "payable", status: "open" } },
   };
 
+  const bosKart = {
+    border: `1px dashed ${c.border}`,
+    borderRadius: 12,
+    background: c.surface,
+    padding: 22,
+    textAlign: "center",
+    color: c.textSecondary,
+    fontSize: 14,
+  } as const;
+
+  const sectionTitle = { fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" } as const;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* --- özet --- */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* --- özet şerit --- */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {Array.from(currencies).map((currency) => {
           const income = incomeTotals.get(currency) ?? 0;
           const expense = expenseTotals.get(currency) ?? 0;
@@ -201,132 +295,166 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
           const payable = payableTotals.get(currency) ?? 0;
           const suffix = currencies.size > 1 ? ` (${currency})` : "";
           return (
-            <div key={currency} style={{ display: "flex", flexWrap: "wrap", gap: 8, width: "100%" }}>
-              <SummaryCard label={`Toplam gelir${suffix}`} value={fmtMoney(income, currency)} tone="positive" />
-              <SummaryCard label={`Toplam gider${suffix}`} value={fmtMoney(expense, currency)} tone="negative" />
-              <SummaryCard label={`Net${suffix}`} value={fmtMoney(net, currency)} tone={net >= 0 ? "positive" : "negative"} />
-              <SummaryCard label={`Açık alacak${suffix}`} value={fmtMoney(receivable, currency)} />
-              <SummaryCard label={`Açık borç${suffix}`} value={fmtMoney(payable, currency)} />
+            <div
+              key={currency}
+              style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(116px, 1fr))", gap: 8 }}
+            >
+              <SummaryCard label={`${t("Net")}${suffix}`} value={fmtMoney(net, currency)} tone={net >= 0 ? "positive" : "negative"} vurgulu />
+              <SummaryCard label={`${t("Toplam gelir")}${suffix}`} value={fmtMoney(income, currency)} tone="positive" />
+              <SummaryCard label={`${t("Toplam gider")}${suffix}`} value={fmtMoney(expense, currency)} tone="negative" />
+              <SummaryCard label={`${t("Açık alacak")}${suffix}`} value={fmtMoney(receivable, currency)} />
+              <SummaryCard label={`${t("Açık borç")}${suffix}`} value={fmtMoney(payable, currency)} />
             </div>
           );
         })}
       </div>
 
-      {/* --- T tablosu: gelir solda, gider sağda --- */}
-      <div>
-        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>{t("Gelir / Gider")}</h4>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            border: `1px solid ${c.border}`,
-            borderRadius: 10,
-            overflow: "hidden",
-          }}
-        >
-          <LedgerColumn
-            title="Gelir"
-            records={incomeRecords}
-            tone="positive"
-            onEdit={setEditing}
-            onDelete={handleDelete}
-            borderRight
-          />
-          <LedgerColumn title="Gider" records={expenseRecords} tone="negative" onEdit={setEditing} onDelete={handleDelete} />
-        </div>
-      </div>
+      <BudgetTrendChart
+        transactions={grafikHareketleri}
+        formatla={(tutar, kisa) => fmtMoney(tutar, grafikBirimi, kisa)}
+        baslikEki={defterBirimleri.size > 1 ? grafikBirimi : undefined}
+      />
 
-      {/* --- alacak / borç --- */}
-      <div>
-        <h4 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 10px" }}>{t("Alacak / Borç")}</h4>
-        {openReceivables.length + openPayables.length + settledRp.length === 0 ? (
-          <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Henüz alacak/borç kaydı yok.")}</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {[...openReceivables, ...openPayables, ...settledRp].map((r) => {
-              const isPayable = r.data.type === "payable";
-              const isSettled = r.data.status === "settled";
-              const busy = settlingId === r.id;
-              return (
-                <div
-                  key={r.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    background: c.surface,
-                    border: `1px solid ${c.border}`,
-                    opacity: isSettled ? 0.6 : 1,
-                  }}
-                >
-                  <span
+      <KasaFiltreCubugu
+        odaklar={odakSecenekleri.map((secenek) => ({
+          ...secenek,
+          sayi: odakSayilari[secenek.key],
+          uyari: secenek.key === "gecikmis" && gecikmisler.length > 0,
+        }))}
+        odak={odak}
+        onOdak={setOdak}
+        siralama={siralama}
+        onSiralama={setSiralama}
+        siralamaId="org-kasa-sirala"
+      />
+
+      {bosSuzgec && <div style={bosKart}>{t("Bu süzgece uyan kayıt yok.")}</div>}
+
+      {/* --- alacak / borç --- Vadesi olan taraf üstte: kasada ilk sorulan
+          soru "neyi kaçırıyorum". */}
+      {(gorunenRp.length > 0 || odak === "tumu") && (
+        <section>
+          <h2 style={sectionTitle}>{t("Alacak / Borç")}</h2>
+          {gorunenRp.length === 0 ? (
+            <div style={bosKart}>{t("Henüz alacak/borç kaydı yok.")}</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {gorunenRp.map((r) => {
+                const isPayable = r.data.type === "payable";
+                const isSettled = r.data.status === "settled";
+                const busy = settlingId === r.id;
+                return (
+                  <div
+                    key={r.id}
                     style={{
-                      fontSize: 12,
-                      fontWeight: 500,
-                      padding: "3px 9px",
-                      borderRadius: 20,
-                      flexShrink: 0,
-                      color: isPayable ? c.danger : c.success,
-                      background: isPayable ? `${c.danger}18` : `${c.success}18`,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      flexWrap: "wrap",
+                      padding: "9px 12px",
+                      borderRadius: 10,
+                      background: c.surface,
+                      border: `1px solid ${c.border}`,
+                      opacity: isSettled ? 0.6 : 1,
                     }}
                   >
-                    {isPayable ? "Borç" : "Alacak"}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {(r.data.counterparty as string) ?? ""}
-                      {r.data.category ? ` · ${r.data.category}` : ""}
-                    </div>
-                    <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
-                      {fmtMoney(Number(r.data.amount) || 0, (r.data.currency as string) || "TRY")}
-                      {fmtDate(r.data.dueDate) ? ` · Vade: ${fmtDate(r.data.dueDate)}` : ""}
-                    </div>
-                  </div>
-                  {!isSettled && (
-                    <button
-                      onClick={() => handleSettle(r)}
-                      disabled={busy}
+                    <span
                       style={{
-                        fontSize: 12,
-                        padding: "6px 10px",
-                        borderRadius: 6,
-                        border: "none",
-                        background: c.primary,
-                        color: c.onPrimary,
+                        fontSize: 11,
+                        fontWeight: 500,
+                        padding: "2px 8px",
+                        borderRadius: 999,
                         flexShrink: 0,
-                        cursor: busy ? "wait" : "pointer",
+                        color: isPayable ? c.danger : c.success,
+                        background: isPayable ? `${c.danger}18` : `${c.success}18`,
                       }}
                     >
-                      {isPayable ? "Ödendi" : "Tahsil edildi"}
-                    </button>
-                  )}
-                  {isSettled && (
-                    <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>
-                      {isPayable ? "Ödendi" : "Tahsil edildi"}
+                      {isPayable ? "Borç" : "Alacak"}
                     </span>
-                  )}
-                  <button
-                    onClick={() => setEditing(r)}
-                    aria-label={t("Kaydı düzenle")}
-                    style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", cursor: "pointer" }}
-                  >
-                    <IconEdit size={14} color={c.textSecondary} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(r.id)}
-                    aria-label={t("Kaydı sil")}
-                    style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", cursor: "pointer" }}
-                  >
-                    <IconTrash size={14} color={c.textSecondary} />
-                  </button>
-                </div>
-              );
-            })}
+                    <div style={{ flex: 1, minWidth: 150 }}>
+                      <div style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {(r.data.counterparty as string) ?? ""}
+                        {r.data.category ? ` · ${r.data.category}` : ""}
+                      </div>
+                      <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
+                        {fmtMoney(tutarAl(r), paraBirimiAl(r))}
+                      </div>
+                    </div>
+
+                    {/* Vade rozeti kişisel kasadakiyle aynı bileşen: gecikmiş
+                        kırmızı, yaklaşan kehribar. Kapanmışta anlamı kalmadı. */}
+                    {!isSettled && r.data.dueDate ? <VadeRozeti tarih={vadeTarihi(r)} /> : null}
+
+                    {!isSettled ? (
+                      <button
+                        onClick={() => handleSettle(r)}
+                        disabled={busy}
+                        style={{
+                          fontSize: 12,
+                          padding: "5px 10px",
+                          borderRadius: 7,
+                          border: "none",
+                          background: c.primary,
+                          color: c.onPrimary,
+                          flexShrink: 0,
+                          cursor: busy ? "wait" : "pointer",
+                        }}
+                      >
+                        {isPayable ? "Ödendi" : "Tahsil edildi"}
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>
+                        {isPayable ? "Ödendi" : "Tahsil edildi"}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setEditing(r)}
+                      aria-label={t("Kaydı düzenle")}
+                      style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", cursor: "pointer" }}
+                    >
+                      <IconEdit size={14} color={c.textSecondary} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(r.id)}
+                      aria-label={t("Kaydı sil")}
+                      style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", cursor: "pointer" }}
+                    >
+                      <IconTrash size={14} color={c.textSecondary} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* --- T tablosu: gelir solda, gider sağda --- */}
+      {defterGorunur && (
+        <section>
+          <h2 style={sectionTitle}>{t("Gelir / Gider")}</h2>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr",
+              border: `1px solid ${c.border}`,
+              borderRadius: 12,
+              overflow: "hidden",
+              background: c.surface,
+            }}
+          >
+            <LedgerColumn
+              title={t("Gelir")}
+              records={gelirKayitlari}
+              tone="positive"
+              onEdit={setEditing}
+              onDelete={handleDelete}
+              borderRight={isDesktop}
+            />
+            <LedgerColumn title={t("Gider")} records={giderKayitlari} tone="negative" onEdit={setEditing} onDelete={handleDelete} />
           </div>
-        )}
-      </div>
+        </section>
+      )}
 
       {editing && (
         <AddModuleRecordModal
@@ -354,6 +482,7 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
 
 export default OrgBudgetPanel;
 
+/** T tablosunun bir sütunu: başlık + toplam, altında kayıtlar. */
 function LedgerColumn({
   title,
   records,
@@ -371,61 +500,84 @@ function LedgerColumn({
 }) {
   const c = useThemeColors();
   const t = useT();
+  const renk = tone === "positive" ? c.success : c.danger;
+  const toplamlar = sumByCurrency(records);
+
   return (
-    <div style={{ borderRight: borderRight ? `1px solid ${c.border}` : undefined }}>
+    <div style={{ borderRight: borderRight ? `1px solid ${c.border}` : undefined, minWidth: 0 }}>
       <div
         style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
           padding: "8px 12px",
           fontSize: 13,
           fontWeight: 500,
-          color: tone === "positive" ? c.success : c.danger,
+          color: renk,
           background: c.background,
           borderBottom: `1px solid ${c.border}`,
         }}
       >
-        {title}
+        <span>{title}</span>
+        {/* Toplam para birimi başına ayrı: farklı birimleri toplamak yanlış
+            bir rakam üretir. */}
+        <span style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {toplamlar.size === 0
+            ? "—"
+            : Array.from(toplamlar.entries()).map(([currency, toplam]) => (
+                <span key={currency}>
+                  {tone === "positive" ? "+" : "−"}
+                  {fmtMoney(toplam, currency)}
+                </span>
+              ))}
+        </span>
       </div>
+
       {records.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, padding: 12 }}>{t("Kayıt yok.")}</p>
       ) : (
-        <div>
-          {records.map((r) => (
-            <div
-              key={r.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "9px 12px",
-                borderBottom: `1px solid ${c.border}`,
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {fmtMoney(Number(r.data.amount) || 0, (r.data.currency as string) || "TRY")}
-                  {r.data.category ? ` · ${r.data.category}` : ""}
-                </div>
-                <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {[fmtDate(r.data.entryDate), r.data.description as string | undefined].filter(Boolean).join(" · ")}
-                </div>
+        records.map((r) => (
+          <div
+            key={r.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 12px",
+              borderBottom: `1px solid ${c.border}`,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {(r.data.description as string) || (r.data.category as string) || (tone === "positive" ? t("Gelir") : t("Gider"))}
               </div>
-              <button
-                onClick={() => onEdit(r)}
-                aria-label={t("Kaydı düzenle")}
-                style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", cursor: "pointer" }}
-              >
-                <IconEdit size={13} color={c.textSecondary} />
-              </button>
-              <button
-                onClick={() => onDelete(r.id)}
-                aria-label={t("Kaydı sil")}
-                style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", cursor: "pointer" }}
-              >
-                <IconTrash size={13} color={c.textSecondary} />
-              </button>
+              <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {[fmtDate(r.data.entryDate), r.data.category as string | undefined].filter(Boolean).join(" · ")}
+              </div>
             </div>
-          ))}
-        </div>
+
+            <span style={{ fontSize: 14, fontWeight: 500, color: renk, flexShrink: 0 }}>
+              {tone === "positive" ? "+" : "−"}
+              {fmtMoney(tutarAl(r), paraBirimiAl(r))}
+            </span>
+
+            <button
+              onClick={() => onEdit(r)}
+              aria-label={t("Kaydı düzenle")}
+              style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", padding: 3, cursor: "pointer" }}
+            >
+              <IconEdit size={13} color={c.textSecondary} />
+            </button>
+            <button
+              onClick={() => onDelete(r.id)}
+              aria-label={t("Kaydı sil")}
+              style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", padding: 3, cursor: "pointer" }}
+            >
+              <IconTrash size={13} color={c.textSecondary} />
+            </button>
+          </div>
+        ))
       )}
     </div>
   );

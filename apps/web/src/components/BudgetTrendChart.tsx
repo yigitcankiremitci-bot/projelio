@@ -1,12 +1,21 @@
 import { useMemo } from "react";
-import type { BudgetTransaction } from "@projelio/shared";
+import type { KasaHareketi } from "../lib/butceOzeti";
 import { aylikOzet } from "../lib/butceOzeti";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 
 interface Props {
-  transactions: BudgetTransaction[];
+  transactions: KasaHareketi[];
   aySayisi?: number;
+  /**
+   * Tutar biçimlendirici. Şirket kasasının defteri çok para birimli; oradaki
+   * panel kendi biçimlendiricisini geçiyor, diğerleri ₺ ile yetiniyor.
+   * `kisa` istendiğinde tavan etiketi için kısaltılmış biçim beklenir —
+   * çubukların üstündeki dar şeride tam rakam sığmıyor.
+   */
+  formatla?: (amount: number, kisa?: boolean) => string;
+  /** Başlığın yanında para birimini yazar (çok para birimli defterde). */
+  baslikEki?: string;
 }
 
 /** Eksen etiketi için kısa tutar: "12,5 B ₺". Uzun rakam çubukların arasına sığmıyor. */
@@ -18,7 +27,7 @@ function kisaTutar(amount: number): string {
   }
 }
 
-function tamTutar(amount: number): string {
+function varsayilanTutar(amount: number): string {
   return `${amount.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ₺`;
 }
 
@@ -35,9 +44,10 @@ const ALAN_YUKSEKLIGI = 128;
  * findAllForUser). Grafik trendi gösterir, muhasebe toplamı değil — kesin
  * toplamlar üstteki özet şeridinde, /budget/overview'dan geliyor.
  */
-export default function BudgetTrendChart({ transactions, aySayisi = 6 }: Props) {
+export default function BudgetTrendChart({ transactions, aySayisi = 6, formatla, baslikEki }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const tamTutar = formatla ?? varsayilanTutar;
   const aylar = useMemo(() => aylikOzet(transactions, aySayisi), [transactions, aySayisi]);
   const tavan = Math.max(...aylar.map((ay) => Math.max(ay.gelir, ay.gider)), 0);
 
@@ -50,6 +60,7 @@ export default function BudgetTrendChart({ transactions, aySayisi = 6 }: Props) 
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <span style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary }}>
           {t("Son {n} ay", { n: aySayisi })}
+          {baslikEki ? ` (${baslikEki})` : ""}
         </span>
         <span style={{ fontSize: 13, color: net < 0 ? c.danger : c.success }}>
           {t("net")} {net < 0 ? "−" : "+"}
@@ -83,7 +94,7 @@ export default function BudgetTrendChart({ transactions, aySayisi = 6 }: Props) 
               padding: "0 4px 0 0",
             }}
           >
-            {kisaTutar(tavan)}
+            {formatla ? formatla(tavan, true) : kisaTutar(tavan)}
           </span>
 
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: "100%" }}>

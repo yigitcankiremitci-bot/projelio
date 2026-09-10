@@ -9,7 +9,8 @@ import { useThemeColors } from "../theme/useThemeColors";
 import FileContextMenu from "./FileContextMenu";
 import FilePreviewModal from "./FilePreviewModal";
 import FileThumb from "./FileThumb";
-import { IconExternalLink, IconFolder, IconX } from "./icons";
+import PickLinkedFilesModal from "./PickLinkedFilesModal";
+import { IconExternalLink, IconFolder, IconPlus, IconX } from "./icons";
 
 interface Props {
   targetKind: LinkTargetKind;
@@ -18,6 +19,11 @@ interface Props {
   title?: string;
   /** Bağlantıyı koparma yetkisi olmayan ekranlarda (salt okunur) kapatılır. */
   canUnlink?: boolean;
+  /**
+   * "Dosya seç" düğmesi. Açıkken bölüm, bağlı dosya OLMASA DA çiziliyor:
+   * düğme yalnızca liste doluyken görünseydi ilk bağlantı hiç kurulamazdı.
+   */
+  canPick?: boolean;
 }
 
 /**
@@ -32,13 +38,20 @@ interface Props {
  * boş bir "Bağlı dosyalar" başlığı durması, ekranı bilgi taşımayan bir satırla
  * doldurmaktı.
  */
-export default function LinkedFilesPanel({ targetKind, targetId, title, canUnlink = true }: Props) {
+export default function LinkedFilesPanel({
+  targetKind,
+  targetId,
+  title,
+  canUnlink = true,
+  canPick = false,
+}: Props) {
   const c = useThemeColors();
   const t = useT();
   const [items, setItems] = useState<LinkedItems>({ files: [], folders: [] });
   const [preview, setPreview] = useState<ProjectFile | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; file: ProjectFile } | null>(null);
   const [error, setError] = useState("");
+  const [picking, setPicking] = useState(false);
   const thumbs = useFileThumbnails(items.files);
 
   const load = useCallback(() => {
@@ -78,12 +91,37 @@ export default function LinkedFilesPanel({ targetKind, targetId, title, canUnlin
     }
   };
 
-  if (!items.files.length && !items.folders.length) return null;
+  // Bağlı bir şey yoksa VE seçme düğmesi de kapalıysa bölüm hiç çizilmiyor:
+  // boş bir "Bağlı dosyalar" başlığı, bilgi taşımayan bir satır olurdu.
+  if (!items.files.length && !items.folders.length && !canPick) return null;
 
   return (
     <div style={{ marginTop: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, marginBottom: 8 }}>
-        {title ?? t("Bağlı dosyalar")}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <div style={{ flex: 1, fontSize: 14, fontWeight: 500, color: c.textPrimary }}>
+          {title ?? t("Bağlı dosyalar")}
+        </div>
+        {canPick && (
+          <button
+            type="button"
+            onClick={() => setPicking(true)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "5px 10px",
+              borderRadius: 8,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textPrimary,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            <IconPlus size={13} color={c.textSecondary} />
+            {t("Dosya seç")}
+          </button>
+        )}
       </div>
 
       {error && <div style={{ color: c.danger, fontSize: 13, marginBottom: 8 }}>{error}</div>}
@@ -230,6 +268,15 @@ export default function LinkedFilesPanel({ targetKind, targetId, title, canUnlin
               ? [{ label: t("Bağlantıyı kopar"), danger: true, onClick: () => void koparDosya(menu.file) }]
               : []),
           ]}
+        />
+      )}
+
+      {picking && (
+        <PickLinkedFilesModal
+          targetKind={targetKind}
+          targetId={targetId}
+          onClose={() => setPicking(false)}
+          onLinked={load}
         />
       )}
 

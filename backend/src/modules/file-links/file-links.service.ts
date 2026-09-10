@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
-import { FilesService, type ProjectFile } from "../files/files.service";
+import { FilesService, type FileOwner, type ProjectFile } from "../files/files.service";
 import { TasksService } from "../tasks/tasks.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
@@ -15,7 +15,7 @@ import { LISTE_TAVANI } from "../../common/liste-tavani";
 const ADAY_TAVANI = 50;
 
 /** Bir dosyanın iliştirilebileceği yerler (bkz. migration 095). */
-export type LinkTargetKind = "task" | "user" | "module_record";
+export type LinkTargetKind = "task" | "user" | "module_record" | "project";
 
 /** Bağlantının kaynağı: bir dosya ya da bir klasör (tam biri). */
 export type LinkSource = { fileId: string; folderId?: undefined } | { folderId: string; fileId?: undefined };
@@ -193,6 +193,19 @@ export class FileLinksService {
         scope: { jobId, departmentId: task.departmentId ?? undefined },
         name: task.title,
       };
+    }
+
+    if (kind === "project") {
+      // Proje erişimi işe bağlı: projenin işini görebilen projeyi de görür
+      // (bkz. FilesService.assertJobAccess). Ayrı bir kontrol yazmak yerine
+      // dosya listesinin kullandığı kapıdan geçiyoruz.
+      const { data: proje } = await this.supabase.client
+        .from("projects")
+        .select("id, title, job_id")
+        .eq("id", targetId)
+        .maybeSingle();
+      if (!proje) throw new NotFoundException("Proje bulunamadı");
+      return { scope: { jobId: proje.job_id ?? undefined }, name: proje.title };
     }
 
     if (kind === "module_record") {
@@ -421,6 +434,7 @@ export class FileLinksService {
     userId: string,
     q?: string
   ): Promise<{
+    projects: { id: string; title: string }[];
     tasks: { id: string; title: string; context?: string; isSubtask: boolean }[];
     users: { id: string; fullName: string }[];
     records: { id: string; name: string; moduleKey?: string }[];
@@ -433,6 +447,19 @@ export class FileLinksService {
       kaynak.organizationId ??
       (await this.organizationOfDepartment(kaynak.departmentId)) ??
       (await this.organizationOfJob(kaynak.jobId));
+
+    // ── Projeler (yalnızca iş kapsamında var; departman/şirket dosyalarının
+    // altında proje hiyerarşisi yok — bkz. FlatScope)
+    let projects: any[] = [];
+    if (kaynak.jobId) {
+      const { data } = await this.supabase.client
+        .from("projects")
+        .select("id, title")
+        .eq("job_id", kaynak.jobId)
+        .order("created_at", { ascending: false })
+        .limit(LISTE_TAVANI);
+      projects = data ?? [];
+    }
 
     // ── Görevler
     let tasks: any[] = [];
@@ -487,6 +514,10 @@ export class FileLinksService {
     }
 
     return {
+      projects: projects
+        .filter((p) => eslesir(p.title))
+        .slice(0, ADAY_TAVANI)
+        .map((p) => ({ id: p.id, title: p.title })),
       tasks: tasks
         .filter((gorev) => eslesir(gorev.title))
         .slice(0, ADAY_TAVANI)
@@ -505,6 +536,62 @@ export class FileLinksService {
         }))
         .filter((kayitSatiri) => eslesir(kayitSatiri.name))
         .slice(0, ADAY_TAVANI),
+    };
+  }
+
+  /**
+   * Hedefin KAPSAMINDAKİ dosya ağacında gezinme.
+   *
+   * "Çağır/Seç" akışı bunu kullanıyor: kullanıcı görev modalinden çıkmadan
+   * işin ana klasörüne bakıp bir dosya seçiyor. Ters yönde çalışması şart —
+   * dosyalar sayfasına gidip "bağla" demek, kullanıcıyı modaldan koparıp
+   * hangi göreve bağlayacağını yeniden aratıyordu.
+   *
+   * Kapsam hedeften çıkıyor, istemciden GELMİYOR: aksi hâlde bir görev
+   * modalinden başka bir şirketin klasörü gezilebilirdi.
+   */
+  async browseForTarget(
+    kind: LinkTargetKind,
+    targetId: string,
+    userId: string,
+    folderId?: string
+  ): Promise<{
+    folders: { id: string; name: string }[];
+    files: ProjectFile[];
+    breadcrumb: { id: string; name: string }[];
+  }> {
+    const bos = { folders: [], files: [], breadcrumb: [] };
+    if (!targetId) return bos;
+
+    const { scope } = await this.hedefKapsami(kind, targetId, userId);
+    // Kişinin kapsamı yok (bkz. hedefKapsami): gezilecek bir ağaç da yok.
+    const owner: FileOwner | undefined = scope.departmentId
+      ? { kind: "department", id: scope.departmentId }
+      : scope.organizationId
+      ? { kind: "organization", id: scope.organizationId }
+      : scope.jobId
+      ? { kind: "job", id: scope.jobId }
+      : undefined;
+    if (!owner) return bos;
+
+    const [folders, files, breadcrumb] = await Promise.all([
+      this.filesService.listFolders(owner, userId, folderId).catch(() => []),
+      owner.kind === "job"
+        ? this.filesService.listByJob(owner.id, userId, {
+            scope: "all",
+            folderId,
+            // Kökte klasörsüz dosyalar listelenir; klasörlerin içi ancak
+            // girilince (bkz. FilesPanel'deki aynı kural).
+            atRoot: !folderId,
+          })
+        : this.filesService.listByFlat({ kind: owner.kind, id: owner.id }, userId, folderId),
+      folderId ? this.filesService.folderPath(folderId, userId).catch(() => []) : Promise.resolve([]),
+    ]);
+
+    return {
+      folders: folders.map((f) => ({ id: f.id, name: f.name })),
+      files,
+      breadcrumb: breadcrumb.map((f) => ({ id: f.id, name: f.name })),
     };
   }
 

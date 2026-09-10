@@ -4,7 +4,9 @@ import { FileLinksService, type LinkSource, type LinkTargetKind } from "./file-l
 
 /** İstemciden gelen değer; tanınmayan her şey en dar hedefe düşer. */
 function normalizeKind(value?: string): LinkTargetKind {
-  return value === "task" || value === "user" || value === "module_record" ? value : "task";
+  return value === "task" || value === "user" || value === "module_record" || value === "project"
+    ? value
+    : "task";
 }
 
 /**
@@ -27,6 +29,28 @@ export class FileLinksController {
     @Req() req: any
   ) {
     return this.fileLinks.listForTarget(normalizeKind(targetKind), targetId, req.user.userId);
+  }
+
+  /**
+   * Hedefin kapsamındaki dosya ağacında gezinme ("Çağır/Seç" akışı).
+   *
+   * Kapsam HEDEFTEN çıkıyor: istemci yalnızca hangi klasöre bakacağını
+   * söylüyor, hangi şirketin ağacı olduğunu değil.
+   */
+  @Get("file-links/browse")
+  @UseGuards(AuthGuard("jwt"))
+  browse(
+    @Query("targetKind") targetKind: string,
+    @Query("targetId") targetId: string,
+    @Query("folderId") folderId: string | undefined,
+    @Req() req: any
+  ) {
+    return this.fileLinks.browseForTarget(
+      normalizeKind(targetKind),
+      targetId,
+      req.user.userId,
+      folderId || undefined
+    );
   }
 
   // ------------------------------------------------------------------ dosya

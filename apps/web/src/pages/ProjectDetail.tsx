@@ -19,6 +19,7 @@ import TeamPanel, { TeamPanelHandle } from "../components/panels/TeamPanel";
 import BudgetPanel, { BudgetPanelHandle } from "../components/panels/BudgetPanel";
 import OutputsPanel, { OutputsPanelHandle } from "../components/OutputsPanel";
 import FilesPanel from "../components/FilesPanel";
+import LinkedFilesPanel from "../components/LinkedFilesPanel";
 import ProcessPanel, { ProcessNavState, ViewMode, computeInitialProcessNavDates } from "../components/panels/ProcessPanel";
 import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
@@ -697,7 +698,17 @@ export default function ProjectDetail() {
               onTaskUpdated={updateTask}
             />
           )}
-          {activeTab === "files" && <FilesPanel projectId={id} />}
+          {activeTab === "files" && (
+            <>
+              <FilesPanel projectId={id} />
+              {/* Başka bir klasörden BU PROJEYE bağlanmış dosyalar. Yukarıdaki
+                  panelden ayrı: oradakiler projeye YÜKLENMİŞ dosyalar, bunlar
+                  işin ana klasöründe yaşayıp buraya iliştirilenler. "Dosya seç"
+                  düğmesi de burada — kullanıcı proje sayfasından çıkmadan işin
+                  ağacına bakıp dosya bağlayabilsin. */}
+              <LinkedFilesPanel targetKind="project" targetId={id} canPick />
+            </>
+          )}
           {activeTab === "process" && (
             <ProcessPanel
               project={project}

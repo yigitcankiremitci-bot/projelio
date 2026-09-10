@@ -598,7 +598,7 @@ export default function TaskEditModal({
           dosyalar, buradakiler başka bir yerde yaşayıp buraya iliştirilmiş
           olanlar. İkisini tek listede birleştirmek, "kaldır"ın hangisini
           sildiğini belirsizleştirirdi. Bağlı dosya yoksa bölüm çizilmez. */}
-      <LinkedFilesPanel targetKind="task" targetId={task.id} />
+      <LinkedFilesPanel targetKind="task" targetId={task.id} canPick />
 
       {/* Bağımlılıklar: "şu bitmeden bu başlayamaz". Ekler gibi kaydetmeyi
           BEKLEMEZ — bağ kurulduğu anda sunucuya yazılır, kart rozeti de hemen

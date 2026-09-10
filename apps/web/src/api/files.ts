@@ -468,7 +468,7 @@ async function uploadInChunks(
 }
 
 /** Bir dosyanın iliştirilebileceği yerler (bkz. migration 095). */
-export type LinkTargetKind = "task" | "user" | "module_record";
+export type LinkTargetKind = "task" | "user" | "module_record" | "project";
 
 export interface FileLink {
   id: string;
@@ -501,9 +501,17 @@ export interface LinkedItems {
 
 /** Seçicideki aday listeleri; hepsi dosyanın kapsamından geliyor. */
 export interface LinkTargets {
+  projects: { id: string; title: string }[];
   tasks: { id: string; title: string; context?: string; isSubtask: boolean }[];
   users: { id: string; fullName: string }[];
   records: { id: string; name: string; moduleKey?: string }[];
+}
+
+/** "Çağır/Seç": hedefin kapsamındaki klasör ağacında bir adım. */
+export interface LinkBrowse {
+  folders: { id: string; name: string }[];
+  files: ProjectFile[];
+  breadcrumb: { id: string; name: string }[];
 }
 
 /**
@@ -516,6 +524,9 @@ export const fileLinksApi = {
   /** Bir hedefe (görev/kişi/modül kaydı) bağlı dosyalar ve klasörler. */
   forTarget: (targetKind: LinkTargetKind, targetId: string) =>
     api.get<LinkedItems>(`/file-links${query({ targetKind, targetId })}`),
+  /** Hedefin kapsamındaki dosya ağacında gezinme. */
+  browse: (targetKind: LinkTargetKind, targetId: string, folderId?: string) =>
+    api.get<LinkBrowse>(`/file-links/browse${query({ targetKind, targetId, folderId })}`),
   /** Bir dosyanın/klasörün bağlı olduğu yerler. */
   forSource: (source: LinkSource) => api.get<FileLink[]>(`${sourceBase(source)}/links`),
   targets: (source: LinkSource, q?: string) =>

@@ -1355,7 +1355,25 @@ export class FilesService {
 
     const { provider, accountId } = await this.ownerRoot(owner, userId);
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
-    await this.cloudStorage.renameFile(provider, accessToken, row.drive_folder_id, temiz);
+
+    // Bulut çağrısı ayrı yakalanıyor: burası sessizce düşen tek adımdı.
+    // Hata 4xx olarak dönüyor ve 4xx'ler log'a YAZILMIYOR (bkz.
+    // all-exceptions.filter.ts), yani kullanıcı "adı değişmiyor" diyor,
+    // sunucuda hiçbir iz bulunmuyordu. En olası sebep klasörün kapsamın ŞU ANKİ
+    // depo hesabından başka bir hesapla açılmış olması: o hesabın jetonuyla
+    // klasör bulunamaz (bkz. organization_storage / migration 088).
+    try {
+      await this.cloudStorage.renameFile(provider, accessToken, row.drive_folder_id, temiz);
+    } catch (err) {
+      const mesaj = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Klasör bulutta yeniden adlandırılamadı (folder=${folderId}, drive=${row.drive_folder_id}, ` +
+          `provider=${provider}, account=${accountId}): ${mesaj}`
+      );
+      throw new BadRequestException(
+        "Klasör bulut deposunda yeniden adlandırılamadı. Klasör orada silinmiş ya da başka bir hesapla açılmış olabilir."
+      );
+    }
 
     const { data: updated, error } = await this.supabase.client
       .from("file_folders")
@@ -1363,7 +1381,15 @@ export class FilesService {
       .eq("id", folderId)
       .select()
       .single();
-    if (error) throw error;
+    if (error) {
+      // Hedefte aynı adda bir klasör (migration 090 tekillik indeksi). Bulutta
+      // ad ZATEN değişti; kullanıcıya net söylemek, "bir şey oldu ama ne?"
+      // durumundan iyi.
+      if ((error as any).code === "23505") {
+        throw new BadRequestException("Bu adda bir klasör zaten var.");
+      }
+      throw error;
+    }
     return mapFolder(updated);
   }
 

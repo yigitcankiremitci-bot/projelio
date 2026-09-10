@@ -116,6 +116,17 @@ export const dosyalar: TranslationDict = {
   "{sayi} öğeyi bağla…": "Link {sayi} items…",
   "Yerinde kalır; seçtiğin yerde de görünmeye başlar.":
     "It stays where it is and also starts showing up where you pick.",
+  // İki adımlı seçim: önce tür, sonra öğe.
+  "Nereye bağlansın?": "What should it be linked to?",
+  "Görev / alt görev": "Task / subtask",
+  "Modül kaydı": "Module record",
+  "Tür değiştir": "Change type",
+  Ara: "Search",
+  "Eşleşen bir şey yok.": "Nothing matches.",
+  // "Dosya seç": hedefin modalinden işin ağacına bakma.
+  "Dosya seç": "Pick a file",
+  "Dosya yerinde kalır; buraya da bağlanır.": "The file stays where it is and is also linked here.",
+  "{sayi} dosyayı bağla": "Link {sayi} files",
   "Görev, kişi ya da kayıt ara": "Search tasks, people or records",
   Kişiler: "People",
   "Modül kayıtları": "Module records",

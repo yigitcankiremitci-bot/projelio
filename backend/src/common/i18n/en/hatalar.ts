@@ -531,6 +531,9 @@ export const hatalar: TranslationDict = {
   "Bir klasör kendi içine taşınamaz": "A folder can't be moved into itself",
   "Bir klasör kendi alt klasörüne taşınamaz": "A folder can't be moved into its own subfolder",
   "Hedefte aynı adda bir klasör zaten var.": "A folder with the same name already exists there.",
+  "Klasör bulut deposunda yeniden adlandırılamadı. Klasör orada silinmiş ya da başka bir hesapla açılmış olabilir.":
+    "The folder couldn't be renamed in cloud storage. It may have been deleted there, or created with a different account.",
+  "Bu adda bir klasör zaten var.": "A folder with this name already exists.",
   // Dosya bağlantıları (migration 095).
   "Bağlanacak öğe seçilmedi": "No item was selected to link to",
   "Bu kişi dosyanın ekibinde değil; bağlasanız da açamaz.":

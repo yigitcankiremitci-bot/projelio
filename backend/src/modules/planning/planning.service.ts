@@ -18,6 +18,7 @@ import type {
   SchedulableTask,
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { parcalara } from "../../common/parcali-liste";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
 import { DepartmentsService } from "../departments/departments.service";
 import {
@@ -864,50 +865,39 @@ export class PlanningService {
       "projects(title, job_id, jobs(title)), " +
       "operations(title, job_id, jobs(title))";
 
-    // Üç ayrı sorgu, tek bir `.or(...)` yerine: PostgREST'in or filtresine
+    // Ayrı sorgular, tek bir `.or(...)` yerine: PostgREST'in or filtresine
     // uzun uuid listeleri gömmek okunaksız ve kırılgan. Sonuçlar id üzerinden
     // birleştiriliyor, kesişimler tekrar etmiyor.
+    //
+    // HER LİSTE PARÇALANIYOR: `.in()` filtresi adres satırına yazılıyor ve
+    // yüzlerce id'lik bir liste isteği sunucunun URL sınırında düşürüyor
+    // (bkz. common/parcali-liste.ts). Küçük hesapta hiç görünmeyen, veri
+    // büyüyünce aniden ortaya çıkan bir sınır.
     const runs: Promise<any>[] = [];
 
-    if (projectIds.length) {
-      let q = this.supabase.client
-        .from("tasks")
-        .select(select)
-        .in("project_id", projectIds)
-        .is("archived_at", null)
-        .neq("status", "completed")
-        .limit(limit * 2);
-      if (opts.query) q = q.ilike("title", `%${opts.query}%`);
-      runs.push(Promise.resolve(q));
-    }
+    /** Ortak gövde: kolona göre parçalı sorgu üretir. */
+    const koldakiler = (kolon: string, idler: string[], ekFiltre?: (q: any) => any) => {
+      for (const parca of parcalara(idler)) {
+        let q = this.supabase.client
+          .from("tasks")
+          .select(select)
+          .in(kolon, parca)
+          .is("archived_at", null)
+          .neq("status", "completed")
+          .limit(limit * 2);
+        if (ekFiltre) q = ekFiltre(q);
+        if (opts.query) q = q.ilike("title", `%${opts.query}%`);
+        runs.push(Promise.resolve(q));
+      }
+    };
 
-    if (operationIds.length) {
-      let q = this.supabase.client
-        .from("tasks")
-        .select(select)
-        .in("operation_id", operationIds)
-        .is("archived_at", null)
-        .is("skipped_at", null)
-        .neq("status", "completed")
-        .limit(limit * 2);
-      if (opts.query) q = q.ilike("title", `%${opts.query}%`);
-      runs.push(Promise.resolve(q));
-    }
+    koldakiler("project_id", projectIds);
+    koldakiler("operation_id", operationIds, (q) => q.is("skipped_at", null));
 
     // Departman görevleri. Kadrosunda olunan (ya da sahibi olunan şirketin)
     // departmanlarındaki işler, kimseye atanmamış olsalar bile listeye girer —
     // "şirketimde bugün şunu yaptım" diyen kişinin görevi burada.
-    if (!opts.projectId && scope.departments.size) {
-      let q = this.supabase.client
-        .from("tasks")
-        .select(select)
-        .in("department_id", [...scope.departments])
-        .is("archived_at", null)
-        .neq("status", "completed")
-        .limit(limit * 2);
-      if (opts.query) q = q.ilike("title", `%${opts.query}%`);
-      runs.push(Promise.resolve(q));
-    }
+    if (!opts.projectId) koldakiler("department_id", [...scope.departments]);
 
     // Yukarıdaki kapsam sorgularına düşmeyen ama kullanıcıya ATANMIŞ işler bu
     // son kolla geliyor (ör. taşeron olduğu projedeki kendi görevleri).
@@ -918,16 +908,8 @@ export class PlanningService {
         .from("task_assignees")
         .select("task_id")
         .eq("user_id", userId);
-      const assignedIds = (assignedRows ?? []).map((r: any) => r.task_id as string);
-      let q = this.supabase.client
-        .from("tasks")
-        .select(select)
-        .in("id", assignedIds.length ? assignedIds : ["00000000-0000-0000-0000-000000000000"])
-        .is("archived_at", null)
-        .neq("status", "completed")
-        .limit(limit * 2);
-      if (opts.query) q = q.ilike("title", `%${opts.query}%`);
-      runs.push(Promise.resolve(q));
+      // Atanan görev sayısı yüzlere çıkabiliyor; en uzun liste bu.
+      koldakiler("id", (assignedRows ?? []).map((r: any) => r.task_id as string));
     }
 
     const results = await Promise.all(runs);

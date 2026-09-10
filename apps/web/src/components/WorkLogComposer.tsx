@@ -59,7 +59,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
 
   // Görev seçiliyken arama durur: kutuda artık bir arama terimi değil, seçilmiş
   // işin adı duruyor.
-  const { tasks, loading } = useTaskSearch(metin, !secilenGorev);
+  const { tasks, loading, hata, adaySayisi, tekrarDene } = useTaskSearch(metin, !secilenGorev);
 
   useEffect(() => {
     if (odakRef) odakRef.current = () => girisRef.current?.focus();
@@ -308,10 +308,34 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
         </button>
       </div>
 
-      {/* Yalnızca İLK yükleme sırasında: eşleştirmenin kendisi anlık
-          (bkz. useTaskSearch). */}
-      {loading && !secilenGorev && (
+      {/* Aday listesinin durumu. Kutu her hâlükârda SERBEST METİN kutusu olarak
+          çalışmaya devam ediyor — görev önerisi bir kolaylık, kaydın önkoşulu
+          değil. Ama sessizce boş kalmıyor: kullanıcı neden öneri görmediğini
+          buradan anlıyor. */}
+      {!secilenGorev && loading && (
         <span style={{ fontSize: 12.5, color: c.textSecondary }}>{t("Görevlerin yükleniyor…")}</span>
+      )}
+      {!secilenGorev && !loading && hata && (
+        <span style={{ fontSize: 12.5, color: c.danger, display: "flex", alignItems: "center", gap: 8 }}>
+          {t("Görevlerin yüklenemedi, arama çalışmıyor.")}
+          <button
+            type="button"
+            onClick={tekrarDene}
+            style={{ border: "none", background: "transparent", color: c.accentDark, fontSize: 12.5, padding: 0 }}
+          >
+            {t("Tekrar dene")}
+          </button>
+        </span>
+      )}
+      {!secilenGorev && !loading && !hata && adaySayisi === 0 && (
+        <span style={{ fontSize: 12.5, color: c.textSecondary }}>
+          {t("Aranacak açık görevin yok; serbestçe yazabilirsin.")}
+        </span>
+      )}
+      {!secilenGorev && !loading && !hata && adaySayisi > 0 && metin.trim().length >= 2 && tasks.length === 0 && (
+        <span style={{ fontSize: 12.5, color: c.textSecondary }}>
+          {t("{n} görev arasında eşleşme yok — serbest kayıt olarak eklenecek.", { n: adaySayisi })}
+        </span>
       )}
     </form>
   );

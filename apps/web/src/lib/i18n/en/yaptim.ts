@@ -47,6 +47,13 @@ export const yaptim: TranslationDict = {
   "Ne yaptın? Görev adı yazarsan listeden seçebilirsin":
     "What did you do? Type a task name to pick it from the list",
   "Görevlerin yükleniyor…": "Loading your tasks…",
+  "Görevlerin yüklenemedi, arama çalışmıyor.": "Couldn't load your tasks, so search isn't working.",
+  "Tekrar dene": "Try again",
+  "Aranacak açık görevin yok; serbestçe yazabilirsin.": "You have no open tasks to search; just type freely.",
+  "{n} görev arasında eşleşme yok — serbest kayıt olarak eklenecek.": {
+    one: "No match among {n} task — it will be added as a free entry.",
+    other: "No match among {n} tasks — it will be added as a free entry.",
+  },
   "alt görev": "subtask",
   "şimdiye dek": "so far",
   Görev: "Task",

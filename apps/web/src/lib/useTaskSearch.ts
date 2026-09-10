@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { SchedulableTask } from "@projelio/shared";
 import { gorevleriAra } from "@projelio/shared";
-import { api, ignoreAbort } from "../api/client";
+import { api, isAbortError } from "../api/client";
 
 /** Öneri listesinde gösterilecek en fazla satır. */
 const TAVAN = 8;
@@ -35,20 +35,35 @@ const ADAY_TAVANI = 300;
 export function useTaskSearch(query: string, enabled = true) {
   const [adaylar, setAdaylar] = useState<SchedulableTask[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
+  const [hata, setHata] = useState("");
+  // Elle "tekrar dene" için: değeri değişince yükleme efekti yeniden koşar.
+  const [deneme, setDeneme] = useState(0);
 
   useEffect(() => {
     const ac = new AbortController();
+    setYukleniyor(true);
+    setHata("");
     api
       .get<SchedulableTask[]>(`/planning/schedulable-tasks?limit=${ADAY_TAVANI}`, ac.signal)
-      .then(setAdaylar)
-      // Arama çalışmazsa kutu serbest metin kutusu olarak çalışmaya devam
-      // etmeli: görev bulunamaması, kaydın hiç girilememesi anlamına gelmemeli.
-      .catch(ignoreAbort)
+      .then((liste) => {
+        setAdaylar(liste);
+        setHata("");
+      })
+      .catch((err) => {
+        if (isAbortError(err) || ac.signal.aborted) return;
+        // HATAYI YUTMUYORUZ.
+        //
+        // Önce `.catch(ignoreAbort)` vardı: istek düşünce liste sessizce boş
+        // kalıyor, kutu hiçbir şey önermiyor ve kullanıcı "arama çalışmıyor"
+        // diyordu — nedenini görebileceği hiçbir yer yoktu. Sessiz başarısızlık,
+        // hatanın kendisinden pahalı.
+        setHata(err instanceof Error ? err.message : "Görevlerin yüklenemedi");
+      })
       .finally(() => {
         if (!ac.signal.aborted) setYukleniyor(false);
       });
     return () => ac.abort();
-  }, []);
+  }, [deneme]);
 
   const aranan = query.trim();
 
@@ -69,6 +84,13 @@ export function useTaskSearch(query: string, enabled = true) {
     );
   }, [aranan, adaylar, enabled]);
 
-  // "Aranıyor" göstergesi yalnızca ilk yükleme için: eşleştirme anlık.
-  return { tasks, loading: yukleniyor };
+  return {
+    tasks,
+    // "Yükleniyor" yalnızca ilk çekim için: eşleştirmenin kendisi anlık.
+    loading: yukleniyor,
+    hata,
+    /** Aday listesi kaç görev taşıyor; boşsa kutu neden öneri vermediğini söyleyebilir. */
+    adaySayisi: adaylar.length,
+    tekrarDene: () => setDeneme((n) => n + 1),
+  };
 }

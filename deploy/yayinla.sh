@@ -52,6 +52,16 @@ fi
 gidecek="$(git log --oneline origin/main..HEAD)"
 [ -n "$gidecek" ] || { echo "Yayınlanacak yeni bir şey yok — origin/main zaten güncel."; exit 0; }
 
+# Web derlemesini etkileyen yollar: uygulamanın kendisi ve ondan derlenen
+# paylaşılan paket. PUSH'TAN ÖNCE hesaplanmak ZORUNDA — push'tan sonra
+# origin/main ile HEAD aynı commit olur ve fark HER ZAMAN boş çıkar. Aşağıdaki
+# doğrulama buna bakıyordu ve web değişmiş olsa bile "bu yayın web'e dokunmuyor"
+# diyip paket adını hiç kontrol etmiyordu: yanlış bir "✓ Yayında".
+web_degisti=0
+if git diff --name-only origin/main HEAD | grep -qE '^(apps/web|packages/shared)/'; then
+  web_degisti=1
+fi
+
 echo "Yayınlanacak commit'ler:"
 echo "$gidecek" | sed 's/^/  /'
 echo
@@ -119,14 +129,6 @@ done
 #    dağıtım sağlamken sunucuda arıza arandı.
 #  · O durumda backend'in yeniden başlamasına bakılıyor: /health/ready
 #    uptimeSeconds'ı düşerse yeni sürüm ayağa kalkmış demektir.
-# `gidecek` push'tan ÖNCE hesaplandı (origin/main..HEAD), yani gönderilen
-# commit'lerin listesi elimizde. Web derlemesini etkileyen yollar: uygulamanın
-# kendisi ve ondan derlenen paylaşılan paket.
-web_degisti=0
-if git diff --name-only origin/main HEAD 2>/dev/null | grep -qE '^(apps/web|packages/shared)/'; then
-  web_degisti=1
-fi
-
 paket() { curl -fsS --max-time 15 https://app.projelio.app/ | grep -oE 'index-[A-Za-z0-9_-]+\.js' | head -1 || true; }
 uptime_sn() { curl -fsS --max-time 15 https://api.projelio.app/health/ready | grep -oE '"uptimeSeconds":[0-9]+' | grep -oE '[0-9]+' || echo 999999; }
 

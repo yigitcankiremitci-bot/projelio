@@ -531,6 +531,8 @@ export const hatalar: TranslationDict = {
   "Bir klasör kendi içine taşınamaz": "A folder can't be moved into itself",
   "Bir klasör kendi alt klasörüne taşınamaz": "A folder can't be moved into its own subfolder",
   "Hedefte aynı adda bir klasör zaten var.": "A folder with the same name already exists there.",
+  "Bu klasör çoğaltmak için çok büyük (en fazla 50 dosya).":
+    "This folder is too large to duplicate (50 files at most).",
   // Abonelik / ödeme (migration 092, modules/billing).
   "Geçersiz paket.": "Invalid plan.",
   "Geçersiz ödeme dönemi.": "Invalid billing period.",

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Job, Project, ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
-import { driveEditUrl, fileKindLabel, formatFileSize } from "../lib/driveLinks";
+import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
 import { useFileThumbnails } from "../lib/fileThumbnails";
+import { useIsDesktop } from "../lib/useIsDesktop";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useThemeColors } from "../theme/useThemeColors";
+import FileContextMenu from "./FileContextMenu";
 import FilePreviewModal from "./FilePreviewModal";
 import FileThumb from "./FileThumb";
 import QuickFileUploadModal, { type UploadTargetOption } from "./QuickFileUploadModal";
@@ -31,10 +33,15 @@ interface Props {
 export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const isDesktop = useIsDesktop();
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<ProjectFile | null>(null);
+  // Sağ tık ve seçim, FilesPanel'dekiyle aynı davranışta olmalı: kullanıcı için
+  // burası da "dosyalar sayfası", listenin nereden derlendiği onun sorunu değil.
+  const [menu, setMenu] = useState<{ x: number; y: number; file: ProjectFile } | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   // Sürükleyip bırakılan dosyalar: hedefi kullanıcı pencerede seçecek.
   const [dropped, setDropped] = useState<File[]>([]);
@@ -147,18 +154,26 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
       {files.map((file) => (
         <div
           key={file.id}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setSelectedId(file.id);
+            setMenu({ x: e.clientX, y: e.clientY, file });
+          }}
           style={{
             display: "flex",
             alignItems: "center",
             gap: 12,
             padding: "11px 14px",
             borderRadius: 10,
-            border: `1px solid ${c.border}`,
-            background: c.surface,
+            border: `1px solid ${selectedId === file.id ? c.accent : c.border}`,
+            background: selectedId === file.id ? `${c.accent}14` : c.surface,
           }}
         >
           <div
-            onClick={() => setPreview(file)}
+            // Masaüstünde tek tık seçer, çift tık açar; dokunmatikte tek
+            // dokunma açar (bkz. FilesPanel'deki aynı kural).
+            onClick={() => (isDesktop ? setSelectedId(file.id) : setPreview(file))}
+            onDoubleClick={() => setPreview(file)}
             style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}
           >
             <FileThumb file={file} thumbs={thumbs} variant="row" />
@@ -195,6 +210,22 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
           </IconButton>
         </div>
       ))}
+
+      {menu && (
+        <FileContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={[
+            { label: t("Önizle"), onClick: () => setPreview(menu.file) },
+            { label: t("İndir"), onClick: () => void handleDownload(menu.file) },
+            {
+              label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file) }),
+              onClick: () => window.open(driveEditUrl(menu.file), "_blank", "noopener,noreferrer"),
+            },
+          ]}
+        />
+      )}
 
       {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} />}
     </div>

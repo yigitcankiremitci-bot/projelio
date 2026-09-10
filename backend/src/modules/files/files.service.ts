@@ -58,6 +58,21 @@ const UPLOADER_SCAN_LIMIT = 300;
 /** Backend belleğinden geçirmeye razı olduğumuz üst sınır. Üstü resumable akışa gider. */
 export const INLINE_UPLOAD_LIMIT = 8 * 1024 * 1024;
 
+/** Tek istekte çoğaltılabilecek en çok dosya (bkz. duplicateFolder). */
+const KLASOR_COGALTMA_TAVANI = 50;
+
+/**
+ * "rapor.pdf" -> "rapor kopya.pdf".
+ *
+ * Ek uzantıdan ÖNCE giriyor: "rapor.pdf kopya" işletim sistemlerinde ve
+ * bulutta artık PDF sayılmaz, çift tıklayınca açılmazdı.
+ */
+function kopyaAdi(name: string): string {
+  const nokta = name.lastIndexOf(".");
+  if (nokta <= 0) return `${name} kopya`;
+  return `${name.slice(0, nokta)} kopya${name.slice(nokta)}`;
+}
+
 export interface ProjectFile {
   id: string;
   /** Dosya bir İŞE, bir DEPARTMANA ya da bir ŞİRKETE aittir (üçünden tam biri dolu). */
@@ -1497,6 +1512,136 @@ export class FilesService {
       throw error;
     }
     return mapFolder(updated);
+  }
+
+  /**
+   * Dosyayı aynı klasöre kopyalar ("Çoğalt").
+   *
+   * Bulutta gerçek bir kopya açılıyor: aynı Drive dosyasına ikinci bir Projelio
+   * satırı yazmak, birini silince diğerinin de içeriğini götürürdü.
+   */
+  async duplicateFile(fileId: string, userId: string): Promise<ProjectFile> {
+    const { row } = await this.findById(fileId, userId);
+    const owner = ownerOfFileRow(row);
+    const { provider, accountId, rootFolderId } = await this.ownerRoot(owner, userId);
+
+    // Kopya kaynağın YANINA düşer; kullanıcı çoğalttığı şeyi bulunduğu yerde arar.
+    const target = await this.resolvePlacement(owner, userId, rootFolderId, {
+      folderId: row.folder_id ?? undefined,
+    });
+
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    const kopya = await this.cloudStorage.copyFile(
+      provider,
+      accessToken,
+      row.drive_file_id,
+      target.driveFolderId,
+      kopyaAdi(row.name)
+    );
+
+    const flat = flatScopeOfRow(row);
+    if (flat) return this.persistFlatFile(flat, userId, provider, accountId, kopya, target.folderRowId);
+    return this.persist(
+      row.job_id,
+      userId,
+      provider,
+      accountId,
+      kopya,
+      { taskId: row.task_id ?? undefined, outputId: row.output_id ?? undefined },
+      row.project_id ?? undefined,
+      target.folderRowId
+    );
+  }
+
+  /**
+   * Klasörü içeriğiyle birlikte çoğaltır.
+   *
+   * TAVAN VAR ve bilerek düşük: her dosya için ayrı bir bulut kopyalama isteği
+   * gidiyor, yani 200 dosyalık bir ağaç tek HTTP isteğini dakikalarca açık
+   * tutardı ve yarıda kopan bir istek yarım bir kopya bırakırdı. Sınırın
+   * üstünde işe hiç başlamıyoruz — yarım kopyalamaktansa açıkça reddetmek.
+   */
+  async duplicateFolder(folderId: string, userId: string): Promise<FileFolderEntry> {
+    const { row, owner } = await this.folderForWrite(folderId, userId);
+
+    const ids = await this.folderSubtreeIds(folderId);
+    const { count } = await this.supabase.client
+      .from("files")
+      .select("id", { count: "exact", head: true })
+      .in("folder_id", ids)
+      .is("archived_at", null);
+    if ((count ?? 0) > KLASOR_COGALTMA_TAVANI) {
+      // Şablon dizesi DEĞİL: mesaj sözlük anahtarı olarak aranıyor, değişken
+      // gömülürse İngilizce arayüzde sessizce Türkçe kalırdı (bkz. dil-denetimi).
+      throw new BadRequestException("Bu klasör çoğaltmak için çok büyük (en fazla 50 dosya).");
+    }
+
+    const hedef = await this.createFolder(owner, userId, kopyaAdi(row.name), row.parent_folder_id ?? undefined);
+    await this.copyFolderContents(owner, userId, folderId, hedef.id, 0);
+    return hedef;
+  }
+
+  /** duplicateFolder'ın özyinelemeli gövdesi: bir klasörün içindekileri hedefe kopyalar. */
+  private async copyFolderContents(
+    owner: FileOwner,
+    userId: string,
+    kaynakId: string,
+    hedefId: string,
+    derinlik: number
+  ): Promise<void> {
+    if (derinlik >= 12) return;
+
+    const { data: dosyalar } = await this.supabase.client
+      .from("files")
+      .select()
+      .eq("folder_id", kaynakId)
+      .is("archived_at", null)
+      .limit(KLASOR_COGALTMA_TAVANI);
+
+    for (const dosya of dosyalar ?? []) {
+      const { provider, accountId } = storageOwner(dosya);
+      const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+      const { data: hedefKlasor } = await this.supabase.client
+        .from("file_folders")
+        .select("drive_folder_id")
+        .eq("id", hedefId)
+        .maybeSingle();
+      if (!hedefKlasor) return;
+
+      // Ad KORUNUR: kopya klasörün içinde "… kopya" eki anlamsız, klasörün
+      // kendisi zaten kopya.
+      const kopya = await this.cloudStorage.copyFile(
+        provider,
+        accessToken,
+        dosya.drive_file_id,
+        hedefKlasor.drive_folder_id,
+        dosya.name
+      );
+      const flat = flatScopeOfRow(dosya);
+      if (flat) await this.persistFlatFile(flat, userId, provider, accountId, kopya, hedefId);
+      else
+        await this.persist(
+          dosya.job_id,
+          userId,
+          provider,
+          accountId,
+          kopya,
+          { taskId: dosya.task_id ?? undefined, outputId: dosya.output_id ?? undefined },
+          dosya.project_id ?? undefined,
+          hedefId
+        );
+    }
+
+    const { data: altlar } = await this.supabase.client
+      .from("file_folders")
+      .select()
+      .eq("parent_folder_id", kaynakId)
+      .eq("kind", "user");
+
+    for (const alt of altlar ?? []) {
+      const yeni = await this.createFolder(owner, userId, alt.name, hedefId);
+      await this.copyFolderContents(owner, userId, alt.id, yeni.id, derinlik + 1);
+    }
   }
 
   /** Klasör ve altındaki tüm klasörlerin kimlikleri. */

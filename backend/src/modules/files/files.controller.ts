@@ -301,6 +301,13 @@ export class FilesController {
    * null" ayrımı istemciden gelen JSON'da güvenilir değil, oysa burada
    * "köke taşı" tam olarak o ayrımdır.
    */
+  /** Klasörü içeriğiyle birlikte çoğaltır (tavan için bkz. FilesService.duplicateFolder). */
+  @Post("file-folders/:id/duplicate")
+  @UseGuards(AuthGuard("jwt"))
+  duplicateFolder(@Param("id") id: string, @Req() req: any) {
+    return this.filesService.duplicateFolder(id, req.user.userId);
+  }
+
   @Patch("file-folders/:id/parent")
   @UseGuards(AuthGuard("jwt"))
   moveFolder(@Param("id") id: string, @Body() body: { parentFolderId?: string | null }, @Req() req: any) {
@@ -741,6 +748,13 @@ export class FilesController {
   @UseGuards(AuthGuard("jwt"))
   rename(@Param("id") id: string, @Body("name") name: string, @Req() req: any) {
     return this.filesService.rename(id, req.user.userId, name);
+  }
+
+  /** Dosyayı bulunduğu klasöre kopyalar ("Çoğalt"). */
+  @Post("files/:id/duplicate")
+  @UseGuards(AuthGuard("jwt"))
+  duplicateFile(@Param("id") id: string, @Req() req: any) {
+    return this.filesService.duplicateFile(id, req.user.userId);
   }
 
   /** Dosyayı başka bir klasöre taşır; `folderId` boşsa kapsamın köküne. */

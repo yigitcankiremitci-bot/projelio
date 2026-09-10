@@ -106,6 +106,9 @@ export const filesApi = {
 
   rename: (fileId: string, name: string) => api.patch<ProjectFile>(`/files/${fileId}`, { name }),
 
+  /** Dosyayı bulunduğu klasöre kopyalar. */
+  duplicate: (fileId: string) => api.post<ProjectFile>(`/files/${fileId}/duplicate`, {}),
+
   /** Dosyayı başka bir klasöre taşır; `folderId` verilmezse kapsamın köküne. */
   move: (fileId: string, folderId?: string) =>
     api.patch<ProjectFile>(`/files/${fileId}/folder`, { folderId: folderId ?? null }),
@@ -165,6 +168,8 @@ export const filesApi = {
     }),
   renameFolder: (folderId: string, name: string) =>
     api.patch<FileFolder>(`/file-folders/${folderId}`, { name }),
+  /** Klasörü içeriğiyle birlikte çoğaltır. */
+  duplicateFolder: (folderId: string) => api.post<FileFolder>(`/file-folders/${folderId}/duplicate`, {}),
   /** Klasörü başka bir klasörün altına taşır; `parentFolderId` yoksa köke. */
   moveFolder: (folderId: string, parentFolderId?: string) =>
     api.patch<FileFolder>(`/file-folders/${folderId}/parent`, { parentFolderId: parentFolderId ?? null }),

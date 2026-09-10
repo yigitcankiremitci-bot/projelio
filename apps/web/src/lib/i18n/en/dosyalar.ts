@@ -107,6 +107,20 @@ export const dosyalar: TranslationDict = {
   // Klasöre sürükleyerek ya da sağ tık menüsünden taşıma.
   Taşınamadı: "Couldn't be moved",
   "Üst klasöre taşı": "Move to parent folder",
+  "Yeni belge oluştur": "New document",
+  "Dosya çoğaltılamadı": "The file couldn't be duplicated",
+  "Klasör çoğaltılamadı": "The folder couldn't be duplicated",
+  // Cmd+Z bildirimindeki etiketler: "<etiket> geri alındı" diye okunuyor, bu
+  // yüzden fiil ismi (bkz. DashboardModulesPanel'deki "Modül atama").
+  "Klasör oluşturma": "Creating a folder",
+  "Klasör yeniden adlandırma": "Renaming a folder",
+  "Klasör çoğaltma": "Duplicating a folder",
+  "Klasör taşıma": "Moving a folder",
+  "Klasör kaldırma": "Removing a folder",
+  "Dosya yeniden adlandırma": "Renaming a file",
+  "Dosya çoğaltma": "Duplicating a file",
+  "Dosya taşıma": "Moving a file",
+  "Dosya kaldırma": "Removing a file",
   "Köke taşı": "Move to the top level",
   "Dosya yeniden adlandırılamadı": "The file couldn't be renamed",
   '"{ad}" klasörü içindekilerle birlikte kaldırılsın mı? Bulutta çöp kutusuna taşınır.':

@@ -38,6 +38,27 @@ import Modal from "./Modal";
 
 type Adim = "menu" | "task" | "budget" | "module" | "link";
 
+/** Bir açılır listedeki tek satır. */
+export interface Secenek {
+  id: string;
+  label: string;
+}
+
+/**
+ * Departman listesini etiketler.
+ *
+ * ŞİRKET ADI ŞART: iki şirkette aynı adlı departman olması (Muhasebe, Satış)
+ * istisna değil kural ve şirket adı olmadan liste iki özdeş satır gösteriyor —
+ * kullanıcı hangisini seçtiğini bilmeden seçiyor.
+ */
+export function departmanlariEtiketle(departments: Department[], organizations: Organization[]): Secenek[] {
+  const sirketAdlari = new Map(organizations.map((o) => [o.id, o.name]));
+  return departments.map((d) => {
+    const sirket = sirketAdlari.get(d.organizationId);
+    return { id: d.id, label: sirket ? `${d.name} · ${sirket}` : d.name };
+  });
+}
+
 interface Props {
   entry: WorkLogEntry;
   onClose: () => void;
@@ -58,6 +79,9 @@ export default function WorkLogTargetModal({ entry, onClose, onDone }: Props) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  // Departman etiketleri şirket adını da taşımalı: iki şirkette aynı adlı
+  // departman ("Muhasebe") olduğunda liste ayırt edilemez hâle geliyordu.
+  const departmanSecenekleri = useMemo(() => departmanlariEtiketle(departments, organizations), [departments, organizations]);
   const [yukleniyor, setYukleniyor] = useState(true);
 
   useEffect(() => {
@@ -158,7 +182,7 @@ export default function WorkLogTargetModal({ entry, onClose, onDone }: Props) {
         {adim === "task" && (
           <GorevAdimi
             projects={projects}
-            departments={departments}
+            departmanSecenekleri={departmanSecenekleri}
             yukleniyor={yukleniyor}
             kaydediliyor={kaydediliyor}
             onAktar={aktar}
@@ -168,7 +192,7 @@ export default function WorkLogTargetModal({ entry, onClose, onDone }: Props) {
         {adim === "budget" && (
           <KasaAdimi
             projects={projects}
-            departments={departments}
+            departmanSecenekleri={departmanSecenekleri}
             yukleniyor={yukleniyor}
             kaydediliyor={kaydediliyor}
             onAktar={aktar}
@@ -190,7 +214,7 @@ export default function WorkLogTargetModal({ entry, onClose, onDone }: Props) {
           <BaglaAdimi
             projects={projects}
             jobs={jobs}
-            departments={departments}
+            departmanSecenekleri={departmanSecenekleri}
             yukleniyor={yukleniyor}
             kaydediliyor={kaydediliyor}
             onBagla={bagla}
@@ -307,13 +331,13 @@ function Menu({
 
 function GorevAdimi({
   projects,
-  departments,
+  departmanSecenekleri,
   yukleniyor,
   kaydediliyor,
   onAktar,
 }: {
   projects: Project[];
-  departments: Department[];
+  departmanSecenekleri: Secenek[];
   yukleniyor: boolean;
   kaydediliyor: boolean;
   onAktar: (body: WorkLogPushInput) => void;
@@ -321,7 +345,8 @@ function GorevAdimi({
   const t = useT();
   const [tur, setTur] = useState<"project" | "department">("project");
   const [hedef, setHedef] = useState("");
-  const secenekler = tur === "project" ? projects : departments;
+  const secenekler =
+    tur === "project" ? projects.map((p) => ({ id: p.id, label: p.title })) : departmanSecenekleri;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -341,10 +366,7 @@ function GorevAdimi({
         value={hedef}
         onChange={setHedef}
         yukleniyor={yukleniyor}
-        secenekler={secenekler.map((o) => ({
-          id: o.id,
-          label: tur === "project" ? (o as Project).title : (o as Department).name,
-        }))}
+        secenekler={secenekler}
       />
       <Aciklama>
         {t("Görev TAMAMLANMIŞ olarak açılır — bu iş zaten yapıldı; ayrıca kapatman gerekmez.")}
@@ -365,13 +387,13 @@ function GorevAdimi({
 
 function KasaAdimi({
   projects,
-  departments,
+  departmanSecenekleri,
   yukleniyor,
   kaydediliyor,
   onAktar,
 }: {
   projects: Project[];
-  departments: Department[];
+  departmanSecenekleri: Secenek[];
   yukleniyor: boolean;
   kaydediliyor: boolean;
   onAktar: (body: WorkLogPushInput) => void;
@@ -427,10 +449,9 @@ function KasaAdimi({
           value={hedef}
           onChange={setHedef}
           yukleniyor={yukleniyor}
-          secenekler={(kapsam === "project" ? projects : departments).map((o) => ({
-            id: o.id,
-            label: kapsam === "project" ? (o as Project).title : (o as Department).name,
-          }))}
+          secenekler={
+            kapsam === "project" ? projects.map((p) => ({ id: p.id, label: p.title })) : departmanSecenekleri
+          }
         />
       )}
 
@@ -572,14 +593,14 @@ function ModulAdimi({
 function BaglaAdimi({
   projects,
   jobs,
-  departments,
+  departmanSecenekleri,
   yukleniyor,
   kaydediliyor,
   onBagla,
 }: {
   projects: Project[];
   jobs: Job[];
-  departments: Department[];
+  departmanSecenekleri: Secenek[];
   yukleniyor: boolean;
   kaydediliyor: boolean;
   onBagla: (kind: WorkLogTargetKind | null, id?: string, label?: string) => void;
@@ -593,7 +614,7 @@ function BaglaAdimi({
       ? projects.map((p) => ({ id: p.id, label: p.title }))
       : tur === "job"
         ? jobs.map((j) => ({ id: j.id, label: j.title }))
-        : departments.map((d) => ({ id: d.id, label: d.name }));
+        : departmanSecenekleri;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

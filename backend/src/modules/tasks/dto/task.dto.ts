@@ -2,7 +2,7 @@ import { IsArray, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from "
 import type { TaskPriority } from "@projelio/shared";
 
 const TASK_STATUSES = ["todo", "in_progress", "completed"] as const;
-const DURATION_UNITS = ["hours", "days"] as const;
+const DURATION_UNITS = ["minutes", "hours", "days"] as const;
 
 // NOT: projects/dto/project.dto.ts'teki ile aynı felsefe — alanlar geniş tutulur,
 // yalnızca en sık karşılaşılan hatalı girdiler (boş başlık, negatif bütçe,

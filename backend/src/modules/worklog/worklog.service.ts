@@ -158,7 +158,14 @@ export class WorklogService {
     const dakika = aralik ? aralik.dakika : this.sureyiCozumle(body);
 
     const hedef = gorev
-      ? { targetKind: "task", targetId: gorev.id, targetLabel: gorev.title }
+      ? {
+          targetKind: "task",
+          targetId: gorev.id,
+          targetLabel: gorev.title,
+          // Görevin sayfası kendi id'si DEĞİL, bağlı olduğu projenin ya da
+          // departmanın sayfası (bkz. migration 099).
+          targetPath: gorevinAdresi(gorev),
+        }
       : this.hedefiCozumle(body);
 
     const { data, error } = await this.supabase.client
@@ -177,6 +184,7 @@ export class WorklogService {
         target_kind: hedef.targetKind,
         target_id: hedef.targetId,
         target_label: hedef.targetLabel,
+        target_path: hedef.targetPath,
         linked_at: hedef.targetKind ? yerelZamanDamgasi(new Date()) : null,
       })
       .select("*")
@@ -360,13 +368,19 @@ export class WorklogService {
   async link(
     userId: string,
     id: string,
-    body: { targetKind?: WorkLogTargetKind | null; targetId?: string | null; targetLabel?: string | null }
+    body: {
+      targetKind?: WorkLogTargetKind | null;
+      targetId?: string | null;
+      targetLabel?: string | null;
+      targetPath?: string | null;
+    }
   ): Promise<WorkLogEntry> {
     const hedef = this.hedefiCozumle(body);
     return this.yaz(userId, id, {
       target_kind: hedef.targetKind,
       target_id: hedef.targetId,
       target_label: hedef.targetLabel,
+      target_path: hedef.targetPath,
       linked_at: hedef.targetKind ? yerelZamanDamgasi(new Date()) : null,
     });
   }
@@ -458,27 +472,27 @@ export class WorklogService {
           description: entry.note,
           status: "completed" as const,
           deadline: entry.doneAt,
-          // Görevin tahmini süresi saat/gün cinsinden (dakika birimi yok);
-          // ölçülen dakika saate çevriliyor, ondalık bir hane korunuyor:
-          // 45 dakikalık bir iş "0 saat" diye kaydedilmemeli.
-          estimatedDurationValue: entry.durationMinutes
-            ? Math.max(0.1, Math.round((entry.durationMinutes / 60) * 10) / 10)
-            : undefined,
-          estimatedDurationUnit: entry.durationMinutes ? ("hours" as const) : undefined,
+          // Ölçülen süre DAKİKA olarak yazılıyor (bkz. migration 099). Önce
+          // saate çevriliyordu ve 15 dakikalık bir iş 0,2 saate yuvarlanıp
+          // arayüzdeki yarım saatlik adımlara sığmıyordu.
+          estimatedDurationValue: entry.durationMinutes ?? undefined,
+          estimatedDurationUnit: entry.durationMinutes ? ("minutes" as const) : undefined,
           outputId: body.outputId,
         };
         const task = body.projectId
           ? await this.tasksService.create(body.projectId, veri, userId)
           : await this.tasksService.createForDepartment(body.departmentId!, veri, userId);
+        const yol = body.projectId ? `/projects/${body.projectId}` : `/departments/${body.departmentId}?tab=tasks`;
         const linked = await this.link(userId, id, {
           targetKind: "task",
           targetId: task.id,
           targetLabel: task.title,
+          targetPath: yol,
         });
         return {
           entry: linked,
           createdId: task.id,
-          path: body.projectId ? `/projects/${body.projectId}` : `/departments/${body.departmentId}?tab=tasks`,
+          path: yol,
         };
       }
 
@@ -492,6 +506,7 @@ export class WorklogService {
           targetKind: "personal_todo",
           targetId: todo.id,
           targetLabel: todo.title,
+          targetPath: "/tasks",
         });
         return { entry: linked, createdId: todo.id, path: "/tasks" };
       }
@@ -517,6 +532,11 @@ export class WorklogService {
           targetKind: "budget",
           targetId: tx.id,
           targetLabel: entry.title,
+          targetPath: body.projectId
+            ? `/projects/${body.projectId}?tab=budget`
+            : body.departmentId
+              ? `/departments/${body.departmentId}?tab=budget`
+              : "/?tab=budget",
         });
         return {
           entry: linked,
@@ -556,6 +576,7 @@ export class WorklogService {
           targetKind: "module_record",
           targetId: record.id,
           targetLabel: entry.title,
+          targetPath: `/organizations/${body.organizationId}`,
         });
         return {
           entry: linked,
@@ -665,14 +686,24 @@ export class WorklogService {
     targetKind?: WorkLogTargetKind | null;
     targetId?: string | null;
     targetLabel?: string | null;
-  }): { targetKind: string | null; targetId: string | null; targetLabel: string | null } {
-    if (!body.targetKind) return { targetKind: null, targetId: null, targetLabel: null };
+    targetPath?: string | null;
+  }): {
+    targetKind: string | null;
+    targetId: string | null;
+    targetLabel: string | null;
+    targetPath: string | null;
+  } {
+    if (!body.targetKind) return { targetKind: null, targetId: null, targetLabel: null, targetPath: null };
     if (!TARGET_KINDS.includes(body.targetKind)) throw new BadRequestException("Geçersiz bağlantı türü");
     if (!body.targetId) throw new BadRequestException("Bağlantı için hedef gerekli");
     return {
       targetKind: body.targetKind,
       targetId: body.targetId,
       targetLabel: body.targetLabel?.trim() || null,
+      // Adres yalnızca uygulama İÇİ olabilir: istemciden gelen bir metin ve
+      // "//baska.site" gibi bir değer, kayda tıklayan kullanıcıyı dışarı
+      // çıkaran bir yönlendirme olurdu.
+      targetPath: iciAdres(body.targetPath),
     };
   }
 }
@@ -697,6 +728,8 @@ export interface WorkLogCreateInput {
   targetKind?: WorkLogTargetKind | null;
   targetId?: string | null;
   targetLabel?: string | null;
+  /** Hedefin uygulama içi adresi; türden türetilemediği için çağıran veriyor. */
+  targetPath?: string | null;
 }
 
 export interface WorkLogUpdateInput {
@@ -737,6 +770,7 @@ function mapEntry(row: any): WorkLogEntry {
     targetKind: row.target_kind ?? undefined,
     targetId: row.target_id ?? undefined,
     targetLabel: row.target_label ?? undefined,
+    targetPath: row.target_path ?? undefined,
     linkedAt: row.linked_at ?? undefined,
     archivedAt: row.archived_at ?? undefined,
     createdAt: row.created_at,
@@ -781,6 +815,25 @@ function yerelZamanDamgasi(tarih: Date): string {
  */
 function naiveMs(damga: string): number {
   return new Date(damga.replace(/(Z|[+-]\d{2}:\d{2})$/, "")).getTime();
+}
+
+/**
+ * Yalnızca uygulama içi adresleri geçirir: "/projects/abc" evet,
+ * "//kotu.site" ya da "https://…" hayır. İstemciden gelen bir metnin
+ * yönlendirmeye dönüşmesi, kendi kaydına tıklayan kullanıcıyı dışarı çıkarırdı.
+ */
+/** Görevin gidilebilir sayfası: projesi ya da departmanının Görevler sekmesi. */
+function gorevinAdresi(gorev: { projectId?: string; departmentId?: string }): string | null {
+  if (gorev.projectId) return `/projects/${gorev.projectId}`;
+  if (gorev.departmentId) return `/departments/${gorev.departmentId}?tab=tasks`;
+  return null;
+}
+
+function iciAdres(deger: string | null | undefined): string | null {
+  const yol = deger?.trim();
+  if (!yol) return null;
+  if (!yol.startsWith("/") || yol.startsWith("//")) return null;
+  return yol.slice(0, 500);
 }
 
 function bugun(): string {

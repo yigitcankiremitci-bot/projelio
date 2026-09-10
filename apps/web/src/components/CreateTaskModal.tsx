@@ -53,7 +53,7 @@ export default function CreateTaskModal({
   const [title, setTitle] = useState("");
   const [deadline, setDeadline] = useState("");
   const [durationValue, setDurationValue] = useState("");
-  const [durationUnit, setDurationUnit] = useState<"hours" | "days">("hours");
+  const [durationUnit, setDurationUnit] = useState<"minutes" | "hours" | "days">("hours");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -200,7 +200,7 @@ export default function CreateTaskModal({
                   <input
                     type="number"
                     min={0}
-                    step="0.5"
+                    step="any"
                     value={durationValue}
                     onChange={(e) => setDurationValue(e.target.value)}
                     placeholder={t("Örn. 4")}
@@ -208,10 +208,11 @@ export default function CreateTaskModal({
                   />
                   <select
                     value={durationUnit}
-                    onChange={(e) => setDurationUnit(e.target.value as "hours" | "days")}
+                    onChange={(e) => setDurationUnit(e.target.value as "minutes" | "hours" | "days")}
                     style={{ flex: 1 }}
                   >
-                    <option value="hours">{t("Saat")}</option>
+                    <option value="minutes">{t("Dakika")}</option>
+              <option value="hours">{t("Saat")}</option>
                     <option value="days">{t("Gün")}</option>
                   </select>
                 </div>

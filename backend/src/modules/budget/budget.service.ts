@@ -16,6 +16,7 @@ function mapTransaction(row: any): BudgetTransaction {
     projectId: row.project_id ?? undefined,
     departmentId: row.department_id ?? undefined,
     projectTitle: row.projects?.title ?? undefined,
+    departmentName: row.departments?.name ?? undefined,
     ownerId: row.owner_id ?? undefined,
     userId: row.user_id ?? undefined,
     type: row.type,
@@ -189,7 +190,7 @@ export class BudgetService {
     await this.assertCanViewDepartmentBudget(departmentId, requestingUserId);
     const { data, error } = await this.supabase.client
       .from("budget_transactions")
-      .select("*")
+      .select("*, departments(name)")
       .eq("department_id", departmentId)
       .order("occurred_at", { ascending: false })
       .order("created_at", { ascending: false });
@@ -199,19 +200,44 @@ export class BudgetService {
 
   async addForDepartment(departmentId: string, data: Partial<BudgetTransaction>, requestingUserId?: string): Promise<BudgetTransaction> {
     await this.assertCanManageDepartment(departmentId, requestingUserId);
+
+    // Departman kaydının defter sahibi ORGANİZASYONUN SAHİBİDİR — kaydı giren
+    // departman yöneticisi değil. Kural proje bütçesindekiyle aynı (bkz. add()):
+    // defter, paranın sahibinin defteridir. owner_id boş bırakıldığı sürece kayıt
+    // hiçbir deftere ait olmuyor ve Kasa sayfasında (owner_id ile süzülüyor)
+    // GÖRÜNMÜYORDU; departman bütçesi 029'da eklenirken 020'nin bu kuralı atlanmıştı.
+    const ownerId = await this.departmentLedgerOwner(departmentId);
+
     const { data: row, error } = await this.supabase.client
       .from("budget_transactions")
       .insert({
         department_id: departmentId,
+        owner_id: ownerId,
         type: requireOneOf(data.type ?? "expense", TRANSACTION_TYPES, "İşlem türü"),
         amount: requireAmount(data.amount ?? 0),
         description: data.description ?? null,
         occurred_at: data.occurredAt ?? new Date().toISOString().slice(0, 10),
       })
-      .select("*")
+      .select("*, departments(name)")
       .single();
     if (error) throw error;
     return mapTransaction(row);
+  }
+
+  // Departmanın bağlı olduğu organizasyonun sahibi.
+  private async departmentLedgerOwner(departmentId: string): Promise<string | null> {
+    const { data: dept } = await this.supabase.client
+      .from("departments")
+      .select("organization_id")
+      .eq("id", departmentId)
+      .maybeSingle();
+    if (!dept?.organization_id) return null;
+    const { data: org } = await this.supabase.client
+      .from("organizations")
+      .select("owner_id")
+      .eq("id", dept.organization_id)
+      .maybeSingle();
+    return org?.owner_id ?? null;
   }
 
   async removeForDepartment(id: string, requestingUserId?: string): Promise<{ success: true }> {
@@ -266,7 +292,7 @@ export class BudgetService {
   async findAllForUser(userId: string, limit = 200): Promise<BudgetTransaction[]> {
     const { data, error } = await this.supabase.client
       .from("budget_transactions")
-      .select("*, projects(title)")
+      .select("*, projects(title), departments(name)")
       .eq("owner_id", userId)
       .order("occurred_at", { ascending: false })
       .order("created_at", { ascending: false })
@@ -281,10 +307,17 @@ export class BudgetService {
       this.findAllForUser(userId, 1000),
     ]);
 
+    // Kırılımda satırı olmayan her kayıt "genel"e düşer. Yalnızca projesiz
+    // kayıtlar değil, ARŞİVLENMİŞ bir projeye ait kayıtlar da: ownedProjects
+    // arşivlileri getirmiyor ve eskiden bu kayıtlar hiçbir kovaya girmediği için
+    // toplamlardan sessizce düşüyordu — defterde duran gider Kasa'daki "Gider"
+    // kutusuna yansımıyordu. Departman kayıtlarının da projesi yoktur; onlar da
+    // buraya düşer (bkz. addForDepartment: defter sahibi organizasyon sahibi).
+    const ownedIds = new Set(projects.map((p) => p.id));
     const byProject = new Map<string, BudgetTransaction[]>();
     const general: BudgetTransaction[] = [];
     for (const tx of transactions) {
-      if (!tx.projectId) {
+      if (!tx.projectId || !ownedIds.has(tx.projectId)) {
         general.push(tx);
         continue;
       }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { dakikayiMetneCevir, sureyiDakikayaCevir, type WorkLogEntry } from "@projelio/shared";
 import { worklog } from "../api/worklog";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -8,8 +8,9 @@ import { useProjectFabAction } from "../lib/projectFab";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import WorkLogComposer from "../components/WorkLogComposer";
 import WorkLogTargetModal from "../components/WorkLogTargetModal";
+import WorkLogEditModal from "../components/WorkLogEditModal";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { IconPlay, IconStop, IconLink, IconTrash, IconCheck } from "../components/icons";
+import { IconPlay, IconStop, IconLink, IconTrash, IconCheck, IconEdit } from "../components/icons";
 
 /**
  * YAPTIM — kullanıcının kişisel iş günlüğü.
@@ -58,6 +59,7 @@ export default function WorkLog() {
 
   const [hedefSecilen, setHedefSecilen] = useState<WorkLogEntry | null>(null);
   const [silinecek, setSilinecek] = useState<WorkLogEntry | null>(null);
+  const [duzenlenen, setDuzenlenen] = useState<WorkLogEntry | null>(null);
   // Kronometre çalışırken saniyede bir yeniden çizmek için: gerçek süre
   // sunucuda hesaplanıyor, buradaki sayaç yalnızca gösterim.
   const [tik, setTik] = useState(0);
@@ -130,6 +132,7 @@ export default function WorkLog() {
     endedAt?: string | null;
     markTaskDone?: boolean;
     addToCalendar?: boolean;
+    hedef?: { targetKind: string; targetId: string; targetLabel: string; targetPath: string } | null;
     kronometreBaslat?: boolean;
   }) => {
     if (kaydediliyor) return;
@@ -146,6 +149,11 @@ export default function WorkLog() {
         doneAt: veri.startedAt ? undefined : simdiYerel(),
         markTaskDone: veri.markTaskDone,
         addToCalendar: veri.addToCalendar,
+        // Kaydetmeden önce seçilen serbest hedef (proje/iş/departman).
+        targetKind: veri.hedef?.targetKind as any,
+        targetId: veri.hedef?.targetId,
+        targetLabel: veri.hedef?.targetLabel,
+        targetPath: veri.hedef?.targetPath,
       });
       const kayit = veri.kronometreBaslat ? await worklog.startTimer(yeni.id) : yeni;
       setEntries((prev) => [
@@ -359,6 +367,7 @@ export default function WorkLog() {
                       onClearDuration={() => void guncelle(entry, { duration: null })}
                       onTimer={() => void kronometre(entry)}
                       onTarget={() => setHedefSecilen(entry)}
+                      onEdit={() => setDuzenlenen(entry)}
                       onDelete={() => setSilinecek(entry)}
                     />
                   ))}
@@ -377,6 +386,21 @@ export default function WorkLog() {
             setEntries((prev) => prev.map((e) => (e.id === guncel.id ? guncel : e)));
             setHedefSecilen(null);
             if (path) navigate(path);
+          }}
+        />
+      )}
+
+      {duzenlenen && (
+        <WorkLogEditModal
+          entry={duzenlenen}
+          onClose={() => setDuzenlenen(null)}
+          onSaved={(guncel) => {
+            // Tarih değişmiş olabilir: kayıt seçili aralığın dışına çıkabilir,
+            // bu yüzden listeyi tazeliyoruz (yerinde güncellemek onu yanlış
+            // gün başlığının altında bırakırdı).
+            setDuzenlenen(null);
+            void guncel;
+            yukle();
           }}
         />
       )}
@@ -404,6 +428,7 @@ function WorkLogRow({
   onClearDuration,
   onTimer,
   onTarget,
+  onEdit,
   onDelete,
 }: {
   entry: WorkLogEntry;
@@ -413,6 +438,7 @@ function WorkLogRow({
   onClearDuration: () => void;
   onTimer: () => void;
   onTarget: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const c = useThemeColors();
@@ -549,14 +575,33 @@ function WorkLogRow({
               · {t("takvimde")}
             </span>
           )}
-          {entry.targetLabel && (
-            <span
-              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12.5, color: c.completed ?? c.success }}
-            >
-              <IconCheck size={12} color={c.completed ?? c.success} />
-              {entry.targetLabel}
-            </span>
-          )}
+          {/* Bağlı olduğu yer TIKLANABİLİR: kullanıcının bir kaydı görünce ilk
+              yaptığı şey "hangi işti bu" diye oraya gitmek. Adres bağlama
+              anında yazılıyor (bkz. migration 099); yoksa düz metin kalır. */}
+          {entry.targetLabel &&
+            (entry.targetPath ? (
+              <Link
+                to={entry.targetPath}
+                title={t("Bağlı olduğu yere git")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 12.5,
+                  color: c.completed,
+                  textDecoration: "underline",
+                  textUnderlineOffset: 2,
+                }}
+              >
+                <IconCheck size={12} color={c.completed} />
+                {entry.targetLabel}
+              </Link>
+            ) : (
+              <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12.5, color: c.completed }}>
+                <IconCheck size={12} color={c.completed} />
+                {entry.targetLabel}
+              </span>
+            ))}
         </div>
       </div>
 
@@ -577,6 +622,15 @@ function WorkLogRow({
         style={ikonDugmesi(c, false)}
       >
         <IconLink size={14} color={entry.targetKind ? c.accentDark : c.textSecondary} />
+      </button>
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label={t("Düzenle")}
+        title={t("Düzenle — tarih, saat, süre")}
+        style={ikonDugmesi(c, false)}
+      >
+        <IconEdit size={14} color={c.textSecondary} />
       </button>
       <button type="button" onClick={onDelete} aria-label={t("Sil")} title={t("Sil")} style={ikonDugmesi(c, false)}>
         <IconTrash size={14} color={c.textSecondary} />

@@ -1231,7 +1231,7 @@ export interface Task {
   // Görevi yapacak kişinin bildirdiği tahmini iş süresi (opsiyonel). Deadline "ne
   // zamana kadar bitmeli"yi, bu "ne kadar sürer"i tutar — ikisi bağımsızdır.
   estimatedDurationValue?: number;
-  estimatedDurationUnit?: "hours" | "days";
+  estimatedDurationUnit?: "minutes" | "hours" | "days";
   /**
    * Yaptım kayıtlarından biriken GERÇEKLEŞEN süre (dakika). Yukarıdaki
    * estimatedDuration* TAHMİNdir ve bunun üzerine YAZILMAZ: ikisinin yan yana
@@ -1316,6 +1316,9 @@ export interface BudgetTransaction {
   // Departman bütçesine ait kayıtlarda dolu, diğerlerinde boştur.
   departmentId?: string;
   projectTitle?: string;
+  // Departman kayıtlarında departmanın adı (Kasa listesinde kaydın nereden
+  // geldiğini göstermek için).
+  departmentName?: string;
   // Kaydın ait olduğu defterin sahibi.
   ownerId?: string;
   userId?: string;
@@ -2003,6 +2006,11 @@ export interface SchedulableTask {
   /** Departman görevlerinde dolu; seçicide görevin nereye ait olduğunu gösterir. */
   departmentId?: string;
   departmentName?: string;
+  /**
+   * Departmanın şirketi. Ayrı bir alan çünkü iki şirkette AYNI ADLI departman
+   * olabiliyor ("Muhasebe") ve şirket adı olmadan seçim yapılamıyor.
+   */
+  departmentOrganizationName?: string;
 }
 
 /** Takvimin gün/hafta/ay görünümlerini tek istekte besleyen paket. */
@@ -2659,6 +2667,12 @@ export interface WorkLogEntry {
   targetId?: string;
   /** Hedefin bağlama anındaki adı; hedef silinse de okunabilir kalsın diye. */
   targetLabel?: string;
+  /**
+   * Hedefin uygulama içi adresi. Türden TÜRETİLEMEZ: bir görevin sayfası kendi
+   * id'si değil, bağlı olduğu projenin/departmanın sayfasıdır — o yüzden
+   * bağlama anında yazılıyor (bkz. migration 099).
+   */
+  targetPath?: string;
   linkedAt?: string;
   archivedAt?: string;
   createdAt: string;

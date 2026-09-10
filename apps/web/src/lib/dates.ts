@@ -26,10 +26,16 @@ export function formatDateTime(iso: string): string {
 }
 
 /** Görevin tahmini iş süresi: "4 sa" / "2 gün" gibi kısa bir etiket üretir. */
-export function formatTaskDuration(value?: number, unit?: "hours" | "days"): string | undefined {
+export function formatTaskDuration(
+  value?: number,
+  unit?: "minutes" | "hours" | "days"
+): string | undefined {
   if (value == null || !unit) return undefined;
   const n = Number(value);
   if (!Number.isFinite(n)) return undefined;
   const trimmed = n % 1 === 0 ? n.toString() : n.toString().replace(".", ",");
+  // "dakika" birimi 15 dakikalık işler için eklendi (bkz. migration 099);
+  // öncesinde en küçük ifade edilebilir süre yarım saatti.
+  if (unit === "minutes") return `${trimmed} dk`;
   return unit === "hours" ? `${trimmed} sa` : `${trimmed} gün`;
 }

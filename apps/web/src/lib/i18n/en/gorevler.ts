@@ -9,6 +9,8 @@ import type { TranslationDict } from "@projelio/shared";
 export const gorevler: TranslationDict = {
   // ─────────────────────────────────────────────── Temel kavramlar
   "Görev ekle": "Add task",
+  // Süre birimi: 15 dakikalık işler yazılabilsin diye eklendi (migration 099).
+  Dakika: "Minutes",
   "Yeni görev": "New task",
   "Görev adı": "Task name",
   "Görev başlığı": "Task title",

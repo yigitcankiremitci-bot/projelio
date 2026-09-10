@@ -4,6 +4,7 @@ import { dakikayiMetneCevir, sureyiDakikayaCevir } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import { useTaskSearch } from "../lib/useTaskSearch";
+import WorkLogHedefSecici, { type SecilenHedef } from "./WorkLogHedefSecici";
 import { IconPlay, IconX, IconCheck } from "./icons";
 
 /**
@@ -34,6 +35,7 @@ interface Props {
     endedAt?: string | null;
     markTaskDone?: boolean;
     addToCalendar?: boolean;
+    hedef?: SecilenHedef | null;
     kronometreBaslat?: boolean;
   }) => void;
   /** Sayfadaki "+" düğmesi kutuya odaklanabilsin diye. */
@@ -52,6 +54,8 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
   const [bitis, setBitis] = useState("");
   const [yapildi, setYapildi] = useState(true);
   const [takvime, setTakvime] = useState(true);
+  // Görev SEÇİLMEDİĞİNDE kullanılan serbest hedef (proje/iş/departman).
+  const [hedef, setHedef] = useState<SecilenHedef | null>(null);
 
   const [listeAcik, setListeAcik] = useState(false);
   const [vurgulu, setVurgulu] = useState(0);
@@ -101,6 +105,9 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
       endedAt: aralikVar ? bitis : null,
       markTaskDone: Boolean(secilenGorev) && yapildi,
       addToCalendar: Boolean(secilenGorev) && takvime,
+      // Görev seçiliyse bağlantı zaten o görevdir; serbest hedef yalnızca
+      // görev seçilmediğinde anlamlı.
+      hedef: secilenGorev ? null : hedef,
       kronometreBaslat,
     });
     setMetin("");
@@ -108,6 +115,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
     setBaslangic("");
     setBitis("");
     setSecilenGorev(null);
+    setHedef(null);
     setListeAcik(false);
   };
 
@@ -262,7 +270,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
           >
             <IconCheck size={12} color={c.accentDark} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {secilenGorev.projectTitle ?? secilenGorev.departmentName ?? secilenGorev.operationTitle ?? t("Görev")}
+              {gorevinYeri(secilenGorev) ?? t("Görev")}
               {secilenGorev.parentTaskId ? ` · ${t("alt görev")}` : ""}
             </span>
             <button
@@ -276,6 +284,8 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
             </button>
           </span>
         )}
+
+        {!secilenGorev && <WorkLogHedefSecici secilen={hedef} onSec={setHedef} />}
 
         {secilenGorev && (
           <>
@@ -408,7 +418,7 @@ function GorevListesi({
           <span style={{ fontSize: 12, color: c.textSecondary }}>
             {[
               gorev.parentTaskId ? t("alt görev") : null,
-              gorev.projectTitle ?? gorev.departmentName ?? gorev.operationTitle,
+              gorevinYeri(gorev),
               gorev.jobTitle,
               gorev.actualMinutes ? `${t("şimdiye dek")} ${dakikayiMetneCevir(gorev.actualMinutes)}` : null,
             ]
@@ -442,6 +452,21 @@ function Onay({
       {etiket}
     </label>
   );
+}
+
+/**
+ * Görevin nerede yaşadığı, tek satırda. Departmanda ŞİRKET ADI da var: iki
+ * şirkette aynı adlı departman olabiliyor ("Muhasebe") ve şirket adı olmadan
+ * hangisi olduğu anlaşılmıyor.
+ */
+function gorevinYeri(gorev: SchedulableTask): string | undefined {
+  if (gorev.projectTitle) return gorev.projectTitle;
+  if (gorev.departmentName) {
+    return gorev.departmentOrganizationName
+      ? `${gorev.departmentName} · ${gorev.departmentOrganizationName}`
+      : gorev.departmentName;
+  }
+  return gorev.operationTitle;
 }
 
 /** "09:00" ve "10:30" -> 90. Gece yarısını geçen aralık burada eksi döner. */

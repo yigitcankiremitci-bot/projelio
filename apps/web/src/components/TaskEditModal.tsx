@@ -124,7 +124,7 @@ export default function TaskEditModal({
   const [durationValue, setDurationValue] = useState(
     task.estimatedDurationValue != null ? String(task.estimatedDurationValue) : ""
   );
-  const [durationUnit, setDurationUnit] = useState<"hours" | "days">(task.estimatedDurationUnit ?? "hours");
+  const [durationUnit, setDurationUnit] = useState<"minutes" | "hours" | "days">(task.estimatedDurationUnit ?? "hours");
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [commentBody, setCommentBody] = useState("");
   /**
@@ -449,7 +449,7 @@ export default function TaskEditModal({
             <input
               type="number"
               min={0}
-              step="0.5"
+              step="any"
               value={durationValue}
               onChange={(e) => setDurationValue(e.target.value)}
               placeholder={t("Örn. 4")}
@@ -457,9 +457,10 @@ export default function TaskEditModal({
             />
             <select
               value={durationUnit}
-              onChange={(e) => setDurationUnit(e.target.value as "hours" | "days")}
+              onChange={(e) => setDurationUnit(e.target.value as "minutes" | "hours" | "days")}
               style={{ flex: "0 0 auto" }}
             >
+              <option value="minutes">{t("Dakika")}</option>
               <option value="hours">{t("Saat")}</option>
               <option value="days">{t("Gün")}</option>
             </select>

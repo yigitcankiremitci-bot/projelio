@@ -658,7 +658,11 @@ function HareketSutunu({
               </div>
               <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {formatDate(hareket.occurredAt)}
-                {hareket.projectTitle ? ` · ${hareket.projectTitle}` : t(" · genel")}
+                {hareket.projectTitle
+                  ? ` · ${hareket.projectTitle}`
+                  : hareket.departmentName
+                    ? ` · ${hareket.departmentName}`
+                    : t(" · genel")}
               </div>
             </div>
 

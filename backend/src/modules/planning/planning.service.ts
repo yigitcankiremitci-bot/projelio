@@ -859,7 +859,7 @@ export class PlanningService {
       // edebilsin diye (aynı projede aynı adı taşıyan ikisi olabiliyor).
       // actual_duration_minutes: seçicide "bu işte şimdiye dek şu kadar
       // çalışılmış" bilgisini göstermek için (bkz. migration 098).
-      "parent_task_id, actual_duration_minutes, department_id, departments(name), " +
+      "parent_task_id, actual_duration_minutes, department_id, departments(name, organizations(name)), " +
       "estimated_duration_value, estimated_duration_unit, " +
       "assigned_user:users!tasks_assigned_to_fkey(full_name), " +
       "projects(title, job_id, jobs(title)), " +
@@ -1571,6 +1571,7 @@ function mapSchedulableTask(row: any): SchedulableTask {
     actualMinutes: row.actual_duration_minutes ?? undefined,
     departmentId: row.department_id ?? undefined,
     departmentName: row.departments?.name ?? undefined,
+    departmentOrganizationName: row.departments?.organizations?.name ?? undefined,
   };
 }
 
@@ -1585,6 +1586,7 @@ function mapSchedulableTask(row: any): SchedulableTask {
 function estimatedMinutes(value: unknown, unit: unknown): number | undefined {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return undefined;
+  if (unit === "minutes") return Math.round(n);
   if (unit === "hours") return Math.round(n * 60);
   if (unit === "days") return Math.round(n * 8 * 60);
   return undefined;

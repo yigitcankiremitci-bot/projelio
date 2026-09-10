@@ -31,6 +31,8 @@ export interface WorkLogLinkInput {
   targetKind?: WorkLogTargetKind | null;
   targetId?: string | null;
   targetLabel?: string | null;
+  /** Hedefin uygulama içi adresi; listede bağlantıyı tıklanabilir yapan şey. */
+  targetPath?: string | null;
 }
 
 export interface WorkLogPushInput {

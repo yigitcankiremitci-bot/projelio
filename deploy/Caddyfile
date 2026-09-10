@@ -130,6 +130,30 @@ api.projelio.app {
 	}
 }
 
+# ------------------------------------------------------ farkındayım (ayrı proje)
+# farkindayim.tr bu VPS'te AYRI bir compose yığınında duruyor
+# (~projelio/farkindayim/deploy/docker-compose.vps.yml). Kendi nginx'i var ama
+# YALNIZ HTTP konuşuyor: 80/443 zaten bu Caddy'de, iki sunucu aynı portu
+# tutamaz. Sertifikayı da yenilemeyi de bu blok üstleniyor.
+#
+# farkindayim-web adı, o yığın `projelio` ağına da bağlandığı için çözülüyor.
+# Yığın kapalıysa YALNIZ bu alan adı 502 verir; projelio etkilenmez.
+farkindayim.tr {
+	reverse_proxy farkindayim-web:80
+	encode zstd gzip
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# includeSubDomains BİLEREK yok: alt alan adları (varsa) ayrı
+		# barındırılabilir, bir yıllık söz vermek gereksiz risk.
+		Strict-Transport-Security "max-age=31536000"
+	}
+}
+
+www.farkindayim.tr {
+	redir https://farkindayim.tr{uri} permanent
+}
+
 # ------------------------------------------------------- Geçici prova adresleri
 # DNS geçişi tamamlanana kadar IP/HTTP prova adresleri çalışmaya devam eder.
 193.111.77.252:80 {

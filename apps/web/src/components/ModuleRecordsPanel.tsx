@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ModuleRecord, Task } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import type { ModuleFieldConfig, ModuleRecordConfig } from "../lib/moduleRecordConfigs";
+import type { ModuleRecordConfig } from "../lib/moduleRecordConfigs";
 import { isReferenceValue } from "../lib/moduleRecordConfigs";
 import { hasDynamicFields, toDisplayData, useModuleReferences } from "../lib/moduleReferences";
+import { emptyForm, formFromRecord, formToData } from "../lib/moduleRecordForm";
 import { useUndo } from "../lib/undo";
 import { useSortableList } from "../lib/useSortableList";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
@@ -37,34 +38,6 @@ type FormMode = { kind: "create" } | { kind: "edit"; id: string } | null;
 // Liste 8'den fazla kayda çıkınca arama/filtre çubuğu görünür. Daha azında
 // araç çubuğu yer kaplamaktan başka işe yaramıyor.
 const TOOLBAR_THRESHOLD = 8;
-
-function emptyForm(fields: ModuleFieldConfig[]): Record<string, string> {
-  const f: Record<string, string> = {};
-  for (const field of fields) {
-    f[field.key] = field.defaultValue ?? "";
-    // currency alanı iki anahtar yönetir; para biriminin de varsayılanı olmalı.
-    if (field.type === "currency") f[field.currencyKey ?? "currency"] = "TRY";
-  }
-  return f;
-}
-
-function formFromRecord(fields: ModuleFieldConfig[], record: ModuleRecord): Record<string, string> {
-  const f: Record<string, string> = {};
-  const read = (key: string) => {
-    const v = record.data[key];
-    return v === undefined || v === null ? "" : String(v);
-  };
-  for (const field of fields) {
-    f[field.key] = read(field.key);
-    // Para birimi ayrı anahtarda duruyor; yüklenmezse düzenlemede TRY'ye
-    // sıfırlanır ve kullanıcı farkında olmadan tutarın birimini değiştirir.
-    if (field.type === "currency") {
-      const ck = field.currencyKey ?? "currency";
-      f[ck] = read(ck) || "TRY";
-    }
-  }
-  return f;
-}
 
 /**
  * Aramada kullanılacak metin.
@@ -313,21 +286,7 @@ export default function ModuleRecordsPanel({
     }
     setSaving(true);
     try {
-      const data: Record<string, unknown> = {};
-      for (const field of config.fields) {
-        // Hesaplanan alanlar kaydedilmez; her okumada yeniden üretilir, aksi
-        // halde kaynak alan değişince bayat bir değer kalırdı.
-        if (field.type === "formula") continue;
-        const v = form[field.key];
-        if (v === undefined || v === "") continue;
-        data[field.key] = field.type === "number" || field.type === "currency" ? Number(v) : v;
-      }
-      // currency alanı para birimini ayrı anahtara yazar (bkz. shared.ts currencyField).
-      for (const field of config.fields) {
-        if (field.type !== "currency") continue;
-        const ck = field.currencyKey ?? "currency";
-        if (form[ck]) data[ck] = form[ck];
-      }
+      const data = formToData(config.fields, form);
 
       if (formMode?.kind === "edit") {
         await api.patch(`/module-records/${formMode.id}`, { data });
@@ -634,7 +593,7 @@ export default function ModuleRecordsPanel({
           {/* Bu kayda BAĞLANMIŞ dosyalar (bkz. migration 095). Yalnızca
               düzenlemede: henüz kaydedilmemiş bir kaydın kimliği yok, dolayısıyla
               bağlanacak bir hedef de yok. */}
-          {formMode.kind === "edit" && <LinkedFilesPanel targetKind="module_record" targetId={formMode.id} />}
+          {formMode.kind === "edit" && <LinkedFilesPanel targetKind="module_record" targetId={formMode.id} canPick />}
         </div>
         </Modal>
       )}

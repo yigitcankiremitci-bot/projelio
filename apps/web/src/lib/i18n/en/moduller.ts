@@ -201,8 +201,6 @@ export const moduller: TranslationDict = {
   "(belirtilmemiş)": "(unspecified)",
 
   // ─────────── Şablon adları
-  "Perakende / tüketici": "Retail / consumer",
-  "Üretim / B2B": "Manufacturing / B2B",
   "Üretim / imalat": "Manufacturing / production",
 
   // ─────────── Boş durum metinleri (form modülleri)
@@ -210,8 +208,6 @@ export const moduller: TranslationDict = {
     "Set your brand up once, so the same brand shows up everywhere",
   "Neyin alternatifi olduğun, ne vaat ettiğin, nasıl konuştuğun ve neye benzediğin tek sayfada dursun; ":
     "Keep what you are an alternative to, what you promise, how you speak and what you look like on a single page; ",
-  "teklif, reklam ve sosyal medya metinleri aynı yerden beslensin. Şablondan başlayıp üstüne yazabilirsin — ":
-    "let proposals, ads and social copy feed from the same place. You can start from a template and write over it — ",
   "her düzenleme sürüm olarak saklanır.": "every edit is kept as a version.",
   "Markayı kur": "Set up the brand",
   "Şirketinin yönünü bir kez yaz": "Write your company's direction once",
@@ -351,6 +347,7 @@ export const moduller: TranslationDict = {
   // ModuleRecordsPanel her modülün kayıt listesini çiziyor; buradaki metinler
   // modülden bağımsız, hepsinde aynı.
   "Kaydı düzenle": "Edit record",
+  "Değişikliği kaydet": "Save change",
   "Kaydı arşivle": "Archive record",
   "Kayıt arşivleme": "Archiving a record",
   "Güncelle": "Update",
@@ -931,13 +928,9 @@ export const moduller: TranslationDict = {
     "Family, health, politics, income… If the line is not drawn in advance, the mood of a busy day draws it.",
   "Anlatmak yerine göstermek daha kısa: doğru bulduğun birkaç örnek görseli ekle.":
     "Showing is shorter than describing: attach a few example images you consider right.",
-  "Başka firmalara üreten ya da tedarik eden iş":
-    "A business that manufactures for or supplies other companies",
   "Bir renk, bir şekil, bir kalıp cümle. Tek şey seç.": "A color, a shape, a stock phrase. Pick one thing.",
   "Bu işi neden yapıyorsun, buraya nasıl geldin?": "Why do you do this work, and how did you get here?",
   "Bülten / e-posta listesi": "Newsletter / mailing list",
-  "Danışman, eğitmen, serbest çalışan — işi kendi adıyla alan kişi":
-    "Consultant, trainer, freelancer — someone who wins work under their own name",
   "Ekten çıkar": "Remove attachment",
   "Eğitim / kurs": "Training / course",
   "Hangi konu akla seni getiriyor?": "Which subject brings you to mind?",
@@ -946,7 +939,6 @@ export const moduller: TranslationDict = {
   "Kime uygun değil": "Who it is not for",
   "Kişi ve uzmanlık": "Person and expertise",
   "Kişisel hikâye": "Personal story",
-  "Kişisel marka": "Personal brand",
   "Kişisel markada güven kişiye, kurumsalda şirkete yazılır; aşağıdaki cevapların tonu buna göre değişir.":
     "In a personal brand trust is credited to the person, in a corporate one to the company; the tone of the answers below follows from that.",
   "Kişisel markada güvenin yarısı hikâyeden gelir; kurumsalda referanstan. Biri diğerinin yerine geçmiyor.":
@@ -967,8 +959,6 @@ export const moduller: TranslationDict = {
   "Onaylanmamış değişiklik var": "There are unapproved changes",
   "Paylaşılmayanlar": "Off limits",
   "Podcast / video kanalı": "Podcast / video channel",
-  "Rafta ya da pazaryerinde, son kullanıcıya satan marka":
-    "A brand selling to end users, on a shelf or in a marketplace",
   "Satın alınmış bir yazı tipi varsa dosyasını da ekle; lisans dosyası aranırken hep kayıp oluyor.":
     "If a typeface was purchased, attach its file too; the licence file is always missing when someone looks for it.",
   "Tek konu yaz. \"Her işi yaparım\" diyen kişiye kimse belirli bir iş için gelmiyor.":
@@ -983,6 +973,8 @@ export const moduller: TranslationDict = {
   "İçerik temaları": "Content themes",
   "Şablondan başla — hepsi taslaktır, üstüne yazabilirsin:":
     "Start from a template — they are all drafts you can write over:",
-  "Şirket adıyla iş alan, ekiple çalışan hizmet işi":
-    "A service business that wins work under a company name and works with a team",
+  "teklif, reklam ve sosyal medya metinleri aynı yerden beslensin. Hepsini bir oturuşta doldurman gerekmez — ":
+    "let proposals, ads and social copy all draw on the same page. You do not have to fill it in one sitting — ",
+  "boş bıraktığın alan kimseye görünmez, her düzenleme sürüm olarak saklanır.":
+    "a field you leave empty is shown to no one, and every edit is kept as a version.",
 };

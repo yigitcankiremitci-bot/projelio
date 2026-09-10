@@ -5,7 +5,9 @@ import { api } from "../api/client";
 import { useRefreshOnUndo } from "../lib/undo";
 import { FAB_PRIORITY, useProjectFabAction } from "../lib/projectFab";
 import { useThemeColors } from "../theme/useThemeColors";
-import { useIsDesktop, useIsWide } from "../lib/useIsDesktop";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { kalanGun, vadeDurumu, YAKLASAN_GUN } from "../lib/butceOzeti";
+import BudgetTrendChart from "./BudgetTrendChart";
 import AddBudgetEntryModal from "./AddBudgetEntryModal";
 import AddRecurringPaymentModal from "./AddRecurringPaymentModal";
 import { useUndo } from "../lib/undo";
@@ -28,19 +30,46 @@ const intervalLabels: Record<string, string> = {
   yearly: "Her yıl", // dil:anahtar
 };
 
-// Kasa listelerinin sıralaması. Etiketler t() ile kullanıldıkları yerde
-// çevriliyor (bkz. intervalLabels'daki not).
-type SiralamaKey = "tarih-yeni" | "tarih-eski" | "tutar-cok" | "tutar-az";
+/**
+ * Sıralama ölçütü.
+ *
+ * "yakin"/"uzak", "yeni"/"eski" yerine geçti çünkü sayfadaki iki listenin
+ * tarihi ZITTIR: hareketlerinki geçmişte (en yakın tarih = en yeni), düzenli
+ * ödemelerinki gelecekte (en yakın tarih = ilk vade). Tek bir "yeni → eski"
+ * seçeneği vade listesini ters çeviriyordu — en uzak vade en üstte duruyordu.
+ * Şimdi ölçüt "şu ana yakınlık" ve iki listede de doğru anlamı veriyor.
+ */
+type SiralamaKey = "yakin" | "uzak" | "tutar-cok" | "tutar-az";
 
 const siralamaSecenekleri: { key: SiralamaKey; label: string }[] = [
-  { key: "tarih-yeni", label: "Yeni → eski" }, // dil:anahtar
-  { key: "tarih-eski", label: "Eski → yeni" }, // dil:anahtar
+  { key: "yakin", label: "Yakın tarih önce" }, // dil:anahtar
+  { key: "uzak", label: "Uzak tarih önce" }, // dil:anahtar
   { key: "tutar-cok", label: "Tutar: çok → az" }, // dil:anahtar
   { key: "tutar-az", label: "Tutar: az → çok" }, // dil:anahtar
 ];
 
 /**
+ * Sayfanın odağı: hangi kayıtların gösterileceği.
+ *
+ * Kasa sayfasında sorulan soru "hangi kayıt daha yeni" değil, "neyi ödemem
+ * gerekiyor, neyi tahsil edeceğim, ne gerçekleşti" — o yüzden filtre ölçütleri
+ * tarih değil VADE ve GERÇEKLEŞME üzerinden.
+ */
+type OdakKey = "tumu" | "gecikmis" | "yaklasan" | "gerceklesen";
+
+const odakSecenekleri: { key: OdakKey; label: string; ipucu: string }[] = [
+  { key: "tumu", label: "Tümü", ipucu: "Her şey" }, // dil:anahtar
+  { key: "gecikmis", label: "Vadesi geçen", ipucu: "Vadesi dolmuş düzenli ödemeler ve tahsil edilmemiş alacaklar" }, // dil:anahtar
+  { key: "yaklasan", label: "Vadesi yaklaşan", ipucu: "Önümüzdeki 7 gün içinde ödenecekler" }, // dil:anahtar
+  { key: "gerceklesen", label: "Ödenenler", ipucu: "Deftere işlenmiş gelir/giderler ve tahsilatı biten projeler" }, // dil:anahtar
+];
+
+/**
  * Listeyi seçilen ölçüte göre sıralar.
+ *
+ * `gecmis`, tarihin hangi yöne baktığını söyler: hareketlerde tarih geçmişte
+ * (yakın = en yeni, azalan), düzenli ödemelerde gelecekte (yakın = ilk vade,
+ * artan). Bkz. SiralamaKey üstündeki not.
  *
  * Kopya üzerinde çalışıyor: gelen dizi doğrudan sunucu yanıtının state'i ve
  * sort() yerinde sıralar — kaynağı bozarsak sıralamayı değiştirmek eski sırayı
@@ -49,18 +78,21 @@ const siralamaSecenekleri: { key: SiralamaKey; label: string }[] = [
 function sirala<T extends { amount: number }>(
   liste: T[],
   key: SiralamaKey,
-  tarihAl: (kayit: T) => string
+  tarihAl: (kayit: T) => string,
+  gecmis: boolean
 ): T[] {
   const kopya = [...liste];
+  const artan = (a: T, b: T) => tarihAl(a).localeCompare(tarihAl(b));
+  const azalan = (a: T, b: T) => tarihAl(b).localeCompare(tarihAl(a));
   switch (key) {
-    case "tarih-eski":
-      return kopya.sort((a, b) => tarihAl(a).localeCompare(tarihAl(b)));
+    case "uzak":
+      return kopya.sort(gecmis ? artan : azalan);
     case "tutar-cok":
       return kopya.sort((a, b) => Number(b.amount) - Number(a.amount));
     case "tutar-az":
       return kopya.sort((a, b) => Number(a.amount) - Number(b.amount));
     default:
-      return kopya.sort((a, b) => tarihAl(b).localeCompare(tarihAl(a)));
+      return kopya.sort(gecmis ? azalan : artan);
   }
 }
 
@@ -111,9 +143,9 @@ export default function BudgetPanel() {
   const [editingTransaction, setEditingTransaction] = useState<BudgetTransaction | null>(null);
   const [addingRecurring, setAddingRecurring] = useState(false);
   const [editingRecurring, setEditingRecurring] = useState<RecurringPayment | null>(null);
-  const [siralama, setSiralama] = useState<SiralamaKey>("tarih-yeni");
+  const [siralama, setSiralama] = useState<SiralamaKey>("yakin");
+  const [odak, setOdak] = useState<OdakKey>("tumu");
   const isDesktop = useIsDesktop();
-  const isWide = useIsWide();
   const { pushUndo, pushDestructive } = useUndo();
   // Anasayfadaki "+" düğmesi, sayfa kendi eylemini KAYDETMEZSE varsayılana —
   // "Yeni iş"e — düşüyor (bkz. BottomNav.tsx). Bütçe sekmesi bunu kaydetmediği
@@ -231,95 +263,294 @@ export default function BudgetPanel() {
     reload();
   };
 
-  // Kasa listeleri tek sütunda çok uzuyordu: geniş ekranda üç sütun, masaüstünde
-  // iki, telefonda tek. Kartların içi zaten flexWrap ile sarıyor.
-  const listeIzgarasi = {
-    display: "grid",
-    gridTemplateColumns: isWide ? "repeat(3, 1fr)" : isDesktop ? "repeat(2, 1fr)" : "1fr",
-    gap: 8,
-    alignItems: "start",
-  } as const;
+  const gecikmisSayisi = recurring.filter((r) => r.active && kalanGun(r.nextDueDate) < 0).length;
+  const yaklasanSayisi = recurring.filter((r) => {
+    if (!r.active) return false;
+    const kalan = kalanGun(r.nextDueDate);
+    return kalan >= 0 && kalan <= YAKLASAN_GUN;
+  }).length;
+  const odakSayilari: Record<OdakKey, number | null> = {
+    tumu: null,
+    gecikmis: gecikmisSayisi,
+    yaklasan: yaklasanSayisi,
+    gerceklesen: transactions.length,
+  };
 
   const siraliHareketler = useMemo(
-    () => sirala(transactions, siralama, (h) => h.occurredAt),
+    () => sirala(transactions, siralama, (h) => h.occurredAt, true),
     [transactions, siralama]
   );
-  // Düzenli ödemelerde "tarih" vadesi: sıralamanın karşılığı bir sonraki ödeme günü.
   const siraliDuzenli = useMemo(
-    () => sirala(recurring, siralama, (r) => r.nextDueDate),
+    () => sirala(recurring, siralama, (r) => r.nextDueDate, false),
     [recurring, siralama]
   );
+
+  // Odak süzgeçleri. Bir bölüme uyan kayıt kalmadıysa bölüm hiç çizilmiyor:
+  // "vadesi geçen" seçiliyken üç ayrı boş liste göstermek filtreyi işe
+  // yaramaz gösteriyordu.
+  const gorunenDuzenli = siraliDuzenli.filter((r) => {
+    if (odak === "tumu") return true;
+    if (odak === "gerceklesen") return false;
+    if (!r.active) return false;
+    const kalan = kalanGun(r.nextDueDate);
+    return odak === "gecikmis" ? kalan < 0 : kalan >= 0 && kalan <= YAKLASAN_GUN;
+  });
+  const hareketlerGorunur = odak === "tumu" || odak === "gerceklesen";
+  const gorunenProjeler = (overview?.projects ?? []).filter((p) => {
+    if (odak === "tumu") return true;
+    if (odak === "gecikmis") return p.expected > 0;
+    if (odak === "gerceklesen") return p.fullyCollected;
+    return false;
+  });
+
+  const gelirler = siraliHareketler.filter((h) => h.type === "income");
+  const giderler = siraliHareketler.filter((h) => h.type !== "income");
+  const gelirToplam = gelirler.reduce((toplam, h) => toplam + Number(h.amount), 0);
+  const giderToplam = giderler.reduce((toplam, h) => toplam + Number(h.amount), 0);
+
+  // Süzgeç açıkken hiçbir bölüme kayıt düşmediyse tek bir satır yazılır.
+  // "Tümü"de bölümler kendi boş durum metinleriyle çizilmeye devam eder:
+  // düzenli ödemenin ne işe yaradığını anlatan metin oradan öğreniliyor.
+  const bosSuzgec =
+    odak !== "tumu" && gorunenDuzenli.length === 0 && gorunenProjeler.length === 0 && !hareketlerGorunur;
 
   const cardStyle = {
     border: `1px solid ${c.border}`,
     borderRadius: 12,
     background: c.surface,
-    padding: 16,
+    padding: 12,
   } as const;
 
   const sectionTitle = {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: 500,
     color: c.textPrimary,
-    margin: "0 0 14px",
+    margin: "0 0 10px",
   } as const;
 
-  const addButton = {
+  const ikonDugmesi = {
+    background: "transparent",
+    border: "none",
+    padding: 3,
     display: "flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "7px 12px",
-    borderRadius: 8,
-    border: `1px solid ${c.border}`,
-    background: c.surface,
-    color: c.textPrimary,
-    fontSize: 14,
-    fontWeight: 500,
+    cursor: "pointer",
   } as const;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 26 }}>
-      {/* Özet kartları — "gelen" ve "beklenen" ayrı ayrı; tahsil edilen para
-          anlaşılan ücretin içinden düşer, üstüne eklenmez. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-        <SummaryCard label={t("Anlaşılan ücret")} value={overview?.totalAgreedFee ?? 0} color={c.textPrimary} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* Özet şerit — tek satır, küçük kutular. Sayfanın gövdesi grafik ve
+          listeler; özet yalnızca "kasada ne var" sorusunu cevaplıyor. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(116px, 1fr))", gap: 8 }}>
+        <SummaryCard label={t("Net kazanç")} value={overview?.netEarned ?? 0} color={(overview?.netEarned ?? 0) < 0 ? c.danger : c.success} vurgulu />
         <SummaryCard label={t("Gelen ödeme")} value={overview?.totalReceived ?? 0} color={c.success} />
         <SummaryCard label={t("Beklenen ödeme")} value={overview?.totalExpected ?? 0} color={c.warning} />
         <SummaryCard label={t("Gider")} value={overview?.totalExpense ?? 0} color={c.danger} />
-        <SummaryCard
-          label={t("Net kazanç")}
-          value={overview?.netEarned ?? 0}
-          color={(overview?.netEarned ?? 0) < 0 ? c.danger : c.success}
-          hint={t("Gelen ödeme − gider")}
-        />
+        <SummaryCard label={t("Anlaşılan ücret")} value={overview?.totalAgreedFee ?? 0} color={c.textPrimary} />
       </div>
 
-      {/* Proje bazlı tahsilat durumu */}
-      <section>
-        <h2 style={sectionTitle}>{t("Projelere göre tahsilat")}</h2>
-        {!overview || overview.projects.length === 0 ? (
-          <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 15, padding: 28 }}>
-            {t("Henüz bütçesi olan bir projen yok.")}
+      <BudgetTrendChart transactions={transactions} />
+
+      {/* Süzgeç ve sıralama sayfanın ÜSTÜNDE, listelerin hepsinden önce:
+          aşağıdaki her bölüm bu iki denetime bağlı. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        {odakSecenekleri.map((secenek) => {
+          const secili = secenek.key === odak;
+          const sayi = odakSayilari[secenek.key];
+          // Gecikmiş kayıt varsa süzgeç, seçili olmasa bile uyarı rengini taşır:
+          // kullanıcının o listeyi açmak için önce tıklaması gerekmesin.
+          const uyari = secenek.key === "gecikmis" && gecikmisSayisi > 0;
+          const renk = secili ? c.accent : uyari ? c.danger : c.textSecondary;
+          return (
+            <button
+              key={secenek.key}
+              type="button"
+              title={t(secenek.ipucu)}
+              onClick={() => setOdak(secenek.key)}
+              style={{
+                padding: "5px 11px",
+                borderRadius: 999,
+                fontSize: 13,
+                fontWeight: 500,
+                border: `1px solid ${secili ? c.accent : uyari ? c.danger : c.border}`,
+                background: secili ? `${c.accent}1a` : uyari ? `${c.danger}12` : c.surface,
+                color: renk,
+                cursor: "pointer",
+              }}
+            >
+              {t(secenek.label)}
+              {sayi ? ` (${sayi})` : ""}
+            </button>
+          );
+        })}
+
+        <span style={{ flex: 1 }} />
+
+        <label htmlFor="kasa-sirala" style={{ fontSize: 13, color: c.textSecondary }}>
+          {t("Sırala")}
+        </label>
+        <select
+          id="kasa-sirala"
+          value={siralama}
+          onChange={(e) => setSiralama(e.target.value as SiralamaKey)}
+          style={{ width: "auto", minWidth: 168, fontSize: 13 }}
+        >
+          {siralamaSecenekleri.map((secenek) => (
+            <option key={secenek.key} value={secenek.key}>
+              {t(secenek.label)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {bosSuzgec && (
+        <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 14, padding: 24 }}>
+          {t("Bu süzgece uyan kayıt yok.")}
+        </div>
+      )}
+
+      {/* Vade takibi: ödenecekler önce, çünkü kasa sayfasında ilk sorulan soru
+          "neyi kaçırıyorum". */}
+      {(gorunenDuzenli.length > 0 || odak === "tumu") && (
+        <section>
+          <h2 style={sectionTitle}>{t("Düzenli ödemeler")}</h2>
+          {gorunenDuzenli.length === 0 ? (
+            <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 14, padding: 22 }}>
+              {t(
+                'Kira, abonelik gibi tekrar eden ödemeleri sayfadaki "+" ile ekle. Vadesi gelince bütçene otomatik işlenir ve bildirim gönderilir.'
+              )}
+            </div>
+          ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {gorunenDuzenli.map((r) => (
+              <div
+                key={r.id}
+                style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", opacity: r.active ? 1 : 0.55 }}
+              >
+                <div style={{ flex: 1, minWidth: 150 }}>
+                  <div style={{ fontSize: 14, color: c.textPrimary }}>
+                    {r.description || (r.type === "income" ? t("Düzenli gelir") : t("Düzenli gider"))}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
+                    <IconCalendar size={11} color={c.textSecondary} />
+                    <span>{t(intervalLabels[r.interval])}</span>
+                    {r.projectTitle && <span>· {r.projectTitle}</span>}
+                  </div>
+                </div>
+
+                {r.active && <VadeRozeti tarih={r.nextDueDate} />}
+
+                <span style={{ fontSize: 14, fontWeight: 500, color: r.type === "income" ? c.success : c.danger }}>
+                  {r.type === "income" ? "+" : "−"}
+                  {formatMoney(r.amount)}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => toggleRecurring(r)}
+                  style={{
+                    padding: "4px 9px",
+                    borderRadius: 7,
+                    border: `1px solid ${c.border}`,
+                    background: c.surface,
+                    color: c.textSecondary,
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  {r.active ? t("Duraklat") : t("Sürdür")}
+                </button>
+                <button type="button" onClick={() => setEditingRecurring(r)} aria-label={t("Düzenle")} style={ikonDugmesi}>
+                  <IconEdit size={14} color={c.textSecondary} />
+                </button>
+                <button type="button" onClick={() => deleteRecurring(r.id)} aria-label={t("Sil")} style={ikonDugmesi}>
+                  <IconTrash size={14} color={c.danger} />
+                </button>
+              </div>
+            ))}
           </div>
-        ) : (
-          <div style={listeIzgarasi}>
-            {overview.projects.map((p) => {
+          )}
+        </section>
+      )}
+
+      {/* Hareketler: gelir solda, gider sağda — defter mantığıyla T tablosu.
+          Tek listede gelirle gider iç içe geçiyordu ve hangi tarafın ağır
+          bastığı ancak tek tek okuyunca anlaşılıyordu. */}
+      {hareketlerGorunur && (
+        <section>
+          <h2 style={sectionTitle}>{t("Hareketler")}</h2>
+          {transactions.length === 0 ? (
+            <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 14, padding: 22 }}>
+              {t('Henüz bir hareket yok. Gelir/gider eklemek için sayfadaki "+" düğmesini kullan.')}
+            </div>
+          ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr",
+              border: `1px solid ${c.border}`,
+              borderRadius: 12,
+              overflow: "hidden",
+              background: c.surface,
+            }}
+          >
+            <HareketSutunu
+              baslik={t("Gelir")}
+              toplam={gelirToplam}
+              renk={c.success}
+              hareketler={gelirler}
+              isaret="+"
+              onEdit={setEditingTransaction}
+              onDelete={deleteTransaction}
+              borderRight={isDesktop}
+            />
+            <HareketSutunu
+              baslik={t("Gider")}
+              toplam={giderToplam}
+              renk={c.danger}
+              hareketler={giderler}
+              isaret="−"
+              onEdit={setEditingTransaction}
+              onDelete={deleteTransaction}
+            />
+          </div>
+          )}
+        </section>
+      )}
+
+      {/* Proje bazlı tahsilat durumu */}
+      {(gorunenProjeler.length > 0 || odak === "tumu") && (
+        <section>
+          <h2 style={sectionTitle}>{t("Projelere göre tahsilat")}</h2>
+          {gorunenProjeler.length === 0 ? (
+            <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 14, padding: 22 }}>
+              {t("Henüz bütçesi olan bir projen yok.")}
+            </div>
+          ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isDesktop ? "repeat(2, 1fr)" : "1fr",
+              gap: 8,
+              alignItems: "start",
+            }}
+          >
+            {gorunenProjeler.map((p) => {
               const progress = p.agreedFee > 0 ? Math.min(100, (p.received / p.agreedFee) * 100) : 0;
               return (
                 <Link key={p.projectId} to={`/projects/${p.projectId}`} style={{ ...cardStyle, display: "block" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-                    <IconFolder size={15} color={c.textSecondary} />
-                    <span style={{ flex: 1, minWidth: 140, fontSize: 15, fontWeight: 500, color: c.textPrimary }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                    <IconFolder size={13} color={c.textSecondary} />
+                    <span style={{ flex: 1, minWidth: 120, fontSize: 14, fontWeight: 500, color: c.textPrimary }}>
                       {p.projectTitle}
                     </span>
                     {p.fullyCollected ? (
                       <span
                         style={{
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: 500,
                           color: c.success,
                           background: `${c.success}1a`,
-                          padding: "2px 9px",
+                          padding: "2px 8px",
                           borderRadius: 999,
                         }}
                       >
@@ -327,18 +558,18 @@ export default function BudgetPanel() {
                         {p.overpaid > 0 && t(" · +{tutar} fazla", { tutar: formatMoney(p.overpaid) })}
                       </span>
                     ) : (
-                      <span style={{ fontSize: 14, color: c.textSecondary }}>
+                      <span style={{ fontSize: 12, color: c.textSecondary }}>
                         {t("{tutar} anlaşıldı", { tutar: formatMoney(p.agreedFee) })}
                       </span>
                     )}
                   </div>
 
                   {/* Tahsilat ilerlemesi */}
-                  <div style={{ height: 6, borderRadius: 999, background: c.background, overflow: "hidden", marginBottom: 10 }}>
+                  <div style={{ height: 5, borderRadius: 999, background: c.background, overflow: "hidden", marginBottom: 8 }}>
                     <div style={{ width: `${progress}%`, height: "100%", background: c.success }} />
                   </div>
 
-                  <div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 14 }}>
+                  <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12.5 }}>
                     <span style={{ color: c.textSecondary }}>
                       {t("Gelen")} <strong style={{ color: c.success, fontWeight: 500 }}>{formatMoney(p.received)}</strong>
                     </span>
@@ -364,156 +595,9 @@ export default function BudgetPanel() {
               );
             })}
           </div>
-        )}
-      </section>
-
-      {/* Sıralama iki listeyi birden yönetir: kullanıcı "ödemeler" derken
-          düzenli olanla gerçekleşeni ayırmıyor, iki ayrı menü koymak da aynı
-          soruyu iki kez sordurur. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Sırala")}</span>
-        {siralamaSecenekleri.map((secenek) => {
-          const secili = secenek.key === siralama;
-          return (
-            <button
-              key={secenek.key}
-              type="button"
-              onClick={() => setSiralama(secenek.key)}
-              style={{
-                padding: "5px 11px",
-                borderRadius: 999,
-                fontSize: 13,
-                fontWeight: 500,
-                border: `1px solid ${secili ? c.accent : c.border}`,
-                background: secili ? `${c.accent}1a` : c.surface,
-                color: secili ? c.accent : c.textSecondary,
-              }}
-            >
-              {t(secenek.label)}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Düzenli ödemeler */}
-      <section>
-        <h2 style={sectionTitle}>{t("Düzenli ödemeler")}</h2>
-
-        {recurring.length === 0 ? (
-          <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 15, padding: 28 }}>
-            {t(
-              'Kira, abonelik gibi tekrar eden ödemeleri sayfadaki "+" ile ekle. Vadesi gelince bütçene otomatik işlenir ve bildirim gönderilir.'
-            )}
-          </div>
-        ) : (
-          <div style={listeIzgarasi}>
-            {siraliDuzenli.map((r) => (
-              <div key={r.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", opacity: r.active ? 1 : 0.55 }}>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                  <div style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>
-                    {r.description || (r.type === "income" ? t("Düzenli gelir") : t("Düzenli gider"))}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: c.textSecondary, marginTop: 3 }}>
-                    <IconCalendar size={12} color={c.textSecondary} />
-                    <span>
-                      {t("{aralik} · sonraki {tarih}", {
-                        aralik: t(intervalLabels[r.interval]),
-                        tarih: formatDate(r.nextDueDate),
-                      })}
-                    </span>
-                    {r.projectTitle && <span>· {r.projectTitle}</span>}
-                  </div>
-                </div>
-
-                <span style={{ fontSize: 15, fontWeight: 500, color: r.type === "income" ? c.success : c.danger }}>
-                  {r.type === "income" ? "+" : "−"}
-                  {formatMoney(r.amount)}
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() => toggleRecurring(r)}
-                  style={{ ...addButton, padding: "5px 10px", fontSize: 13 }}
-                >
-                  {r.active ? t("Duraklat") : t("Sürdür")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingRecurring(r)}
-                  aria-label={t("Düzenle")}
-                  style={{ background: "transparent", border: "none", padding: 4, display: "flex" }}
-                >
-                  <IconEdit size={15} color={c.textSecondary} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteRecurring(r.id)}
-                  aria-label={t("Sil")}
-                  style={{ background: "transparent", border: "none", padding: 4, display: "flex" }}
-                >
-                  <IconTrash size={15} color={c.danger} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Hareketler */}
-      <section>
-        <h2 style={sectionTitle}>{t("Hareketler")}</h2>
-
-        {transactions.length === 0 ? (
-          <div style={{ ...cardStyle, borderStyle: "dashed", textAlign: "center", color: c.textSecondary, fontSize: 15, padding: 28 }}>
-            {t('Henüz bir hareket yok. Gelir/gider eklemek için sayfadaki "+" düğmesini kullan.')}
-          </div>
-        ) : (
-          <div style={listeIzgarasi}>
-            {siraliHareketler.map((hareket) => (
-              <div key={hareket.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                  <div style={{ fontSize: 15, color: c.textPrimary }}>
-                    {hareket.description || t(typeLabels[hareket.type])}
-                    {hareket.recurringPaymentId && (
-                      <span style={{ fontSize: 12, color: c.textSecondary, marginLeft: 8 }}>{t("otomatik")}</span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 3 }}>
-                    {formatDate(hareket.occurredAt)}
-                    {hareket.projectTitle ? ` · ${hareket.projectTitle}` : t(" · genel")}
-                  </div>
-                </div>
-
-                <span style={{ fontSize: 15, fontWeight: 500, color: hareket.type === "income" ? c.success : c.danger }}>
-                  {hareket.type === "income" ? "+" : "−"}
-                  {formatMoney(hareket.amount)}
-                </span>
-
-                {/* Otomatik işlenen kayıt elle düzenlenmez: kaynağı düzenli
-                    ödeme kuralıdır, oradan yönetilir. */}
-                {!hareket.recurringPaymentId && (
-                  <button
-                    type="button"
-                    onClick={() => setEditingTransaction(hareket)}
-                    aria-label={t("Düzenle")}
-                    style={{ background: "transparent", border: "none", padding: 4, display: "flex" }}
-                  >
-                    <IconEdit size={15} color={c.textSecondary} />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => deleteTransaction(hareket.id)}
-                  aria-label={t("Sil")}
-                  style={{ background: "transparent", border: "none", padding: 4, display: "flex" }}
-                >
-                  <IconTrash size={15} color={c.danger} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      )}
 
       {editingTransaction && (
         <AddBudgetEntryModal
@@ -537,23 +621,166 @@ export default function BudgetPanel() {
   );
 }
 
+/** T tablosunun bir sütunu: başlık + toplam, altında hareketler. */
+function HareketSutunu({
+  baslik,
+  toplam,
+  renk,
+  hareketler,
+  isaret,
+  onEdit,
+  onDelete,
+  borderRight,
+}: {
+  baslik: string;
+  toplam: number;
+  renk: string;
+  hareketler: BudgetTransaction[];
+  isaret: string;
+  onEdit: (tx: BudgetTransaction) => void;
+  onDelete: (id: string) => void;
+  borderRight?: boolean;
+}) {
+  const c = useThemeColors();
+  const t = useT();
+  return (
+    <div style={{ borderRight: borderRight ? `1px solid ${c.border}` : undefined, minWidth: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          padding: "8px 12px",
+          background: c.background,
+          borderBottom: `1px solid ${c.border}`,
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 500, color: renk }}>{baslik}</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: renk }}>
+          {isaret}
+          {formatMoney(toplam)}
+        </span>
+      </div>
+
+      {hareketler.length === 0 ? (
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, padding: 12 }}>{t("Kayıt yok.")}</p>
+      ) : (
+        hareketler.map((hareket) => (
+          <div
+            key={hareket.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 12px",
+              borderBottom: `1px solid ${c.border}`,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {hareket.description || t(typeLabels[hareket.type])}
+                {hareket.recurringPaymentId && (
+                  <span style={{ fontSize: 11, color: c.textSecondary, marginLeft: 6 }}>{t("otomatik")}</span>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {formatDate(hareket.occurredAt)}
+                {hareket.projectTitle ? ` · ${hareket.projectTitle}` : t(" · genel")}
+              </div>
+            </div>
+
+            <span style={{ fontSize: 14, fontWeight: 500, color: renk, flexShrink: 0 }}>
+              {isaret}
+              {formatMoney(hareket.amount)}
+            </span>
+
+            {/* Otomatik işlenen kayıt elle düzenlenmez: kaynağı düzenli ödeme
+                kuralıdır, oradan yönetilir. */}
+            {!hareket.recurringPaymentId && (
+              <button
+                type="button"
+                onClick={() => onEdit(hareket)}
+                aria-label={t("Düzenle")}
+                style={{ background: "transparent", border: "none", padding: 3, display: "flex", flexShrink: 0, cursor: "pointer" }}
+              >
+                <IconEdit size={14} color={c.textSecondary} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onDelete(hareket.id)}
+              aria-label={t("Sil")}
+              style={{ background: "transparent", border: "none", padding: 3, display: "flex", flexShrink: 0, cursor: "pointer" }}
+            >
+              <IconTrash size={14} color={c.danger} />
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+/** Vadeye kalan süreyi renkle söyler: gecikmiş kırmızı, yaklaşan kehribar. */
+function VadeRozeti({ tarih }: { tarih: string }) {
+  const c = useThemeColors();
+  const t = useT();
+  const durum = vadeDurumu(tarih);
+  const kalan = kalanGun(tarih);
+
+  if (durum === "uzak") {
+    return <span style={{ fontSize: 12, color: c.textSecondary }}>{formatDate(tarih)}</span>;
+  }
+
+  const renk = durum === "gecikti" ? c.danger : c.warning;
+  const metin =
+    durum === "gecikti"
+      ? t("{gun} gün gecikti", { gun: -kalan })
+      : durum === "bugun"
+        ? t("Bugün ödenecek")
+        : t("{gun} gün kaldı", { gun: kalan });
+
+  return (
+    <span
+      style={{
+        fontSize: 11,
+        fontWeight: 500,
+        color: renk,
+        background: `${renk}1a`,
+        padding: "2px 8px",
+        borderRadius: 999,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {metin}
+    </span>
+  );
+}
+
 function SummaryCard({
   label,
   value,
   color,
-  hint,
+  vurgulu,
 }: {
   label: string;
   value: number;
   color: string;
-  hint?: string;
+  vurgulu?: boolean;
 }) {
   const c = useThemeColors();
   return (
-    <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: "14px 16px" }}>
-      <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 21, fontWeight: 500, color }}>{formatMoney(value)}</div>
-      {hint && <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 4 }}>{hint}</div>}
+    <div
+      style={{
+        background: vurgulu ? `${c.accent}12` : c.surface,
+        border: `1px solid ${vurgulu ? c.accent : c.border}`,
+        borderRadius: 10,
+        padding: "9px 11px",
+      }}
+    >
+      <div style={{ fontSize: 11.5, color: c.textSecondary, marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 17, fontWeight: 600, color }}>{formatMoney(value)}</div>
     </div>
   );
 }

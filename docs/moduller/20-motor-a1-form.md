@@ -196,10 +196,10 @@ cümle, son durum).
 
 ```
 scope: organization
-groups: konum · oz · kisilik · ses · isim · gorunum · temas · koruma · durum
+groups: konum · oz · kisilik · kisisel · ses · isim · gorunum · temas · koruma · durum
 approvalRequires: category, promise, tone_formality
 reviewIntervalMonths: 12
-templates: hizmet, perakende, uretim
+templates: yok (bilerek — aşağıya bakınız)
 ```
 
 Bir marka dokümanı en az üç soruya cevap vermeli — onay için gerekli üç alan
@@ -208,19 +208,38 @@ bunlar: **nerede yarışıyoruz** (`category`), **ne vaat ediyoruz** (`promise`)
 
 | Bölüm | Alanlar |
 |---|---|
-| konum | `brand_name` · `category` · `primary_audience` · `not_for` · `alternatives` (tags) |
+| konum | `brand_type` (kurumsal/kişisel/karma) · `brand_name` · `category` · `primary_audience` · `not_for` · `alternatives` (tags) |
 | oz | `promise` · `differentiator` · `reasons_to_believe` (tags) |
-| kisilik | `archetype` (12 arketip) · `personality` (tags) · `human_reference` |
+| kisilik | `archetype` (12 arketip) · `personality` (tags) |
+| kisisel | `expertise` · `personal_story` · `content_themes` (tags) · `boundaries` (tags) |
 | ses | `tone_formality` · `tone_humor` · `tone_boldness` (üç kaydırıcı, 5 kademe) · `voice_rules` · `say_this` · `avoid` · `boilerplate` |
 | isim | `tagline` · `spelling` · `naming_rule` |
-| gorunum | `primary_color` · `secondary_colors` · `color_rule` · `typography` · `logo_usage` · `logo_donts` · `imagery` · `guideline_url` |
-| temas | `touchpoints` (multiselect, 12 kanal) · `signature_element` |
+| gorunum | `primary_color` · `secondary_colors` · `typography` · `logo_usage` · `logo_donts` · `imagery` · `guideline_url` |
+| temas | `touchpoints` (multiselect, 16 kanal) · `signature_element` |
 | koruma | `trademark_status` · `domains` · `handles` |
 | durum | `brand_owner` (user_ref) · `effective_from` · `review_at` · `status` · `notes` |
 
-37 alan, ama okuma görünümü boş alanları gizler: doküman kullanıcının
-doldurduğu kadar uzundur. Üç şablon boş sayfayı kaldırmak için var; hepsi
-taslak olarak yüklenir.
+40 alan, ama okuma görünümü boş alanları gizler: doküman kullanıcının
+doldurduğu kadar uzundur.
+
+**Şablon yok, bilerek.** Üç şablonla (hizmet / perakende / üretim) başlandı,
+sonra bir dördüncüsü (kişisel marka) eklendi ve hepsi kaldırıldı: marka
+kimliği tam da kopyalanamayacak şey. "Bizi neyin yerine koyuyorlar" sorusunun
+hazır cevabı kullanıcıyı kendi cevabını aramaktan alıkoyuyor, taslakta duran
+ajans cümlesi de düzeltilmeden onaylanıyor. `kimlik_ve_yon` şablonları duruyor
+— vizyon/misyon bir kalıba oturuyor, marka oturmuyor.
+
+**Kişisel marka bir tür, ayrı bir modül değil.** `brand_type` alanı
+(kurumsal / kişisel / karma) ve `kisisel` bölümü, kurucusuyla anılan işletmeyi
+aynı dokümanda tutuyor; ikiye ayırmak aynı ton/renk/tescil sorularını iki
+yerde yaşatmak olurdu. Tür seçimi hiçbir alanı gizlemez: karma markada iki
+taraf da doldurulur.
+
+**Bazı alanların cevabına dosya iliştirilebilir** (`attachments: true` —
+kanıtlar, tipografi, logo kullanımı, görsel dil, kılavuz, tescil). Dosya
+kimlikleri `file_links` yerine kaydın kendi jsonb'sinde `<anahtar>__dosya`
+altında durur: ek cevabın parçasıdır, metinle birlikte taslakta bekler ve
+onayla birlikte yayımlanır.
 
 Tek "ton" seçimi yerine üç kaydırıcı kullanılmasının sebebi: "profesyonel"
 diyen iki kişi iki farklı metin yazıyor. Kaydırıcı, metni yazarken bakılacak

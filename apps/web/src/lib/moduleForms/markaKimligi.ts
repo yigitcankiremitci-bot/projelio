@@ -18,8 +18,13 @@ import type { ModuleFormConfig } from "./types";
 //
 // Alan çokluğu bilinçli: marka kurmak tek soruyla bitmiyor, ama A1 okuma
 // görünümü BOŞ alanları gizliyor (ModuleFormPanel). Yani doldurulmamış alan
-// kimseye görünmez; doküman kullanıcının doldurduğu kadar uzundur. Şablonlar
-// da bu yüzden var — boş 40 alanla karşılaşan kimse başlamıyor.
+// kimseye görünmez; doküman kullanıcının doldurduğu kadar uzundur.
+//
+// ŞABLON YOK (kimlik_ve_yon'da var, burada bilerek kaldırıldı). Hazır metin
+// boş sayfayı kaldırıyordu ama marka kimliği tam da kopyalanamayacak şey:
+// "bizi neyin yerine koyuyorlar" sorusunun hazır cevabı, kullanıcıyı kendi
+// cevabını aramaktan alıkoyuyor ve taslakta duran ajans cümlesi düzeltilmeden
+// onaylanıyor. Vizyon/misyon şablonu bir kalıba oturuyor, marka oturmuyor.
 //
 // KİŞİSEL MARKA da bir marka türü: Projelio'yu kullananların önemli bir kısmı
 // serbest çalışan, danışman ya da kurucusuyla anılan küçük şirket. Onlarda
@@ -27,6 +32,8 @@ import type { ModuleFormConfig } from "./types";
 // başkadır — uzmanlık, hikâye ve NEYİN PAYLAŞILMAYACAĞI. Bu yüzden ayrı bir
 // modül değil, bu modülün içinde bir tür (`brandType`) ve kendi bölümü var:
 // ikiye ayırmak, aynı ton/renk/tescil sorularını iki yerde yaşatmak olurdu.
+// Kişisel marka bir ŞABLON olarak da denendi; şablonlarla birlikte kalktı
+// (yukarıya bakınız). Kararın kendisi alanlarda yaşıyor, hazır metinde değil.
 //
 // KALDIRILAN SORULAR (2026-09): "Marka bir insan olsaydı" ve "renk kullanım
 // oranı (%70/%20/%10)". İkisi de ajans atölyesinde anlamlı, kendi markasını
@@ -461,119 +468,12 @@ export const markaKimligiConfig: ModuleFormConfig = {
 
   reviewIntervalMonths: 12,
 
-  // Şablonlar daima TASLAK yüklenir. Amaç doğru cevabı vermek değil, boş
-  // sayfayı kaldırmak: kullanıcı hazır cümleyi okuyunca kendi cümlesini
-  // yazması kolaylaşıyor.
-  templates: [
-    {
-      key: "hizmet",
-      label: "Hizmet / ajans",
-      hint: "Şirket adıyla iş alan, ekiple çalışan hizmet işi", // dil:anahtar
-      data: {
-        brandType: "kurumsal",
-        category: "İşini büyütmek isteyen markalar için dış ekip", // dil:atla
-        primaryAudience: "Büyüme aşamasındaki küçük ve orta ölçekli markalar", // dil:atla
-        notFor: "En ucuzu arayan, süreci kendi yönetmek isteyenler", // dil:atla
-        alternatives: "İçeride birini işe almak,Serbest çalışanla ilerlemek,Hiçbir şey yapmamak", // dil:atla
-        promise: "İşini bize devreden müşteri, süreci takip etmek zorunda kalmaz; sonucu rakamla görür.", // dil:atla
-        differentiator: "Her işin sonunda ne yaptığımızı ve neye yaradığını tek sayfada raporlarız.", // dil:atla
-        reasonsToBelieve: "Aylık tek sayfa rapor,Sabit ekip,İlk 30 günde çıkış hakkı", // dil:atla
-        archetype: "bilge",
-        personality: "Sözünü tutan,Açık sözlü,Sakin", // dil:atla
-        toneFormality: "s1",
-        toneHumor: "c1",
-        toneBoldness: "orta",
-        voiceRules: "Siz diliyle yazılır. Emoji kullanılmaz. Terim kullanılacaksa bir kez açıklanır. Cümleler kısa.", // dil:atla
-        sayThis: "İş,Çıktı,Rapor", // dil:atla
-        avoid: "Devrim niteliğinde,Sektör lideri,Anahtar teslim mutluluk", // dil:atla
-        touchpoints: "web,sosyal,eposta,teklif,fatura",
-      },
-    },
-    {
-      key: "perakende",
-      label: "Perakende / tüketici", // dil:anahtar
-      hint: "Rafta ya da pazaryerinde, son kullanıcıya satan marka", // dil:anahtar
-      data: {
-        brandType: "kurumsal",
-        category: "Günlük kullanım ürünü", // dil:atla
-        primaryAudience: "Aradığını hızlı bulmak isteyen şehirli alıcı", // dil:atla
-        notFor: "Uzun uzun araştırıp en ucuzu bulmayı sevenler", // dil:atla
-        alternatives: "Pazaryerinden almak,Markete gitmek,Ertelemek",
-        promise: "Aradığını ilk denemede bulur, beğenmezse sorunsuz iade eder.", // dil:atla
-        differentiator: "İade tek tıkla ve soru sorulmadan.", // dil:atla
-        reasonsToBelieve: "14 gün koşulsuz iade,Aynı gün kargo,Gerçek müşteri fotoğrafları", // dil:atla
-        archetype: "sirandan",
-        personality: "Sıcak,Anlaşılır,Hızlı", // dil:atla
-        toneFormality: "s2",
-        toneHumor: "e1",
-        toneBoldness: "c1",
-        voiceRules: "Sen diliyle yazılır. Kısa cümle. Emoji az ve yerinde. Büyük harfle bağırılmaz.", // dil:atla
-        avoid: "Kampanya kaçmasın,Son 3 ürün,Efsane fırsat", // dil:atla
-        touchpoints: "web,sosyal,eposta,ambalaj,reklam",
-      },
-    },
-    {
-      key: "uretim",
-      label: "Üretim / B2B", // dil:anahtar
-      hint: "Başka firmalara üreten ya da tedarik eden iş", // dil:anahtar
-      data: {
-        brandType: "kurumsal",
-        category: "Tedarikçi", // dil:atla
-        primaryAudience: "Zamanında teslim ve sabit kalite arayan üretici firmalar", // dil:atla
-        notFor: "Tek seferlik, en düşük fiyatlı iş arayanlar", // dil:atla
-        alternatives: "Mevcut tedarikçide kalmak,İthalat,Kendi üretimini kurmak", // dil:atla
-        promise: "Söz verilen tarihte, söz verilen kalitede gelir; hattı durdurmaz.", // dil:atla
-        differentiator: "Gecikme ihtimalini biz haber veririz, müşteri sormadan.", // dil:atla
-        reasonsToBelieve: "ISO belgesi,Parti bazlı kalite raporu,Yıllık kapasite taahhüdü", // dil:atla
-        archetype: "yonetici",
-        personality: "Güvenilir,Ölçülü,Şeffaf", // dil:atla
-        toneFormality: "f1",
-        toneHumor: "c2",
-        toneBoldness: "k1",
-        voiceRules: "Siz dili. Rakam ve tarih verilir, sıfat verilmez. Taahhüt edilmeyen şey yazılmaz.", // dil:atla
-        avoid: "En iyisi,Rakipsiz,Sınırsız", // dil:atla
-        touchpoints: "web,eposta,teklif,fatura,etkinlik,basili",
-      },
-    },
-    {
-      // Kişisel marka şablonu diğer üçünden bir alan fazlasını doldurur:
-      // "Paylaşılmayanlar". Kimse o soruyu kendiliğinden sormuyor, ama sınır
-      // sonradan çizilince çoktan aşılmış oluyor.
-      key: "kisisel",
-      label: "Kişisel marka", // dil:anahtar
-      hint: "Danışman, eğitmen, serbest çalışan — işi kendi adıyla alan kişi", // dil:anahtar
-      data: {
-        brandType: "kisisel",
-        category: "Kendi alanında danışmanlık veren uzman", // dil:atla
-        primaryAudience: "Konuyu bilen birine doğrudan ulaşmak isteyen küçük işletme sahipleri", // dil:atla
-        notFor: "Kurumsal bir ekip ve uzun süreç bekleyenler", // dil:atla
-        alternatives: "Ajansla çalışmak,İçeriden birine öğretmek,Kendi kendine öğrenmek", // dil:atla
-        promise: "İşi konuşurken karşısında hep aynı kişi olur; devredilmez, anlatılan baştan anlatılmaz.", // dil:atla
-        differentiator: "İşi yapan da anlatan da aynı kişi; arada aktarım kaybı yok.", // dil:atla
-        reasonsToBelieve: "Adı geçen çalışmalar,Yayımlanmış içerik,Ulaşılabilir referanslar", // dil:atla
-        archetype: "bilge",
-        personality: "Açık sözlü,Meraklı,Ulaşılabilir", // dil:atla
-        expertise: "Tek bir konu — adının yanına yazılan şey", // dil:atla
-        personalStory: "Bu işi neden yaptığını, nereden başladığını ve ne öğrendiğini birkaç cümleyle anlat. Kişisel markada güvenin yarısı buradan geliyor.", // dil:atla
-        contentThemes: "Yaptığım işten çıkarımlar,Sık sorulan sorular,Sektörde değişenler", // dil:atla
-        boundaries: "Aile,Sağlık,Siyaset,Müşteri adları", // dil:atla
-        toneFormality: "s1",
-        toneHumor: "e1",
-        toneBoldness: "c1",
-        voiceRules: "Birinci tekil şahıs: \"biz\" değil \"ben\". Bilmediğime bilmiyorum derim. Müşteri adı izinsiz geçmez.", // dil:atla
-        sayThis: "Deneyimim,Gördüğüm kadarıyla,Şöyle çözdük", // dil:atla
-        avoid: "Ekibimiz,Kurumsal çözümler,Uzman kadromuz", // dil:atla
-        touchpoints: "web,sosyal,eposta,podcast,bulten,sahne",
-      },
-    },
-  ],
-
   empty: {
     title: "Markanı bir kez kur, her yerde aynı marka çıksın", // dil:anahtar
     body:
       "Neyin alternatifi olduğun, ne vaat ettiğin, nasıl konuştuğun ve neye benzediğin tek sayfada dursun; " + // dil:anahtar
-      "teklif, reklam ve sosyal medya metinleri aynı yerden beslensin. Şablondan başlayıp üstüne yazabilirsin — " + // dil:anahtar
-      "her düzenleme sürüm olarak saklanır.", // dil:anahtar
+      "teklif, reklam ve sosyal medya metinleri aynı yerden beslensin. Hepsini bir oturuşta doldurman gerekmez — " + // dil:anahtar
+      "boş bıraktığın alan kimseye görünmez, her düzenleme sürüm olarak saklanır.", // dil:anahtar
     action: "Markayı kur", // dil:anahtar
   },
 };

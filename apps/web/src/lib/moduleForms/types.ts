@@ -61,14 +61,6 @@ export interface ModuleFormGroup {
 export interface ModuleFormTemplate {
   key: string;
   label: string;
-  /**
-   * Şablonun kime uyduğunu söyleyen tek satır.
-   *
-   * Etiket tek başına yetmiyordu: "Hizmet / ajans" ile "Üretim / B2B" arasında
-   * seçim yapan kullanıcı ikisini de tıklayıp içeriğe bakıyordu ve ikinci tık
-   * birinciyi eziyor.
-   */
-  hint?: string;
   /** Şablon daima TASLAK olarak yüklenir — gerçek metin sanılmasın. */
   data: Record<string, unknown>;
 }

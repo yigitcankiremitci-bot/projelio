@@ -534,11 +534,6 @@ export default function ModuleFormPanel({
                     }}
                   >
                     <span style={{ fontSize: 13.5, fontWeight: 600, color: c.textPrimary }}>{t(sablon.label)}</span>
-                    {sablon.hint && (
-                      <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.45 }}>
-                        {t(sablon.hint)}
-                      </span>
-                    )}
                   </button>
                 ))}
               </div>
@@ -555,7 +550,16 @@ export default function ModuleFormPanel({
                   group.hint,
                   <div style={IZGARA}>
                     {fields.map((f) => (
-                      <label
+                      // DİKKAT: burası <label> DEĞİL. Label, üzerine yapılan
+                      // tıklamayı içindeki İLK odaklanabilir öğeye yönlendirir
+                      // — kutunun boşluğuna tıklamak çoklu seçimde ilk
+                      // seçeneği ("Web sitesi") işaretliyor, etiket alanında
+                      // ise ilk etiketin × düğmesine basıp kullanıcının
+                      // dokunmadığı etiketi siliyordu. Bu alanların çoğu tek
+                      // bir <input> değil (düğme ızgarası, etiket listesi,
+                      // ek dosyalar); label'ın tarif ettiği "tek kontrol"
+                      // ilişkisi burada zaten yok.
+                      <div
                         key={f.key}
                         style={{
                           display: "flex",
@@ -584,7 +588,7 @@ export default function ModuleFormPanel({
                             target={uploadTarget}
                           />
                         )}
-                      </label>
+                      </div>
                     ))}
                   </div>
                 )}

@@ -159,6 +159,28 @@ export const projeler: TranslationDict = {
   Gelen: "Received",
   Net: "Net",
   "Düzenli ödemeler": "Recurring payments",
+  // Kasa sayfasının süzgeç/sıralama çubuğu ve vade rozetleri.
+  "Yakın tarih önce": "Nearest date first",
+  "Uzak tarih önce": "Furthest date first",
+  Tümü: "All",
+  "Her şey": "Everything",
+  "Vadesi geçen": "Overdue",
+  "Vadesi dolmuş düzenli ödemeler ve tahsil edilmemiş alacaklar":
+    "Recurring payments past their due date and receivables not collected yet",
+  "Vadesi yaklaşan": "Due soon",
+  "Önümüzdeki 7 gün içinde ödenecekler": "Due within the next 7 days",
+  Ödenenler: "Settled",
+  "Deftere işlenmiş gelir/giderler ve tahsilatı biten projeler":
+    "Income and expenses already recorded, and fully collected projects",
+  "Bu süzgece uyan kayıt yok.": "No entries match this filter.",
+  "{gun} gün gecikti": "{gun} days overdue",
+  "Bugün ödenecek": "Due today",
+  "{gun} gün kaldı": "{gun} days left",
+  "Kayıt yok.": "No entries.",
+  // Kasa grafiği (BudgetTrendChart)
+  "Son {n} ay": "Last {n} months",
+  net: "net",
+  "Bu dönemde kayıtlı bir hareket yok.": "No entries recorded in this period.",
   "Düzenli ödeme ekle": "Add recurring payment",
   "Düzenli ödeme silme": "Recurring payment deletion",
   "Düzenli gelir": "Recurring income",
@@ -326,8 +348,6 @@ export const projeler: TranslationDict = {
   // ─────────────────────────────────────────────── Kasa sıralaması
   // Oklar İngilizcede de aynen kalıyor: yön bilgisi dilden bağımsız.
   Sırala: "Sort",
-  "Yeni → eski": "Newest → oldest",
-  "Eski → yeni": "Oldest → newest",
   "Tutar: çok → az": "Amount: high → low",
   "Tutar: az → çok": "Amount: low → high",
 

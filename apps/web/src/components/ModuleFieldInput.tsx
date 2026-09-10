@@ -200,12 +200,17 @@ function TagsInput({
   const tags = value.split(",").map((t) => t.trim()).filter(Boolean);
 
   const add = () => {
-    const parts = draft
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean)
-      // Aynı etiket iki kez eklenmesin; büyük/küçük harf Türkçe kurallarıyla.
-      .filter((t) => !tags.some((x) => x.toLocaleLowerCase("tr") === t.toLocaleLowerCase("tr")));
+    // Aynı etiket iki kez eklenmesin; büyük/küçük harf Türkçe kurallarıyla.
+    // Karşılaştırma YAZILANLARIN KENDİ ARASINDA da yapılıyor: "Sakin, Sakin"
+    // tek hamlede yazıldığında eskiden ikisi de giriyordu, sonra birini
+    // silmek ikisini birden siliyordu.
+    const parts: string[] = [];
+    const ayni = (a: string, b: string) => a.toLocaleLowerCase("tr") === b.toLocaleLowerCase("tr");
+    for (const parca of draft.split(",").map((t) => t.trim()).filter(Boolean)) {
+      if (tags.some((x) => ayni(x, parca))) continue;
+      if (parts.some((x) => ayni(x, parca))) continue;
+      parts.push(parca);
+    }
     if (parts.length === 0) {
       setDraft("");
       return;
@@ -218,9 +223,12 @@ function TagsInput({
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {tags.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {tags.map((t) => (
+          {tags.map((t, sira) => (
             <span
-              key={t}
+              // Anahtar SIRAYA bağlı: etiketin kendisi anahtar olduğunda,
+              // eski kayıtlardan gelen yinelenen bir etiket iki kardeşe aynı
+              // anahtarı veriyor ve React silmede yanlış olanı çıkarıyordu.
+              key={`${sira}-${t}`}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -236,7 +244,11 @@ function TagsInput({
               {t}
               <button
                 type="button"
-                onClick={() => onChange(tags.filter((x) => x !== t).join(","))}
+                // SIRAYA göre siliniyor, değere göre değil: değere göre
+                // süzmek aynı metni taşıyan bütün etiketleri birden
+                // kaldırıyordu — kullanıcı bir tanesine bastığında iki üç
+                // tanesi birden gidiyordu.
+                onClick={() => onChange(tags.filter((_, x) => x !== sira).join(","))}
                 aria-label={`${t} etiketini kaldır`}
                 style={{ background: "transparent", border: "none", cursor: "pointer", color: c.primary, padding: 0 }}
               >

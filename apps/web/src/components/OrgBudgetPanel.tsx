@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import AddModuleRecordModal from "./AddModuleRecordModal";
 import { useUndo } from "../lib/undo";
-import { IconTrash } from "./icons";
+import { IconEdit, IconTrash } from "./icons";
 import { useT } from "../lib/i18n";
 
 export type BudgetQuickAddKind = "income" | "expense" | "receivable" | "payable";
@@ -93,8 +93,11 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
   const [rp, setRp] = useState<ModuleRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [quickAdd, setQuickAdd] = useState<BudgetQuickAddKind | null>(null);
+  // Düzenlenen kayıt: gelir/gider defteri ile alacak/borç aynı modalı kullanır,
+  // hangi modülün alanlarının çizileceği kaydın kendi moduleKey'inden gelir.
+  const [editing, setEditing] = useState<ModuleRecord | null>(null);
   const [settlingId, setSettlingId] = useState<string | null>(null);
-  const { pushDestructive } = useUndo();
+  const { pushUndo, pushDestructive } = useUndo();
 
   const load = () => {
     setLoading(true);
@@ -126,6 +129,24 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
         await api.delete(`/module-records/${id}`).catch(() => {});
       },
       restore: load,
+    });
+  };
+
+  // Bir kaydın verisini sunucuda o hâle getirir; geri ve ileri alma aynı işlemi
+  // farklı değerlerle çağırır (bkz. BudgetPanel'deki applyValues).
+  const applyData = async (id: string, data: Record<string, unknown>) => {
+    await api.patch(`/module-records/${id}`, { data }).catch(() => {});
+    load();
+  };
+
+  // Düzenleme de geri alınabilir: bütçe girerken en sık yapılan hata yanlış
+  // tutar yazmak ve Cmd/Ctrl+Z burada hiç çalışmıyordu.
+  const handleEdited = (previous: ModuleRecord, saved: ModuleRecord) => {
+    load();
+    pushUndo({
+      label: "Bütçe kaydı düzenlendi",
+      run: () => applyData(previous.id, previous.data),
+      redo: () => applyData(saved.id, saved.data),
     });
   };
 
@@ -203,8 +224,15 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
             overflow: "hidden",
           }}
         >
-          <LedgerColumn title="Gelir" records={incomeRecords} tone="positive" onDelete={handleDelete} borderRight />
-          <LedgerColumn title="Gider" records={expenseRecords} tone="negative" onDelete={handleDelete} />
+          <LedgerColumn
+            title="Gelir"
+            records={incomeRecords}
+            tone="positive"
+            onEdit={setEditing}
+            onDelete={handleDelete}
+            borderRight
+          />
+          <LedgerColumn title="Gider" records={expenseRecords} tone="negative" onEdit={setEditing} onDelete={handleDelete} />
         </div>
       </div>
 
@@ -280,9 +308,16 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
                     </span>
                   )}
                   <button
+                    onClick={() => setEditing(r)}
+                    aria-label={t("Kaydı düzenle")}
+                    style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", cursor: "pointer" }}
+                  >
+                    <IconEdit size={14} color={c.textSecondary} />
+                  </button>
+                  <button
                     onClick={() => handleDelete(r.id)}
                     aria-label={t("Kaydı sil")}
-                    style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex" }}
+                    style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", cursor: "pointer" }}
                   >
                     <IconTrash size={14} color={c.textSecondary} />
                   </button>
@@ -292,6 +327,16 @@ const OrgBudgetPanel = forwardRef<OrgBudgetPanelHandle, Props>(function OrgBudge
           </div>
         )}
       </div>
+
+      {editing && (
+        <AddModuleRecordModal
+          organizationId={organizationId}
+          moduleKey={editing.moduleKey}
+          record={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(saved) => handleEdited(editing, saved)}
+        />
+      )}
 
       {quickAdd && (
         <AddModuleRecordModal
@@ -313,12 +358,14 @@ function LedgerColumn({
   title,
   records,
   tone,
+  onEdit,
   onDelete,
   borderRight,
 }: {
   title: string;
   records: ModuleRecord[];
   tone: "positive" | "negative";
+  onEdit: (record: ModuleRecord) => void;
   onDelete: (id: string) => void;
   borderRight?: boolean;
 }) {
@@ -363,9 +410,16 @@ function LedgerColumn({
                 </div>
               </div>
               <button
+                onClick={() => onEdit(r)}
+                aria-label={t("Kaydı düzenle")}
+                style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", cursor: "pointer" }}
+              >
+                <IconEdit size={13} color={c.textSecondary} />
+              </button>
+              <button
                 onClick={() => onDelete(r.id)}
                 aria-label={t("Kaydı sil")}
-                style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex" }}
+                style={{ background: "transparent", border: "none", flexShrink: 0, display: "flex", cursor: "pointer" }}
               >
                 <IconTrash size={13} color={c.textSecondary} />
               </button>

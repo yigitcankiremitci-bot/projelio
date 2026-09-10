@@ -5,3 +5,4 @@ export * from "./safeUrl";
 export * from "./projectShare";
 export * from "./moduleConfigs";
 export * from "./workLogDuration";
+export * from "./taskSearch";

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { PlanningController } from "./planning.controller";
 import { PlanningService } from "./planning.service";
 import { PersonalTodosModule } from "../personal-todos/personal-todos.module";
+import { DepartmentsModule } from "../departments/departments.module";
 
 /**
  * Takvim / kişisel planlama.
@@ -11,7 +12,7 @@ import { PersonalTodosModule } from "../personal-todos/personal-todos.module";
  * Aynı sorguyu burada tekrar yazmak, iki listenin zamanla ayrışması demekti.
  */
 @Module({
-  imports: [PersonalTodosModule],
+  imports: [PersonalTodosModule, DepartmentsModule],
   controllers: [PlanningController],
   providers: [PlanningService],
   exports: [PlanningService],

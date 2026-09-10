@@ -262,7 +262,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
           >
             <IconCheck size={12} color={c.accentDark} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {secilenGorev.projectTitle ?? secilenGorev.operationTitle ?? t("Görev")}
+              {secilenGorev.projectTitle ?? secilenGorev.departmentName ?? secilenGorev.operationTitle ?? t("Görev")}
               {secilenGorev.parentTaskId ? ` · ${t("alt görev")}` : ""}
             </span>
             <button
@@ -308,8 +308,10 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
         </button>
       </div>
 
-      {loading && !secilenGorev && metin.trim().length >= 2 && (
-        <span style={{ fontSize: 12.5, color: c.textSecondary }}>{t("Görevler aranıyor…")}</span>
+      {/* Yalnızca İLK yükleme sırasında: eşleştirmenin kendisi anlık
+          (bkz. useTaskSearch). */}
+      {loading && !secilenGorev && (
+        <span style={{ fontSize: 12.5, color: c.textSecondary }}>{t("Görevlerin yükleniyor…")}</span>
       )}
     </form>
   );
@@ -382,7 +384,7 @@ function GorevListesi({
           <span style={{ fontSize: 12, color: c.textSecondary }}>
             {[
               gorev.parentTaskId ? t("alt görev") : null,
-              gorev.projectTitle ?? gorev.operationTitle,
+              gorev.projectTitle ?? gorev.departmentName ?? gorev.operationTitle,
               gorev.jobTitle,
               gorev.actualMinutes ? `${t("şimdiye dek")} ${dakikayiMetneCevir(gorev.actualMinutes)}` : null,
             ]

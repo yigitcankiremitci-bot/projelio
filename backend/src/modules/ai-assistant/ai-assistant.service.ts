@@ -23,7 +23,7 @@ import { OutputsService } from "../outputs/outputs.service";
 import { AI_TOOLS, CRITICAL_TOOLS, toolsForChannel } from "./ai-assistant.tools";
 import { describeModuleFields, hasRecordConfig, normalizeModuleData } from "./ai-modules";
 import { taskTarget } from "./ai-task-target";
-import { getModuleRecordConfig } from "@projelio/shared";
+import { getModuleRecordConfig, gorevPuani } from "@projelio/shared";
 import { CatalogService } from "../catalog/catalog.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { DepartmentsService } from "../departments/departments.service";
@@ -3298,7 +3298,10 @@ export class AiAssistantService {
     const collected: any[] = [];
 
     const matches = (task: any): boolean => {
-      if (input.query && !task.title?.toLowerCase().includes(String(input.query).toLowerCase())) return false;
+      // Yaptım'ın arama kutusuyla AYNI eşleştirici (bkz. shared/taskSearch.ts).
+      // Önce düz `includes` vardı: model görevin adını harfi harfine bilmediği
+      // sürece hiçbir şey bulamıyor, sonra da "böyle bir görev yok" diyordu.
+      if (input.query && gorevPuani(String(input.query), { baslik: task.title ?? "" }) == null) return false;
       if (input.status && task.status !== input.status) return false;
       if (input.assignedToMe && task.assignedTo !== userId) return false;
 

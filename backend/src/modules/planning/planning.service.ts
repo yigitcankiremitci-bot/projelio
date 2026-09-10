@@ -19,6 +19,7 @@ import type {
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
+import { DepartmentsService } from "../departments/departments.service";
 import {
   assertTime,
   daysBetween,
@@ -80,7 +81,12 @@ const DEFAULT_PREFERENCES: PlanPreferences = {
 export class PlanningService {
   constructor(
     private supabase: SupabaseService,
-    private personalTodos: PersonalTodosService
+    private personalTodos: PersonalTodosService,
+    // Departman görevleri de planlanabilir olmalı: kadrosunda olduğun
+    // departmanın görevini takvime koyamamak (ve Yaptım'da bulamamak) bir
+    // kapsam eksiğiydi. Kim hangi departmanı görüyor sorusunun cevabı
+    // DepartmentsService'in kendisinde; buraya KOPYALANMIYOR.
+    private departments: DepartmentsService
   ) {}
 
   // ====================================================================== Tercihler
@@ -753,6 +759,9 @@ export class PlanningService {
    * daha kötü).
    */
   private async loadSchedulableScope(userId: string): Promise<SchedulableScope> {
+    // Departmanlar ayrı çağrıda: kuralı (sahip olunan şirketin tüm
+    // departmanları + onaylı kadrosu) DepartmentsService biliyor.
+    const departmentList = await this.departments.findAllForUser(userId);
     const [ownedProjects, memberships, ownedOperations, ownedJobs] = await Promise.all([
       this.supabase.client.from("projects").select("id").eq("owner_id", userId).is("archived_at", null),
       this.supabase.client.from("project_members").select("project_id, role").eq("user_id", userId).eq("status", "approved"),
@@ -787,7 +796,7 @@ export class PlanningService {
       for (const row of data ?? []) operations.add(row.id);
     }
 
-    return { projects, operations };
+    return { projects, operations, departments: new Set(departmentList.map((d) => d.id)) };
   }
 
   /**
@@ -802,7 +811,7 @@ export class PlanningService {
   private async assertSchedulableTask(userId: string, taskId: string): Promise<void> {
     const { data: task, error } = await this.supabase.client
       .from("tasks")
-      .select("id, project_id, operation_id, assigned_to")
+      .select("id, project_id, operation_id, department_id, assigned_to")
       .eq("id", taskId)
       .is("archived_at", null)
       .maybeSingle();
@@ -820,6 +829,7 @@ export class PlanningService {
       if (role && role !== "subcontractor") return;
     }
     if (task.operation_id && scope.operations.has(task.operation_id)) return;
+    if (task.department_id && scope.departments.has(task.department_id)) return;
 
     throw new NotFoundException("Görev bulunamadı veya erişiminiz yok.");
   }
@@ -848,7 +858,7 @@ export class PlanningService {
       // edebilsin diye (aynı projede aynı adı taşıyan ikisi olabiliyor).
       // actual_duration_minutes: seçicide "bu işte şimdiye dek şu kadar
       // çalışılmış" bilgisini göstermek için (bkz. migration 098).
-      "parent_task_id, actual_duration_minutes, " +
+      "parent_task_id, actual_duration_minutes, department_id, departments(name), " +
       "estimated_duration_value, estimated_duration_unit, " +
       "assigned_user:users!tasks_assigned_to_fkey(full_name), " +
       "projects(title, job_id, jobs(title)), " +
@@ -884,8 +894,23 @@ export class PlanningService {
       runs.push(Promise.resolve(q));
     }
 
-    // Departman görevleri gibi, kapsam sorgularına düşmeyen ama kullanıcıya
-    // atanmış işler bu üçüncü kolla geliyor.
+    // Departman görevleri. Kadrosunda olunan (ya da sahibi olunan şirketin)
+    // departmanlarındaki işler, kimseye atanmamış olsalar bile listeye girer —
+    // "şirketimde bugün şunu yaptım" diyen kişinin görevi burada.
+    if (!opts.projectId && scope.departments.size) {
+      let q = this.supabase.client
+        .from("tasks")
+        .select(select)
+        .in("department_id", [...scope.departments])
+        .is("archived_at", null)
+        .neq("status", "completed")
+        .limit(limit * 2);
+      if (opts.query) q = q.ilike("title", `%${opts.query}%`);
+      runs.push(Promise.resolve(q));
+    }
+
+    // Yukarıdaki kapsam sorgularına düşmeyen ama kullanıcıya ATANMIŞ işler bu
+    // son kolla geliyor (ör. taşeron olduğu projedeki kendi görevleri).
     if (!opts.projectId) {
       // Atama ayrı tabloda (bkz. migration 053): birincil atanan olmayan ama
       // göreve eklenmiş kullanıcı da bu listeyi görmeli.
@@ -1361,6 +1386,8 @@ export interface BlockInput {
 interface SchedulableScope {
   /** projeId -> kullanıcının o projedeki rolü ("owner" | "member" | "subcontractor"). */
   projects: Map<string, string>;
+  /** Kullanıcının kadrosunda olduğu ya da sahibi olduğu şirketin departmanları. */
+  departments: Set<string>;
   /** Sahibi olunan ya da sahibi olunan bir işin altındaki programlar. */
   operations: Set<string>;
 }
@@ -1560,6 +1587,8 @@ function mapSchedulableTask(row: any): SchedulableTask {
     estimatedMinutes: estimatedMinutes(row.estimated_duration_value, row.estimated_duration_unit),
     parentTaskId: row.parent_task_id ?? undefined,
     actualMinutes: row.actual_duration_minutes ?? undefined,
+    departmentId: row.department_id ?? undefined,
+    departmentName: row.departments?.name ?? undefined,
   };
 }
 

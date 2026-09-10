@@ -46,7 +46,7 @@ export const yaptim: TranslationDict = {
   // ─────────────────────────────────────────────── Kayıtlı göreve bağlama
   "Ne yaptın? Görev adı yazarsan listeden seçebilirsin":
     "What did you do? Type a task name to pick it from the list",
-  "Görevler aranıyor…": "Searching tasks…",
+  "Görevlerin yükleniyor…": "Loading your tasks…",
   "alt görev": "subtask",
   "şimdiye dek": "so far",
   Görev: "Task",

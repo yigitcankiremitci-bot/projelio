@@ -2000,6 +2000,9 @@ export interface SchedulableTask {
   parentTaskId?: string;
   /** Görevde şimdiye dek biriken gerçekleşen süre (dakika). */
   actualMinutes?: number;
+  /** Departman görevlerinde dolu; seçicide görevin nereye ait olduğunu gösterir. */
+  departmentId?: string;
+  departmentName?: string;
 }
 
 /** Takvimin gün/hafta/ay görünümlerini tek istekte besleyen paket. */

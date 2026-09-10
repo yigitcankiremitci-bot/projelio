@@ -1,71 +1,74 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SchedulableTask } from "@projelio/shared";
+import { gorevleriAra } from "@projelio/shared";
 import { api, ignoreAbort } from "../api/client";
 
-/** Kutuya yazıldıktan kaç ms sonra aranacağı. */
-const GECIKME_MS = 220;
 /** Öneri listesinde gösterilecek en fazla satır. */
 const TAVAN = 8;
+/** Bir kerede çekilen aday görev sayısı. */
+const ADAY_TAVANI = 300;
 
 /**
- * Yazarken kullanıcının görevlerini arar (Yaptım'ın giriş kutusu).
+ * Yaptım'ın giriş kutusundaki görev araması.
  *
- * NEDEN /planning/schedulable-tasks:
- *   Aradığımız şey tam olarak "bu kullanıcının dokunabildiği, henüz kapanmamış
- *   görevler" ve bu kapsam takvim seçicisi için zaten tanımlanmış — projeler,
- *   programlar ve kendisine atanmış işler, taşeronluk kısıtıyla birlikte
- *   (bkz. PlanningService.loadSchedulableScope). İkinci bir arama ucu açmak,
- *   aynı yetki kuralının ikinci bir kopyası demekti; kopya kural er ya da geç
- *   asıl kuralla ayrışır.
+ * LİSTE BİR KEZ ÇEKİLİYOR, EŞLEŞTİRME TARAYICIDA.
  *
- *   Yan etkisi: TAMAMLANMIŞ görevler listeye GİRMEZ. Zaten kapattığı bir işe
- *   sonradan süre yazmak isteyen kullanıcı onu bulamayacak — kabul edilebilir,
- *   çünkü akışın tamamı "yaptığım işi şimdi kapatıyorum" üzerine kurulu.
+ * Önce her tuş vuruşunda sunucuya gidiliyordu ve `ilike '%metin%'` ile
+ * aranıyordu. İki sorunu birden vardı:
  *
- * GECİKME (debounce) ŞART: her tuşta istek atmak, hızlı yazan birinde on
- * beş isteğe çıkıyor ve sonuncudan önce dönen yanıt listeyi yanlış tazeliyordu.
+ *   1. YAVAŞ — gecikme (debounce) koyunca sonuç geç geliyor, koymayınca hızlı
+ *      yazan biri on beş istek atıyordu.
+ *   2. BULAMIYORDU — `ilike` tek ve bitişik bir alt dize arıyor. Kullanıcı
+ *      görevin adını harfi harfine hatırlamadıkça ("sunum hazırla" ile
+ *      "Müşteri sunumu hazırlandı") hiçbir şey çıkmıyordu. Bu esnekliği
+ *      PostgREST üzerinden SQL'de ifade etmek de mümkün değil.
+ *
+ * Kullanıcının açık görevleri yüzler mertebesinde; hepsini tek istekle alıp
+ * eşleştirmeyi burada yapmak ikisini de çözüyor: sonuç anında çıkıyor ve
+ * kelime/ek/yazım hatası toleransı serbestçe yazılabiliyor
+ * (bkz. shared/taskSearch.ts).
+ *
+ * BEDELİ: sayfa açıldıktan SONRA oluşturulan görev listeye girmez. Yaptım
+ * "az önce yaptığım işi kaydediyorum" ekranı; o iş neredeyse her zaman sayfa
+ * açılmadan önce var olan bir görev. Yenilemek için sayfayı yenilemek yeterli.
  */
 export function useTaskSearch(query: string, enabled = true) {
-  const [tasks, setTasks] = useState<SchedulableTask[]>([]);
-  const [loading, setLoading] = useState(false);
-  // Yalnızca EN SON aramanın yanıtı ekrana yazılsın: gecikmeye rağmen iki istek
-  // üst üste binebiliyor ve önce atılan sonra dönebiliyor.
-  const sonIstek = useRef(0);
+  const [adaylar, setAdaylar] = useState<SchedulableTask[]>([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    api
+      .get<SchedulableTask[]>(`/planning/schedulable-tasks?limit=${ADAY_TAVANI}`, ac.signal)
+      .then(setAdaylar)
+      // Arama çalışmazsa kutu serbest metin kutusu olarak çalışmaya devam
+      // etmeli: görev bulunamaması, kaydın hiç girilememesi anlamına gelmemeli.
+      .catch(ignoreAbort)
+      .finally(() => {
+        if (!ac.signal.aborted) setYukleniyor(false);
+      });
+    return () => ac.abort();
+  }, []);
 
   const aranan = query.trim();
 
-  useEffect(() => {
-    // İki karakterden kısa aramada liste neredeyse her şeyi getiriyor; kullanıcı
-    // daha yazmayı bitirmeden ekranı doldurmak yardımcı olmuyor.
-    if (!enabled || aranan.length < 2) {
-      setTasks([]);
-      setLoading(false);
-      return;
-    }
+  const tasks = useMemo(() => {
+    // Tek harfte liste neredeyse her şeyi getiriyor; kullanıcı daha yazmayı
+    // bitirmeden ekranı doldurmak yardımcı olmuyor.
+    if (!enabled || aranan.length < 2) return [];
+    return gorevleriAra(
+      aranan,
+      adaylar,
+      (gorev) => ({
+        baslik: gorev.title,
+        // Bağlam da aranabilir: kullanıcı çoğu zaman görevi projesiyle anıyor
+        // ("milano lojistik").
+        baglam: [gorev.projectTitle, gorev.departmentName, gorev.operationTitle, gorev.jobTitle],
+      }),
+      TAVAN
+    );
+  }, [aranan, adaylar, enabled]);
 
-    const sira = ++sonIstek.current;
-    const ac = new AbortController();
-    setLoading(true);
-    const zamanlayici = window.setTimeout(() => {
-      api
-        .get<SchedulableTask[]>(
-          `/planning/schedulable-tasks?limit=${TAVAN}&query=${encodeURIComponent(aranan)}`,
-          ac.signal
-        )
-        .then((sonuc) => {
-          if (sira === sonIstek.current) setTasks(sonuc.slice(0, TAVAN));
-        })
-        .catch(ignoreAbort)
-        .finally(() => {
-          if (sira === sonIstek.current) setLoading(false);
-        });
-    }, GECIKME_MS);
-
-    return () => {
-      window.clearTimeout(zamanlayici);
-      ac.abort();
-    };
-  }, [aranan, enabled]);
-
-  return { tasks, loading };
+  // "Aranıyor" göstergesi yalnızca ilk yükleme için: eşleştirme anlık.
+  return { tasks, loading: yukleniyor };
 }

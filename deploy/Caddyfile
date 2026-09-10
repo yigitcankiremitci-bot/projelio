@@ -218,3 +218,35 @@ http://caddy {
 		reverse_proxy backend:3000
 	}
 }
+
+# ------------------------------------------ yigitcankiremitci.com (ayrı proje)
+# Kişisel site bu VPS'te AYRI bir compose yığınında duruyor
+# (~projelio/yigitcankiremitci/deploy/docker-compose.vps.yml). Kendi nginx'i var
+# ama YALNIZ HTTP konuşuyor: 80/443 zaten bu Caddy'de. Sertifikayı ve yenilemeyi
+# bu blok üstlenir — farkindayim.tr ile birebir aynı desen.
+#
+# yigitcan-web adı, o yığın `projelio` ağına da bağlandığı için çözülüyor.
+# Yığın kapalıysa YALNIZ bu alan adı 502 verir; projelio ve farkındayım etkilenmez.
+yigitcankiremitci.com {
+	reverse_proxy yigitcan-web:80
+	encode zstd gzip
+	header {
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), geolocation=(), payment=(), usb=(), microphone=()"
+		# includeSubDomains BİLEREK yok: alt alan adları ileride ayrı
+		# barındırılabilir, bir yıllık söz vermek gereksiz risk.
+		Strict-Transport-Security "max-age=31536000"
+
+		# CSP ZORLAYICI (projelio'daki rapor modunun aksine) — bu site tamamen
+		# kendi kendine yeten statik HTML: satır içi script/style YOK, harici
+		# script YOK, form YOK. Tek istisna albüm kapakları: Spotify CDN'inden
+		# (i.scdn.co) doğrudan geliyor, bu yüzden yalnız img-src'de açık.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://i.scdn.co; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
+	}
+}
+
+www.yigitcankiremitci.com {
+	redir https://yigitcankiremitci.com{uri} permanent
+}

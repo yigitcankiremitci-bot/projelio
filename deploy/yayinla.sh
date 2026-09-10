@@ -52,15 +52,21 @@ fi
 gidecek="$(git log --oneline origin/main..HEAD)"
 [ -n "$gidecek" ] || { echo "Yayınlanacak yeni bir şey yok — origin/main zaten güncel."; exit 0; }
 
-# Web derlemesini etkileyen yollar: uygulamanın kendisi ve ondan derlenen
-# paylaşılan paket. PUSH'TAN ÖNCE hesaplanmak ZORUNDA — push'tan sonra
-# origin/main ile HEAD aynı commit olur ve fark HER ZAMAN boş çıkar. Aşağıdaki
-# doğrulama buna bakıyordu ve web değişmiş olsa bile "bu yayın web'e dokunmuyor"
-# diyip paket adını hiç kontrol etmiyordu: yanlış bir "✓ Yayında".
+# Yayının DIŞARIDAN neyle doğrulanacağı, hangi dosyaların değiştiğine bağlı.
+# PUSH'TAN ÖNCE hesaplanmak ZORUNDA — push'tan sonra origin/main ile HEAD aynı
+# commit olur ve fark HER ZAMAN boş çıkar. Doğrulama eskiden buna bakıyordu ve
+# web değişmiş olsa bile "bu yayın web'e dokunmuyor" diyip paket adını hiç
+# kontrol etmiyordu: yanlış bir "✓ Yayında".
+degisen="$(git diff --name-only origin/main HEAD)"
+
+# Web paketi: adı her derlemede değişir, o yüzden dışarıdan görülebilir.
 web_degisti=0
-if git diff --name-only origin/main HEAD | grep -qE '^(apps/web|packages/shared)/'; then
-  web_degisti=1
-fi
+echo "$degisen" | grep -qE '^(apps/web|packages/shared)/' && web_degisti=1
+
+# Konteyner içine giren her şey: değiştiyse `compose up -d` konteyneri yeniden
+# yaratır ve backend'in uptime'ı sıfırlanır.
+imaj_degisti=0
+echo "$degisen" | grep -qE '^(backend|landing|packages/shared)/|^Dockerfile\.|^deploy/(docker-compose|Caddyfile)' && imaj_degisti=1
 
 echo "Yayınlanacak commit'ler:"
 echo "$gidecek" | sed 's/^/  /'
@@ -129,6 +135,16 @@ done
 #    dağıtım sağlamken sunucuda arıza arandı.
 #  · O durumda backend'in yeniden başlamasına bakılıyor: /health/ready
 #    uptimeSeconds'ı düşerse yeni sürüm ayağa kalkmış demektir.
+#  · HİÇBİRİ değişmediyse (yalnızca betik, döküman, migration dosyası) dışarıdan
+#    görülecek BİR ŞEY YOK: imaj aynı kaldığı için konteyner yeniden yaratılmaz,
+#    paket adı da değişmez. Bunu beklemek 15 dakika sonunda "dağıtım görünmedi"
+#    diye yanlış alarm veriyordu — dağıtım olmuştu, gözlenecek izi yoktu.
+if [ "$web_degisti" = "0" ] && [ "$imaj_degisti" = "0" ]; then
+  echo "✓ Push'landı. Bu commit çalışan hiçbir şeyi değiştirmiyor (betik/döküman),"
+  echo "  yani dışarıdan gözlenecek bir iz yok — beklenmiyor."
+  exit 0
+fi
+
 paket() { curl -fsS --max-time 15 https://app.projelio.app/ | grep -oE 'index-[A-Za-z0-9_-]+\.js' | head -1 || true; }
 uptime_sn() { curl -fsS --max-time 15 https://api.projelio.app/health/ready | grep -oE '"uptimeSeconds":[0-9]+' | grep -oE '[0-9]+' || echo 999999; }
 
@@ -152,5 +168,9 @@ for _ in $(seq 1 60); do
     fi
   fi
 done
-echo "⚠ 15 dakikada dağıtım görünmedi. CI yeşildi, yani sorun dağıtım tarafında:"
-echo "  ssh projelio@100.111.242.24 'journalctl -u projelio-deploy.service -n 50 --no-pager'"
+echo "⚠ 15 dakikada dağıtım görünmedi. CI yeşildi, yani sorun dağıtım tarafında."
+echo "  Önce dağıtımın hangi commit'te olduğuna bak — kaydedilmişse dağıtım OLMUŞ,"
+echo "  gözlenecek iz yok demektir:"
+echo "    ssh projelio@100.111.242.24 'cat /srv/projelio/.cicd/state'"
+echo "  Gerçekten koşmadıysa servisin son çalışması:"
+echo "    ssh projelio@100.111.242.24 'systemctl status projelio-deploy.service --no-pager'"

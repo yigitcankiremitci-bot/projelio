@@ -111,11 +111,11 @@ export const dosyalar: TranslationDict = {
   // ─────────────────────────────────────────────── Bağlama (migration 095)
   // "Bağla" tek başına "taşındı mı?" sorusunu doğuruyor; açıklama satırı şart.
   "Bağla…": "Link…",
-  "Dosyayı bağla": "Link file",
-  "{sayi} dosyayı bağla": "Link {sayi} files",
-  "{sayi} dosyayı bağla…": "Link {sayi} files…",
-  "Dosya bulunduğu klasörde kalır; seçtiğin yerde de görünmeye başlar.":
-    "The file stays in its folder and also starts showing up where you pick.",
+  Bağla: "Link",
+  "{sayi} öğeyi bağla": "Link {sayi} items",
+  "{sayi} öğeyi bağla…": "Link {sayi} items…",
+  "Yerinde kalır; seçtiğin yerde de görünmeye başlar.":
+    "It stays where it is and also starts showing up where you pick.",
   "Görev, kişi ya da kayıt ara": "Search tasks, people or records",
   Kişiler: "People",
   "Modül kayıtları": "Module records",

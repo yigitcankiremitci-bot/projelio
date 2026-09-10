@@ -1,5 +1,6 @@
 -- 095_dosya_baglantilari.sql
--- Dosya bağlantıları: bir dosyayı bir göreve, kişiye ya da modül kaydına iliştirmek.
+-- Bağlantılar: bir DOSYAYI ya da KLASÖRÜ bir göreve, kişiye ya da modül
+-- kaydına iliştirmek.
 --
 -- SORUN:
 --   Bir dosyanın nerede görüneceğini SAHİPLİĞİ belirliyordu. `files.task_id`
@@ -11,7 +12,9 @@
 --        bağlamak, onu klasöründen koparıyordu. Kullanıcı dosyayı bir daha
 --        koyduğu yerde bulamıyordu.
 --
---   Kişi ve modül kaydı için ise hiçbir yol yoktu — o kolonlar hiç yok.
+--   Kişi ve modül kaydı için ise hiçbir yol yoktu — o kolonlar hiç yok. Klasör
+--   iliştirmenin de hiçbir karşılığı yoktu, oysa "şu görevin bütün belgeleri"
+--   çoğu zaman tek tek dosyalar değil bir KLASÖR.
 --
 -- MODEL:
 --   Ayrı bir kenar tablosu (bkz. migration 094'teki aynı gerekçe). Dosya
@@ -23,6 +26,12 @@
 --   yazılıyor ve görevin ekleri iki kaynağın birleşimi: kolon + bu tablo. Kolonu
 --   göç ettirmek, çalışan bir akışı bu özellik uğruna riske atmak olurdu.
 --
+-- KAYNAK NEDEN İKİ KOLON (file_id / folder_id):
+--   İkisi de gerçek tablolara işaret ediyor, yani ikisi de FK olabiliyor ve
+--   silinen dosya/klasörün bağlantısı cascade ile gidiyor. Hedef tarafında bu
+--   mümkün değil (aşağıya bakın); kaynakta mümkünken vazgeçmenin sebebi yok.
+--   `files` ve `file_folders` tablolarındaki "üçünden tam biri" deseninin aynısı.
+--
 -- HEDEF NEDEN POLİMORFİK (üç ayrı tablo değil):
 --   Üç hedef türünün de tek bir davranışı var: "bağla, listele, kopar". Ayrı
 --   tablolar üç kopya sorgu ve üç kopya yetki kontrolü demekti; aradaki fark er
@@ -32,7 +41,7 @@
 --   hedefin satırını kimse sormuyor. Yine de temizlik için türe göre indeks var.
 --
 -- 'user' HEDEFİ ERİŞİM VERMEZ:
---   Bir dosyayı birine bağlamak, o kişiye dosyayı GÖSTERMEZ. Görebilmesi için
+--   Bir dosyayı ya da klasörü birine bağlamak, o kişiye onu GÖSTERMEZ. Görebilmesi için
 --   dosyanın kapsamına (iş/departman/şirket) zaten erişimi olmalı; listeleme her
 --   satırı tek tek o kontrolden geçiriyor (bkz. FileLinksService). Bağlantıyı
 --   erişim kapısı yapmak, Drive izinleriyle Projelio izinlerinin ayrışması
@@ -40,27 +49,38 @@
 
 create table if not exists public.file_links (
   id uuid primary key default gen_random_uuid(),
-  file_id uuid not null references public.files(id) on delete cascade,
+  file_id uuid references public.files(id) on delete cascade,
+  folder_id uuid references public.file_folders(id) on delete cascade,
   target_kind text not null check (target_kind in ('task', 'user', 'module_record')),
   target_id uuid not null,
   created_by uuid not null references public.users(id) on delete cascade,
-  created_at timestamp not null default now()
+  created_at timestamp not null default now(),
+  constraint file_links_kaynak check (num_nonnulls(file_id, folder_id) = 1)
 );
 
 comment on table public.file_links is
-  'Dosyanin gorev/kisi/modul kaydina iliştirilmesi. Dosya sahipligine ve klasorune dokunmaz.';
+  'Dosya ya da klasorun gorev/kisi/modul kaydina iliştirilmesi. Sahipligie ve klasor agacina dokunmaz.';
+comment on column public.file_links.folder_id is
+  'Kaynak bir KLASOR ise dolu. file_id ile birlikte tam biri dolu olur.';
 comment on column public.file_links.target_kind is
   'task | user | module_record. Hedef tablolara FK YOK (polimorfik); silinen hedefin satiri artikta kalir.';
 
--- Aynı dosyayı aynı hedefe ikinci kez bağlamak yeni satır açmasın: kullanıcı
+-- Aynı kaynağı aynı hedefe ikinci kez bağlamak yeni satır açmasın: kullanıcı
 -- için "bağla" iki kez tıklanabilir bir düğme ve ikincisi bir hata değil.
-create unique index if not exists file_links_uniq
-  on public.file_links(file_id, target_kind, target_id);
+--
+-- İKİ AYRI KISMİ İNDEKS: kaynak kolonlarından biri her zaman NULL ve NULL'lar
+-- tekillikte birbirine eşit sayılmıyor — tek bir üçlü indeks klasör satırlarını
+-- hiç denetlemezdi.
+create unique index if not exists file_links_file_uniq
+  on public.file_links(file_id, target_kind, target_id) where file_id is not null;
+create unique index if not exists file_links_folder_uniq
+  on public.file_links(folder_id, target_kind, target_id) where folder_id is not null;
 
 -- Asıl sorgu: "bu görevin/kişinin/kaydın dosyaları". Listeleme hep bu yönde.
 create index if not exists file_links_target_idx
   on public.file_links(target_kind, target_id);
 
--- Dosya silinirken satırlar cascade ile gidiyor; bu indeks dosya ekranındaki
--- "bu dosya nereye bağlı" rozetini besliyor.
-create index if not exists file_links_file_idx on public.file_links(file_id);
+-- Kaynak silinirken satırlar cascade ile gidiyor; bu indeksler dosya
+-- ekranındaki "bu nereye bağlı" sorgusunu besliyor.
+create index if not exists file_links_file_idx on public.file_links(file_id) where file_id is not null;
+create index if not exists file_links_folder_idx on public.file_links(folder_id) where folder_id is not null;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Job, Project, ProjectFile } from "@projelio/shared";
-import { filesApi } from "../api/files";
+import { filesApi, type LinkSource } from "../api/files";
 import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
 import { useFileThumbnails } from "../lib/fileThumbnails";
 import { fileKey, parseKey, useFileSelection } from "../lib/fileSelection";
@@ -57,8 +57,8 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   const secim = useFileSelection();
   /** Onay bekleyen kaldırma; tek dosya da bir kümedir (bkz. FilesPanel). */
   const [pendingDelete, setPendingDelete] = useState<ProjectFile[] | null>(null);
-  /** "Bağla" penceresi (bkz. FilesPanel'deki eşi). */
-  const [linking, setLinking] = useState<ProjectFile[] | null>(null);
+  /** "Bağla" penceresi (bkz. FilesPanel'deki eşi). Burada klasör yok. */
+  const [linking, setLinking] = useState<LinkSource[] | null>(null);
   const [viewMode, toggleViewMode] = useFileViewMode();
   const { pushUndo, pushDestructive } = useUndo();
   const [adding, setAdding] = useState(false);
@@ -450,8 +450,8 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
                     onClick: () => void handleDuplicate(menuDosyalari(menu)),
                   },
                   {
-                    label: t("{sayi} dosyayı bağla…", { sayi: menu.toplu.length }),
-                    onClick: () => setLinking(menuDosyalari(menu)),
+                    label: t("{sayi} öğeyi bağla…", { sayi: menu.toplu.length }),
+                    onClick: () => setLinking(menuDosyalari(menu).map((f) => ({ fileId: f.id }))),
                   },
                   {
                     label: t("{sayi} öğeyi kaldır", { sayi: menu.toplu.length }),
@@ -468,7 +468,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
                   },
                   { label: t("Yeniden adlandır"), onClick: () => void handleRename(menu.file!) },
                   { label: t("Çoğalt"), onClick: () => void handleDuplicate([menu.file!]) },
-                  { label: t("Bağla…"), onClick: () => setLinking([menu.file!]) },
+                  { label: t("Bağla…"), onClick: () => setLinking([{ fileId: menu.file!.id }]) },
                   {
                     label: t("Kaldır"),
                     danger: true,
@@ -479,7 +479,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
         />
       )}
 
-      {linking && <LinkFileModal files={linking} onClose={() => setLinking(null)} />}
+      {linking && <LinkFileModal sources={linking} onClose={() => setLinking(null)} />}
 
       {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} />}
 

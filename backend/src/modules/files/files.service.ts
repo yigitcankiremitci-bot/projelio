@@ -1661,6 +1661,28 @@ export class FilesService {
     return ids;
   }
 
+  /**
+   * Klasörün ham satırı + erişim kontrolü.
+   *
+   * Bağlantı modülü (bkz. FileLinksModule) klasörün KAPSAMINI okumak zorunda ve
+   * `listFolders` yalnızca eşlenmiş şekli veriyor. `folderForWrite` de olmaz:
+   * o Projelio üretimi klasörleri reddediyor, oysa bir proje klasörünü bir
+   * göreve bağlamakta bir sakınca yok — bağlantı klasöre dokunmuyor.
+   */
+  async folderForRead(folderId: string, userId: string): Promise<{ row: any; owner: FileOwner }> {
+    const { data: row, error } = await this.supabase.client
+      .from("file_folders")
+      .select()
+      .eq("id", folderId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Klasör bulunamadı");
+
+    const owner = ownerOfFolderRow(row);
+    await this.assertOwnerAccess(owner, userId);
+    return { row, owner };
+  }
+
   /** Yazma işlemleri için klasörü çözer: yalnızca kullanıcı klasörleri değiştirilebilir. */
   private async folderForWrite(folderId: string, userId: string): Promise<{ row: any; owner: FileOwner }> {
     const { data: row, error } = await this.supabase.client

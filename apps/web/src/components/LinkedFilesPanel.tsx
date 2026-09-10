@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { ProjectFile } from "@projelio/shared";
-import { fileLinksApi, filesApi, type LinkTargetKind } from "../api/files";
+import { fileLinksApi, filesApi, type LinkedItems, type LinkTargetKind } from "../api/files";
 import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
 import { useFileThumbnails } from "../lib/fileThumbnails";
 import { useT } from "../lib/i18n";
@@ -8,7 +9,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import FileContextMenu from "./FileContextMenu";
 import FilePreviewModal from "./FilePreviewModal";
 import FileThumb from "./FileThumb";
-import { IconExternalLink, IconX } from "./icons";
+import { IconExternalLink, IconFolder, IconX } from "./icons";
 
 interface Props {
   targetKind: LinkTargetKind;
@@ -34,27 +35,36 @@ interface Props {
 export default function LinkedFilesPanel({ targetKind, targetId, title, canUnlink = true }: Props) {
   const c = useThemeColors();
   const t = useT();
-  const [files, setFiles] = useState<ProjectFile[]>([]);
+  const [items, setItems] = useState<LinkedItems>({ files: [], folders: [] });
   const [preview, setPreview] = useState<ProjectFile | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; file: ProjectFile } | null>(null);
   const [error, setError] = useState("");
-  const thumbs = useFileThumbnails(files);
+  const thumbs = useFileThumbnails(items.files);
 
   const load = useCallback(() => {
     if (!targetId) return;
     fileLinksApi
       .forTarget(targetKind, targetId)
-      // Bağlı dosya listesi kritik değil: alınamazsa bölüm hiç çizilmez.
-      .then(setFiles)
-      .catch(() => setFiles([]));
+      // Bağlı liste kritik değil: alınamazsa bölüm hiç çizilmez.
+      .then(setItems)
+      .catch(() => setItems({ files: [], folders: [] }));
   }, [targetKind, targetId]);
 
   useEffect(load, [load]);
 
-  const kopar = async (file: ProjectFile) => {
+  const koparDosya = async (file: ProjectFile) => {
     try {
-      await fileLinksApi.unlink(file.id, targetKind, targetId);
-      setFiles((prev) => prev.filter((f) => f.id !== file.id));
+      await fileLinksApi.unlink({ fileId: file.id }, targetKind, targetId);
+      setItems((prev) => ({ ...prev, files: prev.files.filter((f) => f.id !== file.id) }));
+    } catch (e: any) {
+      setError(e?.message ?? t("Bağlantı koparılamadı"));
+    }
+  };
+
+  const koparKlasor = async (folderId: string) => {
+    try {
+      await fileLinksApi.unlink({ folderId }, targetKind, targetId);
+      setItems((prev) => ({ ...prev, folders: prev.folders.filter((f) => f.id !== folderId) }));
     } catch (e: any) {
       setError(e?.message ?? t("Bağlantı koparılamadı"));
     }
@@ -68,7 +78,7 @@ export default function LinkedFilesPanel({ targetKind, targetId, title, canUnlin
     }
   };
 
-  if (!files.length) return null;
+  if (!items.files.length && !items.folders.length) return null;
 
   return (
     <div style={{ marginTop: 16 }}>
@@ -79,7 +89,65 @@ export default function LinkedFilesPanel({ targetKind, targetId, title, canUnlin
       {error && <div style={{ color: c.danger, fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {files.map((file) => (
+        {/*
+          Klasörler önce: bir görevin "bütün belgeleri" çoğu zaman tek tek
+          dosyalar değil bir klasör, ve o klasör listenin dibinde aranmamalı.
+
+          Satır Projelio İÇİNE gidiyor, buluta değil: bulut adresi kullanıcıyı
+          uygulamadan çıkarır ve Drive izni olmayan (ama Projelio erişimi olan)
+          bir üyede hiç açılmaz.
+        */}
+        {items.folders.map((folder) => (
+          <div
+            key={folder.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "8px 10px",
+              borderRadius: 9,
+              border: `1px solid ${c.border}`,
+              background: c.surface,
+            }}
+          >
+            <Link
+              to={folder.href}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                flex: 1,
+                minWidth: 0,
+                textDecoration: "none",
+              }}
+            >
+              <IconFolder size={18} color={c.accent} />
+              <span
+                style={{
+                  fontSize: 14,
+                  color: c.textPrimary,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {folder.name}
+              </span>
+            </Link>
+            {canUnlink && (
+              <button
+                type="button"
+                title={t("Bağlantıyı kopar")}
+                onClick={() => void koparKlasor(folder.id)}
+                style={ikonDugmesi(c.border)}
+              >
+                <IconX size={14} color={c.textSecondary} />
+              </button>
+            )}
+          </div>
+        ))}
+
+        {items.files.map((file) => (
           <div
             key={file.id}
             onContextMenu={(e) => {
@@ -136,7 +204,7 @@ export default function LinkedFilesPanel({ targetKind, targetId, title, canUnlin
                 // "Sil" DEĞİL: dosya yerinde kalıyor, yalnızca buradaki
                 // bağlantısı kopuyor. Etiket bunu açıkça söylemeli.
                 title={t("Bağlantıyı kopar")}
-                onClick={() => void kopar(file)}
+                onClick={() => void koparDosya(file)}
                 style={ikonDugmesi(c.border)}
               >
                 <IconX size={14} color={c.textSecondary} />
@@ -159,7 +227,7 @@ export default function LinkedFilesPanel({ targetKind, targetId, title, canUnlin
               onClick: () => window.open(driveEditUrl(menu.file), "_blank", "noopener,noreferrer"),
             },
             ...(canUnlink
-              ? [{ label: t("Bağlantıyı kopar"), danger: true, onClick: () => void kopar(menu.file) }]
+              ? [{ label: t("Bağlantıyı kopar"), danger: true, onClick: () => void koparDosya(menu.file) }]
               : []),
           ]}
         />

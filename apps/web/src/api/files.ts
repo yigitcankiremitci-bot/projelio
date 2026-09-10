@@ -472,11 +472,31 @@ export type LinkTargetKind = "task" | "user" | "module_record";
 
 export interface FileLink {
   id: string;
-  fileId: string;
+  fileId?: string;
+  folderId?: string;
   targetKind: LinkTargetKind;
   targetId: string;
   createdBy: string;
   createdAt: string;
+}
+
+/**
+ * Bağlantının kaynağı: bir dosya ya da bir klasör.
+ *
+ * Uçlar kaynağa göre ayrı (`/files/...` ve `/file-folders/...`): kimliğin hangi
+ * tabloya ait olduğunu sorgu parametresiyle bildirmek, istemcinin doğru
+ * söylediğine güvenmek olurdu.
+ */
+export type LinkSource = { fileId: string; folderId?: undefined } | { folderId: string; fileId?: undefined };
+
+function sourceBase(source: LinkSource): string {
+  return source.folderId ? `/file-folders/${source.folderId}` : `/files/${source.fileId}`;
+}
+
+/** Bir hedefe bağlı olanlar. Klasörün `href`i sunucuda kuruluyor. */
+export interface LinkedItems {
+  files: ProjectFile[];
+  folders: { id: string; name: string; href: string }[];
 }
 
 /** Seçicideki aday listeleri; hepsi dosyanın kapsamından geliyor. */
@@ -493,15 +513,15 @@ export interface LinkTargets {
  * da görünür (bkz. migration 095).
  */
 export const fileLinksApi = {
-  /** Bir hedefe (görev/kişi/modül kaydı) bağlı dosyalar. */
+  /** Bir hedefe (görev/kişi/modül kaydı) bağlı dosyalar ve klasörler. */
   forTarget: (targetKind: LinkTargetKind, targetId: string) =>
-    api.get<ProjectFile[]>(`/file-links${query({ targetKind, targetId })}`),
-  /** Bir dosyanın bağlı olduğu yerler. */
-  forFile: (fileId: string) => api.get<FileLink[]>(`/files/${fileId}/links`),
-  targets: (fileId: string, q?: string) =>
-    api.get<LinkTargets>(`/files/${fileId}/link-targets${query({ q })}`),
-  link: (fileId: string, targetKind: LinkTargetKind, targetId: string) =>
-    api.post<FileLink>(`/files/${fileId}/links`, { targetKind, targetId }),
-  unlink: (fileId: string, targetKind: LinkTargetKind, targetId: string) =>
-    api.delete<{ ok: boolean }>(`/files/${fileId}/links${query({ targetKind, targetId })}`),
+    api.get<LinkedItems>(`/file-links${query({ targetKind, targetId })}`),
+  /** Bir dosyanın/klasörün bağlı olduğu yerler. */
+  forSource: (source: LinkSource) => api.get<FileLink[]>(`${sourceBase(source)}/links`),
+  targets: (source: LinkSource, q?: string) =>
+    api.get<LinkTargets>(`${sourceBase(source)}/link-targets${query({ q })}`),
+  link: (source: LinkSource, targetKind: LinkTargetKind, targetId: string) =>
+    api.post<FileLink>(`${sourceBase(source)}/links`, { targetKind, targetId }),
+  unlink: (source: LinkSource, targetKind: LinkTargetKind, targetId: string) =>
+    api.delete<{ ok: boolean }>(`${sourceBase(source)}/links${query({ targetKind, targetId })}`),
 };

@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
-import type { ProjectFile } from "@projelio/shared";
-import { fileLinksApi, type LinkTargetKind, type LinkTargets } from "../api/files";
+import { fileLinksApi, type LinkSource, type LinkTargetKind, type LinkTargets } from "../api/files";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconFile, IconListCheck, IconUser } from "./icons";
 
 interface Props {
-  /** Bağlanacak dosyalar. Çoklu seçimde hepsi aynı hedefe bağlanır. */
-  files: ProjectFile[];
+  /** Bağlanacak kaynaklar (dosya ve/veya klasör). Hepsi aynı hedefe bağlanır. */
+  sources: LinkSource[];
   onClose: () => void;
   onLinked?: () => void;
 }
@@ -16,7 +15,8 @@ interface Props {
 const BOS: LinkTargets = { tasks: [], users: [], records: [] };
 
 /**
- * "Bağla": dosyayı bir göreve, kişiye ya da modül kaydına iliştirir.
+ * "Bağla": dosyayı ya da KLASÖRÜ bir göreve, kişiye ya da modül kaydına
+ * iliştirir.
  *
  * TAŞIMA DEĞİL. Dosya klasöründe kalır; hedefin ekranında da görünmeye başlar
  * (bkz. migration 095). Kullanıcıya da böyle anlatılıyor — "bağla" sözcüğü
@@ -26,7 +26,7 @@ const BOS: LinkTargets = { tasks: [], users: [], records: [] };
  * bağlamanın izin kurallarıyla aynı kurallardan çıkıyor. İstemcide ikinci bir
  * kopya, seçilebilen ama bağlanamayan satırlar demekti.
  */
-export default function LinkFileModal({ files, onClose, onLinked }: Props) {
+export default function LinkFileModal({ sources, onClose, onLinked }: Props) {
   const c = useThemeColors();
   const t = useT();
   const [q, setQ] = useState("");
@@ -35,9 +35,9 @@ export default function LinkFileModal({ files, onClose, onLinked }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // Adaylar ilk dosyanın kapsamından: çoklu seçimde hepsi aynı ekrandan
+  // Adaylar ilk kaynağın kapsamından: çoklu seçimde hepsi aynı ekrandan
   // geldiği için kapsamları da aynı.
-  const kaynak = files[0];
+  const kaynak = sources[0];
 
   useEffect(() => {
     if (!kaynak) return;
@@ -46,7 +46,7 @@ export default function LinkFileModal({ files, onClose, onLinked }: Props) {
     // Arama sunucuda süzülüyor; kullanıcı yazdıkça istek atmamak için
     // yalnızca ilk yükleme sunucuya gidiyor, sonrası yerelde daraltılıyor.
     fileLinksApi
-      .targets(kaynak.id)
+      .targets(kaynak)
       .then((veri) => {
         if (!iptal) setTargets(veri);
       })
@@ -55,7 +55,7 @@ export default function LinkFileModal({ files, onClose, onLinked }: Props) {
     return () => {
       iptal = true;
     };
-  }, [kaynak?.id]);
+  }, [kaynak?.fileId, kaynak?.folderId]);
 
   const bagla = async (kind: LinkTargetKind, targetId: string) => {
     setBusy(true);
@@ -63,7 +63,7 @@ export default function LinkFileModal({ files, onClose, onLinked }: Props) {
     try {
       // Sırayla: sunucu her bağlantıyı ayrı doğruluyor ve biri reddedilirse
       // (ör. kapsam dışı) diğerleri yine de bağlanmış olmalı.
-      for (const file of files) await fileLinksApi.link(file.id, kind, targetId);
+      for (const source of sources) await fileLinksApi.link(source, kind, targetId);
       onLinked?.();
       onClose();
     } catch (e: any) {
@@ -135,12 +135,12 @@ export default function LinkFileModal({ files, onClose, onLinked }: Props) {
 
   return (
     <Modal
-      title={files.length > 1 ? t("{sayi} dosyayı bağla", { sayi: files.length }) : t("Dosyayı bağla")}
+      title={sources.length > 1 ? t("{sayi} öğeyi bağla", { sayi: sources.length }) : t("Bağla")}
       onClose={onClose}
       maxWidth={460}
     >
       <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 12px" }}>
-        {t("Dosya bulunduğu klasörde kalır; seçtiğin yerde de görünmeye başlar.")}
+        {t("Yerinde kalır; seçtiğin yerde de görünmeye başlar.")}
       </p>
 
       <input

@@ -17,19 +17,37 @@ const ADAY_TAVANI = 50;
 /** Bir dosyanın iliştirilebileceği yerler (bkz. migration 095). */
 export type LinkTargetKind = "task" | "user" | "module_record";
 
+/** Bağlantının kaynağı: bir dosya ya da bir klasör (tam biri). */
+export type LinkSource = { fileId: string; folderId?: undefined } | { folderId: string; fileId?: undefined };
+
 export interface FileLink {
   id: string;
-  fileId: string;
+  fileId?: string;
+  folderId?: string;
   targetKind: LinkTargetKind;
   targetId: string;
   createdBy: string;
   createdAt: string;
 }
 
+/**
+ * Bir hedefe bağlı KLASÖR satırı.
+ *
+ * `href` sunucuda kuruluyor: klasörün hangi ekrana ait olduğunu yalnızca burası
+ * biliyor (kapsam kolonları istemciye hiç gitmiyor) ve o bilgiyi istemciye
+ * taşımak, orada ikinci bir yönlendirme tablosu tutmak demekti.
+ */
+export interface LinkedFolder {
+  id: string;
+  name: string;
+  href: string;
+}
+
 function mapLink(row: any): FileLink {
   return {
     id: row.id,
-    fileId: row.file_id,
+    fileId: row.file_id ?? undefined,
+    folderId: row.folder_id ?? undefined,
     targetKind: row.target_kind,
     targetId: row.target_id,
     createdBy: row.created_by,
@@ -68,19 +86,37 @@ export class FileLinksService {
    * olabiliyor; kapsam kontrolü olmasa A şirketinin dosyası B şirketinin
    * gorevine asılabilir ve orada gören herkes onu açamadığı hâlde görürdü.
    */
-  private async fileScope(fileId: string, userId: string): Promise<{
+  private async kaynakKapsami(
+    source: LinkSource,
+    userId: string
+  ): Promise<{
     row: any;
+    /** Bildirimde ve hata mesajlarında gösterilen ad. */
+    name: string;
     jobId?: string;
     departmentId?: string;
     organizationId?: string;
   }> {
-    const { row } = await this.filesService.findById(fileId, userId);
+    // Klasörde kapsam doğrudan satırda; dosyada da öyle. İkisi de aynı üç
+    // kolonu taşıyor (bkz. migration 090), bu yüzden okuma ortak.
+    const { row } = source.folderId
+      ? await this.filesService.folderForRead(source.folderId, userId)
+      : await this.filesService.findById(source.fileId!, userId);
+
     return {
       row,
+      name: row.name,
       jobId: row.job_id ?? undefined,
       departmentId: row.department_id ?? undefined,
       organizationId: row.organization_id ?? undefined,
     };
+  }
+
+  /** Kaynağın veritabanı kolonu — sorgular bunu kullanıyor. */
+  private static kaynakKolonu(source: LinkSource): { column: "file_id" | "folder_id"; id: string } {
+    return source.folderId
+      ? { column: "folder_id", id: source.folderId }
+      : { column: "file_id", id: source.fileId! };
   }
 
   /** Departmanın bağlı olduğu şirket. */
@@ -231,34 +267,41 @@ export class FileLinksService {
     return false;
   }
 
-  async link(fileId: string, userId: string, kind: LinkTargetKind, targetId: string): Promise<FileLink> {
+  async link(
+    source: LinkSource,
+    userId: string,
+    kind: LinkTargetKind,
+    targetId: string
+  ): Promise<FileLink> {
     if (!targetId) throw new BadRequestException("Bağlanacak öğe seçilmedi");
 
-    const dosya = await this.fileScope(fileId, userId);
+    const kaynak = await this.kaynakKapsami(source, userId);
     const hedef = await this.hedefKapsami(kind, targetId, userId);
 
     if (kind === "user") {
-      if (!(await this.kapsamUyesiMi(dosya, targetId))) {
-        throw new ForbiddenException("Bu kişi dosyanın ekibinde değil; bağlasanız da dosyayı açamaz.");
+      if (!(await this.kapsamUyesiMi(kaynak, targetId))) {
+        throw new ForbiddenException("Bu kişi dosyanın ekibinde değil; bağlasanız da açamaz.");
       }
-    } else if (!(await this.ayniKapsam(dosya, hedef.scope))) {
+    } else if (!(await this.ayniKapsam(kaynak, hedef.scope))) {
       throw new ForbiddenException("Bu öğe dosyanın kapsamında değil.");
     }
 
+    const { column, id } = FileLinksService.kaynakKolonu(source);
+
     const { data: row, error } = await this.supabase.client
       .from("file_links")
-      .insert({ file_id: fileId, target_kind: kind, target_id: targetId, created_by: userId })
+      .insert({ [column]: id, target_kind: kind, target_id: targetId, created_by: userId })
       .select()
       .single();
 
     if (error) {
-      // Zaten bağlı (migration 095'teki tekil indeks): var olanı döndürmek,
+      // Zaten bağlı (migration 095'teki tekil indeksler): var olanı döndürmek,
       // iki kez tıklamayı bir hata olmaktan çıkarıyor.
       if ((error as any).code === "23505") {
         const { data: mevcut } = await this.supabase.client
           .from("file_links")
           .select()
-          .eq("file_id", fileId)
+          .eq(column, id)
           .eq("target_kind", kind)
           .eq("target_id", targetId)
           .maybeSingle();
@@ -273,57 +316,96 @@ export class FileLinksService {
       this.notifications.notifyUserSafe(
         targetId,
         "file_linked",
-        "Sana bir dosya bağlandı",
-        dosya.row.name,
-        dosya.row.web_view_link ?? undefined
+        source.folderId ? "Sana bir klasör bağlandı" : "Sana bir dosya bağlandı",
+        kaynak.name,
+        kaynak.row.web_view_link ?? undefined
       );
     }
 
     return mapLink(row);
   }
 
-  async unlink(fileId: string, userId: string, kind: LinkTargetKind, targetId: string): Promise<void> {
-    // Erişim kontrolü: dosyayı göremeyen bağlantısını da koparamaz.
-    await this.filesService.findById(fileId, userId);
+  async unlink(source: LinkSource, userId: string, kind: LinkTargetKind, targetId: string): Promise<void> {
+    // Erişim kontrolü: kaynağı göremeyen bağlantısını da koparamaz.
+    await this.kaynakKapsami(source, userId);
+    const { column, id } = FileLinksService.kaynakKolonu(source);
     const { error } = await this.supabase.client
       .from("file_links")
       .delete()
-      .eq("file_id", fileId)
+      .eq(column, id)
       .eq("target_kind", kind)
       .eq("target_id", targetId);
     if (error) throw error;
   }
 
   /**
-   * Bir hedefe bağlı dosyalar.
+   * Bir hedefe bağlı dosyalar VE klasörler.
    *
-   * Her satır FilesService.findById'den geçiyor: erişimi olmayan dosya sessizce
+   * Her satır erişim kontrolünden geçiyor: erişimi olmayan kaynak sessizce
    * elenir. Hata döndürmek, tek bir erişilemeyen dosya yüzünden bütün listeyi
    * boş bırakırdı (bkz. FilesController.accessTokens'taki aynı desen).
    */
-  async listForTarget(kind: LinkTargetKind, targetId: string, userId: string): Promise<ProjectFile[]> {
-    if (!targetId) return [];
+  async listForTarget(
+    kind: LinkTargetKind,
+    targetId: string,
+    userId: string
+  ): Promise<{ files: ProjectFile[]; folders: LinkedFolder[] }> {
+    if (!targetId) return { files: [], folders: [] };
 
     const { data, error } = await this.supabase.client
       .from("file_links")
-      .select("file_id")
+      .select("file_id, folder_id")
       .eq("target_kind", kind)
       .eq("target_id", targetId)
       .order("created_at", { ascending: false })
       .limit(LISTE_TAVANI);
     if (error) throw error;
 
-    const sonuc = await Promise.all(
-      (data ?? []).map(async (satir: any) => {
-        try {
-          const { file } = await this.filesService.findById(satir.file_id, userId);
-          return file;
-        } catch {
-          return null;
-        }
-      })
+    const dosyalar = await Promise.all(
+      (data ?? [])
+        .filter((satir: any) => satir.file_id)
+        .map(async (satir: any) => {
+          try {
+            const { file } = await this.filesService.findById(satir.file_id, userId);
+            return file;
+          } catch {
+            return null;
+          }
+        })
     );
-    return sonuc.filter(Boolean) as ProjectFile[];
+
+    const klasorler = await Promise.all(
+      (data ?? [])
+        .filter((satir: any) => satir.folder_id)
+        .map(async (satir: any) => {
+          try {
+            const { row } = await this.filesService.folderForRead(satir.folder_id, userId);
+            return { id: row.id, name: row.name, href: this.klasorAdresi(row) };
+          } catch {
+            return null;
+          }
+        })
+    );
+
+    return {
+      files: dosyalar.filter(Boolean) as ProjectFile[],
+      folders: klasorler.filter(Boolean) as LinkedFolder[],
+    };
+  }
+
+  /**
+   * Klasörü Projelio'da açan adres.
+   *
+   * Klasörün BULUT adresi kullanılamaz: kullanıcıyı uygulamadan çıkarır ve
+   * Drive'da klasörü göremeyen (izni olmayan ama Projelio'da erişimi olan) bir
+   * üye için hiç açılmaz. Adres, klasörün kapsamının dosyalar sekmesine
+   * `klasor` parametresiyle gidiyor (bkz. FilesPanel'deki URL eşitlemesi).
+   */
+  private klasorAdresi(row: any): string {
+    const p = `klasor=${row.id}`;
+    if (row.organization_id) return `/organizations/${row.organization_id}?tab=files&${p}`;
+    if (row.department_id) return `/departments/${row.department_id}?tab=files&${p}`;
+    return `/jobs/${row.job_id}?tab=files&${p}`;
   }
 
   /**
@@ -335,7 +417,7 @@ export class FileLinksService {
    * gösterilmesi demekti — kullanıcı seçer, sunucu reddeder.
    */
   async linkTargets(
-    fileId: string,
+    source: LinkSource,
     userId: string,
     q?: string
   ): Promise<{
@@ -343,27 +425,27 @@ export class FileLinksService {
     users: { id: string; fullName: string }[];
     records: { id: string; name: string; moduleKey?: string }[];
   }> {
-    const dosya = await this.fileScope(fileId, userId);
+    const kaynak = await this.kaynakKapsami(source, userId);
     const arama = (q ?? "").trim().toLowerCase();
     const eslesir = (metin?: string) => !arama || (metin ?? "").toLowerCase().includes(arama);
 
     const organizationId =
-      dosya.organizationId ??
-      (await this.organizationOfDepartment(dosya.departmentId)) ??
-      (await this.organizationOfJob(dosya.jobId));
+      kaynak.organizationId ??
+      (await this.organizationOfDepartment(kaynak.departmentId)) ??
+      (await this.organizationOfJob(kaynak.jobId));
 
     // ── Görevler
     let tasks: any[] = [];
     try {
-      if (dosya.departmentId) {
-        tasks = await this.tasksService.findByDepartment(dosya.departmentId, userId);
-      } else if (dosya.organizationId && organizationId) {
+      if (kaynak.departmentId) {
+        tasks = await this.tasksService.findByDepartment(kaynak.departmentId, userId);
+      } else if (kaynak.organizationId && organizationId) {
         tasks = await this.tasksService.findByOrganization(organizationId, userId);
-      } else if (dosya.jobId) {
+      } else if (kaynak.jobId) {
         const { data: projeler } = await this.supabase.client
           .from("projects")
           .select("id, title")
-          .eq("job_id", dosya.jobId);
+          .eq("job_id", kaynak.jobId);
         for (const proje of projeler ?? []) {
           // Bir projenin gorevleri okunamazsa (taşeron görünürlüğü) tüm liste
           // düşmesin; o proje atlanır.
@@ -380,7 +462,7 @@ export class FileLinksService {
     }
 
     // ── Kişiler: dosyanın kapsamının ekibi
-    const users = await this.kapsamEkibi(dosya, organizationId);
+    const users = await this.kapsamEkibi(kaynak, organizationId);
 
     // ── Modül kayıtları
     let records: any[] = [];
@@ -393,11 +475,11 @@ export class FileLinksService {
         .order("created_at", { ascending: false })
         .limit(LISTE_TAVANI);
       records = data ?? [];
-    } else if (dosya.jobId) {
+    } else if (kaynak.jobId) {
       const { data } = await this.supabase.client
         .from("module_records")
         .select("id, module_key, data, department_id, job_id")
-        .eq("job_id", dosya.jobId)
+        .eq("job_id", kaynak.jobId)
         .is("archived_at", null)
         .order("created_at", { ascending: false })
         .limit(LISTE_TAVANI);
@@ -472,13 +554,14 @@ export class FileLinksService {
     return (data ?? []).map((u: any) => ({ id: u.id, fullName: u.full_name ?? "Kullanıcı" }));
   }
 
-  /** Bir dosyanın bağlı olduğu hedefler — dosya ekranındaki rozet için. */
-  async listForFile(fileId: string, userId: string): Promise<FileLink[]> {
-    await this.filesService.findById(fileId, userId);
+  /** Bir dosyanın/klasörün bağlı olduğu hedefler — dosya ekranındaki rozet için. */
+  async listForSource(source: LinkSource, userId: string): Promise<FileLink[]> {
+    await this.kaynakKapsami(source, userId);
+    const { column, id } = FileLinksService.kaynakKolonu(source);
     const { data, error } = await this.supabase.client
       .from("file_links")
       .select()
-      .eq("file_id", fileId)
+      .eq(column, id)
       .limit(LISTE_TAVANI);
     if (error) throw error;
     return (data ?? []).map(mapLink);

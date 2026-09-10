@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { GoogleDriveStatus, ProjectFile } from "@projelio/shared";
-import { driveApi, filesApi, oneDriveApi } from "../api/files";
+import { driveApi, filesApi, oneDriveApi, type LinkSource } from "../api/files";
 import { useRefreshOnUndo, useUndo, useWithoutPendingDeletes } from "../lib/undo";
 import type { FileFolder, FileFolderOwner, FileScope } from "../api/files";
 import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
@@ -143,8 +143,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<ProjectFile | null>(null);
-  /** "Bağla" penceresi: dosyayı bir göreve/kişiye/modül kaydına iliştirir. */
-  const [linking, setLinking] = useState<ProjectFile[] | null>(null);
+  /** "Bağla" penceresi: dosyayı ya da klasörü bir göreve/kişiye/kayda iliştirir. */
+  const [linking, setLinking] = useState<LinkSource[] | null>(null);
   /**
    * Silinmeyi bekleyen küme. Tek dosya da bir kümedir: çoklu seçim geldikten
    * sonra iki ayrı onay akışı tutmak, birinde düzeltilen bir hatanın diğerinde
@@ -172,7 +172,20 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
   // ── Klasör gezinme ve görünüm
   const [folders, setFolders] = useState<FileFolder[]>([]);
-  const [folderId, setFolderId] = useState<string | undefined>(undefined);
+  /**
+   * Bulunulan klasör ADRESTE tutuluyor (`?klasor=<id>`).
+   *
+   * İki şey buna bağlı:
+   *   1. Bir göreve/kişiye bağlanmış klasör satırı doğrudan buraya açılabiliyor
+   *      (bkz. LinkedFilesPanel; adresi sunucu kuruyor).
+   *   2. Tarayıcının geri tuşu bir üst klasöre çıkıyor — kullanıcının ilk
+   *      refleksi oydu ve eskiden sayfadan tamamen çıkarıyordu.
+   *
+   * Modal içinde (görev eki) ve gezinilemeyen bağlamlarda YEREL state: orada
+   * adres sayfanın kendisine ait, bu panele değil.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [yerelKlasor, setYerelKlasor] = useState<string | undefined>(undefined);
   // Ekmek kırıntısı: kökten bulunulan klasöre kadar. Sunucudan geliyor, çünkü
   // kullanıcı derin bir klasöre bağlantıyla da girebilir.
   const [crumbs, setCrumbs] = useState<FileFolder[]>([]);
@@ -246,6 +259,26 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
    * da salt okunur bir toplama.
    */
   const canBrowse = Boolean(folderOwner) && !compact && !taskId && !outputId && !projectId && !groupId;
+
+  // Adres eşitlemesi yalnızca gezinilebilir, tam sayfa bağlamda.
+  const urlSenkron = canBrowse && !compact;
+  const folderId = urlSenkron ? searchParams.get("klasor") ?? undefined : yerelKlasor;
+
+  const setFolderId = useCallback(
+    (id?: string) => {
+      if (!urlSenkron) {
+        setYerelKlasor(id);
+        return;
+      }
+      const sonraki = new URLSearchParams(searchParams);
+      if (id) sonraki.set("klasor", id);
+      else sonraki.delete("klasor");
+      // replace DEĞİL: her klasör bir geçmiş adımı olsun ki geri tuşu bir üst
+      // klasöre çıksın.
+      setSearchParams(sonraki);
+    },
+    [urlSenkron, searchParams, setSearchParams]
+  );
 
   const target = useMemo(
     () =>
@@ -530,11 +563,9 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       ? [{ kind: "file", id: m.file.id }]
       : [];
 
-  /** Menüdeki seçimin DOSYA olanları — bağlama yalnızca dosyalar için. */
-  const menuSeciliDosyalar = (m: MenuState): ProjectFile[] => {
-    const ids = new Set(menuHedefleri(m).filter((i) => i.kind === "file").map((i) => i.id));
-    return gorunenDosyalar.filter((f) => ids.has(f.id));
-  };
+  /** Menüdeki seçimi bağlantı kaynaklarına çevirir (dosya ve klasör). */
+  const menuKaynaklari = (m: MenuState): LinkSource[] =>
+    menuHedefleri(m).map((i) => (i.kind === "folder" ? { folderId: i.id } : { fileId: i.id }));
 
   const beginDrag = (e: React.DragEvent, key: string) => {
     // Seçimin İÇİNDEN sürüklemek seçimin tamamını taşır; dışından sürüklemek
@@ -1646,16 +1677,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                         },
                       ]
                     : []),
-                  // Klasörler bağlanamıyor: bağlantı DOSYAYA ait bir kavram,
-                  // klasörün hedefte gösterilecek bir içeriği yok.
-                  ...(menuSeciliDosyalar(menu).length
-                    ? [
-                        {
-                          label: t("{sayi} dosyayı bağla…", { sayi: menuSeciliDosyalar(menu).length }),
-                          onClick: () => setLinking(menuSeciliDosyalar(menu)),
-                        },
-                      ]
-                    : []),
+                  {
+                    label: t("{sayi} öğeyi bağla…", { sayi: menu.toplu.length }),
+                    onClick: () => setLinking(menuKaynaklari(menu)),
+                  },
                   {
                     label: t("{sayi} öğeyi kaldır", { sayi: menu.toplu.length }),
                     danger: true,
@@ -1686,6 +1711,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     label: t("Çoğalt"),
                     disabled: readOnly,
                     onClick: () => void handleDuplicateFolder(menu.folder!),
+                  },
+                  {
+                    label: t("Bağla…"),
+                    onClick: () => setLinking([{ folderId: menu.folder!.id }]),
                   },
                   // Dokunmatikte sürükleme yok: klasörden çıkarmanın menüdeki
                   // karşılığı. Yalnızca bir klasörün İÇİNDEYKEN anlamlı.
@@ -1723,7 +1752,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                   },
                   {
                     label: t("Bağla…"),
-                    onClick: () => setLinking([menu.file!]),
+                    onClick: () => setLinking([{ fileId: menu.file!.id }]),
                   },
                   ...(folderId && canMoveFile(menu.file!)
                     ? [
@@ -1755,7 +1784,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       )}
 
       {linking && (
-        <LinkFileModal files={linking} onClose={() => setLinking(null)} />
+        <LinkFileModal sources={linking} onClose={() => setLinking(null)} />
       )}
 
       {preview && (

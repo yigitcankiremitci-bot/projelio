@@ -43,6 +43,28 @@ export const yaptim: TranslationDict = {
   "Son 30 gün": "Last 30 days",
   Dün: "Yesterday",
 
+  // ─────────────────────────────────────────────── Kayıtlı göreve bağlama
+  "Ne yaptın? Görev adı yazarsan listeden seçebilirsin":
+    "What did you do? Type a task name to pick it from the list",
+  "Görevler aranıyor…": "Searching tasks…",
+  "alt görev": "subtask",
+  "şimdiye dek": "so far",
+  Görev: "Task",
+  "Görev bağlantısını kaldır": "Unlink the task",
+  "Görevi yapıldı işaretle": "Mark the task done",
+  "Görev kendi projesinde/departmanında da tamamlandıya geçer.":
+    "The task is also set to completed in its own project or department.",
+  "Takvime işle": "Add to the calendar",
+  "Takvimde “yapıldı” bloğu olarak görünür.": "Shows up on the calendar as a “done” block.",
+  "Takvimde “yapıldı” olarak duruyor": "Sits on the calendar as “done”",
+  takvimde: "on the calendar",
+  "Saat aralığı gir": "Enter a time range",
+  "Süre gir": "Enter a duration",
+  "Başlangıç saati": "Start time",
+  "Bitiş saati": "End time",
+  "Harcanan: {sure}": "Spent: {sure}",
+  "Yaptım kayıtlarından": "from Yaptım entries",
+
   // ─────────────────────────────────────────────── "Nereye ait?" penceresi
   "Nereye ait?": "Where does it belong?",
   "Nereye ait? — projeye, göreve, kasaya aktar": "Where does it belong? — send it to a project, task or the ledger",

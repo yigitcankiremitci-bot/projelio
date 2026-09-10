@@ -555,6 +555,36 @@ export const AI_TOOLS: Anthropic.Tool[] = [
             "İşin yapıldığı an. Yalnızca gün için \"YYYY-MM-DD\", saatiyle için \"YYYY-MM-DDTHH:MM\". " +
             "Varsayılan şimdi. \"Dün\" gibi ifadeleri buraya çevir.",
         },
+        startedAt: {
+          type: "string",
+          description:
+            "Kullanıcı SAAT ARALIĞI söylediyse (\"9'dan 11'e kadar çalıştım\") başlangıç: " +
+            "\"YYYY-MM-DDTHH:MM\". endedAt ile BİRLİKTE gönderilir; süre sunucuda hesaplanır, " +
+            "ayrıca duration gönderme.",
+        },
+        endedAt: { type: "string", description: "Saat aralığının bitişi (\"YYYY-MM-DDTHH:MM\")." },
+        taskId: {
+          type: "string",
+          description:
+            "Yapılan iş sistemde KAYITLI bir görev ya da alt göreve karşılık geliyorsa onun id'si. " +
+            "Kullanıcı bir görev adı andıysa önce search_tasks ile bul, emin değilsen SOR — yanlış " +
+            "göreve süre yazmak ve onu kapatmak, düzeltilmesi zor bir karışıklık. " +
+            "Hiçbir görev eşleşmiyorsa bu alanı BOŞ bırak; kayıt yine de yazılır.",
+        },
+        markTaskDone: {
+          type: "boolean",
+          description:
+            "taskId verildiyse: görev kendi projesinde/departmanında da TAMAMLANDI'ya çekilsin mi. " +
+            "Yalnızca kullanıcı işin BİTTİĞİNİ söylediyse true yap (\"bitirdim\", \"tamamladım\"). " +
+            "\"Üzerinde çalıştım\" bitirmek demek DEĞİLDİR.",
+        },
+        addToCalendar: {
+          type: "boolean",
+          description:
+            "taskId verildiyse: yapılan iş takvime \"yapıldı\" bloğu olarak da işlensin mi. " +
+            "Saat aralığı verildiyse blok o aralığa oturur; yalnızca süre varsa işin şimdi bittiği " +
+            "varsayılıp geriye sayılır.",
+        },
       },
       required: ["title"],
     },

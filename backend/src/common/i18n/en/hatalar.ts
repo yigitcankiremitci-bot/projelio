@@ -603,4 +603,5 @@ export const hatalar: TranslationDict = {
   "Modül kaydı için şirket ve modül seçilmeli": "Pick a company and a module for the record",
   "Geçerli bir tutar gerekiyor": "A valid amount is required",
   "En az bir kayıt gerekli.": "At least one entry is required.",
+  "Bitiş saati başlangıçtan sonra olmalı": "The end time must be after the start time",
 };

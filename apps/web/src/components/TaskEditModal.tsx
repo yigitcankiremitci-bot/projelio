@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Output, Task, TaskComment } from "@projelio/shared";
+import { dakikayiMetneCevir } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
@@ -463,6 +464,17 @@ export default function TaskEditModal({
               <option value="days">{t("Gün")}</option>
             </select>
           </div>
+          {/* GERÇEKLEŞEN süre, tahminin üstüne yazılmaz — yanında durur
+              (bkz. migration 098). Salt okunur: bu sayı Yaptım kayıtlarından
+              birikiyor, elle düzeltilecek bir alan değil. İkisinin yan yana
+              durması "ne kadar sürer sanmıştık / ne kadar sürdü"nün tek
+              dayanağı; tahmin ancak böyle düzeliyor. */}
+          {task.actualDurationMinutes ? (
+            <p style={{ margin: 0, fontSize: 12.5, color: c.textSecondary }}>
+              {t("Harcanan: {sure}", { sure: dakikayiMetneCevir(task.actualDurationMinutes) })} ·{" "}
+              {t("Yaptım kayıtlarından")}
+            </p>
+          ) : null}
         </div>
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}

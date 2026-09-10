@@ -8,6 +8,22 @@ export interface WorkLogInput {
   doneAt?: string;
   /** Serbest yazım: "45", "1s 30dk", "2 saat", "1:30". Boş dize = süreyi sil. */
   duration?: string | number | null;
+  /**
+   * Saat aralığı (yerel duvar saati). İkisi birlikte gönderilir; verilirse süre
+   * sunucuda ONDAN hesaplanır ve `duration` yok sayılır. null göndermek aralığı
+   * temizler (süreyi silmez).
+   */
+  startedAt?: string | null;
+  endedAt?: string | null;
+}
+
+/** Kaydı sistemde KAYITLI bir göreve/alt göreve bağlayan alanlar. */
+export interface WorkLogTaskInput {
+  taskId?: string;
+  /** Görev kendi panosunda da "tamamlandı"ya çekilsin mi. */
+  markTaskDone?: boolean;
+  /** Yapılan iş takvime "yapıldı" bloğu olarak işlensin mi. */
+  addToCalendar?: boolean;
 }
 
 export interface WorkLogLinkInput {
@@ -51,7 +67,7 @@ export const worklog = {
   /** O an kronometresi çalışan kayıt; yoksa null. */
   running: (signal?: AbortSignal) => api.get<WorkLogEntry | null>("/worklog/running", signal),
 
-  create: (body: WorkLogInput & WorkLogLinkInput) => api.post<WorkLogEntry>("/worklog", body),
+  create: (body: WorkLogInput & WorkLogLinkInput & WorkLogTaskInput) => api.post<WorkLogEntry>("/worklog", body),
   update: (id: string, body: WorkLogInput) => api.patch<WorkLogEntry>(`/worklog/${id}`, body),
 
   /** Kaydı bir yere iliştirir; targetKind null ise bağlantıyı koparır. */

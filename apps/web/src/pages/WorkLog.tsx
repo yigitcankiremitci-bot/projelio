@@ -6,6 +6,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import { useProjectFabAction } from "../lib/projectFab";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import WorkLogComposer from "../components/WorkLogComposer";
 import WorkLogTargetModal from "../components/WorkLogTargetModal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { IconPlay, IconStop, IconLink, IconTrash, IconCheck } from "../components/icons";
@@ -50,11 +51,10 @@ export default function WorkLog() {
   const [aralik, setAralik] = useState<Aralik>("today");
   const [hata, setHata] = useState("");
 
-  // Hızlı giriş
-  const [baslik, setBaslik] = useState("");
-  const [sure, setSure] = useState("");
   const [kaydediliyor, setKaydediliyor] = useState(false);
-  const baslikRef = useRef<HTMLInputElement>(null);
+  // Giriş kutusuna odaklanma yolu: kutu kendi ref'ini buraya bırakıyor, mobil
+  // "+" düğmesi de bunu çağırıyor (bkz. WorkLogComposer odakRef).
+  const odaklanRef = useRef<(() => void) | null>(null);
 
   const [hedefSecilen, setHedefSecilen] = useState<WorkLogEntry | null>(null);
   const [silinecek, setSilinecek] = useState<WorkLogEntry | null>(null);
@@ -113,41 +113,46 @@ export default function WorkLog() {
   // Mobildeki "+" düğmesi bu sayfada giriş kutusuna odaklanır: yeni bir modal
   // açmak, tek satırlık bir kaydı iki tıklık bir işe dönüştürürdü.
   useProjectFabAction(
-    useMemo(() => ({ label: "Kayıt ekle", onClick: () => baslikRef.current?.focus() }), []),
+    useMemo(() => ({ label: "Kayıt ekle", onClick: () => odaklanRef.current?.() }), []),
     []
   );
 
-  const ekle = async (kronometreBaslat = false) => {
-    const metin = baslik.trim();
-    if (!metin || kaydediliyor) return;
-
-    // Süre burada da doğrulanıyor: kullanıcı "biraz" yazdıysa kaydı sunucuya
-    // gönderip 400 almak yerine hemen söylüyoruz — kayıt kaybolmasın.
-    if (sure.trim() && sureyiDakikayaCevir(sure) == null) {
-      setHata(t('Süreyi anlayamadım. Örnek: "45", "1s 30dk", "2 saat".'));
-      return;
-    }
-
+  /**
+   * Yeni kayıt. Görev seçildiyse sunucu üç işi daha yapıyor: süreyi görevin
+   * üstünde biriktiriyor, istenirse görevi kapatıyor ve takvime "yapıldı"
+   * bloğu koyuyor (bkz. WorklogService.gorevYansimalari).
+   */
+  const ekle = async (veri: {
+    title?: string;
+    taskId?: string;
+    duration?: string | null;
+    startedAt?: string | null;
+    endedAt?: string | null;
+    markTaskDone?: boolean;
+    addToCalendar?: boolean;
+    kronometreBaslat?: boolean;
+  }) => {
+    if (kaydediliyor) return;
     setKaydediliyor(true);
     try {
-      // Zamanı İSTEMCİ gönderiyor: sunucu uygulamanın saat dilimini (Europe/
-      // Istanbul) varsayıyor, oysa gün başlıkları ve aralık süzgeci burada
-      // TARAYICININ yerel gününe göre hesaplanıyor. Damgayı cihazdan yollamak
-      // ikisini aynı çerçeveye oturtuyor — yoksa başka bir saat diliminde
-      // çalışan biri, az önce eklediği kaydı "Bugün" başlığının altında
-      // göremeyebilirdi.
       const yeni = await worklog.create({
-        title: metin,
-        duration: sure.trim() || null,
-        doneAt: simdiYerel(),
+        title: veri.title,
+        taskId: veri.taskId,
+        duration: veri.duration,
+        // Saat aralığı yerel duvar saatiyle gidiyor: sunucu gün defterini de
+        // takvim bloğunu da buna göre kuruyor (bkz. api/worklog.ts).
+        startedAt: veri.startedAt ? `${yerelGun(new Date())}T${veri.startedAt}:00` : null,
+        endedAt: veri.endedAt ? `${yerelGun(new Date())}T${veri.endedAt}:00` : null,
+        doneAt: veri.startedAt ? undefined : simdiYerel(),
+        markTaskDone: veri.markTaskDone,
+        addToCalendar: veri.addToCalendar,
       });
-      const kayit = kronometreBaslat ? await worklog.startTimer(yeni.id) : yeni;
-      // Yeni kayıt en üste: liste yeniden eskiye sıralı.
-      setEntries((prev) => [kayit, ...prev.map((e) => (kronometreBaslat ? { ...e, timerStartedAt: undefined } : e))]);
-      setBaslik("");
-      setSure("");
+      const kayit = veri.kronometreBaslat ? await worklog.startTimer(yeni.id) : yeni;
+      setEntries((prev) => [
+        kayit,
+        ...prev.map((e) => (veri.kronometreBaslat ? { ...e, timerStartedAt: undefined } : e)),
+      ]);
       setHata("");
-      baslikRef.current?.focus();
     } catch (err) {
       setHata(err instanceof Error ? err.message : "Kayıt eklenemedi");
     } finally {
@@ -155,11 +160,6 @@ export default function WorkLog() {
     }
   };
 
-  /**
-   * Kaydın alanlarını günceller. İyimser: satır anında değişir, istek arkada
-   * gider. Hata olursa eski hâline döner — bir günlükte en kötü şey, kullanıcı
-   * düzelttiğini sanırken sunucuda eski değerin durmasıdır.
-   */
   const guncelle = async (entry: WorkLogEntry, yama: { title?: string; duration?: string | number | null }) => {
     const onceki = entries;
     setEntries((prev) =>
@@ -267,80 +267,11 @@ export default function WorkLog() {
       </div>
 
       {/* --- Hızlı giriş --------------------------------------------------
-          Tek zorunlu alan: ne yaptın. Süre ve hedef opsiyonel; zorunlu
-          kıldığımız her alan kaydın hiç girilmeme ihtimalini artırıyor. */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void ekle(false);
-        }}
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 8,
-          padding: 12,
-          borderRadius: 12,
-          background: c.surface,
-          border: `1px solid ${c.border}`,
-        }}
-      >
-        <input
-          ref={baslikRef}
-          value={baslik}
-          onChange={(e) => setBaslik(e.target.value)}
-          placeholder={t("Ne yaptın?")}
-          aria-label={t("Ne yaptın?")}
-          style={{ flex: "1 1 260px", minWidth: 0 }}
-        />
-        <input
-          value={sure}
-          onChange={(e) => setSure(e.target.value)}
-          placeholder={t("Süre")}
-          aria-label={t("Süre (örn. 45, 1s 30dk)")}
-          title={t('Örnek: "45", "1s 30dk", "2 saat", "1:30"')}
-          style={{ flex: "0 0 110px", width: 110 }}
-        />
-        <button
-          type="submit"
-          data-primary
-          disabled={!baslik.trim() || kaydediliyor}
-          style={{
-            padding: "9px 18px",
-            borderRadius: 8,
-            border: "none",
-            background: c.primary,
-            color: c.onPrimary,
-            fontSize: 15,
-            fontWeight: 500,
-            opacity: !baslik.trim() ? 0.6 : 1,
-          }}
-        >
-          {t("Ekle")}
-        </button>
-        {/* Süreyi bilmeyen için: kaydı aç ve ölçmeye başla. Sunucu aynı anda
-            tek kronometreye izin veriyor, öncekini kendisi durduruyor. */}
-        <button
-          type="button"
-          onClick={() => void ekle(true)}
-          disabled={!baslik.trim() || kaydediliyor}
-          title={t("Kaydı aç ve kronometreyi başlat")}
-          style={{
-            padding: "9px 14px",
-            borderRadius: 8,
-            border: `1px solid ${c.border}`,
-            background: "transparent",
-            color: c.textSecondary,
-            fontSize: 14,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            opacity: !baslik.trim() ? 0.6 : 1,
-          }}
-        >
-          <IconPlay size={14} color={c.textSecondary} />
-          {t("Başlat")}
-        </button>
-      </form>
+          Kutu yazarken kullanıcının görevlerini de tarıyor: yapılan iş çoğu
+          zaman sistemde zaten açık duran bir görev ve onu yüzlerce kart
+          arasında aramak, kaydı hiç girmemeye yol açıyordu
+          (bkz. WorkLogComposer). */}
+      <WorkLogComposer kaydediliyor={kaydediliyor} onSubmit={(veri) => void ekle(veri)} odakRef={odaklanRef} />
 
       {hata && (
         <p style={{ margin: 0, color: c.danger, fontSize: 13.5 }} role="alert">
@@ -565,7 +496,13 @@ function WorkLogRow({
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12.5, color: c.textSecondary }}>{entry.doneAt.slice(11, 16)}</span>
+          {/* Saat aralığı varsa onu göster: "09:00–10:30", kaydın girildiği tek
+              bir andan daha çok şey anlatıyor ve takvimdeki bloğun karşılığı. */}
+          <span style={{ fontSize: 12.5, color: c.textSecondary }}>
+            {entry.startedAt && entry.endedAt
+              ? `${entry.startedAt.slice(11, 16)}–${entry.endedAt.slice(11, 16)}`
+              : entry.doneAt.slice(11, 16)}
+          </span>
           {entry.durationMinutes ? (
             // Süreye tıklamak onu SİLER ve hızlı düğmeleri geri getirir: yanlış
             // düğmeye basan biri tek tıkla düzeltebilmeli.
@@ -605,6 +542,11 @@ function WorkLogRow({
                   {dakikayiMetneCevir(dk)}
                 </button>
               ))}
+            </span>
+          )}
+          {entry.timeBlockId && (
+            <span title={t("Takvimde “yapıldı” olarak duruyor")} style={{ fontSize: 12.5, color: c.textSecondary }}>
+              · {t("takvimde")}
             </span>
           )}
           {entry.targetLabel && (

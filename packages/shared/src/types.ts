@@ -1232,6 +1232,13 @@ export interface Task {
   // zamana kadar bitmeli"yi, bu "ne kadar sürer"i tutar — ikisi bağımsızdır.
   estimatedDurationValue?: number;
   estimatedDurationUnit?: "hours" | "days";
+  /**
+   * Yaptım kayıtlarından biriken GERÇEKLEŞEN süre (dakika). Yukarıdaki
+   * estimatedDuration* TAHMİNdir ve bunun üzerine YAZILMAZ: ikisinin yan yana
+   * durması, "ne kadar sürer sanmıştık / ne kadar sürdü" karşılaştırmasının
+   * tek dayanağı (bkz. migration 098).
+   */
+  actualDurationMinutes?: number;
   createdAt: string;
   archivedAt?: string;
   sortOrder?: number;
@@ -1985,6 +1992,14 @@ export interface SchedulableTask {
   jobTitle?: string;
   /** Görevin tahmini süresi dakikaya çevrilmiş hâli; blok bu uzunlukta açılır. */
   estimatedMinutes?: number;
+  /**
+   * Doluysa bu bir ALT GÖREV. Yaptım'daki arama kutusunda ayırt edilebilmesi
+   * için gerekiyor: aynı projede "Revizyon" adlı hem görev hem alt görev
+   * olabiliyor ve kullanıcı hangisini işaretlediğini bilmeli.
+   */
+  parentTaskId?: string;
+  /** Görevde şimdiye dek biriken gerçekleşen süre (dakika). */
+  actualMinutes?: number;
 }
 
 /** Takvimin gün/hafta/ay görünümlerini tek istekte besleyen paket. */
@@ -2627,6 +2642,15 @@ export interface WorkLogEntry {
   durationMinutes?: number;
   /** Dolu ise kronometre çalışıyor. Aynı anda yalnızca bir kayıtta olabilir. */
   timerStartedAt?: string;
+  /**
+   * İşin başlangıç/bitiş anı. İkisi birlikte dolar ve durationMinutes onlardan
+   * HESAPLANIR — "45 dakika sürdü" ile "09:00–09:45 çalıştım" aynı bilgi değil:
+   * ikincisi takvimde bir yer kaplıyor, ilkinden yer tahmin edilmesi gerekir.
+   */
+  startedAt?: string;
+  endedAt?: string;
+  /** Kaydın takvimde açtığı blok. Kayıt silinince blok da silinir. */
+  timeBlockId?: string;
   source: WorkLogSource;
   targetKind?: WorkLogTargetKind;
   targetId?: string;

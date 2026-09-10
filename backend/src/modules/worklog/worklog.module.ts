@@ -5,6 +5,7 @@ import { TasksModule } from "../tasks/tasks.module";
 import { BudgetModule } from "../budget/budget.module";
 import { ModuleRecordsModule } from "../module-records/module-records.module";
 import { PersonalTodosModule } from "../personal-todos/personal-todos.module";
+import { PlanningModule } from "../planning/planning.module";
 
 /**
  * Yaptım. Aktarma (push) hedeflerinin servislerini içeri alır: yetki kuralları
@@ -12,7 +13,9 @@ import { PersonalTodosModule } from "../personal-todos/personal-todos.module";
  * asıl kuralla ayrışır.
  */
 @Module({
-  imports: [TasksModule, BudgetModule, ModuleRecordsModule, PersonalTodosModule],
+  // PlanningModule: yapılan iş takvime "yapıldı" bloğu olarak işleniyor
+  // (bkz. WorklogService.takvimeIsle).
+  imports: [TasksModule, BudgetModule, ModuleRecordsModule, PersonalTodosModule, PlanningModule],
   controllers: [WorklogController],
   providers: [WorklogService],
   exports: [WorklogService],

@@ -844,6 +844,11 @@ export class PlanningService {
 
     const select =
       "id, title, status, priority, deadline, assigned_to, project_id, operation_id, " +
+      // parent_task_id: Yaptım'daki arama kutusu alt görevi görevden ayırt
+      // edebilsin diye (aynı projede aynı adı taşıyan ikisi olabiliyor).
+      // actual_duration_minutes: seçicide "bu işte şimdiye dek şu kadar
+      // çalışılmış" bilgisini göstermek için (bkz. migration 098).
+      "parent_task_id, actual_duration_minutes, " +
       "estimated_duration_value, estimated_duration_unit, " +
       "assigned_user:users!tasks_assigned_to_fkey(full_name), " +
       "projects(title, job_id, jobs(title)), " +
@@ -1553,6 +1558,8 @@ function mapSchedulableTask(row: any): SchedulableTask {
     jobId: container?.job_id ?? undefined,
     jobTitle: container?.jobs?.title ?? undefined,
     estimatedMinutes: estimatedMinutes(row.estimated_duration_value, row.estimated_duration_unit),
+    parentTaskId: row.parent_task_id ?? undefined,
+    actualMinutes: row.actual_duration_minutes ?? undefined,
   };
 }
 

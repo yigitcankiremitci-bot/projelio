@@ -10,10 +10,12 @@ import {
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
+import { blokAraligi } from "./blok-saatleri";
 import { TasksService } from "../tasks/tasks.service";
 import { BudgetService } from "../budget/budget.service";
 import { ModuleRecordsService } from "../module-records/module-records.service";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
+import { PlanningService } from "../planning/planning.service";
 
 /**
  * YAPTIM — kullanıcının kişisel iş günlüğü.
@@ -47,7 +49,8 @@ export class WorklogService {
     private tasksService: TasksService,
     private budgetService: BudgetService,
     private moduleRecordsService: ModuleRecordsService,
-    private personalTodosService: PersonalTodosService
+    private personalTodosService: PersonalTodosService,
+    private planningService: PlanningService
   ) {}
 
   // ------------------------------------------------------------------ Okuma
@@ -141,32 +144,35 @@ export class WorklogService {
 
   // ------------------------------------------------------------------ Yazma
 
-  async create(
-    userId: string,
-    body: {
-      title?: string;
-      note?: string;
-      doneAt?: string;
-      duration?: string | number | null;
-      durationMinutes?: number | null;
-      source?: WorkLogSource;
-      targetKind?: WorkLogTargetKind | null;
-      targetId?: string | null;
-      targetLabel?: string | null;
-    }
-  ): Promise<WorkLogEntry> {
-    const title = (body.title ?? "").trim();
+  async create(userId: string, body: WorkLogCreateInput): Promise<WorkLogEntry> {
+    // KAYITLI BİR GÖREVE BAĞLIYSA başlık ondan gelir: kullanıcı arama
+    // kutusunda görevi seçiyor, üstüne bir de başlık yazmıyor.
+    const gorev = body.taskId ? await this.tasksService.findById(body.taskId, userId) : null;
+    const title = (body.title ?? gorev?.title ?? "").trim();
     if (!title) throw new BadRequestException("Ne yaptığını yazman gerekiyor");
 
-    const hedef = this.hedefiCozumle(body);
+    const aralik = this.araligiCozumle(body);
+    // Saat aralığı verildiyse süre ONDAN gelir; kullanıcı ikisini birden
+    // yazdıysa aralık kazanır — takvimde yer kaplayan bilgi odur ve ikisinin
+    // ayrışması "09:00–10:00 arası 3 saat çalıştım" gibi bir kayıt üretirdi.
+    const dakika = aralik ? aralik.dakika : this.sureyiCozumle(body);
+
+    const hedef = gorev
+      ? { targetKind: "task", targetId: gorev.id, targetLabel: gorev.title }
+      : this.hedefiCozumle(body);
+
     const { data, error } = await this.supabase.client
       .from("work_log_entries")
       .insert({
         user_id: userId,
         title: title.slice(0, 255),
         note: body.note?.trim() || null,
-        done_at: this.zamaniCozumle(body.doneAt),
-        duration_minutes: this.sureyiCozumle(body),
+        // Aralık verildiyse kayıt işin BAŞLADIĞI ana yazılıyor: gece yarısını
+        // geçen iş, başladığı günün dökümünde durmalı.
+        done_at: aralik ? aralik.baslangic : this.zamaniCozumle(body.doneAt),
+        started_at: aralik?.baslangic ?? null,
+        ended_at: aralik?.bitis ?? null,
+        duration_minutes: dakika,
         source: this.kaynagiCozumle(body.source),
         target_kind: hedef.targetKind,
         target_id: hedef.targetId,
@@ -176,20 +182,85 @@ export class WorklogService {
       .select("*")
       .single();
     if (error) throw error;
-    return mapEntry(data);
+
+    const entry = mapEntry(data);
+    return gorev ? this.gorevYansimalari(userId, entry, body, dakika) : entry;
   }
 
-  async update(
+  /**
+   * Kayıt bir göreve bağlıysa görevin KENDİ ekranlarına yansıyan üç etki.
+   *
+   * Sıra önemli ve rastgele değil: günlük satırı buraya gelindiğinde ZATEN
+   * yazılmış oluyor. Aşağıdakilerden biri patlarsa istisna çağırana gider ama
+   * kayıt yerinde durur — Yaptım'ın bütün varlık sebebi, yapılan işin hiçbir
+   * koşulda kaybolmaması.
+   */
+  private async gorevYansimalari(
     userId: string,
-    id: string,
-    body: {
-      title?: string;
-      note?: string | null;
-      doneAt?: string;
-      duration?: string | number | null;
-      durationMinutes?: number | null;
-    }
+    entry: WorkLogEntry,
+    body: WorkLogCreateInput,
+    dakika: number | null
   ): Promise<WorkLogEntry> {
+    const taskId = entry.targetId!;
+
+    // 1. Harcanan süre görevin üstünde BİRİKİR. "Bu iş ne kadar sürer"in
+    //    cevabı böylece tahmin değil ölçüm oluyor.
+    if (dakika) await this.tasksService.addActualDuration(taskId, dakika, userId);
+
+    // 2. Takvim bloğu, görev KAPATILMADAN ÖNCE. Ters sırada olsaydı, kapatması
+    //    başarısız olan bir görev için takvimde "yapıldı" diye duran bir blok
+    //    kalırdı.
+    let guncel = entry;
+    if (body.addToCalendar) {
+      const blockId = await this.takvimeIsle(userId, entry, dakika);
+      if (blockId) guncel = await this.yaz(userId, entry.id, { time_block_id: blockId });
+    }
+
+    // 3. Görevin kendi panosunda da kapanması — kullanıcı aynı işi iki ekranda
+    //    ayrı ayrı işaretlemesin diye.
+    if (body.markTaskDone) await this.tasksService.updateStatus(taskId, "completed", userId);
+
+    return guncel;
+  }
+
+  /**
+   * Kaydı takvime "yapıldı" olarak işler ve blok id'sini döner.
+   *
+   * ZATEN PLANLANMIŞ BİR BLOK VARSA onu kullanır, yenisini AÇMAZ: kullanıcı
+   * sabah "14:00–16:00 şu görev" diye planladıysa, akşam yaptığını
+   * kaydettiğinde takvimde aynı işin iki kutusu belirmemeli — planlanan blok
+   * yapılmış olana dönüşür.
+   */
+  private async takvimeIsle(userId: string, entry: WorkLogEntry, dakika: number | null): Promise<string | null> {
+    const saatler = blokAraligi(entry, dakika);
+    // Saat de süre de yoksa bloğun uzunluğu yok; takvime sıfır yükseklikte bir
+    // kutu koymak yerine hiç koymuyoruz.
+    if (!saatler) return null;
+
+    const gun = entry.doneAt.slice(0, 10);
+    const mevcut = (await this.planningService.listBlocks(userId, gun, gun)).find(
+      (b) => b.taskId === entry.targetId
+    );
+
+    const blok = mevcut
+      ? await this.planningService.updateBlock(userId, mevcut.id, {
+          startsAt: saatler.baslangic,
+          endsAt: saatler.bitis,
+        })
+      : await this.planningService.createBlock(userId, {
+          blockDate: gun,
+          startsAt: saatler.baslangic,
+          endsAt: saatler.bitis,
+          taskId: entry.targetId,
+          source: "manual",
+        });
+
+    await this.planningService.setBlockStatus(userId, blok.id, "done", dakika ?? undefined);
+    return blok.id;
+  }
+
+  async update(userId: string, id: string, body: WorkLogUpdateInput): Promise<WorkLogEntry> {
+    const onceki = await this.findOne(userId, id);
     const patch: Record<string, unknown> = {};
 
     if (body.title !== undefined) {
@@ -199,17 +270,71 @@ export class WorklogService {
     }
     if (body.note !== undefined) patch.note = body.note?.trim() || null;
     if (body.doneAt !== undefined) patch.done_at = this.zamaniCozumle(body.doneAt);
-    if (body.duration !== undefined || body.durationMinutes !== undefined) {
+
+    // Saat aralığı süreyi de belirler (bkz. create); ikisi ayrı ayrı
+    // güncellenirse "09:00–10:00 arası 3 saat" gibi bir kayıt doğardı.
+    const aralik = this.araligiCozumle(body);
+    if (aralik) {
+      patch.started_at = aralik.baslangic;
+      patch.ended_at = aralik.bitis;
+      patch.done_at = aralik.baslangic;
+      patch.duration_minutes = aralik.dakika;
+    } else if (body.startedAt === null || body.endedAt === null) {
+      // Aralığı temizlemek süreyi SİLMEZ: kullanıcı "saatini bilmiyorum ama
+      // bir saat sürdü" diyebilmeli.
+      patch.started_at = null;
+      patch.ended_at = null;
+    }
+
+    if (!aralik && (body.duration !== undefined || body.durationMinutes !== undefined)) {
       patch.duration_minutes = this.sureyiCozumle(body);
     }
 
-    if (Object.keys(patch).length === 0) return this.findOne(userId, id);
-    return this.yaz(userId, id, patch);
+    if (Object.keys(patch).length === 0) return onceki;
+    const guncel = await this.yaz(userId, id, patch);
+
+    // Süre değiştiyse görevdeki birikim de düzeltilmeli; yoksa "bu iş ne kadar
+    // sürdü" cevabı düzeltilen her kayıtta biraz daha yanlışlaşır.
+    const fark = (guncel.durationMinutes ?? 0) - (onceki.durationMinutes ?? 0);
+    if (fark && guncel.targetKind === "task" && guncel.targetId) {
+      await this.tasksService.addActualDuration(guncel.targetId, fark, userId);
+    }
+
+    // Takvimdeki blok da kaydı izlesin; aksi hâlde günlükte 2 saat, takvimde
+    // 1 saat görünürdü.
+    if (guncel.timeBlockId) await this.blogunuTazele(userId, guncel);
+    return guncel;
+  }
+
+  /** Kaydın takvim bloğunu kaydın son hâline göre günceller. */
+  private async blogunuTazele(userId: string, entry: WorkLogEntry): Promise<void> {
+    const saatler = blokAraligi(entry, entry.durationMinutes ?? null);
+    if (!saatler || !entry.timeBlockId) return;
+    await this.planningService.updateBlock(userId, entry.timeBlockId, {
+      blockDate: entry.doneAt.slice(0, 10),
+      startsAt: saatler.baslangic,
+      endsAt: saatler.bitis,
+    });
+    await this.planningService.setBlockStatus(userId, entry.timeBlockId, "done", entry.durationMinutes ?? undefined);
   }
 
   /** Kalıcı silme değil: arşivlenir. Gün dökümünden bir satırın sessizce kaybolması geri alınamaz olmamalı. */
   async archive(userId: string, id: string): Promise<{ ok: true }> {
+    const entry = await this.findOne(userId, id);
     await this.yaz(userId, id, { archived_at: yerelZamanDamgasi(new Date()), timer_started_at: null });
+
+    // Kaydı silmek, onun DIŞARIYA bıraktığı izleri de silmeli: yanlış girilen
+    // bir kaydın süresi görevin üstünde, bloğu da takvimde kalırsa kullanıcı
+    // düzelttiğini sanır ama sayılar yanlış kalır.
+    if (entry.durationMinutes && entry.targetKind === "task" && entry.targetId) {
+      await this.tasksService.addActualDuration(entry.targetId, -entry.durationMinutes, userId);
+    }
+    // Görevin DURUMUNA dokunulmuyor: kayıt silinse de iş yapılmış olabilir ve
+    // ekibin panosundan bir görevi sessizce yeniden açmak, kimsenin beklemediği
+    // bir yan etki olurdu.
+    if (entry.timeBlockId) {
+      await this.planningService.deleteBlock(userId, entry.timeBlockId).catch(() => undefined);
+    }
     return { ok: true };
   }
 
@@ -461,6 +586,30 @@ export class WorklogService {
   }
 
   /**
+   * Başlangıç–bitiş aralığı. İkisi birlikte verilmediyse null döner (tek başına
+   * bir başlangıç hiçbir şey anlatmıyor, DB'de de CHECK var).
+   *
+   * Süre buradan HESAPLANIR; kullanıcıya "kaç dakika sürdü" diye ikinci kez
+   * sormuyoruz — bildiği şey saatler ve aritmetiği makine yapmalı.
+   */
+  private araligiCozumle(body: {
+    startedAt?: string | null;
+    endedAt?: string | null;
+  }): { baslangic: string; bitis: string; dakika: number } | null {
+    if (!body.startedAt || !body.endedAt) return null;
+
+    const baslangic = this.zamaniCozumle(body.startedAt);
+    const bitis = this.zamaniCozumle(body.endedAt);
+    const dakika = Math.round((naiveMs(bitis) - naiveMs(baslangic)) / 60000);
+
+    if (dakika <= 0) throw new BadRequestException("Bitiş saati başlangıçtan sonra olmalı");
+    if (dakika > MAX_WORK_LOG_MINUTES) {
+      throw new BadRequestException(`Bir kayıt en fazla ${MAX_WORK_LOG_MINUTES / 60} saat sürebilir.`);
+    }
+    return { baslangic, bitis, dakika };
+  }
+
+  /**
    * Süre iki biçimde gelebilir: serbest metin ("1s 30dk", web kutusu ve Lio) ya
    * da doğrudan dakika. Metin anlaşılmazsa REDDEDİLİR — sessizce null yazmak,
    * kullanıcının girdiği süreyi kaybetmek olurdu.
@@ -528,6 +677,38 @@ export class WorklogService {
   }
 }
 
+/** Yeni Yaptım kaydının gövdesi. Tek zorunlu alan yok: başlık ya da taskId. */
+export interface WorkLogCreateInput {
+  title?: string;
+  note?: string;
+  doneAt?: string;
+  duration?: string | number | null;
+  durationMinutes?: number | null;
+  /** Saat aralığı; verilirse süre bundan hesaplanır ve `duration` yok sayılır. */
+  startedAt?: string | null;
+  endedAt?: string | null;
+  source?: WorkLogSource;
+  /** Sistemde KAYITLI bir görev/alt görev. Verilirse başlık ve bağlantı ondan gelir. */
+  taskId?: string;
+  /** Görev kendi panosunda da "tamamlandı"ya çekilsin mi. */
+  markTaskDone?: boolean;
+  /** Yapılan iş takvime "yapıldı" bloğu olarak işlensin mi. */
+  addToCalendar?: boolean;
+  targetKind?: WorkLogTargetKind | null;
+  targetId?: string | null;
+  targetLabel?: string | null;
+}
+
+export interface WorkLogUpdateInput {
+  title?: string;
+  note?: string | null;
+  doneAt?: string;
+  duration?: string | number | null;
+  durationMinutes?: number | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
+}
+
 const TARGET_KINDS: WorkLogTargetKind[] = [
   "task",
   "project",
@@ -549,6 +730,9 @@ function mapEntry(row: any): WorkLogEntry {
     doneAt: row.done_at,
     durationMinutes: row.duration_minutes ?? undefined,
     timerStartedAt: row.timer_started_at ?? undefined,
+    startedAt: row.started_at ?? undefined,
+    endedAt: row.ended_at ?? undefined,
+    timeBlockId: row.time_block_id ?? undefined,
     source: row.source,
     targetKind: row.target_kind ?? undefined,
     targetId: row.target_id ?? undefined,

@@ -1229,6 +1229,12 @@ export class AiAssistantService {
         "seçebiliyor — asıl değer, işin kaydının HİÇ kaybolmaması.",
       "- Süreyi kullanıcı söylediyse yaz, söylemediyse SORMA ve uydurma. Sonradan söylerse update_work_log.",
       "- Kullanıcı bir çırpıda birkaç iş anlattıysa log_works ile tek çağrıda yaz.",
+      "- İŞ KAYITLI BİR GÖREVSE bağla. Kullanıcı bir görev adı andıysa search_tasks ile bul ve " +
+        "log_work'e taskId ver: süre görevin üstünde birikir, istenirse görev kendi panosunda kapanır " +
+        "ve iş takvime işlenir. EMİN DEĞİLSEN SOR — yanlış göreve süre yazıp onu kapatmak, " +
+        "düzeltilmesi zor bir karışıklık. Eşleşme yoksa taskId'siz yaz, kayıt yine durur.",
+      "- markTaskDone yalnızca kullanıcı işin BİTTİĞİNİ söylediyse. \"Üzerinde çalıştım\" bitirmek " +
+        "değildir; \"bitirdim\", \"tamamladım\", \"kapattım\" bitirmektir.",
       "- Kaydı yazdıktan sonra kısa onayla ve gerekiyorsa \"istersen bir projeye bağlayayım\" diye TEK bir " +
         "cümle ekle; ısrar etme.",
       "- \"Bugün ne yaptım\", \"bu hafta kaç saat çalıştım\" gibi sorularda get_work_log'u çağır.",
@@ -3647,6 +3653,11 @@ export class AiAssistantService {
           note: input.note,
           duration: input.duration,
           doneAt: input.doneAt,
+          startedAt: input.startedAt,
+          endedAt: input.endedAt,
+          taskId: input.taskId,
+          markTaskDone: input.markTaskDone === true,
+          addToCalendar: input.addToCalendar === true,
           // Kaynak modelden DEĞİL buradan geliyor: sayfada "Lio ekledi"
           // rozetinin doğruluğu, modelin doğru alanı doldurmasına bağlı olamaz.
           source: "lio",

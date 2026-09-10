@@ -98,6 +98,7 @@ function mapTask(row: any): Task {
     weekNumber: row.week_number ?? undefined,
     estimatedDurationValue: row.estimated_duration_value != null ? Number(row.estimated_duration_value) : undefined,
     estimatedDurationUnit: row.estimated_duration_unit ?? undefined,
+    actualDurationMinutes: row.actual_duration_minutes ?? undefined,
     createdAt: row.created_at,
     archivedAt: row.archived_at ?? undefined,
     sortOrder: row.sort_order ?? 0,
@@ -1165,6 +1166,41 @@ export class TasksService {
     if (error) throw error;
     if (!row) throw new NotFoundException("Görev bulunamadı");
     return mapTask(row);
+  }
+
+  /**
+   * Görevde biriken GERÇEKLEŞEN süreye ekleme yapar (Yaptım kayıtlarından).
+   *
+   * BİRİKTİRİR, üzerine yazmaz: aynı göreve gün içinde iki kez dönmek yaygın ve
+   * ikinci kayıt birincinin süresini silmemeli. Eksi değer de kabul edilir —
+   * kullanıcı bir Yaptım kaydının süresini düzeltirse ya da kaydı silerse fark
+   * geri alınmalı; sıfırın altına düşerse alan boşaltılır (DB'deki CHECK zaten
+   * sıfır ve altını reddediyor).
+   *
+   * Yetki kuralı görevin kendi kuralı: bu görevi görebilen ona süre yazabilir.
+   * Yaptım kaydı kişiseldir ama süre görevin üstünde durur ve ekip görür.
+   */
+  async addActualDuration(id: string, deltaMinutes: number, requestingUserId?: string): Promise<number | null> {
+    if (!Number.isFinite(deltaMinutes) || deltaMinutes === 0) return null;
+    await this.assertTaskAccess(await this.getTaskScope(id), requestingUserId);
+
+    const { data: row, error: readError } = await this.supabase.client
+      .from("tasks")
+      .select("actual_duration_minutes")
+      .eq("id", id)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!row) throw new NotFoundException("Görev bulunamadı");
+
+    const toplam = Math.round((row.actual_duration_minutes ?? 0) + deltaMinutes);
+    const yeni = toplam > 0 ? toplam : null;
+
+    const { error } = await this.supabase.client
+      .from("tasks")
+      .update({ actual_duration_minutes: yeni })
+      .eq("id", id);
+    if (error) throw error;
+    return yeni;
   }
 
   async updateStatus(id: string, status: Task["status"], requestingUserId?: string): Promise<Task> {

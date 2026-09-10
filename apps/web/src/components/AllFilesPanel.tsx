@@ -15,6 +15,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import FileContextMenu from "./FileContextMenu";
 import FilePreviewModal from "./FilePreviewModal";
 import FileThumb from "./FileThumb";
+import LinkFileModal from "./LinkFileModal";
 import QuickFileUploadModal, { type UploadTargetOption } from "./QuickFileUploadModal";
 import { IconDownload, IconExternalLink } from "./icons";
 import { useT } from "../lib/i18n";
@@ -56,6 +57,8 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   const secim = useFileSelection();
   /** Onay bekleyen kaldırma; tek dosya da bir kümedir (bkz. FilesPanel). */
   const [pendingDelete, setPendingDelete] = useState<ProjectFile[] | null>(null);
+  /** "Bağla" penceresi (bkz. FilesPanel'deki eşi). */
+  const [linking, setLinking] = useState<ProjectFile[] | null>(null);
   const [viewMode, toggleViewMode] = useFileViewMode();
   const { pushUndo, pushDestructive } = useUndo();
   const [adding, setAdding] = useState(false);
@@ -447,6 +450,10 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
                     onClick: () => void handleDuplicate(menuDosyalari(menu)),
                   },
                   {
+                    label: t("{sayi} dosyayı bağla…", { sayi: menu.toplu.length }),
+                    onClick: () => setLinking(menuDosyalari(menu)),
+                  },
+                  {
                     label: t("{sayi} öğeyi kaldır", { sayi: menu.toplu.length }),
                     danger: true,
                     onClick: () => setPendingDelete(menuDosyalari(menu)),
@@ -461,6 +468,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
                   },
                   { label: t("Yeniden adlandır"), onClick: () => void handleRename(menu.file!) },
                   { label: t("Çoğalt"), onClick: () => void handleDuplicate([menu.file!]) },
+                  { label: t("Bağla…"), onClick: () => setLinking([menu.file!]) },
                   {
                     label: t("Kaldır"),
                     danger: true,
@@ -470,6 +478,8 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
           }
         />
       )}
+
+      {linking && <LinkFileModal files={linking} onClose={() => setLinking(null)} />}
 
       {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} />}
 

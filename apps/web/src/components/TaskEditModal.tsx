@@ -7,6 +7,7 @@ import Modal from "./Modal";
 import AssigneePicker from "./AssigneePicker";
 import EntityDangerZone from "./EntityDangerZone";
 import FilesPanel from "./FilesPanel";
+import LinkedFilesPanel from "./LinkedFilesPanel";
 import TaskAttachmentsPanel from "./TaskAttachmentsPanel";
 import TaskDependenciesPanel from "./TaskDependenciesPanel";
 import AutoGrowTextarea from "./AutoGrowTextarea";
@@ -591,6 +592,13 @@ export default function TaskEditModal({
       <div style={{ borderTop: `1px solid ${c.border}`, marginTop: 20, paddingTop: 16 }}>
         <TaskAttachmentsPanel taskId={task.id} onChanged={(attachments) => patchAttachments({ attachments })} />
       </div>
+
+      {/* Başka bir klasörden BAĞLANMIŞ dosyalar (bkz. migration 095).
+          Yukarıdaki FilesPanel'den ayrı: oradakiler bu göreve YÜKLENMİŞ
+          dosyalar, buradakiler başka bir yerde yaşayıp buraya iliştirilmiş
+          olanlar. İkisini tek listede birleştirmek, "kaldır"ın hangisini
+          sildiğini belirsizleştirirdi. Bağlı dosya yoksa bölüm çizilmez. */}
+      <LinkedFilesPanel targetKind="task" targetId={task.id} />
 
       {/* Bağımlılıklar: "şu bitmeden bu başlayamaz". Ekler gibi kaydetmeyi
           BEKLEMEZ — bağ kurulduğu anda sunucuya yazılır, kart rozeti de hemen

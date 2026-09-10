@@ -1486,7 +1486,11 @@ export interface NotificationPayload {
     | "ai_spend_alert"
     // Müşteriden WhatsApp mesajı geldi (bkz. whatsapp-webhook.service.ts).
     // Konuşmanın sahibine gider; Lio otomatik yanıt açıksa yine bilgi amaçlı.
-    | "whatsapp_inbound";
+    | "whatsapp_inbound"
+    // Bir dosya sana bağlandı (bkz. migration 095). Bildirim ŞART: kimse kendi
+    // adına bağlanmış dosyaları aramaya gitmez, haber verilmezse özellik
+    // görünmez kalırdı.
+    | "file_linked";
   title: string;
   body: string;
   link?: string;

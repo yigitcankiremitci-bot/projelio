@@ -31,6 +31,7 @@ import type { CreateNativeFileMenuHandle } from "./CreateNativeFileMenu";
 import FileContextMenu from "./FileContextMenu";
 import FilePreviewModal from "./FilePreviewModal";
 import FileThumb from "./FileThumb";
+import LinkFileModal from "./LinkFileModal";
 import { useT } from "../lib/i18n";
 import {
   IconChevronLeft,
@@ -142,6 +143,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<ProjectFile | null>(null);
+  /** "Bağla" penceresi: dosyayı bir göreve/kişiye/modül kaydına iliştirir. */
+  const [linking, setLinking] = useState<ProjectFile[] | null>(null);
   /**
    * Silinmeyi bekleyen küme. Tek dosya da bir kümedir: çoklu seçim geldikten
    * sonra iki ayrı onay akışı tutmak, birinde düzeltilen bir hatanın diğerinde
@@ -526,6 +529,12 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       : m.file
       ? [{ kind: "file", id: m.file.id }]
       : [];
+
+  /** Menüdeki seçimin DOSYA olanları — bağlama yalnızca dosyalar için. */
+  const menuSeciliDosyalar = (m: MenuState): ProjectFile[] => {
+    const ids = new Set(menuHedefleri(m).filter((i) => i.kind === "file").map((i) => i.id));
+    return gorunenDosyalar.filter((f) => ids.has(f.id));
+  };
 
   const beginDrag = (e: React.DragEvent, key: string) => {
     // Seçimin İÇİNDEN sürüklemek seçimin tamamını taşır; dışından sürüklemek
@@ -1637,6 +1646,16 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                         },
                       ]
                     : []),
+                  // Klasörler bağlanamıyor: bağlantı DOSYAYA ait bir kavram,
+                  // klasörün hedefte gösterilecek bir içeriği yok.
+                  ...(menuSeciliDosyalar(menu).length
+                    ? [
+                        {
+                          label: t("{sayi} dosyayı bağla…", { sayi: menuSeciliDosyalar(menu).length }),
+                          onClick: () => setLinking(menuSeciliDosyalar(menu)),
+                        },
+                      ]
+                    : []),
                   {
                     label: t("{sayi} öğeyi kaldır", { sayi: menu.toplu.length }),
                     danger: true,
@@ -1702,6 +1721,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     disabled: readOnly,
                     onClick: () => void handleDuplicateFile(menu.file!),
                   },
+                  {
+                    label: t("Bağla…"),
+                    onClick: () => setLinking([menu.file!]),
+                  },
                   ...(folderId && canMoveFile(menu.file!)
                     ? [
                         {
@@ -1729,6 +1752,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           onClose={() => setBrowsing(false)}
           onImported={handleFileAdded}
         />
+      )}
+
+      {linking && (
+        <LinkFileModal files={linking} onClose={() => setLinking(null)} />
       )}
 
       {preview && (

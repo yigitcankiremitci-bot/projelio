@@ -30,6 +30,7 @@ import { BillingModule } from "./modules/billing/billing.module";
 import { HabieModule } from "./modules/habie/habie.module";
 import { GoogleModule } from "./modules/google/google.module";
 import { MicrosoftModule } from "./modules/microsoft/microsoft.module";
+import { FileLinksModule } from "./modules/file-links/file-links.module";
 import { FilesModule } from "./modules/files/files.module";
 import { HealthModule } from "./modules/health/health.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
@@ -87,6 +88,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     GoogleModule,
     MicrosoftModule,
     FilesModule,
+    FileLinksModule,
     HealthModule,
     CatalogModule,
     DepartmentsModule,

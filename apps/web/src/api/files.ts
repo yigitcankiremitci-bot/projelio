@@ -466,3 +466,42 @@ async function uploadInChunks(
 
   throw new Error("Yükleme tamamlanamadı.");
 }
+
+/** Bir dosyanın iliştirilebileceği yerler (bkz. migration 095). */
+export type LinkTargetKind = "task" | "user" | "module_record";
+
+export interface FileLink {
+  id: string;
+  fileId: string;
+  targetKind: LinkTargetKind;
+  targetId: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+/** Seçicideki aday listeleri; hepsi dosyanın kapsamından geliyor. */
+export interface LinkTargets {
+  tasks: { id: string; title: string; context?: string; isSubtask: boolean }[];
+  users: { id: string; fullName: string }[];
+  records: { id: string; name: string; moduleKey?: string }[];
+}
+
+/**
+ * Dosya bağlantıları.
+ *
+ * Bağlamak TAŞIMAK DEĞİL: dosya klasöründe kalır, yalnızca hedefin ekranında
+ * da görünür (bkz. migration 095).
+ */
+export const fileLinksApi = {
+  /** Bir hedefe (görev/kişi/modül kaydı) bağlı dosyalar. */
+  forTarget: (targetKind: LinkTargetKind, targetId: string) =>
+    api.get<ProjectFile[]>(`/file-links${query({ targetKind, targetId })}`),
+  /** Bir dosyanın bağlı olduğu yerler. */
+  forFile: (fileId: string) => api.get<FileLink[]>(`/files/${fileId}/links`),
+  targets: (fileId: string, q?: string) =>
+    api.get<LinkTargets>(`/files/${fileId}/link-targets${query({ q })}`),
+  link: (fileId: string, targetKind: LinkTargetKind, targetId: string) =>
+    api.post<FileLink>(`/files/${fileId}/links`, { targetKind, targetId }),
+  unlink: (fileId: string, targetKind: LinkTargetKind, targetId: string) =>
+    api.delete<{ ok: boolean }>(`/files/${fileId}/links${query({ targetKind, targetId })}`),
+};

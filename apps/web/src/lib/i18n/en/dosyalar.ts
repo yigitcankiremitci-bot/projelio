@@ -108,6 +108,25 @@ export const dosyalar: TranslationDict = {
   Taşınamadı: "Couldn't be moved",
   "Üst klasöre taşı": "Move to parent folder",
   "Yeni belge oluştur": "New document",
+  // ─────────────────────────────────────────────── Bağlama (migration 095)
+  // "Bağla" tek başına "taşındı mı?" sorusunu doğuruyor; açıklama satırı şart.
+  "Bağla…": "Link…",
+  "Dosyayı bağla": "Link file",
+  "{sayi} dosyayı bağla": "Link {sayi} files",
+  "{sayi} dosyayı bağla…": "Link {sayi} files…",
+  "Dosya bulunduğu klasörde kalır; seçtiğin yerde de görünmeye başlar.":
+    "The file stays in its folder and also starts showing up where you pick.",
+  "Görev, kişi ya da kayıt ara": "Search tasks, people or records",
+  Kişiler: "People",
+  "Modül kayıtları": "Module records",
+  "Bağlanabilecek bir öğe bulunamadı.": "Nothing available to link to.",
+  Bağlanamadı: "Couldn't be linked",
+  "Bağlı dosyalar": "Linked files",
+  // "Bağlantıyı kaldır" bulut hesabını KESMEK için ayrılmış (yukarıda);
+  // dosya bağlantısı için ayrı bir fiil kullanılıyor.
+  "Bağlantıyı kopar": "Unlink",
+  "Bağlantı koparılamadı": "The link couldn't be removed",
+  "Dosya indirilemedi": "The file couldn't be downloaded",
   // Çoklu seçim: sağ tık menüsü ve onay penceresi.
   "{sayi} öğe": "{sayi} items",
   "{sayi} öğeyi çoğalt": "Duplicate {sayi} items",

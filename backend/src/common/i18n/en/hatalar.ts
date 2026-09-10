@@ -531,6 +531,12 @@ export const hatalar: TranslationDict = {
   "Bir klasör kendi içine taşınamaz": "A folder can't be moved into itself",
   "Bir klasör kendi alt klasörüne taşınamaz": "A folder can't be moved into its own subfolder",
   "Hedefte aynı adda bir klasör zaten var.": "A folder with the same name already exists there.",
+  // Dosya bağlantıları (migration 095).
+  "Bağlanacak öğe seçilmedi": "No item was selected to link to",
+  "Bu kişi dosyanın ekibinde değil; bağlasanız da dosyayı açamaz.":
+    "This person isn't on the file's team; linking it wouldn't let them open it.",
+  "Bu öğe dosyanın kapsamında değil.": "This item isn't in the file's scope.",
+  "Sana bir dosya bağlandı": "A file was linked to you",
   "Bu klasör çoğaltmak için çok büyük (en fazla 50 dosya).":
     "This folder is too large to duplicate (50 files at most).",
   // Abonelik / ödeme (migration 092, modules/billing).

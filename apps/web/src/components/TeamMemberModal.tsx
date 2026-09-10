@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ProjectMember, Task } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
+import LinkedFilesPanel from "./LinkedFilesPanel";
 import Modal from "./Modal";
 import { IconCheck } from "./icons";
 import { isAssignedTo } from "../lib/taskAssignees";
@@ -94,6 +95,11 @@ export default function TeamMemberModal({ member, tasks, onClose, onTaskUpdated 
           })
         )}
       </div>
+
+      {/* Bu kişiye bağlanmış dosyalar (bkz. migration 095). Bağlantı erişim
+          VERMEZ: dosyayı zaten görebilenler görür, listeye de yalnızca onlar
+          için giren satırlar düşer. */}
+      <LinkedFilesPanel targetKind="user" targetId={member.userId} />
     </Modal>
   );
 }

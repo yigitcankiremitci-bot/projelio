@@ -9,6 +9,7 @@ import { useUndo } from "../lib/undo";
 import { useSortableList } from "../lib/useSortableList";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import type { SortableOptions } from "sortablejs";
+import LinkedFilesPanel from "./LinkedFilesPanel";
 import Modal from "./Modal";
 import TaskFromRecordModal from "./TaskFromRecordModal";
 import ModuleFieldInput from "./ModuleFieldInput";
@@ -629,6 +630,11 @@ export default function ModuleRecordsPanel({
               {t("Vazgeç")}
             </button>
           </div>
+
+          {/* Bu kayda BAĞLANMIŞ dosyalar (bkz. migration 095). Yalnızca
+              düzenlemede: henüz kaydedilmemiş bir kaydın kimliği yok, dolayısıyla
+              bağlanacak bir hedef de yok. */}
+          {formMode.kind === "edit" && <LinkedFilesPanel targetKind="module_record" targetId={formMode.id} />}
         </div>
         </Modal>
       )}

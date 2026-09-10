@@ -2589,3 +2589,73 @@ export interface BillingOverview {
   /** Vitrinde $ tutarını ₺ göstermek için kur; tahsilatta kullanılmaz. */
   usdTryRate: number | null;
 }
+
+// ---------------------------------------------------------------------- Yaptım
+// Kişisel iş günlüğü. Yapılacaklar'ın tersi: orada "yapacağım" var, burada
+// "yaptım". Kayıt önce yazılır, nereye ait olduğu sonra seçilir — hiç
+// seçilmese bile durur (bkz. migration 097).
+
+/**
+ * Bir Yaptım kaydının bağlanabileceği yerler.
+ *
+ * "budget" bir kasa hareketine, "personal_todo" kullanıcının kendi
+ * yapılacağına işaret eder; geri kalanı ekiple paylaşılan kayıtlardır.
+ * Bağlantı polimorfiktir (target_kind + target_id), hedef tablolara FK yoktur.
+ */
+export type WorkLogTargetKind =
+  | "task"
+  | "project"
+  | "job"
+  | "department"
+  | "operation"
+  | "output"
+  | "module_record"
+  | "budget"
+  | "personal_todo";
+
+/** Kaydı kimin/neyin oluşturduğu. Lio ile girilen kayıtlar sayfada işaretlenir. */
+export type WorkLogSource = "manual" | "lio" | "whatsapp";
+
+export interface WorkLogEntry {
+  id: string;
+  userId: string;
+  title: string;
+  note?: string;
+  /** İşin YAPILDIĞI an (ISO). Kaydın girildiği an createdAt. */
+  doneAt: string;
+  /** Dakika. Süre girmek zorunlu değil: kaydın kendisi süreden değerli. */
+  durationMinutes?: number;
+  /** Dolu ise kronometre çalışıyor. Aynı anda yalnızca bir kayıtta olabilir. */
+  timerStartedAt?: string;
+  source: WorkLogSource;
+  targetKind?: WorkLogTargetKind;
+  targetId?: string;
+  /** Hedefin bağlama anındaki adı; hedef silinse de okunabilir kalsın diye. */
+  targetLabel?: string;
+  linkedAt?: string;
+  archivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Sayfanın üstündeki özet: seçili aralığın toplamı ve gün gün dağılımı. */
+export interface WorkLogSummary {
+  from: string;
+  to: string;
+  entryCount: number;
+  totalMinutes: number;
+  /** Süresi girilmemiş kayıt sayısı — toplamın ne kadarını kaçırdığımızın ölçüsü. */
+  withoutDurationCount: number;
+  /** Henüz bir yere bağlanmamış kayıt sayısı. */
+  unlinkedCount: number;
+  days: { date: string; entryCount: number; totalMinutes: number }[];
+}
+
+/** Bir kaydı hedefe AKTARMANIN sonucu: hedefte açılan kayıt + güncellenmiş günlük satırı. */
+export interface WorkLogPushResult {
+  entry: WorkLogEntry;
+  /** Hedefte oluşan kaydın id'si (görev, kasa hareketi, modül kaydı…). */
+  createdId: string;
+  /** Kullanıcıyı götüreceğimiz sayfa. */
+  path?: string;
+}

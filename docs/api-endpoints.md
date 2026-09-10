@@ -147,6 +147,35 @@ koşulda dönmez.
 |---|---|---|---|
 | GET | `/calendar` | Filtrelenmiş görev listesi | `?projectId=<id>&scope=mine\|team` |
 
+## Yaptım — kişisel iş günlüğü (`/worklog`)
+
+Kullanıcının yaptığı işleri kaydettiği kişisel defter. **Kayıtlar yalnızca
+sahibine aittir**: hiçbir uç kullanıcı kimliğini gövdeden/parametreden almaz,
+daima `req.user.userId` kullanılır (`personal_todos` ile aynı gizlilik sınıfı).
+
+Tarih alanları **yerel duvar saatidir** (`2026-09-10T14:30:00`, sonda `Z` yok);
+gün defterinin gün sınırları buna göre kurulur.
+
+| Method | Path | Açıklama | Query / Gövde |
+|---|---|---|---|
+| GET | `/worklog` | Kayıtlar, yeniden eskiye | `?from=YYYY-MM-DD&to=YYYY-MM-DD&unlinkedOnly=true&limit=` (`to` DAHİL) |
+| GET | `/worklog/summary` | Aralığın toplamı + gün gün dağılım | `?from=&to=` |
+| GET | `/worklog/running` | Kronometresi çalışan kayıt; yoksa `null` | — |
+| POST | `/worklog` | Kayıt ekle | `{ title, note?, doneAt?, duration? }` — `duration` serbest metin: `"45"`, `"1s 30dk"`, `"2 saat"`, `"1:30"` |
+| PATCH | `/worklog/:id` | Düzelt | `{ title?, note?, doneAt?, duration? }` |
+| PATCH | `/worklog/:id/link` | Kaydı bir yere **işaretle** (yer imi) | `{ targetKind, targetId, targetLabel }` — `targetKind` boşsa bağlantı kopar |
+| POST | `/worklog/:id/push` | Kaydı hedefte **gerçek bir kayda dönüştür** | `{ kind: "task"\|"budget"\|"module_record"\|"personal_todo", ... }` |
+| POST | `/worklog/:id/timer/start` | Kronometreyi başlat (çalışan varsa durdurulur) | — |
+| POST | `/worklog/:id/timer/stop` | Durdur; geçen süre kayıtlı süreye **eklenir** | — |
+| DELETE | `/worklog/:id` | Arşivle (kalıcı silmez) | — |
+| PATCH | `/worklog/:id/restore` | Arşivden geri al | — |
+
+**`link` ile `push` farkı önemlidir.** `link` hiçbir yerde kayıt açmaz, hedefe
+erişim vermez ve hedeften bilgi OKUMAZ — etiket istemciden gelir, çünkü sunucu
+hedefin adını sorgulasaydı erişimi olmayan bir uuid'yi deneyen biri o kaydın
+adını öğrenebilirdi. `push` ise gerçek bir yazmadır ve yetkiyi hedefin kendi
+servisi uygular (`TasksService`, `BudgetService`, `ModuleRecordsService`).
+
 ## Abonelik / paketler (`/billing`)
 
 Kurulum ve iyzico paneli adımları: `docs/odeme-kurulumu.md`.

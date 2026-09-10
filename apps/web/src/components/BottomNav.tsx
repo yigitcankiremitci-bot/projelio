@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { OrgType } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus, IconFolder, IconActivity, IconBuilding } from "./icons";
+import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus, IconFolder, IconActivity, IconBuilding, IconCheck } from "./icons";
 import CreateJobModal from "./CreateJobModal";
 import CreateProjectModal from "./CreateProjectModal";
 import CreateOperationModal from "./CreateOperationModal";
@@ -21,6 +21,9 @@ import { useT } from "../lib/i18n";
 // ANAHTAR olarak kalıyor ve çeviri kullanıldığı yerde yapılıyor (aşağıda).
 const rightItems = [
   { to: "/tasks", label: "Yapılacaklar", icon: IconListCheck }, // dil:anahtar
+  // Yaptım mobilde özellikle değerli: iş biter bitmez telefondan tek satır
+  // yazmak, akşam masaya oturup hatırlamaya çalışmaktan kat kat gerçekçi.
+  { to: "/worklog", label: "Yaptım", icon: IconCheck }, // dil:anahtar
   { to: "/settings", label: "Ayarlar", icon: IconSettings }, // dil:anahtar
 ];
 

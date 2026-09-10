@@ -44,6 +44,7 @@ import { ModuleMembersModule } from "./modules/module-members/module-members.mod
 import { PartyModule } from "./modules/party/party.module";
 import { ModuleRecordsModule } from "./modules/module-records/module-records.module";
 import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.module";
+import { WorklogModule } from "./modules/worklog/worklog.module";
 import { PlanningModule } from "./modules/planning/planning.module";
 import { CreationRequestsModule } from "./modules/creation-requests/creation-requests.module";
 import { SocialMediaModule } from "./modules/social-media/social-media.module";
@@ -101,6 +102,9 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     ModuleRecordsModule,
     PartyModule,
     PersonalTodosModule,
+    // Yaptım: kişisel iş günlüğü. Yapılacaklar'ın (PersonalTodosModule) tersi —
+    // orada "yapacağım", burada "yaptım" (bkz. 097_yaptim.sql).
+    WorklogModule,
     PlanningModule,
     // Sosyal medya: kendi tablolarını kullanan ilk modül (bkz. 054_social_media.sql).
     SocialMediaModule,

@@ -23,6 +23,7 @@ import { PlanningModule } from "../planning/planning.module";
 import { OutputsModule } from "../outputs/outputs.module";
 import { FilesModule } from "../files/files.module";
 import { PersonalTodosModule } from "../personal-todos/personal-todos.module";
+import { WorklogModule } from "../worklog/worklog.module";
 import { CloudStorageModule } from "../cloud-storage/cloud-storage.module";
 import { RealtimeModule } from "../realtime/realtime.module";
 import { CatalogModule } from "../catalog/catalog.module";
@@ -56,6 +57,9 @@ import { WhatsappModule } from "../whatsapp/whatsapp.module";
     // (TasksModule) ayrı bir modül çünkü kayıtlar ayrı tabloda ve kimseyle
     // paylaşılmıyor; yetki kuralı da tek: kayıt istekte bulunanın olmalı.
     PersonalTodosModule,
+    // Yaptım: Lio'ya geçmiş zamanla anlatılan işler ("şu raporu bitirdim")
+    // kişisel iş günlüğüne yazılır; oradan projeye/göreve aktarılabiliyor.
+    WorklogModule,
     // Sohbete iliştirilen dosyalar için: FilesModule mevcut bir Projelio dosyasını
     // indirmeye, CloudStorageModule ise kullanıcının Drive/OneDrive'ındaki dosyaya
     // erişmeye yarıyor. İkisi de yalnızca OKUMA için kullanılıyor.

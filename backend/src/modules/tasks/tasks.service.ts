@@ -637,6 +637,12 @@ export class TasksService {
         // Hatırlatma yalnızca saat varsa kurulabilir (DB'de de CHECK var).
         reminder_lead_minutes: data.deadlineTime ? (data.reminderLeadMinutes ?? null) : null,
         status: data.status ?? "todo",
+        // Doğrudan TAMAMLANMIŞ olarak açılan görevler (Yaptım'dan aktarma,
+        // Lio'nun create_task'ı) damgasız kalmasın: updateStatus tamamlanınca
+        // bu ikisini yazıyor, oluşturma yolu yazmıyordu ve o görevler ekip
+        // aktivite özetlerinde "kim ne zaman bitirdi" bilgisi olmadan duruyordu.
+        completed_at: data.status === "completed" ? new Date().toISOString() : null,
+        completed_by: data.status === "completed" ? (requestingUserId ?? null) : null,
         parent_task_id: data.parentTaskId ?? null,
         budget: data.budget ?? 0,
         week_number: data.weekNumber ?? null,
@@ -775,6 +781,10 @@ export class TasksService {
         deadline_time: data.deadlineTime || null,
         reminder_lead_minutes: data.deadlineTime ? (data.reminderLeadMinutes ?? null) : null,
         status: data.status ?? "todo",
+        // Proje görevlerindeki kuralın aynısı: tamamlanmış olarak açılan görev
+        // damgasız kalmasın (bkz. create()).
+        completed_at: data.status === "completed" ? new Date().toISOString() : null,
+        completed_by: data.status === "completed" ? (requestingUserId ?? null) : null,
         parent_task_id: data.parentTaskId ?? null,
         budget: data.budget ?? 0,
         week_number: data.weekNumber ?? null,

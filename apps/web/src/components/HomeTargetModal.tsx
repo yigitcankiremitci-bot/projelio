@@ -35,6 +35,7 @@ const PAGE_OPTIONS: Option[] = [
   { path: "/?tab=files", label: "Dosyalar", icon: IconFile },
   { path: "/calendar", label: "Takvim", icon: IconCalendar },
   { path: "/tasks", label: "Yapılacaklar", icon: IconListCheck },
+  { path: "/worklog", label: "Yaptım", icon: IconCheck },
 ];
 
 interface Props {

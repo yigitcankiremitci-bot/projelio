@@ -64,6 +64,11 @@ export const WRITE_TOOLS = new Set<string>([
   "update_assigned_todo_prefs",
   "reorder_todos",
   "restore_todo",
+  // Yaptım (kişisel iş günlüğü)
+  "log_work",
+  "log_works",
+  "update_work_log",
+  "link_work_log",
   // İş / proje / görev
   "create_job",
   "update_job",
@@ -515,6 +520,130 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: { todoId: { type: "string" } },
       required: ["todoId"],
+    },
+  },
+  // --- Yaptım (kişisel iş günlüğü) --------------------------------------
+  // Yapılacaklar'ın TERSİ: orada "yapacağım", burada "yaptım". Kullanıcı gün
+  // içinde plan dışı bir iş yaptığında önce buraya yazılır (başlık + süre),
+  // nereye ait olduğu SONRA seçilir — hiç seçilmese bile kayıt durur.
+  //
+  // AYRIM ÖNEMLİ: "yarın X yapacağım" -> create_todo. "X'i yaptım / bitirdim /
+  // hallettim" -> log_work. Geçmiş zaman kipi ayırt edicidir.
+  {
+    name: "log_work",
+    description:
+      "Kullanıcının YAPTIĞI bir işi Yaptım sayfasına (kişisel iş günlüğü) yazar. Kullanıcı geçmiş " +
+      "zamanla bir iş anlattığında — \"bugün müşteriyle görüştüm\", \"şu raporu bitirdim\", " +
+      "\"iki saat tasarımla uğraştım\" — BUNU ÇAĞIR. Yapılacak bir iş için create_todo, projeye " +
+      "görev açmak için create_task kullanılır; bu araç YAPILMIŞ işi kaydeder. " +
+      "Kullanıcı nereye ait olduğunu söylemediyse SORMA, kaydı bağlantısız yaz: hangi projeye/göreve " +
+      "ait olduğunu kullanıcı Yaptım sayfasında tek tıkla seçebiliyor. Süreyi söylemediyse boş bırak.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Ne yapıldı. Kullanıcının cümlesini kısa bir başlığa indir." },
+        note: { type: "string", description: "Ayrıntı, opsiyonel." },
+        duration: {
+          type: "string",
+          description:
+            "Ne kadar sürdü. Serbest yazım: \"45\" (dakika), \"1s 30dk\", \"2 saat\", \"1:30\". " +
+            "Kullanıcı söylemediyse GÖNDERME — süre uydurma.",
+        },
+        doneAt: {
+          type: "string",
+          description:
+            "İşin yapıldığı an. Yalnızca gün için \"YYYY-MM-DD\", saatiyle için \"YYYY-MM-DDTHH:MM\". " +
+            "Varsayılan şimdi. \"Dün\" gibi ifadeleri buraya çevir.",
+        },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "log_works",
+    description:
+      "Yaptım sayfasına BİRDEN FAZLA işi tek seferde yazar. Kullanıcı gününü bir çırpıda anlattığında " +
+      "(\"bugün şunu, şunu ve şunu yaptım\") log_work'ü tekrar tekrar çağırmak yerine bunu bir kez " +
+      "çağır — daha az tur, daha az kredi.",
+    input_schema: {
+      type: "object",
+      properties: {
+        entries: {
+          type: "array",
+          description: "Kayıtlar. Her biri log_work ile aynı alanları taşır.",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              note: { type: "string" },
+              duration: { type: "string" },
+              doneAt: { type: "string" },
+            },
+            required: ["title"],
+          },
+        },
+      },
+      required: ["entries"],
+    },
+  },
+  {
+    name: "get_work_log",
+    description:
+      "Yaptım sayfasını okur: kullanıcının yaptığı işler, süreleri ve toplamı. \"Bugün ne yaptım\", " +
+      "\"bu hafta kaç saat çalıştım\", \"dün neyle uğraşmışım\" gibi sorularda bunu çağır. " +
+      "Bir kaydı değiştirmeden ya da bağlamadan önce DAİMA buradan oku: diğer araçlar entryId istiyor.",
+    input_schema: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "Başlangıç günü (YYYY-MM-DD). Varsayılan sınırsız." },
+        to: { type: "string", description: "Bitiş günü (YYYY-MM-DD), DAHİL." },
+        unlinkedOnly: {
+          type: "boolean",
+          description: "Yalnızca henüz bir işe/projeye bağlanmamış kayıtlar gelsin mi.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "update_work_log",
+    description:
+      "Yaptım'daki bir kaydı düzeltir — çoğunlukla sonradan söylenen süreyi eklemek için " +
+      "(\"o iş aslında iki saat sürdü\"). entryId'yi get_work_log'dan al.",
+    input_schema: {
+      type: "object",
+      properties: {
+        entryId: { type: "string" },
+        title: { type: "string" },
+        note: { type: "string" },
+        duration: { type: "string", description: "Serbest yazım: \"45\", \"1s 30dk\", \"2 saat\"." },
+        doneAt: { type: "string" },
+      },
+      required: ["entryId"],
+    },
+  },
+  {
+    name: "link_work_log",
+    description:
+      "Yaptım'daki bir kaydı bir projeye, göreve, işe, departmana ya da modül kaydına iliştirir. " +
+      "Kullanıcı \"o iş şu projeye aitti\" dediğinde kullan. Hedefin id'sini önce ilgili listeleme " +
+      "aracıyla bul (list_projects, search_tasks, list_jobs, list_departments…) ve adını targetLabel " +
+      "olarak ver. Bağlamak bir yer imidir: hedefte yeni bir kayıt AÇMAZ, kimseye bir şey göstermez. " +
+      "Kullanıcı yapılan işin projede GÖREV olarak da görünmesini istiyorsa bunu değil create_task'ı " +
+      "çağır (status=\"completed\").",
+    input_schema: {
+      type: "object",
+      properties: {
+        entryId: { type: "string", description: "get_work_log'daki kaydın id'si." },
+        targetKind: {
+          type: "string",
+          enum: ["task", "project", "job", "department", "operation", "output", "module_record", "budget", "personal_todo"],
+          description: "Bağlantıyı KOPARMAK için bu alanı boş gönder.",
+        },
+        targetId: { type: "string" },
+        targetLabel: { type: "string", description: "Hedefin adı; kullanıcı listede bunu görüyor." },
+      },
+      required: ["entryId"],
     },
   },
   {

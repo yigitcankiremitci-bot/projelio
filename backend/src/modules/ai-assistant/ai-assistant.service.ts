@@ -56,6 +56,7 @@ import { AiAttachmentsService, type PreparedAttachment } from "./ai-attachments.
 import { estimateTranscriptionCredits } from "./ai-credits.config";
 import { FilesService } from "../files/files.service";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
+import { WorklogService } from "../worklog/worklog.service";
 import { AiTranscriptionService } from "./ai-transcription.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { WhatsappLioService } from "../whatsapp/whatsapp-lio.service";
@@ -525,6 +526,10 @@ const ACTION_LABELS: Record<string, string> = {
   reorder_todos: "yapılacaklar sıralandı",
   archive_todo: "yapılacak kaldırıldı",
   restore_todo: "yapılacak geri alındı",
+  log_work: "Yaptım'a kaydedildi",
+  log_works: "Yaptım'a toplu kayıt eklendi",
+  update_work_log: "Yaptım kaydı güncellendi",
+  link_work_log: "Yaptım kaydı bağlandı",
   create_module_record: "modül kaydı eklendi",
   update_module_record: "modül kaydı güncellendi",
   archive_module_record: "modül kaydı arşivlendi",
@@ -600,6 +605,7 @@ function clearMidRunFlag(file: ActiveFile): ActiveFile {
 const COUNTLESS_ACTIONS = new Set([
   "toplu görev eklendi",
   "toplu yapılacak eklendi",
+  "Yaptım'a toplu kayıt eklendi",
   "yapılacaklar sıralandı",
   "dosyadan toplu görev eklendi",
   "dosyadan toplu modül kaydı eklendi",
@@ -658,6 +664,7 @@ export class AiAssistantService {
     private filesService: FilesService,
     // Yapılacaklar sayfası (kişisel pano) araçları için.
     private personalTodosService: PersonalTodosService,
+    private worklogService: WorklogService,
     // WhatsApp araçları (müşteriye yaz, konuşmayı oku, otomatik yanıt). İki
     // yönlü bağımlılık: WhatsApp modülü otomatik yanıt için draftText()'i
     // çağırıyor, bu yüzden forwardRef.
@@ -1211,6 +1218,20 @@ export class AiAssistantService {
         "describe_module bunlara \"kayitDefteriMi: false\" der — buraya module_record EKLEME.",
       "- ÜRÜNLER istisnadır: kendi araçları var (list_products/create_product/update_product). " +
         "Ürün Yönetimi modülünde kayıt istendiğinde kullanıcıyı sayfaya yönlendirme, o araçları kullan.",
+      "",
+      "## Yaptım (kişisel iş günlüğü)",
+      "Kullanıcı sana BİTMİŞ bir işi anlattığında — \"bugün müşteriyle görüştüm\", \"raporu bitirdim\", " +
+        "\"iki saat tasarımla uğraştım\" — bunu log_work ile Yaptım sayfasına yaz. Bu, kullanıcının " +
+        "gününü sisteme geçirmesinin en kolay yolu; yoksa yapılan iş hiçbir yere yazılmıyor.",
+      "- AYIRICI KIP GEÇMİŞ ZAMANDIR. \"Yarın X yapacağım\" -> create_todo. \"X'i yaptım\" -> log_work.",
+      "- NEREYE AİT OLDUĞUNU SORMA. Kullanıcı kendisi söylediyse link_work_log ile bağla; söylemediyse " +
+        "kaydı bağlantısız yaz ve geç. Hangi projeye ait olduğunu kullanıcı Yaptım sayfasında tek tıkla " +
+        "seçebiliyor — asıl değer, işin kaydının HİÇ kaybolmaması.",
+      "- Süreyi kullanıcı söylediyse yaz, söylemediyse SORMA ve uydurma. Sonradan söylerse update_work_log.",
+      "- Kullanıcı bir çırpıda birkaç iş anlattıysa log_works ile tek çağrıda yaz.",
+      "- Kaydı yazdıktan sonra kısa onayla ve gerekiyorsa \"istersen bir projeye bağlayayım\" diye TEK bir " +
+        "cümle ekle; ısrar etme.",
+      "- \"Bugün ne yaptım\", \"bu hafta kaç saat çalıştım\" gibi sorularda get_work_log'u çağır.",
       "",
       "## Kredi disiplini",
       "Kullanıcı her turun ve her araç çağrısının bedelini kredi olarak öder. Bu yüzden:",
@@ -2578,6 +2599,17 @@ export class AiAssistantService {
         return make(`${label[0].toLocaleUpperCase("tr")}${label.slice(1)}`, "/tasks");
       }
 
+      // Yaptım da kişisel: canlı odası yok, bildirim yalnızca sayfaya götürür.
+      case "log_work":
+      case "log_works":
+      case "update_work_log":
+      case "link_work_log": {
+        const label = ACTION_LABELS[toolName];
+        if (!label) return null;
+        const baslik = result?.title ? `: ${result.title}` : "";
+        return make(`${label[0].toLocaleUpperCase("tr")}${label.slice(1)}${baslik}`, "/worklog");
+      }
+
       case "create_job":
       case "update_job":
       case "archive_job": {
@@ -3607,6 +3639,69 @@ export class AiAssistantService {
 
       case "restore_todo":
         return this.personalTodosService.restore(userId, input.todoId);
+
+      // --- Yaptım -------------------------------------------------------
+      case "log_work":
+        return this.worklogService.create(userId, {
+          title: input.title,
+          note: input.note,
+          duration: input.duration,
+          doneAt: input.doneAt,
+          // Kaynak modelden DEĞİL buradan geliyor: sayfada "Lio ekledi"
+          // rozetinin doğruluğu, modelin doğru alanı doldurmasına bağlı olamaz.
+          source: "lio",
+        });
+
+      case "log_works": {
+        const items: any[] = Array.isArray(input.entries) ? input.entries : [];
+        if (!items.length) throw new BadRequestException("En az bir kayıt gerekli.");
+        const created: any[] = [];
+        for (const item of items) {
+          created.push(await this.worklogService.create(userId, { ...item, source: "lio" }));
+        }
+        return { created: created.length, entries: created.map((e) => ({ id: e.id, title: e.title })) };
+      }
+
+      case "get_work_log": {
+        const [entries, summary] = await Promise.all([
+          this.worklogService.list(userId, {
+            from: input.from,
+            to: input.to,
+            unlinkedOnly: input.unlinkedOnly === true,
+          }),
+          this.worklogService.summary(userId, { from: input.from, to: input.to }),
+        ]);
+        // Modele kaydın karar için gereken alanları veriliyor; damgalar ve
+        // hedef id'leri her turda token olarak ödenirdi.
+        return {
+          totalMinutes: summary.totalMinutes,
+          entryCount: summary.entryCount,
+          unlinkedCount: summary.unlinkedCount,
+          entries: entries.map((e) => ({
+            entryId: e.id,
+            title: e.title,
+            note: e.note,
+            doneAt: e.doneAt.slice(0, 16).replace("T", " "),
+            durationMinutes: e.durationMinutes,
+            linkedTo: e.targetKind ? `${e.targetKind}: ${e.targetLabel ?? e.targetId}` : undefined,
+          })),
+        };
+      }
+
+      case "update_work_log":
+        return this.worklogService.update(userId, input.entryId, {
+          title: input.title,
+          note: input.note,
+          duration: input.duration,
+          doneAt: input.doneAt,
+        });
+
+      case "link_work_log":
+        return this.worklogService.link(userId, input.entryId, {
+          targetKind: input.targetKind ?? null,
+          targetId: input.targetId ?? null,
+          targetLabel: input.targetLabel ?? null,
+        });
 
       case "search_files": {
         // Aramanın kapsamı Lio'nun list_jobs'ta gördüğü işlerle AYNI olsun diye

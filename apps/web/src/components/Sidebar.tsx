@@ -57,6 +57,9 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
     // Mobilde BottomNav'da olan "Yapılacaklar" (/tasks) masaüstünde hiçbir yerden
     // erişilebilir değildi; aynı sayfa buraya da bağlandı.
     { to: "/tasks", label: t("Yapılacaklar"), active: location.pathname.startsWith("/tasks") },
+    // Yaptım, Yapılacaklar'ın hemen altında: ikisi aynı kişisel çalışma
+    // alanının iki yüzü — biri "yapacağım", diğeri "yaptım".
+    { to: "/worklog", label: t("Yaptım"), active: location.pathname.startsWith("/worklog") },
     // Ayarlar diğer sayfalarla aynı listede, Yapılacaklar'ın hemen altında.
     // Önceden en altta, gezinme ağacından sonra, "Çıkış yap" ile birlikte ayrı
     // bir öbekteydi; orada bir sayfa değil bir "kapanış" gibi duruyordu.

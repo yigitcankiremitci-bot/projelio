@@ -592,4 +592,15 @@ export const hatalar: TranslationDict = {
   "Bu bağ bir döngü oluşturur: iki görev birbirini beklerdi":
     "That link would create a cycle: the two tasks would wait for each other",
   "Tur listesi bekleniyor": "A list of tours is expected",
+
+  // ─────────────────────────────────────────────── Yaptım (097)
+  "Ne yaptığını yazman gerekiyor": "Write down what you did",
+  "Tarih anlaşılamadı": "Couldn't read that date",
+  "Geçersiz bağlantı türü": "Invalid link type",
+  "Bağlantı için hedef gerekli": "A target is required for the link",
+  "Geçersiz aktarma hedefi": "Invalid transfer target",
+  "Görev için proje ya da departman seçilmeli": "Pick a project or a department for the task",
+  "Modül kaydı için şirket ve modül seçilmeli": "Pick a company and a module for the record",
+  "Geçerli bir tutar gerekiyor": "A valid amount is required",
+  "En az bir kayıt gerekli.": "At least one entry is required.",
 };

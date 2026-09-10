@@ -73,6 +73,7 @@ const AdminPanel = lazy(() => import("./pages/AdminPanel"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Archive = lazy(() => import("./pages/Archive"));
 const TasksOverview = lazy(() => import("./pages/TasksOverview"));
+const WorkLog = lazy(() => import("./pages/WorkLog"));
 const AiCreditsPage = lazy(() => import("./pages/AiCredits"));
 const BillingPage = lazy(() => import("./pages/Billing"));
 
@@ -810,6 +811,8 @@ export default function App() {
                 <Route path="/groups/:id" element={<GroupDetail />} />
                 <Route path="/calendar" element={<CalendarView />} />
                 <Route path="/tasks" element={<TasksOverview />} />
+                {/* Yaptım: kişisel iş günlüğü. Yapılacaklar'ın tersi (bkz. pages/WorkLog.tsx). */}
+                <Route path="/worklog" element={<WorkLog />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/settings/archive" element={<Archive />} />
                 <Route path="/settings/ai-credits" element={<AiCreditsPage />} />

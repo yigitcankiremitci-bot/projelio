@@ -225,6 +225,7 @@ export const hatalar: TranslationDict = {
   "Dosya bulunamadı": "File not found",
   "Dönem bulunamadı.": "Period not found.",
   "Düzenli ödeme bulunamadı": "Recurring payment not found",
+  "Duraklatılmış bir ödeme işlenemez": "A paused payment cannot be posted",
   "Ek bulunamadı": "Attachment not found",
   "Fotoğraf bulunamadı": "Photo not found",
   "Grup bulunamadı": "Group not found",

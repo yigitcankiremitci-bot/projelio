@@ -1,11 +1,15 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { BudgetService } from "./budget.service";
+import { RecurringPaymentsService } from "./recurring-payments.service";
 
 @Controller("projects/:projectId/budget")
 @UseGuards(AuthGuard("jwt"))
 export class BudgetController {
-  constructor(private budgetService: BudgetService) {}
+  constructor(
+    private budgetService: BudgetService,
+    private recurringPaymentsService: RecurringPaymentsService
+  ) {}
 
   @Get()
   findAll(@Param("projectId") projectId: string, @Req() req: any) {
@@ -15,6 +19,16 @@ export class BudgetController {
   @Post()
   add(@Param("projectId") projectId: string, @Body() body: any, @Req() req: any) {
     return this.budgetService.add(projectId, body, req.user.userId);
+  }
+
+  // Projeye bağlı düzenli ödemeler. Kasa'dan bir projeye düzenli gider
+  // girildiğinde o yük deftere ancak vadesi gelince işleniyor; o güne kadar
+  // proje bütçesinde hiçbir izi yoktu ve proje "gideri yokmuş" gibi
+  // görünüyordu. Burası henüz işlenmemiş yükü de görünür kılıyor.
+  @Get("recurring")
+  async recurring(@Param("projectId") projectId: string, @Req() req: any) {
+    await this.budgetService.assertCanViewBudget(projectId, req.user.userId);
+    return this.recurringPaymentsService.findByProject(projectId);
   }
 
   // remainingMargin: eldeki net (tahsil edilen − harcanan).

@@ -2,6 +2,12 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import type { RecurrenceInterval, RecurringPayment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { requireAmount, requireOneOf, optionalOneOf } from "../../common/validation/input";
+import { BudgetService } from "./budget.service";
+import { islenecekDonemler } from "./vade";
+
+// Tarih hesabı vade.ts'te (testten import edilebilsin diye); buradan yeniden
+// dışa aktarılıyor ki mevcut çağrı yerleri değişmesin.
+export { advanceDueDate, islenecekDonemler, toDateString } from "./vade";
 
 const INTERVALS: RecurrenceInterval[] = ["weekly", "monthly", "yearly"];
 
@@ -31,44 +37,12 @@ function mapPayment(row: any): RecurringPayment {
   };
 }
 
-// Tarihi yerel saat diliminden bağımsız, "YYYY-MM-DD" olarak biçimlendirir.
-// toISOString() UTC'ye kaydırdığı için Türkiye saatinde gece yarısına yakın
-// işlemlerde bir gün geri gidebiliyor; bu yüzden elle biçimlendiriyoruz.
-export function toDateString(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-// Bir sonraki vade tarihini hesaplar.
-//
-// Ay sonu taşmasına dikkat edilir: 31 Ocak + 1 ay, JS'te doğal olarak 3 Mart'a taşar;
-// bunun yerine ayın son gününe (28/29/30) sabitlenir. Ayrıca "çapa gün" (anchorDay)
-// kavramı vardır: her ayın 31'i olan bir ödeme Şubat'ta 28'e çekilir, ama bir sonraki
-// hesaplama yine 31'den yapılır — aksi halde ödeme kalıcı olarak 28'e kayardı.
-export function advanceDueDate(current: string, interval: RecurrenceInterval, anchorDay?: number): string {
-  const [year, month, day] = current.split("-").map(Number);
-
-  if (interval === "weekly") {
-    const d = new Date(year, month - 1, day);
-    d.setDate(d.getDate() + 7);
-    return toDateString(d);
-  }
-
-  const monthsToAdd = interval === "monthly" ? 1 : 12;
-  const targetMonthIndex = month - 1 + monthsToAdd;
-  const targetYear = year + Math.floor(targetMonthIndex / 12);
-  const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
-  // Ayın 0. günü = bir önceki ayın son günü.
-  const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-  const desiredDay = anchorDay ?? day;
-  return toDateString(new Date(targetYear, targetMonth, Math.min(desiredDay, lastDayOfTargetMonth)));
-}
-
 @Injectable()
 export class RecurringPaymentsService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private budgetService: BudgetService
+  ) {}
 
   async findAllForUser(userId: string): Promise<RecurringPayment[]> {
     const { data, error } = await this.supabase.client
@@ -172,6 +146,77 @@ export class RecurringPaymentsService {
       .update({ next_due_date: nextDueDate, last_run_at: new Date().toISOString() })
       .eq("id", id);
     if (error) throw error;
+  }
+
+  /**
+   * Bir projeye bağlı düzenli ödemeler.
+   *
+   * Sahibine değil PROJEYE bakar: proje bütçesini görebilen (ör. "bütçeyi
+   * görebilir" izni olan üye) projenin düzenli yüklerini de görmeli. Erişim
+   * denetimi çağıran uçta (bkz. BudgetController).
+   */
+  async findByProject(projectId: string): Promise<RecurringPayment[]> {
+    const { data, error } = await this.supabase.client
+      .from("recurring_payments")
+      .select("*, projects(title)")
+      .eq("project_id", projectId)
+      .order("next_due_date", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(mapPayment);
+  }
+
+  /**
+   * Ödemeyi deftere işler ve vadeyi ilerletir.
+   *
+   * Cron da (RecurringPaymentsProcessor) elle "Ödendi" de buradan geçiyor.
+   * Bildirimi burada GÖNDERMİYORUZ: cron'un bildirimi "haberin olsun" demek,
+   * kullanıcının kendi bastığı düğme için aynı bildirim gürültü olurdu.
+   */
+  async islet(payment: RecurringPayment, today: string): Promise<{ olusanIdler: string[]; sonrakiVade: string }> {
+    const { tarihler, sonrakiVade } = islenecekDonemler(
+      payment.nextDueDate,
+      payment.interval,
+      payment.anchorDay,
+      today
+    );
+
+    const olusanIdler: string[] = [];
+    for (const tarih of tarihler) {
+      const tx = await this.budgetService.createRecurringTransaction(payment, tarih);
+      olusanIdler.push(tx.id);
+    }
+    if (olusanIdler.length > 0) await this.markProcessed(payment.id, sonrakiVade);
+    return { olusanIdler, sonrakiVade };
+  }
+
+  /**
+   * Kullanıcının "Ödendi" düğmesi.
+   *
+   * Vadesi geçmiş bir ödeme, ertesi sabah cron koşana kadar kasada "gecikti"
+   * diye duruyor ve kullanıcının yapabileceği hiçbir şey yoktu — ödemeyi
+   * gerçekten yapmış olsa bile. Dönen değer geri almaya yetecek kadarını
+   * taşıyor: oluşan kayıtların id'leri ve ÖNCEKİ vade.
+   */
+  async odendiIsaretle(
+    id: string,
+    userId: string,
+    today: string
+  ): Promise<{ payment: RecurringPayment; olusanIdler: string[]; oncekiVade: string }> {
+    await this.assertOwner(id, userId);
+    const { data: row } = await this.supabase.client
+      .from("recurring_payments")
+      .select("*, projects(title)")
+      .eq("id", id)
+      .maybeSingle();
+    if (!row) throw new NotFoundException("Düzenli ödeme bulunamadı");
+
+    const payment = mapPayment(row);
+    // Duraklatılmış ödeme takipte değildir; işlemek onu sessizce geri açardı.
+    if (!payment.active) throw new BadRequestException("Duraklatılmış bir ödeme işlenemez");
+
+    const oncekiVade = payment.nextDueDate;
+    const { olusanIdler, sonrakiVade } = await this.islet(payment, today);
+    return { payment: { ...payment, nextDueDate: sonrakiVade }, olusanIdler, oncekiVade };
   }
 
   private assertValid(data: Partial<RecurringPayment>): void {

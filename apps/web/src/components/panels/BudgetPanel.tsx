@@ -1,11 +1,20 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
-import type { BudgetTransaction, Project, ProjectMember, Task } from "@projelio/shared";
+import type { BudgetTransaction, Project, ProjectMember, RecurringPayment, Task } from "@projelio/shared";
 import { api } from "../../api/client";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { IconPlus, IconX, IconEdit, IconTrash } from "../icons";
 import CreateBudgetTransactionModal from "../CreateBudgetTransactionModal";
+import VadeRozeti from "../VadeRozeti";
 import { useUndo, useWithoutPendingDeletes } from "../../lib/undo";
 import { useT } from "../../lib/i18n";
+
+// Metinler t() ile kullanıldıkları yerde çevriliyor: modül düzeyinde kanca
+// çağrılamaz, Türkçe metin anahtar olarak kalır (bkz. BudgetPanel.tsx).
+const intervalLabels: Record<string, string> = {
+  weekly: "Her hafta", // dil:anahtar
+  monthly: "Her ay", // dil:anahtar
+  yearly: "Her yıl", // dil:anahtar
+};
 
 export interface BudgetPanelHandle {
   openCreate: () => void;
@@ -43,6 +52,10 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
   const [addingViewer, setAddingViewer] = useState(false);
   const [viewerToAdd, setViewerToAdd] = useState("");
   const [transactions, setTransactions] = useState<BudgetTransaction[]>([]);
+  // Bu projeye bağlı düzenli ödemeler (Kasa'dan projeye bağlanmış olanlar da
+  // dahil). Deftere ancak vadesi gelince işlendikleri için, o güne kadar
+  // projede hiçbir izleri yoktu; buradan hem görünüyorlar hem işlenebiliyorlar.
+  const [recurring, setRecurring] = useState<RecurringPayment[]>([]);
   const [creatingEntry, setCreatingEntry] = useState(false);
   const [editingEntry, setEditingEntry] = useState<BudgetTransaction | null>(null);
   const { pushUndo, pushDestructive } = useUndo();
@@ -52,6 +65,21 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
       .get<BudgetTransaction[]>(`/projects/${projectId}/budget`)
       .then(setTransactions)
       .catch(() => setTransactions([]));
+    api
+      .get<RecurringPayment[]>(`/projects/${projectId}/budget/recurring`)
+      .then(setRecurring)
+      .catch(() => setRecurring([]));
+  };
+
+  // "Ödendi": ödemeyi bugün deftere işler, vadeyi ilerletir ve kayıt bu
+  // projenin hareketleri arasına düşer (bkz. Kasa'daki aynı düğme).
+  const markRecurringPaid = async (payment: RecurringPayment) => {
+    try {
+      await api.post(`/budget/recurring/${payment.id}/ode`, {});
+    } catch {
+      return;
+    }
+    reloadTransactions();
   };
 
   // Kayıt ekleme/düzenleme de geri alınabilir olmalı: bütçe girerken en sık
@@ -118,12 +146,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
       .finally(() => setLoading(false));
   }, [projectId]);
 
-  useEffect(() => {
-    api
-      .get<BudgetTransaction[]>(`/projects/${projectId}/budget`)
-      .then(setTransactions)
-      .catch(() => setTransactions([]));
-  }, [projectId]);
+  useEffect(reloadTransactions, [projectId]);
 
   useImperativeHandle(ref, () => ({
     openCreate: () => setCreatingEntry(true),
@@ -286,6 +309,71 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
           </div>
         </div>
       </div>
+
+      {/* Projeye bağlı düzenli ödemeler. Bunlar deftere vadesi gelince
+          işlenir; o güne kadar projede hiç görünmüyorlardı ve Kasa'dan bu
+          projeye düzenli bir gider giren kullanıcı burada karşılığını
+          bulamıyordu. Aşağıdaki toplamlara GİRMEZ: henüz para çıkmadı. */}
+      {recurring.length > 0 && (
+        <div>
+          <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>{t("Düzenli ödemeler")}</h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {recurring.map((r) => {
+              const gelir = r.type === "income";
+              return (
+                <div
+                  key={r.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    background: c.surface,
+                    border: `1px solid ${c.border}`,
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    opacity: r.active ? 1 : 0.55,
+                  }}
+                >
+                  <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, minWidth: 140 }}>
+                    {r.description || (gelir ? t("Düzenli gelir") : t("Düzenli gider"))}
+                    <span style={{ fontSize: 13, color: c.textSecondary, marginLeft: 8 }}>
+                      {t(intervalLabels[r.interval])}
+                    </span>
+                  </span>
+
+                  {r.active ? <VadeRozeti tarih={r.nextDueDate} /> : <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Duraklatıldı")}</span>}
+
+                  <span style={{ fontSize: 15, fontWeight: 500, color: gelir ? c.success : c.danger, flexShrink: 0 }}>
+                    {gelir ? "+" : "−"}
+                    {r.amount.toLocaleString("tr-TR")} ₺
+                  </span>
+
+                  {/* İşleme yetkisi ödemenin SAHİBİNDE: kayıt onun kasasında
+                      duruyor. Bütçeyi görebilen üye listeyi görür, işleyemez. */}
+                  {isOwner && r.active && (
+                    <button
+                      onClick={() => markRecurringPaid(r)}
+                      style={{
+                        fontSize: 13,
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        border: "none",
+                        background: c.primary,
+                        color: c.onPrimary,
+                        flexShrink: 0,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {gelir ? t("Tahsil edildi") : t("Ödendi")}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div>
         <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>{t("Ödeme hareketleri")}</h4>

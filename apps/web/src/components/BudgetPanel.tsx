@@ -6,7 +6,8 @@ import { useRefreshOnUndo } from "../lib/undo";
 import { FAB_PRIORITY, useProjectFabAction } from "../lib/projectFab";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { kalanGun, vadeDurumu, YAKLASAN_GUN } from "../lib/butceOzeti";
+import { kalanGun, YAKLASAN_GUN } from "../lib/butceOzeti";
+import VadeRozeti from "./VadeRozeti";
 import BudgetTrendChart from "./BudgetTrendChart";
 import AddBudgetEntryModal from "./AddBudgetEntryModal";
 import AddRecurringPaymentModal from "./AddRecurringPaymentModal";
@@ -263,6 +264,41 @@ export default function BudgetPanel() {
     reload();
   };
 
+  /**
+   * "Ödendi" — düzenli ödemeyi şimdi deftere işler.
+   *
+   * Eskiden bunun tek yolu gecelik iş (her sabah 08:00) idi: vadesi geçmiş bir
+   * ödeme kasada "gecikti" diye duruyor, kullanıcı ödemeyi gerçekten yapmış
+   * olsa bile yapabileceği hiçbir şey yoktu. Sunucu kaçırılmış her dönem için
+   * ayrı kayıt atıyor ve vadeyi ilerletiyor (bkz. islenecekDonemler).
+   *
+   * Geri alınabilir: oluşan kayıtlar silinip vade eski gününe döner.
+   */
+  const markRecurringPaid = async (payment: RecurringPayment) => {
+    let sonuc: { olusanIdler: string[]; oncekiVade: string };
+    try {
+      sonuc = await api.post<{ olusanIdler: string[]; oncekiVade: string }>(
+        `/budget/recurring/${payment.id}/ode`,
+        {}
+      );
+    } catch {
+      return;
+    }
+    reload();
+    pushUndo({
+      label: t("Ödeme işlendi"),
+      run: async () => {
+        await Promise.all(sonuc.olusanIdler.map((id) => api.delete(`/budget/transactions/${id}`).catch(() => {})));
+        await api.patch(`/budget/recurring/${payment.id}`, { nextDueDate: sonuc.oncekiVade }).catch(() => {});
+        reload();
+      },
+      redo: async () => {
+        await api.post(`/budget/recurring/${payment.id}/ode`, {}).catch(() => {});
+        reload();
+      },
+    });
+  };
+
   const gecikmisSayisi = recurring.filter((r) => r.active && kalanGun(r.nextDueDate) < 0).length;
   const yaklasanSayisi = recurring.filter((r) => {
     if (!r.active) return false;
@@ -444,6 +480,27 @@ export default function BudgetPanel() {
                   {formatMoney(r.amount)}
                 </span>
 
+                {/* Ödemeyi deftere işleyen tek düğme. Vadesi gelmemişse de
+                    basılabilir (erken ödeme): sunucu kaydı bugünün tarihiyle
+                    atar, ödeme günü kaymaz. Duraklatılmışta gizli. */}
+                {r.active && (
+                  <button
+                    type="button"
+                    onClick={() => markRecurringPaid(r)}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: 7,
+                      border: "none",
+                      background: c.primary,
+                      color: c.onPrimary,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {r.type === "income" ? t("Tahsil edildi") : t("Ödendi")}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => toggleRecurring(r)}
@@ -719,42 +776,6 @@ function HareketSutunu({
         ))
       )}
     </div>
-  );
-}
-
-/** Vadeye kalan süreyi renkle söyler: gecikmiş kırmızı, yaklaşan kehribar. */
-function VadeRozeti({ tarih }: { tarih: string }) {
-  const c = useThemeColors();
-  const t = useT();
-  const durum = vadeDurumu(tarih);
-  const kalan = kalanGun(tarih);
-
-  if (durum === "uzak") {
-    return <span style={{ fontSize: 12, color: c.textSecondary }}>{formatDate(tarih)}</span>;
-  }
-
-  const renk = durum === "gecikti" ? c.danger : c.warning;
-  const metin =
-    durum === "gecikti"
-      ? t("{gun} gün gecikti", { gun: -kalan })
-      : durum === "bugun"
-        ? t("Bugün ödenecek")
-        : t("{gun} gün kaldı", { gun: kalan });
-
-  return (
-    <span
-      style={{
-        fontSize: 11,
-        fontWeight: 500,
-        color: renk,
-        background: `${renk}1a`,
-        padding: "2px 8px",
-        borderRadius: 999,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {metin}
-    </span>
   );
 }
 

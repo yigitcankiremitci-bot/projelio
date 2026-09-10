@@ -2,8 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import type { RecurringPayment } from "@projelio/shared";
 import { NotificationsService } from "../notifications/notifications.service";
-import { BudgetService } from "./budget.service";
-import { RecurringPaymentsService, advanceDueDate, toDateString } from "./recurring-payments.service";
+import { RecurringPaymentsService, toDateString } from "./recurring-payments.service";
 
 function formatAmount(amount: number): string {
   return `${amount.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
@@ -32,7 +31,6 @@ export class RecurringPaymentsProcessor {
 
   constructor(
     private recurringPaymentsService: RecurringPaymentsService,
-    private budgetService: BudgetService,
     private notificationsService: NotificationsService
   ) {}
 
@@ -60,19 +58,11 @@ export class RecurringPaymentsProcessor {
 
   private async runPayment(payment: RecurringPayment, today: string): Promise<void> {
     try {
-      let dueDate = payment.nextDueDate;
-      let created = 0;
-
-      // Kaçırılmış dönemler için döngü; sonsuz döngüye karşı üst sınır.
-      while (dueDate <= today && created < 60) {
-        await this.budgetService.createRecurringTransaction(payment, dueDate);
-        dueDate = advanceDueDate(dueDate, payment.interval, payment.anchorDay);
-        created += 1;
-      }
-
+      // Deftere işleme ve vade ilerletme servisin içinde: elle "Ödendi"
+      // düğmesi de aynı yoldan geçiyor (bkz. RecurringPaymentsService.islet).
+      const { olusanIdler } = await this.recurringPaymentsService.islet(payment, today);
+      const created = olusanIdler.length;
       if (created === 0) return;
-
-      await this.recurringPaymentsService.markProcessed(payment.id, dueDate);
 
       // Başlık ve gövde AYRI anahtarlar: "Gelir"/"Ödeme" sözcüğünü cümlenin
       // içine gömmek İngilizcede işlemiyor (sözcük sırası ve büyük harf farklı),

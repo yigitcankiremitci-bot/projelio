@@ -189,6 +189,7 @@ export const projeler: TranslationDict = {
   "Kayıt silme": "Entry deletion",
   "Bütçe kaydı eklendi": "Budget entry added",
   "Bütçe kaydı düzenlendi": "Budget entry edited",
+  "Ödeme işlendi": "Payment posted",
   // Aralık etiketleri modül düzeyinde (intervalLabels), `// dil:anahtar` ile işaretli.
   "Her hafta": "Weekly",
   "Her ay": "Monthly",

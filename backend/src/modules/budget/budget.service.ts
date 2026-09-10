@@ -37,7 +37,10 @@ export class BudgetService {
   // Proje bütçesi: finansal veri hassas olduğu için görüntüleme yalnızca proje/iş
   // sahibine ve "bütçeyi görebilir" izni açık onaylı üyelere açık (bkz. departman
   // bütçesindeki assertCanManageDepartment ile aynı gerekçe/desen).
-  private async assertCanViewBudget(projectId: string, userId?: string): Promise<void> {
+  //
+  // `private` DEĞİL: projenin düzenli ödemelerini listeleyen uç de aynı kuralı
+  // uyguluyor (bkz. BudgetController). Kuralın ikinci bir kopyası çıkmasın.
+  async assertCanViewBudget(projectId: string, userId?: string): Promise<void> {
     if (!userId) return;
     const { data: project } = await this.supabase.client
       .from("projects")

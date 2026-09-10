@@ -15,7 +15,9 @@ import {
 } from "../lib/uploadQueue";
 import { openGooglePicker } from "../lib/googlePicker";
 import { readDroppedFiles, type DroppedFile } from "../lib/dropFiles";
+import { fileKey, folderKey, parseKey, useFileSelection } from "../lib/fileSelection";
 import { useFileThumbnails } from "../lib/fileThumbnails";
+import { useFileViewMode } from "../lib/fileViewMode";
 import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -96,27 +98,14 @@ export interface FilesPanelHandle {
  * İkisi de boşsa menü panelin kendisine ait ("Yeni klasör", "Yeni belge") —
  * masaüstündeki her dosya yöneticisinde olan davranış.
  */
-type MenuState = { x: number; y: number; file?: ProjectFile; folder?: FileFolder };
-
-const GORUNUM_ANAHTARI = "projelio.dosya-gorunumu";
-
-/**
- * Görünüm tercihi tarayıcıda saklanıyor: kullanıcı bir kez liste görünümünü
- * seçtiyse her sayfada yeniden seçmek zorunda kalmasın. Sunucuya taşımak için
- * fazla önemsiz bir tercih.
- *
- * VARSAYILAN SİMGE: dosyaların çoğu görsel ve artık önizlemeleri var
- * (bkz. lib/fileThumbnails.ts); liste görünümünde 34 pikselik kareye sıkışan
- * önizleme "hangi görsel bu?" sorusunu cevaplamıyor.
- */
-function readStoredView(): "list" | "grid" {
-  try {
-    return localStorage.getItem(GORUNUM_ANAHTARI) === "list" ? "list" : "grid";
-  } catch {
-    // Gizli sekmede / depolama kapalıyken erişim hata fırlatabiliyor.
-    return "grid";
-  }
-}
+type MenuState = {
+  x: number;
+  y: number;
+  file?: ProjectFile;
+  folder?: FileFolder;
+  /** Çoklu seçime sağ tıklandıysa seçimin tamamı; tek öğede boş. */
+  toplu?: string[];
+};
 
 /** Yüzde, satırda iki yerde (yazı ve çubuk) kullanılıyor. */
 function ratioPct(u: { uploadedBytes: number; sizeBytes: number }): number {
@@ -152,7 +141,20 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<ProjectFile | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<ProjectFile | null>(null);
+  /**
+   * Silinmeyi bekleyen küme. Tek dosya da bir kümedir: çoklu seçim geldikten
+   * sonra iki ayrı onay akışı tutmak, birinde düzeltilen bir hatanın diğerinde
+   * kalması demekti.
+   */
+  const [pendingDelete, setPendingDelete] = useState<{
+    items: { kind: "file" | "folder"; id: string }[];
+    /** Onay penceresinde gösterilecek ad; birden fazlaysa sayı. */
+    label: string;
+    /** Pencere metnini belirler: klasör içindekilerle birlikte gider. */
+    mode: "file" | "folder" | "many";
+    /** Sağlayıcı adı ("Drive'da da çöp kutusuna taşı") — karışıksa boş. */
+    provider?: string;
+  } | null>(null);
   // Varsayılan AÇIK: "Projelio'dan kaldırdım ama Drive'da hâlâ duruyor" en çok
   // şaşırtan davranıştı. Çöp kutusuna taşındığı için geri alınabilir.
   const [alsoTrash, setAlsoTrash] = useState(true);
@@ -170,7 +172,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   // Ekmek kırıntısı: kökten bulunulan klasöre kadar. Sunucudan geliyor, çünkü
   // kullanıcı derin bir klasöre bağlantıyla da girebilir.
   const [crumbs, setCrumbs] = useState<FileFolder[]>([]);
-  const [viewMode, setViewMode] = useState<"list" | "grid">(readStoredView);
+  const [viewMode, toggleViewMode] = useFileViewMode();
   const [menu, setMenu] = useState<MenuState | null>(null);
   // Önizleme jetonları: dosya başına imzalı, tek istekte toplu alınır
   // (bkz. lib/fileThumbnails.ts).
@@ -188,18 +190,17 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   // Uygulama İÇİ sürükleme: satırı klasöre bırakarak taşıma. Bilgisayardan
   // dosya sürüklemekle karışmıyor — o sürüklemede dataTransfer türü "Files",
   // bunda kendi türümüz (bkz. usePageFileDrop'taki denetim).
-  const [dragItem, setDragItem] = useState<{ kind: "file" | "folder"; id: string } | null>(null);
+  const [dragKeys, setDragKeys] = useState<string[] | null>(null);
   // Üzerine bırakılabilecek hedefin vurgusu; "root" ekmek kırıntısındaki kök.
   const [dropOver, setDropOver] = useState<string | null>(null);
   /**
-   * Seçili satır. Masaüstünde tek tık SEÇER, çift tık AÇAR — bir dosya
-   * yöneticisinde beklenen davranış bu ve seçim olmadan sağ tık menüsü
-   * "hangi öğe?" sorusunu görsel olarak cevaplayamıyordu.
+   * Seçim. Masaüstünde tek tık SEÇER, çift tık AÇAR; Cmd/Ctrl ve Shift ile
+   * birden fazla öğe seçilir (bkz. lib/fileSelection.ts).
    *
    * DOKUNMATİKTE çift dokunma diye bir şey yok: orada tek dokunma açar
    * (telefonda Drive da böyle davranıyor).
    */
-  const [selected, setSelected] = useState<{ kind: "file" | "folder"; id: string } | null>(null);
+  const secim = useFileSelection();
 
   const inputRef = useRef<HTMLInputElement>(null);
   // Ayrı bir input: webkitdirectory aynı elemanda açılıp kapatılamıyor
@@ -445,36 +446,6 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     }
   };
 
-  const handleRemoveFolder = async (folder: FileFolder) => {
-    // İçindekilerle birlikte gittiği için onay şart; bulutta çöp kutusuna
-    // taşındığı için geri alınabilir olduğunu da söylüyoruz.
-    const onay = window.confirm(
-      t('"{ad}" klasörü içindekilerle birlikte kaldırılsın mı? Bulutta çöp kutusuna taşınır.', {
-        ad: folder.name,
-      })
-    );
-    if (!onay) return;
-
-    // Sunucudaki kaldırma GERİ ALINAMIYOR (satırlar siliniyor, bulut kopyası
-    // çöpe gidiyor). Bu yüzden istek hemen gitmiyor: satır arayüzden düşüyor,
-    // gerçek çağrı birkaç saniye bekletiliyor ve Cmd+Z penceresi içinde hiç
-    // gönderilmiyor (bkz. pushDestructive).
-    setFolders((prev) => prev.filter((f) => f.id !== folder.id));
-    pushDestructive({
-      label: t("Klasör kaldırma"),
-      entityId: folder.id,
-      commit: async () => {
-        try {
-          await filesApi.removeFolder(folder.id);
-        } catch (e: any) {
-          setError(e?.message ?? t("Klasör kaldırılamadı"));
-          load();
-        }
-      },
-      restore: () => load(),
-    });
-  };
-
   /**
    * Satır bu panelden TAŞINABİLİR mi.
    *
@@ -491,9 +462,23 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   };
 
   const openFolder = (id: string) => {
-    setSelected(null);
+    secim.clear();
     setFolderId(id);
   };
+
+  /**
+   * Ekrandaki sıra — Shift+tık aralığı buna göre kuruluyor.
+   *
+   * Klasörler önce, dosyalar sonra: iki görünümde de çizim sırası bu, yani
+   * kullanıcının "aradakiler" dediği şey bu sıra.
+   */
+  const sirali = useMemo(
+    () => [
+      ...gorunenKlasorler.map((f) => folderKey(f.id)),
+      ...gorunenDosyalar.map((f) => fileKey(f.id)),
+    ],
+    [gorunenKlasorler, gorunenDosyalar]
+  );
 
   /**
    * Tek tık: masaüstünde seçer, dokunmatikte doğrudan açar.
@@ -502,33 +487,43 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
    * dinleyicisi var ve olay oraya kabardığında satır seçilir seçilmez tekrar
    * bırakılırdı.
    */
-  const rowClick = (e: React.MouseEvent, kind: "file" | "folder", id: string, ac: () => void) => {
+  const rowClick = (e: React.MouseEvent, key: string, ac: () => void) => {
     e.stopPropagation();
     setMenu(null);
-    if (isDesktop) setSelected({ kind, id });
+    if (isDesktop) secim.click(e, key, sirali);
     else ac();
   };
 
-  /** Sağ tık önce SEÇER: menü hangi öğeye ait olduğunu göstersin. */
+  /** Sağ tık önce SEÇER: menü hangi öğe(ler) için açıldığını göstersin. */
   const rowContextMenu = (e: React.MouseEvent, hedef: { file?: ProjectFile; folder?: FileFolder }) => {
     e.preventDefault();
     // Panelin boşluk menüsü satırların üstünde açılmasın.
     e.stopPropagation();
-    setSelected(
-      hedef.folder ? { kind: "folder", id: hedef.folder.id } : { kind: "file", id: hedef.file!.id }
-    );
-    setMenu({ x: e.clientX, y: e.clientY, ...hedef });
+    const key = hedef.folder ? folderKey(hedef.folder.id) : fileKey(hedef.file!.id);
+    const aktif = secim.contextSelect(key);
+    setMenu({ x: e.clientX, y: e.clientY, ...hedef, toplu: aktif.length > 1 ? aktif : undefined });
   };
 
-  const isSelected = (kind: "file" | "folder", id: string) =>
-    selected?.kind === kind && selected.id === id;
+  /** Menünün üstünde çalışacağı öğeler: çoklu seçim varsa hepsi, yoksa tıklanan. */
+  const menuHedefleri = (m: MenuState): { kind: "file" | "folder"; id: string }[] =>
+    m.toplu
+      ? m.toplu.map(parseKey)
+      : m.folder
+      ? [{ kind: "folder", id: m.folder.id }]
+      : m.file
+      ? [{ kind: "file", id: m.file.id }]
+      : [];
 
-  const beginDrag = (e: React.DragEvent, kind: "file" | "folder", id: string) => {
+  const beginDrag = (e: React.DragEvent, key: string) => {
+    // Seçimin İÇİNDEN sürüklemek seçimin tamamını taşır; dışından sürüklemek
+    // yalnızca o öğeyi (ve seçimi ona indirger) — dosya yöneticilerinin
+    // davranışı bu, aksi hâlde kullanıcı görmediği dosyaları da taşırdı.
+    const keys = secim.has(key) ? secim.keys : secim.contextSelect(key);
     // Kendi türümüz: sayfanın geneline kurulu DOSYA bırakma dinleyicisi
     // yalnızca "Files" taşıyan sürüklemelere bakıyor (bkz. usePageFileDrop).
-    e.dataTransfer.setData("text/x-projelio-dosya", `${kind}:${id}`);
+    e.dataTransfer.setData("text/x-projelio-dosya", keys.join(","));
     e.dataTransfer.effectAllowed = "move";
-    setDragItem({ kind, id });
+    setDragKeys(keys);
   };
 
   /**
@@ -537,50 +532,57 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
    * `hedef` verilmezse kapsamın kökü. Eski yer BURADA biliniyor: kullanıcı
    * bulunduğu klasörden taşıyor, yani kaynak her zaman `folderId`.
    */
-  const tasi = async (item: { kind: "file" | "folder"; id: string }, hedefId?: string) => {
+  const tasi = async (items: { kind: "file" | "folder"; id: string }[], hedefId?: string) => {
+    if (!items.length) return;
     const eskiKlasor = folderId;
+
+    const uygula = (nereye?: string) =>
+      Promise.all(
+        items.map((item) =>
+          item.kind === "file" ? filesApi.move(item.id, nereye) : filesApi.moveFolder(item.id, nereye)
+        )
+      ).then(() => undefined);
+
     try {
-      if (item.kind === "file") {
-        await filesApi.move(item.id, hedefId);
-        setFiles((prev) => prev.filter((f) => f.id !== item.id));
-        pushUndo({
-          label: t("Dosya taşıma"),
-          run: () => filesApi.move(item.id, eskiKlasor).then(() => undefined),
-          redo: () => filesApi.move(item.id, hedefId).then(() => undefined),
-        });
-      } else {
-        await filesApi.moveFolder(item.id, hedefId);
-        setFolders((prev) => prev.filter((f) => f.id !== item.id));
-        pushUndo({
-          label: t("Klasör taşıma"),
-          run: () => filesApi.moveFolder(item.id, eskiKlasor).then(() => undefined),
-          redo: () => filesApi.moveFolder(item.id, hedefId).then(() => undefined),
-        });
-      }
+      await uygula(hedefId);
+      const dosyalar = new Set(items.filter((i) => i.kind === "file").map((i) => i.id));
+      const klasorler = new Set(items.filter((i) => i.kind === "folder").map((i) => i.id));
+      setFiles((prev) => prev.filter((f) => !dosyalar.has(f.id)));
+      setFolders((prev) => prev.filter((f) => !klasorler.has(f.id)));
+      secim.clear();
+      // Toplu taşıma TEK adım: kullanıcı bir hareket yaptı, Cmd+Z de bir kez
+      // basılmalı (bkz. TaskSelectionBar'daki aynı gerekçe).
+      pushUndo({
+        label: items.length > 1 ? t("Taşıma") : items[0].kind === "file" ? t("Dosya taşıma") : t("Klasör taşıma"),
+        run: () => uygula(eskiKlasor),
+        redo: () => uygula(hedefId),
+      });
     } catch (e: any) {
       setError(e?.message ?? t("Taşınamadı"));
+      load();
     }
   };
 
   /** `hedef` verilmezse kapsamın kökü. */
   const handleInternalDrop = async (hedef?: FileFolder) => {
-    const item = dragItem;
-    setDragItem(null);
+    const keys = dragKeys;
+    setDragKeys(null);
     setDropOver(null);
-    if (!item) return;
-    // Klasörü kendi üstüne bırakmak ve zaten bulunulan yere taşımak işlemsiz.
-    if (item.kind === "folder" && item.id === hedef?.id) return;
-    await tasi(item, hedef?.id);
+    if (!keys?.length) return;
+    // Klasörü kendi üstüne bırakmak işlemsiz; sürüklenen küme hedefi de
+    // içeriyorsa yalnızca o eleniyor, kalanlar taşınıyor.
+    const items = keys.map(parseKey).filter((i) => !(i.kind === "folder" && i.id === hedef?.id));
+    await tasi(items, hedef?.id);
   };
 
   /** Bir üst klasör — sağ tık menüsündeki "Üst klasöre taşı" için (dokunmatikte sürükleme yok). */
   const parentFolderId = crumbs.length > 1 ? crumbs[crumbs.length - 2].id : undefined;
 
-  const moveToParent = (item: { kind: "file" | "folder"; id: string }) => tasi(item, parentFolderId);
+  const moveToParent = (items: { kind: "file" | "folder"; id: string }[]) => tasi(items, parentFolderId);
 
   /** Bırakma hedeflerinin ortak olay bağlantıları. */
   const dropTargetProps = (anahtar: string, hedef?: FileFolder) =>
-    dragItem
+    dragKeys
       ? {
           onDragOver: (e: React.DragEvent) => {
             e.preventDefault();
@@ -615,19 +617,33 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
   const handleDelete = () => {
     if (!pendingDelete) return;
-    const victim = pendingDelete;
+    const { items } = pendingDelete;
     const buluttaDa = alsoTrash;
     setPendingDelete(null);
 
-    // Silme sunucuda geri alınamıyor; istek Cmd+Z penceresi kadar bekletiliyor
-    // (bkz. handleRemoveFolder'daki aynı gerekçe).
-    setFiles((prev) => prev.filter((f) => f.id !== victim.id));
+    const dosyalar = new Set(items.filter((i) => i.kind === "file").map((i) => i.id));
+    const klasorler = new Set(items.filter((i) => i.kind === "folder").map((i) => i.id));
+    setFiles((prev) => prev.filter((f) => !dosyalar.has(f.id)));
+    setFolders((prev) => prev.filter((f) => !klasorler.has(f.id)));
+    secim.clear();
+
+    // Silme sunucuda geri alınamıyor; istek Cmd+Z penceresi kadar bekletiliyor:
+    // satır arayüzden düşüyor, gerçek çağrı o pencerede hiç gönderilmiyor.
     pushDestructive({
-      label: t("Dosya kaldırma"),
-      entityId: victim.id,
+      label:
+        items.length > 1
+          ? t("{sayi} öğeyi kaldırma", { sayi: items.length })
+          : items[0].kind === "file"
+          ? t("Dosya kaldırma")
+          : t("Klasör kaldırma"),
+      entityIds: items.map((i) => i.id),
       commit: async () => {
         try {
-          await filesApi.remove(victim.id, buluttaDa);
+          await Promise.all(
+            items.map((i) =>
+              i.kind === "file" ? filesApi.remove(i.id, buluttaDa) : filesApi.removeFolder(i.id)
+            )
+          );
         } catch (e: any) {
           setError(e?.message ?? t("Dosya kaldırılamadı"));
           load();
@@ -635,6 +651,36 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       },
       restore: () => load(),
     });
+  };
+
+  /** Onay penceresini açar; kaldırmanın kendisi handleDelete'te. */
+  const askDelete = (items: { kind: "file" | "folder"; id: string }[]) => {
+    if (!items.length) return;
+    if (items.length === 1 && items[0].kind === "file") {
+      const dosya = gorunenDosyalar.find((f) => f.id === items[0].id);
+      setPendingDelete({
+        items,
+        mode: "file",
+        label: dosya?.name ?? t("Dosya"),
+        provider: dosya ? driveProviderLabel(dosya) : undefined,
+      });
+      return;
+    }
+    if (items.length === 1 && items[0].kind === "folder") {
+      const klasor = gorunenKlasorler.find((f) => f.id === items[0].id);
+      setPendingDelete({ items, mode: "folder", label: klasor?.name ?? t("Klasör") });
+      return;
+    }
+    setPendingDelete({ items, mode: "many", label: t("{sayi} öğe", { sayi: items.length }) });
+  };
+
+  const handleDuplicateMany = async (items: { kind: "file" | "folder"; id: string }[]) => {
+    for (const item of items) {
+      const dosya = item.kind === "file" ? gorunenDosyalar.find((f) => f.id === item.id) : undefined;
+      const klasor = item.kind === "folder" ? gorunenKlasorler.find((f) => f.id === item.id) : undefined;
+      if (dosya) await handleDuplicateFile(dosya);
+      else if (klasor) await handleDuplicateFolder(klasor);
+    }
   };
 
   const handleDownload = async (file: ProjectFile) => {
@@ -791,7 +837,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     // açtığımız menü aynı karede yok oluyordu. Satır menüleri bunu zaten
     // durduruyor (rowContextMenu), boşluk menüsü de durdurmalı.
     e.stopPropagation();
-    setSelected(null);
+    secim.clear();
     setMenu({ x: e.clientX, y: e.clientY });
   };
 
@@ -800,7 +846,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       onContextMenu={backgroundContextMenu}
       // Boşluğa sol tık seçimi bırakır — seçili satır sonsuza kadar vurgulu
       // kalmasın.
-      onClick={() => setSelected(null)}
+      onClick={() => secim.clear()}
     >
       {!compact && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -808,19 +854,12 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             {t("Dosyalar")}
           </h3>
 
-          {/* Görünüm anahtarı: tercih tarayıcıda saklanıyor (bkz. readStoredView). */}
+          {/* Görünüm anahtarı: tercih bütün dosya ekranlarında ortak
+              (bkz. lib/fileViewMode.ts). */}
           <button
             type="button"
             title={viewMode === "grid" ? t("Liste görünümü") : t("Simge görünümü")}
-            onClick={() => {
-              const sonraki = viewMode === "grid" ? "list" : "grid";
-              setViewMode(sonraki);
-              try {
-                localStorage.setItem(GORUNUM_ANAHTARI, sonraki);
-              } catch {
-                // Depolama kapalıysa tercih oturumluk kalır; işlevi bozmaz.
-              }
-            }}
+            onClick={toggleViewMode}
             style={{
               display: "flex",
               alignItems: "center",
@@ -1283,19 +1322,19 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             <div
               key={folder.id}
               draggable={canBrowse && !readOnly && !folder.managed}
-              onDragStart={(e) => beginDrag(e, "folder", folder.id)}
-              onDragEnd={() => setDragItem(null)}
+              onDragStart={(e) => beginDrag(e, folderKey(folder.id))}
+              onDragEnd={() => setDragKeys(null)}
               onDoubleClick={() => openFolder(folder.id)}
-              onClick={(e) => rowClick(e, "folder", folder.id, () => openFolder(folder.id))}
+              onClick={(e) => rowClick(e, folderKey(folder.id), () => openFolder(folder.id))}
               onContextMenu={(e) => rowContextMenu(e, { folder })}
               {...dropTargetProps(`folder:${folder.id}`, folder)}
               style={{
                 border: `1px solid ${
-                  dropOver === `folder:${folder.id}` || isSelected("folder", folder.id) ? c.accent : c.border
+                  dropOver === `folder:${folder.id}` || secim.has(folderKey(folder.id)) ? c.accent : c.border
                 }`,
                 borderRadius: 10,
                 background:
-                  dropOver === `folder:${folder.id}` || isSelected("folder", folder.id)
+                  dropOver === `folder:${folder.id}` || secim.has(folderKey(folder.id))
                     ? `${c.accent}14`
                     : c.surface,
                 padding: 12,
@@ -1325,15 +1364,15 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             <div
               key={file.id}
               draggable={canMoveFile(file)}
-              onDragStart={(e) => beginDrag(e, "file", file.id)}
-              onDragEnd={() => setDragItem(null)}
-              onClick={(e) => rowClick(e, "file", file.id, () => setPreview(file))}
+              onDragStart={(e) => beginDrag(e, fileKey(file.id))}
+              onDragEnd={() => setDragKeys(null)}
+              onClick={(e) => rowClick(e, fileKey(file.id), () => setPreview(file))}
               onDoubleClick={() => setPreview(file)}
               onContextMenu={(e) => rowContextMenu(e, { file })}
               style={{
-                border: `1px solid ${isSelected("file", file.id) ? c.accent : c.border}`,
+                border: `1px solid ${secim.has(fileKey(file.id)) ? c.accent : c.border}`,
                 borderRadius: 10,
-                background: isSelected("file", file.id) ? `${c.accent}14` : c.surface,
+                background: secim.has(fileKey(file.id)) ? `${c.accent}14` : c.surface,
                 padding: 12,
                 cursor: "pointer",
                 textAlign: "center",
@@ -1377,9 +1416,9 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             <div
               key={folder.id}
               draggable={canBrowse && !readOnly && !folder.managed}
-              onDragStart={(e) => beginDrag(e, "folder", folder.id)}
-              onDragEnd={() => setDragItem(null)}
-              onClick={(e) => rowClick(e, "folder", folder.id, () => openFolder(folder.id))}
+              onDragStart={(e) => beginDrag(e, folderKey(folder.id))}
+              onDragEnd={() => setDragKeys(null)}
+              onClick={(e) => rowClick(e, folderKey(folder.id), () => openFolder(folder.id))}
               onDoubleClick={() => openFolder(folder.id)}
               onContextMenu={(e) => rowContextMenu(e, { folder })}
               {...dropTargetProps(`folder:${folder.id}`, folder)}
@@ -1390,10 +1429,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 padding: "11px 14px",
                 borderRadius: 10,
                 border: `1px solid ${
-                  dropOver === `folder:${folder.id}` || isSelected("folder", folder.id) ? c.accent : c.border
+                  dropOver === `folder:${folder.id}` || secim.has(folderKey(folder.id)) ? c.accent : c.border
                 }`,
                 background:
-                  dropOver === `folder:${folder.id}` || isSelected("folder", folder.id)
+                  dropOver === `folder:${folder.id}` || secim.has(folderKey(folder.id))
                     ? `${c.accent}14`
                     : c.surface,
                 cursor: "pointer",
@@ -1415,8 +1454,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             <div
               key={file.id}
               draggable={canMoveFile(file)}
-              onDragStart={(e) => beginDrag(e, "file", file.id)}
-              onDragEnd={() => setDragItem(null)}
+              onDragStart={(e) => beginDrag(e, fileKey(file.id))}
+              onDragEnd={() => setDragKeys(null)}
               onContextMenu={(e) => rowContextMenu(e, { file })}
               style={{
                 display: "flex",
@@ -1424,12 +1463,12 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 gap: 12,
                 padding: "11px 14px",
                 borderRadius: 10,
-                border: `1px solid ${isSelected("file", file.id) ? c.accent : c.border}`,
-                background: isSelected("file", file.id) ? `${c.accent}14` : c.surface,
+                border: `1px solid ${secim.has(fileKey(file.id)) ? c.accent : c.border}`,
+                background: secim.has(fileKey(file.id)) ? `${c.accent}14` : c.surface,
               }}
             >
               <div
-                onClick={(e) => rowClick(e, "file", file.id, () => setPreview(file))}
+                onClick={(e) => rowClick(e, fileKey(file.id), () => setPreview(file))}
                 onDoubleClick={() => setPreview(file)}
                 style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}
               >
@@ -1474,7 +1513,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 <IconExternalLink size={16} color={c.textSecondary} />
               </IconButton>
               {!readOnly && (
-                <IconButton title={t("Kaldır")} onClick={() => setPendingDelete(file)}>
+                <IconButton title={t("Kaldır")} onClick={() => askDelete([{ kind: "file", id: file.id }])}>
                   <IconTrash size={16} color={c.danger} />
                 </IconButton>
               )}
@@ -1524,7 +1563,34 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             // Boşluk menüsü: oluşturma seçenekleri. "+" düğmesindekilerin
             // aynısı — sağ tık onları imlecin altına getiriyor, ayrı bir
             // yetenek eklemiyor (bkz. useProjectFabAction).
-            !menu.file && !menu.folder
+            // Çoklu seçime sağ tık: menü seçimin TAMAMI için. Tek öğelik
+            // menüyü göstermek, kullanıcının az önce seçtiği beş dosyayı yok
+            // saymak olurdu.
+            menu.toplu
+              ? [
+                  {
+                    label: t("{sayi} öğeyi çoğalt", { sayi: menu.toplu.length }),
+                    disabled: readOnly,
+                    onClick: () => void handleDuplicateMany(menuHedefleri(menu)),
+                  },
+                  ...(folderId && !readOnly
+                    ? [
+                        {
+                          label: parentFolderId
+                            ? t("{sayi} öğeyi üst klasöre taşı", { sayi: menu.toplu.length })
+                            : t("{sayi} öğeyi köke taşı", { sayi: menu.toplu.length }),
+                          onClick: () => void moveToParent(menuHedefleri(menu)),
+                        },
+                      ]
+                    : []),
+                  {
+                    label: t("{sayi} öğeyi kaldır", { sayi: menu.toplu.length }),
+                    danger: true,
+                    disabled: readOnly,
+                    onClick: () => askDelete(menuHedefleri(menu)),
+                  },
+                ]
+              : !menu.file && !menu.folder
               ? [
                   { label: t("Yeni klasör"), onClick: () => void handleCreateFolder() },
                   ...(connectedProvider
@@ -1554,7 +1620,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     ? [
                         {
                           label: parentFolderId ? t("Üst klasöre taşı") : t("Köke taşı"),
-                          onClick: () => void moveToParent({ kind: "folder" as const, id: menu.folder!.id }),
+                          onClick: () => void moveToParent(menuHedefleri(menu)),
                         },
                       ]
                     : []),
@@ -1562,7 +1628,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     label: t("Kaldır"),
                     danger: true,
                     disabled: menu.folder.managed || readOnly,
-                    onClick: () => void handleRemoveFolder(menu.folder!),
+                    onClick: () => askDelete(menuHedefleri(menu)),
                   },
                 ]
               : [
@@ -1586,7 +1652,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     ? [
                         {
                           label: parentFolderId ? t("Üst klasöre taşı") : t("Köke taşı"),
-                          onClick: () => void moveToParent({ kind: "file" as const, id: menu.file!.id }),
+                          onClick: () => void moveToParent(menuHedefleri(menu)),
                         },
                       ]
                     : []),
@@ -1594,7 +1660,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     label: t("Kaldır"),
                     danger: true,
                     disabled: readOnly,
-                    onClick: () => setPendingDelete(menu.file!),
+                    onClick: () => askDelete(menuHedefleri(menu)),
                   },
                 ]
           }
@@ -1617,17 +1683,30 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
       {pendingDelete && (
         <ConfirmDialog
-          title={t("Dosyayı kaldır")}
-          message={t('"{dosya}" Projelio\'dan kaldırılacak.', { dosya: pendingDelete.name })}
+          title={pendingDelete.mode === "folder" ? t("Klasörü kaldır") : t("Dosyayı kaldır")}
+          message={
+            pendingDelete.mode === "folder"
+              ? t('"{ad}" klasörü İÇİNDEKİLERLE BİRLİKTE kaldırılacak.', { ad: pendingDelete.label })
+              : pendingDelete.mode === "many"
+              ? t("{sayi} öğe Projelio'dan kaldırılacak.", { sayi: pendingDelete.items.length })
+              : t('"{dosya}" Projelio\'dan kaldırılacak.', { dosya: pendingDelete.label })
+          }
           extra={
             // Eskiden dosya Drive'da OLDUĞU GİBİ kalıyordu ve pencere bunu
             // yazıyordu; kullanıcı için sonuç, sildiğini sandığı dosyanın
             // Drive'da durmaya devam etmesiydi. Artık varsayılan "orada da
             // kaldır" — çöp kutusuna taşındığı için geri alınabilir.
+            //
+            // Kümede hiç DOSYA yoksa gösterilmiyor: klasör kaldırma bulutta
+            // her hâlükârda çöp kutusuna taşıyor, seçenek sunmak yalan olurdu.
+            !pendingDelete.items.some((i) => i.kind === "file") ? undefined : (
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, color: c.textSecondary }}>
               <input type="checkbox" checked={alsoTrash} onChange={(e) => setAlsoTrash(e.target.checked)} />
-              {t("{saglayici}'da da çöp kutusuna taşı", { saglayici: driveProviderLabel(pendingDelete) })}
+              {pendingDelete.provider
+                ? t("{saglayici}'da da çöp kutusuna taşı", { saglayici: pendingDelete.provider })
+                : t("Bulut deposunda da çöp kutusuna taşı")}
             </label>
+            )
           }
           confirmLabel={t("Kaldır")}
           onConfirm={handleDelete}

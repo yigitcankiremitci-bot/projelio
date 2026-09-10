@@ -3,10 +3,14 @@ import type { Job, Project, ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
 import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
 import { useFileThumbnails } from "../lib/fileThumbnails";
+import { fileKey, parseKey, useFileSelection } from "../lib/fileSelection";
+import { useFileViewMode } from "../lib/fileViewMode";
+import { useRefreshOnUndo, useUndo, useWithoutPendingDeletes } from "../lib/undo";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useThemeColors } from "../theme/useThemeColors";
+import ConfirmDialog from "./ConfirmDialog";
 import FileContextMenu from "./FileContextMenu";
 import FilePreviewModal from "./FilePreviewModal";
 import FileThumb from "./FileThumb";
@@ -38,10 +42,21 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<ProjectFile | null>(null);
-  // Sağ tık ve seçim, FilesPanel'dekiyle aynı davranışta olmalı: kullanıcı için
-  // burası da "dosyalar sayfası", listenin nereden derlendiği onun sorunu değil.
-  const [menu, setMenu] = useState<{ x: number; y: number; file: ProjectFile } | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  /**
+   * Sağ tık, seçim ve görünüm FilesPanel'dekiyle AYNI kancalardan geliyor:
+   * kullanıcı için burası da "dosyalar sayfası" ve listenin birden çok işten
+   * derlendiği onun sorunu değil. Kuralları burada ayrıca yazmak, birinde
+   * düzeltilen davranışın diğerinde eski kalması demekti.
+   *
+   * Klasör YOK: bu liste birden fazla işi birleştiriyor, tek bir klasör ağacı
+   * karşılığı bulunmuyor (bkz. FilesPanel'deki canBrowse).
+   */
+  const [menu, setMenu] = useState<{ x: number; y: number; file?: ProjectFile; toplu?: string[] } | null>(null);
+  const secim = useFileSelection();
+  /** Onay bekleyen kaldırma; tek dosya da bir kümedir (bkz. FilesPanel). */
+  const [pendingDelete, setPendingDelete] = useState<ProjectFile[] | null>(null);
+  const [viewMode, toggleViewMode] = useFileViewMode();
+  const { pushUndo, pushDestructive } = useUndo();
   const [adding, setAdding] = useState(false);
   // Sürükleyip bırakılan dosyalar: hedefi kullanıcı pencerede seçecek.
   const [dropped, setDropped] = useState<File[]>([]);
@@ -84,7 +99,6 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
     setDropped(dosyalar.map((d) => d.file))
   );
 
-  const thumbs = useFileThumbnails(files);
 
 
   useProjectFabAction({ label: "Dosya ekle", onClick: () => setAdding(true) }, []);
@@ -130,13 +144,112 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
     }
   };
 
+  const reload = () => setReloadKey((k) => k + 1);
+  // Geri/ileri alma sunucuyu değiştiriyor; liste kendini tazelemeli.
+  useRefreshOnUndo(reload);
+
+  /** Silinmeyi bekleyenler elenmiş liste (bkz. FilesPanel'deki aynı gerekçe). */
+  const gorunen = useWithoutPendingDeletes(files);
+  const thumbs = useFileThumbnails(gorunen);
+  const sirali = useMemo(() => gorunen.map((f) => fileKey(f.id)), [gorunen]);
+
+  /** Menünün üstünde çalışacağı dosyalar: çoklu seçim varsa hepsi. */
+  const menuDosyalari = (m: { file?: ProjectFile; toplu?: string[] }): ProjectFile[] => {
+    if (m.toplu) {
+      const ids = new Set(m.toplu.map((k) => parseKey(k).id));
+      return gorunen.filter((f) => ids.has(f.id));
+    }
+    return m.file ? [m.file] : [];
+  };
+
+  const rowClick = (e: React.MouseEvent, file: ProjectFile) => {
+    e.stopPropagation();
+    setMenu(null);
+    // Masaüstünde tek tık seçer, çift tık açar; dokunmatikte tek dokunma açar
+    // (bkz. FilesPanel'deki aynı kural).
+    if (isDesktop) secim.click(e, fileKey(file.id), sirali);
+    else setPreview(file);
+  };
+
+  const rowContextMenu = (e: React.MouseEvent, file: ProjectFile) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const aktif = secim.contextSelect(fileKey(file.id));
+    setMenu({ x: e.clientX, y: e.clientY, file, toplu: aktif.length > 1 ? aktif : undefined });
+  };
+
+  const handleRename = async (file: ProjectFile) => {
+    const ad = window.prompt(t("Yeni ad:"), file.name)?.trim();
+    if (!ad || ad === file.name) return;
+    const eski = file.name;
+    try {
+      const guncel = await filesApi.rename(file.id, ad);
+      setFiles((prev) => prev.map((f) => (f.id === file.id ? { ...guncel, jobTitle: f.jobTitle } : f)));
+      pushUndo({
+        label: t("Dosya yeniden adlandırma"),
+        run: () => filesApi.rename(file.id, eski).then(() => undefined),
+        redo: () => filesApi.rename(file.id, ad).then(() => undefined),
+      });
+    } catch (e: any) {
+      setError(e?.message ?? t("Dosya yeniden adlandırılamadı"));
+    }
+  };
+
+  const handleDuplicate = async (list: ProjectFile[]) => {
+    try {
+      for (const file of list) {
+        const kopya = await filesApi.duplicate(file.id);
+        setFiles((prev) => [{ ...kopya, jobTitle: file.jobTitle }, ...prev]);
+        // İleri alma yok: her çoğaltma yeni bir kimlik üretiyor.
+        pushUndo({
+          label: t("Dosya çoğaltma"),
+          run: () => filesApi.remove(kopya.id, true).then(() => undefined),
+        });
+      }
+    } catch (e: any) {
+      setError(e?.message ?? t("Dosya çoğaltılamadı"));
+    }
+  };
+
+  const handleDelete = () => {
+    if (!pendingDelete) return;
+    const list = pendingDelete;
+    setPendingDelete(null);
+
+    const ids = new Set(list.map((f) => f.id));
+    setFiles((prev) => prev.filter((f) => !ids.has(f.id)));
+    secim.clear();
+    // Silme sunucuda geri alınamıyor; istek Cmd+Z penceresi kadar bekletiliyor.
+    pushDestructive({
+      label: list.length > 1 ? t("{sayi} öğeyi kaldırma", { sayi: list.length }) : t("Dosya kaldırma"),
+      entityIds: list.map((f) => f.id),
+      commit: async () => {
+        try {
+          await Promise.all(list.map((f) => filesApi.remove(f.id, true)));
+        } catch (e: any) {
+          setError(e?.message ?? t("Dosya kaldırılamadı"));
+          reload();
+        }
+      },
+      restore: reload,
+    });
+  };
+
+  /** Bir dosyanın alt satırı: hangi işten geldiği, türü, boyutu. */
+  const altSatir = (file: ProjectFile) =>
+    file.status === "missing"
+      ? t("{saglayici}'da bulunamadı", { saglayici: driveProviderLabel(file) })
+      : [file.jobTitle, fileKindLabel(file), file.sizeBytes ? formatFileSize(file.sizeBytes) : null]
+          .filter(Boolean)
+          .join(" · ");
+
   // Modal her durumda render edilmeli: dosya yokken de "+" ile yükleme yapılabilsin.
   // (Eskiden boş durumda erken return vardı; taşeronun gördüğü ekran tam da buydu.)
   const body = loading ? (
     <div style={{ color: c.textSecondary, fontSize: 15 }}>{t("Yükleniyor…")}</div>
   ) : error ? (
     <div style={{ color: c.danger, fontSize: 15 }}>{error}</div>
-  ) : files.length === 0 ? (
+  ) : gorunen.length === 0 ? (
     <div
       style={{
         border: `1px dashed ${c.border}`,
@@ -149,30 +262,82 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
     >
       {t("Henüz dosya yok.")}
     </div>
-  ) : (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {files.map((file) => (
+  ) : viewMode === "grid" ? (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+      {gorunen.map((file) => (
         <div
           key={file.id}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            setSelectedId(file.id);
-            setMenu({ x: e.clientX, y: e.clientY, file });
+          onClick={(e) => rowClick(e, file)}
+          onDoubleClick={() => setPreview(file)}
+          onContextMenu={(e) => rowContextMenu(e, file)}
+          style={{
+            border: `1px solid ${secim.has(fileKey(file.id)) ? c.accent : c.border}`,
+            borderRadius: 10,
+            background: secim.has(fileKey(file.id)) ? `${c.accent}14` : c.surface,
+            padding: 12,
+            cursor: "pointer",
+            textAlign: "center",
           }}
+        >
+          <div
+            style={{
+              height: 74,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+              borderRadius: 6,
+              background: c.background,
+              marginBottom: 8,
+            }}
+          >
+            <FileThumb file={file} thumbs={thumbs} variant="tile" />
+          </div>
+          <div
+            title={file.name}
+            style={{
+              fontSize: 14,
+              color: file.status === "missing" ? c.danger : c.textPrimary,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {file.name}
+          </div>
+          <div
+            title={altSatir(file)}
+            style={{
+              fontSize: 12,
+              color: c.textSecondary,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {file.jobTitle ?? fileKindLabel(file)}
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {gorunen.map((file) => (
+        <div
+          key={file.id}
+          onContextMenu={(e) => rowContextMenu(e, file)}
           style={{
             display: "flex",
             alignItems: "center",
             gap: 12,
             padding: "11px 14px",
             borderRadius: 10,
-            border: `1px solid ${selectedId === file.id ? c.accent : c.border}`,
-            background: selectedId === file.id ? `${c.accent}14` : c.surface,
+            border: `1px solid ${secim.has(fileKey(file.id)) ? c.accent : c.border}`,
+            background: secim.has(fileKey(file.id)) ? `${c.accent}14` : c.surface,
           }}
         >
           <div
-            // Masaüstünde tek tık seçer, çift tık açar; dokunmatikte tek
-            // dokunma açar (bkz. FilesPanel'deki aynı kural).
-            onClick={() => (isDesktop ? setSelectedId(file.id) : setPreview(file))}
+            onClick={(e) => rowClick(e, file)}
             onDoubleClick={() => setPreview(file)}
             style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}
           >
@@ -189,13 +354,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
               >
                 {file.name}
               </div>
-              <div style={{ fontSize: 13, color: c.textSecondary }}>
-                {file.status === "missing"
-                  ? "Drive'da bulunamadı"
-                  : [file.jobTitle, fileKindLabel(file), file.sizeBytes ? formatFileSize(file.sizeBytes) : null]
-                      .filter(Boolean)
-                      .join(" · ")}
-              </div>
+              <div style={{ fontSize: 13, color: c.textSecondary }}>{altSatir(file)}</div>
             </div>
           </div>
 
@@ -203,37 +362,96 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
             <IconDownload size={16} color={c.textSecondary} />
           </IconButton>
           <IconButton
-            title={t("Drive'da düzenle")}
+            title={t("{saglayici}'da düzenle", { saglayici: driveProviderLabel(file) })}
             onClick={() => window.open(driveEditUrl(file), "_blank", "noopener,noreferrer")}
           >
             <IconExternalLink size={16} color={c.textSecondary} />
           </IconButton>
         </div>
       ))}
+    </div>
+  );
+
+  return (
+    <div onClick={() => secim.clear()}>
+      {/* Görünüm anahtarı FilesPanel'dekiyle AYNI tercihi okuyor
+          (bkz. lib/fileViewMode.ts): kullanıcı simge görünümünü bir kez
+          seçtiyse dosyaları nerede açarsa açsın öyle görmeli. */}
+      {!loading && !error && gorunen.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+          <button
+            type="button"
+            title={viewMode === "grid" ? t("Liste görünümü") : t("Simge görünümü")}
+            onClick={toggleViewMode}
+            style={{
+              padding: "7px 12px",
+              borderRadius: 9,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textPrimary,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            {viewMode === "grid" ? t("Liste") : t("Simge")}
+          </button>
+        </div>
+      )}
+
+      {body}
 
       {menu && (
         <FileContextMenu
           x={menu.x}
           y={menu.y}
           onClose={() => setMenu(null)}
-          items={[
-            { label: t("Önizle"), onClick: () => setPreview(menu.file) },
-            { label: t("İndir"), onClick: () => void handleDownload(menu.file) },
-            {
-              label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file) }),
-              onClick: () => window.open(driveEditUrl(menu.file), "_blank", "noopener,noreferrer"),
-            },
-          ]}
+          items={
+            menu.toplu
+              ? [
+                  {
+                    label: t("{sayi} öğeyi çoğalt", { sayi: menu.toplu.length }),
+                    onClick: () => void handleDuplicate(menuDosyalari(menu)),
+                  },
+                  {
+                    label: t("{sayi} öğeyi kaldır", { sayi: menu.toplu.length }),
+                    danger: true,
+                    onClick: () => setPendingDelete(menuDosyalari(menu)),
+                  },
+                ]
+              : [
+                  { label: t("Önizle"), onClick: () => setPreview(menu.file!) },
+                  { label: t("İndir"), onClick: () => void handleDownload(menu.file!) },
+                  {
+                    label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file!) }),
+                    onClick: () => window.open(driveEditUrl(menu.file!), "_blank", "noopener,noreferrer"),
+                  },
+                  { label: t("Yeniden adlandır"), onClick: () => void handleRename(menu.file!) },
+                  { label: t("Çoğalt"), onClick: () => void handleDuplicate([menu.file!]) },
+                  {
+                    label: t("Kaldır"),
+                    danger: true,
+                    onClick: () => setPendingDelete([menu.file!]),
+                  },
+                ]
+          }
         />
       )}
 
       {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} />}
-    </div>
-  );
 
-  return (
-    <>
-      {body}
+      {pendingDelete && (
+        <ConfirmDialog
+          title={t("Dosyayı kaldır")}
+          message={
+            pendingDelete.length > 1
+              ? t("{sayi} öğe Projelio'dan kaldırılacak.", { sayi: pendingDelete.length })
+              : t('"{dosya}" Projelio\'dan kaldırılacak.', { dosya: pendingDelete[0].name })
+          }
+          confirmLabel={t("Kaldır")}
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
 
       {/* Sayfaya bırakılan dosya için tam sayfa gösterge (bkz. FilesPanel'deki eşi). */}
       {dragging && (
@@ -283,7 +501,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 

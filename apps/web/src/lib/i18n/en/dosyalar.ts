@@ -108,6 +108,20 @@ export const dosyalar: TranslationDict = {
   Taşınamadı: "Couldn't be moved",
   "Üst klasöre taşı": "Move to parent folder",
   "Yeni belge oluştur": "New document",
+  // Çoklu seçim: sağ tık menüsü ve onay penceresi.
+  "{sayi} öğe": "{sayi} items",
+  "{sayi} öğeyi çoğalt": "Duplicate {sayi} items",
+  "{sayi} öğeyi üst klasöre taşı": "Move {sayi} items to the parent folder",
+  "{sayi} öğeyi köke taşı": "Move {sayi} items to the top level",
+  "{sayi} öğeyi kaldır": "Remove {sayi} items",
+  "{sayi} öğe Projelio'dan kaldırılacak.": "{sayi} items will be removed from Projelio.",
+  "Klasörü kaldır": "Remove folder",
+  '"{ad}" klasörü İÇİNDEKİLERLE BİRLİKTE kaldırılacak.':
+    'The folder "{ad}" will be removed TOGETHER WITH ITS CONTENTS.',
+  // Küme karışıksa (dosya + klasör) tek bir sağlayıcı adı yazılamıyor.
+  "Bulut deposunda da çöp kutusuna taşı": "Move to the trash in cloud storage too",
+  "{sayi} öğeyi kaldırma": "Removing {sayi} items",
+  Taşıma: "Moving",
   "Dosya çoğaltılamadı": "The file couldn't be duplicated",
   "Klasör çoğaltılamadı": "The folder couldn't be duplicated",
   // Cmd+Z bildirimindeki etiketler: "<etiket> geri alındı" diye okunuyor, bu
@@ -123,8 +137,6 @@ export const dosyalar: TranslationDict = {
   "Dosya kaldırma": "Removing a file",
   "Köke taşı": "Move to the top level",
   "Dosya yeniden adlandırılamadı": "The file couldn't be renamed",
-  '"{ad}" klasörü içindekilerle birlikte kaldırılsın mı? Bulutta çöp kutusuna taşınır.':
-    'Remove the folder "{ad}" together with its contents? It is moved to the trash in the cloud.',
   // Görünüm anahtarının üstündeki yazı ile ipucu: biri düğmenin metni, diğeri title.
   Liste: "List",
   Simge: "Icons",

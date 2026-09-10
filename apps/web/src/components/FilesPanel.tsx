@@ -18,6 +18,7 @@ import { readDroppedFiles, type DroppedFile } from "../lib/dropFiles";
 import { fileKey, folderKey, parseKey, useFileSelection } from "../lib/fileSelection";
 import { useFileThumbnails } from "../lib/fileThumbnails";
 import { useFileViewMode } from "../lib/fileViewMode";
+import { useMarqueeSelection } from "../lib/useMarqueeSelection";
 import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -479,6 +480,18 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     ],
     [gorunenKlasorler, gorunenDosyalar]
   );
+
+  /**
+   * Kement (tarayarak) seçim — boşluğa basılı tutup sürüklemek.
+   *
+   * Dokunmatikte KAPALI: orada parmakla sürüklemek sayfayı kaydırmak demek,
+   * kement onu yutardı.
+   */
+  const marquee = useMarqueeSelection({
+    enabled: isDesktop && !compact,
+    getBase: () => secim.keys,
+    onChange: secim.replace,
+  });
 
   /**
    * Tek tık: masaüstünde seçer, dokunmatikte doğrudan açar.
@@ -1296,6 +1309,23 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
         </div>
       )}
 
+      {/*
+        Kement (tarayarak) seçim buradan başlıyor: kapsayıcı `position:
+        relative`, çünkü dikdörtgen onun içine çiziliyor. `minHeight` bilerek
+        var — listenin altındaki BOŞLUK da kementin başlayabileceği yer, yoksa
+        birkaç dosyalık bir klasörde taramaya başlayacak zemin kalmıyordu.
+      */}
+      <div
+        ref={marquee.containerRef}
+        onMouseDown={marquee.onMouseDown}
+        style={{
+          position: "relative",
+          // Liste boşken taban yükseklik verilmiyor: boş durum kutusunun
+          // altında taranacak bir şey de yok, sadece boşluk kalırdı.
+          minHeight: canBrowse && (gorunenDosyalar.length > 0 || gorunenKlasorler.length > 0) ? 220 : undefined,
+        }}
+      >
+
       {loading ? (
         <div style={{ color: c.textSecondary, fontSize: 15 }}>{t("Yükleniyor…")}</div>
       ) : gorunenDosyalar.length === 0 && gorunenKlasorler.length === 0 ? (
@@ -1321,6 +1351,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           {gorunenKlasorler.map((folder) => (
             <div
               key={folder.id}
+              ref={marquee.item(folderKey(folder.id))}
               draggable={canBrowse && !readOnly && !folder.managed}
               onDragStart={(e) => beginDrag(e, folderKey(folder.id))}
               onDragEnd={() => setDragKeys(null)}
@@ -1363,6 +1394,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           {gorunenDosyalar.map((file) => (
             <div
               key={file.id}
+              ref={marquee.item(fileKey(file.id))}
               draggable={canMoveFile(file)}
               onDragStart={(e) => beginDrag(e, fileKey(file.id))}
               onDragEnd={() => setDragKeys(null)}
@@ -1415,6 +1447,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           {gorunenKlasorler.map((folder) => (
             <div
               key={folder.id}
+              ref={marquee.item(folderKey(folder.id))}
               draggable={canBrowse && !readOnly && !folder.managed}
               onDragStart={(e) => beginDrag(e, folderKey(folder.id))}
               onDragEnd={() => setDragKeys(null)}
@@ -1453,6 +1486,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           {gorunenDosyalar.map((file) => (
             <div
               key={file.id}
+              ref={marquee.item(fileKey(file.id))}
               draggable={canMoveFile(file)}
               onDragStart={(e) => beginDrag(e, fileKey(file.id))}
               onDragEnd={() => setDragKeys(null)}
@@ -1521,6 +1555,26 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           ))}
         </div>
       )}
+
+        {marquee.rect && (
+          <div
+            style={{
+              position: "absolute",
+              left: marquee.rect.left,
+              top: marquee.rect.top,
+              width: marquee.rect.width,
+              height: marquee.rect.height,
+              border: `1px solid ${c.accent}`,
+              background: `${c.accent}1f`,
+              borderRadius: 4,
+              // Kementin altındaki öğelerin ölçüsü alınıyor; fare olaylarını
+              // yutmamalı.
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </div>
+
 
       {/* Sayfa geneline sürüklerken tek bir örtü: kullanıcı bırakmanın
           çalışacağını görsün. Tıklamayı engellememesi için pointerEvents kapalı. */}

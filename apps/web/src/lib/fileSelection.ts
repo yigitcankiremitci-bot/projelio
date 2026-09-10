@@ -90,6 +90,8 @@ export interface FileSelection {
    * seçimin bire düşmesini değil.
    */
   contextSelect: (key: SelectionKey) => SelectionKey[];
+  /** Seçimi doğrudan kurar — kement her harekette bunu çağırıyor. */
+  replace: (keys: SelectionKey[]) => void;
   clear: () => void;
 }
 
@@ -118,10 +120,17 @@ export function useFileSelection(): FileSelection {
     [keys]
   );
 
+  const replace = useCallback((next: SelectionKey[]) => {
+    // Çıpa kementin son değdiği öğeye değil, KALDIĞI yere kurulmalı: kement
+    // bittikten sonraki ilk Shift+tık oradan ölçüyor.
+    anchor.current = next[next.length - 1] ?? null;
+    setKeys(next);
+  }, []);
+
   const clear = useCallback(() => {
     anchor.current = null;
     setKeys([]);
   }, []);
 
-  return { keys, count: keys.length, has, click, contextSelect, clear };
+  return { keys, count: keys.length, has, click, contextSelect, replace, clear };
 }

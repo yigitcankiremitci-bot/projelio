@@ -5,6 +5,7 @@ import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from 
 import { useFileThumbnails } from "../lib/fileThumbnails";
 import { fileKey, parseKey, useFileSelection } from "../lib/fileSelection";
 import { useFileViewMode } from "../lib/fileViewMode";
+import { useMarqueeSelection } from "../lib/useMarqueeSelection";
 import { useRefreshOnUndo, useUndo, useWithoutPendingDeletes } from "../lib/undo";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useProjectFabAction } from "../lib/projectFab";
@@ -162,6 +163,13 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
     return m.file ? [m.file] : [];
   };
 
+  /** Kement (tarayarak) seçim — FilesPanel'dekiyle aynı kanca. */
+  const marquee = useMarqueeSelection({
+    enabled: isDesktop,
+    getBase: () => secim.keys,
+    onChange: secim.replace,
+  });
+
   const rowClick = (e: React.MouseEvent, file: ProjectFile) => {
     e.stopPropagation();
     setMenu(null);
@@ -267,6 +275,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
       {gorunen.map((file) => (
         <div
           key={file.id}
+          ref={marquee.item(fileKey(file.id))}
           onClick={(e) => rowClick(e, file)}
           onDoubleClick={() => setPreview(file)}
           onContextMenu={(e) => rowContextMenu(e, file)}
@@ -325,6 +334,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
       {gorunen.map((file) => (
         <div
           key={file.id}
+          ref={marquee.item(fileKey(file.id))}
           onContextMenu={(e) => rowContextMenu(e, file)}
           style={{
             display: "flex",
@@ -398,7 +408,31 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
         </div>
       )}
 
-      {body}
+      {/* Kement kapsayıcısı: `position: relative` + altta boşluk
+          (bkz. FilesPanel'deki aynı düzen). */}
+      <div
+        ref={marquee.containerRef}
+        onMouseDown={marquee.onMouseDown}
+        style={{ position: "relative", minHeight: gorunen.length > 0 ? 220 : undefined }}
+      >
+        {body}
+
+        {marquee.rect && (
+          <div
+            style={{
+              position: "absolute",
+              left: marquee.rect.left,
+              top: marquee.rect.top,
+              width: marquee.rect.width,
+              height: marquee.rect.height,
+              border: `1px solid ${c.accent}`,
+              background: `${c.accent}1f`,
+              borderRadius: 4,
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </div>
 
       {menu && (
         <FileContextMenu

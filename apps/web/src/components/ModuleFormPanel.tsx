@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ModuleRecord, ModuleRecordVersion, Product } from "@projelio/shared";
 import { api } from "../api/client";
+import type { UploadTarget } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
 import {
+  attachmentKey,
   changedFields,
   missingForApproval,
   type ModuleFormConfig,
@@ -10,6 +12,7 @@ import {
 } from "../lib/moduleForms";
 import { useModuleReferences } from "../lib/moduleReferences";
 import ModuleFieldInput from "./ModuleFieldInput";
+import ModuleFormAttachments from "./ModuleFormAttachments";
 import { useT } from "../lib/i18n";
 
 // A1 — Form / Doküman görünümü.
@@ -22,6 +25,12 @@ import { useT } from "../lib/i18n";
 //   read     — yürürlükteki metin (modal açılınca gelen)
 //   edit     — bölüm bölüm form; Kaydet taslağa yazar, Onayla yayımlar
 //   versions — geçmiş sürümler, istenirse taslağa geri yükleme
+//
+// YERLEŞİM: bölümler kart, kısa alanlar İKİ SÜTUN. Tek sütunlu eski hâlde
+// 40 alanlık bir doküman (marka kimliği) uçsuz bir şerit oluyordu ve tarih ya
+// da renk kodu gibi üç karakterlik bir cevap, yanındaki paragrafla aynı
+// genişliği kaplayarak aynı ağırlıkta görünüyordu. Uzun metin, etiket listesi
+// ve eki olan alanlar satırın tamamını alır (bkz. tamGenislik).
 //
 // Bkz. docs/moduller/20-motor-a1-form.md
 
@@ -39,9 +48,22 @@ interface Props {
 
 type Mode = "read" | "edit" | "versions";
 
+/**
+ * Alanın form durumunda tuttuğu anahtarlar.
+ *
+ * Ek dosyalar cevabın parçası olduğu için forma da girer: kaydet düğmesi
+ * `form`u olduğu gibi `data` olarak yazıyor, ek anahtarı burada üretilmezse
+ * kullanıcının yüklediği dosya ilk kaydetmede sessizce kaybolurdu.
+ */
+function keysOf(field: ModuleFormFieldConfig): string[] {
+  return field.attachments ? [field.key, attachmentKey(field.key)] : [field.key];
+}
+
 function emptyForm(fields: ModuleFormFieldConfig[]): Record<string, string> {
   const f: Record<string, string> = {};
-  for (const field of fields) f[field.key] = field.defaultValue ?? "";
+  for (const field of fields) {
+    for (const key of keysOf(field)) f[key] = key === field.key ? field.defaultValue ?? "" : "";
+  }
   return f;
 }
 
@@ -51,8 +73,11 @@ function formFromData(
 ): Record<string, string> {
   const f: Record<string, string> = {};
   for (const field of fields) {
-    const v = data[field.key];
-    f[field.key] = v === undefined || v === null ? field.defaultValue ?? "" : String(v);
+    for (const key of keysOf(field)) {
+      const v = data[key];
+      const fallback = key === field.key ? field.defaultValue ?? "" : "";
+      f[key] = v === undefined || v === null ? fallback : String(v);
+    }
   }
   return f;
 }
@@ -71,6 +96,46 @@ function displayValue(field: ModuleFormFieldConfig, data: Record<string, unknown
   }
   return String(raw);
 }
+
+/** Okuma görünümünde alanın çizilmesi için bir şey var mı. */
+function hasContent(field: ModuleFormFieldConfig, data: Record<string, unknown>): boolean {
+  if (displayValue(field, data) !== "") return true;
+  if (!field.attachments) return false;
+  return String(data[attachmentKey(field.key)] ?? "").trim() !== "";
+}
+
+/**
+ * Alan iki sütunlu ızgarada satırın tamamını mı alıyor.
+ *
+ * Ölçüt cevabın uzunluğu: paragraf, etiket listesi ve çoklu seçim yarım
+ * sütunda kırpılmış görünüyor; tek satırlık cevap ise tam genişlikte
+ * abartılı duruyor. Eki olan alan da tam genişlik alır — dosya satırları
+ * yarım sütunda ada yer bırakmıyor.
+ */
+function tamGenislik(field: ModuleFormFieldConfig): boolean {
+  return (
+    field.attachments === true ||
+    field.type === "longtext" ||
+    field.type === "textarea" ||
+    field.type === "tags" ||
+    field.type === "multiselect"
+  );
+}
+
+/**
+ * Kısa alanların ızgarası.
+ *
+ * 280px alt sınırı ölçülerek seçildi: modal 900px, kenar boşlukları ve kart
+ * dolgusu düşünce içeride ~824px kalıyor ve bu değer tam İKİ sütun veriyor.
+ * 240px'te üç sütun oluyordu — etiketin altındaki yardım metni orada üç
+ * satıra kırılıyor, alan da girilen değer için dar kalıyordu. Dar ekranda
+ * auto-fit kendiliğinden tek sütuna düşer.
+ */
+const IZGARA = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gap: "14px 18px",
+} as const;
 
 export default function ModuleFormPanel({
   organizationId,
@@ -94,6 +159,17 @@ export default function ModuleFormPanel({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Ek dosyalar modülün bulunduğu kapsama yüklenir. Şirket kapsamında açılmış
+  // bir modül departman sekmesinden geliyorsa dosya o departmanın klasörüne
+  // gider — modülün yaşadığı yer neresiyse dosyası da orada aransın.
+  const uploadTarget: UploadTarget | null = jobId
+    ? { jobId }
+    : departmentId
+    ? { departmentId }
+    : organizationId
+    ? { organizationId }
+    : null;
 
   // Referans alanları (user_ref) yalnızca gerekiyorsa yüklensin.
   const references = useModuleReferences(
@@ -144,11 +220,11 @@ export default function ModuleFormPanel({
   };
 
   const applyTemplate = (key: string) => {
-    const t = config.templates?.find((x) => x.key === key);
-    if (!t) return;
+    const sablon = config.templates?.find((x) => x.key === key);
+    if (!sablon) return;
     setForm((f) => {
       const next = { ...f };
-      for (const [k, v] of Object.entries(t.data)) next[k] = v === undefined || v === null ? "" : String(v);
+      for (const [k, v] of Object.entries(sablon.data)) next[k] = v === undefined || v === null ? "" : String(v);
       return next;
     });
   };
@@ -243,8 +319,45 @@ export default function ModuleFormPanel({
 
   const setValue = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
+  /** Bölüm kartı: başlık + ipucu + içerik. İki kipte de aynı çerçeve. */
+  const bolum = (label: string, hint: string | undefined, icerik: React.ReactNode) => (
+    <section
+      style={{
+        border: `1px solid ${c.border}`,
+        borderRadius: 12,
+        padding: "14px 16px 16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <h3
+          style={{
+            margin: 0,
+            fontSize: 14,
+            fontWeight: 600,
+            color: c.textPrimary,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <span style={{ width: 3, height: 14, borderRadius: 2, background: c.accent, flexShrink: 0 }} />
+          {t(label)}
+        </h3>
+        {hint && (
+          <span style={{ fontSize: 12.5, color: c.textSecondary, lineHeight: 1.45, paddingLeft: 11 }}>
+            {t(hint)}
+          </span>
+        )}
+      </div>
+      {icerik}
+    </section>
+  );
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Varlık kapsamı: her ürün için ayrı bir doküman. Seçim kaydın kimliğidir. */}
       {config.scope === "entity" && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -273,70 +386,100 @@ export default function ModuleFormPanel({
         </div>
       )}
 
-      {error && (
-        <div style={{ fontSize: 13, color: c.danger }}>{error}</div>
-      )}
+      {error && <div style={{ fontSize: 13, color: c.danger }}>{error}</div>}
 
       {/* Onaylanmamış değişiklik uyarısı: okuma görünümü hâlâ ESKİ metni gösterir,
           kullanıcı bunun farkında olmalı. */}
       {pending.length > 0 && mode === "read" && (
         <div
           style={{
-            fontSize: 12,
+            fontSize: 12.5,
+            lineHeight: 1.5,
             color: c.textSecondary,
             background: `${c.primary}0d`,
             border: `1px solid ${c.primary}40`,
-            borderRadius: 8,
-            padding: "8px 10px",
+            borderRadius: 10,
+            padding: "10px 12px",
           }}
         >
-          Onaylanmamış değişiklik var — {pending.join(", ")}.{" "}
-          {canApprove ? "Yayımlamak için Onayla." : "Onay için modül yöneticisine iletilmeli."}
+          <strong style={{ color: c.textPrimary, fontWeight: 600 }}>
+            {t("Onaylanmamış değişiklik var")}
+          </strong>
+          {" — "}
+          {pending.join(", ")}.{" "}
+          {canApprove ? t("Yayımlamak için Onayla.") : t("Onay için modül yöneticisine iletilmeli.")}
         </div>
       )}
 
       {mode === "read" && !record && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <strong style={{ fontSize: 15, color: c.textPrimary }}>{config.empty.title}</strong>
-          <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>{config.empty.body}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "8px 0" }}>
+          <strong style={{ fontSize: 17, fontWeight: 600, color: c.textPrimary, lineHeight: 1.35 }}>
+            {t(config.empty.title)}
+          </strong>
+          <p style={{ fontSize: 13.5, color: c.textSecondary, margin: 0, lineHeight: 1.6, maxWidth: 620 }}>
+            {t(config.empty.body)}
+          </p>
           {canWrite && (
             <button
+              data-primary
               onClick={startEdit}
               disabled={config.scope === "entity" && !scopeRef}
-              style={{ alignSelf: "flex-start", fontSize: 13 }}
+              style={{ alignSelf: "flex-start", fontSize: 13, marginTop: 2 }}
             >
-              {config.empty.action}
+              {t(config.empty.action)}
             </button>
           )}
         </div>
       )}
 
       {mode === "read" && record && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {config.groups.map((group) => {
-            const fields = config.fields.filter((f) => f.group === group.key);
-            const filled = fields.filter((f) => displayValue(f, current) !== "");
+            const filled = config.fields.filter((f) => f.group === group.key && hasContent(f, current));
             if (filled.length === 0) return null;
             return (
-              <div key={group.key} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span style={{ fontSize: 11, letterSpacing: 0.6, color: c.textSecondary, textTransform: "uppercase" }}>
-                  {group.label}
-                </span>
-                {filled.map((f) => (
-                  <div key={f.key} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span style={{ fontSize: 12, color: c.textSecondary }}>{f.label}</span>
-                    <span style={{ fontSize: 14, color: c.textPrimary, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-                      {displayValue(f, current)}
-                    </span>
+              <div key={group.key}>
+                {bolum(
+                  group.label,
+                  undefined,
+                  <div style={IZGARA}>
+                    {filled.map((f) => (
+                      <div
+                        key={f.key}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 3,
+                          gridColumn: tamGenislik(f) ? "1 / -1" : undefined,
+                        }}
+                      >
+                        <span style={{ fontSize: 12, fontWeight: 500, color: c.textSecondary }}>{t(f.label)}</span>
+                        {displayValue(f, current) !== "" && (
+                          <span
+                            style={{
+                              fontSize: 14.5,
+                              color: c.textPrimary,
+                              lineHeight: 1.6,
+                              whiteSpace: "pre-wrap",
+                            }}
+                          >
+                            {displayValue(f, current)}
+                          </span>
+                        )}
+                        {f.attachments && (
+                          <ModuleFormAttachments value={String(current[attachmentKey(f.key)] ?? "")} />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             );
           })}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             {canWrite && (
-              <button onClick={startEdit} style={{ fontSize: 13 }}>
+              <button data-primary onClick={startEdit} style={{ fontSize: 13 }}>
                 {t("Düzenle")}
               </button>
             )}
@@ -357,22 +500,48 @@ export default function ModuleFormPanel({
 
           {canApprove && pending.length > 0 && missing.length > 0 && (
             <span style={{ fontSize: 12, color: c.textSecondary }}>
-              Onay için eksik: {missing.join(", ")}
+              {t("Onay için eksik:")} {missing.join(", ")}
             </span>
           )}
         </div>
       )}
 
       {mode === "edit" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Şablon kartları yalnızca boş kayıtta: dolu bir dokümanın üstüne
+              şablon yüklemek, kullanıcının yazdığını tek tıkla eziyor. */}
           {config.templates && config.templates.length > 0 && !record && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Şablondan başla:")}</span>
-              {config.templates.map((t) => (
-                <button key={t.key} type="button" onClick={() => applyTemplate(t.key)} style={{ fontSize: 12 }}>
-                  {t.label}
-                </button>
-              ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={{ fontSize: 12.5, color: c.textSecondary }}>
+                {t("Şablondan başla — hepsi taslaktır, üstüne yazabilirsin:")}
+              </span>
+              <div style={IZGARA}>
+                {config.templates.map((sablon) => (
+                  <button
+                    key={sablon.key}
+                    type="button"
+                    onClick={() => applyTemplate(sablon.key)}
+                    style={{
+                      textAlign: "left",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 3,
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: `1px solid ${c.border}`,
+                      background: "transparent",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: c.textPrimary }}>{t(sablon.label)}</span>
+                    {sablon.hint && (
+                      <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.45 }}>
+                        {t(sablon.hint)}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -380,30 +549,50 @@ export default function ModuleFormPanel({
             const fields = config.fields.filter((f) => f.group === group.key);
             if (fields.length === 0) return null;
             return (
-              <div key={group.key} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span
-                    style={{ fontSize: 11, letterSpacing: 0.6, color: c.textSecondary, textTransform: "uppercase" }}
-                  >
-                    {group.label}
-                  </span>
-                  {group.hint && <span style={{ fontSize: 12, color: c.textSecondary }}>{group.hint}</span>}
-                </div>
-                {fields.map((f) => (
-                  <label key={f.key} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    <span style={{ fontSize: 12, color: c.textSecondary }}>
-                      {f.label}
-                      {f.requiredForApproval && <span style={{ color: c.textSecondary }}> {t("· onay için gerekli")}</span>}
-                    </span>
-                    <ModuleFieldInput field={f} form={form} setValue={setValue} references={references} />
-                    {f.help && <span style={{ fontSize: 11, color: c.textSecondary }}>{f.help}</span>}
-                  </label>
-                ))}
+              <div key={group.key}>
+                {bolum(
+                  group.label,
+                  group.hint,
+                  <div style={IZGARA}>
+                    {fields.map((f) => (
+                      <label
+                        key={f.key}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 5,
+                          gridColumn: tamGenislik(f) ? "1 / -1" : undefined,
+                        }}
+                      >
+                        <span style={{ fontSize: 12, fontWeight: 500, color: c.textPrimary }}>
+                          {t(f.label)}
+                          {f.requiredForApproval && (
+                            <span style={{ color: c.textSecondary, fontWeight: 400 }}>
+                              {" "}
+                              {t("· onay için gerekli")}
+                            </span>
+                          )}
+                        </span>
+                        <ModuleFieldInput field={f} form={form} setValue={setValue} references={references} />
+                        {f.help && (
+                          <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.45 }}>{t(f.help)}</span>
+                        )}
+                        {f.attachments && (
+                          <ModuleFormAttachments
+                            value={form[attachmentKey(f.key)] ?? ""}
+                            onChange={(next) => setValue(attachmentKey(f.key), next)}
+                            target={uploadTarget}
+                          />
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <button data-primary onClick={handleSave} disabled={busy} style={{ fontSize: 13 }}>
               {t("Kaydet")}
             </button>
@@ -415,16 +604,16 @@ export default function ModuleFormPanel({
             <button onClick={() => setMode("read")} disabled={busy} style={{ fontSize: 13 }}>
               {t("Vazgeç")}
             </button>
+            <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.45 }}>
+              {t("Kaydetmek yayımlamaz: metin onaylanana kadar okuma görünümünde eski hali kalır.")}
+            </span>
           </div>
-          <span style={{ fontSize: 11, color: c.textSecondary }}>
-            {t("Kaydetmek yayımlamaz: metin onaylanana kadar okuma görünümünde eski hali kalır.")}
-          </span>
         </div>
       )}
 
       {mode === "versions" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <span style={{ fontSize: 13, color: c.textPrimary }}>{t("Sürüm geçmişi")}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary }}>{t("Sürüm geçmişi")}</span>
           {versions.length === 0 ? (
             <span style={{ fontSize: 13, color: c.textSecondary }}>
               {t("Henüz sürüm yok — ilk onaydan sonra burada birikir.")}
@@ -438,13 +627,15 @@ export default function ModuleFormPanel({
                   alignItems: "center",
                   gap: 8,
                   border: `1px solid ${c.border}`,
-                  borderRadius: 8,
-                  padding: "8px 10px",
+                  borderRadius: 10,
+                  padding: "10px 12px",
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: c.textPrimary }}>
-                    {new Date(v.approvedAt).toLocaleDateString("tr-TR")} tarihine kadar yürürlükteydi
+                  <div style={{ fontSize: 13.5, color: c.textPrimary }}>
+                    {t("{tarih} tarihine kadar yürürlükteydi", {
+                      tarih: new Date(v.approvedAt).toLocaleDateString("tr-TR"),
+                    })}
                   </div>
                   {v.note && <div style={{ fontSize: 12, color: c.textSecondary }}>{v.note}</div>}
                 </div>

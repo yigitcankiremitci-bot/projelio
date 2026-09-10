@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { MODULE_FORM_CONFIGS, changedFields, isFormModule, missingForApproval } from "./index";
+import { MODULE_FORM_CONFIGS, attachmentKey, changedFields, isFormModule, missingForApproval } from "./index";
+import { markaKimligiConfig } from "./markaKimligi";
 import { kimlikVeYonConfig } from "./kimlikVeYon";
 
 // A1 (Form / Doküman) motorunun kuralları.
@@ -61,6 +62,44 @@ describe("changedFields — taslak ile yürürlükteki metnin farkı", () => {
     const changed = changedFields(kimlikVeYonConfig, current, { ...current, eskiAlan: "x" });
     assert.deepEqual(changed, []);
   });
+
+  test("kayıtta hiç olmayan anahtar taslakta boşsa değişiklik değildir", () => {
+    // Forma YENİ bir alan eklendiğinde eski kayıtlarda o anahtar yok, taslakta
+    // ise "" olarak yer alıyor. İkisini farklı saymak, kullanıcı hiçbir şeye
+    // dokunmamışken bütün kayıtlarda "onaylanmamış değişiklik var" demekti.
+    const changed = changedFields(kimlikVeYonConfig, current, { ...current, values: "" });
+    assert.deepEqual(changed, []);
+  });
+});
+
+describe("ek dosyalar cevabın parçasıdır", () => {
+  const eklentili = markaKimligiConfig.fields.find((f) => f.attachments);
+
+  test("marka kimliğinde en az bir alan dosya kabul ediyor", () => {
+    assert.ok(eklentili, "dosya eklenebilen alan yok");
+  });
+
+  test("yalnızca ek değişse bile alan adıyla bildirilir", () => {
+    // Logoyu değiştirip metne dokunmayan kullanıcı "değişiklik yok" görseydi,
+    // yeni logo hiç yayımlanmazdı.
+    const alan = eklentili!;
+    const current = { [alan.key]: "Aynı metin" };
+    const draft = { ...current, [attachmentKey(alan.key)]: "11111111-1111-1111-1111-111111111111" };
+    assert.deepEqual(changedFields(markaKimligiConfig, current, draft), [alan.label]);
+  });
+
+  test("ek anahtarı başka bir alanın anahtarıyla çakışmıyor", () => {
+    for (const [key, config] of Object.entries(MODULE_FORM_CONFIGS)) {
+      const alanAnahtarlari = new Set(config.fields.map((f) => f.key));
+      for (const field of config.fields) {
+        if (!field.attachments) continue;
+        assert.ok(
+          !alanAnahtarlari.has(attachmentKey(field.key)),
+          `${key}: "${field.key}" alanının ek anahtarı gerçek bir alanı eziyor`
+        );
+      }
+    }
+  });
 });
 
 describe("konfigürasyon tutarlılığı", () => {
@@ -90,6 +129,27 @@ describe("konfigürasyon tutarlılığı", () => {
         !config.fields.some((f) => f.key === config.scopeFieldKey),
         `${key}: kapsam alanı (${config.scopeFieldKey}) form alanı olarak da tanımlanmış`
       );
+    }
+  });
+
+  test("şablonların seçim değerleri katalogda var", () => {
+    // Geçersiz bir değer sessiz kalıyordu: select boş açılıyor, multiselect
+    // düğmesi hiçbir zaman seçili görünmüyordu ve sebebi ekranda belli olmuyordu.
+    for (const [key, config] of Object.entries(MODULE_FORM_CONFIGS)) {
+      const secimli = new Map(
+        config.fields
+          .filter((f) => f.type === "select" || f.type === "multiselect")
+          .map((f) => [f.key, new Set((f.options ?? []).map((o) => o.value))])
+      );
+      for (const t of config.templates ?? []) {
+        for (const [alan, deger] of Object.entries(t.data)) {
+          const izinli = secimli.get(alan);
+          if (!izinli) continue;
+          for (const v of String(deger).split(",").map((x) => x.trim()).filter(Boolean)) {
+            assert.ok(izinli.has(v), `${key}/${t.key}: "${alan}" alanında tanımsız seçenek (${v})`);
+          }
+        }
+      }
     }
   });
 

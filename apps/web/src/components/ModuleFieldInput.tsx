@@ -16,6 +16,24 @@ interface Props {
 }
 
 /**
+ * Çok satırlı alanların kutu ölçüleri.
+ *
+ * Genel `input, select, textarea` kuralı (index.css) sabit 42px yükseklik ve
+ * dikey dolgusuz padding veriyor — tek satırlık alanlar için doğru, textarea
+ * için değil: `rows` hiç işlemiyordu ve paragraf yazılan alan tek satır
+ * yüksekliğinde kalıyordu. Aynı geçersiz kılma AddEditProductModal'da da var.
+ */
+const cokSatirliStil = {
+  height: "auto",
+  padding: "10px 12px",
+  lineHeight: 1.5,
+  resize: "vertical",
+  fontFamily: "inherit",
+  fontSize: "inherit",
+  overflowY: "auto",
+} as const;
+
+/**
  * Tek bir modül alanının form kontrolü.
  *
  * ModuleRecordsPanel'den ayrıldı çünkü alan tipi sayısı 5'ten 10'a çıktı ve
@@ -46,8 +64,8 @@ export default function ModuleFieldInput({ field, form, setValue, references, cr
           value={value}
           onChange={(e) => setValue(field.key, e.target.value)}
           placeholder={field.placeholder}
-          rows={2}
-          style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+          rows={3}
+          style={{ ...inputStyle, ...cokSatirliStil, minHeight: 72 }}
         />
       );
 
@@ -61,7 +79,7 @@ export default function ModuleFieldInput({ field, form, setValue, references, cr
           onChange={(e) => setValue(field.key, e.target.value)}
           placeholder={field.placeholder}
           rows={5}
-          style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 }}
+          style={{ ...inputStyle, ...cokSatirliStil, minHeight: 132 }}
         />
       );
 
@@ -233,11 +251,16 @@ function TagsInput({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={add}
         onKeyDown={(e) => {
-          // Enter form göndermesin: bu alan formun içinde yaşıyor.
-          if (e.key === "Enter" || e.key === ",") {
-            e.preventDefault();
-            add();
-          }
+          if (e.key !== "Enter" && e.key !== ",") return;
+          // preventDefault TEK BAŞINA YETMİYOR. Tarayıcının örtük gönderimini
+          // durduruyor ama olay yukarı çıkmaya devam ediyor ve Modal'ın kendi
+          // Enter kuralı (bkz. Modal.tsx findPrimaryAction) onu yakalayıp
+          // "Kaydet"e basıyordu: kullanıcı etiketi yazıp Enter'a bastığında
+          // etiket ekleniyor, aynı anda form kaydedilip düzenleme kipinden
+          // çıkılıyordu — yani alan fiilen çalışmıyordu.
+          e.stopPropagation();
+          e.preventDefault();
+          add();
         }}
         placeholder={placeholder ?? "Yaz ve Enter'a bas"}
         style={{ width: "100%" }}
@@ -334,6 +357,18 @@ function ReferencePicker({
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          // Arama kutusunda Enter, listedeki ilk eşleşmeyi seçer. Yukarı
+          // bırakılsaydı Modal'ın Enter kuralı formu kaydederdi (bkz. yukarıda
+          // TagsInput'taki aynı not) — kullanıcı henüz kimseyi seçmemişken.
+          if (e.key !== "Enter") return;
+          e.stopPropagation();
+          e.preventDefault();
+          const ilk = filtered[0];
+          if (!ilk) return;
+          setValue(ilk.id);
+          setQuery("");
+        }}
         placeholder={references.loading ? "Yükleniyor…" : field.placeholder ?? "Aramak için yaz…"}
         style={{ width: "100%" }}
       />

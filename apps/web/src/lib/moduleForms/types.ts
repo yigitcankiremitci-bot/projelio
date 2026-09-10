@@ -26,6 +26,29 @@ export interface ModuleFormFieldConfig extends ModuleFieldConfig {
   requiredForApproval?: boolean;
   /** Alanın altında görünen açıklama. */
   help?: string;
+  /**
+   * Bu alanın cevabına dosya iliştirilebilir mi (logo, sertifika, yazı tipi
+   * dosyası, tescil belgesi…).
+   *
+   * Dosya kimlikleri AYRI bir tabloya değil, kaydın kendi jsonb'sine
+   * `<anahtar>__dosya` altında virgülle ayrılmış yazılır. Sebebi: ek, cevabın
+   * parçasıdır — taslakta beklemesi, onayla yayımlanması ve sürüm geçmişinde
+   * metinle birlikte durması gerekiyor. file_links (migration 095) bunu
+   * veremezdi: orada bağlantı kaydın TAMAMINA asılır ve taslak/onay ayrımını
+   * hiç bilmez.
+   */
+  attachments?: boolean;
+}
+
+/**
+ * Bir alanın eklerinin durduğu anahtar.
+ *
+ * İki alt çizgi bilerek: kullanıcı alan anahtarı "logoUsage" ise
+ * "logoUsage__dosya" ile hiç karşılaşmaz, ama bir gün gerçek bir alan aynı adı
+ * almaya kalkarsa çakışma göze batacak kadar çirkin görünür.
+ */
+export function attachmentKey(fieldKey: string): string {
+  return `${fieldKey}__dosya`;
 }
 
 export interface ModuleFormGroup {
@@ -38,6 +61,14 @@ export interface ModuleFormGroup {
 export interface ModuleFormTemplate {
   key: string;
   label: string;
+  /**
+   * Şablonun kime uyduğunu söyleyen tek satır.
+   *
+   * Etiket tek başına yetmiyordu: "Hizmet / ajans" ile "Üretim / B2B" arasında
+   * seçim yapan kullanıcı ikisini de tıklayıp içeriğe bakıyordu ve ikinci tık
+   * birinciyi eziyor.
+   */
+  hint?: string;
   /** Şablon daima TASLAK olarak yüklenir — gerçek metin sanılmasın. */
   data: Record<string, unknown>;
 }
@@ -100,6 +131,26 @@ export function changedFields(
 ): string[] {
   if (!draft) return [];
   return config.fields
-    .filter((f) => JSON.stringify(current[f.key] ?? null) !== JSON.stringify(draft[f.key] ?? null))
+    .filter((f) => {
+      // Ek dosyalar da bir değişikliktir: logoyu değiştirip metne dokunmayan
+      // kullanıcı "onaylanmamış değişiklik yok" görseydi, yeni logo hiç
+      // yayımlanmazdı.
+      const keys = f.attachments ? [f.key, attachmentKey(f.key)] : [f.key];
+      return keys.some((k) => normalize(current[k]) !== normalize(draft[k]));
+    })
     .map((f) => f.label);
+}
+
+/**
+ * Karşılaştırma için değerin sadeleştirilmiş hâli.
+ *
+ * Yokluk ile boşluk AYNI sayılır. Kayıt yazıldığında forma yeni eklenen bir
+ * alan kayıtta hiç yoktur ama taslakta "" olarak yer alır; ikisini farklı
+ * saymak, kullanıcı hiçbir şeye dokunmamışken "onaylanmamış değişiklik var"
+ * demekti — üstelik alan eklendiği anda BÜTÜN kayıtlarda.
+ */
+function normalize(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (Array.isArray(value)) return value.join(",");
+  return String(value).trim();
 }

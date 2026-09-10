@@ -19,9 +19,31 @@ import type { ModuleFormConfig } from "./types";
 // Alan çokluğu bilinçli: marka kurmak tek soruyla bitmiyor, ama A1 okuma
 // görünümü BOŞ alanları gizliyor (ModuleFormPanel). Yani doldurulmamış alan
 // kimseye görünmez; doküman kullanıcının doldurduğu kadar uzundur. Şablonlar
-// da bu yüzden var — boş 37 alanla karşılaşan kimse başlamıyor.
+// da bu yüzden var — boş 40 alanla karşılaşan kimse başlamıyor.
+//
+// KİŞİSEL MARKA da bir marka türü: Projelio'yu kullananların önemli bir kısmı
+// serbest çalışan, danışman ya da kurucusuyla anılan küçük şirket. Onlarda
+// "kategori / vaat / ton" soruları aynen geçerli, ama kimliğin gövdesi
+// başkadır — uzmanlık, hikâye ve NEYİN PAYLAŞILMAYACAĞI. Bu yüzden ayrı bir
+// modül değil, bu modülün içinde bir tür (`brandType`) ve kendi bölümü var:
+// ikiye ayırmak, aynı ton/renk/tescil sorularını iki yerde yaşatmak olurdu.
+//
+// KALDIRILAN SORULAR (2026-09): "Marka bir insan olsaydı" ve "renk kullanım
+// oranı (%70/%20/%10)". İkisi de ajans atölyesinde anlamlı, kendi markasını
+// yazan kullanıcıda değil: birincisi cevaplanabilir bir soru değil, ikincisi
+// tasarımcının işini kullanıcıya sorduruyordu. Eski kayıtlarda bu iki anahtar
+// duruyor olabilir — veri silinmedi, yalnızca ekranda sorulmuyor.
 //
 // Bkz. docs/moduller/20-motor-a1-form.md §6.3
+
+// Markanın kim olduğu: şirket mi, kişi mi. Bu seçim ekranda hiçbir alanı
+// gizlemiyor — bilinçli. Karma markada iki taraf da doldurulur ve "kişisel"
+// seçince kapanan bir bölüm, kurucusuyla anılan şirketin yarısını yok sayardı.
+const BRAND_TYPE = {
+  kurumsal: "Kurumsal — şirketin adı öne çıkar", // dil:anahtar
+  kisisel: "Kişisel — bir kişinin adı öne çıkar", // dil:anahtar
+  karma: "Karma — kurucunun adı şirketle birlikte anılır", // dil:anahtar
+};
 
 // 12 arketip: markaya bir kişilik ekseni verir. Ekipteki herkesin aklındaki
 // sesi tek noktada buluşturmanın en ucuz yolu — sıfat listesinden daha
@@ -66,6 +88,9 @@ const BOLDNESS = {
   c2: "Belirgin cesur",
 };
 
+// Son dört seçenek kişisel markanın temas noktaları. Kurumsal listeye
+// eklenmelerinin sebebi, ayrı bir liste tutmamak: bülten çıkaran bir şirket de
+// var, sahneye çıkan bir kurucu da.
 const TOUCHPOINT = {
   web: "Web sitesi",
   sosyal: "Sosyal medya",
@@ -79,6 +104,10 @@ const TOUCHPOINT = {
   etkinlik: "Fuar / etkinlik",
   uygulama: "Mobil uygulama",
   basili: "Kartvizit ve basılı", // dil:anahtar
+  podcast: "Podcast / video kanalı", // dil:anahtar
+  bulten: "Bülten / e-posta listesi", // dil:anahtar
+  sahne: "Konuşma / sahne", // dil:anahtar
+  egitim: "Eğitim / kurs", // dil:anahtar
 };
 
 const TRADEMARK = {
@@ -99,7 +128,12 @@ export const markaKimligiConfig: ModuleFormConfig = {
   groups: [
     { key: "konum", label: "Konum", hint: "Kimin gözünde, neyin alternatifiyiz?" }, // dil:anahtar
     { key: "oz", label: "Öz", hint: "Ne vaat ediyoruz, neye dayanarak?" }, // dil:anahtar
-    { key: "kisilik", label: "Kişilik", hint: "Marka bir insan olsaydı nasıl biri olurdu?" }, // dil:anahtar
+    { key: "kisilik", label: "Kişilik", hint: "Nasıl bir karakteri var?" }, // dil:anahtar
+    {
+      key: "kisisel",
+      label: "Kişi ve uzmanlık", // dil:anahtar
+      hint: "Markanın arkasında bir kişi varsa burası. Kurumsal markada boş kalabilir.", // dil:anahtar
+    },
     { key: "ses", label: "Ses ve dil", hint: "Nasıl konuşuyor?" }, // dil:anahtar
     { key: "isim", label: "Ad ve yazım", hint: "Adımız nasıl yazılır, yenileri nasıl adlandırılır?" }, // dil:anahtar
     { key: "gorunum", label: "Görünüm", hint: "Renk, yazı, logo, görsel dil" }, // dil:anahtar
@@ -110,6 +144,15 @@ export const markaKimligiConfig: ModuleFormConfig = {
 
   fields: [
     // ---------------------------------------------------------- Konum
+    {
+      key: "brandType",
+      label: "Marka türü", // dil:anahtar
+      type: "select",
+      group: "konum",
+      defaultValue: "kurumsal",
+      options: opts(BRAND_TYPE),
+      help: "Kişisel markada güven kişiye, kurumsalda şirkete yazılır; aşağıdaki cevapların tonu buna göre değişir.", // dil:anahtar
+    },
     {
       key: "brandName",
       label: "Marka adı", // dil:anahtar
@@ -136,7 +179,7 @@ export const markaKimligiConfig: ModuleFormConfig = {
     },
     {
       key: "notFor",
-      label: "Kime göre değil", // dil:anahtar
+      label: "Kime uygun değil", // dil:anahtar
       type: "text",
       group: "konum",
       help: "Herkese hitap eden marka kimseye hitap etmez. Bunu yazmak vaadi keskinleştirir.", // dil:anahtar
@@ -146,7 +189,7 @@ export const markaKimligiConfig: ModuleFormConfig = {
       label: "Bizim yerimize ne seçilir", // dil:anahtar
       type: "tags",
       group: "konum",
-      help: "Rakip kartları Rakip Analizi'nde. Buraya müşterinin gözündeki gerçek alternatifleri yaz — \"kendi yapmak\", \"hiçbir şey yapmamak\" dahil.", // dil:anahtar
+      help: "Müşterinin gerçekten değerlendirdiği seçenekler — \"kendimiz yaparız\" ve \"şimdilik dursun\" dahil.", // dil:anahtar
     },
 
     // ---------------------------------------------------------- Öz
@@ -172,7 +215,8 @@ export const markaKimligiConfig: ModuleFormConfig = {
       label: "Kanıtlar", // dil:anahtar
       type: "tags",
       group: "oz",
-      help: "Vaadi ayakta tutan somut şeyler: teslim süresi, garanti, sertifika, referans sayısı. Kanıtsız vaat slogandır.", // dil:anahtar
+      attachments: true,
+      help: "Vaadi ayakta tutan somut şeyler: teslim süresi, garanti, sertifika, referans sayısı. Belgesi varsa ekle.", // dil:anahtar
     },
 
     // ---------------------------------------------------------- Kişilik
@@ -191,13 +235,37 @@ export const markaKimligiConfig: ModuleFormConfig = {
       group: "kisilik",
       help: "3–5 sıfat. \"Kaliteli\" ve \"güvenilir\" herkesin yazdığı şey; ayırt edeni yaz.", // dil:anahtar
     },
+
+    // ---------------------------------------------------------- Kişi ve uzmanlık
     {
-      key: "humanReference",
-      label: "Marka bir insan olsaydı", // dil:anahtar
+      key: "expertise",
+      label: "Uzmanlık alanı", // dil:anahtar
       type: "text",
-      group: "kisilik",
-      placeholder: "Tanıdığın bir tip, bir karakter", // dil:anahtar
-      help: "Ölçülemez ama işe yarar: metni yazan kişi kimin ağzından yazdığını bilir.", // dil:anahtar
+      group: "kisisel",
+      placeholder: "Hangi konu akla seni getiriyor?", // dil:anahtar
+      help: "Tek konu yaz. \"Her işi yaparım\" diyen kişiye kimse belirli bir iş için gelmiyor.", // dil:anahtar
+    },
+    {
+      key: "personalStory",
+      label: "Kişisel hikâye", // dil:anahtar
+      type: "longtext",
+      group: "kisisel",
+      placeholder: "Bu işi neden yapıyorsun, buraya nasıl geldin?", // dil:anahtar
+      help: "Kişisel markada güvenin yarısı hikâyeden gelir; kurumsalda referanstan. Biri diğerinin yerine geçmiyor.", // dil:anahtar
+    },
+    {
+      key: "contentThemes",
+      label: "İçerik temaları", // dil:anahtar
+      type: "tags",
+      group: "kisisel",
+      help: "3–5 konu. Her gün başka bir şey anlatan hesap, ne için takip edildiğini kaybediyor.", // dil:anahtar
+    },
+    {
+      key: "boundaries",
+      label: "Paylaşılmayanlar", // dil:anahtar
+      type: "tags",
+      group: "kisisel",
+      help: "Aile, sağlık, siyaset, gelir… Sınır önceden çizilmezse kararı yoğun bir günün ruh hâli veriyor.", // dil:anahtar
     },
 
     // ---------------------------------------------------------- Ses ve dil
@@ -279,26 +347,22 @@ export const markaKimligiConfig: ModuleFormConfig = {
     },
     { key: "secondaryColors", label: "Yardımcı renkler", type: "tags", group: "gorunum" }, // dil:anahtar
     {
-      key: "colorRule",
-      label: "Renk kullanım oranı", // dil:anahtar
-      type: "text",
-      group: "gorunum",
-      placeholder: "Örn. %70 nötr, %20 ana renk, %10 vurgu", // dil:anahtar
-      help: "Oran yazılmazsa ana renk her yeri kaplar ve vurgu diye bir şey kalmaz.", // dil:anahtar
-    },
-    {
       key: "typography",
       label: "Tipografi",
       type: "text",
       group: "gorunum",
+      attachments: true,
       placeholder: "Başlık yazı tipi / metin yazı tipi", // dil:anahtar
+      help: "Satın alınmış bir yazı tipi varsa dosyasını da ekle; lisans dosyası aranırken hep kayıp oluyor.", // dil:anahtar
     },
     {
       key: "logoUsage",
       label: "Logo kullanımı", // dil:anahtar
       type: "longtext",
       group: "gorunum",
+      attachments: true,
       placeholder: "En küçük boyut, çevresindeki boş alan, koyu/açık zemin sürümleri", // dil:anahtar
+      help: "Logo dosyalarını buraya ekle — kılavuzu okuyan kişi doğru dosyayı aynı yerde bulsun.", // dil:anahtar
     },
     {
       key: "logoDonts",
@@ -312,13 +376,16 @@ export const markaKimligiConfig: ModuleFormConfig = {
       label: "Görsel dil", // dil:anahtar
       type: "longtext",
       group: "gorunum",
+      attachments: true,
       placeholder: "Fotoğraf mı illüstrasyon mu, insan var mı, hangi ışık ve ton?", // dil:anahtar
+      help: "Anlatmak yerine göstermek daha kısa: doğru bulduğun birkaç örnek görseli ekle.", // dil:anahtar
     },
     {
       key: "guidelineUrl",
       label: "Kılavuz ve dosyalar bağlantısı", // dil:anahtar
       type: "text",
       group: "gorunum",
+      attachments: true,
       help: "Logo dosyaları ve kılavuz nerede duruyorsa oranın bağlantısı — Dosyalar modülünden alabilirsin.", // dil:anahtar
     },
 
@@ -337,7 +404,7 @@ export const markaKimligiConfig: ModuleFormConfig = {
       type: "text",
       group: "temas",
       placeholder: "Uzaktan bakınca bizi belli eden tek şey", // dil:anahtar
-      help: "Bir renk, bir şekil, bir kalıp cümle. Tek şey seç — iki tane \"ayırt edici\" zaten değildir.", // dil:anahtar
+      help: "Bir renk, bir şekil, bir kalıp cümle. Tek şey seç.", // dil:anahtar
     },
 
     // ---------------------------------------------------------- Koruma
@@ -347,7 +414,8 @@ export const markaKimligiConfig: ModuleFormConfig = {
       type: "select",
       group: "koruma",
       options: opts(TRADEMARK),
-      help: "Yalnızca son durum. Başvuru, sınıf ve süre takibi Hukuk'un Marka/Patent/Telif modülünde.", // dil:anahtar
+      attachments: true,
+      help: "Yalnızca son durum; belgesi varsa ekle. Başvuru, sınıf ve süre takibi Hukuk'un Marka/Patent/Telif modülünde.", // dil:anahtar
     },
     {
       key: "domains",
@@ -400,7 +468,9 @@ export const markaKimligiConfig: ModuleFormConfig = {
     {
       key: "hizmet",
       label: "Hizmet / ajans",
+      hint: "Şirket adıyla iş alan, ekiple çalışan hizmet işi", // dil:anahtar
       data: {
+        brandType: "kurumsal",
         category: "İşini büyütmek isteyen markalar için dış ekip", // dil:atla
         primaryAudience: "Büyüme aşamasındaki küçük ve orta ölçekli markalar", // dil:atla
         notFor: "En ucuzu arayan, süreci kendi yönetmek isteyenler", // dil:atla
@@ -422,7 +492,9 @@ export const markaKimligiConfig: ModuleFormConfig = {
     {
       key: "perakende",
       label: "Perakende / tüketici", // dil:anahtar
+      hint: "Rafta ya da pazaryerinde, son kullanıcıya satan marka", // dil:anahtar
       data: {
+        brandType: "kurumsal",
         category: "Günlük kullanım ürünü", // dil:atla
         primaryAudience: "Aradığını hızlı bulmak isteyen şehirli alıcı", // dil:atla
         notFor: "Uzun uzun araştırıp en ucuzu bulmayı sevenler", // dil:atla
@@ -443,7 +515,9 @@ export const markaKimligiConfig: ModuleFormConfig = {
     {
       key: "uretim",
       label: "Üretim / B2B", // dil:anahtar
+      hint: "Başka firmalara üreten ya da tedarik eden iş", // dil:anahtar
       data: {
+        brandType: "kurumsal",
         category: "Tedarikçi", // dil:atla
         primaryAudience: "Zamanında teslim ve sabit kalite arayan üretici firmalar", // dil:atla
         notFor: "Tek seferlik, en düşük fiyatlı iş arayanlar", // dil:atla
@@ -459,6 +533,37 @@ export const markaKimligiConfig: ModuleFormConfig = {
         voiceRules: "Siz dili. Rakam ve tarih verilir, sıfat verilmez. Taahhüt edilmeyen şey yazılmaz.", // dil:atla
         avoid: "En iyisi,Rakipsiz,Sınırsız", // dil:atla
         touchpoints: "web,eposta,teklif,fatura,etkinlik,basili",
+      },
+    },
+    {
+      // Kişisel marka şablonu diğer üçünden bir alan fazlasını doldurur:
+      // "Paylaşılmayanlar". Kimse o soruyu kendiliğinden sormuyor, ama sınır
+      // sonradan çizilince çoktan aşılmış oluyor.
+      key: "kisisel",
+      label: "Kişisel marka", // dil:anahtar
+      hint: "Danışman, eğitmen, serbest çalışan — işi kendi adıyla alan kişi", // dil:anahtar
+      data: {
+        brandType: "kisisel",
+        category: "Kendi alanında danışmanlık veren uzman", // dil:atla
+        primaryAudience: "Konuyu bilen birine doğrudan ulaşmak isteyen küçük işletme sahipleri", // dil:atla
+        notFor: "Kurumsal bir ekip ve uzun süreç bekleyenler", // dil:atla
+        alternatives: "Ajansla çalışmak,İçeriden birine öğretmek,Kendi kendine öğrenmek", // dil:atla
+        promise: "İşi konuşurken karşısında hep aynı kişi olur; devredilmez, anlatılan baştan anlatılmaz.", // dil:atla
+        differentiator: "İşi yapan da anlatan da aynı kişi; arada aktarım kaybı yok.", // dil:atla
+        reasonsToBelieve: "Adı geçen çalışmalar,Yayımlanmış içerik,Ulaşılabilir referanslar", // dil:atla
+        archetype: "bilge",
+        personality: "Açık sözlü,Meraklı,Ulaşılabilir", // dil:atla
+        expertise: "Tek bir konu — adının yanına yazılan şey", // dil:atla
+        personalStory: "Bu işi neden yaptığını, nereden başladığını ve ne öğrendiğini birkaç cümleyle anlat. Kişisel markada güvenin yarısı buradan geliyor.", // dil:atla
+        contentThemes: "Yaptığım işten çıkarımlar,Sık sorulan sorular,Sektörde değişenler", // dil:atla
+        boundaries: "Aile,Sağlık,Siyaset,Müşteri adları", // dil:atla
+        toneFormality: "s1",
+        toneHumor: "e1",
+        toneBoldness: "c1",
+        voiceRules: "Birinci tekil şahıs: \"biz\" değil \"ben\". Bilmediğime bilmiyorum derim. Müşteri adı izinsiz geçmez.", // dil:atla
+        sayThis: "Deneyimim,Gördüğüm kadarıyla,Şöyle çözdük", // dil:atla
+        avoid: "Ekibimiz,Kurumsal çözümler,Uzman kadromuz", // dil:atla
+        touchpoints: "web,sosyal,eposta,podcast,bulten,sahne",
       },
     },
   ],

@@ -15,7 +15,6 @@ export const moduller: TranslationDict = {
 
   // ─────────── Marka kimliği: grup ipuçları
   "Kimin gözünde, neyin alternatifiyiz?": "In whose eyes, and an alternative to what?",
-  "Marka bir insan olsaydı nasıl biri olurdu?": "If the brand were a person, what kind of person would it be?",
   "Nasıl konuşuyor?": "How does it speak?",
   "Adımız nasıl yazılır, yenileri nasıl adlandırılır?": "How is our name written, and how are new ones named?",
   "Renk, yazı, logo, görsel dil": "Color, type, logo, visual language",
@@ -38,12 +37,9 @@ export const moduller: TranslationDict = {
   "Örn. büyümek isteyen küçük üreticiler": "E.g. small manufacturers looking to grow",
   "Tek kitle yaz. Persona detayı Hedef Kitle modülünde durur.":
     "Write one audience. Persona detail lives in the Target Audience module.",
-  "Kime göre değil": "Who it is not for",
   "Herkese hitap eden marka kimseye hitap etmez. Bunu yazmak vaadi keskinleştirir.":
     "A brand that speaks to everyone speaks to no one. Writing this sharpens the promise.",
   "Bizim yerimize ne seçilir": "What gets chosen instead of us",
-  "Rakip kartları Rakip Analizi'nde. Buraya müşterinin gözündeki gerçek alternatifleri yaz — \"kendi yapmak\", \"hiçbir şey yapmamak\" dahil.":
-    "Competitor cards live in Competitor Analysis. Write the real alternatives in the customer's eyes here — including \"doing it in-house\" and \"doing nothing\".",
   "Bu markayı seçen kişi ne elde ediyor?": "What does someone who picks this brand get?",
   "Ürünü değil sonucu anlat. Şirketin niye var olduğu Kimlik ve Yön'de duruyor.":
     "Describe the outcome, not the product. Why the company exists lives in Identity & Direction.",
@@ -52,8 +48,6 @@ export const moduller: TranslationDict = {
   "Aynı cümleyi rakip de kurabiliyorsa ayrışma değil, kategori girişidir.":
     "If a competitor can write the same sentence, it is not differentiation; it is the entry ticket to the category.",
   "Kanıtlar": "Proof points",
-  "Vaadi ayakta tutan somut şeyler: teslim süresi, garanti, sertifika, referans sayısı. Kanıtsız vaat slogandır.":
-    "The concrete things that hold the promise up: delivery time, warranty, certification, number of references. A promise without proof is a slogan.",
 
   // ─────────── Marka kimliği: arketipler
   "Bilge — bilgi, doğruluk": "Sage — knowledge, truth",
@@ -74,10 +68,6 @@ export const moduller: TranslationDict = {
   "Kişilik sıfatları": "Personality adjectives",
   "3–5 sıfat. \"Kaliteli\" ve \"güvenilir\" herkesin yazdığı şey; ayırt edeni yaz.":
     "3–5 adjectives. \"Quality\" and \"reliable\" are what everyone writes; write the one that sets you apart.",
-  "Marka bir insan olsaydı": "If the brand were a person",
-  "Tanıdığın bir tip, bir karakter": "A type you know, a character",
-  "Ölçülemez ama işe yarar: metni yazan kişi kimin ağzından yazdığını bilir.":
-    "Unmeasurable but useful: whoever writes the copy knows whose voice they are writing in.",
   "Resmîye yakın": "Leaning formal",
   "Samimiye yakın": "Leaning casual",
   "Ciddiye yakın": "Leaning serious",
@@ -118,10 +108,6 @@ export const moduller: TranslationDict = {
   "HEX kodu yaz. \"Lacivert\" baskıda ve ekranda aynı çıkmaz, kod çıkar.":
     "Write the HEX code. \"Navy\" does not come out the same in print and on screen; a code does.",
   "Yardımcı renkler": "Secondary colors",
-  "Renk kullanım oranı": "Color ratio",
-  "Örn. %70 nötr, %20 ana renk, %10 vurgu": "E.g. 70% neutral, 20% primary, 10% accent",
-  "Oran yazılmazsa ana renk her yeri kaplar ve vurgu diye bir şey kalmaz.":
-    "Without a ratio the primary color covers everything and there is no accent left.",
   "Başlık yazı tipi / metin yazı tipi": "Heading typeface / body typeface",
   "Logo kullanımı": "Logo usage",
   "En küçük boyut, çevresindeki boş alan, koyu/açık zemin sürümleri":
@@ -146,12 +132,8 @@ export const moduller: TranslationDict = {
     "Every place you tick is a place the guidelines have to be applied. Invoices and proposals are the most forgotten.",
   "Ayırt edici işaret": "Signature element",
   "Uzaktan bakınca bizi belli eden tek şey": "The one thing that gives us away from a distance",
-  "Bir renk, bir şekil, bir kalıp cümle. Tek şey seç — iki tane \"ayırt edici\" zaten değildir.":
-    "A color, a shape, a stock phrase. Pick one thing — two of them are not \"distinctive\" anyway.",
   "Araştırılıyor": "Researching",
   "Başvuruldu": "Applied",
-  "Yalnızca son durum. Başvuru, sınıf ve süre takibi Hukuk'un Marka/Patent/Telif modülünde.":
-    "Current status only. Applications, classes and deadlines are tracked in Legal's Trademark/Patent/Copyright module.",
   "Alan adları": "Domains",
   "Elimizdekiler ve almamız gerekenler. Marka adına sahip olmak, alan adına sahip olmak değildir.":
     "The ones we hold and the ones we should get. Owning the brand name is not owning the domain.",
@@ -941,4 +923,66 @@ export const moduller: TranslationDict = {
   "Yatırım": "Investment",
   "Bu modül henüz veri girişine açık değil — diğer modüllerin verisinden gösterge üretecek.":
     "This module isn't open for data entry yet — it will build indicators from other modules' data.",
+
+  // ─────────── Marka kimliği: marka türü, kişisel marka, ekler ve şablonlar
+  "3–5 konu. Her gün başka bir şey anlatan hesap, ne için takip edildiğini kaybediyor.":
+    "3–5 topics. An account that talks about something different every day loses track of what it is followed for.",
+  "Aile, sağlık, siyaset, gelir… Sınır önceden çizilmezse kararı yoğun bir günün ruh hâli veriyor.":
+    "Family, health, politics, income… If the line is not drawn in advance, the mood of a busy day draws it.",
+  "Anlatmak yerine göstermek daha kısa: doğru bulduğun birkaç örnek görseli ekle.":
+    "Showing is shorter than describing: attach a few example images you consider right.",
+  "Başka firmalara üreten ya da tedarik eden iş":
+    "A business that manufactures for or supplies other companies",
+  "Bir renk, bir şekil, bir kalıp cümle. Tek şey seç.": "A color, a shape, a stock phrase. Pick one thing.",
+  "Bu işi neden yapıyorsun, buraya nasıl geldin?": "Why do you do this work, and how did you get here?",
+  "Bülten / e-posta listesi": "Newsletter / mailing list",
+  "Danışman, eğitmen, serbest çalışan — işi kendi adıyla alan kişi":
+    "Consultant, trainer, freelancer — someone who wins work under their own name",
+  "Ekten çıkar": "Remove attachment",
+  "Eğitim / kurs": "Training / course",
+  "Hangi konu akla seni getiriyor?": "Which subject brings you to mind?",
+  "Karma — kurucunun adı şirketle birlikte anılır":
+    "Hybrid — the founder's name is mentioned alongside the company",
+  "Kime uygun değil": "Who it is not for",
+  "Kişi ve uzmanlık": "Person and expertise",
+  "Kişisel hikâye": "Personal story",
+  "Kişisel marka": "Personal brand",
+  "Kişisel markada güven kişiye, kurumsalda şirkete yazılır; aşağıdaki cevapların tonu buna göre değişir.":
+    "In a personal brand trust is credited to the person, in a corporate one to the company; the tone of the answers below follows from that.",
+  "Kişisel markada güvenin yarısı hikâyeden gelir; kurumsalda referanstan. Biri diğerinin yerine geçmiyor.":
+    "In a personal brand half of the trust comes from the story; in a corporate one from references. Neither stands in for the other.",
+  "Kişisel — bir kişinin adı öne çıkar": "Personal — a person's name leads",
+  "Konuşma / sahne": "Speaking / stage",
+  "Kurumsal — şirketin adı öne çıkar": "Corporate — the company name leads",
+  "Logo dosyalarını buraya ekle — kılavuzu okuyan kişi doğru dosyayı aynı yerde bulsun.":
+    "Attach the logo files here — whoever reads the guide should find the right file in the same place.",
+  "Marka türü": "Brand type",
+  "Markanın arkasında bir kişi varsa burası. Kurumsal markada boş kalabilir.":
+    "This is for when there is a person behind the brand. It can stay empty for a corporate brand.",
+  "Müşterinin gerçekten değerlendirdiği seçenekler — \"kendimiz yaparız\" ve \"şimdilik dursun\" dahil.":
+    "The options the customer actually weighs — including \"we'll do it ourselves\" and \"let it wait\".",
+  "Nasıl bir karakteri var?": "What kind of character does it have?",
+  "Onay için eksik:": "Missing for approval:",
+  "Onay için modül yöneticisine iletilmeli.": "It has to go to the module manager for approval.",
+  "Onaylanmamış değişiklik var": "There are unapproved changes",
+  "Paylaşılmayanlar": "Off limits",
+  "Podcast / video kanalı": "Podcast / video channel",
+  "Rafta ya da pazaryerinde, son kullanıcıya satan marka":
+    "A brand selling to end users, on a shelf or in a marketplace",
+  "Satın alınmış bir yazı tipi varsa dosyasını da ekle; lisans dosyası aranırken hep kayıp oluyor.":
+    "If a typeface was purchased, attach its file too; the licence file is always missing when someone looks for it.",
+  "Tek konu yaz. \"Her işi yaparım\" diyen kişiye kimse belirli bir iş için gelmiyor.":
+    "Write one subject. Nobody comes to someone who says \"I do everything\" for a particular job.",
+  "Uzmanlık alanı": "Area of expertise",
+  "Vaadi ayakta tutan somut şeyler: teslim süresi, garanti, sertifika, referans sayısı. Belgesi varsa ekle.":
+    "The concrete things that hold the promise up: delivery time, warranty, certification, number of references. Attach the document if there is one.",
+  "Yalnızca son durum; belgesi varsa ekle. Başvuru, sınıf ve süre takibi Hukuk'un Marka/Patent/Telif modülünde.":
+    "Current status only; attach the certificate if there is one. Applications, classes and deadlines are tracked in Legal's Trademark/Patent/Copyright module.",
+  "Yayımlamak için Onayla.": "Use Approve to publish.",
+  "{tarih} tarihine kadar yürürlükteydi": "In effect until {tarih}",
+  "İçerik temaları": "Content themes",
+  "Şablondan başla — hepsi taslaktır, üstüne yazabilirsin:":
+    "Start from a template — they are all drafts you can write over:",
+  "Şirket adıyla iş alan, ekiple çalışan hizmet işi":
+    "A service business that wins work under a company name and works with a team",
 };

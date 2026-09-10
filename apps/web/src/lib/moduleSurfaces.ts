@@ -119,7 +119,13 @@ export function moduleSurface(moduleKey: string): ModuleSurface {
  *
  * Bugünkü Modal varsayılanı 400px — form modülleri için dar, uzun metin iki
  * kelimede bir kırılıyor. Liste/panel taşıyan modaller daha da geniş olmalı.
+ *
+ * A1 formu 640'tan 900'e çıktı: bu modüller (marka kimliği 40 alan) tek sütun
+ * hâlinde uzayıp gidiyordu ve kısa alanlar — tarih, renk kodu, seçim kutusu —
+ * satır boyunca uzayıp yanındaki uzun metinle aynı ağırlıkta görünüyordu.
+ * 900'de kısa alanlar iki sütuna giriyor (bkz. ModuleFormPanel), uzun metin
+ * tek sütunda kalıyor ve satır uzunluğu okunur bir aralıkta duruyor.
  */
 export function moduleModalWidth(moduleKey: string): number {
-  return moduleArchetype(moduleKey) === "a1_form" ? 640 : 760;
+  return moduleArchetype(moduleKey) === "a1_form" ? 900 : 760;
 }

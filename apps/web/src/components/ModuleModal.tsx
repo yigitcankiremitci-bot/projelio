@@ -11,7 +11,7 @@ interface Props extends ModuleSurfaceProps {
 /**
  * Modal yüzeyinde açılan modül.
  *
- * Genişlik modülün arketipinden gelir (form 640, liste/panel 760): bugünkü
+ * Genişlik modülün arketipinden gelir (form 900, liste/panel 760): bugünkü
  * Modal varsayılanı 400px ve uzun metin orada iki kelimede bir kırılıyor.
  * Dar ekranda modal tam ekrana geçer.
  *

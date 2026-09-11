@@ -388,15 +388,20 @@ export class WorklogService {
   // ------------------------------------------------------------ Kronometre
 
   /**
-   * Kronometreyi başlatır. Aynı anda yalnızca bir kayıt ölçülebilir — kural
-   * veritabanında kısmi tekil indeksle (bkz. migration 097). Burada önce
-   * çalışan varsa DURDURUYORUZ: kullanıcı yeni işe geçtiğinde eskisinin
-   * süresini kaybetmemeli, ama iki kronometreyle de baş başa kalmamalı.
+   * Kronometreyi başlatır.
+   *
+   * AYNI ANDA BİRDEN FAZLA kronometre çalışabilir (bkz. migration 101). Önce
+   * tek kronometre kuralı vardı ve ikinci işi başlatmak birincisini sessizce
+   * durduruyordu; insanlar gerçekte paralel işlerle ilgilendiği için bu,
+   * hâlâ süren işin süresini eksik bırakıyordu. Ölçümün eksik olması,
+   * ölçümün karışık olmasından kötü.
+   *
+   * Zaten çalışan bir kaydı yeniden başlatmak sayacı SIFIRLAMAZ: o ana kadar
+   * geçen süre kaybolurdu.
    */
   async startTimer(userId: string, id: string): Promise<WorkLogEntry> {
-    const calisan = await this.runningEntry(userId);
-    if (calisan && calisan.id !== id) await this.stopTimer(userId, calisan.id);
-    if (calisan && calisan.id === id) return calisan;
+    const entry = await this.findOne(userId, id);
+    if (entry.timerStartedAt) return entry;
     return this.yaz(userId, id, { timer_started_at: yerelZamanDamgasi(new Date()) });
   }
 
@@ -422,17 +427,17 @@ export class WorklogService {
     return this.yaz(userId, id, { timer_started_at: null, duration_minutes: toplam });
   }
 
-  /** O an kronometresi çalışan kayıt (varsa). Sayfa açılışında gösteriliyor. */
-  async runningEntry(userId: string): Promise<WorkLogEntry | null> {
+  /** O an kronometresi çalışan kayıtlar. Birden fazla olabilir (bkz. migration 101). */
+  async runningEntries(userId: string): Promise<WorkLogEntry[]> {
     const { data, error } = await this.supabase.client
       .from("work_log_entries")
       .select("*")
       .eq("user_id", userId)
       .is("archived_at", null)
       .not("timer_started_at", "is", null)
-      .maybeSingle();
+      .order("timer_started_at", { ascending: true });
     if (error) throw error;
-    return data ? mapEntry(data) : null;
+    return (data ?? []).map(mapEntry);
   }
 
   // --------------------------------------------------------------- Aktarma

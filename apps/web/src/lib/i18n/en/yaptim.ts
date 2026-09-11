@@ -39,6 +39,7 @@ export const yaptim: TranslationDict = {
   "Yukarıya bir satır yaz — sonrası kolay.": "Write one line above — the rest is easy.",
   kayıt: { one: "entry", other: "entries" },
   bağlanmamış: "unlinked",
+  "{n} kronometre çalışıyor": { one: "{n} timer running", other: "{n} timers running" },
   "Son 7 gün": "Last 7 days",
   "Son 30 gün": "Last 30 days",
   Dün: "Yesterday",

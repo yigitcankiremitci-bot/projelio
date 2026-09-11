@@ -37,10 +37,10 @@ export class WorklogController {
     return this.worklogService.summary(req.user.userId, { from, to });
   }
 
-  /** O an kronometresi çalışan kayıt; sayfa açılışında ve rozet için. */
+  /** O an kronometresi çalışan kayıtlar; birden fazla olabilir (bkz. migration 101). */
   @Get("running")
   running(@Req() req: any) {
-    return this.worklogService.runningEntry(req.user.userId);
+    return this.worklogService.runningEntries(req.user.userId);
   }
 
   @Post()

@@ -104,13 +104,14 @@ export default function WorkLog() {
     return () => ac.abort();
   }, [yukle]);
 
-  // Kronometre çalışan bir kayıt varsa geçen süreyi canlı göster.
-  const calisan = entries.find((e) => e.timerStartedAt);
+  // Kronometre çalışan kayıt varsa geçen süreyi canlı göster. Birden fazla
+  // olabiliyor; tek bir sayaç hepsini yeniden çizmeye yetiyor.
+  const calisanSayisi = entries.filter((e) => e.timerStartedAt).length;
   useEffect(() => {
-    if (!calisan) return;
+    if (!calisanSayisi) return;
     const id = window.setInterval(() => setTik((n) => n + 1), 1000);
     return () => window.clearInterval(id);
-  }, [calisan?.id]);
+  }, [calisanSayisi]);
 
   // Mobildeki "+" düğmesi bu sayfada giriş kutusuna odaklanır: yeni bir modal
   // açmak, tek satırlık bir kaydı iki tıklık bir işe dönüştürürdü.
@@ -166,10 +167,9 @@ export default function WorkLog() {
       // sahipsiz bir görev kalırdı.
       const bagli = veri.niyet?.tip === "push" ? (await worklog.push(yeni.id, veri.niyet.push)).entry : yeni;
       const kayit = veri.kronometreBaslat ? await worklog.startTimer(bagli.id) : bagli;
-      setEntries((prev) => [
-        kayit,
-        ...prev.map((e) => (veri.kronometreBaslat ? { ...e, timerStartedAt: undefined } : e)),
-      ]);
+      // Diğer kronometrelere DOKUNULMUYOR: aynı anda birden fazla iş ölçülebilir
+      // (bkz. migration 101).
+      setEntries((prev) => [kayit, ...prev]);
       setHata("");
     } catch (err) {
       setHata(err instanceof Error ? err.message : "Kayıt eklenemedi");
@@ -221,12 +221,8 @@ export default function WorkLog() {
       const guncel = entry.timerStartedAt
         ? await worklog.stopTimer(entry.id)
         : await worklog.startTimer(entry.id);
-      // Başlatmak, çalışan başka bir kronometreyi durdurur (sunucu kuralı);
-      // o kaydın süresi de değişmiş olabilir, listeyi tazeliyoruz.
-      if (!entry.timerStartedAt && entries.some((e) => e.timerStartedAt && e.id !== entry.id)) {
-        yukle();
-        return;
-      }
+      // Yalnızca bu satır değişiyor: başlatmak artık başka bir kronometreyi
+      // durdurmuyor (bkz. migration 101).
       setEntries((prev) => prev.map((e) => (e.id === guncel.id ? guncel : e)));
     } catch (err) {
       setHata(err instanceof Error ? err.message : "Kronometre değiştirilemedi");
@@ -321,6 +317,7 @@ export default function WorkLog() {
           {entries.length} {t("kayıt")}
           {toplamDakika > 0 && ` · ${dakikayiMetneCevir(toplamDakika)}`}
           {bagsizSayisi > 0 && ` · ${bagsizSayisi} ${t("bağlanmamış")}`}
+          {calisanSayisi > 0 && ` · ${t("{n} kronometre çalışıyor", { n: calisanSayisi })}`}
         </span>
       </div>
 

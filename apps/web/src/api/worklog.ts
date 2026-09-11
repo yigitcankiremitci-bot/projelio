@@ -67,8 +67,8 @@ export const worklog = {
   summary: (opts: { from?: string; to?: string } = {}, signal?: AbortSignal) =>
     api.get<WorkLogSummary>(`/worklog/summary${aralik(opts.from, opts.to)}`, signal),
 
-  /** O an kronometresi çalışan kayıt; yoksa null. */
-  running: (signal?: AbortSignal) => api.get<WorkLogEntry | null>("/worklog/running", signal),
+  /** O an kronometresi çalışan kayıtlar; aynı anda birden fazla olabilir. */
+  running: (signal?: AbortSignal) => api.get<WorkLogEntry[]>("/worklog/running", signal),
 
   create: (body: WorkLogInput & WorkLogLinkInput & WorkLogTaskInput) => api.post<WorkLogEntry>("/worklog", body),
   update: (id: string, body: WorkLogInput) => api.patch<WorkLogEntry>(`/worklog/${id}`, body),

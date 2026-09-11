@@ -256,6 +256,11 @@ export const kurumsal: TranslationDict = {
     "You'll leave this job's team. You'll lose access to its projects and files; tasks assigned to you stay with the job.",
   "{kisi} ekipten çıkarılacak. İşin projelerine ve dosyalarına erişimi kalkar; ona atanmış görevler işte kalır.":
     "{kisi} will be removed from the team. They'll lose access to the job's projects and files; tasks assigned to them stay with the job.",
+  "İş ayarları": "Job settings",
+  "Ayrılırsan bu iş listenden ve kenar çubuğundan kalkar; işin {n} projesindeki ekip üyeliğin de sona erer. Sana atanmış görevler işte kalır.":
+    "If you leave, this job disappears from your list and sidebar, and your team membership in {n} of its projects ends too. Tasks assigned to you stay with the job.",
+  "Ayrılırsan bu iş listenden ve kenar çubuğundan kalkar; projelerine ve dosyalarına erişimin biter. Sana atanmış görevler işte kalır.":
+    "If you leave, this job disappears from your list and sidebar, and you lose access to its projects and files. Tasks assigned to you stay with the job.",
   '"{is}" işinden ayrılmak istediğine emin misin? İşe ve projelerine erişimin kalkar.':
     'Are you sure you want to leave "{is}"? You\'ll lose access to the job and its projects.',
 

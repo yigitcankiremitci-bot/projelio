@@ -27,13 +27,13 @@ export class JobMembersController {
     return this.jobMembersService.findByJob(jobId);
   }
 
-  // Kendi kadro kaydım. Ekip listesinin tamamını açmaz — taşeron ekibi göremez
-  // (yukarıdaki assertNotSubcontractor) ama kendi kaydını görmeli, yoksa işten
-  // ayrılma düğmesinin görünüp görünmeyeceği bilinemezdi.
+  // Kendi bağlarım. Ekip listesinin tamamını açmaz — taşeron ekibi göremez
+  // (yukarıdaki assertNotSubcontractor) ama kendi durumunu görmeli, yoksa işten
+  // ayrılma seçeneğinin görünüp görünmeyeceği bilinemezdi.
   @Get("jobs/:jobId/members/me")
   async findMine(@Param("jobId") jobId: string, @Req() req: any) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
-    return this.jobMembersService.findMembership(jobId, req.user.userId);
+    return this.jobMembersService.findMyTies(jobId, req.user.userId);
   }
 
   // İşten ayrılma. "job-members/:id" ile aynı işi yapar ama üyelik kimliğini

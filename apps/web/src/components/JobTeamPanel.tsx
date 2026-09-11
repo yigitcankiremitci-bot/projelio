@@ -381,14 +381,19 @@ const JobTeamPanel = forwardRef<JobTeamPanelHandle, Props>(function JobTeamPanel
           danger
           onCancel={() => setRemoving(null)}
           onConfirm={async () => {
-            await api.delete(`/job-members/${removing.id}`);
-            // Kendisi ayrıldıysa bu sayfayı görme yetkisi de kalkmış olabilir;
-            // listede kalmasındansa anasayfaya dönmek doğru olan.
+            // Kendisi ayrılıyorsa "kadro kaydını sil" yetmez: iş, PROJELERİNDEN
+            // birinin ekibinde olmak yüzünden de listede kalıyor. Ayrılmanın
+            // tamamı tek uçta (bkz. JobMembersService.leaveJob); buradan da o
+            // çağrılıyor ki iki düğme iki farklı sonuç vermesin.
             if (currentUser?.id === removing.userId) {
+              await api.delete(`/jobs/${jobId}/members/me`);
+              // Ayrılan kişinin bu sayfayı görme yetkisi de kalkmış olabilir;
+              // listede kalmasındansa anasayfaya dönmek doğru olan.
               setRemoving(null);
               navigate("/");
               return;
             }
+            await api.delete(`/job-members/${removing.id}`);
             setMembers((prev) => prev.filter((uye) => uye.id !== removing.id));
             setRemoving(null);
           }}

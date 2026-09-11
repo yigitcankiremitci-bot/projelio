@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { Job, JobMember, Operation, Project, Task, TaskStatus } from "@projelio/shared";
+import type { Job, Operation, Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { useLiveRoom } from "../lib/liveRoom";
 import ProjectCard from "../components/ProjectCard";
@@ -19,10 +19,9 @@ import FilesPanel from "../components/FilesPanel";
 import TodayCompletedPanel from "../components/TodayCompletedPanel";
 import TaskEditModal from "../components/TaskEditModal";
 import Modal from "../components/Modal";
-import ConfirmDialog from "../components/ConfirmDialog";
-import { notifySidebarChanged } from "../lib/sidebarEvents";
+import JobMemberSettingsModal from "../components/JobMemberSettingsModal";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconUser, IconCalendar, IconSettings, IconLogout } from "../components/icons";
+import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 import { gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
@@ -32,6 +31,12 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
 import { useT } from "../lib/i18n";
+
+/** GET /jobs/:id/members/me — kullanıcının bu işe bağlanma yolları. */
+interface JobTies {
+  projectCount: number;
+  canLeave: boolean;
+}
 
 export default function JobDetail() {
   const t = useT();
@@ -52,11 +57,12 @@ export default function JobDetail() {
   const [endedOpen, setEndedOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editing, setEditing] = useState(false);
-  // İşten ayrılma: işi KURAN kişi dışındaki ekip üyelerinin çıkış yolu.
-  // Ekip sekmesindeki düğme (bkz. JobTeamPanel) taşerona ve sekmeyi kapatmış
-  // işlere ulaşmıyordu; kapaktaki bu düğme her koşulda duruyor.
-  const [myMembership, setMyMembership] = useState<JobMember | null>(null);
-  const [leaving, setLeaving] = useState(false);
+  // İşi KURAN kişi dışındaki ekip üyelerinin ayar penceresi (şimdilik tek
+  // seçeneği "İşten ayrıl", bkz. JobMemberSettingsModal). Ekip sekmesindeki
+  // düğme (bkz. JobTeamPanel) taşerona ve sekmeyi kapatmış işlere
+  // ulaşmıyordu; kapaktaki dişli her koşulda duruyor.
+  const [myTies, setMyTies] = useState<JobTies | null>(null);
+  const [memberSettings, setMemberSettings] = useState(false);
   // Sekme, URL'deki ?tab= ile eşleşir: sidebar'daki ağaçtan "Ekip" ya da "Dosyalar"
   // gibi bir alt bağlantıya tıklandığında doğrudan o sekmeyle açılsın diye.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -114,14 +120,15 @@ export default function JobDetail() {
   const reload = () => {
     if (!id) return;
     api.get<Job>(`/jobs/${id}`).then(setJob).catch(() => setJob(null));
-    // Kendi kadro kaydım: "İşten ayrıl" düğmesi yalnızca gerçekten ekipte
-    // olana çıksın diye. Ekip LİSTESİ sorulmuyor — taşeron onu göremez
-    // (bkz. job-members.controller findMine). Yanıtlanmamış davet "ayrıl"
-    // değil, kabul/ret işidir (bkz. JobInviteBanner) — o yüzden approved şartı.
+    // Bu işe hangi bağlarla bağlıyım: ayar dişlisi yalnızca gerçekten
+    // ayrılabilene çıksın diye. Ekip LİSTESİ sorulmuyor — taşeron onu göremez
+    // (bkz. job-members.controller findMine). canLeave hesabı sunucuda:
+    // kadro kaydı OLMADAN yalnızca bir projeye eklenmiş kişi de işi görüyor
+    // ve ayrılabilmeli.
     api
-      .get<JobMember | null>(`/jobs/${id}/members/me`)
-      .then((uyelik) => setMyMembership(uyelik?.status === "approved" ? uyelik : null))
-      .catch(() => setMyMembership(null));
+      .get<JobTies>(`/jobs/${id}/members/me`)
+      .then(setMyTies)
+      .catch(() => setMyTies(null));
     api.get<Project[]>(`/jobs/${id}/projects`).then(setProjects).catch(() => setProjects([]));
     api.get<Operation[]>(`/jobs/${id}/operations`).then(setOperations).catch(() => setOperations([]));
   };
@@ -410,14 +417,13 @@ export default function JobDetail() {
             >
               <IconSettings size={20} color={c.textSecondary} />
             </button>
-          ) : myMembership ? (
+          ) : myTies?.canLeave ? (
             <button
-              onClick={() => setLeaving(true)}
-              aria-label={t("İşten ayrıl")}
-              title={t("İşten ayrıl")}
+              onClick={() => setMemberSettings(true)}
+              aria-label={t("İş ayarları")}
               style={coverActionButton(c)}
             >
-              <IconLogout size={20} color={c.danger} />
+              <IconSettings size={20} color={c.textSecondary} />
             </button>
           ) : undefined
         }
@@ -640,21 +646,11 @@ export default function JobDetail() {
         />
       )}
 
-      {leaving && job && (
-        <ConfirmDialog
-          title={t("İşten ayrıl")}
-          message={t('"{is}" işinden ayrılmak istediğine emin misin? İşe ve projelerine erişimin kalkar.', {
-            is: job.title,
-          })}
-          confirmLabel={t("Ayrıl")}
-          danger
-          onCancel={() => setLeaving(false)}
-          onConfirm={async () => {
-            await api.delete(`/jobs/${job.id}/members/me`);
-            setLeaving(false);
-            notifySidebarChanged();
-            navigate("/");
-          }}
+      {memberSettings && job && myTies && (
+        <JobMemberSettingsModal
+          job={job}
+          projectCount={myTies.projectCount}
+          onClose={() => setMemberSettings(false)}
         />
       )}
 

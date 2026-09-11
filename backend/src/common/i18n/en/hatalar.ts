@@ -9,6 +9,7 @@ export const hatalar: TranslationDict = {
   "Bu departman görevi üzerinde bu işlemi yapma yetkin yok.": "You don't have permission to do this on this department task.",
   "Bu departmanda bir kadro kaydın yok": "You have no staff record in this department",
   "Bu işte bir kadro kaydın yok": "You have no staff record in this job",
+  "İş sahibi kendi işinden ayrılamaz": "A job owner can't leave their own job",
   "Bu şirkette bir üyeliğin yok": "You have no membership in this company",
   "Kendi kurduğun şirketten ayrılamazsın; arşivleyebilir ya da silebilirsin":
     "You can't leave a company you founded; you can archive or delete it instead",

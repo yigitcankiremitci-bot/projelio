@@ -56,6 +56,8 @@ export const bildirimler: TranslationDict = {
   "Ekipten ayrılma": "Someone left the team",
   '{kisi}, "{proje}" projesinden ayrıldı.': '{kisi} left the project "{proje}".',
   'Bir ekip üyesi "{proje}" projesinden ayrıldı.': 'A team member left the project "{proje}".',
+  '{kisi}, "{is}" işinden ayrıldı.': '{kisi} left the job "{is}".',
+  'Bir ekip üyesi "{is}" işinden ayrıldı.': 'A team member left the job "{is}".',
   "Anlaşma Güncellendi": "Agreement updated",
   "Ücret anlaşmanız güncellendi.": "Your rate agreement has been updated.",
 

@@ -227,33 +227,122 @@ export class JobMembersService {
   // Ekipten çıkarma: yalnızca işin sahibi başkasını çıkarabilir; kişinin kendisi
   // her zaman ayrılabilir. Eskiden hiç kontrol yoktu — üyelik id'sini bilen
   // herhangi biri başkasını ekipten atabiliyordu.
-  /** Kullanıcının bu işteki kendi kadro kaydı (yoksa null). */
-  async findMembership(jobId: string, userId: string): Promise<JobMember | null> {
-    const { data, error } = await this.supabase.client
+  /**
+   * Kullanıcının bu işe bağlanma yolları. Bir iş kullanıcının listesinde ÜÇ
+   * sebeple durabiliyor (bkz. JobsService.findAllForUser): işin sahibi olmak,
+   * iş kadrosunda (job_members) olmak ve işin PROJELERİNDEN birinin ekibinde
+   * (project_members) olmak. Üçüncüsü tek başına yeter: kadro kaydı hiç
+   * olmadan yalnızca bir projeye eklenmiş kişi de işi görür.
+   *
+   * "Ayrılabilir miyim" sorusunun cevabı bu yüzden yalnızca job_members'a
+   * bakılarak verilemez.
+   */
+  async findMyTies(
+    jobId: string,
+    userId: string
+  ): Promise<{ member: JobMember | null; projectCount: number; canLeave: boolean }> {
+    const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", jobId).maybeSingle();
+    if (!job) throw new NotFoundException("İş bulunamadı");
+
+    const { data: rows, error } = await this.supabase.client
       .from("job_members")
       .select("*")
       .eq("job_id", jobId)
       .eq("user_id", userId)
-      .maybeSingle();
+      .order("joined_at", { ascending: true });
     if (error) throw error;
-    return data ? mapJobMember(data) : null;
+    const member = (rows ?? []).map(mapJobMember).find((m) => m.status === "approved") ?? null;
+
+    const projectIds = await this.myProjectMemberships(jobId, userId);
+
+    return {
+      member,
+      projectCount: projectIds.length,
+      // İş sahibi kendi işinden ayrılamaz; ayrılsa iş sahipsiz kalırdı.
+      canLeave: job.owner_id !== userId && (member !== null || projectIds.length > 0),
+    };
+  }
+
+  /** Bu işin projelerinde kullanıcının üyelik kayıtları (kendi projeleri hariç). */
+  private async myProjectMemberships(jobId: string, userId: string): Promise<string[]> {
+    const { data: projects } = await this.supabase.client
+      .from("projects")
+      .select("id, owner_id")
+      .eq("job_id", jobId);
+    // Kendi kurduğu projeden ayrılamaz (bkz. MembersService.leaveProject);
+    // listeye alınsa silinemeyecek bir şey vaat edilmiş olurdu.
+    const ids = (projects ?? []).filter((p: any) => p.owner_id !== userId).map((p: any) => p.id);
+    if (ids.length === 0) return [];
+
+    const { data: memberships } = await this.supabase.client
+      .from("project_members")
+      .select("id")
+      .eq("user_id", userId)
+      .in("project_id", ids);
+    return (memberships ?? []).map((m: any) => m.id);
   }
 
   /**
    * İşten ayrılma. Kadro kimliğini kullanıcının bilmesini gerektirmez —
    * "jobs/:jobId/members" listesini göremeyen taşeron için tek yol bu.
-   * Silmeyi remove üstlenir ki Drive izinlerinin geri alınması (syncDriveShares)
-   * iki ayrı yerde yaşamasın.
+   *
+   * KADRO KAYDINI SİLMEK TEK BAŞINA YETMİYOR: iş, projelerinden birinin
+   * ekibinde olmak yüzünden de listede kalıyor (bkz. findMyTies). İlk sürüm
+   * yalnızca job_members'ı siliyordu ve kullanıcı "ayrıldım ama iş hâlâ
+   * duruyor" diyordu — hatta kadro kaydı hiç olmayan, yalnızca projeye
+   * eklenmiş kişi için ayrılma ucu 404 veriyordu.
+   *
+   * Kadro kaydının silinmesini remove üstlenir ki Drive izinlerinin geri
+   * alınması (syncDriveShares) iki ayrı yerde yaşamasın.
    */
   async leaveJob(jobId: string, userId: string): Promise<void> {
-    const { data: row } = await this.supabase.client
+    const { data: job } = await this.supabase.client
+      .from("jobs")
+      .select("owner_id, title")
+      .eq("id", jobId)
+      .maybeSingle();
+    if (!job) throw new NotFoundException("İş bulunamadı");
+    if (job.owner_id === userId) throw new ForbiddenException("İş sahibi kendi işinden ayrılamaz");
+
+    const { data: rows } = await this.supabase.client
       .from("job_members")
       .select("id")
       .eq("job_id", jobId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!row) throw new NotFoundException("Bu işte bir kadro kaydın yok");
-    await this.remove(row.id, userId);
+      .eq("user_id", userId);
+
+    let ayrildi = false;
+    for (const row of rows ?? []) {
+      await this.remove(row.id, userId);
+      ayrildi = true;
+    }
+
+    const projectMemberIds = await this.myProjectMemberships(jobId, userId);
+    if (projectMemberIds.length > 0) {
+      const { error } = await this.supabase.client.from("project_members").delete().in("id", projectMemberIds);
+      if (error) throw error;
+      ayrildi = true;
+    }
+
+    if (!ayrildi) throw new NotFoundException("Bu işte bir kadro kaydın yok");
+
+    // İş sahibi haberdar olsun: ekipten biri sessizce düşmesin
+    // (aynı gerekçe MembersService.leaveProject'te de yazılı).
+    if (job.owner_id) {
+      const { data: user } = await this.supabase.client
+        .from("users")
+        .select("full_name")
+        .eq("id", userId)
+        .maybeSingle();
+      this.notificationsService.notifyUserSafe(
+        job.owner_id,
+        "role_updated",
+        "Ekipten ayrılma",
+        user?.full_name
+          ? { metin: '{kisi}, "{is}" işinden ayrıldı.', params: { kisi: user.full_name, is: job.title } }
+          : { metin: 'Bir ekip üyesi "{is}" işinden ayrıldı.', params: { is: job.title } },
+        `/jobs/${jobId}`
+      );
+    }
   }
 
   async remove(id: string, requestingUserId?: string): Promise<void> {

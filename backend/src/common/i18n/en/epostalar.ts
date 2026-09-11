@@ -81,4 +81,31 @@ export const epostalar: TranslationDict = {
   "Bu talebi sen yapmadıysan hemen giriş yap — girişin kendisi silme talebini iptal eder.":
     "If you didn't request this, sign in right away — signing in cancels the deletion by itself.",
   "Tarih geçtikten sonra veriler geri getirilemez.": "After that date the data cannot be recovered.",
+
+  // ─────────────────────────────────────────────── Bildirim e-postaları (102)
+  "Projelio — bugünkü özetin": "Projelio — your daily summary",
+  "Bugünkü özetin": "Your daily summary",
+  "Yeni bildirimlerin var": "You have new notifications",
+  "Projelio — {n} yeni bildirim": {
+    one: "Projelio — {n} new notification",
+    other: "Projelio — {n} new notifications",
+  },
+  "Merhaba {ad},": "Hi {ad},",
+  "Günün özeti aşağıda. Ayrıntı için herhangi bir satıra tıklayabilirsin.":
+    "Here is your summary for today. Click any line for the details.",
+  "Projelio'da senin için yeni bir şeyler oldu.": "Something new happened for you in Projelio.",
+  "Bildirimler": "Notifications",
+  "Bugün biten görevlerin": "Your tasks due today",
+  "ve {n} bildirim daha": {
+    one: "and {n} more notification",
+    other: "and {n} more notifications",
+  },
+  "ve {n} görev daha": {
+    one: "and {n} more task",
+    other: "and {n} more tasks",
+  },
+  "Projelio'yu aç": "Open Projelio",
+  "Bu e-postaları ne sıklıkla almak istediğini Ayarlar > Yardımcılar > Bildirim e-postaları bölümünden değiştirebilir, tamamen kapatabilirsin.":
+    "You can change how often you get these emails — or turn them off completely — in Settings > Helpers > Notification emails.",
+  "Bildirim e-postası ayarları": "Notification email settings",
 };

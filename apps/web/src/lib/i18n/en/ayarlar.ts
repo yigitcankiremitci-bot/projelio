@@ -127,4 +127,30 @@ export const ayarlar: TranslationDict = {
     "Projelio's file access to this account will be removed. Your files stay where they are but can't be opened from Projelio. You can still sign in with this account.",
   "Bu hesabın bağlantısı tamamen kaldırılacak. Hesapta saklanan Projelio dosyası varsa önce ilgili şirket için başka bir depo hesabı seçmeniz gerekir.":
     "This account will be disconnected completely. If it still stores Projelio files, choose another storage account for the company first.",
+
+  // ══════════════════════════════════════════════════════ Bildirim e-postaları
+  "Bildirim e-postaları": "Notification emails",
+  "Bildirimlerin e-posta olarak da gelsin — sıklığını ve saatini sen seç.":
+    "Get your notifications by email too — you choose how often and when.",
+  "Her bildirimde": "Every notification",
+  "Bildirim oluştukça gelir. Arka arkaya gelenler tek e-postada toplanır.":
+    "Sent as notifications happen. Ones arriving close together are bundled into a single email.",
+  "Günde bir özet": "One summary a day",
+  "Seçtiğin saatte, o güne ait her şey tek e-postada.":
+    "Everything from that day in one email, at the hour you pick.",
+  "Hiç e-posta gönderilmez. Bildirimler uygulamada görünmeye devam eder.":
+    "No emails at all. Notifications still show up in the app.",
+  "Her gün saat": "Every day at",
+  "({zamanDilimi} saatiyle)": "({zamanDilimi} time)",
+  "O gün biten görevlerim de listelensin": "Also list my tasks due that day",
+  "Deneme e-postası gönder": "Send a test email",
+  "Gönderiliyor…": "Sending…",
+  "Kurulumun çalıştığını hemen görmek için.": "To see right away that it works.",
+  "Deneme e-postası gönderildi. Birkaç dakika içinde gelmezse spam klasörüne bak.":
+    "Test email sent. If it doesn't arrive within a few minutes, check your spam folder.",
+  "Deneme e-postası gönderilemedi. E-posta adresin doğrulanmamış olabilir.":
+    "The test email couldn't be sent. Your email address may not be verified.",
+  "Deneme e-postası gönderilemedi.": "The test email couldn't be sent.",
+  "Bildirim e-postası ayarları yüklenemedi.": "Notification email settings couldn't be loaded.",
+  "Ayar kaydedilemedi.": "The setting couldn't be saved.",
 };

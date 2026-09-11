@@ -19,6 +19,7 @@ import TabBar from "../components/TabBar";
 // varsayımının kalıntısıydı (bkz. CloudAccountsCard).
 import CloudAccountsCard from "../components/CloudAccountsCard";
 import WhatsappCard from "../components/WhatsappCard";
+import NotificationEmailCard from "../components/NotificationEmailCard";
 import WhatsappProfileCard from "../components/WhatsappProfileCard";
 import {
   IconShield,
@@ -891,6 +892,11 @@ export default function Settings() {
       >
         <Toggle checked={prefs.showPresence} onChange={prefs.setShowPresence} />
       </SettingCard>
+
+      {/* Bildirim e-postaları en altta ve KATLANMIŞ: varsayılanı (günde bir
+          özet, 09:00) çoğu kullanıcı için doğru, ayarı arayan ise burada
+          bulur. Bkz. NotificationEmailCard başlığı. */}
+      <NotificationEmailCard />
 
       <SettingCard
         title={t("Kullanım turu")}

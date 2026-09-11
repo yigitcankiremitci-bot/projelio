@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { getWebAppUrl, isProduction } from "../../common/config/env";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 import { cevirmen } from "../../common/i18n";
+import { epostaKabugu, MARKA } from "./email-shell";
 import type { Locale, Translate } from "@projelio/shared";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -148,7 +149,34 @@ export class EmailService {
     });
   }
 
-  private async send(params: { to: string; subject: string; html: string; text: string }): Promise<void> {
+  /**
+   * Şablonu ÇAĞIRAN tarafta hazırlanmış e-postayı gönderir.
+   *
+   * NEDEN VAR: bu servisteki metotların her biri tek bir akışa ait (doğrulama,
+   * sıfırlama, silme) — hepsinin şablonu burada duruyor çünkü hepsi kimlik
+   * akışının parçası. Bildirim özeti öyle değil: içeriği bildirim modülünün
+   * verisinden üretiliyor ve şablonu orada yaşamalı (bkz.
+   * notifications/notification-email.template.ts). Buradan sızan tek şey
+   * gönderim kanalı.
+   *
+   * Auth metotlarıyla aynı sözleşme: sağlayıcı yapılandırılmadıysa ya da
+   * gönderim başarısızsa HATA FIRLATMAZ, loglar. Çağıran tarafta bir kuyruk
+   * işleyicisi var; tek bir e-posta yüzünden turun düşmesi, o turdaki diğer
+   * kullanıcıların da özetini kaybettirirdi.
+   *
+   * @returns gönderim gerçekten yapıldıysa true
+   */
+  async sendPrepared(to: string, mail: { subject: string; html: string; text: string }): Promise<boolean> {
+    if (!this.apiKey) {
+      this.logger.warn(
+        `E-posta sağlayıcısı yapılandırılmadı (RESEND_API_KEY yok) — "${mail.subject}" gönderilemedi. Alıcı: ${to}`
+      );
+      return false;
+    }
+    return this.send({ to, ...mail });
+  }
+
+  private async send(params: { to: string; subject: string; html: string; text: string }): Promise<boolean> {
     try {
       const response = await fetchWithTimeout(RESEND_ENDPOINT, {
         method: "POST",
@@ -170,12 +198,14 @@ export class EmailService {
         this.logger.error(
           `E-posta gönderilemedi (HTTP ${response.status}). Alıcı: ${params.to}. Sağlayıcı yanıtı: ${detail.slice(0, 500)}`
         );
-        return;
+        return false;
       }
 
       this.logger.log(`E-posta gönderildi: ${params.to} — "${params.subject}"`);
+      return true;
     } catch (err) {
       this.logger.error(`E-posta gönderilirken ağ hatası. Alıcı: ${params.to}. Hata: ${String(err)}`);
+      return false;
     }
   }
 }
@@ -197,34 +227,26 @@ function emailLayout(params: {
   t: Translate;
   locale: Locale;
 }): string {
-  return `<!doctype html>
-<html lang="${params.locale}">
-  <body style="margin:0;padding:24px;background:#F4F5F7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-    <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:14px;padding:32px;">
-      <tr>
-        <td>
-          <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#3E4858;">${params.heading}</h1>
-          <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#5A6472;">${params.intro}</p>
+  return epostaKabugu(
+    params.locale,
+    `          <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:${MARKA.yaziKoyu};">${params.heading}</h1>
+          <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:${MARKA.yaziOrta};">${params.intro}</p>
           <p style="margin:0 0 24px;">
             <a href="${params.url}"
-               style="display:inline-block;background:#3E4858;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-size:15px;font-weight:500;">
+               style="display:inline-block;background:${MARKA.yaziKoyu};color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-size:15px;font-weight:500;">
               ${params.ctaLabel}
             </a>
           </p>
-          <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#8A929E;">
+          <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:${MARKA.yaziSoluk};">
             ${params.t("Düğme çalışmazsa bu adresi tarayıcına yapıştırabilirsin:")}
           </p>
-          <p style="margin:0 0 24px;font-size:13px;line-height:1.6;word-break:break-all;color:#C0813F;">
+          <p style="margin:0 0 24px;font-size:13px;line-height:1.6;word-break:break-all;color:${MARKA.vurgu};">
             ${params.url}
           </p>
-          <p style="margin:0;font-size:13px;line-height:1.6;color:#8A929E;border-top:1px solid #E6E8EC;padding-top:16px;">
+          <p style="margin:0;font-size:13px;line-height:1.6;color:${MARKA.yaziSoluk};border-top:1px solid ${MARKA.cizgi};padding-top:16px;">
             ${params.footer}
-          </p>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+          </p>`
+  );
 }
 
 function passwordResetHtml(resetUrl: string, t: Translate, locale: Locale): string {

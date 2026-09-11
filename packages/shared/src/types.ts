@@ -1550,6 +1550,25 @@ export interface PushSubscriptionPayload {
   keys: PushSubscriptionKeys;
 }
 
+/**
+ * Bildirimlerin e-posta ile gönderim sıklığı (bkz. migration 102).
+ *
+ * `anlik` gerçekten "anlık" değil, "biriktirmeden": işleyici birkaç dakikada
+ * bir tarıyor ve o aralıkta doğan bildirimleri TEK e-postada topluyor. Her
+ * bildirim için ayrı e-posta, yoğun bir günde gelen kutusunu doldururdu.
+ */
+export type NotificationEmailFrequency = "anlik" | "gunluk" | "kapali";
+
+export interface NotificationEmailPrefs {
+  frequency: NotificationEmailFrequency;
+  /** Günlük özetin gideceği saat (0-23), KULLANICININ saat diliminde. */
+  dailyHour: number;
+  /** IANA saat dilimi adı (ör. "Europe/Istanbul"). */
+  timezone: string;
+  /** Günlük özete "bugün biten görevlerim" listesi de eklensin mi. */
+  includeTasks: boolean;
+}
+
 export interface ArchivedJobEntry {
   id: string;
   title: string;

@@ -26,6 +26,7 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | Modül sistemi tasarımı | `docs/moduller/` — 20 belge; README'de faz tablosu |
 | Tanıtım sitesi (Next.js) | `landing/` |
 | Abonelik / ödeme (iyzico + mağazalar) | `backend/src/modules/billing/` — kurulum `docs/odeme-kurulumu.md` |
+| Bildirim e-postaları | `backend/src/modules/notifications/notification-email.*` — tercih, şablon, iki turlu işleyici |
 | Yaptım (kişisel iş günlüğü) | `backend/src/modules/worklog/`, `apps/web/src/pages/WorkLog.tsx` — Yapılacaklar'ın tersi |
 | WhatsApp köprüsü (WAHA yan-servisi + modül) | `backend/src/modules/whatsapp/`, `deploy/docker-compose.prod.yml` `waha` servisi, tasarım `docs/whatsapp-qr-plan.md` |
 

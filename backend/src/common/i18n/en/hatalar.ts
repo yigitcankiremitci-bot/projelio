@@ -609,4 +609,9 @@ export const hatalar: TranslationDict = {
   "Geçerli bir tutar gerekiyor": "A valid amount is required",
   "En az bir kayıt gerekli.": "At least one entry is required.",
   "Bitiş saati başlangıçtan sonra olmalı": "The end time must be after the start time",
+
+  // Bildirim e-postası tercihleri (bkz. migration 102)
+  "Geçersiz bildirim e-postası sıklığı.": "Invalid notification email frequency.",
+  "Günlük özet saati 0 ile 23 arasında olmalı.": "The daily summary hour must be between 0 and 23.",
+  "Geçersiz saat dilimi.": "Invalid time zone.",
 };

@@ -407,12 +407,16 @@ export class WorklogService {
   async startTimer(userId: string, id: string): Promise<WorkLogEntry> {
     const entry = await this.findOne(userId, id);
     if (entry.timerStartedAt) return entry;
-    return this.yaz(userId, id, { timer_started_at: yerelZamanDamgasi(new Date()) });
+    // Başlatmak duraklatmayı kaldırır: ikisi bir arada anlamsız bir durum
+    // (DB'de de CHECK var).
+    return this.yaz(userId, id, { timer_started_at: yerelZamanDamgasi(new Date()), timer_paused: false });
   }
 
   /**
-   * Kronometreyi DURAKLATIR: geçen süre birikime eklenir, kayıt olduğu yerde
-   * kalır ve "devam et" ile kaldığı yerden sürer.
+   * Kronometreyi duraklatır (`duraklat=true`) ya da BİTİRİR. İkisinde de geçen
+   * süre birikime ekleniyor; fark kaydın ekranda nasıl göründüğü: duraklatılmış
+   * kayıt yanıp sönüyor ve "devam et" bekliyor, bitmiş kayıt sessiz duruyor.
+   * Ayrım kullanıcıya ait — ara vermek, işi bitirmekle aynı şey değil.
    *
    * SANİYE BİRİKİYOR, DAKİKA DEĞİL. Önce her duraklatmada dakikaya yuvarlanıp
    * en az 1 dakika sayılıyordu; duraklatma bir özellik hâline gelince aynı
@@ -423,9 +427,13 @@ export class WorklogService {
    * Kayıtlı süre 1 dakikanın altında kalsa bile 1 yazılıyor: kullanıcı bir işi
    * ölçtüyse defterde "0 dakika" olarak durmamalı.
    */
-  async stopTimer(userId: string, id: string): Promise<WorkLogEntry> {
+  async stopTimer(userId: string, id: string, duraklat = false): Promise<WorkLogEntry> {
     const entry = await this.findOne(userId, id);
-    if (!entry.timerStartedAt) return entry;
+    if (!entry.timerStartedAt) {
+      // Çalışmayan kaydı "bitir" demek, duraklatılmış olanı kapatmak anlamına
+      // geliyor: kullanıcı geri dönmeyeceğine karar vermiş.
+      return entry.timerPaused && !duraklat ? this.yaz(userId, id, { timer_paused: false }) : entry;
+    }
 
     // İki damga da AYNI çerçevede (yerel duvar saati, saat dilimsiz) okunuyor;
     // ikisini de aynı yanlış ofsetle çözsek bile FARK doğru kalır. Türkiye
@@ -438,6 +446,7 @@ export class WorklogService {
 
     return this.yaz(userId, id, {
       timer_started_at: null,
+      timer_paused: duraklat,
       timer_seconds: toplamSaniye,
       duration_minutes: Math.max(1, Math.round(toplamSaniye / 60)),
     });
@@ -790,6 +799,7 @@ function mapEntry(row: any): WorkLogEntry {
     durationMinutes: row.duration_minutes ?? undefined,
     timerStartedAt: row.timer_started_at ?? undefined,
     timerSeconds: row.timer_seconds ?? 0,
+    timerPaused: Boolean(row.timer_paused),
     startedAt: row.started_at ?? undefined,
     endedAt: row.ended_at ?? undefined,
     timeBlockId: row.time_block_id ?? undefined,

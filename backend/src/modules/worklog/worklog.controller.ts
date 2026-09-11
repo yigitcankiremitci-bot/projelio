@@ -82,6 +82,13 @@ export class WorklogController {
     return this.worklogService.startTimer(req.user.userId, id);
   }
 
+  /** Ara ver: süre birikime eklenir, kayıt "devam et" bekler hâlde kalır. */
+  @Post(":id/timer/pause")
+  pauseTimer(@Req() req: any, @Param("id") id: string) {
+    return this.worklogService.stopTimer(req.user.userId, id, true);
+  }
+
+  /** Bitir: süre birikime eklenir ve kayıt sessizleşir. */
   @Post(":id/timer/stop")
   stopTimer(@Req() req: any, @Param("id") id: string) {
     return this.worklogService.stopTimer(req.user.userId, id);

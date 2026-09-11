@@ -80,6 +80,9 @@ export const worklog = {
   push: (id: string, body: WorkLogPushInput) => api.post<WorkLogPushResult>(`/worklog/${id}/push`, body),
 
   startTimer: (id: string) => api.post<WorkLogEntry>(`/worklog/${id}/timer/start`, {}),
+  /** Ara ver; kayıt "devam et" bekler hâlde kalır. */
+  pauseTimer: (id: string) => api.post<WorkLogEntry>(`/worklog/${id}/timer/pause`, {}),
+  /** Bitir; kayıt sessizleşir ve duraklatma düğmesi kaybolur. */
   stopTimer: (id: string) => api.post<WorkLogEntry>(`/worklog/${id}/timer/stop`, {}),
 
   /** Kalıcı silmez, arşivler. */

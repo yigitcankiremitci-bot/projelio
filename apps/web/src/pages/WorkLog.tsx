@@ -10,7 +10,7 @@ import WorkLogComposer from "../components/WorkLogComposer";
 import WorkLogTargetModal, { type HedefNiyeti } from "../components/WorkLogTargetModal";
 import WorkLogEditModal from "../components/WorkLogEditModal";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { IconPlay, IconPause, IconLink, IconTrash, IconCheck, IconEdit } from "../components/icons";
+import { IconPlay, IconPause, IconStop, IconLink, IconTrash, IconCheck, IconEdit } from "../components/icons";
 
 /**
  * YAPTIM — kullanıcının kişisel iş günlüğü.
@@ -216,11 +216,14 @@ export default function WorkLog() {
     }
   };
 
-  const kronometre = async (entry: WorkLogEntry) => {
+  const kronometre = async (entry: WorkLogEntry, eylem: "baslat" | "duraklat" | "bitir") => {
     try {
-      const guncel = entry.timerStartedAt
-        ? await worklog.stopTimer(entry.id)
-        : await worklog.startTimer(entry.id);
+      const guncel =
+        eylem === "baslat"
+          ? await worklog.startTimer(entry.id)
+          : eylem === "duraklat"
+            ? await worklog.pauseTimer(entry.id)
+            : await worklog.stopTimer(entry.id);
       // Yalnızca bu satır değişiyor: başlatmak artık başka bir kronometreyi
       // durdurmuyor (bkz. migration 101).
       setEntries((prev) => prev.map((e) => (e.id === guncel.id ? guncel : e)));
@@ -372,7 +375,7 @@ export default function WorkLog() {
                       onDuration={(dk) => void sureyiDegistir(entry, dk)}
                       onRename={(yeni) => void guncelle(entry, { title: yeni })}
                       onClearDuration={() => void guncelle(entry, { duration: null })}
-                      onTimer={() => void kronometre(entry)}
+                      onTimer={(eylem) => void kronometre(entry, eylem)}
                       onTarget={() => setHedefSecilen(entry)}
                       onEdit={() => setDuzenlenen(entry)}
                       onDelete={() => setSilinecek(entry)}
@@ -443,7 +446,7 @@ function WorkLogRow({
   onDuration: (dakika: number) => void;
   onRename: (baslik: string) => void;
   onClearDuration: () => void;
-  onTimer: () => void;
+  onTimer: (eylem: "baslat" | "duraklat" | "bitir") => void;
   onTarget: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -451,6 +454,7 @@ function WorkLogRow({
   const c = useThemeColors();
   const t = useT();
   const calisiyor = Boolean(entry.timerStartedAt);
+  const duraklatildi = !calisiyor && entry.timerPaused;
   // `tik` sayfadan her saniye artıyor; burada okunması satırın yeniden
   // çizilmesini sağlıyor — sayaç onsuz donuk kalırdı.
   void tik;
@@ -473,6 +477,7 @@ function WorkLogRow({
 
   return (
     <div
+      className={duraklatildi ? "yaptim-duraklatildi" : undefined}
       style={{
         display: "flex",
         alignItems: "center",
@@ -480,7 +485,9 @@ function WorkLogRow({
         padding: "10px 12px",
         borderRadius: 10,
         background: c.surface,
-        border: `1px solid ${calisiyor ? c.accent : c.border}`,
+        border: `1px solid ${calisiyor || duraklatildi ? c.accent : c.border}`,
+        // Animasyon rengini temadan alıyor: koyu temada accent farklı.
+        ...(duraklatildi ? ({ "--yaptim-duraklatildi-renk": c.accent } as React.CSSProperties) : {}),
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -521,7 +528,7 @@ function WorkLogRow({
                 padding: "1px 6px",
                 borderRadius: 999,
                 background: "rgba(192,129,63,0.14)",
-                color: c.accentDark,
+                color: duraklatildi ? c.textSecondary : c.accentDark,
               }}
             >
               Lio
@@ -536,7 +543,7 @@ function WorkLogRow({
               ? `${entry.startedAt.slice(11, 16)}–${entry.endedAt.slice(11, 16)}`
               : entry.doneAt.slice(11, 16)}
           </span>
-          {calisiyor ? (
+          {calisiyor || duraklatildi ? (
             /* CANLI SAYAÇ. Kayıtlı süreyi DE içeriyor: kronometre bir işe
                ikinci kez basıldığında sıfırdan saymıyor, kaldığı yerden devam
                ediyormuş gibi görünüyor — "bu işte ne kadar çalıştım"ın cevabı
@@ -545,7 +552,7 @@ function WorkLogRow({
                tabular-nums: rakamlar eşit genişlikte, sayaç her saniye
                yanlamasına titremiyor. */
             <span
-              title={t("Kronometre çalışıyor")}
+              title={duraklatildi ? t("Duraklatıldı") : t("Kronometre çalışıyor")}
               style={{
                 fontSize: 17,
                 fontWeight: 600,
@@ -632,19 +639,35 @@ function WorkLogRow({
         </div>
       </div>
 
-      {/* DURAKLAT / DEVAM ET. Duraklatmak süreyi bitirmiyor, birikime ekliyor:
-          ara verip dönen kullanıcı kaldığı yerden sürüyor. Hiç ölçülmemiş bir
-          kayıtta etiket "başlat", birikimi olanda "devam et" — aynı düğmenin
-          ne yapacağı kullanıcının nerede olduğuna bağlı. */}
+      {/* ÜÇ AYRI DURUM, ÜÇ AYRI DÜĞME.
+          Önce tek düğme vardı ve duraklatılmış kayıt bitmiş gibi görünüyordu.
+          Şimdi: çalışırken "duraklat", duraklatılmışken "devam et", ikisinde de
+          yanında "bitir". Bitmiş kayıtta yalnızca "başlat" kalıyor — bitirme
+          düğmesi ortadan kalkıyor, çünkü bitirecek bir şey yok. */}
       <button
         type="button"
-        onClick={onTimer}
-        aria-label={calisiyor ? t("Duraklat") : entry.timerSeconds ? t("Devam et") : t("Kronometreyi başlat")}
-        title={calisiyor ? t("Duraklat") : entry.timerSeconds ? t("Devam et") : t("Kronometreyi başlat")}
-        style={ikonDugmesi(c, calisiyor)}
+        onClick={() => onTimer(calisiyor ? "duraklat" : "baslat")}
+        aria-label={calisiyor ? t("Duraklat") : duraklatildi ? t("Devam et") : t("Kronometreyi başlat")}
+        title={calisiyor ? t("Duraklat") : duraklatildi ? t("Devam et") : t("Kronometreyi başlat")}
+        style={ikonDugmesi(c, calisiyor || duraklatildi)}
       >
-        {calisiyor ? <IconPause size={14} color={c.accentDark} /> : <IconPlay size={14} color={c.textSecondary} />}
+        {calisiyor ? (
+          <IconPause size={14} color={c.accentDark} />
+        ) : (
+          <IconPlay size={14} color={duraklatildi ? c.accentDark : c.textSecondary} />
+        )}
       </button>
+      {(calisiyor || duraklatildi) && (
+        <button
+          type="button"
+          onClick={() => onTimer("bitir")}
+          aria-label={t("Bitir")}
+          title={t("Bitir — kronometreyi kapat")}
+          style={ikonDugmesi(c, false)}
+        >
+          <IconStop size={13} color={c.textSecondary} />
+        </button>
+      )}
       <button
         type="button"
         onClick={onTarget}

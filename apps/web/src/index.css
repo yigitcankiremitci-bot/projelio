@@ -595,3 +595,31 @@ button:focus-visible {
     animation: none;
   }
 }
+
+/* Yaptım — duraklatılmış kayıt.
+   Ara vermek işi bitirmekle aynı şey değil ama ekranda ikisi de "duruyor"
+   gibi görünüyordu; kullanıcı kaydını bitmiş sanıp geri dönmüyordu. Yanıp
+   sönen çerçeve "buraya döneceksin" diyor. Kenarlık rengi değişiyor, kutu
+   yeri/boyu değil: satır listede zıplamamalı. */
+@keyframes yaptim-duraklatildi {
+  0%,
+  100% {
+    border-color: var(--yaptim-duraklatildi-renk, #C0813F);
+  }
+  50% {
+    border-color: transparent;
+  }
+}
+
+.yaptim-duraklatildi {
+  animation: yaptim-duraklatildi 1.4s ease-in-out infinite;
+}
+
+/* Yanıp sönme baş dönmesi ve dikkat dağınıklığı yaratabiliyor; azaltılmış
+   hareket tercihinde çerçeve sabit kalıyor — bilgi kayboluyor değil, yalnızca
+   hareketi duruyor. */
+@media (prefers-reduced-motion: reduce) {
+  .yaptim-duraklatildi {
+    animation: none;
+  }
+}

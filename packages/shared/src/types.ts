@@ -2711,6 +2711,12 @@ export interface WorkLogEntry {
    */
   timerSeconds: number;
   /**
+   * Kronometre DURAKLATILDI mı (bitirilmedi). Duraklatılmış kayıt ekranda
+   * yanıp sönüyor: ara vermek işi bitirmekle aynı şey değil ve kullanıcının
+   * geri döneceğini hatırlatan bir şey olmalı (bkz. migration 103).
+   */
+  timerPaused: boolean;
+  /**
    * İşin başlangıç/bitiş anı. İkisi birlikte dolar ve durationMinutes onlardan
    * HESAPLANIR — "45 dakika sürdü" ile "09:00–09:45 çalıştım" aynı bilgi değil:
    * ikincisi takvimde bir yer kaplıyor, ilkinden yer tahmin edilmesi gerekir.

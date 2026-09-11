@@ -1319,6 +1319,13 @@ export interface BudgetTransaction {
   // Departman kayıtlarında departmanın adı (Kasa listesinde kaydın nereden
   // geldiğini göstermek için).
   departmentName?: string;
+  // Şirket Kasa'sının gelir/gider defterinden yansıyan kayıtlarda şirketin
+  // kimliği ve adı. Yalnızca kullanıcının SAHİBİ olduğu şirketler yansır.
+  organizationId?: string;
+  organizationName?: string;
+  // Kayıt kişisel Kasa'da salt okunur: kimliği budget_transactions'a ait değil,
+  // düzenleme kendi ekranında yapılır (bkz. BudgetService.ownedOrganizationLedger).
+  readOnly?: boolean;
   // Kaydın ait olduğu defterin sahibi.
   ownerId?: string;
   userId?: string;
@@ -1380,6 +1387,31 @@ export interface ProjectBudgetSummary {
   netEarned: number;
   // Tahsilatın tamamlanıp tamamlanmadığı (received >= agreedFee).
   fullyCollected: boolean;
+}
+
+/**
+ * Kasa'daki vade takibine giren şirket alacak/borç kaydı.
+ *
+ * Kaynağı budget_transactions değil, şirketin alacak/borç modülü
+ * (module_records / fm_alacak_borc) — Kasa'ya yalnızca kullanıcının SAHİBİ
+ * olduğu şirketlerden ve yalnızca AÇIK kayıtlar yansır. Gerçekleşen para değil,
+ * beklenen para: bu yüzden Kasa'nın gelir/gider toplamlarına GİRMEZ, yalnızca
+ * "vadesi geçen / yaklaşan" listesinde görünür.
+ */
+export interface KasaAlacakBorc {
+  id: string;
+  organizationId: string;
+  organizationName?: string;
+  type: "receivable" | "payable";
+  counterparty?: string;
+  amount: number;
+  // Şirket defterinde para birimi kayıt başına seçilir. Burada bir toplam
+  // hesaplanmadığı için TRY dışı kayıtlar da listelenir, kendi birimiyle yazılır.
+  currency: string;
+  // Vade girilmemiş olabilir; o kayıt gecikmiş/yaklaşan süzgeçlerine düşmez.
+  dueDate?: string;
+  category?: string;
+  description?: string;
 }
 
 export interface BudgetOverview {

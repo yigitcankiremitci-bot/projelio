@@ -1,15 +1,21 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import type { BudgetOverview, BudgetTransaction, ProjectBudgetSummary, RecurringPayment } from "@projelio/shared";
+import type { BudgetOverview, BudgetTransaction, KasaAlacakBorc, ProjectBudgetSummary, RecurringPayment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { requireAmount, requireOneOf, optionalOneOf } from "../../common/validation/input";
 import { NotificationsService } from "../notifications/notifications.service";
+import { LISTE_TAVANI } from "../../common/liste-tavani";
+import {
+  ORG_LEDGER_MODULE_KEY,
+  ORG_RECEIVABLE_MODULE_KEY,
+  sirketAlacakBorcu,
+  sirketDefterHareketi,
+} from "./sirket-defteri";
 
 /**
  * budget_transactions.type için izin verilen değerler. 001_init_schema.sql'deki
  * CHECK kısıtıyla BİREBİR aynı olmalı — biri değişirse diğeri de değişmeli.
  */
 const TRANSACTION_TYPES = ["income", "expense", "payout"] as const;
-
 function mapTransaction(row: any): BudgetTransaction {
   return {
     id: row.id,
@@ -288,17 +294,125 @@ export class BudgetService {
     return data ?? [];
   }
 
-  // Kullanıcının tüm hareketleri: kendi projelerine ait olanlar + projesiz genel kayıtlar.
+  // Kullanıcının tüm hareketleri: kendi projelerine ait olanlar + projesiz genel
+  // kayıtlar + KURDUĞU şirketlerin gelir/gider defteri.
   async findAllForUser(userId: string, limit = 200): Promise<BudgetTransaction[]> {
-    const { data, error } = await this.supabase.client
-      .from("budget_transactions")
-      .select("*, projects(title), departments(name)")
-      .eq("owner_id", userId)
-      .order("occurred_at", { ascending: false })
+    const [defter, sirket] = await Promise.all([
+      this.supabase.client
+        .from("budget_transactions")
+        .select("*, projects(title), departments(name)")
+        .eq("owner_id", userId)
+        .order("occurred_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(limit),
+      this.ownedOrganizationLedger(userId, limit),
+    ]);
+    if (defter.error) throw defter.error;
+
+    const hepsi = [...(defter.data ?? []).map(mapTransaction), ...sirket];
+    // İki kaynak ayrı ayrı sıralı geldi; birleşince tarih sırası yeniden kurulmalı.
+    hepsi.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : a.occurredAt > b.occurredAt ? -1 : b.createdAt.localeCompare(a.createdAt)));
+    return hepsi.slice(0, limit);
+  }
+
+  /**
+   * Kullanıcının SAHİBİ olduğu şirketlerin gelir/gider defteri, kişisel Kasa'nın
+   * anlayacağı biçime çevrilmiş hâli.
+   *
+   * Kural bilinçli olarak "kurduysan akar, dahil olduysan akmaz": Kasa kişinin
+   * kendi defteri. Şirketi kuran için şirketin parası kendi parasıdır; başkasının
+   * şirketinde departman yöneticisi olan biri için değildir — onun Kasa'sına
+   * çalıştığı şirketin cirosu karışmamalı. Aynı kural departman kayıtlarında da
+   * geçerli (bkz. addForDepartment: defter sahibi organizasyonun sahibi).
+   *
+   * Kayıtlar Kasa'da SALT OKUNURDUR (`readOnly`): kimlikleri module_records'a
+   * ait, `/budget/transactions/:id` uçlarıyla düzenlenemez. Düzenleme kaydın
+   * kendi yerinde, şirketin Kasa sekmesinde yapılır.
+   */
+  private async ownedOrganizationLedger(userId: string, limit: number): Promise<BudgetTransaction[]> {
+    const adlar = await this.ownedOrganizations(userId);
+    if (adlar.size === 0) return [];
+
+    const { data: rows, error } = await this.supabase.client
+      .from("module_records")
+      .select("id, organization_id, data, created_at")
+      .in("organization_id", Array.from(adlar.keys()))
+      .eq("module_key", ORG_LEDGER_MODULE_KEY)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return (data ?? []).map(mapTransaction);
+
+    const hareketler: BudgetTransaction[] = [];
+    for (const row of rows ?? []) {
+      const hareket = sirketDefterHareketi(row, adlar.get(row.organization_id));
+      if (hareket) hareketler.push(hareket);
+    }
+    return hareketler;
+  }
+
+  /** Kullanıcının KURDUĞU (arşivlenmemiş) şirketler: id -> ad. */
+  private async ownedOrganizations(userId: string): Promise<Map<string, string>> {
+    const { data, error } = await this.supabase.client
+      .from("organizations")
+      .select("id, name")
+      .eq("owner_id", userId)
+      .is("archived_at", null);
+    if (error) throw error;
+    return new Map<string, string>((data ?? []).map((o: any) => [o.id, o.name]));
+  }
+
+  /**
+   * Kasa'nın vade takibine giren şirket alacak/borçları: kullanıcının sahibi
+   * olduğu şirketlerin AÇIK kayıtları.
+   *
+   * Gelir/gider defterinin aksine bunlar gerçekleşen para DEĞİL, bu yüzden
+   * hareketlere karışmıyor ve hiçbir toplama girmiyor — ayrı bir uçtan, ayrı
+   * bir bölüm olarak veriliyor (bkz. BudgetPanel > "Alacak / borç").
+   */
+  async findOpenReceivablesForUser(userId: string): Promise<KasaAlacakBorc[]> {
+    const adlar = await this.ownedOrganizations(userId);
+    if (adlar.size === 0) return [];
+
+    const { data: rows, error } = await this.supabase.client
+      .from("module_records")
+      .select("id, organization_id, data")
+      .in("organization_id", Array.from(adlar.keys()))
+      .eq("module_key", ORG_RECEIVABLE_MODULE_KEY)
+      .is("archived_at", null)
+      .limit(LISTE_TAVANI);
+    if (error) throw error;
+
+    // "Kimden / kime" alanı bir referans: kayıtta party id'si durur, ekranda ad
+    // gösterilir (eski kayıtlarda ham metin olabilir, bkz. moduleReferences.ts).
+    // Adı burada çözüyoruz; istemci tarafında çözmek Kasa'daki her şirket için
+    // ayrı bir /party isteği demekti.
+    const karsiTaraflar = await this.resolveParties(
+      (rows ?? []).map((r: any) => r.data?.counterparty).filter((v: unknown): v is string => typeof v === "string")
+    );
+
+    const kayitlar: KasaAlacakBorc[] = [];
+    for (const row of rows ?? []) {
+      const kayit = sirketAlacakBorcu(
+        row,
+        adlar.get(row.organization_id),
+        karsiTaraflar.get(String(row.data?.counterparty ?? ""))
+      );
+      if (kayit) kayitlar.push(kayit);
+    }
+    // Vadesi olmayanlar listenin sonuna: süzgeç onları gecikmiş/yaklaşan saymıyor.
+    kayitlar.sort((a, b) => (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31"));
+    return kayitlar;
+  }
+
+  /** Party id'lerini ada çevirir; UUID olmayan (eski, serbest metin) değerler atlanır. */
+  private async resolveParties(degerler: string[]): Promise<Map<string, string>> {
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const idler = Array.from(new Set(degerler.filter((v) => UUID.test(v))));
+    if (idler.length === 0) return new Map();
+    const { data, error } = await this.supabase.client.from("party").select("id, display_name").in("id", idler);
+    if (error) throw error;
+    return new Map<string, string>((data ?? []).map((p: any) => [p.id, p.display_name]));
   }
 
   async getOverview(userId: string): Promise<BudgetOverview> {

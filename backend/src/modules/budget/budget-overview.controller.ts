@@ -19,6 +19,13 @@ export class BudgetOverviewController {
     return this.budgetService.findAllForUser(req.user.userId);
   }
 
+  // Şirketlerin açık alacak/borçları — vade takibi için. Gerçekleşen para
+  // olmadığı için hareketlerle aynı listede değil, ayrı uçta (bkz. service).
+  @Get("receivables")
+  receivables(@Req() req: any) {
+    return this.budgetService.findOpenReceivablesForUser(req.user.userId);
+  }
+
   @Post("transactions")
   create(@Req() req: any, @Body() body: any) {
     return this.budgetService.createForUser(req.user.userId, body);

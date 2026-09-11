@@ -159,6 +159,8 @@ export const projeler: TranslationDict = {
   Gelen: "Received",
   Net: "Net",
   "Düzenli ödemeler": "Recurring payments",
+  // Kasa'daki şirket alacak/borç bölümü (kullanıcının kurduğu şirketlerden gelir).
+  "Alacak / borç": "Receivables / payables",
   // Kasa sayfasının süzgeç/sıralama çubuğu ve vade rozetleri.
   "Yakın tarih önce": "Nearest date first",
   "Uzak tarih önce": "Furthest date first",

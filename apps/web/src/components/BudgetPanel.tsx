@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { BudgetOverview, BudgetTransaction, RecurringPayment } from "@projelio/shared";
+import type { BudgetOverview, BudgetTransaction, KasaAlacakBorc, RecurringPayment } from "@projelio/shared";
 import { api } from "../api/client";
 import { useRefreshOnUndo } from "../lib/undo";
 import { FAB_PRIORITY, useProjectFabAction } from "../lib/projectFab";
@@ -18,6 +18,19 @@ import { useT } from "../lib/i18n";
 
 function formatMoney(amount: number): string {
   return `${amount.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
+}
+
+/**
+ * Alacak/borç satırlarında para birimi kayıt başına değişir (şirket defterinde
+ * seçiliyor). Hareketlerdeki formatMoney her zaman ₺ yazar; burada onu
+ * kullanmak USD bir alacağı ₺ göstermek olurdu.
+ */
+function formatCurrency(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("tr-TR", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
+  } catch {
+    return `${amount} ${currency}`;
+  }
 }
 
 function formatDate(value: string): string {
@@ -90,6 +103,10 @@ export default function BudgetPanel() {
   const [overview, setOverview] = useState<BudgetOverview | null>(null);
   const [transactions, setTransactions] = useState<BudgetTransaction[]>([]);
   const [recurring, setRecurring] = useState<RecurringPayment[]>([]);
+  // Şirket alacak/borçları: kullanıcının KURDUĞU şirketlerden gelir, salt okunur
+  // (düzenleme kaydın kendi ekranında). Gerçekleşen para olmadığı için özet
+  // kutularına ve grafiğe girmez — yalnızca vade takibinde görünür.
+  const [alacakBorc, setAlacakBorc] = useState<KasaAlacakBorc[]>([]);
   const [addingEntry, setAddingEntry] = useState(false);
 
   const [editingTransaction, setEditingTransaction] = useState<BudgetTransaction | null>(null);
@@ -123,6 +140,7 @@ export default function BudgetPanel() {
     api.get<BudgetOverview>("/budget/overview").then(setOverview).catch(() => setOverview(null));
     api.get<BudgetTransaction[]>("/budget/transactions").then(setTransactions).catch(() => setTransactions([]));
     api.get<RecurringPayment[]>("/budget/recurring").then(setRecurring).catch(() => setRecurring([]));
+    api.get<KasaAlacakBorc[]>("/budget/receivables").then(setAlacakBorc).catch(() => setAlacakBorc([]));
   };
 
   useEffect(reload, []);
@@ -250,12 +268,22 @@ export default function BudgetPanel() {
     });
   };
 
-  const gecikmisSayisi = recurring.filter((r) => r.active && kalanGun(r.nextDueDate) < 0).length;
-  const yaklasanSayisi = recurring.filter((r) => {
-    if (!r.active) return false;
-    const kalan = kalanGun(r.nextDueDate);
-    return kalan >= 0 && kalan <= YAKLASAN_GUN;
-  }).length;
+  // Vadesi olmayan alacak/borç hiçbir vade süzgecine girmez: "ne zaman" bilgisi
+  // olmadan gecikmiş de yaklaşan da denemez, yalnızca "Tümü"de listelenir.
+  const vadeliAlacakBorc = alacakBorc.filter((a) => !!a.dueDate);
+  const gecikmisSayisi =
+    recurring.filter((r) => r.active && kalanGun(r.nextDueDate) < 0).length +
+    vadeliAlacakBorc.filter((a) => kalanGun(a.dueDate!) < 0).length;
+  const yaklasanSayisi =
+    recurring.filter((r) => {
+      if (!r.active) return false;
+      const kalan = kalanGun(r.nextDueDate);
+      return kalan >= 0 && kalan <= YAKLASAN_GUN;
+    }).length +
+    vadeliAlacakBorc.filter((a) => {
+      const kalan = kalanGun(a.dueDate!);
+      return kalan >= 0 && kalan <= YAKLASAN_GUN;
+    }).length;
   const odakSayilari: Record<OdakKey, number | null> = {
     tumu: null,
     gecikmis: gecikmisSayisi,
@@ -271,6 +299,12 @@ export default function BudgetPanel() {
     () => sirala(recurring, siralama, (r) => r.nextDueDate, (r) => Number(r.amount), false),
     [recurring, siralama]
   );
+  // Vadesi girilmemiş kayıt en sona düşsün diye çok uzak bir tarih sayılıyor
+  // (şirket Kasa'sındaki aynı davranış, bkz. OrgBudgetPanel > vadeTarihi).
+  const siraliAlacakBorc = useMemo(
+    () => sirala(alacakBorc, siralama, (a) => a.dueDate ?? "9999-12-31", (a) => Number(a.amount), false),
+    [alacakBorc, siralama]
+  );
 
   // Odak süzgeçleri. Bir bölüme uyan kayıt kalmadıysa bölüm hiç çizilmiyor:
   // "vadesi geçen" seçiliyken üç ayrı boş liste göstermek filtreyi işe
@@ -280,6 +314,13 @@ export default function BudgetPanel() {
     if (odak === "gerceklesen") return false;
     if (!r.active) return false;
     const kalan = kalanGun(r.nextDueDate);
+    return odak === "gecikmis" ? kalan < 0 : kalan >= 0 && kalan <= YAKLASAN_GUN;
+  });
+  const gorunenAlacakBorc = siraliAlacakBorc.filter((a) => {
+    if (odak === "tumu") return true;
+    // "Ödenenler" gerçekleşmiş parayı gösterir; açık alacak/borcun orada işi yok.
+    if (odak === "gerceklesen" || !a.dueDate) return false;
+    const kalan = kalanGun(a.dueDate);
     return odak === "gecikmis" ? kalan < 0 : kalan >= 0 && kalan <= YAKLASAN_GUN;
   });
   const hareketlerGorunur = odak === "tumu" || odak === "gerceklesen";
@@ -299,7 +340,11 @@ export default function BudgetPanel() {
   // "Tümü"de bölümler kendi boş durum metinleriyle çizilmeye devam eder:
   // düzenli ödemenin ne işe yaradığını anlatan metin oradan öğreniliyor.
   const bosSuzgec =
-    odak !== "tumu" && gorunenDuzenli.length === 0 && gorunenProjeler.length === 0 && !hareketlerGorunur;
+    odak !== "tumu" &&
+    gorunenDuzenli.length === 0 &&
+    gorunenAlacakBorc.length === 0 &&
+    gorunenProjeler.length === 0 &&
+    !hareketlerGorunur;
 
   const cardStyle = {
     border: `1px solid ${c.border}`,
@@ -441,6 +486,56 @@ export default function BudgetPanel() {
             ))}
           </div>
           )}
+        </section>
+      )}
+
+      {/* Şirket alacak/borçları. Düzenli ödemelerin hemen ardında, çünkü ikisi de
+          aynı soruyu cevaplıyor: "vadesi gelen ne var". Kayıtlar salt okunur —
+          kimlikleri module_records'a ait, düzenleme şirketin Kasa sekmesinde.
+          Kaydı olmayan kullanıcıya boş bölüm çizilmiyor: şirketi olmayan biri
+          için bu bölümün anlatacağı bir şey yok. */}
+      {gorunenAlacakBorc.length > 0 && (
+        <section>
+          <h2 style={sectionTitle}>{t("Alacak / borç")}</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {gorunenAlacakBorc.map((a) => {
+              const borc = a.type === "payable";
+              return (
+                <div key={a.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 500,
+                      padding: "2px 8px",
+                      borderRadius: 999,
+                      flexShrink: 0,
+                      color: borc ? c.danger : c.success,
+                      background: `${borc ? c.danger : c.success}18`,
+                    }}
+                  >
+                    {borc ? t("Borç") : t("Alacak")}
+                  </span>
+
+                  <div style={{ flex: 1, minWidth: 150 }}>
+                    <div style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {a.counterparty || a.description || (borc ? t("Borç") : t("Alacak"))}
+                    </div>
+                    <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
+                      {a.organizationName}
+                      {a.category ? ` · ${a.category}` : ""}
+                    </div>
+                  </div>
+
+                  {a.dueDate && <VadeRozeti tarih={a.dueDate} />}
+
+                  <span style={{ fontSize: 14, fontWeight: 500, color: borc ? c.danger : c.success }}>
+                    {borc ? "−" : "+"}
+                    {formatCurrency(a.amount, a.currency)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </section>
       )}
 
@@ -662,7 +757,9 @@ function HareketSutunu({
                   ? ` · ${hareket.projectTitle}`
                   : hareket.departmentName
                     ? ` · ${hareket.departmentName}`
-                    : t(" · genel")}
+                    : hareket.organizationName
+                      ? ` · ${hareket.organizationName}`
+                      : t(" · genel")}
               </div>
             </div>
 
@@ -672,8 +769,11 @@ function HareketSutunu({
             </span>
 
             {/* Otomatik işlenen kayıt elle düzenlenmez: kaynağı düzenli ödeme
-                kuralıdır, oradan yönetilir. */}
-            {!hareket.recurringPaymentId && (
+                kuralıdır, oradan yönetilir. Aynı gerekçe şirket defterinden
+                yansıyan kayıtlar için de geçerli (readOnly): kimlikleri
+                budget_transactions'a ait değil, /budget/transactions uçları
+                onları bulamaz — düğme koymak 404 veren bir düğme olurdu. */}
+            {!hareket.recurringPaymentId && !hareket.readOnly && (
               <button
                 type="button"
                 onClick={() => onEdit(hareket)}
@@ -683,14 +783,16 @@ function HareketSutunu({
                 <IconEdit size={14} color={c.textSecondary} />
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => onDelete(hareket.id)}
-              aria-label={t("Sil")}
-              style={{ background: "transparent", border: "none", padding: 3, display: "flex", flexShrink: 0, cursor: "pointer" }}
-            >
-              <IconTrash size={14} color={c.danger} />
-            </button>
+            {!hareket.readOnly && (
+              <button
+                type="button"
+                onClick={() => onDelete(hareket.id)}
+                aria-label={t("Sil")}
+                style={{ background: "transparent", border: "none", padding: 3, display: "flex", flexShrink: 0, cursor: "pointer" }}
+              >
+                <IconTrash size={14} color={c.danger} />
+              </button>
+            )}
           </div>
         ))
       )}

@@ -852,7 +852,11 @@ export class PlanningService {
     // eşleştirmeyi tarayıcıda yapıyor (bkz. useTaskSearch), dolayısıyla
     // listeye girmeyen bir görev ARANAMIYORDU bile. Görev sayısı 200'ü geçen
     // hesapta kullanıcı kendi görevini "yok" sanıyordu.
-    const limit = clampInt(opts.limit ?? 60, 1, 500);
+    //
+    // 1000: gerçek kullanımda TEK BİR İŞTE 500'ün üzerinde görev var. Varsayılan
+    // (60) değişmedi — tavanı yükseltmek yalnızca açıkça isteyene daha büyük
+    // liste veriyor, takvimin seçicisi eskisi gibi çalışmaya devam ediyor.
+    const limit = clampInt(opts.limit ?? 60, 1, 1000);
 
     const projectIds = [...scope.projects.keys()].filter((id) => !opts.projectId || id === opts.projectId);
     const operationIds = opts.projectId ? [] : [...scope.operations];

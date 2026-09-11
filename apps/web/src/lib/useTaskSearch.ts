@@ -5,8 +5,16 @@ import { api, isAbortError } from "../api/client";
 
 /** Öneri listesinde gösterilecek en fazla satır. */
 const TAVAN = 8;
-/** Bir kerede çekilen aday görev sayısı. */
-const ADAY_TAVANI = 300;
+/**
+ * Bir kerede çekilen aday görev sayısı.
+ *
+ * 1000, çünkü tek bir işte 500'ün üzerinde görev olabiliyor ve yereldeki liste
+ * hesabın TAMAMINI kapsamazsa arama sessizce eksik cevap veriyor. Bedeli tek
+ * seferlik ~350 KB'lık bir yanıt (sıkıştırılmış olarak çok daha azı); sayfa
+ * başına bir kez ödeniyor ve karşılığında her tuş vuruşu anında sonuçlanıyor.
+ * Bu sayıyı da aşan hesaplarda sunucu yedeği devreye giriyor.
+ */
+const ADAY_TAVANI = 1000;
 /** Yerelde eşleşme çıkmayınca sunucuya sorma gecikmesi. */
 const YEDEK_GECIKME_MS = 250;
 

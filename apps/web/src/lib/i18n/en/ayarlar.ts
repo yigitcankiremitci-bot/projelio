@@ -132,14 +132,14 @@ export const ayarlar: TranslationDict = {
   "Bildirim e-postaları": "Notification emails",
   "Bildirimlerin e-posta olarak da gelsin — sıklığını ve saatini sen seç.":
     "Get your notifications by email too — you choose how often and when.",
-  "Her bildirimde": "Every notification",
-  "Bildirim oluştukça gelir. Arka arkaya gelenler tek e-postada toplanır.":
-    "Sent as notifications happen. Ones arriving close together are bundled into a single email.",
+  "Bildirim geldikçe": "As notifications arrive",
+  "Bir şey olduğunda hemen haber ver. Arka arkaya gelenler tek e-postada toplanır.":
+    "Tell me as soon as something happens. Ones arriving close together are bundled into a single email.",
   "Günde bir özet": "One summary a day",
   "Seçtiğin saatte, o güne ait her şey tek e-postada.":
     "Everything from that day in one email, at the hour you pick.",
-  "Hiç e-posta gönderilmez. Bildirimler uygulamada görünmeye devam eder.":
-    "No emails at all. Notifications still show up in the app.",
+  "İkisi de kapalı: sana bildirim e-postası gönderilmiyor. Bildirimler uygulama içinde görünmeye devam ediyor.":
+    "Both are off: no notification emails are sent to you. Notifications still show up inside the app.",
   "Her gün saat": "Every day at",
   "({zamanDilimi} saatiyle)": "({zamanDilimi} time)",
   "O gün biten görevlerim de listelensin": "Also list my tasks due that day",

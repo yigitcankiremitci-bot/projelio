@@ -7,6 +7,7 @@ import { DeadlineReminderProcessor } from "./deadline-reminder.processor";
 import { DigestProcessor } from "./digest.processor";
 import { NotificationEmailPrefsService } from "./notification-email-prefs.service";
 import { NotificationEmailProcessor } from "./notification-email.processor";
+import { NotificationEmailUnsubscribeController } from "./notification-email-unsubscribe.controller";
 import { getJwtSecret } from "../../common/config/env";
 import { WhatsappModule } from "../whatsapp/whatsapp.module";
 import { EmailModule } from "../auth/email.module";
@@ -25,7 +26,10 @@ import { EmailModule } from "../auth/email.module";
     // bilerek bağımlılıksız, bu yüzden döngü riski yok.
     EmailModule,
   ],
-  controllers: [NotificationsController],
+  // İkinci controller BİLEREK ayrı: "aboneliği bırak" ucu kimlik doğrulaması
+  // istemiyor (e-posta istemcisi çağırıyor), NotificationsController ise sınıf
+  // düzeyinde JWT guard taşıyor.
+  controllers: [NotificationsController, NotificationEmailUnsubscribeController],
   providers: [
     NotificationsGateway,
     NotificationsService,

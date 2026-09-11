@@ -33,6 +33,26 @@ export class EmailService {
   private readonly apiKey = process.env.RESEND_API_KEY?.trim() ?? "";
   private readonly from = process.env.EMAIL_FROM?.trim() || "Projelio <onboarding@resend.dev>";
 
+  constructor() {
+    /*
+     * EMAIL_FROM'un eksikliği SESSİZ DEĞİL, çünkü sessizken çok pahalıydı.
+     *
+     * Yedek adres (onboarding@resend.dev) Resend'in kum havuzu alanı ve iki
+     * şey birden yapıyor: hesap sahibi dışındaki HER alıcıya 403 döndürüyor
+     * (yani doğrulama ve şifre sıfırlama e-postaları hiç gitmiyor), sahibe
+     * giden tek e-posta da ortak bir alan adından çıktığı için spam'e düşüyor.
+     * Üretimde aylarca böyle çalıştı ve hiçbir yerde uyarı yoktu — tek iz,
+     * kimsenin okumadığı bir 403 log satırıydı.
+     */
+    if (!process.env.EMAIL_FROM?.trim()) {
+      this.logger.warn(
+        "EMAIL_FROM tanımlı değil — e-postalar onboarding@resend.dev üzerinden gidecek. " +
+          "Resend bu adreste yalnızca hesap sahibine göndermeye izin verir: diğer tüm alıcılar 403 alır. " +
+          "Doğrulanmış alan adında bir adres tanımla (ör. \"Projelio <bildirim@projelio.app>\")."
+      );
+    }
+  }
+
   async sendPasswordResetEmail(to: string, resetUrl: string, locale: Locale): Promise<void> {
     if (!this.apiKey) {
       this.logUndeliverable("şifre sıfırlama", to, resetUrl);
@@ -166,7 +186,10 @@ export class EmailService {
    *
    * @returns gönderim gerçekten yapıldıysa true
    */
-  async sendPrepared(to: string, mail: { subject: string; html: string; text: string }): Promise<boolean> {
+  async sendPrepared(
+    to: string,
+    mail: { subject: string; html: string; text: string; headers?: Record<string, string> }
+  ): Promise<boolean> {
     if (!this.apiKey) {
       this.logger.warn(
         `E-posta sağlayıcısı yapılandırılmadı (RESEND_API_KEY yok) — "${mail.subject}" gönderilemedi. Alıcı: ${to}`
@@ -176,7 +199,19 @@ export class EmailService {
     return this.send({ to, ...mail });
   }
 
-  private async send(params: { to: string; subject: string; html: string; text: string }): Promise<boolean> {
+  private async send(params: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+    /**
+     * Ek SMTP başlıkları. Şu an tek kullanıcısı bildirim e-postalarındaki
+     * List-Unsubscribe çifti: Gmail/Yahoo düzenli gönderenden bunu bekliyor ve
+     * yokluğu doğrudan spam klasörü demek (bkz.
+     * notifications/notification-email-unsubscribe.controller.ts).
+     */
+    headers?: Record<string, string>;
+  }): Promise<boolean> {
     try {
       const response = await fetchWithTimeout(RESEND_ENDPOINT, {
         method: "POST",
@@ -190,6 +225,7 @@ export class EmailService {
           subject: params.subject,
           html: params.html,
           text: params.text,
+          ...(params.headers ? { headers: params.headers } : {}),
         }),
       });
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { NotificationEmailFrequency, NotificationEmailPrefs } from "@projelio/shared";
+import type { NotificationEmailPrefs } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
@@ -19,21 +19,22 @@ import { IconChevronRight } from "./icons";
  * yalnızca bilgi olarak yazıyor.
  */
 
-const SIKLIKLAR: { value: NotificationEmailFrequency; label: string; aciklama: string }[] = [
+/**
+ * İki bağımsız kanal — biri diğerinin alternatifi DEĞİL (bkz. migration 103).
+ * Eskiden üç seçenekli tek bir listeydi ve kullanıcıyı "şimdi haberim olsun"
+ * ile "sabah dökümü görsün" arasında seçim yapmaya zorluyordu; oysa bunlar
+ * farklı ihtiyaçlar ve çoğu kişi ikisini birden istiyor.
+ */
+const KANALLAR: { alan: "instantEnabled" | "dailyEnabled"; label: string; aciklama: string }[] = [
   {
-    value: "anlik",
-    label: "Her bildirimde", // dil:anahtar
-    aciklama: "Bildirim oluştukça gelir. Arka arkaya gelenler tek e-postada toplanır.", // dil:anahtar
+    alan: "instantEnabled",
+    label: "Bildirim geldikçe", // dil:anahtar
+    aciklama: "Bir şey olduğunda hemen haber ver. Arka arkaya gelenler tek e-postada toplanır.", // dil:anahtar
   },
   {
-    value: "gunluk",
+    alan: "dailyEnabled",
     label: "Günde bir özet", // dil:anahtar
     aciklama: "Seçtiğin saatte, o güne ait her şey tek e-postada.", // dil:anahtar
-  },
-  {
-    value: "kapali",
-    label: "Kapalı", // dil:anahtar
-    aciklama: "Hiç e-posta gönderilmez. Bildirimler uygulamada görünmeye devam eder.", // dil:anahtar
   },
 ];
 
@@ -119,7 +120,10 @@ export default function NotificationEmailCard() {
     }
   };
 
-  const gunluk = prefs?.frequency === "gunluk";
+  const gunluk = prefs?.dailyEnabled === true;
+  // İkisi de kapalıysa e-posta hiç gitmiyor demektir; "kapalı" ayrı bir seçenek
+  // değil, iki anahtarın da kapalı olması.
+  const hepsiKapali = prefs !== null && !prefs.instantEnabled && !prefs.dailyEnabled;
 
   return (
     <section style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, overflow: "hidden" }}>
@@ -157,37 +161,47 @@ export default function NotificationEmailCard() {
           {prefs && (
             <>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {SIKLIKLAR.map((secenek) => {
-                  const secili = prefs.frequency === secenek.value;
+                {KANALLAR.map((kanal) => {
+                  const acik = prefs[kanal.alan];
                   return (
-                    <button
-                      key={secenek.value}
-                      type="button"
-                      onClick={() => void kaydet({ frequency: secenek.value })}
-                      aria-pressed={secili}
-                      disabled={kaydediliyor}
+                    <label
+                      key={kanal.alan}
                       style={{
                         display: "flex",
-                        flexDirection: "column",
                         alignItems: "flex-start",
-                        gap: 2,
+                        gap: 10,
                         padding: "10px 12px",
                         borderRadius: 10,
-                        border: `1.5px solid ${secili ? c.primary : c.border}`,
-                        background: secili ? c.background : "transparent",
-                        textAlign: "left",
+                        border: `1.5px solid ${acik ? c.primary : c.border}`,
+                        background: acik ? c.background : "transparent",
+                        cursor: "pointer",
                       }}
                     >
-                      <span style={{ fontSize: 15, fontWeight: secili ? 500 : 400, color: c.textPrimary }}>
-                        {t(secenek.label)}
+                      <input
+                        type="checkbox"
+                        checked={acik}
+                        onChange={(e) => void kaydet({ [kanal.alan]: e.target.checked })}
+                        disabled={kaydediliyor}
+                        style={{ width: 17, height: 17, marginTop: 2, flexShrink: 0 }}
+                      />
+                      <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <span style={{ fontSize: 15, fontWeight: acik ? 500 : 400, color: c.textPrimary }}>
+                          {t(kanal.label)}
+                        </span>
+                        <span style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.4 }}>
+                          {t(kanal.aciklama)}
+                        </span>
                       </span>
-                      <span style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.4 }}>
-                        {t(secenek.aciklama)}
-                      </span>
-                    </button>
+                    </label>
                   );
                 })}
               </div>
+
+              {hepsiKapali && (
+                <span style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.4 }}>
+                  {t("İkisi de kapalı: sana bildirim e-postası gönderilmiyor. Bildirimler uygulama içinde görünmeye devam ediyor.")}
+                </span>
+              )}
 
               {gunluk && (
                 <>
@@ -232,7 +246,7 @@ export default function NotificationEmailCard() {
                 </>
               )}
 
-              {prefs.frequency !== "kapali" && (
+              {!hepsiKapali && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <button
                     type="button"

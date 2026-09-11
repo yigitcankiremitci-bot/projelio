@@ -614,4 +614,6 @@ export const hatalar: TranslationDict = {
   "Geçersiz bildirim e-postası sıklığı.": "Invalid notification email frequency.",
   "Günlük özet saati 0 ile 23 arasında olmalı.": "The daily summary hour must be between 0 and 23.",
   "Geçersiz saat dilimi.": "Invalid time zone.",
+  "Bildirim e-postası anahtarları doğru/yanlış olmalı.":
+    "Notification email switches must be true or false.",
 };

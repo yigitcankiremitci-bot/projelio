@@ -138,6 +138,20 @@ function normalizeOrigin(raw: string): string {
  * Yereldeki varsayılan bilerek http://localhost — geliştirmede doğrusu bu.
  * Üretimde bu varsayılana DÜŞÜLMEMESİ assertRequiredEnv ile garanti altında.
  */
+/**
+ * API'nin DIŞARIDAN görünen adresi (ör. https://api.projelio.app).
+ *
+ * NEDEN AYRI DEĞİŞKEN: WEB_APP_URL'den türetilemez — app.projelio.app ile
+ * api.projelio.app farklı adlar ve "app" ön ekini "api" ile değiştirmek her
+ * kurulumda doğru olmaz. İhtiyaç duyulan tek yer bildirim e-postasındaki tek
+ * tık "aboneliği bırak" bağlantısı: o bağlantı e-posta istemcisinden açılıyor,
+ * yani localhost ya da iç ağ adresi işe yaramaz.
+ */
+export function getApiPublicUrl(): string {
+  const raw = process.env.API_PUBLIC_URL?.trim();
+  return raw ? raw.replace(/\/+$/, "") : "http://localhost:3000";
+}
+
 export function getWebAppUrl(): string {
   const raw = process.env.WEB_APP_URL?.trim();
   return raw ? raw.replace(/\/+$/, "") : "http://localhost:5173";
@@ -245,6 +259,34 @@ export function assertRequiredEnv(): void {
   // çalışmaz, ama mevcut kullanıcılar giriş yapmaya devam eder. Bu yüzden açılışı
   // engellemek (çalışan bir uygulamayı tamamen kapatmak) orantısız olurdu —
   // ama sessiz kalmak da bu arızanın haftalarca fark edilmemesi demek.
+  /*
+   * EMAIL_FROM ve API_PUBLIC_URL: ikisi de eksikken uygulama ÇALIŞIYOR gibi
+   * görünür ama e-posta tarafı sessizce bozulur.
+   *
+   * EMAIL_FROM eksikken kod onboarding@resend.dev yedeğine düşüyor; Resend o
+   * adreste yalnızca hesap sahibine göndermeye izin verir ve diğer HERKESE 403
+   * döner — yani doğrulama ve şifre sıfırlama e-postaları hiç ulaşmaz. Bu
+   * üretimde aylarca böyle kaldı, tek iz kimsenin okumadığı 403 satırlarıydı.
+   *
+   * API_PUBLIC_URL eksikken bildirim e-postasındaki tek tık "aboneliği bırak"
+   * bağlantısı localhost'a çıkar; Gmail o başlığı geçersiz sayar ve gönderici
+   * "çıkış yolu olmayan toplu posta" sınıfına düşer.
+   */
+  if (isProduction() && !process.env.EMAIL_FROM?.trim()) {
+    logger.warn(
+      "EMAIL_FROM tanımlı değil. E-postalar onboarding@resend.dev üzerinden gider ve " +
+        "Resend hesap sahibi dışındaki TÜM alıcıları 403 ile reddeder. " +
+        'Doğrulanmış alan adında bir adres tanımlayın: EMAIL_FROM="Projelio <bildirim@projelio.app>"'
+    );
+  }
+
+  if (isProduction() && !process.env.API_PUBLIC_URL?.trim()) {
+    logger.warn(
+      "API_PUBLIC_URL tanımlı değil. Bildirim e-postalarındaki tek tık \"aboneliği bırak\" " +
+        "bağlantısı localhost'a çıkar ve çalışmaz. Örn: API_PUBLIC_URL=https://api.projelio.app"
+    );
+  }
+
   if (isProduction() && !process.env.RESEND_API_KEY?.trim()) {
     logger.warn(
       "RESEND_API_KEY tanımlı değil. E-posta doğrulama ve şifre sıfırlama e-postaları GÖNDERİLEMEYECEK; " +

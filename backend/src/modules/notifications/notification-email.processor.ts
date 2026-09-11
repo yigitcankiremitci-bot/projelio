@@ -14,6 +14,7 @@ import {
 } from "./notification-email-prefs.service";
 import { bildirimEpostasiOlustur, type EpostaBildirimi, type EpostaGorevi } from "./notification-email.template";
 import { gunlukOzetSirasiGeldiMi, yerelAn } from "./notification-email.zaman";
+import { abonelikKapatmaAdresi } from "./notification-email.abonelik";
 
 /**
  * Bildirimleri e-posta olarak gönderen işleyici (bkz. migration 102).
@@ -48,6 +49,9 @@ const KULLANICI_TAVANI = 2000;
 
 /** Su seviyesi yoksa en fazla bu kadar geriye bakılır. */
 const EN_FAZLA_GERIYE_MS = 3 * 24 * 60 * 60 * 1000;
+
+const TERCIH_KOLONLARI =
+  "user_id, instant_enabled, daily_enabled, daily_hour, timezone, include_tasks, last_instant_at, last_digest_at, last_digest_on";
 
 /** Görev + hangi takvim gününe ait olduğu (yerel gün süzmesi için). */
 interface GunlukGorev extends EpostaGorevi {
@@ -95,7 +99,7 @@ export class NotificationEmailProcessor {
     this.anlikCalisiyor = true;
     const taramaAni = new Date();
     try {
-      const satirlar = await this.tercihSatirlari("anlik");
+      const satirlar = await this.anlikAdaylar();
       if (satirlar.length === 0) return;
 
       const aliciMap = await this.aliciBilgileri(satirlar);
@@ -106,7 +110,7 @@ export class NotificationEmailProcessor {
           this.logger.warn(`Anlık tur tavana dayandı (${TUR_BASINA_EPOSTA}); kalanlar sonraki turda.`);
           break;
         }
-        const bildirimler = await this.yeniBildirimler(alici, taramaAni);
+        const bildirimler = await this.yeniBildirimler(alici, taramaAni, "anlik");
         if (bildirimler.length === 0) continue;
 
         const gitti = await this.gonder(alici, "anlik", bildirimler, []);
@@ -114,7 +118,7 @@ export class NotificationEmailProcessor {
         // verdiğinde su seviyesini yükseltmek, o bildirimleri sessizce
         // yutmak demekti.
         if (gitti) {
-          await this.tercihler.damgala(alici.userId, { taramaAni });
+          await this.damgalaSessiz(alici.userId, { taramaAni, kanal: "anlik" });
           gonderilen += 1;
           await bekle(GONDERIM_ARASI_MS);
         }
@@ -165,19 +169,19 @@ export class NotificationEmailProcessor {
           break;
         }
 
-        const bildirimler = await this.yeniBildirimler(alici, taramaAni);
+        const bildirimler = await this.yeniBildirimler(alici, taramaAni, "gunluk");
         const gunlukGorevler = alici.tercih.includeTasks ? (gorevler.get(alici.userId) ?? []) : [];
 
         if (bildirimler.length === 0 && gunlukGorevler.length === 0) {
           // Söyleyecek bir şey yok: e-posta gönderme ama GÜNÜ DAMGALA, yoksa
           // bu kullanıcı gün boyu her 10 dakikada bir yeniden sorgulanırdı.
-          await this.damgalaSessiz(alici.userId, { taramaAni, ozetGunu: gun });
+          await this.damgalaSessiz(alici.userId, { taramaAni, kanal: "gunluk", ozetGunu: gun });
           continue;
         }
 
         const gitti = await this.gonder(alici, "gunluk", bildirimler, gunlukGorevler);
         if (gitti) {
-          await this.damgalaSessiz(alici.userId, { taramaAni, ozetGunu: gun });
+          await this.damgalaSessiz(alici.userId, { taramaAni, kanal: "gunluk", ozetGunu: gun });
           gonderilen += 1;
           await bekle(GONDERIM_ARASI_MS);
         }
@@ -205,11 +209,13 @@ export class NotificationEmailProcessor {
     // dilimi ve "görevler de gelsin" ayarı dahil gerçek e-postanın aynısı
     // olmalı — yoksa denemesi çalışıp asıl özeti yanlış saatte gelirdi.
     const tercih = await this.tercihler.findForUser(userId);
-    const alicilar = await this.aliciBilgileri([{ ...tercih, userId, lastEmailedAt: null, lastDigestOn: null }]);
+    const alicilar = await this.aliciBilgileri([
+      { ...tercih, userId, lastInstantAt: null, lastDigestAt: null, lastDigestOn: null },
+    ]);
     const alici = alicilar[0];
     if (!alici) return { sent: false };
 
-    const bildirimler = await this.yeniBildirimler(alici, new Date());
+    const bildirimler = await this.yeniBildirimler(alici, new Date(), "gunluk");
     const gorevler = tercih.includeTasks ? await this.bugunkuGorevler([userId]) : new Map<string, GunlukGorev[]>();
     const ornek: EpostaBildirimi[] =
       bildirimler.length > 0
@@ -225,23 +231,28 @@ export class NotificationEmailProcessor {
     return { sent: gitti };
   }
 
-  /** Verilen sıklıktaki tercih satırları. */
-  private async tercihSatirlari(frequency: "anlik" | "gunluk"): Promise<TercihSatiri[]> {
+  /**
+   * Anlık kanal adayları.
+   *
+   * Burada "satırı olmayan kullanıcı" aranmıyor, günlük turun aksine: anlık
+   * kanalın varsayılanı KAPALI, yani açmak için satır yazılmış olması şart.
+   */
+  private async anlikAdaylar(): Promise<TercihSatiri[]> {
     const { data, error } = await this.supabase.client
       .from("notification_email_prefs")
-      .select("user_id, frequency, daily_hour, timezone, include_tasks, last_emailed_at, last_digest_on")
-      .eq("frequency", frequency)
+      .select(TERCIH_KOLONLARI)
+      .eq("instant_enabled", true)
       .limit(KULLANICI_TAVANI);
     if (error) throw error;
     return (data ?? []).map(satiriCevir);
   }
 
   /**
-   * Günlük özet adayları: tercihi 'gunluk' olanlar VE hiç tercihi olmayanlar.
+   * Günlük özet adayları: günlüğü açık olanlar VE hiç tercihi olmayanlar.
    *
-   * İkincisi şart — varsayılan 'gunluk' ve satır ancak ilk gönderimde açılıyor
-   * (bkz. migration 102 başlığı). Yalnızca satırı olanlara baksaydık, tabloya
-   * hiç dokunmamış kullanıcı hiçbir zaman e-posta almazdı.
+   * İkincisi şart — varsayılan açık ve satır ancak ilk gönderimde/kayıtta
+   * oluşuyor (bkz. migration 102 başlığı). Yalnızca satırı olanlara baksaydık,
+   * tabloya hiç dokunmamış kullanıcı hiçbir zaman e-posta almazdı.
    */
   private async gunlukAdaylar(): Promise<Alici[]> {
     const { data, error } = await this.supabase.client
@@ -266,8 +277,8 @@ export class NotificationEmailProcessor {
         : (row as any).notification_email_prefs;
       const tercih: TercihSatiri = ham
         ? satiriCevir({ ...ham, user_id: row.id })
-        : { ...VARSAYILAN_TERCIH, userId: row.id, lastEmailedAt: null, lastDigestOn: null };
-      if (tercih.frequency !== "gunluk") continue;
+        : { ...VARSAYILAN_TERCIH, userId: row.id, lastInstantAt: null, lastDigestAt: null, lastDigestOn: null };
+      if (!tercih.dailyEnabled) continue;
       const alici = this.aliciYap(row, tercih);
       if (alici) alicilar.push(alici);
     }
@@ -318,10 +329,22 @@ export class NotificationEmailProcessor {
     };
   }
 
-  /** Su seviyesinin üstündeki bildirimler, eskiden yeniye. */
-  private async yeniBildirimler(alici: Alici, taramaAni: Date): Promise<EpostaBildirimi[]> {
+  /**
+   * Pencerenin üstündeki okunmamış bildirimler, eskiden yeniye.
+   *
+   * HER KANALIN KENDİ PENCERESİ VAR (bkz. migration 103). İkisi tek bir su
+   * seviyesini paylaşsaydı, iki kanal birden açık olan kullanıcıda anlık
+   * gönderim seviyeyi ilerletir ve akşamki günlük özet BOŞ çıkardı — oysa
+   * özetin işi tam da gün içinde olanı tekrar toparlamak.
+   */
+  private async yeniBildirimler(
+    alici: Alici,
+    taramaAni: Date,
+    kanal: "anlik" | "gunluk"
+  ): Promise<EpostaBildirimi[]> {
     const enEski = new Date(taramaAni.getTime() - EN_FAZLA_GERIYE_MS);
-    const suSeviyesi = alici.tercih.lastEmailedAt ? new Date(alici.tercih.lastEmailedAt) : enEski;
+    const damga = kanal === "anlik" ? alici.tercih.lastInstantAt : alici.tercih.lastDigestAt;
+    const suSeviyesi = damga ? new Date(damga) : enEski;
     // Su seviyesi çok eskiyse (ör. uzun süre kapalı kalmış hesap) geriye
     // doğru sınırlanır: aylık bir bildirim yığınını tek e-postada göndermek
     // kimseye bir şey anlatmaz.
@@ -416,12 +439,16 @@ export class NotificationEmailProcessor {
       gorevler: bugunkuler,
       webUrl: getWebAppUrl(),
       ad: alici.ad,
+      abonelikAdresi: abonelikKapatmaAdresi(alici.userId),
     });
     return this.email.sendPrepared(alici.email, mail);
   }
 
   /** Damgalama tek bir kullanıcı için düşse tur devam etmeli. */
-  private async damgalaSessiz(userId: string, damga: { taramaAni: Date; ozetGunu?: string }): Promise<void> {
+  private async damgalaSessiz(
+    userId: string,
+    damga: { taramaAni: Date; kanal: "anlik" | "gunluk"; ozetGunu?: string }
+  ): Promise<void> {
     try {
       await this.tercihler.damgala(userId, damga);
     } catch (err) {

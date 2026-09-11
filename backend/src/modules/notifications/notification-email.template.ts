@@ -32,6 +32,13 @@ export interface BildirimEpostasi {
   subject: string;
   html: string;
   text: string;
+  /**
+   * List-Unsubscribe çifti. Gmail/Yahoo düzenli gönderenden bunu BEKLİYOR;
+   * yokluğu "çıkış yolu olmayan toplu posta" sayılıp spam'e düşmenin en sık
+   * sebebi. Şablonla birlikte üretiliyor ki bağlantı ile başlık hiçbir zaman
+   * ayrışmasın.
+   */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -95,6 +102,8 @@ export function bildirimEpostasiOlustur(params: {
   webUrl: string;
   /** Görüntülenecek ad — e-postayı kişiselleştirir, yoksa selam atlanır. */
   ad?: string;
+  /** Tek tık "aboneliği bırak" adresi (bkz. notification-email.abonelik.ts). */
+  abonelikAdresi?: string;
 }): BildirimEpostasi {
   const t = cevirmen(params.locale);
   const gunluk = params.kip === "gunluk";
@@ -124,6 +133,9 @@ export function bildirimEpostasiOlustur(params: {
   const altNot = t(
     "Bu e-postaları ne sıklıkla almak istediğini Ayarlar > Yardımcılar > Bildirim e-postaları bölümünden değiştirebilir, tamamen kapatabilirsin."
   );
+  const kapatBagi = params.abonelikAdresi
+    ? ` &nbsp;·&nbsp; <a href="${kacir(params.abonelikAdresi)}" style="color:${MARKA.yaziSoluk};">${t("Aboneliği bırak")}</a>`
+    : "";
 
   const satirlar: string[] = [];
   if (bildirimler.length > 0) {
@@ -153,7 +165,7 @@ ${satirlar.join("\n")}
           <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:${MARKA.yaziSoluk};border-top:1px solid ${MARKA.cizgi};padding-top:16px;">
             ${altNot}
             <br>
-            <a href="${kacir(ayarAdresi)}" style="color:${MARKA.vurgu};">${t("Bildirim e-postası ayarları")}</a>
+            <a href="${kacir(ayarAdresi)}" style="color:${MARKA.vurgu};">${t("Bildirim e-postası ayarları")}</a>${kapatBagi}
           </p>`,
     560
   );
@@ -176,6 +188,18 @@ ${satirlar.join("\n")}
     metinSatirlari.push("");
   }
   metinSatirlari.push(params.webUrl, "", altNot, ayarAdresi);
+  if (params.abonelikAdresi) {
+    metinSatirlari.push("", `${t("Aboneliği bırak")}: ${params.abonelikAdresi}`);
+  }
 
-  return { subject, html, text: metinSatirlari.join("\n") };
+  // List-Unsubscribe-Post olmadan başlık "tek tık" sayılmaz: sağlayıcı
+  // kullanıcıya düğmeyi göstermek yerine adresi açmakla yetinir.
+  const headers = params.abonelikAdresi
+    ? {
+        "List-Unsubscribe": `<${params.abonelikAdresi}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      }
+    : undefined;
+
+  return { subject, html, text: metinSatirlari.join("\n"), headers };
 }

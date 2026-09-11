@@ -78,6 +78,21 @@ describe("bildirimEpostasiOlustur", () => {
     assert.ok(mail.text.includes("/settings?sekme=yardimcilar"));
   });
 
+  it("abonelik adresi verilince hem bağlantı hem List-Unsubscribe başlıkları çıkar", () => {
+    const adres = "https://api.projelio.test/notifications/eposta-kapat?u=abc&i=deadbeef";
+    const mail = bildirimEpostasiOlustur({ ...temel, abonelikAdresi: adres });
+    assert.ok(mail.html.includes("eposta-kapat"));
+    assert.ok(mail.text.includes(adres));
+    // Tek tık için İKİSİ de şart: yalnız List-Unsubscribe, sağlayıcıya düğme
+    // göstertmez (bkz. şablondaki gerekçe).
+    assert.equal(mail.headers?.["List-Unsubscribe"], `<${adres}>`);
+    assert.equal(mail.headers?.["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click");
+  });
+
+  it("abonelik adresi yoksa başlık da üretilmez", () => {
+    assert.equal(bildirimEpostasiOlustur(temel).headers, undefined);
+  });
+
   it("İngilizce dilde konu da çevrilir", () => {
     const mail = bildirimEpostasiOlustur({ ...temel, locale: "en" });
     assert.ok(!mail.subject.includes("bugünkü"), `konu çevrilmemiş: ${mail.subject}`);

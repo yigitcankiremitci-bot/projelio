@@ -108,4 +108,13 @@ export const epostalar: TranslationDict = {
   "Bu e-postaları ne sıklıkla almak istediğini Ayarlar > Yardımcılar > Bildirim e-postaları bölümünden değiştirebilir, tamamen kapatabilirsin.":
     "You can change how often you get these emails — or turn them off completely — in Settings > Helpers > Notification emails.",
   "Bildirim e-postası ayarları": "Notification email settings",
+
+  // ─────────────────────────── Tek tık abonelik kapatma (migration 103)
+  "Aboneliği bırak": "Unsubscribe",
+  "Bildirim e-postaların kapatıldı": "Your notification emails are off",
+  "Bundan sonra sana bildirim e-postası göndermeyeceğiz. Bildirimler uygulama içinde görünmeye devam edecek; fikrin değişirse Ayarlar > Yardımcılar'dan yeniden açabilirsin.":
+    "We won't send you notification emails any more. Notifications still show up inside the app, and you can turn emails back on from Settings > Helpers whenever you like.",
+  "Bağlantı geçersiz": "This link isn't valid",
+  "Bu bağlantı artık geçerli değil. Ayarlar > Yardımcılar bölümünden tercihini kendin değiştirebilirsin.":
+    "This link is no longer valid. You can change the setting yourself from Settings > Helpers.",
 };

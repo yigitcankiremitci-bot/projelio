@@ -125,6 +125,8 @@ Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 | WhatsApp'tan Lio'ya komut | `WHATSAPP_LIO_KOMUT=1` | `backend/.env` |
 | Lio'nun AI sağlayıcı sırası | `AI_PROVIDERS` | `backend/.env` (ya da Admin paneli) |
 | Abonelik tahsilatı | `IYZICO_API_KEY` + `IYZICO_SECRET_KEY` | `backend/.env` (plan kodları Admin panelinde) |
+| Gönderen e-posta adresi | `EMAIL_FROM` | `backend/.env` — **eksikse Resend kum havuzuna düşer** |
+| Tek tık "aboneliği bırak" | `API_PUBLIC_URL` | `backend/.env` |
 | Mağaza abonelikleri | `APPSTORE_*` / `PLAY_*` | `backend/.env` |
 
 `AI_PROVIDERS` sağlayıcıları hem **açar** hem **sıralar** — virgülle ayrılmış,
@@ -208,6 +210,13 @@ etkin, hangi model kullanılıyor.
 (MiniMax, z.ai) Çin merkezli; müşteri verisi (görev içerikleri, dosya adları,
 WhatsApp mesajları) oraya gider. KVKK açısından bu teknik değil ticari/hukuki
 bir karar — açmadan önce bilerek karar ver.
+
+**⚠️ `EMAIL_FROM` tanımsızsa e-posta fiilen çalışmaz.** Kod
+`onboarding@resend.dev` yedeğine düşer; Resend bu adreste yalnızca hesap
+sahibine göndermeye izin verir ve diğer TÜM alıcılara 403 döner — doğrulama,
+şifre sıfırlama ve bildirim e-postaları sessizce ulaşmaz, sahibe giden tek
+kopya da ortak alan adından çıktığı için spam'e düşer. Üretimde aylarca böyle
+kaldı. Açılışta artık uyarı düşüyor (bkz. `assertRequiredEnv`).
 
 Kurulum adımları `deploy/yedekle.sh` ve `deploy/uyar.sh` başlıklarında yazılı.
 Dış kopya kurulana kadar yedekler **yalnızca korumaya çalıştıkları diskte**

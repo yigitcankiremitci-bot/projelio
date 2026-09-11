@@ -1551,16 +1551,21 @@ export interface PushSubscriptionPayload {
 }
 
 /**
- * Bildirimlerin e-posta ile gönderim sıklığı (bkz. migration 102).
+ * Bildirim e-postası tercihleri (bkz. migration 102, 103).
  *
- * `anlik` gerçekten "anlık" değil, "biriktirmeden": işleyici birkaç dakikada
- * bir tarıyor ve o aralıkta doğan bildirimleri TEK e-postada topluyor. Her
- * bildirim için ayrı e-posta, yoğun bir günde gelen kutusunu doldururdu.
+ * İKİ KANAL BAĞIMSIZ, biri diğerinin alternatifi değil (103): "şimdi ne oldu"
+ * ile "bugün ne var" farklı ihtiyaçlar ve ikisi birden açık olabilir.
+ * "Kapalı", ikisinin de kapalı olmasıdır — ayrı bir değer değil.
  */
-export type NotificationEmailFrequency = "anlik" | "gunluk" | "kapali";
-
 export interface NotificationEmailPrefs {
-  frequency: NotificationEmailFrequency;
+  /**
+   * Bildirim oluştukça e-posta. Gerçekten "anlık" değil, "biriktirmeden":
+   * işleyici birkaç dakikada bir tarayıp o aralıktakileri TEK e-postada
+   * topluyor. Her bildirime ayrı e-posta gelen kutusunu doldururdu.
+   */
+  instantEnabled: boolean;
+  /** Günde bir, seçilen saatte özet. */
+  dailyEnabled: boolean;
   /** Günlük özetin gideceği saat (0-23), KULLANICININ saat diliminde. */
   dailyHour: number;
   /** IANA saat dilimi adı (ör. "Europe/Istanbul"). */
@@ -1568,6 +1573,13 @@ export interface NotificationEmailPrefs {
   /** Günlük özete "bugün biten görevlerim" listesi de eklensin mi. */
   includeTasks: boolean;
 }
+
+/**
+ * 102'nin tek kolonlu sıklık değeri. Kaldırıldı ama tip DURUYOR: güncellenmemiş
+ * bir istemci hâlâ bu alanı gönderebilir ve sunucu onu iki anahtara çeviriyor
+ * (bkz. NotificationEmailPrefsService.save).
+ */
+export type NotificationEmailFrequency = "anlik" | "gunluk" | "kapali";
 
 export interface ArchivedJobEntry {
   id: string;

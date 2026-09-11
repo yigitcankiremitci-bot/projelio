@@ -848,7 +848,11 @@ export class PlanningService {
     opts: { query?: string; projectId?: string; limit?: number; includeCompleted?: boolean } = {}
   ): Promise<SchedulableTask[]> {
     const scope = await this.loadSchedulableScope(userId);
-    const limit = clampInt(opts.limit ?? 60, 1, 200);
+    // Tavan 200'dü ve SESSİZ kırpıyordu: Yaptım aday listesini sorgusuz çekip
+    // eşleştirmeyi tarayıcıda yapıyor (bkz. useTaskSearch), dolayısıyla
+    // listeye girmeyen bir görev ARANAMIYORDU bile. Görev sayısı 200'ü geçen
+    // hesapta kullanıcı kendi görevini "yok" sanıyordu.
+    const limit = clampInt(opts.limit ?? 60, 1, 500);
 
     const projectIds = [...scope.projects.keys()].filter((id) => !opts.projectId || id === opts.projectId);
     const operationIds = opts.projectId ? [] : [...scope.operations];

@@ -10,7 +10,7 @@ import WorkLogComposer from "../components/WorkLogComposer";
 import WorkLogTargetModal, { type HedefNiyeti } from "../components/WorkLogTargetModal";
 import WorkLogEditModal from "../components/WorkLogEditModal";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { IconPlay, IconStop, IconLink, IconTrash, IconCheck, IconEdit } from "../components/icons";
+import { IconPlay, IconPause, IconLink, IconTrash, IconCheck, IconEdit } from "../components/icons";
 
 /**
  * YAPTIM — kullanıcının kişisel iş günlüğü.
@@ -540,8 +540,8 @@ function WorkLogRow({
             /* CANLI SAYAÇ. Kayıtlı süreyi DE içeriyor: kronometre bir işe
                ikinci kez basıldığında sıfırdan saymıyor, kaldığı yerden devam
                ediyormuş gibi görünüyor — "bu işte ne kadar çalıştım"ın cevabı
-               tek sayı. (Durdurulduğunda değer dakikaya yuvarlanıyor: saniyeler
-               kayıt biriminin altında kalıyor, bkz. stopTimer.)
+               tek sayı. Saniyeler duraklatmada KAYBOLMUYOR, birikime ekleniyor
+               (bkz. migration 102).
                tabular-nums: rakamlar eşit genişlikte, sayaç her saniye
                yanlamasına titremiyor. */
             <span
@@ -554,7 +554,7 @@ function WorkLogRow({
                 letterSpacing: 0.3,
               }}
             >
-              {sayacMetni((entry.durationMinutes ?? 0) * 60 + gecenSaniye(entry.timerStartedAt))}
+              {sayacMetni(entry.timerSeconds + gecenSaniye(entry.timerStartedAt))}
             </span>
           ) : entry.durationMinutes ? (
             // Süreye tıklamak onu SİLER ve hızlı düğmeleri geri getirir: yanlış
@@ -632,14 +632,18 @@ function WorkLogRow({
         </div>
       </div>
 
+      {/* DURAKLAT / DEVAM ET. Duraklatmak süreyi bitirmiyor, birikime ekliyor:
+          ara verip dönen kullanıcı kaldığı yerden sürüyor. Hiç ölçülmemiş bir
+          kayıtta etiket "başlat", birikimi olanda "devam et" — aynı düğmenin
+          ne yapacağı kullanıcının nerede olduğuna bağlı. */}
       <button
         type="button"
         onClick={onTimer}
-        aria-label={calisiyor ? t("Kronometreyi durdur") : t("Kronometreyi başlat")}
-        title={calisiyor ? t("Kronometreyi durdur") : t("Kronometreyi başlat")}
+        aria-label={calisiyor ? t("Duraklat") : entry.timerSeconds ? t("Devam et") : t("Kronometreyi başlat")}
+        title={calisiyor ? t("Duraklat") : entry.timerSeconds ? t("Devam et") : t("Kronometreyi başlat")}
         style={ikonDugmesi(c, calisiyor)}
       >
-        {calisiyor ? <IconStop size={14} color={c.accentDark} /> : <IconPlay size={14} color={c.textSecondary} />}
+        {calisiyor ? <IconPause size={14} color={c.accentDark} /> : <IconPlay size={14} color={c.textSecondary} />}
       </button>
       <button
         type="button"

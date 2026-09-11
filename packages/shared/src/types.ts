@@ -2702,8 +2702,14 @@ export interface WorkLogEntry {
   doneAt: string;
   /** Dakika. Süre girmek zorunlu değil: kaydın kendisi süreden değerli. */
   durationMinutes?: number;
-  /** Dolu ise kronometre çalışıyor. Aynı anda yalnızca bir kayıtta olabilir. */
+  /** Dolu ise kronometre çalışıyor. Aynı anda birden fazla kayıtta olabilir. */
   timerStartedAt?: string;
+  /**
+   * Kronometrenin biriktirdiği TAM süre (saniye). durationMinutes bundan
+   * türetilir; her duraklatmada dakikaya yuvarlamak süreyi şişiriyordu
+   * (bkz. migration 102).
+   */
+  timerSeconds: number;
   /**
    * İşin başlangıç/bitiş anı. İkisi birlikte dolar ve durationMinutes onlardan
    * HESAPLANIR — "45 dakika sürdü" ile "09:00–09:45 çalıştım" aynı bilgi değil:

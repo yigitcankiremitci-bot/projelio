@@ -297,6 +297,11 @@ export class WorklogService {
     if (!aralik && (body.duration !== undefined || body.durationMinutes !== undefined)) {
       patch.duration_minutes = this.sureyiCozumle(body);
     }
+    // Elle yazılan süre kronometreyi de HİZALAR: aksi hâlde "2 saat" yazıp
+    // sonra devam et diyen kullanıcının sayacı eski birikimden sürerdi.
+    if (patch.duration_minutes !== undefined) {
+      patch.timer_seconds = ((patch.duration_minutes as number | null) ?? 0) * 60;
+    }
 
     if (Object.keys(patch).length === 0) return onceki;
     const guncel = await this.yaz(userId, id, patch);
@@ -406,10 +411,17 @@ export class WorklogService {
   }
 
   /**
-   * Kronometreyi durdurur ve geçen süreyi kayıtlı süreye EKLER (üzerine yazmaz):
-   * bir işe gün içinde iki kez dönmek yaygın ve ikinci ölçüm birincisini
-   * silmemeli. Toplam tavanı aşarsa tavanda kalır — burada reddetmek,
-   * kullanıcının ölçtüğü süreyi hiç kaydetmemek olurdu.
+   * Kronometreyi DURAKLATIR: geçen süre birikime eklenir, kayıt olduğu yerde
+   * kalır ve "devam et" ile kaldığı yerden sürer.
+   *
+   * SANİYE BİRİKİYOR, DAKİKA DEĞİL. Önce her duraklatmada dakikaya yuvarlanıp
+   * en az 1 dakika sayılıyordu; duraklatma bir özellik hâline gelince aynı
+   * davranış süreyi şişiriyordu — 10 saniyelik beş ara, 50 saniyelik işi
+   * 5 dakika gösteriyordu (bkz. migration 102). Yuvarlama artık yalnızca
+   * duration_minutes'a yazarken, bir kez yapılıyor.
+   *
+   * Kayıtlı süre 1 dakikanın altında kalsa bile 1 yazılıyor: kullanıcı bir işi
+   * ölçtüyse defterde "0 dakika" olarak durmamalı.
    */
   async stopTimer(userId: string, id: string): Promise<WorkLogEntry> {
     const entry = await this.findOne(userId, id);
@@ -418,13 +430,17 @@ export class WorklogService {
     // İki damga da AYNI çerçevede (yerel duvar saati, saat dilimsiz) okunuyor;
     // ikisini de aynı yanlış ofsetle çözsek bile FARK doğru kalır. Türkiye
     // 2016'dan beri yaz saati uygulamıyor, yani aradaki tek risk de yok.
-    const gecenDakika = Math.max(
-      1,
-      Math.round((naiveMs(yerelZamanDamgasi(new Date())) - naiveMs(entry.timerStartedAt)) / 60000)
+    const gecenSaniye = Math.max(
+      0,
+      Math.round((naiveMs(yerelZamanDamgasi(new Date())) - naiveMs(entry.timerStartedAt)) / 1000)
     );
-    const toplam = Math.min((entry.durationMinutes ?? 0) + gecenDakika, MAX_WORK_LOG_MINUTES);
+    const toplamSaniye = Math.min(entry.timerSeconds + gecenSaniye, MAX_WORK_LOG_MINUTES * 60);
 
-    return this.yaz(userId, id, { timer_started_at: null, duration_minutes: toplam });
+    return this.yaz(userId, id, {
+      timer_started_at: null,
+      timer_seconds: toplamSaniye,
+      duration_minutes: Math.max(1, Math.round(toplamSaniye / 60)),
+    });
   }
 
   /** O an kronometresi çalışan kayıtlar. Birden fazla olabilir (bkz. migration 101). */
@@ -773,6 +789,7 @@ function mapEntry(row: any): WorkLogEntry {
     doneAt: row.done_at,
     durationMinutes: row.duration_minutes ?? undefined,
     timerStartedAt: row.timer_started_at ?? undefined,
+    timerSeconds: row.timer_seconds ?? 0,
     startedAt: row.started_at ?? undefined,
     endedAt: row.ended_at ?? undefined,
     timeBlockId: row.time_block_id ?? undefined,

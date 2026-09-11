@@ -5,7 +5,9 @@ import type {
   ModuleCatalogEntry,
   Organization,
   OrganizationModule,
+  Output,
   Project,
+  Task,
   WorkLogEntry,
   WorkLogTargetKind,
 } from "@projelio/shared";
@@ -345,8 +347,41 @@ function GorevAdimi({
   const t = useT();
   const [tur, setTur] = useState<"project" | "department">("project");
   const [hedef, setHedef] = useState("");
+  const [outputId, setOutputId] = useState("");
+  const [parentTaskId, setParentTaskId] = useState("");
+  const [outputs, setOutputs] = useState<Output[]>([]);
+  const [gorevler, setGorevler] = useState<Task[]>([]);
   const secenekler =
     tur === "project" ? projects.map((p) => ({ id: p.id, label: p.title })) : departmanSecenekleri;
+
+  /**
+   * Seçilen kapsamın çıktıları ve görevleri.
+   *
+   * NEDEN BURADA, ARAMA KUTUSUNDA DEĞİL: çıktı bir projenin İÇİNDE yaşıyor ve
+   * hepsini birden listeleyen bir uç yok — genel listede göstermek proje başına
+   * bir istek demekti. Kapsam belli olduğunda tek istekle geliyor.
+   */
+  useEffect(() => {
+    if (!hedef) {
+      setOutputs([]);
+      setGorevler([]);
+      return;
+    }
+    const kok = tur === "project" ? `/projects/${hedef}` : `/departments/${hedef}`;
+    const ac = new AbortController();
+    setOutputId("");
+    setParentTaskId("");
+    Promise.all([
+      api.get<Output[]>(`${kok}/outputs`, ac.signal).catch(() => []),
+      api.get<Task[]>(`${kok}/tasks`, ac.signal).catch(() => []),
+    ]).then(([c, g]) => {
+      setOutputs(c);
+      // Üst görev yalnızca KÖK görevlerden seçilebilir: alt görevin alt görevi
+      // hiyerarşiyi bir kat daha derinleştirirdi ve panolar iki kat gösteriyor.
+      setGorevler(g.filter((x) => !x.parentTaskId));
+    });
+    return () => ac.abort();
+  }, [hedef, tur]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -368,15 +403,42 @@ function GorevAdimi({
         yukleniyor={yukleniyor}
         secenekler={secenekler}
       />
+      {hedef && outputs.length > 0 && (
+        <Secim
+          label={t("Çıktı (opsiyonel)")}
+          value={outputId}
+          onChange={setOutputId}
+          yukleniyor={false}
+          secenekler={outputs.map((o) => ({ id: o.id, label: o.title }))}
+        />
+      )}
+
+      {hedef && gorevler.length > 0 && (
+        <Secim
+          label={t("Üst görev (opsiyonel)")}
+          value={parentTaskId}
+          onChange={setParentTaskId}
+          yukleniyor={false}
+          secenekler={gorevler.map((g) => ({ id: g.id, label: g.title }))}
+        />
+      )}
+
       <Aciklama>
-        {t("Görev TAMAMLANMIŞ olarak açılır — bu iş zaten yapıldı; ayrıca kapatman gerekmez.")}
+        {parentTaskId
+          ? t("Seçtiğin görevin ALT GÖREVİ olarak, tamamlanmış şekilde açılır.")
+          : t("Görev TAMAMLANMIŞ olarak açılır — bu iş zaten yapıldı; ayrıca kapatman gerekmez.")}
       </Aciklama>
       <Onayla
         disabled={!hedef || kaydediliyor}
         kaydediliyor={kaydediliyor}
         label={t("Görev olarak ekle")}
         onClick={() =>
-          onAktar({ kind: "task", ...(tur === "project" ? { projectId: hedef } : { departmentId: hedef }) })
+          onAktar({
+            kind: "task",
+            ...(tur === "project" ? { projectId: hedef } : { departmentId: hedef }),
+            outputId: outputId || undefined,
+            parentTaskId: parentTaskId || undefined,
+          })
         }
       />
     </div>

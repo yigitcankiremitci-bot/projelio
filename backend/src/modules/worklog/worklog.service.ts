@@ -451,6 +451,7 @@ export class WorklogService {
       projectId?: string;
       departmentId?: string;
       outputId?: string;
+      parentTaskId?: string;
       organizationId?: string;
       moduleKey?: string;
       recordData?: Record<string, unknown>;
@@ -478,6 +479,10 @@ export class WorklogService {
           estimatedDurationValue: entry.durationMinutes ?? undefined,
           estimatedDurationUnit: entry.durationMinutes ? ("minutes" as const) : undefined,
           outputId: body.outputId,
+          // Üst görev verilirse yapılan iş, o görevin ALT GÖREVİ olarak
+          // açılıyor: büyük bir işin parçasını ayrı bir görev olarak listenin
+          // dibine atmak, işi bağlamından koparıyordu.
+          parentTaskId: body.parentTaskId,
         };
         const task = body.projectId
           ? await this.tasksService.create(body.projectId, veri, userId)

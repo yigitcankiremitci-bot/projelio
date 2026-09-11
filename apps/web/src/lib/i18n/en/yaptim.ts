@@ -49,11 +49,14 @@ export const yaptim: TranslationDict = {
   "Görevlerin yükleniyor…": "Loading your tasks…",
   "Görevlerin yüklenemedi, arama çalışmıyor.": "Couldn't load your tasks, so search isn't working.",
   "Tekrar dene": "Try again",
-  "Aranacak açık görevin yok; serbestçe yazabilirsin.": "You have no open tasks to search; just type freely.",
-  "{n} görev arasında eşleşme yok — serbest kayıt olarak eklenecek.": {
-    one: "No match among {n} task — it will be added as a free entry.",
-    other: "No match among {n} tasks — it will be added as a free entry.",
+  "Bağlanacak bir şey bulunamadı; serbestçe yazabilirsin.": "Nothing to link to; just type freely.",
+  "{n} kayıt arasında eşleşme yok — serbest kayıt olarak eklenecek.": {
+    one: "No match among {n} record — it will be added as a free entry.",
+    other: "No match among {n} records — it will be added as a free entry.",
   },
+  "Üst görev (opsiyonel)": "Parent task (optional)",
+  "Seçtiğin görevin ALT GÖREVİ olarak, tamamlanmış şekilde açılır.":
+    "Created as a SUBTASK of the task you picked, already completed.",
   "alt görev": "subtask",
   "şimdiye dek": "so far",
   Görev: "Task",
@@ -68,7 +71,6 @@ export const yaptim: TranslationDict = {
   "Saat aralığı gir": "Enter a time range",
   "Saat aralığı": "Time range",
   "Başlangıç ve bitiş saatinin ikisi de gerekli": "Both a start and an end time are required",
-  "Bir yere bağla": "Link it somewhere",
   "Bağlı olduğu yere git": "Go to what it's linked to",
   "Bağlı olduğu yer:": "Linked to:",
   "bağlantıyı değiştirmek için satırdaki zincir düğmesini kullan.":

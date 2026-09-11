@@ -36,6 +36,12 @@ export interface AranabilirGorev {
   baslik: string;
   /** Proje / departman / program / iş adı gibi bağlam metinleri. */
   baglam?: (string | undefined)[];
+  /**
+   * Eşit yakınlıktaki adaylar arasında öne çıkarma payı. Aynı listede farklı
+   * TÜRDE kayıtlar olduğunda gerekiyor: "rapor" yazan kullanıcı büyük
+   * ihtimalle "Rapor" adlı GÖREVİ kastediyor, "Raporlama" adlı projeyi değil.
+   */
+  oncelik?: number;
 }
 
 const BASLIK_AGIRLIGI = 3;
@@ -218,6 +224,7 @@ export function gorevPuani(sorgu: string, gorev: AranabilirGorev): number | null
   // Eşitlikte kısa başlık kazanır: "Rapor" ile "Rapor revizyon toplantısı"
   // arasında, "rapor" arayan büyük ihtimalle ilkini kastediyor.
   toplam -= Math.min(normalBaslik.length / 20, 5);
+  toplam += gorev.oncelik ?? 0;
 
   return toplam;
 }

@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import type { SchedulableTask } from "@projelio/shared";
 import { dakikayiMetneCevir, sureyiDakikayaCevir } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
-import { useTaskSearch } from "../lib/useTaskSearch";
-import WorkLogHedefSecici, { type SecilenHedef } from "./WorkLogHedefSecici";
+import { useTaskSearch, type Oneri } from "../lib/useTaskSearch";
 import { IconPlay, IconX, IconCheck } from "./icons";
 
 /**
@@ -35,7 +33,7 @@ interface Props {
     endedAt?: string | null;
     markTaskDone?: boolean;
     addToCalendar?: boolean;
-    hedef?: SecilenHedef | null;
+    hedef?: { targetKind: string; targetId: string; targetLabel: string; targetPath: string } | null;
     kronometreBaslat?: boolean;
   }) => void;
   /** Sayfadaki "+" düğmesi kutuya odaklanabilsin diye. */
@@ -47,15 +45,15 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
   const t = useT();
 
   const [metin, setMetin] = useState("");
-  const [secilenGorev, setSecilenGorev] = useState<SchedulableTask | null>(null);
+  // Seçilen öneri: görev de olabilir, proje/iş/departman da. Ayrım
+  // `secilen.tur`'de; görev seçildiğinde ek seçenekler (yapıldı/takvim) çıkıyor.
+  const [secilen, setSecilen] = useState<Oneri | null>(null);
   const [sure, setSure] = useState("");
   const [aralikModu, setAralikModu] = useState(false);
   const [baslangic, setBaslangic] = useState("");
   const [bitis, setBitis] = useState("");
   const [yapildi, setYapildi] = useState(true);
   const [takvime, setTakvime] = useState(true);
-  // Görev SEÇİLMEDİĞİNDE kullanılan serbest hedef (proje/iş/departman).
-  const [hedef, setHedef] = useState<SecilenHedef | null>(null);
 
   const [listeAcik, setListeAcik] = useState(false);
   const [vurgulu, setVurgulu] = useState(0);
@@ -63,7 +61,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
 
   // Görev seçiliyken arama durur: kutuda artık bir arama terimi değil, seçilmiş
   // işin adı duruyor.
-  const { tasks, loading, hata, adaySayisi, tekrarDene } = useTaskSearch(metin, !secilenGorev);
+  const { oneriler, loading, hata, adaySayisi, tekrarDene } = useTaskSearch(metin, !secilen);
 
   useEffect(() => {
     if (odakRef) odakRef.current = () => girisRef.current?.focus();
@@ -71,51 +69,57 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
 
   useEffect(() => {
     setVurgulu(0);
-  }, [tasks.length]);
+  }, [oneriler.length]);
 
-  const gorunenListe = listeAcik && !secilenGorev && tasks.length > 0;
+  const gorunenListe = listeAcik && !secilen && oneriler.length > 0;
 
-  const gorevSec = (gorev: SchedulableTask) => {
-    setSecilenGorev(gorev);
-    setMetin(gorev.title);
+  const oneriSec = (oneri: Oneri) => {
+    setSecilen(oneri);
+    setMetin(oneri.baslik);
     setListeAcik(false);
     // Görevin tahmini süresi hazır bir öneri: çoğu zaman gerçekleşen de ona
     // yakın çıkıyor ve kullanıcı yalnızca düzeltiyor. Kullanıcı süre yazdıysa
     // ona dokunmuyoruz.
-    if (!sure && !aralikModu && gorev.estimatedMinutes) setSure(dakikayiMetneCevir(gorev.estimatedMinutes));
+    if (!sure && !aralikModu && oneri.task?.estimatedMinutes) {
+      setSure(dakikayiMetneCevir(oneri.task.estimatedMinutes));
+    }
     girisRef.current?.focus();
   };
 
   const secimiKaldir = () => {
-    setSecilenGorev(null);
-    setMetin("");
+    setSecilen(null);
+    // Metin DURUYOR: kullanıcı proje bağlantısını kaldırdığında yazdığı iş
+    // adını da kaybetmemeli.
     girisRef.current?.focus();
   };
 
   const gonder = (kronometreBaslat = false) => {
     if (!metin.trim() || kaydediliyor) return;
     const aralikVar = aralikModu && baslangic && bitis;
+    const gorev = secilen?.tur === "task" ? secilen : null;
     onSubmit({
       // Görev seçiliyse başlık sunucuda görevden geliyor; kullanıcı kutudaki
       // metni değiştirdiyse (ör. "…(revizyon)" ekledi) onunki kazanıyor.
       title: metin.trim(),
-      taskId: secilenGorev?.id,
+      taskId: gorev?.id,
       duration: aralikVar ? null : sure.trim() || null,
       startedAt: aralikVar ? baslangic : null,
       endedAt: aralikVar ? bitis : null,
-      markTaskDone: Boolean(secilenGorev) && yapildi,
-      addToCalendar: Boolean(secilenGorev) && takvime,
-      // Görev seçiliyse bağlantı zaten o görevdir; serbest hedef yalnızca
-      // görev seçilmediğinde anlamlı.
-      hedef: secilenGorev ? null : hedef,
+      markTaskDone: Boolean(gorev) && yapildi,
+      addToCalendar: Boolean(gorev) && takvime,
+      // Görev seçiliyse bağlantıyı sunucu görevden kuruyor; kapsayıcı
+      // (proje/iş/departman) seçildiyse bağlantı bilgisi buradan gidiyor.
+      hedef:
+        secilen && !gorev
+          ? { targetKind: secilen.tur, targetId: secilen.id, targetLabel: secilen.baslik, targetPath: secilen.path }
+          : null,
       kronometreBaslat,
     });
     setMetin("");
     setSure("");
     setBaslangic("");
     setBitis("");
-    setSecilenGorev(null);
-    setHedef(null);
+    setSecilen(null);
     setListeAcik(false);
   };
 
@@ -123,15 +127,15 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
     if (!gorunenListe) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setVurgulu((n) => (n + 1) % tasks.length);
+      setVurgulu((n) => (n + 1) % oneriler.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setVurgulu((n) => (n - 1 + tasks.length) % tasks.length);
+      setVurgulu((n) => (n - 1 + oneriler.length) % oneriler.length);
     } else if (e.key === "Enter") {
       // Listede gezinirken Enter SEÇER, kaydetmez: kullanıcı ok tuşlarıyla
       // aşağı indiyse niyeti listeden bir şey almaktır.
       e.preventDefault();
-      gorevSec(tasks[vurgulu]);
+      oneriSec(oneriler[vurgulu]);
     } else if (e.key === "Escape") {
       setListeAcik(false);
     }
@@ -153,7 +157,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
         padding: 12,
         borderRadius: 12,
         background: c.surface,
-        border: `1px solid ${secilenGorev ? c.accent : c.border}`,
+        border: `1px solid ${secilen ? c.accent : c.border}`,
       }}
     >
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, position: "relative" }}>
@@ -166,7 +170,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
               setListeAcik(true);
               // Kutuyu elle değiştirmek seçimi bozmaz: kullanıcı görevin adına
               // bir ek yazabilmeli. Tamamen silerse seçim de düşer.
-              if (secilenGorev && !e.target.value.trim()) setSecilenGorev(null);
+              if (secilen && !e.target.value.trim()) setSecilen(null);
             }}
             onFocus={() => setListeAcik(true)}
             onBlur={() => window.setTimeout(() => setListeAcik(false), 150)}
@@ -179,7 +183,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
             style={{ width: "100%" }}
           />
           {gorunenListe && (
-            <GorevListesi tasks={tasks} vurgulu={vurgulu} onSec={gorevSec} onVurgula={setVurgulu} />
+            <OneriListesi oneriler={oneriler} vurgulu={vurgulu} onSec={oneriSec} onVurgula={setVurgulu} />
           )}
         </div>
 
@@ -255,7 +259,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
 
       {/* --- İkinci satır: seçili görev, seçenekler ve süre biçimi --------- */}
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13 }}>
-        {secilenGorev && (
+        {secilen && (
           <span
             style={{
               display: "inline-flex",
@@ -270,14 +274,14 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
           >
             <IconCheck size={12} color={c.accentDark} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {gorevinYeri(secilenGorev) ?? t("Görev")}
-              {secilenGorev.parentTaskId ? ` · ${t("alt görev")}` : ""}
+              {TUR_ETIKETLERI[secilen.tur]}
+              {secilen.altBaslik ? ` · ${secilen.altBaslik}` : ""}
             </span>
             <button
               type="button"
               onClick={secimiKaldir}
-              aria-label={t("Görev bağlantısını kaldır")}
-              title={t("Görev bağlantısını kaldır")}
+              aria-label={t("Bağlantıyı kaldır")}
+              title={t("Bağlantıyı kaldır")}
               style={{ border: "none", background: "transparent", padding: 0, display: "flex" }}
             >
               <IconX size={12} color={c.accentDark} />
@@ -285,9 +289,10 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
           </span>
         )}
 
-        {!secilenGorev && <WorkLogHedefSecici secilen={hedef} onSec={setHedef} />}
-
-        {secilenGorev && (
+        {/* Bu iki seçenek YALNIZCA görevde anlamlı: bir projeyi "yapıldı"
+            işaretlemek ya da onu takvime bir blok olarak koymak diye bir şey
+            yok. Kapsayıcı seçildiğinde kayıt yalnızca oraya iliştiriliyor. */}
+        {secilen?.tur === "task" && (
           <>
             <Onay
               isaretli={yapildi}
@@ -322,10 +327,10 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
           çalışmaya devam ediyor — görev önerisi bir kolaylık, kaydın önkoşulu
           değil. Ama sessizce boş kalmıyor: kullanıcı neden öneri görmediğini
           buradan anlıyor. */}
-      {!secilenGorev && loading && (
+      {!secilen && loading && (
         <span style={{ fontSize: 12.5, color: c.textSecondary }}>{t("Görevlerin yükleniyor…")}</span>
       )}
-      {!secilenGorev && !loading && hata && (
+      {!secilen && !loading && hata && (
         <span style={{ fontSize: 12.5, color: c.danger, display: "flex", alignItems: "center", gap: 8 }}>
           {t("Görevlerin yüklenemedi, arama çalışmıyor.")}
           <button
@@ -337,30 +342,44 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
           </button>
         </span>
       )}
-      {!secilenGorev && !loading && !hata && adaySayisi === 0 && (
+      {!secilen && !loading && !hata && adaySayisi === 0 && (
         <span style={{ fontSize: 12.5, color: c.textSecondary }}>
-          {t("Aranacak açık görevin yok; serbestçe yazabilirsin.")}
+          {t("Bağlanacak bir şey bulunamadı; serbestçe yazabilirsin.")}
         </span>
       )}
-      {!secilenGorev && !loading && !hata && adaySayisi > 0 && metin.trim().length >= 2 && tasks.length === 0 && (
+      {!secilen && !loading && !hata && adaySayisi > 0 && metin.trim().length >= 2 && oneriler.length === 0 && (
         <span style={{ fontSize: 12.5, color: c.textSecondary }}>
-          {t("{n} görev arasında eşleşme yok — serbest kayıt olarak eklenecek.", { n: adaySayisi })}
+          {t("{n} kayıt arasında eşleşme yok — serbest kayıt olarak eklenecek.", { n: adaySayisi })}
         </span>
       )}
     </form>
   );
 }
 
-/** Arama kutusunun altında açılan görev listesi. */
-function GorevListesi({
-  tasks,
+/** Öneri türlerinin listede görünen adı. */
+const TUR_ETIKETLERI: Record<Oneri["tur"], string> = {
+  task: "Görev", // dil:anahtar
+  project: "Proje", // dil:anahtar
+  job: "İş", // dil:anahtar
+  department: "Departman", // dil:anahtar
+};
+
+/**
+ * Arama kutusunun altında açılan "nereye" listesi.
+ *
+ * Türü her satırda YAZIYOR: aynı listede görev de proje de var ve ikisi aynı
+ * adı taşıyabiliyor ("Rapor" görevi / "Rapor" projesi). Tür yazmadan kullanıcı
+ * neyi seçtiğini ancak sonuçtan anlıyor.
+ */
+function OneriListesi({
+  oneriler,
   vurgulu,
   onSec,
   onVurgula,
 }: {
-  tasks: SchedulableTask[];
+  oneriler: Oneri[];
   vurgulu: number;
-  onSec: (gorev: SchedulableTask) => void;
+  onSec: (oneri: Oneri) => void;
   onVurgula: (i: number) => void;
 }) {
   const c = useThemeColors();
@@ -374,8 +393,6 @@ function GorevListesi({
         left: 0,
         right: 0,
         marginTop: 4,
-        // Kutunun kendi kartından yukarıda dursun; sayfadaki satırların altında
-        // kaybolursa liste yarı görünür kalıyor.
         zIndex: 5,
         background: c.surface,
         border: `1px solid ${c.border}`,
@@ -384,9 +401,9 @@ function GorevListesi({
         overflow: "hidden",
       }}
     >
-      {tasks.map((gorev, i) => (
+      {oneriler.map((oneri, i) => (
         <button
-          key={gorev.id}
+          key={`${oneri.tur}:${oneri.id}`}
           type="button"
           role="option"
           aria-selected={i === vurgulu}
@@ -395,13 +412,12 @@ function GorevListesi({
           // kapatıyor ve onClick hiç ateşlenmiyordu.
           onMouseDown={(e) => {
             e.preventDefault();
-            onSec(gorev);
+            onSec(oneri);
           }}
           style={{
             display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: 2,
+            alignItems: "center",
+            gap: 8,
             width: "100%",
             padding: "8px 11px",
             border: "none",
@@ -412,18 +428,34 @@ function GorevListesi({
             textAlign: "left",
           }}
         >
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
-            {gorev.title}
+          <span
+            style={{
+              flexShrink: 0,
+              fontSize: 10.5,
+              padding: "1px 6px",
+              borderRadius: 999,
+              background: oneri.tur === "task" ? "rgba(192,129,63,0.14)" : c.background,
+              border: `1px solid ${oneri.tur === "task" ? "transparent" : c.border}`,
+              color: oneri.tur === "task" ? c.accentDark : c.textSecondary,
+            }}
+          >
+            {t(TUR_ETIKETLERI[oneri.tur])}
           </span>
-          <span style={{ fontSize: 12, color: c.textSecondary }}>
-            {[
-              gorev.parentTaskId ? t("alt görev") : null,
-              gorevinYeri(gorev),
-              gorev.jobTitle,
-              gorev.actualMinutes ? `${t("şimdiye dek")} ${dakikayiMetneCevir(gorev.actualMinutes)}` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
+          <span style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 1 }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{oneri.baslik}</span>
+            {oneri.altBaslik && (
+              <span
+                style={{
+                  fontSize: 12,
+                  color: c.textSecondary,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {oneri.altBaslik}
+              </span>
+            )}
           </span>
         </button>
       ))}
@@ -452,21 +484,6 @@ function Onay({
       {etiket}
     </label>
   );
-}
-
-/**
- * Görevin nerede yaşadığı, tek satırda. Departmanda ŞİRKET ADI da var: iki
- * şirkette aynı adlı departman olabiliyor ("Muhasebe") ve şirket adı olmadan
- * hangisi olduğu anlaşılmıyor.
- */
-function gorevinYeri(gorev: SchedulableTask): string | undefined {
-  if (gorev.projectTitle) return gorev.projectTitle;
-  if (gorev.departmentName) {
-    return gorev.departmentOrganizationName
-      ? `${gorev.departmentName} · ${gorev.departmentOrganizationName}`
-      : gorev.departmentName;
-  }
-  return gorev.operationTitle;
 }
 
 /** "09:00" ve "10:30" -> 90. Gece yarısını geçen aralık burada eksi döner. */

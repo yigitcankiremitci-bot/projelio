@@ -40,6 +40,7 @@ export interface WorkLogPushInput {
   projectId?: string;
   departmentId?: string;
   outputId?: string;
+  parentTaskId?: string;
   organizationId?: string;
   moduleKey?: string;
   recordData?: Record<string, unknown>;

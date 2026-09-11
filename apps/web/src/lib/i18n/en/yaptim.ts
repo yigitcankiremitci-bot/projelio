@@ -21,6 +21,7 @@ export const yaptim: TranslationDict = {
   Başlat: "Start",
   "Kaydı aç ve kronometreyi başlat": "Add the entry and start the timer",
   "Kronometreyi başlat": "Start the timer",
+  "Kronometre çalışıyor": "Timer running",
   "Kronometreyi durdur": "Stop the timer",
   "Kronometre değiştirilemedi": "Couldn't change the timer",
   "Süre kaydedilemedi": "Couldn't save the duration",

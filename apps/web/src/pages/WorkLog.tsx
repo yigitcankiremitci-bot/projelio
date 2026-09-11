@@ -451,14 +451,14 @@ function WorkLogRow({
   const c = useThemeColors();
   const t = useT();
   const calisiyor = Boolean(entry.timerStartedAt);
+  // `tik` sayfadan her saniye artıyor; burada okunması satırın yeniden
+  // çizilmesini sağlıyor — sayaç onsuz donuk kalırdı.
+  void tik;
   // Çift tıklayınca başlık yerinde düzenlenir — pano kartlarındaki davranışın
   // aynısı (bkz. TaskColumn). Yazım hatasını düzeltmek için kaydı silip yeniden
   // yazmak, hızlı giriş vaadini boşa çıkarırdı.
   const [duzenleniyor, setDuzenleniyor] = useState(false);
   const [taslak, setTaslak] = useState(entry.title);
-  // tik yalnızca yeniden çizim tetiği; değeri kullanılmıyor.
-  void tik;
-
   const bitir = () => {
     const yeniBaslik = taslak.trim();
     setDuzenleniyor(false);
@@ -536,7 +536,27 @@ function WorkLogRow({
               ? `${entry.startedAt.slice(11, 16)}–${entry.endedAt.slice(11, 16)}`
               : entry.doneAt.slice(11, 16)}
           </span>
-          {entry.durationMinutes ? (
+          {calisiyor ? (
+            /* CANLI SAYAÇ. Kayıtlı süreyi DE içeriyor: kronometre bir işe
+               ikinci kez basıldığında sıfırdan saymıyor, kaldığı yerden devam
+               ediyormuş gibi görünüyor — "bu işte ne kadar çalıştım"ın cevabı
+               tek sayı. (Durdurulduğunda değer dakikaya yuvarlanıyor: saniyeler
+               kayıt biriminin altında kalıyor, bkz. stopTimer.)
+               tabular-nums: rakamlar eşit genişlikte, sayaç her saniye
+               yanlamasına titremiyor. */
+            <span
+              title={t("Kronometre çalışıyor")}
+              style={{
+                fontSize: 17,
+                fontWeight: 600,
+                fontVariantNumeric: "tabular-nums",
+                color: c.accentDark,
+                letterSpacing: 0.3,
+              }}
+            >
+              {sayacMetni((entry.durationMinutes ?? 0) * 60 + gecenSaniye(entry.timerStartedAt))}
+            </span>
+          ) : entry.durationMinutes ? (
             // Süreye tıklamak onu SİLER ve hızlı düğmeleri geri getirir: yanlış
             // düğmeye basan biri tek tıkla düzeltebilmeli.
             <button
@@ -667,6 +687,29 @@ function simdiYerel(): string {
   const dd = String(d.getMinutes()).padStart(2, "0");
   const sn = String(d.getSeconds()).padStart(2, "0");
   return `${yerelGun(d)}T${ss}:${dd}:${sn}`;
+}
+
+/**
+ * Kronometrenin başlangıcından bu yana geçen saniye.
+ *
+ * Damga saat dilimi TAŞIMIYOR (yerel duvar saati, bkz. migration 097). İkisi de
+ * aynı çerçevede okunduğu için farkı doğru: `new Date("…T14:30:00")` tarayıcının
+ * yerel dilimine göre çözülüyor, `Date.now()` de öyle.
+ */
+function gecenSaniye(baslangic?: string): number {
+  if (!baslangic) return 0;
+  const ms = Date.now() - new Date(baslangic).getTime();
+  return ms > 0 ? Math.floor(ms / 1000) : 0;
+}
+
+/** Saniyeyi sayaç biçimine çevirir: "07:12", bir saati geçince "1:07:12". */
+function sayacMetni(saniye: number): string {
+  const s = Math.max(0, Math.floor(saniye));
+  const saat = Math.floor(s / 3600);
+  const dakika = Math.floor((s % 3600) / 60);
+  const kalan = s % 60;
+  const ikiHane = (n: number) => String(n).padStart(2, "0");
+  return saat ? `${saat}:${ikiHane(dakika)}:${ikiHane(kalan)}` : `${ikiHane(dakika)}:${ikiHane(kalan)}`;
 }
 
 /** Yerel günü "YYYY-MM-DD" olarak verir. toISOString UTC'ye kaydırırdı. */

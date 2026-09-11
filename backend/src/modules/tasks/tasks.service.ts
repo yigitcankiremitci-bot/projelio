@@ -6,6 +6,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { applyOrder } from "../../common/reorder.util";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
+import { parcalara } from "../../common/parcali-liste";
 import type { Metin } from "../../common/i18n";
 import {
   assertConvertToSubtaskAllowed,
@@ -1250,6 +1251,30 @@ export class TasksService {
   // ============================================================ Bağımlılıklar
 
   /**
+   * Verilen id'lerle görev satırlarını okur — liste ne kadar uzun olursa olsun.
+   *
+   * Toplu işlemlerin (arşivle/sil/çoğalt/sırala) hepsi seçimdeki id'lerle
+   * başlıyor ve seçim "tümünü seç" ile kolayca yüzlerce satıra çıkıyor. Tek bir
+   * `.in()` bu listeyi adres satırına yazdığı için ~420 id'de istek sessizce
+   * düşüyordu: hata "liste çok uzun" demiyor, alttaki fetch birkaç kez deneyip
+   * saniyeler harcıyor ve işlem hiç yapılmamış gibi dönüyordu. Bkz.
+   * common/parcali-liste.ts.
+   */
+  private async gorevSatirlariniOku(ids: string[], select: string, arsivsiz = false): Promise<any[]> {
+    const parcalar = await Promise.all(
+      parcalara(ids).map((parca) => {
+        const sorgu = this.supabase.client.from("tasks").select(select).in("id", parca);
+        return arsivsiz ? sorgu.is("archived_at", null) : sorgu;
+      })
+    );
+    // Toplu işlemde eksik satır listesi yanlış karar verdirir (ör. "bu görev
+    // seçimde yok" sanılıp atlanır), o yüzden ilk hata yukarı veriliyor.
+    const hatali = parcalar.find((p) => p.error);
+    if (hatali?.error) throw hatali.error;
+    return parcalar.flatMap((p) => (p.data ?? []) as any[]);
+  }
+
+  /**
    * Verilen görevlere `dependsOn` alanını ekler (bkz. migration 094).
    *
    * TASK_SELECT'e gömülü bir ilişki OLARAK DEĞİL, ayrı bir sorgu olarak: tablo
@@ -1257,23 +1282,29 @@ export class TasksService {
    * tamamen kararırdı. Burada hata yalnızca bağımlılık bilgisini eksiltiyor —
    * aynı yaklaşım ai-model-settings'te de var.
    *
-   * Tek sorgu: görev başına ayrı istek atmak, 200 görevlik bir panoda 200 gidiş
-   * dönüş demekti.
+   * Görev başına ayrı istek YOK: 200 görevlik bir panoda 200 gidiş dönüş
+   * demekti. Bunun yerine az sayıda parçalı sorgu (aşağıdaki yoruma bak).
    */
   private async attachDependencies(tasks: Task[]): Promise<Task[]> {
     if (tasks.length === 0) return tasks;
 
-    const { data, error } = await this.supabase.client
-      .from("task_dependencies")
-      .select("task_id, depends_on_task_id")
-      .in(
-        "task_id",
-        tasks.map((gorev) => gorev.id)
-      );
-    if (error) return tasks;
+    // PARÇALI SORULUYOR: id listesi adres satırına yazılıyor ve kalabalık bir
+    // panoda (~420 görev) URL sınırı aşılıyordu. İstek "çok uzun" demeden
+    // düşüyor, altındaki fetch yeniden deniyor ve pano 10 SANİYE boş kalıyordu
+    // — üstelik sonunda bağımlılıklar yine gelmiyordu, çünkü hata aşağıda
+    // sessizce yutuluyor. Bkz. common/parcali-liste.ts.
+    const parcalar = await Promise.all(
+      parcalara(tasks.map((gorev) => gorev.id)).map((parca) =>
+        this.supabase.client.from("task_dependencies").select("task_id, depends_on_task_id").in("task_id", parca)
+      )
+    );
+    // Parçalardan biri hata verdiyse eksik bağımlılık göstermektense hiç
+    // göstermemek doğru: yarısı gelmiş bir liste "bu görevin bağımlılığı yok"
+    // gibi okunur ve yanlış karar verdirir.
+    if (parcalar.some((p) => p.error)) return tasks;
 
     const harita = new Map<string, string[]>();
-    for (const satir of (data ?? []) as any[]) {
+    for (const satir of parcalar.flatMap((p) => (p.data ?? []) as any[])) {
       const liste = harita.get(satir.task_id);
       if (liste) liste.push(satir.depends_on_task_id);
       else harita.set(satir.task_id, [satir.depends_on_task_id]);
@@ -1503,13 +1534,8 @@ export class TasksService {
   // görev ayrıca işlenmez, üst görevin çocuk-arşivleme adımıyla zaten kapsanır.
   async bulkArchive(ids: string[], requestingUserId?: string): Promise<Task[]> {
     if (!ids?.length) return [];
-    const { data: rows, error } = await this.supabase.client
-      .from("tasks")
-      .select("*")
-      .in("id", ids)
-      .is("archived_at", null);
-    if (error) throw error;
-    if (!rows?.length) return [];
+    const rows = await this.gorevSatirlariniOku(ids, "*", true);
+    if (!rows.length) return [];
 
     const departmentIds = new Set(rows.filter((r: any) => r.department_id).map((r: any) => r.department_id as string));
     for (const deptId of departmentIds) {
@@ -1557,12 +1583,8 @@ export class TasksService {
   // bu yüzden hem üst hem alt görev id'leri için güvenle kullanılabilir.
   async bulkRemove(ids: string[], requestingUserId?: string): Promise<string[]> {
     if (!ids?.length) return [];
-    const { data: rows, error } = await this.supabase.client
-      .from("tasks")
-      .select("id, project_id, department_id")
-      .in("id", ids);
-    if (error) throw error;
-    if (!rows?.length) return [];
+    const rows = await this.gorevSatirlariniOku(ids, "id, project_id, department_id");
+    if (!rows.length) return [];
 
     const departmentIds = new Set(rows.filter((r: any) => r.department_id).map((r: any) => r.department_id as string));
     for (const deptId of departmentIds) {
@@ -1574,8 +1596,12 @@ export class TasksService {
     }
 
     const idsToDelete = rows.map((r: any) => r.id as string);
-    const { error: deleteError } = await this.supabase.client.from("tasks").delete().in("id", idsToDelete);
-    if (deleteError) throw deleteError;
+    // Silme de parçalı: okuma sığmayan bir liste silmeye de sığmaz.
+    const silmeler = await Promise.all(
+      parcalara(idsToDelete).map((parca) => this.supabase.client.from("tasks").delete().in("id", parca))
+    );
+    const silmeHatasi = silmeler.find((s) => s.error);
+    if (silmeHatasi?.error) throw silmeHatasi.error;
 
     return idsToDelete;
   }
@@ -1603,13 +1629,8 @@ export class TasksService {
   // alt görev ayrıca çoğaltılmaz — üst görevle birlikte zaten kopyalanır.
   async duplicate(ids: string[], requestingUserId?: string): Promise<Task[]> {
     if (!ids?.length) return [];
-    const { data: rows, error } = await this.supabase.client
-      .from("tasks")
-      .select("*")
-      .in("id", ids)
-      .is("archived_at", null);
-    if (error) throw error;
-    if (!rows?.length) return [];
+    const rows = await this.gorevSatirlariniOku(ids, "*", true);
+    if (!rows.length) return [];
 
     const idSet = new Set(rows.map((r: any) => r.id as string));
     const departmentIds = new Set(rows.filter((r: any) => r.department_id).map((r: any) => r.department_id as string));
@@ -1864,12 +1885,8 @@ export class TasksService {
 
   async reorder(ids: string[], requestingUserId?: string): Promise<void> {
     if (!ids?.length) return;
-    const { data: rows, error } = await this.supabase.client
-      .from("tasks")
-      .select("id, project_id, department_id, parent_task_id")
-      .in("id", ids);
-    if (error) throw error;
-    if (!rows || rows.length !== ids.length) {
+    const rows = await this.gorevSatirlariniOku(ids, "id, project_id, department_id, parent_task_id");
+    if (rows.length !== ids.length) {
       throw new BadRequestException("Geçersiz sıralama isteği");
     }
 

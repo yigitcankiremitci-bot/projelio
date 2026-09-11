@@ -3,9 +3,13 @@
  *
  * NEDEN VAR: Supabase JS istemcisi PostgREST'e HTTP ile gidiyor ve `.in()`
  * filtresindeki her id ADRES SATIRINA yazılıyor. Bir uuid, kaçış karakterleriyle
- * birlikte ~40 bayt; 300 id, 12 KB'lık bir URL demek. Sunucuların (ve Caddy'nin)
- * istek satırı sınırı bunun çok altında — istek 4xx ile düşüyor ve hata
- * "sorgu çok uzun" değil, anlamsız bir 500 olarak görünüyor.
+ * birlikte ~40 bayt; 500 id, 19 KB'lık bir URL demek.
+ *
+ * Canlıda ölçülen eşik (2026-09-11): 410 id geçiyor, 420 id geçmiyor — yani
+ * ~16 KB. Üstüne çıkınca istek "sorgu çok uzun" demiyor; Node'un fetch'i
+ * UND_ERR_HEADERS_OVERFLOW ile düşüyor, alttaki yeniden deneme birkaç tur
+ * dönüyor ve çağrı ~10 SANİYE sonra anlamsız bir hatayla bitiyor. 519 görevli
+ * bir panonun 10 saniye boş kalmasının sebebi tam olarak buydu.
  *
  * SESSİZ BİR SINIR: küçük hesaplarda hiç görünmüyor, veri büyüdükçe bir gün
  * aniden ortaya çıkıyor. Bu yüzden liste uzunluğuna güvenen her `.in()`

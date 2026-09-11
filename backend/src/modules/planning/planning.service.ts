@@ -845,7 +845,7 @@ export class PlanningService {
    */
   async listSchedulableTasks(
     userId: string,
-    opts: { query?: string; projectId?: string; limit?: number } = {}
+    opts: { query?: string; projectId?: string; limit?: number; includeCompleted?: boolean } = {}
   ): Promise<SchedulableTask[]> {
     const scope = await this.loadSchedulableScope(userId);
     const limit = clampInt(opts.limit ?? 60, 1, 200);
@@ -883,8 +883,11 @@ export class PlanningService {
           .select(select)
           .in(kolon, parca)
           .is("archived_at", null)
-          .neq("status", "completed")
           .limit(limit * 2);
+        // TAKVİM tamamlanmışı istemiyor (biten işe zaman ayrılmaz), YAPTIM
+        // istiyor: kullanıcı zaten kapattığı bir işe sonradan süre yazabilmeli
+        // ve onu listede bulamayınca kaydı hiç girmiyordu.
+        if (!opts.includeCompleted) q = q.neq("status", "completed");
         if (ekFiltre) q = ekFiltre(q);
         if (opts.query) q = q.ilike("title", `%${opts.query}%`);
         runs.push(Promise.resolve(q));

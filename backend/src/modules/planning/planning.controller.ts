@@ -48,12 +48,14 @@ export class PlanningController {
     @Req() req: any,
     @Query("query") query?: string,
     @Query("projectId") projectId?: string,
-    @Query("limit") limit?: string
+    @Query("limit") limit?: string,
+    @Query("includeCompleted") includeCompleted?: string
   ) {
     return this.planning.listSchedulableTasks(req.user.userId, {
       query: query?.trim() || undefined,
       projectId: projectId || undefined,
       limit: limit ? Number(limit) : undefined,
+      includeCompleted: includeCompleted === "true",
     });
   }
 

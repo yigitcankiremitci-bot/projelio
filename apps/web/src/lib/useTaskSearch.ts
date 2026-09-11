@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Department, Job, Organization, Project, SchedulableTask } from "@projelio/shared";
+import type { SchedulableTask } from "@projelio/shared";
 import { gorevleriAra } from "@projelio/shared";
 import { api, isAbortError } from "../api/client";
 
@@ -8,36 +8,29 @@ const TAVAN = 8;
 /** Bir kerede çekilen aday görev sayısı. */
 const ADAY_TAVANI = 300;
 
-export type OneriTuru = "task" | "project" | "job" | "department";
-
-/** Giriş kutusunun açılır listesindeki tek satır. */
+/** Giriş kutusunun açılır listesindeki tek satır — her zaman bir görev. */
 export interface Oneri {
-  tur: OneriTuru;
   id: string;
   baslik: string;
-  /** Nerede yaşadığı: projesi, şirketi… */
+  /** Nerede yaşadığı: projesi, departmanı, işi. */
   altBaslik?: string;
   /** Bağlantı için uygulama içi adres. */
   path: string;
-  /** tur === "task" ise görevin kendisi; seçenekler (yapıldı/takvim) buna bağlı. */
-  task?: SchedulableTask;
+  task: SchedulableTask;
 }
 
 /**
- * Yaptım'ın giriş kutusundaki "nereye" araması.
+ * Yaptım'ın giriş kutusundaki görev araması.
  *
- * TEK LİSTE, ÇOK TÜR. Önce yalnızca görevler aranıyordu; proje/iş/departmana
- * bağlamak için kutunun yanında ayrı, küçük bir düğme vardı — kimse görmüyordu.
- * Oysa kullanıcının sorusu tek: "bu iş nereye ait". Cevabın bir görev mi yoksa
- * bir proje mi olduğu onun derdi değil. Hepsi aynı listede, aynı yerden
- * tıklanıyor.
+ * LİSTE YALNIZCA GÖREV VE ALT GÖREVLERDEN oluşuyor. Bir ara proje/iş/departman
+ * da aynı listeye konmuştu; yanlıştı. Kutuya yazan kişi "az önce yaptığım iş"i
+ * arıyor ve o neredeyse her zaman bir görev. Kapsayıcılar listeyi şişirip
+ * görevleri aşağı itiyordu. Eşleşme çıkmadığında açılan "yeni oluştur" satırı,
+ * kapsayıcı seçimini kendi penceresinde yapıyor (bkz. WorkLogComposer).
  *
- * GÖREVLER ÖNDE: "rapor" yazan biri büyük ihtimalle "Rapor" adlı GÖREVİ
- * kastediyor, "Raporlama" adlı projeyi değil (bkz. AranabilirGorev.oncelik).
- *
- * ÇIKTILAR BU LİSTEDE YOK: bir projenin içinde yaşıyorlar ve genel bir uçları
- * da yok — hepsini çekmek proje başına bir istek demekti. Çıktı seçimi,
- * projenin belli olduğu AKTARMA adımında yapılıyor.
+ * TAMAMLANMIŞ GÖREVLER DE GELİYOR (includeCompleted): kullanıcı zaten
+ * kapattığı bir işe sonradan süre yazabilmeli. Takvim seçicisi aynı ucu
+ * tamamlanmışlar olmadan çağırıyor — orada biten işe zaman ayrılmıyor.
  *
  * LİSTE BİR KEZ ÇEKİLİYOR, EŞLEŞTİRME TARAYICIDA: her tuşta sunucuya gitmek
  * hem yavaştı hem de `ilike` ile ek/yazım toleransı yazılamıyordu
@@ -45,10 +38,6 @@ export interface Oneri {
  */
 export function useTaskSearch(query: string, enabled = true) {
   const [gorevler, setGorevler] = useState<SchedulableTask[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [hata, setHata] = useState("");
   const [deneme, setDeneme] = useState(0);
@@ -57,23 +46,13 @@ export function useTaskSearch(query: string, enabled = true) {
     const ac = new AbortController();
     setYukleniyor(true);
     setHata("");
-    // Kapsayıcı listeleri (proje/iş/departman) küçük ve hepsi tek turda
-    // geliyor. Biri düşerse arama o tür olmadan çalışmaya devam etsin diye
-    // ayrı ayrı yutuluyor; GÖREV listesi düşerse arama anlamını yitirdiği
-    // için hata yüzeye çıkıyor.
-    Promise.all([
-      api.get<SchedulableTask[]>(`/planning/schedulable-tasks?limit=${ADAY_TAVANI}`, ac.signal),
-      api.get<Project[]>("/projects", ac.signal).catch(() => []),
-      api.get<Job[]>("/jobs", ac.signal).catch(() => []),
-      api.get<Department[]>("/departments", ac.signal).catch(() => []),
-      api.get<Organization[]>("/organizations", ac.signal).catch(() => []),
-    ])
-      .then(([t, p, j, d, o]) => {
-        setGorevler(t);
-        setProjects(p);
-        setJobs(j);
-        setDepartments(d);
-        setOrganizations(o);
+    api
+      .get<SchedulableTask[]>(
+        `/planning/schedulable-tasks?limit=${ADAY_TAVANI}&includeCompleted=true`,
+        ac.signal
+      )
+      .then((liste) => {
+        setGorevler(liste);
         setHata("");
       })
       .catch((err) => {
@@ -88,15 +67,14 @@ export function useTaskSearch(query: string, enabled = true) {
     return () => ac.abort();
   }, [deneme]);
 
-  const adaylar = useMemo<Oneri[]>(() => {
-    const sirketAdlari = new Map(organizations.map((o) => [o.id, o.name]));
-    return [
-      ...gorevler.map<Oneri>((g) => ({
-        tur: "task",
+  const adaylar = useMemo<Oneri[]>(
+    () =>
+      gorevler.map((g) => ({
         id: g.id,
         baslik: g.title,
         altBaslik: [
           g.parentTaskId ? "alt görev" : null,
+          g.status === "completed" ? "tamamlandı" : null,
           g.projectTitle ?? departmanEtiketi(g.departmentName, g.departmentOrganizationName) ?? g.operationTitle,
           g.jobTitle,
         ]
@@ -105,23 +83,8 @@ export function useTaskSearch(query: string, enabled = true) {
         path: g.projectId ? `/projects/${g.projectId}` : `/departments/${g.departmentId}?tab=tasks`,
         task: g,
       })),
-      ...projects.map<Oneri>((p) => ({
-        tur: "project",
-        id: p.id,
-        baslik: p.title,
-        path: `/projects/${p.id}`,
-      })),
-      ...jobs.map<Oneri>((j) => ({ tur: "job", id: j.id, baslik: j.title, path: `/jobs/${j.id}` })),
-      ...departments.map<Oneri>((d) => ({
-        tur: "department",
-        id: d.id,
-        baslik: d.name,
-        // Şirket adı ŞART: iki şirkette "Muhasebe" olması kural, istisna değil.
-        altBaslik: sirketAdlari.get(d.organizationId),
-        path: `/departments/${d.id}`,
-      })),
-    ];
-  }, [gorevler, projects, jobs, departments, organizations]);
+    [gorevler]
+  );
 
   const aranan = query.trim();
 
@@ -135,8 +98,9 @@ export function useTaskSearch(query: string, enabled = true) {
       (o) => ({
         baslik: o.baslik,
         baglam: [o.altBaslik],
-        // Görevler öne: "rapor" arayan çoğunlukla görevi kastediyor.
-        oncelik: o.tur === "task" ? 40 : 0,
+        // Açık görevler kapanmışların önünde: kullanıcı çoğunlukla hâlâ
+        // üzerinde çalıştığı işi kaydediyor.
+        oncelik: o.task.status === "completed" ? 0 : 25,
       }),
       TAVAN
     );

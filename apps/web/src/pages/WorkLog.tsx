@@ -7,7 +7,7 @@ import { useT } from "../lib/i18n";
 import { useProjectFabAction } from "../lib/projectFab";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import WorkLogComposer from "../components/WorkLogComposer";
-import WorkLogTargetModal from "../components/WorkLogTargetModal";
+import WorkLogTargetModal, { type HedefNiyeti } from "../components/WorkLogTargetModal";
 import WorkLogEditModal from "../components/WorkLogEditModal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { IconPlay, IconStop, IconLink, IconTrash, IconCheck, IconEdit } from "../components/icons";
@@ -132,7 +132,7 @@ export default function WorkLog() {
     endedAt?: string | null;
     markTaskDone?: boolean;
     addToCalendar?: boolean;
-    hedef?: { targetKind: string; targetId: string; targetLabel: string; targetPath: string } | null;
+    niyet?: HedefNiyeti | null;
     kronometreBaslat?: boolean;
   }) => {
     if (kaydediliyor) return;
@@ -149,13 +149,23 @@ export default function WorkLog() {
         doneAt: veri.startedAt ? undefined : simdiYerel(),
         markTaskDone: veri.markTaskDone,
         addToCalendar: veri.addToCalendar,
-        // Kaydetmeden önce seçilen serbest hedef (proje/iş/departman).
-        targetKind: veri.hedef?.targetKind as any,
-        targetId: veri.hedef?.targetId,
-        targetLabel: veri.hedef?.targetLabel,
-        targetPath: veri.hedef?.targetPath,
+        // "Yeni oluştur" ile BAĞLAMA seçildiyse kayıt zaten bağlı doğuyor.
+        ...(veri.niyet?.tip === "link"
+          ? {
+              targetKind: veri.niyet.targetKind,
+              targetId: veri.niyet.targetId,
+              targetLabel: veri.niyet.targetLabel,
+              targetPath: veri.niyet.targetPath,
+            }
+          : {}),
       });
-      const kayit = veri.kronometreBaslat ? await worklog.startTimer(yeni.id) : yeni;
+
+      // AKTARMA kaydın açılmasını bekliyor: hedefte kayıt açmak (tamamlanmış
+      // görev, kasa hareketi) kaydın id'sini istiyor ve kullanıcı Ekle'ye
+      // basmadan hedefte bir şey yaratmak yanlış olurdu — vazgeçerse ortada
+      // sahipsiz bir görev kalırdı.
+      const bagli = veri.niyet?.tip === "push" ? (await worklog.push(yeni.id, veri.niyet.push)).entry : yeni;
+      const kayit = veri.kronometreBaslat ? await worklog.startTimer(bagli.id) : bagli;
       setEntries((prev) => [
         kayit,
         ...prev.map((e) => (veri.kronometreBaslat ? { ...e, timerStartedAt: undefined } : e)),

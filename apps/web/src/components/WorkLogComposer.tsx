@@ -3,6 +3,7 @@ import { dakikayiMetneCevir, sureyiDakikayaCevir } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import { useTaskSearch, type Oneri } from "../lib/useTaskSearch";
+import WorkLogTargetModal, { type HedefNiyeti } from "./WorkLogTargetModal";
 import { IconPlay, IconX, IconCheck } from "./icons";
 
 /**
@@ -33,7 +34,7 @@ interface Props {
     endedAt?: string | null;
     markTaskDone?: boolean;
     addToCalendar?: boolean;
-    hedef?: { targetKind: string; targetId: string; targetLabel: string; targetPath: string } | null;
+    niyet?: HedefNiyeti | null;
     kronometreBaslat?: boolean;
   }) => void;
   /** Sayfadaki "+" düğmesi kutuya odaklanabilsin diye. */
@@ -48,6 +49,10 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
   // Seçilen öneri: görev de olabilir, proje/iş/departman da. Ayrım
   // `secilen.tur`'de; görev seçildiğinde ek seçenekler (yapıldı/takvim) çıkıyor.
   const [secilen, setSecilen] = useState<Oneri | null>(null);
+  // Eşleşme çıkmayınca "yeni oluştur" ile seçilen yer. Kayıt HENÜZ açılmadı;
+  // niyet Ekle'ye basılınca uygulanıyor.
+  const [niyet, setNiyet] = useState<HedefNiyeti | null>(null);
+  const [hedefModali, setHedefModali] = useState(false);
   const [sure, setSure] = useState("");
   const [aralikModu, setAralikModu] = useState(false);
   const [baslangic, setBaslangic] = useState("");
@@ -71,7 +76,9 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
     setVurgulu(0);
   }, [oneriler.length]);
 
-  const gorunenListe = listeAcik && !secilen && oneriler.length > 0;
+  // Liste, eşleşme olmasa da açılıyor: "yeni oluştur" satırı her zaman
+  // orada ve kullanıcının bir sonraki adımı o.
+  const gorunenListe = listeAcik && !secilen && !niyet && metin.trim().length >= 2;
 
   const oneriSec = (oneri: Oneri) => {
     setSecilen(oneri);
@@ -88,6 +95,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
 
   const secimiKaldir = () => {
     setSecilen(null);
+    setNiyet(null);
     // Metin DURUYOR: kullanıcı proje bağlantısını kaldırdığında yazdığı iş
     // adını da kaybetmemeli.
     girisRef.current?.focus();
@@ -96,7 +104,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
   const gonder = (kronometreBaslat = false) => {
     if (!metin.trim() || kaydediliyor) return;
     const aralikVar = aralikModu && baslangic && bitis;
-    const gorev = secilen?.tur === "task" ? secilen : null;
+    const gorev = secilen;
     onSubmit({
       // Görev seçiliyse başlık sunucuda görevden geliyor; kullanıcı kutudaki
       // metni değiştirdiyse (ör. "…(revizyon)" ekledi) onunki kazanıyor.
@@ -109,10 +117,9 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
       addToCalendar: Boolean(gorev) && takvime,
       // Görev seçiliyse bağlantıyı sunucu görevden kuruyor; kapsayıcı
       // (proje/iş/departman) seçildiyse bağlantı bilgisi buradan gidiyor.
-      hedef:
-        secilen && !gorev
-          ? { targetKind: secilen.tur, targetId: secilen.id, targetLabel: secilen.baslik, targetPath: secilen.path }
-          : null,
+      // Görev seçiliyse bağlantıyı sunucu görevden kuruyor; "yeni oluştur"
+      // ile bir yer seçildiyse niyet Ekle'den sonra uygulanıyor.
+      niyet: gorev ? null : niyet,
       kronometreBaslat,
     });
     setMetin("");
@@ -120,6 +127,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
     setBaslangic("");
     setBitis("");
     setSecilen(null);
+    setNiyet(null);
     setListeAcik(false);
   };
 
@@ -127,15 +135,20 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
     if (!gorunenListe) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setVurgulu((n) => (n + 1) % oneriler.length);
+      setVurgulu((n) => (n + 1) % (oneriler.length + 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setVurgulu((n) => (n - 1 + oneriler.length) % oneriler.length);
+      setVurgulu((n) => (n - 1 + oneriler.length + 1) % (oneriler.length + 1));
     } else if (e.key === "Enter") {
       // Listede gezinirken Enter SEÇER, kaydetmez: kullanıcı ok tuşlarıyla
       // aşağı indiyse niyeti listeden bir şey almaktır.
       e.preventDefault();
-      oneriSec(oneriler[vurgulu]);
+      if (vurgulu >= oneriler.length) {
+        setListeAcik(false);
+        setHedefModali(true);
+      } else {
+        oneriSec(oneriler[vurgulu]);
+      }
     } else if (e.key === "Escape") {
       setListeAcik(false);
     }
@@ -157,7 +170,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
         padding: 12,
         borderRadius: 12,
         background: c.surface,
-        border: `1px solid ${secilen ? c.accent : c.border}`,
+        border: `1px solid ${secilen || niyet ? c.accent : c.border}`,
       }}
     >
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, position: "relative" }}>
@@ -183,7 +196,17 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
             style={{ width: "100%" }}
           />
           {gorunenListe && (
-            <OneriListesi oneriler={oneriler} vurgulu={vurgulu} onSec={oneriSec} onVurgula={setVurgulu} />
+            <OneriListesi
+              oneriler={oneriler}
+              metin={metin.trim()}
+              vurgulu={vurgulu}
+              onSec={oneriSec}
+              onYeni={() => {
+                setListeAcik(false);
+                setHedefModali(true);
+              }}
+              onVurgula={setVurgulu}
+            />
           )}
         </div>
 
@@ -259,7 +282,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
 
       {/* --- İkinci satır: seçili görev, seçenekler ve süre biçimi --------- */}
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13 }}>
-        {secilen && (
+        {(secilen || niyet) && (
           <span
             style={{
               display: "inline-flex",
@@ -274,8 +297,7 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
           >
             <IconCheck size={12} color={c.accentDark} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {TUR_ETIKETLERI[secilen.tur]}
-              {secilen.altBaslik ? ` · ${secilen.altBaslik}` : ""}
+              {secilen ? (secilen.altBaslik || t("Görev")) : niyet?.ozet}
             </span>
             <button
               type="button"
@@ -289,10 +311,10 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
           </span>
         )}
 
-        {/* Bu iki seçenek YALNIZCA görevde anlamlı: bir projeyi "yapıldı"
-            işaretlemek ya da onu takvime bir blok olarak koymak diye bir şey
-            yok. Kapsayıcı seçildiğinde kayıt yalnızca oraya iliştiriliyor. */}
-        {secilen?.tur === "task" && (
+        {/* Bu iki seçenek yalnızca VAR OLAN bir görev seçilince anlamlı: yeni
+            açılacak görev zaten tamamlanmış olarak açılıyor ve takvime de
+            aktarma adımında giriyor. */}
+        {secilen && (
           <>
             <Onay
               isaretli={yapildi}
@@ -352,38 +374,59 @@ export default function WorkLogComposer({ kaydediliyor, onSubmit, odakRef }: Pro
           {t("{n} kayıt arasında eşleşme yok — serbest kayıt olarak eklenecek.", { n: adaySayisi })}
         </span>
       )}
+      {hedefModali && (
+        <WorkLogTargetModal
+          baslik={metin.trim()}
+          onClose={() => setHedefModali(false)}
+          onSecim={(secim) => {
+            setNiyet(secim);
+            setHedefModali(false);
+            girisRef.current?.focus();
+          }}
+        />
+      )}
     </form>
   );
 }
 
-/** Öneri türlerinin listede görünen adı. */
-const TUR_ETIKETLERI: Record<Oneri["tur"], string> = {
-  task: "Görev", // dil:anahtar
-  project: "Proje", // dil:anahtar
-  job: "İş", // dil:anahtar
-  department: "Departman", // dil:anahtar
-};
-
 /**
- * Arama kutusunun altında açılan "nereye" listesi.
+ * Arama kutusunun altında açılan görev listesi.
  *
- * Türü her satırda YAZIYOR: aynı listede görev de proje de var ve ikisi aynı
- * adı taşıyabiliyor ("Rapor" görevi / "Rapor" projesi). Tür yazmadan kullanıcı
- * neyi seçtiğini ancak sonuçtan anlıyor.
+ * SON SATIR HER ZAMAN "YENİ OLUŞTUR": eşleşme çıkmadığında kullanıcının tek
+ * yolu bu, eşleşme çıktığında da hiçbiri doğru olmayabiliyor. Ona basmak
+ * "nereye ait?" penceresini açıyor — yer seçimi orada, süre yine kutuda.
  */
 function OneriListesi({
   oneriler,
+  metin,
   vurgulu,
   onSec,
+  onYeni,
   onVurgula,
 }: {
   oneriler: Oneri[];
+  metin: string;
   vurgulu: number;
   onSec: (oneri: Oneri) => void;
+  onYeni: () => void;
   onVurgula: (i: number) => void;
 }) {
   const c = useThemeColors();
   const t = useT();
+  const satirStili = (secili: boolean) => ({
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+    padding: "8px 11px",
+    border: "none",
+    borderBottom: `1px solid ${c.border}`,
+    background: secili ? c.background : "transparent",
+    color: c.textPrimary,
+    fontSize: 14,
+    textAlign: "left" as const,
+  });
+
   return (
     <div
       role="listbox"
@@ -403,7 +446,7 @@ function OneriListesi({
     >
       {oneriler.map((oneri, i) => (
         <button
-          key={`${oneri.tur}:${oneri.id}`}
+          key={oneri.id}
           type="button"
           role="option"
           aria-selected={i === vurgulu}
@@ -414,35 +457,21 @@ function OneriListesi({
             e.preventDefault();
             onSec(oneri);
           }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            width: "100%",
-            padding: "8px 11px",
-            border: "none",
-            borderBottom: `1px solid ${c.border}`,
-            background: i === vurgulu ? c.background : "transparent",
-            color: c.textPrimary,
-            fontSize: 14,
-            textAlign: "left",
-          }}
+          style={satirStili(i === vurgulu)}
         >
-          <span
-            style={{
-              flexShrink: 0,
-              fontSize: 10.5,
-              padding: "1px 6px",
-              borderRadius: 999,
-              background: oneri.tur === "task" ? "rgba(192,129,63,0.14)" : c.background,
-              border: `1px solid ${oneri.tur === "task" ? "transparent" : c.border}`,
-              color: oneri.tur === "task" ? c.accentDark : c.textSecondary,
-            }}
-          >
-            {t(TUR_ETIKETLERI[oneri.tur])}
-          </span>
           <span style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 1 }}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{oneri.baslik}</span>
+            <span
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                // Tamamlanmış görev listede duruyor (sonradan süre yazılabilsin
+                // diye) ama açık olanlardan ayırt edilebilmeli.
+                color: oneri.task.status === "completed" ? c.textSecondary : c.textPrimary,
+              }}
+            >
+              {oneri.baslik}
+            </span>
             {oneri.altBaslik && (
               <span
                 style={{
@@ -459,6 +488,23 @@ function OneriListesi({
           </span>
         </button>
       ))}
+
+      <button
+        type="button"
+        role="option"
+        aria-selected={vurgulu === oneriler.length}
+        onMouseEnter={() => onVurgula(oneriler.length)}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          onYeni();
+        }}
+        style={{ ...satirStili(vurgulu === oneriler.length), borderBottom: "none", color: c.accentDark }}
+      >
+        <span style={{ fontSize: 15, lineHeight: 1 }}>＋</span>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {t("“{metin}” için yeni oluştur — yerini seç", { metin })}
+        </span>
+      </button>
     </div>
   );
 }

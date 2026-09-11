@@ -61,14 +61,33 @@ export function departmanlariEtiketle(departments: Department[], organizations: 
   });
 }
 
+/**
+ * Kaydedilmeden önce seçilen hedef. Kayıt HENÜZ YOK; kullanıcı Ekle'ye
+ * bastığında sayfa önce kaydı açıp sonra bu niyeti uyguluyor.
+ */
+export type HedefNiyeti =
+  | { tip: "link"; ozet: string; targetKind: WorkLogTargetKind; targetId: string; targetLabel: string; targetPath: string }
+  | { tip: "push"; ozet: string; push: WorkLogPushInput };
+
 interface Props {
-  entry: WorkLogEntry;
+  /** Kaydedilmiş kayıt. Yoksa pencere "kaydetmeden önce seçim" kipinde açılır. */
+  entry?: WorkLogEntry;
+  /** Kaydedilmemiş kayıtta gösterilecek başlık (kullanıcının yazdığı metin). */
+  baslik?: string;
   onClose: () => void;
-  /** Güncellenmiş kayıt + (aktarma yapıldıysa) kullanıcının gidebileceği sayfa. */
-  onDone: (entry: WorkLogEntry, path?: string) => void;
+  /** Kayıtlı kip: işlem uygulandıktan sonra. */
+  onDone?: (entry: WorkLogEntry, path?: string) => void;
+  /**
+   * Kaydedilmemiş kip: işlem UYGULANMAZ, yalnızca niyet döner. Kayıt Ekle'ye
+   * basılınca açılacağı için hedefte şimdiden bir şey yaratmak yanlış olurdu —
+   * kullanıcı vazgeçerse ortada sahipsiz bir görev kalırdı.
+   */
+  onSecim?: (niyet: HedefNiyeti) => void;
 }
 
-export default function WorkLogTargetModal({ entry, onClose, onDone }: Props) {
+export default function WorkLogTargetModal({ entry, baslik, onClose, onDone, onSecim }: Props) {
+  const oncesiKip = !entry;
+  const gosterilenBaslik = entry?.title ?? baslik ?? "";
   const c = useThemeColors();
   const t = useT();
   const [adim, setAdim] = useState<Adim>("menu");
@@ -106,29 +125,51 @@ export default function WorkLogTargetModal({ entry, onClose, onDone }: Props) {
     return () => ac.abort();
   }, []);
 
-  const aktar = async (body: WorkLogPushInput) => {
+  const aktar = async (body: WorkLogPushInput, ozet: string) => {
+    if (oncesiKip) {
+      onSecim?.({ tip: "push", ozet, push: body });
+      return;
+    }
     setKaydediliyor(true);
     setHata("");
     try {
-      const sonuc = await worklog.push(entry.id, body);
-      onDone(sonuc.entry, sonuc.path);
+      const sonuc = await worklog.push(entry!.id, body);
+      onDone?.(sonuc.entry, sonuc.path);
     } catch (err) {
       setHata(err instanceof Error ? err.message : "Aktarılamadı");
       setKaydediliyor(false);
     }
   };
 
-  const bagla = async (targetKind: WorkLogTargetKind | null, targetId?: string, targetLabel?: string) => {
+  const bagla = async (
+    targetKind: WorkLogTargetKind | null,
+    targetId?: string,
+    targetLabel?: string,
+    targetPath?: string
+  ) => {
+    if (oncesiKip) {
+      if (!targetKind || !targetId) return;
+      onSecim?.({
+        tip: "link",
+        ozet: targetLabel ?? "",
+        targetKind,
+        targetId,
+        targetLabel: targetLabel ?? "",
+        targetPath: targetPath ?? "",
+      });
+      return;
+    }
     setKaydediliyor(true);
     setHata("");
     try {
-      const guncel = await worklog.link(entry.id, {
+      const guncel = await worklog.link(entry!.id, {
         targetKind,
         targetId: targetId ?? null,
         targetLabel: targetLabel ?? null,
+        targetPath: targetPath ?? null,
       });
       // Bağlama bir yer imi; kullanıcıyı başka bir sayfaya SÜRÜKLEMİYORUZ.
-      onDone(guncel);
+      onDone?.(guncel);
     } catch (err) {
       setHata(err instanceof Error ? err.message : "Bağlanamadı");
       setKaydediliyor(false);
@@ -148,7 +189,7 @@ export default function WorkLogTargetModal({ entry, onClose, onDone }: Props) {
             color: c.textPrimary,
           }}
         >
-          {entry.title}
+          {gosterilenBaslik}
         </div>
 
         {adim !== "menu" && (
@@ -174,9 +215,10 @@ export default function WorkLogTargetModal({ entry, onClose, onDone }: Props) {
         {adim === "menu" && (
           <Menu
             entry={entry}
+            oncesiKip={oncesiKip}
             onSec={setAdim}
             onBaglantiyiKaldir={() => void bagla(null)}
-            onYapilacaklara={() => void aktar({ kind: "personal_todo" })}
+            onYapilacaklara={() => void aktar({ kind: "personal_todo" }, t("Yapılacaklarım"))}
             kaydediliyor={kaydediliyor}
           />
         )}
@@ -237,12 +279,14 @@ export default function WorkLogTargetModal({ entry, onClose, onDone }: Props) {
 
 function Menu({
   entry,
+  oncesiKip,
   onSec,
   onBaglantiyiKaldir,
   onYapilacaklara,
   kaydediliyor,
 }: {
-  entry: WorkLogEntry;
+  entry?: WorkLogEntry;
+  oncesiKip: boolean;
   onSec: (adim: Adim) => void;
   onBaglantiyiKaldir: () => void;
   onYapilacaklara: () => void;
@@ -307,7 +351,7 @@ function Menu({
         </button>
       ))}
 
-      {entry.targetKind && (
+      {!oncesiKip && entry?.targetKind && (
         <button
           type="button"
           onClick={onBaglantiyiKaldir}
@@ -322,7 +366,7 @@ function Menu({
             fontSize: 14,
           }}
         >
-          {t("Bağlantıyı kaldır")} ({entry.targetLabel ?? entry.targetKind})
+          {t("Bağlantıyı kaldır")} ({entry?.targetLabel ?? entry?.targetKind})
         </button>
       )}
     </div>
@@ -342,7 +386,7 @@ function GorevAdimi({
   departmanSecenekleri: Secenek[];
   yukleniyor: boolean;
   kaydediliyor: boolean;
-  onAktar: (body: WorkLogPushInput) => void;
+  onAktar: (body: WorkLogPushInput, ozet: string) => void;
 }) {
   const t = useT();
   const [tur, setTur] = useState<"project" | "department">("project");
@@ -433,12 +477,15 @@ function GorevAdimi({
         kaydediliyor={kaydediliyor}
         label={t("Görev olarak ekle")}
         onClick={() =>
-          onAktar({
-            kind: "task",
-            ...(tur === "project" ? { projectId: hedef } : { departmentId: hedef }),
-            outputId: outputId || undefined,
-            parentTaskId: parentTaskId || undefined,
-          })
+          onAktar(
+            {
+              kind: "task",
+              ...(tur === "project" ? { projectId: hedef } : { departmentId: hedef }),
+              outputId: outputId || undefined,
+              parentTaskId: parentTaskId || undefined,
+            },
+            `${t("Görev")}: ${secenekler.find((o) => o.id === hedef)?.label ?? ""}`
+          )
         }
       />
     </div>
@@ -458,7 +505,7 @@ function KasaAdimi({
   departmanSecenekleri: Secenek[];
   yukleniyor: boolean;
   kaydediliyor: boolean;
-  onAktar: (body: WorkLogPushInput) => void;
+  onAktar: (body: WorkLogPushInput, ozet: string) => void;
 }) {
   const c = useThemeColors();
   const t = useT();
@@ -524,12 +571,15 @@ function KasaAdimi({
         kaydediliyor={kaydediliyor}
         label={t("Kasaya işle")}
         onClick={() =>
-          onAktar({
-            kind: "budget",
-            amount: tutarSayi,
-            transactionType: tur,
-            ...(kapsam === "project" ? { projectId: hedef } : kapsam === "department" ? { departmentId: hedef } : {}),
-          })
+          onAktar(
+            {
+              kind: "budget",
+              amount: tutarSayi,
+              transactionType: tur,
+              ...(kapsam === "project" ? { projectId: hedef } : kapsam === "department" ? { departmentId: hedef } : {}),
+            },
+            `${t("Kasa")}: ${tutarSayi} ₺`
+          )
         }
       />
     </div>
@@ -550,8 +600,8 @@ function ModulAdimi({
   departments: Department[];
   yukleniyor: boolean;
   kaydediliyor: boolean;
-  entry: WorkLogEntry;
-  onAktar: (body: WorkLogPushInput) => void;
+  entry?: WorkLogEntry;
+  onAktar: (body: WorkLogPushInput, ozet: string) => void;
 }) {
   const t = useT();
   const [organizationId, setOrganizationId] = useState("");
@@ -598,6 +648,7 @@ function ModulAdimi({
     const metinAlani = config.fields.find((f) => f.type === "text");
     const notAlani = config.fields.find((f) => f.type === "textarea");
     const tarihAlani = config.fields.find((f) => f.type === "date");
+    if (!entry) return undefined;
     if (metinAlani) veri[metinAlani.key] = entry.title;
     if (notAlani && entry.note) veri[notAlani.key] = entry.note;
     if (tarihAlani) veri[tarihAlani.key] = entry.doneAt.slice(0, 10);
@@ -637,13 +688,16 @@ function ModulAdimi({
         kaydediliyor={kaydediliyor}
         label={t("Deftere yaz")}
         onClick={() =>
-          onAktar({
-            kind: "module_record",
-            organizationId,
-            moduleKey,
-            departmentId: departmentId || undefined,
-            recordData: kayitVerisi(),
-          })
+          onAktar(
+            {
+              kind: "module_record",
+              organizationId,
+              moduleKey,
+              departmentId: departmentId || undefined,
+              recordData: kayitVerisi(),
+            },
+            `${t("Modül")}: ${modulAdlari.get(moduleKey) ?? moduleKey}`
+          )
         }
       />
     </div>
@@ -665,7 +719,7 @@ function BaglaAdimi({
   departmanSecenekleri: Secenek[];
   yukleniyor: boolean;
   kaydediliyor: boolean;
-  onBagla: (kind: WorkLogTargetKind | null, id?: string, label?: string) => void;
+  onBagla: (kind: WorkLogTargetKind | null, id?: string, label?: string, path?: string) => void;
 }) {
   const t = useT();
   const [tur, setTur] = useState<"project" | "job" | "department">("project");
@@ -700,7 +754,14 @@ function BaglaAdimi({
         disabled={!hedef || kaydediliyor}
         kaydediliyor={kaydediliyor}
         label={t("İşaretle")}
-        onClick={() => onBagla(tur, hedef, secenekler.find((s) => s.id === hedef)?.label)}
+        onClick={() =>
+          onBagla(
+            tur,
+            hedef,
+            secenekler.find((s) => s.id === hedef)?.label,
+            tur === "project" ? `/projects/${hedef}` : tur === "job" ? `/jobs/${hedef}` : `/departments/${hedef}`
+          )
+        }
       />
     </div>
   );

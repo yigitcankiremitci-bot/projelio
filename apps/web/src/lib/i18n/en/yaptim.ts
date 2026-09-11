@@ -55,6 +55,8 @@ export const yaptim: TranslationDict = {
     other: "No match among {n} records — it will be added as a free entry.",
   },
   "Üst görev (opsiyonel)": "Parent task (optional)",
+  "“{metin}” için yeni oluştur — yerini seç": "Create new for “{metin}” — pick where",
+  Yapılacaklarım: "My to-dos",
   "Seçtiğin görevin ALT GÖREVİ olarak, tamamlanmış şekilde açılır.":
     "Created as a SUBTASK of the task you picked, already completed.",
   "alt görev": "subtask",

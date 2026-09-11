@@ -444,12 +444,32 @@ export class WorklogService {
     );
     const toplamSaniye = Math.min(entry.timerSeconds + gecenSaniye, MAX_WORK_LOG_MINUTES * 60);
 
-    return this.yaz(userId, id, {
+    const yeniDakika = Math.max(1, Math.round(toplamSaniye / 60));
+    const guncel = await this.yaz(userId, id, {
       timer_started_at: null,
       timer_paused: duraklat,
       timer_seconds: toplamSaniye,
-      duration_minutes: Math.max(1, Math.round(toplamSaniye / 60)),
+      duration_minutes: yeniDakika,
     });
+
+    // KRONOMETREYLE ÖLÇÜLEN SÜRE DE GÖREVE İŞLENMELİ.
+    //
+    // Elle girilen süre için bu yol zaten vardı (create/update), ama kronometre
+    // duration_minutes'ı DOĞRUDAN yazıyordu: kullanıcı bir görevi seçip
+    // "Başlat" diyor, yarım saat çalışıyor, durduruyor ve görevin üstünde
+    // hiçbir şey birikmiyordu. Süreyi ölçmenin bütün amacı oydu.
+    //
+    // Fark yazılıyor, toplam değil: aynı kayda ikinci kez dönüldüğünde ilk
+    // ölçüm ikinci kez eklenmemeli.
+    const fark = yeniDakika - (entry.durationMinutes ?? 0);
+    if (fark && guncel.targetKind === "task" && guncel.targetId) {
+      await this.tasksService.addActualDuration(guncel.targetId, fark, userId);
+    }
+    // Takvim bloğu da süreyi izlesin; yoksa günlükte 40 dakika, takvimde
+    // 10 dakika görünürdü.
+    if (guncel.timeBlockId) await this.blogunuTazele(userId, guncel);
+
+    return guncel;
   }
 
   /** O an kronometresi çalışan kayıtlar. Birden fazla olabilir (bkz. migration 101). */

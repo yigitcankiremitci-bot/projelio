@@ -11,6 +11,9 @@ export const gezinme: TranslationDict = {
   // ─────────────────────────────────────────────── Ana bağlantılar
   "Ana Sayfa": "Home",
   "İşlerim": "My jobs",
+  // Kenar çubuğundaki kategori başlıkları (bkz. SidebarTree).
+  Gruplar: "Groups",
+  Organizasyonlar: "Organizations",
   // "Bütçe" hâlâ kullanılıyor: proje/departman/şirket sekme çubukları.
   "Bütçe": "Budget",
   // Kenar çubuğu ve anasayfadaki sekme "Kasa" oldu: orası bir plan değil,

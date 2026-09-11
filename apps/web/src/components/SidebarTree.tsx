@@ -173,9 +173,10 @@ export default function SidebarTree() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, openProjectsByJobId, openOperationsByJobId]);
 
-  // Tek organizasyon durumunda "Organizasyonlar" başlığı kaldırıldığı için o
-  // organizasyon artık en üst seviyede duruyor; eskiden kategori açık geldiğinde
-  // görünen alt öğeler kaybolmasın diye varsayılan olarak açık başlatılır.
+  // Tek organizasyonu olan kullanıcı için o organizasyon varsayılan olarak
+  // AÇIK gelir: kapalı başlasa ağacın tamamı iki satıra inerdi ve departmanına
+  // gitmek her açılışta iki tıklama isterdi. Birden fazlaysa hangisiyle
+  // ilgilenildiği bilinmiyor, hepsi kapalı başlar.
   const soleOrgId = standaloneOrgs.length === 1 ? standaloneOrgs[0].org.id : null;
   useEffect(() => {
     if (!soleOrgId) return;
@@ -394,7 +395,7 @@ export default function SidebarTree() {
           <Row
             to="/groups"
             icon={IconLayers}
-            label="Gruplar"
+            label={t("Gruplar")}
             depth={0}
             active={groupsActive}
             expandable
@@ -405,18 +406,19 @@ export default function SidebarTree() {
         </div>
       )}
 
-      {/* Tek bir organizasyon varsa "Organizasyonlar" başlığı gereksiz bir ara
-          katman oluyor: onun yerine organizasyonun kendisi doğrudan en üst
-          seviyede, kapak resminin minik hâliyle birlikte gösterilir. Birden fazla
-          olduğunda eski kategori başlığı davranışı korunur. */}
-      {standaloneOrgs.length === 1 && renderOrg(standaloneOrgs[0], 0)}
-
-      {standaloneOrgs.length > 1 && (
-        <div>
+      {/* "Organizasyonlar" başlığı TEK organizasyonda da durur. Bir süre tek
+          organizasyonda başlık gizlenip şirket doğrudan kök seviyeye
+          çıkarılıyordu ("gereksiz ara katman" gerekçesiyle); sonuç, şirketin
+          altındaki "İşlerim" düğümüyle aynı hizaya düşüp onunla karışması oldu
+          — üstelik ikinci şirkete geçen kullanıcı için başlık bir anda "yeniden
+          belirdiği" için ağaç yer değiştiriyordu. Kategoriler sayıya göre
+          değişmiyor: şirketler bir başlık, işler ayrı bir başlık. */}
+      {standaloneOrgs.length > 0 && (
+        <div style={{ marginTop: groups.length > 0 ? 6 : 0 }}>
           <Row
             to="/organizations"
             icon={IconBuilding}
-            label="Organizasyonlar"
+            label={t("Organizasyonlar")}
             depth={0}
             active={orgsActive}
             expandable
@@ -434,7 +436,7 @@ export default function SidebarTree() {
           artık yalnızca oktaki dar hedefte değil, metne çift tıklayarak da
           yapılabilir (bkz. Row onLabelDoubleClick). */}
       {standaloneJobs.length > 0 && (
-        <div>
+        <div style={{ marginTop: groups.length > 0 || standaloneOrgs.length > 0 ? 6 : 0 }}>
           <Row
             to="/"
             icon={IconBriefcase}

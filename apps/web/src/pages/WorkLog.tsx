@@ -4,6 +4,7 @@ import { dakikayiMetneCevir, sureyiDakikayaCevir, type WorkLogEntry } from "@pro
 import { worklog } from "../api/worklog";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { onWorklogChanged } from "../lib/liveRoom";
 import { useProjectFabAction } from "../lib/projectFab";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import WorkLogComposer from "../components/WorkLogComposer";
@@ -76,8 +77,11 @@ export default function WorkLog() {
   }, [aralik]);
 
   const yukle = useCallback(
-    (signal?: AbortSignal) => {
-      setLoading(true);
+    // `sessiz`: canlı sinyalle gelen tazelemede yükleme göstergesi AÇILMAZ.
+    // Açılsaydı, diğer bilgisayarda her tuş vuruşunda bu ekranda liste
+    // kaybolup "Yükleniyor…" yanıp sönerdi.
+    (signal?: AbortSignal, sessiz = false) => {
+      if (!sessiz) setLoading(true);
       worklog
         .list(araligiCozumle(), signal)
         .then((liste) => {
@@ -89,11 +93,38 @@ export default function WorkLog() {
           setHata(err instanceof Error ? err.message : "Kayıtlar yüklenemedi");
         })
         .finally(() => {
-          if (!signal?.aborted) setLoading(false);
+          if (!signal?.aborted && !sessiz) setLoading(false);
         });
     },
     [araligiCozumle]
   );
+
+  /**
+   * BAŞKA BİR CİHAZDAKİ değişiklikleri yakala.
+   *
+   * Aynı kişi iki bilgisayarda çalışabiliyor: birinde kronometre başlatıp
+   * diğerinde durdurmak ya da masaüstünde girdiği kaydı dizüstünde görmek
+   * olağan. Sinyal yalnızca "değişti" diyor, veriyi taşımıyor — listeyi
+   * yeniden çekmek iki ekranın ayrışmasını kökten engelliyor (bkz.
+   * WorklogService.degistiginiDuyur).
+   *
+   * GECİKTİRİLİYOR: tek bir eylem (aktarma) arka arkaya birkaç yazma yapıyor
+   * ve her biri sinyal üretiyor; geciktirmeden her sinyal ayrı bir istek
+   * olurdu. Ayrıca kendi yazdığımız kayıt da sinyal üretiyor — o gecikme
+   * içinde yerel iyimser güncelleme zaten ekranda, tazeleme onu sessizce
+   * doğruluyor.
+   */
+  useEffect(() => {
+    let zamanlayici = 0;
+    const birak = onWorklogChanged(() => {
+      window.clearTimeout(zamanlayici);
+      zamanlayici = window.setTimeout(() => yukle(undefined, true), 400);
+    });
+    return () => {
+      window.clearTimeout(zamanlayici);
+      birak();
+    };
+  }, [yukle]);
 
   // Aralık değişince yeniden yükle. AbortController şart: kullanıcı hızlıca
   // Bugün → Hafta → Ay gezdiğinde geç dönen eski yanıt yenisini eziyordu

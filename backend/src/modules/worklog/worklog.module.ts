@@ -5,6 +5,7 @@ import { TasksModule } from "../tasks/tasks.module";
 import { BudgetModule } from "../budget/budget.module";
 import { ModuleRecordsModule } from "../module-records/module-records.module";
 import { PersonalTodosModule } from "../personal-todos/personal-todos.module";
+import { RealtimeModule } from "../realtime/realtime.module";
 import { PlanningModule } from "../planning/planning.module";
 
 /**
@@ -15,7 +16,7 @@ import { PlanningModule } from "../planning/planning.module";
 @Module({
   // PlanningModule: yapılan iş takvime "yapıldı" bloğu olarak işleniyor
   // (bkz. WorklogService.takvimeIsle).
-  imports: [TasksModule, BudgetModule, ModuleRecordsModule, PersonalTodosModule, PlanningModule],
+  imports: [TasksModule, BudgetModule, ModuleRecordsModule, PersonalTodosModule, RealtimeModule, PlanningModule],
   controllers: [WorklogController],
   providers: [WorklogService],
   exports: [WorklogService],

@@ -48,6 +48,7 @@ const changeListeners = new Set<(payload: RoomChangedPayload) => void>();
  * ekranda olduğu için görsün (bkz. AiLiveActivity).
  */
 const lioActivityListeners = new Set<(payload: LioActivityPayload) => void>();
+const worklogListeners = new Set<() => void>();
 
 function token(): string | null {
   return localStorage.getItem("projelio_token");
@@ -99,11 +100,33 @@ export function getSocket(): Socket | null {
   socket.on("room-changed", (payload: RoomChangedPayload) => {
     changeListeners.forEach((fn) => fn(payload));
   });
+  socket.on("worklog-changed", () => {
+    debug("worklog-changed");
+    worklogListeners.forEach((fn) => fn());
+  });
   socket.on("lio-activity", (payload: LioActivityPayload) => {
     debug("lio", payload?.tool, payload?.path);
     lioActivityListeners.forEach((fn) => fn(payload));
   });
   return socket;
+}
+
+/**
+ * Yaptım defterindeki değişiklikleri dinler — AYNI KULLANICININ diğer
+ * cihazlarında yapılanlar dahil.
+ *
+ * Oda dinleyicisinden (onRoomChanged) farkı hedefin sayfa değil KİŞİ olması:
+ * Yaptım kişisel bir defter, onu gören tek kişi sahibi. İki bilgisayarda
+ * çalışan biri için "aynı sayfadaki başkaları" diye bir şey yok; olan şey
+ * aynı kişinin iki ekranı.
+ */
+export function onWorklogChanged(fn: () => void): () => void {
+  // Soket henüz açılmamış olabilir; dinleyici eklerken bağlantıyı da kurarız.
+  getSocket();
+  worklogListeners.add(fn);
+  return () => {
+    worklogListeners.delete(fn);
+  };
 }
 
 /** Lio'nun yaptığı işleri dinler. Dönen fonksiyon aboneliği bırakır. */

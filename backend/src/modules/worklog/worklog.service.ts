@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import {
   MAX_WORK_LOG_MINUTES,
   sureyiDakikayaCevir,
@@ -15,6 +15,7 @@ import { TasksService } from "../tasks/tasks.service";
 import { BudgetService } from "../budget/budget.service";
 import { ModuleRecordsService } from "../module-records/module-records.service";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
+import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { PlanningService } from "../planning/planning.service";
 
 /**
@@ -44,12 +45,15 @@ import { PlanningService } from "../planning/planning.service";
  */
 @Injectable()
 export class WorklogService {
+  private readonly logger = new Logger(WorklogService.name);
+
   constructor(
     private supabase: SupabaseService,
     private tasksService: TasksService,
     private budgetService: BudgetService,
     private moduleRecordsService: ModuleRecordsService,
     private personalTodosService: PersonalTodosService,
+    private realtime: RealtimeGateway,
     private planningService: PlanningService
   ) {}
 
@@ -180,6 +184,13 @@ export class WorklogService {
         started_at: aralik?.baslangic ?? null,
         ended_at: aralik?.bitis ?? null,
         duration_minutes: dakika,
+        // Kronometrenin başlangıç noktası da süreyle HİZALI doğmalı.
+        // Hizalanmasaydı: "25" yazıp kaydeden, sonra o kayıtta kronometreyi
+        // çalıştırıp durduran kullanıcının 25 dakikası 1 dakikaya düşerdi —
+        // durdurma, süreyi biriken saniyeden yeniden hesaplıyor (bkz.
+        // stopTimer) ve birikim sıfırdan başlıyordu. update() aynı hizalamayı
+        // zaten yapıyor; eksik olan yalnızca doğuş anıydı.
+        timer_seconds: dakika ? dakika * 60 : 0,
         source: this.kaynagiCozumle(body.source),
         target_kind: hedef.targetKind,
         target_id: hedef.targetId,
@@ -192,6 +203,10 @@ export class WorklogService {
     if (error) throw error;
 
     const entry = mapEntry(data);
+    // Yeni kayıt da diğer ekranlara duyurulmalı. gorevYansimalari kendi
+    // yazmalarında ayrıca duyuruyor; fazladan sinyal zararsız, eksik olan
+    // kaydın diğer bilgisayarda hiç görünmemesi ise gözden kaçardı.
+    this.degistiginiDuyur(userId);
     return gorev ? this.gorevYansimalari(userId, entry, body, dakika) : entry;
   }
 
@@ -361,6 +376,7 @@ export class WorklogService {
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException("Kayıt bulunamadı");
+    this.degistiginiDuyur(userId);
     return mapEntry(data);
   }
 
@@ -658,7 +674,33 @@ export class WorklogService {
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException("Kayıt bulunamadı");
+    this.degistiginiDuyur(userId);
     return mapEntry(data);
+  }
+
+  /**
+   * Kullanıcının AÇIK TÜM EKRANLARINA "Yaptım değişti" sinyali gönderir.
+   *
+   * NEDEN ODA DEĞİL KİŞİ: Yaptım kişisel bir defter; onu görebilen tek kişi
+   * sahibi. Odaya yayın yapan genel mekanizma (RealtimeChangeInterceptor)
+   * değişikliği yalnızca AYNI SAYFADAKİ başkalarına taşıyor — oysa buradaki
+   * ihtiyaç tam tersi: aynı kişinin iki bilgisayarı. `user:<id>` kanalı
+   * kullanıcının bütün sekmelerine ulaşıyor.
+   *
+   * NEDEN YALNIZCA SİNYAL, VERİ DEĞİL: yükü taşımak, iki ekranın aynı kaydı
+   * farklı sıralarda alıp ayrışması demek olurdu (kronometre durumu, gün
+   * grupları, süzgeç aralığı). Sinyali alan ekran listeyi yeniden çekiyor:
+   * tek doğru kaynak sunucu kalıyor ve liste zaten küçük.
+   *
+   * Hata YUTULUYOR: sinyal gönderilemezse iş yine yapılmıştır; kullanıcı
+   * yalnızca diğer ekranda bir tazeleme bekler.
+   */
+  private degistiginiDuyur(userId: string): void {
+    try {
+      this.realtime.emitToUser(userId, "worklog-changed", { at: new Date().toISOString() });
+    } catch (err: any) {
+      this.logger.warn(`Yaptım canlı sinyali gönderilemedi: ${err?.message}`);
+    }
   }
 
   /**

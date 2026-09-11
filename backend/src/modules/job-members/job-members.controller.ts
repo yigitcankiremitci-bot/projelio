@@ -27,6 +27,23 @@ export class JobMembersController {
     return this.jobMembersService.findByJob(jobId);
   }
 
+  // Kendi kadro kaydım. Ekip listesinin tamamını açmaz — taşeron ekibi göremez
+  // (yukarıdaki assertNotSubcontractor) ama kendi kaydını görmeli, yoksa işten
+  // ayrılma düğmesinin görünüp görünmeyeceği bilinemezdi.
+  @Get("jobs/:jobId/members/me")
+  async findMine(@Param("jobId") jobId: string, @Req() req: any) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
+    return this.jobMembersService.findMembership(jobId, req.user.userId);
+  }
+
+  // İşten ayrılma. "job-members/:id" ile aynı işi yapar ama üyelik kimliğini
+  // bilmeyi gerektirmez: ekip listesini göremeyen (taşeron) ya da Ekip sekmesi
+  // kapatılmış bir işteki kişinin ayrılabilmesinin tek yolu bu.
+  @Delete("jobs/:jobId/members/me")
+  leave(@Param("jobId") jobId: string, @Req() req: any) {
+    return this.jobMembersService.leaveJob(jobId, req.user.userId);
+  }
+
   @Post("jobs/:jobId/members")
   hire(@Param("jobId") jobId: string, @Body() body: { userId: string; title?: string }, @Req() req: any) {
     return this.jobMembersService.hire(jobId, body.userId, body.title, req.user.userId);

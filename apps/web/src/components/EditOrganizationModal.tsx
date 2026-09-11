@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import CoverPicker from "./CoverPicker";
 import type { Group, Organization, OrgType } from "@projelio/shared";
 import { ORG_TYPE_LABEL } from "@projelio/shared";
@@ -11,6 +12,9 @@ import EntityDangerZone from "./EntityDangerZone";
 import TabVisibilitySection from "./TabVisibilitySection";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { useT } from "../lib/i18n";
+import { useCurrentUser } from "../lib/useCurrentUser";
+import ConfirmDialog from "./ConfirmDialog";
+import { IconLogout } from "./icons";
 
 interface Props {
   organization: Organization;
@@ -23,6 +27,7 @@ interface Props {
 export default function EditOrganizationModal({ organization, onClose, onSaved, onDeleted, onArchived }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const navigate = useNavigate();
   const [name, setName] = useState(organization.name);
   const [description, setDescription] = useState(organization.description ?? "");
   const [groupId, setGroupId] = useState(organization.groupId ?? "");
@@ -37,6 +42,41 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
   const [hiddenTabs, setHiddenTabs] = useState<string[]>(organization.hiddenTabs ?? []);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Şirketten ayrılma onayı (yalnızca sahibi OLMAYANLARA görünür).
+  const [leaving, setLeaving] = useState(false);
+  const { user: currentUser } = useCurrentUser();
+  // Sahibi kim olduğu bilinmiyorsa (eski kayıt) eski davranış sürsün: tehlikeli
+  // bölge görünür, "ayrıl" görünmez. Yanlış tarafa düşmek, sahibine ayrılma
+  // düğmesi göstermekten iyidir.
+  const isOwner = !organization.ownerId || currentUser?.id === organization.ownerId;
+
+  // Şirketten ayrılmak = o şirketteki TÜM bağların bırakılması: doğrudan üyelik
+  // ve departman kadroları (bkz. OrganizationsService.leave). Son yöneticisi
+  // olunan departmanlar hemen bırakılamaz, kurucunun onayına düşer — sunucu
+  // bunları geri bildiriyor ki kullanıcı "ayrıldım sandım" demesin.
+  const handleLeave = async () => {
+    const sonuc = await api
+      .patch<{ success: true; pendingDepartments: string[] }>(
+        `/organizations/${organization.id}/members/me/leave`,
+        {}
+      )
+      .catch(() => null);
+    if (!sonuc) {
+      setError(t("Şirketten ayrılınamadı. Tekrar dene."));
+      return;
+    }
+    if (sonuc.pendingDepartments.length > 0) {
+      window.alert(
+        t(
+          "Şirketten ayrıldın. Son yöneticisi olduğun departmanlarda ({departmanlar}) ayrılma talebin şirket kurucusunun onayını bekliyor.",
+          { departmanlar: sonuc.pendingDepartments.join(", ") }
+        )
+      );
+    }
+    notifySidebarChanged();
+    onClose();
+    navigate("/");
+  };
 
   useEffect(() => {
     api.get<Group[]>("/groups").then(setGroups).catch(() => setGroups([]));
@@ -162,15 +202,64 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
 
       <OrganizationStorageSection organizationId={organization.id} />
 
-      <EntityDangerZone
-        entityLabel="Organizasyonu"
-        resourcePath={`/organizations/${organization.id}`}
-        affectsSidebar
-        onArchive={onArchived ? handleArchive : undefined}
-        onDelete={onDeleted ? handleDelete : undefined}
-        archiveMessage={`"${organization.name}" organizasyonunu arşive eklemek istediğine emin misin? Bu organizasyona bağlı tüm projeler de arşive taşınır.`}
-        deleteMessage={`"${organization.name}" organizasyonunu silmek istediğine emin misin? Bu organizasyona bağlı projelerin organizasyon bağlantısı kaldırılır (projeler silinmez). Bu işlem geri alınamaz.`}
-      />
+      {/* Şirketten ayrılma. Sahibinin yerinde (tehlikeli bölge) duruyor çünkü
+          ikisi aynı sorunun iki cevabı: "bu şirketle işim bitti". Üye
+          silemez/arşivleyemez, sahibi de ayrılamaz — bu yüzden ikisi birbirini
+          dışlıyor. */}
+      {!isOwner && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${c.border}` }}>
+          <div style={{ fontSize: 15, color: c.textSecondary, marginBottom: 10 }}>
+            {t("Ayrılırsan bu şirket ve departmanları listenden kalkar; işlerin ve dosyaların sende kalmaz.")}
+          </div>
+          <button
+            type="button"
+            onClick={() => setLeaving(true)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "9px 14px",
+              fontSize: 15,
+              borderRadius: 8,
+              border: `1px solid ${c.danger}`,
+              background: "transparent",
+              color: c.danger,
+              cursor: "pointer",
+            }}
+          >
+            <IconLogout size={16} color={c.danger} />
+            {t("Şirketten ayrıl")}
+          </button>
+        </div>
+      )}
+
+      {leaving && (
+        <ConfirmDialog
+          title={t("Şirketten ayrıl")}
+          message={t('"{sirket}" şirketinden ayrılmak istediğine emin misin? Departman kadrolarından da çıkarılırsın.', {
+            sirket: organization.name,
+          })}
+          confirmLabel={t("Ayrıl")}
+          danger
+          onCancel={() => setLeaving(false)}
+          onConfirm={async () => {
+            setLeaving(false);
+            await handleLeave();
+          }}
+        />
+      )}
+
+      {isOwner && (
+        <EntityDangerZone
+          entityLabel="Organizasyonu"
+          resourcePath={`/organizations/${organization.id}`}
+          affectsSidebar
+          onArchive={onArchived ? handleArchive : undefined}
+          onDelete={onDeleted ? handleDelete : undefined}
+          archiveMessage={`"${organization.name}" organizasyonunu arşive eklemek istediğine emin misin? Bu organizasyona bağlı tüm projeler de arşive taşınır.`}
+          deleteMessage={`"${organization.name}" organizasyonunu silmek istediğine emin misin? Bu organizasyona bağlı projelerin organizasyon bağlantısı kaldırılır (projeler silinmez). Bu işlem geri alınamaz.`}
+        />
+      )}
     </Modal>
   );
 }

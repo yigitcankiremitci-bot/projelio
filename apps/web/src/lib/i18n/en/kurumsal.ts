@@ -256,4 +256,16 @@ export const kurumsal: TranslationDict = {
     "You'll leave this job's team. You'll lose access to its projects and files; tasks assigned to you stay with the job.",
   "{kisi} ekipten çıkarılacak. İşin projelerine ve dosyalarına erişimi kalkar; ona atanmış görevler işte kalır.":
     "{kisi} will be removed from the team. They'll lose access to the job's projects and files; tasks assigned to them stay with the job.",
+  '"{is}" işinden ayrılmak istediğine emin misin? İşe ve projelerine erişimin kalkar.':
+    'Are you sure you want to leave "{is}"? You\'ll lose access to the job and its projects.',
+
+  // ─────────────────────────────────────────────── Şirketten ayrılma
+  "Şirketten ayrıl": "Leave company",
+  "Ayrılırsan bu şirket ve departmanları listenden kalkar; işlerin ve dosyaların sende kalmaz.":
+    "If you leave, this company and its departments disappear from your list; its work and files stay behind.",
+  '"{sirket}" şirketinden ayrılmak istediğine emin misin? Departman kadrolarından da çıkarılırsın.':
+    'Are you sure you want to leave "{sirket}"? You will also be removed from its department staff.',
+  "Şirketten ayrılınamadı. Tekrar dene.": "Couldn't leave the company. Try again.",
+  "Şirketten ayrıldın. Son yöneticisi olduğun departmanlarda ({departmanlar}) ayrılma talebin şirket kurucusunun onayını bekliyor.":
+    "You have left the company. In the departments where you were the last manager ({departmanlar}), your departure is waiting for the founder's approval.",
 };

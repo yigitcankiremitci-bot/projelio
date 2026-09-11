@@ -6,6 +6,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { JobsService } from "../jobs/jobs.service";
 import { AccessService } from "../../common/access/access.service";
+import { DepartmentMembersService } from "../department-members/department-members.service";
 import { applyOrder } from "../../common/reorder.util";
 import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 
@@ -36,7 +37,8 @@ export class OrganizationsService {
   constructor(
     private supabase: SupabaseService,
     private jobsService: JobsService,
-    private access: AccessService
+    private access: AccessService,
+    private departmentMembers: DepartmentMembersService
   ) {}
 
   // Kullanıcının sahibi olduğu organizasyonlar + üyesi olduğu (approved) organizasyonlar
@@ -240,6 +242,82 @@ export class OrganizationsService {
     if (error) throw error;
     if (!row) throw new NotFoundException("Organizasyon bulunamadı");
     return mapOrganization(row);
+  }
+
+  /**
+   * Şirketten ayrılma. Bir kullanıcı bir organizasyona İKİ yoldan bağlı
+   * olabilir: doğrudan üyelik (organization_members) ve onaylı bir departman
+   * kadrosu (department_members) — bkz. findAllForUser. Bu yüzden ayrılmak
+   * ikisini de bırakmaktır; yalnızca birini temizlemek şirketi kenar
+   * çubuğunda bırakır ve kullanıcı "ayrıldım ama hâlâ duruyor" derdi.
+   *
+   * Departman kadrosundan çıkış kuralı burada KOPYALANMIYOR,
+   * DepartmentMembersService.leave çağrılıyor: son yöneticinin doğrudan
+   * gidememesi (şirket sahibinin onayına düşmesi, bkz. migration 061) orada
+   * tanımlı ve iki yerde ayrı ayrı yaşamamalı.
+   */
+  async leave(id: string, userId: string): Promise<{ success: true; pendingDepartments: string[] }> {
+    const { data: org } = await this.supabase.client
+      .from("organizations")
+      .select("owner_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (!org) throw new NotFoundException("Organizasyon bulunamadı");
+    // Sahibi kendi şirketinden ayrılamaz: ayrılsa şirket sahipsiz kalırdı.
+    // Onun çıkışı arşivlemek ya da silmek (bkz. archive/remove).
+    if (org.owner_id === userId) {
+      throw new ForbiddenException("Kendi kurduğun şirketten ayrılamazsın; arşivleyebilir ya da silebilirsin");
+    }
+
+    const { data: depts } = await this.supabase.client
+      .from("departments")
+      .select("id, name")
+      .eq("organization_id", id);
+    const deptById = new Map<string, string>((depts ?? []).map((d: any) => [d.id, d.name]));
+
+    let foundAny = false;
+    const pendingDepartments: string[] = [];
+
+    if (deptById.size > 0) {
+      const { data: kadro } = await this.supabase.client
+        .from("department_members")
+        .select("department_id, status")
+        .eq("user_id", userId)
+        .in("department_id", Array.from(deptById.keys()))
+        .neq("status", "removed");
+
+      for (const row of kadro ?? []) {
+        foundAny = true;
+        const name = deptById.get(row.department_id) ?? "";
+        // Zaten onay bekleyen talebi tekrar göndermek BadRequest'e düşerdi;
+        // kullanıcıya "hâlâ bekliyor" demek için listeye ekleyip geçiyoruz.
+        if (row.status === "leave_pending") {
+          pendingDepartments.push(name);
+          continue;
+        }
+        const sonuc = await this.departmentMembers.leave(row.department_id, userId);
+        if (sonuc.pendingApproval) pendingDepartments.push(name);
+      }
+    }
+
+    const { data: uyelik } = await this.supabase.client
+      .from("organization_members")
+      .select("id")
+      .eq("organization_id", id)
+      .eq("user_id", userId);
+    if ((uyelik ?? []).length > 0) {
+      foundAny = true;
+      const { error } = await this.supabase.client
+        .from("organization_members")
+        .delete()
+        .eq("organization_id", id)
+        .eq("user_id", userId);
+      if (error) throw error;
+    }
+
+    if (!foundAny) throw new NotFoundException("Bu şirkette bir üyeliğin yok");
+
+    return { success: true, pendingDepartments };
   }
 
   async remove(id: string, requestingUserId?: string): Promise<void> {

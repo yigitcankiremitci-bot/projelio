@@ -8,6 +8,10 @@ export const hatalar: TranslationDict = {
   "Bu daveti yalnızca davet edilen kişi yanıtlayabilir": "Only the invited person can respond to this invite",
   "Bu departman görevi üzerinde bu işlemi yapma yetkin yok.": "You don't have permission to do this on this department task.",
   "Bu departmanda bir kadro kaydın yok": "You have no staff record in this department",
+  "Bu işte bir kadro kaydın yok": "You have no staff record in this job",
+  "Bu şirkette bir üyeliğin yok": "You have no membership in this company",
+  "Kendi kurduğun şirketten ayrılamazsın; arşivleyebilir ya da silebilirsin":
+    "You can't leave a company you founded; you can archive or delete it instead",
   "Bu departmanı görüntüleme yetkiniz yok": "You don't have permission to view this department",
   "Bu departmanı yalnızca organizasyon sahibi veya departman yöneticisi düzenleyebilir": "Only the organization owner or the department manager can edit this department",
   "Bu departmanın bütçesini görüntüleme yetkiniz yok": "You don't have permission to view this department's budget",

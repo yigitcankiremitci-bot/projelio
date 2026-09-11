@@ -227,6 +227,35 @@ export class JobMembersService {
   // Ekipten çıkarma: yalnızca işin sahibi başkasını çıkarabilir; kişinin kendisi
   // her zaman ayrılabilir. Eskiden hiç kontrol yoktu — üyelik id'sini bilen
   // herhangi biri başkasını ekipten atabiliyordu.
+  /** Kullanıcının bu işteki kendi kadro kaydı (yoksa null). */
+  async findMembership(jobId: string, userId: string): Promise<JobMember | null> {
+    const { data, error } = await this.supabase.client
+      .from("job_members")
+      .select("*")
+      .eq("job_id", jobId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapJobMember(data) : null;
+  }
+
+  /**
+   * İşten ayrılma. Kadro kimliğini kullanıcının bilmesini gerektirmez —
+   * "jobs/:jobId/members" listesini göremeyen taşeron için tek yol bu.
+   * Silmeyi remove üstlenir ki Drive izinlerinin geri alınması (syncDriveShares)
+   * iki ayrı yerde yaşamasın.
+   */
+  async leaveJob(jobId: string, userId: string): Promise<void> {
+    const { data: row } = await this.supabase.client
+      .from("job_members")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!row) throw new NotFoundException("Bu işte bir kadro kaydın yok");
+    await this.remove(row.id, userId);
+  }
+
   async remove(id: string, requestingUserId?: string): Promise<void> {
     // İzin geri alınabilmesi için hangi işe ait olduğunu SİLMEDEN ÖNCE öğren.
     const { data: existing } = await this.supabase.client

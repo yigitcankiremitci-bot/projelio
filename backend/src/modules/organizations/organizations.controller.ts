@@ -67,6 +67,14 @@ export class OrganizationsController {
     return this.organizationsService.uploadCover(id, file, req.user.userId);
   }
 
+  // Şirketten ayrılma. Silme/arşivleme sahibin eylemi; bu ise ÜYENİN eylemi —
+  // yetki kuralı "sahibi olmak" değil "o şirkette bir üyeliğim olmak"
+  // (bkz. OrganizationsService.leave).
+  @Patch(":id/members/me/leave")
+  leave(@Param("id") id: string, @Req() req: any) {
+    return this.organizationsService.leave(id, req.user.userId);
+  }
+
   @Delete(":id")
   remove(@Param("id") id: string, @Req() req: any) {
     return this.organizationsService.remove(id, req.user.userId);

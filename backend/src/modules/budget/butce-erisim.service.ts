@@ -5,6 +5,20 @@ import { AccessService } from "../../common/access/access.service";
 import { butceYetkisiKarari, viewerKapsamiMi, type ViewerKapsami } from "./butce-erisim";
 
 /**
+ * Gömülü kullanıcı alanı — FK ADI AÇIKÇA yazılıyor.
+ *
+ * NEDEN: budget_viewers tablosunun `users`'a İKİ yabancı anahtarı var
+ * (`user_id` = listeye eklenen kişi, `created_by` = ekleyen kişi). Sade
+ * `users(...)` yazıldığında PostgREST hangisini kastettiğimizi bilemiyor ve
+ * isteği PGRST201 ile reddediyor — uç 500 dönüyordu. Tipler ve testler bunu
+ * yakalamaz; hata yalnızca gerçek veritabanına çıkınca görünür.
+ *
+ * İstediğimiz her zaman `user_id`: liste "bu bütçeyi kimler görüyor" sorusunun
+ * cevabı, "kim ekledi"nin değil.
+ */
+const VIEWER_KULLANICI = "users!budget_viewers_user_id_fkey(full_name, email)";
+
+/**
  * Bütçe kademelerinin yetki kapısı.
  *
  * Burada yalnızca GERÇEKLER toplanır; karar butce-erisim.ts'teki saf
@@ -179,7 +193,7 @@ export class ButceErisimService {
 
     const { data, error } = await this.supabase.client
       .from("budget_viewers")
-      .select("*, users(full_name, email)")
+      .select(`*, ${VIEWER_KULLANICI}`)
       .eq("scope_type", kapsam)
       .eq("scope_id", scopeId)
       .order("created_at", { ascending: true });
@@ -222,7 +236,7 @@ export class ButceErisimService {
         },
         { onConflict: "scope_type,scope_id,user_id" }
       )
-      .select("*, users(full_name, email)")
+      .select(`*, ${VIEWER_KULLANICI}`)
       .single();
     if (error) throw error;
     return mapViewer(data);

@@ -132,6 +132,7 @@ Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 | Abonelik tahsilatı | `IYZICO_API_KEY` + `IYZICO_SECRET_KEY` | `backend/.env` (plan kodları Admin panelinde) |
 | Hesap şifrelerinin şifrelenmesi | `HESAP_KIMLIK_ENC_KEY` | `backend/.env` — **eksikse giriş bilgisi kaydedilemez** |
 | Gönderen e-posta adresi | `EMAIL_FROM` | `backend/.env` — **eksikse Resend kum havuzuna düşer** |
+| Yönetici mesajlarının göndereni (isteğe bağlı) | `EMAIL_FROM_DESTEK` | `backend/.env` — tanımsızsa EMAIL_FROM alan adında `destek@` |
 | Tek tık "aboneliği bırak" | `API_PUBLIC_URL` | `backend/.env` |
 | Mağaza abonelikleri | `APPSTORE_*` / `PLAY_*` | `backend/.env` |
 

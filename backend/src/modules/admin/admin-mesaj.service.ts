@@ -13,6 +13,7 @@ import { anonimlestirilmisMi } from "../users/account-deletion.service";
 import { istekDili } from "../../common/i18n";
 import { getWebAppUrl } from "../../common/config/env";
 import { adminMesajEpostasiOlustur } from "./admin-mesaj-eposta";
+import { destekGondereni } from "../auth/destek-gondereni";
 
 /**
  * Yöneticinin bir ya da birden çok kullanıcıya bildirim ve/veya e-posta göndermesi.
@@ -100,6 +101,8 @@ export class AdminMesajService {
 
     if (mesaj.eposta) {
       const webUrl = getWebAppUrl();
+      // destek@ adresinden, yanıtlanabilir: bkz. auth/destek-gondereni.ts.
+      const gonderen = destekGondereni(process.env.EMAIL_FROM, process.env.EMAIL_FROM_DESTEK);
       const kuyruk = canlilar.filter((a) => {
         if (gercekEpostaMi(a.email)) return true;
         sonuc.eposta.atlanan++;
@@ -114,9 +117,14 @@ export class AdminMesajService {
           link: mesaj.link,
           webUrl,
           ad: a.full_name,
+          yanitAdresi: gonderen?.replyTo,
         });
         // sendPrepared hata fırlatmaz; sağlayıcı yoksa ya da ret dönerse false.
-        const tamam = await this.email.sendPrepared(a.email, mail);
+        const tamam = await this.email.sendPrepared(a.email, {
+          ...mail,
+          from: gonderen?.from,
+          replyTo: gonderen?.replyTo,
+        });
         if (tamam) sonuc.eposta.gonderilen++;
         else sonuc.eposta.basarisiz++;
         kisiBasina.get(a.id)!.eposta = tamam;

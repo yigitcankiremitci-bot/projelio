@@ -124,4 +124,5 @@ export const epostalar: TranslationDict = {
   // ─────────────────────────────────────────────── Admin > kullanıcıya mesaj
   "Bu mesaj Projelio yönetimi tarafından hesabınla ilgili olarak gönderildi.": "This message was sent by the Projelio team about your account.",
   "Bağlantıyı aç": "Open link",
+  "Bir sorun ya da sorunun olursa bu e-postayı yanıtlaman yeterli.": "If you have a problem or question, just reply to this email.",
 };

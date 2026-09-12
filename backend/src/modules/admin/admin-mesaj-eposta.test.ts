@@ -37,4 +37,16 @@ describe("adminMesajEpostasiOlustur", () => {
     const mail = adminMesajEpostasiOlustur({ ...temel, baslik: "a\r\nBcc: x@y.com" });
     assert.ok(!/[\r\n]/.test(mail.subject));
   });
+
+  it("önizleme metni, düz bağlantı ve yanıt adresi başlıkları eklenir", () => {
+    const mail = adminMesajEpostasiOlustur({ ...temel, yanitAdresi: "destek@projelio.app" });
+    assert.ok(mail.html.includes('display:none'));
+    assert.ok(mail.html.includes(">https://app.projelio.test</a>"));
+    assert.match(mail.headers["List-Unsubscribe"], /^<mailto:destek@projelio\.app\?subject=/);
+    assert.ok(mail.text.includes("yanıtlaman yeterli"));
+  });
+
+  it("yanıt adresi yoksa List-Unsubscribe eklenmez", () => {
+    assert.equal(adminMesajEpostasiOlustur(temel).headers["List-Unsubscribe"], undefined);
+  });
 });

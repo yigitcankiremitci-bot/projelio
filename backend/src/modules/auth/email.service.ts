@@ -188,7 +188,16 @@ export class EmailService {
    */
   async sendPrepared(
     to: string,
-    mail: { subject: string; html: string; text: string; headers?: Record<string, string> }
+    mail: {
+      subject: string;
+      html: string;
+      text: string;
+      headers?: Record<string, string>;
+      /** Varsayılan gönderen (EMAIL_FROM) yerine — ör. yönetici mesajında destek@. */
+      from?: string;
+      /** Yanıtların gideceği adres. Yanıt beklenen e-postada gönderen itibarına katkı sağlar. */
+      replyTo?: string;
+    }
   ): Promise<boolean> {
     if (!this.apiKey) {
       this.logger.warn(
@@ -211,6 +220,8 @@ export class EmailService {
      * notifications/notification-email-unsubscribe.controller.ts).
      */
     headers?: Record<string, string>;
+    from?: string;
+    replyTo?: string;
   }): Promise<boolean> {
     try {
       const response = await fetchWithTimeout(RESEND_ENDPOINT, {
@@ -220,8 +231,9 @@ export class EmailService {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: this.from,
+          from: params.from ?? this.from,
           to: [params.to],
+          ...(params.replyTo ? { reply_to: params.replyTo } : {}),
           subject: params.subject,
           html: params.html,
           text: params.text,

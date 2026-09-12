@@ -1,5 +1,5 @@
 import type { ModuleAccess } from "@projelio/shared";
-import { isEntityModule } from "../lib/entityModules";
+import { isEntityModule, isOpenableModule } from "../lib/entityModules";
 import { MODULE_FORM_CONFIGS } from "../lib/moduleForms";
 import { getModuleRecordConfig } from "../lib/moduleRecordConfigs";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleConfigs";
@@ -167,12 +167,6 @@ function ModuleSurfaceContent({
 
 /** Modül tıklanınca bir şey açılıyor mu. */
 export function isOpenable(moduleKey: string): boolean {
-  return (
-    Boolean(MODULE_FORM_CONFIGS[moduleKey]) ||
-    Boolean(PANEL_CONFIGS[moduleKey]) ||
-    isEntityModule(moduleKey) ||
-    isSocialMediaModule(moduleKey) ||
-    isHesaplarModule(moduleKey) ||
-    Boolean(MODULE_RECORD_CONFIGS[moduleKey])
-  );
+  // Kart ve içerik aynı kararı kullanmalı; aksi hâlde hazır panel tıklanamaz kalır.
+  return isOpenableModule(moduleKey, Boolean(MODULE_RECORD_CONFIGS[moduleKey]));
 }

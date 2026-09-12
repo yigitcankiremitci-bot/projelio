@@ -45,6 +45,7 @@ export const projeler: TranslationDict = {
   "İşi düzenle": "Edit job",
   "Projeyi düzenle": "Edit project",
   "Üye ekle": "Add member",
+  "Yeni proje": "New project",
   "Yeni rutin": "New routine",
   "Yeni paylaşım": "New post",
   "Kapak fotoğrafı ekle": "Add cover photo",

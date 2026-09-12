@@ -1,6 +1,8 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { JobMember } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { atamalariBirak } from "../../common/atamalari-birak";
+import { parcalara } from "../../common/parcali-liste";
 import {
   canRespondToInvite,
   inviteAnswerNotificationBody,
@@ -263,6 +265,28 @@ export class JobMembersService {
     };
   }
 
+  /**
+   * İşe bağlı tüm görevlerin kimlikleri. Bir görev işe İKİ yoldan bağlanır:
+   * projesi üzerinden (tasks.project_id) ya da rutini üzerinden
+   * (tasks.operation_id). Yalnızca projelere bakmak, rutin görevlerini
+   * ayrılan kişinin panosunda bırakırdı.
+   */
+  private async jobTaskIds(jobId: string): Promise<string[]> {
+    const { data: projects } = await this.supabase.client.from("projects").select("id").eq("job_id", jobId);
+    const { data: operations } = await this.supabase.client.from("operations").select("id").eq("job_id", jobId);
+
+    const taskIds: string[] = [];
+    for (const parca of parcalara((projects ?? []).map((p: any) => p.id))) {
+      const { data } = await this.supabase.client.from("tasks").select("id").in("project_id", parca);
+      for (const row of data ?? []) taskIds.push(row.id);
+    }
+    for (const parca of parcalara((operations ?? []).map((o: any) => o.id))) {
+      const { data } = await this.supabase.client.from("tasks").select("id").in("operation_id", parca);
+      for (const row of data ?? []) taskIds.push(row.id);
+    }
+    return Array.from(new Set(taskIds));
+  }
+
   /** Bu işin projelerinde kullanıcının üyelik kayıtları (kendi projeleri hariç). */
   private async myProjectMemberships(jobId: string, userId: string): Promise<string[]> {
     const { data: projects } = await this.supabase.client
@@ -324,6 +348,16 @@ export class JobMembersService {
     }
 
     if (!ayrildi) throw new NotFoundException("Bu işte bir kadro kaydın yok");
+
+    // Üyelik kaydını silmek yetmiyor: Yapılacaklar panosu task_assignees'ten
+    // besleniyor (bkz. v_personal_board) ve işe erişimi kalmamış kullanıcının
+    // görevleri panosunda durmaya devam ediyordu. Görevler silinmez — yalnızca
+    // "bu iş bende" bağı kopar, iş sahibi yeniden atayabilir.
+    //
+    // SIRA ÖNEMLİ: ayrılacak bir bağ yoksa (yukarıdaki 404) atamalara hiç
+    // dokunulmaz. Aksi hâlde başarısız bir istek, kullanıcının o işteki
+    // görevlerini sessizce üstünden almış olurdu.
+    await atamalariBirak(this.supabase.client, await this.jobTaskIds(jobId), userId);
 
     // İş sahibi haberdar olsun: ekipten biri sessizce düşmesin
     // (aynı gerekçe MembersService.leaveProject'te de yazılı).

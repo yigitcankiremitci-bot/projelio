@@ -78,7 +78,8 @@ export default function ModulePage() {
 
   const title = entry?.name ?? "Modül";
   const parent = jobId
-    ? { to: `/jobs/${jobId}?tab=modules`, label: job?.title ?? "İş" }
+    ? // İşin Modüller sekmesi kalktı: modüller Projeler sekmesinin altında.
+      { to: `/jobs/${jobId}`, label: job?.title ?? "İş" }
     : { to: `/departments/${departmentId}?tab=modules`, label: department?.name ?? "Departman" };
 
   if (loading) {

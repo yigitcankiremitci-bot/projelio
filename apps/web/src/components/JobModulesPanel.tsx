@@ -13,6 +13,15 @@ import { useT } from "../lib/i18n";
 
 interface Props {
   jobId: string;
+  /**
+   * Modül yokken hiçbir şey çizme.
+   *
+   * Panel artık Projeler sekmesinin altında duruyor: modülü olmayan bir işte
+   * orada koca bir "henüz modül yok" kutusu durması proje kartlarının altını
+   * gereksiz yere dolduruyordu. "+" ile ekleme listesi açıldığında panel yine
+   * görünür — kullanıcı ne eklediğini görmeli.
+   */
+  hideWhenEmpty?: boolean;
 }
 
 /**
@@ -35,7 +44,7 @@ export interface JobModulesPanelHandle {
   openAdd: () => void;
 }
 
-const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobModulesPanel({ jobId }, ref) {
+const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobModulesPanel({ jobId, hideWhenEmpty }, ref) {
   const c = useThemeColors();
   const t = useT();
   const navigate = useNavigate();
@@ -114,9 +123,10 @@ const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobMod
   // Tek yönlü açma, listeyi kapatmanın tek yolunu "Vazgeç" bağlantısı yapıyordu.
   useImperativeHandle(ref, () => ({ openAdd: () => setAdding((v) => !v) }));
 
-  if (loading) return <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>;
+  if (loading) return hideWhenEmpty ? null : <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>;
 
   const activeEntries = catalog.filter((e) => isAssigned(e.key));
+  if (hideWhenEmpty && activeEntries.length === 0 && !adding) return null;
   const availableEntries = catalog.filter((e) => !isAssigned(e.key));
   const modalEntry = modalKey ? catalog.find((e) => e.key === modalKey) ?? null : null;
 

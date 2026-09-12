@@ -12,10 +12,11 @@ function mapDepartmentCatalog(row: any): DepartmentCatalogEntry {
   };
 }
 
-function mapModuleCatalog(row: any): ModuleCatalogEntry {
+function mapModuleCatalog(row: any, departmentKeys?: string[]): ModuleCatalogEntry {
   return {
     key: row.key,
     departmentKey: row.department_key ?? undefined,
+    departmentKeys: departmentKeys?.length ? departmentKeys : undefined,
     name: row.name,
     description: row.description ?? undefined,
     scope: row.scope,
@@ -66,6 +67,31 @@ export class CatalogService {
     if (opts.freelancerOnly) query = query.eq("applies_to_freelancer", true);
     const { data, error } = await query;
     if (error) throw error;
-    return (data ?? []).map(mapModuleCatalog);
+
+    // Her modülün TÜM departmanları, birincil olan başta. Şirket sayfasındaki
+    // modül kartı tek bir departman anahtarıyla yetinemiyor: modül, birincil
+    // departmanı kurulmamış bir şirkette de açık olabiliyor ve kart o zaman
+    // gidecek yer bulamıyordu (bkz. apps/web ModulesPanel).
+    const byModule = await this.departmentKeysByModule();
+    return (data ?? []).map((row: any) => mapModuleCatalog(row, byModule.get(row.key)));
+  }
+
+  /** module_catalog_departments'ı modül anahtarına göre toplar. */
+  private async departmentKeysByModule(): Promise<Map<string, string[]>> {
+    const { data, error } = await this.supabase.client
+      .from("module_catalog_departments")
+      .select("module_key, department_key, is_primary, sort_order")
+      .order("is_primary", { ascending: false })
+      .order("sort_order", { ascending: true });
+    // Eşleme tablosu okunamazsa katalog yine dönmeli: kart tıklanamaz kalır ama
+    // liste kaybolmaz.
+    if (error) return new Map();
+    const map = new Map<string, string[]>();
+    for (const row of data ?? []) {
+      const list = map.get(row.module_key) ?? [];
+      list.push(row.department_key);
+      map.set(row.module_key, list);
+    }
+    return map;
   }
 }

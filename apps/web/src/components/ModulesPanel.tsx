@@ -48,6 +48,25 @@ export default function ModulesPanel({ organizationId }: Props) {
   const enabledKeys = new Set(enabled.map((m) => m.moduleKey));
   const activeEntries = catalog.filter((e) => enabledKeys.has(e.key));
 
+  /**
+   * Kart tıklanınca hangi departmanın sayfasına gidilecek.
+   *
+   * Modül BİRDEN FAZLA departmana açık olabiliyor (module_catalog_departments)
+   * ve şirkette bunlardan yalnızca biri kurulmuş olabiliyor. Eskiden yalnızca
+   * BİRİNCİL departmana bakılıyordu: Hesaplar'ın birincili BT olduğu için, modül
+   * Yönetim'den açılmış bir şirkette kart hiçbir yere gitmiyor — tıklanınca
+   * hiçbir şey olmuyordu. Artık kurulu olan ilk departman kazanıyor (liste
+   * zaten birincil başta geliyor).
+   */
+  const departmentIdFor = (entry: ModuleCatalogEntry): string | undefined => {
+    const keys = entry.departmentKeys?.length ? entry.departmentKeys : entry.departmentKey ? [entry.departmentKey] : [];
+    for (const key of keys) {
+      const id = deptIdByCatalogKey.get(key);
+      if (id) return id;
+    }
+    return undefined;
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Modüller")}</h2>
@@ -89,7 +108,7 @@ export default function ModulesPanel({ organizationId }: Props) {
           }}
         >
           {activeEntries.map((entry) => (
-            <ModuleCard key={entry.key} entry={entry} departmentId={entry.departmentKey ? deptIdByCatalogKey.get(entry.departmentKey) : undefined} />
+            <ModuleCard key={entry.key} entry={entry} departmentId={departmentIdFor(entry)} />
           ))}
         </div>
       )}

@@ -291,6 +291,11 @@ export type ModuleScope = "organization" | "holding";
 export interface ModuleCatalogEntry {
   key: string;
   departmentKey?: string;
+  // Modülün açık olduğu TÜM departmanlar (module_catalog_departments), birincil
+  // olan başta. departmentKey yalnızca birincili söyler; şirket sayfasındaki
+  // modül kartı bunu kullanamıyordu: Hesaplar'ın birincili BT ama modül Yönetim
+  // ya da Finans'tan açılmış olabiliyor ve o durumda kart tıklanamaz kalıyordu.
+  departmentKeys?: string[];
   name: string;
   description?: string;
   scope: ModuleScope;

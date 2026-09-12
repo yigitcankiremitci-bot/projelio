@@ -6,6 +6,8 @@ import { useLiveRoom } from "../lib/liveRoom";
 import ProjectCard from "../components/ProjectCard";
 import OperationCard from "../components/OperationCard";
 import CreateOperationModal from "../components/CreateOperationModal";
+import CreateProjectModal from "../components/CreateProjectModal";
+import CreateTaskModal from "../components/CreateTaskModal";
 import EditJobModal from "../components/EditJobModal";
 import JobTabs, { JobTab, visibleJobTabs } from "../components/JobTabs";
 import ScopeBudgetPanel, { type ScopeBudgetPanelHandle } from "../components/butce/ScopeBudgetPanel";
@@ -56,6 +58,11 @@ export default function JobDetail() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);
   const [creatingOperation, setCreatingOperation] = useState(false);
+  // Projeler sekmesinin "+" menüsü artık sayfanın kendisinde: menüye "Modül
+  // ekle" eklenebilmesi için proje/görev pencerelerinin de burada olması
+  // gerekiyordu (BottomNav'ın sabit üçlü menüsüne dışarıdan seçenek eklenemez).
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
   const [endedOpen, setEndedOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editing, setEditing] = useState(false);
@@ -108,21 +115,32 @@ export default function JobDetail() {
   // kaydı SAYFA yapıyor, çünkü useProjectFabAction sayfa başına tek yerden
   // çağrılmalı (bkz. lib/projectFab.ts).
   useProjectFabAction(
-    activeTab === "tasks"
+    activeTab === "projects"
+      ? {
+          // Projeler sekmesi artık modülleri de taşıyor (aşağıdaki
+          // JobModulesPanel), o yüzden ekleme menüsü de burada: proje / rutin /
+          // görev + modül. Taşeron modül göremez, ona eski üçlü menü kalır.
+          label: t("Ekle"),
+          options: [
+            { label: t("Yeni proje"), onClick: () => setCreatingProject(true) },
+            { label: t("Yeni rutin"), onClick: () => setCreatingOperation(true) },
+            { label: t("Yeni görev"), onClick: () => setCreatingTask(true) },
+            ...(isSubcontractor ? [] : [{ label: t("Modül ekle"), onClick: () => modulesRef.current?.openAdd() }]),
+          ],
+        }
+      : activeTab === "tasks"
       ? { label: t("Görev ekle"), onClick: () => tasksPanelRef.current?.openCreate() }
       : activeTab === "programs"
       ? { label: t("Yeni rutin"), onClick: () => setCreatingOperation(true) }
       : activeTab === "team"
       ? { label: t("İşe al"), onClick: () => teamRef.current?.openHire() }
-      : activeTab === "modules"
-      ? { label: t("Modül ekle"), onClick: () => modulesRef.current?.openAdd() }
       : activeTab === "budget"
       ? { label: t("Gelir / gider ekle"), onClick: () => budgetRef.current?.openCreate() }
       : // Dosyalar sekmesinin "+" eylemini FilesPanel'in kendisi kaydediyor
         // (bkz. components/FilesPanel.tsx) — seçenekler bağlı buluta göre
         // değiştiği için o bilgi yalnızca panelin içinde var.
         null,
-    [activeTab]
+    [activeTab, isSubcontractor]
   );
 
   const reload = () => {
@@ -502,6 +520,19 @@ export default function JobDetail() {
             )
           )}
 
+          {/* Modüller proje kartlarının ALTINDA, ayrı bir sekmede değil.
+              Sekmedeyken kullanıcı işine modül atadığını unutuyordu: modül işin
+              bir parçası, ayrı bir yer değil. Taşerona çizilmiyor — sunucu da
+              job-modules uçlarını ona kapatıyor. Modül yokken hiçbir şey
+              çizilmiyor (hideWhenEmpty): proje kartlarının altında duran boş
+              kutu, sekmedeyken anlamlıydı, burada değil. "+"ın "Modül ekle"
+              seçeneği listeyi açıp paneli görünür kılıyor. */}
+          {activeTab === "projects" && id && !isSubcontractor && (
+            <div style={{ marginTop: 28 }}>
+              <JobModulesPanel ref={modulesRef} jobId={id} hideWhenEmpty />
+            </div>
+          )}
+
           {activeTab === "programs" && (
             operations.length === 0 ? (
               <div
@@ -608,10 +639,6 @@ export default function JobDetail() {
             <FilesPanel jobId={id} />
           )}
 
-          {/* Modüller işin içinde de görünür: anasayfadan atanan modüle
-              ulaşmak için kullanıcıyı anasayfaya geri göndermek gerekmiyor. */}
-          {activeTab === "modules" && id && <JobModulesPanel ref={modulesRef} jobId={id} />}
-
           {/* "Bugün yapılanlar" görev listesinin başında: bugün neyin bittiği,
               sıradaki işe bakarken anlam taşıyor — proje kartlarının üstünde
               değil. */}
@@ -638,6 +665,25 @@ export default function JobDetail() {
           )}
         </div>
       </div>
+
+      {creatingProject && id && (
+        <CreateProjectModal
+          jobId={id}
+          onClose={() => setCreatingProject(false)}
+          // onCreated verilmezse modal sayfayı tamamen yeniliyor; liste zaten
+          // yerinde tazelenebiliyor.
+          onCreated={reload}
+        />
+      )}
+
+      {creatingTask && id && (
+        <CreateTaskModal
+          jobId={id}
+          projects={projects}
+          onClose={() => setCreatingTask(false)}
+          onCreated={() => reloadTasks()}
+        />
+      )}
 
       {creatingOperation && (
         <CreateOperationModal

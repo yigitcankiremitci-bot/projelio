@@ -549,3 +549,16 @@ export function IconWhatsapp({ size = 18 }: IconProps) {
     </svg>
   );
 }
+
+// Bilgi kartı: şirketin künyesi. Kimlik kartı sembolü bilerek IconBuilding'den
+// ayrı — o "şirket" demek, bu "şirketin künyesi" demek.
+export function IconIdCard({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="5" width="19" height="14" rx="2" />
+      <circle cx="8" cy="11" r="2" />
+      <path d="M5 16c.6-1.4 1.7-2 3-2s2.4.6 3 2" />
+      <path d="M14.5 10h4M14.5 13.5h4" />
+    </svg>
+  );
+}

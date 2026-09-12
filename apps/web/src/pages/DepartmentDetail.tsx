@@ -7,6 +7,7 @@ import DepartmentMembersList, { DepartmentMembersListHandle } from "../component
 import DepartmentModulesPanel from "../components/DepartmentModulesPanel";
 import DepartmentTasksPanel, { DepartmentTasksPanelHandle } from "../components/DepartmentTasksPanel";
 import ScopeBudgetPanel, { type ScopeBudgetPanelHandle } from "../components/butce/ScopeBudgetPanel";
+import BilgiKartiModal from "../components/bilgiKarti/BilgiKartiModal";
 import DepartmentTabs, { DepartmentTab, visibleDepartmentTabs } from "../components/DepartmentTabs";
 import ProductsPanel from "../components/ProductsPanel";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
@@ -25,7 +26,7 @@ import { colors } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
-import { IconLayers, IconSettings } from "../components/icons";
+import { IconIdCard, IconLayers, IconSettings } from "../components/icons";
 import { useT } from "../lib/i18n";
 
 // Bir departmanın kendi sayfası: iç dinamikler üstteki sekmelerle ayrılır —
@@ -67,6 +68,10 @@ export default function DepartmentDetail() {
   };
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Departmandan da ŞİRKETİN kartı açılıyor: kartı en çok kullanan Yönetim ve
+  // Finans departmanları ve onların çalışma yeri burası — şirket sayfasına
+  // çıkıp geri dönmek, bilgiye ulaşmanın önündeki asıl engeldi.
+  const [bilgiKarti, setBilgiKarti] = useState(false);
   const feedRef = useRef<FeedPanelHandle>(null);
   const teamRef = useRef<DepartmentMembersListHandle>(null);
   const tasksRef = useRef<DepartmentTasksPanelHandle>(null);
@@ -222,6 +227,33 @@ export default function DepartmentDetail() {
         </div>
 
         {/* Ayarlar dişlisi yalnızca yönetebilenlere: taşeron/çalışan tıklasa 403 alırdı. */}
+        {department && (
+          <button
+            type="button"
+            onClick={() => setBilgiKarti(true)}
+            aria-label="Şirket bilgi kartı"
+            title="Şirket bilgi kartı"
+            style={{
+              position: "absolute",
+              bottom: 14,
+              // Ayarların solunda; ayar düğmesi yoksa (yetkisi olmayan kadro)
+              // kendisi sağa kaymaz — düğmelerin yeri kullanıcıya göre
+              // değişmesin, kas hafızası bozulmasın.
+              right: 56,
+              width: 34,
+              height: 34,
+              borderRadius: "50%",
+              border: "none",
+              background: "rgba(26,31,41,0.55)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <IconIdCard size={15} color="#fff" />
+          </button>
+        )}
+
         {department && access?.canManage !== false && (
           <button
             type="button"
@@ -246,6 +278,14 @@ export default function DepartmentDetail() {
           </button>
         )}
       </div>
+
+      {bilgiKarti && department && (
+        <BilgiKartiModal
+          scopeType="organization"
+          scopeId={department.organizationId}
+          onClose={() => setBilgiKarti(false)}
+        />
+      )}
 
       <div style={{ padding: `12px ${gutter}px 28px` }}>
         {department && (

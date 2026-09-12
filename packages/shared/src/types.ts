@@ -1421,6 +1421,10 @@ export interface BudgetTransaction {
    * yazmasın diye.
    */
   taskId?: string;
+  /** Bağlı görevin başlığı — listede "neyle ilgili" sütununu doldurmak için. */
+  taskTitle?: string;
+  /** Kaydın nereden doğduğu; otomatik satırlar elle düzenlenmez. */
+  source?: BudgetTransactionSource;
   description?: string;
   // İşlemin gerçekleştiği tarih (createdAt kayıt anıdır).
   occurredAt: string;
@@ -1447,7 +1451,35 @@ export interface BudgetViewer {
   createdAt: string;
 }
 
-export type RecurrenceInterval = "weekly" | "monthly" | "yearly";
+/**
+ * Düzenli ödemenin tekrar aralığı.
+ *
+ * 3 ve 6 aylık BİLEREK var: vergi, sigorta ve denetim ücretleri pratikte bu
+ * ritimde ödeniyor. Olmadıklarında kullanıcı ya yıllık girip tutarı bölüyor
+ * (defterde yanlış ay) ya da her seferinde elle yazıyordu.
+ */
+export type RecurrenceInterval = "weekly" | "monthly" | "quarterly" | "semiannual" | "yearly";
+
+export const RECURRENCE_INTERVAL_LABEL: Record<RecurrenceInterval, string> = {
+  weekly: "Haftalık",
+  monthly: "Aylık",
+  quarterly: "3 aylık",
+  semiannual: "6 aylık",
+  yearly: "Yıllık",
+};
+
+/** Seçim kutularının sırası: en sıktan en seyreğe. */
+export const RECURRENCE_INTERVALS: RecurrenceInterval[] = ["weekly", "monthly", "quarterly", "semiannual", "yearly"];
+
+/**
+ * Bir defter kaydının nereden doğduğu.
+ *
+ * `task_budget` satırları otomatiktir ve görev başına TEKTİR (veritabanında
+ * kısmi tekil indeks) — "ödendi"ye iki kez basmak gideri iki kez yazmasın
+ * diye. `manual` kayıtlar elle bir göreve bağlanabilir ve aynı göreve birden
+ * fazlası yazılabilir; oradaki soru "bu görev için ne harcandı".
+ */
+export type BudgetTransactionSource = "manual" | "task_budget" | "recurring";
 
 // Kira, abonelik, düzenli hakediş gibi tekrar eden ödemeler. Vadesi geldiğinde
 // sunucudaki günlük görev otomatik olarak bir BudgetTransaction üretir, sonraki
@@ -1465,6 +1497,9 @@ export interface RecurringPayment {
   organizationId?: string;
   groupId?: string;
   scopeType?: BudgetScopeType;
+  /** İlgili görev — vadesi gelince üretilen hareket bu bağı devralır. */
+  taskId?: string;
+  taskTitle?: string;
   type: "income" | "expense";
   amount: number;
   currency: string;
@@ -3038,4 +3073,419 @@ export interface WorkLogPushResult {
   createdId: string;
   /** Kullanıcıyı götüreceğimiz sayfa. */
   path?: string;
+}
+
+// ============================================================ Hesaplar modülü
+//
+// Üye olunan hesaplar (yazılım, bulut, banka, resmi kurum) ve giriş bilgileri.
+// Bkz. database/migrations/106_hesaplar_modulu.sql
+//
+// ÜÇ KURAL BU TİPLERDE GÖRÜNÜR:
+//   1. Sır listede DÖNMEZ. ServiceCredential yalnızca "böyle bir kayıt var"
+//      der; değer ayrı bir uçtan, kilit açılmış hâlde gelir.
+//   2. Para bu modülde TUTULMAZ. Abonelik alanları defterdeki düzenli ödeme
+//      satırına işaret eder (bkz. recurringPaymentId), toplamı o hesaplar.
+//   3. İzin HESABA verilir ("tek hesap") ya da kapsama ("tümü").
+
+/** Hesabın ne tür bir üyelik olduğu — süzgeç ve gruplama için kapalı liste. */
+export type ServiceAccountCategory =
+  | "yazilim"
+  | "bulut"
+  | "sosyal"
+  | "banka"
+  | "resmi"
+  | "egitim"
+  | "pazaryeri"
+  | "kargo"
+  | "iletisim"
+  | "diger";
+
+export const SERVICE_ACCOUNT_CATEGORIES: ServiceAccountCategory[] = [
+  "yazilim",
+  "bulut",
+  "sosyal",
+  "banka",
+  "resmi",
+  "pazaryeri",
+  "kargo",
+  "iletisim",
+  "egitim",
+  "diger",
+];
+
+/**
+ * Hesaba nasıl girildiği.
+ *
+ * Şifresiz girişler (geçiş anahtarı, "Google ile devam et") gerçek ve yaygın.
+ * Bunları listede "şifresi girilmemiş hesap" diye eksik göstermek, kullanıcıyı
+ * olmayan bir şifreyi aramaya iterdi.
+ */
+export type ServiceAccountLoginMethod =
+  | "password"
+  | "passkey"
+  | "sso_google"
+  | "sso_microsoft"
+  | "magic_link"
+  | "certificate"
+  | "other";
+
+export const SERVICE_ACCOUNT_LOGIN_METHODS: ServiceAccountLoginMethod[] = [
+  "password",
+  "passkey",
+  "sso_google",
+  "sso_microsoft",
+  "magic_link",
+  "certificate",
+  "other",
+];
+
+export interface ServiceAccount {
+  id: string;
+  /** Sahiplik: organizasyon ya da iş (tam olarak biri dolu). */
+  organizationId?: string;
+  jobId?: string;
+  departmentId?: string;
+
+  name: string;
+  category: ServiceAccountCategory;
+  /** Giriş adresi. Toplu link düğmesi bunu açar. */
+  url?: string;
+  loginMethod: ServiceAccountLoginMethod;
+  plan?: string;
+  ownerUserId?: string;
+  ownerName?: string;
+  /** SIR DEĞİL: "kurumsal kartla ödeniyor" gibi serbest not. */
+  note?: string;
+
+  // ---------------------------------------------------------- Abonelik
+  isPaid: boolean;
+  amount?: number;
+  currency: string;
+  billingInterval?: RecurrenceInterval;
+  nextDueDate?: string;
+  /** Kasadaki düzenli gider satırı. Boşsa hesap kasaya bağlı değil. */
+  recurringPaymentId?: string;
+  /** Giderin yazıldığı kademe — ekranda "Pazarlama kasası" diye gösterilir. */
+  budgetScopeType?: "department" | "job";
+  budgetScopeName?: string;
+
+  /** Kaç giriş kaydı var. Sır değil: sayı, değerine dair bir şey söylemez. */
+  credentialCount: number;
+  /** Bu kullanıcı bu hesabın giriş bilgilerini görebilir mi. */
+  canReveal: boolean;
+  /** Görebiliyorsa hangi haktan. */
+  revealReason?: ServiceCredentialReason;
+  /** Hesabı kaç kişiyle paylaşıldığı — yalnızca yöneticiye doldurulur. */
+  grantCount?: number;
+
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+/** Modül açılışında tek istekte dönen paket. */
+export interface ServiceAccountList {
+  accounts: ServiceAccount[];
+  /** Yönetici mi: paylaşım verebilir, denetim izini okuyabilir. */
+  canManage: boolean;
+  canCreate: boolean;
+  /** Kapsam geneli ("tüm hesaplar") paylaşımlar — yalnızca yöneticiye. */
+  scopeGrants: ServiceAccountGrant[];
+  /**
+   * Abonelik giderinin gideceği kasa: departmanda departmanın, işte işin.
+   * Ekranda yazılı olsun diye dönüyor — kullanıcı parayı nereye yazdığını
+   * kaydetmeden önce görmeli.
+   */
+  budgetScopeName?: string;
+  /** Kullanıcının o kasaya kayıt girme yetkisi var mı. */
+  canManageBudget: boolean;
+  /** Sunucuda şifreleme anahtarı tanımlı mı — yoksa şifre kaydedilemez. */
+  cryptoReady: boolean;
+}
+
+/** Şifrenin neden gösterilebildiği. */
+export type ServiceCredentialReason = "admin" | "creator" | "account_grant" | "scope_grant";
+
+/** Kilidin hangi yöntemle açıldığı — denetim izine yazılır. */
+export type ServiceUnlockMethod = "password" | "passkey";
+
+/** Giriş kaydının sırsız hâli. */
+export interface ServiceCredential {
+  id: string;
+  accountId: string;
+  label: string;
+  /** Şifre girilmiş mi. Şifresiz giriş yöntemlerinde boş olabilir. */
+  hasPassword: boolean;
+  hasNote: boolean;
+  hasTotp: boolean;
+  createdBy?: string;
+  createdByName?: string;
+  createdAt: string;
+  updatedAt?: string;
+  passwordChangedAt: string;
+  canReveal: boolean;
+  revealReason?: ServiceCredentialReason;
+  canEdit: boolean;
+}
+
+/** Yalnızca "göster" ucundan dönen sır. Hiçbir listeye, hiçbir log'a girmez. */
+export interface ServiceCredentialSecret {
+  id: string;
+  username?: string;
+  password?: string;
+  note?: string;
+  totp?: string;
+  reason: ServiceCredentialReason;
+}
+
+/** Bir kişiye verilmiş paylaşım. accountId boşsa kapsamdaki TÜM hesaplar. */
+export interface ServiceAccountGrant {
+  id: string;
+  userId: string;
+  userName?: string;
+  accountId?: string;
+  accountName?: string;
+  grantedBy?: string;
+  grantedByName?: string;
+  grantedAt: string;
+  expiresAt?: string;
+  revokedAt?: string;
+  active: boolean;
+}
+
+/** Sırrın gösterildiği an — denetim izi, yalnızca yöneticiye açık. */
+export interface ServiceCredentialView {
+  id: string;
+  credentialId: string;
+  credentialLabel?: string;
+  userId?: string;
+  userName?: string;
+  reason: ServiceCredentialReason;
+  unlockMethod: ServiceUnlockMethod;
+  viewedAt: string;
+}
+
+// ---------------------------------------------------------- Kilit
+//
+// Sır göstermeden önce kimlik TEKRAR doğrulanır: oturum açık olmak yetmez,
+// çünkü açık kalmış bir ekran başkasının eline geçebiliyor. İki yol var ve
+// ikisi de aynı kilit jetonunu üretir.
+
+export interface ServiceUnlockResult {
+  /** Kısa ömürlü jeton; `reveal` uçları bunu ister. */
+  token: string;
+  /** Jetonun geçerlilik süresi (saniye) — arayüz geri sayım gösterir. */
+  expiresInSeconds: number;
+  method: ServiceUnlockMethod;
+}
+
+// ---------------------------------------------------------- Geçiş anahtarları
+//
+// Kullanıcıya ait, modüle değil (bkz. migration 106 §5). Bugün tek kullanımı
+// hesap sırlarının kilidini açmak.
+
+export interface Passkey {
+  id: string;
+  label?: string;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
+/** Tarayıcıya verilecek kayıt seçenekleri — navigator.credentials.create(). */
+export interface PasskeyRegistrationOptions {
+  challenge: string;
+  rpId: string;
+  rpName: string;
+  userId: string;
+  userName: string;
+  userDisplayName: string;
+  /** COSE algoritma kimlikleri (ES256, RS256, EdDSA). */
+  algorithms: number[];
+  /** Zaten kayıtlı cihazlar — aynı cihaz ikinci kez kaydedilmesin. */
+  excludeCredentialIds: string[];
+  timeoutMs: number;
+}
+
+/** Kilit açma seçenekleri — navigator.credentials.get(). */
+export interface PasskeyAuthOptions {
+  challenge: string;
+  rpId: string;
+  allowCredentialIds: string[];
+  timeoutMs: number;
+}
+
+// ============================================================ BİLGİ KARTI
+//
+// Şirketin (ya da serbest çalışanın işinin) künyesi, belgeleri ve özeti.
+// Tek kapsam iki türlü olabiliyor: organizasyon ve iş (bkz. migration 107).
+//
+// ÖZET KAYDEDİLMİYOR: aşağıdaki BilgiKartiOzeti her açılışta ilgili
+// modüllerden hesaplanır. Kopyalansaydı ilk günden bayatlar ve aynı sayıyı
+// farklı gösteren iki ekran çıkardı.
+
+export type BilgiKartiKapsami = "organization" | "job";
+
+export function bilgiKartiKapsamiMi(deger: unknown): deger is BilgiKartiKapsami {
+  return deger === "organization" || deger === "job";
+}
+
+/** Künye — sabit alanlar. Hepsi isteğe bağlı: kart boşken de açılır. */
+export interface BilgiKarti {
+  id: string;
+  scopeType: BilgiKartiKapsami;
+  scopeId: string;
+  legalName?: string;
+  brandName?: string;
+  sector?: string;
+  foundedOn?: string;
+  employeeCount?: number;
+  about?: string;
+  taxOffice?: string;
+  taxNumber?: string;
+  tradeRegistryNo?: string;
+  mersisNo?: string;
+  naceCode?: string;
+  sgkNo?: string;
+  kepAddress?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  address?: string;
+  district?: string;
+  city?: string;
+  country?: string;
+  postalCode?: string;
+  bankName?: string;
+  iban?: string;
+  notes?: string;
+  updatedAt?: string;
+  updatedByName?: string;
+}
+
+/** Kullanıcının kendi eklediği alan — sabit listede olmayan her şey. */
+export interface BilgiKartiAlani {
+  id: string;
+  label: string;
+  value?: string;
+  sortOrder: number;
+}
+
+export type BilgiKartiBelgeTuru =
+  | "vergi_levhasi"
+  | "imza_sirkuleri"
+  | "ticaret_sicil_gazetesi"
+  | "faaliyet_belgesi"
+  | "vergi_mukellefiyet_yazisi"
+  | "sgk_belgesi"
+  | "kimlik"
+  | "sozlesme"
+  | "ruhsat"
+  | "sigorta_policesi"
+  | "marka_tescil"
+  | "logo"
+  | "diger";
+
+export const BILGI_KARTI_BELGE_TURLERI: BilgiKartiBelgeTuru[] = [
+  "vergi_levhasi",
+  "imza_sirkuleri",
+  "ticaret_sicil_gazetesi",
+  "faaliyet_belgesi",
+  "vergi_mukellefiyet_yazisi",
+  "sgk_belgesi",
+  "marka_tescil",
+  "ruhsat",
+  "sigorta_policesi",
+  "sozlesme",
+  "kimlik",
+  "logo",
+  "diger",
+];
+
+export const BILGI_KARTI_BELGE_ETIKET: Record<BilgiKartiBelgeTuru, string> = {
+  vergi_levhasi: "Vergi levhası",
+  imza_sirkuleri: "İmza sirküleri",
+  ticaret_sicil_gazetesi: "Ticaret sicil gazetesi",
+  faaliyet_belgesi: "Faaliyet belgesi",
+  vergi_mukellefiyet_yazisi: "Vergi mükellefiyet yazısı",
+  sgk_belgesi: "SGK belgesi",
+  kimlik: "Kimlik / imza beyannamesi",
+  sozlesme: "Sözleşme",
+  ruhsat: "Ruhsat / izin belgesi",
+  sigorta_policesi: "Sigorta poliçesi",
+  marka_tescil: "Marka tescil belgesi",
+  logo: "Logo / kurumsal kimlik",
+  diger: "Diğer",
+};
+
+/**
+ * Karta asılı belge. Kaynağı ya Projelio'daki bir dosya ya da dış bağlantı —
+ * ikisinden tam biri (bkz. migration 107).
+ */
+export interface BilgiKartiBelgesi {
+  id: string;
+  docType: BilgiKartiBelgeTuru;
+  title: string;
+  fileId?: string;
+  fileName?: string;
+  fileMimeType?: string;
+  /** Dosyanın bulut sağlayıcısındaki adresi — "aç" düğmesi bunu kullanır. */
+  webViewLink?: string;
+  externalUrl?: string;
+  issuedOn?: string;
+  validUntil?: string;
+  note?: string;
+  createdAt: string;
+  createdByName?: string;
+}
+
+/** Özetin tek satırı. Sayı ya da metin; ikisi de olmayan satır gösterilmez. */
+export interface BilgiKartiOzetSatiri {
+  key: string;
+  label: string;
+  value: string;
+  /** Varsa satıra tıklanınca gidilecek uygulama içi adres. */
+  href?: string;
+}
+
+/**
+ * Diğer modüllerden toplanan şirket özeti.
+ *
+ * Bölümlere ayrılmış: kullanıcı "kaç kişiyiz" ile "ne kadar paramız var"ı aynı
+ * listede aramıyor. Bir bölümün satırı yoksa bölüm hiç çizilmez — boş başlık
+ * göstermek, veri yokluğunu hata gibi okutuyordu.
+ */
+export interface BilgiKartiOzetBolumu {
+  key: string;
+  title: string;
+  rows: BilgiKartiOzetSatiri[];
+}
+
+export interface BilgiKartiOzeti {
+  sections: BilgiKartiOzetBolumu[];
+}
+
+/** İsteyen kullanıcının karttaki yetkisi. */
+export interface BilgiKartiYetkisi {
+  canView: boolean;
+  /** Künyeyi, alanları ve belgeleri değiştirebilir mi. */
+  canEdit: boolean;
+}
+
+/**
+ * Kartın TÜM verisi — tek uçtan gelir (bkz. ButceSayfasi'ndaki aynı gerekçe):
+ * parçalara bölünseydi modal künyeyi gösterip belgeleri saniyeler sonra
+ * doldururdu.
+ */
+export interface BilgiKartiSayfasi {
+  scopeType: BilgiKartiKapsami;
+  scopeId: string;
+  /** Kapsamın adı — modalin başlığı ("Projelio Yazılım A.Ş."). */
+  scopeName: string;
+  /** Kapak görseli: kart, sayfanın kimliğini tekrar etsin diye. */
+  coverImageUrl?: string;
+  kart: BilgiKarti | null;
+  alanlar: BilgiKartiAlani[];
+  belgeler: BilgiKartiBelgesi[];
+  ozet: BilgiKartiOzeti;
+  yetki: BilgiKartiYetkisi;
 }

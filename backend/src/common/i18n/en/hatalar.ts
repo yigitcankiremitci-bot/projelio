@@ -616,4 +616,66 @@ export const hatalar: TranslationDict = {
   "Geçersiz saat dilimi.": "Invalid time zone.",
   "Bildirim e-postası anahtarları doğru/yanlış olmalı.":
     "Notification email switches must be true or false.",
+
+  // ─────────────────────────────────────────────── Hesaplar modülü
+  //
+  // Bu modülün hata cümleleri bir SONRAKİ ADIMI söylüyor ("bütçe yetkisi
+  // gerekiyor", "Ayarlar'dan cihaz ekleyin"); yarısı Türkçe kalan bir akış
+  // kullanıcıyı tam da takıldığı yerde bırakırdı.
+  "Bu modüle hesap ekleme yetkiniz yok": "You don't have permission to add accounts to this module",
+  "Bu modüle giriş bilgisi ekleme yetkiniz yok": "You don't have permission to add logins to this module",
+  "Bu hesabı yalnızca yöneticiler ve kaydı giren kişi düzenleyebilir":
+    "Only managers and the person who added it can edit this account",
+  "Bu hesabı yalnızca yöneticiler ve kaydı giren kişi silebilir":
+    "Only managers and the person who added it can delete this account",
+  "Bu kaydı yalnızca yöneticiler ve bilgiyi giren kişi düzenleyebilir":
+    "Only managers and the person who entered it can edit this record",
+  "Bu kaydı yalnızca yöneticiler ve bilgiyi giren kişi silebilir":
+    "Only managers and the person who entered it can delete this record",
+  "Bu hesabın giriş bilgilerini görme yetkiniz yok. Modül yöneticisinden paylaşım isteyebilirsiniz.":
+    "You don't have permission to see this account's logins. Ask a module manager to share it with you.",
+  "Hesap bu modüle ait değil": "That account doesn't belong to this module",
+  "Hesap paylaşımını yalnızca modül yöneticileri yapabilir": "Only module managers can share accounts",
+  "Paylaşımları yalnızca modül yöneticileri görebilir": "Only module managers can see the shares",
+  "Paylaşımı yalnızca modül yöneticileri kaldırabilir": "Only module managers can remove a share",
+  "Denetim izini yalnızca modül yöneticileri görebilir": "Only module managers can see the audit trail",
+  "Bu kişi Hesaplar modülünü görmüyor. Önce modül ekibine ekleyin, sonra paylaşın.":
+    "This person can't see the Accounts module. Add them to the module team first, then share.",
+  "Ücretli abonelik için tutar ve ödeme aralığı gerekli":
+    "A paid subscription needs an amount and a billing interval",
+  "Abonelik gideri için bir kasa gerekiyor. Bu modül bir departman ya da iş altında açılmalı.":
+    "A subscription cost needs a ledger. This module has to be opened under a department or a job.",
+  "Aboneliği kasaya işlemek için bütçe yetkisi gerekiyor. Hesabı ücretsiz olarak kaydedebilir ya da bütçe yetkisi olan birinden yardım isteyebilirsiniz.":
+    "Posting a subscription to the ledger needs budget permission. Save the account as free, or ask someone with budget permission.",
+  "En az bir bilgi girin (kullanıcı adı, şifre ya da not)": "Fill in at least one field (username, password or note)",
+  "Bilgiler çözülemedi. Sunucudaki şifreleme anahtarı değişmiş olabilir; kaydı yeniden girin.":
+    "Couldn't decrypt the details. The server's encryption key may have changed; enter the record again.",
+  "Şifre saklama kapalı: sunucuda HESAP_KIMLIK_ENC_KEY tanımlı değil. Sistem yöneticinize bildirin.":
+    "Password storage is off: HESAP_KIMLIK_ENC_KEY isn't configured on the server. Tell your system administrator.",
+  "Şifrenizi girin": "Enter your password",
+  "Şifre yanlış": "Wrong password",
+  "Kilit süresi doldu. Yeniden açmanız gerekiyor.": "The unlock expired. You need to unlock again.",
+  "Kilit doğrulanamadı. Yeniden açmanız gerekiyor.": "The unlock couldn't be verified. You need to unlock again.",
+  "Kilidi açın: şifrenizi girin ya da geçiş anahtarınızı kullanın.":
+    "Unlock first: enter your password or use your passkey.",
+  "Hesabınız Google ile oluşturulmuş, şifresi yok. Kilidi geçiş anahtarıyla açın: Ayarlar > Geçiş anahtarları.":
+    "Your account was created with Google and has no password. Unlock with a passkey instead: Settings > Passkeys.",
+  "Kayıtlı geçiş anahtarınız yok. Ayarlar'dan bir cihaz ekleyin.":
+    "You have no passkey saved. Add a device from Settings.",
+  "Geçiş anahtarı bulunamadı": "Passkey not found",
+  "Geçiş anahtarı yanıtı eksik": "The passkey response is incomplete",
+  "Bu geçiş anahtarı hesabınıza kayıtlı değil": "That passkey isn't registered to your account",
+  "Bu geçiş anahtarı başka bir hesaba kayıtlı": "That passkey is registered to another account",
+  "Doğrulama isteğinin süresi geçti. Lütfen yeniden deneyin.": "The verification request expired. Please try again.",
+  "Alan adı boş olamaz": "Field name cannot be empty",
+  "Belge adı boş olamaz": "Document name cannot be empty",
+  "Belge için dosya ya da bağlantı gerekiyor": "A document requires a file or a link",
+  "Belgenin kaynağı ya dosya ya bağlantı olabilir, ikisi birden değil": "A document can reference a file or a link, but not both",
+  "Bilgi kartı bulunamadı": "Info card not found",
+  "Bilgi kartını yalnızca sahibi ve Yönetim departmanının yöneticisi düzenleyebilir": "Only the owner and the Management department manager can edit the info card",
+  "Bu bilgi kartını görüntüleme yetkiniz yok": "You do not have permission to view this info card",
+  "Kayıt bu bilgi kartında bulunamadı": "Record not found in this info card",
+  "Tanınmayan bilgi kartı kapsamı": "Unknown info card scope",
+  "organizationId ya da jobId gerekli (list_modules ile bulabilirsin).": "organizationId or jobId is required (use list_modules to find it).",
+  "Güvenliğiniz için çıkış yapıp yeniden giriş yapın; ardından beş dakika içinde tekrar deneyin.": "For your security, sign out and sign in again, then try again within five minutes.",
 };

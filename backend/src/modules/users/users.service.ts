@@ -1,3 +1,4 @@
+import { assertRecentInteractiveLogin, type ReauthSession } from "../auth/account-reauth";
 import { randomUUID } from "crypto";
 import { hashPassword, verifyPassword } from "../../common/password.util";
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
@@ -555,7 +556,8 @@ export class UsersService {
   async changePassword(
     userId: string,
     currentPassword: string | undefined,
-    newPassword: string
+    newPassword: string,
+    session: ReauthSession = {}
   ): Promise<{ ok: true; hasPassword: true }> {
     // DEMO HESABI: şifre değiştirilemez. Şifresi tanıtım sitesinde yazan ortak
     // bir hesap bu; değiştiren ilk ziyaretçi demoyu herkese kapatırdı ve geri
@@ -577,6 +579,9 @@ export class UsersService {
       if (await verifyPassword(newPassword, user.passwordHash)) {
         throw new BadRequestException("Yeni şifre eskisiyle aynı olamaz.");
       }
+    } else {
+      // İlk şifreyle yeni kasa kilidi aşılmasın: Google girişini yenilemek gerekir.
+      assertRecentInteractiveLogin(session);
     }
 
     await this.updatePasswordHash(userId, await hashPassword(newPassword));

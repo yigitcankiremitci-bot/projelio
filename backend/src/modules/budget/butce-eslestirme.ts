@@ -18,7 +18,7 @@ import type { BudgetScopeType, BudgetTransaction, RecurringPayment } from "@proj
  * kastettiğini kendi başına bilemez.
  */
 export const SECIM =
-  "*, projects(title), departments(name), jobs(title), organizations(name), groups(name), party(display_name), users!budget_transactions_created_by_fkey(full_name)";
+  "*, projects(title), departments(name), jobs(title), organizations(name), groups(name), tasks(title), party(display_name), users!budget_transactions_created_by_fkey(full_name)";
 
 /**
  * Kaydın hangi kademeye ait olduğu, kimlik sütunlarından türetilir.
@@ -64,6 +64,9 @@ export function mapTransaction(row: any): BudgetTransaction {
     category: row.category ?? undefined,
     counterpartyId: row.counterparty_id ?? undefined,
     taskId: row.task_id ?? undefined,
+    taskTitle: row.tasks?.title ?? undefined,
+    // Eski kayıtlarda sütun yoktu; hepsi elle girilmişti (bkz. migration 105).
+    source: row.source ?? "manual",
     counterpartyName: row.party?.display_name ?? undefined,
     description: row.description ?? undefined,
     occurredAt: row.occurred_at,
@@ -83,6 +86,8 @@ export function mapRecurringPayment(row: any): RecurringPayment {
     organizationId: row.organization_id ?? undefined,
     groupId: row.group_id ?? undefined,
     scopeType: kapsamTuru(row),
+    taskId: row.task_id ?? undefined,
+    taskTitle: row.tasks?.title ?? undefined,
     type: row.type,
     amount: Number(row.amount),
     currency: row.currency || "TRY",

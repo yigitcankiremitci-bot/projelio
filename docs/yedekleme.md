@@ -92,8 +92,13 @@ jetonları **hiçbir şekilde** çözülemez.
 
 Yedeklenmesi gereken kritik değişkenler: `APP_JWT_SECRET`,
 `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `POSTGRES_PASSWORD`,
-`SOCIAL_CREDENTIAL_ENC_KEY`, `GOOGLE_TOKEN_ENC_KEY`, `WAHA_API_KEY`,
-`ANTHROPIC_API_KEY`, VAPID anahtar çifti.
+`SOCIAL_CREDENTIAL_ENC_KEY`, `HESAP_KIMLIK_ENC_KEY`, `GOOGLE_TOKEN_ENC_KEY`,
+`WAHA_API_KEY`, `ANTHROPIC_API_KEY`, VAPID anahtar çifti.
+
+`HESAP_KIMLIK_ENC_KEY` bu listenin en acısı: Hesaplar modülüne girilmiş TÜM
+hesap şifreleri onunla çözülüyor ve kullanıcılar o şifreleri başka hiçbir yerde
+tutmadıkları için (modülün varlık sebebi tam olarak bu) anahtarın kaybı
+şifrelerin kaybıdır.
 
 ## Geri yükleme
 

@@ -208,8 +208,13 @@ export class ButceHiyerarsiService {
    *
    * Tek seferde çıkarılıyor: sonraki adımlarda hem hareketleri toplu çekmek
    * hem çocuk kırılımını üretmek için kullanılıyor, iki kez sorgulamaya değmez.
+   *
+   * `private` DEĞİL: kayıt eklerken seçilen hedefin gerçekten bu kademenin
+   * ALTINDA olduğunu doğrulamak da aynı listeyi istiyor (bkz.
+   * ButceKademeService.hedefiCoz). İkinci bir kopya, iki kuralın bir gün
+   * ayrışması demekti.
    */
-  private async altKapsamlar(scopeType: ViewerKapsami, scopeId: string): Promise<AltKapsamlar> {
+  async altKapsamlar(scopeType: ViewerKapsami, scopeId: string): Promise<AltKapsamlar> {
     const bos: AltKapsamlar = { organizations: [], jobs: [], departments: [], projects: [], operations: [] };
 
     if (scopeType === "department") return bos;
@@ -425,7 +430,7 @@ export class ButceHiyerarsiService {
   }
 }
 
-interface AltKapsamlar {
+export interface AltKapsamlar {
   organizations: { id: string; ad: string }[];
   jobs: { id: string; ad: string; organizationId?: string }[];
   departments: { id: string; ad: string; organizationId: string }[];

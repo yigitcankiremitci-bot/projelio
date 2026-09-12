@@ -21,8 +21,9 @@ import TodayCompletedPanel from "../components/TodayCompletedPanel";
 import TaskEditModal from "../components/TaskEditModal";
 import Modal from "../components/Modal";
 import JobMemberSettingsModal from "../components/JobMemberSettingsModal";
+import BilgiKartiModal from "../components/bilgiKarti/BilgiKartiModal";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconUser, IconCalendar, IconSettings } from "../components/icons";
+import { IconUser, IconCalendar, IconSettings, IconIdCard } from "../components/icons";
 import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 import { gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
@@ -58,6 +59,9 @@ export default function JobDetail() {
   const [endedOpen, setEndedOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editing, setEditing] = useState(false);
+  // İşin bilgi kartı: künye, belgeler ve özet (bkz. BilgiKartiModal).
+  // Taşerona hiç gösterilmiyor — sunucu da reddediyor, düğme boş yere durmasın.
+  const [bilgiKarti, setBilgiKarti] = useState(false);
   // İşi KURAN kişi dışındaki ekip üyelerinin ayar penceresi (şimdilik tek
   // seçeneği "İşten ayrıl", bkz. JobMemberSettingsModal). Ekip sekmesindeki
   // düğme (bkz. JobTeamPanel) taşerona ve sekmeyi kapatmış işlere
@@ -413,23 +417,22 @@ export default function JobDetail() {
         }
         stats={<CoverStats items={stats} />}
         action={
-          job && currentUser?.id === job.ownerId ? (
-            <button
-              onClick={() => setEditing(true)}
-              aria-label={t("İşi düzenle")}
-              style={coverActionButton(c)}
-            >
-              <IconSettings size={20} color={c.textSecondary} />
-            </button>
-          ) : myTies?.canLeave ? (
-            <button
-              onClick={() => setMemberSettings(true)}
-              aria-label={t("İş ayarları")}
-              style={coverActionButton(c)}
-            >
-              <IconSettings size={20} color={c.textSecondary} />
-            </button>
-          ) : undefined
+          <div style={{ display: "flex", gap: 8 }}>
+            {!isSubcontractor && (
+              <button onClick={() => setBilgiKarti(true)} aria-label="İş bilgi kartı" style={coverActionButton(c)}>
+                <IconIdCard size={20} color={c.textSecondary} />
+              </button>
+            )}
+            {job && currentUser?.id === job.ownerId ? (
+              <button onClick={() => setEditing(true)} aria-label={t("İşi düzenle")} style={coverActionButton(c)}>
+                <IconSettings size={20} color={c.textSecondary} />
+              </button>
+            ) : myTies?.canLeave ? (
+              <button onClick={() => setMemberSettings(true)} aria-label={t("İş ayarları")} style={coverActionButton(c)}>
+                <IconSettings size={20} color={c.textSecondary} />
+              </button>
+            ) : null}
+          </div>
         }
       />
 
@@ -647,6 +650,8 @@ export default function JobDetail() {
           }}
         />
       )}
+
+      {bilgiKarti && id && <BilgiKartiModal scopeType="job" scopeId={id} onClose={() => setBilgiKarti(false)} />}
 
       {editing && job && (
         <EditJobModal

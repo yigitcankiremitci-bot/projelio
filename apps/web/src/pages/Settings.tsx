@@ -20,6 +20,7 @@ import TabBar from "../components/TabBar";
 import CloudAccountsCard from "../components/CloudAccountsCard";
 import WhatsappCard from "../components/WhatsappCard";
 import NotificationEmailCard from "../components/NotificationEmailCard";
+import PasskeysCard from "../components/PasskeysCard";
 import WhatsappProfileCard from "../components/WhatsappProfileCard";
 import {
   IconShield,
@@ -530,6 +531,16 @@ export default function Settings() {
         )}
       </SettingCard>
       )}
+
+      {/* Geçiş anahtarları şifrenin HEMEN ALTINDA: ikisi de "kimliğini nasıl
+          kanıtlıyorsun" sorusunun cevabı ve kullanıcı birini ararken diğerini
+          de görüyor. */}
+      <SettingCard
+        title={t("Geçiş anahtarları")}
+        description={t("Hesap şifrelerinin kilidini parmak izi, yüz ya da PIN ile açmak için cihaz ekle. Cihazdaki özel anahtar Projelio'ya hiç gönderilmez.")}
+      >
+        <PasskeysCard hasPassword={hasPassword} />
+      </SettingCard>
 
       <CardGroup label={t("Hesabına bağlı sayfalar")}>
         <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, overflow: "hidden" }}>

@@ -287,6 +287,22 @@ export function assertRequiredEnv(): void {
     );
   }
 
+  /*
+   * HESAP_KIMLIK_ENC_KEY: Hesaplar modülünün şifreleme anahtarı.
+   *
+   * Eksikken modül ÇALIŞIR — hesaplar listelenir, abonelik gideri kasaya
+   * yazılır — ama giriş bilgisi kaydetmeye çalışan kullanıcı her seferinde
+   * "şifre saklama kapalı" hatası alır ve sebebini sunucuda arar. Uyarı,
+   * hata değil: modül isteğe bağlı ve açmayan kurulumlarda anahtar da
+   * gerekmiyor. Üretimi engellemek orantısız olurdu.
+   */
+  if (isProduction() && !process.env.HESAP_KIMLIK_ENC_KEY?.trim()) {
+    logger.warn(
+      "HESAP_KIMLIK_ENC_KEY tanımlı değil. Hesaplar modülünde giriş bilgisi KAYDEDİLEMEZ " +
+        "(şifreler düz metin yazılmasın diye kayıt reddedilir). Anahtar üretin: openssl rand -base64 32"
+    );
+  }
+
   if (isProduction() && !process.env.RESEND_API_KEY?.trim()) {
     logger.warn(
       "RESEND_API_KEY tanımlı değil. E-posta doğrulama ve şifre sıfırlama e-postaları GÖNDERİLEMEYECEK; " +

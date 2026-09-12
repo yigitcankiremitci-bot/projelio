@@ -28,6 +28,8 @@ import { CloudStorageModule } from "../cloud-storage/cloud-storage.module";
 import { RealtimeModule } from "../realtime/realtime.module";
 import { CatalogModule } from "../catalog/catalog.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { BilgiKartiModule } from "../bilgi-karti/bilgi-karti.module";
+import { HesaplarModule } from "../hesaplar/hesaplar.module";
 import { DepartmentsModule } from "../departments/departments.module";
 import { DepartmentMembersModule } from "../department-members/department-members.module";
 import { OrganizationModulesModule } from "../organization-modules/organization-modules.module";
@@ -75,6 +77,12 @@ import { WhatsappModule } from "../whatsapp/whatsapp.module";
     // ise kullanıcının hangi organizasyonlarda olduğunu söylüyor.
     CatalogModule,
     OrganizationsModule,
+    // Bilgi kartı: "vergi numaramız kaç" sorusunun tek kaynağı. Şirketin
+    // künyesi başka hiçbir serviste yok (bkz. migration 107).
+    BilgiKartiModule,
+    // Hesaplar: Lio üyelik listesini ve abonelik giderlerini okuyor; sır
+    // okuyan servis bu modülden dışa aktarılmıyor.
+    HesaplarModule,
     // Departman araçları: görev bir projeye ya da bir departmana açılabiliyor.
     // Departmanı listelemek, kadrosunu görmek ve görevlerini yönetmek için.
     DepartmentsModule,

@@ -89,7 +89,7 @@ export class UsersController {
   // /auth/forgot-password (bkz. password-reset.service.ts).
   @Patch("me/password")
   changePassword(@Req() req: any, @Body() body: { currentPassword?: string; newPassword: string }) {
-    return this.usersService.changePassword(req.user.userId, body.currentPassword, body.newPassword);
+    return this.usersService.changePassword(req.user.userId, body.currentPassword, body.newPassword, req.user);
   }
 
   /**

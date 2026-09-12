@@ -261,6 +261,52 @@ kaydın *varlığını* görür.
 verilebilir; departmanı görebildiği için modülü okuyabilen ama modüle atanmamış
 kişiye izin verilmez.
 
+## Hesaplar modülü (`/service-accounts`, `/passkeys`)
+
+Üye olunan hesaplar (yazılım, bulut, banka, resmi kurum) ve giriş bilgileri.
+Sosyal medya şifrelerinin genelleştirilmiş hâli; o modül hesabı bir *yayın
+kanalı* olarak tutar, buradaki kayıt bir *üyelik*.
+
+Değerler veritabanında AES-256-GCM ile şifreli durur (anahtar:
+`HESAP_KIMLIK_ENC_KEY`, diğer anahtarlardan ayrı) ve **yalnızca** `reveal`
+ucundan çözülmüş olarak çıkar.
+
+**İKİ KAPI VAR, İKİSİ DE GEÇİLMELİ:**
+
+1. **Yetki** — kim görebilir (`hesap-erisim.ts`): yönetici → bilgiyi giren kişi
+   → o hesap paylaşılmış kişi → tüm liste paylaşılmış kişi. Modülü okuyabilen
+   diğer herkes yalnızca kaydın *varlığını* görür.
+2. **Kilit** — şu an kimliğini kanıtladı mı (`hesap-kilit.service.ts`): oturum
+   yetmez. Projelio şifresi ya da geçiş anahtarı (WebAuthn) ile 5 dakikalık bir
+   jeton alınır ve `reveal` o jetonu ister.
+
+| Method | Path | Açıklama | Body |
+|---|---|---|---|
+| GET | `/organizations/:id/service-accounts?departmentId=` | Kapsamın hesapları (sırsız) + yetki bayrakları + kasa adı | — |
+| POST | `/organizations/:id/service-accounts?departmentId=` | Hesap ekler; ücretliyse kasaya düzenli gider kurar | `{ name, category?, url?, loginMethod?, plan?, ownerUserId?, note?, isPaid?, amount?, currency?, billingInterval?, nextDueDate? }` |
+| GET/POST | `/jobs/:jobId/service-accounts` | Serbest çalışan tarafı — aynı gövde | — |
+| PATCH | `/service-accounts/:id` | Günceller; vade **yalnızca değiştirildiyse** deftere yazılır | aynı alanlar |
+| DELETE | `/service-accounts/:id` | Hesabı ve sırlarını siler; düzenli ödemeyi pasifleştirir | — |
+| POST | `/service-accounts/unlock/password` | Kilidi şifreyle açar, jeton döner | `{ password }` |
+| POST | `/service-accounts/unlock/passkey-options` | Tek kullanımlık meydan okuma | `{}` |
+| POST | `/service-accounts/unlock/passkey` | Kilidi geçiş anahtarıyla açar | `{ challenge, credentialId, clientDataJSON, authenticatorData, signature }` |
+| GET | `/service-accounts/:accountId/credentials` | Giriş kayıtları (sırsız) | — |
+| POST | `/service-accounts/:accountId/credentials` | Giriş ekler; şifre ZORUNLU DEĞİL (passkey/SSO hesapları) | `{ label?, username?, password?, note?, totp? }` |
+| PATCH | `/service-credentials/:id` | Günceller; `password` boşsa şifreye dokunulmaz | aynı alanlar |
+| DELETE | `/service-credentials/:id` | Kaydı siler | — |
+| POST | `/service-credentials/:id/reveal` | Sırrı çözer, `no-store` döner, **denetim izine yazar** | `{ unlockToken }` |
+| GET | `/service-accounts/:accountId/credential-views` | Kim, ne zaman, hangi hakla, hangi kilitle gördü (yönetici) | — |
+| GET/POST | `/organizations/:id/service-account-grants` | Paylaşımlar; `accountId` boş = **tüm liste** paylaşımı | `{ userId, accountId?, expiresAt? }` |
+| DELETE | `/service-account-grants/:id` | Paylaşımı geri alır (satır silinmez) | — |
+| GET | `/passkeys` | Kullanıcının cihazları | — |
+| POST | `/passkeys/registration-options` · `/passkeys/register` | Yeni cihaz kaydı | `{ challenge, clientDataJSON, attestationObject, label? }` |
+| DELETE | `/passkeys/:id` | Cihazı kaldırır | — |
+
+Ücretli abonelik kasaya **düzenli gider** olarak yazılır (`recurring_payments`,
+departman ya da iş kademesi) ve gerçek hareketi gecelik cron üretir — modülün
+kendi para tablosu YOKTUR, defter tek yerdedir (bkz. migration 104).
+Aboneliği işaretlemek **bütçe yetkisi** ister; modül yöneticiliği yetmez.
+
 ## WhatsApp köprüsü (`/whatsapp`, `/admin/whatsapp`)
 
 Havuz modeli (tasarım `docs/whatsapp-qr-plan.md` §12): numaralar Projelio'nun,

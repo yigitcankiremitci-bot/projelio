@@ -12,7 +12,7 @@ describe("isSessionPayload", () => {
   });
 
   test("özel amaçlı jetonlar oturum sayılmaz", () => {
-    for (const typ of ["file_access", "google_oauth", "microsoft_oauth", "instagram_oauth"]) {
+    for (const typ of ["file_access", "google_oauth", "microsoft_oauth", "instagram_oauth", "hesap-kilit"]) {
       assert.equal(isSessionPayload({ typ }), false, `${typ} reddedilmeliydi`);
     }
   });

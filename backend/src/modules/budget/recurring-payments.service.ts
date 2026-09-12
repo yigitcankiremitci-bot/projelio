@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { RecurrenceInterval, RecurringPayment } from "@projelio/shared";
+import { RECURRENCE_INTERVALS } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { requireAmount, requireOneOf, optionalOneOf } from "../../common/validation/input";
 import { BudgetService } from "./budget.service";
@@ -12,7 +13,9 @@ import { mapRecurringPayment as mapPayment } from "./butce-eslestirme";
 // dışa aktarılıyor ki mevcut çağrı yerleri değişmesin.
 export { advanceDueDate, islenecekDonemler, toDateString } from "./vade";
 
-const INTERVALS: RecurrenceInterval[] = ["weekly", "monthly", "yearly"];
+// Liste SÖZLÜKTEN (packages/shared): 3/6 aylık aralıklar eklenince buradaki
+// kopya eksik kalmış ve kişisel Kasa yolunda bu aralıklar reddediliyordu.
+const INTERVALS: RecurrenceInterval[] = RECURRENCE_INTERVALS;
 
 /**
  * recurring_payments.type için izin verilen değerler — 020_budget_ledger_and_recurring.sql

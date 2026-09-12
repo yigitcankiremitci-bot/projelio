@@ -59,6 +59,17 @@ const A5_PLAN_KEYS = new Set([
 const A3_INVENTORY_KEYS = new Set(["oud_depo"]);
 
 /**
+ * Kendi motoru olan, arketip listelerinin hiçbirine girmeyen modüller.
+ *
+ * Hesaplar bir A2 (kayıt listesi) gibi görünüyor ama module_records'a
+ * yazmıyor: sır şifreli sütunlarda, para defterde, izinler kendi tablosunda.
+ * Listeye alınmasa "unknown" sayılıp MODAL yüzeyine düşerdi — oysa ekranda
+ * süzgeç, toplu link ve abonelik toplamı var, yani ekranın kendisi bir çalışma
+ * alanı.
+ */
+const OZEL_MOTOR_KEYS = new Set(["hesaplar"]);
+
+/**
  * Modülün arketipi.
  *
  * Sıra önemli: bir modül birden fazla kayıt defterinde görünmemeli, ama göç
@@ -71,6 +82,7 @@ export function moduleArchetype(moduleKey: string): ModuleArchetype {
   if (A3_INVENTORY_KEYS.has(moduleKey)) return "a3_inventory";
   if (A4_PIPELINE_KEYS.has(moduleKey)) return "a4_pipeline";
   if (A5_PLAN_KEYS.has(moduleKey)) return "a5_plan";
+  if (OZEL_MOTOR_KEYS.has(moduleKey)) return "a2_records";
   if (isPanelModule(moduleKey)) return "a6_panel";
   if (isEntityModule(moduleKey)) return "entity";
   if (MODULE_RECORD_CONFIGS[moduleKey]) return "a2_records";

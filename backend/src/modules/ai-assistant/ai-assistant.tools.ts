@@ -91,6 +91,10 @@ export const WRITE_TOOLS = new Set<string>([
   "create_module_record",
   "update_module_record",
   "enable_module",
+  // Bilgi kartı: künye düzenlemek geri alınabilir bir değişiklik (silme değil),
+  // o yüzden kritik değil — ama yazmadır, "hiçbir şeyi değiştirme" denmişse kapanır.
+  "update_info_card",
+  "add_info_card_field",
 ]);
 
 /**
@@ -1537,6 +1541,85 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "get_info_card",
+    description:
+      "ŞİRKETİN (ya da işin) BİLGİ KARTI: künye + belgeler + diğer modüllerden toplanan özet. " +
+      "\"Vergi numaramız kaç\", \"şirketin adresi ne\", \"IBAN\", \"MERSİS\", \"ticaret sicil no\", " +
+      "\"vergi levhamız var mı\", \"kaç çalışanımız var\" gibi ŞİRKETİN KENDİSİYLE ilgili sorularda bunu " +
+      "çağır — bu bilgiler başka hiçbir araçta yok. MÜŞTERİNİN künyesiyle karıştırma: o, modül " +
+      "kayıtlarında (list_module_records). Kimliği list_organizations / list_jobs ile bul.",
+    input_schema: {
+      type: "object",
+      properties: {
+        scopeType: {
+          type: "string",
+          enum: ["organization", "job"],
+          description: "Şirket/işletme için \"organization\", serbest çalışanın işi için \"job\".",
+        },
+        scopeId: { type: "string", description: "Organizasyon ya da iş kimliği." },
+      },
+      required: ["scopeType", "scopeId"],
+    },
+  },
+  {
+    name: "update_info_card",
+    description:
+      "Bilgi kartının künye alanlarını günceller (vergi dairesi, vergi no, adres, IBAN, KEP…). " +
+      "Yalnızca şirket sahibi ve YÖNETİM departmanının yöneticisi yapabilir; başkasında istek reddedilir. " +
+      "Yalnızca DEĞİŞTİRİLECEK alanları gönder: göndermediğin alana dokunulmaz, bir alanı boşaltmak için " +
+      "boş dize gönder. Kullanıcının söylemediği bir bilgiyi UYDURMA — resmî kimlik bilgisindeki tahmin " +
+      "yanlış faturaya yol açar.",
+    input_schema: {
+      type: "object",
+      properties: {
+        scopeType: { type: "string", enum: ["organization", "job"] },
+        scopeId: { type: "string" },
+        legalName: { type: "string", description: "Ticari ünvan." },
+        brandName: { type: "string", description: "Marka / kısa ad." },
+        sector: { type: "string" },
+        foundedOn: { type: "string", description: "Kuruluş tarihi, YYYY-MM-DD." },
+        employeeCount: { type: "number" },
+        about: { type: "string", description: "Şirketi anlatan kısa metin." },
+        taxOffice: { type: "string" },
+        taxNumber: { type: "string", description: "VKN ya da TC kimlik no." },
+        tradeRegistryNo: { type: "string" },
+        mersisNo: { type: "string" },
+        naceCode: { type: "string", description: "Faaliyet (NACE) kodu." },
+        sgkNo: { type: "string", description: "SGK işyeri sicil no." },
+        kepAddress: { type: "string" },
+        phone: { type: "string" },
+        email: { type: "string" },
+        website: { type: "string" },
+        address: { type: "string", description: "Açık adres." },
+        district: { type: "string" },
+        city: { type: "string" },
+        country: { type: "string" },
+        postalCode: { type: "string" },
+        bankName: { type: "string" },
+        iban: { type: "string" },
+        notes: { type: "string" },
+      },
+      required: ["scopeType", "scopeId"],
+    },
+  },
+  {
+    name: "add_info_card_field",
+    description:
+      "Bilgi kartına SABİT LİSTEDE OLMAYAN bir alan ekler (ör. \"Oda sicil no\", \"İhracatçı birliği üyeliği\"). " +
+      "Sabit alanlardan biri için (vergi no, adres, IBAN…) bunu KULLANMA, update_info_card'ı kullan — " +
+      "yoksa aynı bilgi kartta iki kez görünür.",
+    input_schema: {
+      type: "object",
+      properties: {
+        scopeType: { type: "string", enum: ["organization", "job"] },
+        scopeId: { type: "string" },
+        label: { type: "string", description: "Alan adı." },
+        value: { type: "string", description: "Değeri." },
+      },
+      required: ["scopeType", "scopeId", "label"],
+    },
+  },
+  {
     name: "create_department",
     description:
       "Organizasyona yeni departman açar (Pazarlama, Muhasebe, Üretim…). Yalnızca organizasyon sahibi " +
@@ -1764,6 +1847,60 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         name: { type: "string", description: "Talebi açan kişinin adı (opsiyonel; boşsa hesaptaki ad kullanılır)." },
       },
       required: ["subject", "message"],
+    },
+  },
+  // --- Hesaplar modülü ----------------------------------------------------
+  //
+  // SIR OKUYAN ARAÇ YOK ve olmayacak: kullanıcı adı, şifre, 2FA anahtarı ve
+  // notlar bu araca hiç girmiyor. Gerekçe teknik değil ilkesel — sır bir kez
+  // model bağlamına girdiğinde sohbet geçmişinde, sağlayıcının loglarında ve
+  // özetlenen bağlamda yaşamaya başlar; kasanın tüm anlamı kaybolur. Şifre
+  // yalnızca ekrandan, kilit açılarak ve kaydı tutularak gösterilir.
+  {
+    name: "list_service_accounts",
+    description:
+      "Hesaplar modülündeki üyelikleri listeler: hangi hesaba üye olunmuş, kim sorumlu, " +
+      "ücretli mi, aylık karşılığı ne kadar, sıradaki ödeme ne zaman ve giriş bilgisi girilmiş mi. " +
+      "\"Hangi aboneliklerimiz var\", \"aylık yazılım gideri ne kadar\", \"Adobe'nin sorumlusu kim\", " +
+      "\"şifresi girilmemiş hesap var mı\" gibi sorularda çağır. organizationId ya da jobId'den biri verilmeli " +
+      "(list_modules'tan alırsın).\n" +
+      "ŞİFRE DÖNMEZ. Bu araç kullanıcı adı, şifre, 2FA anahtarı ya da notların İÇERİĞİNİ vermez ve " +
+      "veremez — yalnızca \"kayıt var/yok\" bilgisini görürsün. Kullanıcı şifre isterse tahmin etme, " +
+      "başka araçta arama: Hesaplar modülünü açıp ilgili hesabın \"Giriş bilgileri\"nden kilidi açmasını söyle " +
+      "(kilit, Projelio şifresi ya da geçiş anahtarıyla açılır ve her gösterim kaydedilir).",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string", description: "Şirket tarafı: organizasyon kimliği." },
+        departmentId: {
+          type: "string",
+          description:
+            "Modül bir departman altında açıldıysa o departmanın kimliği (opsiyonel). " +
+            "Verilmezse şirketin tamamı taranır.",
+        },
+        jobId: { type: "string", description: "Serbest çalışan tarafı: iş kimliği." },
+        kategori: {
+          type: "string",
+          enum: [
+            "yazilim",
+            "bulut",
+            "sosyal",
+            "banka",
+            "resmi",
+            "pazaryeri",
+            "kargo",
+            "iletisim",
+            "egitim",
+            "diger",
+          ],
+          description: "Yalnızca bu kategorideki hesaplar (opsiyonel).",
+        },
+        yalnizcaUcretli: {
+          type: "boolean",
+          description: "true ise yalnızca ücretli abonelikler. Gider sorularında kullan.",
+        },
+      },
+      required: [],
     },
   },
   // --- Dışa aktarma -------------------------------------------------------

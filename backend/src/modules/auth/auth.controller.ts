@@ -67,7 +67,7 @@ export class AuthController {
       throw new UnauthorizedException("Oturum süresi doldu, lütfen yeniden giriş yapın.");
     }
     // loginAt AYNEN aktarılır — yenileme saati sıfırlamaz, yoksa sınır hiç dolmazdı.
-    return this.authService.signToken(req.user.userId, req.user.email, req.user.role, req.user.loginAt);
+    return this.authService.signToken(req.user.userId, req.user.email, req.user.role, req.user.loginAt ?? 0);
   }
 
   // Yanıt her zaman aynı genel mesajdır — hesabın var olup olmadığını sızdırmamak

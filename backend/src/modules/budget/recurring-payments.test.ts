@@ -18,6 +18,30 @@ describe("vade ilerletme", () => {
   it("yıllık aynı güne gider", () => {
     assert.equal(advanceDueDate("2026-03-10", "yearly"), "2027-03-10");
   });
+
+  // 3 ve 6 aylık, vergi/sigorta/denetim gibi kalemlerin gerçek ritmi.
+  it("3 aylık üç ay ekler ve yıl sınırını geçer", () => {
+    assert.equal(advanceDueDate("2026-03-10", "quarterly"), "2026-06-10");
+    assert.equal(advanceDueDate("2026-11-10", "quarterly"), "2027-02-10");
+  });
+
+  it("6 aylık altı ay ekler ve yıl sınırını geçer", () => {
+    assert.equal(advanceDueDate("2026-03-10", "semiannual"), "2026-09-10");
+    assert.equal(advanceDueDate("2026-09-10", "semiannual"), "2027-03-10");
+  });
+
+  // Ay sonu kuralı 3/6 aylıkta da geçerli: aylıkla aynı koddan geçiyorlar.
+  it("3 aylık ay sonunda taşmaz: 31 Ocak + 3 ay = 30 Nisan", () => {
+    assert.equal(advanceDueDate("2026-01-31", "quarterly"), "2026-04-30");
+  });
+
+  it("3 aylıkta da çapa gün korunur", () => {
+    assert.equal(advanceDueDate("2026-04-30", "quarterly", 31), "2026-07-31");
+  });
+
+  it("6 aylık 31 Ağustos + 6 ay = 28 Şubat", () => {
+    assert.equal(advanceDueDate("2026-08-31", "semiannual"), "2027-02-28");
+  });
 });
 
 describe("işlenecek dönemler", () => {
@@ -38,6 +62,12 @@ describe("işlenecek dönemler", () => {
     const { tarihler, sonrakiVade } = islenecekDonemler("2026-09-20", "monthly", 20, "2026-09-10");
     assert.deepEqual(tarihler, ["2026-09-10"]);
     assert.equal(sonrakiVade, "2026-10-20");
+  });
+
+  it("3 aylıkta kaçırılan dönemler üçer ay atlar", () => {
+    const { tarihler, sonrakiVade } = islenecekDonemler("2026-01-15", "quarterly", 15, "2026-09-10");
+    assert.deepEqual(tarihler, ["2026-01-15", "2026-04-15", "2026-07-15"]);
+    assert.equal(sonrakiVade, "2026-10-15");
   });
 
   it("çok eski bir vade sonsuz döngüye girmez", () => {

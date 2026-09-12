@@ -23,9 +23,19 @@ import { OutputsService } from "../outputs/outputs.service";
 import { AI_TOOLS, CRITICAL_TOOLS, toolsForChannel } from "./ai-assistant.tools";
 import { describeModuleFields, hasRecordConfig, normalizeModuleData } from "./ai-modules";
 import { taskTarget } from "./ai-task-target";
-import { getModuleRecordConfig, gorevPuani } from "@projelio/shared";
+import {
+  BELGE_DURUM_ETIKET,
+  BILGI_KARTI_BELGE_ETIKET,
+  aylikKarsilikHesapla,
+  aylikToplamlar,
+  belgeDurumu,
+  getModuleRecordConfig,
+  gorevPuani,
+} from "@projelio/shared";
 import { CatalogService } from "../catalog/catalog.service";
 import { OrganizationsService } from "../organizations/organizations.service";
+import { BilgiKartiService } from "../bilgi-karti/bilgi-karti.service";
+import { HesaplarService } from "../hesaplar/hesaplar.service";
 import { DepartmentsService } from "../departments/departments.service";
 import { DepartmentMembersService } from "../department-members/department-members.service";
 import { OrganizationModulesService } from "../organization-modules/organization-modules.service";
@@ -675,6 +685,12 @@ export class AiAssistantService {
     // yetkisiyle aynı kapıdan geçiyor.
     private catalogService: CatalogService,
     private organizationsService: OrganizationsService,
+    // Şirket künyesi (vergi no, adres, IBAN) + belgeler + özet.
+    private bilgiKartiService: BilgiKartiService,
+    // Hesaplar modülü: üyelikler ve abonelik giderleri. YALNIZCA liste servisi
+    // enjekte ediliyor; sırrı okuyan HesapKimlikService bilerek dışarıda
+    // (bkz. hesaplar.module.ts exports).
+    private hesaplarService: HesaplarService,
     // Departman araçları: görev bir projeye ya da bir departmana açılabiliyor
     // (bkz. Task.departmentId). Yetki kontrolleri yine bu servislerin içinde.
     private departmentsService: DepartmentsService,
@@ -1023,6 +1039,18 @@ export class AiAssistantService {
       "- Yeni bir organizasyon ya da departman açmak ekibin göreceği bir yapı değişikliğidir; " +
         "yalnızca kullanıcı açıkça isterse yap.",
       "",
+      "## Şirketin kendi künyesi (bilgi kartı)",
+      "Şirketin/işin resmî bilgileri — vergi dairesi ve numarası, adres, MERSİS, ticaret sicil, KEP, IBAN, " +
+        "çalışan sayısı — BİLGİ KARTINDA durur ve başka hiçbir araçta yoktur: get_info_card ile oku.",
+      "- MÜŞTERİNİN künyesiyle karıştırma. \"Bizim vergi no\" bilgi kartı, \"müşterinin vergi no\" modül " +
+        "kayıtlarıdır (list_module_records).",
+      "- Kart aynı zamanda BELGELERİ (vergi levhası, imza sirküleri, sicil gazetesi) ve şirket ÖZETİNİ " +
+        "(departman/çalışan/görev/bütçe sayıları) taşır; \"şirket ne durumda\" sorusuna özet bölümüyle cevap ver.",
+      "- Bir belgenin süresi dolduysa bunu kullanıcıya SÖYLE: kart durumu hesaplayıp veriyor, tarihten kendin " +
+        "çıkarım yapma.",
+      "- Künyeyi yalnızca sahibi ve Yönetim departmanının yöneticisi değiştirebilir; yetkisi olmayan biri " +
+        "istediğinde uç reddeder, bunu kullanıcıya açıkça söyle.",
+      "",
       "## Rutinler (operasyonlar)",
       "Rutin, bir İŞE bağlı ve tekrar eden yükümlülüktür (aylık muhasebe, haftalık bakım).",
       "- Rutinin tekrar takvimini (hangi gün, hangi sıklık) kuramazsın; onu kullanıcı rutinin sayfasından ekler. " +
@@ -1033,6 +1061,20 @@ export class AiAssistantService {
       "Ürün/hizmet kaydı bir ORGANİZASYONA aittir (uyd_urunler modülü kendi tablosuna yazar, module_record değildir).",
       "- Fiyat, stok ve maliyet sayısaldır; kullanıcı söylemediyse boş bırak, UYDURMA.",
       "- Stok kodu (sku) şirkette benzersizdir; çakışırsa hatayı olduğu gibi söyle.",
+      "",
+      "## Hesaplar (üyelikler ve abonelikler)",
+      "Şirketin üye olduğu hesaplar (yazılım, bulut, banka, resmi kurum) Hesaplar modülünde durur: " +
+        "list_service_accounts ile oku. \"Hangi aboneliklerimiz var\", \"aylık yazılım gideri ne kadar\", " +
+        "\"bu hesabın sorumlusu kim\" sorularının cevabı burada.",
+      "- ŞİFRELERİ GÖREMEZSİN, hiçbir araçta yok. Kullanıcı şifre isterse tahmin etme ve başka araçta arama: " +
+        "Hesaplar modülünde ilgili hesabın \"Giriş bilgileri\"ni açıp kilidi (Projelio şifresi ya da geçiş " +
+        "anahtarı) açmasını söyle. Bu bir eksiklik değil kasıtlı bir sınır — sır sohbete girmez.",
+      "- Aylık toplamı SEN HESAPLAMA, araç veriyor: haftalık/3 aylık/yıllık kalemler zaten aylığa çevrilmiş " +
+        "gelir. Para birimleri AYRI toplanır, kur dönüşümü yapma.",
+      "- \"Ücretli ama kasaya bağlı değil\" (kasayaBagli=hayır) bir eksiktir: o giderin defterde karşılığı yok, " +
+        "kullanıcıya söyle.",
+      "- Giriş kaydı \"girilmemiş\" görünen hesapları da söyle: çalışan ayrıldığında erişimi kimsede olmayan " +
+        "hesap tam olarak bunlardır.",
       "",
       "## Destek talepleri",
       "create_support_request Projelio ekibine giden gerçek bir mesaj açar ve geri alınamaz.",
@@ -4382,6 +4424,53 @@ export class AiAssistantService {
         await this.organizationsService.remove(input.organizationId, userId);
         return { success: true };
 
+      case "get_info_card": {
+        const kapsam = this.bilgiKartiService.kapsamDogrula(input.scopeType);
+        const sayfa = await this.bilgiKartiService.sayfa(kapsam, input.scopeId, userId);
+        return pruneEmpty({
+          ad: sayfa.scopeName,
+          kunye: sayfa.kart ? pruneEmpty({ ...sayfa.kart, id: undefined, scopeType: undefined, scopeId: undefined }) : undefined,
+          ekBilgiler: sayfa.alanlar.map((a) => ({ alan: a.label, deger: a.value })),
+          belgeler: sayfa.belgeler.map((b) =>
+            pruneEmpty({
+              tur: BILGI_KARTI_BELGE_ETIKET[b.docType],
+              ad: b.title,
+              gecerlilikBitisi: b.validUntil,
+              // Modelin "süresi dolmuş" diyebilmesi için durum HESAPLANMIŞ
+              // gelir: ham tarihten kendi çıkarımını yapması, bugünün tarihini
+              // bilmediği turlarda yanlış cevap üretiyordu.
+              durum: BELGE_DURUM_ETIKET[belgeDurumu(b.validUntil)],
+              adres: b.externalUrl ?? b.webViewLink,
+            })
+          ),
+          ozet: sayfa.ozet.sections.map((bolum) => ({
+            baslik: bolum.title,
+            satirlar: bolum.rows.map((r) => `${r.label}: ${r.value}`),
+          })),
+          duzenleyebilirMiyim: sayfa.yetki.canEdit,
+        });
+      }
+
+      case "update_info_card": {
+        const kapsam = this.bilgiKartiService.kapsamDogrula(input.scopeType);
+        // scopeType/scopeId kartın adresi, künyenin alanı değil: gövdeye
+        // karışırsa servis onları bilinmeyen alan olarak görüp yok sayardı.
+        const { scopeType: _tur, scopeId: _kimlik, ...kunye } = input;
+        const kart = await this.bilgiKartiService.guncelle(kapsam, input.scopeId, kunye, userId);
+        return { success: true, guncellenen: Object.keys(kunye), unvan: kart.legalName ?? kart.brandName };
+      }
+
+      case "add_info_card_field": {
+        const kapsam = this.bilgiKartiService.kapsamDogrula(input.scopeType);
+        const alan = await this.bilgiKartiService.alanEkle(
+          kapsam,
+          input.scopeId,
+          { label: input.label, value: input.value },
+          userId
+        );
+        return { success: true, alan: alan.label, deger: alan.value };
+      }
+
       case "create_department": {
         const department = await this.departmentsService.create(
           input.organizationId,
@@ -4544,6 +4633,62 @@ export class AiAssistantService {
           message: input.message,
         });
         return { konu: created.subject, durum: created.status };
+      }
+
+      // --- Hesaplar modülü --------------------------------------------------
+      //
+      // SIR BURAYA GİRMİYOR. Yanıtta yalnızca "kaç giriş kaydı var" ve "sen
+      // görebiliyor musun" bilgisi var; kullanıcı adı, şifre, 2FA anahtarı ve
+      // not İÇERİĞİ hiç okunmuyor (o sütunları okuyan servis, HesapKimlikService,
+      // bu modüle hiç enjekte edilmedi — bkz. hesaplar.module.ts exports).
+      //
+      // Yetki kontrolü HesaplarService.liste'nin içinde: Lio ayrı bir yol
+      // açmıyor, kullanıcının kendi yetkisiyle aynı kapıdan geçiyor.
+      case "list_service_accounts": {
+        const kapsam = input.jobId
+          ? { jobId: String(input.jobId) }
+          : { organizationId: String(input.organizationId ?? ""), departmentId: input.departmentId };
+        if (!("jobId" in kapsam) && !kapsam.organizationId) {
+          throw new BadRequestException("organizationId ya da jobId gerekli (list_modules ile bulabilirsin).");
+        }
+
+        const liste = await this.hesaplarService.liste(kapsam as any, userId);
+        let hesaplar = liste.accounts;
+        if (input.kategori) hesaplar = hesaplar.filter((h) => h.category === input.kategori);
+        if (input.yalnizcaUcretli) hesaplar = hesaplar.filter((h) => h.isPaid);
+
+        return pruneEmpty({
+          kasa: liste.budgetScopeName,
+          // Toplam SUNUCUDA hesaplanıyor: farklı ritimleri (haftalık/3 aylık/
+          // yıllık) aylığa çevirmek modelin sık hata yaptığı bir aritmetik ve
+          // rakam faturayla ilgili. Kur dönüşümü YOK, birim başına ayrı.
+          aylikToplam: aylikToplamlar(hesaplar).map((t) => `${round1(t.amount)} ${t.currency}`),
+          hesaplar: hesaplar.map((h) =>
+            pruneEmpty({
+              ad: h.name,
+              kategori: h.category,
+              girisYontemi: h.loginMethod,
+              plan: h.plan,
+              sorumlu: h.ownerName,
+              adres: h.url,
+              ucretli: h.isPaid ? "evet" : undefined,
+              tutar: h.isPaid && h.amount ? `${h.amount} ${h.currency}` : undefined,
+              aralik: h.billingInterval,
+              aylikKarsilik: h.isPaid ? round1(aylikKarsilikHesapla(h.amount, h.billingInterval) ?? 0) : undefined,
+              siradakiOdeme: h.isPaid ? h.nextDueDate : undefined,
+              // Ücretli ama kasaya bağlı değilse bu bir EKSİK: gider defterde
+              // görünmüyor demektir ve kullanıcıya söylenmeye değer.
+              kasayaBagli: h.isPaid ? (h.recurringPaymentId ? "evet" : "hayır") : undefined,
+              girisKaydi: h.credentialCount > 0 ? h.credentialCount : "girilmemiş",
+              not: h.note,
+            })
+          ),
+          // Modelin şifre arayışına girmesini kesen satır: aracın ne
+          // DÖNMEDİĞİNİ yanıtın içinde de söylüyoruz, yalnızca tanımda değil.
+          uyari:
+            "Şifreler, kullanıcı adları ve 2FA anahtarları bu araçta YOKTUR. Kullanıcı şifre isterse " +
+            "Hesaplar modülünden ilgili hesabın \"Giriş bilgileri\"ni açıp kilidi açmasını söyle.",
+        });
       }
 
       // --- Dışa aktarma -----------------------------------------------------

@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { BudgetTransaction, RecurringPayment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { requireAmount, requireOneOf, optionalOneOf, paraBirimiDogrula } from "../../common/validation/input";
@@ -6,6 +6,9 @@ import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { ButceErisimService } from "./butce-erisim.service";
 import type { ViewerKapsami } from "./butce-erisim";
 import { mapRecurringPayment, mapTransaction, SECIM } from "./butce-eslestirme";
+import { ButceHiyerarsiService } from "./butce-hiyerarsi.service";
+import { advanceDueDate } from "./vade";
+import { RECURRENCE_INTERVALS } from "@projelio/shared";
 
 /**
  * İş / departman / şirket / holding bütçelerinin ortak defter işlemleri.
@@ -23,7 +26,6 @@ import { mapRecurringPayment, mapTransaction, SECIM } from "./butce-eslestirme";
 
 /** budget_transactions.type için izin verilen değerler (001'deki CHECK ile aynı). */
 const TRANSACTION_TYPES = ["income", "expense", "payout"] as const;
-const RECURRENCE_INTERVALS = ["weekly", "monthly", "yearly"] as const;
 const RECURRING_TYPES = ["income", "expense"] as const;
 
 /** Kademe → budget_transactions'taki kimlik sütunu. */
@@ -38,7 +40,8 @@ const SUTUN: Record<ViewerKapsami, string> = {
 export class ButceKademeService {
   constructor(
     private supabase: SupabaseService,
-    private erisim: ButceErisimService
+    private erisim: ButceErisimService,
+    private hiyerarsi: ButceHiyerarsiService
   ) {}
 
   // ------------------------------------------------------------- Hareketler
@@ -56,22 +59,42 @@ export class ButceKademeService {
     return (data ?? []).map(mapTransaction);
   }
 
+  /**
+   * Kademeye kayıt ekler.
+   *
+   * HEDEF SEÇİMİ: kayıt, açık olan sayfanın kademesine yazılır — ama kullanıcı
+   * "bu gider aslında şu projeye ait" diyebilir. O zaman kayıt PROJENİN
+   * defterine düşer ve oradan yukarı toplanır.
+   *
+   * Bu üstteki toplamı BOZMAZ: alt kademe zaten üste toplanıyor, yani kayıt
+   * aşağı indiğinde şirketin rakamı değişmez, yalnızca detaylanır. Toplamı
+   * değiştirmeden detay kazandırdığı için hedef seçimi serbest bırakıldı.
+   *
+   * Göreve bağlama ayrı bir alan: görev bir kademe değil, kademenin içinde
+   * yaşayan bir kayıt. Bir göreve BİRDEN FAZLA masraf yazılabilir (veritabanı
+   * tekilliği yalnızca otomatik üretilen ödeme satırına uygulanıyor, bkz.
+   * migration 105).
+   */
   async ekle(
     scopeType: ViewerKapsami,
     scopeId: string,
-    data: Partial<BudgetTransaction>,
+    data: Partial<BudgetTransaction> & { hedefTur?: string; hedefId?: string },
     userId?: string
   ): Promise<BudgetTransaction> {
     await this.erisim.assertCanManage(scopeType, scopeId, userId);
 
+    const hedef = await this.hedefiCoz(scopeType, scopeId, data);
+
     const { data: row, error } = await this.supabase.client
       .from("budget_transactions")
       .insert({
-        [SUTUN[scopeType]]: scopeId,
+        [hedef.sutun]: hedef.id,
         // Defter sahibi kaydı GİREN değil, paranın sahibi olan kademenin
         // sahibidir (bkz. migration 100). Kaydı giren created_by'da durur.
-        owner_id: await this.defterSahibi(scopeType, scopeId),
+        owner_id: hedef.ownerId,
         created_by: userId ?? null,
+        task_id: hedef.taskId,
+        source: "manual",
         type: requireOneOf(data.type ?? "expense", TRANSACTION_TYPES, "İşlem türü"),
         amount: requireAmount(data.amount ?? 0),
         currency: paraBirimiDogrula(data.currency),
@@ -84,6 +107,88 @@ export class ButceKademeService {
       .single();
     if (error) throw error;
     return mapTransaction(row);
+  }
+
+  /**
+   * Kaydın hangi kademeye ve hangi göreve yazılacağını çözer.
+   *
+   * KURAL: hedef, açık olan kademenin ALTINDA olmalı. Aksi hâlde bir holding
+   * sahibi, kendi holdingine ait olmayan bir projenin defterine kayıt
+   * yazabilirdi — üstelik o projenin sahibinin haberi olmadan. Kontrol
+   * "hedefin kimliği alt kapsam listesinde mi" diye yapılıyor; liste zaten
+   * sayfanın kendisi için de çıkarılan liste (bkz. altKapsamlar).
+   *
+   * Hedef verilmemişse kayıt, sayfanın kendi kademesine yazılır — eski davranış.
+   */
+  private async hedefiCoz(
+    scopeType: ViewerKapsami,
+    scopeId: string,
+    data: { hedefTur?: string; hedefId?: string; taskId?: string }
+  ): Promise<{ sutun: string; id: string; ownerId: string | null; taskId: string | null }> {
+    const gorev = data.taskId ? await this.gorevKapsami(data.taskId) : null;
+
+    // Görev seçildiyse ve ayrıca bir kademe seçilmediyse, kademe GÖREVDEN gelir:
+    // bir görevin masrafı, görevin yaşadığı yerin defterine aittir.
+    const hedefTur = data.hedefTur || (gorev ? gorev.tur : "");
+    const hedefId = data.hedefId || (gorev ? gorev.id : "");
+
+    if (!hedefTur || !hedefId || (hedefTur === scopeType && hedefId === scopeId)) {
+      return {
+        sutun: SUTUN[scopeType],
+        id: scopeId,
+        ownerId: await this.defterSahibi(scopeType, scopeId),
+        taskId: data.taskId || null,
+      };
+    }
+
+    const kapsamlar = await this.hiyerarsi.altKapsamlar(scopeType, scopeId);
+    const izinli: Record<string, { sutun: string; idler: Set<string> }> = {
+      organization: { sutun: "organization_id", idler: new Set(kapsamlar.organizations.map((o) => o.id)) },
+      job: { sutun: "job_id", idler: new Set(kapsamlar.jobs.map((j) => j.id)) },
+      department: { sutun: "department_id", idler: new Set(kapsamlar.departments.map((d) => d.id)) },
+      project: { sutun: "project_id", idler: new Set(kapsamlar.projects.map((p) => p.id)) },
+      operation: { sutun: "operation_id", idler: new Set(kapsamlar.operations.map((o) => o.id)) },
+    };
+
+    const secim = izinli[hedefTur];
+    if (!secim) throw new BadRequestException("Tanınmayan hedef türü");
+    if (!secim.idler.has(hedefId)) {
+      throw new ForbiddenException("Seçilen hedef bu bütçenin altında değil");
+    }
+
+    return {
+      sutun: secim.sutun,
+      id: hedefId,
+      ownerId: await this.hedefDefterSahibi(hedefTur, hedefId),
+      taskId: data.taskId || null,
+    };
+  }
+
+  /** Görevin hangi kademede yaşadığı — masrafı oraya yazılsın diye. */
+  private async gorevKapsami(taskId: string): Promise<{ tur: string; id: string } | null> {
+    const { data } = await this.supabase.client
+      .from("tasks")
+      .select("project_id, department_id, operation_id")
+      .eq("id", taskId)
+      .maybeSingle();
+    if (!data) throw new NotFoundException("Görev bulunamadı");
+    if (data.project_id) return { tur: "project", id: data.project_id };
+    if (data.department_id) return { tur: "department", id: data.department_id };
+    if (data.operation_id) return { tur: "operation", id: data.operation_id };
+    return null;
+  }
+
+  /** Proje/rutin de dahil, her hedef türü için defter sahibi. */
+  private async hedefDefterSahibi(hedefTur: string, hedefId: string): Promise<string | null> {
+    if (hedefTur === "project") {
+      const { data } = await this.supabase.client.from("projects").select("owner_id").eq("id", hedefId).maybeSingle();
+      return data?.owner_id ?? null;
+    }
+    if (hedefTur === "operation") {
+      const { data } = await this.supabase.client.from("operations").select("owner_id").eq("id", hedefId).maybeSingle();
+      return data?.owner_id ?? null;
+    }
+    return this.defterSahibi(hedefTur as ViewerKapsami, hedefId);
   }
 
   /**
@@ -103,6 +208,12 @@ export class ButceKademeService {
     if (data.counterpartyId !== undefined) patch.counterparty_id = data.counterpartyId || null;
     if (data.description !== undefined) patch.description = data.description || null;
     if (data.occurredAt !== undefined) patch.occurred_at = data.occurredAt.slice(0, 10);
+    // Görev bağı sonradan kurulabilir/kaldırılabilir: "bu masraf aslında şu
+    // görev içindi" çoğu zaman kayıt girildikten sonra fark ediliyor. Boş
+    // değer bağı koparır. Otomatik üretilmiş satırlarda buna izin verilmez
+    // (aşağıdaki yonetilebilirSatir kontrolü), yoksa ödeme satırının kaynağı
+    // kaybolurdu.
+    if (data.taskId !== undefined) patch.task_id = data.taskId || null;
     // Kademe DEĞİŞTİRİLEMEZ: kaydı başka bir şirkete taşımak, iki kademenin
     // geçmiş toplamlarını aynı anda değiştirir ve kimse farkı göremez.
 
@@ -183,6 +294,85 @@ export class ButceKademeService {
   }
 
   // -------------------------------------------------- Düzenli gelir/giderler
+
+  /**
+   * Deftere girilmiş TEK SEFERLİK bir kaydı düzenli gelir/gidere çevirir.
+   *
+   * NEDEN VAR: kira, abonelik, maaş gibi kalemler ilk kez elle giriliyor ve
+   * ancak ikinci ay "bu her ay tekrarlıyor" fark ediliyor. O noktada
+   * kullanıcının elinde iki kötü seçenek vardı: kaydı silip düzenli olarak
+   * yeniden kurmak (defterde geçmiş kaybolur) ya da her ay elle yazmak.
+   *
+   * MEVCUT KAYIT DURUR, silinmez: o para gerçekten çıktı ve defterde kalmalı.
+   * Yeni düzenli ödeme, o kaydın BİR SONRAKİ vadesinden başlar — aksi hâlde
+   * aynı ay iki kez işlenir ve gider iki katı görünürdü.
+   */
+  async duzenliyeCevir(
+    id: string,
+    data: { interval?: string; reminderDaysBefore?: number },
+    userId?: string
+  ): Promise<RecurringPayment> {
+    const { data: kayit } = await this.supabase.client
+      .from("budget_transactions")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (!kayit) throw new NotFoundException("Kayıt bulunamadı");
+
+    const kademe = this.satirinKademesi(kayit);
+    if (kademe) await this.erisim.assertCanManage(kademe.scopeType, kademe.scopeId, userId);
+    else if (userId && kayit.owner_id !== userId) {
+      throw new ForbiddenException("Bu kaydı düzenli hâle getirme yetkin yok");
+    }
+
+    // Hakediş/ödeme (payout) düzenliye çevrilemez: recurring_payments yalnızca
+    // income/expense tanıyor (020'deki CHECK) ve bir görev ödemesinin kendini
+    // her ay tekrarlaması zaten istenmez.
+    if (kayit.type === "payout") {
+      throw new BadRequestException("Hakediş/ödeme kayıtları düzenli hâle getirilemez");
+    }
+    if (kayit.recurring_payment_id) {
+      throw new BadRequestException("Bu kayıt zaten bir düzenli ödemeden üretilmiş");
+    }
+
+    const interval = requireOneOf(data.interval ?? "monthly", RECURRENCE_INTERVALS, "Tekrar aralığı");
+    const ilkTarih = String(kayit.occurred_at).slice(0, 10);
+    const anchorDay = Number(ilkTarih.slice(8, 10));
+    // Sıradaki vade, mevcut kaydın tarihinden BİR DÖNEM SONRASI: bu ayın
+    // gideri zaten defterde duruyor.
+    const sonrakiVade = advanceDueDate(ilkTarih, interval, anchorDay);
+
+    const { data: row, error } = await this.supabase.client
+      .from("recurring_payments")
+      .insert({
+        project_id: kayit.project_id,
+        department_id: kayit.department_id,
+        job_id: kayit.job_id,
+        organization_id: kayit.organization_id,
+        group_id: kayit.group_id,
+        owner_id: kayit.owner_id,
+        task_id: kayit.task_id,
+        type: kayit.type,
+        amount: kayit.amount,
+        currency: kayit.currency || "TRY",
+        category: kayit.category,
+        description: kayit.description,
+        interval,
+        next_due_date: sonrakiVade,
+        anchor_day: anchorDay,
+        reminder_days_before: data.reminderDaysBefore ?? 1,
+        active: true,
+      })
+      .select("*, projects(title), tasks(title)")
+      .single();
+    if (error) throw error;
+
+    // Kaynak kayıt artık düzenli ödemeye bağlı: ekranda "bu satırdan doğdu"
+    // izlenebilsin ve aynı kayıt ikinci kez çevrilmeye kalkılmasın.
+    await this.supabase.client.from("budget_transactions").update({ recurring_payment_id: row.id }).eq("id", id);
+
+    return mapRecurringPayment(row);
+  }
 
   /**
    * Kademeye bağlı düzenli ödeme ekler.

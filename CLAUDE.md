@@ -29,6 +29,9 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | Bildirim e-postaları | `backend/src/modules/notifications/notification-email.*` — tercih, şablon, iki turlu işleyici |
 | Yaptım (kişisel iş günlüğü) | `backend/src/modules/worklog/`, `apps/web/src/pages/WorkLog.tsx` — Yapılacaklar'ın tersi |
 | Bütçe (tüm kademeler) | `backend/src/modules/budget/` — tek defter, bkz. aşağıdaki başlık |
+| Bilgi kartı (şirket/iş künyesi) | `backend/src/modules/bilgi-karti/`, `apps/web/src/components/bilgiKarti/` — künye + belge + diğer modüllerden özet |
+| Hesaplar (üyelikler + şifreli giriş bilgileri) | `backend/src/modules/hesaplar/`, `apps/web/src/components/hesaplar/` — sır yalnızca `hesap-kimlik.service.ts`'ten çıkar |
+| Geçiş anahtarı (WebAuthn) doğrulaması | `backend/src/common/webauthn/` — elle yazıldı, bağımlılık yok; `backend/src/modules/passkeys/` kullanıcının cihazları |
 | WhatsApp köprüsü (WAHA yan-servisi + modül) | `backend/src/modules/whatsapp/`, `deploy/docker-compose.prod.yml` `waha` servisi, tasarım `docs/whatsapp-qr-plan.md` |
 
 Backend'de 48 modül, 500'den fazla HTTP ucu var (`node scripts/uc-listesi.mjs` ile
@@ -126,6 +129,7 @@ Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 | WhatsApp'tan Lio'ya komut | `WHATSAPP_LIO_KOMUT=1` | `backend/.env` |
 | Lio'nun AI sağlayıcı sırası | `AI_PROVIDERS` | `backend/.env` (ya da Admin paneli) |
 | Abonelik tahsilatı | `IYZICO_API_KEY` + `IYZICO_SECRET_KEY` | `backend/.env` (plan kodları Admin panelinde) |
+| Hesap şifrelerinin şifrelenmesi | `HESAP_KIMLIK_ENC_KEY` | `backend/.env` — **eksikse giriş bilgisi kaydedilemez** |
 | Gönderen e-posta adresi | `EMAIL_FROM` | `backend/.env` — **eksikse Resend kum havuzuna düşer** |
 | Tek tık "aboneliği bırak" | `API_PUBLIC_URL` | `backend/.env` |
 | Mağaza abonelikleri | `APPSTORE_*` / `PLAY_*` | `backend/.env` |

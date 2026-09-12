@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { RecurrenceInterval, RecurringPayment } from "@projelio/shared";
+import { RECURRENCE_INTERVAL_LABEL, RECURRENCE_INTERVALS } from "@projelio/shared";
 import { api } from "../../api/client";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
@@ -14,11 +15,9 @@ interface Props {
   onDegisti: () => void;
 }
 
-const ARALIK_ETIKET: Record<RecurrenceInterval, string> = {
-  weekly: "Haftalık",
-  monthly: "Aylık",
-  yearly: "Yıllık",
-};
+// Etiketler ve sıra SÖZLÜKTEN (packages/shared): 3/6 aylık aralıklar eklenince
+// buradaki kopya eksik kaldı ve seçim kutusunda hiç görünmediler.
+const ARALIK_ETIKET = RECURRENCE_INTERVAL_LABEL;
 
 /**
  * Kademeye bağlı düzenli gelir/giderler: kira, maaş, abonelik, düzenli hakediş.
@@ -155,9 +154,11 @@ export default function DuzenliOdemeler({ scopeType, scopeId, odemeler, canManag
               onChange={(e) => setInterval(e.target.value as RecurrenceInterval)}
               style={{ flex: 1, minWidth: 110 }}
             >
-              <option value="weekly">{t("Haftalık")}</option>
-              <option value="monthly">{t("Aylık")}</option>
-              <option value="yearly">{t("Yıllık")}</option>
+              {RECURRENCE_INTERVALS.map((aralik) => (
+                <option key={aralik} value={aralik}>
+                  {t(RECURRENCE_INTERVAL_LABEL[aralik])}
+                </option>
+              ))}
             </select>
             <input
               type="date"

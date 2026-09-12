@@ -21,6 +21,10 @@ export function toDateString(date: Date): string {
 
 // Bir sonraki vade tarihini hesaplar.
 //
+// Aralıklar: haftalık (7 gün), aylık (1 ay), 3 aylık, 6 aylık, yıllık (12 ay).
+// Ay ekleyen aralıkların hepsi aynı kuraldan geçer — 31 Ocak'tan 3 ay sonrası
+// 30 Nisan'dır ve bir sonraki hesap yine 31'den yapılır (çapa gün).
+//
 // Ay sonu taşmasına dikkat edilir: 31 Ocak + 1 ay, JS'te doğal olarak 3 Mart'a taşar;
 // bunun yerine ayın son gününe (28/29/30) sabitlenir. Ayrıca "çapa gün" (anchorDay)
 // kavramı vardır: her ayın 31'i olan bir ödeme Şubat'ta 28'e çekilir, ama bir sonraki
@@ -34,7 +38,10 @@ export function advanceDueDate(current: string, interval: RecurrenceInterval, an
     return toDateString(d);
   }
 
-  const monthsToAdd = interval === "monthly" ? 1 : 12;
+  // Ay sayısı aralığa göre. Haftalık yukarıda ayrıldı çünkü o gün ekliyor,
+  // ay ekleme kuralına (çapa gün + ay sonu taşması) hiç girmiyor.
+  const monthsToAdd =
+    interval === "monthly" ? 1 : interval === "quarterly" ? 3 : interval === "semiannual" ? 6 : 12;
   const targetMonthIndex = month - 1 + monthsToAdd;
   const targetYear = year + Math.floor(targetMonthIndex / 12);
   const targetMonth = ((targetMonthIndex % 12) + 12) % 12;

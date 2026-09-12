@@ -13,6 +13,7 @@ import ModulesPanel from "../components/ModulesPanel";
 import OrgBudgetPanel, { OrgBudgetPanelHandle } from "../components/OrgBudgetPanel";
 import AddModuleRecordModal from "../components/AddModuleRecordModal";
 import QuickFileUploadModal from "../components/QuickFileUploadModal";
+import BilgiKartiModal from "../components/bilgiKarti/BilgiKartiModal";
 import OrgTabs, { CORE_ORG_TABS, OrgTab, visibleOrgTabs } from "../components/OrgTabs";
 import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
@@ -27,7 +28,7 @@ import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
-import { IconUser, IconCalendar, IconSettings, IconLayers } from "../components/icons";
+import { IconUser, IconCalendar, IconSettings, IconLayers, IconIdCard } from "../components/icons";
 import { useT } from "../lib/i18n";
 
 // Şirket AKIŞINDA görev/tamamlanan-görev karışımı yok: paylaşımlar ile görevler
@@ -57,6 +58,10 @@ export default function OrganizationDetail() {
   const gutter = pageGutter(isDesktop);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [editing, setEditing] = useState(false);
+  // Şirket bilgi kartı (künye + belgeler + özet). Kapakta kendi düğmesi var:
+  // aranan bilgi çoğu zaman başka bir işin ortasında lazım oluyor ve sekme
+  // arkasına saklanınca hiç açılmıyordu (bkz. BilgiKartiModal).
+  const [bilgiKarti, setBilgiKarti] = useState(false);
   // Ürün/Hizmet panelinden doğrudan ürün/hizmet eklendiğinde de departman yöneticisinin
   // yetkisi çalışsın diye Ürün Yönetimi departmanının id'si burada tutulur
   // (bkz. ProductsPanel/ProductsService.assertCanManage).
@@ -237,9 +242,20 @@ export default function OrganizationDetail() {
         }
         asideOnMobile
         action={
-          <button onClick={() => setEditing(true)} aria-label={t("Organizasyonu düzenle")} style={coverActionButton(c)}>
-            <IconSettings size={20} color={c.textSecondary} />
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            {/* Taşerona gösterilmiyor: sunucu kartı zaten reddediyor
+                (bkz. bilgiKartiYetkisiKarari) ve açılmayan bir düğme, yetki
+                sorununu hata gibi gösteriyordu. canViewCommercial tam olarak
+                bu ayrımı taşıyor. */}
+            {access?.canViewCommercial !== false && (
+              <button onClick={() => setBilgiKarti(true)} aria-label="Şirket bilgi kartı" style={coverActionButton(c)}>
+                <IconIdCard size={20} color={c.textSecondary} />
+              </button>
+            )}
+            <button onClick={() => setEditing(true)} aria-label={t("Organizasyonu düzenle")} style={coverActionButton(c)}>
+              <IconSettings size={20} color={c.textSecondary} />
+            </button>
+          </div>
         }
       />
 
@@ -299,6 +315,8 @@ export default function OrganizationDetail() {
         )}
         {activeTab === "files" && <FilesPanel organizationId={id} />}
       </div>
+
+      {bilgiKarti && <BilgiKartiModal scopeType="organization" scopeId={id} onClose={() => setBilgiKarti(false)} />}
 
       {editing && organization && (
         <EditOrganizationModal

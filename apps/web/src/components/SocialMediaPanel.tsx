@@ -33,6 +33,7 @@ import SocialAccountModal from "./SocialAccountModal";
 import SocialCredentialsModal from "./SocialCredentialsModal";
 import SocialPostComposer from "./SocialPostComposer";
 import { IconChevronLeft, IconChevronRight, IconEdit, IconExternalLink, IconTrash } from "./icons";
+import { sekmeleriAc } from "../lib/topluLink";
 import { useDragScroll } from "../lib/useDragScroll";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { popupSettingsHint } from "../lib/popupSettings";
@@ -376,48 +377,17 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   /**
    * Hesapları aynı anda yeni sekmelerde açar.
    *
-   * ÖNCE BOŞ SEKMELER açılıyor, sonra adresler yükleniyor. Sebep: tarayıcı bir
-   * tıklamadan doğan İLK pencereyi her hâlükârda geçiriyor, kalanını siteye
-   * açılır pencere izni verilmemişse engelliyor. Doğrudan adreslerle açılsaydı
-   * (eski hâli) izin yokken bir hesap açılır, diğerleri açılmaz, kullanıcı
-   * yarım bir sonuçla kalırdı. Boş sekmeler hiçbir yere gitmediği için engel
-   * görüldüğünde hepsi anında kapatılıyor: ya hepsi açılır ya hiçbiri.
-   *
-   * `opener` elle koparılıyor; `noopener` seçenek dizesiyle verilemiyor çünkü
-   * o hâlde window.open null döner ve başarılı açılışı engellenmiş sayardık.
+   * Açma kuralının kendisi lib/topluLink.ts'te (aynı düğme Hesaplar modülünde
+   * de var). Burada yalnızca engellenme hâlinde ne göstereceğimiz kalıyor:
+   * liste açılıyor ve YALNIZCA açılamayanları gösteriyor.
    */
   const openAccountsInBrowser = (hedefler: { account: SocialAccount; url: string }[]) => {
-    const pencereler = hedefler.map(() => {
-      try {
-        return window.open("", "_blank");
-      } catch {
-        return null;
-      }
-    });
-
-    if (pencereler.some((w) => !w)) {
-      for (const w of pencereler) {
-        try {
-          w?.close();
-        } catch {
-          // Kapatılamayan boş sekme kullanıcıyı rahatsız etmez, sessiz geç.
-        }
-      }
+    if (!sekmeleriAc(hedefler.map((h) => h.url))) {
       setBlockedAccounts(hedefler);
       setCopied(null);
       setAccountLinks(true);
       return;
     }
-
-    pencereler.forEach((w, i) => {
-      if (!w) return;
-      try {
-        w.opener = null;
-      } catch {
-        // Bazı tarayıcılar opener'a yazdırmıyor; sekme yine açılıyor.
-      }
-      w.location.replace(hedefler[i].url);
-    });
     setBlockedAccounts([]);
   };
 

@@ -6,12 +6,14 @@ import { MODULE_RECORD_CONFIGS } from "../lib/moduleConfigs";
 import { PANEL_CONFIGS } from "../lib/panelConfigs";
 import { isMailModule } from "../lib/mailbox";
 import { isSocialMediaModule } from "../lib/socialMedia";
+import { isHesaplarModule } from "../lib/hesaplar";
 import CustomersPanel from "./CustomersPanel";
 import EmailModulePanel from "./EmailModulePanel";
 import ModuleFormPanel from "./ModuleFormPanel";
 import ModulePanelView from "./ModulePanelView";
 import ModuleRecordsPanel from "./ModuleRecordsPanel";
 import SocialMediaPanel from "./SocialMediaPanel";
+import HesaplarPanel from "./hesaplar/HesaplarPanel";
 import AskLioButton from "./AskLioButton";
 
 /**
@@ -106,6 +108,20 @@ function ModuleSurfaceContent({
     );
   }
 
+  if (isHesaplarModule(moduleKey)) {
+    // Kendi tablolarına yazan modül (bkz. 106_hesaplar_modulu.sql): şifreli
+    // sırlar, paylaşım izinleri ve kasaya bağlı abonelik, module_records'ın tek
+    // jsonb sütununa sığmıyordu — sır bir kayıt alanı olamaz.
+    return (
+      <HesaplarPanel
+        organizationId={organizationId}
+        departmentId={departmentId}
+        jobId={jobId}
+        canWrite={canWrite}
+      />
+    );
+  }
+
   if (isMailModule(moduleKey)) {
     // E-posta modülü iki yüzey taşıyor: canlı gelen kutusu (Graph üzerinden,
     // saklanmıyor) ve kampanya kayıtları (module_records). Bkz. EmailModulePanel.
@@ -156,6 +172,7 @@ export function isOpenable(moduleKey: string): boolean {
     Boolean(PANEL_CONFIGS[moduleKey]) ||
     isEntityModule(moduleKey) ||
     isSocialMediaModule(moduleKey) ||
+    isHesaplarModule(moduleKey) ||
     Boolean(MODULE_RECORD_CONFIGS[moduleKey])
   );
 }

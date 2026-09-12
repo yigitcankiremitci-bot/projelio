@@ -10,8 +10,12 @@ export const ACCENT_KEY = "projelio_accent";
 export const SIDEBAR_COLOR_KEY = "projelio_sidebar_color";
 export const SIDEBAR_PATTERN_KEY = "projelio_sidebar_pattern";
 
+// Varsayılan görünüm: karanlık mod + gece sidebar + çizgili desen. Yalnızca
+// hiç seçim yapmamış kullanıcıyı etkiler — açıkça "light"/"default"/"none"
+// seçmiş olanın tercihi localStorage'da yazılı olduğu için korunur.
+// pre-paint.js aynı varsayılanı boyamadan önce uygular; ikisi senkron kalmalı.
 export function getThemeMode(): ThemeMode {
-  return localStorage.getItem(THEME_MODE_KEY) === "dark" ? "dark" : "light";
+  return localStorage.getItem(THEME_MODE_KEY) === "light" ? "light" : "dark";
 }
 
 export function setThemeMode(mode: ThemeMode) {
@@ -31,7 +35,7 @@ export function setAccentKey(key: AccentKey) {
 export function getSidebarColorKey(): SidebarColorKey {
   const stored = localStorage.getItem(SIDEBAR_COLOR_KEY);
   if (stored === "default" || stored === "gece" || stored === "zeytin" || stored === "bordo" || stored === "orman") return stored;
-  return "default";
+  return "gece";
 }
 
 export function setSidebarColorKey(key: SidebarColorKey) {
@@ -40,8 +44,8 @@ export function setSidebarColorKey(key: SidebarColorKey) {
 
 export function getSidebarPatternKey(): SidebarPatternKey {
   const stored = localStorage.getItem(SIDEBAR_PATTERN_KEY);
-  if (stored === "dots" || stored === "diagonal" || stored === "grid") return stored;
-  return "none";
+  if (stored === "dots" || stored === "diagonal" || stored === "grid" || stored === "none") return stored;
+  return "diagonal";
 }
 
 export function setSidebarPatternKey(key: SidebarPatternKey) {

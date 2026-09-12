@@ -26,11 +26,11 @@
     }
   } catch (e) {}
 
-  // Karanlık mod seçiliyse temel yüzey renklerini önceden uygula.
+  // Karanlık mod varsayılan: yalnızca açıkça "light" seçilmişse atlanır.
   // Değerler packages/shared/src/theme.ts (colors.dark) ile senkron tutulmalı;
   // anahtar adı src/theme/preferences.ts (THEME_MODE_KEY) ile.
   try {
-    if (localStorage.getItem("projelio_theme_mode") === "dark") {
+    if (localStorage.getItem("projelio_theme_mode") !== "light") {
       var root = document.documentElement.style;
       root.setProperty("--color-primary", "#8593A8");
       root.setProperty("--color-primary-dark", "#3E4858");

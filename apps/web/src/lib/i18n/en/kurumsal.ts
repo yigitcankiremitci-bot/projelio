@@ -401,4 +401,7 @@ export const kurumsal: TranslationDict = {
   "En az bir kanal seç: bildirim ya da e-posta.": "Choose at least one channel: notification or email.",
   "Mesaj çok uzun.": "The message is too long.",
   "Mesaj boş olamaz.": "The message can't be empty.",
+  "Hesabı askıya alma": "Suspend account",
+  "Hesap askıda: kişi giriş yapamıyor. Askıyı kaldırınca yeniden giriş yapabilir.": "The account is suspended: they can't sign in. Lifting the suspension lets them sign in again.",
+  "Kişi hemen tüm cihazlardan çıkarılır ve askı kaldırılana kadar giriş yapamaz. Verisi silinmez.": "They're signed out on all devices right away and can't sign in until the suspension is lifted. No data is deleted.",
 };

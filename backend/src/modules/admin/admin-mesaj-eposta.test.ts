@@ -38,10 +38,10 @@ describe("adminMesajEpostasiOlustur", () => {
     assert.ok(!/[\r\n]/.test(mail.subject));
   });
 
-  it("önizleme metni, düz bağlantı ve yanıt adresi başlıkları eklenir", () => {
+  it("önizleme metni ve yanıt adresi başlıkları eklenir; düğmenin altında çıplak adres yazmaz", () => {
     const mail = adminMesajEpostasiOlustur({ ...temel, yanitAdresi: "destek@projelio.app" });
     assert.ok(mail.html.includes('display:none'));
-    assert.ok(mail.html.includes(">https://app.projelio.test</a>"));
+    assert.ok(!mail.html.includes(">https://app.projelio.test</a>"));
     assert.match(mail.headers["List-Unsubscribe"], /^<mailto:destek@projelio\.app\?subject=/);
     assert.ok(mail.text.includes("yanıtlaman yeterli"));
   });

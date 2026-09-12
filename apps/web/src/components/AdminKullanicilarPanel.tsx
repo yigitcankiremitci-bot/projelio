@@ -606,20 +606,6 @@ function KullaniciDetayModal({ userId, onClose, onDegisti }: { userId: string; o
           {/* ---------------------------------------------------- Hesap */}
           <Bolum c={c} baslik={t("Hesap")}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {u.bannedAt ? (
-                <button
-                  type="button"
-                  disabled={kilitli}
-                  style={ikincilButon(c)}
-                  onClick={() => calistir(() => adminKullanicilar.askiyiKaldir(u.id), t("Askı kaldırıldı."))}
-                >
-                  {t("Askıyı kaldır")}
-                </button>
-              ) : (
-                <button type="button" disabled={kilitli} style={tehlikeButon(c)} onClick={() => setOnay({ tur: "askiya_al" })}>
-                  {t("Askıya al")}
-                </button>
-              )}
               <button type="button" disabled={kilitli} style={ikincilButon(c)} onClick={() => setMesajAc(true)}>
                 {t("Mesaj gönder")}
               </button>
@@ -745,6 +731,34 @@ function KullaniciDetayModal({ userId, onClose, onDegisti }: { userId: string; o
               </table>
             </div>
           </Bolum>
+
+          {/* ---------------------------------------------------- Askı
+              Hesap bölümünde, "Mesaj gönder"in yanındaydı: sık kullanılan bir
+              düğmenin bitişiğinde yanlış tıklamaya açıktı. Silmeyle birlikte en
+              alta, ayrı bir bölüme alındı. Onay penceresi ayrıca duruyor. */}
+          {!u.anonimlestirildi && (
+            <Bolum c={c} baslik={t("Hesabı askıya alma")}>
+              <p style={{ color: c.textSecondary, fontSize: 14, margin: "0 0 10px", lineHeight: 1.5 }}>
+                {u.bannedAt
+                  ? t("Hesap askıda: kişi giriş yapamıyor. Askıyı kaldırınca yeniden giriş yapabilir.")
+                  : t("Kişi hemen tüm cihazlardan çıkarılır ve askı kaldırılana kadar giriş yapamaz. Verisi silinmez.")}
+              </p>
+              {u.bannedAt ? (
+                <button
+                  type="button"
+                  disabled={kilitli}
+                  style={ikincilButon(c)}
+                  onClick={() => calistir(() => adminKullanicilar.askiyiKaldir(u.id), t("Askı kaldırıldı."))}
+                >
+                  {t("Askıyı kaldır")}
+                </button>
+              ) : (
+                <button type="button" disabled={kilitli} style={tehlikeButon(c)} onClick={() => setOnay({ tur: "askiya_al" })}>
+                  {t("Askıya al")}
+                </button>
+              )}
+            </Bolum>
+          )}
 
           {/* ---------------------------------------------------- Silme */}
           {!u.anonimlestirildi && (

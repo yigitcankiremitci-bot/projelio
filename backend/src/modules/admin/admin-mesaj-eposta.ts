@@ -20,8 +20,6 @@ import { epostaKabugu, kacir, MARKA } from "../auth/email-shell";
  * SPAM'E DÜŞMEMEK İÇİN (kimlik doğrulama DNS'te tamam: DKIM + SPF + DMARC):
  *   · Önizleme metni (preheader): yoksa Gmail listede ilk görünen metni — çoğu
  *     zaman düğme etiketini — gösteriyor; boş/anlamsız önizleme spam işareti.
- *   · Düğmenin altında düz bağlantı: yalnızca görsel düğmeden oluşan çağrı,
- *     filtrelerin sevmediği "tek büyük link" kalıbı.
  *   · "Yanıtlayabilirsin" notu + Reply-To: yanıt, alıcı tarafında en güçlü
  *     "istenen posta" sinyali.
  *   · List-Unsubscribe (mailto): Gmail/Yahoo toplu gönderenden bekliyor; hizmet
@@ -74,9 +72,6 @@ ${selamHtml}${paragraflar}
                style="display:inline-block;background:${MARKA.yaziKoyu};color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-size:15px;font-weight:500;">
               ${dugmeEtiketi}
             </a>
-          </p>
-          <p style="margin:10px 0 0;font-size:13px;line-height:1.5;color:${MARKA.yaziSoluk};word-break:break-all;">
-            <a href="${kacir(adres)}" style="color:${MARKA.vurgu};">${kacir(adres)}</a>
           </p>
           <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:${MARKA.yaziSoluk};border-top:1px solid ${MARKA.cizgi};padding-top:16px;">
             ${yanitNotu ? `${yanitNotu}<br>` : ""}${altNot}

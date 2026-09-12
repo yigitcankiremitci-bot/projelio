@@ -117,4 +117,8 @@ export const epostalar: TranslationDict = {
   "Bağlantı geçersiz": "This link isn't valid",
   "Bu bağlantı artık geçerli değil. Ayarlar > Yardımcılar bölümünden tercihini kendin değiştirebilirsin.":
     "This link is no longer valid. You can change the setting yourself from Settings > Helpers.",
+
+  // Günlük özetin görev bölümleri
+  "Geciken görevlerin": "Your overdue tasks",
+  "Yarın biten görevlerin": "Your tasks due tomorrow",
 };

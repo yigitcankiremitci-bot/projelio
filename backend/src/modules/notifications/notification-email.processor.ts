@@ -12,7 +12,12 @@ import {
   VARSAYILAN_TERCIH,
   type TercihSatiri,
 } from "./notification-email-prefs.service";
-import { bildirimEpostasiOlustur, type EpostaBildirimi, type EpostaGorevi } from "./notification-email.template";
+import {
+  bildirimEpostasiOlustur,
+  type EpostaBildirimi,
+  type EpostaGorevBolumleri,
+  type EpostaGorevi,
+} from "./notification-email.template";
 import { gunlukOzetSirasiGeldiMi, yerelAn } from "./notification-email.zaman";
 import { abonelikKapatmaAdresi } from "./notification-email.abonelik";
 import { gunlukOzetIcerigi } from "./notification-email.icerik";
@@ -50,6 +55,15 @@ const KULLANICI_TAVANI = 2000;
 
 /** Su seviyesi yoksa en fazla bu kadar geriye bakılır. */
 const EN_FAZLA_GERIYE_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Geciken görevlerde ne kadar geriye bakılır. 30 gün: daha eskisi çoğunlukla
+ * unutulmuş/ölü bir kayıt ve onu her sabah hatırlatmak özeti gürültüye çevirir.
+ */
+const GECIKME_PENCERESI_GUN = 30;
+
+/** Anlık kipte görev listesi yok: o e-posta "şu an ne oldu"yu anlatıyor. */
+const BOS_GOREVLER: EpostaGorevBolumleri = { geciken: [], bugun: [], yarin: [] };
 
 const TERCIH_KOLONLARI =
   "user_id, instant_enabled, daily_enabled, daily_hour, timezone, include_tasks, last_instant_at, last_digest_at, last_digest_on";
@@ -114,7 +128,7 @@ export class NotificationEmailProcessor {
         const bildirimler = await this.yeniBildirimler(alici, taramaAni, "anlik");
         if (bildirimler.length === 0) continue;
 
-        const gitti = await this.gonder(alici, "anlik", bildirimler, []);
+        const gitti = await this.gonder(alici, "anlik", bildirimler, BOS_GOREVLER);
         // Damga yalnızca gönderim BAŞARILIYSA ilerler: sağlayıcı hata
         // verdiğinde su seviyesini yükseltmek, o bildirimleri sessizce
         // yutmak demekti.
@@ -389,19 +403,25 @@ export class NotificationEmailProcessor {
   }
 
   /**
-   * Bugün biten görevler, kullanıcıya göre gruplanmış.
+   * Özete girebilecek görevler, kullanıcıya göre gruplanmış.
    *
-   * "Bugün" görevin TAKVİM GÜNÜ ile karşılaştırılıyor (deadline'ın ilk 10
+   * Gün karşılaştırması görevin TAKVİM GÜNÜ üzerinden (deadline'ın ilk 10
    * karakteri). deadline bir son tarih; saat bileşenini saat dilimine çevirip
    * karşılaştırmak, 00:00'da saklanan bir tarihi komşu güne kaydırırdı.
+   *
+   * PENCERE NEDEN GENİŞ: özet geciken + bugün + yarın anlatıyor (bkz.
+   * notification-email.icerik.ts). Geriye doğru sınır, "yıllardır açık kalmış
+   * bir görevi her sabah tekrar tekrar hatırlatmak" ile "dün kaçırdığını
+   * söylememek" arasındaki denge. İleri uç +72 saat, çünkü kullanıcının
+   * "yarın"ı sunucunun UTC gününden iki gün ileride olabilir (UTC+14).
    */
   private async bugunkuGorevler(userIds: string[]): Promise<Map<string, GunlukGorev[]>> {
     const sonuc = new Map<string, GunlukGorev[]>();
     if (userIds.length === 0) return sonuc;
 
     const simdi = new Date();
-    const pencereBasi = new Date(simdi.getTime() - 36 * 60 * 60 * 1000);
-    const pencereSonu = new Date(simdi.getTime() + 36 * 60 * 60 * 1000);
+    const pencereBasi = new Date(simdi.getTime() - GECIKME_PENCERESI_GUN * 24 * 60 * 60 * 1000);
+    const pencereSonu = new Date(simdi.getTime() + 72 * 60 * 60 * 1000);
 
     const { data, error } = await this.supabase.client
       .from("tasks")
@@ -427,6 +447,9 @@ export class NotificationEmailProcessor {
         // kullanıcının saat dilimine bağlı ve o bilgi burada değil, gönderim
         // anında elimizde (bkz. gonder()).
         const liste = sonuc.get(atanan.user_id) ?? [];
+        // `gun` hem sınıflandırma (geciken/bugün/yarın) hem de geciken
+        // bölümündeki tarih etiketi için taşınıyor; etiketin biçimi DİLE bağlı
+        // olduğu için burada değil şablonda üretiliyor.
         liste.push({ baslik: (task as any).title, saat: saatKirp((task as any).deadline_time), gun });
         sonuc.set(atanan.user_id, liste);
       }
@@ -439,13 +462,14 @@ export class NotificationEmailProcessor {
     alici: Alici,
     kip: "anlik" | "gunluk",
     bildirimler: EpostaBildirimi[],
-    /** ZATEN süzülmüş liste — süzmeyi burada yapmak, çağıranın "boş mu" kararıyla
-     *  ayrışmasına yol açmıştı (bkz. notification-email.icerik.ts). */
-    gorevler: EpostaGorevi[]
+    /** ZATEN bölümlenmiş görevler — bölümlemeyi burada yapmak, çağıranın
+     *  "boş mu" kararıyla ayrışmasına yol açmıştı (bkz. notification-email.icerik.ts). */
+    gorevler: EpostaGorevBolumleri
   ): Promise<boolean> {
+    const gorevSayisi = gorevler.geciken.length + gorevler.bugun.length + gorevler.yarin.length;
     // Boş e-posta gönderilmez: "hiçbir şey olmadı" demek için gelen kutusuna
     // girmek, özelliğin kapatılma sebeplerinin başında gelir.
-    if (bildirimler.length === 0 && gorevler.length === 0) return false;
+    if (bildirimler.length === 0 && gorevSayisi === 0) return false;
 
     const mail = bildirimEpostasiOlustur({
       locale: alici.locale,

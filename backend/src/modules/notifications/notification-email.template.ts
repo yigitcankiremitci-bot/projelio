@@ -26,6 +26,21 @@ export interface EpostaGorevi {
   baslik: string;
   /** "14:30" — bitiş saati varsa. */
   saat?: string;
+  /**
+   * Görevin takvim günü (YYYY-MM-DD). Yalnızca GECİKEN bölümünde gösterilir:
+   * bugün/yarın bölümünde tarih zaten başlıkta yazıyor, gecikende ise "ne
+   * kadar geciktiği" asıl bilgi ve onsuz liste anlamsız bir yığına dönüyor.
+   * Biçimlendirme burada yapılıyor çünkü ay adı DİLE bağlı ("11 Eyl" / "11 Sep")
+   * ve aynı görev listesi farklı dillerdeki kullanıcılara gidiyor.
+   */
+  gun?: string;
+}
+
+/** Görevlerin üç bölümü (bkz. notification-email.icerik.ts). */
+export interface EpostaGorevBolumleri {
+  geciken: EpostaGorevi[];
+  bugun: EpostaGorevi[];
+  yarin: EpostaGorevi[];
 }
 
 export interface BildirimEpostasi {
@@ -67,8 +82,21 @@ function kalemHtml(kalem: EpostaBildirimi, webUrl: string): string {
           </tr>`;
 }
 
-function gorevHtml(gorev: EpostaGorevi): string {
-  const saat = gorev.saat ? ` <span style="color:${MARKA.vurgu};">${kacir(gorev.saat)}</span>` : "";
+/** "2026-09-11" → "11 Eyl" / "11 Sep". Geçersiz değerde boş döner. */
+function kisaTarih(gun: string | undefined, locale: Locale): string {
+  if (!gun) return "";
+  const tarih = new Date(`${gun}T12:00:00Z`);
+  if (Number.isNaN(tarih.getTime())) return "";
+  return tarih.toLocaleDateString(locale === "en" ? "en-GB" : "tr-TR", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+function gorevHtml(gorev: EpostaGorevi, locale: Locale, tarihGoster: boolean): string {
+  const ek = [tarihGoster ? kisaTarih(gorev.gun, locale) : "", gorev.saat].filter(Boolean).join(" ");
+  const saat = ek ? ` <span style="color:${MARKA.vurgu};">${kacir(ek)}</span>` : "";
   return `          <tr>
             <td style="padding:0 0 8px;font-size:15px;color:${MARKA.yaziKoyu};line-height:1.5;">
               &#8226;&nbsp;${kacir(gorev.baslik)}${saat}
@@ -98,7 +126,7 @@ export function bildirimEpostasiOlustur(params: {
   locale: Locale;
   kip: "anlik" | "gunluk";
   bildirimler: EpostaBildirimi[];
-  gorevler: EpostaGorevi[];
+  gorevler: EpostaGorevBolumleri;
   webUrl: string;
   /** Görüntülenecek ad — e-postayı kişiselleştirir, yoksa selam atlanır. */
   ad?: string;
@@ -109,11 +137,23 @@ export function bildirimEpostasiOlustur(params: {
   const gunluk = params.kip === "gunluk";
   const bildirimler = params.bildirimler.slice(0, LISTE_SINIRI);
   const kalanBildirim = params.bildirimler.length - bildirimler.length;
-  const gorevler = params.gorevler.slice(0, LISTE_SINIRI);
-  const kalanGorev = params.gorevler.length - gorevler.length;
-  // Başlık iki listeyi de ayırmak gerektiğinde yazılır; tek liste varsa
+  // Görev bölümleri sabit sırada: önce kaçırılan, sonra bugün, sonra yarın.
+  // Boş bölüm hiç yazılmaz.
+  const gorevBolumleri = [
+    { baslik: t("Geciken görevlerin"), gorevler: params.gorevler.geciken, tarihGoster: true },
+    { baslik: t("Bugün biten görevlerin"), gorevler: params.gorevler.bugun, tarihGoster: false },
+    { baslik: t("Yarın biten görevlerin"), gorevler: params.gorevler.yarin, tarihGoster: false },
+  ].filter((bolum) => bolum.gorevler.length > 0);
+  const gorevSayisi = gorevBolumleri.reduce((toplam, bolum) => toplam + bolum.gorevler.length, 0);
+  // Başlık ancak ayrılacak birden fazla liste varsa yazılır; tek liste varsa
   // "BİLDİRİMLER" başlığı gereksiz gürültü.
-  const ikiListe = bildirimler.length > 0 && gorevler.length > 0;
+  const basliklar = gorevBolumleri.length + (bildirimler.length > 0 ? 1 : 0) > 1;
+  /**
+   * Kırpma TÜM görevleri birlikte sayar, bölüm bölüm değil: üç bölümün her
+   * birine 12'şer kalem vermek 36 satırlık bir e-posta demekti ve Gmail
+   * 102 KB'tan sonra mesajı kırpıp alttaki kapatma bağlantısını gizliyor.
+   */
+  let gorevButcesi = LISTE_SINIRI;
 
   const baslik = gunluk ? t("Bugünkü özetin") : t("Yeni bildirimlerin var");
   const subject = gunluk
@@ -138,15 +178,33 @@ export function bildirimEpostasiOlustur(params: {
     : "";
 
   const satirlar: string[] = [];
+  const metinGorevSatirlari: string[] = [];
   if (bildirimler.length > 0) {
-    if (ikiListe) satirlar.push(bolumBasligiHtml(t("Bildirimler")));
+    if (basliklar) satirlar.push(bolumBasligiHtml(t("Bildirimler")));
     satirlar.push(...bildirimler.map((kalem) => kalemHtml(kalem, params.webUrl)));
     if (kalanBildirim > 0) satirlar.push(solukSatirHtml(t("ve {n} bildirim daha", { n: kalanBildirim })));
   }
-  if (gorevler.length > 0) {
-    if (ikiListe) satirlar.push(bolumBasligiHtml(t("Bugün biten görevlerin")));
-    satirlar.push(...gorevler.map(gorevHtml));
-    if (kalanGorev > 0) satirlar.push(solukSatirHtml(t("ve {n} görev daha", { n: kalanGorev })));
+  for (const bolum of gorevBolumleri) {
+    if (gorevButcesi <= 0) break;
+    const gosterilen = bolum.gorevler.slice(0, gorevButcesi);
+    gorevButcesi -= gosterilen.length;
+    if (basliklar) {
+      satirlar.push(bolumBasligiHtml(bolum.baslik));
+      metinGorevSatirlari.push(`${bolum.baslik}:`, "");
+    }
+    satirlar.push(...gosterilen.map((gorev) => gorevHtml(gorev, params.locale, bolum.tarihGoster)));
+    for (const gorev of gosterilen) {
+      const ek = [bolum.tarihGoster ? kisaTarih(gorev.gun, params.locale) : "", gorev.saat]
+        .filter(Boolean)
+        .join(" ");
+      metinGorevSatirlari.push(`- ${gorev.baslik}${ek ? ` (${ek})` : ""}`);
+    }
+    metinGorevSatirlari.push("");
+  }
+  const kalanGorev = gorevSayisi - (LISTE_SINIRI - Math.max(gorevButcesi, 0));
+  if (kalanGorev > 0) {
+    satirlar.push(solukSatirHtml(t("ve {n} görev daha", { n: kalanGorev })));
+    metinGorevSatirlari.push(t("ve {n} görev daha", { n: kalanGorev }), "");
   }
 
   const html = epostaKabugu(
@@ -172,21 +230,14 @@ ${satirlar.join("\n")}
 
   const metinSatirlari: string[] = [baslik, "", `${selamMetin}${giris}`, ""];
   if (bildirimler.length > 0) {
-    if (ikiListe) metinSatirlari.push(`${t("Bildirimler")}:`, "");
+    if (basliklar) metinSatirlari.push(`${t("Bildirimler")}:`, "");
     for (const kalem of bildirimler) {
       metinSatirlari.push(`- ${kalem.baslik}: ${kalem.govde}`, `  ${tamAdres(params.webUrl, kalem.link)}`);
     }
     if (kalanBildirim > 0) metinSatirlari.push(t("ve {n} bildirim daha", { n: kalanBildirim }));
     metinSatirlari.push("");
   }
-  if (gorevler.length > 0) {
-    if (ikiListe) metinSatirlari.push(`${t("Bugün biten görevlerin")}:`, "");
-    for (const gorev of gorevler) {
-      metinSatirlari.push(`- ${gorev.baslik}${gorev.saat ? ` (${gorev.saat})` : ""}`);
-    }
-    if (kalanGorev > 0) metinSatirlari.push(t("ve {n} görev daha", { n: kalanGorev }));
-    metinSatirlari.push("");
-  }
+  metinSatirlari.push(...metinGorevSatirlari);
   metinSatirlari.push(params.webUrl, "", altNot, ayarAdresi);
   if (params.abonelikAdresi) {
     metinSatirlari.push("", `${t("Aboneliği bırak")}: ${params.abonelikAdresi}`);

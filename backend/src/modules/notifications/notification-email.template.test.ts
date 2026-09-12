@@ -6,7 +6,7 @@ const temel = {
   locale: "tr" as const,
   kip: "gunluk" as const,
   bildirimler: [{ baslik: "Yeni görev", govde: "Can seni bir göreve atadı", link: "/tasks" }],
-  gorevler: [],
+  gorevler: { geciken: [], bugun: [], yarin: [] },
   webUrl: "https://app.projelio.test",
 };
 
@@ -50,10 +50,56 @@ describe("bildirimEpostasiOlustur", () => {
     assert.ok(mail.html.includes("8"), "kalan sayısı yazılmalı");
   });
 
+  it("geciken görevlerde tarih yazar, bugün/yarın bölümünde yazmaz", () => {
+    const mail = bildirimEpostasiOlustur({
+      ...temel,
+      bildirimler: [],
+      gorevler: {
+        geciken: [{ baslik: "Mastering", gun: "2026-09-01" }],
+        bugun: [{ baslik: "Bugünkü iş", gun: "2026-09-12" }],
+        yarin: [{ baslik: "Yarınki iş", gun: "2026-09-13" }],
+      },
+    });
+    assert.ok(mail.html.includes("Geciken görevlerin"));
+    assert.ok(mail.html.includes("Bugün biten görevlerin"));
+    assert.ok(mail.html.includes("Yarın biten görevlerin"));
+    // Geciken satırında tarih etiketi var; bugün/yarın satırlarında yok.
+    assert.ok(/1 Eyl/.test(mail.html), `geciken tarihi yazılmamış: ${mail.html.slice(0, 200)}`);
+    assert.ok(!mail.html.includes("13 Eyl"), "yarın bölümünde tarih yazılmamalı");
+  });
+
+  it("yalnızca geciken varsa özet yine üretilir", () => {
+    const mail = bildirimEpostasiOlustur({
+      ...temel,
+      bildirimler: [],
+      gorevler: { geciken: [{ baslik: "Unutulmuş iş", gun: "2026-09-01" }], bugun: [], yarin: [] },
+    });
+    assert.ok(mail.html.includes("Unutulmuş iş"));
+    assert.ok(mail.text.includes("Unutulmuş iş"));
+  });
+
+  it("tüm bölümler birlikte 12 kalemle sınırlı — üç bölüme 12'şer kalem e-postayı kırptırırdı", () => {
+    const cok = (onek: string, gun: string, adet: number) =>
+      Array.from({ length: adet }, (_, i) => ({ baslik: `${onek}${i}`, gun }));
+    const mail = bildirimEpostasiOlustur({
+      ...temel,
+      bildirimler: [],
+      gorevler: {
+        geciken: cok("G", "2026-09-01", 10),
+        bugun: cok("B", "2026-09-12", 10),
+        yarin: cok("Y", "2026-09-13", 10),
+      },
+    });
+    assert.ok(mail.html.includes("G9"), "geciken bölümü tamamen girmeli");
+    assert.ok(mail.html.includes("B1"), "bütçenin kalanı bugüne geçmeli");
+    assert.ok(!mail.html.includes("Y0"), "bütçe bitince yarın bölümü hiç yazılmamalı");
+    assert.ok(mail.html.includes("18"), "kalan görev sayısı yazılmalı");
+  });
+
   it("günlük özette görevler ayrı bölümde listelenir", () => {
     const mail = bildirimEpostasiOlustur({
       ...temel,
-      gorevler: [{ baslik: "Kapak tasarımı", saat: "14:30" }],
+      gorevler: { geciken: [], bugun: [{ baslik: "Kapak tasarımı", saat: "14:30" }], yarin: [] },
     });
     assert.ok(mail.html.includes("Kapak tasarımı"));
     assert.ok(mail.html.includes("14:30"));

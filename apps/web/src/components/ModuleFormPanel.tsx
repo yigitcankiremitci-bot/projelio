@@ -44,6 +44,12 @@ interface Props {
   canWrite?: boolean;
   /** Yayımlayabilir mi (modül yöneticisi / organizasyon sahibi). */
   canApprove?: boolean;
+  /**
+   * Varlık kapsamını tek bir kayda SABİTLER (ör. ürün kartındaki Strateji
+   * sekmesi). Verilirse ürün seçici çizilmez ve ürün listesi hiç yüklenmez:
+   * kart zaten o ürünün içinde, başka ürüne geçmek kartın konusunu değiştirirdi.
+   */
+  fixedScopeRef?: string;
 }
 
 type Mode = "read" | "edit" | "versions";
@@ -145,6 +151,7 @@ export default function ModuleFormPanel({
   config,
   canWrite = true,
   canApprove = false,
+  fixedScopeRef,
 }: Props) {
   const c = useThemeColors();
   const t = useT();
@@ -152,7 +159,7 @@ export default function ModuleFormPanel({
 
   const [records, setRecords] = useState<ModuleRecord[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [scopeRef, setScopeRef] = useState<string | null>(null);
+  const [scopeRef, setScopeRef] = useState<string | null>(fixedScopeRef ?? null);
   const [mode, setMode] = useState<Mode>("read");
   const [form, setForm] = useState<Record<string, string>>(() => emptyForm(config.fields));
   const [versions, setVersions] = useState<ModuleRecordVersion[]>([]);
@@ -181,7 +188,7 @@ export default function ModuleFormPanel({
     setLoading(true);
     const calls: [Promise<ModuleRecord[]>, Promise<Product[]>] = [
       api.get<ModuleRecord[]>(`${basePath}?moduleKey=${moduleKey}`).catch(() => []),
-      config.scope === "entity" && organizationId
+      config.scope === "entity" && organizationId && !fixedScopeRef
         ? api.get<Product[]>(`/organizations/${organizationId}/products`).catch(() => [])
         : Promise.resolve([]),
     ];
@@ -359,7 +366,7 @@ export default function ModuleFormPanel({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Varlık kapsamı: her ürün için ayrı bir doküman. Seçim kaydın kimliğidir. */}
-      {config.scope === "entity" && (
+      {config.scope === "entity" && !fixedScopeRef && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Ürün:")}</span>
           {products.length === 0 ? (

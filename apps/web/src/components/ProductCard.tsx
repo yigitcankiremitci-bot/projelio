@@ -8,17 +8,19 @@ import ProductPhotoCropModal from "./ProductPhotoCropModal";
 import { coverBackground, isCoverPreset } from "../lib/covers";
 import { IconPlus } from "./icons";
 import { useT } from "../lib/i18n";
+import { stokDurumu } from "../lib/urunKarti";
 
 interface Props {
   product: Product;
-  onEdit: () => void;
+  /** Ürün kartını (ProductDetailModal) açar. */
+  onOpen: () => void;
   onCoverUpdated: (coverImageUrl?: string) => void;
 }
 
 // JobCard ile aynı görsel dil (kart yüksekliği HER ZAMAN sabit, hiç
 // büyümez/küçülmez) — "Şirket anasayfasında ürün departmanından eklenen
 // ürünler tıpkı iş kartları gibi görünsün". Ürün/hizmetlerin ayrı bir detay
-// sayfası yok; karta tıklamak düzenleme modalını açar, açıklamaya tıklamaksa
+// sayfası yok; karta tıklamak ürün kartını açar, açıklamaya tıklamaksa
 // kartın boyutunu değiştirmeden açıklama alanını kendi içinde kaydırır.
 //
 // GÖRSEL ALANI İŞ KARTINDAN YÜKSEK. İş/proje kapağı bir afiş şeridi, ürün
@@ -43,7 +45,7 @@ function formatStock(product: Product): string | null {
   return product.unit ? `${miktar} ${PRODUCT_UNIT_LABEL[product.unit].toLocaleLowerCase("tr-TR")}` : miktar;
 }
 
-export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) {
+export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) {
   const c = useThemeColors();
   const t = useT();
   const [coverUrl, setCoverUrl] = useState(product.coverImageUrl);
@@ -88,7 +90,10 @@ export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) 
   };
 
   const priceLabel = formatPrice(product.price, product.currency);
-  const stockLabel = formatStock(product);
+  // Hizmette stok gösterilmez: tür değiştirilmiş eski bir üründe değer
+  // kalmış olabilir (bkz. ProductForm), kartta "12 adet" hizmet anlamsız.
+  const stockLabel = product.kind === "service" ? null : formatStock(product);
+  const stock = product.kind === "service" ? "yok" : stokDurumu(product.stockQuantity, product.minStock);
   // Kullanıcının yüklediği gerçek bir fotoğraf mı, yoksa kimlikten türetilen
   // hazır kapak mı? Fotoğrafta <img> + contain kullanılıyor: arka plan olarak
   // çizilseydi CSS `cover` ürünün kenarlarını kırpardı.
@@ -109,7 +114,7 @@ export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) 
 
     <button
       type="button"
-      onClick={onEdit}
+      onClick={onOpen}
       className="entity-card"
       style={{
         display: "flex",
@@ -188,6 +193,23 @@ export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) 
             }}
           >
             {imageCount} fotoğraf
+          </span>
+        )}
+
+        {product.kind === "service" && (
+          <span
+            style={{
+              position: "absolute",
+              left: 8,
+              top: 8,
+              padding: "2px 7px",
+              borderRadius: 999,
+              fontSize: 11.5,
+              color: "#fff",
+              background: "rgba(26,31,41,0.62)",
+            }}
+          >
+            {t("Hizmet")}
           </span>
         )}
 
@@ -295,7 +317,16 @@ export default function ProductCard({ product, onEdit, onCoverUpdated }: Props) 
             {priceLabel ?? "Fiyat belirtilmedi"}
           </span>
           {stockLabel && (
-            <span style={{ color: c.textSecondary, whiteSpace: "nowrap" }}>{stockLabel}</span>
+            <span
+              title={stock === "kritik" ? t("Kritik stok") : stock === "tukendi" ? t("Stok tükendi") : undefined}
+              style={{
+                color: stock === "tukendi" ? c.danger : stock === "kritik" ? c.warning : c.textSecondary,
+                fontWeight: stock === "kritik" || stock === "tukendi" ? 500 : 400,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {stockLabel}
+            </span>
           )}
         </div>
       </div>

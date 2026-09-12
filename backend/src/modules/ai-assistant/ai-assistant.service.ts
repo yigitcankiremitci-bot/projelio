@@ -4967,6 +4967,12 @@ export class AiAssistantService {
       "taxRate",
       "status",
       "notes",
+      "kind",
+      "features",
+      "specs",
+      "warranty",
+      "leadTime",
+      "minStock",
     ];
     for (const field of fields) {
       if (input[field] !== undefined) patch[field] = input[field];

@@ -701,4 +701,13 @@ export const hatalar: TranslationDict = {
   "Başlık çok uzun.": "The title is too long.",
   "En az bir kanal seç: bildirim ya da e-posta.": "Choose at least one channel: notification or email.",
   "Mesaj çok uzun.": "The message is too long.",
+
+  // Ürün kartı (110)
+  "Geçersiz ürün türü": "Invalid product type",
+  "Özellikler bir liste olmalı": "Features must be a list",
+  "Teknik özellikler bir liste olmalı": "Specifications must be a list",
+  "Teknik özelliğin adı boş bırakılamaz": "A specification needs a name",
+  "Tedarikçi bu şirkette bulunamadı": "Supplier not found in this company",
+  "Ürün kaydedilemedi: sunucu güncellemesi tamamlanmamış. Biraz sonra tekrar dene.":
+    "Couldn't save the product: a server update is still in progress. Try again shortly.",
 };

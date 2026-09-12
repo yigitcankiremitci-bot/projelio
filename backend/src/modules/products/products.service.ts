@@ -1,8 +1,10 @@
 import { randomUUID } from "crypto";
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import type { Product, ProductImage, ProductStatus, ProductUnit } from "@projelio/shared";
-import { PRODUCT_UNITS } from "@projelio/shared";
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import type { ModuleRecord, Product, ProductImage, ProductKind, ProductOverview, ProductSpec, ProductStatus, ProductUnit } from "@projelio/shared";
+import { PRODUCT_UNITS, URUN_BAGLANTI_ALANLARI, URUN_STRATEJI_MODUL_KEY, urunIliskiliKayitlar } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { ModuleRecordsService } from "../module-records/module-records.service";
+import { ModuleMembersService } from "../module-members/module-members.service";
 import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 import { safeExternalUrl } from "../../common/safe-url";
 
@@ -14,6 +16,22 @@ const COVER_BUCKET = "product-covers";
 const MAX_IMAGES_PER_PRODUCT = 12;
 
 const PRODUCT_STATUSES: ProductStatus[] = ["active", "inactive"];
+const PRODUCT_KINDS: ProductKind[] = ["product", "service"];
+
+// Ürün kartı listeleri. Sınırlar kartın okunabilirliğinden geliyor: otuz
+// maddelik bir "öne çıkan özellikler" listesi artık öne çıkan bir şey söylemez.
+const MAX_FEATURES = 30;
+const MAX_SPECS = 60;
+const MAX_LIST_TEXT = 300;
+
+// Kartın "Modüllerde" bölümünde gösterilen en fazla kayıt. Popüler bir ürünün
+// adı yüzlerce sevkiyatta geçebilir; kart bir özet, defterin kendisi değil.
+const MAX_RELATED = 60;
+
+/** jsonb dizisini güvenle okur: bozuk/eski satırda kart `.map`'te kırılmasın. */
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
 
 function mapProductImage(row: any): ProductImage {
   return {
@@ -45,6 +63,15 @@ function mapProduct(row: any, images: ProductImage[] = []): Product {
     costPrice: row.cost_price !== null && row.cost_price !== undefined ? Number(row.cost_price) : undefined,
     taxRate: row.tax_rate !== null && row.tax_rate !== undefined ? Number(row.tax_rate) : undefined,
     status: (row.status ?? "active") as ProductStatus,
+    kind: (row.kind ?? "product") as ProductKind,
+    features: asArray(row.features).filter((f): f is string => typeof f === "string"),
+    specs: asArray(row.specs)
+      .filter((s: any) => s && typeof s.label === "string" && typeof s.value === "string")
+      .map((s: any) => ({ label: s.label, value: s.value })),
+    warranty: row.warranty ?? undefined,
+    leadTime: row.lead_time ?? undefined,
+    minStock: row.min_stock !== null && row.min_stock !== undefined ? Number(row.min_stock) : undefined,
+    supplierPartyId: row.supplier_party_id ?? undefined,
     productUrl: row.product_url ?? undefined,
     notes: row.notes ?? undefined,
     sortOrder: row.sort_order ?? 0,
@@ -94,6 +121,55 @@ export interface ProductWriteInput {
   status?: string;
   productUrl?: string | null;
   notes?: string | null;
+  kind?: string;
+  features?: unknown;
+  specs?: unknown;
+  warranty?: string | null;
+  leadTime?: string | null;
+  minStock?: number | string | null;
+  supplierPartyId?: string | null;
+}
+
+/** Özellik listesini doğrular: boş maddeler atılır, tekrarlar teke düşer. */
+function parseFeatures(value: unknown): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return [];
+  if (!Array.isArray(value)) throw new BadRequestException("Özellikler bir liste olmalı");
+  const seen = new Set<string>();
+  const list: string[] = [];
+  for (const item of value) {
+    const text = String(item ?? "").trim();
+    if (!text || seen.has(text)) continue;
+    if (text.length > MAX_LIST_TEXT) throw new BadRequestException(`Bir özellik en fazla ${MAX_LIST_TEXT} karakter olabilir`);
+    seen.add(text);
+    list.push(text);
+  }
+  if (list.length > MAX_FEATURES) throw new BadRequestException(`En fazla ${MAX_FEATURES} özellik eklenebilir`);
+  return list;
+}
+
+/**
+ * Teknik özellikleri doğrular. Değeri boş satır atılır (başlığı yazılıp
+ * doldurulmamış bir satır kartta "Ağırlık: —" diye boş boş durmasın); başlığı
+ * boş ama değeri dolu satır ise reddedilir — neyin değeri olduğu bilinmez.
+ */
+function parseSpecs(value: unknown): ProductSpec[] | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return [];
+  if (!Array.isArray(value)) throw new BadRequestException("Teknik özellikler bir liste olmalı");
+  const list: ProductSpec[] = [];
+  for (const item of value) {
+    const label = String((item as any)?.label ?? "").trim();
+    const specValue = String((item as any)?.value ?? "").trim();
+    if (!specValue) continue;
+    if (!label) throw new BadRequestException("Teknik özelliğin adı boş bırakılamaz");
+    if (label.length > MAX_LIST_TEXT || specValue.length > MAX_LIST_TEXT) {
+      throw new BadRequestException(`Teknik özellik en fazla ${MAX_LIST_TEXT} karakter olabilir`);
+    }
+    list.push({ label, value: specValue });
+  }
+  if (list.length > MAX_SPECS) throw new BadRequestException(`En fazla ${MAX_SPECS} teknik özellik eklenebilir`);
+  return list;
 }
 
 // Ürün Yönetimi departmanından eklenen ürün/hizmet. Şirket anasayfasında iş
@@ -102,7 +178,11 @@ export interface ProductWriteInput {
 export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
 
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private moduleRecords: ModuleRecordsService,
+    private moduleMembers: ModuleMembersService
+  ) {}
 
   // Organizasyon sahibi ya da (ürün bir departmana bağlıysa) o departmanın
   // onaylı yöneticisi ürün ekleyip düzenleyebilir.
@@ -236,10 +316,18 @@ export class ProductsService {
       ["brand", "brand"],
       ["category", "category"],
       ["notes", "notes"],
+      ["warranty", "warranty"],
+      ["leadTime", "lead_time"],
     ];
     for (const [field, column] of textFields) {
       const value = parseOptionalText(data[field]);
       if (value !== undefined) patch[column] = value;
+    }
+    // Sütun varchar(120): sınır burada söylenmezse Postgres'in "value too long"
+    // hatası kullanıcıya ham haliyle gidiyordu.
+    for (const [field, label] of [["warranty", "Garanti"], ["leadTime", "Teslim süresi"]] as const) {
+      const value = patch[field === "leadTime" ? "lead_time" : field];
+      if (typeof value === "string" && value.length > 120) throw new BadRequestException(`${label} en fazla 120 karakter olabilir`);
     }
 
     if (data.unit !== undefined) {
@@ -257,6 +345,16 @@ export class ProductsService {
       patch.status = data.status;
     }
 
+    if (data.kind !== undefined) {
+      if (!PRODUCT_KINDS.includes(data.kind as ProductKind)) throw new BadRequestException("Geçersiz ürün türü");
+      patch.kind = data.kind;
+    }
+
+    const features = parseFeatures(data.features);
+    if (features !== undefined) patch.features = features;
+    const specs = parseSpecs(data.specs);
+    if (specs !== undefined) patch.specs = specs;
+
     if (data.currency !== undefined) patch.currency = String(data.currency).trim() || "TRY";
 
     const price = parseOptionalNumber(data.price, "Fiyat");
@@ -269,6 +367,8 @@ export class ProductsService {
     if (stock !== undefined) patch.stock_quantity = stock;
     const taxRate = parseOptionalNumber(data.taxRate, "KDV oranı", { min: 0, max: 100 });
     if (taxRate !== undefined) patch.tax_rate = taxRate;
+    const minStock = parseOptionalNumber(data.minStock, "Kritik stok");
+    if (minStock !== undefined) patch.min_stock = minStock;
 
     if (data.productUrl !== undefined) {
       const raw = parseOptionalText(data.productUrl);
@@ -292,6 +392,8 @@ export class ProductsService {
     if (!data.name?.trim()) throw new BadRequestException("Ürün adı gerekli");
 
     const patch = this.buildPatch(data);
+    const supplier = await this.resolveSupplier(organizationId, data.supplierPartyId);
+    if (supplier !== undefined) patch.supplier_party_id = supplier;
     const { data: row, error } = await this.supabase.client
       .from("products")
       .insert({
@@ -312,6 +414,8 @@ export class ProductsService {
     await this.assertCanManage(existing.organizationId, existing.departmentId, requestingUserId);
 
     const patch = this.buildPatch(data);
+    const supplier = await this.resolveSupplier(existing.organizationId, data.supplierPartyId);
+    if (supplier !== undefined) patch.supplier_party_id = supplier;
     if (Object.keys(patch).length === 0) return existing;
 
     const { data: row, error } = await this.supabase.client
@@ -326,6 +430,123 @@ export class ProductsService {
   }
 
   /**
+   * Tedarikçi kimliğini doğrular: kayıt AYNI şirketin party satırı olmalı.
+   *
+   * Kimlik istemciden geliyor. Doğrulanmazsa başka bir şirketin tedarikçisi
+   * buraya bağlanabilir, ürün kartı da o firmanın telefonunu ve e-postasını
+   * (bkz. overview) bu şirketin kullanıcılarına gösterirdi.
+   */
+  private async resolveSupplier(organizationId: string, value: unknown): Promise<string | null | undefined> {
+    if (value === undefined) return undefined;
+    if (value === null || value === "") return null;
+    const { data, error } = await this.supabase.client
+      .from("party")
+      .select("id")
+      .eq("id", String(value))
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (error || !data) throw new BadRequestException("Tedarikçi bu şirkette bulunamadı");
+    return data.id;
+  }
+
+  /**
+   * Ürün kartının tek istekte ihtiyaç duyduğu her şey: ürün, tedarikçi,
+   * strateji kaydı ve ürünün adının geçtiği modül kayıtları.
+   *
+   * YETKİ. Çağıran (controller) ürünü görebildiğini zaten doğruladı. Modül
+   * kayıtları ise ModuleRecordsService.findByOrganization'dan geçiyor — o
+   * metot kullanıcının OKUYAMADIĞI modüllerin kayıtlarını eler. Ürün kartı
+   * modül yetkisini delen bir arka kapı olmamalı: depo modülüne erişimi
+   * olmayan satışçı, kartta da depo kaydı görmez.
+   */
+  async overview(id: string, userId: string): Promise<ProductOverview> {
+    const product = await this.findOne(id);
+    const organizationId = product.organizationId;
+
+    const [canManage, records, strategyAccess, strategyModule, supplier] = await Promise.all([
+      this.assertCanManage(organizationId, product.departmentId, userId).then(
+        () => true,
+        () => false
+      ),
+      this.moduleRecords.findByOrganization(organizationId, undefined, userId).catch((error) => {
+        // Kart modül kayıtları olmadan da işe yarar; bir modülün okunamaması
+        // ürünün kendisini göstermeyi engellemesin.
+        this.logger.warn(`Ürün kartı modül kayıtları okunamadı (${id}): ${(error as Error).message}`);
+        return [] as ModuleRecord[];
+      }),
+      this.moduleMembers.resolveOrganizationAccess(organizationId, URUN_STRATEJI_MODUL_KEY, userId).catch(() => null),
+      this.supabase.client
+        .from("organization_modules")
+        .select("department_id")
+        .eq("organization_id", organizationId)
+        .eq("module_key", URUN_STRATEJI_MODUL_KEY)
+        .limit(1)
+        .maybeSingle(),
+      product.supplierPartyId
+        ? this.supabase.client
+            .from("party")
+            .select("id, display_name, email, phone, website")
+            .eq("id", product.supplierPartyId)
+            .eq("organization_id", organizationId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    const strategyRecord = records.find(
+      (r) => r.moduleKey === URUN_STRATEJI_MODUL_KEY && r.scopeRef === id
+    );
+
+    const ilgiliModuller = new Set(Object.keys(URUN_BAGLANTI_ALANLARI));
+    const matches = urunIliskiliKayitlar(
+      product,
+      records.filter((r) => ilgiliModuller.has(r.moduleKey))
+    );
+    const shown = matches.slice(0, MAX_RELATED);
+    const names = await this.moduleNames([...new Set(shown.map((m) => m.record.moduleKey))]);
+
+    const supplierRow = (supplier as { data: any }).data;
+    return {
+      product,
+      canManage,
+      supplier: supplierRow
+        ? {
+            id: supplierRow.id,
+            displayName: supplierRow.display_name,
+            email: supplierRow.email ?? undefined,
+            phone: supplierRow.phone ?? undefined,
+            website: supplierRow.website ?? undefined,
+          }
+        : undefined,
+      strategy: {
+        enabled: !!strategyModule.data,
+        departmentId: strategyModule.data?.department_id ?? undefined,
+        access: {
+          canRead: strategyAccess?.canRead ?? false,
+          canWrite: strategyAccess?.canWrite ?? false,
+          canManageTeam: strategyAccess?.canManageTeam ?? false,
+        },
+        record: strategyRecord,
+      },
+      related: shown.map(({ record, matchedBy }) => ({
+        moduleKey: record.moduleKey,
+        moduleName: names.get(record.moduleKey) ?? record.moduleKey,
+        matchedBy,
+        record,
+        departmentId: record.departmentId,
+      })),
+      relatedTruncated: matches.length > shown.length,
+    };
+  }
+
+  private async moduleNames(keys: string[]): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    if (keys.length === 0) return map;
+    const { data } = await this.supabase.client.from("module_catalog").select("key, name").in("key", keys);
+    for (const row of data ?? []) map.set(row.key, row.name);
+    return map;
+  }
+
+  /**
    * Veritabanı kısıtlarını kullanıcının anlayacağı mesaja çevirir.
    * Ham Postgres hatası ("duplicate key value violates unique constraint
    * products_org_sku_uniq") arayüzde olduğu gibi görünüyordu.
@@ -336,6 +557,13 @@ export class ProductsService {
     }
     if (error?.code === "23514" && String(error?.message ?? "").includes("products_status_check")) {
       return new BadRequestException("Geçersiz ürün durumu");
+    }
+    // Kod yayına migration 110'dan ÖNCE çıkarsa PostgREST yeni sütunları
+    // tanımaz (PGRST204) ve her kayıt ham bir şema hatasıyla düşer. Sebep
+    // kullanıcının değil sunucunun; log'a açıkça yazılsın ki aranmasın.
+    if (error?.code === "PGRST204" || error?.code === "42703") {
+      this.logger.error(`Ürün yazılamadı — migration 110 uygulanmış mı? ${error?.message ?? ""}`);
+      return new ServiceUnavailableException("Ürün kaydedilemedi: sunucu güncellemesi tamamlanmamış. Biraz sonra tekrar dene.");
     }
     return error;
   }

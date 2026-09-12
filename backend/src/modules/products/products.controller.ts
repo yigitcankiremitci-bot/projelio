@@ -53,6 +53,17 @@ export class ProductsController {
     return product;
   }
 
+  // Ürün kartı: ürün + tedarikçi + strateji + ürünün geçtiği modül kayıtları.
+  // Yetki liste ucuyla aynı; modül kayıtları ayrıca modül yetkisinden geçer
+  // (bkz. ProductsService.overview).
+  @Get("products/:id/overview")
+  async overview(@Param("id") id: string, @Req() req: any) {
+    const product = await this.productsService.findOne(id);
+    await this.access.assertCanViewOrganization(product.organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "products");
+    return this.productsService.overview(id, req.user.userId);
+  }
+
   @Patch("products/:id")
   update(@Param("id") id: string, @Body() body: ProductWriteInput, @Req() req: any) {
     return this.productsService.update(id, body, req.user.userId);

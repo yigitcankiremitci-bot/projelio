@@ -401,6 +401,22 @@ export const PRODUCT_STATUS_LABEL: Record<ProductStatus, string> = {
   inactive: "Satış dışı",
 };
 
+/**
+ * Ürün mü hizmet mi. Kart hizmette stok/barkod gibi anlamsız alanları gizler;
+ * gizlenen alanın verisi silinmez (bkz. migration 110).
+ */
+export type ProductKind = "product" | "service";
+export const PRODUCT_KIND_LABEL: Record<ProductKind, string> = {
+  product: "Ürün",
+  service: "Hizmet",
+};
+
+/** Teknik özellik satırı: "Ağırlık" → "2,4 kg". */
+export interface ProductSpec {
+  label: string;
+  value: string;
+}
+
 /** Ürünün fotoğraflarından biri. `sortOrder` 0 olan vitrin görselidir. */
 export interface ProductImage {
   id: string;
@@ -446,6 +462,22 @@ export interface Product {
   taxRate?: number;
 
   status: ProductStatus;
+  kind: ProductKind;
+
+  // --- Ürün kartı (migration 110) ---
+  /** Öne çıkan özellikler, sıralı kısa maddeler. */
+  features: string[];
+  /** Teknik özellikler. */
+  specs: ProductSpec[];
+  /** Serbest metin: "2 yıl", "Ömür boyu". */
+  warranty?: string;
+  /** Teslim / başlama süresi: "3 iş günü". */
+  leadTime?: string;
+  /** Kritik stok seviyesi; stok buna eşit ya da altındaysa uyarılır. */
+  minStock?: number;
+  /** Asıl tedarikçi (ortak varlık: party). */
+  supplierPartyId?: string;
+
   /** Tanıtım/satış sayfası. Sunucuda güvenlik süzgecinden geçer. */
   productUrl?: string;
   /** Yalnızca şirket içi görünen serbest not. */

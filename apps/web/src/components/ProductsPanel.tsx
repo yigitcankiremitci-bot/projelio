@@ -6,6 +6,7 @@ import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/proje
 import { useDragScroll } from "../lib/useDragScroll";
 import ProductCard from "./ProductCard";
 import AddEditProductModal from "./AddEditProductModal";
+import ProductDetailModal from "./ProductDetailModal";
 import { useT } from "../lib/i18n";
 
 export interface ProductsPanelHandle {
@@ -44,7 +45,9 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
+  // Açık ürün kartı. Karta tıklamak artık düzenleme formunu değil ürün kartını
+  // açar; düzenleme kartın "Bilgiler" sekmesinde (bkz. ProductDetailModal).
+  const [open, setOpen] = useState<Product | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -106,7 +109,7 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
             // olarak büzülüyor ve otuz ürün eklendiğinde hepsi satıra sıkışıp
             // okunamaz hale geliyordu (bkz. DepartmentsPanel'deki aynı ölçü).
             <div key={p.id} style={layout === "grid" ? undefined : { flex: "0 0 260px", width: 260 }}>
-              <ProductCard product={p} onEdit={() => setEditing(p)} onCoverUpdated={() => load()} />
+              <ProductCard product={p} onOpen={() => setOpen(p)} onCoverUpdated={() => load()} />
             </div>
           ))}
         </div>
@@ -117,23 +120,28 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
           organizationId={organizationId}
           departmentId={departmentId}
           onClose={() => setAdding(false)}
-          onSaved={load}
+          onSaved={(olusan) => {
+            load();
+            // Yeni ürünün kartı hemen açılsın: strateji ve eksik bilgiler oradan
+            // tamamlanıyor, kullanıcı ürünü listede aramak zorunda kalmasın.
+            setOpen(olusan);
+          }}
         />
       )}
 
-      {editing && (
-        <AddEditProductModal
+      {open && (
+        <ProductDetailModal
+          key={open.id}
           organizationId={organizationId}
-          departmentId={editing.departmentId}
-          product={editing}
-          onClose={() => setEditing(null)}
-          onSaved={load}
+          product={open}
+          onClose={() => setOpen(null)}
+          onChanged={load}
           onArchived={() => {
-            setEditing(null);
+            setOpen(null);
             load();
           }}
           onDeleted={() => {
-            setEditing(null);
+            setOpen(null);
             load();
           }}
         />

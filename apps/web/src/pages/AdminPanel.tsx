@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconShield } from "../components/icons";
 import AiCreditAdminPanel from "../components/AiCreditAdminPanel";
+import AdminKullanicilarPanel from "../components/AdminKullanicilarPanel";
 import BillingAdminPanel from "../components/BillingAdminPanel";
 import SupportAdminPanel from "../components/SupportAdminPanel";
 import DemoAdminPanel from "../components/DemoAdminPanel";
@@ -87,7 +88,11 @@ export default function AdminPanel() {
         {t("Kullanıcılar, proje istatistikleri ve sistem durumu burada listelenir.")}
       </p>
 
-      <AiCreditAdminPanel />
+      <AdminKullanicilarPanel />
+
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
+        <AiCreditAdminPanel />
+      </div>
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
         <BillingAdminPanel />

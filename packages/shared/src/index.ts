@@ -9,3 +9,4 @@ export * from "./taskSearch";
 export * from "./butceToplama";
 export * from "./hesapAbonelik";
 export * from "./bilgiKartiBelge";
+export * from "./adminKullanici";

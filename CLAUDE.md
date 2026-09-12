@@ -32,6 +32,7 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | Bilgi kartı (şirket/iş künyesi) | `backend/src/modules/bilgi-karti/`, `apps/web/src/components/bilgiKarti/` — künye + belge + diğer modüllerden özet |
 | Hesaplar (üyelikler + şifreli giriş bilgileri) | `backend/src/modules/hesaplar/`, `apps/web/src/components/hesaplar/` — sır yalnızca `hesap-kimlik.service.ts`'ten çıkar |
 | Geçiş anahtarı (WebAuthn) doğrulaması | `backend/src/common/webauthn/` — elle yazıldı, bağımlılık yok; `backend/src/modules/passkeys/` kullanıcının cihazları |
+| Admin kullanıcı yönetimi (askı, oturum iptali, kredi, silme) | `backend/src/modules/admin/admin-kullanicilar.service.ts`, `apps/web/src/components/AdminKullanicilarPanel.tsx` — oturum engeli `backend/src/common/hesap-durumu/` |
 | WhatsApp köprüsü (WAHA yan-servisi + modül) | `backend/src/modules/whatsapp/`, `deploy/docker-compose.prod.yml` `waha` servisi, tasarım `docs/whatsapp-qr-plan.md` |
 
 Backend'de 48 modül, 500'den fazla HTTP ucu var (`node scripts/uc-listesi.mjs` ile

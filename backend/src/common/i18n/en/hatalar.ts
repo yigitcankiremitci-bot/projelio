@@ -678,4 +678,17 @@ export const hatalar: TranslationDict = {
   "Tanınmayan bilgi kartı kapsamı": "Unknown info card scope",
   "organizationId ya da jobId gerekli (list_modules ile bulabilirsin).": "organizationId or jobId is required (use list_modules to find it).",
   "Güvenliğiniz için çıkış yapıp yeniden giriş yapın; ardından beş dakika içinde tekrar deneyin.": "For your security, sign out and sign in again, then try again within five minutes.",
+  // ─────────────────────────────────────────────── Admin > kullanıcı yönetimi
+  "Bu hesabın bekleyen bir silme talebi yok.": "This account has no pending deletion request.",
+  "Bu yükleme zaten geri alınmış.": "This top-up has already been reversed.",
+  "Bu özellik için veritabanı güncellemesi (migration 108) henüz uygulanmamış.": "The database update this feature needs (migration 108) hasn't been applied yet.",
+  "Demo hesabında bu işlem yapılamaz.": "This action isn't available on the demo account.",
+  "Geçersiz rol.": "Invalid role.",
+  "Kalıcı olarak silinmiş bir hesap geri getirilemez.": "A permanently deleted account can't be restored.",
+  "Kredi hareketi bulunamadı.": "Credit transaction not found.",
+  "Kullanıcının bakiyesi bu kadar krediyi karşılamıyor.": "The user's balance doesn't cover that many credits.",
+  "Onay için hesabın e-posta adresini aynen yazmalısın.": "To confirm, type the account's email address exactly.",
+  "Yalnızca kredi yüklemeleri geri alınabilir.": "Only credit top-ups can be reversed.",
+  "Hesabın askıya alındı. Destek için bizimle iletişime geç.": "Your account has been suspended. Contact us for support.",
+  "Oturumun sonlandırıldı, lütfen yeniden giriş yap.": "Your session was ended, please sign in again.",
 };

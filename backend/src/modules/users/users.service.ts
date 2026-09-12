@@ -25,6 +25,8 @@ export interface UserRecord {
   passwordHash?: string;
   /** Dolu ise hesap silinmiş: giriş kapalı, kimlik alanları anonimleştirilmiş. */
   deletedAt?: string;
+  // Yönetici tarafından askıya alındıysa dolu; giriş ve API erişimi kapalı (migration 108).
+  bannedAt?: string;
   role: "admin" | "freelancer";
   accountType: AccountType;
   activeTaskId?: string;
@@ -91,6 +93,7 @@ function mapUser(row: any): UserRecord {
     username: row.username,
     passwordHash: row.password_hash ?? undefined,
     deletedAt: row.deleted_at ?? undefined,
+    bannedAt: row.banned_at ?? undefined,
     role: row.role,
     accountType: row.account_type,
     activeTaskId: row.active_task_id ?? undefined,
@@ -124,6 +127,8 @@ function toPublicUser(user: UserRecord): PublicUser {
     // Kimin hangi eğitimi izlediği de yalnızca kişinin kendisini ilgilendiriyor;
     // /auth/me'den geliyor, başkasının görünümünde yok.
     toursSeen: _toursSeen,
+    // Askı durumu yalnızca yöneticiyi ilgilendirir (bkz. modules/admin).
+    bannedAt: _bannedAt,
     ...publicUser
   } = user;
   return publicUser;

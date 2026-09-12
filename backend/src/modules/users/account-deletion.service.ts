@@ -40,6 +40,15 @@ import {
 /** Talep ile asıl silme arasındaki bekleme. */
 export const GRACE_PERIOD_DAYS = 30;
 
+/** Anonimleştirilmiş satırın e-postası: `silinmis+<kısa id>@projelio.invalid`. */
+const ANONIM_EPOSTA_ONEKI = "silinmis+";
+const ANONIM_EPOSTA_ALANI = "@projelio.invalid";
+
+/** Satır zaten kalıcı olarak silinmiş (anonimleştirilmiş) mi? */
+export function anonimlestirilmisMi(email: string | null | undefined): boolean {
+  return Boolean(email?.startsWith(ANONIM_EPOSTA_ONEKI) && email.endsWith(ANONIM_EPOSTA_ALANI));
+}
+
 @Injectable()
 export class AccountDeletionService {
   private readonly logger = new Logger(AccountDeletionService.name);
@@ -123,6 +132,50 @@ export class AccountDeletionService {
     return { ok: true, purgeAt: purgeAt.toISOString() };
   }
 
+  // ============================================================ Yönetici yolları
+  //
+  // Admin paneli (modules/admin) kullanıcı adına silme yapabiliyor. Kurallar
+  // kullanıcının kendi silmesiyle AYNI: sahiplik engelleri atlanmıyor. Tek fark
+  // şifre istenmemesi (yönetici kişinin şifresini bilmez) ve bilgilendirme
+  // e-postasının gitmemesi — o e-posta "talebini aldık" diyor, kişi böyle bir
+  // talepte bulunmadı.
+
+  /** 30 günlük bekleme başlatır; kişi bu sürede giriş yaparsa talep iptal olur. */
+  async adminSilmeTalebi(userId: string): Promise<{ purgeAt: string }> {
+    demoHesabindaYasak(userId, "hesap silme");
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new BadRequestException("Kullanıcı bulunamadı.");
+    if (user.deletedAt) throw new BadRequestException("Bu hesap zaten silinmiş.");
+    await this.engelVarsaDurdur(userId);
+
+    const now = new Date();
+    const { error } = await this.supabase.client
+      .from("users")
+      .update({ deleted_at: now.toISOString() })
+      .eq("id", userId);
+    if (error) throw error;
+    return { purgeAt: new Date(now.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000).toISOString() };
+  }
+
+  /**
+   * Beklemeden, ŞİMDİ kalıcı olarak siler. GERİ ALINAMAZ.
+   * Bekleyen bir talep olsun olmasın çalışır.
+   */
+  async adminHemenSil(userId: string): Promise<void> {
+    demoHesabindaYasak(userId, "hesap silme");
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new BadRequestException("Kullanıcı bulunamadı.");
+    if (anonimlestirilmisMi(user.email)) throw new BadRequestException("Bu hesap zaten silinmiş.");
+    await this.engelVarsaDurdur(userId);
+    await this.purgeAccount(userId);
+  }
+
+  private async engelVarsaDurdur(userId: string): Promise<void> {
+    const { engeller } = await this.classifyOwnedOrgs(userId);
+    const engel = describeBlockers(engeller);
+    if (engel) throw new BadRequestException(engel);
+  }
+
   /**
    * Bekleme süresi içinde geri dönüş. Giriş akışı çağırıyor: doğru şifreyle
    * gelen kullanıcı zaten kimliğini kanıtlamış oluyor, ayrıca bir onay istemek
@@ -149,8 +202,11 @@ export class AccountDeletionService {
       .select("id")
       .not("deleted_at", "is", null)
       .lt("deleted_at", esik)
-      // Zaten anonimleştirilmiş satırlar tekrar işlenmesin.
-      .not("password_hash", "is", null);
+      // Zaten anonimleştirilmiş satırlar tekrar işlenmesin. Ölçüt anonim e-posta
+      // (bkz. anonymizeUser). Eskiden `password_hash IS NOT NULL` idi: Google ya
+      // da Microsoft ile açılmış hesapların şifresi hiç olmadığı için bu hesaplar
+      // silme talebinden sonra SONSUZA KADAR silinmeden kalıyordu.
+      .not("email", "like", `${ANONIM_EPOSTA_ONEKI}%${ANONIM_EPOSTA_ALANI}`);
     if (error) throw error;
 
     let silinen = 0;
@@ -378,7 +434,7 @@ export class AccountDeletionService {
         full_name: "Silinmiş kullanıcı",
         // Benzersizlik kısıtı korunsun diye kimliğe bağlı; .invalid alan adı
         // RFC 2606 gereği hiçbir zaman gerçek bir adrese çözülmez.
-        email: `silinmis+${kisaId}@projelio.invalid`,
+        email: `${ANONIM_EPOSTA_ONEKI}${kisaId}${ANONIM_EPOSTA_ALANI}`,
         username: `silinmis_${kisaId}`,
         password_hash: null,
         avatar_url: null,

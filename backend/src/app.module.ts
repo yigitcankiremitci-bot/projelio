@@ -4,6 +4,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { DatabaseModule } from "./database/database.module";
 import { KullaniciDiliModule } from "./common/i18n/kullanici-dili.service";
 import { AccessModule } from "./common/access/access.module";
+import { HesapDurumuModule } from "./common/hesap-durumu/hesap-durumu.service";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
@@ -65,6 +66,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     KullaniciDiliModule,
     // Görünürlüğün tek kapısı (bkz. common/access/access.service.ts).
     AccessModule,
+    HesapDurumuModule,
     AuthModule,
     UsersModule,
     ProjectsModule,

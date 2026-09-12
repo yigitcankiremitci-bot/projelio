@@ -1,4 +1,6 @@
-import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { OTURUM_KARARI_MESAJI } from "../../common/hesap-durumu/oturum-engeli";
+import { AccountDeletionService } from "../users/account-deletion.service";
 import { JwtService } from "@nestjs/jwt";
 import { OAuthHandoffStore } from "../../common/auth/oauth-handoff";
 import { nowInSeconds } from "../auth/session-payload";
@@ -19,6 +21,7 @@ export class MicrosoftAuthService {
 
   constructor(
     private usersService: UsersService,
+    private accountDeletionService: AccountDeletionService,
     private accounts: MicrosoftAccountsService,
     private jwtService: JwtService
   ) {}
@@ -99,6 +102,20 @@ export class MicrosoftAuthService {
 
     const user = await this.usersService.findById(userId);
     if (!user) throw new UnauthorizedException("Kullanıcı bulunamadı.");
+
+    // Askıdaki hesap Microsoft ile de giremez. Şifreli girişle aynı sıra: önce askı,
+    // sonra silme talebinin geri alınması (bkz. AuthService.login).
+    if (user.bannedAt) {
+      throw new ForbiddenException(OTURUM_KARARI_MESAJI.askida);
+    }
+
+    // Silme talebi olan kişi geri döndüyse talep iptal olur — şifreyle girişte
+    // de böyle. Eskiden yalnızca şifreli giriş geri alıyordu; Microsoft ile dönen
+    // kullanıcı uygulamayı kullanmaya devam ederken 30 gün sonra hesabı
+    // silinirdi.
+    if (user.deletedAt) {
+      await this.accountDeletionService.restoreAccount(user.id);
+    }
 
     // loginAt: Microsoft ile giriş de yeni bir oturumdur, mutlak ömür saati
     // burada başlar (bkz. modules/auth/session-payload.ts).

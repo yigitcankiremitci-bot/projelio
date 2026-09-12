@@ -266,6 +266,75 @@ export class AiCreditsService {
   }
 
   /**
+   * Yöneticinin bakiyeden elle kredi düşmesi (admin paneli).
+   *
+   * Bakiyenin altına İNİLMEZ: elle düşme bir düzeltmedir, ceza değil; eksi bakiye
+   * kullanıcıyı yeni bir yükleme yapana kadar kilitlerdi. Belirli bir yüklemeyi
+   * geri almak için `reverse` kullanılmalı — o, orijinal satıra bağlanır ve
+   * aynı yüklemenin iki kez geri alınmasını engeller.
+   */
+  async deduct(userId: string, credits: number, description: string | undefined, createdBy: string): Promise<CreditBalance> {
+    if (!Number.isFinite(credits) || credits <= 0) {
+      throw new BadRequestException("Kredi miktarı pozitif bir sayı olmalı.");
+    }
+    try {
+      await this.chargeAtomic({
+        userId,
+        credits: -credits,
+        type: "adjustment",
+        description,
+        createdBy,
+        allowNegative: false,
+      });
+    } catch (e) {
+      if (e instanceof InsufficientCreditsException) {
+        throw new BadRequestException("Kullanıcının bakiyesi bu kadar krediyi karşılamıyor.");
+      }
+      throw e;
+    }
+    return this.getBalance(userId);
+  }
+
+  /**
+   * Bir yükleme satırını geri alır: karşı yönde yeni bir satır yazılır, orijinal
+   * DEĞİŞMEZ. Bakiye eksiye düşebilir (kredi harcanmış olabilir) — gerekçesi
+   * migration 108'deki fonksiyonun içinde.
+   *
+   * @param userId Satırın bu kullanıcıya ait olduğu doğrulanır: uçta hem kullanıcı
+   *               hem satır kimliği geliyor, uyuşmazlık yanlış kişinin kredisine
+   *               dokunmak demek.
+   */
+  async reverse(userId: string, transactionId: string, description: string | undefined, createdBy: string): Promise<CreditBalance> {
+    const { data: tx, error: txError } = await this.supabase.client
+      .from("ai_credit_transactions")
+      .select("id, user_id")
+      .eq("id", transactionId)
+      .maybeSingle();
+    if (txError) throw txError;
+    if (!tx || (tx as any).user_id !== userId) {
+      throw new BadRequestException("Kredi hareketi bulunamadı.");
+    }
+
+    const { error } = await this.supabase.client.rpc("ai_reverse_credit_transaction", {
+      p_transaction_id: transactionId,
+      p_created_by: createdBy,
+      p_description: description ?? null,
+    });
+    if (error) {
+      const mesaj = error.message ?? "";
+      if (mesaj.includes("TX_NOT_REVERSIBLE")) {
+        throw new BadRequestException("Yalnızca kredi yüklemeleri geri alınabilir.");
+      }
+      if (mesaj.includes("uniq_ai_credit_tx_reverses") || (error as any).code === "23505") {
+        throw new BadRequestException("Bu yükleme zaten geri alınmış.");
+      }
+      if (mesaj.includes("TX_NOT_FOUND")) throw new BadRequestException("Kredi hareketi bulunamadı.");
+      throw error;
+    }
+    return this.getBalance(userId);
+  }
+
+  /**
    * Bir AI turunda harcanan token'ları krediye çevirip bakiyeden düşer.
    *
    * Not: Düşüm, iş tamamlandıktan SONRA yapılır ve bakiyenin eksiye düşmesine izin

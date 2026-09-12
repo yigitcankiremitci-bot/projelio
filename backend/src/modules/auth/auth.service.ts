@@ -10,6 +10,7 @@ import { istekDili } from "../../common/i18n";
 import type { Locale } from "@projelio/shared";
 import { AccountDeletionService } from "../users/account-deletion.service";
 import { DemoSifirlamaService } from "../demo/demo-sifirlama.service";
+import { OTURUM_KARARI_MESAJI } from "../../common/hesap-durumu/oturum-engeli";
 import { demoEpostasiMi } from "../../common/demo-hesap";
 import { getWebAppUrl } from "../../common/config/env";
 
@@ -127,6 +128,14 @@ export class AuthService {
     // kimliğini zaten kanıtlamış oluyor; ayrıca bir onay ekranı istemek "geri
     // gelmek zor olsun" demek olurdu. Kullanıcıya durumu döndürdüğümüz için ön
     // yüz "hesabın geri açıldı" diyebiliyor.
+    // ASKIYA ALINMIŞ HESAP: şifre kontrolünden SONRA bakılır (aksi hâlde hata
+    // mesajı adresin kayıtlı olduğunu ele verirdi) ve silme talebini geri
+    // almadan ÖNCE — askıdaki biri giriş deneyerek silmeyi iptal edememeli.
+    // Asıl engel jwt.strategy'de; burası kişiye anlaşılır bir mesaj vermek için.
+    if (user.bannedAt) {
+      throw new ForbiddenException(OTURUM_KARARI_MESAJI.askida);
+    }
+
     let restored = false;
     if (user.deletedAt) {
       await this.accountDeletionService.restoreAccount(user.id);

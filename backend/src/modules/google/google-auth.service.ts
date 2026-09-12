@@ -1,4 +1,6 @@
-import { ConflictException, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import { OTURUM_KARARI_MESAJI } from "../../common/hesap-durumu/oturum-engeli";
+import { AccountDeletionService } from "../users/account-deletion.service";
 import { JwtService } from "@nestjs/jwt";
 import { UsersService } from "../users/users.service";
 import { GoogleAccount, GoogleAccountsService } from "./google-accounts.service";
@@ -13,6 +15,7 @@ export class GoogleAuthService {
 
   constructor(
     private usersService: UsersService,
+    private accountDeletionService: AccountDeletionService,
     private googleAccounts: GoogleAccountsService,
     private jwtService: JwtService
   ) {}
@@ -99,6 +102,20 @@ export class GoogleAuthService {
 
     const user = await this.usersService.findById(userId);
     if (!user) throw new UnauthorizedException("Kullanıcı bulunamadı.");
+
+    // Askıdaki hesap Google ile de giremez. Şifreli girişle aynı sıra: önce askı,
+    // sonra silme talebinin geri alınması (bkz. AuthService.login).
+    if (user.bannedAt) {
+      throw new ForbiddenException(OTURUM_KARARI_MESAJI.askida);
+    }
+
+    // Silme talebi olan kişi geri döndüyse talep iptal olur — şifreyle girişte
+    // de böyle. Eskiden yalnızca şifreli giriş geri alıyordu; Google ile dönen
+    // kullanıcı uygulamayı kullanmaya devam ederken 30 gün sonra hesabı
+    // silinirdi.
+    if (user.deletedAt) {
+      await this.accountDeletionService.restoreAccount(user.id);
+    }
 
     // loginAt: Google ile giriş de yeni bir oturumdur, mutlak ömür saati burada başlar
     // (bkz. modules/auth/session-payload.ts).

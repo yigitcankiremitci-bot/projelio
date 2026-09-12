@@ -20,7 +20,7 @@ interface Props {
  * asistan durduğunda fark ediyordu. Rozet bakiyeyi görünür kılıp yükleme
  * sayfasına tek tıklamayla bağlar.
  *
- * Kredi YÜKLEME akışı yönetici işi (bkz. /ai/admin/credits/topup); buradaki
+ * Kredi YÜKLEME akışı yönetici işi (bkz. Admin > Kullanıcılar, /admin/kullanicilar/:id/kredi/yukle); buradaki
  * bağlantı kullanıcıyı bakiyesini ve hareketlerini gördüğü sayfaya götürür,
  * yükleme oradan (azaldı uyarısındaki yönlendirmeyle) sürer.
  */

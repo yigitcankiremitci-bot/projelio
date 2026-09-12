@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import {
   adminKullaniciDurumu,
+  gunlukEtkinligiDoldur,
   type AdminKrediHareketi,
   type AdminKullaniciDetayi,
   type AdminKullaniciIslemi,
@@ -65,7 +66,7 @@ export class AdminKullanicilarService {
       q.order("created_at", { ascending: false }).limit(KULLANICI_TAVANI)
     );
 
-    const [bakiyeler, abonelikler] = await Promise.all([
+    const [bakiyeler, abonelikler, etkinlikler] = await Promise.all([
       this.supabase.client.from("ai_credit_balances").select("user_id, balance, lifetime_purchased, lifetime_spent"),
       this.supabase.client
         .from("subscriptions")
@@ -73,8 +74,12 @@ export class AdminKullanicilarService {
         .eq("scope", "user")
         .in("status", ["trialing", "active", "past_due", "canceled"])
         .order("created_at", { ascending: true }),
+      this.supabase.client.rpc("admin_kullanici_etkinlik_ozeti"),
     ]);
     if (bakiyeler.error) throw bakiyeler.error;
+    // Etkinlik (migration 109) yoksa da liste açılsın; süre sütunları boş kalır.
+    if (etkinlikler.error) this.logger.warn(`Etkinlik özeti okunamadı: ${etkinlikler.error.message}`);
+    const etkinlikMap = new Map(((etkinlikler.data as any[]) ?? []).map((r) => [r.user_id, r]));
     // Abonelik tablosu (migration 092) yoksa liste yine açılsın; sütun boş kalır.
     if (abonelikler.error) this.logger.warn(`Abonelikler okunamadı: ${abonelikler.error.message}`);
 
@@ -85,7 +90,9 @@ export class AdminKullanicilarService {
     for (const r of abonelikler.data ?? []) abonelikMap.set((r as any).user_id, r);
 
     return {
-      kullanicilar: satirlar.map((row) => this.satiriCevir(row, bakiyeMap.get(row.id), abonelikMap.get(row.id))),
+      kullanicilar: satirlar.map((row) =>
+        this.satiriCevir(row, bakiyeMap.get(row.id), abonelikMap.get(row.id), etkinlikMap.get(row.id))
+      ),
       migrationEksik,
     };
   }
@@ -95,7 +102,7 @@ export class AdminKullanicilarService {
     const row = satirlar[0];
     if (!row) throw new BadRequestException("Kullanıcı bulunamadı.");
 
-    const [bakiye, abonelik, isler, orglar, gruplar, hareketler, sonKullanim, islemler] = await Promise.all([
+    const [bakiye, abonelik, isler, orglar, gruplar, hareketler, sonKullanim, islemler, etkinlik] = await Promise.all([
       this.supabase.client
         .from("ai_credit_balances")
         .select("user_id, balance, lifetime_purchased, lifetime_spent")
@@ -123,9 +130,10 @@ export class AdminKullanicilarService {
         .limit(1)
         .maybeSingle(),
       migrationEksik ? Promise.resolve([]) : this.islemKaydi(userId),
+      this.etkinlikDetayi(userId),
     ]);
 
-    const kullanici = this.satiriCevir(row, bakiye.data, abonelik.error ? null : abonelik.data);
+    const kullanici = this.satiriCevir(row, bakiye.data, abonelik.error ? null : abonelik.data, etkinlik.ozet);
 
     // Silinmiş hesapta önizleme anlamsız; diğerlerinde hata detayı düşürmesin.
     let silmeOnizleme: AdminKullaniciDetayi["silmeOnizleme"] = null;
@@ -143,6 +151,7 @@ export class AdminKullanicilarService {
       krediHareketleri: hareketler,
       islemler,
       silmeOnizleme,
+      gunlukEtkinlik: gunlukEtkinligiDoldur(etkinlik.gunler, istanbulGunu()),
       migrationEksik,
     };
   }
@@ -329,7 +338,7 @@ export class AdminKullanicilarService {
     return { satirlar: temel.data ?? [], migrationEksik: true };
   }
 
-  private satiriCevir(row: any, bakiye: any, abonelik: any): AdminKullaniciSatiri {
+  private satiriCevir(row: any, bakiye: any, abonelik: any, etkinlik?: any): AdminKullaniciSatiri {
     const anonimlestirildi = anonimlestirilmisMi(row.email);
     const alanlar = {
       anonimlestirildi,
@@ -357,6 +366,54 @@ export class AdminKullanicilarService {
         lifetimeSpent: Number(bakiye?.lifetime_spent ?? 0),
       },
       abonelik: abonelik ? { planKey: abonelik.plan_key, status: abonelik.status, period: abonelik.period } : undefined,
+      etkinlik: etkinlik
+        ? {
+            ilkGorulme: etkinlik.first_seen_at,
+            sonGorulme: etkinlik.last_seen_at,
+            toplamSaniye: Number(etkinlik.total_seconds ?? 0),
+            son7GunSaniye: Number(etkinlik.seconds_7d ?? 0),
+            son30GunSaniye: Number(etkinlik.seconds_30d ?? 0),
+            son30GundeAktifGun: Number(etkinlik.active_days_30d ?? 0),
+          }
+        : undefined,
+    };
+  }
+
+  /**
+   * Tek kullanıcının etkinliği: özet satırı + son 30 günün günleri. Liste ucundaki
+   * özet fonksiyonu herkesi topladığı için burada aynı hesap tek kişiye yapılıyor.
+   */
+  private async etkinlikDetayi(userId: string): Promise<{ ozet: any | null; gunler: { gun: string; saniye: number }[] }> {
+    const bugun = istanbulGunu();
+    const esik = gunEkle(bugun, -29);
+    const [durum, gunler] = await Promise.all([
+      this.supabase.client
+        .from("user_activity_state")
+        .select("first_seen_at, last_seen_at, total_seconds")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      this.supabase.client
+        .from("user_activity_days")
+        .select("day, active_seconds")
+        .eq("user_id", userId)
+        .gte("day", esik)
+        .order("day"),
+    ]);
+    if (durum.error || gunler.error) {
+      // Migration 109 yoksa tablolar yok: detay yine açılsın.
+      return { ozet: null, gunler: [] };
+    }
+    const gunListesi = (gunler.data ?? []).map((g: any) => ({ gun: g.day as string, saniye: Number(g.active_seconds) }));
+    if (!durum.data) return { ozet: null, gunler: gunListesi };
+    const yediGunEsigi = gunEkle(bugun, -6);
+    return {
+      ozet: {
+        ...durum.data,
+        seconds_7d: gunListesi.filter((g) => g.gun >= yediGunEsigi).reduce((a, g) => a + g.saniye, 0),
+        seconds_30d: gunListesi.reduce((a, g) => a + g.saniye, 0),
+        active_days_30d: gunListesi.filter((g) => g.saniye > 0).length,
+      },
+      gunler: gunListesi,
     };
   }
 
@@ -437,4 +494,18 @@ export class AdminKullanicilarService {
 /** PostgreSQL 42703 (sütun yok) ya da PostgREST'in şema önbelleğinde bulunamayan sütun. */
 function sutunYokHatasi(error: any): boolean {
   return error?.code === "42703" || error?.code === "PGRST204" || /column .* does not exist/i.test(error?.message ?? "");
+}
+
+/**
+ * Europe/Istanbul günü, "YYYY-MM-DD". Etkinlik günleri veritabanında bu saat
+ * diliminde yazılıyor (migration 109); sunucu süreci UTC'de çalıştığı için
+ * `new Date().toISOString()` gece 00:00–03:00 arası bir önceki günü verirdi.
+ */
+function istanbulGunu(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
+}
+
+function gunEkle(gun: string, fark: number): string {
+  const [y, m, d] = gun.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + fark)).toISOString().slice(0, 10);
 }

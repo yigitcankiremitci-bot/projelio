@@ -691,4 +691,14 @@ export const hatalar: TranslationDict = {
   "Yalnızca kredi yüklemeleri geri alınabilir.": "Only credit top-ups can be reversed.",
   "Hesabın askıya alındı. Destek için bizimle iletişime geç.": "Your account has been suspended. Contact us for support.",
   "Oturumun sonlandırıldı, lütfen yeniden giriş yap.": "Your session was ended, please sign in again.",
+  // ─────────────────────────────────────────────── Admin > kullanıcıya mesaj
+  "En az bir alıcı seç.": "Select at least one recipient.",
+  "Geçersiz alıcı.": "Invalid recipient.",
+  "Tek seferde en fazla 200 kişiye mesaj gönderilebilir.": "You can message at most 200 people at once.",
+  "Bağlantı uygulama içi bir yol (/tasks gibi) ya da https:// ile başlayan bir adres olmalı.": "The link must be an in-app path (like /tasks) or an address starting with https://.",
+  "Bağlantı çok uzun.": "The link is too long.",
+  "Başlık boş olamaz.": "The title can't be empty.",
+  "Başlık çok uzun.": "The title is too long.",
+  "En az bir kanal seç: bildirim ya da e-posta.": "Choose at least one channel: notification or email.",
+  "Mesaj çok uzun.": "The message is too long.",
 };

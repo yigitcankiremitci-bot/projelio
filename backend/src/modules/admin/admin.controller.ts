@@ -7,6 +7,8 @@ import { UsersService } from "../users/users.service";
 import { DemoAnlikGoruntuService } from "../demo/demo-anlik-goruntu.service";
 import { DemoSifirlamaService } from "../demo/demo-sifirlama.service";
 import { AdminKullanicilarService } from "./admin-kullanicilar.service";
+import { AdminMesajService } from "./admin-mesaj.service";
+import type { AdminMesajGirdisi } from "@projelio/shared";
 
 @Controller("admin")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
@@ -17,7 +19,8 @@ export class AdminController {
     private usersService: UsersService,
     private demoAnlikGoruntu: DemoAnlikGoruntuService,
     private demoSifirlama: DemoSifirlamaService,
-    private kullanicilar: AdminKullanicilarService
+    private kullanicilar: AdminKullanicilarService,
+    private mesaj: AdminMesajService
   ) {}
 
   @Get("stats")
@@ -41,6 +44,13 @@ export class AdminController {
   @Get("kullanicilar")
   kullaniciListesi() {
     return this.kullanicilar.liste();
+  }
+
+  /** Bir ya da birden çok kullanıcıya (en fazla 200) bildirim ve/veya e-posta. */
+  @Post("kullanicilar/mesaj")
+  mesajGonder(@Body() body: Partial<AdminMesajGirdisi> & { userIds?: string[] }, @Req() req: any) {
+    const { userIds, ...girdi } = body ?? {};
+    return this.mesaj.gonder(req.user.userId, userIds, girdi);
   }
 
   @Get("kullanicilar/:id")

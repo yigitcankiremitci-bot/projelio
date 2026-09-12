@@ -1,13 +1,13 @@
 import { assertRecentInteractiveLogin, type ReauthSession } from "../auth/account-reauth";
 import { randomUUID } from "crypto";
 import { hashPassword, verifyPassword } from "../../common/password.util";
-import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 import { demoHesabindaYasak } from "../../common/demo-hesap";
-import type { Locale, Sector, TeamSize, UseCase } from "@projelio/shared";
+import type { Locale, Sector, TeamSize, UseCase, UserRole } from "@projelio/shared";
 import { isLocale, SECTORS, TEAM_SIZES, USE_CASES } from "@projelio/shared";
 
 const AVATAR_BUCKET = "avatars";
@@ -27,7 +27,7 @@ export interface UserRecord {
   deletedAt?: string;
   // Yönetici tarafından askıya alındıysa dolu; giriş ve API erişimi kapalı (migration 108).
   bannedAt?: string;
-  role: "admin" | "freelancer";
+  role: UserRole;
   accountType: AccountType;
   activeTaskId?: string;
   onboardingCompletedAt?: string;
@@ -55,7 +55,7 @@ export interface PublicUser {
   fullName: string;
   email: string;
   username: string;
-  role: "admin" | "freelancer";
+  role: UserRole;
   accountType: AccountType;
   activeTaskId?: string;
   onboardingCompletedAt?: string;
@@ -158,6 +158,7 @@ export function assertValidUsername(username: string): void {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   constructor(
     private supabase: SupabaseService,
     private readonly diller: KullaniciDiliService
@@ -286,6 +287,21 @@ export class UsersService {
   }
 
   /** Sağlayıcıyla gelen kullanıcının profil fotoğrafı yoksa sağlayıcıdakini kullan. */
+  /**
+   * Etkinlik sinyalini işler. Hata FIRLATMAZ: sayaç bir istatistik, bir
+   * veritabanı hıçkırığı kullanıcının ekranında hata olarak görünmemeli.
+   * Migration 109 uygulanmadıysa fonksiyon yok — log'u her dakika
+   * doldurmasın diye yalnızca bir kez yazılır.
+   */
+  async etkinlikSinyali(userId: string): Promise<void> {
+    const { error } = await this.supabase.client.rpc("kullanici_etkinligi_isle", { p_user_id: userId });
+    if (error && !this.etkinlikHatasiYazildi) {
+      this.etkinlikHatasiYazildi = true;
+      this.logger.warn(`Etkinlik sinyali işlenemedi: ${error.message}`);
+    }
+  }
+  private etkinlikHatasiYazildi = false;
+
   async setAvatarIfEmpty(userId: string, avatarUrl: string): Promise<void> {
     const { error } = await this.supabase.client
       .from("users")

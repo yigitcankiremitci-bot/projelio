@@ -23,6 +23,8 @@ export default function AdminPanel() {
   const c = useThemeColors();
   const t = useT();
   const [me, setMe] = useState<User | null | undefined>(undefined);
+  // Kredi siparişi onaylanınca Kullanıcılar listesindeki bakiyeler tazelensin.
+  const [kullaniciYenile, setKullaniciYenile] = useState(0);
 
   useEffect(() => {
     api
@@ -88,10 +90,10 @@ export default function AdminPanel() {
         {t("Kullanıcılar, proje istatistikleri ve sistem durumu burada listelenir.")}
       </p>
 
-      <AdminKullanicilarPanel />
+      <AdminKullanicilarPanel yenile={kullaniciYenile} />
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
-        <AiCreditAdminPanel />
+        <AiCreditAdminPanel onKrediDegisti={() => setKullaniciYenile((n) => n + 1)} />
       </div>
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>

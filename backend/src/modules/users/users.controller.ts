@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -87,6 +88,21 @@ export class UsersController {
 
   // Ayarlar > Hesap. Şifresini UNUTANLAR buradan geçmez — o akış giriş ekranındaki
   // /auth/forgot-password (bkz. password-reset.service.ts).
+  /**
+   * Uygulamada geçirilen süre için sinyal (bkz. apps/web/src/lib/etkinlikSayaci.ts).
+   *
+   * Gövde yok: süreyi istemci bildirmiyor, sunucu iki sinyal arasındaki farktan
+   * hesaplıyor (migration 109). Bu yüzden ucu çok çağırmak sayacı şişirmez.
+   * Dış uygulamaya verilmiş devir jetonu (Habie) sayılmaz — o, kişinin kendisi
+   * uygulamayı kullanıyor demek değil.
+   */
+  @Post("me/etkinlik")
+  @HttpCode(204)
+  async etkinlik(@Req() req: any): Promise<void> {
+    if (req.user.agent) return;
+    await this.usersService.etkinlikSinyali(req.user.userId);
+  }
+
   @Patch("me/password")
   changePassword(@Req() req: any, @Body() body: { currentPassword?: string; newPassword: string }) {
     return this.usersService.changePassword(req.user.userId, body.currentPassword, body.newPassword, req.user);

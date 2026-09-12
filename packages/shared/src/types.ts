@@ -2,7 +2,10 @@
 
 import type { Locale } from "./i18n";
 
-export type UserRole = "admin" | "freelancer";
+// "demo": herkese açık demo şirketinin (@celikhan.test) kadrosu (migration 109).
+// Yetki açısından "freelancer" ile aynı — kod yalnızca "admin"i kontrol ediyor;
+// rol, bu hesapların admin listesinde gerçek kullanıcılardan ayrılması için.
+export type UserRole = "admin" | "freelancer" | "demo";
 
 // Kullanıcının hiyerarşideki hangi seviyeyi yönettiğini belirler; navigasyonda hangi
 // panellerin/isimlendirmenin gösterileceğine bu karar verir. Sonradan yükseltilebilir
@@ -1851,7 +1854,11 @@ export interface NotificationPayload {
     // Bir dosya sana bağlandı (bkz. migration 095). Bildirim ŞART: kimse kendi
     // adına bağlanmış dosyaları aramaya gitmez, haber verilmezse özellik
     // görünmez kalırdı.
-    | "file_linked";
+    | "file_linked"
+    // Admin panelinden yöneticinin yazdığı mesaj (bkz. modules/admin/admin-mesaj.service.ts).
+    // Bildirim çanı bu tipi görünce mesajın tamamını bir pencerede açar: gövde
+    // listede tek satıra sığmayacak kadar uzun olabilir.
+    | "admin_message";
   title: string;
   body: string;
   link?: string;

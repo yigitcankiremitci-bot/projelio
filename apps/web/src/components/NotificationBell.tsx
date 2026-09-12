@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { TOP_CHROME, Z } from "../lib/layout";
 import { useNavigate } from "react-router-dom";
 import type { Socket } from "socket.io-client";
-import type { CreationRequest, JobMember, NotificationPayload } from "@projelio/shared";
+import { safeExternalUrl, type CreationRequest, type JobMember, type NotificationPayload } from "@projelio/shared";
 import { api } from "../api/client";
 import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -29,6 +29,8 @@ export default function NotificationBell() {
   // (bkz. handleSelect). Yanıt metni bildirimin gövdesinde geldiği için ayrıca
   // sunucuya sorulmuyor.
   const [supportReply, setSupportReply] = useState<NotificationPayload | null>(null);
+  // Yönetici mesajı listede tek satıra sığmayabilir; tamamı pencerede açılır.
+  const [adminMesaji, setAdminMesaji] = useState<NotificationPayload | null>(null);
   // Bekleyen iş davetleri bildirimlerden ayrı tutulur: bildirim okununca kaybolur,
   // davet ise yanıtlanana kadar durmalı. Rozet ikisinin toplamını gösterir.
   const [invites, setInvites] = useState<JobMember[]>([]);
@@ -188,6 +190,10 @@ export default function NotificationBell() {
     }
     if (n.type === "support_reply") {
       setSupportReply(n);
+      return;
+    }
+    if (n.type === "admin_message") {
+      setAdminMesaji(n);
       return;
     }
     if (n.link) navigate(n.link);
@@ -460,6 +466,44 @@ export default function NotificationBell() {
             </div>
           )}
         </div>
+      )}
+
+      {adminMesaji && (
+        <Modal title={adminMesaji.title} onClose={() => setAdminMesaji(null)} maxWidth={520}>
+          <p style={{ fontSize: 15, color: c.textPrimary, margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+            {adminMesaji.body}
+          </p>
+          <p style={{ fontSize: 12, color: c.textSecondary, margin: "12px 0 0" }}>
+            {t("Projelio yönetimi")} · {timeAgo(adminMesaji.createdAt)}
+          </p>
+          {adminMesaji.link && (
+            <button
+              type="button"
+              onClick={() => {
+                const link = adminMesaji.link!;
+                setAdminMesaji(null);
+                // Sunucu yalnızca iç yol ya da https kabul ediyor; dış adres
+                // yeni sekmede açılır, uygulama içindeki yer kaybolmasın.
+                if (link.startsWith("/")) navigate(link);
+                else {
+                  const guvenli = safeExternalUrl(link);
+                  if (guvenli) window.open(guvenli, "_blank", "noopener,noreferrer");
+                }
+              }}
+              style={{
+                marginTop: 14,
+                background: "transparent",
+                color: c.textPrimary,
+                padding: "8px 15px",
+                borderRadius: 8,
+                border: `1px solid ${c.border}`,
+                fontSize: 14,
+              }}
+            >
+              {t("Bağlantıyı aç")}
+            </button>
+          )}
+        </Modal>
       )}
 
       {supportReply && (

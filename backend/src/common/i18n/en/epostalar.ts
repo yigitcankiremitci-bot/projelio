@@ -121,4 +121,7 @@ export const epostalar: TranslationDict = {
   // Günlük özetin görev bölümleri
   "Geciken görevlerin": "Your overdue tasks",
   "Yarın biten görevlerin": "Your tasks due tomorrow",
+  // ─────────────────────────────────────────────── Admin > kullanıcıya mesaj
+  "Bu mesaj Projelio yönetimi tarafından hesabınla ilgili olarak gönderildi.": "This message was sent by the Projelio team about your account.",
+  "Bağlantıyı aç": "Open link",
 };

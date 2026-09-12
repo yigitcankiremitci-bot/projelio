@@ -18,6 +18,7 @@ import { TourProvider } from "./lib/tour/TourContext";
 import { useIsDesktop } from "./lib/useIsDesktop";
 import { getSidebarDefaultOpen, useAppPrefs } from "./lib/appPrefs";
 import { refreshSession } from "./lib/session";
+import { useEtkinlikSayaci } from "./lib/etkinlikSayaci";
 import { SIDEBAR_WIDTH, pageGutter, Z, TOP_CHROME } from "./lib/layout";
 import UploadTray, { UPLOAD_TRAY_HEIGHT } from "./components/UploadTray";
 import { useUploads } from "./lib/uploadQueue";
@@ -588,6 +589,10 @@ export default function App() {
   };
 
   useEffect(reloadMe, [hasToken, isAuthScreen]);
+
+  // Uygulamada geçirilen süre (Admin > Kullanıcılar). Yalnızca oturum doğrulanmışken:
+  // giriş ekranında ya da /auth/me yanıt vermeden sinyal atmak 401 zinciri başlatırdı.
+  useEtkinlikSayaci(Boolean(me) && !isAuthScreen);
 
   // Oturumu her açılışta tazele ki süre "son kullanımdan itibaren" işlesin —
   // düzenli kullanan biri token ömrü dolduğu için giriş ekranına düşmesin

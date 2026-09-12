@@ -159,7 +159,8 @@ export class DemoSifirlamaService {
    */
   private async demoVerisiniGeriYaz(veri: DemoTablo[], kapsam: KapsamIdleri): Promise<number> {
     let yazilan = 0;
-    for (const { table, rows } of veri) {
+    for (const { table, rows: hamSatirlar } of veri) {
+      const rows = table === "users" ? hamSatirlar.map(demoRolunuZorla) : hamSatirlar;
       for (let i = 0; i < rows.length; i += YAZMA_PARCASI) {
         const parca = rows.slice(i, i + YAZMA_PARCASI);
         const { error } = await this.supabase.client.from(table).upsert(parca, { onConflict: "id" });
@@ -221,4 +222,17 @@ export class DemoSifirlamaService {
     this.logger.warn(`Rutin tekrar çakışması: ${count ?? 0} üretilmiş satır silinip yeniden denendi.`);
     return true;
   }
+}
+
+/**
+ * Demo kadrosunun rolü her geri yüklemede "demo"ya çekilir (migration 109).
+ *
+ * Anlık görüntüler (hem depodaki fabrika dosyası hem panelden kaydedilen) rol
+ * alanını o anki değeriyle taşıyor ve upsert bütün sütunları yazıyor. Zorlanmasa
+ * migration'ın yaptığı değişiklik ilk demo girişinde "freelancer"a geri dönerdi.
+ * Yönetici rolü korunur: demo alan adında bir yönetici hesabı olmamalı ama
+ * olursa sıfırlama onu sessizce yetkisiz bırakmasın.
+ */
+function demoRolunuZorla(row: Record<string, unknown>): Record<string, unknown> {
+  return row.role === "admin" ? row : { ...row, role: "demo" };
 }

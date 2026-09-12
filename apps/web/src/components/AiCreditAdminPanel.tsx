@@ -2,24 +2,15 @@ import { useEffect, useState } from "react";
 import type { ThemeColors } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import AiCreditOrdersAdmin from "./AiCreditOrdersAdmin";
-import { api } from "../api/client";
 import {
   aiChat,
   type AiHealth,
   type AiModelSettingsResponse,
   type AiProviderBalance,
-  type AiUserBalanceRow,
 } from "../api/aiChat";
 import { IconSparkle } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useT } from "../lib/i18n";
-
-interface UserRow {
-  id: string;
-  fullName: string;
-  username?: string;
-  email?: string;
-}
 
 interface MarginReport {
   days: number;
@@ -34,21 +25,21 @@ interface MarginReport {
 }
 
 /**
- * Yönetici görünümü: kullanıcılara kredi yükleme ve Projelio'nun AI marj raporu.
- * Ödeme sağlayıcısı entegre edilene kadar bakiye yüklemenin tek yolu burasıdır.
+ * Yönetici görünümü: Projelio'nun AI marj raporu, sağlayıcı bakiyesi, model
+ * seçimi ve kredi siparişleri.
+ *
+ * Kullanıcı başına kredi yükleme/düşme/geri alma BURADA DEĞİL: Kullanıcılar
+ * listesine taşındı (AdminKullanicilarPanel). İki ayrı kullanıcı listesi
+ * vardı ve buradaki yükleme işlem kaydına düşmüyordu.
+ *
+ * @param onKrediDegisti Bir sipariş onaylanıp kredi yüklendiğinde çağrılır;
+ *                       Kullanıcılar listesindeki bakiyeler tazelensin diye.
  */
-export default function AiCreditAdminPanel() {
+export default function AiCreditAdminPanel({ onKrediDegisti }: { onKrediDegisti?: () => void }) {
   const c = useThemeColors();
   const t = useT();
   const isDesktop = useIsDesktop();
 
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<UserRow[]>([]);
-  const [selected, setSelected] = useState<UserRow | null>(null);
-  const [amount, setAmount] = useState("10000");
-  const [note, setNote] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [margin, setMargin] = useState<MarginReport | null>(null);
   const [health, setHealth] = useState<AiHealth | null>(null);
   const [modelSettings, setModelSettings] = useState<AiModelSettingsResponse | null>(null);
@@ -72,27 +63,12 @@ export default function AiCreditAdminPanel() {
       .catch(() => {});
   };
 
-  const [userBalances, setUserBalances] = useState<AiUserBalanceRow[] | null>(null);
-  const [userBalancesError, setUserBalancesError] = useState<string | null>(null);
-  const [userListFilter, setUserListFilter] = useState("");
-
-  const loadUserBalances = () => {
-    aiChat
-      .getUsersCredits()
-      .then((rows) => {
-        setUserBalances(rows);
-        setUserBalancesError(null);
-      })
-      .catch((err: any) => setUserBalancesError(err?.message ?? t("Kullanıcı listesi yüklenemedi.")));
-  };
-
   useEffect(() => {
     aiChat
       .getMarginReport(30)
       .then((r) => setMargin(r as unknown as MarginReport))
       .catch(() => {});
     loadProviderBalance();
-    loadUserBalances();
     // Sağlayıcı durumu: hangi AI sağlayıcıları açık. Hata yutulur — bu bölüm
     // bilgilendirme amaçlı, yüklenemezse panelin geri kalanı çalışmaya devam etsin.
     aiChat
@@ -101,16 +77,6 @@ export default function AiCreditAdminPanel() {
       .catch(() => {});
     loadModelSettings();
   }, []);
-
-  const filteredUserBalances = (userBalances ?? []).filter((u) => {
-    const q = userListFilter.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      u.fullName.toLowerCase().includes(q) ||
-      u.username?.toLowerCase().includes(q) ||
-      u.email?.toLowerCase().includes(q)
-    );
-  });
 
   const loadModelSettings = () => {
     aiChat
@@ -200,50 +166,6 @@ export default function AiCreditAdminPanel() {
       setCheckpointFeedback({ ok: false, text: err?.message ?? t("Kaydedilemedi.") });
     } finally {
       setCheckpointSaving(false);
-    }
-  };
-
-  // Arama kutusu için basit gecikmeli sorgu.
-  useEffect(() => {
-    const q = query.trim();
-    if (q.length < 2) {
-      setResults([]);
-      return;
-    }
-    const timer = setTimeout(() => {
-      api
-        .get<UserRow[]>(`/users/search?q=${encodeURIComponent(q)}`)
-        .then(setResults)
-        .catch(() => setResults([]));
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  const handleTopUp = async () => {
-    if (!selected) return;
-    const credits = Number(amount);
-    if (!Number.isFinite(credits) || credits <= 0) {
-      setFeedback({ ok: false, text: t("Geçerli bir kredi miktarı gir.") });
-      return;
-    }
-    setSaving(true);
-    setFeedback(null);
-    try {
-      const result = await aiChat.topUp(selected.id, credits, note.trim() || undefined);
-      setFeedback({
-        ok: true,
-        text: t("{ad} hesabına {kredi} kredi yüklendi. Yeni bakiye: {bakiye}.", {
-          ad: selected.fullName,
-          kredi: credits.toLocaleString("tr-TR"),
-          bakiye: Math.round(result.balance).toLocaleString("tr-TR"),
-        }),
-      });
-      setNote("");
-      loadUserBalances();
-    } catch (err: any) {
-      setFeedback({ ok: false, text: err?.message ?? t("Kredi yüklenemedi.") });
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -664,251 +586,9 @@ export default function AiCreditAdminPanel() {
       )}
 
       {/* Self-servis kredi siparişleri: ödemesi alınanları onaylayıp krediyi yükler.
-          Onay sonrası kullanıcı bakiyeleri listesi de tazelenmeli. */}
-      <AiCreditOrdersAdmin onCredited={loadUserBalances} />
+          Onay sonrası Kullanıcılar listesindeki bakiyeler de tazelenmeli. */}
+      <AiCreditOrdersAdmin onCredited={onKrediDegisti} />
 
-      {/* Kullanıcılar (geniş) + kredi yükleme formu (yan panel): masaüstünde yan yana. */}
-      <div
-        style={{
-          display: isDesktop ? "grid" : "block",
-          gridTemplateColumns: isDesktop ? "1.7fr 1fr" : undefined,
-          gap: isDesktop ? 18 : 0,
-          alignItems: "start",
-        }}
-      >
-
-      {/* Kullanıcılar ve kredi bakiyeleri */}
-      <div
-        style={{
-          background: c.surface,
-          border: `1px solid ${c.border}`,
-          borderRadius: 12,
-          padding: 16,
-          marginBottom: isDesktop ? 0 : 18,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 10 }}>
-          <div style={{ fontSize: 13, color: c.textSecondary }}>
-            {t("Kullanıcılar")} {userBalances ? `(${userBalances.length})` : ""}
-          </div>
-          <input
-            value={userListFilter}
-            onChange={(e) => setUserListFilter(e.target.value)}
-            placeholder={t("Ada, kullanıcı adına veya e-postaya göre filtrele…")}
-            style={{ ...inputStyle(c), width: "auto", flex: 1, maxWidth: 280, padding: "6px 10px", fontSize: 13 }}
-          />
-        </div>
-
-        {userBalancesError && <p style={{ fontSize: 13, color: c.danger, margin: 0 }}>{userBalancesError}</p>}
-
-        {!userBalancesError && !userBalances && (
-          <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
-        )}
-
-        {!userBalancesError && userBalances && (
-          <div
-            style={{
-              maxHeight: isDesktop ? 480 : 340,
-              overflowY: "auto",
-              borderRadius: 9,
-              border: `1px solid ${c.border}`,
-            }}
-          >
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
-              <thead>
-                <tr style={{ background: c.background, position: "sticky", top: 0 }}>
-                  <th style={thStyle(c)}>{t("Kullanıcı")}</th>
-                  <th style={thStyle(c, "right")}>{t("Bakiye")}</th>
-                  <th style={thStyle(c, "right")}>{t("Ömür boyu yüklenen")}</th>
-                  <th style={thStyle(c, "right")}>{t("Ömür boyu harcanan")}</th>
-                  <th style={thStyle(c, "right")}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUserBalances.map((u) => (
-                  <tr key={u.userId} style={{ borderTop: `1px solid ${c.border}` }}>
-                    <td style={tdStyle(c)}>
-                      <div style={{ color: c.textPrimary }}>{u.fullName}</div>
-                      <div style={{ fontSize: 11.5, color: c.textSecondary }}>
-                        {u.username ? `@${u.username}` : u.email}
-                      </div>
-                    </td>
-                    <td style={{ ...tdStyle(c), textAlign: "right", fontWeight: 600, color: u.balance <= 0 ? c.danger : c.textPrimary }}>
-                      {Math.round(u.balance).toLocaleString("tr-TR")}
-                    </td>
-                    <td style={{ ...tdStyle(c), textAlign: "right", color: c.textSecondary }}>
-                      {Math.round(u.lifetimePurchased).toLocaleString("tr-TR")}
-                    </td>
-                    <td style={{ ...tdStyle(c), textAlign: "right", color: c.textSecondary }}>
-                      {Math.round(u.lifetimeSpent).toLocaleString("tr-TR")}
-                    </td>
-                    <td style={{ ...tdStyle(c), textAlign: "right" }}>
-                      <button
-                        onClick={() => {
-                          setSelected({ id: u.userId, fullName: u.fullName, username: u.username, email: u.email });
-                          setQuery("");
-                          setResults([]);
-                          setFeedback(null);
-                        }}
-                        style={{
-                          background: "transparent",
-                          border: `1px solid ${c.border}`,
-                          borderRadius: 7,
-                          padding: "4px 9px",
-                          fontSize: 12,
-                          color: c.accent,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {t("Kredi yükle")}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {filteredUserBalances.length === 0 && (
-                  <tr>
-                    <td colSpan={5} style={{ ...tdStyle(c), textAlign: "center", color: c.textSecondary }}>
-                      {t("Sonuç yok.")}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Kredi yükleme */}
-      <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: 16 }}>
-        <label style={labelStyle(c)}>{t("Kullanıcı")}</label>
-        {selected ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "9px 12px",
-              borderRadius: 9,
-              background: c.background,
-              border: `1px solid ${c.border}`,
-              marginBottom: 12,
-            }}
-          >
-            <span style={{ flex: 1, fontSize: 15, color: c.textPrimary }}>
-              {selected.fullName}
-              {selected.username ? ` (@${selected.username})` : ""}
-            </span>
-            <button
-              onClick={() => {
-                setSelected(null);
-                setQuery("");
-              }}
-              style={{ background: "transparent", border: "none", color: c.textSecondary, fontSize: 13, cursor: "pointer" }}
-            >
-              {t("Değiştir")}
-            </button>
-          </div>
-        ) : (
-          <>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("İsim veya kullanıcı adı ara…")}
-              style={{ ...inputStyle(c), marginBottom: results.length ? 0 : 12 }}
-            />
-            {results.length > 0 && (
-              <div
-                style={{
-                  border: `1px solid ${c.border}`,
-                  borderTop: "none",
-                  borderRadius: "0 0 9px 9px",
-                  marginBottom: 12,
-                  maxHeight: 180,
-                  overflowY: "auto",
-                }}
-              >
-                {results.map((u) => (
-                  <button
-                    key={u.id}
-                    onClick={() => {
-                      setSelected(u);
-                      setResults([]);
-                    }}
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "9px 12px",
-                      border: "none",
-                      background: "transparent",
-                      fontSize: 14,
-                      color: c.textPrimary,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {u.fullName}
-                    {u.username ? ` (@${u.username})` : ""}
-                  </button>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        <label style={labelStyle(c)}>{t("Kredi miktarı")}</label>
-        <input
-          type="number"
-          min={1}
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          style={{ ...inputStyle(c), marginBottom: 4 }}
-        />
-        <p style={{ fontSize: 12, color: c.textSecondary, margin: "0 0 12px" }}>
-          {t("10.000 kredi ≈ 1 USD satış bedeli (%20 komisyon dahil) ≈ 70 asistan işlemi.")}
-        </p>
-
-        <label style={labelStyle(c)}>{t("Açıklama (opsiyonel)")}</label>
-        <input
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder={t("Ör. Ocak ayı paketi")}
-          style={{ ...inputStyle(c), marginBottom: 14 }}
-        />
-
-        <button
-          onClick={handleTopUp}
-          disabled={!selected || saving}
-          style={{
-            width: "100%",
-            padding: "11px 0",
-            borderRadius: 9,
-            border: "none",
-            background: c.accent,
-            color: "#fff",
-            fontSize: 15,
-            fontWeight: 600,
-            cursor: !selected || saving ? "default" : "pointer",
-            opacity: !selected || saving ? 0.55 : 1,
-          }}
-        >
-          {saving ? t("Yükleniyor…") : t("Kredi yükle")}
-        </button>
-
-        {feedback && (
-          <p
-            style={{
-              margin: "12px 0 0",
-              fontSize: 13.5,
-              lineHeight: 1.5,
-              color: feedback.ok ? c.success : c.danger,
-            }}
-          >
-            {feedback.text}
-          </p>
-        )}
-      </div>
-      </div>
     </section>
   );
 }

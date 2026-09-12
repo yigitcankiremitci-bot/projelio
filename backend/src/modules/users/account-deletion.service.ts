@@ -413,6 +413,9 @@ export class AccountDeletionService {
       "email_verification_tokens",
       "ai_conversations",
       "ai_credit_balances",
+      // Uygulamada geçirilen süre (migration 109): kim ne zaman içerideydi.
+      "user_activity_state",
+      "user_activity_days",
     ];
 
     for (const tablo of tablolar) {

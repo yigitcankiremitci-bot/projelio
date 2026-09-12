@@ -21,7 +21,6 @@ export const lio: TranslationDict = {
   "İşleniyor…": "Processing…",
   "okunuyor…": "reading…",
   "Yükleniyor…": "Loading…",
-  "Sonuç yok.": "No results.",
   " · görsel okuyabilir": " · can read images",
   "· şu an kullanılan": "· currently in use",
 
@@ -65,9 +64,6 @@ export const lio: TranslationDict = {
     "You're running low on credit. Top up below to keep using the assistant without interruption.",
   "Kredi yükle": "Top up credit",
   "Krediyi yükle": "Add the credit",
-  "Kredi yüklenemedi.": "Could not add the credit.",
-  "Kredi miktarı": "Credit amount",
-  "Geçerli bir kredi miktarı gir.": "Enter a valid credit amount.",
   "Kredi paketleri yüklenemedi. Sayfayı yenilemeyi dene.":
     "Could not load the credit packages. Try refreshing the page.",
   "{n} kredi": { one: "{n} credit", other: "{n} credits" },
@@ -77,8 +73,6 @@ export const lio: TranslationDict = {
   "Harcanan kredi": "Credits spent",
   "Şimdiye kadar harcanan": "Spent so far",
   "Şimdiye kadar yapılan": "Done so far",
-  "Ömür boyu harcanan": "Spent all-time",
-  "Ömür boyu yüklenen": "Topped up all-time",
   "Demo hesabındasın: Lio ücretsiz, krediden düşmüyor. Yukarıdaki sayı, bütün ziyaretçilerin paylaştığı saatlik deneme hakkından kalan kısım — dolarsa bir süre sonra kendiliğinden yenileniyor. Kendi hesabında böyle bir sınır yok.":
     "You're in the demo account: Lio is free here and costs no credit. The number above is what's left of an hourly trial allowance shared by all visitors — if it runs out it refills on its own after a while. Your own account has no such limit.",
 
@@ -105,13 +99,7 @@ export const lio: TranslationDict = {
   "Kullanıcılar": "Users",
   "Kullanıcı": "User",
   "Kullanıcı listesi yüklenemedi.": "Could not load the user list.",
-  "İsim veya kullanıcı adı ara…": "Search by name or username…",
-  "Ada, kullanıcı adına veya e-postaya göre filtrele…": "Filter by name, username or email…",
-  "{ad} hesabına {kredi} kredi yüklendi. Yeni bakiye: {bakiye}.":
-    "{kredi} credits added to {ad}. New balance: {bakiye}.",
   "Not (opsiyonel)": "Note (optional)",
-  "Açıklama (opsiyonel)": "Description (optional)",
-  "Ör. Ocak ayı paketi": "e.g. January package",
   "Ör. Ağustos yüklemesi": "e.g. August top-up",
   "Ör. 0.55": "e.g. 0.55",
 
@@ -150,8 +138,6 @@ export const lio: TranslationDict = {
     ", or you can reconcile it by hand with the Console's actual figure below.",
   "Bu tutarlar, Anthropic'in her yanıtta bildirdiği gerçek token sayılarından hesaplanır. Doğrulamak için console.anthropic.com'daki kullanım ekranıyla karşılaştırın; ciddi bir fark varsa fiyat tablosu güncellenmelidir.":
     "These amounts are computed from the real token counts Anthropic reports with every response. To verify, compare them with the usage screen at console.anthropic.com; a significant gap means the pricing table needs updating.",
-  "10.000 kredi ≈ 1 USD satış bedeli (%20 komisyon dahil) ≈ 70 asistan işlemi.":
-    "10,000 credits ≈ 1 USD list price (20% commission included) ≈ 70 assistant operations.",
   "Son {gun} gün · {istek} istek · %{komisyon} komisyon":
     "Last {gun} days · {istek} requests · {komisyon}% commission",
 

@@ -1,44 +1,26 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { BudgetOverview, BudgetTransaction, KasaAlacakBorc, ProjectBudgetSummary, RecurringPayment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
-import { requireAmount, requireOneOf, optionalOneOf } from "../../common/validation/input";
+import { requireAmount, requireOneOf, optionalOneOf, paraBirimiDogrula } from "../../common/validation/input";
 import { NotificationsService } from "../notifications/notifications.service";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
-import {
-  ORG_LEDGER_MODULE_KEY,
-  ORG_RECEIVABLE_MODULE_KEY,
-  sirketAlacakBorcu,
-  sirketDefterHareketi,
-} from "./sirket-defteri";
+import { ORG_RECEIVABLE_MODULE_KEY, sirketAlacakBorcu } from "./sirket-defteri";
+import { mapTransaction, SECIM } from "./butce-eslestirme";
+import { ButceErisimService } from "./butce-erisim.service";
+import { ButceKademeService } from "./butce-kademe.service";
 
 /**
  * budget_transactions.type için izin verilen değerler. 001_init_schema.sql'deki
  * CHECK kısıtıyla BİREBİR aynı olmalı — biri değişirse diğeri de değişmeli.
  */
 const TRANSACTION_TYPES = ["income", "expense", "payout"] as const;
-function mapTransaction(row: any): BudgetTransaction {
-  return {
-    id: row.id,
-    projectId: row.project_id ?? undefined,
-    departmentId: row.department_id ?? undefined,
-    projectTitle: row.projects?.title ?? undefined,
-    departmentName: row.departments?.name ?? undefined,
-    ownerId: row.owner_id ?? undefined,
-    userId: row.user_id ?? undefined,
-    type: row.type,
-    amount: Number(row.amount),
-    description: row.description ?? undefined,
-    occurredAt: row.occurred_at,
-    recurringPaymentId: row.recurring_payment_id ?? undefined,
-    createdAt: row.created_at,
-  };
-}
-
 @Injectable()
 export class BudgetService {
   constructor(
     private supabase: SupabaseService,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
+    private erisim: ButceErisimService,
+    private kademe: ButceKademeService
   ) {}
 
   // Proje bütçesi: finansal veri hassas olduğu için görüntüleme yalnızca proje/iş
@@ -93,7 +75,7 @@ export class BudgetService {
 
     const { data, error } = await this.supabase.client
       .from("budget_transactions")
-      .select("*, projects(title)")
+      .select(SECIM)
       .eq("project_id", projectId)
       .order("occurred_at", { ascending: false });
     if (error) throw error;
@@ -115,13 +97,17 @@ export class BudgetService {
       .insert({
         project_id: projectId,
         owner_id: project?.owner_id ?? null,
+        created_by: requestingUserId ?? null,
         user_id: data.userId ?? null,
         type: requireOneOf(data.type ?? "expense", TRANSACTION_TYPES, "İşlem türü"),
         amount: requireAmount(data.amount ?? 0),
+        currency: paraBirimiDogrula(data.currency),
+        category: data.category?.trim() || null,
+        counterparty_id: data.counterpartyId || null,
         description: data.description ?? null,
         occurred_at: data.occurredAt ?? new Date().toISOString().slice(0, 10),
       })
-      .select("*, projects(title)")
+      .select(SECIM)
       .single();
     if (error) throw error;
     const tx = mapTransaction(row);
@@ -143,120 +129,31 @@ export class BudgetService {
   }
 
   // --- Departman bütçesi (Bütçe sekmesi) ---
-  // Finansal veri hassas olduğu için yalnızca organizasyon sahibi ya da o
-  // departmanın onaylı yöneticisi kayıt ekleyip silebilir (bkz. ModuleRecordsService
-  // ile aynı desen).
   //
-  // GÖRÜNTÜLEME de aynı daire ile sınırlı. Eskiden findByDepartment hiç userId
-  // almıyordu: departman id'sini bilen HERHANGİ bir oturumlu kullanıcı — kadroda
-  // olmayan biri dahil — organizasyonun gelir/gider defterini okuyabiliyordu.
-  // Taşeron ve çalışan bu sekmeyi hiç görmemeli (bkz. department-access.ts).
-  private async assertCanManageDepartment(departmentId: string, userId?: string): Promise<void> {
-    if (!userId) return;
-    const { data: dept } = await this.supabase.client
-      .from("departments")
-      .select("organization_id")
-      .eq("id", departmentId)
-      .maybeSingle();
-    if (!dept) throw new NotFoundException("Departman bulunamadı");
-    const { data: org } = await this.supabase.client
-      .from("organizations")
-      .select("owner_id")
-      .eq("id", dept.organization_id)
-      .maybeSingle();
-    if (org?.owner_id === userId) return;
-    const { data: managerRow } = await this.supabase.client
-      .from("department_members")
-      .select("id")
-      .eq("department_id", departmentId)
-      .eq("user_id", userId)
-      .eq("role", "manager")
-      .eq("status", "approved")
-      .maybeSingle();
-    if (managerRow) return;
-    throw new ForbiddenException("Bu bütçeyi yalnızca organizasyon sahibi veya departman yöneticisi düzenleyebilir");
-  }
-
-  // Görüntüleme yetkisi yönetme yetkisiyle aynı daire: organizasyon sahibi +
-  // departman yöneticisi. Ayrı bir mesajla 403 döner ki arayüz "bu sekmeyi
-  // göremezsin" ile "kayıt ekleyemezsin" durumlarını ayırt edebilsin.
-  private async assertCanViewDepartmentBudget(departmentId: string, userId?: string): Promise<void> {
-    if (!userId) return;
-    try {
-      await this.assertCanManageDepartment(departmentId, userId);
-    } catch (err) {
-      if (err instanceof ForbiddenException) {
-        throw new ForbiddenException("Bu departmanın bütçesini görüntüleme yetkiniz yok");
-      }
-      throw err;
-    }
-  }
+  // Kural artık BURADA DEĞİL: dört kurumsal kademe (iş / departman / şirket /
+  // holding) tek koddan geçiyor (bkz. ButceKademeService). Bu üç metot yalnızca
+  // eski çağıranları (departman bütçe ucu, Yaptım kaydından gider girme)
+  // kırmamak için duruyor.
+  //
+  // Neden birleştirildi: departman bütçesi 029'da tek başına yazılırken 020'nin
+  // "defter sahibi" kuralı atlanmış ve kayıtlar aylarca hiçbir deftere ait
+  // olmamıştı (bkz. migration 100). Aynı hatanın dört kez tekrarlanmaması için
+  // tek kural, tek yer.
 
   async findByDepartment(departmentId: string, requestingUserId?: string): Promise<BudgetTransaction[]> {
-    await this.assertCanViewDepartmentBudget(departmentId, requestingUserId);
-    const { data, error } = await this.supabase.client
-      .from("budget_transactions")
-      .select("*, departments(name)")
-      .eq("department_id", departmentId)
-      .order("occurred_at", { ascending: false })
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return (data ?? []).map(mapTransaction);
+    return this.kademe.hareketler("department", departmentId, requestingUserId);
   }
 
-  async addForDepartment(departmentId: string, data: Partial<BudgetTransaction>, requestingUserId?: string): Promise<BudgetTransaction> {
-    await this.assertCanManageDepartment(departmentId, requestingUserId);
-
-    // Departman kaydının defter sahibi ORGANİZASYONUN SAHİBİDİR — kaydı giren
-    // departman yöneticisi değil. Kural proje bütçesindekiyle aynı (bkz. add()):
-    // defter, paranın sahibinin defteridir. owner_id boş bırakıldığı sürece kayıt
-    // hiçbir deftere ait olmuyor ve Kasa sayfasında (owner_id ile süzülüyor)
-    // GÖRÜNMÜYORDU; departman bütçesi 029'da eklenirken 020'nin bu kuralı atlanmıştı.
-    const ownerId = await this.departmentLedgerOwner(departmentId);
-
-    const { data: row, error } = await this.supabase.client
-      .from("budget_transactions")
-      .insert({
-        department_id: departmentId,
-        owner_id: ownerId,
-        type: requireOneOf(data.type ?? "expense", TRANSACTION_TYPES, "İşlem türü"),
-        amount: requireAmount(data.amount ?? 0),
-        description: data.description ?? null,
-        occurred_at: data.occurredAt ?? new Date().toISOString().slice(0, 10),
-      })
-      .select("*, departments(name)")
-      .single();
-    if (error) throw error;
-    return mapTransaction(row);
-  }
-
-  // Departmanın bağlı olduğu organizasyonun sahibi.
-  private async departmentLedgerOwner(departmentId: string): Promise<string | null> {
-    const { data: dept } = await this.supabase.client
-      .from("departments")
-      .select("organization_id")
-      .eq("id", departmentId)
-      .maybeSingle();
-    if (!dept?.organization_id) return null;
-    const { data: org } = await this.supabase.client
-      .from("organizations")
-      .select("owner_id")
-      .eq("id", dept.organization_id)
-      .maybeSingle();
-    return org?.owner_id ?? null;
+  async addForDepartment(
+    departmentId: string,
+    data: Partial<BudgetTransaction>,
+    requestingUserId?: string
+  ): Promise<BudgetTransaction> {
+    return this.kademe.ekle("department", departmentId, data, requestingUserId);
   }
 
   async removeForDepartment(id: string, requestingUserId?: string): Promise<{ success: true }> {
-    const { data: row } = await this.supabase.client
-      .from("budget_transactions")
-      .select("department_id")
-      .eq("id", id)
-      .maybeSingle();
-    if (!row || !row.department_id) throw new NotFoundException("Kayıt bulunamadı");
-    await this.assertCanManageDepartment(row.department_id, requestingUserId);
-    const { error } = await this.supabase.client.from("budget_transactions").delete().eq("id", id);
-    if (error) throw error;
-    return { success: true };
+    return this.removeTransaction(id, requestingUserId);
   }
 
   // Projeden elde kalan net: tahsil edilen - harcanan.
@@ -294,61 +191,29 @@ export class BudgetService {
     return data ?? [];
   }
 
-  // Kullanıcının tüm hareketleri: kendi projelerine ait olanlar + projesiz genel
-  // kayıtlar + KURDUĞU şirketlerin gelir/gider defteri.
-  async findAllForUser(userId: string, limit = 200): Promise<BudgetTransaction[]> {
-    const [defter, sirket] = await Promise.all([
-      this.supabase.client
-        .from("budget_transactions")
-        .select("*, projects(title), departments(name)")
-        .eq("owner_id", userId)
-        .order("occurred_at", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(limit),
-      this.ownedOrganizationLedger(userId, limit),
-    ]);
-    if (defter.error) throw defter.error;
-
-    const hepsi = [...(defter.data ?? []).map(mapTransaction), ...sirket];
-    // İki kaynak ayrı ayrı sıralı geldi; birleşince tarih sırası yeniden kurulmalı.
-    hepsi.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : a.occurredAt > b.occurredAt ? -1 : b.createdAt.localeCompare(a.createdAt)));
-    return hepsi.slice(0, limit);
-  }
-
   /**
-   * Kullanıcının SAHİBİ olduğu şirketlerin gelir/gider defteri, kişisel Kasa'nın
-   * anlayacağı biçime çevrilmiş hâli.
+   * Kullanıcının tüm hareketleri — TEK SORGU.
    *
-   * Kural bilinçli olarak "kurduysan akar, dahil olduysan akmaz": Kasa kişinin
-   * kendi defteri. Şirketi kuran için şirketin parası kendi parasıdır; başkasının
-   * şirketinde departman yöneticisi olan biri için değildir — onun Kasa'sına
-   * çalıştığı şirketin cirosu karışmamalı. Aynı kural departman kayıtlarında da
-   * geçerli (bkz. addForDepartment: defter sahibi organizasyonun sahibi).
+   * Eskiden iki kaynaktan okunuyordu: budget_transactions + şirketin
+   * gelir-gider MODÜLÜ (module_records). Modül kaldırıldı ve kayıtları buraya
+   * taşındı (migration 104); artık tek tablo var.
    *
-   * Kayıtlar Kasa'da SALT OKUNURDUR (`readOnly`): kimlikleri module_records'a
-   * ait, `/budget/transactions/:id` uçlarıyla düzenlenemez. Düzenleme kaydın
-   * kendi yerinde, şirketin Kasa sekmesinde yapılır.
+   * Şirket/holding/iş kademesine girilen kayıtlar da BURAYA DÜŞER, çünkü
+   * hepsinin owner_id'si kademenin sahibidir. Kural bilerek "kurduysan akar,
+   * dahil olduysan akmaz": Kasa kişinin kendi defteri — şirketi kuran için
+   * şirketin parası kendi parasıdır, başkasının şirketinde departman
+   * yöneticisi olan biri için değildir.
    */
-  private async ownedOrganizationLedger(userId: string, limit: number): Promise<BudgetTransaction[]> {
-    const adlar = await this.ownedOrganizations(userId);
-    if (adlar.size === 0) return [];
-
-    const { data: rows, error } = await this.supabase.client
-      .from("module_records")
-      .select("id, organization_id, data, created_at")
-      .in("organization_id", Array.from(adlar.keys()))
-      .eq("module_key", ORG_LEDGER_MODULE_KEY)
-      .is("archived_at", null)
+  async findAllForUser(userId: string, limit = 200): Promise<BudgetTransaction[]> {
+    const { data, error } = await this.supabase.client
+      .from("budget_transactions")
+      .select(SECIM)
+      .eq("owner_id", userId)
+      .order("occurred_at", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) throw error;
-
-    const hareketler: BudgetTransaction[] = [];
-    for (const row of rows ?? []) {
-      const hareket = sirketDefterHareketi(row, adlar.get(row.organization_id));
-      if (hareket) hareketler.push(hareket);
-    }
-    return hareketler;
+    return (data ?? []).map(mapTransaction);
   }
 
   /** Kullanıcının KURDUĞU (arşivlenmemiş) şirketler: id -> ad. */
@@ -416,10 +281,17 @@ export class BudgetService {
   }
 
   async getOverview(userId: string): Promise<BudgetOverview> {
-    const [projects, transactions] = await Promise.all([
+    const [projects, tumHareketler] = await Promise.all([
       this.ownedProjects(userId),
       this.findAllForUser(userId, 1000),
     ]);
+
+    // Kişisel Kasa TEK TOPLAM gösterir ve kur dönüşümü yapmaz; bu yüzden
+    // özet YALNIZCA ₺ kayıtlardan hesaplanır. Defter çok para birimli oldu
+    // (migration 104) ama "1.000 USD + 1.000 TRY = 2.000 ₺" her zaman yanlış.
+    // Döviz kayıtlar listede kendi birimiyle görünmeye devam eder — yalnızca
+    // bu özetin dışında kalırlar.
+    const transactions = tumHareketler.filter((t) => (t.currency || "TRY") === "TRY");
 
     // Kırılımda satırı olmayan her kayıt "genel"e düşer. Yalnızca projesiz
     // kayıtlar değil, ARŞİVLENMİŞ bir projeye ait kayıtlar da: ownedProjects
@@ -489,13 +361,17 @@ export class BudgetService {
       .insert({
         project_id: data.projectId ?? null,
         owner_id: userId,
+        created_by: userId,
         user_id: data.userId ?? null,
         type: requireOneOf(data.type ?? "expense", TRANSACTION_TYPES, "İşlem türü"),
         amount: requireAmount(data.amount ?? 0),
+        currency: paraBirimiDogrula(data.currency),
+        category: data.category?.trim() || null,
+        counterparty_id: data.counterpartyId || null,
         description: data.description ?? null,
         occurred_at: data.occurredAt ?? new Date().toISOString().slice(0, 10),
       })
-      .select("*, projects(title)")
+      .select(SECIM)
       .single();
     if (error) throw error;
     return mapTransaction(row);
@@ -506,15 +382,23 @@ export class BudgetService {
     const { data: row, error } = await this.supabase.client
       .from("budget_transactions")
       .insert({
+        // Düzenli ödeme hangi kademeye bağlıysa üreteceği hareket de oraya
+        // düşer: şirketin kirası şirket defterine, projenin hakedişi projeye.
         project_id: payment.projectId ?? null,
+        department_id: payment.departmentId ?? null,
+        job_id: payment.jobId ?? null,
+        organization_id: payment.organizationId ?? null,
+        group_id: payment.groupId ?? null,
         owner_id: payment.ownerId,
         type: payment.type,
         amount: payment.amount,
+        currency: payment.currency || "TRY",
+        category: payment.category ?? null,
         description: payment.description ?? null,
         occurred_at: occurredAt,
         recurring_payment_id: payment.id,
       })
-      .select("*, projects(title)")
+      .select(SECIM)
       .single();
     if (error) throw error;
     return mapTransaction(row);
@@ -539,8 +423,22 @@ export class BudgetService {
       await this.assertCanManageBudget(row.project_id, userId);
       return row;
     }
+    // Kurumsal kademeler (iş / departman / şirket / holding) tek kapıdan:
+    // sahip + yönetici + yöneticinin görünürlük verdiği kullanıcılar.
     if (row.department_id) {
-      await this.assertCanManageDepartment(row.department_id, userId);
+      await this.erisim.assertCanManage("department", row.department_id, userId);
+      return row;
+    }
+    if (row.job_id) {
+      await this.erisim.assertCanManage("job", row.job_id, userId);
+      return row;
+    }
+    if (row.organization_id) {
+      await this.erisim.assertCanManage("organization", row.organization_id, userId);
+      return row;
+    }
+    if (row.group_id) {
+      await this.erisim.assertCanManage("group", row.group_id, userId);
       return row;
     }
     if (userId && row.owner_id !== userId) throw new ForbiddenException("Bu kaydı düzenleme yetkin yok");
@@ -559,6 +457,9 @@ export class BudgetService {
     if (data.amount !== undefined) patch.amount = requireAmount(data.amount);
     // Boş açıklama "temizle" demektir; undefined ise alan hiç gönderilmemiştir.
     if (data.description !== undefined) patch.description = data.description || null;
+    if (data.currency !== undefined) patch.currency = paraBirimiDogrula(data.currency);
+    if (data.category !== undefined) patch.category = data.category?.trim() || null;
+    if (data.counterpartyId !== undefined) patch.counterparty_id = data.counterpartyId || null;
     if (data.occurredAt !== undefined) patch.occurred_at = data.occurredAt.slice(0, 10);
     // Kaydı başka bir projeye taşımak: hedef projenin de kullanıcıya ait olması şart.
     if (data.projectId !== undefined) {
@@ -570,7 +471,7 @@ export class BudgetService {
       .from("budget_transactions")
       .update(patch)
       .eq("id", id)
-      .select("*, projects(title)")
+      .select(SECIM)
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Kayıt bulunamadı");

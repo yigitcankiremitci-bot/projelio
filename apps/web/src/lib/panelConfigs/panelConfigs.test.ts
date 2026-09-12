@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import { MODULE_RECORD_CONFIGS } from "../moduleConfigs";
 import { PANEL_CONFIGS, isPanelModule, panelSourceKeys } from "./index";
 import {
+  BUTCE_DEFTERI,
   buildPeriod,
   groupBy,
   inPeriod,
@@ -77,22 +78,22 @@ describe("inPeriod — tarihsiz kayıt dışarıda bırakılmaz", () => {
   const agustos: Period = buildPeriod("this_month", new Date(2026, 7, 12));
 
   test("dönem içindeki kayıt geçer", () => {
-    assert.equal(inPeriod(rec("fm_gelir_gider", { entryDate: "2026-08-05" }), "fm_gelir_gider", agustos), true);
+    assert.equal(inPeriod(rec(BUTCE_DEFTERI, { entryDate: "2026-08-05" }), BUTCE_DEFTERI, agustos), true);
   });
 
   test("dönem dışındaki kayıt elenir", () => {
-    assert.equal(inPeriod(rec("fm_gelir_gider", { entryDate: "2026-07-05" }), "fm_gelir_gider", agustos), false);
+    assert.equal(inPeriod(rec(BUTCE_DEFTERI, { entryDate: "2026-07-05" }), BUTCE_DEFTERI, agustos), false);
   });
 
   test("sınır tarihleri dahildir", () => {
-    assert.equal(inPeriod(rec("fm_gelir_gider", { entryDate: "2026-08-01" }), "fm_gelir_gider", agustos), true);
-    assert.equal(inPeriod(rec("fm_gelir_gider", { entryDate: "2026-08-31" }), "fm_gelir_gider", agustos), true);
+    assert.equal(inPeriod(rec(BUTCE_DEFTERI, { entryDate: "2026-08-01" }), BUTCE_DEFTERI, agustos), true);
+    assert.equal(inPeriod(rec(BUTCE_DEFTERI, { entryDate: "2026-08-31" }), BUTCE_DEFTERI, agustos), true);
   });
 
   test("tarihi boş olan kayıt DIŞARIDA BIRAKILMAZ", () => {
     // Sessizce süzmek kullanıcıya "verim kayboldu" hissi verir.
-    assert.equal(inPeriod(rec("fm_gelir_gider", {}), "fm_gelir_gider", agustos), true);
-    assert.equal(inPeriod(rec("fm_gelir_gider", { entryDate: "" }), "fm_gelir_gider", agustos), true);
+    assert.equal(inPeriod(rec(BUTCE_DEFTERI, {}), BUTCE_DEFTERI, agustos), true);
+    assert.equal(inPeriod(rec(BUTCE_DEFTERI, { entryDate: "" }), BUTCE_DEFTERI, agustos), true);
   });
 
   test("dönem alanı tanımsız modüller filtreden muaftır", () => {
@@ -103,7 +104,7 @@ describe("inPeriod — tarihsiz kayıt dışarıda bırakılmaz", () => {
 
   test("tüm zamanlar seçilince her kayıt geçer", () => {
     const hepsi = buildPeriod("all");
-    assert.equal(inPeriod(rec("fm_gelir_gider", { entryDate: "2020-01-01" }), "fm_gelir_gider", hepsi), true);
+    assert.equal(inPeriod(rec(BUTCE_DEFTERI, { entryDate: "2020-01-01" }), BUTCE_DEFTERI, hepsi), true);
   });
 });
 
@@ -149,7 +150,7 @@ describe("panel kayıt defteri", () => {
 
   test("isPanelModule doğru ayırt eder", () => {
     assert.equal(isPanelModule("yonetim_analiz"), true);
-    assert.equal(isPanelModule("fm_gelir_gider"), false);
+    assert.equal(isPanelModule(BUTCE_DEFTERI), false);
   });
 
   test("holding panelleri kapsam sınırını açıkça söylüyor", () => {
@@ -181,10 +182,10 @@ describe("göstergeler boş veriyle patlamıyor", () => {
 
 describe("finans göstergeleri doğru hesaplıyor", () => {
   const kayitlar = {
-    fm_gelir_gider: [
-      rec("fm_gelir_gider", { type: "income", amount: 1000, currency: "TRY", category: "Satış" }),
-      rec("fm_gelir_gider", { type: "expense", amount: 400, currency: "TRY", category: "Kira" }),
-      rec("fm_gelir_gider", { type: "expense", amount: 100, currency: "TRY", category: "Kira" }),
+    [BUTCE_DEFTERI]: [
+      rec(BUTCE_DEFTERI, { type: "income", amount: 1000, currency: "TRY", category: "Satış" }),
+      rec(BUTCE_DEFTERI, { type: "expense", amount: 400, currency: "TRY", category: "Kira" }),
+      rec(BUTCE_DEFTERI, { type: "expense", amount: 100, currency: "TRY", category: "Kira" }),
     ],
     fm_fatura: [rec("fm_fatura", { status: "pending", amount: 250, currency: "TRY" })],
     fm_alacak_borc: [],
@@ -208,9 +209,9 @@ describe("finans göstergeleri doğru hesaplıyor", () => {
 
   test("farklı para birimleri ayrı gösterilir", () => {
     const karisik = {
-      fm_gelir_gider: [
-        rec("fm_gelir_gider", { type: "income", amount: 100, currency: "TRY" }),
-        rec("fm_gelir_gider", { type: "income", amount: 100, currency: "USD" }),
+      [BUTCE_DEFTERI]: [
+        rec(BUTCE_DEFTERI, { type: "income", amount: 100, currency: "TRY" }),
+        rec(BUTCE_DEFTERI, { type: "income", amount: 100, currency: "USD" }),
       ],
     };
     const gelir = PANEL_CONFIGS.fm_analiz_rapor.metrics.find((m) => m.label === "Gelir")!;

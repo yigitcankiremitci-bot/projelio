@@ -54,6 +54,22 @@ export function requireAmount(value: unknown, field = "Tutar"): number {
 }
 
 /**
+ * Para birimi kodu: 3 harf, büyük harfe çevrilir. Boş/eksikse TRY.
+ *
+ * Serbest metin kabul edilseydi aynı birim "usd", "USD", "Usd" diye üç ayrı
+ * kovaya dağılır ve toplamlar üçe bölünürdü — bütçe toplaması gruplamayı tam
+ * olarak bu koda göre yapıyor (bkz. packages/shared butceToplama.ts).
+ */
+export function paraBirimiDogrula(value: unknown, field = "Para birimi"): string {
+  if (value === undefined || value === null || value === "") return "TRY";
+  const kod = String(value).trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(kod)) {
+    throw new BadRequestException(`${field} 3 harfli ISO kodu olmalı (örn. TRY, USD, EUR).`);
+  }
+  return kod;
+}
+
+/**
  * Değerin izin verilen listede olmasını şart koşar.
  *
  * Rol, durum, tür gibi alanlar için: bunların TypeScript tipi ("manager" | "employee")

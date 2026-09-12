@@ -28,6 +28,7 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | Abonelik / ödeme (iyzico + mağazalar) | `backend/src/modules/billing/` — kurulum `docs/odeme-kurulumu.md` |
 | Bildirim e-postaları | `backend/src/modules/notifications/notification-email.*` — tercih, şablon, iki turlu işleyici |
 | Yaptım (kişisel iş günlüğü) | `backend/src/modules/worklog/`, `apps/web/src/pages/WorkLog.tsx` — Yapılacaklar'ın tersi |
+| Bütçe (tüm kademeler) | `backend/src/modules/budget/` — tek defter, bkz. aşağıdaki başlık |
 | WhatsApp köprüsü (WAHA yan-servisi + modül) | `backend/src/modules/whatsapp/`, `deploy/docker-compose.prod.yml` `waha` servisi, tasarım `docs/whatsapp-qr-plan.md` |
 
 Backend'de 48 modül, 500'den fazla HTTP ucu var (`node scripts/uc-listesi.mjs` ile
@@ -264,6 +265,71 @@ Değişmez kurallar:
 
 Kredi *paketleri* (tek seferlik yükleme, `ai_credit_orders`) ayrı ve duruyor:
 abonelik onun yerine değil, yanına geldi.
+
+## Bütçe: tek defter, beş kademe
+
+**Para TEK TABLODA: `budget_transactions`.** Şirketin ayrı bir "Gelir-Gider"
+modülü vardı (`fm_gelir_gider`, `module_records`); kaldırıldı ve kayıtları
+buraya taşındı (migration 104). Sebebi çift sayımdı: aynı 10.000 TL hem proje
+bütçesine hem o modüle girilebiliyor, yönetim 20.000 TL görüyordu.
+
+Hiyerarşi ve toplama yönü:
+
+```
+görev bütçesi (tasks.budget, onaylanıp ödenince)
+  └─ proje / rutin
+      └─ iş ────────────┐
+      departman ────────┤
+                        └─ organizasyon
+                             └─ holding (groups)
+```
+
+**Kademeler birbirini TOPLAR, kopyalamaz.** Bir satır yalnızca tek bir kademeye
+aittir — `budget_tx_single_parent` kısıtı (`num_nonnulls(...) <= 1`) bunu
+veritabanı düzeyinde garanti ediyor. Ürünün finansal güvenilirliği bu tek
+cümleye dayanıyor; kısıtı gevşetmek çift sayımı geri getirir.
+
+| Ne | Nerede |
+|---|---|
+| Toplama (saf fonksiyonlar) | `packages/shared/src/butceToplama.ts` — sunucu ve arayüz aynı koddan geçer |
+| Kademe toplaması | `backend/src/modules/budget/butce-hiyerarsi.service.ts` |
+| Yetki kararı (saf) | `backend/src/modules/budget/butce-erisim.ts` |
+| Defter işlemleri (4 kademe ortak) | `backend/src/modules/budget/butce-kademe.service.ts` |
+| Görev bütçesi onayı | `backend/src/modules/budget/gorev-butce.service.ts` |
+| Arayüz (4 kademe ortak) | `apps/web/src/components/butce/ScopeBudgetPanel.tsx` |
+
+Uçlar: `GET /budget/scope/:scopeType/:scopeId` sayfanın TÜM verisini tek seferde
+döner (`scopeType` = job | department | organization | group). Hareketlerin
+düzenlenmesi ve silinmesi buradan değil, `/budget/transactions/:id` ucundan —
+kaydın kademesi zaten satırın kendisinde yazılı ve kuralın ikinci bir kopyası
+çıkmasın diye.
+
+Değişmez kurallar:
+
+- **Kur dönüşümü YOK.** Defter çok para birimli; toplamlar birim başına ayrı
+  hesaplanır. "1.000 USD + 1.000 TRY = 2.000 ₺" her zaman yanlıştır ve kur
+  kaynağı olmadan doğrusu üretilemez. Kişisel Kasa tek toplam gösterdiği için
+  orada yalnızca ₺ kayıtlar toplanır, döviz kayıtlar listede kendi birimiyle
+  görünür.
+- **Onay ile ödeme AYRI adımlar.** Onay (`planned`) bir taahhüttür, bütçeyi
+  bağlar ama kasadan para çıkarmaz; ödeme (`paid`) deftere gerçek bir `payout`
+  satırı yazar. Tek adım olsaydı nakit akışı grafiği gerçekte olmayan çıkışlar
+  gösterirdi. Ödenen görev deftere düştüğü için **ayrıca toplanmaz** — iki
+  kez saymak olurdu.
+- **Onay yetkisi satın alınamaz.** `budget_viewers`'a eklenen kullanıcı
+  `can_manage` ile kayıt girebilir ama görev bütçesi ONAYLAYAMAZ; onay
+  kademenin sahibine/yöneticisine özgüdür.
+- **Taşeron hiçbir kurumsal bütçeyi göremez** — `budget_viewers`'a yanlışlıkla
+  eklenmiş olsa bile (bkz. `butceYetkisiKarari`, taşeron kontrolü her şeyden
+  önce gelir).
+- **Bir görev deftere yalnızca BİR KEZ düşebilir** (`budget_transactions`
+  üzerinde `task_id` tekil indeksi): "ödendi"ye iki kez basmak gideri iki kez
+  yazmasın diye.
+- `fm_alacak_borc` bilerek MODÜL olarak kaldı: orada henüz gerçekleşmemiş para
+  var ve hiçbir bakiyeye girmez.
+- Türev paneller (Finansal Analiz, Yönetim Analizi) deftere `BUTCE_DEFTERI`
+  sanal kaynak anahtarıyla bakar (`apps/web/src/lib/panelConfigs/types.ts`):
+  bir modül değil, hareketlerin panel biçimine çevrilmiş hâli.
 
 ## Bu repoda geçerli konvansiyonlar
 

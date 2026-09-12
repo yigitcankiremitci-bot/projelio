@@ -1,12 +1,12 @@
-import type { BudgetTransaction, KasaAlacakBorc } from "@projelio/shared";
+// Şirketin ALACAK/BORÇ modülünden (fm_alacak_borc) kişisel Kasa'nın vade
+// listesine yansıyan kayıtlar.
+//
+// Bu dosya eskiden şirketin GELİR-GİDER defterini de çeviriyordu; o modül
+// kaldırıldı ve kayıtları budget_transactions'a taşındı (migration 104), yani
+// gerçekleşen para artık tek tabloda. Burada kalan tek şey henüz gerçekleşmemiş
+// para: alacak/borç.
 
-/**
- * Şirket "Kasa" sekmesindeki gelir/gider defteri, budget_transactions'ta değil
- * generic module_records sisteminde tutuluyor (bkz. OrgBudgetPanel /
- * moduleConfigs > financeEntryConfig). Kişisel Kasa'ya yansıtabilmek için
- * modülün anahtarı burada tanımlı.
- */
-export const ORG_LEDGER_MODULE_KEY = "fm_gelir_gider";
+import type { KasaAlacakBorc } from "@projelio/shared";
 
 /**
  * Şirketin alacak/borç takibi. Gelir/gider defterinden ayrı bir modül: orada
@@ -15,44 +15,7 @@ export const ORG_LEDGER_MODULE_KEY = "fm_gelir_gider";
  */
 export const ORG_RECEIVABLE_MODULE_KEY = "fm_alacak_borc";
 
-/**
- * Kişisel Kasa TEK PARA BİRİMLİDİR: budget_transactions'ta currency sütunu yok,
- * arayüz tutarların hepsini ₺ ile yazıyor. Şirket defterinde ise para birimi
- * kayıt başına seçiliyor. Farklı para birimindeki bir kaydı toplama katmak
- * "1.000 USD + 1.000 TRY = 2.000 ₺" demek olurdu; bu yüzden TRY dışındakiler
- * Kasa'ya yansıtılmaz (şirketin kendi Kasa sekmesinde para birimi başına ayrı
- * toplanmaya devam ediyor).
- */
-export const KASA_PARA_BIRIMI = "TRY";
-
-/**
- * Bir module_records satırını kişisel Kasa'nın anlayacağı harekete çevirir.
- * Yansıtılmayacak kayıtlarda null döner: farklı para birimi ya da okunamayan
- * tutar. Ayrı dosyada duruyor ki bu sessiz eleme testlenebilsin — Kasa'da
- * görünmeyen kaydın sebebi bir daha tahmin işi olmasın.
- */
-export function sirketDefterHareketi(
-  row: { id: string; organization_id: string; data: Record<string, unknown> | null; created_at: string },
-  sirketAdi?: string
-): BudgetTransaction | null {
-  const d = row.data ?? {};
-  if (((d.currency as string) || KASA_PARA_BIRIMI) !== KASA_PARA_BIRIMI) return null;
-  const amount = Number(d.amount);
-  if (!Number.isFinite(amount) || amount === 0) return null;
-  const tarih = typeof d.entryDate === "string" && d.entryDate ? d.entryDate : row.created_at;
-  return {
-    id: row.id,
-    organizationId: row.organization_id,
-    organizationName: sirketAdi,
-    readOnly: true,
-    // Şirket defterinde yalnızca income/expense var; "payout" oraya girmiyor.
-    type: d.type === "expense" ? "expense" : "income",
-    amount,
-    description: (d.description as string) || (d.category as string) || undefined,
-    occurredAt: String(tarih).slice(0, 10),
-    createdAt: row.created_at,
-  };
-}
+const VARSAYILAN_PARA_BIRIMI = "TRY";
 
 /**
  * Şirketin alacak/borç kaydını kişisel Kasa'nın vade listesine çevirir.
@@ -81,7 +44,7 @@ export function sirketAlacakBorcu(
     type: d.type === "payable" ? "payable" : "receivable",
     counterparty: karsiTarafAdi || (typeof d.counterparty === "string" ? d.counterparty : undefined),
     amount,
-    currency: (d.currency as string) || KASA_PARA_BIRIMI,
+    currency: (d.currency as string) || VARSAYILAN_PARA_BIRIMI,
     dueDate: typeof d.dueDate === "string" && d.dueDate ? d.dueDate.slice(0, 10) : undefined,
     category: (d.category as string) || undefined,
     description: (d.description as string) || undefined,

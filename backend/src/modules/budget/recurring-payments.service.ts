@@ -4,6 +4,9 @@ import { SupabaseService } from "../../database/supabase.service";
 import { requireAmount, requireOneOf, optionalOneOf } from "../../common/validation/input";
 import { BudgetService } from "./budget.service";
 import { islenecekDonemler } from "./vade";
+// Eşleştirme ortak dosyada: aynı satır artık altı ayrı yerden okunuyor ve her
+// kopya, yeni bir sütun eklendiğinde birinde unutulmak demekti.
+import { mapRecurringPayment as mapPayment } from "./butce-eslestirme";
 
 // Tarih hesabı vade.ts'te (testten import edilebilsin diye); buradan yeniden
 // dışa aktarılıyor ki mevcut çağrı yerleri değişmesin.
@@ -17,25 +20,6 @@ const INTERVALS: RecurrenceInterval[] = ["weekly", "monthly", "yearly"];
  * "payout" yok.)
  */
 const RECURRING_TYPES = ["income", "expense"] as const;
-
-function mapPayment(row: any): RecurringPayment {
-  return {
-    id: row.id,
-    ownerId: row.owner_id,
-    projectId: row.project_id ?? undefined,
-    projectTitle: row.projects?.title ?? undefined,
-    type: row.type,
-    amount: Number(row.amount),
-    description: row.description ?? undefined,
-    interval: row.interval,
-    nextDueDate: row.next_due_date,
-    anchorDay: row.anchor_day ?? undefined,
-    reminderDaysBefore: row.reminder_days_before ?? 0,
-    active: row.active,
-    lastRunAt: row.last_run_at ?? undefined,
-    createdAt: row.created_at,
-  };
-}
 
 @Injectable()
 export class RecurringPaymentsService {

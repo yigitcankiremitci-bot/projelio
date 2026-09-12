@@ -1,7 +1,6 @@
 import { hardwareConfig, networkSecurityConfig, softwareConfig } from "./bilgiTeknolojileri";
 import {
   budgetPlanConfig,
-  financeEntryConfig,
   invoiceConfig,
   investmentConfig,
   receivablesPayablesConfig,
@@ -99,7 +98,6 @@ export const MODULE_RECORD_CONFIGS: Record<string, ModuleRecordConfig> = {
   ik_ic_iletisim_kultur: internalCommsConfig,
 
   // FİNANS MUHASEBE
-  fm_gelir_gider: financeEntryConfig,
   fm_alacak_borc: receivablesPayablesConfig,
   fm_fatura: invoiceConfig,
   fm_vergi_takip: taxTrackingConfig,

@@ -6,6 +6,7 @@ import { useLiveRoom } from "../lib/liveRoom";
 import OrganizationCard from "../components/OrganizationCard";
 import EditGroupModal from "../components/EditGroupModal";
 import FilesPanel from "../components/FilesPanel";
+import ScopeBudgetPanel from "../components/butce/ScopeBudgetPanel";
 import ProfileCard from "../components/ProfileCard";
 import AiCreditsChip from "../components/AiCreditsChip";
 import { useAppPrefs } from "../lib/appPrefs";
@@ -116,6 +117,20 @@ export default function GroupDetail() {
             ))}
           </div>
         )}
+
+        {/* HOLDİNG KASASI — hiyerarşinin en üstü.
+            Buradaki rakamlar bağlı TÜM organizasyonların (ve onların
+            departman/iş/proje kademelerinin) toplamıdır; holdinge doğrudan
+            girilen gelir/giderler de aynı ekranda ama ayrı satırlarda durur.
+            Hiçbir tutar iki kez sayılmaz: bir kayıt yalnızca tek bir kademeye
+            aittir (bkz. butce-hiyerarsi.service.ts).
+
+            Holdingi olmayan kullanıcıda bu kademe hiç yoktur; son durak
+            organizasyon ya da serbest çalışanın kişisel Kasa'sıdır. */}
+        <div style={{ marginTop: 8, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
+          <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 14px" }}>{t("Holding kasası")}</h2>
+          {id && <ScopeBudgetPanel scopeType="group" scopeId={id} />}
+        </div>
 
         {/* Hiyerarşi: gruba bağlı organizasyonların departmanlarındaki tüm dosyalar. */}
         <div style={{ marginTop: 8, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>

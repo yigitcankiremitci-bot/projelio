@@ -29,42 +29,14 @@ import {
 // proje bütçesiyle (budget_transactions) birleştirilmesi Faz 4'e ait —
 // bkz. docs/moduller/02-karar-notu-butce-vs-muhasebe.md
 
-// ============================================================ Gelir-Gider
-const ENTRY_TYPE = { income: "Gelir", expense: "Gider" };
-
-export const financeEntryConfig: ModuleRecordConfig = {
-  periodKey: "entryDate",
-  // Pano görünümünde gelir ve gider iki ayrı sütun olur. Varsayılan seçim
-  // (ilk select alanı) burada zaten "type" ama açıkça yazılıyor: bu modülde
-  // sütunların türe göre bölünmesi bir tasarım kararı, tesadüf değil.
-  boardKey: "type",
-  title: "Gelir-Gider",
-  addLabel: "Kayıt ekle",
-  emptyLabel: "Henüz gelir/gider kaydı yok.",
-  fields: [
-    { key: "type", label: "Tür", type: "select", required: true, defaultValue: "income", options: opts(ENTRY_TYPE) },
-    currencyField("amount", "Tutar", { required: true }),
-    { key: "category", label: "Kategori", type: "text", placeholder: "Örn. Kira, Yazılım, Satış" },
-    { key: "entryDate", label: "Tarih", type: "date" },
-    { key: "description", label: "Açıklama", type: "textarea" },
-  ],
-  summary: (d) =>
-    `${d.type === "expense" ? "− " : "+ "}${fmtMoney(d.amount, d.currency)}${d.category ? ` · ${d.category}` : ""}`,
-  detail: (d) => joinDetail(d.entryDate as string, d.description as string),
-  computeStats: (records) => {
-    const totals = new Map<string, number>();
-    for (const r of records) {
-      const currency = (r.data.currency as string) || "TRY";
-      const amount = Number(r.data.amount) || 0;
-      totals.set(currency, (totals.get(currency) ?? 0) + (r.data.type === "expense" ? -amount : amount));
-    }
-    if (totals.size === 0) return [{ label: "Kayıt", value: "0" }];
-    return Array.from(totals.entries()).map(([currency, net]) => ({
-      label: `Net bakiye (${currency})`,
-      value: fmtMoney(net, currency),
-    }));
-  },
-};
+// NOT: "Gelir-Gider" modülü (fm_gelir_gider) KALDIRILDI. Şirketin gelir/gider
+// defteri artık bir modül değil, çekirdek bütçe tablosu: kayıtları
+// budget_transactions'a taşındı (migration 104) ve iş/departman/şirket/holding
+// kademelerinin Bütçe sekmesinden giriliyor.
+//
+// Sebebi çift sayımdı: aynı 10.000 TL hem proje bütçesine hem bu modüle
+// girilebiliyor ve yönetim paneli 20.000 TL gösterebiliyordu
+// (bkz. docs/moduller/02-karar-notu-butce-vs-muhasebe.md).
 
 // ============================================================ Alacak-Borç
 // Şirket Bütçe sekmesindeki gelir/gider defterinden ayrı: burada henüz TAHSİL

@@ -333,8 +333,13 @@ export default function BudgetPanel() {
 
   const gelirler = siraliHareketler.filter((h) => h.type === "income");
   const giderler = siraliHareketler.filter((h) => h.type !== "income");
-  const gelirToplam = gelirler.reduce((toplam, h) => toplam + Number(h.amount), 0);
-  const giderToplam = giderler.reduce((toplam, h) => toplam + Number(h.amount), 0);
+  // Sütun toplamları YALNIZCA ₺ kayıtları kapsar. Defter çok para birimli
+  // oldu (migration 104) ama kişisel Kasa tek toplam gösteriyor ve kur
+  // dönüşümü yapılmıyor: "1.000 USD + 1.000 TRY = 2.000 ₺" her zaman yanlış.
+  // Döviz kayıtlar listede kendi birimiyle görünür, toplama katılmaz.
+  const tryOlan = (h: { currency?: string }) => (h.currency || "TRY") === "TRY";
+  const gelirToplam = gelirler.filter(tryOlan).reduce((toplam, h) => toplam + Number(h.amount), 0);
+  const giderToplam = giderler.filter(tryOlan).reduce((toplam, h) => toplam + Number(h.amount), 0);
 
   // Süzgeç açıkken hiçbir bölüme kayıt düşmediyse tek bir satır yazılır.
   // "Tümü"de bölümler kendi boş durum metinleriyle çizilmeye devam eder:
@@ -724,6 +729,8 @@ function HareketSutunu({
         }}
       >
         <span style={{ fontSize: 13, fontWeight: 500, color: renk }}>{baslik}</span>
+        {/* Toplam ₺ kayıtlardan: farklı para birimlerini toplamak yanlış bir
+            rakam üretirdi (bkz. satırlardaki formatCurrency). */}
         <span style={{ fontSize: 13, fontWeight: 500, color: renk }}>
           {isaret}
           {formatMoney(toplam)}
@@ -763,9 +770,13 @@ function HareketSutunu({
               </div>
             </div>
 
+            {/* Satırın kendi para birimiyle: defter artık çok para birimli
+                (migration 104) ve bir USD kaydını ₺ göstermek yanlış olurdu.
+                Yukarıdaki TOPLAM ise yalnızca ₺ kayıtları kapsıyor — kur
+                dönüşümü olmadan iki birimi toplamak imkânsız. */}
             <span style={{ fontSize: 14, fontWeight: 500, color: renk, flexShrink: 0 }}>
               {isaret}
-              {formatMoney(hareket.amount)}
+              {formatCurrency(hareket.amount, hareket.currency || "TRY")}
             </span>
 
             {/* Otomatik işlenen kayıt elle düzenlenmez: kaynağı düzenli ödeme

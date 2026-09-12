@@ -4,6 +4,7 @@ import { requireSafeUrl } from "../../common/safe-url";
 import { visibleTaskIdsForSubcontractor } from "../../common/access/subcontractor";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { GorevButceService } from "../budget/gorev-butce.service";
 import { applyOrder } from "../../common/reorder.util";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { parcalara } from "../../common/parcali-liste";
@@ -96,6 +97,14 @@ function mapTask(row: any): Task {
     parentTaskId: row.parent_task_id ?? undefined,
     budget: row.budget != null ? Number(row.budget) : 0,
     budgetStatus: row.budget_status ?? "pending",
+    // Onay izi (bkz. migration 104): kim istedi, kim karar verdi, gerekçe ne.
+    // Bunlar olmadan budget_status bir ONAY değil yalnızca bir ETİKETTİ.
+    budgetCurrency: row.budget_currency || "TRY",
+    budgetRequestedBy: row.budget_requested_by ?? undefined,
+    budgetRequestedAt: row.budget_requested_at ?? undefined,
+    budgetDecidedBy: row.budget_decided_by ?? undefined,
+    budgetDecidedAt: row.budget_decided_at ?? undefined,
+    budgetNote: row.budget_note ?? undefined,
     weekNumber: row.week_number ?? undefined,
     estimatedDurationValue: row.estimated_duration_value != null ? Number(row.estimated_duration_value) : undefined,
     estimatedDurationUnit: row.estimated_duration_unit ?? undefined,
@@ -140,7 +149,8 @@ function taskLink(task: Task): string | undefined {
 export class TasksService {
   constructor(
     private supabase: SupabaseService,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
+    private gorevButce: GorevButceService
   ) {}
 
   // requestingUserId verilirse önce projeye erişimi olduğu doğrulanır; ayrıca bu
@@ -865,7 +875,18 @@ export class TasksService {
     const requestedAssignees = this.resolveAssigneeIds(data);
     if (data.budget !== undefined) {
       patch.budget = data.budget;
+      // Tutar değişince onay SIFIRLANIR: 500 TL'lik bir talebi onaylayan
+      // yönetici 50.000 TL'ye onay vermiş sayılamaz.
       patch.budget_status = "pending";
+      // Talep izi: kimin istediği ve ne zaman istediği. Bu alanlar olmadan
+      // onay kuyruğunda "kim istedi" sorusunun cevabı yoktu.
+      patch.budget_requested_by = requestingUserId ?? null;
+      patch.budget_requested_at = new Date().toISOString();
+      patch.budget_decided_by = null;
+      patch.budget_decided_at = null;
+      // Eski ret gerekçesi düzeltilmiş talebin üstünde durmamalı.
+      patch.budget_note = null;
+      if (data.budgetCurrency !== undefined) patch.budget_currency = (data.budgetCurrency || "TRY").toUpperCase();
     }
     if (data.weekNumber !== undefined) patch.week_number = data.weekNumber;
     if (data.outputId !== undefined) patch.output_id = data.outputId;
@@ -920,6 +941,13 @@ export class TasksService {
           taskLink(task)
         );
       }
+    }
+
+    // Bütçe girildiyse/değiştiyse karar verecek kişiye haber ver. Bildirim
+    // gitmezse yöneticinin bekleyen bir onaydan haberi olmaz ve talep sahibi
+    // sebebini anlamadan bekler (bkz. GorevButceService.talebiDuyur).
+    if (data.budget !== undefined && Number(data.budget) > 0) {
+      void this.gorevButce.talebiDuyur(id).catch(() => {});
     }
 
     return requestedAssignees ? this.reloadTask(id) : task;
@@ -1155,16 +1183,38 @@ export class TasksService {
     return { updated, skipped };
   }
 
+  /**
+   * Görev bütçesinin durumunu değiştirir — ESKİ UÇ, artık yalnızca bir adaptör.
+   *
+   * NEDEN DEĞİŞTİ: bu metot eskiden yalnızca `assertTaskAccess` çağırıp sütunu
+   * yazıyordu. Yani GÖREVİ GÖREBİLEN HERKES bütçeyi onaylayabiliyordu — kendi
+   * girdiği bütçeyi kendisi "planlandı"ya çekebilen bir kullanıcı, onay
+   * akışının tamamını anlamsız kılıyordu. Üstelik "ödendi" demek deftere
+   * hiçbir şey yazmıyordu: görev ödenmiş görünürken kasada izi yoktu.
+   *
+   * Karar artık tek yerden geçiyor (bkz. GorevButceService): yetki yöneticiye
+   * daralıyor, kim/ne zaman izi tutuluyor ve "ödendi" gerçek bir defter satırı
+   * üretiyor. Uç, güncellenmemiş istemciler için duruyor.
+   */
   async updateBudgetStatus(id: string, budgetStatus: Task["budgetStatus"], requestingUserId?: string): Promise<Task> {
-    await this.assertTaskAccess(await this.getTaskScope(id), requestingUserId);
+    if (budgetStatus === "planned") {
+      await this.gorevButce.karar(id, true, undefined, requestingUserId);
+    } else if (budgetStatus === "rejected") {
+      await this.gorevButce.karar(id, false, undefined, requestingUserId);
+    } else if (budgetStatus === "paid") {
+      await this.gorevButce.odendiIsaretle(id, requestingUserId);
+    } else {
+      // "pending"e geri dönüş = ödemeyi geri alma. Ödenmemiş bir görevde
+      // yapacak bir şey yok, o yüzden sessizce geçiliyor.
+      const { data: mevcut } = await this.supabase.client
+        .from("tasks")
+        .select("budget_status")
+        .eq("id", id)
+        .maybeSingle();
+      if (mevcut?.budget_status === "paid") await this.gorevButce.odemeyiGeriAl(id, requestingUserId);
+    }
 
-    const { data: row, error } = await this.supabase.client
-      .from("tasks")
-      .update({ budget_status: budgetStatus })
-      .eq("id", id)
-      .select()
-      .maybeSingle();
-    if (error) throw error;
+    const { data: row } = await this.supabase.client.from("tasks").select().eq("id", id).maybeSingle();
     if (!row) throw new NotFoundException("Görev bulunamadı");
     return mapTask(row);
   }

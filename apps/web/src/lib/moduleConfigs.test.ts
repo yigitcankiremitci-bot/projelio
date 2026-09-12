@@ -8,7 +8,11 @@ import type { ModuleFieldConfig, ModuleRecordConfig } from "./moduleConfigs";
 // gösterge fonksiyonları hiçbir veri kombinasyonunda patlamamalı.
 // Modül tanımları lib/moduleConfigs/ altında, katalog eşlemesi index.ts'te.
 
-// module_catalog'daki 56 anahtar.
+// module_catalog'daki anahtarlar.
+//
+// fm_gelir_gider LİSTEDE YOK: gelir/gider defteri artık bir modül değil,
+// çekirdek bütçe tablosu (budget_transactions). Modül katalogdan da silindi —
+// bkz. migration 104.
 // 046'da iki müşteri anahtarı (mid_musteri_modulu, spd_musteri_modulu) tek
 // crm_musteri'de birleşti; crm_musteri ortak `party` varlığına yazdığı için
 // module_records tanımı YOKTUR, kendi paneli vardır.
@@ -16,7 +20,7 @@ const CATALOG_KEYS = [
   "crm_musteri",
   "bt_ag_guvenlik", "bt_donanim", "bt_yazilim",
   "fm_alacak_borc", "fm_analiz_rapor", "fm_butce_hazirlama", "fm_fatura", "fm_finansal_planlama",
-  "fm_gelir_gider", "fm_nakit_akis", "fm_risk_yonetimi", "fm_sermaye_yatirim_takip", "fm_vergi_takip",
+  "fm_nakit_akis", "fm_risk_yonetimi", "fm_sermaye_yatirim_takip", "fm_vergi_takip",
   "holding_analiz", "holding_denetim", "holding_raporlama",
   "hud_marka_patent_telif", "hud_mevzuatlar", "hud_sozlesme",
   "ik_bordro_ozluk", "ik_egitim_gelisim", "ik_ic_iletisim_kultur", "ik_ise_alim_oryantasyon", "ik_performans_izleme",
@@ -93,8 +97,8 @@ describe("katalog kapsama", () => {
     assert.deepEqual(beklenmeyen, [], "sessizce generic fallback'e düşen modül var");
   });
 
-  test("37 kayıt tanımı + 1 varlık modülü tanımlı", () => {
-    assert.equal(entries.length, 37);
+  test("36 kayıt tanımı + 1 varlık modülü tanımlı", () => {
+    assert.equal(entries.length, 36);
     assert.equal(ENTITY_MODULE_KEYS.length, 1);
   });
 
@@ -122,7 +126,7 @@ describe("katalog kapsama", () => {
   });
 
   test("tanımlı anahtar kendi config'ini döndürür", () => {
-    assert.equal(getModuleRecordConfig("fm_gelir_gider", "yoksayılır").title, "Gelir-Gider");
+    assert.equal(getModuleRecordConfig("fm_alacak_borc", "yoksayılır").title, "Alacak-Borç");
   });
 });
 

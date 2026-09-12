@@ -8,11 +8,14 @@ import { describeModuleFields, hasRecordConfig, normalizeModuleData } from "./ai
 // kullanıcıya "kayıt eklendi" der ama ekranda boş satır gösterir — bu yüzden
 // asıl sınanan şey, uydurulmuş alanın SESSİZCE geçmemesi.
 
-const GELIR_GIDER = "fm_gelir_gider";
+// Sınama modülü olarak Alacak-Borç seçildi: select, para birimi, tarih ve
+// zorunlu alanların hepsi tek tanımda var. Eskiden Gelir-Gider kullanılıyordu
+// ama o modül kaldırıldı — defter artık çekirdek bütçe tablosu (migration 104).
+const ALACAK_BORC = "fm_alacak_borc";
 
 describe("normalizeModuleData — tanımsız alanlar", () => {
   test("tanımda olmayan anahtar atılır ve uyarı üretir", () => {
-    const { data, warnings } = normalizeModuleData(GELIR_GIDER, "Gelir-Gider", {
+    const { data, warnings } = normalizeModuleData(ALACAK_BORC, "Alacak-Borç", {
       amount: 100,
       uydurulmusAlan: "x",
     });
@@ -36,39 +39,39 @@ describe("normalizeModuleData — tanımsız alanlar", () => {
 describe("normalizeModuleData — tip zorlama", () => {
   test("sayı alanına metin gelirse hata", () => {
     assert.throws(
-      () => normalizeModuleData(GELIR_GIDER, "Gelir-Gider", { amount: "bilmiyorum" }),
+      () => normalizeModuleData(ALACAK_BORC, "Alacak-Borç", { amount: "bilmiyorum" }),
       /sayı olmalı/
     );
   });
 
   test("sayıya çevrilebilen metin kabul edilir", () => {
-    const { data } = normalizeModuleData(GELIR_GIDER, "Gelir-Gider", { amount: "1250.5" });
+    const { data } = normalizeModuleData(ALACAK_BORC, "Alacak-Borç", { amount: "1250.5" });
     assert.equal(data.amount, 1250.5);
   });
 
   test("geçersiz select değeri reddedilir", () => {
     assert.throws(
-      () => normalizeModuleData(GELIR_GIDER, "Gelir-Gider", { type: "gelir" }),
+      () => normalizeModuleData(ALACAK_BORC, "Alacak-Borç", { type: "tahsilat" }),
       /geçersiz değer/i
     );
   });
 
   test("geçerli select değeri geçer", () => {
-    const { data } = normalizeModuleData(GELIR_GIDER, "Gelir-Gider", { type: "expense" });
-    assert.equal(data.type, "expense");
+    const { data } = normalizeModuleData(ALACAK_BORC, "Alacak-Borç", { type: "payable" });
+    assert.equal(data.type, "payable");
   });
 
   test("tarih YYYY-MM-DD olmalı", () => {
-    assert.throws(() => normalizeModuleData(GELIR_GIDER, "Gelir-Gider", { entryDate: "12.08.2026" }), /YYYY-MM-DD/);
-    const { data } = normalizeModuleData(GELIR_GIDER, "Gelir-Gider", { entryDate: "2026-08-12T10:00:00Z" });
-    assert.equal(data.entryDate, "2026-08-12");
+    assert.throws(() => normalizeModuleData(ALACAK_BORC, "Alacak-Borç", { dueDate: "12.08.2026" }), /YYYY-MM-DD/);
+    const { data } = normalizeModuleData(ALACAK_BORC, "Alacak-Borç", { dueDate: "2026-08-12T10:00:00Z" });
+    assert.equal(data.dueDate, "2026-08-12");
   });
 
   test("para birimi ayrı anahtara yazılır ve doğrulanır", () => {
-    const { data, warnings } = normalizeModuleData(GELIR_GIDER, "Gelir-Gider", { amount: 10, currency: "usd" });
+    const { data, warnings } = normalizeModuleData(ALACAK_BORC, "Alacak-Borç", { amount: 10, currency: "usd" });
     assert.equal(data.currency, "USD");
     assert.equal(warnings.length, 0);
-    assert.throws(() => normalizeModuleData(GELIR_GIDER, "Gelir-Gider", { currency: "BTC" }), /para birimi/i);
+    assert.throws(() => normalizeModuleData(ALACAK_BORC, "Alacak-Borç", { currency: "BTC" }), /para birimi/i);
   });
 });
 
@@ -92,30 +95,32 @@ describe("normalizeModuleData — çoklu seçim dizi DEĞİL metin olarak saklan
 describe("normalizeModuleData — zorunlu alanlar", () => {
   test("zorunlu alan eksikse create engellenir", () => {
     assert.throws(
-      () => normalizeModuleData(GELIR_GIDER, "Gelir-Gider", { category: "Kira" }, { requireMandatory: true }),
+      () => normalizeModuleData(ALACAK_BORC, "Alacak-Borç", { category: "Kira" }, { requireMandatory: true }),
       /Zorunlu alan/
     );
   });
 
   test("varsayılanı olan zorunlu alan otomatik dolar", () => {
-    // type'ın varsayılanı "income"; kullanıcı söylemediyse panelde de öyle geliyor.
+    // type'ın varsayılanı "receivable"; kullanıcı söylemediyse panelde de öyle geliyor.
     const { data } = normalizeModuleData(
-      GELIR_GIDER,
-      "Gelir-Gider",
-      { amount: 500 },
+      ALACAK_BORC,
+      "Alacak-Borç",
+      // counterparty de zorunlu ama varsayılanı yok; testin konusu VARSAYILANI
+      // OLAN alanın kendiliğinden dolması, o yüzden bu alan veriliyor.
+      { amount: 500, counterparty: "0f8fad5b-d9cb-469f-a165-70867728950e" },
       { requireMandatory: true }
     );
-    assert.equal(data.type, "income");
+    assert.equal(data.type, "receivable");
     assert.equal(data.amount, 500);
   });
 });
 
 describe("describeModuleFields", () => {
   test("tanımlı modülün alanlarını ve seçeneklerini verir", () => {
-    const described = describeModuleFields(GELIR_GIDER, "Gelir-Gider");
+    const described = describeModuleFields(ALACAK_BORC, "Alacak-Borç");
     const type = described.fields.find((f: any) => f.key === "type") as any;
     assert.ok(type);
-    assert.match(type.options, /income/);
+    assert.match(type.options, /receivable/);
     assert.equal(type.required, true);
   });
 

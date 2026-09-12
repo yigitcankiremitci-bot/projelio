@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ModuleRecord, OrganizationModule, Party } from "@projelio/shared";
+import type { BudgetTransaction, ModuleRecord, OrganizationModule, Party } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleConfigs";
 import { useT } from "../lib/i18n";
 import {
+  BUTCE_DEFTERI,
   PERIOD_KEYS,
   buildPeriod,
   inPeriod,
@@ -13,6 +14,31 @@ import {
   type PanelContext,
   type PeriodKey,
 } from "../lib/panelConfigs";
+
+/**
+ * Bütçe hareketini panelin anladığı "kayıt" biçimine çevirir.
+ *
+ * Paneller kayıt listesi arayüzüyle yazıldı ve defter eskiden gerçekten bir
+ * modüldü (fm_gelir_gider). Modül kaldırılıp defter çekirdeğe taşınınca
+ * (migration 104) panelleri yeniden yazmak yerine bu çeviri kondu: alan adları
+ * bilerek eskisiyle AYNI, böylece panel tanımlarında tek satır değişmedi.
+ */
+function defterKaydi(tx: BudgetTransaction): ModuleRecord {
+  return {
+    id: tx.id,
+    moduleKey: BUTCE_DEFTERI,
+    data: {
+      // Hakediş/ödeme de gider tarafında: kasadan çıkan paradır.
+      type: tx.type === "income" ? "income" : "expense",
+      amount: tx.amount,
+      currency: tx.currency || "TRY",
+      category: tx.category ?? "",
+      entryDate: tx.occurredAt,
+      description: tx.description ?? "",
+    },
+    createdAt: tx.createdAt,
+  } as ModuleRecord;
+}
 
 interface Props {
   config: PanelConfig;
@@ -45,6 +71,15 @@ export default function ModulePanelView({ config, organizationId, jobId }: Props
     const recordPath = jobId ? `/jobs/${jobId}/module-records` : `/organizations/${organizationId}/module-records`;
     const partyPath = jobId ? `/jobs/${jobId}/party` : `/organizations/${organizationId}/party`;
 
+    // Defter artık bir modül değil (bkz. BUTCE_DEFTERI): para metriklerini
+    // isteyen panel için çekirdek bütçe tablosundan ayrıca okunuyor. `alt=1`
+    // alt kademeleri de katıyor — şirketin kazancı yalnızca şirkete elle
+    // girilen satırlar değil, departman ve projelerininki de.
+    const defterGerekli = sourceKeys.includes(BUTCE_DEFTERI);
+    const defterYolu = jobId
+      ? `/budget/scope/job/${jobId}/transactions?alt=1`
+      : `/budget/scope/organization/${organizationId}/transactions?alt=1`;
+
     Promise.all([
       // Tek istekte tüm kayıtlar: panel birkaç modülden birden okuyor, her biri
       // için ayrı istek atmak gereksiz gidiş-geliş olurdu.
@@ -53,14 +88,17 @@ export default function ModulePanelView({ config, organizationId, jobId }: Props
         ? Promise.resolve<OrganizationModule[]>([])
         : api.get<OrganizationModule[]>(`/organizations/${organizationId}/modules`).catch(() => []),
       api.get<Party[]>(partyPath).catch(() => []),
+      // Bütçeyi göremeyen kullanıcıda 403 döner ve boş listeye düşer: panel
+      // para metriklerini sıfır gösterir, hata vermez.
+      defterGerekli ? api.get<BudgetTransaction[]>(defterYolu).catch(() => []) : Promise.resolve([]),
     ])
-      .then(([records, mods, p]) => {
-        setAllRecords(records);
+      .then(([records, mods, p, defter]) => {
+        setAllRecords([...records, ...defter.map(defterKaydi)]);
         setEnabled(new Set(mods.map((m) => m.moduleKey)));
         setParties(p);
       })
       .finally(() => setLoading(false));
-  }, [organizationId, jobId]);
+  }, [organizationId, jobId, sourceKeys]);
 
   const period = useMemo(() => buildPeriod(periodKey), [periodKey]);
 

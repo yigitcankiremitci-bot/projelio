@@ -6,7 +6,7 @@ import { useLiveRoom } from "../lib/liveRoom";
 import DepartmentMembersList, { DepartmentMembersListHandle } from "../components/DepartmentMembersList";
 import DepartmentModulesPanel from "../components/DepartmentModulesPanel";
 import DepartmentTasksPanel, { DepartmentTasksPanelHandle } from "../components/DepartmentTasksPanel";
-import DepartmentBudgetPanel, { DepartmentBudgetPanelHandle } from "../components/DepartmentBudgetPanel";
+import ScopeBudgetPanel, { type ScopeBudgetPanelHandle } from "../components/butce/ScopeBudgetPanel";
 import DepartmentTabs, { DepartmentTab, visibleDepartmentTabs } from "../components/DepartmentTabs";
 import ProductsPanel from "../components/ProductsPanel";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
@@ -70,7 +70,7 @@ export default function DepartmentDetail() {
   const feedRef = useRef<FeedPanelHandle>(null);
   const teamRef = useRef<DepartmentMembersListHandle>(null);
   const tasksRef = useRef<DepartmentTasksPanelHandle>(null);
-  const budgetRef = useRef<DepartmentBudgetPanelHandle>(null);
+  const budgetRef = useRef<ScopeBudgetPanelHandle>(null);
 
   const reload = () => {
     if (!id) return;
@@ -266,7 +266,7 @@ export default function DepartmentDetail() {
 
             {/* Sekme zaten gizli; ?tab=budget ile doğrudan gelinirse de panel açılmasın. */}
             {activeTab === "budget" && access?.canViewBudget !== false && (
-              <DepartmentBudgetPanel ref={budgetRef} departmentId={department.id} />
+              <ScopeBudgetPanel ref={budgetRef} scopeType="department" scopeId={department.id} />
             )}
 
             {activeTab === "modules" && (

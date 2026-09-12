@@ -393,7 +393,8 @@ export const moduller: TranslationDict = {
   // packages/shared/src/moduleConfigs/finans.ts
 
   // Modül başlıkları ve ekleme düğmeleri
-  "Gelir-Gider": "Income & expenses",
+  // NOT: "Gelir-Gider" modülü kaldırıldı (migration 104) — defter artık
+  // çekirdekte, çevirileri i18n/en/butce.ts'te.
   "Alacak-Borç": "Receivables & payables",
   Faturalar: "Invoices",
   "Bütçe Kalemleri": "Budget lines",
@@ -408,7 +409,6 @@ export const moduller: TranslationDict = {
   "Risk ekle": "Add risk",
 
   // Boş durumlar
-  "Henüz gelir/gider kaydı yok.": "No income or expense records yet.",
   "Henüz alacak/borç kaydı yok.": "No receivables or payables yet.",
   "Henüz fatura kaydı yok.": "No invoices yet.",
   "Henüz bütçe kalemi yok.": "No budget lines yet.",

@@ -1,19 +1,37 @@
 # Karar Notu — Bütçe Yönetimi vs. Gelir-Gider Defteri
 
-> **Durum (2026-09-03): karar duruyor, UYGULANMADI — süresiz ertelendi.**
+> **Durum (2026-09-12): UYGULANDI — migration 104_butce_hiyerarsisi.sql.**
 >
-> Karar 2026-08-09'da alındı; aradan geçen sürede `money_entry` tablosu
-> yazılmadı ve kodda hiçbir izi yok. Bütçe tarafı bugün eski şemayla
-> (`budget_transactions`, `recurring_payments`) sorunsuz çalışıyor, yani bu bir
-> arıza değil — yapılmamış bir iyileştirme.
+> Karar 2026-08-09'da alındı, 2026-09-12'de hayata geçti. Aşağıdaki metin
+> kararın gerekçesini koruyor; UYGULAMA İKİ NOKTADA FARKLI OLDU:
 >
-> Bu belge **kararın gerekçesini** korumak için duruyor: bütçe yönetimi ile
-> gelir-gider defterinin neden ayrı kavramlar olduğu ve birleştirilirse ne
-> kırılacağı burada yazılı. Konuya dönülürse başlangıç noktası budur.
+> **1. `money_entry` tablosu AÇILMADI.** Onun yerine `budget_transactions`
+> genişletildi (`job_id`, `organization_id`, `group_id`, `currency`,
+> `category`, `counterparty_id`, `created_by`, `task_id`). Sebep: §3'teki
+> "önce yeni tablo, sonra view, sonra kademeli geçiş" yolu, çalışan bir
+> defteri üç adım boyunca iki yerden okumak demekti. Tek tablo hedefine aynı
+> yerden varıldı — kademe sütunları arasında `num_nonnulls(...) <= 1` kısıtı
+> var, yani bir satır hâlâ yalnızca tek bir kademeye ait ve çift sayım
+> imkânsız. Alan adları (`type`, `occurred_at`) DEĞİŞMEDİ; dolayısıyla
+> `10-modul-fm_gelir_gider.md`'deki `type→direction` / `entryDate→occurred_at`
+> yeniden adlandırması da yapılmadı ve yapılmayacak.
 >
-> `10-modul-fm_gelir_gider.md`'deki alan yeniden adlandırması
-> (`type` → `direction`, `entryDate` → `occurred_at`) bu karara bağlıdır ve o da
-> yapılmadı — o belgedeki sözleşme bugünkü kodla bu noktada çelişir.
+> **2. `fm_gelir_gider` modülü KALDIRILDI**, katalogdan silindi ve kayıtları
+> deftere taşındı. §1'deki "iki ayrı görünüm, aynı tablo" kurgusu yerine tek
+> görünüm kaldı: gelir/gider artık her kademenin (iş, departman, şirket,
+> holding) **Bütçe sekmesinden** giriliyor.
+>
+> **§4'teki hesap planı YAPILMADI**: kategori hâlâ serbest metin. T tablosu
+> kırılımı bu metne göre gruplanıyor, yani "Kira" ile "kira" iki satır olur.
+> Hesap planı referans tablosu hâlâ açık bir iş.
+>
+> `fm_alacak_borc` bilerek modül olarak kaldı: orada henüz gerçekleşmemiş para
+> var ve hiçbir bakiyeye girmiyor.
+>
+> Ne eklendi (kararın ötesinde): kademeler arası **toplama**
+> (`butce-hiyerarsi.service.ts`), görev bütçesi **onay akışı** (talep → karar →
+> ödeme, izleriyle), **çok para birimi** (kur dönüşümü YOK, birim başına ayrı
+> toplam) ve **bütçe görünürlük listesi** (`budget_viewers`).
 
 ---
 

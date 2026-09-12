@@ -183,21 +183,38 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
   const overpaid = Math.max(0, received - agreedFee);
   const fullyCollected = agreedFee > 0 && received >= agreedFee;
 
-  // Dışarı çıkan para: elle eklenen gider/hakediş + ödendi olarak işaretlenmiş görev bütçeleri.
-  const manualExpense = transactions
+  // Dışarı çıkan para: defterdeki gider ve hakediş satırlarının toplamı.
+  //
+  // ÖDENEN GÖREV BÜTÇELERİ AYRICA EKLENMEZ. Eskiden ekleniyordu çünkü "ödendi"
+  // demek yalnızca görevdeki bir etiketi değiştiriyor, deftere hiçbir şey
+  // yazmıyordu. Artık ödeme gerçek bir "payout" satırı üretiyor
+  // (bkz. GorevButceService.deftereIsle) — ikisini birden toplamak aynı parayı
+  // iki kez saymak olurdu.
+  const totalSpent = transactions
     .filter((t) => t.type === "expense" || t.type === "payout")
     .reduce((sum, t) => sum + t.amount, 0);
-  const totalSpent = paidTotal + manualExpense;
   // Eldeki net: tahsil edilen − harcanan.
   const netEarned = received - totalSpent;
 
-  const setBudgetStatus = async (task: Task, status: Task["budgetStatus"]) => {
+  /**
+   * Görev bütçesi kararı.
+   *
+   * Uçlar ayrı: onay/ret bir YÖNETİM kararı, ödeme ise deftere gerçek bir gider
+   * satırı yazan ayrı bir adım. Eskiden ikisi de tek bir "durumu şu yap"
+   * ucundan geçiyordu ve o uç görevi görebilen herkese açıktı — kendi girdiği
+   * bütçeyi kendisi onaylayabilen bir kullanıcı akışı anlamsız kılıyordu.
+   */
+  const gorevKarari = async (task: Task, eylem: "approve" | "reject" | "pay") => {
     setApprovingId(task.id);
     try {
-      const updated = await api.patch<Task>(`/tasks/${task.id}/budget-status`, { budgetStatus: status });
-      onTaskUpdated(updated);
+      if (eylem === "pay") await api.post(`/budget/tasks/${task.id}/pay`, {});
+      else await api.post(`/budget/tasks/${task.id}/decision`, { approve: eylem === "approve" });
+      // Ödeme deftere satır yazar; hareketler ve görev listesi birlikte tazelenmeli.
+      reloadTransactions();
+      const guncel = await api.get<Task>(`/tasks/${task.id}`).catch(() => null);
+      if (guncel) onTaskUpdated(guncel);
     } catch {
-      // durum güncellenemedi
+      // karar kaydedilemedi, kullanıcı tekrar deneyebilir
     } finally {
       setApprovingId(null);
     }
@@ -486,38 +503,72 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                     flexShrink: 0,
                     padding: "2px 8px",
                     borderRadius: 20,
-                    color: kayit.budgetStatus === "paid" ? c.success : kayit.budgetStatus === "planned" ? c.primary : c.warning,
+                    color:
+                      kayit.budgetStatus === "paid"
+                        ? c.success
+                        : kayit.budgetStatus === "planned"
+                          ? c.primary
+                          : kayit.budgetStatus === "rejected"
+                            ? c.danger
+                            : c.warning,
                     background:
-                      kayit.budgetStatus === "paid" ? `${c.success}1a` : kayit.budgetStatus === "planned" ? `${c.primary}1a` : `${c.warning}1a`,
+                      kayit.budgetStatus === "paid"
+                        ? `${c.success}1a`
+                        : kayit.budgetStatus === "planned"
+                          ? `${c.primary}1a`
+                          : kayit.budgetStatus === "rejected"
+                            ? `${c.danger}1a`
+                            : `${c.warning}1a`,
                   }}
                 >
-                  {kayit.budgetStatus === "paid" ? "Ödendi" : kayit.budgetStatus === "planned" ? "Planlandı" : "Bekliyor"}
+                  {kayit.budgetStatus === "paid"
+                    ? t("Ödendi")
+                    : kayit.budgetStatus === "planned"
+                      ? t("Planlandı")
+                      : kayit.budgetStatus === "rejected"
+                        ? t("Reddedildi")
+                        : t("Bekliyor")}
                 </span>
+                {/* Onay ile ödeme AYRI adımlar: onay bir taahhüttür, bütçeyi
+                    bağlar ama kasadan para çıkarmaz. Tek adım olsaydı onaylanan
+                    her talep aynı anda harcanmış sayılır ve nakit akışı
+                    gerçekte olmayan çıkışlar gösterirdi. */}
                 {isOwner && kayit.budgetStatus === "pending" && (
                   <>
                     <button
-                      onClick={() => setBudgetStatus(kayit, "planned")}
-                      disabled={approvingId === kayit.id}
-                      style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, flexShrink: 0 }}
-                    >
-                      {t("Planlandı")}
-                    </button>
-                    <button
-                      onClick={() => setBudgetStatus(kayit, "paid")}
+                      onClick={() => gorevKarari(kayit, "approve")}
                       disabled={approvingId === kayit.id}
                       style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, flexShrink: 0 }}
                     >
-                      {t("Ödendi")}
+                      {t("Onayla")}
+                    </button>
+                    <button
+                      onClick={() => gorevKarari(kayit, "reject")}
+                      disabled={approvingId === kayit.id}
+                      style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, flexShrink: 0 }}
+                    >
+                      {t("Reddet")}
                     </button>
                   </>
                 )}
                 {isOwner && kayit.budgetStatus === "planned" && (
                   <button
-                    onClick={() => setBudgetStatus(kayit, "paid")}
+                    onClick={() => gorevKarari(kayit, "pay")}
                     disabled={approvingId === kayit.id}
                     style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, flexShrink: 0 }}
                   >
                     {t("Ödendi olarak işaretle")}
+                  </button>
+                )}
+                {/* Reddedilen talep silinmez: gerekçesiyle durur ki talep eden
+                    kişi "onaylandı mı, unutuldu mu" diye beklemesin. */}
+                {isOwner && kayit.budgetStatus === "rejected" && (
+                  <button
+                    onClick={() => gorevKarari(kayit, "approve")}
+                    disabled={approvingId === kayit.id}
+                    style={{ fontSize: 13, padding: "4px 9px", borderRadius: 6, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, flexShrink: 0 }}
+                  >
+                    {t("Yine de onayla")}
                   </button>
                 )}
               </div>

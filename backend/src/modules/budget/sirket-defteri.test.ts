@@ -1,54 +1,10 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { sirketAlacakBorcu, sirketDefterHareketi } from "./sirket-defteri";
 
-const satir = (data: Record<string, unknown>) => ({
-  id: "kayit-1",
-  organization_id: "org-1",
-  data,
-  created_at: "2026-03-04T10:00:00.000Z",
-});
-
-describe("şirket defteri kaydı Kasa hareketine çevrilir", () => {
-  it("gider kaydı türüyle ve tarihiyle gelir", () => {
-    const h = sirketDefterHareketi(satir({ type: "expense", amount: 1500, entryDate: "2026-02-10", description: "Ofis kirası" }), "Akkoç A.Ş.");
-    assert.equal(h?.type, "expense");
-    assert.equal(h?.amount, 1500);
-    assert.equal(h?.occurredAt, "2026-02-10");
-    assert.equal(h?.organizationName, "Akkoç A.Ş.");
-    assert.equal(h?.description, "Ofis kirası");
-  });
-
-  it("tarih girilmemişse kaydın açılma günü kullanılır", () => {
-    const h = sirketDefterHareketi(satir({ type: "income", amount: 200 }));
-    assert.equal(h?.occurredAt, "2026-03-04");
-  });
-
-  it("açıklama yoksa kategori yazılır", () => {
-    const h = sirketDefterHareketi(satir({ type: "expense", amount: 90, category: "Yazılım" }));
-    assert.equal(h?.description, "Yazılım");
-  });
-
-  // Kişisel Kasa tek para birimli: TRY dışı bir kayıt toplama katılsaydı
-  // "1.000 USD + 1.000 TRY = 2.000 ₺" gibi yanlış bir toplam çıkardı.
-  it("TRY dışı para birimi Kasa'ya yansımaz", () => {
-    assert.equal(sirketDefterHareketi(satir({ type: "expense", amount: 1000, currency: "USD" })), null);
-    assert.ok(sirketDefterHareketi(satir({ type: "expense", amount: 1000, currency: "TRY" })));
-    // Para birimi hiç seçilmemiş eski kayıtlar TRY sayılır.
-    assert.ok(sirketDefterHareketi(satir({ type: "expense", amount: 1000 })));
-  });
-
-  it("tutarsız kayıt elenir", () => {
-    assert.equal(sirketDefterHareketi(satir({ type: "expense" })), null);
-    assert.equal(sirketDefterHareketi(satir({ type: "expense", amount: "abc" })), null);
-    assert.equal(sirketDefterHareketi(satir({ type: "expense", amount: 0 })), null);
-  });
-
-  // Kimliği module_records'a ait; /budget/transactions uçları onu bulamaz.
-  it("kayıt Kasa'da salt okunur işaretlenir", () => {
-    assert.equal(sirketDefterHareketi(satir({ type: "income", amount: 5 }))?.readOnly, true);
-  });
-});
+// Şirketin GELİR-GİDER defteri artık burada değil: modül kaldırıldı ve
+// kayıtları budget_transactions'a taşındı (migration 104). Bu dosyada yalnızca
+// henüz gerçekleşmemiş para — alacak/borç — kaldı.
+import { sirketAlacakBorcu } from "./sirket-defteri";
 
 describe("şirket alacak/borcu Kasa vade listesine çevrilir", () => {
   const kayit = (data: Record<string, unknown>) => ({ id: "ab-1", organization_id: "org-1", data });

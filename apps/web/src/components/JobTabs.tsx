@@ -1,6 +1,6 @@
 import TabBar from "./TabBar";
 
-export type JobTab = "projects" | "programs" | "team" | "tasks" | "files" | "modules";
+export type JobTab = "projects" | "programs" | "team" | "tasks" | "budget" | "files" | "modules";
 
 // Projeler süreli ve biten işleri, Rutinler (kodda "program"/"operation") süresiz
 // ve tekrarlayan işleri tutar. İkisi de bu işin altında yaşadığı için sekmeler
@@ -10,6 +10,9 @@ export const JOB_TABS: { key: JobTab; label: string }[] = [
   { key: "programs", label: "Rutinler" }, // dil:anahtar
   { key: "team", label: "Ekip" }, // dil:anahtar
   { key: "tasks", label: "İşler" }, // dil:anahtar
+  // Bütçe de işe aittir: altındaki projelerin bütçeleri burada TOPLANIR ve
+  // projeye dağıtılmayan (işin kendisine ait) gelir/giderler burada tutulur.
+  { key: "budget", label: "Bütçe" }, // dil:anahtar
   // Dosyalar işe aittir: iş sahibi altındaki tüm projelerin dosyalarını burada görür.
   { key: "files", label: "Dosyalar" }, // dil:anahtar
   // Modüller de işe aittir: anasayfadan bu işe atanan modüller burada açılır.
@@ -17,12 +20,12 @@ export const JOB_TABS: { key: JobTab; label: string }[] = [
 ];
 
 /**
- * Taşerona kapalı iş sekmeleri: Ekip (kim çalışıyor) ve Modüller (işin
- * kurumsal araçları). Taşeron işi görür — orada çalışıyor — ama işin ekibini
- * ve modüllerini görmez. Sunucu da bu uçları reddeder
- * (bkz. backend job-members / job-modules controller).
+ * Taşerona kapalı iş sekmeleri: Ekip (kim çalışıyor), Modüller (işin kurumsal
+ * araçları) ve Bütçe. Taşeron işi görür — orada çalışıyor — ama işin ekibini,
+ * modüllerini ve finansal defterini görmez. Sunucu da bu uçları reddeder
+ * (bkz. backend job-members / job-modules controller, butce-erisim.ts).
  */
-const SUBCONTRACTOR_HIDDEN: JobTab[] = ["team", "modules"];
+const SUBCONTRACTOR_HIDDEN: JobTab[] = ["team", "modules", "budget"];
 
 /**
  * Önce YETKİ (taşerona kapalı olanlar), sonra SAHİBİN TERCİHİ (iş ayarlarından

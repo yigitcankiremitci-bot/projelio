@@ -8,6 +8,7 @@ import OperationCard from "../components/OperationCard";
 import CreateOperationModal from "../components/CreateOperationModal";
 import EditJobModal from "../components/EditJobModal";
 import JobTabs, { JobTab, visibleJobTabs } from "../components/JobTabs";
+import ScopeBudgetPanel, { type ScopeBudgetPanelHandle } from "../components/butce/ScopeBudgetPanel";
 import { useCurrentUser, useIsSubcontractor } from "../lib/useCurrentUser";
 import JobModulesPanel, { JobModulesPanelHandle } from "../components/JobModulesPanel";
 import JobTeamPanel, { JobTeamPanelHandle } from "../components/JobTeamPanel";
@@ -93,6 +94,7 @@ export default function JobDetail() {
   const tasksPanelRef = useRef<JobTasksPanelHandle>(null);
   const teamRef = useRef<JobTeamPanelHandle>(null);
   const modulesRef = useRef<JobModulesPanelHandle>(null);
+  const budgetRef = useRef<ScopeBudgetPanelHandle>(null);
 
   // Sekmeye göre alt navigasyondaki "+" butonunun ne yapacağı.
   //
@@ -110,6 +112,8 @@ export default function JobDetail() {
       ? { label: t("İşe al"), onClick: () => teamRef.current?.openHire() }
       : activeTab === "modules"
       ? { label: t("Modül ekle"), onClick: () => modulesRef.current?.openAdd() }
+      : activeTab === "budget"
+      ? { label: t("Gelir / gider ekle"), onClick: () => budgetRef.current?.openCreate() }
       : // Dosyalar sekmesinin "+" eylemini FilesPanel'in kendisi kaydediyor
         // (bkz. components/FilesPanel.tsx) — seçenekler bağlı buluta göre
         // değiştiği için o bilgi yalnızca panelin içinde var.
@@ -587,6 +591,14 @@ export default function JobDetail() {
               ownerId={job?.ownerId}
               onTasksReload={reloadTasks}
             />
+          )}
+
+          {/* İşin bütçesi: altındaki projelerin bütçeleri burada TOPLANIR
+              (kopyalanmaz) ve projeye dağıtılmayan gelir/giderler burada
+              tutulur. Aynı bileşen departman/şirket/holding kademelerinde de
+              çalışıyor — bkz. butce/ScopeBudgetPanel. */}
+          {activeTab === "budget" && id && (
+            <ScopeBudgetPanel ref={budgetRef} scopeType="job" scopeId={id} />
           )}
 
           {activeTab === "files" && (

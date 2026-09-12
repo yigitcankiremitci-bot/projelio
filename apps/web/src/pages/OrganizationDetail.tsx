@@ -274,6 +274,7 @@ export default function OrganizationDetail() {
               departmentsRef={departmentsRef}
               setAddingRecordModule={setAddingRecordModule}
               setAddingFile={setAddingFile}
+              onGelirGider={() => setActiveTab("budget")}
             />
             <ProductsPanel ref={productsRef} organizationId={id} departmentId={productDepartmentId} useFab={false} />
             <div style={{ marginTop: 28 }}>
@@ -376,11 +377,13 @@ function HomeAddFabRegistrar({
   departmentsRef,
   setAddingRecordModule,
   setAddingFile,
+  onGelirGider,
 }: {
   productsRef: React.RefObject<ProductsPanelHandle | null>;
   departmentsRef: React.RefObject<DepartmentsPanelHandle | null>;
   setAddingRecordModule: (value: string | null) => void;
   setAddingFile: (value: boolean) => void;
+  onGelirGider: () => void;
 }) {
   useProjectFabAction(
     {
@@ -388,12 +391,14 @@ function HomeAddFabRegistrar({
       options: [
         { label: "Ürün ekle", onClick: () => productsRef.current?.openAdd() },
         { label: "İşe al", onClick: () => setAddingRecordModule("ik_ise_alim_oryantasyon") },
-        { label: "Gelir/gider ekle", onClick: () => setAddingRecordModule("fm_gelir_gider") },
+        // Gelir/gider artık bir modül kaydı değil, defterin kendisi: kısayol
+        // Bütçe sekmesine götürüyor (bkz. migration 104, tek defter kararı).
+        { label: "Gelir/gider ekle", onClick: onGelirGider },
         { label: "Departman kur", onClick: () => departmentsRef.current?.openAdd() },
         { label: "Dosya ekle", onClick: () => setAddingFile(true) },
       ],
     },
-    [productsRef, departmentsRef, setAddingRecordModule, setAddingFile]
+    [productsRef, departmentsRef, setAddingRecordModule, setAddingFile, onGelirGider]
   );
   return null;
 }

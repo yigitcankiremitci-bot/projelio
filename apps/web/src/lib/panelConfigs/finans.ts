@@ -7,13 +7,15 @@ import {
   recordsOf,
   recordsOfAll,
   sumMoney,
+  BUTCE_DEFTERI,
   type PanelConfig,
 } from "./types";
 
 // FİNANS panelleri. Hepsi gelir-gider defterinden ve komşu modüllerden okur;
 // hiçbiri veri girişi almaz.
 
-const LEDGER = "fm_gelir_gider";
+// Defter artık bir modül değil, çekirdek bütçe tablosu (bkz. BUTCE_DEFTERI).
+const LEDGER = BUTCE_DEFTERI;
 const RECEIVABLES = "fm_alacak_borc";
 const INVOICES = "fm_fatura";
 const BUDGET_PLAN = "fm_butce_hazirlama";

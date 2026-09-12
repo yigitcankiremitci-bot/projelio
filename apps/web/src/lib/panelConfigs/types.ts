@@ -60,12 +60,34 @@ export const PERIOD_KEYS: PeriodKey[] = ["this_month", "last_month", "this_quart
  */
 export function inPeriod(record: ModuleRecord, moduleKey: string, period: Period): boolean {
   if (!period.from || !period.to) return true;
-  const periodKey = MODULE_RECORD_CONFIGS[moduleKey]?.periodKey;
+  // Sanal defter kaynağının modül kataloğunda satırı yok; dönem alanı burada
+  // sabit. Aksi hâlde periodKey bulunamaz ve TÜM hareketler her döneme
+  // düşerdi — "bu ay" süzgeci sessizce işlevsiz kalırdı.
+  const periodKey =
+    moduleKey === BUTCE_DEFTERI ? BUTCE_DEFTERI_DONEM_ALANI : MODULE_RECORD_CONFIGS[moduleKey]?.periodKey;
   if (!periodKey) return true;
   const value = record.data[periodKey];
   if (typeof value !== "string" || !value) return true;
   return value >= period.from && value <= period.to;
 }
+
+/**
+ * Bütçe defterinin panel kaynağı olarak anahtarı.
+ *
+ * BU BİR MODÜL DEĞİL, SANAL BİR KAYNAK. Şirketin gelir/gider defteri eskiden
+ * `fm_gelir_gider` modülüydü ve module_records'ta dururdu; modül kaldırılıp
+ * defter budget_transactions'a taşındı (migration 104). Türev paneller yine de
+ * "kayıt listesi" arayüzüyle çalışıyor, bu yüzden ModulePanelView defterden
+ * gelen hareketleri bu anahtarla, aynı alan adlarıyla (type / amount /
+ * currency / category / entryDate) sahte kayıtlara çeviriyor.
+ *
+ * Anahtarın modül kataloğunda karşılığı YOK: bu yüzden "kaynağı kapalı modül"
+ * uyarısına düşmüyor ve dönem süzgeci aşağıdaki özel durumdan geçiyor.
+ */
+export const BUTCE_DEFTERI = "butce_defteri";
+
+/** Sanal defter kaynağının dönem alanı — modül kataloğundan okunamaz. */
+export const BUTCE_DEFTERI_DONEM_ALANI = "entryDate";
 
 // ============================================================ Panel bağlamı
 

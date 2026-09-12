@@ -1,9 +1,10 @@
 import { fmtMoney, sumByCurrency } from "../moduleConfigs";
-import { NA, countRecords, groupBy, percent, recordsOf, recordsOfAll, sumMoney, type PanelConfig } from "./types";
+import { NA, countRecords, groupBy, percent, recordsOf, recordsOfAll, sumMoney, BUTCE_DEFTERI, type PanelConfig } from "./types";
 
 // YÖNETİM, PAZARLAMA ve HOLDİNG panelleri.
 
-const LEDGER = "fm_gelir_gider";
+// Defter artık bir modül değil, çekirdek bütçe tablosu (bkz. BUTCE_DEFTERI).
+const LEDGER = BUTCE_DEFTERI;
 const SALES = "spd_satis_planlama_b2b_b2c";
 const ADS = "pd_reklam";
 const TICKETS = "mid_teknik_destek";

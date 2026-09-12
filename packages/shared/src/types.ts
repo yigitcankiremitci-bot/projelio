@@ -169,7 +169,7 @@ export type TabScope = "organization" | "job" | "department" | "project";
  */
 export const ENTITY_TAB_KEYS: Record<TabScope, string[]> = {
   organization: ["home", "flow", "departments", "tasks", "products", "budget", "files"],
-  job: ["projects", "programs", "team", "tasks", "files", "modules"],
+  job: ["projects", "programs", "team", "tasks", "budget", "files", "modules"],
   department: ["flow", "team", "tasks", "budget", "modules", "files"],
   project: ["feed", "team", "tasks", "files", "budget", "process"],
 };
@@ -1162,7 +1162,16 @@ export interface Output {
 }
 
 export type TaskStatus = "todo" | "in_progress" | "completed";
-export type TaskBudgetStatus = "pending" | "planned" | "paid";
+/**
+ * Görev bütçesinin onay durumu.
+ *
+ * pending  — talep açıldı, yönetici kararı bekliyor
+ * planned  — onaylandı, henüz ödenmedi (taahhüt: bütçeyi bağlar, kasayı değil)
+ * paid     — ödendi, deftere gider satırı düştü
+ * rejected — reddedildi, gerekçesi budgetNote'ta. SİLİNMEZ: talep eden kişi
+ *            gerekçeyi görmeli, yoksa "onaylandı mı, unutuldu mu" belirsiz kalır.
+ */
+export type TaskBudgetStatus = "pending" | "planned" | "paid" | "rejected";
 
 /** Bir görevin atananlarından biri (bkz. task_assignees). */
 export interface TaskAssignee {
@@ -1227,6 +1236,22 @@ export interface Task {
   parentTaskId?: string;
   budget?: number;
   budgetStatus: TaskBudgetStatus;
+  /** Görev bütçesinin para birimi (ISO 4217). Onaylanınca deftere bu birimle düşer. */
+  budgetCurrency?: string;
+  /**
+   * Onay izi. Eskiden yalnızca budgetStatus vardı ve bu bir ONAY değil ETİKETTİ:
+   * kimin talep ettiği, kimin karar verdiği, ne zaman ve neden reddedildiği
+   * hiçbir yerde yazmıyordu. "Bütçe onayı yöneticiye gider" cümlesinin
+   * izlenebilir olması için bu alanlar şart.
+   */
+  budgetRequestedBy?: string;
+  budgetRequestedByName?: string;
+  budgetRequestedAt?: string;
+  budgetDecidedBy?: string;
+  budgetDecidedByName?: string;
+  budgetDecidedAt?: string;
+  /** Reddetme gerekçesi ya da onay notu. */
+  budgetNote?: string;
   weekNumber?: number;
   // Görevi yapacak kişinin bildirdiği tahmini iş süresi (opsiyonel). Deadline "ne
   // zamana kadar bitmeli"yi, bu "ne kadar sürer"i tutar — ikisi bağımsızdır.
@@ -1309,33 +1334,116 @@ export interface PostComment {
 
 export type BudgetTransactionType = "income" | "expense" | "payout";
 
+/**
+ * Defterin kademeleri. Bir bütçe kaydı bunlardan YALNIZCA BİRİNE aittir
+ * (veritabanında budget_tx_single_parent kısıtı) — üst kademe alttakileri
+ * toplar, kopyalamaz. Aynı para iki kez sayılamaz olmasının sebebi budur.
+ *
+ * "personal" karşılığı olan bir sütun yoktur: kişisel Kasa kaydı hiçbir
+ * kademeye bağlı değildir, yalnızca owner_id taşır.
+ */
+export type BudgetScopeType = "project" | "operation" | "department" | "job" | "organization" | "group" | "personal";
+
+/** Bütçe kademelerinin üstten aşağı sırası — toplama yönü bunun tersidir. */
+export const BUDGET_SCOPE_ORDER: BudgetScopeType[] = [
+  "group",
+  "organization",
+  "job",
+  "department",
+  "project",
+  "operation",
+  "personal",
+];
+
+export const BUDGET_SCOPE_LABEL: Record<BudgetScopeType, string> = {
+  group: "Holding",
+  organization: "Organizasyon",
+  job: "İş",
+  department: "Departman",
+  project: "Proje",
+  operation: "Rutin",
+  personal: "Kişisel",
+};
+
 export interface BudgetTransaction {
   id: string;
   // Projeye bağlı olmayan (genel işletme gideri gibi) kayıtlarda boştur.
   projectId?: string;
   // Departman bütçesine ait kayıtlarda dolu, diğerlerinde boştur.
   departmentId?: string;
+  // Rutin (operation) kademesine ait kayıtlarda dolu.
+  operationId?: string;
+  // İş (job) kademesine ait kayıtlarda dolu: projelere dağıtılmayan, işin
+  // kendisine ait gelir/giderler.
+  jobId?: string;
+  // Holding (grup) kasasına doğrudan girilen kayıtlarda dolu.
+  groupId?: string;
   projectTitle?: string;
   // Departman kayıtlarında departmanın adı (Kasa listesinde kaydın nereden
   // geldiğini göstermek için).
   departmentName?: string;
-  // Şirket Kasa'sının gelir/gider defterinden yansıyan kayıtlarda şirketin
-  // kimliği ve adı. Yalnızca kullanıcının SAHİBİ olduğu şirketler yansır.
+  jobTitle?: string;
+  groupName?: string;
+  // Şirket kademesine ait kayıtlarda şirketin kimliği ve adı.
   organizationId?: string;
   organizationName?: string;
-  // Kayıt kişisel Kasa'da salt okunur: kimliği budget_transactions'a ait değil,
-  // düzenleme kendi ekranında yapılır (bkz. BudgetService.ownedOrganizationLedger).
+  /**
+   * Kaydın hangi kademeye ait olduğu — yukarıdaki kimlik alanlarından türetilir.
+   * Sunucu doldurur; istemcinin beş alanı tek tek yoklaması gerekmesin diye.
+   */
+  scopeType?: BudgetScopeType;
+  // Kayıt bu ekranda salt okunur mu (alt kademeden TOPLANARAK gelmiş bir satır
+  // kendi yerinde düzenlenir, toplandığı yerde değil).
   readOnly?: boolean;
   // Kaydın ait olduğu defterin sahibi.
   ownerId?: string;
+  // Kaydı giren kişi. ownerId ile aynı olmak zorunda değil: departman
+  // yöneticisinin şirket defterine girdiği kayıtta ikisi farklıdır.
+  createdBy?: string;
+  createdByName?: string;
   userId?: string;
   type: BudgetTransactionType;
   amount: number;
+  /**
+   * ISO 4217 kodu. Toplamlar para birimi BAŞINA ayrı hesaplanır, kur dönüşümü
+   * yapılmaz — "1.000 USD + 1.000 TRY = 2.000 ₺" her zaman yanlıştır.
+   */
+  currency: string;
+  // Serbest metin ("Kira", "Yazılım", "Satış"). T tablosundaki kırılım bunu kullanır.
+  category?: string;
+  // Karşı taraf (müşteri/tedarikçi) — ortak party kaydına referans.
+  counterpartyId?: string;
+  counterpartyName?: string;
+  /**
+   * Satır bir GÖREV BÜTÇESİNDEN doğduysa kaynağı. Kademe değildir: görevin
+   * projesiyle birlikte durur. Bir görev deftere yalnızca bir kez düşebilir
+   * (veritabanında tekil indeks) — "ödendi"ye iki kez basmak gideri iki kez
+   * yazmasın diye.
+   */
+  taskId?: string;
   description?: string;
   // İşlemin gerçekleştiği tarih (createdAt kayıt anıdır).
   occurredAt: string;
   // Otomatik olarak bir düzenli ödemeden üretildiyse onun kimliği.
   recurringPaymentId?: string;
+  createdAt: string;
+}
+
+/**
+ * Yöneticinin bütçe görünürlüğü verdiği ek kullanıcı.
+ *
+ * Sahip/yönetici dairesinin YERİNE geçmez, üzerine ekler: buradan bir satır
+ * silmek sahibi kendi bütçesinden kilitleyemez.
+ */
+export interface BudgetViewer {
+  id: string;
+  scopeType: Exclude<BudgetScopeType, "project" | "operation" | "personal">;
+  scopeId: string;
+  userId: string;
+  userName?: string;
+  userEmail?: string;
+  /** Yalnızca okuma mu, kayıt da girebilir mi. Onay yetkisi BURADAN GELMEZ. */
+  canManage: boolean;
   createdAt: string;
 }
 
@@ -1349,8 +1457,18 @@ export interface RecurringPayment {
   ownerId: string;
   projectId?: string;
   projectTitle?: string;
+  // Düzenli ödeme de tek bir kademeye aittir; vadesi gelince üretilen
+  // BudgetTransaction bu kademeyi devralır. Kira/maaş/abonelik gibi giderlerin
+  // projeye değil şirkete ait olması bu alanları gerektirdi.
+  departmentId?: string;
+  jobId?: string;
+  organizationId?: string;
+  groupId?: string;
+  scopeType?: BudgetScopeType;
   type: "income" | "expense";
   amount: number;
+  currency: string;
+  category?: string;
   description?: string;
   interval: RecurrenceInterval;
   nextDueDate: string;
@@ -1428,6 +1546,152 @@ export interface BudgetOverview {
   generalIncome: number;
   generalExpense: number;
   projects: ProjectBudgetSummary[];
+}
+
+// ============================================================ Bütçe hiyerarşisi
+//
+// Kademeler birbirini TOPLAR, kopyalamaz. Bir tutar yalnızca tek bir kademenin
+// kendi defterinde durur (bkz. BudgetScopeType); üst kademe onu "alt
+// kademelerden gelen" olarak görür. Bu ayrım ekranda da korunuyor: kullanıcı
+// "bu şirketin kendi gideri" ile "departmanlarından toplanan gider"i ayırt
+// edemezse rakamın nereden geldiğini asla bulamaz.
+
+/**
+ * Tek para biriminde gelir/gider/net üçlüsü.
+ *
+ * Kur dönüşümü YOK: her para birimi kendi satırında toplanır. Bir ekranda üç
+ * para birimi varsa üç ayrı bakiye gösterilir, tek bir "toplam" gösterilmez.
+ */
+export interface ParaBirimiToplami {
+  currency: string;
+  income: number;
+  expense: number;
+  /** income - expense. Eksi olabilir. */
+  net: number;
+}
+
+/** Kategori kırılımı — T tablosunun gelir ve gider sütunlarındaki satırlar. */
+export interface ButceKategoriSatiri {
+  category: string;
+  currency: string;
+  amount: number;
+  /** Aynı yöndeki (gelir ya da gider) toplamın yüzde kaçı. 0-100. */
+  yuzde: number;
+}
+
+/**
+ * T tablosu: solda gelir, sağda gider, altta bakiye. Muhasebedeki "T hesabı"
+ * görünümünün ekran karşılığı.
+ *
+ * Para birimi başına ayrı bir T üretilir — tek T'de iki para birimi göstermek
+ * toplamı anlamsız kılardı.
+ */
+export interface ButceTTablosu {
+  currency: string;
+  gelir: ButceKategoriSatiri[];
+  gider: ButceKategoriSatiri[];
+  gelirToplam: number;
+  giderToplam: number;
+  /** gelirToplam - giderToplam. */
+  bakiye: number;
+}
+
+/** Grafiklerin beslendiği dönem noktası (ay bazlı). */
+export interface ButceDonemNoktasi {
+  /** "2026-09" biçiminde ay. */
+  donem: string;
+  currency: string;
+  income: number;
+  expense: number;
+  net: number;
+  /** Dönem sonu birikimli bakiye — nakit akışı çizgisi bunu kullanır. */
+  birikimli: number;
+}
+
+/**
+ * Bir kademenin bütçe özeti.
+ *
+ * `kendi` ile `alt` BİLEREK ayrı: "şirketin kendi kirası" ile "departmanlardan
+ * toplanan giderler" aynı kutuda gösterilirse kullanıcı rakamı doğrulayamaz.
+ * `toplam` ikisinin birleşimidir ve üst kademeye o gider.
+ */
+export interface ButceKademeOzeti {
+  scopeType: BudgetScopeType;
+  scopeId: string;
+  ad: string;
+  /** Yalnızca bu kademenin kendi defterine girilen hareketler. */
+  kendi: ParaBirimiToplami[];
+  /** Alt kademelerden toplanan (bu kademeye doğrudan girilmemiş) hareketler. */
+  alt: ParaBirimiToplami[];
+  /** kendi + alt. Üst kademeye bu rakam çıkar. */
+  toplam: ParaBirimiToplami[];
+  /** Bir alt kademedeki birimler — holding'in şirketleri, işin projeleri gibi. */
+  cocuklar: ButceKademeOzeti[];
+}
+
+/**
+ * Bir bütçe sayfasının tüm verisi. Tek uçtan gelir: ekran üç ayrı istek atıp
+ * aralarında tutarsız bir an yaşamasın diye.
+ */
+export interface ButceSayfasi {
+  ozet: ButceKademeOzeti;
+  /** Para birimi başına T tablosu. */
+  tTablolari: ButceTTablosu[];
+  /** Son 12 ayın dönem noktaları (grafikler). */
+  donemler: ButceDonemNoktasi[];
+  /** Bu kademenin kendi defterindeki hareketler, tarihe göre yeniden eskiye. */
+  hareketler: BudgetTransaction[];
+  /** Bu kademeye bağlı düzenli gelir/giderler. */
+  duzenliOdemeler: RecurringPayment[];
+  /** Onay bekleyen görev bütçeleri (yalnızca yöneticiye anlamlı). */
+  onayBekleyenler: GorevButceTalebi[];
+  /** İsteyen kullanıcının bu bütçede ne yapabildiği. */
+  yetki: ButceYetkisi;
+}
+
+/** İsteyen kullanıcının bir bütçe kademesindeki yetkisi. */
+export interface ButceYetkisi {
+  canView: boolean;
+  /** Kayıt ekleyip düzenleyebilir mi. */
+  canManage: boolean;
+  /** Görev bütçesi taleplerini onaylayıp reddedebilir mi (yönetici kararı). */
+  canApprove: boolean;
+  /** Kimlerin göreceğini seçebilir mi (yalnızca sahip/yönetici). */
+  canManageViewers: boolean;
+}
+
+// ===================================================== Görev bütçesi onay akışı
+//
+// Akış: görev için para gerekiyor → bütçe talebi açılır → PROJE/DEPARTMAN
+// YÖNETİCİSİNE gider → onaylanırsa proje bütçesinde "planlandı" olarak durur →
+// ödeme yapılınca "ödendi" olur ve deftere gerçek bir gider satırı düşer.
+//
+// Reddedilen talep SİLİNMEZ: talep eden kişi gerekçeyi görmeli, yoksa
+// "onaylandı mı, unutuldu mu" belirsizliği kalır.
+
+/** Onay ekranındaki bir satır: görev + bütçesi + talep/karar izi. */
+export interface GorevButceTalebi {
+  taskId: string;
+  title: string;
+  /** Görevin bağlı olduğu proje/departman — onay kuyruğunda nereden geldiği. */
+  projectId?: string;
+  projectTitle?: string;
+  departmentId?: string;
+  departmentName?: string;
+  amount: number;
+  currency: string;
+  status: TaskBudgetStatus;
+  /** Talebi açan kişi (görev bütçesini ilk giren). */
+  requestedBy?: string;
+  requestedByName?: string;
+  requestedAt?: string;
+  decidedBy?: string;
+  decidedByName?: string;
+  decidedAt?: string;
+  /** Reddetme gerekçesi ya da onay notu. */
+  note?: string;
+  assigneeName?: string;
+  deadline?: string;
 }
 
 // ====================================================== Açma talepleri

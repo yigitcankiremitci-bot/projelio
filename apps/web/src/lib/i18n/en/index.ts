@@ -14,6 +14,7 @@ import { hatalar } from "./hatalar";
 import { sosyal } from "./sosyal";
 import { abonelik } from "./abonelik";
 import { yaptim } from "./yaptim";
+import { butce } from "./butce";
 
 /**
  * Türkçe → İngilizce sözlük.
@@ -59,5 +60,6 @@ export const en: TranslationDict = {
   ...sosyal,
   ...abonelik,
   ...yaptim,
+  ...butce,
   ...hatalar,
 };

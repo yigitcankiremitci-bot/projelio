@@ -15,6 +15,7 @@ import {
 import { bildirimEpostasiOlustur, type EpostaBildirimi, type EpostaGorevi } from "./notification-email.template";
 import { gunlukOzetSirasiGeldiMi, yerelAn } from "./notification-email.zaman";
 import { abonelikKapatmaAdresi } from "./notification-email.abonelik";
+import { gunlukOzetIcerigi } from "./notification-email.icerik";
 
 /**
  * Bildirimleri e-posta olarak gönderen işleyici (bkz. migration 102).
@@ -169,17 +170,24 @@ export class NotificationEmailProcessor {
           break;
         }
 
-        const bildirimler = await this.yeniBildirimler(alici, taramaAni, "gunluk");
-        const gunlukGorevler = alici.tercih.includeTasks ? (gorevler.get(alici.userId) ?? []) : [];
+        // Süzme ve "boş mu" kararı TEK yerde (bkz. notification-email.icerik.ts):
+        // ikisi ayrı yerlerde verildiğinde, penceresinde görevi olup bugüne
+        // düşeni olmayan kullanıcı ne e-posta alıyor ne damgalanıyordu.
+        const icerik = gunlukOzetIcerigi({
+          bildirimler: await this.yeniBildirimler(alici, taramaAni, "gunluk"),
+          gorevler: gorevler.get(alici.userId) ?? [],
+          yerelGun: gun,
+          gorevlerDahil: alici.tercih.includeTasks,
+        });
 
-        if (bildirimler.length === 0 && gunlukGorevler.length === 0) {
+        if (icerik.bos) {
           // Söyleyecek bir şey yok: e-posta gönderme ama GÜNÜ DAMGALA, yoksa
           // bu kullanıcı gün boyu her 10 dakikada bir yeniden sorgulanırdı.
           await this.damgalaSessiz(alici.userId, { taramaAni, kanal: "gunluk", ozetGunu: gun });
           continue;
         }
 
-        const gitti = await this.gonder(alici, "gunluk", bildirimler, gunlukGorevler);
+        const gitti = await this.gonder(alici, "gunluk", icerik.bildirimler, icerik.gorevler);
         if (gitti) {
           await this.damgalaSessiz(alici.userId, { taramaAni, kanal: "gunluk", ozetGunu: gun });
           gonderilen += 1;
@@ -217,6 +225,14 @@ export class NotificationEmailProcessor {
 
     const bildirimler = await this.yeniBildirimler(alici, new Date(), "gunluk");
     const gorevler = tercih.includeTasks ? await this.bugunkuGorevler([userId]) : new Map<string, GunlukGorev[]>();
+    // Deneme de gerçek özetle aynı süzmeden geçer, yoksa deneme "bugün 32
+    // görevin var" derken asıl özet boş çıkardı.
+    const denemeIcerigi = gunlukOzetIcerigi({
+      bildirimler,
+      gorevler: gorevler.get(userId) ?? [],
+      yerelGun: yerelAn(new Date(), tercih.timezone).gun,
+      gorevlerDahil: tercih.includeTasks,
+    });
     const ornek: EpostaBildirimi[] =
       bildirimler.length > 0
         ? bildirimler
@@ -227,7 +243,7 @@ export class NotificationEmailProcessor {
               link: "/",
             },
           ];
-    const gitti = await this.gonder(alici, "gunluk", ornek, gorevler.get(userId) ?? []);
+    const gitti = await this.gonder(alici, "gunluk", ornek, denemeIcerigi.gorevler);
     return { sent: gitti };
   }
 
@@ -423,20 +439,19 @@ export class NotificationEmailProcessor {
     alici: Alici,
     kip: "anlik" | "gunluk",
     bildirimler: EpostaBildirimi[],
-    gorevler: GunlukGorev[]
+    /** ZATEN süzülmüş liste — süzmeyi burada yapmak, çağıranın "boş mu" kararıyla
+     *  ayrışmasına yol açmıştı (bkz. notification-email.icerik.ts). */
+    gorevler: EpostaGorevi[]
   ): Promise<boolean> {
-    // Görev listesi kullanıcının YEREL gününe göre süzülür (bkz. bugunkuGorevler).
-    const bugun = yerelAn(new Date(), alici.tercih.timezone).gun;
-    const bugunkuler = gorevler.filter((gorev) => gorev.gun === bugun);
     // Boş e-posta gönderilmez: "hiçbir şey olmadı" demek için gelen kutusuna
     // girmek, özelliğin kapatılma sebeplerinin başında gelir.
-    if (bildirimler.length === 0 && bugunkuler.length === 0) return false;
+    if (bildirimler.length === 0 && gorevler.length === 0) return false;
 
     const mail = bildirimEpostasiOlustur({
       locale: alici.locale,
       kip,
       bildirimler,
-      gorevler: bugunkuler,
+      gorevler,
       webUrl: getWebAppUrl(),
       ad: alici.ad,
       abonelikAdresi: abonelikKapatmaAdresi(alici.userId),

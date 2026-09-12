@@ -450,7 +450,7 @@ export class BudgetService {
     data: Partial<BudgetTransaction>,
     userId?: string
   ): Promise<BudgetTransaction> {
-    await this.assertCanManageTransaction(id, userId);
+    const mevcut = await this.assertCanManageTransaction(id, userId);
 
     const patch: Record<string, unknown> = {};
     if (data.type !== undefined) patch.type = optionalOneOf(data.type, TRANSACTION_TYPES, "İşlem türü");
@@ -461,6 +461,22 @@ export class BudgetService {
     if (data.category !== undefined) patch.category = data.category?.trim() || null;
     if (data.counterpartyId !== undefined) patch.counterparty_id = data.counterpartyId || null;
     if (data.occurredAt !== undefined) patch.occurred_at = data.occurredAt.slice(0, 10);
+    /**
+     * Görev bağı sonradan kurulabilir ya da koparılabilir: "bu masraf aslında
+     * şu görev içindi" çoğu zaman kayıt girildikten sonra fark ediliyor.
+     *
+     * OTOMATİK SATIRLARDA KAPALI. Onaylanan görev bütçesi ödenince üretilen
+     * satırın (source='task_budget') görev bağı o satırın VAR OLMA sebebidir;
+     * koparılırsa görev "ödendi" görünmeye devam eder ama defterdeki karşılığı
+     * kaynaksız kalır ve "ödemeyi geri al" o satırı bir daha bulamaz.
+     * Aynı gerekçe düzenli ödemeden doğan satırlar için de geçerli.
+     */
+    if (data.taskId !== undefined) {
+      if ((mevcut.source ?? "manual") !== "manual") {
+        throw new ForbiddenException("Otomatik oluşan bir kaydın görev bağı değiştirilemez");
+      }
+      patch.task_id = data.taskId || null;
+    }
     // Kaydı başka bir projeye taşımak: hedef projenin de kullanıcıya ait olması şart.
     if (data.projectId !== undefined) {
       if (data.projectId && userId) await this.assertOwnsProject(data.projectId, userId);

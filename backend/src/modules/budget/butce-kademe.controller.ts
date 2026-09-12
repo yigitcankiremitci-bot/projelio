@@ -58,6 +58,18 @@ export class ButceKademeController {
       : this.kademe.hareketler(kapsam, scopeId, req.user.userId);
   }
 
+  /**
+   * Kayıt eklerken "bu neyle ilgili?" seçeneklerinin listesi — bu kademenin
+   * altındaki iş/departman/proje/rutin birimleri.
+   *
+   * Görevler burada yok (bkz. ButceHiyerarsiService.hedefler): kullanıcı önce
+   * kademeyi seçiyor, görev listesi o kademenin kendi ucundan geliyor.
+   */
+  @Get("targets")
+  hedefler(@Param("scopeType") scopeType: string, @Param("scopeId") scopeId: string, @Req() req: any) {
+    return this.hiyerarsi.hedefler(this.erisim.kapsamDogrula(scopeType), scopeId, req.user.userId);
+  }
+
   @Post("transactions")
   ekle(
     @Param("scopeType") scopeType: string,

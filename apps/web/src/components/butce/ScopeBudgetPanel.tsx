@@ -13,8 +13,10 @@ import TTablosu from "./TTablosu";
 import KademeKirilimi from "./KademeKirilimi";
 import OnayKuyrugu from "./OnayKuyrugu";
 import DuzenliOdemeler from "./DuzenliOdemeler";
+import HedefSecici, { GorevBagiDuzenle } from "./HedefSecici";
 import ButceGorunurluk from "./ButceGorunurluk";
 import { PARA_BIRIMLERI, fmtPara, fmtTarih } from "./butceBicim";
+import { RECURRENCE_INTERVAL_LABEL, RECURRENCE_INTERVALS, type RecurrenceInterval } from "@projelio/shared";
 
 export interface ScopeBudgetPanelHandle {
   openCreate: () => void;
@@ -83,8 +85,22 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [occurredAt, setOccurredAt] = useState("");
+  // "Bu kayıt neyle ilgili?" — hedef kademe ve (varsa) görev.
+  const [hedef, setHedef] = useState({ hedefTur: "", hedefId: "", taskId: "" });
+  // Düzenliye çevrilmek üzere açılan satır ve seçilen aralık.
+  const [cevrilen, setCevrilen] = useState<BudgetTransaction | null>(null);
+  const [cevirmeAraligi, setCevirmeAraligi] = useState<RecurrenceInterval>("monthly");
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [hata, setHata] = useState("");
+  /**
+   * "Kayıt şuraya yazıldı" bildirimi.
+   *
+   * Hedef seçilerek eklenen kayıt ALT kademenin defterine gidiyor, yani bu
+   * sayfadaki "Bu kademenin kayıtları" listesinde GÖRÜNMÜYOR (yalnızca
+   * toplamlara ve "Alt kademeler" kırılımına yansıyor). Bunu söylemezsek
+   * kullanıcı kaydın kaybolduğunu sanıyor.
+   */
+  const [bilgi, setBilgi] = useState("");
 
   useImperativeHandle(ref, () => ({ openCreate: () => setFormAcik(true) }));
 
@@ -124,6 +140,7 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
     setCategory("");
     setDescription("");
     setOccurredAt("");
+    setHedef({ hedefTur: "", hedefId: "", taskId: "" });
   };
 
   const duzenlemeyeBasla = (kayit: BudgetTransaction) => {
@@ -134,6 +151,11 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
     setCategory(kayit.category ?? "");
     setDescription(kayit.description ?? "");
     setOccurredAt(kayit.occurredAt ? kayit.occurredAt.slice(0, 10) : "");
+    // Düzenlemede kademe DEĞİŞTİRİLEMEZ (kaydı başka bir şirkete taşımak iki
+    // kademenin geçmiş toplamını birden değiştirirdi), ama görev bağı
+    // değiştirilebilir — çoğu zaman "bu masraf şu görev içindi" sonradan
+    // fark ediliyor.
+    setHedef({ hedefTur: "", hedefId: "", taskId: kayit.taskId ?? "" });
     setHata("");
     setFormAcik(true);
   };
@@ -170,6 +192,9 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
         category: category || "",
         description: description || "",
         occurredAt: occurredAt || undefined,
+        taskId: hedef.taskId || "",
+        // Hedef yalnızca EKLEMEDE gönderiliyor; düzenlemede kademe sabit.
+        ...(duzenlenen ? {} : { hedefTur: hedef.hedefTur || undefined, hedefId: hedef.hedefId || undefined }),
       };
 
       if (duzenlenen) {
@@ -182,6 +207,14 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
         });
       } else {
         const olusan = await api.post<BudgetTransaction>(`/budget/scope/${scopeType}/${scopeId}/transactions`, govde);
+        // Kayıt bu kademeye değil, seçilen hedefe yazıldıysa nereye gittiğini
+        // söyle: aksi hâlde aşağıdaki listede görünmediği için kaybolmuş sanılıyor.
+        const yazildigiYer = olusan.projectTitle || olusan.departmentName || olusan.jobTitle || olusan.organizationName;
+        setBilgi(
+          olusan.scopeType !== scopeType && yazildigiYer
+            ? t("Kayıt {yer} defterine yazıldı; buradaki toplamlara dahil.", { yer: yazildigiYer })
+            : ""
+        );
         // Ekleme de geri alınabilir olmalı: bütçe girerken en sık yapılan hata
         // yanlış tutar yazmak.
         pushUndo({
@@ -202,6 +235,28 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
       yukle();
     } catch (err) {
       setHata(err instanceof Error ? err.message : t("Kayıt kaydedilemedi."));
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  /**
+   * Tek seferlik bir kaydı düzenli gelir/gidere çevirir.
+   *
+   * Kayıt SİLİNMEZ: o para gerçekten çıktı ve defterde kalmalı. Yeni düzenli
+   * ödeme bir sonraki vadeden başlıyor (sunucu hesaplıyor), yoksa aynı ay iki
+   * kez işlenir ve gider iki katı görünürdü.
+   */
+  const duzenliyeCevir = async () => {
+    if (!cevrilen) return;
+    setKaydediliyor(true);
+    setHata("");
+    try {
+      await api.post(`/budget/transactions/${cevrilen.id}/recurring`, { interval: cevirmeAraligi });
+      setCevrilen(null);
+      yukle();
+    } catch (err) {
+      setHata(err instanceof Error ? err.message : t("Düzenli hâle getirilemedi."));
     } finally {
       setKaydediliyor(false);
     }
@@ -383,6 +438,29 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
                 style={{ flex: 1, minWidth: 140 }}
               />
             </div>
+
+            {/* "Bu kayıt neyle ilgili?" — kademe ve (varsa) görev.
+                Düzenlemede kademe seçilemiyor: kaydı başka bir şirkete taşımak
+                iki kademenin geçmiş toplamını birden değiştirirdi. Görev bağı
+                ise düzenlemede de değiştirilebilir. */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {duzenlenen ? (
+                <GorevBagiDuzenle
+                  kayit={duzenlenen}
+                  taskId={hedef.taskId}
+                  onChange={(taskId) => setHedef((h) => ({ ...h, taskId }))}
+                />
+              ) : (
+                <HedefSecici
+                  scopeType={scopeType}
+                  scopeId={scopeId}
+                  hedefTur={hedef.hedefTur}
+                  hedefId={hedef.hedefId}
+                  taskId={hedef.taskId}
+                  onChange={setHedef}
+                />
+              )}
+            </div>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -428,6 +506,101 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
           </div>
         )}
 
+        {bilgi && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: `${c.success}12`,
+              border: `1px solid ${c.success}`,
+              borderRadius: 10,
+              padding: "8px 11px",
+              marginBottom: 10,
+              fontSize: 13,
+              color: c.textPrimary,
+            }}
+          >
+            <span style={{ flex: 1 }}>{bilgi}</span>
+            <button
+              onClick={() => setBilgi("")}
+              aria-label={t("Kapat")}
+              style={{ background: "transparent", border: "none", color: c.textSecondary, cursor: "pointer", fontSize: 15 }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* Düzenliye çevirme: hangi aralıkta tekrarlayacağını sormak zorunlu,
+            çünkü kaydın kendisinde bu bilgi yok. Kayıt olduğu yerde durur. */}
+        {cevrilen && (
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              flexWrap: "wrap",
+              background: `${c.accent}10`,
+              border: `1px solid ${c.accent}`,
+              borderRadius: 10,
+              padding: 12,
+              marginBottom: 10,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <div style={{ fontSize: 13.5, color: c.textPrimary }}>
+                {cevrilen.description || cevrilen.category || t(TUR_ETIKET[cevrilen.type])} ·{" "}
+                {fmtPara(cevrilen.amount, cevrilen.currency)}
+              </div>
+              <div style={{ fontSize: 11.5, color: c.textSecondary, marginTop: 2 }}>
+                {t("Bu kayıt defterde kalır; tekrarı bir sonraki vadeden başlar.")}
+              </div>
+            </div>
+            <select
+              value={cevirmeAraligi}
+              onChange={(e) => setCevirmeAraligi(e.target.value as RecurrenceInterval)}
+              style={{ minWidth: 120 }}
+              aria-label={t("Tekrar aralığı")}
+            >
+              {RECURRENCE_INTERVALS.map((aralik) => (
+                <option key={aralik} value={aralik}>
+                  {t(RECURRENCE_INTERVAL_LABEL[aralik])}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={duzenliyeCevir}
+              disabled={kaydediliyor}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 7,
+                border: "none",
+                background: c.primary,
+                color: c.onPrimary,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              {kaydediliyor ? t("Kaydediliyor…") : t("Düzenli yap")}
+            </button>
+            <button
+              onClick={() => setCevrilen(null)}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 7,
+                border: `1px solid ${c.border}`,
+                background: "transparent",
+                color: c.textSecondary,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              {t("Vazgeç")}
+            </button>
+          </div>
+        )}
+
         {defterHareketleri.length === 0 ? (
           <div style={bosKart}>{t("Bu kademeye henüz doğrudan bir kayıt girilmedi.")}</div>
         ) : (
@@ -459,7 +632,12 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
                     {[
                       fmtTarih(kayit.occurredAt),
                       kayit.category,
+                      // Neyle ilgili olduğu: kaydın kendi kademesinden BAŞKA
+                      // bir yere aitse orası, ayrıca bağlıysa görev.
+                      kayit.projectTitle || kayit.departmentName || kayit.jobTitle,
+                      kayit.taskTitle ? `↳ ${kayit.taskTitle}` : undefined,
                       kayit.type === "payout" ? t(TUR_ETIKET.payout) : undefined,
+                      kayit.source === "recurring" ? t("düzenli") : undefined,
                       isDesktop && kayit.createdByName ? kayit.createdByName : undefined,
                     ]
                       .filter(Boolean)
@@ -477,6 +655,32 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
                   {kayit.type === "income" ? "+" : "−"}
                   {fmtPara(kayit.amount, kayit.currency)}
                 </span>
+                {/* Tek seferlik bir gider aslında her ay tekrarlıyorsa: kayıt
+                    durur, üstüne bir düzenli ödeme kurulur. Eskiden tek yol
+                    kaydı silip düzenli olarak yeniden kurmaktı — defterdeki
+                    geçmiş de onunla birlikte gidiyordu. */}
+                {yetki.canManage && kayit.source === "manual" && kayit.type !== "payout" && !kayit.recurringPaymentId && (
+                  <button
+                    onClick={() => {
+                      setCevrilen(kayit);
+                      setCevirmeAraligi("monthly");
+                      setHata("");
+                    }}
+                    title={t("Düzenli hâle getir")}
+                    style={{
+                      fontSize: 12,
+                      padding: "3px 8px",
+                      borderRadius: 7,
+                      border: `1px solid ${c.border}`,
+                      background: "transparent",
+                      color: c.textSecondary,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {t("Düzenli yap")}
+                  </button>
+                )}
                 {yetki.canManage && (
                   <>
                     <button

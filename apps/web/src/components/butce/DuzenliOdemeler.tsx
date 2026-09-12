@@ -231,6 +231,8 @@ export default function DuzenliOdemeler({ scopeType, scopeId, odemeler, canManag
                 </div>
                 <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
                   {t(ARALIK_ETIKET[o.interval])} · {t("Sıradaki")}: {fmtTarih(o.nextDueDate)}
+                  {/* Düzenliye çevrilen bir kayıt görev bağını da taşır. */}
+                  {o.taskTitle ? ` · ↳ ${o.taskTitle}` : ""}
                   {!o.active && ` · ${t("Duraklatıldı")}`}
                 </div>
               </div>

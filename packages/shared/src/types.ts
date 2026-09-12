@@ -1684,6 +1684,21 @@ export interface ButceSayfasi {
   yetki: ButceYetkisi;
 }
 
+/**
+ * Bir defter kaydının "neyle ilgili" olduğu seçilirken sunulan hedef.
+ *
+ * Hedef seçmek kaydı o kademenin defterine yazar. ÜSTTEKİ TOPLAMI BOZMAZ:
+ * alt kademe zaten üste toplanıyor, yani kayıt aşağı indiğinde şirketin
+ * rakamı değişmez — yalnızca detaylanır ve proje yöneticisi de görür.
+ */
+export interface ButceHedefi {
+  scopeType: BudgetScopeType;
+  scopeId: string;
+  ad: string;
+  /** Altında görev yaşıyor mu — görev seçici yalnızca bunlarda açılır. */
+  gorevAlir: boolean;
+}
+
 /** İsteyen kullanıcının bir bütçe kademesindeki yetkisi. */
 export interface ButceYetkisi {
   canView: boolean;

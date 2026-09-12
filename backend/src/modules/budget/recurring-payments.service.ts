@@ -7,7 +7,7 @@ import { BudgetService } from "./budget.service";
 import { islenecekDonemler } from "./vade";
 // Eşleştirme ortak dosyada: aynı satır artık altı ayrı yerden okunuyor ve her
 // kopya, yeni bir sütun eklendiğinde birinde unutulmak demekti.
-import { mapRecurringPayment as mapPayment } from "./butce-eslestirme";
+import { mapRecurringPayment as mapPayment, DUZENLI_SECIM } from "./butce-eslestirme";
 
 // Tarih hesabı vade.ts'te (testten import edilebilsin diye); buradan yeniden
 // dışa aktarılıyor ki mevcut çağrı yerleri değişmesin.
@@ -34,7 +34,7 @@ export class RecurringPaymentsService {
   async findAllForUser(userId: string): Promise<RecurringPayment[]> {
     const { data, error } = await this.supabase.client
       .from("recurring_payments")
-      .select("*, projects(title)")
+      .select(DUZENLI_SECIM)
       .eq("owner_id", userId)
       .order("next_due_date", { ascending: true });
     if (error) throw error;
@@ -60,7 +60,7 @@ export class RecurringPaymentsService {
         reminder_days_before: data.reminderDaysBefore ?? 1,
         active: data.active ?? true,
       })
-      .select("*, projects(title)")
+      .select(DUZENLI_SECIM)
       .single();
     if (error) throw error;
     return mapPayment(row);
@@ -92,7 +92,7 @@ export class RecurringPaymentsService {
       .from("recurring_payments")
       .update(patch)
       .eq("id", id)
-      .select("*, projects(title)")
+      .select(DUZENLI_SECIM)
       .single();
     if (error) throw error;
     return mapPayment(row);
@@ -109,7 +109,7 @@ export class RecurringPaymentsService {
   async findDue(today: string): Promise<RecurringPayment[]> {
     const { data, error } = await this.supabase.client
       .from("recurring_payments")
-      .select("*, projects(title)")
+      .select(DUZENLI_SECIM)
       .eq("active", true)
       .lte("next_due_date", today);
     if (error) throw error;
@@ -120,7 +120,7 @@ export class RecurringPaymentsService {
   async findUpcoming(today: string): Promise<RecurringPayment[]> {
     const { data, error } = await this.supabase.client
       .from("recurring_payments")
-      .select("*, projects(title)")
+      .select(DUZENLI_SECIM)
       .eq("active", true)
       .gt("next_due_date", today);
     if (error) throw error;
@@ -145,7 +145,7 @@ export class RecurringPaymentsService {
   async findByProject(projectId: string): Promise<RecurringPayment[]> {
     const { data, error } = await this.supabase.client
       .from("recurring_payments")
-      .select("*, projects(title)")
+      .select(DUZENLI_SECIM)
       .eq("project_id", projectId)
       .order("next_due_date", { ascending: true });
     if (error) throw error;
@@ -192,7 +192,7 @@ export class RecurringPaymentsService {
     await this.assertOwner(id, userId);
     const { data: row } = await this.supabase.client
       .from("recurring_payments")
-      .select("*, projects(title)")
+      .select(DUZENLI_SECIM)
       .eq("id", id)
       .maybeSingle();
     if (!row) throw new NotFoundException("Düzenli ödeme bulunamadı");

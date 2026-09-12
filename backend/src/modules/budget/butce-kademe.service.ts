@@ -5,7 +5,7 @@ import { requireAmount, requireOneOf, optionalOneOf, paraBirimiDogrula } from ".
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { ButceErisimService } from "./butce-erisim.service";
 import type { ViewerKapsami } from "./butce-erisim";
-import { mapRecurringPayment, mapTransaction, SECIM } from "./butce-eslestirme";
+import { mapRecurringPayment, mapTransaction, SECIM, DUZENLI_SECIM } from "./butce-eslestirme";
 import { ButceHiyerarsiService } from "./butce-hiyerarsi.service";
 import { advanceDueDate } from "./vade";
 import { RECURRENCE_INTERVALS } from "@projelio/shared";
@@ -363,7 +363,7 @@ export class ButceKademeService {
         reminder_days_before: data.reminderDaysBefore ?? 1,
         active: true,
       })
-      .select("*, projects(title), tasks(title)")
+      .select(DUZENLI_SECIM)
       .single();
     if (error) throw error;
 
@@ -409,7 +409,7 @@ export class ButceKademeService {
         reminder_days_before: data.reminderDaysBefore ?? 1,
         active: data.active ?? true,
       })
-      .select("*, projects(title)")
+      .select(DUZENLI_SECIM)
       .single();
     if (error) throw error;
     return mapRecurringPayment(row);
@@ -436,7 +436,7 @@ export class ButceKademeService {
       .from("recurring_payments")
       .update(patch)
       .eq("id", satir)
-      .select("*, projects(title)")
+      .select(DUZENLI_SECIM)
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Düzenli ödeme bulunamadı");

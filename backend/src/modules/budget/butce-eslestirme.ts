@@ -21,6 +21,15 @@ export const SECIM =
   "*, projects(title), departments(name), jobs(title), organizations(name), groups(name), tasks(title), party(display_name), users!budget_transactions_created_by_fkey(full_name)";
 
 /**
+ * Düzenli ödeme sorgularının ortak seçimi.
+ *
+ * Hareket seçimiyle aynı gerekçe: dört yerden okunuyor ve kopyalarından biri
+ * `tasks(title)` eklenince güncellenmeyi unutmuştu — ekranda görev bağı olan
+ * düzenli ödemeler bağsız görünüyordu.
+ */
+export const DUZENLI_SECIM = "*, projects(title), tasks(title)";
+
+/**
  * Kaydın hangi kademeye ait olduğu, kimlik sütunlarından türetilir.
  *
  * Sunucu doldurur; istemcinin altı alanı tek tek yoklaması gerekmesin diye.

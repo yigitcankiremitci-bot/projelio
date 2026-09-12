@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type {
   BudgetScopeType,
+  ButceHedefi,
   BudgetTransaction,
   ButceKademeOzeti,
   ButceSayfasi,
@@ -12,7 +13,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { ButceErisimService } from "./butce-erisim.service";
 import type { ViewerKapsami } from "./butce-erisim";
-import { mapTransaction, mapRecurringPayment, SECIM } from "./butce-eslestirme";
+import { mapTransaction, mapRecurringPayment, SECIM, DUZENLI_SECIM } from "./butce-eslestirme";
 
 /**
  * Kademeler arası bütçe toplaması.
@@ -74,6 +75,46 @@ export class ButceHiyerarsiService {
       onayBekleyenler,
       yetki,
     };
+  }
+
+  /**
+   * Kayıt eklerken "bu neyle ilgili?" sorusunun seçenekleri.
+   *
+   * Yalnızca bu kademenin ALTINDAKİ birimler döner — bir holding sahibi kendi
+   * holdingine ait olmayan bir projeye masraf yazamasın diye (aynı kural
+   * sunucuda ikinci kez doğrulanıyor, bkz. ButceKademeService.hedefiCoz;
+   * burası sadece seçim kutusunu dolduruyor).
+   *
+   * Kademenin KENDİSİ de listede, en başta: varsayılan hedef odur ve
+   * kullanıcının "hiçbiri" diye ayrı bir seçenek araması gerekmesin.
+   *
+   * Görevler burada YOK: bir holdingin altında binlerce görev olabilir ve
+   * hepsini tek listede göndermek hem ağır hem kullanışsız. Kullanıcı önce
+   * kademeyi seçiyor, görev listesi o kademenin kendi ucundan geliyor
+   * (bkz. HedefSecici).
+   */
+  async hedefler(scopeType: ViewerKapsami, scopeId: string, userId?: string): Promise<ButceHedefi[]> {
+    await this.erisim.assertCanView(scopeType, scopeId, userId);
+    const kapsamlar = await this.altKapsamlar(scopeType, scopeId);
+
+    const hedefler: ButceHedefi[] = [
+      { scopeType, scopeId, ad: await this.erisim.kademeAdi(scopeType, scopeId), gorevAlir: false },
+    ];
+    for (const o of kapsamlar.organizations) {
+      hedefler.push({ scopeType: "organization", scopeId: o.id, ad: o.ad, gorevAlir: false });
+    }
+    for (const j of kapsamlar.jobs) hedefler.push({ scopeType: "job", scopeId: j.id, ad: j.ad, gorevAlir: false });
+    // Görev alabilen kademeler: görevler yalnızca proje, departman ve rutinde yaşıyor.
+    for (const d of kapsamlar.departments) {
+      hedefler.push({ scopeType: "department", scopeId: d.id, ad: d.ad, gorevAlir: true });
+    }
+    for (const p of kapsamlar.projects) {
+      hedefler.push({ scopeType: "project", scopeId: p.id, ad: p.ad, gorevAlir: true });
+    }
+    for (const o of kapsamlar.operations) {
+      hedefler.push({ scopeType: "operation", scopeId: o.id, ad: o.ad, gorevAlir: false });
+    }
+    return hedefler;
   }
 
   /**
@@ -374,7 +415,7 @@ export class ButceHiyerarsiService {
   private async duzenliOdemeler(scopeType: string, scopeId: string): Promise<RecurringPayment[]> {
     const { data, error } = await this.supabase.client
       .from("recurring_payments")
-      .select("*, projects(title)")
+      .select(DUZENLI_SECIM)
       .eq(ButceHiyerarsiService.SUTUN[scopeType], scopeId)
       .order("next_due_date", { ascending: true })
       .limit(LISTE_TAVANI);

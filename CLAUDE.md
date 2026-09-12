@@ -326,9 +326,30 @@ Değişmez kurallar:
 - **Taşeron hiçbir kurumsal bütçeyi göremez** — `budget_viewers`'a yanlışlıkla
   eklenmiş olsa bile (bkz. `butceYetkisiKarari`, taşeron kontrolü her şeyden
   önce gelir).
-- **Bir görev deftere yalnızca BİR KEZ düşebilir** (`budget_transactions`
-  üzerinde `task_id` tekil indeksi): "ödendi"ye iki kez basmak gideri iki kez
-  yazmasın diye.
+- **Kaydın kaynağı `source` sütununda**: `manual` (elle girildi) · `task_budget`
+  (onaylanan görev bütçesi ödenince üretildi) · `recurring` (düzenli ödemenin
+  vadesi gelince üretildi). Otomatik satırların görev bağı DEĞİŞTİRİLEMEZ —
+  o bağ satırın var olma sebebi, koparılırsa "ödemeyi geri al" onu bulamaz.
+- **Otomatik ödeme satırı görev başına BİR TANEDİR** —
+  `budget_transactions_task_odeme_uniq`, `task_id` üzerinde ama yalnızca
+  `source = 'task_budget'` satırlarına uygulanan KISMİ tekil indeks.
+  "Ödendi"ye iki kez basmak gideri iki kez yazmasın diye. Elle bağlanan
+  kayıtlar serbest: aynı göreve birden çok masraf yazmak normaldir.
+- **Kayıt üst bir sayfadan girilip ALT bir kademeye yazılabilir** ("bu gider
+  aslında şu projeye ait" — `hedefTur`/`hedefId`, bkz. `ButceKademeService.hedefiCoz`).
+  Hedef, açık olan kademenin altında olmak ZORUNDA. Üstteki toplamı bozmaz:
+  alt kademe zaten üste toplanıyor, yani kayıt aşağı indiğinde şirketin rakamı
+  değişmez, yalnızca detaylanır. Seçenekler `GET .../targets` ucundan gelir;
+  görevler o listede YOK (bir holdingin altında binlerce olabilir), kademe
+  seçildikten sonra kendi ucundan yükleniyor.
+- **Tekrar aralıkları**: haftalık · aylık · 3 aylık · 6 aylık · yıllık. Ay
+  ekleyenlerin hepsi aynı koddan geçer (`vade.ts`): çapa gün korunur, ay sonu
+  taşmaz. Etiketler ve sıra `RECURRENCE_INTERVAL_LABEL` / `RECURRENCE_INTERVALS`
+  içinde — bileşene kopyalama, 3/6 aylık eklenince o kopyalar eksik kalmıştı.
+- **Tek seferlik bir kayıt düzenliye çevrilebilir**
+  (`POST /budget/transactions/:id/recurring`). Kayıt SİLİNMEZ — o para gerçekten
+  çıktı; yeni düzenli ödeme BİR SONRAKİ vadeden başlar, yoksa aynı ay iki kez
+  işlenirdi.
 - `fm_alacak_borc` bilerek MODÜL olarak kaldı: orada henüz gerçekleşmemiş para
   var ve hiçbir bakiyeye girmez.
 - Türev paneller (Finansal Analiz, Yönetim Analizi) deftere `BUTCE_DEFTERI`

@@ -1470,6 +1470,15 @@ export interface BudgetTransaction {
   occurredAt: string;
   // Otomatik olarak bir düzenli ödemeden üretildiyse onun kimliği.
   recurringPaymentId?: string;
+  /**
+   * Başkasının defterindeki satırın bu kullanıcıya YANSIMASI mı.
+   *
+   * Hizmet verilen projede proje sahibinin yaptığı ödeme onun defterinde
+   * `payout`tur; parayı alan üyenin Kasa'sında aynı satır `income` olarak
+   * görünür. İkinci bir kayıt YOK — satır tek, bakış açısı iki. Yansıma
+   * Kasa'dan düzenlenmez; kendi yerinden (proje bütçesi) yönetilir.
+   */
+  mirror?: boolean;
   createdAt: string;
 }
 
@@ -1580,6 +1589,39 @@ export interface ProjectBudgetSummary {
   netEarned: number;
   // Tahsilatın tamamlanıp tamamlanmadığı (received >= agreedFee).
   fullyCollected: boolean;
+  /**
+   * Kullanıcının bu projedeki yeri. `provider`: proje başkasının, kullanıcı
+   * ona hizmet veriyor — agreedFee üyeyle yapılan anlaşma, received proje
+   * sahibinin ona yaptığı ödemeler (bkz. HizmetAnlasmasi). Boşsa `owner`.
+   */
+  role?: "owner" | "provider";
+  // provider satırlarında hizmet alan (proje sahibi) kişinin adı.
+  counterpartName?: string;
+}
+
+/**
+ * Proje sahibi ile projede hizmet veren bir üye arasındaki ücret anlaşması.
+ *
+ * Aynı para iki kişi için ters işaretlidir: sahip için gider (`payout`),
+ * üye için gelir. Bu yüzden kayıt "gelir mi gider mi" diye değil, "kim kime
+ * ödedi" diye tutulur: satır projenin defterinde `payout` + `user_id` = üye.
+ * Anlaşma tutarı project_members.custom_agreed_rate'te durur.
+ */
+export interface HizmetAnlasmasi {
+  projectId: string;
+  memberId: string;
+  userId: string;
+  fullName?: string;
+  // Hizmet alan taraf: projenin sahibi.
+  ownerId: string;
+  ownerName?: string;
+  agreedFee: number;
+  paid: number;
+  remaining: number;
+  overpaid: number;
+  payments: BudgetTransaction[];
+  // İsteyen kişi bu anlaşmaya ödeme/tutar girebilir mi (sahip ya da üyenin kendisi).
+  canEdit: boolean;
 }
 
 /**

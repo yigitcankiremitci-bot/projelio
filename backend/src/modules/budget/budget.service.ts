@@ -8,6 +8,7 @@ import { ORG_RECEIVABLE_MODULE_KEY, sirketAlacakBorcu } from "./sirket-defteri";
 import { mapTransaction, SECIM } from "./butce-eslestirme";
 import { ButceErisimService } from "./butce-erisim.service";
 import { ButceKademeService } from "./butce-kademe.service";
+import { aynaKayit, hizmetOzeti, uyeKendiOdemesiniYonetebilir } from "./hizmet-anlasmasi";
 
 /**
  * budget_transactions.type için izin verilen değerler. 001_init_schema.sql'deki
@@ -205,15 +206,79 @@ export class BudgetService {
    * yöneticisi olan biri için değildir.
    */
   async findAllForUser(userId: string, limit = 200): Promise<BudgetTransaction[]> {
+    const [kendi, yansimalar] = await Promise.all([
+      this.supabase.client
+        .from("budget_transactions")
+        .select(SECIM)
+        .eq("owner_id", userId)
+        .order("occurred_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(limit),
+      this.hizmetGelirleri(userId, limit),
+    ]);
+    if (kendi.error) throw kendi.error;
+    return [...(kendi.data ?? []).map(mapTransaction), ...yansimalar]
+      .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
+  }
+
+  /**
+   * Başkasının projesinde hizmet veren kullanıcıya yapılan ödemeler — onun
+   * Kasa'sında GELİR olarak.
+   *
+   * Satır proje sahibinin defterinde `payout` olarak duruyor (owner_id = sahip)
+   * ve yukarıdaki "kurduysan akar" sorgusu onu hiç getirmiyordu: sahibi Arda
+   * olan projede Arda'nın ödediği para, parayı alanın kasasına hiç girmiyordu.
+   * Kopya yazılmaz, okunurken yansıtılır (bkz. aynaKayit).
+   */
+  private async hizmetGelirleri(userId: string, limit: number): Promise<BudgetTransaction[]> {
     const { data, error } = await this.supabase.client
       .from("budget_transactions")
       .select(SECIM)
-      .eq("owner_id", userId)
+      .eq("user_id", userId)
+      .eq("type", "payout")
+      .neq("owner_id", userId)
+      .not("project_id", "is", null)
       .order("occurred_at", { ascending: false })
-      .order("created_at", { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return (data ?? []).map(mapTransaction);
+    const satirlar = data ?? [];
+    const adlar = await this.kullaniciAdlari(satirlar.map((r: any) => r.owner_id));
+    return satirlar.map((r: any) => aynaKayit(mapTransaction(r), adlar.get(r.owner_id)));
+  }
+
+  private async kullaniciAdlari(idler: (string | null | undefined)[]): Promise<Map<string, string>> {
+    const tekil = Array.from(new Set(idler.filter((v): v is string => !!v)));
+    if (tekil.length === 0) return new Map();
+    const { data, error } = await this.supabase.client.from("users").select("id, full_name").in("id", tekil);
+    if (error) throw error;
+    return new Map<string, string>((data ?? []).map((u: any) => [u.id, u.full_name]));
+  }
+
+  /**
+   * Kullanıcının başkasının projesinde hizmet verdiği projeler: anlaşması
+   * olan ya da kendisine ödeme yapılmış onaylı üyelikler.
+   */
+  private async hizmetProjeleri(
+    userId: string,
+    odemeAlinanProjeler: string[]
+  ): Promise<{ id: string; title: string; ownerId: string; agreedFee: number }[]> {
+    const { data, error } = await this.supabase.client
+      .from("project_members")
+      .select("project_id, custom_agreed_rate, projects!inner(id, title, owner_id, archived_at)")
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .is("projects.archived_at", null);
+    if (error) throw error;
+    return (data ?? [])
+      .filter((m: any) => m.projects && m.projects.owner_id !== userId)
+      .filter((m: any) => Number(m.custom_agreed_rate ?? 0) > 0 || odemeAlinanProjeler.includes(m.project_id))
+      .map((m: any) => ({
+        id: m.project_id,
+        title: m.projects.title,
+        ownerId: m.projects.owner_id,
+        agreedFee: Number(m.custom_agreed_rate ?? 0),
+      }));
   }
 
   /** Kullanıcının KURDUĞU (arşivlenmemiş) şirketler: id -> ad. */
@@ -299,11 +364,17 @@ export class BudgetService {
     // toplamlardan sessizce düşüyordu — defterde duran gider Kasa'daki "Gider"
     // kutusuna yansımıyordu. Departman kayıtlarının da projesi yoktur; onlar da
     // buraya düşer (bkz. addForDepartment: defter sahibi organizasyon sahibi).
+    const hizmetler = await this.hizmetProjeleri(
+      userId,
+      Array.from(new Set(transactions.filter((t) => t.mirror && t.projectId).map((t) => t.projectId as string)))
+    );
     const ownedIds = new Set(projects.map((p) => p.id));
+    const hizmetIds = new Set(hizmetler.map((h) => h.id));
     const byProject = new Map<string, BudgetTransaction[]>();
     const general: BudgetTransaction[] = [];
     for (const tx of transactions) {
-      if (!tx.projectId || !ownedIds.has(tx.projectId)) {
+      const kova = tx.mirror ? hizmetIds : ownedIds;
+      if (!tx.projectId || !kova.has(tx.projectId)) {
         general.push(tx);
         continue;
       }
@@ -330,6 +401,30 @@ export class BudgetService {
         fullyCollected: agreedFee > 0 && received >= agreedFee,
       };
     });
+
+    // Hizmet verilen projeler: anlaşılan = üyeyle yapılan anlaşma, tahsil
+    // edilen = sahibin yaptığı ödemeler. Gider yok — o projenin giderleri
+    // sahibinin defterinde.
+    const sahipAdlari = await this.kullaniciAdlari(hizmetler.map((h) => h.ownerId));
+    for (const h of hizmetler) {
+      const txs = byProject.get(h.id) ?? [];
+      // Yansıma satırları "income"a çevrilmiş olarak geliyor; hizmetOzeti
+      // payout bekliyor, bu yüzden tutarı doğrudan topluyoruz.
+      const ozet = hizmetOzeti(h.agreedFee, txs.map((t) => ({ ...t, type: "payout" as const })));
+      projectSummaries.push({
+        projectId: h.id,
+        projectTitle: h.title,
+        agreedFee: ozet.agreedFee,
+        received: ozet.paid,
+        expected: ozet.remaining,
+        overpaid: ozet.overpaid,
+        expense: 0,
+        netEarned: ozet.paid,
+        fullyCollected: ozet.agreedFee > 0 && ozet.paid >= ozet.agreedFee,
+        role: "provider",
+        counterpartName: sahipAdlari.get(h.ownerId),
+      });
+    }
 
     const generalIncome = sumByType(general, "income");
     const generalExpense = sumSpent(general);
@@ -420,6 +515,9 @@ export class BudgetService {
       .maybeSingle();
     if (!row) throw new NotFoundException("Kayıt bulunamadı");
     if (row.project_id) {
+      // Hizmet veren üye, sahibin defterine kendi girdiği ödemeyi düzeltebilir
+      // (bkz. hizmet-anlasmasi.ts). Diğer her satır proje yöneticisinin.
+      if (uyeKendiOdemesiniYonetebilir(row, userId)) return row;
       await this.assertCanManageBudget(row.project_id, userId);
       return row;
     }
@@ -451,6 +549,13 @@ export class BudgetService {
     userId?: string
   ): Promise<BudgetTransaction> {
     const mevcut = await this.assertCanManageTransaction(id, userId);
+
+    // Üye kendi girdiği hizmet ödemesinde yalnızca tutarı, tarihi ve açıklamayı
+    // değiştirir. Türü ya da projeyi değiştirebilseydi sahibin defterine
+    // istediği satırı yazabilirdi.
+    if (userId && mevcut.owner_id !== userId && uyeKendiOdemesiniYonetebilir(mevcut, userId)) {
+      data = { amount: data.amount, description: data.description, occurredAt: data.occurredAt };
+    }
 
     const patch: Record<string, unknown> = {};
     if (data.type !== undefined) patch.type = optionalOneOf(data.type, TRANSACTION_TYPES, "İşlem türü");

@@ -130,4 +130,23 @@ export const butce: TranslationDict = {
   "Kayıt {yer} defterine yazıldı; buradaki toplamlara dahil.":
     "The entry was written to {yer}'s ledger; it is included in the totals here.",
   düzenli: "recurring",
+  // Hizmet anlaşmaları (proje sahibi ↔ hizmet veren üye)
+  "Hizmet anlaşmaları": "Service agreements",
+  "Proje sahibiyle projede hizmet veren kişi arasındaki ücret. Ödemeyi iki taraf da girebilir; sahibin defterinde gider, hizmet verenin Kasa'sında gelir olarak görünür.":
+    "The fee between the project owner and the person providing a service on the project. Either side can record a payment; it shows as an expense in the owner's ledger and as income in the provider's Cash.",
+  "Hizmet aldığın: {ad}": "Client: {ad}",
+  "Hizmet veren: {ad}": "Provider: {ad}",
+  "Hizmet verdiğin proje": "Project you provide services for",
+  "Senin için gelir": "Income for you",
+  "Senin için gider": "Expense for you",
+  "Kalan borç": "Remaining balance",
+  "+{tutar} fazla ödendi": "+{tutar} overpaid",
+  "Aldığım ödemeyi ekle": "Add payment I received",
+  "Yaptığım ödemeyi ekle": "Add payment I made",
+  "{odeyen} → {alan} ödemesi": "Payment {odeyen} → {alan}",
+  "Anlaşma kaydedilemedi. Tekrar dene.": "Couldn't save the agreement. Try again.",
+  "Ödeme kaydedilemedi. Tekrar dene.": "Couldn't save the payment. Try again.",
+  "Proje sahibi": "Project owner",
+  "Ödemeyi sil": "Delete payment",
+  "Ödeme silinemedi.": "Couldn't delete the payment.",
 };

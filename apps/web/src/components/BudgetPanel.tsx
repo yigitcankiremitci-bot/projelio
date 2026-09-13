@@ -614,6 +614,15 @@ export default function BudgetPanel() {
                     <IconFolder size={13} color={c.textSecondary} />
                     <span style={{ flex: 1, minWidth: 120, fontSize: 14, fontWeight: 500, color: c.textPrimary }}>
                       {p.projectTitle}
+                      {/* Başkasının projesinde hizmet veriyorsa: anlaşılan/gelen,
+                          proje sahibiyle yapılan anlaşmadan geliyor. */}
+                      {p.role === "provider" && (
+                        <span style={{ display: "block", fontSize: 12, fontWeight: 400, color: c.textSecondary }}>
+                          {p.counterpartName
+                            ? t("Hizmet aldığın: {ad}", { ad: p.counterpartName })
+                            : t("Hizmet verdiğin proje")}
+                        </span>
+                      )}
                     </span>
                     {p.fullyCollected ? (
                       <span
@@ -767,6 +776,8 @@ function HareketSutunu({
                     : hareket.organizationName
                       ? ` · ${hareket.organizationName}`
                       : t(" · genel")}
+                {/* Hizmet verilen projeden yansıyan ödeme: kimden geldiği. */}
+                {hareket.mirror && hareket.counterpartyName && ` · ${hareket.counterpartyName}`}
               </div>
             </div>
 

@@ -710,4 +710,8 @@ export const hatalar: TranslationDict = {
   "Tedarikçi bu şirkette bulunamadı": "Supplier not found in this company",
   "Ürün kaydedilemedi: sunucu güncellemesi tamamlanmamış. Biraz sonra tekrar dene.":
     "Couldn't save the product: a server update is still in progress. Try again shortly.",
+  "Bu anlaşmayı yalnızca proje sahibi ya da hizmet veren kişi değiştirebilir":
+    "Only the project owner or the service provider can change this agreement",
+  "Bu kişi projenin onaylı üyesi değil": "This person is not an approved member of the project",
+  "Proje sahibi kendi projesinde hizmet veren olamaz": "The project owner can't be a service provider on their own project",
 };

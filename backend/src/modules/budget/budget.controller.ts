@@ -1,14 +1,16 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { BudgetService } from "./budget.service";
 import { RecurringPaymentsService } from "./recurring-payments.service";
+import { HizmetAnlasmasiService } from "./hizmet-anlasmasi.service";
 
 @Controller("projects/:projectId/budget")
 @UseGuards(AuthGuard("jwt"))
 export class BudgetController {
   constructor(
     private budgetService: BudgetService,
-    private recurringPaymentsService: RecurringPaymentsService
+    private recurringPaymentsService: RecurringPaymentsService,
+    private hizmet: HizmetAnlasmasiService
   ) {}
 
   @Get()
@@ -25,6 +27,34 @@ export class BudgetController {
   // girildiğinde o yük deftere ancak vadesi gelince işleniyor; o güne kadar
   // proje bütçesinde hiçbir izi yoktu ve proje "gideri yokmuş" gibi
   // görünüyordu. Burası henüz işlenmemiş yükü de görünür kılıyor.
+  // Hizmet anlaşmaları: proje sahibi ile projede hizmet veren üye arasındaki
+  // ücret ve ödemeler. Bütçe görüntüleme yetkisinden BAĞIMSIZ: üye sahibin
+  // defterini görmeden kendi anlaşmasını görür (bkz. HizmetAnlasmasiService).
+  @Get("hizmet")
+  hizmetListesi(@Param("projectId") projectId: string, @Req() req: any) {
+    return this.hizmet.liste(projectId, req.user.userId);
+  }
+
+  @Patch("hizmet/:userId")
+  hizmetAnlasmasi(
+    @Param("projectId") projectId: string,
+    @Param("userId") memberUserId: string,
+    @Body("agreedFee") agreedFee: number,
+    @Req() req: any
+  ) {
+    return this.hizmet.anlasmaBelirle(projectId, memberUserId, agreedFee, req.user.userId);
+  }
+
+  @Post("hizmet/:userId/odeme")
+  hizmetOdemesi(
+    @Param("projectId") projectId: string,
+    @Param("userId") memberUserId: string,
+    @Body() body: { amount?: number; occurredAt?: string; description?: string },
+    @Req() req: any
+  ) {
+    return this.hizmet.odemeEkle(projectId, memberUserId, body, req.user.userId);
+  }
+
   @Get("recurring")
   async recurring(@Param("projectId") projectId: string, @Req() req: any) {
     await this.budgetService.assertCanViewBudget(projectId, req.user.userId);

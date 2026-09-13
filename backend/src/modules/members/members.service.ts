@@ -148,6 +148,20 @@ export class MembersService {
         username: ownerUser?.username ?? undefined,
       } as ProjectMember);
     }
+
+    // Ücret anlaşması kişiler arası bilgidir: yönetici herkesinkini, üye yalnızca
+    // kendisininkini görür. Eskiden ekip listesiyle birlikte her üyeye herkesin
+    // ücreti gidiyordu (arayüz göstermese de yanıtta vardı).
+    const yonetici =
+      !requestingUserId ||
+      project?.owner_id === requestingUserId ||
+      (await this.assertIsProjectManager(projectId, requestingUserId).then(
+        () => true,
+        () => false
+      ));
+    if (!yonetici) {
+      for (const m of members) if (m.userId !== requestingUserId) m.customAgreedRate = undefined;
+    }
     return members;
   }
 

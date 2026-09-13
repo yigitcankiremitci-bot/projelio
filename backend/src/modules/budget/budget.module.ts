@@ -15,6 +15,7 @@ import { ButceHiyerarsiService } from "./butce-hiyerarsi.service";
 import { ButceKademeController } from "./butce-kademe.controller";
 import { GorevButceService } from "./gorev-butce.service";
 import { GorevButceController } from "./gorev-butce.controller";
+import { HizmetAnlasmasiService } from "./hizmet-anlasmasi.service";
 
 @Module({
   imports: [NotificationsModule],
@@ -34,6 +35,7 @@ import { GorevButceController } from "./gorev-butce.controller";
     ButceKademeService,
     ButceHiyerarsiService,
     GorevButceService,
+    HizmetAnlasmasiService,
   ],
   exports: [BudgetService, RecurringPaymentsService, ButceErisimService, ButceHiyerarsiService, GorevButceService],
 })

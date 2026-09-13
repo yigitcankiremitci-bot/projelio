@@ -5,6 +5,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { IconPlus, IconX, IconEdit, IconTrash } from "../icons";
 import CreateBudgetTransactionModal from "../CreateBudgetTransactionModal";
 import VadeRozeti from "../VadeRozeti";
+import HizmetAnlasmalari from "../butce/HizmetAnlasmalari";
 import { useUndo, useWithoutPendingDeletes } from "../../lib/undo";
 import { useT } from "../../lib/i18n";
 
@@ -157,10 +158,15 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
 
   if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
 
+  // Bütçeyi göremeyen üye de KENDİ hizmet anlaşmasını görür: sahibin
+  // defterini görmesi gerekmeden aldığı ödemeyi girebilmeli.
   if (!canView) {
     return (
-      <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 16 }}>
-        <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>{t("Bu projenin bütçesini görüntüleme yetkin yok.")}</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <HizmetAnlasmalari projectId={projectId} currentUserId={currentUserId} />
+        <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 16 }}>
+          <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>{t("Bu projenin bütçesini görüntüleme yetkin yok.")}</p>
+        </div>
       </div>
     );
   }
@@ -326,6 +332,8 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
           </div>
         </div>
       </div>
+
+      <HizmetAnlasmalari projectId={projectId} currentUserId={currentUserId} onChanged={reloadTransactions} />
 
       {/* Projeye bağlı düzenli ödemeler. Bunlar deftere vadesi gelince
           işlenir; o güne kadar projede hiç görünmüyorlardı ve Kasa'dan bu

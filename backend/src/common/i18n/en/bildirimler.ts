@@ -379,4 +379,7 @@ export const bildirimler: TranslationDict = {
   "Bu adres kayıtlı ve henüz doğrulanmamışsa, yeni bir doğrulama bağlantısı gönderildi.":
     "If that address is registered and not yet verified, a new verification link has been sent.",
   "Şifreniz güncellendi. Şimdi giriş yapabilirsiniz.": "Your password has been updated. You can sign in now.",
+  "Ödeme Kaydedildi": "Payment Recorded",
+  "{proje} için hizmet anlaşması {tutar} ₺ olarak kaydedildi.": "The service agreement for {proje} was set to {tutar} ₺.",
+  "{proje} için {tutar} ₺ hizmet ödemesi kaydedildi.": "A {tutar} ₺ service payment was recorded for {proje}.",
 };

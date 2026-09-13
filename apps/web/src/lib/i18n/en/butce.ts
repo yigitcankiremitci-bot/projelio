@@ -132,8 +132,11 @@ export const butce: TranslationDict = {
   düzenli: "recurring",
   // Hizmet anlaşmaları (proje sahibi ↔ hizmet veren üye)
   "Hizmet anlaşmaları": "Service agreements",
-  "Proje sahibiyle projede hizmet veren kişi arasındaki ücret. Ödemeyi iki taraf da girebilir; sahibin defterinde gider, hizmet verenin Kasa'sında gelir olarak görünür.":
-    "The fee between the project owner and the person providing a service on the project. Either side can record a payment; it shows as an expense in the owner's ledger and as income in the provider's Cash.",
+  "Hizmet alan ile hizmet veren arasındaki ücret. Ödemeyi iki taraf da girebilir; hizmet alan için gider, hizmet veren için gelir olarak görünür.":
+    "The fee between the client and the service provider. Either side can record a payment; it shows as an expense for the client and as income for the provider.",
+  "Bu projede iş sahibine hizmet veriyorum": "I provide services to the job owner on this project",
+  "İşaretlenirse projenin bütçesi yalnızca senin olur ve işin bütçesine eklenmez. İş sahibinin ödemeleri onun tarafında gider olarak görünür.":
+    "If checked, the project's budget is yours alone and isn't added to the job's budget. The job owner's payments show as expenses on their side.",
   "Hizmet aldığın: {ad}": "Client: {ad}",
   "Hizmet veren: {ad}": "Provider: {ad}",
   "Hizmet verdiğin proje": "Project you provide services for",

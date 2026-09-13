@@ -9,12 +9,17 @@ import type { BudgetTransaction } from "@projelio/shared";
  * anda doğru görünemiyordu; üye "gelir mi gider mi gireyim" diye kalıyordu ve
  * sahibi olmadığı projeye zaten hiç kayıt giremiyordu.
  *
- * Çözüm: kayıt YÖNLE tutulur. Satır projenin defterinde `payout` (defter
- * sahibi = proje sahibi, user_id = parayı alan üye). Sahibin tarafında gider
- * olarak toplanır; üyenin Kasa'sına aynı satır `income` olarak YANSIR
- * (`aynaKayit`). İkinci bir satır yazılmaz: iki kişi ayrı defterler olduğu
- * için çift sayım yok, ama satırı kopyalamak düzenlemede ikisinin ayrışması
- * demek olurdu.
+ * Çözüm: kayıt YÖNLE tutulur ve satır tek kalır, bakış açısı iki olur
+ * (`aynaKayit`). Satırı kopyalamak düzenlemede ikisinin ayrışması demekti.
+ *
+ * İki biçim var:
+ *   `uye`   — proje sahibi hizmet alır, projedeki üye verir. Satır projenin
+ *             defterinde `payout` (user_id = üye); üyenin Kasa'sına `income`
+ *             olarak yansır.
+ *   `proje` — iş sahibi hizmet alır, işin altındaki hizmet projesinin
+ *             (projects.hizmet_projesi, migration 111) sahibi verir. Satır
+ *             projenin defterinde `income`; proje işe TOPLANMAZ, bu satırlar
+ *             işe ve iş sahibinin Kasa'sına `payout` olarak yansır.
  */
 
 export interface HizmetYetkiGercekleri {
@@ -49,12 +54,14 @@ export interface HizmetOzeti {
  *
  * Ödenen, anlaşmanın ÜSTÜNE EKLENMEZ, içinden düşer (proje tahsilatıyla aynı
  * kural, bkz. BudgetService.calculateExpectedPayment). Yalnızca ₺ ödemeler
- * sayılır: anlaşma tutarı ₺ ve kur dönüşümü yapılmıyor.
+ * sayılır: anlaşma tutarı ₺ ve kur dönüşümü yapılmıyor. Satırların türüne
+ * bakılmaz — hangi satırın ödeme olduğunu biçime göre çağıran seçer
+ * (`uye`de payout, `proje`de income).
  */
 export function hizmetOzeti(agreedFee: number | null | undefined, odemeler: BudgetTransaction[]): HizmetOzeti {
   const anlasilan = Number(agreedFee ?? 0) || 0;
   const paid = odemeler
-    .filter((o) => o.type === "payout" && (o.currency || "TRY") === "TRY")
+    .filter((o) => (o.currency || "TRY") === "TRY")
     .reduce((t, o) => t + (Number(o.amount) || 0), 0);
   return {
     agreedFee: anlasilan,
@@ -65,16 +72,22 @@ export function hizmetOzeti(agreedFee: number | null | undefined, odemeler: Budg
 }
 
 /**
- * Sahibin defterindeki `payout` satırının parayı alan üyedeki görünümü.
+ * Karşı tarafın defterindeki satırın bu taraftaki görünümü: `uye`de sahibin
+ * payout'u üyede `income`, `proje`de hizmet verenin income'u iş sahibinde
+ * `payout` olur.
  *
- * Tür `income`a döner ve satır salt okunur olur: Kasa'daki silme/düzenleme
- * düğmeleri kişisel defter kuralıyla (owner_id = ben) çalışıyor ve bu satırın
- * sahibi başkası. Yönetimi proje bütçesindeki "Hizmet anlaşmaları"ndan.
+ * Satır salt okunur olur: Kasa'daki ve kademe sayfasındaki düzenleme
+ * düğmeleri o defterin kuralıyla çalışıyor ve bu satırın sahibi başkası.
+ * Yönetimi proje bütçesindeki "Hizmet anlaşmaları"ndan.
  */
-export function aynaKayit(tx: BudgetTransaction, karsiTarafAdi?: string): BudgetTransaction {
+export function aynaKayit(
+  tx: BudgetTransaction,
+  karsiTarafAdi?: string,
+  tur: "income" | "payout" = "income"
+): BudgetTransaction {
   return {
     ...tx,
-    type: "income",
+    type: tur,
     readOnly: true,
     mirror: true,
     counterpartyName: karsiTarafAdi ?? tx.counterpartyName,
@@ -97,6 +110,25 @@ export function uyeKendiOdemesiniYonetebilir(
     row.type === "payout" &&
     row.user_id === userId &&
     row.created_by === userId &&
+    (row.source ?? "manual") === "manual"
+  );
+}
+
+/**
+ * `proje` biçiminde iş sahibi (hizmet alan), hizmet verenin defterine KENDİ
+ * girdiği ödemeyi düzeltebilir/silebilir. Kişinin gerçekten o hizmet
+ * projesinin iş sahibi olduğunu çağıran doğrular; burası satırın kendisine
+ * bakar.
+ */
+export function musteriKendiOdemesiniYonetebilir(
+  row: { type?: string; created_by?: string | null; owner_id?: string | null; source?: string | null },
+  userId: string | undefined
+): boolean {
+  if (!userId) return false;
+  return (
+    row.type === "income" &&
+    row.created_by === userId &&
+    row.owner_id !== userId &&
     (row.source ?? "manual") === "manual"
   );
 }

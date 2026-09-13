@@ -8,7 +8,7 @@ import { ORG_RECEIVABLE_MODULE_KEY, sirketAlacakBorcu } from "./sirket-defteri";
 import { mapTransaction, SECIM } from "./butce-eslestirme";
 import { ButceErisimService } from "./butce-erisim.service";
 import { ButceKademeService } from "./butce-kademe.service";
-import { aynaKayit, hizmetOzeti, uyeKendiOdemesiniYonetebilir } from "./hizmet-anlasmasi";
+import { aynaKayit, hizmetOzeti, musteriKendiOdemesiniYonetebilir, uyeKendiOdemesiniYonetebilir } from "./hizmet-anlasmasi";
 
 /**
  * budget_transactions.type için izin verilen değerler. 001_init_schema.sql'deki
@@ -34,12 +34,14 @@ export class BudgetService {
     if (!userId) return;
     const { data: project } = await this.supabase.client
       .from("projects")
-      .select("owner_id, job_id")
+      .select("owner_id, job_id, hizmet_projesi")
       .eq("id", projectId)
       .maybeSingle();
     if (!project) throw new NotFoundException("Proje bulunamadı");
     if (project.owner_id === userId) return;
-    if (project.job_id) {
+    // Hizmet projesinde iş sahibi MÜŞTERİDİR: hizmet verenin defterini
+    // (masraflarını, kârını) görmez; kendi payını Hizmet anlaşmaları'ndan görür.
+    if (project.job_id && !project.hizmet_projesi) {
       const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", project.job_id).maybeSingle();
       if (job?.owner_id === userId) return;
     }
@@ -59,12 +61,14 @@ export class BudgetService {
     if (!userId) return;
     const { data: project } = await this.supabase.client
       .from("projects")
-      .select("owner_id, job_id")
+      .select("owner_id, job_id, hizmet_projesi")
       .eq("id", projectId)
       .maybeSingle();
     if (!project) throw new NotFoundException("Proje bulunamadı");
     if (project.owner_id === userId) return;
-    if (project.job_id) {
+    // Hizmet projesinde iş sahibi MÜŞTERİDİR: hizmet verenin defterini
+    // (masraflarını, kârını) görmez; kendi payını Hizmet anlaşmaları'ndan görür.
+    if (project.job_id && !project.hizmet_projesi) {
       const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", project.job_id).maybeSingle();
       if (job?.owner_id === userId) return;
     }
@@ -182,14 +186,16 @@ export class BudgetService {
   // Kullanıcının sahibi olduğu projeler. Bütçe hassas bir veri olduğu için genel
   // defterde yalnızca kendi projeleri toplanır; üyesi olduğu başkasının projesi
   // buraya karışmaz (o proje kendi detay sayfasında ayrıca görülebiliyor).
-  private async ownedProjects(userId: string): Promise<{ id: string; title: string; total_budget: number }[]> {
+  private async ownedProjects(
+    userId: string
+  ): Promise<{ id: string; title: string; total_budget: number; hizmet_projesi?: boolean; job_owner_id?: string }[]> {
     const { data, error } = await this.supabase.client
       .from("projects")
-      .select("id, title, total_budget")
+      .select("id, title, total_budget, hizmet_projesi, jobs(owner_id)")
       .eq("owner_id", userId)
       .is("archived_at", null);
     if (error) throw error;
-    return data ?? [];
+    return (data ?? []).map((p: any) => ({ ...p, job_owner_id: p.jobs?.owner_id ?? undefined }));
   }
 
   /**
@@ -243,8 +249,40 @@ export class BudgetService {
       .limit(limit);
     if (error) throw error;
     const satirlar = data ?? [];
+    const [adlar, giderler] = await Promise.all([
+      this.kullaniciAdlari(satirlar.map((r: any) => r.owner_id)),
+      this.hizmetGiderleri(userId, limit),
+    ]);
+    return [...satirlar.map((r: any) => aynaKayit(mapTransaction(r), adlar.get(r.owner_id))), ...giderler];
+  }
+
+  /**
+   * Tersi: kullanıcının İŞİ altındaki hizmet projelerine yaptığı ödemeler — onun
+   * Kasa'sında GİDER olarak. Satır hizmet verenin defterinde `income`
+   * (bkz. migration 111).
+   */
+  private async hizmetGiderleri(userId: string, limit: number): Promise<BudgetTransaction[]> {
+    const { data: projeler, error: projeHatasi } = await this.supabase.client
+      .from("projects")
+      .select("id, owner_id, jobs!inner(owner_id)")
+      .eq("hizmet_projesi", true)
+      .eq("jobs.owner_id", userId)
+      .neq("owner_id", userId)
+      .limit(LISTE_TAVANI);
+    // Kolon yoksa (migration 111 uygulanmadan) Kasa durmasın: yansıma yok sayılır.
+    if (projeHatasi || !projeler || projeler.length === 0) return [];
+
+    const { data, error } = await this.supabase.client
+      .from("budget_transactions")
+      .select(SECIM)
+      .in("project_id", projeler.map((p: any) => p.id))
+      .eq("type", "income")
+      .order("occurred_at", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    const satirlar = data ?? [];
     const adlar = await this.kullaniciAdlari(satirlar.map((r: any) => r.owner_id));
-    return satirlar.map((r: any) => aynaKayit(mapTransaction(r), adlar.get(r.owner_id)));
+    return satirlar.map((r: any) => aynaKayit(mapTransaction(r), adlar.get(r.owner_id), "payout"));
   }
 
   private async kullaniciAdlari(idler: (string | null | undefined)[]): Promise<Map<string, string>> {
@@ -383,6 +421,10 @@ export class BudgetService {
       byProject.set(tx.projectId, list);
     }
 
+    // Sahibi olunan hizmet projeleri: iş sahibinin (müşterinin) adı etikete.
+    const musteriAdlari = await this.kullaniciAdlari(
+      projects.filter((p) => p.hizmet_projesi && p.job_owner_id !== userId).map((p) => p.job_owner_id)
+    );
     const projectSummaries: ProjectBudgetSummary[] = projects.map((p) => {
       const txs = byProject.get(p.id) ?? [];
       const agreedFee = Number(p.total_budget);
@@ -399,6 +441,9 @@ export class BudgetService {
         expense,
         netEarned: received - expense,
         fullyCollected: agreedFee > 0 && received >= agreedFee,
+        ...(p.hizmet_projesi && p.job_owner_id && p.job_owner_id !== userId
+          ? { role: "provider" as const, counterpartName: musteriAdlari.get(p.job_owner_id) }
+          : {}),
       };
     });
 
@@ -518,6 +563,9 @@ export class BudgetService {
       // Hizmet veren üye, sahibin defterine kendi girdiği ödemeyi düzeltebilir
       // (bkz. hizmet-anlasmasi.ts). Diğer her satır proje yöneticisinin.
       if (uyeKendiOdemesiniYonetebilir(row, userId)) return row;
+      if (musteriKendiOdemesiniYonetebilir(row, userId) && (await this.hizmetProjesiMusterisiMi(row.project_id, userId))) {
+        return row;
+      }
       await this.assertCanManageBudget(row.project_id, userId);
       return row;
     }
@@ -553,7 +601,11 @@ export class BudgetService {
     // Üye kendi girdiği hizmet ödemesinde yalnızca tutarı, tarihi ve açıklamayı
     // değiştirir. Türü ya da projeyi değiştirebilseydi sahibin defterine
     // istediği satırı yazabilirdi.
-    if (userId && mevcut.owner_id !== userId && uyeKendiOdemesiniYonetebilir(mevcut, userId)) {
+    if (
+      userId &&
+      mevcut.owner_id !== userId &&
+      (uyeKendiOdemesiniYonetebilir(mevcut, userId) || musteriKendiOdemesiniYonetebilir(mevcut, userId))
+    ) {
       data = { amount: data.amount, description: data.description, occurredAt: data.occurredAt };
     }
 
@@ -618,6 +670,17 @@ export class BudgetService {
     const { error } = await this.supabase.client.from("budget_transactions").delete().eq("id", id);
     if (error) throw error;
     return { success: true };
+  }
+
+  /** Kullanıcı bu hizmet projesinin bağlı olduğu işin sahibi (hizmet alan) mı. */
+  private async hizmetProjesiMusterisiMi(projectId: string, userId: string): Promise<boolean> {
+    const { data } = await this.supabase.client
+      .from("projects")
+      .select("owner_id, hizmet_projesi, jobs(owner_id)")
+      .eq("id", projectId)
+      .maybeSingle();
+    const isSahibi = (data as any)?.jobs?.owner_id;
+    return !!data?.hizmet_projesi && isSahibi === userId && data.owner_id !== userId;
   }
 
   private async assertOwnsProject(projectId: string, userId: string): Promise<void> {

@@ -15,9 +15,11 @@ interface Props {
 const para = (n: number) => `${n.toLocaleString("tr-TR")} ₺`;
 
 /**
- * Proje sahibi (hizmet alan) ile projede hizmet veren üye arasındaki anlaşma.
+ * Hizmet alan ile hizmet veren arasındaki anlaşma — iki biçimde: proje sahibi ↔
+ * projedeki üye, ya da iş sahibi ↔ o işin altındaki hizmet projesinin sahibi
+ * (bkz. Project.hizmetProjesi). Bileşen ikisini aynı gösterir; farkı sunucu çözer.
  *
- * Neden ayrı bölüm: aynı ödeme sahibi için gider, üye için gelirdir. "Gelir mi
+ * Neden ayrı bölüm: aynı ödeme hizmet alan için gider, veren için gelirdir. "Gelir mi
  * gider mi" diye sormak ikisinden birine yanlış soru sormaktı; burada kayıt
  * "kim kime ödedi" diye giriliyor ve tür sunucuda yöne göre belirleniyor
  * (bkz. backend hizmet-anlasmasi.ts). İki taraf da girebilir.
@@ -48,7 +50,7 @@ export default function HizmetAnlasmalari({ projectId, currentUserId, onChanged 
     <div>
       <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 4px" }}>{t("Hizmet anlaşmaları")}</h4>
       <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 8px" }}>
-        {t("Proje sahibiyle projede hizmet veren kişi arasındaki ücret. Ödemeyi iki taraf da girebilir; sahibin defterinde gider, hizmet verenin Kasa'sında gelir olarak görünür.")}
+        {t("Hizmet alan ile hizmet veren arasındaki ücret. Ödemeyi iki taraf da girebilir; hizmet alan için gider, hizmet veren için gelir olarak görünür.")}
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {liste.map((a) => (
@@ -138,11 +140,13 @@ function AnlasmaKarti({
     }
   };
 
-  // Silme: sahip her satırı; hizmet veren yalnızca kendi girdiğini (sunucu da
-  // aynı kuralı uyguluyor, burada yalnızca düğmeyi gizliyoruz). Otomatik
-  // satırlar (görev bütçesi) kendi yerinden yönetilir.
+  // Silme: satırın yazıldığı defterin sahibi her satırı; karşı taraf yalnızca
+  // kendi girdiğini (sunucu da aynı kuralı uyguluyor, burada yalnızca düğmeyi
+  // gizliyoruz). Otomatik satırlar (görev bütçesi) kendi yerinden yönetilir.
   const silebilir = (o: BudgetTransaction) =>
-    a.canEdit && (o.source ?? "manual") === "manual" && (!benHizmetVerenim || o.createdBy === currentUserId);
+    a.canEdit &&
+    (o.source ?? "manual") === "manual" &&
+    (a.ledgerOwnerId === currentUserId || o.createdBy === currentUserId);
 
   const girdi = {
     fontSize: 14,

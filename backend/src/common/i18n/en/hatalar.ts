@@ -713,5 +713,9 @@ export const hatalar: TranslationDict = {
   "Bu anlaşmayı yalnızca proje sahibi ya da hizmet veren kişi değiştirebilir":
     "Only the project owner or the service provider can change this agreement",
   "Bu kişi projenin onaylı üyesi değil": "This person is not an approved member of the project",
-  "Proje sahibi kendi projesinde hizmet veren olamaz": "The project owner can't be a service provider on their own project",
+  "Bu anlaşmayı yalnızca iş sahibi ya da hizmet veren kişi değiştirebilir":
+    "Only the job owner or the service provider can change this agreement",
+  "Bu proje iş sahibine hizmet projesi olarak işaretli değil": "This project isn't marked as a service project for the job owner",
+  "Hizmet projesi yalnızca başkasının işi altındaki projede işaretlenebilir":
+    "A service project can only be marked on a project under someone else's job",
 };

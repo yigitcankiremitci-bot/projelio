@@ -1,7 +1,13 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { BudgetTransaction } from "@projelio/shared";
-import { aynaKayit, hizmetOzeti, hizmetYetkisi, uyeKendiOdemesiniYonetebilir } from "./hizmet-anlasmasi";
+import {
+  aynaKayit,
+  hizmetOzeti,
+  hizmetYetkisi,
+  musteriKendiOdemesiniYonetebilir,
+  uyeKendiOdemesiniYonetebilir,
+} from "./hizmet-anlasmasi";
 
 function tx(over: Partial<BudgetTransaction>): BudgetTransaction {
   return {
@@ -59,6 +65,29 @@ describe("aynaKayit", () => {
     assert.equal(a.mirror, true);
     assert.equal(a.counterpartyName, "Arda İrman");
     assert.equal(a.amount, 10000);
+  });
+
+  test("hizmet projesinin geliri iş sahibinde gider olur", () => {
+    const a = aynaKayit(tx({ type: "income", amount: 10000 }), "Can", "payout");
+    assert.equal(a.type, "payout");
+    assert.equal(a.readOnly, true);
+  });
+});
+
+describe("musteriKendiOdemesiniYonetebilir", () => {
+  const satir = { type: "income", created_by: "arda", owner_id: "can", source: "manual" };
+
+  test("iş sahibinin hizmet verenin defterine girdiği ödeme", () => {
+    assert.equal(musteriKendiOdemesiniYonetebilir(satir, "arda"), true);
+  });
+
+  test("hizmet verenin kendi girdiği satır iş sahibinin değil", () => {
+    assert.equal(musteriKendiOdemesiniYonetebilir({ ...satir, created_by: "can" }, "arda"), false);
+  });
+
+  test("gider satırı ya da otomatik satır", () => {
+    assert.equal(musteriKendiOdemesiniYonetebilir({ ...satir, type: "expense" }, "arda"), false);
+    assert.equal(musteriKendiOdemesiniYonetebilir({ ...satir, source: "recurring" }, "arda"), false);
   });
 });
 

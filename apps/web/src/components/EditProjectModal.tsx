@@ -45,6 +45,8 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   // Kapatılan sekmeler (bkz. TabVisibilitySection).
   const [hiddenTabs, setHiddenTabs] = useState<string[]>(project.hiddenTabs ?? []);
+  // İş sahibine hizmet verilen proje (bkz. Project.hizmetProjesi).
+  const [hizmetProjesi, setHizmetProjesi] = useState(!!project.hizmetProjesi);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -77,6 +79,9 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
         deadline: new Date(deadline).toISOString(),
         status,
         hiddenTabs,
+        // Değişmediyse gönderilmez: sunucu işaretlemeyi iş sahibi farklıysa
+        // kabul ediyor, kendi işindeki projede her kayıtta hata dönmesin.
+        ...(hizmetProjesi !== !!project.hizmetProjesi ? { hizmetProjesi } : {}),
         // Hazır kapak seçimi / kapağı kaldırma doğrudan bu alanla kaydedilir;
         // dosya yüklemesi ayrı uçtan gider. Değişmediyse hiç gönderilmez.
         ...(coverValue !== project.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
@@ -152,6 +157,23 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}
         />
+
+        {project.jobId && (
+          <label style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={hizmetProjesi}
+              onChange={(e) => setHizmetProjesi(e.target.checked)}
+              style={{ marginTop: 3 }}
+            />
+            <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ fontSize: 15, color: c.textPrimary }}>{t("Bu projede iş sahibine hizmet veriyorum")}</span>
+              <span style={{ fontSize: 13, color: c.textSecondary }}>
+                {t("İşaretlenirse projenin bütçesi yalnızca senin olur ve işin bütçesine eklenmez. İş sahibinin ödemeleri onun tarafında gider olarak görünür.")}
+              </span>
+            </span>
+          </label>
+        )}
 
         <TabVisibilitySection scope="project" value={hiddenTabs} onChange={setHiddenTabs} />
 

@@ -6,7 +6,7 @@ import AskLioButton from "../components/AskLioButton";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import { useBackTarget } from "../lib/backTarget";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
-import type { Project, ProjectMember, ProjectStatus, Task, TaskStatus } from "@projelio/shared";
+import type { HizmetAnlasmasi, Project, ProjectMember, ProjectStatus, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import StatusBadge from "../components/StatusBadge";
 import EditProjectModal from "../components/EditProjectModal";
@@ -117,12 +117,16 @@ export default function ProjectDetail() {
       : activeTab === "team"
       ? { label: t("Üye ekle"), onClick: () => teamRef.current?.openCreate() }
       : activeTab === "budget"
-      ? { label: t("Ödeme / gider ekle"), onClick: () => budgetRef.current?.openCreate() }
+      ? // Defter kaydını yalnızca proje sahibi girer; anlaşmanın tarafı olan
+        // diğerleri ödemeyi panelin içinden, "Hizmet anlaşmaları"ndan girer.
+        currentUserId === project?.ownerId
+        ? { label: t("Ödeme / gider ekle"), onClick: () => budgetRef.current?.openCreate() }
+        : null
       : activeTab === "files"
       ? // Dosyalar sekmesinin "+" eylemi panelin kendisinde (bkz. FilesPanel).
         null
       : { label: t("Deadline'ı değiştir"), onClick: () => setExtendingDeadline(true) },
-    [activeTab, project, id]
+    [activeTab, project, id, currentUserId]
   );
 
   // Süreç sekmesinin gün/hafta/ay/yıl gezinme durumu burada tutulur ki sekme değiştirince kaybolmasın.
@@ -208,14 +212,17 @@ export default function ProjectDetail() {
       setCanViewBudget(true);
       return;
     }
-    api
-      .get<ProjectMember[]>(`/projects/${id}/members`)
-      .then((members) => {
-        const mine = members.find((m) => m.userId === currentUserId);
-        setCanViewBudget(!!mine?.canViewBudget);
-      })
-      // Ekip listesini bile göremiyorsa bütçeyi hiç göremez.
-      .catch(() => setCanViewBudget(false));
+    // Hizmet anlaşmasının tarafı olan (iş sahibi ya da hizmet veren üye)
+    // bütçe izni olmasa da sekmeyi görür: panel ona yalnızca kendi anlaşmasını
+    // gösterir (bkz. BudgetPanel > HizmetAnlasmalari). Ekibe üye olmayan iş
+    // sahibi ekip listesini göremeyebilir; bu yüzden iki istek birbirini düşürmez.
+    Promise.all([
+      api.get<ProjectMember[]>(`/projects/${id}/members`).catch(() => [] as ProjectMember[]),
+      api.get<HizmetAnlasmasi[]>(`/projects/${id}/budget/hizmet`).catch(() => [] as HizmetAnlasmasi[]),
+    ]).then(([members, hizmet]) => {
+      const mine = members.find((m) => m.userId === currentUserId);
+      setCanViewBudget(!!mine?.canViewBudget || hizmet.length > 0);
+    });
   }, [id, currentUserId, project?.ownerId]);
 
   // Not: "yetki cevabı geç geldi, sekme kapandı" ve "başka projeye geçilince

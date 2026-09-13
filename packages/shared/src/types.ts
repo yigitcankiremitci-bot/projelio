@@ -837,6 +837,11 @@ export interface Project {
   sortOrder?: number;
   // Sahibinin kapattığı sekmeler (bkz. hiddenTabs açıklaması / TabScope).
   hiddenTabs?: string[];
+  /**
+   * Proje sahibi, projenin bağlı olduğu İŞİN sahibine hizmet veriyor
+   * (migration 111). Defter işe toplanmaz; gelirler işe gider olarak yansır.
+   */
+  hizmetProjesi?: boolean;
 }
 
 // --- Proje paylaşım linki (üyelik gerektirmeyen takip) -----------------------
@@ -1608,13 +1613,21 @@ export interface ProjectBudgetSummary {
  * Anlaşma tutarı project_members.custom_agreed_rate'te durur.
  */
 export interface HizmetAnlasmasi {
+  /**
+   * `uye`: proje sahibi ↔ projede hizmet veren üye (anlaşma project_members'ta).
+   * `proje`: iş sahibi ↔ hizmet projesinin sahibi (anlaşma projenin
+   * total_budget'ı, bkz. Project.hizmetProjesi).
+   */
+  kind: "uye" | "proje";
   projectId: string;
   memberId: string;
   userId: string;
   fullName?: string;
-  // Hizmet alan taraf: projenin sahibi.
+  // Hizmet ALAN taraf: `uye`de projenin sahibi, `proje`de işin sahibi.
   ownerId: string;
   ownerName?: string;
+  // Ödeme satırlarının yazıldığı defterin sahibi — silme yetkisi ona göre.
+  ledgerOwnerId: string;
   agreedFee: number;
   paid: number;
   remaining: number;

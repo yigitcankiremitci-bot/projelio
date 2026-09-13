@@ -14,6 +14,7 @@ import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { ButceErisimService } from "./butce-erisim.service";
 import type { ViewerKapsami } from "./butce-erisim";
 import { mapTransaction, mapRecurringPayment, SECIM, DUZENLI_SECIM } from "./butce-eslestirme";
+import { aynaKayit } from "./hizmet-anlasmasi";
 
 /**
  * Kademeler arası bütçe toplaması.
@@ -179,7 +180,9 @@ export class ButceHiyerarsiService {
       for (const org of kapsamlar.organizations) {
         const altJobIds = new Set(kapsamlar.jobs.filter((j) => j.organizationId === org.id).map((j) => j.id));
         const altDeptIds = new Set(kapsamlar.departments.filter((d) => d.organizationId === org.id).map((d) => d.id));
-        const altProjectIds = new Set(kapsamlar.projects.filter((p) => altJobIds.has(p.jobId)).map((p) => p.id));
+        const altProjectIds = new Set(
+          [...kapsamlar.projects, ...kapsamlar.hizmetProjeleri].filter((p) => altJobIds.has(p.jobId)).map((p) => p.id)
+        );
         const altOperationIds = new Set(kapsamlar.operations.filter((o) => altJobIds.has(o.jobId)).map((o) => o.id));
         cocuklar.push({
           scopeType: "organization",
@@ -208,7 +211,7 @@ export class ButceHiyerarsiService {
         });
       }
     } else if (scopeType === "job") {
-      for (const proje of kapsamlar.projects) {
+      for (const proje of [...kapsamlar.projects, ...kapsamlar.hizmetProjeleri]) {
         cocuklar.push({ scopeType: "project", id: proje.id, ad: proje.ad, icerdigi: (h) => h.projectId === proje.id });
       }
       for (const rutin of kapsamlar.operations) {
@@ -229,7 +232,9 @@ export class ButceHiyerarsiService {
   }
 
   private isCocugu(job: { id: string; ad: string }, kapsamlar: AltKapsamlar) {
-    const projeIds = new Set(kapsamlar.projects.filter((p) => p.jobId === job.id).map((p) => p.id));
+    const projeIds = new Set(
+      [...kapsamlar.projects, ...kapsamlar.hizmetProjeleri].filter((p) => p.jobId === job.id).map((p) => p.id)
+    );
     const rutinIds = new Set(kapsamlar.operations.filter((o) => o.jobId === job.id).map((o) => o.id));
     return {
       scopeType: "job" as BudgetScopeType,
@@ -256,20 +261,20 @@ export class ButceHiyerarsiService {
    * ayrışması demekti.
    */
   async altKapsamlar(scopeType: ViewerKapsami, scopeId: string): Promise<AltKapsamlar> {
-    const bos: AltKapsamlar = { organizations: [], jobs: [], departments: [], projects: [], operations: [] };
+    const bos: AltKapsamlar = { organizations: [], jobs: [], departments: [], projects: [], hizmetProjeleri: [], operations: [] };
 
     if (scopeType === "department") return bos;
 
     if (scopeType === "job") {
-      const [projects, operations] = await Promise.all([this.projeler([scopeId]), this.rutinler([scopeId])]);
-      return { ...bos, projects, operations };
+      const [{ projects, hizmetProjeleri }, operations] = await Promise.all([this.projeler([scopeId]), this.rutinler([scopeId])]);
+      return { ...bos, projects, hizmetProjeleri, operations };
     }
 
     if (scopeType === "organization") {
       const [jobs, departments] = await Promise.all([this.isler({ organizationIds: [scopeId] }), this.departmanlar([scopeId])]);
       const jobIds = jobs.map((j) => j.id);
-      const [projects, operations] = await Promise.all([this.projeler(jobIds), this.rutinler(jobIds)]);
-      return { ...bos, jobs, departments, projects, operations };
+      const [{ projects, hizmetProjeleri }, operations] = await Promise.all([this.projeler(jobIds), this.rutinler(jobIds)]);
+      return { ...bos, jobs, departments, projects, hizmetProjeleri, operations };
     }
 
     // group
@@ -281,8 +286,8 @@ export class ButceHiyerarsiService {
       this.departmanlar(orgIds),
     ]);
     const jobIds = jobs.map((j) => j.id);
-    const [projects, operations] = await Promise.all([this.projeler(jobIds), this.rutinler(jobIds)]);
-    return { organizations, jobs, departments, projects, operations };
+    const [{ projects, hizmetProjeleri }, operations] = await Promise.all([this.projeler(jobIds), this.rutinler(jobIds)]);
+    return { organizations, jobs, departments, projects, hizmetProjeleri, operations };
   }
 
   private async organizasyonlar(groupId: string) {
@@ -343,16 +348,36 @@ export class ButceHiyerarsiService {
     return (data ?? []).map((d: any) => ({ id: d.id as string, ad: d.name as string, organizationId: d.organization_id as string }));
   }
 
-  private async projeler(jobIds: string[]) {
-    if (jobIds.length === 0) return [];
+  /**
+   * İşlerin projeleri, iki ayrı listede.
+   *
+   * `hizmetProjeleri`: iş sahibine HİZMET VERİLEN projeler (migration 111).
+   * Bunlar `projects`e KONMAZ, çünkü o liste her yerde "bu kademenin parası"
+   * demek: hareketleri toplanır, kayıt hedefi olur, görev bütçeleri onay
+   * kuyruğuna düşer. Hizmet projesinin defteri hizmet verenin; işe yalnızca
+   * iş sahibinin yaptığı ödemeler gider olarak yansır (altKademeHareketleri).
+   */
+  private async projeler(jobIds: string[]): Promise<Pick<AltKapsamlar, "projects" | "hizmetProjeleri">> {
+    if (jobIds.length === 0) return { projects: [], hizmetProjeleri: [] };
     const { data, error } = await this.supabase.client
       .from("projects")
-      .select("id, title, job_id")
+      .select("id, title, job_id, owner_id, hizmet_projesi, jobs(owner_id)")
       .in("job_id", jobIds)
       .is("archived_at", null)
       .limit(LISTE_TAVANI);
     if (error) throw error;
-    return (data ?? []).map((p: any) => ({ id: p.id as string, ad: p.title as string, jobId: p.job_id as string }));
+    const projects: AltKapsamlar["projects"] = [];
+    const hizmetProjeleri: AltKapsamlar["hizmetProjeleri"] = [];
+    for (const p of (data ?? []) as any[]) {
+      const kayit = { id: p.id as string, ad: p.title as string, jobId: p.job_id as string };
+      // Kendi işinde işaretlenmiş bayrak anlamsız (bkz. HizmetAnlasmasiService.baglam).
+      if (p.hizmet_projesi && p.jobs?.owner_id && p.jobs.owner_id !== p.owner_id) {
+        hizmetProjeleri.push({ ...kayit, ownerId: p.owner_id as string });
+      } else {
+        projects.push(kayit);
+      }
+    }
+    return { projects, hizmetProjeleri };
   }
 
   private async rutinler(jobIds: string[]) {
@@ -408,8 +433,31 @@ export class ButceHiyerarsiService {
     ekle("department", kapsamlar.departments.map((d) => d.id));
     ekle("project", kapsamlar.projects.map((p) => p.id));
     ekle("operation", kapsamlar.operations.map((o) => o.id));
+    if (kapsamlar.hizmetProjeleri.length > 0) istekler.push(this.hizmetOdemeleri(kapsamlar.hizmetProjeleri));
     const sonuclar = await Promise.all(istekler);
     return sonuclar.flat();
+  }
+
+  /**
+   * Hizmet projelerine yapılan ödemeler, iş tarafının gözünden: hizmet verenin
+   * defterindeki `income` satırı burada `payout` (salt okunur). Satır tek
+   * kademeye aittir (projeye); burada yalnızca YANSIR, çift sayım olmaz çünkü
+   * projenin kendisi bu kademeye toplanmıyor.
+   */
+  private async hizmetOdemeleri(projeler: AltKapsamlar["hizmetProjeleri"]): Promise<BudgetTransaction[]> {
+    const { data, error } = await this.supabase.client
+      .from("budget_transactions")
+      .select(SECIM)
+      .in("project_id", projeler.map((p) => p.id))
+      .eq("type", "income")
+      .order("occurred_at", { ascending: false })
+      .limit(LISTE_TAVANI);
+    if (error) throw error;
+    const ownerIds = Array.from(new Set(projeler.map((p) => p.ownerId)));
+    const { data: kullanicilar } = await this.supabase.client.from("users").select("id, full_name").in("id", ownerIds);
+    const adlar = new Map<string, string>((kullanicilar ?? []).map((u: any) => [u.id, u.full_name]));
+    const sahipler = new Map(projeler.map((p) => [p.id, p.ownerId]));
+    return (data ?? []).map((r: any) => aynaKayit(mapTransaction(r), adlar.get(sahipler.get(r.project_id) ?? ""), "payout"));
   }
 
   private async duzenliOdemeler(scopeType: string, scopeId: string): Promise<RecurringPayment[]> {
@@ -476,6 +524,8 @@ export interface AltKapsamlar {
   jobs: { id: string; ad: string; organizationId?: string }[];
   departments: { id: string; ad: string; organizationId: string }[];
   projects: { id: string; ad: string; jobId: string }[];
+  /** İş sahibine hizmet verilen projeler — toplanmaz, ödemeleri yansır (bkz. projeler()). */
+  hizmetProjeleri: { id: string; ad: string; jobId: string; ownerId: string }[];
   operations: { id: string; ad: string; jobId: string }[];
 }
 

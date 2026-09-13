@@ -29,6 +29,8 @@ function mapProject(row: any): Project {
     sortOrder: row.sort_order ?? 0,
     // Kolon yoksa (migration 091 uygulanmadan) boş dizi: hiçbir sekme kapalı değil.
     hiddenTabs: sanitizeHiddenTabs("project", row.hidden_tabs),
+    // Kolon yoksa (migration 111 uygulanmadan) false: projeler eskisi gibi işe toplanır.
+    hizmetProjesi: row.hizmet_projesi ?? false,
   };
 }
 
@@ -227,6 +229,22 @@ export class ProjectsService {
     if (data.coverImageUrl !== undefined) patch.cover_image_url = data.coverImageUrl;
     // Tanınmayan/kilitli anahtarlar ve "hepsini gizle" listesi kayıttan önce elenir.
     if (data.hiddenTabs !== undefined) patch.hidden_tabs = sanitizeHiddenTabs("project", data.hiddenTabs);
+    if (data.hizmetProjesi !== undefined) {
+      // Bayrak yalnızca iş sahibi ile proje sahibi FARKLIYSA anlamlı; kendi
+      // işinde kendine hizmet veren biri defterini işten koparmış olurdu.
+      if (data.hizmetProjesi) {
+        const { data: proje } = await this.supabase.client
+          .from("projects")
+          .select("owner_id, jobs(owner_id)")
+          .eq("id", id)
+          .maybeSingle();
+        const isSahibi = (proje as any)?.jobs?.owner_id;
+        if (!isSahibi || isSahibi === proje?.owner_id) {
+          throw new BadRequestException("Hizmet projesi yalnızca başkasının işi altındaki projede işaretlenebilir");
+        }
+      }
+      patch.hizmet_projesi = !!data.hizmetProjesi;
+    }
 
     const { data: row, error } = await this.supabase.client
       .from("projects")

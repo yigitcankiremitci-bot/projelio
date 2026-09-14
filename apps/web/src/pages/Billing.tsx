@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { BillingOverview, BillingPlanView, Subscription } from "@projelio/shared";
 import { billingApi } from "../api/billing";
+import { kabuktaMi } from "../lib/mobilKabuk";
 import { ApiError } from "../api/client";
 import { IconSparkle, IconStar } from "../components/icons";
 import { demoHesap } from "../lib/demoHesap";
@@ -31,6 +32,9 @@ const DURUM_METINLERI: Record<Subscription["status"], string> = {
 };
 
 export default function BillingPage() {
+  // Mobil kabukta mıyız? Mağaza kuralı gereği ödeme akışları burada
+  // gösterilmiyor (bkz. aşağıdaki satinAlinabilir).
+  const kabukta = kabuktaMi();
   const c = useThemeColors();
   const t = useT();
   const [params, setParams] = useSearchParams();
@@ -245,11 +249,22 @@ export default function BillingPage() {
           )}
 
           <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+            {/* "Kartı güncelle" de iyzico ödeme formunu açıyor, yani o da
+                mağaza kuralına giriyor; kabukta gösterilmiyor. İPTAL kalıyor:
+                bir ödeme akışı değil ve kullanıcının aboneliğini sonlandırma
+                hakkını uygulamadan almak doğru olmaz. */}
             {abonelik.source === "iyzico" && !abonelik.cancelAtPeriodEnd && (
               <>
-                <button onClick={() => kartGuncelle(abonelik)} disabled={islemde !== null} style={koyuDugme(c)}>
-                  {islemde === "kart" ? t("Açılıyor…") : t("Kartı güncelle")}
-                </button>
+                {/* "Kartı güncelle" iyzico ödeme formunu açıyor, yani o da
+                    mağaza kuralına giriyor; kabukta gösterilmiyor. */}
+                {!kabukta && (
+                  <button onClick={() => kartGuncelle(abonelik)} disabled={islemde !== null} style={koyuDugme(c)}>
+                    {islemde === "kart" ? t("Açılıyor…") : t("Kartı güncelle")}
+                  </button>
+                )}
+                {/* İPTAL kabukta da duruyor: bir ödeme akışı değil ve
+                    kullanıcının aboneliğini sonlandırma hakkını uygulamadan
+                    almak doğru olmaz. */}
                 <button onClick={() => iptalEt(abonelik)} disabled={islemde !== null} style={koyuDugme(c, true)}>
                   {islemde === "iptal" ? t("İptal ediliyor…") : t("Paketi iptal et")}
                 </button>
@@ -299,7 +314,12 @@ export default function BillingPage() {
               const tahsilat = donem === "monthly" ? plan.charge.monthly : plan.charge.yearly;
               const usd = donem === "monthly" ? plan.priceUsd.monthly : plan.priceUsd.yearly;
               const bu = yururlukte && abonelik?.planKey === plan.key;
-              const satinAlinabilir = Boolean(tahsilat) && veri?.paymentConfigured && !demoHesabi && !yururlukte;
+              // MAĞAZA KURALI: uygulama içinden mağazanın ödeme sistemini
+              // atlayan bir satın alma akışı gösterilemez — Play ve App Store
+              // bunu reddediyor. Kabukta iyzico formu hiç açılmıyor.
+              // Mağaza içi satın alma geldiğinde bu dal onun yerini alacak.
+              const satinAlinabilir =
+                !kabukta && Boolean(tahsilat) && veri?.paymentConfigured && !demoHesabi && !yururlukte;
 
               return (
                 <div
@@ -367,7 +387,13 @@ export default function BillingPage() {
                       color: satinAlinabilir ? "#fff" : c.textSecondary,
                     }}
                   >
-                    {bu ? t("Mevcut paketin") : islemde === plan.key ? t("Açılıyor…") : t("Bu paketi seç")}
+                    {bu
+                      ? t("Mevcut paketin")
+                      : kabukta
+                        ? t("Uygulamada kullanılamıyor")
+                        : islemde === plan.key
+                          ? t("Açılıyor…")
+                          : t("Bu paketi seç")}
                   </button>
                 </div>
               );

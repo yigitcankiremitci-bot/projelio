@@ -14,6 +14,7 @@ export const abonelik: TranslationDict = {
     "Your plan's credits renew every month. Yearly billing gives you two months free; credits still arrive monthly.",
   "Mevcut paketin": "Your current plan",
   "Bu paketi seç": "Choose this plan",
+  "Uygulamada kullanılamıyor": "Not available in the app",
   Popüler: "Popular",
   Aylık: "Monthly",
   "Yıllık — 2 ay bedava": "Yearly — 2 months free",

@@ -240,3 +240,27 @@ yigitcankiremitci.com {
 www.yigitcankiremitci.com {
 	redir https://yigitcankiremitci.com{uri} permanent
 }
+
+# ------------------------------------------------------- budnal.app (ayrı proje)
+# Budnal bu VPS'te AYRI bir compose yığınında duruyor
+# (~projelio/apps/budnal/docker-compose.yml). budnal-app yalnız HTTP konuşuyor;
+# `projelio` ağına da bağlı olduğu için adıyla çözülüyor. Yığın kapalıysa
+# YALNIZ bu alan adı 502 verir; projelio ve diğer siteler etkilenmez.
+budnal.app {
+	encode zstd gzip
+	reverse_proxy budnal-app:8787 {
+		# Budy'nin SSE akışı tamponlanmadan iletilsin.
+		flush_interval -1
+	}
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# .app TLD'si zaten HSTS preload listesinde.
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+}
+
+www.budnal.app {
+	redir https://budnal.app{uri} permanent
+}

@@ -20,15 +20,26 @@ Links'te alan adı doğrulaması var, o risk yok.
 
 ## Parmak izleri
 
-Listedeki her parmak izi, uygulamayı imzalayan bir anahtara ait. Şu an yalnızca
-GELİŞTİRME (debug) anahtarı var; onunla üretilen APK'lar telefonda ve
-emülatörde doğrulanıyor.
+Listedeki her parmak izi, uygulamayı imzalayan bir anahtara ait. Üçü de
+gerekli ve hiçbiri silinmemeli:
 
-**Play'e ilk yüklemeden sonra Play App Signing'in verdiği SHA-256 parmak izi
-buraya EKLENMELİ** (Play Console > Yayın > Uygulama bütünlüğü). Eksik kalırsa
-mağazadan inen sürümde Google/Microsoft ile giriş sessizce tarayıcıda açılıp
-uygulamaya dönmez. Liste birden fazla parmak izi kabul eder; debug olanı
-silmeye gerek yok.
+| Sıra | Anahtar | Ne zaman kullanılır |
+|---|---|---|
+| 1 | Play App Signing — klasik | Mağazadan inen sürüm |
+| 2 | Play App Signing — kuantum sonrası (Beta) | Google bu anahtara geçerse mağaza sürümü |
+| 3 | Geliştirme (debug) | Elden kurulan APK'lar, emülatör |
+
+Play'in iki anahtarı Play Console > Google Play ile korunanlar > Uygulama
+imzalama sayfasından alındı (`.../app/<id>/keymanagement`). Değerler sayfada
+metin olarak GÖRÜNMÜYOR, yalnızca "kopyala" düğmesi var.
+
+Kuantum sonrası anahtar bilerek listede: Google o anahtara geçtiği gün eksik
+olsaydı giriş sessizce bozulurdu ve sebebi hiçbir yerde yazmazdı. Fazladan bir
+parmak izi ise hiçbir şeye mal olmuyor — eşleşmeyen satır yok sayılıyor.
+
+Yeni bir imza anahtarı devreye girerse (ör. anahtar değiştirme) buraya
+EKLENMELİ. Eksik kalırsa mağazadan inen sürümde Google/Microsoft ile giriş
+sessizce tarayıcıda açılıp uygulamaya dönmez, hata da vermez.
 
 ## Doğrulama
 

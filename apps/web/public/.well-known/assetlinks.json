@@ -5,6 +5,8 @@
       "namespace": "android_app",
       "package_name": "app.projelio.mobile",
       "sha256_cert_fingerprints": [
+        "03:D5:E4:DE:29:50:C1:66:DA:AF:0A:47:CE:E6:88:32:20:03:95:F5:A3:80:EE:D7:32:37:DB:AE:88:73:9D:65",
+        "1F:3F:02:B5:18:5F:B0:DF:13:ED:06:06:EB:6B:B8:0D:04:84:EA:DD:C1:8B:8F:4D:33:F5:FF:63:C6:AB:E9:85",
         "EE:99:87:44:B3:25:83:B6:38:D6:1E:09:C5:BF:17:A6:75:30:D6:89:9C:F6:A4:3D:2B:F8:9F:9F:0C:3B:F8:C8"
       ]
     }

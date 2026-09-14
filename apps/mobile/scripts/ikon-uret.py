@@ -29,7 +29,12 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 KOK = Path(__file__).resolve().parents[3]
-LOGO = KOK / "apps/web/public/logo.png"
+# YÜKSEK ÇÖZÜNÜRLÜKLÜ KAYNAK BURADA, web'deki logo.png'de DEĞİL.
+#
+# Web'deki logo.png 512 px'e indirildi: arayüzde en büyük 48 px kullanılıyor ve
+# 2160 px'lik dosya her ziyaretçiye boşuna iniyordu. Uygulama ikonu ise 1024 px
+# üretiliyor, yani web sürümünden büyütmek bulanık bir simge verirdi.
+LOGO = KOK / "apps/mobile/assets/logo-kaynak.png"
 CIKTI = KOK / "apps/mobile/assets"
 
 # packages/shared/src/theme.ts -> light.background. Bkz. yukarıdaki 2. madde.

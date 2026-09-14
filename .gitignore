@@ -57,3 +57,17 @@ out/
 # durmalarının bir sebebi yok ve yayın betiği bunları "commit'lenmemiş
 # değişiklik" sayıp yayını durduruyor.
 output/
+
+# --- Mobil kabuk (Capacitor) ---
+# android/ ve ios/ klasörleri `cap add` ile ÜRETİLİYOR ama repoda DURUYOR:
+# içlerinde elle yapılan ayarlar var (paket kimliği, izinler, App Links, imza
+# yapılandırması). Üretilen derleme çıktıları ise girmemeli.
+apps/mobile/android/app/build/
+apps/mobile/android/build/
+apps/mobile/android/.gradle/
+apps/mobile/android/local.properties
+apps/mobile/android/app/src/main/assets/public/
+apps/mobile/android/app/src/main/assets/capacitor.config.json
+apps/mobile/android/app/src/main/assets/capacitor.plugins.json
+apps/mobile/ios/App/App/public/
+apps/mobile/ios/App/Pods/

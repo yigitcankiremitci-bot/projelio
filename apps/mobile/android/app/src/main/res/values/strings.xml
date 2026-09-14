@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Projelio</string>
+    <string name="title_activity_main">Projelio</string>
+    <string name="package_name">app.projelio.mobile</string>
+    <string name="custom_url_scheme">app.projelio.mobile</string>
+</resources>

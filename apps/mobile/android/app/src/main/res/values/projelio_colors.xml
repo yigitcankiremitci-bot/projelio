@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Pencere arka planı. packages/shared/src/theme.ts -> light.primaryDark
+      ile aynı değer (#1C222C). Bkz. styles.xml AppTheme.NoActionBar.
+    -->
+    <color name="projelioWindowBackground">#1C222C</color>
+</resources>

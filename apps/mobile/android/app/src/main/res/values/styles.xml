@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <!-- Customize your theme here. -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <!--
+          Pencerenin arka planı: ESKİ WebView'lerde (Chromium < 140) güvenli alan
+          eklentisi env() yerine WebView'in KENDİSİNE dolgu uyguluyor. O dolgunun
+          bıraktığı bant WebView'i değil PENCEREYİ gösteriyor; "@null" bırakılınca
+          koyu temadaki uygulamanın üstünde bembeyaz bir şerit kalıyordu
+          (emülatörde görüldü). Uygulamanın varsayılan teması karanlık, bu yüzden
+          değer theme.ts'teki primaryDark ile aynı.
+        -->
+        <item name="android:background">@color/projelioWindowBackground</item>
+        <!-- Pencereyi boyayan öznitelik bu; "android:background" bir View
+             özniteliği ve tek başına bandı beyaz bırakıyordu (emülatörde
+             denendi). -->
+        <item name="android:windowBackground">@color/projelioWindowBackground</item>
+    </style>
+
+
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="android:background">@drawable/splash</item>
+    </style>
+</resources>

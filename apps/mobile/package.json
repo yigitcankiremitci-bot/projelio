@@ -2,23 +2,25 @@
   "name": "@projelio/mobile",
   "version": "0.1.0",
   "private": true,
-  "main": "node_modules/expo/AppEntry.js",
+  "description": "Projelio'nun mobil kabuğu. Ayrı bir uygulama DEĞİL: apps/web'in derlenmiş hâli Capacitor ile yerel bir WebView'e gömülür, yani telefondaki uygulama web'dekiyle birebir aynı koddur.",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios"
+    "ikon": "python3 scripts/ikon-uret.py && npx @capacitor/assets generate --android && python3 scripts/ikon-uret.py --android-duzelt",
+    "web:derle": "npm run build --workspace @projelio/web",
+    "esitle": "cap sync",
+    "android:hazirla": "npm run web:derle && cap sync android",
+    "android:apk": "npm run android:hazirla && node scripts/apk-uret.mjs"
   },
   "dependencies": {
-    "@projelio/shared": "*",
-    "@react-navigation/native": "^6.1.18",
-    "@react-navigation/native-stack": "^6.11.0",
-    "expo": "~51.0.0",
-    "expo-notifications": "~0.28.0",
-    "react": "18.2.0",
-    "react-native": "0.74.5",
-    "socket.io-client": "^4.7.5"
+    "@capacitor-community/safe-area": "^8.0.1",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/keyboard": "^8.0.5",
+    "@capacitor/splash-screen": "^8.0.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
     "typescript": "^5.5.4"
   }
 }

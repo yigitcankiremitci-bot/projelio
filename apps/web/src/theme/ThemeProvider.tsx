@@ -12,6 +12,7 @@ import {
   setSidebarPatternKey as persistSidebarPatternKey,
   setThemeMode as persistThemeMode,
 } from "./preferences";
+import { sistemCubuklariniTemayaUydur } from "../lib/mobilKabuk";
 
 interface ThemeContextValue {
   mode: ThemeMode;
@@ -62,6 +63,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     syncCssVariables(themeColors);
   }, [themeColors]);
+
+  // Mobil kabukta sistem çubuklarının (saat, pil, gezinme çizgisi) rengi de
+  // temayla birlikte değişmeli; tarayıcıda bu çağrı hiçbir şey yapmaz
+  // (bkz. lib/mobilKabuk.ts). Renklere değil MODA bağlı: accent değişince
+  // sistem çubuğunda değişecek bir şey yok.
+  useEffect(() => {
+    sistemCubuklariniTemayaUydur(mode);
+  }, [mode]);
 
   const setMode = (next: ThemeMode) => {
     setModeState(next);

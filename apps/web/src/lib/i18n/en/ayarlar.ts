@@ -102,6 +102,8 @@ export const ayarlar: TranslationDict = {
   "Kullanıcı Sözleşmesi": "Terms of Service",
   "Gizlilik Politikası": "Privacy Policy",
   "KVKK Aydınlatma Metni": "Data Protection Notice",
+  "Mesafeli Satış Sözleşmesi": "Distance Sales Agreement",
+  "İptal ve İade Koşulları": "Cancellation and Refund Policy",
 
   // ─────────────────────────────────────────────── Bulut depolama hesapları
   "Bulut depolama hesapları": "Cloud storage accounts",

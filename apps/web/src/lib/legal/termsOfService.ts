@@ -5,8 +5,12 @@
  * src/i18n/legal.ts). Birini değiştirirsen diğerini de güncelle; iki yerde
  * farklı yasal metin yayımlamak hukuki risktir.
  *
- * Köşeli parantezli alanlar ([ŞİRKET UNVANI] gibi) yayına almadan önce
- * doldurulmalı ve metin bir hukuk danışmanınca gözden geçirilmelidir.
+ * Künye bilgileri (unvan, adres, yetkili mahkeme) metnin içine doğrudan
+ * yazılıdır; şahıs işletmesi olduğumuz için MERSİS numarası, hizmet Türkiye'ye
+ * yönelik olduğu için de AB/BK temsilcisi yoktur — bu boşluklar bilerek boş
+ * değil, o cümlelerde açıkça belirtiliyor. Bilgi değişirse dört yer birden
+ * güncellenmeli: bu dosya, privacyPolicy.ts, kvkkNotice.ts ve
+ * landing/src/i18n/legal.ts.
  */
 import type { LegalDoc } from "./legalDoc";
 
@@ -37,7 +41,7 @@ export const termsDoc: LegalDoc = {
       {
         h: "1. Taraflar ve sözleşmenin konusu",
         p: [
-          "Bu Kullanıcı Sözleşmesi (\"Sözleşme\"), bir tarafta [ŞİRKET UNVANI] ([ADRES]) (\"Projelio\", \"biz\") ile diğer tarafta Hizmet'i kullanan gerçek veya tüzel kişi (\"Kullanıcı\", \"siz\") arasında kurulur.",
+          "Bu Kullanıcı Sözleşmesi (\"Sözleşme\"), bir tarafta Yiğitcan Kiremitci (şahıs işletmesi — Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye) (\"Projelio\", \"biz\") ile diğer tarafta Hizmet'i kullanan gerçek veya tüzel kişi (\"Kullanıcı\", \"siz\") arasında kurulur.",
           "Sözleşmenin konusu, Projelio'nun sunduğu iş, proje, görev, ekip, modül, bütçe ve yapay zekâ asistanı özelliklerinden oluşan bulut tabanlı yazılım hizmetinin (\"Hizmet\") hangi koşullarla kullanılacağıdır.",
           "Hesap oluşturarak, bir davet kabul ederek veya Hizmet'i kullanmaya devam ederek bu Sözleşme'yi ve ayrılmaz parçası olan Gizlilik Politikası'nı kabul etmiş sayılırsınız. Kabul etmiyorsanız Hizmet'i kullanmamalısınız.",
           "Ücretli paket satın alan tüketiciler bakımından Mesafeli Satış Sözleşmesi ile İptal ve İade Koşulları da uygulanır. Bu metinler arasında çelişki olursa, satın alma işlemine özgü konularda ilgili özel metin geçerlidir.",
@@ -220,7 +224,7 @@ export const termsDoc: LegalDoc = {
         h: "21. Uygulanacak hukuk ve uyuşmazlıkların çözümü",
         p: [
           "Bu Sözleşme Türk hukukuna tabidir.",
-          "Uyuşmazlıklarda [İL] Mahkemeleri ve İcra Daireleri yetkilidir.",
+          "Uyuşmazlıklarda İstanbul (Anadolu) Mahkemeleri ve İcra Daireleri yetkilidir.",
           "Tüketici sıfatını taşıyan kullanıcılar bakımından, parasal sınırlara göre Tüketici Hakem Heyetleri ile Tüketici Mahkemeleri'ne başvurma hakkı saklıdır; bu bölüm o hakkı sınırlamaz.",
           "Uyuşmazlığı yargıya taşımadan önce info@projelio.app adresinden bize yazmanızı rica ederiz; çoğu sorun bu aşamada çözülüyor.",
         ],
@@ -230,7 +234,7 @@ export const termsDoc: LegalDoc = {
         p: [
           "Bu Sözleşme, hesabınızı oluşturduğunuz anda yürürlüğe girer ve hesabınız açık kaldığı sürece geçerlidir.",
           "Sözleşme ekleri: Gizlilik Politikası, KVKK Aydınlatma Metni, Mesafeli Satış Sözleşmesi, İptal ve İade Koşulları.",
-          "İletişim: [ŞİRKET UNVANI], [ADRES] · info@projelio.app · [MERSİS / VERGİ DAİRESİ VE NUMARASI].",
+          "İletişim: Yiğitcan Kiremitci (şahıs işletmesi), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye · info@projelio.app · Kozyatağı VD 25750888104 · Şahıs işletmesi olduğumuzdan MERSİS numaramız bulunmamaktadır.",
           "Yürürlük tarihi: 21 Ağustos 2026.",
         ],
       },
@@ -247,7 +251,7 @@ export const termsDoc: LegalDoc = {
       {
         h: "1. Parties and subject matter",
         p: [
-          "This User Agreement (the \"Agreement\") is made between [COMPANY LEGAL NAME] ([ADDRESS]) (\"Projelio\", \"we\") and the individual or legal entity using the Service (\"User\", \"you\").",
+          "This User Agreement (the \"Agreement\") is made between Yiğitcan Kiremitci (sole proprietorship — Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye) (\"Projelio\", \"we\") and the individual or legal entity using the Service (\"User\", \"you\").",
           "Its subject matter is the terms on which you may use Projelio's cloud software service — the jobs, projects, tasks, teams, modules, budget and AI assistant features (the \"Service\").",
           "By creating an account, accepting an invitation or continuing to use the Service, you accept this Agreement and the Privacy Policy, which forms an integral part of it. If you do not accept them, you must not use the Service.",
           "For consumers purchasing a paid plan, the Distance Sales Agreement and the Cancellation and Refund Policy also apply. Where those documents conflict with this one, the specific document governs its own subject matter.",
@@ -430,7 +434,7 @@ export const termsDoc: LegalDoc = {
         h: "21. Governing law and dispute resolution",
         p: [
           "This Agreement is governed by Turkish law.",
-          "The Courts and Enforcement Offices of [CITY] have jurisdiction over disputes.",
+          "The Courts and Enforcement Offices of İstanbul (Anadolu), Türkiye have jurisdiction over disputes.",
           "For users who are consumers, the right to apply to the Consumer Arbitration Committees and Consumer Courts according to the applicable monetary thresholds is reserved; this section does not limit that right.",
           "Before taking a dispute to court, please write to us at info@projelio.app — most issues are resolved at that stage.",
         ],
@@ -440,7 +444,7 @@ export const termsDoc: LegalDoc = {
         p: [
           "This Agreement takes effect when you create your account and applies for as long as your account remains open.",
           "Annexes: the Privacy Policy, the KVKK Privacy Notice, the Distance Sales Agreement and the Cancellation and Refund Policy.",
-          "Contact: [COMPANY LEGAL NAME], [ADDRESS] · info@projelio.app · [TRADE REGISTRY / TAX OFFICE AND NUMBER].",
+          "Contact: Yiğitcan Kiremitci (sole proprietorship), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye · info@projelio.app · Kozyatağı Tax Office, tax/ID no 25750888104 · As a sole proprietorship we have no trade registry (MERSİS) number.",
           "Effective date: 21 August 2026.",
         ],
       },

@@ -566,6 +566,12 @@ export const tr = {
       { label: "E-posta", value: "info@projelio.app", href: "mailto:info@projelio.app" },
       { label: "WhatsApp", value: "Lio'ya yazın", href: "" },
       { label: "Destek saatleri", value: "Hafta içi 09:00 – 18:00 (TSİ)", href: "" },
+      {
+        label: "Adres",
+        value:
+          "Yiğitcan Kiremitci · Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul",
+        href: "",
+      },
     ],
     demoTitle: "Canlı demo isteyin",
     demoText: "30 dakikalık ekran paylaşımıyla Projelio'yu kendi iş akışınız üzerinden gösterelim. Ücretsiz ve satış baskısı yok.",
@@ -602,8 +608,6 @@ export const tr = {
       title: "İptal ve İade Koşulları",
       lede: "Aboneliğinizi ve kredi alımlarınızı hangi koşullarda iptal edip iade alabileceğiniz.",
     },
-    placeholder:
-      "Bu metin taslak niteliğindedir ve yayına almadan önce bir hukuk danışmanı tarafından şirket bilgilerinize göre güncellenmelidir.",
   },
 
   notFound: {

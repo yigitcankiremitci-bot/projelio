@@ -6,6 +6,12 @@ import { appLinks, path, site } from "@/lib/site";
 export default function Footer({ dict, locale }: { dict: Dict; locale: Locale }) {
   const year = new Date().getFullYear();
 
+  const legalName =
+    locale === "en" ? site.company.legalNameEn : site.company.legalName;
+  const taxLine = [site.company.taxOffice, site.company.taxNumber]
+    .filter(Boolean)
+    .join(" / ");
+
   const product = [
     { href: path(locale, "#lio"), label: dict.nav.lio },
     { href: path(locale, "#modules"), label: dict.nav.modules },
@@ -78,6 +84,17 @@ export default function Footer({ dict, locale }: { dict: Dict; locale: Locale })
             </ul>
           </div>
         </div>
+
+        {/*
+          Satıcı künyesi. Mesafeli Satış Sözleşmesi satıcının unvanına ve
+          adresine erişilebilir olmasını istiyor; boş bırakılan alanlar (vergi
+          dairesi/numarası) hiç yazılmıyor — "—" göstermek bilgi vermekten
+          beter görünüyordu.
+        */}
+        <p className="footer-legal">
+          {legalName} · {site.company.address}
+          {taxLine ? ` · ${taxLine}` : ""}
+        </p>
 
         <div className="footer-bottom">
           <span>

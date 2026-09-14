@@ -59,10 +59,6 @@ export default async function LegalPage({
           </p>
         </div>
 
-        <div className="alert alert-err" role="note">
-          {dict.legal.placeholder}
-        </div>
-
         <div className="prose">
           {sections.map((s) => (
             <section key={s.h}>

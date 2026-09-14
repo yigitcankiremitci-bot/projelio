@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { BillingOverview, BillingPlanView, Subscription } from "@projelio/shared";
 import { billingApi } from "../api/billing";
 import { ApiError } from "../api/client";
@@ -374,6 +374,19 @@ export default function BillingPage() {
             })}
         </div>
       )}
+
+      {/* Ön bilgilendirme. Mesafeli Sözleşmeler Yönetmeliği satın almadan ÖNCE
+          sözleşmenin ve iade koşullarının erişilebilir olmasını istiyor;
+          metinler paneldeki kendi adreslerinde (bkz. lib/legal). */}
+      <p style={{ marginTop: 22, maxWidth: 620, fontSize: 13, lineHeight: 1.7, color: c.textSecondary }}>
+        {t("Bir paket seçtiğinizde aşağıdaki metinleri kabul etmiş olursunuz:")}{" "}
+        <Link to="/distance" style={{ color: c.accent }}>
+          {t("Mesafeli Satış Sözleşmesi")}
+        </Link>{" · "}
+        <Link to="/refund" style={{ color: c.accent }}>
+          {t("İptal ve İade Koşulları")}
+        </Link>
+      </p>
 
       {/* iyzico ödeme formu buraya basılır (kendi açılır penceresini kurar). */}
       <div ref={formKabi} />

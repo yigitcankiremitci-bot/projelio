@@ -4,10 +4,9 @@ export type LegalSection = { h: string; p: string[] };
 type LegalDoc = Record<"tr" | "en", LegalSection[]>;
 
 /**
- * TASLAK METİNLER.
- * Yayına almadan önce şirket unvanı, adres, vergi bilgileri ve iş modelinize
- * göre bir hukuk danışmanı tarafından gözden geçirilmelidir.
- * Şirket bilgileri src/lib/site.ts içindeki `company` alanından gelir.
+ * Künye bilgileri (unvan, adres, yetkili mahkeme) metinlerin içine doğrudan
+ * yazılıdır; sayfa altındaki satır ise src/lib/site.ts içindeki `company`
+ * alanından gelir — bilgi değişirse ikisi birden güncellenmeli.
  *
  * `privacy` ve `terms` metinleri uygulamada da yayımlanıyor:
  * ../projelio/apps/web/src/lib/legal/{privacyPolicy,termsOfService}.ts —
@@ -228,9 +227,10 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
       {
         h: "19. Bize ulaşın",
         p: [
-          "Veri sorumlusu: [ŞİRKET UNVANI], [ADRES], [VERBİS KAYIT NUMARASI].",
+          "Veri sorumlusu: Yiğitcan Kiremitci (şahıs işletmesi), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye.",
+          "VERBİS: Veri Sorumluları Sicili'ne kayıt yükümlülüğü, yıllık çalışan sayısı 50'den az ve yıllık mali bilanço toplamı 25 milyon TL'nin altında olan, ana faaliyet konusu özel nitelikli kişisel veri işlemek olmayan veri sorumluları bakımından aranmamaktadır; işletmemiz bu kapsamdadır.",
           "Gizlilikle ilgili tüm sorularınız, talepleriniz ve şikâyetleriniz için: info@projelio.app",
-          "Avrupa Ekonomik Alanı ve Birleşik Krallık'taki ilgili kişiler için temsilcimiz: [AB/BK TEMSİLCİSİ — İSİM VE ADRES].",
+          "Avrupa Ekonomik Alanı ve Birleşik Krallık'taki ilgili kişiler: Hizmet Türkiye'ye yöneliktir ve AB/BK'de atanmış bir temsilcimiz bulunmamaktadır; taleplerinizi doğrudan info@projelio.app adresine iletebilirsiniz.",
           "Yürürlük tarihi: 7 Eylül 2026.",
         ],
       },
@@ -434,9 +434,10 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
       {
         h: "19. Contact us",
         p: [
-          "Data controller: [COMPANY LEGAL NAME], [ADDRESS], [VERBIS REGISTRATION NUMBER].",
+          "Data controller: Yiğitcan Kiremitci (sole proprietorship), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye.",
+          "VERBIS: data controllers with fewer than 50 employees and an annual balance sheet total below TRY 25 million, whose principal activity is not the processing of special categories of personal data, are not required to register with the Data Controllers' Registry; our business falls within that exemption.",
           "For any privacy question, request or complaint: info@projelio.app",
-          "Our representative for individuals in the European Economic Area and the United Kingdom: [EU/UK REPRESENTATIVE — NAME AND ADDRESS].",
+          "Individuals in the European Economic Area and the United Kingdom: the Service is directed at Türkiye and we have not appointed a representative in the EEA or the UK; you can send your requests directly to info@projelio.app.",
           "Effective date: 7 September 2026.",
         ],
       },
@@ -456,7 +457,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
       {
         h: "1. Taraflar ve sözleşmenin konusu",
         p: [
-          "Bu Kullanıcı Sözleşmesi (\"Sözleşme\"), bir tarafta [ŞİRKET UNVANI] ([ADRES]) (\"Projelio\", \"biz\") ile diğer tarafta Hizmet'i kullanan gerçek veya tüzel kişi (\"Kullanıcı\", \"siz\") arasında kurulur.",
+          "Bu Kullanıcı Sözleşmesi (\"Sözleşme\"), bir tarafta Yiğitcan Kiremitci (şahıs işletmesi — Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye) (\"Projelio\", \"biz\") ile diğer tarafta Hizmet'i kullanan gerçek veya tüzel kişi (\"Kullanıcı\", \"siz\") arasında kurulur.",
           "Sözleşmenin konusu, Projelio'nun sunduğu iş, proje, görev, ekip, modül, bütçe ve yapay zekâ asistanı özelliklerinden oluşan bulut tabanlı yazılım hizmetinin (\"Hizmet\") hangi koşullarla kullanılacağıdır.",
           "Hesap oluşturarak, bir davet kabul ederek veya Hizmet'i kullanmaya devam ederek bu Sözleşme'yi ve ayrılmaz parçası olan Gizlilik Politikası'nı kabul etmiş sayılırsınız. Kabul etmiyorsanız Hizmet'i kullanmamalısınız.",
           "Ücretli paket satın alan tüketiciler bakımından Mesafeli Satış Sözleşmesi ile İptal ve İade Koşulları da uygulanır. Bu metinler arasında çelişki olursa, satın alma işlemine özgü konularda ilgili özel metin geçerlidir.",
@@ -639,7 +640,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "21. Uygulanacak hukuk ve uyuşmazlıkların çözümü",
         p: [
           "Bu Sözleşme Türk hukukuna tabidir.",
-          "Uyuşmazlıklarda [İL] Mahkemeleri ve İcra Daireleri yetkilidir.",
+          "Uyuşmazlıklarda İstanbul (Anadolu) Mahkemeleri ve İcra Daireleri yetkilidir.",
           "Tüketici sıfatını taşıyan kullanıcılar bakımından, parasal sınırlara göre Tüketici Hakem Heyetleri ile Tüketici Mahkemeleri'ne başvurma hakkı saklıdır; bu bölüm o hakkı sınırlamaz.",
           "Uyuşmazlığı yargıya taşımadan önce info@projelio.app adresinden bize yazmanızı rica ederiz; çoğu sorun bu aşamada çözülüyor.",
         ],
@@ -649,7 +650,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         p: [
           "Bu Sözleşme, hesabınızı oluşturduğunuz anda yürürlüğe girer ve hesabınız açık kaldığı sürece geçerlidir.",
           "Sözleşme ekleri: Gizlilik Politikası, KVKK Aydınlatma Metni, Mesafeli Satış Sözleşmesi, İptal ve İade Koşulları.",
-          "İletişim: [ŞİRKET UNVANI], [ADRES] · info@projelio.app · [MERSİS / VERGİ DAİRESİ VE NUMARASI].",
+          "İletişim: Yiğitcan Kiremitci (şahıs işletmesi), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye · info@projelio.app · Kozyatağı VD 25750888104 · Şahıs işletmesi olduğumuzdan MERSİS numaramız bulunmamaktadır.",
           "Yürürlük tarihi: 21 Ağustos 2026.",
         ],
       },
@@ -666,7 +667,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
       {
         h: "1. Parties and subject matter",
         p: [
-          "This User Agreement (the \"Agreement\") is made between [COMPANY LEGAL NAME] ([ADDRESS]) (\"Projelio\", \"we\") and the individual or legal entity using the Service (\"User\", \"you\").",
+          "This User Agreement (the \"Agreement\") is made between Yiğitcan Kiremitci (sole proprietorship — Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye) (\"Projelio\", \"we\") and the individual or legal entity using the Service (\"User\", \"you\").",
           "Its subject matter is the terms on which you may use Projelio's cloud software service — the jobs, projects, tasks, teams, modules, budget and AI assistant features (the \"Service\").",
           "By creating an account, accepting an invitation or continuing to use the Service, you accept this Agreement and the Privacy Policy, which forms an integral part of it. If you do not accept them, you must not use the Service.",
           "For consumers purchasing a paid plan, the Distance Sales Agreement and the Cancellation and Refund Policy also apply. Where those documents conflict with this one, the specific document governs its own subject matter.",
@@ -849,7 +850,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "21. Governing law and dispute resolution",
         p: [
           "This Agreement is governed by Turkish law.",
-          "The Courts and Enforcement Offices of [CITY] have jurisdiction over disputes.",
+          "The Courts and Enforcement Offices of İstanbul (Anadolu), Türkiye have jurisdiction over disputes.",
           "For users who are consumers, the right to apply to the Consumer Arbitration Committees and Consumer Courts according to the applicable monetary thresholds is reserved; this section does not limit that right.",
           "Before taking a dispute to court, please write to us at info@projelio.app — most issues are resolved at that stage.",
         ],
@@ -859,7 +860,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         p: [
           "This Agreement takes effect when you create your account and applies for as long as your account remains open.",
           "Annexes: the Privacy Policy, the KVKK Privacy Notice, the Distance Sales Agreement and the Cancellation and Refund Policy.",
-          "Contact: [COMPANY LEGAL NAME], [ADDRESS] · info@projelio.app · [TRADE REGISTRY / TAX OFFICE AND NUMBER].",
+          "Contact: Yiğitcan Kiremitci (sole proprietorship), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye · info@projelio.app · Kozyatağı Tax Office, tax/ID no 25750888104 · As a sole proprietorship we have no trade registry (MERSİS) number.",
           "Effective date: 21 August 2026.",
         ],
       },
@@ -872,7 +873,8 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "1. Veri sorumlusu",
         p: [
           "6698 sayılı Kişisel Verilerin Korunması Kanunu (\"KVKK\") uyarınca veri sorumlusu sıfatıyla, kişisel verileriniz aşağıda açıklanan kapsamda işlenmektedir.",
-          "Veri sorumlusu: [ŞİRKET UNVANI], [ADRES], [VERBİS KAYIT NUMARASI]. İletişim: info@projelio.app",
+          "Veri sorumlusu: Yiğitcan Kiremitci (şahıs işletmesi), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye. İletişim: info@projelio.app",
+          "VERBİS: Veri Sorumluları Sicili'ne kayıt yükümlülüğü, yıllık çalışan sayısı 50'den az ve yıllık mali bilanço toplamı 25 milyon TL'nin altında olan, ana faaliyet konusu özel nitelikli kişisel veri işlemek olmayan veri sorumluları bakımından aranmamaktadır; işletmemiz bu kapsamdadır.",
           "Organizasyonunuzun Projelio içinde ürettiği içerik bakımından veri sorumlusu organizasyonunuzdur; biz veri işleyen sıfatıyla hareket ederiz.",
         ],
       },
@@ -932,7 +934,8 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "1. Data controller",
         p: [
           "Under Turkish Personal Data Protection Law no. 6698 (\"KVKK\"), your personal data is processed as data controller within the scope described below.",
-          "Data controller: [COMPANY LEGAL NAME], [ADDRESS], [VERBIS REGISTRATION NUMBER]. Contact: info@projelio.app",
+          "Data controller: Yiğitcan Kiremitci (sole proprietorship), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye. Contact: info@projelio.app",
+          "VERBIS: data controllers with fewer than 50 employees and an annual balance sheet total below TRY 25 million, whose principal activity is not the processing of special categories of personal data, are not required to register with the Data Controllers' Registry; our business falls within that exemption.",
           "For the content your organisation creates inside Projelio, your organisation is the controller and we act as a processor.",
         ],
       },
@@ -994,7 +997,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
       {
         h: "1. Taraflar",
         p: [
-          "SATICI: sitenin altbilgisinde unvanı, adresi, vergi dairesi ve numarası belirtilen şirket.",
+          "SATICI: Yiğitcan Kiremitci (şahıs işletmesi), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye · Kozyatağı VD 25750888104 · info@projelio.app.",
           "ALICI: Projelio hizmetine abone olan veya kredi satın alan gerçek ya da tüzel kişi.",
         ],
       },
@@ -1034,7 +1037,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
       {
         h: "1. Parties",
         p: [
-          "SELLER: the company whose name, address and tax details appear in the site footer.",
+          "SELLER: Yiğitcan Kiremitci (sole proprietorship), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye · Kozyatağı Tax Office, tax/ID no 25750888104 · info@projelio.app.",
           "BUYER: the natural or legal person subscribing to Projelio or purchasing credits.",
         ],
       },

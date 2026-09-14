@@ -5,8 +5,12 @@
  * src/i18n/legal.ts). Birini değiştirirsen diğerini de güncelle; iki yerde
  * farklı yasal metin yayımlamak hukuki risktir.
  *
- * Köşeli parantezli alanlar ([ŞİRKET UNVANI] gibi) yayına almadan önce
- * doldurulmalı ve metin bir hukuk danışmanınca gözden geçirilmelidir.
+ * Künye bilgileri (unvan, adres, yetkili mahkeme) metnin içine doğrudan
+ * yazılıdır; şahıs işletmesi olduğumuz için MERSİS numarası, hizmet Türkiye'ye
+ * yönelik olduğu için de AB/BK temsilcisi yoktur — bu boşluklar bilerek boş
+ * değil, o cümlelerde açıkça belirtiliyor. Bilgi değişirse dört yer birden
+ * güncellenmeli: bu dosya, privacyPolicy.ts, kvkkNotice.ts ve
+ * landing/src/i18n/legal.ts.
  *
  * BURADAKİ HER CÜMLE BİR TAAHHÜT. Metni değiştirmeden önce kodda karşılığı
  * olduğundan emin ol; §12'deki saklama süreleri
@@ -230,9 +234,10 @@ export const privacyDoc: LegalDoc = {
       {
         h: "19. Bize ulaşın",
         p: [
-          "Veri sorumlusu: [ŞİRKET UNVANI], [ADRES], [VERBİS KAYIT NUMARASI].",
+          "Veri sorumlusu: Yiğitcan Kiremitci (şahıs işletmesi), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye.",
+          "VERBİS: Veri Sorumluları Sicili'ne kayıt yükümlülüğü, yıllık çalışan sayısı 50'den az ve yıllık mali bilanço toplamı 25 milyon TL'nin altında olan, ana faaliyet konusu özel nitelikli kişisel veri işlemek olmayan veri sorumluları bakımından aranmamaktadır; işletmemiz bu kapsamdadır.",
           "Gizlilikle ilgili tüm sorularınız, talepleriniz ve şikâyetleriniz için: info@projelio.app",
-          "Avrupa Ekonomik Alanı ve Birleşik Krallık'taki ilgili kişiler için temsilcimiz: [AB/BK TEMSİLCİSİ — İSİM VE ADRES].",
+          "Avrupa Ekonomik Alanı ve Birleşik Krallık'taki ilgili kişiler: Hizmet Türkiye'ye yöneliktir ve AB/BK'de atanmış bir temsilcimiz bulunmamaktadır; taleplerinizi doğrudan info@projelio.app adresine iletebilirsiniz.",
           "Yürürlük tarihi: 7 Eylül 2026.",
         ],
       },
@@ -436,9 +441,10 @@ export const privacyDoc: LegalDoc = {
       {
         h: "19. Contact us",
         p: [
-          "Data controller: [COMPANY LEGAL NAME], [ADDRESS], [VERBIS REGISTRATION NUMBER].",
+          "Data controller: Yiğitcan Kiremitci (sole proprietorship), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye.",
+          "VERBIS: data controllers with fewer than 50 employees and an annual balance sheet total below TRY 25 million, whose principal activity is not the processing of special categories of personal data, are not required to register with the Data Controllers' Registry; our business falls within that exemption.",
           "For any privacy question, request or complaint: info@projelio.app",
-          "Our representative for individuals in the European Economic Area and the United Kingdom: [EU/UK REPRESENTATIVE — NAME AND ADDRESS].",
+          "Individuals in the European Economic Area and the United Kingdom: the Service is directed at Türkiye and we have not appointed a representative in the EEA or the UK; you can send your requests directly to info@projelio.app.",
           "Effective date: 7 September 2026.",
         ],
       },

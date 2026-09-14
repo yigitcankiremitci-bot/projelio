@@ -648,6 +648,28 @@ export default function Settings() {
             </span>
             <IconChevronRight size={16} color={c.textSecondary} />
           </button>
+
+          <div style={{ borderTop: `1px solid ${c.border}` }} />
+
+          {/* Satın alma bu panelde yapılıyor; mesafeli satış sözleşmesi ve iade
+              koşulları ödemeden önce buradan okunabilmeli. */}
+          <button onClick={() => openLegal("/distance")} style={linkRowStyle}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <IconFile size={17} color={c.textSecondary} />
+              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("Mesafeli Satış Sözleşmesi")}</span>
+            </span>
+            <IconChevronRight size={16} color={c.textSecondary} />
+          </button>
+
+          <div style={{ borderTop: `1px solid ${c.border}` }} />
+
+          <button onClick={() => openLegal("/refund")} style={linkRowStyle}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <IconFile size={17} color={c.textSecondary} />
+              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("İptal ve İade Koşulları")}</span>
+            </span>
+            <IconChevronRight size={16} color={c.textSecondary} />
+          </button>
         </div>
       </CardGroup>
 

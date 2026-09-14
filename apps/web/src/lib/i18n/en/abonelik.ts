@@ -2,6 +2,12 @@ import type { TranslationDict } from "@projelio/shared";
 
 /** Paket (abonelik) ekranı — bkz. apps/web/src/pages/Billing.tsx. */
 export const abonelik: TranslationDict = {
+  // ══════════════════════════════════════════════════════ Ödeme öncesi bilgilendirme
+  "Bir paket seçtiğinizde aşağıdaki metinleri kabul etmiş olursunuz:":
+    "By choosing a plan you accept the following:",
+  "Mesafeli Satış Sözleşmesi": "Distance Sales Agreement",
+  "İptal ve İade Koşulları": "Cancellation and Refund Policy",
+
   // ══════════════════════════════════════════════════════ Ekran
   Paketim: "My plan",
   "Paketindeki krediler her ay yenilenir. Yıllık ödemede iki ay bedava; krediler yine her ay yüklenir.":

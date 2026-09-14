@@ -29,12 +29,22 @@ export const site = {
     instagram: "https://www.instagram.com/projelio",
     x: "https://x.com/projelio",
   },
+  /**
+   * Yasal künye. Mesafeli Satış Sözleşmesi ve e-ticaret mevzuatı satıcının
+   * unvanını ve adresini erişilebilir kılmayı istiyor; sayfa altbilgisi ve
+   * yasal metinlerin son bölümü bunu gösteriyor.
+   *
+   * Şahıs işletmesi olduğu için MERSİS numarası YOK — boş unutulmuş bir alan
+   * değil, gerçekten bulunmuyor (altbilgi bu alanı boşsa hiç yazmıyor).
+   */
   company: {
-    legalName: "Projelio Yazılım A.Ş.",
-    address: "İstanbul, Türkiye",
-    taxOffice: "—",
-    taxNumber: "—",
-    mersis: "—",
+    legalName: "Yiğitcan Kiremitci",
+    legalNameEn: "Yiğitcan Kiremitci (sole proprietorship)",
+    address:
+      "Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye",
+    taxOffice: "Kozyatağı VD",
+    taxNumber: "25750888104",
+    mersis: "",
   },
 } as const;
 

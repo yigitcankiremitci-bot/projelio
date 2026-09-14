@@ -560,6 +560,12 @@ export const en: Dict = {
       { label: "Email", value: "info@projelio.app", href: "mailto:info@projelio.app" },
       { label: "WhatsApp", value: "Message Lio", href: "" },
       { label: "Support hours", value: "Weekdays 09:00 – 18:00 (GMT+3)", href: "" },
+      {
+        label: "Address",
+        value:
+          "Yiğitcan Kiremitci · Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye",
+        href: "",
+      },
     ],
     demoTitle: "Request a live demo",
     demoText: "In a 30-minute screen share we'll walk through Projelio using your own workflow. Free, and no sales pressure.",
@@ -596,8 +602,6 @@ export const en: Dict = {
       title: "Cancellation and Refund Policy",
       lede: "When and how you can cancel your subscription or get a refund on credits.",
     },
-    placeholder:
-      "This text is a draft and must be reviewed by a lawyer and adapted to your company details before going live.",
   },
 
   notFound: {

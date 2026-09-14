@@ -36,7 +36,8 @@ export const kvkkDoc: LegalDoc = {
         h: "1. Veri sorumlusu",
         p: [
           "6698 sayılı Kişisel Verilerin Korunması Kanunu (\"KVKK\") uyarınca veri sorumlusu sıfatıyla, kişisel verileriniz aşağıda açıklanan kapsamda işlenmektedir.",
-          "Veri sorumlusu: [ŞİRKET UNVANI], [ADRES], [VERBİS KAYIT NUMARASI]. İletişim: info@projelio.app",
+          "Veri sorumlusu: Yiğitcan Kiremitci (şahıs işletmesi), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye. İletişim: info@projelio.app",
+          "VERBİS: Veri Sorumluları Sicili'ne kayıt yükümlülüğü, yıllık çalışan sayısı 50'den az ve yıllık mali bilanço toplamı 25 milyon TL'nin altında olan, ana faaliyet konusu özel nitelikli kişisel veri işlemek olmayan veri sorumluları bakımından aranmamaktadır; işletmemiz bu kapsamdadır.",
           "Organizasyonunuzun Projelio içinde ürettiği içerik bakımından veri sorumlusu organizasyonunuzdur; biz veri işleyen sıfatıyla hareket ederiz.",
         ],
       },
@@ -96,7 +97,8 @@ export const kvkkDoc: LegalDoc = {
         h: "1. Data controller",
         p: [
           "Under Turkish Personal Data Protection Law no. 6698 (\"KVKK\"), your personal data is processed as data controller within the scope described below.",
-          "Data controller: [COMPANY LEGAL NAME], [ADDRESS], [VERBIS REGISTRATION NUMBER]. Contact: info@projelio.app",
+          "Data controller: Yiğitcan Kiremitci (sole proprietorship), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye. Contact: info@projelio.app",
+          "VERBIS: data controllers with fewer than 50 employees and an annual balance sheet total below TRY 25 million, whose principal activity is not the processing of special categories of personal data, are not required to register with the Data Controllers' Registry; our business falls within that exemption.",
           "For the content your organisation creates inside Projelio, your organisation is the controller and we act as a processor.",
         ],
       },

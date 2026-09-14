@@ -77,6 +77,8 @@ const TasksOverview = lazy(() => import("./pages/TasksOverview"));
 const WorkLog = lazy(() => import("./pages/WorkLog"));
 const AiCreditsPage = lazy(() => import("./pages/AiCredits"));
 const BillingPage = lazy(() => import("./pages/Billing"));
+const DistanceSales = lazy(() => import("./pages/DistanceSales"));
+const Refund = lazy(() => import("./pages/Refund"));
 
 const HEADER_HEIGHT = 76;
 
@@ -630,6 +632,8 @@ export default function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/kvkk" element={<Kvkk />} />
+          <Route path="/distance" element={<DistanceSales />} />
+          <Route path="/refund" element={<Refund />} />
           <Route path="/takip/:token" element={<PublicProject />} />
         </Routes>
       </Suspense>

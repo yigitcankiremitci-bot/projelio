@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { driveApi, oneDriveApi } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { girisAdresiniSistemTarayicisindaAc } from "../lib/mobilKabuk";
 
 /**
  * Giriş/kayıt ekranlarındaki sağlayıcı düğmeleri (Google, Microsoft).
@@ -102,8 +103,17 @@ function ProviderButton({
     onError("");
     try {
       const { url } = await requestUrl();
-      if (url) window.location.href = url;
-      else {
+      if (url) {
+        // Mobil kabukta aynı sekmede yönlendirmek ÇALIŞMAZ: Google gömülü
+        // WebView'da giriş sayfasını açmayı reddediyor. Adres sistem
+        // tarayıcısına verilir; dönüşü App Link olarak uygulama yakalar
+        // (bkz. lib/mobilKabuk.ts). Tarayıcıda bu çağrı false döner ve
+        // her şey eskisi gibi işler.
+        if (!girisAdresiniSistemTarayicisindaAc(url)) window.location.href = url;
+        // Kabukta sayfa DEĞİŞMİYOR; düğme "Yönlendiriliyor…" hâlinde asılı
+        // kalmasın, kullanıcı vazgeçip geri dönebilir.
+        else setBusy(false);
+      } else {
         setBusy(false);
         onError(t("Bu giriş yöntemi şu anda kullanılamıyor."));
       }

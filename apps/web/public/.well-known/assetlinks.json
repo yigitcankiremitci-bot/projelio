@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.projelio.mobile",
+      "sha256_cert_fingerprints": [
+        "EE:99:87:44:B3:25:83:B6:38:D6:1E:09:C5:BF:17:A6:75:30:D6:89:9C:F6:A4:3D:2B:F8:9F:9F:0C:3B:F8:C8"
+      ]
+    }
+  }
+]

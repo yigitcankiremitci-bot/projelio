@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { Routes, Route, Link, useLocation, useParams, Navigate } from "react-router-dom";
+import { Routes, Route, Link, useLocation, useNavigate, useParams, Navigate } from "react-router-dom";
 import type { User } from "@projelio/shared";
 import { api } from "./api/client";
 import Sidebar from "./components/Sidebar";
@@ -20,6 +20,7 @@ import { getSidebarDefaultOpen, useAppPrefs } from "./lib/appPrefs";
 import { refreshSession } from "./lib/session";
 import { useEtkinlikSayaci } from "./lib/etkinlikSayaci";
 import { SIDEBAR_WIDTH, pageGutter, Z, TOP_CHROME, SAFE_TOP, safeTop } from "./lib/layout";
+import { kabukDonusunuDinle } from "./lib/mobilKabuk";
 import UploadTray, { UPLOAD_TRAY_HEIGHT } from "./components/UploadTray";
 import { useUploads } from "./lib/uploadQueue";
 import { CoverBackLink } from "./components/EntityCover";
@@ -535,6 +536,16 @@ function CoverStickyHeader({
 
 export default function App() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // MOBİL KABUKTA SAĞLAYICI DÖNÜŞÜ.
+  //
+  // Google/Microsoft ile giriş, kabukta sistem tarayıcısında açılıyor (gömülü
+  // WebView reddediliyor). Zincirin sonunda backend .../google/return adresine
+  // yönlendiriyor ve Android o adresi doğrulanmış bir App Link olarak
+  // uygulamaya teslim ediyor; buradan router'a aktarılıyor, gerisi her zamanki
+  // dönüş ekranı (bkz. lib/mobilKabuk.ts). Tarayıcıda hiçbir şey yapmaz.
+  useEffect(() => kabukDonusunuDinle((yol) => navigate(yol, { replace: true })), [navigate]);
   // Google dönüş ekranı da kimlik doğrulaması gerektirmeyen bir ekrandır: token
   // henüz yerel depoda yok, tam da burada oluşturuluyor. Korumalı bölgeye
   // koyarsak /login'e yönlenir ve akış hiç tamamlanamaz.

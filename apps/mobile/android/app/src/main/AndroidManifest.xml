@@ -18,6 +18,34 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!--
+              GOOGLE / MICROSOFT İLE GİRİŞİN DÖNÜŞ YOLU.
+
+              Google gömülü WebView'da giriş sayfasını açmayı reddediyor
+              (disallowed_useragent), bu yüzden adres sistem tarayıcısında
+              açılıyor. Zincirin sonunda backend
+              https://app.projelio.app/google/return?code=... adresine
+              yönlendiriyor; bu filtre sayesinde Android o adresi tarayıcıda
+              açmak yerine uygulamaya teslim ediyor.
+
+              autoVerify: Android, https://app.projelio.app/.well-known/assetlinks.json
+              dosyasını indirip uygulamanın imza parmak izini orada arıyor;
+              eşleşmezse filtre çalışmaz ve adres sessizce tarayıcıda açılır.
+              Parmak izleri o dosyada — Play'e yükledikten sonra Play App
+              Signing'in parmak izi de EKLENMELİ (bkz. docs/mobil-app-links.md).
+
+              YALNIZCA İKİ YOL: alan adının tamamı talep edilirse siteye giden
+              her bağlantı uygulamayı açardı (ör. e-postadaki şifre sıfırlama
+              bağlantısı), ki istenen bu değil.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="app.projelio.app" android:path="/google/return" />
+                <data android:scheme="https" android:host="app.projelio.app" android:path="/microsoft/return" />
+            </intent-filter>
         </activity>
 
         <provider

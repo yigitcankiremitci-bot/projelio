@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { driveApi } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { kabukDonusuTarayicidaMi, kabukIsaretiniTemizle } from "../lib/mobilKabuk";
+import KabugaDonKarti from "../components/KabugaDonKarti";
 
 /**
  * Google akışından dönüş ekranı.
@@ -17,18 +19,27 @@ export default function GoogleReturn() {
   const c = useThemeColors();
   const t = useT();
   const [error, setError] = useState("");
+  // Dönüş tarayıcıda kaldıysa kurtarma ekranı gösterilir ve devir kodu
+  // TAKAS EDİLMEZ; kod tek kullanımlık, burada harcanırsa kullanıcı
+  // uygulamaya hiç geçemez (bkz. components/KabugaDonKarti).
+  const [kurtarma, setKurtarma] = useState(false);
+  const [tarayicidaDevam, setTarayicidaDevam] = useState(false);
   // React 18 StrictMode geliştirmede effect'i iki kez çalıştırır; kod tek
   // kullanımlık olduğu için ikinci çağrı "geçersiz kod" hatası verirdi.
   const handled = useRef(false);
 
   useEffect(() => {
     if (handled.current) return;
+    if (!tarayicidaDevam && kabukDonusuTarayicidaMi(params.get("next"))) {
+      setKurtarma(true);
+      return;
+    }
     handled.current = true;
 
     const errorParam = params.get("error");
     const code = params.get("code");
     const connected = params.get("connected");
-    const next = params.get("next");
+    const next = kabukIsaretiniTemizle(params.get("next"));
 
     if (errorParam) {
       setError(
@@ -57,7 +68,7 @@ export default function GoogleReturn() {
         window.location.replace(next || "/");
       })
       .catch((e: Error) => setError(e.message));
-  }, [params]);
+  }, [params, tarayicidaDevam]);
 
   return (
     <div
@@ -82,7 +93,14 @@ export default function GoogleReturn() {
         }}
       >
         <img src="/logo.png" alt="Projelio" style={{ width: 44, height: 44, marginBottom: 14 }} />
-        {error ? (
+        {kurtarma ? (
+          <KabugaDonKarti
+            onTarayicidaDevam={() => {
+              setKurtarma(false);
+              setTarayicidaDevam(true);
+            }}
+          />
+        ) : error ? (
           <>
             <h1 style={{ fontSize: 19, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>
               {t("Google ile devam edilemedi")}

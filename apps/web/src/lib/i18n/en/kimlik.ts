@@ -95,6 +95,16 @@ export const kimlik: TranslationDict = {
 
   // ══════════════════════════════════════════════════════ Google / Microsoft dönüşü
   "Google ile devam edilemedi": "Couldn't continue with Google",
+
+  // Sağlayıcı dönüşü tarayıcıda kaldığında çıkan kurtarma ekranı
+  // (bkz. components/KabugaDonKarti.tsx).
+  "Girişi uygulamada tamamla": "Finish signing in in the app",
+  "Giriş doğrulandı. Devam etmek için Projelio uygulamasına dönmen gerekiyor.":
+    "You're signed in. To continue, you need to return to the Projelio app.",
+  "Projelio'da aç": "Open in Projelio",
+  "Uygulama açılmadıysa: Ayarlar > Uygulamalar > Projelio > Varsayılan olarak aç bölümünden app.projelio.app bağlantılarını aç.":
+    "If the app didn't open: go to Settings > Apps > Projelio > Open by default and turn on app.projelio.app links.",
+  "Bunun yerine tarayıcıda devam et": "Continue in the browser instead",
   "Google izni verilmedi. Devam etmek için izin vermeniz gerekiyor.":
     "Google access wasn't granted. You need to allow it to continue.",
   "Google'dan beklenen yanıt gelmedi.": "Google didn't return the expected response.",

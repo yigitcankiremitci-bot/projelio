@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { driveApi, oneDriveApi } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
-import { girisAdresiniSistemTarayicisindaAc } from "../lib/mobilKabuk";
+import { girisAdresiniSistemTarayicisindaAc, kabukDonusHedefi, kabuktaMi } from "../lib/mobilKabuk";
 
 /**
  * Giriş/kayıt ekranlarındaki sağlayıcı düğmeleri (Google, Microsoft).
@@ -52,7 +52,7 @@ export default function SocialSignInButtons({ verb }: { verb: "giris" | "kayit" 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {googleReady && (
           <ProviderButton
-            requestUrl={() => driveApi.loginUrl()}
+            requestUrl={(next) => driveApi.loginUrl(next)}
             label={verb === "giris" ? t("Google ile giriş yap") : t("Google ile kayıt ol")}
             glyph={<GoogleGlyph />}
             onError={setError}
@@ -60,7 +60,7 @@ export default function SocialSignInButtons({ verb }: { verb: "giris" | "kayit" 
         )}
         {microsoftReady && (
           <ProviderButton
-            requestUrl={() => oneDriveApi.loginUrl()}
+            requestUrl={(next) => oneDriveApi.loginUrl(next)}
             label={verb === "giris" ? t("Microsoft ile giriş yap") : t("Microsoft ile kayıt ol")}
             // Kullanıcı çoğu zaman hesabını "Outlook hesabı" diye biliyor;
             // düğmenin markası Microsoft olmak zorunda (marka kuralları).
@@ -88,7 +88,7 @@ function ProviderButton({
    * ömürlü. Ekranı açık bırakıp sonra tıklayan kullanıcı, açılışta alınmış bir
    * adresle "istek süresi dolmuş" hatasına düşerdi.
    */
-  requestUrl: () => Promise<{ configured: boolean; url: string | null }>;
+  requestUrl: (next?: string) => Promise<{ configured: boolean; url: string | null }>;
   label: string;
   hint?: string;
   glyph: React.ReactNode;
@@ -102,7 +102,11 @@ function ProviderButton({
     setBusy(true);
     onError("");
     try {
-      const { url } = await requestUrl();
+      // Kabuktan başlatılan akışa işaret konuyor: dönüş tarayıcıda kalırsa
+      // dönüş sayfası bunu anlayıp kurtarma ekranı gösteriyor (bkz.
+      // lib/mobilKabuk.ts kabukDonusuTarayicidaMi). Tarayıcıda başlatılan
+      // girişlerde işaret YOK — onlar hiç etkilenmemeli.
+      const { url } = await requestUrl(kabuktaMi() ? kabukDonusHedefi() : undefined);
       if (url) {
         // Mobil kabukta aynı sekmede yönlendirmek ÇALIŞMAZ: Google gömülü
         // WebView'da giriş sayfasını açmayı reddediyor. Adres sistem

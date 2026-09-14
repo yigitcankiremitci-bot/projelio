@@ -153,3 +153,72 @@ export function kabukDonusunuDinle(handler: (yol: string) => void): () => void {
 
   return () => guvenliCagir(handle?.remove && (() => handle!.remove!()));
 }
+
+/* ------------------------------------------------------------------ *
+ * SAĞLAYICI DÖNÜŞÜNÜN TARAYICIDA KALMASI                             *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Kabuktan başlatılan giriş akışlarına konan işaret.
+ *
+ * NEDEN GEREKLİ. Dönüş adresi (app.projelio.app/google/return) uygulamaya
+ * doğrulanmış bir App Link olarak bağlı; normalde Android onu uygulamaya
+ * teslim eder. Ama doğrulama CİHAZ TARAFINDA başarısız olabiliyor (kurulum
+ * anında ağ, üretici ROM'u, ya da aynı paket adına daha önce farklı imzayla
+ * kurulum yapılmış olması). O zaman dönüş tarayıcıda kalıyor ve kullanıcı
+ * çıkmaza giriyor.
+ *
+ * İşaret ŞART, çünkü tarayıcıda açılan bir dönüş sayfası tek başına
+ * "bu akış uygulamadan mı başladı" sorusunu yanıtlayamaz: Android'de
+ * tarayıcıdan normal web girişi yapan kullanıcının dönüşü de birebir aynı
+ * görünür. İşaret olmasaydı onları da uygulamaya yönlendirmeye çalışırdık.
+ *
+ * `next` üzerinden taşınıyor çünkü backend'in imzalı state'inde geri
+ * yansıtılan tek alan o — sunucuda değişiklik gerektirmiyor.
+ */
+const KABUK_ISARETI = "kabuk";
+
+/** Kabuktan giriş başlatırken `next`e işaretimizi ekler. */
+export function kabukDonusHedefi(next = "/"): string {
+  const ayirac = next.includes("?") ? "&" : "?";
+  return `${next}${ayirac}${KABUK_ISARETI}=1`;
+}
+
+/** Dönüş sonrası gidilecek adresten işareti temizler — kullanıcı görmesin. */
+export function kabukIsaretiniTemizle(next: string | null): string | null {
+  if (!next) return next;
+  try {
+    const u = new URL(next, window.location.origin);
+    u.searchParams.delete(KABUK_ISARETI);
+    const q = u.searchParams.toString();
+    return `${u.pathname}${q ? `?${q}` : ""}${u.hash}`;
+  } catch {
+    return next;
+  }
+}
+
+/**
+ * Bu dönüş uygulamada olmalıydı ama tarayıcıda mı açıldı?
+ *
+ * Üç koşul birden: akış kabuktan başlamış (işaret var), şu an kabukta
+ * DEĞİLİZ, ve cihaz Android (kurtarma yolu olan `intent://` yalnızca orada
+ * çalışıyor).
+ */
+export function kabukDonusuTarayicidaMi(next: string | null): boolean {
+  if (!next || !next.includes(`${KABUK_ISARETI}=1`)) return false;
+  if (kabuktaMi()) return false;
+  return /android/i.test(navigator.userAgent);
+}
+
+/**
+ * Bulunulan adresi UYGULAMADA açan Android intent adresi.
+ *
+ * `package=` ile açık hedef veriliyor: App Link doğrulaması tutmamış olsa bile
+ * bu adres uygulamayı açar — kurtarmanın çalışma sebebi tam olarak bu.
+ * Geri dönüş adresi (browser_fallback_url) BİLEREK yok: aynı sayfaya düşerdi
+ * ve kullanıcı döngüye girerdi.
+ */
+export function uygulamadaAcAdresi(): string {
+  const { host, pathname, search } = window.location;
+  return `intent://${host}${pathname}${search}#Intent;scheme=https;package=app.projelio.mobile;end`;
+}

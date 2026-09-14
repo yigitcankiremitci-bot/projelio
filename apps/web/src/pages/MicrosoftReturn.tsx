@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { oneDriveApi } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { kabukDonusuTarayicidaMi, kabukIsaretiniTemizle } from "../lib/mobilKabuk";
+import KabugaDonKarti from "../components/KabugaDonKarti";
 
 /**
  * Microsoft akışından dönüş ekranı. GoogleReturn.tsx ile aynı desende iki mod:
@@ -18,6 +20,11 @@ export default function MicrosoftReturn() {
   const c = useThemeColors();
   const t = useT();
   const [error, setError] = useState("");
+  // Dönüş tarayıcıda kaldıysa kurtarma ekranı gösterilir ve devir kodu
+  // TAKAS EDİLMEZ; kod tek kullanımlık, burada harcanırsa kullanıcı
+  // uygulamaya hiç geçemez (bkz. components/KabugaDonKarti).
+  const [kurtarma, setKurtarma] = useState(false);
+  const [tarayicidaDevam, setTarayicidaDevam] = useState(false);
   // Giriş denemesi mi OneDrive bağlama denemesi mi: hata kartının metnini ve
   // "geri dön" hedefini bu belirliyor.
   const isLogin = params.get("mode") === "login" || Boolean(params.get("code"));
@@ -27,12 +34,16 @@ export default function MicrosoftReturn() {
 
   useEffect(() => {
     if (handled.current) return;
+    if (!tarayicidaDevam && kabukDonusuTarayicidaMi(params.get("next"))) {
+      setKurtarma(true);
+      return;
+    }
     handled.current = true;
 
     const errorParam = params.get("error");
     const code = params.get("code");
     const connected = params.get("connected");
-    const next = params.get("next");
+    const next = kabukIsaretiniTemizle(params.get("next"));
 
     if (errorParam) {
       setError(
@@ -60,7 +71,7 @@ export default function MicrosoftReturn() {
     }
 
     setError(t("Microsoft'tan beklenen yanıt gelmedi."));
-  }, [params]);
+  }, [params, tarayicidaDevam]);
 
   return (
     <div
@@ -85,7 +96,14 @@ export default function MicrosoftReturn() {
         }}
       >
         <img src="/logo.png" alt="Projelio" style={{ width: 44, height: 44, marginBottom: 14 }} />
-        {error ? (
+        {kurtarma ? (
+          <KabugaDonKarti
+            onTarayicidaDevam={() => {
+              setKurtarma(false);
+              setTarayicidaDevam(true);
+            }}
+          />
+        ) : error ? (
           <>
             <h1 style={{ fontSize: 19, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>
               {isLogin ? t("Microsoft ile devam edilemedi") : t("OneDrive bağlanamadı")}

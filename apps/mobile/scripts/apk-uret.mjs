@@ -75,15 +75,29 @@ execFileSync("sh", ["-c", `echo "sdk.dir=${ortam.ANDROID_HOME}" > local.properti
   env: ortam,
 });
 
-const surum = process.argv.includes("--release") ? "Release" : "Debug";
-console.log(`\n▸ Gradle: assemble${surum}`);
-calistir("./gradlew", [`assemble${surum}`], androidKok);
+// --aab: Play'e yüklenen paket biçimi (Android App Bundle). APK yalnızca elden
+// dağıtım ve deneme için; Play yeni uygulamalarda APK kabul etmiyor.
+const aab = process.argv.includes("--aab");
+const surum = aab || process.argv.includes("--release") ? "Release" : "Debug";
 
-const kaynak = join(androidKok, `app/build/outputs/apk/${surum.toLowerCase()}/app-${surum.toLowerCase()}.apk`);
+if (aab && !existsSync(join(androidKok, "keystore.properties"))) {
+  throw new Error(
+    "Yayın imzası yapılandırılmamış: apps/mobile/android/keystore.properties yok.\n" +
+      "İmzasız bir AAB'yi Play reddeder. Kurulum: docs/mobil-yayin.md"
+  );
+}
+
+const gorev = aab ? "bundleRelease" : `assemble${surum}`;
+console.log(`\n▸ Gradle: ${gorev}`);
+calistir("./gradlew", [gorev], androidKok);
+
+const kaynak = aab
+  ? join(androidKok, "app/build/outputs/bundle/release/app-release.aab")
+  : join(androidKok, `app/build/outputs/apk/${surum.toLowerCase()}/app-${surum.toLowerCase()}.apk`);
 const damga = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "").replace(/(\d{8})(\d{4})/, "$1-$2");
 const hedefKlasor = join(repoKok, "output");
 mkdirSync(hedefKlasor, { recursive: true });
-const hedef = join(hedefKlasor, `projelio-${damga}.apk`);
+const hedef = join(hedefKlasor, `projelio-${damga}.${aab ? "aab" : "apk"}`);
 copyFileSync(kaynak, hedef);
 
-console.log(`\n✓ APK hazır: ${hedef}\n`);
+console.log(`\n✓ ${aab ? "AAB" : "APK"} hazır: ${hedef}\n`);

@@ -71,3 +71,11 @@ apps/mobile/android/app/src/main/assets/capacitor.config.json
 apps/mobile/android/app/src/main/assets/capacitor.plugins.json
 apps/mobile/ios/App/App/public/
 apps/mobile/ios/App/Pods/
+
+# Yayın imzası: anahtarın kendisi de parolası da repoya GİRMEZ.
+# Anahtar kaybolursa Play'e bir daha güncelleme gönderilemez (Play App Signing
+# kullanılıyorsa yükleme anahtarı sıfırlanabilir) — yedeği repoda değil, parola
+# yöneticisinde durmalı. Bkz. docs/mobil-yayin.md
+apps/mobile/android/keystore.properties
+*.jks
+*.keystore

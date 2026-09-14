@@ -8,7 +8,8 @@
     "web:derle": "npm run build --workspace @projelio/web",
     "esitle": "cap sync",
     "android:hazirla": "npm run web:derle && cap sync android",
-    "android:apk": "npm run android:hazirla && node scripts/apk-uret.mjs"
+    "android:apk": "npm run android:hazirla && node scripts/apk-uret.mjs",
+    "android:aab": "npm run android:hazirla && node scripts/apk-uret.mjs --aab"
   },
   "dependencies": {
     "@capacitor-community/safe-area": "^8.0.1",

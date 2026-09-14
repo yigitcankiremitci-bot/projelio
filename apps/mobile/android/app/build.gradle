@@ -16,10 +16,48 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    /**
+     * YAYIN İMZASI.
+     *
+     * Play'e yüklenecek paket imzalanmak ZORUNDA; imzasız bir AAB kabul
+     * edilmiyor. Anahtarın kendisi ve parolası repoda DURMAZ — ikisi de
+     * keystore.properties'ten okunuyor (o dosya .gitignore'da) ya da ortam
+     * değişkenlerinden (CI için).
+     *
+     * Dosya yoksa imza yapılandırması hiç kurulmaz: `assembleDebug` ve
+     * emülatör akışı etkilenmez, yalnızca yayın paketi üretilemez. Sessizce
+     * imzasız bir paket üretip "neden kabul edilmiyor" diye aramaktansa,
+     * gradle açıkça "imza yapılandırılmamış" desin diye böyle.
+     *
+     * Anahtar ÜRETME komutu ve Play App Signing notu: docs/mobil-yayin.md
+     */
+    signingConfigs {
+        release {
+            def props = new Properties()
+            def dosya = rootProject.file("keystore.properties")
+            if (dosya.exists()) {
+                dosya.withInputStream { props.load(it) }
+            }
+            def yol = props['storeFile'] ?: System.getenv('PROJELIO_KEYSTORE')
+            if (yol) {
+                storeFile file(yol)
+                storePassword props['storePassword'] ?: System.getenv('PROJELIO_KEYSTORE_PASSWORD')
+                keyAlias props['keyAlias'] ?: System.getenv('PROJELIO_KEY_ALIAS')
+                keyPassword props['keyPassword'] ?: System.getenv('PROJELIO_KEY_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Anahtar tanımlıysa imzala. Tanımlı değilse imzasız üretilir ve
+            // Play reddeder — ama yerelde `assembleRelease` ile ölçüm almak
+            // (paket boyutu, açılış süresi) yine mümkün kalsın.
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

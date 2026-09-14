@@ -413,10 +413,20 @@ export class BillingService {
     providerCustomerRef?: string;
     status: AbonelikDurumu;
     baslangic: Date;
+    /** Mağazanın doğruladığı gerçek dönem sonu; yoksa katalog döneminden hesaplanır. */
+    bitis?: Date;
   }): Promise<Abonelik> {
+    const mevcut = await this.abonelikSaglayiciReferansiyla(params.source, params.providerRef);
+    if (mevcut && mevcut.userId !== params.userId) {
+      // Mağaza purchase token'ı küresel olarak tekildir. Upsert'in user_id'yi
+      // değiştirmesine izin vermek, sızan bir token'la aboneliği başka hesaba
+      // taşıyabilirdi.
+      throw new ConflictException("Bu mağaza satın alması başka bir Projelio hesabına bağlı.");
+    }
+
     const plan = findPlan(params.planKey) ?? FREE_PLAN;
     const ref = await this.settings.planRef(params.source === "manual" ? "iyzico" : params.source, params.planKey, params.period);
-    const bitis = ayEkle(params.baslangic, periodMonths(params.period));
+    const bitis = params.bitis ?? ayEkle(params.baslangic, periodMonths(params.period));
 
     const { data, error } = await this.supabase.client
       .from("subscriptions")
@@ -451,6 +461,46 @@ export class BillingService {
       await this.krediYukle(abonelik, params.baslangic);
     }
     return abonelik;
+  }
+
+  /** Satın alma jetonunun bağlı olduğu aboneliği bulur; RTDN ve replay savunması kullanır. */
+  async abonelikSaglayiciReferansiyla(source: AbonelikKaynagi, providerRef: string): Promise<Abonelik | null> {
+    const { data, error } = await this.supabase.client
+      .from("subscriptions")
+      .select("*")
+      .eq("source", source)
+      .eq("provider_ref", providerRef)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapAbonelik(data) : null;
+  }
+
+  /**
+   * Play plan değişiminde yeni purchase token eski token'ı devralır. Satırı
+   * yerinde güncellemek abonelik ve dönemlik kredi tekilliklerini korur.
+   */
+  async magazaReferansiniDegistir(
+    source: "app_store" | "play_store",
+    eskiRef: string,
+    yeniRef: string,
+    userId: string
+  ): Promise<void> {
+    if (eskiRef === yeniRef) return;
+    const eski = await this.abonelikSaglayiciReferansiyla(source, eskiRef);
+    if (!eski) return;
+    if (eski.userId !== userId) {
+      throw new ConflictException("Bu mağaza satın alması başka bir Projelio hesabına bağlı.");
+    }
+    const yeni = await this.abonelikSaglayiciReferansiyla(source, yeniRef);
+    if (yeni && yeni.id !== eski.id) {
+      throw new ConflictException("Yeni mağaza satın alma jetonu zaten başka bir aboneliğe bağlı.");
+    }
+    const { error } = await this.supabase.client
+      .from("subscriptions")
+      .update({ provider_ref: yeniRef, updated_at: new Date().toISOString() })
+      .eq("id", eski.id)
+      .eq("user_id", userId);
+    if (error) throw error;
   }
 
   // =================================================================== Kredi
@@ -612,7 +662,7 @@ export class BillingService {
     dedupeKey: string;
     payload: unknown;
     signatureOk: boolean;
-  }): Promise<{ islendi: boolean }> {
+  }, uygula?: () => Promise<void>): Promise<{ islendi: boolean }> {
     const { error } = await this.supabase.client.from("subscription_events").insert({
       source: params.source,
       event_type: params.eventType,
@@ -624,16 +674,28 @@ export class BillingService {
 
     if (error) {
       if ((error as any).code === "23505") {
-        this.logger.log(`Yinelenen webhook atlandı (${params.source}/${params.dedupeKey}).`);
-        return { islendi: false };
+        const { data: onceki, error: okumaHatasi } = await this.supabase.client
+          .from("subscription_events")
+          .select("processed_at")
+          .eq("source", params.source)
+          .eq("dedupe_key", params.dedupeKey)
+          .maybeSingle();
+        if (okumaHatasi) throw okumaHatasi;
+        if (onceki?.processed_at) {
+          this.logger.log(`Yinelenen webhook atlandı (${params.source}/${params.dedupeKey}).`);
+          return { islendi: false };
+        }
+        // İlk teslimat kaydedilmiş ama işlenememişse Pub/Sub/sağlayıcı tekrarı
+        // iyileşme yoludur; körlemesine atlamak olayı sonsuza kadar kaybettirirdi.
       }
-      throw error;
+      else throw error;
     }
 
     if (!params.providerRef) return { islendi: false };
 
     try {
-      await this.olayiUygula(params.source, params.eventType, params.providerRef);
+      if (uygula) await uygula();
+      else await this.olayiUygula(params.source, params.eventType, params.providerRef);
       await this.supabase.client
         .from("subscription_events")
         .update({ processed_at: new Date().toISOString() })

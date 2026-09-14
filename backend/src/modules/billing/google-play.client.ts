@@ -1,5 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
-import { createSign } from "node:crypto";
+import { createHash, createSign } from "node:crypto";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 /**
@@ -23,9 +23,21 @@ export interface PlayAbonelikDurumu {
   productId: string;
   /** SUBSCRIPTION_STATE_ACTIVE, _IN_GRACE_PERIOD, _CANCELED, _EXPIRED ... */
   state: string;
+  startTime?: Date;
   expiryTime?: Date;
+  acknowledgementState?: string;
+  obfuscatedExternalAccountId?: string;
   /** Kullanıcının satın almayı hangi hesapla yaptığı (Google'ın verdiği kimlik). */
   linkedPurchaseToken?: string;
+}
+
+/**
+ * Mobil satın alma penceresine verilecek, Projelio hesabına bağlı ama ham kullanıcı
+ * kimliğini Google'a taşımayan sabit değer. Google en çok 64 karakter kabul ediyor;
+ * SHA-256'nın hex çıktısı tam 64 karakterdir.
+ */
+export function playObfuscatedAccountId(userId: string): string {
+  return createHash("sha256").update(`projelio-play:${userId}`, "utf8").digest("hex");
 }
 
 @Injectable()
@@ -75,9 +87,37 @@ export class GooglePlayClient {
       purchaseToken,
       productId: String(kalem.productId ?? ""),
       state: String(veri.subscriptionState ?? ""),
+      startTime: veri.startTime ? new Date(veri.startTime) : undefined,
       expiryTime: kalem.expiryTime ? new Date(kalem.expiryTime) : undefined,
+      acknowledgementState: veri.acknowledgementState ? String(veri.acknowledgementState) : undefined,
+      obfuscatedExternalAccountId: veri.externalAccountIdentifiers?.obfuscatedExternalAccountId
+        ? String(veri.externalAccountIdentifiers.obfuscatedExternalAccountId)
+        : undefined,
       linkedPurchaseToken: veri.linkedPurchaseToken ? String(veri.linkedPurchaseToken) : undefined,
     };
+  }
+
+  /** Yeni satın alma/plan değişimi işlendiğinde Google'a hakkın verildiğini bildirir. */
+  async aboneligiOnayla(purchaseToken: string, productId: string): Promise<void> {
+    if (!this.isConfigured()) throw new ServiceUnavailableException("Google Play doğrulaması yapılandırılmamış.");
+
+    const paket = process.env.PLAY_PACKAGE_NAME!.trim();
+    const url =
+      `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(paket)}` +
+      `/purchases/subscriptions/${encodeURIComponent(productId)}/tokens/${encodeURIComponent(purchaseToken)}:acknowledge`;
+    const response = await fetchWithTimeout(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await this.erisimJetonu()}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    if (!response.ok) {
+      this.logger.warn(`Google Play abonelik onayı HTTP ${response.status}.`);
+      throw new ServiceUnavailableException("Google Play satın alma onayı tamamlanamadı.");
+    }
   }
 
   /** Pub/Sub bildiriminin gövdesinden purchaseToken'ı çıkarır (yalnızca ipucu). */

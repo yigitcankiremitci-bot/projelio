@@ -15,6 +15,22 @@ export const abonelik: TranslationDict = {
   "Mevcut paketin": "Your current plan",
   "Bu paketi seç": "Choose this plan",
   "Uygulamada kullanılamıyor": "Not available in the app",
+
+  // Mağaza (Google Play / App Store) satın alma doğrulamasının hata mesajları.
+  "Bu mağaza satın alması başka bir Projelio hesabına bağlı.":
+    "This store purchase is linked to a different Projelio account.",
+  "Google Play satın alması başka bir Projelio hesabına bağlı.":
+    "This Google Play purchase is linked to a different Projelio account.",
+  "Google Play satın alması bu Projelio hesabıyla eşleşmiyor.":
+    "This Google Play purchase doesn't match this Projelio account.",
+  "Yeni mağaza satın alma jetonu zaten başka bir aboneliğe bağlı.":
+    "The new store purchase token is already linked to another subscription.",
+  "Google Play abonelik bitiş tarihini döndürmedi.":
+    "Google Play didn't return the subscription's end date.",
+  "Google Play bilinmeyen bir abonelik durumu döndürdü.":
+    "Google Play returned an unknown subscription state.",
+  "Google Play satın alma onayı tamamlanamadı.":
+    "The Google Play purchase couldn't be acknowledged.",
   Popüler: "Popular",
   Aylık: "Monthly",
   "Yıllık — 2 ay bedava": "Yearly — 2 months free",

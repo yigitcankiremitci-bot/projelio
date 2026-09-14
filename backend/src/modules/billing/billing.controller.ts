@@ -69,8 +69,8 @@ export class BillingController {
 
   /** Mobil istemcinin hangi mağaza akışını açabileceğini öğrenmesi için. */
   @Get("store/status")
-  storeStatus() {
-    return this.store.durum();
+  storeStatus(@Req() req: any) {
+    return this.store.durum(req.user.userId);
   }
 
   /** iOS istemcisi satın almayı bitirince çağırır; doğrulama Apple'a sorularak yapılır. */

@@ -1,8 +1,10 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { AppleStoreClient } from "./apple-store.client";
-import { GooglePlayClient } from "./google-play.client";
-import { BillingService, type Abonelik } from "./billing.service";
+import { GooglePlayClient, playObfuscatedAccountId, type PlayAbonelikDurumu } from "./google-play.client";
+import { BillingService, type Abonelik, type AbonelikDurumu } from "./billing.service";
 import { BillingSettingsService, type OdemeSaglayici } from "./billing-settings.service";
+import { magazaUrunleri, type MagazaUrunu } from "./magaza-urunleri";
+import { playAbonelikDurumu } from "./play-abonelik-durumu";
 import type { BillingPeriod, PlanKey } from "./billing.plans";
 
 /**
@@ -43,8 +45,34 @@ export class StorePurchasesService {
     this.settings = settings;
   }
 
-  durum(): { appStore: boolean; playStore: boolean } {
-    return { appStore: this.apple.isConfigured(), playStore: this.play.isConfigured() };
+  /**
+   * Mobil istemcinin mağaza akışını kurabilmesi için gereken her şey.
+   *
+   * ÜRÜN KİMLİKLERİ BURADAN GELİYOR, İSTEMCİYE GÖMÜLMÜYOR. Mağaza ürün
+   * kimlikleri mağaza panelinde belirleniyor ve değişebiliyor; istemciye
+   * gömülseler bir ürün yeniden adlandırıldığında uygulamanın yeni sürümünü
+   * yayınlayıp kullanıcıların güncellemesini beklemek gerekirdi. Eşleştirme
+   * zaten billing_plan_refs'te duruyor (satın alma doğrulanırken de oradan
+   * okunuyor, bkz. planCoz) — tek kaynak orası.
+   *
+   * Yalnızca referans kodu TANIMLI olanlar dönüyor: tanımsız bir plan mağazada
+   * yok demektir, istemcinin onu sorması sağlayıcıdan hata almasına yol açardı.
+   */
+  async durum(userId: string): Promise<{
+    appStore: boolean;
+    playStore: boolean;
+    googleObfuscatedAccountId: string;
+    products: MagazaUrunu[];
+  }> {
+    const refs = await this.settings.planRefs();
+    return {
+      appStore: this.apple.isConfigured(),
+      playStore: this.play.isConfigured(),
+      // Mobil istemci bunu BillingFlowParams.setObfuscatedAccountId'e verir;
+      // backend satın alma döndüğünde aynı hesabı doğrular.
+      googleObfuscatedAccountId: playObfuscatedAccountId(userId),
+      products: magazaUrunleri(refs),
+    };
   }
 
   /**
@@ -80,22 +108,12 @@ export class StorePurchasesService {
 
     const durum = await this.play.abonelikDurumu(purchaseToken.trim());
     if (!durum) throw new NotFoundException("Bu satın alma Google Play'de bulunamadı.");
-    const gecerli = ["SUBSCRIPTION_STATE_ACTIVE", "SUBSCRIPTION_STATE_IN_GRACE_PERIOD", "SUBSCRIPTION_STATE_CANCELED"];
-    if (!gecerli.includes(durum.state)) {
+    this.googleHesabiniDogrula(userId, durum);
+    const status = playAbonelikDurumu(durum, new Date());
+    if (!status || !["active", "past_due", "canceled"].includes(status)) {
       throw new BadRequestException("Bu abonelik Google Play'de etkin değil.");
     }
-
-    const plan = await this.planCoz("play_store", durum.productId);
-    return this.billing.aboneligiKaydet({
-      userId,
-      scope: "user",
-      planKey: plan.planKey,
-      period: plan.period,
-      source: "play_store",
-      providerRef: durum.purchaseToken,
-      status: durum.state === "SUBSCRIPTION_STATE_CANCELED" ? "canceled" : "active",
-      baslangic: new Date(),
-    });
+    return this.googleAboneliginiKaydet(userId, durum, status, true);
   }
 
   /**
@@ -126,14 +144,91 @@ export class StorePurchasesService {
     const bilgi = this.play.bildirimdenJeton(mesaj.data);
     if (!bilgi?.purchaseToken) return { islendi: false };
 
-    return this.billing.webhookIsle({
+    // RTDN yalnızca "şu token değişti" sinyalidir. Hak ve süre kararı daima
+    // subscriptionsv2.get yanıtından verilir.
+    const durum = await this.play.abonelikDurumu(bilgi.purchaseToken);
+    if (!durum) return { islendi: false };
+    const mevcut = await this.billing.abonelikSaglayiciReferansiyla("play_store", durum.purchaseToken);
+    const onceki = !mevcut && durum.linkedPurchaseToken
+      ? await this.billing.abonelikSaglayiciReferansiyla("play_store", durum.linkedPurchaseToken)
+      : null;
+    const sahip = mevcut ?? onceki;
+    // İlk satın alma RTDN'si uygulamanın doğrulama isteğinden önce gelebilir.
+    // Hash tek yönlü olduğu için buradan kullanıcı kimliği türetilmez; istemcinin
+    // /store/google çağrısı kaydı güvenle açar.
+    if (!sahip) return { islendi: false };
+    this.googleHesabiniDogrula(sahip.userId, durum);
+    const status = playAbonelikDurumu(durum, new Date());
+    if (!status) throw new ServiceUnavailableException("Google Play bilinmeyen bir abonelik durumu döndürdü.");
+
+    return this.billing.webhookIsle(
+      {
+        source: "play_store",
+        eventType: `play.${bilgi.notificationType ?? "unknown"}`,
+        providerRef: bilgi.purchaseToken,
+        dedupeKey: mesaj.messageId ?? `${bilgi.purchaseToken}:${bilgi.notificationType}`,
+        payload: bilgi,
+        signatureOk: false,
+      },
+      async () => {
+        await this.googleAboneliginiKaydet(sahip.userId, durum, status, true);
+      }
+    );
+  }
+
+  private googleHesabiniDogrula(userId: string, durum: PlayAbonelikDurumu): void {
+    const beklenen = playObfuscatedAccountId(userId);
+    if (!durum.obfuscatedExternalAccountId || durum.obfuscatedExternalAccountId !== beklenen) {
+      throw new BadRequestException("Google Play satın alması bu Projelio hesabıyla eşleşmiyor.");
+    }
+  }
+
+  private async googleAboneliginiKaydet(
+    userId: string,
+    durum: PlayAbonelikDurumu,
+    status: AbonelikDurumu,
+    acknowledge: boolean
+  ): Promise<Abonelik> {
+    if (!durum.expiryTime || !Number.isFinite(durum.expiryTime.getTime())) {
+      throw new ServiceUnavailableException("Google Play abonelik bitiş tarihini döndürmedi.");
+    }
+
+    const mevcut = await this.billing.abonelikSaglayiciReferansiyla("play_store", durum.purchaseToken);
+    if (mevcut && mevcut.userId !== userId) {
+      throw new BadRequestException("Google Play satın alması başka bir Projelio hesabına bağlı.");
+    }
+    if (!mevcut && durum.linkedPurchaseToken) {
+      await this.billing.magazaReferansiniDegistir("play_store", durum.linkedPurchaseToken, durum.purchaseToken, userId);
+    }
+
+    const plan = await this.planCoz("play_store", durum.productId);
+    // AYNI SORGU İKİNCİ KEZ, BİLEREK: yukarıdaki `mevcut` referans DEVRİNDEN
+    // ÖNCE okundu. Plan değiştiğinde magazaReferansiniDegistir eski satırı yeni
+    // purchase token'a taşıyor; dönem başlangıcını o taşınmış satırdan almak
+    // için taze okuma gerekiyor. Tek sorguya indirilirse yükseltme yapan
+    // kullanıcının dönem başlangıcı bugüne kayar ve kredi ayı bozulur.
+    const onceki = await this.billing.abonelikSaglayiciReferansiyla("play_store", durum.purchaseToken);
+    const baslangic = durum.startTime && Number.isFinite(durum.startTime.getTime())
+      ? durum.startTime
+      : onceki?.currentPeriodStart
+        ? new Date(onceki.currentPeriodStart)
+        : new Date();
+    const abonelik = await this.billing.aboneligiKaydet({
+      userId,
+      scope: "user",
+      planKey: plan.planKey,
+      period: plan.period,
       source: "play_store",
-      eventType: `play.${bilgi.notificationType ?? "unknown"}`,
-      providerRef: bilgi.purchaseToken,
-      dedupeKey: mesaj.messageId ?? `${bilgi.purchaseToken}:${bilgi.notificationType}`,
-      payload: bilgi,
-      signatureOk: false,
+      providerRef: durum.purchaseToken,
+      status,
+      baslangic,
+      bitis: durum.expiryTime,
     });
+
+    if (acknowledge && durum.acknowledgementState === "ACKNOWLEDGEMENT_STATE_PENDING") {
+      await this.play.aboneligiOnayla(durum.purchaseToken, durum.productId);
+    }
+    return abonelik;
   }
 
   /**
@@ -155,3 +250,4 @@ export class StorePurchasesService {
     return { planKey: eslesme.planKey, period: eslesme.period };
   }
 }
+

@@ -230,21 +230,11 @@ http://caddy {
 yigitcankiremitci.com {
 	reverse_proxy yigitcan-web:80
 	encode zstd gzip
-	header {
-		X-Frame-Options "DENY"
-		X-Content-Type-Options "nosniff"
-		Referrer-Policy "strict-origin-when-cross-origin"
-		Permissions-Policy "camera=(), geolocation=(), payment=(), usb=(), microphone=()"
-		# includeSubDomains BİLEREK yok: alt alan adları ileride ayrı
-		# barındırılabilir, bir yıllık söz vermek gereksiz risk.
-		Strict-Transport-Security "max-age=31536000"
-
-		# CSP ZORLAYICI (projelio'daki rapor modunun aksine) — bu site tamamen
-		# kendi kendine yeten statik HTML: satır içi script/style YOK, harici
-		# script YOK, form YOK. Tek istisna albüm kapakları: Spotify CDN'inden
-		# (i.scdn.co) doğrudan geliyor, bu yüzden yalnız img-src'de açık.
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://i.scdn.co; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
-	}
+	# Güvenlik başlıkları (CSP, HSTS, X-Frame-Options...) BURADA YOK, bilerek.
+	# Sahibi sitenin kendi nginx'i: yigitcankiremitci deposundaki
+	# deploy/nginx.vps.conf. Buraya header eklenirse nginx'inkiyle yan yana
+	# iki CSP gider; tarayıcı ikisini birden uygular, dar olan kazanır ve
+	# anasayfadaki YouTube çalma listesi yine engellenir (2026-09'da oldu).
 }
 
 www.yigitcankiremitci.com {

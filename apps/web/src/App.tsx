@@ -60,8 +60,6 @@ const MicrosoftReturn = lazy(() => import("./pages/MicrosoftReturn"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Kvkk = lazy(() => import("./pages/Kvkk"));
-const DistanceSales = lazy(() => import("./pages/DistanceSales"));
-const Refund = lazy(() => import("./pages/Refund"));
 const JobDetail = lazy(() => import("./pages/JobDetail"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const OperationDetail = lazy(() => import("./pages/OperationDetail"));
@@ -632,8 +630,6 @@ export default function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/kvkk" element={<Kvkk />} />
-          <Route path="/distance" element={<DistanceSales />} />
-          <Route path="/refund" element={<Refund />} />
           <Route path="/takip/:token" element={<PublicProject />} />
         </Routes>
       </Suspense>

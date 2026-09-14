@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { OrgType } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconDashboard, IconCalendar, IconListCheck, IconSettings, IconPlus, IconFolder, IconActivity, IconBuilding, IconCheck } from "./icons";
+import { IconDashboard, IconCalendar, IconListCheck, IconPlus, IconFolder, IconActivity, IconBuilding, IconCheck } from "./icons";
 import CreateJobModal from "./CreateJobModal";
 import CreateProjectModal from "./CreateProjectModal";
 import CreateOperationModal from "./CreateOperationModal";
@@ -19,12 +19,18 @@ import { useT } from "../lib/i18n";
 
 // Etiketler modül düzeyinde duruyor, yani burada t() çağrılamaz; Türkçe metin
 // ANAHTAR olarak kalıyor ve çeviri kullanıldığı yerde yapılıyor (aşağıda).
+//
+// SAYI SOLDAKİYLE EŞİT OLMALI (leftItems da 2). "+" butonu esnek değil, sabit
+// 60 px'lik bir yuvada duruyor; iki yandaki öğe sayısı eşit değilse buton
+// ortadan kayar. Yaptım eklenince 2'ye 3 olmuş ve buton sola kaymıştı.
+// Ayarlar buradan çıkarıldı: kenar çubuğunun gezinme listesinde zaten var
+// (bkz. Sidebar.tsx), yani erişim kaybolmuyor — alt menüde her gün açılan
+// sayfalar durmalı, ayda bir açılan değil.
 const rightItems = [
   { to: "/tasks", label: "Yapılacaklar", icon: IconListCheck }, // dil:anahtar
   // Yaptım mobilde özellikle değerli: iş biter bitmez telefondan tek satır
   // yazmak, akşam masaya oturup hatırlamaya çalışmaktan kat kat gerçekçi.
   { to: "/worklog", label: "Yaptım", icon: IconCheck }, // dil:anahtar
-  { to: "/settings", label: "Ayarlar", icon: IconSettings }, // dil:anahtar
 ];
 
 type ModalKind = "job" | "project" | "operation" | "task" | "organization" | "group" | "organization-in-group";
@@ -385,7 +391,7 @@ export default function BottomNav({ sidebarOpen }: Props) {
                   maxWidth: "100%",
                 }}
               >
-                {item.label}
+                {t(item.label)}
               </span>
             </Link>
           );

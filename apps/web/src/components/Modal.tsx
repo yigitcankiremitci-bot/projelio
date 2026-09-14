@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { bodyScrollLock } from "../lib/scrollLock";
-import { Z } from "../lib/layout";
+import { Z, SAFE_TOP, SAFE_BOTTOM } from "../lib/layout";
 import { createPortal } from "react-dom";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -173,7 +173,11 @@ export default function Modal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: fullScreen ? 0 : 20,
+        // Tam ekran pencere ekranın dört kenarına dayanıyor: mobil kabukta
+        // başlığı durum çubuğunun, alt kenarı hareket çizgisinin altında
+        // kalıyordu. Ortalanan (tam ekran olmayan) pencerelerde sorun yok,
+        // onlar zaten 20px içeride ve en fazla 85vh yüksekliğinde.
+        padding: fullScreen ? `${SAFE_TOP} 0 ${SAFE_BOTTOM}` : 20,
         zIndex: Z.modal,
       }}
     >

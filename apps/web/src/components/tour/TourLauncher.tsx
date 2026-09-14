@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { TOP_CHROME, Z } from "../../lib/layout";
+import { TOP_CHROME, Z, safeTop } from "../../lib/layout";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useTour } from "../../lib/tour/TourContext";
 import { AREA_LABELS, tourAnchor } from "../../lib/tour/types";
@@ -84,7 +84,7 @@ export default function TourLauncher() {
   );
 
   return (
-    <div ref={ref} style={{ position: "fixed", top: TOP_CHROME.top, right: 62, zIndex: Z.topChrome }}>
+    <div ref={ref} style={{ position: "fixed", top: safeTop(TOP_CHROME.top), right: 62, zIndex: Z.topChrome }}>
       <button
         type="button"
         {...tourAnchor("tour-launcher")}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Z } from "../lib/layout";
+import { Z, safeTop, safeBottom } from "../lib/layout";
 import { useNavigate } from "react-router-dom";
 import type {
   AccountType,
@@ -323,7 +323,9 @@ export default function OnboardingWizard({ onCompleted }: Props) {
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
-        padding: 20,
+        // Sihirbaz tüm ekranı kaplıyor ve içerik uzayınca üstten başlıyor;
+        // mobil kabukta ilk adımın başlığı durum çubuğunun altında kalıyordu.
+        padding: `${safeTop(20)} 20px ${safeBottom(20)}`,
         overflowY: "auto",
       }}
     >

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { TOP_CHROME, Z } from "../lib/layout";
+import { TOP_CHROME, Z, safeTop } from "../lib/layout";
 import { useNavigate } from "react-router-dom";
 import type { Socket } from "socket.io-client";
 import { safeExternalUrl, type CreationRequest, type JobMember, type NotificationPayload } from "@projelio/shared";
@@ -206,7 +206,7 @@ export default function NotificationBell() {
   };
 
   return (
-    <div ref={ref} {...tourAnchor("notification-bell")} style={{ position: "fixed", top: TOP_CHROME.top, right: TOP_CHROME.gutter, zIndex: Z.topChrome }}>
+    <div ref={ref} {...tourAnchor("notification-bell")} style={{ position: "fixed", top: safeTop(TOP_CHROME.top), right: TOP_CHROME.gutter, zIndex: Z.topChrome }}>
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label="Bildirimler"

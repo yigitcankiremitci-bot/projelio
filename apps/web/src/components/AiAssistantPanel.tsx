@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AI_PANEL_WIDTH, Z } from "../lib/layout";
+import { AI_PANEL_WIDTH, Z, safeTop, safeBottom } from "../lib/layout";
 import { useNavigate } from "react-router-dom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { parseMessageLinks } from "../lib/messageLinks";
@@ -970,7 +970,10 @@ export default function AiAssistantPanel({
         {/* Başlık */}
         <header
           style={{
-            padding: "16px 18px",
+            // Panel ekranın tepesinden başlıyor (top: 0); mobil kabukta başlık
+            // durum çubuğunun altında kalıyordu. Dolgu hem zemini oraya kadar
+            // uzatır hem içeriği aşağı iter (bkz. lib/layout.ts SAFE_TOP).
+            padding: `${safeTop(16)} 18px 16px`,
             background: c.primaryDark,
             color: "#fff",
             display: "flex",
@@ -1365,7 +1368,9 @@ export default function AiAssistantPanel({
         )}
 
         {/* Yazma alanı */}
-        <div style={{ padding: 14, borderTop: `1px solid ${c.border}`, flexShrink: 0, position: "relative" }}>
+        {/* Yazma alanı ekranın dibinde: alt dolguya gezinme çubuğu payı ekleniyor,
+            yoksa gönder düğmesi hareket çizgisinin altında kalıyor. */}
+        <div style={{ padding: `14px 14px ${safeBottom(14)}`, borderTop: `1px solid ${c.border}`, flexShrink: 0, position: "relative" }}>
           {/* İliştirilmiş dosyalar. Okunanlar dökümüyle, okunmayı bekleyenler soluk görünür. */}
           {(attachments.length > 0 || attaching.length > 0) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>

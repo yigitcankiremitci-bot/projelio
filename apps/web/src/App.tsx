@@ -19,7 +19,7 @@ import { useIsDesktop } from "./lib/useIsDesktop";
 import { getSidebarDefaultOpen, useAppPrefs } from "./lib/appPrefs";
 import { refreshSession } from "./lib/session";
 import { useEtkinlikSayaci } from "./lib/etkinlikSayaci";
-import { SIDEBAR_WIDTH, pageGutter, Z, TOP_CHROME } from "./lib/layout";
+import { SIDEBAR_WIDTH, pageGutter, Z, TOP_CHROME, SAFE_TOP, safeTop } from "./lib/layout";
 import UploadTray, { UPLOAD_TRAY_HEIGHT } from "./components/UploadTray";
 import { useUploads } from "./lib/uploadQueue";
 import { CoverBackLink } from "./components/EntityCover";
@@ -60,6 +60,8 @@ const MicrosoftReturn = lazy(() => import("./pages/MicrosoftReturn"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Kvkk = lazy(() => import("./pages/Kvkk"));
+const DistanceSales = lazy(() => import("./pages/DistanceSales"));
+const Refund = lazy(() => import("./pages/Refund"));
 const JobDetail = lazy(() => import("./pages/JobDetail"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const OperationDetail = lazy(() => import("./pages/OperationDetail"));
@@ -363,6 +365,11 @@ function CoverStickyHeader({
         transition: "opacity 0.16s ease, transform 0.16s ease",
         // Görünmezken altındaki içeriğe tıklanabilmeli.
         pointerEvents: passed ? "auto" : "none",
+        // Şerit ekranın tepesinden başlıyor (top: 0) ama satırları durum
+        // çubuğunun altında kalmamalı: dolgu hem zemini oraya kadar uzatır
+        // hem içeriği aşağı iter. Geri hapı şeridin ÖLÇÜLEN yüksekliğine
+        // (barHeight) göre konumlandığı için kendiliğinden doğru yere düşer.
+        paddingTop: SAFE_TOP,
       }}
     >
       {/* Üst satır: logo/çan bandına zemin (ikisi de ayrı position:fixed öğeler).
@@ -553,6 +560,10 @@ export default function App() {
     // KVKK aydınlatma metni: Kanun aydınlatmayı veri işlemeden ÖNCE arıyor,
     // yani kayıt ekranındaki kişi henüz hesabı yokken okuyabilmeli.
     location.pathname === "/kvkk" ||
+    // Mesafeli satış sözleşmesi ve iade koşulları: ödeme öncesi bilgilendirme,
+    // hesabı olmayan ziyaretçi de (tanıtım sitesinden gelen bağlantı) okuyabilmeli.
+    location.pathname === "/distance" ||
+    location.pathname === "/refund" ||
     // Proje takip linki (bkz. pages/PublicProject.tsx). Buraya gelen kişinin
     // hesabı YOK: uygulama kabuğu kurulmamalı, /login'e de atılmamalı. Diğerleri
     // gibi tam eşleşme değil, çünkü adres token taşıyor.
@@ -621,6 +632,8 @@ export default function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/kvkk" element={<Kvkk />} />
+          <Route path="/distance" element={<DistanceSales />} />
+          <Route path="/refund" element={<Refund />} />
           <Route path="/takip/:token" element={<PublicProject />} />
         </Routes>
       </Suspense>
@@ -690,7 +703,7 @@ export default function App() {
               top: 0,
               left: isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0,
               right: 0,
-              height: HEADER_HEIGHT,
+              height: safeTop(HEADER_HEIGHT),
               // Kasıtlı olarak sayfa arka planıyla AYNI renk (beyaz değil): bu şerit
               // dekoratif bir başlık çubuğu değil, yukarı kaydırılan içeriğin sabit
               // duran bildirim çanı / AI düğmesi / sidebar okunun altından geçerken
@@ -724,7 +737,7 @@ export default function App() {
               title={t("Sidebar'ı aç")}
               style={{
                 position: "fixed",
-                top: TOP_CHROME.top,
+                top: safeTop(TOP_CHROME.top),
                 left: TOP_CHROME.gutter,
                 zIndex: Z.topChrome,
                 width: 40,
@@ -745,7 +758,7 @@ export default function App() {
               aria-label="Projelio - Ana sayfa"
               style={{
                 position: "fixed",
-                top: 10,
+                top: safeTop(10),
                 left: 62,
                 zIndex: Z.topChrome,
                 display: "flex",
@@ -786,7 +799,7 @@ export default function App() {
         <ProjectFabProvider>
           <div
             style={{
-              paddingTop: isCoverPage ? 0 : HEADER_HEIGHT,
+              paddingTop: isCoverPage ? 0 : safeTop(HEADER_HEIGHT),
               // Mobilde sayfanın altında üç şey üst üste duruyor: alt menü
               // (68 px + safe-area), onun üstüne taşan yuvarlak FAB (bottom 24 +
               // 64 = tepesi 88 px) ve Lio balonu (bottom 96). Eski 84 px bunların

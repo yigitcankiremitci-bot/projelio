@@ -99,6 +99,47 @@ export const Z = {
  * her ekranın kendi 62'sini yazması, düğme boyutu değiştiğinde yalnızca bazı
  * sayfaların düzelmesi demekti.
  */
+/**
+ * DURUM ÇUBUĞU / ÇENTİK PAYI.
+ *
+ * AYIKLANAN HATA. Mobil kabukta (bkz. apps/mobile) uygulama artık ekranın
+ * tamamına, durum çubuğunun ALTINA kadar çiziyor — Android 15'ten beri
+ * "edge-to-edge" zorunlu ve targetSdk 36'da devre dışı bırakılamıyor. Üst
+ * şerittekilerin hepsi position:fixed olduğu için saat, pil ve sinyal
+ * simgelerinin altında kalıyorlardı: kenar çubuğu oku, logo, yardım düğmesi
+ * ve bildirim çanı.
+ *
+ * Değer tarayıcıda 0 — yani SİTE ETKİLENMEZ. iPhone'da Safari'de sayfa tam
+ * ekran gezinirken çentik payını da doğru veriyor, yani düzeltme web için de
+ * doğru olanı.
+ *
+ * Android'de eski WebView sürümleri (Chromium < 140) edge-to-edge modunda
+ * `env()` değerlerini yanlış veriyordu; kabukta bunun için bir eklenti var
+ * (@capacitor-community/safe-area). O sürümlerde eklenti WebView'in kendisine
+ * dolgu uyguluyor ve `env()` 0 kalıyor — yani buradaki hesap her iki yolda da
+ * doğru sonucu veriyor, ikisi üst üste binmiyor.
+ */
+export const SAFE_TOP = "env(safe-area-inset-top, 0px)";
+
+/** Üstten `px` kadar boşluk + durum çubuğu payı. */
+export function safeTop(px: number): string {
+  return `calc(${px}px + ${SAFE_TOP})`;
+}
+
+/**
+ * Gezinme çubuğu / hareket çizgisi payı. SAFE_TOP'un alt karşılığı.
+ *
+ * Alt menü bunu zaten hesaba katıyordu (bkz. BottomNav), ama ekranın altına
+ * dayanan DİĞER yüzeyler katmıyordu: Lio penceresinin yazma alanı ve tam
+ * ekran açılan pencerelerin alt kenarı hareket çizgisinin altında kalıyordu.
+ */
+export const SAFE_BOTTOM = "env(safe-area-inset-bottom, 0px)";
+
+/** Alttan `px` kadar boşluk + gezinme çubuğu payı. */
+export function safeBottom(px: number): string {
+  return `calc(${px}px + ${SAFE_BOTTOM})`;
+}
+
 export const TOP_CHROME = {
   /** Düğmelerin üstten uzaklığı. */
   top: 14,

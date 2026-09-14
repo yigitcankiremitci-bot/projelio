@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useSidebarStyle } from "../theme/useSidebarStyle";
 import { IconChevronLeft, IconSettings } from "./icons";
-import { SIDEBAR_WIDTH, DRAWER_WIDTH_CSS, Z } from "../lib/layout";
+import { SIDEBAR_WIDTH, DRAWER_WIDTH_CSS, Z, safeTop } from "../lib/layout";
 import SidebarTree from "./SidebarTree";
 import HomeTargetModal from "./HomeTargetModal";
 import { useHomeTarget, DEFAULT_HOME_TARGET } from "../lib/homeTarget";
@@ -108,7 +108,9 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
           backgroundImage: sidebarStyle.backgroundImage,
           backgroundSize: sidebarStyle.backgroundSize,
           boxShadow: overlay ? "2px 0 18px rgba(15,18,25,0.3)" : "none",
-          padding: "20px 14px",
+          // Üstteki dolgu durum çubuğu payını da içeriyor: çekmece ekranın
+          // tepesinden başlıyor, logosu ve kapatma oku saatin altında kalmamalı.
+          padding: `${safeTop(20)} 14px 20px`,
           display: "flex",
           flexDirection: "column",
           gap: 4,

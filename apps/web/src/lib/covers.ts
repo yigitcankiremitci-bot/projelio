@@ -159,6 +159,21 @@ export const COVER_TEXT_VEIL_DARK =
 /** Perdenin kapladığı yükseklik oranı (kapağın alt %72'si). */
 export const COVER_VEIL_HEIGHT = "72%";
 
+/**
+ * Dar ekranda perde kapağın TAMAMINI kaplar.
+ *
+ * Telefonda kapağın üst bandı çok kalabalık: kenar çubuğu oku, logo, bildirim
+ * çanı, "‹ Organizasyonlar" çipi ve profil fotoğrafı hepsi orada duruyor.
+ * %72'lik perde tam da o bandın altında bittiği için, kalabalık bir kapak
+ * fotoğrafında (ör. makine dolu bir fabrika görseli) bu öğeler ham görselin
+ * üstüne biniyor ve ortalık karışıyordu.
+ *
+ * Perde bir örtü değil GRADYAN: kutusu uzayınca üst ucu yine saydam kalır,
+ * yalnızca alfa kademeleri yukarı yayılır. Yani kapak görseli kaybolmuyor,
+ * üst bandı hafifçe yatışıyor ve yazı bandı bir tık daha güçleniyor.
+ */
+export const COVER_VEIL_HEIGHT_MOBILE = "100%";
+
 /** Yazı bandının başladığı yerdeki en düşük beyazlık — kontrast testinin girdisi. */
 export const COVER_VEIL_MIN_ALPHA = 0.86;
 

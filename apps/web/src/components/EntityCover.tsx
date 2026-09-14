@@ -1,13 +1,14 @@
 import type { CSSProperties, ReactNode, RefObject } from "react";
 import { Link } from "react-router-dom";
-import { COVER_VEIL_HEIGHT, coverBackground } from "../lib/covers";
+import { COVER_VEIL_HEIGHT, COVER_VEIL_HEIGHT_MOBILE, coverBackground } from "../lib/covers";
 import type { LioSubject } from "../lib/askLio";
 import AskLioButton from "./AskLioButton";
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { COVER_TOP_CLEARANCE, pageGutter, TOP_CHROME_BOTTOM } from "../lib/layout";
+import { COVER_TOP_CLEARANCE, pageGutter, SAFE_TOP, TOP_CHROME_BOTTOM, safeTop } from "../lib/layout";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import { IconChevronLeft } from "./icons";
+import { PROFILE_CARD_MOBILE_WIDTH } from "./ProfileCard";
 
 /**
  * Kapağın sağ alt köşesindeki düzenleme düğmesinin ortak stili — beş sayfada
@@ -46,14 +47,18 @@ const ASIDE_TOP_CLEARANCE = BELL_BAND_BOTTOM - COVER_PADDING;
 /**
  * Dar ekranda kart mutlak konumlu; başlık bloğu tam genişlikte olduğu için
  * altına girmesin diye sağda bu kadar yer ayrılır (katlıyken kart = fotoğraf).
+ *
+ * Sayı ELLE YAZILMIYOR: kartın kendi ölçüsünden geliyor. Daha önce 104 diye
+ * kopyalanmıştı ve avatar küçültülünce burası eski genişlikte yer ayırmaya
+ * devam ederdi — başlık aynı sıkışıklıkta kalırdı.
  */
-const MOBILE_ASIDE_RESERVE = 104;
+const MOBILE_ASIDE_RESERVE = PROFILE_CARD_MOBILE_WIDTH;
 /**
  * Dar ekranda bindirilen kartın (fotoğraf + altındaki Lio rozeti) kapladığı
  * yükseklik. Kapak bundan kısa kalırsa kart bandına sığmıyor ve ortalanırken
  * iki uçtan da taşıyor: üstte çanın, altta düzenleme düğmesinin üstüne biner.
  */
-const MOBILE_ASIDE_BAND = 160;
+const MOBILE_ASIDE_BAND = PROFILE_CARD_MOBILE_WIDTH + 56;
 /**
  * Dar ekranda kapağın tavanı.
  *
@@ -79,6 +84,33 @@ const MOBILE_MAX_HEIGHT = 220;
  * bağlantı bandın üst sınırına yakın duruyor; kendi zemini olmadan bazı
  * fotoğraflarda okunmuyordu.
  */
+/**
+ * Kapak künyesindeki küçük etiketin ("Şirket", "İşletme") stili.
+ *
+ * AYIKLANAN HATA. Bu etiket tema paletinden besleniyordu
+ * (`color: c.primaryDark`, `background: ${c.primary}22`) — oysa kapağın
+ * üstündeki YAZI RENKLERİ ayrı bir kümeden geliyor (bkz. useCoverTheme):
+ * perdenin üstünde 4.5:1 kontrastı tutturmak için özellikle seçilmiş
+ * değerler. Tema paleti o perde için tasarlanmadığı için etiket karanlık
+ * modda koyu zemin üstünde koyu yazı oluyor ve fiilen okunmuyordu.
+ *
+ * Görünüm bilerek geri hapıyla (CoverBackLink) aynı dilde: yarı saydam zemin
+ * + saç teli çerçeve. Kapak fotoğrafı ne olursa olsun etiketin kendi zemini
+ * oluyor, ki perdenin gücüne bel bağlamasın.
+ */
+export function coverBadgeStyle(cover: { primary: string; dark: boolean }): CSSProperties {
+  return {
+    fontSize: 12,
+    color: cover.primary,
+    background: cover.dark ? "rgba(255,255,255,0.14)" : "rgba(26,31,41,0.08)",
+    border: `1px solid ${cover.dark ? "rgba(255,255,255,0.22)" : "rgba(26,31,41,0.10)"}`,
+    borderRadius: 20,
+    padding: "2px 9px",
+    alignSelf: "center",
+    whiteSpace: "nowrap",
+  };
+}
+
 export function CoverBackLink({
   to,
   label,
@@ -242,8 +274,14 @@ export default function EntityCover({
    * Dar ekranda kapağın alt sınırı: yazı bloğu kadar (minHeight ile kendiliğinden
    * uzar) ama bindirilen kart varsa onun bandını da karşılamalı.
    */
+  const mobileAsideBandBottom = COVER_PADDING + (action ? ACTION_BAND : 0);
+  /**
+   * SAFE_TOP burada da var: kart, çanın ALTINDAN başlayan bir banda oturuyor
+   * ve çan mobil kabukta durum çubuğu kadar aşağı itiliyor (bkz. layout.ts).
+   * Bant eski yerinde bırakılınca fotoğraf çanın altına giriyordu.
+   */
   const mobileMinHeight = showAsideOverlay
-    ? Math.max(coverHeight, BELL_BAND_BOTTOM + MOBILE_ASIDE_BAND + COVER_PADDING + (action ? ACTION_BAND : 0))
+    ? `calc(${Math.max(coverHeight, BELL_BAND_BOTTOM + MOBILE_ASIDE_BAND + mobileAsideBandBottom)}px + ${SAFE_TOP})`
     : coverHeight;
 
   return (
@@ -266,7 +304,7 @@ export default function EntityCover({
         // şeridin altında başladığı için gerekmiyor.
         padding: isDesktop
           ? `20px ${gutter}px`
-          : `${COVER_TOP_CLEARANCE}px ${gutter}px 16px`,
+          : `${safeTop(COVER_TOP_CLEARANCE)} ${gutter}px 16px`,
         display: "flex",
         overflow: "hidden",
       }}
@@ -280,7 +318,7 @@ export default function EntityCover({
           left: 0,
           right: 0,
           bottom: 0,
-          height: COVER_VEIL_HEIGHT,
+          height: isDesktop ? COVER_VEIL_HEIGHT : COVER_VEIL_HEIGHT_MOBILE,
           background: cover.veil,
           pointerEvents: "none",
         }}
@@ -382,8 +420,8 @@ export default function EntityCover({
         <div
           style={{
             position: "absolute",
-            top: BELL_BAND_BOTTOM,
-            bottom: COVER_PADDING + (action ? ACTION_BAND : 0),
+            top: safeTop(BELL_BAND_BOTTOM),
+            bottom: mobileAsideBandBottom,
             right: 0,
             zIndex: 2,
             display: "flex",

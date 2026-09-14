@@ -13,8 +13,23 @@ import { useT } from "../lib/i18n";
 // 116 px'lik avatar + geniş kapsül tek başına ekranın üçte birini kaplıyor.
 // Mobilde ölçüler küçültülüyor, masaüstü olduğu gibi kalıyor.
 const AVATAR_SIZE_DESKTOP = 116;
-const AVATAR_SIZE_MOBILE = 96;
+/**
+ * 96'dan 76'ya indirildi. 375 px'lik bir ekranda 96+halka = 104 px, kapağın
+ * yazı sütunundan aynı miktarı çalıyordu (bkz. EntityCover MOBILE_ASIDE_RESERVE)
+ * ve "Çelikhan Endüstri A.Ş." gibi üç kelimelik bir şirket adı üç satıra
+ * yayılıyordu. Fotoğrafın kendisi de o boyutta kapağın yarısını kaplayıp
+ * kalabalık kapak görsellerinde karmaşa yaratıyordu.
+ */
+const AVATAR_SIZE_MOBILE = 76;
 const RING_PADDING = 4;
+/**
+ * Dar ekranda kartın kapladığı GENİŞLİK (avatar + iki yandaki halka).
+ *
+ * Dışarı açılıyor çünkü EntityCover kapağın yazı sütununda tam bu kadar yer
+ * ayırmak zorunda ve sayı orada elle kopyalanmıştı: avatar küçülünce kapak
+ * eski genişlikte yer ayırmaya devam ediyordu, yani düzeltme yarım kalırdı.
+ */
+export const PROFILE_CARD_MOBILE_WIDTH = AVATAR_SIZE_MOBILE + RING_PADDING * 2;
 /**
  * Avatar kapsülden YÜKSEK olmalı: tasarımın tamamı dairenin kapsülün üstüne
  * binmesine dayanıyor. Açıklama uzun olduğunda kapsül büyüyor — daire sabit

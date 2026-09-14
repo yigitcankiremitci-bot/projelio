@@ -20,7 +20,7 @@ import { useModuleTabs } from "../lib/useModuleTabs";
 import ProfileCard from "../components/ProfileCard";
 import AiCreditsChip from "../components/AiCreditsChip";
 import { useAppPrefs } from "../lib/appPrefs";
-import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
+import EntityCover, { CoverBackLink, coverActionButton, coverBadgeStyle } from "../components/EntityCover";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
@@ -178,18 +178,7 @@ export default function OrganizationDetail() {
         meta={
           organization && (
             <>
-              <span
-                style={{
-                  fontSize: 12,
-                  color: c.primaryDark,
-                  background: `${c.primary}22`,
-                  borderRadius: 20,
-                  padding: "2px 9px",
-                  alignSelf: "center",
-                }}
-              >
-                {ORG_TYPE_LABEL[organization.orgType]}
-              </span>
+              <span style={coverBadgeStyle(cover)}>{ORG_TYPE_LABEL[organization.orgType]}</span>
               {organization.ownerName && (
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                   <IconUser size={12} color={cover.secondary} />

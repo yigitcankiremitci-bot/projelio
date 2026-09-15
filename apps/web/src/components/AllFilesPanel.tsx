@@ -470,7 +470,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
                   { label: t("Önizle"), onClick: () => setPreview(menu.file!) },
                   { label: t("İndir"), onClick: () => void handleDownload(menu.file!) },
                   {
-                    label: t("Bağlantı oluştur…"),
+                    label: t("Bağlantı oluştur/gönder…"),
                     onClick: () => setSharing(menu.file!),
                   },
                   {

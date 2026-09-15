@@ -6,7 +6,7 @@ import { formatDateTime } from "../lib/dates";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
-import { IconCopy, IconSend, IconTrash } from "./icons";
+import { IconCopy, IconLink, IconSend, IconTrash } from "./icons";
 
 interface Props {
   file: ProjectFile;
@@ -25,33 +25,46 @@ interface Props {
  * göre değişiyor ve ikinci bir kopya, e-postayla gönderilen adresle panodaki
  * adresin ayrışması demekti.
  */
+/**
+ * İki adımlı: önce NE YAPMAK İSTEDİĞİ, sonra ona göre pencere.
+ *
+ * NEDEN ADIM SORULUYOR: "bağlantıyı kopyalayıp WhatsApp'tan atacağım" ile
+ * "adrese e-posta göndereceğim" farklı işler ve ikisini tek ekranda yan yana
+ * koymak her ikisini de yavaşlatıyordu — kopyalamak isteyen kişi altındaki
+ * e-posta formunu, göndermek isteyen de üstündeki adres kutusunu es geçmek
+ * zorunda kalıyordu. Seçim yapılınca bağlantı KENDİLİĞİNDEN üretiliyor:
+ * "bağlantı al" demek zaten "bağlantı üret" demek, ayrıca bir düğmeye daha
+ * basmak gereksiz bir adım olurdu.
+ */
+type Mod = "secim" | "baglanti" | "eposta";
+
 export default function FileDownloadLinkModal({ file, onClose }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const [mod, setMod] = useState<Mod>("secim");
   const [links, setLinks] = useState<FileDownloadLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const yukle = () =>
+  useEffect(() => {
     fileDownloadLinksApi
       .list(file.id)
       .then(setLinks)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-
-  useEffect(() => {
-    void yukle();
   }, [file.id]);
 
-  const olustur = async () => {
+  const olustur = async (): Promise<boolean> => {
     setBusy(true);
     setError("");
     try {
       const link = await fileDownloadLinksApi.create(file.id);
       setLinks((onceki) => [link, ...onceki]);
+      return true;
     } catch (e: any) {
       setError(e?.message ?? t("Bağlantı oluşturulamadı"));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -62,25 +75,71 @@ export default function FileDownloadLinkModal({ file, onClose }: Props) {
 
   const acikVar = links.some((l) => l.active);
 
+  /** Seçim yapıldı: açık bir bağlantı yoksa hemen üret, sonra ekrana geç. */
+  const sec = async (hedef: Mod) => {
+    if (!acikVar && !(await olustur())) return;
+    setMod(hedef);
+  };
+
+  const baslik =
+    mod === "eposta" ? t("Bağlantıyı e-postayla gönder") : mod === "baglanti" ? t("İndirme bağlantısı") : t("Dosyayı paylaş");
+
   return (
-    <Modal title={t("İndirme bağlantısı")} subtitle={file.name} onClose={onClose} maxWidth={520}>
+    <Modal title={baslik} subtitle={file.name} onClose={onClose} maxWidth={520}>
       {error && <div style={{ color: c.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
       {loading ? (
         <div style={{ color: c.textSecondary, fontSize: 14 }}>{t("Yükleniyor…")}</div>
-      ) : (
+      ) : mod === "secim" ? (
         <>
-          {links.length === 0 && (
-            <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.6, color: c.textSecondary }}>
-              {t(
-                "Bu dosya için bir bağlantı oluşturun; açan kişi Projelio hesabı olmadan dosyayı önizleyip indirebilir. Bağlantıyı istediğiniz an kaldırabilirsiniz."
-              )}
+          <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.6, color: c.textSecondary }}>
+            {t(
+              "Bağlantıyı açan kişi Projelio hesabı olmadan dosyayı önizleyip indirebilir. Bağlantıyı istediğiniz an kaldırabilirsiniz."
+            )}
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <SecimKarti
+              icon={<IconLink size={18} color={c.accent} />}
+              label={t("Bağlantı al")}
+              hint={t("Adresi kopyalayın, istediğiniz yere yapıştırın.")}
+              disabled={busy}
+              onClick={() => void sec("baglanti")}
+            />
+            <SecimKarti
+              icon={<IconSend size={18} color={c.accent} />}
+              label={t("E-postayla gönder")}
+              hint={t("Bağlantıyı doğrudan alıcının gelen kutusuna yollayın.")}
+              disabled={busy}
+              onClick={() => void sec("eposta")}
+            />
+          </div>
+          {acikVar && (
+            <p style={{ margin: "14px 0 0", fontSize: 12, color: c.textSecondary }}>
+              {t("Bu dosya için zaten bir bağlantı var; ikisi de onu kullanır.")}
             </p>
           )}
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => setMod("secim")}
+            style={{
+              marginBottom: 12,
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              color: c.textSecondary,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            ← {t("Geri")}
+          </button>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {links.map((link) => (
-              <LinkKarti key={link.id} link={link} onChange={degistir} />
+              <LinkKarti key={link.id} link={link} onChange={degistir} gonderim={mod === "eposta"} />
             ))}
           </div>
 
@@ -89,20 +148,20 @@ export default function FileDownloadLinkModal({ file, onClose }: Props) {
             onClick={() => void olustur()}
             disabled={busy}
             style={{
-              marginTop: links.length ? 16 : 0,
+              marginTop: 16,
               width: "100%",
               padding: "11px 14px",
               borderRadius: 10,
               border: "none",
-              background: acikVar ? "transparent" : c.accent,
-              color: acikVar ? c.accent : "#fff",
-              boxShadow: acikVar ? `inset 0 0 0 1px ${c.border}` : undefined,
+              background: "transparent",
+              color: c.accent,
+              boxShadow: `inset 0 0 0 1px ${c.border}`,
               fontSize: 15,
               fontWeight: 600,
               cursor: busy ? "wait" : "pointer",
             }}
           >
-            {acikVar ? t("Yeni bağlantı oluştur") : t("Bağlantı oluştur")}
+            {t("Yeni bağlantı oluştur")}
           </button>
         </>
       )}
@@ -110,8 +169,79 @@ export default function FileDownloadLinkModal({ file, onClose }: Props) {
   );
 }
 
-/** Tek bir bağlantının kartı: adres, ayarlar, e-postayla gönderme, kaldırma. */
-function LinkKarti({ link, onChange }: { link: FileDownloadLink; onChange: (l: FileDownloadLink) => void }) {
+/** İlk adımdaki iki seçenekten biri. */
+function SecimKarti({
+  icon,
+  label,
+  hint,
+  disabled,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  hint: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const c = useThemeColors();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        width: "100%",
+        textAlign: "left",
+        padding: "14px 16px",
+        borderRadius: 12,
+        border: `1px solid ${c.border}`,
+        background: c.surface,
+        cursor: disabled ? "wait" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <span
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 10,
+          background: `${c.accent}1f`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        {icon}
+      </span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{label}</span>
+        <span style={{ display: "block", fontSize: 12.5, lineHeight: 1.5, color: c.textSecondary }}>{hint}</span>
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Tek bir bağlantının kartı: adres, ayarlar, kaldırma — ve e-posta kipinde
+ * gönderme formu.
+ *
+ * `gonderim` kapalıyken form HİÇ ÇİZİLMİYOR (gizlenmiyor): "bağlantı al"
+ * diyen kişiye e-posta alanı göstermek, seçim sormanın anlamını ortadan
+ * kaldırırdı.
+ */
+function LinkKarti({
+  link,
+  onChange,
+  gonderim,
+}: {
+  link: FileDownloadLink;
+  onChange: (l: FileDownloadLink) => void;
+  gonderim: boolean;
+}) {
   const c = useThemeColors();
   const t = useT();
   const [busy, setBusy] = useState(false);
@@ -174,6 +304,66 @@ function LinkKarti({ link, onChange }: { link: FileDownloadLink; onChange: (l: F
     }
   };
 
+  // E-postayla gönderme. Gönderen link@ alan adı, yanıt kullanıcının kendi
+  // adresi — alıcı "bu dosya ne?" diye yanıtlayabilsin.
+  //
+  // <form> ŞART: Modal'ın Enter kuralı önce odağın İÇİNDE olduğu forma bakıyor.
+  // Form olmadan Enter, modalin genelindeki "Bağlantı oluştur" düğmesine
+  // düşüyordu — yani gönderilmek istenen her Enter yeni bir bağlantı üretiyordu.
+  const gonderimFormu = (
+        <form
+          onSubmit={epostaylaGonder}
+          style={{ marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${c.border}` }}
+        >
+          {/* Etiket "Kime": pencerenin başlığı zaten "Bağlantıyı e-postayla
+              gönder", aynı cümleyi iki kez yazmak yer kaybı. */}
+          <label style={{ display: "block", fontSize: 13, color: c.textSecondary, marginBottom: 5 }}>
+            {t("Kime")}
+          </label>
+          {/* type="email" DEĞİL: tarayıcı çoklu adresi geçersiz sayıp formu
+              engelliyor. Ayrıştırma ve doğrulama zaten sunucuda. */}
+          <input
+            type="text"
+            value={gonderAdres}
+            disabled={busy}
+            onChange={(e) => setGonderAdres(e.target.value)}
+            placeholder={t("alici@firma.com, ikinci@firma.com")}
+            style={{ width: "100%", fontSize: 13, padding: "7px 9px", marginBottom: 4 }}
+          />
+          <div style={{ fontSize: 11, color: c.textSecondary, marginBottom: 6 }}>
+            {t("Birden fazla adresi virgülle ayırın. Enter gönderir; bir kopyası size de gelir.")}
+          </div>
+          {/* Çok satırlı alanda Enter yeni satırdır (Modal'ın kuralı); notu
+              bitirip göndermek için ⌘/Ctrl+Enter ya da düğme. */}
+          <textarea
+            value={not}
+            disabled={busy}
+            onChange={(e) => setNot(e.target.value)}
+            placeholder={t("Kısa bir not (isteğe bağlı)")}
+            rows={2}
+            style={{ width: "100%", fontSize: 13, padding: "7px 9px", resize: "vertical" }}
+          />
+          <button
+            type="submit"
+            data-primary
+            disabled={busy || !gonderAdres.trim()}
+            style={{
+              ...ikincilButon(c),
+              marginTop: 6,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              opacity: busy || !gonderAdres.trim() ? 0.5 : 1,
+            }}
+          >
+            <IconSend size={14} color={c.textSecondary} />
+            {busy ? t("Gönderiliyor…") : t("Gönder")}
+          </button>
+
+          {sonuclar && <GonderimSonucu sonuclar={sonuclar} />}
+        </form>
+  );
+
   const kutu: React.CSSProperties = {
     border: `1px solid ${c.border}`,
     borderRadius: 12,
@@ -197,6 +387,8 @@ function LinkKarti({ link, onChange }: { link: FileDownloadLink; onChange: (l: F
 
   return (
     <div style={kutu}>
+      {gonderim && gonderimFormu}
+
       <KopyalaSatiri url={link.url} />
 
       <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -278,60 +470,6 @@ function LinkKarti({ link, onChange }: { link: FileDownloadLink; onChange: (l: F
           <option value="90">{t("90 gün")}</option>
         </select>
       </div>
-
-      {/* E-postayla gönderme. Gönderen link@ alan adı, yanıt kullanıcının
-          kendi adresi — alıcı "bu dosya ne?" diye yanıtlayabilsin.
-
-          <form> ŞART: Modal'ın Enter kuralı önce odağın içinde olduğu forma
-          bakıyor. Form olmadan Enter, modalin genelindeki "Bağlantı oluştur"
-          düğmesine düşüyordu — yani gönderilmek istenen her Enter yeni bir
-          bağlantı üretiyordu. */}
-      <form onSubmit={epostaylaGonder} style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${c.border}` }}>
-        <label style={{ display: "block", fontSize: 13, color: c.textSecondary, marginBottom: 5 }}>
-          {t("Bağlantıyı e-postayla gönder")}
-        </label>
-        {/* type="email" DEĞİL: tarayıcı çoklu adresi geçersiz sayıp formu
-            engelliyor. Ayrıştırma ve doğrulama zaten sunucuda. */}
-        <input
-          type="text"
-          value={gonderAdres}
-          disabled={busy}
-          onChange={(e) => setGonderAdres(e.target.value)}
-          placeholder={t("alici@firma.com, ikinci@firma.com")}
-          style={{ width: "100%", fontSize: 13, padding: "7px 9px", marginBottom: 4 }}
-        />
-        <div style={{ fontSize: 11, color: c.textSecondary, marginBottom: 6 }}>
-          {t("Birden fazla adresi virgülle ayırın. Enter gönderir; bir kopyası size de gelir.")}
-        </div>
-        {/* Çok satırlı alanda Enter yeni satırdır (Modal'ın kuralı); notu
-            bitirip göndermek için ⌘/Ctrl+Enter ya da düğme. */}
-        <textarea
-          value={not}
-          disabled={busy}
-          onChange={(e) => setNot(e.target.value)}
-          placeholder={t("Kısa bir not (isteğe bağlı)")}
-          rows={2}
-          style={{ width: "100%", fontSize: 13, padding: "7px 9px", resize: "vertical" }}
-        />
-        <button
-          type="submit"
-          data-primary
-          disabled={busy || !gonderAdres.trim()}
-          style={{
-            ...ikincilButon(c),
-            marginTop: 6,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            opacity: busy || !gonderAdres.trim() ? 0.5 : 1,
-          }}
-        >
-          <IconSend size={14} color={c.textSecondary} />
-          {busy ? t("Gönderiliyor…") : t("Gönder")}
-        </button>
-
-        {sonuclar && <GonderimSonucu sonuclar={sonuclar} />}
-      </form>
 
       <div
         style={{

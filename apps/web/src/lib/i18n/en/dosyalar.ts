@@ -191,15 +191,24 @@ export const dosyalar: TranslationDict = {
   // Buradaki metinlerin bir kısmını, Projelio hesabı OLMAYAN bir alıcı görüyor
   // (bkz. pages/PublicFileDownload.tsx): dili hesap tercihinden değil
   // TARAYICIDAN geliyor, yani İngilizce karşılığı olmadan sayfa Türkçe kalırdı.
-  "Bağlantı oluştur…": "Create link…",
+  "Bağlantı oluştur/gönder…": "Create or send link…",
+  "Dosyayı paylaş": "Share file",
+  "Bağlantı al": "Get a link",
+  "Adresi kopyalayın, istediğiniz yere yapıştırın.": "Copy the address and paste it wherever you like.",
+  "E-postayla gönder": "Send by email",
+  "Bağlantıyı doğrudan alıcının gelen kutusuna yollayın.":
+    "Send the link straight to the recipient's inbox.",
+  "Bağlantıyı açan kişi Projelio hesabı olmadan dosyayı önizleyip indirebilir. Bağlantıyı istediğiniz an kaldırabilirsiniz.":
+    "Whoever opens the link can preview and download the file without a Projelio account. You can remove the link at any time.",
+  "Bu dosya için zaten bir bağlantı var; ikisi de onu kullanır.":
+    "This file already has a link; both options use it.",
+  Kime: "To",
   "İndirme bağlantısı": "Download link",
   "Bağlantı oluştur": "Create link",
   "Yeni bağlantı oluştur": "Create another link",
   "Bağlantı oluşturulamadı": "Couldn't create the link",
   "Gönderilemedi": "Couldn't be sent",
   "1 gün": "1 day",
-  "Bu dosya için bir bağlantı oluşturun; açan kişi Projelio hesabı olmadan dosyayı önizleyip indirebilir. Bağlantıyı istediğiniz an kaldırabilirsiniz.":
-    "Create a link for this file: whoever opens it can preview and download without a Projelio account. You can remove the link at any time.",
   "İndirmeye izin ver": "Allow downloading",
   "Kapalıyken bağlantıyı açan kişi dosyayı görebilir ama indiremez.":
     "When off, whoever opens the link can view the file but not download it.",

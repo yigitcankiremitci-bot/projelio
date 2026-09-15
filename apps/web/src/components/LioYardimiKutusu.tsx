@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { faturalarApi, type FaturaKapsami, type LioGirisSonucu, type LioYardimiDurumu } from "../api/faturalar";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
+import Anahtar from "./Anahtar";
 import { IconInfo, IconSparkle, IconX } from "./icons";
 
 interface Props {
@@ -137,11 +138,11 @@ export default function LioYardimiKutusu({ moduleKey, kapsam, departmentId, canW
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: canWrite ? "pointer" : "default" }}>
-          <input type="checkbox" checked={durum.enabled} onChange={cevir} disabled={!canWrite} />
-          <IconSparkle size={15} color={durum.enabled ? c.primary : c.textSecondary} />
-          <span style={{ fontSize: 14, color: c.textPrimary }}>{t("Lio yardımı")}</span>
-        </label>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <Anahtar checked={durum.enabled} onChange={cevir} disabled={!canWrite} label={t("Lio yardımı")} />
+          <IconSparkle size={15} color={durum.enabled ? c.accent : c.textSecondary} />
+          <span style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary }}>{t("Lio yardımı")}</span>
+        </div>
 
         <button
           type="button"

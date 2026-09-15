@@ -84,6 +84,46 @@ export class EmailService {
   }
 
   /**
+   * Belge arşivi gönderimi (bugün: ay sonu fatura arşivi, muhasebeciye).
+   *
+   * Diğer metotlardan iki farkı var ve ikisi de bilerek:
+   *   * ALICI KULLANICI DEĞİL. Muhasebecinin Projelio hesabı yok, dili
+   *     bilinmiyor; metin gönderen şirketin diliyle değil, sabit Türkçe.
+   *   * `replyTo` gönderen kişinin adresi: muhasebeci "şu fatura eksik" diye
+   *     yanıtladığında yanıtın bize değil, arşivi gönderene gitmesi gerekiyor.
+   *
+   * Sonuç BOOLEAN dönüyor ve çağıran buna bakmak zorunda: "gönderildi" deyip
+   * göndermemek, ay sonu için en pahalı sessiz hata olurdu.
+   */
+  async sendBelgeArsivi(params: {
+    to: string;
+    replyTo?: string;
+    konu: string;
+    baslik: string;
+    govdeSatirlari: string[];
+    ek?: { filename: string; content: Buffer };
+    indirmeUrl?: string;
+  }): Promise<boolean> {
+    if (!this.apiKey) {
+      this.logger.warn(
+        `E-posta sağlayıcısı yapılandırılmadı (RESEND_API_KEY yok) — arşiv gönderilemedi. Alıcı: ${params.to}`
+      );
+      return false;
+    }
+
+    return this.send({
+      to: params.to,
+      replyTo: params.replyTo,
+      subject: params.konu,
+      html: belgeArsiviHtml(params.baslik, params.govdeSatirlari, params.indirmeUrl),
+      text: [params.baslik, "", ...params.govdeSatirlari, ...(params.indirmeUrl ? ["", params.indirmeUrl] : [])].join(
+        "\n"
+      ),
+      attachments: params.ek ? [params.ek] : undefined,
+    });
+  }
+
+  /**
    * Gönderim hatasında BİLEREK exception fırlatmıyoruz.
    *
    * Şifre sıfırlama uç noktası, bir e-postanın kayıtlı olup olmadığını
@@ -222,6 +262,11 @@ export class EmailService {
     headers?: Record<string, string>;
     from?: string;
     replyTo?: string;
+    /**
+     * Dosya ekleri. Resend içeriği base64 bekliyor ve base64 boyu ~%33
+     * büyütüyor — çağıran ham tavanı buna göre seçmeli (bkz. EPOSTA_EKI_TAVANI).
+     */
+    attachments?: { filename: string; content: Buffer }[];
   }): Promise<boolean> {
     try {
       const response = await fetchWithTimeout(RESEND_ENDPOINT, {
@@ -238,6 +283,14 @@ export class EmailService {
           html: params.html,
           text: params.text,
           ...(params.headers ? { headers: params.headers } : {}),
+          ...(params.attachments?.length
+            ? {
+                attachments: params.attachments.map((ek) => ({
+                  filename: ek.filename,
+                  content: ek.content.toString("base64"),
+                })),
+              }
+            : {}),
         }),
       });
 
@@ -293,6 +346,40 @@ function emailLayout(params: {
           </p>
           <p style="margin:0;font-size:13px;line-height:1.6;color:${MARKA.yaziSoluk};border-top:1px solid ${MARKA.cizgi};padding-top:16px;">
             ${params.footer}
+          </p>`
+  );
+}
+
+/**
+ * Belge arşivi e-postası.
+ *
+ * emailLayout KULLANILMIYOR: o şablon tek bir düğme (CTA) etrafına kurulu,
+ * burada ise düğme OLMAYABİLİR — arşiv eke sığdıysa indirilecek bir adres yok.
+ */
+function belgeArsiviHtml(baslik: string, satirlar: string[], indirmeUrl?: string): string {
+  const govde = satirlar
+    .map(
+      (satir) =>
+        `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:${MARKA.yaziOrta};">${satir}</p>`
+    )
+    .join("\n");
+  const dugme = indirmeUrl
+    ? `<p style="margin:16px 0 24px;">
+            <a href="${indirmeUrl}"
+               style="display:inline-block;background:${MARKA.yaziKoyu};color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-size:15px;font-weight:500;">
+              Arşivi indir
+            </a>
+          </p>
+          <p style="margin:0 0 24px;font-size:13px;line-height:1.6;word-break:break-all;color:${MARKA.vurgu};">${indirmeUrl}</p>`
+    : "";
+
+  return epostaKabugu(
+    "tr",
+    `          <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:${MARKA.yaziKoyu};">${baslik}</h1>
+${govde}
+${dugme}
+          <p style="margin:0;font-size:13px;line-height:1.6;color:${MARKA.yaziSoluk};border-top:1px solid ${MARKA.cizgi};padding-top:16px;">
+            Bu e-posta Projelio üzerinden gönderildi. Yanıtınız arşivi gönderen kişiye ulaşır.
           </p>`
   );
 }

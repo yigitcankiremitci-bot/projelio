@@ -37,6 +37,15 @@ import { HizmetAnlasmasiService } from "./hizmet-anlasmasi.service";
     GorevButceService,
     HizmetAnlasmasiService,
   ],
-  exports: [BudgetService, RecurringPaymentsService, ButceErisimService, ButceHiyerarsiService, GorevButceService],
+  // ButceKademeService dışarı açık: fatura modülü kasa satırına belge bağlarken
+  // paranın yetki kuralını kendi kopyalamasın diye (bkz. faturalar.service.ts).
+  exports: [
+    BudgetService,
+    RecurringPaymentsService,
+    ButceErisimService,
+    ButceHiyerarsiService,
+    GorevButceService,
+    ButceKademeService,
+  ],
 })
 export class BudgetModule {}

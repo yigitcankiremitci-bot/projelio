@@ -1470,6 +1470,14 @@ export interface BudgetTransaction {
   taskTitle?: string;
   /** Kaydın nereden doğduğu; otomatik satırlar elle düzenlenmez. */
   source?: BudgetTransactionSource;
+  /**
+   * Bu ödemenin FATURASI (Fatura modülündeki kayıt, bkz. migration 112).
+   *
+   * Birebir: bir ödemenin bir faturası, bir faturanın bir ödemesi vardır
+   * (veritabanında tekil indeks). Fatura kaydı silinirse bağ kopar ama para
+   * hareketi yerinde kalır — para belgeye bağlı değildir.
+   */
+  invoiceRecordId?: string;
   description?: string;
   // İşlemin gerçekleştiği tarih (createdAt kayıt anıdır).
   occurredAt: string;
@@ -3471,6 +3479,12 @@ export interface BilgiKarti {
   postalCode?: string;
   bankName?: string;
   iban?: string;
+  /**
+   * Muhasebecinin e-postası: ay sonu fatura arşivi buraya gönderiliyor
+   * (bkz. migration 112). Künyede duruyor çünkü vergi dairesi ve IBAN'la aynı
+   * sorunun cevabı — şirketin sabit bilgisi.
+   */
+  accountantEmail?: string;
   notes?: string;
   updatedAt?: string;
   updatedByName?: string;

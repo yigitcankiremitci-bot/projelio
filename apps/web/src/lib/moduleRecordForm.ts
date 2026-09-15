@@ -1,5 +1,5 @@
 import type { ModuleRecord } from "@projelio/shared";
-import type { ModuleFieldConfig } from "./moduleConfigs";
+import { todayISO, type ModuleFieldConfig } from "./moduleConfigs";
 
 /**
  * Modül kayıt formunun dönüşümleri: alan tanımı → form state → sunucuya giden
@@ -15,7 +15,9 @@ import type { ModuleFieldConfig } from "./moduleConfigs";
 export function emptyForm(fields: ModuleFieldConfig[]): Record<string, string> {
   const f: Record<string, string> = {};
   for (const field of fields) {
-    f[field.key] = field.defaultValue ?? "";
+    // defaultToday form AÇILDIĞI anda çözülüyor; tanımda sabit bir tarih
+    // dursaydı uygulamanın yüklendiği günde donardı (bkz. ModuleFieldConfig).
+    f[field.key] = field.defaultToday ? todayISO() : (field.defaultValue ?? "");
     // currency alanı iki anahtar yönetir; para biriminin de varsayılanı olmalı.
     if (field.type === "currency") f[field.currencyKey ?? "currency"] = "TRY";
   }

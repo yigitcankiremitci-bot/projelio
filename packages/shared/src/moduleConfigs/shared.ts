@@ -19,7 +19,10 @@ import type { ModuleRecord } from "../types";
 //   multiselect — çoklu seçim, dizi olarak saklanır
 //   formula     — salt okunur, diğer alanlardan hesaplanır
 //
-// `file` tipi henüz yok: Drive/OneDrive bağlaması ayrı bir iş.
+// `file` tipi ALAN olarak yok ve olmayacak: belge kaydın bir alanı değil,
+// kaydın EKİ. Modül belge biriktiriyorsa tanıma `attachments` yazılır (bkz.
+// ModuleAttachmentsConfig, migration 112) ve dosya kapsamın dosya ağacına
+// yüklenip kayda bağlanır — jsonb'nin içinde bir dosya kimliği taşımaz.
 // Bkz. docs/moduller/00-modul-mimarisi.md §4
 
 export type ModuleFieldType =
@@ -51,6 +54,15 @@ export interface ModuleFieldConfig {
   required?: boolean;
   options?: ModuleFieldOption[];
   defaultValue?: string;
+  /**
+   * date: yeni kayıtta bugünün tarihiyle açılsın mı.
+   *
+   * `defaultValue: todayISO()` YAZILAMAZ: tanım dosyası bir kez import edilir,
+   * tarih o anda donar ve sekmesini günlerce açık bırakan kullanıcıya dünkü
+   * tarih varsayılan gelirdi. Bayrak, formun açıldığı anda çözülüyor
+   * (bkz. moduleRecordForm > emptyForm).
+   */
+  defaultToday?: boolean;
   placeholder?: string;
 
   /** currency: para biriminin yazılacağı anahtar. Verilmezse "currency". */
@@ -139,6 +151,32 @@ export interface ModuleRecordConfig {
   // Modülün ana ekranında listenin üstünde gösterilen gösterge/özet kutucukları
   // (örn. "Net bakiye", "Açık şikayet sayısı").
   computeStats?: (records: ModuleRecord[]) => ModuleSummaryStat[];
+
+  /**
+   * Kayda BELGE eklenebilir mi (bkz. migration 112).
+   *
+   * Tanımlıysa kayıt penceresinde yükleme alanı çıkar ve yüklenen dosya
+   * kapsamın dosya ağacında <rootFolder>/<yıl>/<ay> klasörüne iner. Panelde
+   * bayrak yok, TANIMDA: hangi modülün belge biriktirdiği modülün kendi
+   * meselesi, panelin değil (bkz. dosya başındaki not).
+   */
+  attachments?: ModuleAttachmentsConfig;
+}
+
+export interface ModuleAttachmentsConfig {
+  /** Kapsamın dosya ağacındaki kök klasör adı ("Faturalar"). */
+  rootFolder: string;
+  /**
+   * Ay klasörünü belirleyen tarih alanı.
+   *
+   * YÜKLEME TARİHİ DEĞİL: geçmiş ayın faturası bir hafta sonra yüklendiğinde
+   * ait olduğu ayın klasörüne düşmeli, yoksa ay sonu arşivi eksik çıkar.
+   * Alan boşsa bugünün ayına düşer — belgeyi kapsam dışı bırakmaktansa
+   * bugüne yazmak, kullanıcının düzeltebileceği tek hata.
+   */
+  dateKey: string;
+  /** Yükleme alanının başlığı ("Fatura / fiş"). */
+  label: string;
 }
 
 // ============================================================ Yardımcılar

@@ -10,6 +10,9 @@ import { useUndo } from "../lib/undo";
 import { useSortableList } from "../lib/useSortableList";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import type { SortableOptions } from "sortablejs";
+import AyArsiviModal from "./AyArsiviModal";
+import KayitEkleri from "./KayitEkleri";
+import LioYardimiKutusu from "./LioYardimiKutusu";
 import LinkedFilesPanel from "./LinkedFilesPanel";
 import Modal from "./Modal";
 import TaskFromRecordModal from "./TaskFromRecordModal";
@@ -89,6 +92,8 @@ export default function ModuleRecordsPanel({
   const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
   // Göreve dönüştürme modalinin açık olduğu kayıt.
   const [taskFor, setTaskFor] = useState<ModuleRecord | null>(null);
+  // Ay sonu penceresi (yalnızca belge biriktiren modüllerde).
+  const [ayArsivi, setAyArsivi] = useState(false);
   const { pushUndo } = useUndo();
 
   const basePath = jobId ? `/jobs/${jobId}/module-records` : `/organizations/${organizationId}/module-records`;
@@ -290,11 +295,24 @@ export default function ModuleRecordsPanel({
 
       if (formMode?.kind === "edit") {
         await api.patch(`/module-records/${formMode.id}`, { data });
+        void logToReferencedParties(data);
+        closeForm();
       } else {
-        await api.post(basePath, jobId ? { moduleKey, data } : { departmentId, moduleKey, data });
+        const olusan = await api.post<ModuleRecord>(
+          basePath,
+          jobId ? { moduleKey, data } : { departmentId, moduleKey, data }
+        );
+        void logToReferencedParties(data);
+        // Belge biriktiren modülde pencere KAPANMIYOR, düzenlemeye geçiyor.
+        //
+        // Yükleme alanı yalnızca düzenlemede çizilebiliyor (kaydedilmemiş bir
+        // kaydın kimliği, dolayısıyla bağlanacak hedefi yok). Kapansaydı
+        // kullanıcı faturayı kaydettikten sonra belgesini eklemek için kaydı
+        // listeden bulup yeniden açmak zorunda kalır ve çoğu zaman hiç
+        // eklemezdi — oysa belge bu modülün asıl sebebi.
+        if (config.attachments && olusan?.id) setFormMode({ kind: "edit", id: olusan.id });
+        else closeForm();
       }
-      void logToReferencedParties(data);
-      closeForm();
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kaydedilemedi");
@@ -441,6 +459,48 @@ export default function ModuleRecordsPanel({
             </div>
           ))}
         </div>
+      )}
+
+      {/* Lio yardımı: açıkken bırakılan belgeyi Lio okuyup kaydı ve kasa
+          satırını kendisi açıyor (bkz. migration 113). Kutu yalnızca belge
+          biriktiren modüllerde ve kapsamı olan ekranlarda. */}
+      {config.attachments && (organizationId || jobId) && (
+        <LioYardimiKutusu
+          moduleKey={moduleKey}
+          kapsam={jobId ? { scope: "job", scopeId: jobId } : { scope: "organization", scopeId: organizationId! }}
+          departmentId={jobId ? undefined : departmentId}
+          canWrite={canWrite}
+          onIslendi={load}
+        />
+      )}
+
+      {/* Ay sonu: belgeleri toplu indirme ve muhasebeciye gönderme. Yalnızca
+          belge biriktiren modüllerde ve yalnızca kapsamı olan ekranlarda —
+          arşivin kaynağı kapsamın kayıtları (bkz. migration 112). */}
+      {config.attachments && (organizationId || jobId) && (
+        <button
+          onClick={() => setAyArsivi(true)}
+          style={{
+            alignSelf: "flex-start",
+            fontSize: 13,
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: `1px solid ${c.border}`,
+            background: "transparent",
+            color: c.textPrimary,
+            cursor: "pointer",
+          }}
+        >
+          {t("Ay sonu · indir veya gönder")}
+        </button>
+      )}
+
+      {ayArsivi && config.attachments && (
+        <AyArsiviModal
+          kapsam={jobId ? { scope: "job", scopeId: jobId } : { scope: "organization", scopeId: organizationId! }}
+          baslik={t(config.title)}
+          onClose={() => setAyArsivi(false)}
+        />
       )}
 
       {showToolbar && (
@@ -593,7 +653,12 @@ export default function ModuleRecordsPanel({
           {/* Bu kayda BAĞLANMIŞ dosyalar (bkz. migration 095). Yalnızca
               düzenlemede: henüz kaydedilmemiş bir kaydın kimliği yok, dolayısıyla
               bağlanacak bir hedef de yok. */}
-          {formMode.kind === "edit" && <LinkedFilesPanel targetKind="module_record" targetId={formMode.id} canPick />}
+          {formMode.kind === "edit" &&
+            (config.attachments ? (
+              <KayitEkleri recordId={formMode.id} ayar={config.attachments} canWrite={canWrite} />
+            ) : (
+              <LinkedFilesPanel targetKind="module_record" targetId={formMode.id} canPick />
+            ))}
         </div>
         </Modal>
       )}

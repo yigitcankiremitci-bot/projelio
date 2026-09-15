@@ -152,4 +152,18 @@ export const butce: TranslationDict = {
   "Proje sahibi": "Project owner",
   "Ödemeyi sil": "Delete payment",
   "Ödeme silinemedi.": "Couldn't delete the payment.",
+
+  // Kasa satırının faturası (bkz. migration 112).
+  Fatura: "Invoice",
+  "Faturayı aç": "Open the invoice",
+  "Ödemenin faturası": "The payment's invoice",
+  "Kasa kaydı": "Cash entry",
+  "Fatura kaydı aç": "Create invoice record",
+  "Fatura kaydı açılamadı.": "Couldn't create the invoice record.",
+  "Fatura bağını kaldır": "Unlink the invoice",
+  "Bağ kaldırılamadı.": "Couldn't remove the link.",
+  "Bu ödeme için Fatura modülünde bir kayıt açılır; tutar, tarih ve karşı taraf buradan kopyalanır. Belgeyi sonra yüklersiniz.":
+    "A record is created for this payment in the Invoices module; the amount, date and counterparty are copied from here. You upload the document afterwards.",
+  "Bağı kaldırmak fatura kaydını ve belgelerini silmez; yalnızca bu ödemeyle ilişkisini koparır.":
+    "Removing the link does not delete the invoice record or its documents; it only detaches it from this payment.",
 };

@@ -119,6 +119,9 @@ import { WhatsappModule } from "../whatsapp/whatsapp.module";
   // AiAssistantService dışarı açık: e-posta modülü yanıt taslağı üretmek için
   // draftText() çağırıyor (bkz. MailboxService.draftReply). Kredi muhasebesi ve
   // Anthropic istemcisi tek yerde kalsın diye ikinci bir istemci kurulmuyor.
-  exports: [AiCreditsService, AiAssistantService],
+  // LlmProviderRegistry dışarı açık: Lio'nun sohbeti dışındaki okuma işleri de
+  // (ör. fatura belgesi) aynı sağlayıcı sırasından geçsin, ikinci bir istemci
+  // kurmasın (bkz. faturalar/lio-yardimi.service.ts).
+  exports: [AiCreditsService, AiAssistantService, LlmProviderRegistry],
 })
 export class AiAssistantModule {}

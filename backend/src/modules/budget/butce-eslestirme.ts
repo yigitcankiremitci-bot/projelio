@@ -76,6 +76,7 @@ export function mapTransaction(row: any): BudgetTransaction {
     taskTitle: row.tasks?.title ?? undefined,
     // Eski kayıtlarda sütun yoktu; hepsi elle girilmişti (bkz. migration 105).
     source: row.source ?? "manual",
+    invoiceRecordId: row.invoice_record_id ?? undefined,
     counterpartyName: row.party?.display_name ?? undefined,
     description: row.description ?? undefined,
     occurredAt: row.occurred_at,

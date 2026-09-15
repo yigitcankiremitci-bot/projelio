@@ -176,6 +176,31 @@ export class LlmProviderRegistry {
   }
 
   /**
+   * BELGE OKUYAN işler için model seçimi (bkz. faturalar/lio-yardimi.service.ts).
+   *
+   * `send()` KULLANILMIYOR ve bu bilinçli: orası geçici bir hatada sıradaki
+   * sağlayıcıya geçiyor, oysa buradaki adayların bir kısmı görsel girdiyi hiç
+   * kabul etmiyor (katalogda `vision: false`). Yedeğe geçmek, belgeyi
+   * GÖRMEDEN cevap üreten bir modele düşmek demekti — hata vermez, uydurur ve
+   * uydurduğu tutar deftere girer. Görsel kabul eden model yoksa iş hiç
+   * başlamıyor, çağıran kullanıcıya açıkça söylüyor.
+   *
+   * Aynı kademedeki görsel modeli önce denenir; yoksa sağlayıcı sırasındaki
+   * ilk görsel model kullanılır (okuma işi kademe tercihinden daha dar bir iş).
+   */
+  visionChoice(tier: "fast" | "smart" | "max"): ProviderChoice | null {
+    const adaylar: ProviderChoice[] = [];
+    for (const definition of this.activeDefinitions()) {
+      const provider = this.providers.get(definition.id);
+      if (!provider?.isConfigured() || !provider.capabilities.vision) continue;
+      for (const model of definition.models) {
+        if (model.vision) adaylar.push({ provider, definition, model: model.id, info: model });
+      }
+    }
+    return adaylar.find((a) => a.info?.tier === tier) ?? adaylar[0] ?? null;
+  }
+
+  /**
    * Arayüzün model seçicisine giden liste: yalnızca ETKİN sağlayıcıların
    * modelleri. Kapalı bir sağlayıcının modeli seçenek olarak gösterilmez.
    */

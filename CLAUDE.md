@@ -30,6 +30,8 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | Yaptım (kişisel iş günlüğü) | `backend/src/modules/worklog/`, `apps/web/src/pages/WorkLog.tsx` — Yapılacaklar'ın tersi |
 | Ürün kartı (ürün/hizmet + strateji + modüllerdeki izi) | `apps/web/src/components/ProductDetailModal.tsx`, `ProductForm.tsx`; özet ucu `GET /products/:id/overview`; modül eşleştirmesi `packages/shared/src/urunIliskileri.ts` |
 | Bütçe (tüm kademeler) | `backend/src/modules/budget/` — tek defter, bkz. aşağıdaki başlık |
+| Fatura belgeleri (ek, ay klasörü, ay sonu arşivi) | `backend/src/modules/faturalar/` — fatura KAYDI module_records'ta, burada yalnızca belgesi var |
+| Lio yardımı (belgeden okuyup kayıt + kasa satırı açma) | `backend/src/modules/faturalar/lio-yardimi.service.ts`, `fatura-okuma.ts`; anahtar `organization_modules.ai_assist` |
 | Bilgi kartı (şirket/iş künyesi) | `backend/src/modules/bilgi-karti/`, `apps/web/src/components/bilgiKarti/` — künye + belge + diğer modüllerden özet |
 | Hesaplar (üyelikler + şifreli giriş bilgileri) | `backend/src/modules/hesaplar/`, `apps/web/src/components/hesaplar/` — sır yalnızca `hesap-kimlik.service.ts`'ten çıkar |
 | Geçiş anahtarı (WebAuthn) doğrulaması | `backend/src/common/webauthn/` — elle yazıldı, bağımlılık yok; `backend/src/modules/passkeys/` kullanıcının cihazları |

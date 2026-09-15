@@ -46,6 +46,8 @@ const KUNYE_ALANLARI: Record<string, string> = {
   postalCode: "postal_code",
   bankName: "bank_name",
   iban: "iban",
+  // Ay sonu fatura arşivinin varsayılan alıcısı (bkz. migration 112).
+  accountantEmail: "accountant_email",
   notes: "notes",
 };
 

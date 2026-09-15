@@ -7,6 +7,7 @@ import { useT } from "../../lib/i18n";
 import { useRefreshOnUndo, useUndo } from "../../lib/undo";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { IconEdit, IconTrash } from "../icons";
+import KasaFaturasiModal from "./KasaFaturasiModal";
 import ButceOzetSeridi from "./ButceOzetSeridi";
 import NakitAkisGrafigi from "./NakitAkisGrafigi";
 import TTablosu from "./TTablosu";
@@ -89,6 +90,8 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
   const [hedef, setHedef] = useState({ hedefTur: "", hedefId: "", taskId: "" });
   // Düzenliye çevrilmek üzere açılan satır ve seçilen aralık.
   const [cevrilen, setCevrilen] = useState<BudgetTransaction | null>(null);
+  // Faturası açılan/görüntülenen kasa satırı.
+  const [faturasi, setFaturasi] = useState<BudgetTransaction | null>(null);
   const [cevirmeAraligi, setCevirmeAraligi] = useState<RecurrenceInterval>("monthly");
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [hata, setHata] = useState("");
@@ -681,6 +684,26 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
                     {t("Düzenli yap")}
                   </button>
                 )}
+                {/* Ödemenin faturası. Kasadan açılan fatura Fatura modülünde de
+                    görünür — ikinci bir fatura listesi YOK (bkz. migration 112). */}
+                {yetki.canManage && (
+                  <button
+                    onClick={() => setFaturasi(kayit)}
+                    title={kayit.invoiceRecordId ? t("Faturayı aç") : t("Fatura ekle")}
+                    style={{
+                      fontSize: 12,
+                      padding: "3px 8px",
+                      borderRadius: 7,
+                      border: `1px solid ${kayit.invoiceRecordId ? c.primary : c.border}`,
+                      background: "transparent",
+                      color: kayit.invoiceRecordId ? c.primary : c.textSecondary,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {t("Fatura")}
+                  </button>
+                )}
                 {yetki.canManage && (
                   <>
                     <button
@@ -704,6 +727,14 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
           </div>
         )}
       </section>
+
+      {faturasi && (
+        <KasaFaturasiModal
+          kayit={faturasi}
+          onDegisti={yukle}
+          onClose={() => setFaturasi(null)}
+        />
+      )}
 
       <DuzenliOdemeler
         scopeType={scopeType}

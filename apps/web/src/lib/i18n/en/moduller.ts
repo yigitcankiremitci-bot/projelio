@@ -986,4 +986,45 @@ export const moduller: TranslationDict = {
     "let proposals, ads and social copy all draw on the same page. You do not have to fill it in one sitting — ",
   "boş bıraktığın alan kimseye görünmez, her düzenleme sürüm olarak saklanır.":
     "a field you leave empty is shown to no one, and every edit is kept as a version.",
+
+  // Kayıt belgeleri ve ay sonu arşivi (bkz. migration 112).
+  "Fatura tarihi": "Invoice date",
+  "Fatura / fiş": "Invoice / receipt",
+  Belgeler: "Documents",
+  "Belge yüklenemedi": "Couldn't upload the document",
+  "PDF'i buraya sürükleyin ya da tıklayıp seçin.": "Drop a PDF here, or click to choose one.",
+  "Ay sonu · indir veya gönder": "Month end · download or send",
+  "{modul} — ay sonu": "{modul} — month end",
+  "Tüm faturaları indir": "Download all invoices",
+  "Muhasebeci e-postası": "Accountant's email",
+  "Muhasebeciye gönder": "Send to accountant",
+  "Hazırlanıyor…": "Preparing…",
+  "Arşiv indirildi.": "Archive downloaded.",
+  "Arşiv indirilemedi.": "Couldn't download the archive.",
+  "Gönderilemedi.": "Couldn't send it.",
+  "Bu dönemde fatura kaydı yok.": "There is no invoice record in this period.",
+  "Bu dönemde {n} fatura kaydı var.": "There are {n} invoice records in this period.",
+  "{n} belge ek olarak gönderildi.": "{n} documents were sent as an attachment.",
+  "{n} belge, indirme bağlantısıyla gönderildi (arşiv eke sığmadı).":
+    "{n} documents were sent as a download link (the archive was too large to attach).",
+  "Belgesi yüklenmemiş {n} fatura var.": "{n} invoices still have no document uploaded.",
+
+  // Lio yardımı kutusu (bkz. migration 113).
+  "Lio yardımı": "Lio assistance",
+  "Lio yardımı nedir?": "What is Lio assistance?",
+  "Lio yardımı açıkken modüle bıraktığın fatura ya da fişi Lio okur: tarihini, tutarını ve karşı tarafını kendisi doldurur, belgeyi ayın klasörüne koyar ve kasaya gideri/geliri yazar. Her okuma AI kredisi harcar. Kapalıyken hiçbir şey değişmez — kaydı elle girersin.":
+    "With Lio assistance on, Lio reads the invoice or receipt you drop into the module: it fills in the date, amount and counterparty, files the document in that month's folder, and writes the expense or income to the cash book. Each read spends AI credit. With it off nothing changes — you enter the record by hand.",
+  "Faturaları tek tek yazmak yerine Lio'ya bırakabilirsin: belgeyi sürükle, gerisini o doldursun.":
+    "Instead of typing invoices one by one, you can leave them to Lio: drop the document and let it fill in the rest.",
+  "Faturayı buraya bırak, Lio işlesin": "Drop the invoice here and let Lio handle it",
+  "PDF ya da fotoğraf. Fişin fotoğrafını çekip de bırakabilirsin.":
+    "PDF or photo. You can snap a picture of the receipt and drop that too.",
+  "Lio okuyor…": "Lio is reading…",
+  "Lio yardımı için AI kredin yok. Her belge okumasında krediden düşülüyor.":
+    "You have no AI credit for Lio assistance. Each document read is deducted from your credit.",
+  "Belge okunamadı.": "The document couldn't be read.",
+  "Okundu: {ozet} — kayıt ve kasa hareketi açıldı.":
+    "Read: {ozet} — the record and the cash entry were created.",
+  "Okundu: {ozet} — kayıt açıldı ama kasaya yazılamadı ({hata})":
+    "Read: {ozet} — the record was created but it couldn't be written to the cash book ({hata})",
 };

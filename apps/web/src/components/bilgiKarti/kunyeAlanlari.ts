@@ -80,6 +80,19 @@ export const KUNYE_BOLUMLERI: KunyeBolumu[] = [
     ],
   },
   {
+    key: "muhasebe",
+    title: "Muhasebe",
+    alanlar: [
+      {
+        key: "accountantEmail",
+        label: "Muhasebeci e-postası",
+        tur: "email",
+        genis: true,
+        placeholder: "muhasebe@ornek.com",
+      },
+    ],
+  },
+  {
     key: "notlar",
     title: "Notlar",
     alanlar: [{ key: "notes", label: "Not", tur: "multiline", genis: true }],

@@ -176,6 +176,63 @@ hedefin adını sorgulasaydı erişimi olmayan bir uuid'yi deneyen biri o kaydı
 adını öğrenebilirdi. `push` ise gerçek bir yazmadır ve yetkiyi hedefin kendi
 servisi uygular (`TasksService`, `BudgetService`, `ModuleRecordsService`).
 
+## Fatura belgeleri ve ay sonu arşivi (`/module-records/:id/attachments`, `/invoices`)
+
+Fatura **kaydı** sıradan bir modül kaydıdır (`module_records`, `fm_fatura`) ve
+kendi uçlarından yönetilir. Buradaki uçlar yalnızca faturanın **belgesiyle**
+ilgilidir (bkz. `database/migrations/112_fatura_ekleri.sql`).
+
+Yüklenen belge kaydın içinde DEĞİL, kapsamın dosya ağacında yaşar:
+`Faturalar/<yıl>/<yıl-ay Ay>/` klasörüne iner ve kayda `file_links` ile bağlanır.
+Klasör **fatura tarihinden** seçilir, yükleme tarihinden değil — geçmiş ayın
+faturası bir hafta sonra yüklendiğinde ait olduğu ayın arşivinde çıksın diye.
+
+| Method | Path | Açıklama | Query / Gövde |
+|---|---|---|---|
+| POST | `/module-records/:id/attachments` | Kayda belge ekler (multipart `file`) | Yalnızca tanımında `attachments` olan modüllerde |
+| POST | `/budget/transactions/:id/invoice` | Kasa satırının faturası | `{ recordId? , departmentId? }` — `recordId` yoksa yeni fatura kaydı açılır |
+| DELETE | `/budget/transactions/:id/invoice` | Bağı koparır (kaydı silmez) | — |
+| GET | `/invoices/month-summary` | Dönemde kaç fatura var + muhasebeci adresi | `?scope=organization\|job&scopeId=&month=YYYY-MM` |
+| GET | `/invoices/archive` | Ayın bütün belgeleri, tek ZIP | aynı parametreler |
+| GET | `/invoices/archive/download` | **Kimlik gerektirmez**: e-postadaki süreli bağlantı | `?t=<jeton>` (7 gün) |
+| POST | `/invoices/send` | Arşivi muhasebeciye yollar | `{ scope, scopeId, month, to? }` |
+
+Arşiv **eke sığıyorsa ek olarak**, sığmıyorsa süreli indirme bağlantısıyla gider
+(ham tavan 20 MB; Resend'in 40 MB sınırı base64'e çevrilmiş hâlin sınırı).
+Bağlantının jetonu **gönderenin kimliğini** taşır: arşiv indirilirken onun
+yetkisiyle yeniden kurulur, yani bağlantı hiçbir zaman gönderenin göremediği bir
+belgeyi açamaz.
+
+Kasadan açılan fatura **Fatura modülünde de görünür** — ikinci bir fatura listesi
+yoktur. Bağ birebirdir: bir ödemenin bir faturası, bir faturanın bir ödemesi
+(`budget_transactions.invoice_record_id` üzerinde kısmi tekil indeks).
+
+### Lio yardımı (modül anahtarı + belgeden okuma)
+
+Anahtar **modüle** aittir (`organization_modules.ai_assist` / `job_modules.ai_assist`,
+bkz. migration 113): aynı modüle belge bırakan herkesin aynı davranışı görmesi
+gerekiyor. Kredi ise **kişiye** aittir — durum ucu ikisini birlikte döndürür.
+
+| Method | Path | Açıklama | Query / Gövde |
+|---|---|---|---|
+| GET | `/modules/:moduleKey/ai-assist` | Anahtarın durumu + kredi durumu | `?scope=organization\|job&scopeId=` |
+| PATCH | `/modules/:moduleKey/ai-assist` | Anahtarı aç/kapat | `{ scope, scopeId, enabled }` — kredi yoksa açılmaz |
+| POST | `/invoices/ai-intake` | Bırakılan belgeyi Lio okur; kayıt + belge + kasa satırı | multipart `file` + `{ scope, scopeId, departmentId? }` |
+
+Okuma **yedeğe geçmez**: sağlayıcı sırasındaki ilk *görsel kabul eden* model
+kullanılır (`LlmProviderRegistry.visionChoice`). Yedeğe geçmek, belgeyi görmeden
+cevap üreten bir modele düşmek demekti — hata vermez, uydurur ve uydurduğu tutar
+deftere girerdi.
+
+Modelin `confidence` değeri eşiğin altındaysa **kayıt açılmaz**; okunamayan tutar
+ya da ISO olmayan tarih de işi düşürür. Sessiz varsayılan yok: yanlış bir kayıt,
+hiç açılmamış bir kayıttan pahalı. Başarısız denemede de kredi harcanır (sağlayıcı
+isteği işledi) — arayüz bakiyeyi hata sonrası da tazeler.
+
+Kasa satırı **en sonda** yazılır ve hatası işi düşürmez: modüle yazma yetkisi olan
+herkesin defteri yönetme yetkisi olmayabiliyor. O durumda kayıt ve belge yerinde
+kalır, yanıt `kasa.yazildi: false` döner.
+
 ## Abonelik / paketler (`/billing`)
 
 Kurulum ve iyzico paneli adımları: `docs/odeme-kurulumu.md`.

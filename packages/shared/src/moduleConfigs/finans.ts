@@ -93,8 +93,13 @@ export const invoiceConfig: ModuleRecordConfig = {
     { key: "invoiceNo", label: "Fatura no", type: "text" },
     currencyField("amount", "Tutar", { required: true }),
     { key: "status", label: "Durum", type: "select", defaultValue: "pending", options: opts(INVOICE_STATUS) },
-    { key: "issueDate", label: "Tarih", type: "date" },
+    // ZORUNLU ve varsayılanı bugün: fatura tarihi artık yalnızca bir bilgi
+    // değil, belgenin hangi ay klasörüne ineceğini ve ay sonu arşivine girip
+    // girmeyeceğini belirleyen alan (bkz. attachments, migration 112).
+    // Boş bırakılabilseydi o faturalar hiçbir ayın arşivinde çıkmazdı.
+    { key: "issueDate", label: "Fatura tarihi", type: "date", required: true, defaultToday: true },
   ],
+  attachments: { rootFolder: "Faturalar", dateKey: "issueDate", label: "Fatura / fiş" },
   summary: (d) => `${d.counterpartyName ?? ""} · ${fmtMoney(d.amount, d.currency)}`,
   detail: (d) => {
     const no = d.invoiceNo ? `#${d.invoiceNo}` : undefined;

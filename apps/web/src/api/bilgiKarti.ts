@@ -41,6 +41,8 @@ export interface BilgiKartiGirdisi {
   postalCode?: string;
   bankName?: string;
   iban?: string;
+  /** Ay sonu fatura arşivinin varsayılan alıcısı (bkz. migration 112). */
+  accountantEmail?: string;
   notes?: string;
 }
 

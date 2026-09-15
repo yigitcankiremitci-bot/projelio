@@ -256,7 +256,7 @@ export class ModuleRecordsService {
 
   /** Kaydın sahibine (organizasyon ya da iş) göre doğru yetki kontrolünü seçer. */
   /** Okuma yetkisi (canRead). Sürüm geçmişi gibi by-id okuma uçları için. */
-  private async assertCanViewRecord(record: ModuleRecord, userId?: string): Promise<void> {
+  async assertCanViewRecord(record: ModuleRecord, userId?: string): Promise<void> {
     if (!userId) throw new ForbiddenException("Bu kaydı görme yetkin yok");
     const access = record.jobId
       ? await this.moduleMembers.resolveJobAccess(record.jobId, record.moduleKey, userId)
@@ -269,7 +269,9 @@ export class ModuleRecordsService {
     if (!access.canRead) throw new ForbiddenException("Bu kaydı görme yetkin yok");
   }
 
-  private async assertCanManageRecord(record: ModuleRecord, userId?: string): Promise<void> {
+  // Dışarı açık: fatura eki yüklerken belgenin yetkisi KAYDIN yetkisidir ve
+  // bu kuralın ikinci bir kopyası çıkmasın (bkz. faturalar.service.ts).
+  async assertCanManageRecord(record: ModuleRecord, userId?: string): Promise<void> {
     if (record.jobId) return this.assertCanManageJob(record.jobId, record.moduleKey, userId);
     if (record.organizationId) {
       return this.assertCanManage(record.organizationId, record.moduleKey, record.departmentId, userId);

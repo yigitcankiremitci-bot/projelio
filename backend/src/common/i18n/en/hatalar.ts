@@ -718,4 +718,44 @@ export const hatalar: TranslationDict = {
   "Bu proje iş sahibine hizmet projesi olarak işaretli değil": "This project isn't marked as a service project for the job owner",
   "Hizmet projesi yalnızca başkasının işi altındaki projede işaretlenebilir":
     "A service project can only be marked on a project under someone else's job",
+
+  // Fatura belgeleri ve ay sonu arşivi (bkz. migration 112).
+  "Ay 'YYYY-MM' biçiminde olmalı.": "The month must be in YYYY-MM format.",
+  "Bağlantı geçersiz ya da süresi dolmuş.": "This link is invalid or has expired.",
+  "Bağlantı geçersiz.": "This link is invalid.",
+  "Bu ayda belgesi yüklenmiş fatura yok; gönderilecek bir şey çıkmadı.":
+    "No invoice in this month has a document uploaded, so there is nothing to send.",
+  "Bu ayın belgeleri tek arşive sığmayacak kadar büyük (200 MB üstü). Belgeleri Drive'daki ay klasöründen indirebilirsiniz.":
+    "This month's documents are too large for a single archive (over 200 MB). You can download them from the month folder in Drive.",
+  "Bu fatura zaten başka bir ödemeye bağlı.": "This invoice is already linked to another payment.",
+  "Bu işin faturalarını görme yetkin yok": "You do not have permission to view this job's invoices",
+  "Bu kasa kaydına fatura eklenemez: fatura bir şirkete ya da işe ait olmalı. Kaydı şirket veya departman kasasına girip yeniden deneyin.":
+    "An invoice can't be attached to this cash entry: an invoice must belong to a company or a job. Enter the record in the company or department cash book and try again.",
+  "Bu kayıt bir fatura değil.": "This record is not an invoice.",
+  "Bu modülün kayıtlarına belge eklenemez.": "Records in this module can't take document attachments.",
+  "Departmanın şirketi bulunamadı": "The department's company was not found",
+  "E-posta adresi geçersiz.": "The email address is invalid.",
+  "E-posta gönderilemedi. Sunucu e-posta ayarları eksik olabilir; arşivi indirip elle gönderebilirsiniz.":
+    "The email couldn't be sent. The server's email settings may be missing; you can download the archive and send it yourself.",
+  "Kapsam kimliği gerekli": "A scope id is required",
+  "Muhasebeci e-posta adresi yok. Bilgi kartına yazabilir ya da bu gönderim için elle girebilirsiniz.":
+    "There is no accountant email address. Add one to the info card, or type one for this send.",
+
+  // Lio yardımı (bkz. migration 113).
+  "Bu modül bu alana atanmamış.": "This module isn't assigned to this area.",
+  "Bu modülde Lio yardımı kapalı.": "Lio assistance is turned off for this module.",
+  "Bu modülün ayarlarını değiştirme yetkin yok.": "You do not have permission to change this module's settings.",
+  "Lio yalnızca PDF ve fotoğraf okuyabiliyor. Bu dosyayı elle girmen gerekiyor.":
+    "Lio can only read PDFs and photos. You'll need to enter this file by hand.",
+  "Lio yardımını açmak için AI kredin olmalı. Ayarlar > AI Kredileri sayfasından kredi yükleyebilirsin.":
+    "You need AI credit to turn on Lio assistance. You can top up from Settings > AI Credits.",
+  "Sunucuda belge okuyabilen bir AI sağlayıcısı tanımlı değil.":
+    "No AI provider that can read documents is configured on the server.",
+  "Belge okunamadı: yanıt anlaşılamadı.": "The document couldn't be read: the response was not understood.",
+  "Belge yeterince okunamadı. Daha net bir fotoğraf deneyebilir ya da faturayı elle girebilirsin.":
+    "The document couldn't be read clearly enough. Try a sharper photo, or enter the invoice by hand.",
+  "Belgedeki tutar okunamadı. Faturayı elle girebilirsin.":
+    "The amount on the document couldn't be read. You can enter the invoice by hand.",
+  "Belgedeki tarih okunamadı. Faturayı elle girebilirsin.":
+    "The date on the document couldn't be read. You can enter the invoice by hand.",
 };

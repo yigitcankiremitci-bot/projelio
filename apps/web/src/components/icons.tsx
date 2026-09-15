@@ -280,6 +280,17 @@ export function IconSparkle({ size = 18, color = "currentColor" }: IconProps) {
   );
 }
 
+// Bilgi ikonu: yanındaki ayarın ne yaptığını anlatan küçük açıklamalar için.
+export function IconInfo({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 7.6h.01" />
+    </svg>
+  );
+}
+
 // Sohbet gönderme (ok) ikonu.
 export function IconSend({ size = 18, color = "currentColor" }: IconProps) {
   return (

@@ -228,6 +228,56 @@ export class ButceKademeService {
     return mapTransaction(row);
   }
 
+  // --------------------------------------------------------------- Faturası
+  //
+  // Ödeme ile faturası AYRI şeylerdir ve ayrı kalmalı: defter parayı, fatura
+  // belgeyi tutar. Aralarındaki bağ tek sütun (bkz. migration 112) ve buradan
+  // kuruluyor — bağın yetkisi paranın yetkisidir, belgenin değil: kasa satırını
+  // yönetemeyen kişi ona fatura iliştirip kaydın anlamını değiştiremesin.
+
+  /**
+   * Faturası bağlanacak satır: yetki kontrolünden geçmiş ham alanlar.
+   *
+   * Fatura kaydı bu satırdan üretiliyor (tutar, tarih, karşı taraf); alanları
+   * çağıranın ikinci bir sorguyla okuması, yetkisiz bir okuma yolu açardı.
+   */
+  async faturaIcinSatir(id: string, userId?: string) {
+    const satir = await this.yonetilebilirSatir(id, userId);
+    const { data: row } = await this.supabase.client
+      .from("budget_transactions")
+      .select(
+        "id, type, amount, currency, occurred_at, category, description, counterparty_id, " +
+          "invoice_record_id, job_id, department_id, organization_id, group_id"
+      )
+      .eq("id", satir.id)
+      .maybeSingle();
+    if (!row) throw new NotFoundException("Kayıt bulunamadı");
+    return row as any;
+  }
+
+  /** Bağı kurar ya da (null ile) koparır. Fatura KAYDINA dokunmaz. */
+  async faturaBagla(id: string, invoiceRecordId: string | null, userId?: string): Promise<BudgetTransaction> {
+    const satir = await this.yonetilebilirSatir(id, userId);
+
+    const { data: row, error } = await this.supabase.client
+      .from("budget_transactions")
+      .update({ invoice_record_id: invoiceRecordId })
+      .eq("id", satir.id)
+      .select(SECIM)
+      .maybeSingle();
+    if (error) {
+      // Tekil indeks (migration 112): bu fatura başka bir ödemeye bağlı.
+      // Sessizce kabul etmek, aynı belgenin iki kez giderleştiği izlenimini
+      // verirdi; kullanıcıya hangi durumun olduğunu söylüyoruz.
+      if ((error as any).code === "23505") {
+        throw new BadRequestException("Bu fatura zaten başka bir ödemeye bağlı.");
+      }
+      throw error;
+    }
+    if (!row) throw new NotFoundException("Kayıt bulunamadı");
+    return mapTransaction(row);
+  }
+
   async sil(id: string, userId?: string): Promise<{ success: true }> {
     const satir = await this.yonetilebilirSatir(id, userId);
     const { error } = await this.supabase.client.from("budget_transactions").delete().eq("id", satir.id);

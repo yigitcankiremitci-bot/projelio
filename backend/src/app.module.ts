@@ -44,6 +44,7 @@ import { ProductsModule } from "./modules/products/products.module";
 import { ModuleMembersModule } from "./modules/module-members/module-members.module";
 import { PartyModule } from "./modules/party/party.module";
 import { ModuleRecordsModule } from "./modules/module-records/module-records.module";
+import { FaturalarModule } from "./modules/faturalar/faturalar.module";
 import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.module";
 import { WorklogModule } from "./modules/worklog/worklog.module";
 import { PlanningModule } from "./modules/planning/planning.module";
@@ -105,6 +106,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     ProductsModule,
     ModuleMembersModule,
     ModuleRecordsModule,
+    FaturalarModule,
     PartyModule,
     PersonalTodosModule,
     // Yaptım: kişisel iş günlüğü. Yapılacaklar'ın (PersonalTodosModule) tersi —

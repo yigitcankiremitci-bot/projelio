@@ -43,13 +43,17 @@ export class FileDownloadLinksController {
   }
 
   /**
-   * Bağlantıyı alıcının e-postasına gönderir (link@ alan adından).
+   * Bağlantıyı bir ya da birden çok alıcıya e-postayla gönderir (link@ adresinden).
    *
-   * Yanıt `sent` taşıyor: e-posta sağlayıcısı yapılandırılmamışsa ya da
-   * reddederse arayüz bunu kullanıcıya söylemek zorunda.
+   * Yanıt ADRES BAŞINA sonuç taşıyor: e-posta sağlayıcısı yapılandırılmamışsa
+   * ya da tek bir adresi reddederse arayüz bunu kullanıcıya söylemek zorunda.
    */
   @Post("file-download-links/:id/send")
-  send(@Param("id") id: string, @Body() body: { email?: string; note?: string }, @Req() req: any) {
+  send(
+    @Param("id") id: string,
+    @Body() body: { email?: string; emails?: string[]; note?: string },
+    @Req() req: any
+  ) {
     return this.links.sendByEmail(id, req.user.userId, body ?? {});
   }
 }

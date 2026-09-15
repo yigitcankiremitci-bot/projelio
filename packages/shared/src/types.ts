@@ -2149,6 +2149,18 @@ export interface UpdateFileDownloadLinkInput {
 }
 
 /**
+ * Bağlantıyı e-postayla gönderme sonucu — ADRES BAŞINA.
+ *
+ * Tek bir "başarılı" bayrağı yetmiyor: birden çok alıcıya gönderilirken
+ * bazıları geçip bazıları düşebilir (sağlayıcı bir adresi reddeder). Toplu bir
+ * "gönderildi", ulaşmayan adresi kullanıcıdan gizlemek olurdu.
+ */
+export interface FileDownloadLinkSendResult {
+  results: { email: string; sent: boolean }[];
+  link: FileDownloadLink;
+}
+
+/**
  * Linki AÇAN kişiye dönen üç durumdan biri.
  *
  * "closed" hiçbir gerekçe taşımaz ve tanınmayan token da aynı yanıtı alır:

@@ -1,6 +1,7 @@
 import type {
   CreateFileDownloadLinkInput,
   FileDownloadLink,
+  FileDownloadLinkSendResult,
   PublicFileAccess,
   UpdateFileDownloadLinkInput,
 } from "@projelio/shared";
@@ -26,13 +27,17 @@ export const fileDownloadLinksApi = {
   revoke: (id: string) => api.delete<FileDownloadLink>(`/file-download-links/${id}`),
 
   /**
-   * Bağlantıyı e-postayla gönderir (link@ adresinden).
+   * Bağlantıyı bir ya da birden çok alıcıya e-postayla gönderir (link@ adresinden).
    *
-   * `sent: false` DÖNEBİLİR ve çağıran buna bakmak zorunda: e-posta sağlayıcısı
-   * yapılandırılmamışsa istek başarılı olur ama mesaj gitmez.
+   * Sonuç ADRES BAŞINA geliyor ve çağıran hepsine bakmak zorunda: e-posta
+   * sağlayıcısı yapılandırılmamışsa ya da tek bir adres reddedilirse istek yine
+   * başarılı olur, mesaj gitmez.
+   *
+   * Adresler SERBEST YAZILIR (virgül, noktalı virgül, boşluk ya da alt alta);
+   * ayrıştırma sunucuda — ikinci bir kopya iki yerde ayrışırdı.
    */
-  send: (id: string, email: string, note?: string) =>
-    api.post<{ sent: boolean; link: FileDownloadLink }>(`/file-download-links/${id}/send`, { email, note }),
+  send: (id: string, emails: string, note?: string) =>
+    api.post<FileDownloadLinkSendResult>(`/file-download-links/${id}/send`, { email: emails, note }),
 
   /** Bağlantıyı açan sayfanın ilk çağrısı. */
   open: (token: string) => api.get<PublicFileAccess>(`/public/file-links/${encodeURIComponent(token)}`),

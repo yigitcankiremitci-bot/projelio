@@ -208,10 +208,14 @@ export const dosyalar: TranslationDict = {
   "Yalnızca bu adresi bilen açsın (isteğe bağlı)": "Only someone who knows this address can open it (optional)",
   "Bağlantıyı e-postayla gönder": "Send the link by email",
   "Kısa bir not (isteğe bağlı)": "A short note (optional)",
-  "alici@firma.com": "recipient@company.com",
+  "alici@firma.com, ikinci@firma.com": "first@company.com, second@company.com",
+  "Birden fazla adresi virgülle ayırın. Enter gönderir; bir kopyası size de gelir.":
+    "Separate multiple addresses with commas. Enter sends; you'll get a copy too.",
+  "Gönderiliyor…": "Sending…",
+  "{sayi} adrese gönderildi": { one: "Sent to {sayi} address", other: "Sent to {sayi} addresses" },
+  "Gönderilemedi: {adresler}": "Couldn't be sent to: {adresler}",
+  "Bağlantıyı kopyalayıp kendiniz iletebilirsiniz.": "You can copy the link and share it yourself.",
   "ornek@firma.com": "name@company.com",
-  "E-posta gönderilemedi; bağlantıyı kopyalayıp kendiniz iletebilirsiniz.":
-    "The email couldn't be sent; copy the link and share it yourself.",
   "Bağlantıyı kapat": "Close link",
   "Bağlantı kapatıldı": "Link closed",
   "Süresiz — değiştir": "No expiry — change",

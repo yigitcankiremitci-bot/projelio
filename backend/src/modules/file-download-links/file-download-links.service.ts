@@ -6,6 +6,7 @@ import type {
   FileDownloadLink,
   FileDownloadLinkClosedReason,
   PublicFileAccess,
+  FileDownloadLinkSendResult,
   PublicFileView,
   UpdateFileDownloadLinkInput,
 } from "@projelio/shared";
@@ -21,10 +22,12 @@ import {
   indirildiHtml,
   indirildiKonusu,
   indirildiMetni,
+  kopyaKonusu,
   paylasimHtml,
   paylasimKonusu,
   paylasimMetni,
 } from "./indirme-linki-eposta";
+import { adresleriAyikla } from "./alici-adresleri";
 import { linkGondereni } from "./link-gondereni";
 
 /** İçerik adresine eklenen kısa ömürlü jetonun gövdesi. */
@@ -187,14 +190,13 @@ export class FileDownloadLinksService {
   async sendByEmail(
     id: string,
     userId: string,
-    input: { email?: string; note?: string }
-  ): Promise<{ sent: boolean; link: FileDownloadLink }> {
+    input: { email?: string; emails?: string[]; note?: string }
+  ): Promise<FileDownloadLinkSendResult> {
     const row = await this.kendiLinki(id, userId);
     const kapali = kapanmaSebebi(row);
     if (kapali) throw new BadRequestException("Kapalı bir bağlantı gönderilemez");
 
-    const adres = normalizeShareEmail(input?.email);
-    if (!adres || !isLikelyEmail(adres)) throw new BadRequestException("Geçerli bir e-posta adresi girin");
+    const adresler = adresleriAyikla([...(input?.emails ?? []), input?.email ?? ""]);
 
     const dosyaAdi = await this.dosyaAdi(row.file_id);
     const gonderen = await this.kullanici(userId);
@@ -206,16 +208,44 @@ export class FileDownloadLinksService {
       url: linkUrl(row.token),
       boyutMetni: boyutMetni(await this.dosyaBoyutu(row.file_id)),
     };
-
-    const sent = await this.email.sendPrepared(adres, {
+    const mail = {
       subject: paylasimKonusu({ dosyaAdi, paylasanAdi: govde.paylasanAdi }),
       html: paylasimHtml(govde),
       text: paylasimMetni(govde),
       from: linkGondereni(process.env.EMAIL_FROM, process.env.EMAIL_FROM_LINK) ?? undefined,
       replyTo: gonderen?.email || undefined,
-    });
+    };
 
-    return { sent, link: this.mapLink(row, dosyaAdi) };
+    // SIRAYLA, tek istekte değil: Resend'in `to` dizisi tüm alıcıları aynı
+    // mesajın başlığında GÖSTERİR — bir müşteriye gönderilen dosyanın yanında
+    // diğer müşterilerin adresleri görünürdü. Ayrıca adres başına sonuç
+    // ancak ayrı gönderimle bilinebiliyor.
+    const results: { email: string; sent: boolean }[] = [];
+    for (const adres of adresler) {
+      results.push({ email: adres, sent: await this.email.sendPrepared(adres, mail) });
+    }
+
+    // Gönderene KENDİ KOPYASI. Gerekçe: gönderen, karşı tarafın tam olarak neyi
+    // gördüğünü kontrol etmek istiyor (not doğru yazılmış mı, bağlantı çalışıyor
+    // mu). Ayrı bir "gönderdiniz" özeti bu soruyu cevaplamazdı; bu yüzden
+    // alıcıya giden mesajın AYNISI, üstünde "kime gitti" şeridiyle yollanıyor.
+    //
+    // Hepsi düştüyse kopya da gitmez: gitmemiş bir mesajın kopyası yanıltıcı
+    // olurdu. Gönderen zaten alıcılar arasındaysa ikinci bir kopya yollanmaz.
+    const gidenler = results.filter((r) => r.sent).map((r) => r.email);
+    if (gidenler.length && gonderen?.email && !adresler.includes(gonderen.email.toLowerCase())) {
+      const kopya = { ...govde, kopyaAlicilari: gidenler };
+      void this.email
+        .sendPrepared(gonderen.email, {
+          subject: kopyaKonusu(dosyaAdi),
+          html: paylasimHtml(kopya),
+          text: paylasimMetni(kopya),
+          from: mail.from,
+        })
+        .catch(() => undefined);
+    }
+
+    return { results, link: this.mapLink(row, dosyaAdi) };
   }
 
   // ===================================================== Linki açan kişi (public)

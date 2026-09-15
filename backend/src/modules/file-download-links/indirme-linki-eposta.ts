@@ -20,6 +20,12 @@ interface PaylasimParams {
   not?: string;
   url: string;
   boyutMetni?: string;
+  /**
+   * Doluysa bu e-posta GÖNDERENİN KENDİ KOPYASI: üstte "kime gitti" şeridiyle
+   * çizilir. Gönderen, alıcının gördüğü mesajın aynısını görmeli — ayrı bir
+   * "gönderdiniz" özeti yazmak, asıl sorunun ("ne gitti?") cevabını vermezdi.
+   */
+  kopyaAlicilari?: string[];
 }
 
 export function paylasimKonusu(params: { dosyaAdi: string; paylasanAdi?: string }): string {
@@ -28,12 +34,25 @@ export function paylasimKonusu(params: { dosyaAdi: string; paylasanAdi?: string 
     : `Sizinle bir dosya paylaşıldı: ${params.dosyaAdi}`;
 }
 
+/** Gönderenin kendi kopyasının konusu — gelen kutusunda alıcının mesajıyla karışmasın. */
+export function kopyaKonusu(dosyaAdi: string): string {
+  return `Kopya: ${dosyaAdi} paylaşıldı`;
+}
+
 export function paylasimHtml(p: PaylasimParams): string {
   const kim = p.paylasanAdi ? `<strong>${kacir(p.paylasanAdi)}</strong>` : "Bir Projelio kullanıcısı";
   const boyut = p.boyutMetni ? ` · ${kacir(p.boyutMetni)}` : "";
+  const kopyaSeridi = p.kopyaAlicilari?.length
+    ? `<div style="margin:0 0 18px;padding:10px 12px;border-radius:9px;background:${MARKA.zemin};font-size:13px;line-height:1.6;color:${MARKA.yaziOrta};">
+  <strong style="color:${MARKA.yaziKoyu};">Bu sizin kopyanız.</strong> Aşağıdaki mesaj şu adreslere gönderildi:<br />${kacir(
+        p.kopyaAlicilari.join(", ")
+      )}
+</div>`
+    : "";
+
   return epostaKabugu(
     "tr",
-    `
+    `${kopyaSeridi}
 <h1 style="margin:0 0 16px;font-size:20px;color:${MARKA.yaziKoyu};">Sizinle bir dosya paylaşıldı</h1>
 <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:${MARKA.yaziOrta};">
   ${kim} sizinle bir dosya paylaştı. Aşağıdaki bağlantıdan önizleyebilir ve indirebilirsiniz.
@@ -61,6 +80,9 @@ ${
 
 export function paylasimMetni(p: PaylasimParams): string {
   return [
+    ...(p.kopyaAlicilari?.length
+      ? [`Bu sizin kopyanız. Aşağıdaki mesaj şu adreslere gönderildi: ${p.kopyaAlicilari.join(", ")}`, ""]
+      : []),
     p.paylasanAdi ? `${p.paylasanAdi} sizinle bir dosya paylaştı.` : "Sizinle bir dosya paylaşıldı.",
     "",
     p.dosyaAdi + (p.boyutMetni ? ` (${p.boyutMetni})` : ""),

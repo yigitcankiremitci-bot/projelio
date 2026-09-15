@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { FileDownloadLink } from "@projelio/shared";
+import type { FileDownloadLink, FileDownloadLinkSendResult } from "@projelio/shared";
 import type { ProjectFile } from "@projelio/shared";
 import { fileDownloadLinksApi } from "../api/fileDownloadLinks";
 import { formatDateTime } from "../lib/dates";
@@ -86,7 +86,6 @@ export default function FileDownloadLinkModal({ file, onClose }: Props) {
 
           <button
             type="button"
-            data-primary
             onClick={() => void olustur()}
             disabled={busy}
             style={{
@@ -120,7 +119,9 @@ function LinkKarti({ link, onChange }: { link: FileDownloadLink; onChange: (l: F
   const [alici, setAlici] = useState(link.recipientEmail ?? "");
   const [gonderAdres, setGonderAdres] = useState(link.recipientEmail ?? "");
   const [not, setNot] = useState("");
-  const [gonderimDurumu, setGonderimDurumu] = useState<"" | "gonderildi" | "gonderilemedi">("");
+  // Gönderim sonucu ADRES BAŞINA tutuluyor: "3 adrese gönderildi" ile
+  // "2 gitti, 1 gitmedi" arasındaki farkı kullanıcı görmeli.
+  const [sonuclar, setSonuclar] = useState<FileDownloadLinkSendResult["results"] | null>(null);
 
   const guncelle = async (input: Parameters<typeof fileDownloadLinksApi.update>[1]) => {
     setBusy(true);
@@ -146,17 +147,26 @@ function LinkKarti({ link, onChange }: { link: FileDownloadLink; onChange: (l: F
     }
   };
 
-  const epostaylaGonder = async () => {
+  const epostaylaGonder = async (e: React.FormEvent) => {
+    // Form gönderimi: Enter da buraya düşüyor (bkz. Modal'ın Enter kuralı —
+    // odağın İÇİNDE olduğu formun olumlu eylemi kazanır). Bu form olmadan
+    // Enter, modalin genelindeki "Bağlantı oluştur" düğmesine gidiyordu.
+    e.preventDefault();
+    if (!gonderAdres.trim()) return;
     setBusy(true);
     setHata("");
-    setGonderimDurumu("");
+    setSonuclar(null);
     try {
-      const sonuc = await fileDownloadLinksApi.send(link.id, gonderAdres.trim(), not.trim() || undefined);
+      const sonuc = await fileDownloadLinksApi.send(link.id, gonderAdres, not.trim() || undefined);
       onChange(sonuc.link);
-      // `sent: false` sessizce "gönderildi" sayılmaz: e-posta sağlayıcısı
-      // yapılandırılmamışsa istek başarılı olur ama mesaj hiç çıkmaz.
-      setGonderimDurumu(sonuc.sent ? "gonderildi" : "gonderilemedi");
-      if (sonuc.sent) setNot("");
+      setSonuclar(sonuc.results);
+      // Hepsi gittiyse alanlar temizlenir: aynı listeye ikinci kez basılması
+      // en kolay hata. Bir tanesi bile düştüyse metin DURUR, kullanıcı
+      // düzeltip yeniden gönderebilsin.
+      if (sonuc.results.every((r) => r.sent)) {
+        setGonderAdres("");
+        setNot("");
+      }
     } catch (e: any) {
       setHata(e?.message ?? t("Gönderilemedi"));
     } finally {
@@ -212,7 +222,15 @@ function LinkKarti({ link, onChange }: { link: FileDownloadLink; onChange: (l: F
         <label style={{ display: "block", fontSize: 13, color: c.textSecondary, marginBottom: 5 }}>
           {t("Yalnızca bu adresi bilen açsın (isteğe bağlı)")}
         </label>
-        <div style={{ display: "flex", gap: 6 }}>
+        {/* Kendi formu: buradaki Enter, gönderim formunun düğmesine değil bu
+            "Kaydet"e gitsin (bkz. Modal'ın Enter kuralı). */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void guncelle({ recipientEmail: alici.trim() || null });
+          }}
+          style={{ display: "flex", gap: 6 }}
+        >
           <input
             type="email"
             value={alici}
@@ -222,14 +240,14 @@ function LinkKarti({ link, onChange }: { link: FileDownloadLink; onChange: (l: F
             style={{ flex: 1, minWidth: 0, fontSize: 13, padding: "7px 9px" }}
           />
           <button
-            type="button"
-            onClick={() => void guncelle({ recipientEmail: alici.trim() || null })}
+            type="submit"
+            data-primary
             disabled={busy || (alici.trim() || null) === (link.recipientEmail ?? null)}
             style={ikincilButon(c)}
           >
             {t("Kaydet")}
           </button>
-        </div>
+        </form>
       </div>
 
       {/* Süre. "Süresiz" varsayılan: çoğu paylaşım tek seferlik ve kullanıcı
@@ -262,19 +280,31 @@ function LinkKarti({ link, onChange }: { link: FileDownloadLink; onChange: (l: F
       </div>
 
       {/* E-postayla gönderme. Gönderen link@ alan adı, yanıt kullanıcının
-          kendi adresi — alıcı "bu dosya ne?" diye yanıtlayabilsin. */}
-      <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${c.border}` }}>
+          kendi adresi — alıcı "bu dosya ne?" diye yanıtlayabilsin.
+
+          <form> ŞART: Modal'ın Enter kuralı önce odağın içinde olduğu forma
+          bakıyor. Form olmadan Enter, modalin genelindeki "Bağlantı oluştur"
+          düğmesine düşüyordu — yani gönderilmek istenen her Enter yeni bir
+          bağlantı üretiyordu. */}
+      <form onSubmit={epostaylaGonder} style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${c.border}` }}>
         <label style={{ display: "block", fontSize: 13, color: c.textSecondary, marginBottom: 5 }}>
           {t("Bağlantıyı e-postayla gönder")}
         </label>
+        {/* type="email" DEĞİL: tarayıcı çoklu adresi geçersiz sayıp formu
+            engelliyor. Ayrıştırma ve doğrulama zaten sunucuda. */}
         <input
-          type="email"
+          type="text"
           value={gonderAdres}
           disabled={busy}
           onChange={(e) => setGonderAdres(e.target.value)}
-          placeholder={t("alici@firma.com")}
-          style={{ width: "100%", fontSize: 13, padding: "7px 9px", marginBottom: 6 }}
+          placeholder={t("alici@firma.com, ikinci@firma.com")}
+          style={{ width: "100%", fontSize: 13, padding: "7px 9px", marginBottom: 4 }}
         />
+        <div style={{ fontSize: 11, color: c.textSecondary, marginBottom: 6 }}>
+          {t("Birden fazla adresi virgülle ayırın. Enter gönderir; bir kopyası size de gelir.")}
+        </div>
+        {/* Çok satırlı alanda Enter yeni satırdır (Modal'ın kuralı); notu
+            bitirip göndermek için ⌘/Ctrl+Enter ya da düğme. */}
         <textarea
           value={not}
           disabled={busy}
@@ -284,23 +314,24 @@ function LinkKarti({ link, onChange }: { link: FileDownloadLink; onChange: (l: F
           style={{ width: "100%", fontSize: 13, padding: "7px 9px", resize: "vertical" }}
         />
         <button
-          type="button"
-          onClick={() => void epostaylaGonder()}
+          type="submit"
+          data-primary
           disabled={busy || !gonderAdres.trim()}
-          style={{ ...ikincilButon(c), marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6 }}
+          style={{
+            ...ikincilButon(c),
+            marginTop: 6,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            opacity: busy || !gonderAdres.trim() ? 0.5 : 1,
+          }}
         >
           <IconSend size={14} color={c.textSecondary} />
-          {t("Gönder")}
+          {busy ? t("Gönderiliyor…") : t("Gönder")}
         </button>
-        {gonderimDurumu === "gonderildi" && (
-          <span style={{ marginLeft: 10, fontSize: 12, color: c.textSecondary }}>{t("Gönderildi")}</span>
-        )}
-        {gonderimDurumu === "gonderilemedi" && (
-          <span style={{ marginLeft: 10, fontSize: 12, color: c.danger }}>
-            {t("E-posta gönderilemedi; bağlantıyı kopyalayıp kendiniz iletebilirsiniz.")}
-          </span>
-        )}
-      </div>
+
+        {sonuclar && <GonderimSonucu sonuclar={sonuclar} />}
+      </form>
 
       <div
         style={{
@@ -344,6 +375,53 @@ function LinkKarti({ link, onChange }: { link: FileDownloadLink; onChange: (l: F
       </div>
 
       {hata && <div style={{ marginTop: 8, fontSize: 12, color: c.danger }}>{hata}</div>}
+    </div>
+  );
+}
+
+/**
+ * Gönderim sonucu — ADRES BAŞINA.
+ *
+ * Eskiden düğmenin yanında tek satırlık soluk bir yazıydı ve fark edilmiyordu:
+ * kullanıcı "gönder"e basıp hiçbir şey olmadığını sanıyordu. Şimdi kendi
+ * kutusunda, başarıda yeşil çerçeveyle duruyor ve giden adresleri sayıyor.
+ *
+ * Başarısızlar AYRI listeleniyor: "3 adrese gönderildi" deyip birinin
+ * düştüğünü söylememek, kullanıcının beklemeye devam etmesi demekti.
+ */
+function GonderimSonucu({ sonuclar }: { sonuclar: FileDownloadLinkSendResult["results"] }) {
+  const c = useThemeColors();
+  const t = useT();
+  const gidenler = sonuclar.filter((r) => r.sent);
+  const dusenler = sonuclar.filter((r) => !r.sent);
+
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        padding: "9px 11px",
+        borderRadius: 9,
+        border: `1px solid ${dusenler.length ? c.danger : c.success}`,
+        background: `${dusenler.length ? c.danger : c.success}14`,
+        fontSize: 12,
+        lineHeight: 1.6,
+        color: c.textPrimary,
+      }}
+    >
+      {gidenler.length > 0 && (
+        <div>
+          ✓ {t("{sayi} adrese gönderildi", { sayi: gidenler.length })}
+          <span style={{ color: c.textSecondary }}> — {gidenler.map((r) => r.email).join(", ")}</span>
+        </div>
+      )}
+      {dusenler.length > 0 && (
+        <div style={{ color: c.danger, marginTop: gidenler.length ? 4 : 0 }}>
+          {t("Gönderilemedi: {adresler}", { adresler: dusenler.map((r) => r.email).join(", ") })}
+          <div style={{ color: c.textSecondary }}>
+            {t("Bağlantıyı kopyalayıp kendiniz iletebilirsiniz.")}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

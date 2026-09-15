@@ -19,3 +19,24 @@ export function gorevDurumHatasiniBildir(err: unknown): void {
   if (hata?.status !== 400 || !hata.message) return;
   window.alert(hata.message);
 }
+
+/**
+ * Alt görev kaydedilemediğinde kullanıcıyı uyarır.
+ *
+ * NEDEN AYRI: durum değişikliğinin aksine burada iyimser bir kart yok — istek
+ * düşerse ekranda hiçbir iz kalmaz. Dört ayrı panoda bu hata `catch {}` ile
+ * yutuluyordu; kullanıcı yazdığı alt görevin kaybolduğunu görüp "uygulama
+ * kaydetmiyor" diyordu, oysa sebebini görebilseydi tekrar deneyebilirdi.
+ *
+ * 401 dışarıda: oturum sonlanması client.ts'te tek merkezden yönetiliyor,
+ * üstüne bir de kutu açmak aynı olayı iki kez anlatmak olurdu.
+ */
+export function altGorevHatasiniBildir(err: unknown): void {
+  const hata = err as { status?: number; message?: string } | null;
+  if (hata?.status === 401) return;
+  if (hata?.status === 400 && hata.message) {
+    window.alert(hata.message);
+    return;
+  }
+  window.alert("Alt görev kaydedilemedi. Lütfen tekrar deneyin.");
+}

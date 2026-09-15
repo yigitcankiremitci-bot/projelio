@@ -28,7 +28,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { IconUser, IconCalendar, IconSettings, IconIdCard } from "../components/icons";
 import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
-import { gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
+import { gorevDurumHatasiniBildir, altGorevHatasiniBildir } from "../lib/taskBlockNotice";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -264,8 +264,8 @@ export default function JobDetail() {
       const created = await api.post<Task>(`/projects/${parent.projectId}/tasks`, payload);
       setTasks((prev) => [...prev, created]);
       registerTaskCreateUndo(created, payload);
-    } catch {
-      // alt görev oluşturulamadı, kullanıcı tekrar deneyebilir
+    } catch (err) {
+      altGorevHatasiniBildir(err);
     }
   };
 

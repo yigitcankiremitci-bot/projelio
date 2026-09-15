@@ -6,7 +6,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { GorevButceService } from "../budget/gorev-butce.service";
 import { applyOrder } from "../../common/reorder.util";
-import { LISTE_TAVANI } from "../../common/liste-tavani";
+import { tumSayfalar } from "../../common/liste-tavani";
 import { parcalara } from "../../common/parcali-liste";
 import type { Metin } from "../../common/i18n";
 import {
@@ -159,16 +159,17 @@ export class TasksService {
   async findByProject(projectId: string, requestingUserId?: string): Promise<Task[]> {
     await this.assertProjectAccess(projectId, requestingUserId);
 
-    const { data, error } = await this.supabase.client
-      .from("tasks")
-      .select(TASK_SELECT)
-      .eq("project_id", projectId)
-      .is("archived_at", null)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true })
-      .limit(LISTE_TAVANI);
-    if (error) throw error;
-    const tasks = (data ?? []).map(mapTask);
+    const data = await tumSayfalar<any>((bas, bit) =>
+      this.supabase.client
+        .from("tasks")
+        .select(TASK_SELECT)
+        .eq("project_id", projectId)
+        .is("archived_at", null)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true })
+        .range(bas, bit)
+    );
+    const tasks = data.map(mapTask);
 
     if (!requestingUserId) return this.attachDependencies(tasks);
     const visibleIds = await this.getVisibleTaskIdsForSubcontractor(projectId, requestingUserId);
@@ -179,16 +180,17 @@ export class TasksService {
   async findByDepartment(departmentId: string, requestingUserId?: string): Promise<Task[]> {
     await this.assertDepartmentAccess(departmentId, requestingUserId);
 
-    const { data, error } = await this.supabase.client
-      .from("tasks")
-      .select(TASK_SELECT)
-      .eq("department_id", departmentId)
-      .is("archived_at", null)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true })
-      .limit(LISTE_TAVANI);
-    if (error) throw error;
-    return this.attachDependencies((data ?? []).map(mapTask));
+    const data = await tumSayfalar<any>((bas, bit) =>
+      this.supabase.client
+        .from("tasks")
+        .select(TASK_SELECT)
+        .eq("department_id", departmentId)
+        .is("archived_at", null)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true })
+        .range(bas, bit)
+    );
+    return this.attachDependencies(data.map(mapTask));
   }
 
   /**
@@ -237,18 +239,19 @@ export class TasksService {
 
     if (visibleIds.length === 0) return [];
 
-    const { data, error } = await this.supabase.client
-      .from("tasks")
-      .select(TASK_SELECT)
-      .in("department_id", visibleIds)
-      .is("archived_at", null)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true })
-      .limit(LISTE_TAVANI);
-    if (error) throw error;
+    const data = await tumSayfalar<any>((bas, bit) =>
+      this.supabase.client
+        .from("tasks")
+        .select(TASK_SELECT)
+        .in("department_id", visibleIds)
+        .is("archived_at", null)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true })
+        .range(bas, bit)
+    );
 
     return this.attachDependencies(
-      (data ?? []).map((row: any) => ({
+      data.map((row: any) => ({
         ...mapTask(row),
         departmentName: row.department_id ? deptNameById.get(row.department_id) : undefined,
       }))

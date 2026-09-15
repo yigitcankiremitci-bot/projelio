@@ -33,7 +33,7 @@ import { useIsSubcontractor } from "../lib/useCurrentUser";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { isProjectInSidebar } from "../lib/useSidebarHierarchy";
 import { useT } from "../lib/i18n";
-import { gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
+import { gorevDurumHatasiniBildir, altGorevHatasiniBildir } from "../lib/taskBlockNotice";
 
 export default function ProjectDetail() {
   const t = useT();
@@ -352,8 +352,8 @@ export default function ProjectDetail() {
       const created = await api.post<Task>(`/projects/${id}/tasks`, payload);
       setTasks((prev) => [...prev, created]);
       registerTaskCreateUndo(created.id, payload);
-    } catch {
-      // alt görev oluşturulamadı, kullanıcı tekrar deneyebilir
+    } catch (err) {
+      altGorevHatasiniBildir(err);
     }
   };
 

@@ -7,7 +7,7 @@ import TaskEditModal from "./TaskEditModal";
 import Modal from "./Modal";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/undo";
 import { useT } from "../lib/i18n";
-import { gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
+import { gorevDurumHatasiniBildir, altGorevHatasiniBildir } from "../lib/taskBlockNotice";
 
 export interface DepartmentTasksPanelHandle {
   /** "Görevler" görünümünde "Yapılacak" sütununun hızlı ekleme kutusunu açar. */
@@ -180,8 +180,8 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
       const created = await api.post<Task>(`/departments/${departmentId}/tasks`, payload);
       setTasks((prev) => [...prev, created]);
       registerTaskCreateUndo(created.id, payload);
-    } catch {
-      // alt görev oluşturulamadı, kullanıcı tekrar deneyebilir
+    } catch (err) {
+      altGorevHatasiniBildir(err);
     }
   };
 

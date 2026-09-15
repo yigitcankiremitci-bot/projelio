@@ -28,3 +28,38 @@ export const LISTE_TAVANI = 500;
  * Kullanıcı zaten en yenileri görüyor; eskisine gitmek için sayfalama gerekir.
  */
 export const AKIS_TAVANI = 200;
+
+/**
+ * Tavanın yetmediği listeler için: satırları sayfa sayfa çekip birleştirir.
+ *
+ * NEDEN VAR: LISTE_TAVANI bir güvenlik ağıdır, sayfalama değil — ve ağa DAYANAN
+ * bir uç sessizce veri kaybeder. Proje görev listesi tam olarak buna düştü:
+ * projede 541 görev birikince uç 500'ünü döndürdü, `sort_order` artan sıralama
+ * yüzünden kesilen 41 satırın hepsi tek bir görevin alt görevleriydi. Kullanıcı
+ * yeni eklediği alt görevleri sayfayı yenileyince göremiyordu ve "kaydetmiyor"
+ * sanıyordu; oysa kayıtlar veritabanındaydı.
+ *
+ * Buradaki döngü sunucu tarafında kalıyor: istemci yine tek dizi alıyor, API
+ * sözleşmesi değişmiyor. Yine de sınırsız değil — GETIRME_TAVANI bir kopyayı
+ * değil, kaçak bir sorguyu durdurmak için duruyor.
+ */
+export const SAYFA_BOYU = 1000;
+export const GETIRME_TAVANI = 20_000;
+
+export async function tumSayfalar<T>(
+  sayfaGetir: (baslangic: number, bitis: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  tavan: number = GETIRME_TAVANI,
+  sayfaBoyu: number = SAYFA_BOYU
+): Promise<T[]> {
+  const tumu: T[] = [];
+  for (let baslangic = 0; baslangic < tavan; baslangic += sayfaBoyu) {
+    const bitis = Math.min(baslangic + sayfaBoyu, tavan) - 1;
+    const { data, error } = await sayfaGetir(baslangic, bitis);
+    if (error) throw error;
+    const satirlar = data ?? [];
+    tumu.push(...satirlar);
+    // Eksik dolu sayfa = son sayfa. Tam dolu gelirse bir sonrakine bakılır.
+    if (satirlar.length < bitis - baslangic + 1) break;
+  }
+  return tumu;
+}

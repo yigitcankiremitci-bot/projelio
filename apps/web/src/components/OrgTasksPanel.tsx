@@ -13,7 +13,7 @@ import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { backState } from "../lib/backTarget";
 import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
-import { gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
+import { gorevDurumHatasiniBildir, altGorevHatasiniBildir } from "../lib/taskBlockNotice";
 
 // Sıra, uygulamadaki diğer tüm kanbanlarla aynı: önce üzerinde çalışılan işler.
 // (bkz. DepartmentTasksPanel, JobTasksPanel, TasksOverview)
@@ -136,8 +136,8 @@ export default function OrgTasksPanel({ organizationId, organizationName }: Prop
       // departmentName tekil yanıtta gelmiyor (bkz. updateTask'taki aynı not);
       // üst görevinkini veriyoruz, alt görev zaten onun departmanında.
       setTasks((prev) => [...prev, { departmentName: parent.departmentName, ...created }]);
-    } catch {
-      // alt görev oluşturulamadı, kullanıcı tekrar deneyebilir
+    } catch (err) {
+      altGorevHatasiniBildir(err);
     }
   };
 

@@ -215,6 +215,28 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     openCreate: () => setAdding(true),
   }));
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  /**
+   * Tamamlandı kolonundaki HAYALET grupların açık/kapalı durumu.
+   *
+   * NEDEN AYRI KÜME: `expanded` gerçek kartların alt görev listesini tutuyor ve
+   * `subtasksEnabled` kapalıyken hiç çalışmıyor (bkz. toggleExpand). Hayalet
+   * gruplar ise alt görev katmanından bağımsız çiziliyor; aynı kümeyi paylaşmak
+   * o kapının arkasında kalmaları demekti.
+   *
+   * Varsayılan KAPALI: bu gruplar eskiden hep açıktı ve kapatılamıyordu. Uzun
+   * yaşayan bir üst görevin (ör. yüzden fazla maddesi olan bir "Bug Listesi")
+   * tamamlanmış alt görevleri Tamamlandı kolonunu metrelerce uzatıyor, kolondaki
+   * diğer her şeyi görünmez kılıyordu. Gerçek kartlar da kapalı başlıyor;
+   * böylece ikisi aynı davranıyor.
+   */
+  const [expandedGhosts, setExpandedGhosts] = useState<Set<string>>(new Set());
+  const toggleGhost = (id: string) =>
+    setExpandedGhosts((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [subtaskParent, setSubtaskParent] = useState<string | null>(null);
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; title: string } | null>(null);
@@ -1758,10 +1780,17 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
         })}
       </div>
 
-      {ghostGroups.map(({ parent, subtasks }) => (
+      {ghostGroups.map(({ parent, subtasks }) => {
+        const ghostOpen = expandedGhosts.has(parent.id);
+        return (
         <div key={parent.id} style={{ marginBottom: 8 }}>
-          <div
+          <button
+            onClick={() => toggleGhost(parent.id)}
+            aria-expanded={ghostOpen}
             style={{
+              width: "100%",
+              textAlign: "left",
+              cursor: "pointer",
               opacity: 0.5,
               background: c.surface,
               border: `1px dashed ${c.border}`,
@@ -1773,12 +1802,42 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
               gap: 8,
             }}
           >
+            <span
+              style={{
+                display: "inline-flex",
+                flexShrink: 0,
+                transform: ghostOpen ? "rotate(90deg)" : "none",
+                transition: "transform 0.1s ease",
+              }}
+            >
+              <IconChevronRight size={13} color={c.textSecondary} />
+            </span>
             <span style={{ fontSize: 15, color: c.textSecondary, fontStyle: "italic", flex: 1, minWidth: 0, overflowWrap: "break-word", wordBreak: "break-word" }}>{parent.title}</span>
+            <span
+              style={{
+                fontSize: 12,
+                lineHeight: 1,
+                color: c.textSecondary,
+                background: c.background,
+                border: `1px solid ${c.border}`,
+                borderRadius: 20,
+                minWidth: 14,
+                height: 16,
+                padding: "0 5px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              {subtasks.length}
+            </span>
             <span style={{ fontSize: 12, color: c.textSecondary, whiteSpace: "nowrap" }}>
               {t("{sutun}'de", { sutun: t(columnLabel[parent.status]) })}
             </span>
-          </div>
+          </button>
 
+          {ghostOpen && (
           <div
             style={{
               marginLeft: 14,
@@ -1844,8 +1903,10 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
               </div>
             ))}
           </div>
+          )}
         </div>
-      ))}
+        );
+      })}
 
       {onCreate &&
         (adding ? (

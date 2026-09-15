@@ -382,4 +382,6 @@ export const bildirimler: TranslationDict = {
   "Ödeme Kaydedildi": "Payment Recorded",
   "{proje} için hizmet anlaşması {tutar} ₺ olarak kaydedildi.": "The service agreement for {proje} was set to {tutar} ₺.",
   "{proje} için {tutar} ₺ hizmet ödemesi kaydedildi.": "A {tutar} ₺ service payment was recorded for {proje}.",
+  "Paylaştığınız dosya indirildi": "A file you shared was downloaded",
+  '"{ad}" indirildi': '"{ad}" was downloaded',
 };

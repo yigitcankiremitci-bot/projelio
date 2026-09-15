@@ -7,6 +7,7 @@ import { useFileThumbnails } from "../lib/fileThumbnails";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import FileContextMenu from "./FileContextMenu";
+import FileDownloadLinkModal from "./FileDownloadLinkModal";
 import FilePreviewModal from "./FilePreviewModal";
 import FileThumb from "./FileThumb";
 import PickLinkedFilesModal from "./PickLinkedFilesModal";
@@ -49,6 +50,12 @@ export default function LinkedFilesPanel({
   const t = useT();
   const [items, setItems] = useState<LinkedItems>({ files: [], folders: [] });
   const [preview, setPreview] = useState<ProjectFile | null>(null);
+  // "Bağlantı oluştur": dosyayı Projelio hesabı OLMAYAN birine göndermek
+  // (bkz. FileDownloadLinkModal). Salt okunur ekranlarda da açık: bağlantı
+  // üretmek bir OKUMA eylemi — dosyayı zaten indirip elden gönderebilecek biri
+  // için engel olmanın anlamı yok, üstelik bağlantı geri alınabilir olduğu için
+  // eki e-postaya koymaktan daha güvenli.
+  const [sharing, setSharing] = useState<ProjectFile | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; file: ProjectFile } | null>(null);
   const [error, setError] = useState("");
   const [picking, setPicking] = useState(false);
@@ -261,6 +268,10 @@ export default function LinkedFilesPanel({
             { label: t("Önizle"), onClick: () => setPreview(menu.file) },
             { label: t("İndir"), onClick: () => void indir(menu.file) },
             {
+              label: t("Bağlantı oluştur…"),
+              onClick: () => setSharing(menu.file),
+            },
+            {
               label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file) }),
               onClick: () => window.open(driveEditUrl(menu.file), "_blank", "noopener,noreferrer"),
             },
@@ -281,6 +292,8 @@ export default function LinkedFilesPanel({
       )}
 
       {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} />}
+
+      {sharing && <FileDownloadLinkModal file={sharing} onClose={() => setSharing(null)} />}
     </div>
   );
 }

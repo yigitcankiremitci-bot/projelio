@@ -186,4 +186,58 @@ export const dosyalar: TranslationDict = {
   "Bırakın, nereye ekleneceğini soralım": "Drop it and we'll ask where it goes",
   "Buraya yükle": "Upload here",
   "{n} dosya seçildi": { one: "{n} file selected", other: "{n} files selected" },
+
+  // ──────────────────────────────────── İndirme bağlantıları (migration 114)
+  // Buradaki metinlerin bir kısmını, Projelio hesabı OLMAYAN bir alıcı görüyor
+  // (bkz. pages/PublicFileDownload.tsx): dili hesap tercihinden değil
+  // TARAYICIDAN geliyor, yani İngilizce karşılığı olmadan sayfa Türkçe kalırdı.
+  "Bağlantı oluştur…": "Create link…",
+  "İndirme bağlantısı": "Download link",
+  "Bağlantı oluştur": "Create link",
+  "Yeni bağlantı oluştur": "Create another link",
+  "Bağlantı oluşturulamadı": "Couldn't create the link",
+  "Gönderilemedi": "Couldn't be sent",
+  "1 gün": "1 day",
+  "Bu dosya için bir bağlantı oluşturun; açan kişi Projelio hesabı olmadan dosyayı önizleyip indirebilir. Bağlantıyı istediğiniz an kaldırabilirsiniz.":
+    "Create a link for this file: whoever opens it can preview and download without a Projelio account. You can remove the link at any time.",
+  "İndirmeye izin ver": "Allow downloading",
+  "Kapalıyken bağlantıyı açan kişi dosyayı görebilir ama indiremez.":
+    "When off, whoever opens the link can view the file but not download it.",
+  "İndirilince bana haber ver": "Notify me on download",
+  "E-posta ve uygulama içi bildirim gönderilir.": "You'll get an email and an in-app notification.",
+  "Yalnızca bu adresi bilen açsın (isteğe bağlı)": "Only someone who knows this address can open it (optional)",
+  "Bağlantıyı e-postayla gönder": "Send the link by email",
+  "Kısa bir not (isteğe bağlı)": "A short note (optional)",
+  "alici@firma.com": "recipient@company.com",
+  "ornek@firma.com": "name@company.com",
+  "E-posta gönderilemedi; bağlantıyı kopyalayıp kendiniz iletebilirsiniz.":
+    "The email couldn't be sent; copy the link and share it yourself.",
+  "Bağlantıyı kapat": "Close link",
+  "Bağlantı kapatıldı": "Link closed",
+  "Süresiz — değiştir": "No expiry — change",
+  "{tarih} tarihine kadar — değiştir": "Until {tarih} — change",
+  "{goruntuleme} görüntüleme · {indirme} indirme": "{goruntuleme} views · {indirme} downloads",
+  "{sayi} indirme": { one: "{sayi} download", other: "{sayi} downloads" },
+  "son indirme {tarih}": "last download {tarih}",
+
+  // Bağlantıyı açan kişinin gördüğü sayfa.
+  "Bu bağlantı artık geçerli değil": "This link is no longer valid",
+  "Bağlantı kaldırılmış ya da süresi dolmuş olabilir. Dosyayı paylaşan kişiden yeni bir bağlantı isteyin.":
+    "The link may have been removed or expired. Ask the person who shared the file for a new one.",
+  "Bağlantı şu anda açılamadı. Birkaç dakika sonra tekrar deneyin.":
+    "The link couldn't be opened right now. Try again in a few minutes.",
+  "E-posta adresinizi girin": "Enter your email address",
+  "Bu dosya belirli bir adres için paylaşıldı. Dosyayı görmek için o adresi yazın.":
+    "This file was shared with a specific address. Enter that address to see it.",
+  "Bu adres bağlantıyla eşleşmedi. Dosyayı paylaşan kişinin yazdığı adresi deneyin.":
+    "That address didn't match. Try the address the sender used.",
+  "{ad} paylaştı": "shared by {ad}",
+  "Dosyayı indir": "Download file",
+  "Bu dosya yalnızca görüntülenmek üzere paylaşıldı; indirme kapatılmış. Kopyasına ihtiyacınız varsa dosyayı paylaşan kişiye yazın.":
+    "This file was shared for viewing only; downloading is turned off. If you need a copy, contact the person who shared it.",
+  "Bu dosya": "This file was shared with",
+  "ile paylaşıldı — projelerinizi, görevlerinizi, dosyalarınızı ve bütçenizi tek yerde toplayan iş yönetim uygulaması.":
+    "— the work management app that keeps your projects, tasks, files and budget in one place.",
+  "Dosyalarınızı ek olarak göndermek yerine, geri alabileceğiniz bağlantılarla paylaşın.":
+    "Share files with links you can revoke, instead of sending attachments.",
 };

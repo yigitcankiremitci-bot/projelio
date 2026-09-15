@@ -29,6 +29,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import CreateNativeFileMenu from "./CreateNativeFileMenu";
 import type { CreateNativeFileMenuHandle } from "./CreateNativeFileMenu";
 import FileContextMenu from "./FileContextMenu";
+import FileDownloadLinkModal from "./FileDownloadLinkModal";
 import FilePreviewModal from "./FilePreviewModal";
 import FileThumb from "./FileThumb";
 import LinkFileModal from "./LinkFileModal";
@@ -143,6 +144,12 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<ProjectFile | null>(null);
+  // "Bağlantı oluştur": dosyayı Projelio hesabı OLMAYAN birine göndermek
+  // (bkz. FileDownloadLinkModal). Salt okunur ekranlarda da açık: bağlantı
+  // üretmek bir OKUMA eylemi — dosyayı zaten indirip elden gönderebilecek biri
+  // için engel olmanın anlamı yok, üstelik bağlantı geri alınabilir olduğu için
+  // eki e-postaya koymaktan daha güvenli.
+  const [sharing, setSharing] = useState<ProjectFile | null>(null);
   /** "Bağla" penceresi: dosyayı ya da klasörü bir göreve/kişiye/kayda iliştirir. */
   const [linking, setLinking] = useState<LinkSource[] | null>(null);
   /**
@@ -1737,6 +1744,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                   { label: t("Önizle"), onClick: () => setPreview(menu.file!) },
                   { label: t("İndir"), onClick: () => void handleDownload(menu.file!) },
                   {
+                    label: t("Bağlantı oluştur…"),
+                    onClick: () => setSharing(menu.file!),
+                  },
+                  {
                     label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file!) }),
                     onClick: () => window.open(driveEditUrl(menu.file!), "_blank", "noopener,noreferrer"),
                   },
@@ -1790,6 +1801,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       {preview && (
         <FilePreviewModal file={preview} onClose={() => setPreview(null)} onMaybeChanged={load} />
       )}
+
+      {sharing && <FileDownloadLinkModal file={sharing} onClose={() => setSharing(null)} />}
 
       {pendingDelete && (
         <ConfirmDialog

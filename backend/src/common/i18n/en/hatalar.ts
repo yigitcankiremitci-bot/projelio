@@ -758,4 +758,11 @@ export const hatalar: TranslationDict = {
     "The amount on the document couldn't be read. You can enter the invoice by hand.",
   "Belgedeki tarih okunamadı. Faturayı elle girebilirsin.":
     "The date on the document couldn't be read. You can enter the invoice by hand.",
+
+  // Dosya indirme bağlantıları (bkz. migration 114). Bu metinleri Projelio
+  // hesabı OLMAYAN bir alıcı da görebilir: dili tarayıcısından geliyor.
+  "Bağlantı bulunamadı": "Link not found",
+  "Bağlantının süresi doldu, sayfayı yenileyin": "The link expired; refresh the page",
+  "Bu bağlantıda indirme kapatılmış": "Downloading is turned off for this link",
+  "Kapalı bir bağlantı gönderilemez": "A closed link can't be sent",
 };

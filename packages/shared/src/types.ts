@@ -1950,6 +1950,10 @@ export interface NotificationPayload {
     // adına bağlanmış dosyaları aramaya gitmez, haber verilmezse özellik
     // görünmez kalırdı.
     | "file_linked"
+    // Paylaşılan indirme bağlantısından dosya indirildi (bkz. migration 114).
+    // Linki OLUŞTURANA gider; aynı anda e-posta da yollanır. Kim indirdiği
+    // yalnızca linkte e-posta kapısı varsa bilinir, uydurulmaz.
+    | "file_link_downloaded"
     // Admin panelinden yöneticinin yazdığı mesaj (bkz. modules/admin/admin-mesaj.service.ts).
     // Bildirim çanı bu tipi görünce mesajın tamamını bir pencerede açar: gövde
     // listede tek satıra sığmayacak kadar uzun olabilir.
@@ -2081,6 +2085,104 @@ export interface ProjectFile {
   createdAt: string;
   /** Bu kullanıcının Drive/OneDrive klasörüne izni var mı — düzenle düğmesi buna bakar. */
   canEditInDrive: boolean;
+}
+
+/* ============================ Dosya indirme linkleri ======================== */
+/*
+ * Tek bir dosyayı Projelio hesabı OLMAYAN birine göndermenin yolu
+ * (bkz. migration 114). Proje takip linkinin (ProjectShareLink) dosya
+ * karşılığı; tipler bilerek ayrı, çünkü kurallar farklı: burada paylaşılan şey
+ * bir görünüm değil, dosyanın İÇERİĞİ.
+ */
+
+/** Linkin neden kapandığı. YALNIZCA sahibine gösterilir. */
+export type FileDownloadLinkClosedReason = "revoked" | "expired";
+
+/** Sahibin gördüğü link kaydı. `token`/`url` yalnızca onu YÖNETEN kişiye döner. */
+export interface FileDownloadLink {
+  id: string;
+  fileId: string;
+  fileName: string;
+  token: string;
+  /** Kopyalanmaya hazır tam adres; sunucu WEB_APP_URL'den üretir. */
+  url: string;
+  label?: string;
+  /**
+   * Linki açacak kişinin e-postası. Doluysa sayfa açılmadan önce sorulur.
+   * Kimlik doğrulaması DEĞİL: adresi bilen geçer (bkz. migration 077).
+   */
+  recipientEmail?: string;
+  /** Kapalıyken sayfa açılır, önizleme çalışır, indirme reddedilir. */
+  downloadEnabled: boolean;
+  /** İndirildiğinde oluşturana e-posta + bildirim gitsin mi. */
+  notifyOnDownload: boolean;
+  expiresAt?: string;
+  revokedAt?: string;
+  viewCount: number;
+  lastViewedAt?: string;
+  downloadCount: number;
+  lastDownloadedAt?: string;
+  createdAt: string;
+  /** Sunucunun kararı: iptal edilmiş ya da süresi dolmuş link açılmıyor. */
+  active: boolean;
+  closedReason?: FileDownloadLinkClosedReason;
+}
+
+export interface CreateFileDownloadLinkInput {
+  label?: string;
+  /** Gün cinsinden ömür. Verilmezse süresiz. */
+  expiresInDays?: number | null;
+  /** Boş bırakılırsa link doğrudan açılır. */
+  recipientEmail?: string;
+  downloadEnabled?: boolean;
+  notifyOnDownload?: boolean;
+}
+
+export interface UpdateFileDownloadLinkInput {
+  label?: string;
+  /** null = e-posta kapısını kaldır. */
+  recipientEmail?: string | null;
+  downloadEnabled?: boolean;
+  notifyOnDownload?: boolean;
+  /** null = süresiz yap. */
+  expiresInDays?: number | null;
+}
+
+/**
+ * Linki AÇAN kişiye dönen üç durumdan biri.
+ *
+ * "closed" hiçbir gerekçe taşımaz ve tanınmayan token da aynı yanıtı alır:
+ * kapatılmış link ile hiç var olmamış link dışarıdan ayırt edilemez.
+ */
+export type FileDownloadAccessState = "open" | "email_required" | "closed";
+
+/** Linki açan kişinin gördüğü TÜM veri. Dosyanın bağlamı (iş, proje, klasör) yok. */
+export interface PublicFileView {
+  name: string;
+  mimeType: string;
+  sizeBytes?: number;
+  /** "PDF", "Görsel" gibi kısa tür etiketi — sunucu üretir, alıcı hesaplamaz. */
+  kindLabel: string;
+  /** Tarayıcıda gömülü gösterilebilir mi (görsel/PDF). */
+  canPreview: boolean;
+  /** Sağlayıcının küçük resmi var mı — önizlenemeyen türlerde kapak olarak kullanılır. */
+  hasThumbnail: boolean;
+  /** İndirme açık mı. Kapalıysa sayfa sebebini açıklar. */
+  downloadEnabled: boolean;
+  /** Dosyayı paylaşan kişinin adı — "bu link kimden geldi" sorusunun cevabı. */
+  sharedByName?: string;
+  sharedAt: string;
+  /** İçerik/önizleme adreslerine eklenecek kısa ömürlü imzalı jeton. */
+  contentToken: string;
+  contentTokenExpiresInSeconds: number;
+}
+
+export interface PublicFileAccess {
+  state: FileDownloadAccessState;
+  /** Yalnızca state === "open" iken dolu. */
+  view?: PublicFileView;
+  /** Girilen adres tutmadı — kapı yeniden gösterilir. İlk açılışta false. */
+  emailRejected?: boolean;
 }
 
 /** Google Drive VE OneDrive bağlantı kartlarının paylaştığı durum şekli. */

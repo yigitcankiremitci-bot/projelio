@@ -51,6 +51,7 @@ const TourLauncher = lazy(() => import("./components/tour/TourLauncher"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Login = lazy(() => import("./pages/Login"));
 const PublicProject = lazy(() => import("./pages/PublicProject"));
+const PublicFileDownload = lazy(() => import("./pages/PublicFileDownload"));
 const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -578,7 +579,10 @@ export default function App() {
     // Proje takip linki (bkz. pages/PublicProject.tsx). Buraya gelen kişinin
     // hesabı YOK: uygulama kabuğu kurulmamalı, /login'e de atılmamalı. Diğerleri
     // gibi tam eşleşme değil, çünkü adres token taşıyor.
-    location.pathname.startsWith("/takip/");
+    location.pathname.startsWith("/takip/") ||
+    // Dosya indirme bağlantısı (bkz. pages/PublicFileDownload.tsx). Takip
+    // linkiyle aynı gerekçe: açan kişinin hesabı yok, /login'e atılmamalı.
+    location.pathname.startsWith("/dosya/");
   const hasToken = !!localStorage.getItem("projelio_token");
   // Bilgisayarda (geniş ekran) sol sidebar + üstte tam genişlik header;
   // telefonda (dar ekran) sidebar kaybolur, alt menü (BottomNav) ve
@@ -646,6 +650,7 @@ export default function App() {
           <Route path="/distance" element={<DistanceSales />} />
           <Route path="/refund" element={<Refund />} />
           <Route path="/takip/:token" element={<PublicProject />} />
+          <Route path="/dosya/:token" element={<PublicFileDownload />} />
         </Routes>
       </Suspense>
     );

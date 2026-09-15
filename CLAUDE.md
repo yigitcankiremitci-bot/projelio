@@ -32,6 +32,7 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | Bütçe (tüm kademeler) | `backend/src/modules/budget/` — tek defter, bkz. aşağıdaki başlık |
 | Fatura belgeleri (ek, ay klasörü, ay sonu arşivi) | `backend/src/modules/faturalar/` — fatura KAYDI module_records'ta, burada yalnızca belgesi var |
 | Lio yardımı (belgeden okuyup kayıt + kasa satırı açma) | `backend/src/modules/faturalar/lio-yardimi.service.ts`, `fatura-okuma.ts`; anahtar `organization_modules.ai_assist` |
+| Dosya indirme bağlantısı (üyeliksiz paylaşım) | `backend/src/modules/file-download-links/`, `apps/web/src/components/FileDownloadLinkModal.tsx`, açılan sayfa `apps/web/src/pages/PublicFileDownload.tsx` |
 | Bilgi kartı (şirket/iş künyesi) | `backend/src/modules/bilgi-karti/`, `apps/web/src/components/bilgiKarti/` — künye + belge + diğer modüllerden özet |
 | Hesaplar (üyelikler + şifreli giriş bilgileri) | `backend/src/modules/hesaplar/`, `apps/web/src/components/hesaplar/` — sır yalnızca `hesap-kimlik.service.ts`'ten çıkar |
 | Geçiş anahtarı (WebAuthn) doğrulaması | `backend/src/common/webauthn/` — elle yazıldı, bağımlılık yok; `backend/src/modules/passkeys/` kullanıcının cihazları |
@@ -78,8 +79,15 @@ olurdu.
 
 `landing/` = Next.js tanıtım sitesi (projelio.app). Bu repoda ama npm
 workspace'i DEĞİL: kendi `package.json` ve `package-lock.json`'ı var, kök
-`npm install` ona dokunmaz. Vercel'de ayrı bir proje olarak, Root Directory
-`landing` verilerek yayımlanır.
+`npm install` ona dokunmaz.
+
+**2026-09-15'ten beri landing de kendi VPS'imizde yayımlanıyor** (`landing`
+servisi, `deploy/docker-compose.prod.yml`; Caddy `projelio.app`'i
+`landing:3001`'e veriyor, `www` apex'e 301). Yani diğer her şey gibi main'e
+push'landığında yayına girer. Önceden Vercel'deydi ve Vercel'in GitHub
+bağlantısı sessizce kopmuştu: push'lar bir aydır dağıtılmıyordu, kimse fark
+etmemişti. Vercel projesi (`projelio-site`) geri dönüş yolu olarak duruyor ama
+alan adları artık ona bağlı DEĞİL.
 
 Kardeş klasör `../projelio-whatsapp` ayrı bir projedir, bu repoya dahil değil.
 
@@ -136,6 +144,7 @@ Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 | Hesap şifrelerinin şifrelenmesi | `HESAP_KIMLIK_ENC_KEY` | `backend/.env` — **eksikse giriş bilgisi kaydedilemez** |
 | Gönderen e-posta adresi | `EMAIL_FROM` | `backend/.env` — **eksikse Resend kum havuzuna düşer** |
 | Yönetici mesajlarının göndereni (isteğe bağlı) | `EMAIL_FROM_DESTEK` | `backend/.env` — tanımsızsa EMAIL_FROM alan adında `destek@` |
+| Dosya paylaşımlarının göndereni (isteğe bağlı) | `EMAIL_FROM_LINK` | `backend/.env` — tanımsızsa EMAIL_FROM alan adında `link@` |
 | Tek tık "aboneliği bırak" | `API_PUBLIC_URL` | `backend/.env` |
 | Mağaza abonelikleri | `APPSTORE_*` / `PLAY_*` | `backend/.env` |
 

@@ -13,6 +13,7 @@ import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
 import FileContextMenu from "./FileContextMenu";
+import FileDownloadLinkModal from "./FileDownloadLinkModal";
 import FilePreviewModal from "./FilePreviewModal";
 import FileThumb from "./FileThumb";
 import LinkFileModal from "./LinkFileModal";
@@ -44,6 +45,12 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<ProjectFile | null>(null);
+  // "Bağlantı oluştur": dosyayı Projelio hesabı OLMAYAN birine göndermek
+  // (bkz. FileDownloadLinkModal). Salt okunur ekranlarda da açık: bağlantı
+  // üretmek bir OKUMA eylemi — dosyayı zaten indirip elden gönderebilecek biri
+  // için engel olmanın anlamı yok, üstelik bağlantı geri alınabilir olduğu için
+  // eki e-postaya koymaktan daha güvenli.
+  const [sharing, setSharing] = useState<ProjectFile | null>(null);
   /**
    * Sağ tık, seçim ve görünüm FilesPanel'dekiyle AYNI kancalardan geliyor:
    * kullanıcı için burası da "dosyalar sayfası" ve listenin birden çok işten
@@ -463,6 +470,10 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
                   { label: t("Önizle"), onClick: () => setPreview(menu.file!) },
                   { label: t("İndir"), onClick: () => void handleDownload(menu.file!) },
                   {
+                    label: t("Bağlantı oluştur…"),
+                    onClick: () => setSharing(menu.file!),
+                  },
+                  {
                     label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file!) }),
                     onClick: () => window.open(driveEditUrl(menu.file!), "_blank", "noopener,noreferrer"),
                   },
@@ -482,6 +493,8 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
       {linking && <LinkFileModal sources={linking} onClose={() => setLinking(null)} />}
 
       {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} />}
+
+      {sharing && <FileDownloadLinkModal file={sharing} onClose={() => setSharing(null)} />}
 
       {pendingDelete && (
         <ConfirmDialog

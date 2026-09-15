@@ -24,6 +24,7 @@ export const legalUpdatedAt: Record<LegalSlug, string> = {
   kvkk: "04.09.2026",
   distance: "12.08.2026",
   refund: "12.08.2026",
+  "hesap-silme": "15.09.2026",
 };
 
 export const legalContent: Record<LegalSlug, LegalDoc> = {
@@ -1153,6 +1154,101 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "6. Exceptions",
         p: [
           "Accounts closed for breach of the Terms, custom enterprise development fees, and completed training or consultancy services are outside the scope of refunds.",
+        ],
+      },
+    ],
+  },
+  /**
+   * Google Play, mağaza girişinde gösterilen bir "hesap silme" sayfası istiyor:
+   * uygulamayı indirmeden erişilebilecek, silme adımlarını ve hangi verinin ne
+   * kadar saklandığını açıkça yazan bir sayfa. Saklama süreleri Gizlilik
+   * Politikası'ndaki tablodan kopyalanmıştır — biri değişirse diğeri de
+   * güncellenmeli, iki farklı süre yayımlamak beyan uyuşmazlığıdır.
+   */
+  "hesap-silme": {
+    tr: [
+      {
+        h: "Uygulamadan silme (en hızlı yol)",
+        p: [
+          "Projelio hesabınızı ve ona bağlı verileri uygulamanın içinden silebilirsiniz; ayrıca bir talep formu doldurmanız gerekmez.",
+          "Adımlar: Projelio'yu açın ve hesabınıza giriş yapın → sol menüden Ayarlar'a girin → sayfanın en altındaki \u201cHesabımı sil\u201d düğmesine basın → açılan pencerede neyin silineceğini okuyup şifrenizle onaylayın.",
+          "Mobil uygulamada da aynı ekran geçerlidir: uygulama, web'deki Projelio'nun aynısıdır.",
+        ],
+      },
+      {
+        h: "E-posta ile silme talebi",
+        p: [
+          "Uygulamaya giriş yapamıyorsanız, hesabınızın e-posta adresinden info@projelio.app adresine \u201chesap silme talebi\u201d konulu bir e-posta gönderin. Talebi kimlik doğrulamasının ardından en geç 30 gün içinde sonuçlandırırız.",
+        ],
+      },
+      {
+        h: "Silinen veriler",
+        p: [
+          "Hesabınız, profil bilgileriniz (ad, e-posta, telefon, profil fotoğrafı), oluşturduğunuz görev, proje, dosya ve yorumlar, Lio sohbet geçmişiniz ve bildirim tercihleriniz silinir.",
+          "İçinde başka üye bulunmayan işleriniz ve organizasyonlarınız da silinir. İçinde başkalarının emeği olan ortak çalışma alanları korunur; oradaki katkılarınız kimliksizleştirilir, yani size bağlanamaz hâle gelir.",
+        ],
+      },
+      {
+        h: "Saklanan veriler ve süreleri",
+        p: [
+          "Hesap silme talebinden sonra 30 günlük bir bekleme süresi başlar. Bu süre içinde giriş yaparsanız talep iptal olur ve hiçbir şey silinmez. Süre dolduğunda hesabınız ve kişisel verileriniz kalıcı olarak silinir; yedeklerden tamamen temizlenmesi ek olarak birkaç haftayı bulabilir.",
+          "Lio sohbet geçmişi 90 gün, WhatsApp konuşma kayıtları 90 gün, teknik ve güvenlik kayıtları en fazla 12 ay saklanır.",
+          "Faturalandırma ve ödeme kayıtları, vergi ve ticaret mevzuatı gereği 10 yıl saklanmak zorundadır; bu kayıtlar hesabınız silinse de yasal süre dolana kadar tutulur.",
+        ],
+      },
+      {
+        h: "Aboneliğiniz varsa",
+        p: [
+          "Ücretli bir aboneliğiniz varsa hesabı silmeden önce aboneliği iptal etmeniz önerilir. Google Play üzerinden alınan abonelikler Google Play hesabınızdan iptal edilir; hesabın silinmesi Play aboneliğini kendiliğinden sonlandırmaz.",
+        ],
+      },
+      {
+        h: "İletişim",
+        p: [
+          "Silme talebiniz veya verileriniz hakkında sorularınız için: info@projelio.app. Uygulamanın geliştiricisi Yiğitcan Kiremitci'dir (Projelio).",
+        ],
+      },
+    ],
+    en: [
+      {
+        h: "Deleting from the app (fastest way)",
+        p: [
+          "You can delete your Projelio account and its data from inside the app; no separate request form is needed.",
+          "Steps: open Projelio and sign in → go to Settings from the left menu → press the \u201cDelete my account\u201d button at the bottom of the page → read what will be deleted and confirm with your password.",
+          "The mobile app uses the same screen: the app is the same Projelio as on the web.",
+        ],
+      },
+      {
+        h: "Requesting deletion by email",
+        p: [
+          "If you cannot sign in, email info@projelio.app from your account's email address with the subject \u201caccount deletion request\u201d. After identity verification we complete the request within 30 days at the latest.",
+        ],
+      },
+      {
+        h: "Data that is deleted",
+        p: [
+          "Your account, profile details (name, email, phone, profile photo), the tasks, projects, files and comments you created, your Lio chat history and your notification preferences are deleted.",
+          "Jobs and organisations with no other members are deleted as well. Shared workspaces containing other people's work are kept; your contributions there are anonymised so they can no longer be linked to you.",
+        ],
+      },
+      {
+        h: "Data that is kept, and for how long",
+        p: [
+          "A 30-day waiting period starts after a deletion request. If you sign in during that period the request is cancelled and nothing is deleted. Once it expires your account and personal data are permanently deleted; removal from backups can take a few more weeks.",
+          "Lio chat history is kept for 90 days, WhatsApp conversation records for 90 days, technical and security logs for at most 12 months.",
+          "Billing and payment records must be kept for 10 years under Turkish tax and commercial law; these are retained until that period expires even after the account is deleted.",
+        ],
+      },
+      {
+        h: "If you have a subscription",
+        p: [
+          "If you have a paid subscription, cancel it before deleting the account. Subscriptions purchased through Google Play are cancelled from your Google Play account; deleting the Projelio account does not end a Play subscription on its own.",
+        ],
+      },
+      {
+        h: "Contact",
+        p: [
+          "Questions about your deletion request or your data: info@projelio.app. The app is developed by Yiğitcan Kiremitci (Projelio).",
         ],
       },
     ],

@@ -82,7 +82,10 @@ export function checkoutHref(planKey: string, period: "monthly" | "yearly"): str
 /** Panelin herkese açık fiyat ucu (bkz. backend billing-public.controller.ts). */
 export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.projelio.app";
 
-export const legalSlugs = ["privacy", "terms", "kvkk", "distance", "refund"] as const;
+// "hesap-silme" Google Play'in zorunlu tuttuğu hesap silme sayfasıdır: mağaza
+// girişinde gösterilen bu URL'nin, uygulamayı indirmeden de erişilebilir olması
+// ve silme adımlarını anlatması gerekiyor (bkz. Veri güvenliği beyanı).
+export const legalSlugs = ["privacy", "terms", "kvkk", "distance", "refund", "hesap-silme"] as const;
 export type LegalSlug = (typeof legalSlugs)[number];
 
 export function path(locale: Locale | string, sub = ""): string {

@@ -602,6 +602,10 @@ export const en: Dict = {
       title: "Cancellation and Refund Policy",
       lede: "When and how you can cancel your subscription or get a refund on credits.",
     },
+    "hesap-silme": {
+      title: "Account Deletion Request",
+      lede: "How to delete your Projelio account and data, what gets deleted and how long anything is kept.",
+    },
   },
 
   notFound: {

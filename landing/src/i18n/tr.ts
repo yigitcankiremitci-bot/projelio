@@ -608,6 +608,10 @@ export const tr = {
       title: "İptal ve İade Koşulları",
       lede: "Aboneliğinizi ve kredi alımlarınızı hangi koşullarda iptal edip iade alabileceğiniz.",
     },
+    "hesap-silme": {
+      title: "Hesap Silme Talebi",
+      lede: "Projelio hesabınızı ve verilerinizi nasıl sileceğiniz, hangi verilerin silindiği ve ne kadar süre saklandığı.",
+    },
   },
 
   notFound: {

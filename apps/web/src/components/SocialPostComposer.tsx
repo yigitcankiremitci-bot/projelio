@@ -668,7 +668,11 @@ export default function SocialPostComposer({
               onChange={(e) => setCollabHandle(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
+                  // Enter burada "ekle" demek. Olay pencereye ulaşırsa Modal onu
+                  // "Kaydet" sayıyor ve içerik, ad listeye eklenmeden kaydedilip
+                  // kapanıyordu.
                   e.preventDefault();
+                  e.stopPropagation();
                   addTypedCollaborator();
                 }
               }}

@@ -51,6 +51,7 @@ export const hatalar: TranslationDict = {
   "Bu projenin bütçesine kayıt eklemeyi yalnızca proje veya iş sahibi yapabilir": "Only the project or job owner can add records to this project's budget",
   "Bu projenin bütçesini görüntüleme yetkiniz yok": "You don't have permission to view this project's budget",
   "Bu projenin dosyalarına erişim yetkiniz yok": "You don't have permission to access this project's files",
+  "Bu klasöre erişim yetkiniz yok": "You don't have permission to access this folder",
   "Bu projenin ekibini yalnızca proje ekibi görebilir": "Only the project team can see this project's team",
   "Bu projeye bağlayamazsın": "You can't link it to this project",
   "Bu projeye erişim yetkiniz yok": "You don't have permission to access this project",
@@ -520,7 +521,8 @@ export const hatalar: TranslationDict = {
   "Bu şirkette dosya saklamak için önce bir Google Drive ya da OneDrive hesabı bağlanmalı. Ayarlar > Bağlı hesaplar.":
     "To store files for this company, connect a Google Drive or OneDrive account first. Settings > Connected accounts.",
   "Bu alanın dosya deposu bulunamadı": "No file storage found for this area",
-  "jobId, departmentId ya da organizationId gerekli": "jobId, departmentId or organizationId is required",
+  "jobId, projectId, departmentId ya da organizationId gerekli":
+    "jobId, projectId, departmentId or organizationId is required",
   "Bu hedef OneDrive kullanıyor; dosya seçimi OneDrive penceresiyle yapılır.":
     "This target uses OneDrive; pick files through the OneDrive window.",
   "Bu organizasyonun dosyalarına erişim yetkiniz yok":

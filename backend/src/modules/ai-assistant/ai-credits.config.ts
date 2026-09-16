@@ -45,6 +45,8 @@ export const DEFAULT_PRICING: ModelPricing = { inputPerMillion: 15, outputPerMil
  */
 export const CACHE_WRITE_MULTIPLIER = Number(process.env.AI_CACHE_WRITE_MULTIPLIER ?? 1.25);
 export const CACHE_READ_MULTIPLIER = Number(process.env.AI_CACHE_READ_MULTIPLIER ?? 0.1);
+/** 1 saatlik önbelleğe yazma 2× (5 dakikalığın 1,25× yerine). */
+export const CACHE_WRITE_1H_MULTIPLIER = Number(process.env.AI_CACHE_WRITE_1H_MULTIPLIER ?? 2);
 
 /**
  * Fiyatları kod değiştirmeden güncelleyebilmek için isteğe bağlı override.
@@ -89,7 +91,15 @@ export const MIN_BALANCE_TO_START = Number(process.env.AI_MIN_BALANCE_TO_START ?
  * Sistem promptu + araç şemaları + günlük bağlamın kabaca token karşılığı.
  *
  * Bir turun bedelini ÖNDEN kestirmek için kullanılır (bkz. AiAssistantService.reserveFor).
- * Ölçüm (2026-09, tablodan toplu içe aktarma araçları eklendikten sonra):
+ *
+ * GERÇEK ÖLÇÜM (2026-09-16, canlı kredi defteri): web kanalında ~50.100, WhatsApp'ta
+ * ~45.700 token. Aşağıdaki karakter hesabı yarıya yakın az tahmin ediyordu — Türkçe
+ * metin ve JSON şeması 3,5 karakter/token'dan çok daha kötü bölünüyor. Bu yüzden
+ * "tahmin 600'ün altında, sormadan geç" diyen kontrol 760 kredilik ilk turları
+ * yakalayamıyordu. Yeniden ölçmek için ai_credit_transactions'ta yeni bir sohbetin
+ * ilk satırındaki input_tokens'a bakın.
+ *
+ * Eski ölçüm (2026-09, tablodan toplu içe aktarma araçları eklendikten sonra):
  * araç şemaları JSON olarak 51.629 karakter (≈14.750 token), statik sistem promptu
  * 24.442 karakter (≈7.000 token), günlük bağlam ~800 token → ≈22.550. Varsayılan
  * bunun biraz üstünde tutuldu ki yeni bir araç eklendiğinde pay hemen erimesin.
@@ -103,12 +113,12 @@ export const MIN_BALANCE_TO_START = Number(process.env.AI_MIN_BALANCE_TO_START ?
  * "devam edeyim mi?" eşiğine daha erken çarpıyorsa AI_BASE_PROMPT_TOKENS ile
  * düşürülebilir (bkz. aşağıdaki not).
  *
- * Önbellek indirimi KASITLI olarak yok sayılır: önbellek ıskalayabilir ve o zaman gerçek
- * bedel bu sayıya yaklaşır. Kullanıcıya eksi bakiye göstermektense ihtiyatlı davranıp
- * "yeterli kredin yok" demeyi tercih ediyoruz. Eşik fazla katı gelirse AI_BASE_PROMPT_TOKENS
- * ile düşürülebilir — karşılığında küçük bir eksi bakiye riski kabul edilmiş olur.
+ * Bu önek artık kullanıcıya her zaman önbellek OKUMA fiyatından yansıtılıyor (bkz.
+ * calculateUsageCost), dolayısıyla tahminler de öyle hesaplar — önbellek ıskalasa
+ * bile kullanıcının ödeyeceği değişmez. Önbelleği hiç desteklemeyen sağlayıcıda
+ * önek tam fiyattır ama o sağlayıcıların modelleri zaten ~10 kat ucuz.
  */
-export const BASE_PROMPT_TOKENS = Number(process.env.AI_BASE_PROMPT_TOKENS ?? 24_000);
+export const BASE_PROMPT_TOKENS = Number(process.env.AI_BASE_PROMPT_TOKENS ?? 52_000);
 
 /**
  * Yeni kullanıcılara ilk kullanımda tanımlanan deneme kredisi (0 = kapalı).
@@ -133,6 +143,12 @@ export interface TokenUsage {
   cacheWriteTokens?: number;
   /** Önbellekten okunan token'lar (standart girdinin 0,10 katı fiyatlanır). */
   cacheReadTokens?: number;
+  /**
+   * PAYLAŞILAN önekin (araç şemaları + statik sistem promptu) 1 saatlik önbelleğe
+   * yazımı. Maliyete gerçek fiyatıyla (2×) girer ama kullanıcıya OKUMA fiyatından
+   * yansıtılır — bkz. calculateUsageCost.
+   */
+  sharedCacheWriteTokens?: number;
 }
 
 /**
@@ -141,18 +157,30 @@ export interface TokenUsage {
  * Önbellek token'ları ayrı fiyatlandığı için ayrı hesaplanır — bunları normal girdi
  * gibi saymak maliyeti olduğundan yüksek gösterir ve kullanıcıdan fazla kredi keser.
  * Kredi sayısı yukarı yuvarlanır (2 ondalık) ki küsurattan Projelio zarar etmesin.
+ *
+ * `costUsd` GERÇEK maliyettir (marj takibi ve harcama uyarıları buna bakar);
+ * `chargedUsd` ve `credits` kullanıcıya yansıyandır. İkisi yalnızca paylaşılan
+ * önek yazımında ayrışır: o önek (~50 bin token) tüm kullanıcılar için aynı ve
+ * Anthropic tarafında ortak önbellekte duruyor. Bedelini, önbellek soğukken
+ * denk gelen kullanıcıya yüklemek kredi faturasını şansa bağlıyordu — 2026-09-16'da
+ * bir test kullanıcısı iki mesaja ~1.460 kredi ödedi, birkaç dakika sonra aynı
+ * mesajlar 80'er kredi tuttu. Yazımın farkını Projelio üstleniyor; 1 saatlik
+ * ömür sayesinde bu, trafiğe göre saatte en fazla bir kez oluyor.
  */
 export function calculateUsageCost(model: string, usage: TokenUsage): UsageCost {
   const pricing = getPricing(model);
   const perInputToken = pricing.inputPerMillion / 1_000_000;
+  const shared = usage.sharedCacheWriteTokens ?? 0;
 
-  const costUsd =
+  const commonUsd =
     usage.inputTokens * perInputToken +
     (usage.cacheWriteTokens ?? 0) * perInputToken * CACHE_WRITE_MULTIPLIER +
     (usage.cacheReadTokens ?? 0) * perInputToken * CACHE_READ_MULTIPLIER +
     (usage.outputTokens / 1_000_000) * pricing.outputPerMillion;
 
-  const chargedUsd = costUsd * (1 + COMMISSION_RATE);
+  const costUsd = commonUsd + shared * perInputToken * CACHE_WRITE_1H_MULTIPLIER;
+  const billedUsd = commonUsd + shared * perInputToken * CACHE_READ_MULTIPLIER;
+  const chargedUsd = billedUsd * (1 + COMMISSION_RATE);
   const credits = Math.ceil((chargedUsd / CREDIT_UNIT_USD) * 100) / 100;
 
   return {

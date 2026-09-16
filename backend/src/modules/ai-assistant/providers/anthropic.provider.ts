@@ -64,6 +64,7 @@ export class AnthropicProvider implements LlmProvider {
         output_tokens: usage.output_tokens ?? 0,
         cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
         cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
+        cache_creation_1h_input_tokens: usage.cache_creation?.ephemeral_1h_input_tokens ?? 0,
       },
     };
   }

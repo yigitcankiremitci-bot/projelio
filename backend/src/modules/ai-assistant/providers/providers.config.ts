@@ -56,7 +56,7 @@ export const PROVIDER_CATALOG: ProviderDefinition[] = [
     label: "Anthropic",
     kind: "anthropic",
     apiKeyEnv: "ANTHROPIC_API_KEY",
-    capabilities: { promptCaching: true, tools: true, vision: true },
+    capabilities: { promptCaching: true, longCacheTtl: true, tools: true, vision: true },
     models: [
       {
         id: "claude-haiku-4-5-20251001",

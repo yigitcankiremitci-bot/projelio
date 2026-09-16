@@ -172,12 +172,20 @@ const CONTEXT_PROJECT_LIMIT = 12;
  * Sorun çıkarsa AI_PROMPT_CACHING=false ile kapatılabilir.
  */
 const CACHING_ENABLED = (process.env.AI_PROMPT_CACHING ?? "true").toLowerCase() !== "false";
+/**
+ * Paylaşılan önek için 1 saatlik önbellek ömrü. Kapatılırsa 5 dakikaya döner;
+ * kredi yansıtması değişmez (önek yine okuma fiyatından), yalnızca Projelio'nun
+ * yazım maliyeti artar. Acil durum anahtarı: AI_CACHE_TTL_1H=false.
+ */
+const LONG_CACHE_TTL = (process.env.AI_CACHE_TTL_1H ?? "true").toLowerCase() !== "false";
 
 interface TokenTotals {
   input: number;
   output: number;
   cacheWrite: number;
   cacheRead: number;
+  /** Paylaşılan önekin 1 saatlik önbelleğe yazımı — kullanıcıya okuma fiyatından yansır. */
+  sharedCacheWrite: number;
 }
 
 /**
@@ -1795,7 +1803,7 @@ export class AiAssistantService {
     // `let`: sağlayıcı yedeğe geçerse gerçekte kullanılan model değişir ve kredi
     // hesabı (calculateUsageCost) o modelin fiyatından yapılmalıdır.
     let model = this.modelForTier(run.tier, run.preferredModel);
-    const totals: TokenTotals = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
+    const totals: TokenTotals = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0, sharedCacheWrite: 0 };
     /** Son turun kredi bedeli — "devam edersem ne kadar tutar" tahmini bundan çıkar. */
     let lastStepCredits = 0;
     /**
@@ -1815,6 +1823,7 @@ export class AiAssistantService {
         outputTokens: totals.output,
         cacheWriteTokens: totals.cacheWrite,
         cacheReadTokens: totals.cacheRead,
+        sharedCacheWriteTokens: totals.sharedCacheWrite,
       }).credits;
 
     const finish = async (
@@ -1833,6 +1842,7 @@ export class AiAssistantService {
         outputTokens: totals.output,
         cacheWriteTokens: totals.cacheWrite,
         cacheReadTokens: totals.cacheRead,
+        sharedCacheWriteTokens: totals.sharedCacheWrite,
         conversationId: run.conversationId,
       });
       run.spentCredits += credits;
@@ -1856,13 +1866,13 @@ export class AiAssistantService {
       // Maliyet denetimi için her segmentin gerçek token dökümü loglanır.
       this.logger.log(
         `AI kullanım · model=${model} in=${totals.input} out=${totals.output} ` +
-          `cacheWrite=${totals.cacheWrite} cacheRead=${totals.cacheRead} → ${credits} kredi ` +
+          `cacheWrite=${totals.cacheWrite} sharedWrite=${totals.sharedCacheWrite} cacheRead=${totals.cacheRead} → ${credits} kredi ` +
           `(koşu toplamı ${run.spentCredits}, tur ${run.iterationsUsed})`
       );
 
       if (assistantText) {
         await this.conversationsService.addMessage(run.conversationId, "assistant", assistantText, {
-          inputTokens: totals.input + totals.cacheWrite + totals.cacheRead,
+          inputTokens: totals.input + totals.cacheWrite + totals.sharedCacheWrite + totals.cacheRead,
           outputTokens: totals.output,
           creditsCharged: credits,
         });
@@ -2030,8 +2040,19 @@ export class AiAssistantService {
             text: AiAssistantService.STATIC_SYSTEM_PROMPT[run.locale],
             // Önbellek işareti yalnızca destekleyen sağlayıcıya konur; desteklemeyen
             // sağlayıcılarda bu alan bilinmeyen bir anahtar olarak reddedilebilir.
+            //
+            // Ömür 1 SAAT: bu önek tüm kullanıcılar için aynı ve trafik seyrek —
+            // 5 dakikalık önbellek kullanıcılar arasındaki boşlukta hep soğuyor,
+            // her soğuk başlangıç ~50 bin token yeniden yazıyordu. 1 saatlik
+            // yazım 2× ama bir okuma kadar zamanlayıcıyı tazeliyor. 1 saatlik
+            // girdi 5 dakikalıklardan (sabit dosyalar) ÖNCE gelmek zorunda; bu
+            // blok onların hepsinden önce duruyor.
             ...(CACHING_ENABLED && choice.provider.capabilities.promptCaching
-              ? { cache_control: { type: "ephemeral" } }
+              ? {
+                  cache_control: LONG_CACHE_TTL && choice.provider.capabilities.longCacheTtl
+                    ? { type: "ephemeral", ttl: "1h" }
+                    : { type: "ephemeral" },
+                }
               : {}),
           },
           // Açık dosya bildirimi HER TURDA yeniden yazılır: koşunun ortasında
@@ -2053,9 +2074,15 @@ export class AiAssistantService {
       const usage: any = response.usage ?? {};
       totals.input += usage.input_tokens ?? 0;
       totals.output += usage.output_tokens ?? 0;
-      totals.cacheWrite += usage.cache_creation_input_tokens ?? 0;
+      // 1 saatlik yazım yalnızca paylaşılan önekten gelir (bkz. sistem bloğu);
+      // geri kalanı bu sohbete özgü yazımdır ve normal fiyatlanır.
+      const sharedWrite = Math.min(usage.cache_creation_1h_input_tokens ?? 0, usage.cache_creation_input_tokens ?? 0);
+      const ownWrite = (usage.cache_creation_input_tokens ?? 0) - sharedWrite;
+      totals.sharedCacheWrite += sharedWrite;
+      totals.cacheWrite += ownWrite;
       totals.cacheRead += usage.cache_read_input_tokens ?? 0;
-      lastTurnWroteCache = (usage.cache_creation_input_tokens ?? 0) > 0;
+      // Paylaşılan önekin yazımı kullanıcıya pahalı yansımadığı için tahmini de şişirmez.
+      lastTurnWroteCache = ownWrite > 0;
       lastStepCredits = Math.max(0, segmentCredits() - creditsBefore);
 
       const toolUses = response.content.filter(
@@ -2302,9 +2329,11 @@ export class AiAssistantService {
     messages: Anthropic.MessageParam[],
     remaining: number
   ): { maxTokens: number; required: number } | null {
-    const inputTokens = BASE_PROMPT_TOKENS + this.estimateInputTokens(messages);
-    const costFor = (outputTokens: number) =>
-      calculateUsageCost(model, { inputTokens, outputTokens }).credits;
+    // En kötü hâl: konuşmanın tamamı önbelleğe YAZILIR. Paylaşılan önek ise
+    // kullanıcıya her durumda okuma fiyatından yansıdığı için öyle hesaplanır;
+    // tam fiyattan saymak, 378 kredisi olan kullanıcıya 80 kredilik tur için
+    // "kredin yetmiyor" dedirtiyordu (2026-09-16).
+    const costFor = (outputTokens: number) => this.turnCredits(model, messages, outputTokens, true);
 
     const full = costFor(MAX_TOKENS);
     if (full <= remaining) return { maxTokens: MAX_TOKENS, required: full };
@@ -2337,20 +2366,44 @@ export class AiAssistantService {
    * turda 1100 kredi harcanmasına rağmen 600 eşiğini hiç tetiklemiyordu.
    */
   private estimateTurnCredits(model: string, run: PendingRun, writesCache: boolean): number {
-    const cachedTokens = BASE_PROMPT_TOKENS + run.pinnedTokens;
-    const freshTokens = Math.max(0, this.estimateInputTokens(run.messages) - run.pinnedTokens);
+    const pinned = run.pinnedTokens;
+    const freshTokens = Math.max(0, this.estimateInputTokens(run.messages) - pinned);
 
     if (!CACHING_ENABLED) {
       return calculateUsageCost(model, {
-        inputTokens: cachedTokens + freshTokens,
+        inputTokens: BASE_PROMPT_TOKENS + pinned + freshTokens,
         outputTokens: TYPICAL_OUTPUT_TOKENS,
       }).credits;
     }
 
     return calculateUsageCost(model, {
       inputTokens: freshTokens,
-      ...(writesCache ? { cacheWriteTokens: cachedTokens } : { cacheReadTokens: cachedTokens }),
+      // Paylaşılan önek kullanıcıya her zaman okuma fiyatından yansır.
+      cacheReadTokens: BASE_PROMPT_TOKENS + (writesCache ? 0 : pinned),
+      cacheWriteTokens: writesCache ? pinned : 0,
       outputTokens: TYPICAL_OUTPUT_TOKENS,
+    }).credits;
+  }
+
+  /**
+   * Bir turun kredi bedeli; `worstCase` ise sohbete özgü girdinin tamamı önbelleğe
+   * yazılıyormuş gibi (1,25×) hesaplanır. Paylaşılan önek her iki hâlde de okuma
+   * fiyatındadır — kullanıcıya öyle yansıyor (bkz. calculateUsageCost).
+   */
+  private turnCredits(
+    model: string,
+    messages: Anthropic.MessageParam[],
+    outputTokens: number,
+    worstCase: boolean
+  ): number {
+    const own = this.estimateInputTokens(messages);
+    if (!CACHING_ENABLED) {
+      return calculateUsageCost(model, { inputTokens: BASE_PROMPT_TOKENS + own, outputTokens }).credits;
+    }
+    return calculateUsageCost(model, {
+      cacheReadTokens: BASE_PROMPT_TOKENS,
+      ...(worstCase ? { inputTokens: 0, cacheWriteTokens: own } : { inputTokens: own }),
+      outputTokens,
     }).credits;
   }
 
@@ -2391,10 +2444,7 @@ export class AiAssistantService {
 
   /** Bir turun asgari bedeli — "başlamak için en az ne gerekiyor" mesajları için. */
   private minimumTurnCredits(model: string, messages: Anthropic.MessageParam[]): number {
-    return calculateUsageCost(model, {
-      inputTokens: BASE_PROMPT_TOKENS + this.estimateInputTokens(messages),
-      outputTokens: MIN_OUTPUT_TOKENS,
-    }).credits;
+    return this.turnCredits(model, messages, MIN_OUTPUT_TOKENS, false);
   }
 
   /**

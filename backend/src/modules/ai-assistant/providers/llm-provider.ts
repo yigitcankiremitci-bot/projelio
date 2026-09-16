@@ -37,6 +37,12 @@ export interface LlmResponse {
     output_tokens: number;
     cache_creation_input_tokens: number;
     cache_read_input_tokens: number;
+    /**
+     * `cache_creation_input_tokens`'ın 1 saatlik önbelleğe giden kısmı (yalnızca
+     * Anthropic ayrıştırıyor). Lio'da 1 saatlik ömür yalnızca paylaşılan önekte
+     * kullanıldığı için bu sayı doğrudan "paylaşılan önek yazımı" demek.
+     */
+    cache_creation_1h_input_tokens?: number;
   };
 }
 
@@ -44,6 +50,8 @@ export interface LlmResponse {
 export interface LlmCapabilities {
   /** Prompt caching (`cache_control`) destekleniyor mu? */
   promptCaching: boolean;
+  /** 1 saatlik önbellek ömrü (`ttl: "1h"`) kabul ediliyor mu? Uyumlu uçlar bilinmeyen alanı reddedebilir. */
+  longCacheTtl?: boolean;
   /** Araç kullanımı (tool use / function calling) destekleniyor mu? */
   tools: boolean;
   /** Görsel girdi kabul ediliyor mu? */

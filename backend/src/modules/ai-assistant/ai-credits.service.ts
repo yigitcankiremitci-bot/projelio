@@ -349,14 +349,17 @@ export class AiCreditsService {
     outputTokens: number;
     cacheWriteTokens?: number;
     cacheReadTokens?: number;
+    sharedCacheWriteTokens?: number;
     conversationId?: string;
   }): Promise<{ credits: number; balanceAfter: number }> {
-    const { userId, model, inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens, conversationId } = params;
+    const { userId, model, inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens, sharedCacheWriteTokens, conversationId } =
+      params;
     const { costUsd, chargedUsd, credits } = calculateUsageCost(model, {
       inputTokens,
       outputTokens,
       cacheWriteTokens,
       cacheReadTokens,
+      sharedCacheWriteTokens,
     });
 
     if (demoKullanicisiMi(userId)) return this.demoHarcamasiniYaz(credits);
@@ -372,7 +375,7 @@ export class AiCreditsService {
       conversationId,
       model,
       // Denetlenebilirlik için tüm girdi token'ları (önbellek dahil) tek alanda toplanır.
-      inputTokens: inputTokens + (cacheWriteTokens ?? 0) + (cacheReadTokens ?? 0),
+      inputTokens: inputTokens + (cacheWriteTokens ?? 0) + (cacheReadTokens ?? 0) + (sharedCacheWriteTokens ?? 0),
       outputTokens,
       costUsd,
       chargedUsd,

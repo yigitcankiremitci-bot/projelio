@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { SocialAccount, SocialPost } from "@projelio/shared";
 import {
+  isExternallyPublished,
   PLATFORM_ORDER,
   SOCIAL_PLATFORMS,
   SOCIAL_STATUS,
@@ -47,6 +48,8 @@ function post(over: Partial<SocialPost> = {}): SocialPost {
     createdAt: "2026-08-01T00:00:00Z",
     targets: [],
     media: [],
+    publishVia: "projelio",
+    collaborators: [],
     ...over,
   };
 }
@@ -192,5 +195,13 @@ describe("takvim rengi", () => {
     // Hesap silinmişse de kart renksiz kalmalı, patlamamalı.
     const orphan = post({ targets: [{ id: "t1", postId: "p1", accountId: "yok", status: "pending" }] });
     assert.equal(postColor(orphan, []), "#9AA2B0");
+  });
+});
+
+describe("yayın yolu", () => {
+  test("başka araçta planlanan içerik harici sayılır", () => {
+    assert.equal(isExternallyPublished(post({ publishVia: "external", externalTool: "Meta Business Suite" })), true);
+    assert.equal(isExternallyPublished(post()), false);
+    assert.equal(isExternallyPublished(null), false);
   });
 });

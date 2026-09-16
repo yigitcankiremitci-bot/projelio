@@ -4,7 +4,9 @@ import type {
   SocialMediaOverview,
   SocialPlatform,
   SocialPost,
+  SocialPostCollaboratorInput,
   SocialPostStatus,
+  SocialPublishVia,
 } from "@projelio/shared";
 import { api } from "./client";
 
@@ -51,6 +53,10 @@ export interface SocialPostInput {
   departmentId?: string;
   accountIds?: string[];
   captionOverrides?: Record<string, string>;
+  publishVia?: SocialPublishVia;
+  externalTool?: string | null;
+  /** Verilirse katkıda bulunan listesi bununla değiştirilir. */
+  collaborators?: SocialPostCollaboratorInput[];
 }
 
 function base(scope: SocialScope): string {

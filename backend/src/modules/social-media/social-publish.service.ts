@@ -2,8 +2,8 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from "@nes
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { InstagramPublishService, PublishError } from "./instagram-publish.service";
-import { buildCaption, mediaFileIds } from "./publish-format";
-import { SocialMediaService, type SocialScope } from "./social-media.service";
+import { buildCaption, instagramCollaborators, MAX_INSTAGRAM_COLLABORATORS, mediaFileIds } from "./publish-format";
+import { isMissingRelation, SocialMediaService, type SocialScope } from "./social-media.service";
 
 /**
  * Yayının orkestrasyonu: kim, neyi, hangi hesaba, ne zaman.
@@ -48,6 +48,7 @@ export class SocialPublishService {
   async publishPostNow(postId: string, userId: string): Promise<{ published: number; failed: number }> {
     const post = await this.loadPost(postId);
     await this.social.assertWritable(this.scopeOfPost(post), userId);
+    this.assertPublishedByProjelio(post);
 
     const targets = (post.social_post_targets ?? []).filter((t: any) => t.status !== "published");
     if (targets.length === 0) throw new BadRequestException("Yayımlanacak kanal yok");
@@ -66,6 +67,7 @@ export class SocialPublishService {
   async publishTargetNow(targetId: string, userId: string): Promise<{ ok: boolean }> {
     const { target, post } = await this.loadTarget(targetId);
     await this.social.assertWritable(this.scopeOfPost(post), userId);
+    this.assertPublishedByProjelio(post);
 
     const ok = await this.runTarget({ target, post, account: await this.loadAccount(target.account_id) }, false);
     await this.syncPostStatus(post.id);
@@ -101,7 +103,10 @@ export class SocialPublishService {
       const account = await this.loadAccount(target.account_id).catch(() => null);
       // Gönderi arşivlendiyse ya da iptal edildiyse kuyruk onu yayımlamaz;
       // kullanıcının "vazgeçtim" kararı zamanlayıcıdan güçlüdür.
-      if (!post || !account || post.archived_at || post.status === "cancelled") {
+      // Başka bir araçta zamanlanmış içerik de atlanır: hedefte eski bir saat
+      // kalmış olsa bile (ör. yayın yolu sonradan değiştirildi) aynı video
+      // ikinci kez çıkmamalı.
+      if (!post || !account || post.archived_at || post.status === "cancelled" || post.publish_via === "external") {
         await this.updateTarget(target.id, { status: "skipped", publish_at: null });
         skipped++;
         continue;
@@ -130,12 +135,21 @@ export class SocialPublishService {
         throw new PublishError("Hesap Instagram'a bağlı değil. Hesaplar sekmesinden bağlayın.", true);
       }
 
+      const collaborators = instagramCollaborators(post.social_post_collaborators, account.handle);
+      if (collaborators.length > MAX_INSTAGRAM_COLLABORATORS) {
+        throw new PublishError(
+          `Instagram tek gönderide en fazla ${MAX_INSTAGRAM_COLLABORATORS} katkıda bulunan kabul ediyor.`,
+          true
+        );
+      }
+
       await this.updateTarget(target.id, { attempted_at: new Date().toISOString() });
 
       const result = await this.instagram.publish({
         accountId: account.id,
         externalAccountId: account.external_account_id,
         caption: buildCaption(post, target),
+        collaborators,
         mediaFileIds: mediaFileIds(post),
         // Dosyalar kullanıcı yetkisiyle okunur; sistem adına arka kapı yok.
         // Zamanlanmış yayında içeriği oluşturan kişi adına hareket edilir.
@@ -253,16 +267,31 @@ export class SocialPublishService {
     }
   }
 
+  /**
+   * Başka bir araçta zamanlanmış içerik Projelio'dan yayımlanamaz.
+   *
+   * Kullanıcı "Şimdi paylaş"a bassaydı içerik hem şimdi hem de Business
+   * Suite'teki saatinde çıkardı. Önce yayın yolunu değiştirmesi gerekiyor —
+   * bu bilinçli bir karar olmalı.
+   */
+  private assertPublishedByProjelio(post: any): void {
+    if (post.publish_via === "external") {
+      throw new BadRequestException(
+        "Bu içerik başka bir araçta planlandı. Projelio'dan yayımlamak için önce yayın yolunu Projelio yapın."
+      );
+    }
+  }
+
   private scopeOfPost(post: any): SocialScope {
     return this.social.scopeOfRow(post);
   }
 
   private async loadPost(postId: string): Promise<any> {
-    const { data, error } = await this.supabase.client
-      .from("social_posts")
-      .select("*, social_post_targets(*), social_post_media(*)")
-      .eq("id", postId)
-      .maybeSingle();
+    const run = (select: string) =>
+      this.supabase.client.from("social_posts").select(select).eq("id", postId).maybeSingle<any>();
+    let { data, error } = await run("*, social_post_targets(*), social_post_media(*), social_post_collaborators(*)");
+    // Migration 115 öncesi: katkıda bulunan tablosu yok, yayın onsuz sürer.
+    if (isMissingRelation(error)) ({ data, error } = await run("*, social_post_targets(*), social_post_media(*)"));
     if (error) throw error;
     if (!data) throw new NotFoundException("Gönderi bulunamadı");
     return data;

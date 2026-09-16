@@ -8,6 +8,7 @@ import { filesApi } from "../api/files";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import {
   ACTIVE_STATUSES,
+  COLLABORATOR_STATUS,
   CONNECTION_STATUS,
   MONTH_LABELS,
   SOCIAL_PLATFORMS,
@@ -19,6 +20,7 @@ import {
   accountLabel,
   accountProfileUrl,
   canAutoPublish,
+  isExternallyPublished,
   localDay,
   monthGrid,
   postColor,
@@ -930,20 +932,60 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
    * Kartın altındaki yayın satırı.
    *
    * Yalnızca söyleyecek bir şey varsa görünür: bağlı bir kanal, bir yayın
-   * sonucu ya da bir hata. Her karta sabit bir düğme koymak, elle yönetilen
-   * hesaplarda ekranı anlamsız yere doldururdu.
+   * sonucu, bir hata, harici yayın aracı ya da ortak yazarlar. Her karta sabit
+   * bir düğme koymak, elle yönetilen hesaplarda ekranı anlamsız yere
+   * doldururdu.
    */
   const publishRow = (post: SocialPost) => {
-    const auto = post.targets.filter((hedef) => {
-      const a = accountById.get(hedef.accountId);
-      return a && canAutoPublish(a);
-    });
+    const external = isExternallyPublished(post);
+    // Başka araçta planlanan içerikte "Şimdi paylaş" yok: içerik iki kez çıkardı.
+    const auto = external
+      ? []
+      : post.targets.filter((hedef) => {
+          const a = accountById.get(hedef.accountId);
+          return a && canAutoPublish(a);
+        });
     const failed = post.targets.filter((hedef) => hedef.status === "failed");
     const published = post.targets.filter((hedef) => hedef.status === "published");
-    if (auto.length === 0 && failed.length === 0 && published.length === 0) return null;
+    const collaborators = post.collaborators ?? [];
+    if (
+      auto.length === 0 &&
+      failed.length === 0 &&
+      published.length === 0 &&
+      !external &&
+      collaborators.length === 0
+    )
+      return null;
 
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", paddingLeft: 6 }}>
+        {external && (
+          <span
+            title={t("Projelio bu içeriği yayımlamaz; kayıt takvim ve takip içindir.")}
+            style={{
+              fontSize: 10,
+              padding: "1px 6px",
+              borderRadius: 999,
+              border: `1px solid ${c.border}`,
+              color: c.textSecondary,
+            }}
+          >
+            {post.externalTool
+              ? t("{arac} üzerinden planlandı", { arac: post.externalTool })
+              : t("Başka araçta planlandı")}
+          </span>
+        )}
+
+        {collaborators.map((k) => (
+          <span
+            key={k.id}
+            title={`${t(SOCIAL_PLATFORMS[k.platform].label)} · ${t(COLLABORATOR_STATUS[k.status].label)}`}
+            style={{ fontSize: 10, color: COLLABORATOR_STATUS[k.status].color }}
+          >
+            + @{k.handle}
+          </span>
+        ))}
+
         {published.map((hedef) => {
           const a = accountById.get(hedef.accountId);
           const etiket = t("{kanal} yayında", { kanal: a ? `@${a.handle}` : t("Kanal") });

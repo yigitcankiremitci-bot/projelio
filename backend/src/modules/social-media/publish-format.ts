@@ -8,6 +8,8 @@
  * çalıştıramıyor; saf dosyalar bu yüzden ayrı duruyor.)
  */
 
+import { normalizeSocialHandle } from "@projelio/shared";
+
 /**
  * Yayımlanacak metin.
  *
@@ -37,6 +39,48 @@ export function mediaFileIds(post: { social_post_media?: { file_id: string; sort
   return [...(post.social_post_media ?? [])]
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     .map((m) => m.file_id);
+}
+
+/**
+ * Gönderi yayın kuyruğuna girer mi.
+ *
+ * Yalnızca yayın kararı verilmiş içerik girer: taslak ve fikir aşamasındaki
+ * bir gönderi, tarihi geçmiş olsa bile kendiliğinden çıkmaz.
+ *
+ * Başka bir araçta (Meta Business Suite vb.) zamanlanmış içerik ASLA girmez —
+ * durumu "planlandı" olsa bile. O kayıt takvim içindir; kuyruk onu da
+ * yayımlasaydı bağlı hesapta aynı video iki kez çıkardı.
+ */
+export function isQueueable(status: string, publishVia: string | null | undefined): boolean {
+  if (publishVia === "external") return false;
+  return status === "scheduled" || status === "approved" || status === "ready";
+}
+
+/** Kullanıcı adının tek biçimi — web ile ortak (bkz. @projelio/shared sosyalHesap). */
+export const normalizeHandle = normalizeSocialHandle;
+
+/** Instagram API'sinin tek gönderide kabul ettiği katkıda bulunan sayısı. */
+export const MAX_INSTAGRAM_COLLABORATORS = 3;
+
+/**
+ * Instagram'a davet gidecek kullanıcı adları.
+ *
+ * Başka platformun katkıda bulunanı (ör. Facebook sayfası) Instagram
+ * yayınına karışmaz; yayımlayan hesabın kendisi de listeden düşer — Meta
+ * kendini davet eden gönderiyi reddediyor.
+ */
+export function instagramCollaborators(
+  collaborators: { platform?: string | null; handle?: string | null }[] | null | undefined,
+  ownHandle?: string | null
+): string[] {
+  const own = normalizeHandle(ownHandle);
+  const seen = new Set<string>();
+  for (const c of collaborators ?? []) {
+    if ((c.platform ?? "instagram") !== "instagram") continue;
+    const handle = normalizeHandle(c.handle);
+    if (handle && handle !== own) seen.add(handle);
+  }
+  return [...seen];
 }
 
 /**

@@ -99,6 +99,8 @@ export class InstagramPublishService {
     externalAccountId: string;
     caption: string;
     mediaFileIds: string[];
+    /** Katkıda bulunan kullanıcı adları ("@" öneksiz). Boşsa parametre gitmez. */
+    collaborators?: string[];
     actingUserId: string;
     /** Yarım kalmış denemeden gelen konteyner — medya yeniden yüklenmesin. */
     existingContainerId?: string | null;
@@ -133,8 +135,8 @@ export class InstagramPublishService {
 
         containerId =
           staged.length === 1
-            ? await this.createContainer(params.externalAccountId, token.accessToken, staged[0], caption)
-            : await this.createCarousel(params.externalAccountId, token.accessToken, staged, caption);
+            ? await this.createContainer(params.externalAccountId, token.accessToken, staged[0], caption, params.collaborators)
+            : await this.createCarousel(params.externalAccountId, token.accessToken, staged, caption, params.collaborators);
 
         await params.onContainer?.(containerId);
       }
@@ -217,9 +219,10 @@ export class InstagramPublishService {
     igId: string,
     accessToken: string,
     media: StagedMedia,
-    caption: string
+    caption: string,
+    collaborators?: string[]
   ): Promise<string> {
-    const body: Record<string, string> = { caption, access_token: accessToken };
+    const body: Record<string, string> = { caption, access_token: accessToken, ...collaboratorParam(collaborators) };
     if (media.isVideo) {
       body.video_url = media.publicUrl;
       // REELS: Meta 2024'ten beri tekil videoları reel olarak yayımlıyor;
@@ -236,7 +239,8 @@ export class InstagramPublishService {
     igId: string,
     accessToken: string,
     items: StagedMedia[],
-    caption: string
+    caption: string,
+    collaborators?: string[]
   ): Promise<string> {
     const children: string[] = [];
     for (const item of items) {
@@ -256,6 +260,8 @@ export class InstagramPublishService {
       children: children.join(","),
       caption,
       access_token: accessToken,
+      // Katkıda bulunanlar karuselin ÜST konteynerine yazılır; öğeler kabul etmiyor.
+      ...collaboratorParam(collaborators),
     });
     return json.id;
   }
@@ -381,4 +387,13 @@ export class InstagramPublishService {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Meta'nın `collaborators` parametresi: kullanıcı adlarının JSON dizisi
+ * (["projelio.app","pist.istanbul"]). Liste boşsa parametre hiç gönderilmez —
+ * boş dizi bazı API sürümlerinde "geçersiz parametre" hatası veriyor.
+ */
+function collaboratorParam(collaborators?: string[]): Record<string, string> {
+  return collaborators && collaborators.length > 0 ? { collaborators: JSON.stringify(collaborators) } : {};
 }

@@ -2761,6 +2761,38 @@ export interface SocialPostTarget {
   attemptedAt?: string;
 }
 
+/**
+ * Yayını kim yapıyor.
+ *
+ * `external`: içerik başka bir araçta (ör. Meta Business Suite) zamanlandı;
+ * Projelio'daki kayıt takvim ve takip içindir, yayın kuyruğu ona DOKUNMAZ.
+ * Aksi hâlde aynı video iki kez yayımlanırdı.
+ */
+export type SocialPublishVia = "projelio" | "external";
+
+export type SocialCollaboratorStatus = "invited" | "accepted" | "declined";
+
+/** Gönderinin ortak yazarı (Instagram "katkıda bulunanlar"). */
+export interface SocialPostCollaborator {
+  id: string;
+  postId: string;
+  /** Hesap modülde kayıtlıysa dolu. */
+  accountId?: string;
+  platform: SocialPlatform;
+  /** "@" öneksiz kullanıcı adı. Hesap arşivlense de kalır. */
+  handle: string;
+  status: SocialCollaboratorStatus;
+  sortOrder: number;
+}
+
+/** Kayıt/güncelleme gövdesindeki katkıda bulunan. */
+export interface SocialPostCollaboratorInput {
+  accountId?: string;
+  platform?: SocialPlatform;
+  handle?: string;
+  status?: SocialCollaboratorStatus;
+}
+
 export interface SocialPost {
   id: string;
   organizationId?: string;
@@ -2791,9 +2823,15 @@ export interface SocialPost {
   createdAt: string;
   updatedAt?: string;
   archivedAt?: string;
+  /** Yayını Projelio mu yapıyor, başka bir araç mı. */
+  publishVia: SocialPublishVia;
+  /** publishVia "external" ise aracın adı (ör. "Meta Business Suite"). */
+  externalTool?: string;
   /** Hangi hesaplarda yayımlanacak. */
   targets: SocialPostTarget[];
   media: SocialPostMedia[];
+  /** Ortak yazar hesaplar. */
+  collaborators: SocialPostCollaborator[];
 }
 
 /** Modül açılışında tek istekte dönen paket: liste + takvim + hesaplar. */

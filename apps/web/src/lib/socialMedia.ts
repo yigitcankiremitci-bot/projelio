@@ -7,6 +7,7 @@
 
 import type {
   SocialAccount,
+  SocialCollaboratorStatus,
   SocialConnectionStatus,
   SocialContentType,
   SocialPlatform,
@@ -163,6 +164,31 @@ export const TARGET_STATUS: Record<SocialTargetStatus, { label: string; color: s
 };
 
 /** Hesap otomatik yayına hazır mı — "Şimdi paylaş" düğmesi buna bakar. */
+/** Katkıda bulunan davetinin durumu. */
+export const COLLABORATOR_STATUS: Record<SocialCollaboratorStatus, { label: string; color: string }> = {
+  invited: { label: "Davet edildi", color: "#C0813F" },
+  accepted: { label: "Kabul etti", color: "#2E9E5B" },
+  declined: { label: "Reddetti", color: "#C13434" },
+};
+
+export const COLLABORATOR_STATUS_ORDER: SocialCollaboratorStatus[] = ["invited", "accepted", "declined"];
+
+/**
+ * Harici yayın aracı önerileri. Serbest metin — liste yalnızca yazımı
+ * tekleştirsin diye ("Meta Business Suite" / "business suite" / "MBS").
+ */
+export const EXTERNAL_TOOLS = ["Meta Business Suite", "Instagram uygulaması", "TikTok Studio", "LinkedIn", "X"];
+
+/**
+ * İçerik Projelio dışında mı yayımlanacak.
+ *
+ * Böyle bir içerikte "Şimdi paylaş" düğmesi görünmez: sunucu zaten reddediyor,
+ * düğme kalsaydı basınca yalnızca hata çıkacaktı.
+ */
+export function isExternallyPublished(post: Pick<SocialPost, "publishVia"> | null | undefined): boolean {
+  return post?.publishVia === "external";
+}
+
 export function canAutoPublish(account: SocialAccount): boolean {
   return account.connectionStatus === "connected" && account.platform === "instagram";
 }

@@ -2,7 +2,14 @@
 // gereği), bu yüzden namespace import kullanılıyor.
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { buildCaption, extractMetaError, mediaFileIds } from "./publish-format";
+import {
+  buildCaption,
+  extractMetaError,
+  instagramCollaborators,
+  isQueueable,
+  mediaFileIds,
+  normalizeHandle,
+} from "./publish-format";
 
 // Yayına giden metnin ve medya sırasının kuralları. Bu iki fonksiyon yanlış
 // çalışırsa hata sessiz olur: gönderi çıkar, ama yanlış metinle ya da yanlış
@@ -66,5 +73,58 @@ describe("Meta hata mesajı", () => {
     // Meta bazen HTML hata sayfası döndürüyor; kullanıcıya ham HTML gösterilmemeli.
     assert.equal(extractMetaError("<html>502 Bad Gateway</html>"), "Instagram isteği reddedildi.");
     assert.equal(extractMetaError(""), "Instagram isteği reddedildi.");
+  });
+});
+
+describe("yayın kuyruğu kararı", () => {
+  test("yalnızca yayın kararı verilmiş içerik kuyruğa girer", () => {
+    assert.equal(isQueueable("scheduled", "projelio"), true);
+    assert.equal(isQueueable("approved", "projelio"), true);
+    assert.equal(isQueueable("draft", "projelio"), false);
+    assert.equal(isQueueable("idea", undefined), false);
+  });
+
+  test("başka araçta planlanmış içerik planlı olsa bile kuyruğa girmez", () => {
+    // Meta Business Suite'te zamanlanmış Reels Projelio'ya işlendiğinde
+    // kuyruk onu da yayımlasaydı aynı video iki kez çıkardı.
+    assert.equal(isQueueable("scheduled", "external"), false);
+    assert.equal(isQueueable("approved", "external"), false);
+  });
+
+  test("migration öncesi satır (publish_via yok) eskisi gibi davranır", () => {
+    assert.equal(isQueueable("scheduled", null), true);
+  });
+});
+
+describe("katkıda bulunanlar", () => {
+  test("kullanıcı adı üç yazımda da aynı hesaba çözülür", () => {
+    assert.equal(normalizeHandle("@Pist.Istanbul"), "pist.istanbul");
+    assert.equal(normalizeHandle("  pist.istanbul "), "pist.istanbul");
+    assert.equal(normalizeHandle("https://www.instagram.com/pist.istanbul/"), "pist.istanbul");
+    assert.equal(normalizeHandle("https://instagram.com/projelio.app?igsh=abc"), "projelio.app");
+    assert.equal(normalizeHandle(undefined), "");
+  });
+
+  test("Instagram'a yalnızca Instagram katkıda bulunanları gider", () => {
+    const list = [
+      { platform: "instagram", handle: "@projelio.app" },
+      { platform: "facebook", handle: "pist" },
+      { platform: "instagram", handle: "pist.istanbul" },
+    ];
+    assert.deepEqual(instagramCollaborators(list), ["projelio.app", "pist.istanbul"]);
+  });
+
+  test("yayımlayan hesap kendini davet etmez, tekrarlar düşer", () => {
+    const list = [
+      { platform: "instagram", handle: "yigitcankiremitci" },
+      { platform: "instagram", handle: "@Pist.Istanbul" },
+      { platform: "instagram", handle: "pist.istanbul" },
+    ];
+    assert.deepEqual(instagramCollaborators(list, "@yigitcankiremitci"), ["pist.istanbul"]);
+  });
+
+  test("platformu yazılmamış kayıt Instagram sayılır, boş ad atlanır", () => {
+    assert.deepEqual(instagramCollaborators([{ handle: "a" }, { handle: " @ " }]), ["a"]);
+    assert.deepEqual(instagramCollaborators(null), []);
   });
 });

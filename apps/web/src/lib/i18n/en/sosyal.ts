@@ -28,6 +28,28 @@ export const sosyal: TranslationDict = {
   "Şimdi paylaş ({n})": "Publish now ({n})",
   "Yayımlanıyor…": "Publishing…",
   "Yayımlanamadı": "Could not publish",
+  // ─────────────────────────────────────────────── Katkıda bulunanlar ve yayın yolu
+  "Katkıda bulunanlar": "Collaborators",
+  "Ortak gönderi yapılan hesaplar. Gönderi onların profilinde de görünür; davet her hesapta ayrıca kabul edilmeli.":
+    "Accounts you co-post with. The post also appears on their profiles; each account has to accept the invite.",
+  "@kullaniciadi ya da profil adresi": "@username or profile URL",
+  "Modüldeki hesaplar:": "Accounts in this module:",
+  "Davet durumu": "Invite status",
+  "Katkıda bulunanı çıkar": "Remove collaborator",
+  "Davet edildi": "Invited",
+  "Kabul etti": "Accepted",
+  "Yayını kim yapıyor": "Who publishes",
+  "Başka bir araç": "Another tool",
+  "Projelio bu içeriği yayımlamaz; kayıt takvim ve takip içindir.":
+    "Projelio won't publish this; the entry is for the calendar and tracking.",
+  "Bağlı hesaplarda planlanan saatte Projelio yayımlar.":
+    "Projelio publishes on connected accounts at the scheduled time.",
+  "Başka araçta planlandı": "Scheduled in another tool",
+  "{arac} üzerinden planlandı": "Scheduled via {arac}",
+  "Meta Business Suite": "Meta Business Suite",
+  "Instagram uygulaması": "Instagram app",
+  "TikTok Studio": "TikTok Studio",
+  X: "X",
   "{n} kanalda yayımlandı.": { one: "Published on {n} channel.", other: "Published on {n} channels." },
   "{n} kanalda yayımlandı, {hata} kanalda hata var.": {
     one: "Published on {n} channel; {hata} failed.",

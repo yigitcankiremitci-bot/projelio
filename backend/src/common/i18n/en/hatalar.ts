@@ -236,6 +236,13 @@ export const hatalar: TranslationDict = {
   "Fotoğraf bulunamadı": "Photo not found",
   "Grup bulunamadı": "Group not found",
   "Gönderi bulunamadı": "Post not found",
+  "Katkıda bulunan hesap bulunamadı": "Collaborator account not found",
+  "Katkıda bulunanın kullanıcı adı gerekli": "The collaborator's username is required",
+  "Geçersiz yayın yolu": "Invalid publishing method",
+  "Geçersiz platform": "Invalid platform",
+  "Geçersiz davet durumu": "Invalid invitation status",
+  "Bu içerik başka bir araçta planlandı. Projelio'dan yayımlamak için önce yayın yolunu Projelio yapın.":
+    "This content is scheduled in another tool. To publish it from Projelio, switch its publishing method to Projelio first.",
   "Görev bulunamadı": "Task not found",
   "Görev bulunamadı veya erişiminiz yok.": "The task wasn't found, or you don't have access to it.",
   "Görev bulunamadı veya size atanmamış": "The task wasn't found, or it isn't assigned to you",

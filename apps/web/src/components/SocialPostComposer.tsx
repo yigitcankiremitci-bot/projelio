@@ -1,13 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { SocialAccount, SocialContentType, SocialPost, SocialPostStatus } from "@projelio/shared";
+import type {
+  SocialAccount,
+  SocialCollaboratorStatus,
+  SocialContentType,
+  SocialPlatform,
+  SocialPost,
+  SocialPostStatus,
+  SocialPublishVia,
+} from "@projelio/shared";
+import { normalizeSocialHandle } from "@projelio/shared";
 import type { ProjectFile } from "@projelio/shared";
 import { driveApi, filesApi, oneDriveApi, uploadFile } from "../api/files";
 import { openGooglePicker } from "../lib/googlePicker";
 import BrowseDriveModal from "./BrowseDriveModal";
 import { socialMediaApi, type SocialPostInput, type SocialScope } from "../api/socialMedia";
 import {
+  COLLABORATOR_STATUS,
+  COLLABORATOR_STATUS_ORDER,
   CONTENT_TYPES,
   CONTENT_TYPE_ORDER,
+  EXTERNAL_TOOLS,
+  PLATFORM_ORDER,
   SOCIAL_PLATFORMS,
   SOCIAL_STATUS,
   STATUS_ORDER,
@@ -52,6 +65,16 @@ interface FormState {
   status: SocialPostStatus;
   scheduledAt: string;
   assigneeId: string;
+  publishVia: SocialPublishVia;
+  externalTool: string;
+}
+
+/** Formdaki katkıda bulunan: kayıtlı hesap ya da yalnızca kullanıcı adı. */
+interface CollaboratorDraft {
+  accountId?: string;
+  platform: SocialPlatform;
+  handle: string;
+  status: SocialCollaboratorStatus;
 }
 
 function initialForm(post: SocialPost | null | undefined, defaultDate?: string): FormState {
@@ -67,6 +90,8 @@ function initialForm(post: SocialPost | null | undefined, defaultDate?: string):
     // Takvimden açıldıysa gün belli, saat için makul bir varsayılan: 10:00.
     scheduledAt: post ? toDateTimeLocal(post.scheduledAt) : defaultDate ? `${defaultDate}T10:00` : "",
     assigneeId: post?.assigneeId ?? "",
+    publishVia: post?.publishVia ?? "projelio",
+    externalTool: post?.externalTool ?? "",
   };
 }
 
@@ -109,6 +134,16 @@ export default function SocialPostComposer({
     )
   );
   const [openOverride, setOpenOverride] = useState<string | null>(null);
+  const [collabs, setCollabs] = useState<CollaboratorDraft[]>(() =>
+    (post?.collaborators ?? []).map((k) => ({
+      accountId: k.accountId,
+      platform: k.platform,
+      handle: k.handle,
+      status: k.status,
+    }))
+  );
+  const [collabHandle, setCollabHandle] = useState("");
+  const [collabPlatform, setCollabPlatform] = useState<SocialPlatform>("instagram");
   // Kaydedilmiş gönderi: yeni içerikte medya yüklenince burada doğar.
   const [saved, setSaved] = useState<SocialPost | null>(post ?? null);
   const [previews, setPreviews] = useState<Record<string, string>>({});
@@ -174,6 +209,39 @@ export default function SocialPostComposer({
     };
   }, [saved]);
 
+  /**
+   * Katkıda bulunan ekler. Aynı platformda aynı ad ikinci kez eklenmez —
+   * sunucudaki tekil indeksle aynı kural (bkz. normalizeSocialHandle).
+   */
+  const addCollaborator = (draft: Omit<CollaboratorDraft, "status">) => {
+    const handle = normalizeSocialHandle(draft.handle);
+    if (!handle) return;
+    setCollabs((list) =>
+      list.some((k) => k.platform === draft.platform && k.handle === handle)
+        ? list
+        : [...list, { ...draft, handle, status: "invited" }]
+    );
+  };
+
+  const addTypedCollaborator = () => {
+    // Yazılan ad modülde kayıtlı bir hesapsa ona bağlanır: takvimde hesabın
+    // rengi ve adı oradan gelsin.
+    const handle = normalizeSocialHandle(collabHandle);
+    const known = accounts.find(
+      (a) => a.platform === collabPlatform && normalizeSocialHandle(a.handle) === handle
+    );
+    addCollaborator({ accountId: known?.id, platform: collabPlatform, handle });
+    setCollabHandle("");
+  };
+
+  /** Modülde kayıtlı olup henüz kanal ya da katkıda bulunan olmayan hesaplar. */
+  const collaboratorSuggestions = accounts.filter(
+    (a) =>
+      a.active &&
+      !selected.includes(a.id) &&
+      !collabs.some((k) => k.platform === a.platform && k.handle === normalizeSocialHandle(a.handle))
+  );
+
   const toggleAccount = (id: string) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
@@ -192,6 +260,14 @@ export default function SocialPostComposer({
     // Yalnızca seçili hesapların ezmeleri gider: hesap listeden çıkarıldığında
     // eski metni geride bırakmak, hesap geri eklendiğinde şaşırtıcı olurdu.
     captionOverrides: Object.fromEntries(Object.entries(overrides).filter(([id, v]) => selected.includes(id) && v.trim())),
+    publishVia: form.publishVia,
+    externalTool: form.publishVia === "external" ? form.externalTool : null,
+    collaborators: collabs.map((k) => ({
+      accountId: k.accountId,
+      platform: k.platform,
+      handle: k.handle,
+      status: k.status,
+    })),
   });
 
   /** Kayıt yoksa açar, varsa günceller. Medya yüklemesi de bunu kullanır. */
@@ -387,9 +463,14 @@ export default function SocialPostComposer({
     onClose();
   };
 
-  const publishableAccounts = accounts.filter(
-    (a) => selected.includes(a.id) && canAutoPublish(a) && targetByAccount.get(a.id)?.status !== "published"
-  );
+  // Başka araçta planlanan içerikte doğrudan yayın yok: sunucu reddediyor,
+  // üstelik içerik iki kez çıkardı.
+  const publishableAccounts =
+    form.publishVia === "external"
+      ? []
+      : accounts.filter(
+          (a) => selected.includes(a.id) && canAutoPublish(a) && targetByAccount.get(a.id)?.status !== "published"
+        );
 
   const label = (text: string) => <label style={{ fontSize: 12, color: c.textSecondary }}>{text}</label>;
   const field = { fontSize: 13, padding: "6px 8px", width: "100%" } as const;
@@ -504,6 +585,144 @@ export default function SocialPostComposer({
                   </button>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        {/* ---------------------------------------------- Katkıda bulunanlar */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {label(t("Katkıda bulunanlar"))}
+          <span style={{ fontSize: 11, color: c.textSecondary }}>
+            {t(
+              "Ortak gönderi yapılan hesaplar. Gönderi onların profilinde de görünür; davet her hesapta ayrıca kabul edilmeli."
+            )}
+          </span>
+          {collabs.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {collabs.map((k, i) => {
+                const account = k.accountId ? accounts.find((a) => a.id === k.accountId) : undefined;
+                const color = account ? accountColor(account) : SOCIAL_PLATFORMS[k.platform].color;
+                return (
+                  <span
+                    key={`${k.platform}:${k.handle}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 12,
+                      padding: "3px 6px 3px 10px",
+                      borderRadius: 999,
+                      border: `1px solid ${color}`,
+                      background: `${color}1A`,
+                      color: c.textPrimary,
+                    }}
+                  >
+                    @{k.handle}
+                    <span style={{ color: c.textSecondary }}>{t(SOCIAL_PLATFORMS[k.platform].label)}</span>
+                    <select
+                      value={k.status}
+                      aria-label={t("Davet durumu")}
+                      onChange={(e) =>
+                        setCollabs((list) =>
+                          list.map((x, j) => (j === i ? { ...x, status: e.target.value as SocialCollaboratorStatus } : x))
+                        )
+                      }
+                      style={{
+                        fontSize: 11,
+                        height: "auto",
+                        padding: "1px 4px",
+                        border: "none",
+                        background: "transparent",
+                        color: COLLABORATOR_STATUS[k.status].color,
+                      }}
+                    >
+                      {COLLABORATOR_STATUS_ORDER.map((st) => (
+                        <option key={st} value={st}>
+                          {t(COLLABORATOR_STATUS[st].label)}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setCollabs((list) => list.filter((_, j) => j !== i))}
+                      aria-label={t("Katkıda bulunanı çıkar")}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        color: c.textSecondary,
+                        fontSize: 14,
+                        lineHeight: 1,
+                        padding: "0 4px",
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <input
+              value={collabHandle}
+              onChange={(e) => setCollabHandle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addTypedCollaborator();
+                }
+              }}
+              placeholder={t("@kullaniciadi ya da profil adresi")}
+              style={{ ...field, flex: "2 1 200px", width: "auto" }}
+            />
+            <select
+              value={collabPlatform}
+              onChange={(e) => setCollabPlatform(e.target.value as SocialPlatform)}
+              style={{ ...field, flex: "1 1 120px", width: "auto" }}
+            >
+              {PLATFORM_ORDER.map((p) => (
+                <option key={p} value={p}>
+                  {t(SOCIAL_PLATFORMS[p].label)}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={addTypedCollaborator}
+              disabled={!normalizeSocialHandle(collabHandle)}
+              style={{
+                fontSize: 13,
+                padding: "6px 12px",
+                background: "transparent",
+                border: `1px solid ${c.border}`,
+                borderRadius: 8,
+                cursor: "pointer",
+                color: c.textPrimary,
+                opacity: normalizeSocialHandle(collabHandle) ? 1 : 0.5,
+              }}
+            >
+              {t("Ekle")}
+            </button>
+          </div>
+          {collaboratorSuggestions.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Modüldeki hesaplar:")}</span>
+              {collaboratorSuggestions.map((a) => (
+                <button
+                  key={a.id}
+                  onClick={() => addCollaborator({ accountId: a.id, platform: a.platform, handle: a.handle })}
+                  style={{
+                    fontSize: 11,
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    border: `1px dashed ${accountColor(a)}`,
+                    background: "transparent",
+                    cursor: "pointer",
+                    color: c.textSecondary,
+                  }}
+                >
+                  + {accountLabel(a)}
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -814,6 +1033,40 @@ export default function SocialPostComposer({
               ))}
             </select>
             <span style={{ fontSize: 11, color: c.textSecondary }}>{t(SOCIAL_STATUS[form.status].hint)}</span>
+          </div>
+          <div style={{ flex: "1 1 170px", display: "flex", flexDirection: "column", gap: 4 }}>
+            {label(t("Yayını kim yapıyor"))}
+            <select
+              value={form.publishVia}
+              onChange={(e) => set("publishVia", e.target.value as SocialPublishVia)}
+              style={field}
+            >
+              <option value="projelio">Projelio</option>
+              <option value="external">{t("Başka bir araç")}</option>
+            </select>
+            {form.publishVia === "external" ? (
+              <>
+                <input
+                  list="sosyal-harici-araclar"
+                  value={form.externalTool}
+                  onChange={(e) => set("externalTool", e.target.value)}
+                  placeholder="Meta Business Suite"
+                  style={field}
+                />
+                <datalist id="sosyal-harici-araclar">
+                  {EXTERNAL_TOOLS.map((ad) => (
+                    <option key={ad} value={t(ad)} />
+                  ))}
+                </datalist>
+                <span style={{ fontSize: 11, color: c.textSecondary }}>
+                  {t("Projelio bu içeriği yayımlamaz; kayıt takvim ve takip içindir.")}
+                </span>
+              </>
+            ) : (
+              <span style={{ fontSize: 11, color: c.textSecondary }}>
+                {t("Bağlı hesaplarda planlanan saatte Projelio yayımlar.")}
+              </span>
+            )}
           </div>
           <div style={{ flex: "1 1 150px", display: "flex", flexDirection: "column", gap: 4 }}>
             {label(t("Sorumlu"))}

@@ -3,12 +3,15 @@ import type {
   SocialAccount,
   SocialMediaOverview,
   SocialPost,
+  SocialPostCollaborator,
+  SocialPostCollaboratorInput,
   SocialPostMedia,
   SocialPostTarget,
 } from "@projelio/shared";
 import { requireSafeUrl } from "../../common/safe-url";
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
+import { isQueueable, normalizeHandle } from "./publish-format";
 
 /**
  * Sosyal Medya modülünün (pd_sosyal_medya) servisi.
@@ -64,6 +67,11 @@ export interface SocialPostInput {
   accountIds?: string[];
   /** Kanala özel metinler: hesap id → metin. */
   captionOverrides?: Record<string, string>;
+  /** "projelio" | "external" — bkz. isQueueable. */
+  publishVia?: string;
+  externalTool?: string | null;
+  /** Katkıda bulunanlar. Verilirse liste bununla değiştirilir. */
+  collaborators?: SocialPostCollaboratorInput[];
 }
 
 const PLATFORMS = new Set([
@@ -90,6 +98,25 @@ const CONTENT_TYPES = new Set([
   "poll",
   "other",
 ]);
+
+const PUBLISH_VIA = new Set(["projelio", "external"]);
+
+const COLLABORATOR_STATUSES = new Set(["invited", "accepted", "declined"]);
+
+const LEGACY_POST_SELECT =
+  "*, social_post_targets(*), social_post_media(*, files(name, mime_type, web_view_link, icon_link))";
+
+const POST_SELECT = `${LEGACY_POST_SELECT}, social_post_collaborators(*)`;
+
+/**
+ * Migration 115 uygulanmadan önce social_post_collaborators yok ve PostgREST
+ * ilişkiyi bulamayınca (PGRST200) BÜTÜN sorguyu reddediyor. Kod migration'dan
+ * önce yayına çıkarsa modül tamamen düşmesin diye eski seçime dönülüyor.
+ */
+export function isMissingRelation(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  return error.code === "PGRST200" || /social_post_collaborators/.test(error.message ?? "");
+}
 
 const POST_STATUSES = new Set([
   "idea",
@@ -148,6 +175,18 @@ function mapTarget(row: any): SocialPostTarget {
   };
 }
 
+function mapCollaborator(row: any): SocialPostCollaborator {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    accountId: row.account_id ?? undefined,
+    platform: row.platform ?? "instagram",
+    handle: row.handle,
+    status: row.status ?? "invited",
+    sortOrder: row.sort_order ?? 0,
+  };
+}
+
 function mapMedia(row: any): SocialPostMedia {
   // files satırı ilişkisel seçimle geldiyse (files(...)) gösterim
   // bilgilerini de taşırız; gelmediyse yalnızca referans döner.
@@ -194,8 +233,14 @@ function mapPost(row: any, assigneeName?: string): SocialPost {
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? undefined,
     archivedAt: row.archived_at ?? undefined,
+    // Migration 115 uygulanmadan önce kolon yok: eski davranış "projelio".
+    publishVia: row.publish_via ?? "projelio",
+    externalTool: row.external_tool ?? undefined,
     targets: (row.social_post_targets ?? []).map(mapTarget),
     media: (row.social_post_media ?? []).map(mapMedia).sort((a, b) => a.sortOrder - b.sortOrder),
+    collaborators: (row.social_post_collaborators ?? [])
+      .map(mapCollaborator)
+      .sort((a: SocialPostCollaborator, b: SocialPostCollaborator) => a.sortOrder - b.sortOrder),
   };
 }
 
@@ -334,15 +379,13 @@ export class SocialMediaService {
   }
 
   async listPosts(scope: SocialScope): Promise<SocialPost[]> {
-    const { data, error } = await this.scopeFilter(
-      this.supabase.client
-        .from("social_posts")
-        .select(
-          "*, social_post_targets(*), social_post_media(*, files(name, mime_type, web_view_link, icon_link))"
-        )
-        .is("archived_at", null),
-      scope
-    ).order("scheduled_at", { ascending: true, nullsFirst: false });
+    const run = (select: string) =>
+      this.scopeFilter(this.supabase.client.from("social_posts").select(select).is("archived_at", null), scope).order(
+        "scheduled_at",
+        { ascending: true, nullsFirst: false }
+      );
+    let { data, error } = await run(POST_SELECT);
+    if (isMissingRelation(error)) ({ data, error } = await run(LEGACY_POST_SELECT));
     if (error) throw error;
     const rows = data ?? [];
     const names = await this.resolveUserNames(rows.map((r: any) => r.assignee_id));
@@ -350,13 +393,10 @@ export class SocialMediaService {
   }
 
   async findPost(id: string, userId?: string): Promise<SocialPost> {
-    const { data, error } = await this.supabase.client
-      .from("social_posts")
-      .select(
-        "*, social_post_targets(*), social_post_media(*, files(name, mime_type, web_view_link, icon_link))"
-      )
-      .eq("id", id)
-      .maybeSingle();
+    const run = (select: string) =>
+      this.supabase.client.from("social_posts").select(select).eq("id", id).maybeSingle<any>();
+    let { data, error } = await run(POST_SELECT);
+    if (isMissingRelation(error)) ({ data, error } = await run(LEGACY_POST_SELECT));
     if (error) throw error;
     if (!data) throw new NotFoundException("Gönderi bulunamadı");
     await this.assertCanRead(this.scopeOf(data), userId);
@@ -481,6 +521,7 @@ export class SocialMediaService {
         scheduled_at: input.scheduledAt || null,
         assignee_id: input.assigneeId || null,
         created_by: userId ?? null,
+        ...this.publishViaColumns(input),
       })
       .select("*")
       .single();
@@ -489,7 +530,10 @@ export class SocialMediaService {
     if (input.accountIds?.length) {
       await this.replaceTargets(data.id, input.accountIds, input.captionOverrides ?? {});
     }
-    await this.syncTargetSchedule(data.id, data.scheduled_at, data.status);
+    if (input.collaborators?.length) {
+      await this.replaceCollaborators(data.id, scope, input.collaborators);
+    }
+    await this.syncTargetSchedule(data.id, data.scheduled_at, data.status, data.publish_via);
     return this.findPost(data.id, userId);
   }
 
@@ -530,6 +574,12 @@ export class SocialMediaService {
         scheduled_at: scheduledAt || null,
         assignee_id: existing.assignee_id ?? null,
         created_by: userId ?? null,
+        // Yayın yolu taşınır: Business Suite'te planlanan bir seri tekrar
+        // edildiğinde kopya da oraya aittir. Kolon yoksa (migration 115
+        // öncesi) hiç yazılmaz.
+        ...("publish_via" in existing
+          ? { publish_via: existing.publish_via, external_tool: existing.external_tool ?? null }
+          : {}),
       })
       .select("id")
       .single();
@@ -572,7 +622,22 @@ export class SocialMediaService {
       if (mediaError) throw mediaError;
     }
 
-    await this.syncTargetSchedule(created.id, scheduledAt || null, "draft");
+    // Ortak yazarlar taşınır, onay durumları taşınmaz: yeni gönderi için
+    // davet yeniden gidecek.
+    const { data: collabs, error: collabError } = await this.supabase.client
+      .from("social_post_collaborators")
+      .select("account_id, platform, handle")
+      .eq("post_id", id);
+    if (collabError && !isMissingRelation(collabError)) throw collabError;
+    if (collabs?.length) {
+      await this.replaceCollaborators(
+        created.id,
+        scope,
+        (collabs as any[]).map((k) => ({ accountId: k.account_id ?? undefined, platform: k.platform, handle: k.handle }))
+      );
+    }
+
+    await this.syncTargetSchedule(created.id, scheduledAt || null, "draft", existing.publish_via);
     return this.findPost(created.id, userId);
   }
 
@@ -598,6 +663,7 @@ export class SocialMediaService {
     if (input.engagement !== undefined) patch.engagement = input.engagement;
     if (input.clicks !== undefined) patch.clicks = input.clicks;
     if (input.resultNote !== undefined) patch.result_note = nullable(input.resultNote);
+    Object.assign(patch, this.publishViaColumns(input));
 
     if (input.status !== undefined) {
       patch.status = input.status;
@@ -624,10 +690,14 @@ export class SocialMediaService {
     if (input.accountIds) {
       await this.replaceTargets(id, input.accountIds, input.captionOverrides ?? {});
     }
+    if (input.collaborators) {
+      await this.replaceCollaborators(id, this.scopeOf(existing), input.collaborators);
+    }
     await this.syncTargetSchedule(
       id,
       input.scheduledAt !== undefined ? (input.scheduledAt || null) : (existing.scheduled_at ?? null),
-      (patch.status as string) ?? existing.status
+      (patch.status as string) ?? existing.status,
+      (patch.publish_via as string) ?? existing.publish_via
     );
     return this.findPost(id, userId);
   }
@@ -642,16 +712,16 @@ export class SocialMediaService {
    *  2. Kuyruk tek tabloda, tek indeksle çalışıyor; her turda gönderilere
    *     join atmıyor.
    *
-   * Kuyruğa yalnızca yayın kararı verilmiş içerik girer: taslak ve fikir
-   * aşamasındaki bir gönderi, tarihi geçmiş olsa bile kendiliğinden çıkmaz.
+   * Kuyruğa kimin gireceği `isQueueable`'da: yayın kararı verilmemiş ya da
+   * başka bir araçta zamanlanmış içerik girmez.
    */
   private async syncTargetSchedule(
     postId: string,
     scheduledAt: string | null,
-    status: string
+    status: string,
+    publishVia: string | null | undefined
   ): Promise<void> {
-    const queueable = status === "scheduled" || status === "approved" || status === "ready";
-    const publishAt = queueable ? scheduledAt : null;
+    const publishAt = isQueueable(status, publishVia) ? scheduledAt : null;
 
     const { error } = await this.supabase.client
       .from("social_post_targets")
@@ -697,6 +767,99 @@ export class SocialMediaService {
     if (input.status && !POST_STATUSES.has(input.status)) {
       throw new BadRequestException("Geçersiz durum");
     }
+    if (input.publishVia && !PUBLISH_VIA.has(input.publishVia)) {
+      throw new BadRequestException("Geçersiz yayın yolu");
+    }
+  }
+
+  /**
+   * Yayın yolu kolonları. Projelio'ya dönülünce araç adı temizlenir: "Meta
+   * Business Suite" yazısı Projelio'nun yayımlayacağı içerikte kalmasın.
+   */
+  private publishViaColumns(input: SocialPostInput): Record<string, unknown> {
+    const cols: Record<string, unknown> = {};
+    if (input.publishVia !== undefined) {
+      cols.publish_via = input.publishVia;
+      if (input.publishVia === "projelio") cols.external_tool = null;
+    }
+    if (input.externalTool !== undefined && input.publishVia !== "projelio") {
+      cols.external_tool = nullable(input.externalTool);
+    }
+    return cols;
+  }
+
+  /**
+   * Katkıda bulunan listesini istenen hâle getirir.
+   *
+   * Hedeflerden farklı olarak hepsi silinip yeniden yazılabilir — dışarıdan
+   * gelen bir sonuç (dış id, yayın tarihi) taşımıyorlar. Yalnızca kabul
+   * durumu korunur: listeyi düzenlemek, zaten kabul etmiş hesabı yeniden
+   * "davet edildi"ye düşürmemeli.
+   *
+   * Hesap id'si verildiyse kullanıcı adı ve platform hesaptan okunur; o hesap
+   * başka bir işin/şirketin olamaz — aksi hâlde id tahmin eden biri başka
+   * birinin hesap adını kendi gönderisine yazdırabilirdi.
+   */
+  private async replaceCollaborators(
+    postId: string,
+    scope: SocialScope,
+    input: SocialPostCollaboratorInput[]
+  ): Promise<void> {
+    const accountIds = input.map((k) => k.accountId).filter((id): id is string => Boolean(id));
+    const accounts = new Map<string, any>();
+    if (accountIds.length > 0) {
+      const { data, error } = await this.scopeFilter(
+        this.supabase.client.from("social_accounts").select("id, platform, handle").in("id", accountIds),
+        scope
+      );
+      if (error) throw error;
+      for (const a of data ?? []) accounts.set(a.id, a);
+    }
+
+    const rows: Record<string, unknown>[] = [];
+    const seen = new Set<string>();
+    for (const k of input) {
+      const account = k.accountId ? accounts.get(k.accountId) : undefined;
+      if (k.accountId && !account) throw new BadRequestException("Katkıda bulunan hesap bulunamadı");
+      const platform = account?.platform ?? k.platform ?? "instagram";
+      if (!PLATFORMS.has(platform)) throw new BadRequestException("Geçersiz platform");
+      const handle = normalizeHandle(account?.handle ?? k.handle);
+      if (!handle) throw new BadRequestException("Katkıda bulunanın kullanıcı adı gerekli");
+      if (k.status && !COLLABORATOR_STATUSES.has(k.status)) {
+        throw new BadRequestException("Geçersiz davet durumu");
+      }
+      const key = `${platform}:${handle}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push({
+        post_id: postId,
+        account_id: account?.id ?? null,
+        platform,
+        handle,
+        status: k.status,
+        sort_order: rows.length,
+      });
+    }
+
+    const { data: existing, error: readError } = await this.supabase.client
+      .from("social_post_collaborators")
+      .select("platform, handle, status")
+      .eq("post_id", postId);
+    if (readError) throw readError;
+    const previous = new Map((existing ?? []).map((e: any) => [`${e.platform}:${e.handle}`, e.status as string]));
+    for (const row of rows) {
+      if (!row.status) row.status = previous.get(`${row.platform}:${row.handle}`) ?? "invited";
+    }
+
+    const { error: delError } = await this.supabase.client
+      .from("social_post_collaborators")
+      .delete()
+      .eq("post_id", postId);
+    if (delError) throw delError;
+    if (rows.length === 0) return;
+
+    const { error: insError } = await this.supabase.client.from("social_post_collaborators").insert(rows);
+    if (insError) throw insError;
   }
 
   private async rawPost(id: string): Promise<any> {

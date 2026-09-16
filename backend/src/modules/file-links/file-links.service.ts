@@ -586,7 +586,7 @@ export class FileLinksService {
    * (FilesService.jobLevelUsers) + dosya bir projedeyse o projenin sahibi ve
    * onaylı ekibi. Eskiden işin tüm kadrosu ve şirketin tüm üyeleri listeleniyordu;
    * seçilen kişi bağlantıyı görüyor ama dosyayı açamıyordu. Projesiz iş dosyası
-   * ("Genel") yalnızca yönetenlere açık, aday da yalnızca onlar.
+   * ("Genel") yönetenlere ve iş kadrosuna açık, aday da onlar.
    *
    * Düz kapsamda (departman/şirket) proje yok; orada kadro ve şirket üyeliği
    * dosyayı görmenin gerçek kuralı.
@@ -609,6 +609,10 @@ export class FileLinksService {
 
     if (dosya.jobId) {
       for (const id of await this.filesService.jobLevelUsers(dosya.jobId)) ids.add(id);
+      // İşin GENELİNE ait dosyayı iş kadrosu da açabilir (bkz. FilesService
+      // resolveAccess > includesGeneral). Kadroda taşeron varsa link()
+      // içindeki kişi başı kontrol (acabilirMi) onu yine reddeder.
+      if (!dosya.projectId) await topla("job_members", "job_id", dosya.jobId);
       if (dosya.projectId) {
         const { data: proje } = await this.supabase.client
           .from("projects")

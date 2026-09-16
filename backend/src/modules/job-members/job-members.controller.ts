@@ -24,7 +24,7 @@ export class JobMembersController {
   async findByJob(@Param("jobId") jobId: string, @Req() req: any) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "team");
-    return this.jobMembersService.findByJob(jobId);
+    return this.jobMembersService.findTeamOfJob(jobId);
   }
 
   // Kendi bağlarım. Ekip listesinin tamamını açmaz — taşeron ekibi göremez

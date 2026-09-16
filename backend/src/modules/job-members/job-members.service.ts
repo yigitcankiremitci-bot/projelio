@@ -66,6 +66,41 @@ export class JobMembersService {
     return (data ?? []).map(mapJobMember);
   }
 
+  /**
+   * Ekip ekranının listesi: işin sahibi + kadro.
+   *
+   * İşin sahibi job_members'ta DEĞİL, jobs.owner_id'de duruyor; liste yalnızca
+   * tabloyu okuduğu için kurucu ekipte hiç görünmüyordu (panelde onun için
+   * "Yönetici" rozeti bile hazırdı). Sahip bu yüzden başa eklenir; sahip bir
+   * gün kadroya da yazılmışsa kopyası atılır.
+   *
+   * Sahip satırının kimliği SENTETİK (`sahip:<jobId>`): tabloda karşılığı yok,
+   * çıkarma/ayrılma uçlarına gitmemeli — arayüz sahibe o düğmeleri zaten
+   * göstermiyor. Arka uçta job_members üzerinde dönen başka bir iş (bildirim,
+   * Drive izni) bu metodu KULLANMAMALI; onlar findByJob'u kullanır.
+   */
+  async findTeamOfJob(jobId: string): Promise<JobMember[]> {
+    const [uyeler, { data: job }] = await Promise.all([
+      this.findByJob(jobId),
+      this.supabase.client
+        .from("jobs")
+        .select("owner_id, created_at, users(full_name, email, username, active_task_id)")
+        .eq("id", jobId)
+        .maybeSingle(),
+    ]);
+    if (!job?.owner_id) return uyeler;
+
+    const sahip: JobMember = mapJobMember({
+      id: `sahip:${jobId}`,
+      job_id: jobId,
+      user_id: job.owner_id,
+      status: "approved",
+      joined_at: job.created_at,
+      users: (job as any).users,
+    });
+    return [sahip, ...uyeler.filter((m) => m.userId !== job.owner_id)];
+  }
+
   // Kullanıcının yanıt bekleyen iş davetleri. Bildirim çanı ve iş sayfasındaki
   // davet şeridi bunu okur; iş adı ve davet eden kişi burada birleştirilir ki
   // arayüz ayrıca sorgu atmak zorunda kalmasın.

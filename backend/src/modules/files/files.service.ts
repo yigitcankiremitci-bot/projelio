@@ -169,6 +169,24 @@ interface JobAccess {
   isJobOwner: boolean;
   /** level='project' ise erişebildiği proje kimlikleri. */
   projectIds: string[];
+  /**
+   * level='project' iken işin GENELİ (projesiz dosyalar, Genel ve kullanıcı
+   * klasörleri) de açık mı? İş kadrosunda (job_members, approved) olan için
+   * evet: kadro işin ortak alanında çalışır, yalnızca atanmadığı projeleri
+   * görmez. Yalnızca bir projeye çağrılmış kişi için hayır.
+   */
+  includesGeneral: boolean;
+}
+
+/**
+ * Bu erişim, projesi `projectId` olan (boşsa işin geneline ait) bir dosyaya
+ * ya da klasöre açık mı? Tek kural: liste süzgeçleri, tek kayıt okuması ve
+ * yükleme hep buradan geçiyor.
+ */
+function kapsamaAcik(access: JobAccess, projectId?: string | null): boolean {
+  if (access.level === "job") return true;
+  if (access.level === "none") return false;
+  return projectId ? access.projectIds.includes(projectId) : access.includesGeneral;
 }
 
 function mapFile(row: any, canEditInDrive: boolean): ProjectFile {
@@ -445,7 +463,7 @@ export class FilesService {
 
     const jobLevel = await this.jobLevelUserIds(jobId);
     if (jobLevel.has(userId)) {
-      return { level: "job", isJobOwner: job.owner_id === userId, projectIds: [] };
+      return { level: "job", isJobOwner: job.owner_id === userId, projectIds: [], includesGeneral: true };
     }
 
     // Bu işin altındaki projelerden hangilerine üye ya da sahip?
@@ -463,8 +481,30 @@ export class FilesService {
       )
       .map((p: any) => p.id);
 
-    if (projectIds.length) return { level: "project", isJobOwner: false, projectIds };
-    return { level: "none", isJobOwner: false, projectIds: [] };
+    // İş kadrosu işin geneline erişir, hiçbir projeye atanmamış olsa bile.
+    // Daraltma (bkz. jobLevelUserIds) ilk yayınlandığında kadro üyesi "none"a
+    // ya da yalnızca projelerine düşüyordu ve kendi işinin Dosyalar sekmesine
+    // "İşin geneline dosya eklemek için iş ekibinde olmanız gerekir" diye
+    // yükleyemiyordu — oysa ekipteydi. Taşeron kadroda olsa da yalnızca
+    // atandığı projeleri görür (bkz. common/access/subcontractor.ts).
+    const { data: kadro } = await this.supabase.client
+      .from("job_members")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .maybeSingle();
+    const includesGeneral = Boolean(kadro) && !(await this.isSubcontractorUser(userId));
+
+    if (projectIds.length || includesGeneral) {
+      return { level: "project", isJobOwner: false, projectIds, includesGeneral };
+    }
+    return { level: "none", isJobOwner: false, projectIds: [], includesGeneral: false };
+  }
+
+  private async isSubcontractorUser(userId: string): Promise<boolean> {
+    const { data } = await this.supabase.client.from("users").select("account_type").eq("id", userId).maybeSingle();
+    return isSubcontractorAccount(data?.account_type);
   }
 
   /** İşe herhangi bir düzeyde erişimi olduğunu doğrular. */
@@ -478,7 +518,7 @@ export class FilesService {
 
   /** Belirli bir bağlama (proje/iş geneli) yazma ya da okuma hakkı var mı? */
   private assertContextAllowed(access: JobAccess, projectId?: string): void {
-    if (access.level === "job") return;
+    if (kapsamaAcik(access, projectId)) return;
     if (!projectId) {
       throw new ForbiddenException(
         "İşin geneline dosya eklemek için iş ekibinde olmanız gerekir"
@@ -1296,8 +1336,8 @@ export class FilesService {
    * ve 'user' klasörleri işin geneline aittir ve proje düzeyine kapalıdır.
    */
   private assertFolderAllowed(access: JobAccess | undefined, row: any): void {
-    if (access?.level !== "project") return;
-    if (!row.project_id || !access.projectIds.includes(row.project_id)) {
+    if (!access) return;
+    if (!kapsamaAcik(access, row.project_id)) {
       throw new ForbiddenException("Bu klasöre erişim yetkiniz yok");
     }
   }
@@ -1338,9 +1378,7 @@ export class FilesService {
     // projelerin klasörlerini — yani proje adlarını — görüyordu.
     // Proje/görev/çıktı klasörleri project_id taşır; 'general' ve 'user'
     // klasörleri işin geneline aittir ve proje düzeyine kapalıdır.
-    if (access?.level === "project") {
-      rows = rows.filter((r: any) => r.project_id && access.projectIds.includes(r.project_id));
-    }
+    if (access) rows = rows.filter((r: any) => kapsamaAcik(access, r.project_id));
 
     return rows.map(mapFolder);
   }
@@ -2243,18 +2281,22 @@ export class FilesService {
       query = query.is("project_id", null);
     } else if (access.level === "project") {
       // Proje düzeyindeki kullanıcı "hepsi" istese bile yalnızca kendi
-      // projelerini görür; işin geneli ona kapalı.
-      query = query.in("project_id", access.projectIds);
+      // projelerini (kadrodaysa bir de işin genelini) görür. Süzgeç sorguda:
+      // sonradan süzmek, tavana (LISTE_TAVANI) başkasının dosyalarıyla
+      // ulaşıp kendi dosyalarını kaybetmek demekti. Kimlikler veritabanından
+      // geliyor (uuid), filtre metnine gömülmeleri güvenli.
+      const kosullar = [
+        ...(access.projectIds.length ? [`project_id.in.(${access.projectIds.join(",")})`] : []),
+        ...(access.includesGeneral ? ["project_id.is.null"] : []),
+      ];
+      query = query.or(kosullar.join(","));
     }
 
     const { data, error } = await query;
     if (error) throw error;
 
-    let rows = data ?? [];
-    // Görev/çıktı filtresiyle gelindiğinde de proje sınırını uygula.
-    if (access.level === "project") {
-      rows = rows.filter((r: any) => r.project_id && access.projectIds.includes(r.project_id));
-    }
+    // Görev/çıktı/klasör filtresiyle gelindiğinde de proje sınırını uygula.
+    const rows = (data ?? []).filter((r: any) => kapsamaAcik(access, r.project_id));
 
     return Promise.all(
       rows.map(async (row: any) =>
@@ -2508,9 +2550,7 @@ export class FilesService {
 
     const visible = rows.filter((row: any) => {
       const access = accessByJob.get(row.job_id);
-      if (!access || access.level === "none") return false;
-      if (access.level === "job") return true;
-      return Boolean(row.project_id) && access.projectIds.includes(row.project_id);
+      return Boolean(access) && kapsamaAcik(access!, row.project_id);
     });
     if (!visible.length) return [];
 

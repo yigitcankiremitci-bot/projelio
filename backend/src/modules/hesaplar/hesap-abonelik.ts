@@ -123,3 +123,51 @@ export function abonelikKarari(girdi: AbonelikGirdisi, secenekler: AbonelikSecen
 
   return { eylem: "guncelle", satir };
 }
+
+/** Hesap satırının defteri ilgilendiren alanları (veritabanı biçiminde). */
+export interface AbonelikAlanlari {
+  is_paid?: boolean | null;
+  amount?: number | string | null;
+  currency?: string | null;
+  billing_interval?: string | null;
+  name?: string | null;
+  plan?: string | null;
+}
+
+/**
+ * Bir güncellemede defter açısından NE değişti?
+ *
+ *   mali     → tutar, para birimi, aralık, ücretli işareti ya da vade: kasaya
+ *              yazılan parayı değiştirir, bütçe yetkisi ister.
+ *   aciklama → yalnızca ad/plan: defterdeki satırın AÇIKLAMASI değişir, para
+ *              değişmez; bütçe yetkisi istemez.
+ *   yok      → defter hiç etkilenmez.
+ *
+ * NEDEN GEREKLİ: eskiden ücretli bir hesabın HER kaydedilişi defter
+ * güncellemesi sayılıyordu. Notu ya da giriş adresini düzelten yönetici
+ * (ya da kaydı giren kişi) bütçe yetkisi olmadığı için 403 alıyor, yani
+ * ücretli hesabı hiç düzenleyemiyordu.
+ *
+ * Tutar PostgREST'ten numeric olduğu için METİN gelebiliyor ("40.00");
+ * karşılaştırma sayıya çevrilerek yapılıyor, yoksa değişmemiş tutar
+ * değişmiş sayılırdı.
+ */
+export function abonelikDegisimi(
+  once: AbonelikAlanlari,
+  sonra: AbonelikAlanlari,
+  vadeDegisti: boolean
+): "mali" | "aciklama" | "yok" {
+  const tutar = (v: AbonelikAlanlari["amount"]) => (v === null || v === undefined || v === "" ? null : Number(v));
+  const metin = (v?: string | null) => (v ?? "").trim() || null;
+
+  const mali =
+    vadeDegisti ||
+    Boolean(once.is_paid) !== Boolean(sonra.is_paid) ||
+    tutar(once.amount) !== tutar(sonra.amount) ||
+    (once.currency ?? "").toUpperCase() !== (sonra.currency ?? "").toUpperCase() ||
+    (once.billing_interval ?? null) !== (sonra.billing_interval ?? null);
+  if (mali) return "mali";
+
+  if (metin(once.name) !== metin(sonra.name) || metin(once.plan) !== metin(sonra.plan)) return "aciklama";
+  return "yok";
+}

@@ -176,6 +176,11 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   // "anyReady=false" görünüp driveMissing uyarısı bir anlığına yanıp söner.
   // İkisi de dönene kadar bekleyip uyarıyı ona göre göstermek bunu önler.
   const [statusLoading, setStatusLoading] = useState(true);
+  // Dosyaların durduğu deponun durumu (iş/proje/departman/şirket). null: bilinmiyor
+  // (istek başarısız ya da grup ekranı) — o zaman kişisel duruma düşülür.
+  const [scopeStorage, setScopeStorage] = useState<{ ready: boolean; provider?: "google" | "microsoft" } | null>(
+    null
+  );
 
   // ── Klasör gezinme ve görünüm
   const [folders, setFolders] = useState<FileFolder[]>([]);
@@ -384,13 +389,21 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
   // Kullanıcı iki sağlayıcıdan yalnızca birini bağlamış olabilir; yükleme
   // engeli ikisi de hazır değilse devreye girmeli (bkz. driveMissing).
+  //
+  // Kapsamın deposu da AYNI anda soruluyor: uyarının asıl kaynağı o (bkz.
+  // aşağıdaki driveMissing). Kişisel durum yine gerekli — kapsamın deposu
+  // hiç kurulamıyorsa DriveNotice kişiye kendi hesabını bağlamayı öneriyor.
   useEffect(() => {
     setStatusLoading(true);
+    const kapsam = groupId ? null : target;
     Promise.allSettled([
       driveApi.status().then(setGoogleStatus).catch(() => setGoogleStatus(null)),
       oneDriveApi.status().then(setMsStatus).catch(() => setMsStatus(null)),
+      kapsam
+        ? filesApi.storageStatus(kapsam).then(setScopeStorage).catch(() => setScopeStorage(null))
+        : Promise.resolve(setScopeStorage(null)),
     ]).finally(() => setStatusLoading(false));
-  }, []);
+  }, [groupId, target]);
 
   const handleFiles = useCallback((selected: FileList | DroppedFile[] | null) => {
     if (!selected?.length) return;
@@ -751,19 +764,30 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     }
   };
 
-  // Hiçbir sağlayıcı (Drive/OneDrive) bağlı değilse yükleme yapılamaz;
-  // kullanıcıyı boş bir hata yerine doğrudan çözüme yönlendir. Kullanıcı
-  // ikisinden birini bağlamışsa (hangisi olursa olsun) engel kalkar.
+  // Depo kullanılamıyorsa yükleme yapılamaz; kullanıcıyı boş bir hata yerine
+  // doğrudan çözüme yönlendir.
+  //
+  // Karar DOSYALARIN DURDUĞU DEPOYA göre (scopeStorage). Eskiden izleyenin
+  // kendi Drive'ına bakılıyordu: deposu iş sahibinin Drive'ına bağlı bir işte,
+  // kendi Drive'ı olmayan ekip üyesi "Drive bağla" görüyordu — oysa yüklemesi
+  // zaten iş sahibinin hesabına gidiyor. Kapsam durumu bilinmiyorsa kişisel
+  // duruma düşülüyor (eski davranış).
   const anyConfigured = Boolean(googleStatus?.configured || msStatus?.configured);
-  const anyReady = Boolean(googleStatus?.driveReady || msStatus?.driveReady);
-  const driveMissing = !statusLoading && anyConfigured && !anyReady;
-  // "Drive'dan seç"/"Yeni dosya" için hangi sağlayıcı bağlı: Google Drive
-  // öncelikli (bkz. CloudStorageService.findAccountForUser'daki aynı sıralama).
-  const connectedProvider: "google" | "microsoft" | undefined = googleStatus?.driveReady
+  const personalProvider: "google" | "microsoft" | undefined = googleStatus?.driveReady
     ? "google"
     : msStatus?.driveReady
     ? "microsoft"
     : undefined;
+  const storageReady = scopeStorage ? scopeStorage.ready : Boolean(personalProvider);
+  const driveMissing = !statusLoading && anyConfigured && !storageReady;
+  // "Drive'dan seç"/"Yeni dosya" için sağlayıcı: seçici jetonu da kapsamın
+  // deposundan alınıyor (bkz. FilesService.pickerTokenForTarget), yani doğru
+  // pencere deponun sağlayıcısınınki — izleyenin kendi hesabınınki değil.
+  const connectedProvider: "google" | "microsoft" | undefined = scopeStorage
+    ? scopeStorage.ready
+      ? scopeStorage.provider
+      : undefined
+    : personalProvider;
 
   /**
    * Sayfanın her yerine bırakılan dosya da yüklenir.
@@ -777,6 +801,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
    */
   const pageDropEnabled = !readOnly && !driveMissing && !compact && !taskId && !outputId;
   const { dragging: pageDragging } = usePageFileDrop(pageDropEnabled, handleFiles);
+
+  // Boş ekrandaki kesik çizgili kutunun vurgusu: sayfa geneli açıkken onun
+  // durumundan, kapalıyken (modal/compact) kutunun kendi durumundan gelir.
+  const kutuDragging = pageDropEnabled ? pageDragging : dragging;
 
   // Yeni oluşturulan/içe aktarılan dosya listeye eklenir VE hemen geniş önizleme
   // modalında açılır — kullanıcı Projelio'dan hiç ayrılmadan görür; ayrılmak
@@ -807,13 +835,15 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           }
         },
         // Picker, hedefin depo hesabıyla açılmalı (bkz. lib/googlePicker.ts).
-        // Proje hedefinde iş kimliği yok; o durumda varsayılan hesap kullanılır.
+        // Proje hedefi işin deposuna çözülüyor (bkz. pickerTokenForTarget).
         departmentId
           ? { departmentId }
           : organizationId
           ? { organizationId }
           : jobId
           ? { jobId }
+          : projectId
+          ? { projectId }
           : undefined
       ).catch((e: Error) => setPickerError(e.message));
       return;
@@ -1098,21 +1128,35 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       */}
       {!readOnly && !loading && gorunenDosyalar.length === 0 && gorunenKlasorler.length === 0 && (
         <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            if (!driveMissing) setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            // Klasör bırakılabilsin diye ağaç okunuyor (bkz. lib/dropFiles.ts).
-            if (!driveMissing) void readDroppedFiles(e.dataTransfer).then(handleFiles);
-          }}
+          /*
+            Sayfa geneli bırakma açıkken kutunun KENDİ işleyicisi YOK.
+
+            İkisi birden bağlıyken kutunun içine bırakılan dosya iki kez
+            yükleniyordu: önce kutunun onDrop'u, sonra aynı olay document'e
+            kabararak usePageFileDrop'un dinleyicisi. Olayı burada
+            stopPropagation ile kesmek de olmazdı — hook'un sürükleme sayacı
+            yalnızca drop'ta sıfırlanıyor, kesilirse örtü ekranda asılı kalır.
+            Kutu sayfa geneli kapalıyken (modal/compact) kendi işini görüyor.
+          */
+          {...(pageDropEnabled
+            ? {}
+            : {
+                onDragOver: (e: React.DragEvent) => {
+                  e.preventDefault();
+                  if (!driveMissing) setDragging(true);
+                },
+                onDragLeave: () => setDragging(false),
+                onDrop: (e: React.DragEvent) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  // Klasör bırakılabilsin diye ağaç okunuyor (bkz. lib/dropFiles.ts).
+                  if (!driveMissing) void readDroppedFiles(e.dataTransfer).then(handleFiles);
+                },
+              })}
           style={{
-            border: `1.5px dashed ${dragging ? c.accent : c.border}`,
+            border: `1.5px dashed ${kutuDragging ? c.accent : c.border}`,
             borderRadius: 12,
-            background: dragging ? "rgba(192,129,63,0.06)" : "transparent",
+            background: kutuDragging ? "rgba(192,129,63,0.06)" : "transparent",
             padding: compact ? "16px 14px" : "26px 18px",
             textAlign: "center",
             color: c.textSecondary,
@@ -1150,7 +1194,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           ) : (
             <>
               <div style={{ marginTop: 8, marginBottom: 12 }}>
-                {dragging ? t("Bırakın, yükleyelim") : folderId ? t("Bu klasör boş.") : t("Henüz dosya yok.")}
+                {kutuDragging ? t("Bırakın, yükleyelim") : folderId ? t("Bu klasör boş.") : t("Henüz dosya yok.")}
               </div>
               <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
                 {connectedProvider && (

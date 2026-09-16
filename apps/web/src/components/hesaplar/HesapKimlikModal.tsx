@@ -10,6 +10,7 @@ import { useT } from "../../lib/i18n";
 import { HESAP_GIRIS_YONTEMLERI, HESAP_KILIT_YONTEMI, HESAP_YETKI_GEREKCESI, sifresizYontem } from "../../lib/hesaplar";
 import { useThemeColors } from "../../theme/useThemeColors";
 import Modal from "../Modal";
+import SifreGirdisi from "../SifreGirdisi";
 import HesapKilidi, { useKilit } from "./HesapKilidi";
 
 interface Props {
@@ -292,12 +293,12 @@ export default function HesapKimlikModal({ hesap, canManage, canWrite, onClose, 
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {etiket(form.id ? t("Yeni şifre (boş bırakılırsa değişmez)") : t("Şifre"))}
-              {/* type=password + autoComplete=new-password: tarayıcı bunu kendi
-                  şifre kasasına kaydetmeye çalışmasın, sır tek yerde dursun. */}
-              <input
-                type="password"
+              {/* autoComplete=new-password: tarayıcı bunu kendi şifre kasasına
+                  kaydetmeye çalışmasın, sır tek yerde dursun. Göz düğmesi
+                  yazılanı kaydetmeden önce kontrol etmek için. */}
+              <SifreGirdisi
                 value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                onChange={(password) => setForm({ ...form, password })}
                 autoComplete="new-password"
                 style={alan}
               />

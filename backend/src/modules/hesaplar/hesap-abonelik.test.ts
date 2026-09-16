@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { abonelikKarari } from "./hesap-abonelik";
+import { abonelikDegisimi, abonelikKarari } from "./hesap-abonelik";
 
 const temel = {
   isPaid: true,
@@ -75,4 +75,30 @@ test("tutarsız ücretli abonelik reddedilir", () => {
   assert.throws(() => abonelikKarari({ ...temel, amount: 0 }), /tutar/);
   assert.throws(() => abonelikKarari({ ...temel, amount: null }), /tutar/);
   assert.throws(() => abonelikKarari({ ...temel, billingInterval: null }), /aralığı/);
+});
+
+// Şikayet: ücretli bir hesabın notunu düzeltmek bile bütçe yetkisi istiyordu,
+// çünkü her kaydetme defter güncellemesi sayılıyordu.
+const kayit = { is_paid: true, amount: "40.00", currency: "USD", billing_interval: "monthly", name: "Adobe", plan: "Pro" };
+
+test("defteri ilgilendirmeyen düzenleme defter değişimi sayılmaz", () => {
+  // Tutar veritabanından metin gelir; aynı sayı değişmiş sayılmamalı.
+  assert.equal(abonelikDegisimi(kayit, { ...kayit, amount: 40 }, false), "yok");
+});
+
+test("ad ya da plan değişince yalnızca açıklama güncellenir", () => {
+  assert.equal(abonelikDegisimi(kayit, { ...kayit, name: "Adobe CC" }, false), "aciklama");
+  assert.equal(abonelikDegisimi(kayit, { ...kayit, plan: "Teams" }, false), "aciklama");
+});
+
+test("tutar, birim, aralık, ücretli işareti ya da vade parayı değiştirir", () => {
+  assert.equal(abonelikDegisimi(kayit, { ...kayit, amount: 45 }, false), "mali");
+  assert.equal(abonelikDegisimi(kayit, { ...kayit, currency: "EUR" }, false), "mali");
+  assert.equal(abonelikDegisimi(kayit, { ...kayit, billing_interval: "yearly" }, false), "mali");
+  assert.equal(abonelikDegisimi(kayit, { ...kayit, is_paid: false }, false), "mali");
+  assert.equal(abonelikDegisimi(kayit, kayit, true), "mali");
+});
+
+test("para birimi büyük/küçük harf farkı değişim değildir", () => {
+  assert.equal(abonelikDegisimi(kayit, { ...kayit, currency: "usd" }, false), "yok");
 });

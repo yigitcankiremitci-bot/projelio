@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
+import { isSubcontractorAccount } from "../../common/access/subcontractor";
 import { SupabaseService } from "../../database/supabase.service";
 import { DriveNotConnectedError } from "../google/google-accounts.service";
 import { DriveFileMissingError } from "../google/drive.service";
@@ -328,22 +329,30 @@ export class FilesService {
   // atlamak, başka bir işin belgelerini herkese açmak demektir.
 
   /**
-   * İşin BÜTÜN dosyalarına erişmesi gereken kullanıcılar.
+   * İşin BÜTÜN dosyalarına erişmesi gereken kullanıcılar: işi YÖNETENLER.
    *
    * Projelio'nun sahiplik zinciri: Grup > Organizasyon > İş > Proje.
-   * Üst kademe, altındaki her şeyi görebilmeli — bir holding sahibi, holdingine
-   * bağlı şirketlerin işlerindeki dosyaları görmek ister.
+   * Üst kademeyi YÖNETEN, altındaki her şeyi görebilmeli — bir holding sahibi,
+   * holdingine bağlı şirketlerin işlerindeki dosyaları görmek ister.
    *
-   *   İşin sahibi ve iş ekibi
-   *   + İş bir organizasyona bağlıysa: o organizasyonun sahibi ve onaylı üyeleri
-   *   + İş (ya da bağlı olduğu organizasyon) bir gruba bağlıysa: grubun sahibi ve üyeleri
+   *   İşin sahibi
+   *   + İş bir organizasyona bağlıysa: o organizasyonun sahibi ve departman yöneticileri
+   *   + İş (ya da bağlı olduğu organizasyon) bir gruba bağlıysa: grubun sahibi
    *
    * Bağ kurulmamışsa (organization_id ve group_id boşsa) zincir işin kendisinde
    * biter — serbest çalışanın işleri kimsenin holdingine görünmez.
    *
+   * ESKİDEN iş kadrosu (job_members) ve sıradan şirket/grup üyeliği de bu
+   * listedeydi: bir projeye almak için işe kadro olarak da eklenen ekip üyesi,
+   * dahil olmadığı projelerin dosyalarını ve işin "Genel" klasörünü görüyordu.
+   * Kural artık projelerdekiyle aynı (bkz. common/access/subcontractor.ts,
+   * seesAllProjectsOfJob): yöneten hepsini görür, geri kalan herkes yalnızca
+   * atandığı projenin klasörünü.
+   *
    * Hem yetki kontrolü hem Drive izin eşitlemesi bu tek listeden beslenir;
    * ikisinin ayrışması "Projelio'da göremiyor ama Drive'da görüyor" gibi
-   * sessiz tutarsızlıklar üretirdi.
+   * sessiz tutarsızlıklar üretirdi. Daralan liste syncJobShares'te eski kök
+   * klasör izinlerinin GERİ ALINMASINA yol açar — istenen de budur.
    */
   private async jobLevelUserIds(jobId: string): Promise<Set<string>> {
     const { data: job, error } = await this.supabase.client
@@ -354,47 +363,64 @@ export class FilesService {
     if (error) throw error;
     if (!job) throw new NotFoundException("İş bulunamadı");
 
+    // İşin sahibi listeden hiçbir koşulda düşmez: kendi işinin dosyalarına
+    // erişimi hesap tipine bağlı değildir (taşeron hesap da kendi işini açar).
     const ids = new Set<string>();
     if (job.owner_id) ids.add(job.owner_id);
 
-    const { data: jobMembers } = await this.supabase.client
-      .from("job_members")
-      .select("user_id")
-      .eq("job_id", jobId)
-      // Drive klasörü yalnızca daveti kabul etmiş ekiple paylaşılır; bekleyen
-      // davet sahibi henüz ekipten sayılmaz.
-      .eq("status", "approved");
-    for (const m of jobMembers ?? []) ids.add(m.user_id);
+    // Üst kademeden MİRAS alınanlar ayrı tutuluyor: taşeron süzgeci yalnızca
+    // onlara uygulanacak (taşeron kurumsal kademeye hiç dahil değildir).
+    const mirasAlanlar = new Set<string>();
 
     // İş doğrudan gruba bağlı olabilir; organizasyon üzerinden de gruba bağlanabilir.
     let groupId: string | null = job.group_id ?? null;
 
     if (job.organization_id) {
-      const [{ data: org }, { data: orgMembers }] = await Promise.all([
+      const [{ data: org }, { data: depts }] = await Promise.all([
         this.supabase.client
           .from("organizations")
           .select("owner_id, group_id")
           .eq("id", job.organization_id)
           .maybeSingle(),
-        this.supabase.client
-          .from("organization_members")
-          .select("user_id")
-          .eq("organization_id", job.organization_id)
-          .eq("status", "approved"),
+        this.supabase.client.from("departments").select("id").eq("organization_id", job.organization_id),
       ]);
-      if (org?.owner_id) ids.add(org.owner_id);
-      for (const m of orgMembers ?? []) ids.add(m.user_id);
+      if (org?.owner_id) mirasAlanlar.add(org.owner_id);
+
+      // Departman yöneticisi şirketin işlerini yönetenlerden sayılır
+      // (AccessService.organizationAccess'teki "department_manager" rolüyle
+      // aynı ölçüt); sıradan kadro üyeliği yetmez.
+      const deptIds = (depts ?? []).map((d: any) => d.id);
+      if (deptIds.length > 0) {
+        const { data: managers } = await this.supabase.client
+          .from("department_members")
+          .select("user_id")
+          .in("department_id", deptIds)
+          .eq("role", "manager")
+          .eq("status", "approved");
+        for (const m of managers ?? []) mirasAlanlar.add(m.user_id);
+      }
+
       groupId = groupId ?? org?.group_id ?? null;
     }
 
     if (groupId) {
-      const [{ data: group }, { data: groupMembers }] = await Promise.all([
-        this.supabase.client.from("groups").select("owner_id").eq("id", groupId).maybeSingle(),
-        // group_members'ta onay durumu yok: eklenen kişi doğrudan üyedir.
-        this.supabase.client.from("group_members").select("user_id").eq("group_id", groupId),
-      ]);
-      if (group?.owner_id) ids.add(group.owner_id);
-      for (const m of groupMembers ?? []) ids.add(m.user_id);
+      const { data: group } = await this.supabase.client
+        .from("groups")
+        .select("owner_id")
+        .eq("id", groupId)
+        .maybeSingle();
+      if (group?.owner_id) mirasAlanlar.add(group.owner_id);
+    }
+
+    if (mirasAlanlar.size > 0) {
+      const { data: hesaplar } = await this.supabase.client
+        .from("users")
+        .select("id, account_type")
+        .in("id", [...mirasAlanlar]);
+      const taseronlar = new Set(
+        (hesaplar ?? []).filter((u: any) => isSubcontractorAccount(u.account_type)).map((u: any) => u.id)
+      );
+      for (const id of mirasAlanlar) if (!taseronlar.has(id)) ids.add(id);
     }
 
     return ids;
@@ -403,8 +429,10 @@ export class FilesService {
   /**
    * Kullanıcının bu işteki erişim düzeyini hesaplar.
    *
-   * Yalnızca bir projeye çağrılmış kişi (tipik olarak taşeron) sadece o projeyi
-   * görür; hiyerarşideki üst kademeler ise işin tamamını görür.
+   * Bir projeye çağrılmış kişi sadece o projeyi görür; hiyerarşiyi YÖNETENLER
+   * (bkz. jobLevelUserIds) işin tamamını. İş kadrosunda olmak tek başına iş
+   * düzeyi vermez — hiçbir projeye atanmamış kadro üyesi için sonuç "none"dır
+   * ve Dosyalar sekmesi kapalıdır.
    */
   private async resolveAccess(jobId: string, userId: string): Promise<JobAccess> {
     const { data: job, error: jobError } = await this.supabase.client
@@ -649,7 +677,7 @@ export class FilesService {
    */
   async pickerTokenForTarget(
     userId: string,
-    target: { jobId?: string; departmentId?: string; organizationId?: string }
+    target: { jobId?: string; projectId?: string; departmentId?: string; organizationId?: string }
   ): Promise<{ accessToken: string; expiresInSeconds: number; provider: StorageProvider }> {
     let provider: StorageProvider;
     let accountId: string;
@@ -660,11 +688,15 @@ export class FilesService {
         : { kind: "organization", id: target.organizationId! };
       await this.assertFlatAccess(scope, userId);
       ({ provider, accountId } = await this.ensureFlatStorage(scope, userId));
-    } else if (target.jobId) {
-      await this.assertJobAccess(target.jobId, userId);
-      ({ provider, accountId } = await this.ensureJobStorage(target.jobId, userId));
+    } else if (target.jobId || target.projectId) {
+      // Proje hedefi işin deposunu kullanır. Eskiden proje ekranı hedefsiz
+      // istiyordu ve jeton İZLEYENİN hesabından geliyordu: kendi Drive'ı
+      // olmayan proje üyesi seçiciyi açamıyor, olan ise yanlış Drive'ı görüyordu.
+      const jobId = target.jobId ?? (await this.jobIdOfProject(target.projectId!));
+      await this.assertJobAccess(jobId, userId);
+      ({ provider, accountId } = await this.ensureJobStorage(jobId, userId));
     } else {
-      throw new BadRequestException("jobId, departmentId ya da organizationId gerekli");
+      throw new BadRequestException("jobId, projectId, departmentId ya da organizationId gerekli");
     }
 
     if (provider !== "google") {
@@ -674,6 +706,91 @@ export class FilesService {
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
     // 3000 sn: jetonun ömrü 1 saat, Picker açıkken sona ermesin diye pay bırakılıyor.
     return { accessToken, expiresInSeconds: 3000, provider };
+  }
+
+  /**
+   * Bu kapsamda dosya saklanabilir mi? Dosyalar sekmesindeki "Drive bağla"
+   * uyarısının kaynağı.
+   *
+   * NEDEN KAPSAM BAZLI: uyarı eskiden İZLEYEN kişinin kendi Drive'ına
+   * bakıyordu. Oysa dosyalar işin deposunda duruyor (iş sahibinin ya da
+   * şirketin seçtiği hesap, bkz. ensureJobStorage); kendi Drive'ı olmayan bir
+   * ekip üyesi, deposu bağlı bir işte bile "Drive bağla" görüyordu.
+   *
+   * Karar ensureJobStorage/ensureFlatStorage'ın hesap seçim sırasıyla AYNI,
+   * ama hiçbir şey kurmaz: klasör açmak bir okuma ucunun işi değil.
+   */
+  async storageStatus(
+    userId: string,
+    target: { jobId?: string; projectId?: string; departmentId?: string; organizationId?: string }
+  ): Promise<{ ready: boolean; provider?: StorageProvider }> {
+    const hesaptan = async (provider: StorageProvider, accountId: string) => {
+      const account = await this.cloudStorage.findById(provider, accountId);
+      return this.cloudStorage.isDriveReady(provider, account) ? { ready: true, provider } : { ready: false };
+    };
+    const adaylardan = async (organizationId: string | undefined, sahipId: string | undefined) => {
+      let resolved = await this.resolveOrganizationAccount(organizationId);
+      for (const adayId of resolved ? [] : ([sahipId, userId].filter(Boolean) as string[])) {
+        resolved = await this.cloudStorage.findAccountForUser(adayId);
+        if (resolved) break;
+      }
+      return resolved ? { ready: true, provider: resolved.provider } : { ready: false };
+    };
+
+    if (target.departmentId || target.organizationId) {
+      const scope: FlatScope = target.departmentId
+        ? { kind: "department", id: target.departmentId }
+        : { kind: "organization", id: target.organizationId! };
+      await this.assertFlatAccess(scope, userId);
+      const tables = this.flatTables(scope);
+      const { data: existing } = await this.supabase.client
+        .from(tables.storage)
+        .select()
+        .eq(tables.idColumn, scope.id)
+        .maybeSingle();
+      if (existing) {
+        const { provider, accountId } = storageOwner(existing);
+        return hesaptan(provider, accountId);
+      }
+
+      let organizationId = scope.kind === "organization" ? scope.id : undefined;
+      if (scope.kind === "department") {
+        const { data: dept } = await this.supabase.client
+          .from("departments")
+          .select("organization_id")
+          .eq("id", scope.id)
+          .maybeSingle();
+        organizationId = dept?.organization_id ?? undefined;
+      }
+      const { data: org } = organizationId
+        ? await this.supabase.client.from("organizations").select("owner_id").eq("id", organizationId).maybeSingle()
+        : { data: null as any };
+      return adaylardan(organizationId, org?.owner_id ?? undefined);
+    }
+
+    // Proje ekranı ve projeli görev modali yalnızca projeyi biliyor; deposu
+    // işinki (proje başına ayrı depo yok).
+    const jobId = target.jobId ?? (target.projectId ? await this.jobIdOfProject(target.projectId) : undefined);
+    if (!jobId) throw new BadRequestException("jobId, projectId, departmentId ya da organizationId gerekli");
+    await this.assertJobAccess(jobId, userId);
+
+    const { data: existing } = await this.supabase.client
+      .from("job_storage")
+      .select()
+      .eq("job_id", jobId)
+      .maybeSingle();
+    if (existing) {
+      const { provider, accountId } = storageOwner(existing);
+      return hesaptan(provider, accountId);
+    }
+
+    const { data: job } = await this.supabase.client
+      .from("jobs")
+      .select("owner_id, organization_id")
+      .eq("id", jobId)
+      .maybeSingle();
+    if (!job) throw new NotFoundException("İş bulunamadı");
+    return adaylardan(job.organization_id ?? undefined, job.owner_id ?? undefined);
   }
 
   // ============================================================ depolama sahibi
@@ -1148,12 +1265,16 @@ export class FilesService {
   }
 
   /** Kapsamın erişim kontrolü; klasör uçları da dosya uçlarıyla aynı kapıdan geçer. */
-  private async assertOwnerAccess(owner: FileOwner, userId: string): Promise<void> {
+  /**
+   * Erişim kontrolü + iş kapsamında kişinin DÜZEYİ. Düz kapsamlarda (departman,
+   * şirket) proje kavramı olmadığı için `undefined` döner.
+   */
+  private async assertOwnerAccess(owner: FileOwner, userId: string): Promise<JobAccess | undefined> {
     if (owner.kind === "job") {
-      await this.assertJobAccess(owner.id, userId);
-      return;
+      return this.assertJobAccess(owner.id, userId);
     }
     await this.assertFlatAccess({ kind: owner.kind, id: owner.id }, userId);
+    return undefined;
   }
 
   /** Kapsamın kök klasörü (bulut tarafındaki kimlik) ve depo hesabı. */
@@ -1166,8 +1287,31 @@ export class FilesService {
     return { provider: flat.provider, accountId: flat.accountId, rootFolderId: flat.folderId };
   }
 
+  /**
+   * Tek bir klasör satırı bu erişim düzeyine açık mı?
+   *
+   * Klasör kimliği istemciden geliyor: listede görünmeyen bir klasör tek tek
+   * de açılmamalı (yol/ekmek kırıntısı, bağlama kaynağı), yoksa süzgeç yalnızca
+   * görünümde kalır. Proje/görev/çıktı klasörleri project_id taşır; 'general'
+   * ve 'user' klasörleri işin geneline aittir ve proje düzeyine kapalıdır.
+   */
+  private assertFolderAllowed(access: JobAccess | undefined, row: any): void {
+    if (access?.level !== "project") return;
+    if (!row.project_id || !access.projectIds.includes(row.project_id)) {
+      throw new ForbiddenException("Bu klasöre erişim yetkiniz yok");
+    }
+  }
+
+  /**
+   * İşin TAMAMINI görenler (bkz. jobLevelUserIds). Dosya bağlama adaylarını
+   * süzmek için dışarı açık: kuralın ikinci bir kopyası çıkmasın.
+   */
+  async jobLevelUsers(jobId: string): Promise<string[]> {
+    return [...(await this.jobLevelUserIds(jobId))];
+  }
+
   async listFolders(owner: FileOwner, userId: string, parentFolderId?: string): Promise<FileFolderEntry[]> {
-    await this.assertOwnerAccess(owner, userId);
+    const access = await this.assertOwnerAccess(owner, userId);
     if (!(await this.foldersAvailable())) return [];
 
     let query = this.supabase.client
@@ -1187,7 +1331,18 @@ export class FilesService {
       return [];
     }
 
-    return (data ?? []).map(mapFolder);
+    let rows = data ?? [];
+    // Proje düzeyindeki kullanıcı işin TÜM klasörlerini görmemeli. Dosyalarda
+    // bu sınır vardı (bkz. listByJob) ama klasörler süzülmüyordu: görev
+    // modalinden "Dosya seç" ile gezinen bir ekip üyesi, üyesi olmadığı
+    // projelerin klasörlerini — yani proje adlarını — görüyordu.
+    // Proje/görev/çıktı klasörleri project_id taşır; 'general' ve 'user'
+    // klasörleri işin geneline aittir ve proje düzeyine kapalıdır.
+    if (access?.level === "project") {
+      rows = rows.filter((r: any) => r.project_id && access.projectIds.includes(r.project_id));
+    }
+
+    return rows.map(mapFolder);
   }
 
   /** Klasörün kök'e kadar olan yolu — ekmek kırıntısı için (en üstteki başta). */
@@ -1206,7 +1361,8 @@ export class FilesService {
       if (error || !data) break;
 
       if (i === 0) {
-        await this.assertOwnerAccess(ownerOfFolderRow(data), userId);
+        const access = await this.assertOwnerAccess(ownerOfFolderRow(data), userId);
+        this.assertFolderAllowed(access, data);
       }
       chain.unshift(mapFolder(data));
       current = data.parent_folder_id ?? undefined;
@@ -1705,7 +1861,8 @@ export class FilesService {
     if (!row) throw new NotFoundException("Klasör bulunamadı");
 
     const owner = ownerOfFolderRow(row);
-    await this.assertOwnerAccess(owner, userId);
+    const access = await this.assertOwnerAccess(owner, userId);
+    this.assertFolderAllowed(access, row);
     return { row, owner };
   }
 
@@ -3325,14 +3482,11 @@ export class FilesService {
     uploaderId: string
   ): Promise<void> {
     try {
-      const [{ data: job }, { data: jobMembers }] = await Promise.all([
-        this.supabase.client.from("jobs").select("owner_id").eq("id", jobId).maybeSingle(),
-        this.supabase.client.from("job_members").select("user_id").eq("job_id", jobId).eq("status", "approved"),
-      ]);
-
-      const recipients = new Set<string>();
-      if (job?.owner_id) recipients.add(job.owner_id);
-      for (const m of jobMembers ?? []) recipients.add(m.user_id);
+      // Alıcılar dosyayı GÖREBİLENLERDEN seçilir: iş düzeyindekiler (işi
+      // yönetenler) + dosya bir projeye iliştirilmişse o projenin ekibi. Burası
+      // eskiden tüm iş kadrosuna haber veriyordu; kadro üyeliği artık projenin
+      // dosyalarını açmaya yetmediği için bildirime tıklayan kişi 403 görürdü.
+      const recipients = await this.jobLevelUserIds(jobId);
 
       // Dosya bir projeye iliştirilmişse o projenin ekibi de haberdar olsun.
       if (projectId) {

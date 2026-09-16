@@ -13,7 +13,7 @@ import {
 // projelerini görebiliyordu. Kural artık hesap tipine bağlı ve burada sabit.
 
 function facts(over: Partial<ProjectScopeFacts> = {}): ProjectScopeFacts {
-  return { isJobOwner: false, isApprovedJobMember: false, isSubcontractor: false, ...over };
+  return { isJobOwner: false, isOrgManager: false, isSubcontractor: false, ...over };
 }
 
 describe("isSubcontractorAccount", () => {
@@ -35,19 +35,19 @@ describe("seesAllProjectsOfJob", () => {
     assert.equal(seesAllProjectsOfJob(facts({ isJobOwner: true })), true);
   });
 
-  test("onaylı iş ekibi üyesi tüm projeleri görür", () => {
-    assert.equal(seesAllProjectsOfJob(facts({ isApprovedJobMember: true })), true);
+  test("şirketin sahibi / departman yöneticisi tüm projeleri görür", () => {
+    assert.equal(seesAllProjectsOfJob(facts({ isOrgManager: true })), true);
   });
 
-  test("bekleyen davet yeterli değil", () => {
+  // Asıl şikayet: bir projeye alabilmek için işe kadro olarak da eklenen
+  // sıradan ekip üyesi, işin İşler sekmesinde dahil olmadığı TÜM projeleri ve
+  // rutinleri listeleyebiliyordu. Kadro üyeliği artık tek başına açmıyor.
+  test("iş kadrosunda olmak tek başına tüm projeleri AÇMAZ", () => {
     assert.equal(seesAllProjectsOfJob(facts()), false);
   });
 
-  test("TAŞERON işe alınmış olsa bile tüm projeleri GÖRMEZ", () => {
-    assert.equal(
-      seesAllProjectsOfJob(facts({ isApprovedJobMember: true, isSubcontractor: true })),
-      false
-    );
+  test("TAŞERON yöneten kademede görünse bile tüm projeleri GÖRMEZ", () => {
+    assert.equal(seesAllProjectsOfJob(facts({ isOrgManager: true, isSubcontractor: true })), false);
   });
 
   test("taşeron işin sahibiyse bile bu yoldan geniş erişim kazanmaz", () => {
@@ -56,8 +56,8 @@ describe("seesAllProjectsOfJob", () => {
     assert.equal(seesAllProjectsOfJob(facts({ isJobOwner: true, isSubcontractor: true })), false);
   });
 
-  test("taşeron olmayan hiç kimse kayıpsız kalmaz (regresyon guard'ı)", () => {
-    for (const f of [facts({ isJobOwner: true }), facts({ isApprovedJobMember: true })]) {
+  test("yöneten kademe kayıpsız kalmaz (regresyon guard'ı)", () => {
+    for (const f of [facts({ isJobOwner: true }), facts({ isOrgManager: true })]) {
       assert.equal(seesAllProjectsOfJob(f), true);
     }
   });

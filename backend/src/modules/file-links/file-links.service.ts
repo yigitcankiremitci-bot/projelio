@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { AccessService } from "../../common/access/access.service";
 import { SupabaseService } from "../../database/supabase.service";
 import { FilesService, type FileOwner, type ProjectFile } from "../files/files.service";
 import { TasksService } from "../tasks/tasks.service";
@@ -76,7 +77,8 @@ export class FileLinksService {
     private supabase: SupabaseService,
     private filesService: FilesService,
     private tasksService: TasksService,
-    private notifications: NotificationsService
+    private notifications: NotificationsService,
+    private access: AccessService
   ) {}
 
   /**
@@ -94,6 +96,8 @@ export class FileLinksService {
     /** Bildirimde ve hata mesajlarında gösterilen ad. */
     name: string;
     jobId?: string;
+    /** İş kapsamında dosyanın/klasörün projesi; kimin açabileceğini daraltır. */
+    projectId?: string;
     departmentId?: string;
     organizationId?: string;
   }> {
@@ -107,6 +111,7 @@ export class FileLinksService {
       row,
       name: row.name,
       jobId: row.job_id ?? undefined,
+      projectId: row.project_id ?? undefined,
       departmentId: row.department_id ?? undefined,
       organizationId: row.organization_id ?? undefined,
     };
@@ -235,49 +240,23 @@ export class FileLinksService {
     return { scope: {}, name: user.full_name ?? "Kullanıcı" };
   }
 
-  /** Kişi dosyanın kapsamının ekibinde mi. */
-  private async kapsamUyesiMi(
-    dosya: { jobId?: string; departmentId?: string; organizationId?: string },
-    userId: string
-  ): Promise<boolean> {
-    const kontrol = async (table: string, column: string, id?: string): Promise<boolean> => {
-      if (!id) return false;
-      const { data } = await this.supabase.client
-        .from(table)
-        .select("id")
-        .eq(column, id)
-        .eq("user_id", userId)
-        .eq("status", "approved")
-        .maybeSingle();
-      return Boolean(data);
-    };
-
-    const organizationId =
-      dosya.organizationId ??
-      (await this.organizationOfDepartment(dosya.departmentId)) ??
-      (await this.organizationOfJob(dosya.jobId));
-
-    if (organizationId) {
-      const { data: org } = await this.supabase.client
-        .from("organizations")
-        .select("owner_id")
-        .eq("id", organizationId)
-        .maybeSingle();
-      if (org?.owner_id === userId) return true;
-      if (await kontrol("organization_members", "organization_id", organizationId)) return true;
+  /**
+   * Kişi bu dosyayı/klasörü AÇABİLİR mi?
+   *
+   * Eskiden burada kapsamın (iş/departman/şirket) üyeliğine bakan ayrı bir
+   * kural vardı ve dosyanın PROJESİNİ bilmiyordu: bir proje dosyası, o
+   * projede olmayan bir iş kadrosu üyesine bağlanabiliyordu ve kişi bağlantıyı
+   * görüp dosyayı açamıyordu. Artık dosya ekranının kullandığı kapıdan
+   * (FilesService.findById / folderForRead) o kişi adına geçiliyor — kural tek.
+   */
+  private async acabilirMi(source: LinkSource, userId: string): Promise<boolean> {
+    try {
+      if (source.folderId) await this.filesService.folderForRead(source.folderId, userId);
+      else await this.filesService.findById(source.fileId!, userId);
+      return true;
+    } catch {
+      return false;
     }
-    if (await kontrol("department_members", "department_id", dosya.departmentId)) return true;
-    if (await kontrol("job_members", "job_id", dosya.jobId)) return true;
-
-    if (dosya.jobId) {
-      const { data: job } = await this.supabase.client
-        .from("jobs")
-        .select("owner_id")
-        .eq("id", dosya.jobId)
-        .maybeSingle();
-      if (job?.owner_id === userId) return true;
-    }
-    return false;
   }
 
   async link(
@@ -292,7 +271,7 @@ export class FileLinksService {
     const hedef = await this.hedefKapsami(kind, targetId, userId);
 
     if (kind === "user") {
-      if (!(await this.kapsamUyesiMi(kaynak, targetId))) {
+      if (!(await this.acabilirMi(source, targetId))) {
         throw new ForbiddenException("Bu kişi dosyanın ekibinde değil; bağlasanız da açamaz.");
       }
     } else if (!(await this.ayniKapsam(kaynak, hedef.scope))) {
@@ -425,7 +404,7 @@ export class FileLinksService {
    * Bir dosyanın bağlanabileceği öğeler.
    *
    * NEDEN SUNUCUDA: aday listesi dosyanın kapsamından çıkıyor ve o kapsam
-   * kuralları bağlama yetkisiyle AYNI kurallar (bkz. ayniKapsam, kapsamUyesiMi).
+   * kuralları bağlama yetkisiyle AYNI kurallar (bkz. ayniKapsam, acabilirMi).
    * İstemcide ikinci bir kopyasını tutmak, seçilebilen ama bağlanamayan öğeler
    * gösterilmesi demekti — kullanıcı seçer, sunucu reddeder.
    */
@@ -458,7 +437,12 @@ export class FileLinksService {
         .eq("job_id", kaynak.jobId)
         .order("created_at", { ascending: false })
         .limit(LISTE_TAVANI);
-      projects = data ?? [];
+      // Kullanıcının göremediği projeler aday olmamalı: liste proje ADLARINI
+      // sızdırıyordu. Karar proje sayfasının kapısından (canViewProject).
+      const gorunur = await Promise.all(
+        (data ?? []).map((p: any) => this.access.canViewProject(p.id, userId).catch(() => false))
+      );
+      projects = (data ?? []).filter((_: any, i: number) => gorunur[i]);
     }
 
     // ── Görevler
@@ -595,9 +579,20 @@ export class FileLinksService {
     };
   }
 
-  /** Dosyanın kapsamındaki onaylı kişiler — "kime bağlanabilir" listesi. */
+  /**
+   * Dosyayı açabilecek kişiler — "kime bağlanabilir" listesi.
+   *
+   * İŞ kapsamında aday listesi dosyanın görünürlüğünden çıkıyor: işi yönetenler
+   * (FilesService.jobLevelUsers) + dosya bir projedeyse o projenin sahibi ve
+   * onaylı ekibi. Eskiden işin tüm kadrosu ve şirketin tüm üyeleri listeleniyordu;
+   * seçilen kişi bağlantıyı görüyor ama dosyayı açamıyordu. Projesiz iş dosyası
+   * ("Genel") yalnızca yönetenlere açık, aday da yalnızca onlar.
+   *
+   * Düz kapsamda (departman/şirket) proje yok; orada kadro ve şirket üyeliği
+   * dosyayı görmenin gerçek kuralı.
+   */
   private async kapsamEkibi(
-    dosya: { jobId?: string; departmentId?: string },
+    dosya: { jobId?: string; projectId?: string; departmentId?: string },
     organizationId?: string
   ): Promise<{ id: string; fullName: string }[]> {
     const ids = new Set<string>();
@@ -612,24 +607,28 @@ export class FileLinksService {
       for (const satir of data ?? []) if (satir.user_id) ids.add(satir.user_id);
     };
 
-    if (organizationId) {
-      const { data: org } = await this.supabase.client
-        .from("organizations")
-        .select("owner_id")
-        .eq("id", organizationId)
-        .maybeSingle();
-      if (org?.owner_id) ids.add(org.owner_id);
-      await topla("organization_members", "organization_id", organizationId);
-    }
-    await topla("department_members", "department_id", dosya.departmentId);
-    await topla("job_members", "job_id", dosya.jobId);
     if (dosya.jobId) {
-      const { data: job } = await this.supabase.client
-        .from("jobs")
-        .select("owner_id")
-        .eq("id", dosya.jobId)
-        .maybeSingle();
-      if (job?.owner_id) ids.add(job.owner_id);
+      for (const id of await this.filesService.jobLevelUsers(dosya.jobId)) ids.add(id);
+      if (dosya.projectId) {
+        const { data: proje } = await this.supabase.client
+          .from("projects")
+          .select("owner_id")
+          .eq("id", dosya.projectId)
+          .maybeSingle();
+        if (proje?.owner_id) ids.add(proje.owner_id);
+        await topla("project_members", "project_id", dosya.projectId);
+      }
+    } else {
+      if (organizationId) {
+        const { data: org } = await this.supabase.client
+          .from("organizations")
+          .select("owner_id")
+          .eq("id", organizationId)
+          .maybeSingle();
+        if (org?.owner_id) ids.add(org.owner_id);
+        await topla("organization_members", "organization_id", organizationId);
+      }
+      await topla("department_members", "department_id", dosya.departmentId);
     }
 
     if (!ids.size) return [];

@@ -95,11 +95,11 @@ export class ProjectsService {
     const projects = (data ?? []).map(mapProject);
     if (!requestingUserId) return projects;
 
-    // Görünürlük kısıtı: iş sahibi ve işe alınmış iş ekibi üyeleri tüm projeleri
-    // görür — TAŞERON HARİÇ. Taşeron işe alınmış olsa bile yalnızca açıkça
-    // atandığı projeleri görür ("sadece ekli olduğu projeyi ve işi görmeli").
-    // Karar AccessService.seesAllProjectsOfJob'da, saf kuralı
-    // common/access/subcontractor.ts içinde.
+    // Görünürlük kısıtı: yalnızca işi YÖNETEN (iş sahibi, şirket sahibi,
+    // departman yöneticisi) tüm projeleri görür. Kadro üyeliği, taşeronluk ya
+    // da şirket üyeliği tek başına yetmez — herkes yalnızca sahibi olduğu ya da
+    // atandığı projeleri görür. Karar AccessService.seesAllProjectsOfJob'da,
+    // saf kuralı common/access/subcontractor.ts içinde.
     if (await this.access.seesAllProjectsOfJob(jobId, requestingUserId)) return projects;
 
     const { data: memberships } = await this.supabase.client

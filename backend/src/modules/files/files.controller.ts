@@ -241,10 +241,24 @@ export class FilesController {
   pickerToken(
     @Req() req: any,
     @Query("jobId") jobId?: string,
+    @Query("projectId") projectId?: string,
     @Query("departmentId") departmentId?: string,
     @Query("organizationId") organizationId?: string
   ) {
-    return this.filesService.pickerTokenForTarget(req.user.userId, { jobId, departmentId, organizationId });
+    return this.filesService.pickerTokenForTarget(req.user.userId, { jobId, projectId, departmentId, organizationId });
+  }
+
+  /** Bu kapsamda dosya saklanabilir mi (bkz. FilesService.storageStatus). */
+  @Get("files/storage-status")
+  @UseGuards(AuthGuard("jwt"))
+  storageStatus(
+    @Req() req: any,
+    @Query("jobId") jobId?: string,
+    @Query("projectId") projectId?: string,
+    @Query("departmentId") departmentId?: string,
+    @Query("organizationId") organizationId?: string
+  ) {
+    return this.filesService.storageStatus(req.user.userId, { jobId, projectId, departmentId, organizationId });
   }
 
   // ---------------------------------------------------------------- klasörler

@@ -4,6 +4,7 @@ import { hesaplarApi } from "../../api/hesaplar";
 import { anahtarlaImzala, desteklenirMi } from "../../lib/gecisAnahtari";
 import { useT } from "../../lib/i18n";
 import { useThemeColors } from "../../theme/useThemeColors";
+import SifreGirdisi from "../SifreGirdisi";
 
 /**
  * Hesap sırlarının kilidi — arayüz tarafı.
@@ -137,10 +138,9 @@ export default function HesapKilidi({ onAcildi }: { onAcildi: (sonuc: ServiceUnl
         }}
         style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
       >
-        <input
-          type="password"
+        <SifreGirdisi
           value={sifre}
-          onChange={(e) => setSifre(e.target.value)}
+          onChange={setSifre}
           placeholder={t("Projelio şifreniz")}
           autoComplete="current-password"
           style={{ flex: "1 1 180px", fontSize: 13, padding: "6px 8px" }}

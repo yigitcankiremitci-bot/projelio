@@ -80,6 +80,15 @@ export interface DriveBrowseEntry {
 }
 
 export const filesApi = {
+  /**
+   * Bu kapsamda dosya saklanabilir mi — "Drive bağla" uyarısının kaynağı.
+   * İzleyenin kendi Drive'ına değil, dosyaların durduğu depoya bakar
+   * (bkz. FilesService.storageStatus).
+   */
+  storageStatus: (target: { jobId?: string; projectId?: string; departmentId?: string; organizationId?: string }) =>
+    api.get<{ ready: boolean; provider?: "google" | "microsoft" }>(
+      `/files/storage-status${query(target as Record<string, string | undefined>)}`
+    ),
   /** İş ekranı: kapsamı seçerek listeler. */
   listByJob: (
     jobId: string,
@@ -245,8 +254,8 @@ export const driveApi = {
    * Drive hesabında olan bir departmanda bu, seçilen dosyanın kopyalanamamasına
    * yol açar (bkz. FilesService.pickerTokenForTarget).
    */
-  pickerToken: (target?: { jobId?: string; departmentId?: string; organizationId?: string }) => {
-    if (!target?.jobId && !target?.departmentId && !target?.organizationId) {
+  pickerToken: (target?: { jobId?: string; projectId?: string; departmentId?: string; organizationId?: string }) => {
+    if (!target?.jobId && !target?.projectId && !target?.departmentId && !target?.organizationId) {
       return api.get<{ accessToken: string; expiresInSeconds: number }>("/google/picker-token");
     }
     const params = new URLSearchParams(
@@ -254,7 +263,9 @@ export const driveApi = {
         ? { departmentId: target.departmentId }
         : target.organizationId
         ? { organizationId: target.organizationId }
-        : { jobId: target.jobId! }
+        : target.jobId
+        ? { jobId: target.jobId }
+        : { projectId: target.projectId! }
     );
     return api.get<{ accessToken: string; expiresInSeconds: number }>(`/files/picker-token?${params.toString()}`);
   },

@@ -5,6 +5,7 @@ import type {
   OperationOccurrence,
   OperationRoutine,
 } from "@projelio/shared";
+import { AccessService } from "../../common/access/access.service";
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { applyOrder } from "../../common/reorder.util";
@@ -126,7 +127,7 @@ function normalizeIntArray(value: unknown): number[] | null {
 
 @Injectable()
 export class OperationsService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(private supabase: SupabaseService, private access: AccessService) {}
 
   // ---------------------------------------------------------------- rutinler
 
@@ -178,9 +179,11 @@ export class OperationsService {
       );
   }
 
-  // Görünürlük kuralı projelerdekiyle aynı: iş sahibi ve iş ekibi tüm rutinleri
-  // görür; dışarıdakiler yalnızca sahibi oldukları ya da ekibinde bulundukları
-  // rutinleri görebilir.
+  // Görünürlük kuralı projelerdekiyle aynı ve aynı kapıdan geçiyor
+  // (AccessService.seesAllProjectsOfJob): işi YÖNETEN tüm rutinleri görür,
+  // diğerleri yalnızca sahibi oldukları ya da ekibinde bulundukları rutinleri.
+  // Kuralın ikinci bir kopyası buradaydı ve projelerde kısıtlanan kadro üyesi
+  // rutinlerde kısıtsız kalıyordu.
   async findByJob(jobId: string, requestingUserId?: string): Promise<Operation[]> {
     const { data, error } = await this.supabase.client
       .from("operations")
@@ -196,22 +199,7 @@ export class OperationsService {
     const operations = rows.map((r: any) => mapOperation(r, health.get(r.id)));
     if (!requestingUserId) return operations;
 
-    const { data: job } = await this.supabase.client
-      .from("jobs")
-      .select("owner_id")
-      .eq("id", jobId)
-      .maybeSingle();
-    if (job?.owner_id === requestingUserId) return operations;
-
-    const { data: jobMember } = await this.supabase.client
-      .from("job_members")
-      .select("id")
-      .eq("job_id", jobId)
-      .eq("user_id", requestingUserId)
-      // Yalnızca daveti kabul etmiş iş ekibi üyeleri (bkz. job_members.status).
-      .eq("status", "approved")
-      .maybeSingle();
-    if (jobMember) return operations;
+    if (await this.access.seesAllProjectsOfJob(jobId, requestingUserId)) return operations;
 
     const { data: memberships } = await this.supabase.client
       .from("operation_members")

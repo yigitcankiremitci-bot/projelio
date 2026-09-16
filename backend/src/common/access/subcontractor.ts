@@ -23,23 +23,34 @@ export function isSubcontractorAccount(accountType?: AccountType | null): boolea
 export interface ProjectScopeFacts {
   /** İşin sahibi mi. */
   isJobOwner: boolean;
-  /** İş ekibine alınmış ve daveti kabul etmiş mi (job_members.status = approved). */
-  isApprovedJobMember: boolean;
+  /** İşin bağlı olduğu şirketin/holdingin sahibi ya da departman yöneticisi mi. */
+  isOrgManager: boolean;
   /** Hesap tipi taşeron mu. */
   isSubcontractor: boolean;
 }
 
 /**
- * Bir kullanıcı, işin ALTINDAKİ TÜM projeleri görebilir mi?
+ * Bir kullanıcı, işin ALTINDAKİ TÜM projeleri (ve rutinleri) görebilir mi?
  *
- * Taşeron için cevap her zaman hayır: işe alınmış olsa bile yalnızca
- * project_members ile atandığı projeleri görür. Bu, "sadece ekli olduğu projeyi
- * ve işi görmeli" kuralının tam karşılığı — işi görür (orada çalışıyor), işin
- * geri kalan projelerini görmez.
+ * Cevap yalnızca YÖNETEN için evet: işin sahibi ya da işin bağlı olduğu
+ * şirketin/holdingin sahibi/departman yöneticisi. Onların dışında herkes —
+ * taşeron olsun olmasın — yalnızca sahibi olduğu ya da atandığı projeleri
+ * görür.
+ *
+ * ÖNCEDEN iş kadrosunda (job_members, approved) olmak tek başına işin BÜTÜN
+ * projelerini açıyordu; kısıt yalnızca taşeron hesaplara uygulanıyordu. Bir
+ * projeye almak için işe kadro olarak da alınan sıradan ekip üyeleri böylece
+ * işin İşler sekmesinde dahil olmadıkları her projeyi ve rutini
+ * listeleyebiliyordu. Kadro üyeliği işi GÖRMEYE yeter (bkz.
+ * AccessService.canViewJob), işin tamamını görmeye değil.
+ *
+ * DOSYA görünürlüğü bu kuralın dışında: orada kapsam FilesService.resolveAccess
+ * ile ayrı çözülüyor ve kadro üyesinin işin geneline (Genel klasörü) erişimi
+ * bilerek duruyor.
  */
 export function seesAllProjectsOfJob(facts: ProjectScopeFacts): boolean {
   if (facts.isSubcontractor) return false;
-  return facts.isJobOwner || facts.isApprovedJobMember;
+  return facts.isJobOwner || facts.isOrgManager;
 }
 
 /**

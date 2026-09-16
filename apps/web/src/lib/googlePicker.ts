@@ -69,7 +69,7 @@ export async function openGooglePicker(
    * jetonuyla açılan Picker'da seçilen dosyayı hedef hesap göremez ve kopyalama
    * "Dosya içe aktarılamadı" ile biter.
    */
-  target?: { jobId?: string; departmentId?: string; organizationId?: string }
+  target?: { jobId?: string; projectId?: string; departmentId?: string; organizationId?: string }
 ): Promise<void> {
   // Picker tarayıcıda çalışır ve doğrudan Google'a gider; backend'deki
   // GOOGLE_CLIENT_ID/SECRET buraya yetmez, kendi tarayıcı anahtarını ister.

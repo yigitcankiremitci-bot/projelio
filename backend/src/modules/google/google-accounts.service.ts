@@ -103,6 +103,26 @@ export class GoogleAccountsService {
     return data ? mapAccount(data) : undefined;
   }
 
+  /**
+   * Kullanıcının dosya işlemine HAZIR ilk hesabı; sıra findByUserId'ninkiyle aynı.
+   *
+   * findByUserId giriş kimliğini döndürür, o hesabın Drive izni olmayabilir:
+   * "Google ile giriş" yapıp Drive'ı ayrı bir depo hesabıyla bağlayan kullanıcı
+   * her yerde "Drive bağla" görüyordu. Hazır hesabı arayan her yer bunu
+   * kullanmalı; hesabın kendisini (bağlı mı, yeniden bağlanmalı mı) göstermek
+   * için findByUserId geçerli.
+   */
+  async findDriveReadyByUserId(userId: string): Promise<GoogleAccount | undefined> {
+    const { data, error } = await this.supabase.client
+      .from("google_accounts")
+      .select()
+      .eq("user_id", userId)
+      .order("is_login_identity", { ascending: false })
+      .order("connected_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(mapAccount).find((account) => this.isDriveReady(account));
+  }
+
   /** Kullanıcının bağlı BÜTÜN Google hesapları (Ayarlar > Bağlı hesaplar listesi). */
   async listByUserId(userId: string): Promise<GoogleAccount[]> {
     const { data, error } = await this.supabase.client

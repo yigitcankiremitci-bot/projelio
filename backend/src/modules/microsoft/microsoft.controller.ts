@@ -165,7 +165,11 @@ export class MicrosoftController {
   @UseGuards(AuthGuard("jwt"))
   async status(@Req() req: any) {
     const configured = this.oauth.isDriveConfigured();
-    const account = await this.accounts.findByUserId(req.user.userId);
+    // Hazır bir hesap varsa o gösterilir; giriş kimliğinin Drive izni olmaması
+    // "bağlı değil" demek değil (bkz. findDriveReadyByUserId).
+    const account =
+      (await this.accounts.findDriveReadyByUserId(req.user.userId)) ??
+      (await this.accounts.findByUserId(req.user.userId));
     const driveReady = this.accounts.isDriveReady(account);
 
     let quota: { limitBytes?: number; usageBytes?: number } | undefined;

@@ -20,7 +20,7 @@ import { optionalOneOf, paraBirimiDogrula, requireAmount, requireOneOf } from ".
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { ButceErisimService } from "../budget/butce-erisim.service";
 import { hesapErisimKarari, paylasimGecerliMi } from "./hesap-erisim";
-import { abonelikKarari } from "./hesap-abonelik";
+import { abonelikDegisimi, abonelikKarari } from "./hesap-abonelik";
 import { hesapKimlikCrypto } from "./hesap-kripto";
 
 /**
@@ -295,7 +295,17 @@ export class HesaplarService {
     // Vade yalnızca kullanıcı gerçekten değiştirdiyse deftere yazılıyor.
     const vadeDegisti =
       girdi.nextDueDate !== undefined && (girdi.nextDueDate?.slice(0, 10) ?? null) !== (row.next_due_date ?? null);
-    const guncel = await this.aboneligiEsitle(data, kapsam, userId, vadeDegisti);
+    // Defter yalnızca PARA değiştiyse bütçe yetkisiyle eşitleniyor; ad/plan
+    // değiştiyse yalnızca açıklama yenileniyor (bkz. abonelikDegisimi).
+    // Eskiden her kaydetme eşitlemeden geçiyordu ve bütçe yetkisi olmayan
+    // yönetici ücretli hesabın notunu bile düzeltemiyordu.
+    const degisim = abonelikDegisimi(row, data as any, vadeDegisti);
+    const guncel =
+      degisim === "mali"
+        ? await this.aboneligiEsitle(data, kapsam, userId, vadeDegisti)
+        : degisim === "aciklama"
+        ? await this.defterAciklamasiniYenile(data)
+        : data;
     const isimler = await this.kullaniciAdlari([guncel.owner_user_id]);
     const kasaAdi = guncel.recurring_payment_id ? (await this.kasaBilgisi(kapsam, userId)).ad : undefined;
     return this.map(guncel, {
@@ -476,6 +486,25 @@ export class HesaplarService {
    * hem veritabanı kısıtında doğrulanıyor) — ama düşerse kullanıcı 500 değil
    * ne yapacağını söyleyen bir cümle görmeli.
    */
+  /**
+   * Ücretli hesabın adı/planı değişince defterdeki satırın AÇIKLAMASI.
+   *
+   * Bütçe yetkisi sorulmuyor: tutar, vade ve kasa aynı kalıyor, değişen yalnızca
+   * satırın hangi hesaba ait olduğunu anlatan metin. Açıklama eskide kalsaydı
+   * kasada eski adıyla görünürdü.
+   */
+  private async defterAciklamasiniYenile(row: any): Promise<any> {
+    if (!row.is_paid || !row.recurring_payment_id) return row;
+    const karar = this.abonelikKararini(row, false);
+    if (!karar.satir) return row;
+    const { error } = await this.supabase.client
+      .from("recurring_payments")
+      .update({ description: karar.satir.description })
+      .eq("id", row.recurring_payment_id);
+    if (error) throw error;
+    return row;
+  }
+
   private abonelikKararini(row: any, vadeDegisti: boolean) {
     try {
       return abonelikKarari(

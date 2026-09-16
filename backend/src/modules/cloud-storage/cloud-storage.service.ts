@@ -41,11 +41,13 @@ export class CloudStorageService {
    * yapabilme" tam olarak budur.
    */
   async findAccountForUser(userId: string): Promise<ResolvedCloudAccount | undefined> {
-    const google = await this.googleAccounts.findByUserId(userId);
-    if (this.googleAccounts.isDriveReady(google)) return { provider: "google", account: google };
+    // Giriş kimliği değil, HAZIR ilk hesap (bkz. findDriveReadyByUserId):
+    // Drive'ı ikinci bir depo hesabıyla bağlayan kullanıcı burada yok sayılıyordu.
+    const google = await this.googleAccounts.findDriveReadyByUserId(userId);
+    if (google) return { provider: "google", account: google };
 
-    const microsoft = await this.msAccounts.findByUserId(userId);
-    if (this.msAccounts.isDriveReady(microsoft)) return { provider: "microsoft", account: microsoft };
+    const microsoft = await this.msAccounts.findDriveReadyByUserId(userId);
+    if (microsoft) return { provider: "microsoft", account: microsoft };
 
     return undefined;
   }

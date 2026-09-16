@@ -114,6 +114,8 @@ export const hesaplar: TranslationDict = {
   "Oturumun açık olması yeterli değil: açık kalmış bir ekran başkasının eline geçebilir.":
     "Being signed in isn't enough: a screen left open can end up in someone else's hands.",
   "Projelio şifreniz": "Your Projelio password",
+  "Şifreyi göster": "Show password",
+  "Şifreyi gizle": "Hide password",
   "Kilidi aç": "Unlock",
   "Kilit açık ({yontem}) · {n} sn": "Unlocked ({yontem}) · {n}s",
   "Kilit kapalı": "Locked",

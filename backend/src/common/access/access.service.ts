@@ -76,10 +76,11 @@ export class AccessService {
       .maybeSingle();
     if (membership) return true;
 
-    // İş üzerinden dolaylı erişim yalnızca taşeron OLMAYANLAR için geçerli.
-    if (project.job_id && !(await this.isSubcontractor(userId))) {
-      return this.canViewJob(project.job_id, userId);
-    }
+    // İş üzerinden dolaylı erişim yalnızca işi YÖNETENLER için geçerli
+    // (taşeron kontrolü de bu kuralın içinde). Eskiden işi görebilen herkes
+    // — kadro üyesi, şirket üyesi — id'sini bildiği her projeyi açabiliyordu:
+    // liste onları gizliyor ama doğrudan adres çalışıyordu.
+    if (project.job_id) return this.seesAllProjectsOfJob(project.job_id, userId);
     return false;
   }
 
@@ -143,21 +144,44 @@ export class AccessService {
     }
   }
 
-  /** İşin TÜM projeleri mi görünür, yoksa yalnızca atandıkları mı? */
+  /** İşin TÜM projeleri/rutinleri mi görünür, yoksa yalnızca atandıkları mı? */
   async seesAllProjectsOfJob(jobId: string, userId: string): Promise<boolean> {
-    const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", jobId).maybeSingle();
-    const { data: jobMember } = await this.supabase.client
-      .from("job_members")
-      .select("id")
-      .eq("job_id", jobId)
-      .eq("user_id", userId)
-      .eq("status", "approved")
+    const { data: job } = await this.supabase.client
+      .from("jobs")
+      .select("owner_id, organization_id, group_id")
+      .eq("id", jobId)
       .maybeSingle();
     return seesAllProjectsOfJob({
       isJobOwner: job?.owner_id === userId,
-      isApprovedJobMember: !!jobMember,
+      isOrgManager: await this.manageJobsOfScope(job?.organization_id, job?.group_id, userId),
       isSubcontractor: await this.isSubcontractor(userId),
     });
+  }
+
+  /**
+   * İşin bağlı olduğu kurumsal kademede YÖNETEN mi? Şirketin sahibi ve
+   * departman yöneticisi, holdinge doğrudan bağlı işlerde de holdingin sahibi.
+   * Sıradan şirket/holding üyeliği yetmez: onlar da yalnızca atandıkları
+   * projeleri görür (bkz. seesAllProjectsOfJob'un saf kuralı).
+   */
+  private async manageJobsOfScope(
+    organizationId: string | null | undefined,
+    groupId: string | null | undefined,
+    userId: string
+  ): Promise<boolean> {
+    if (organizationId) {
+      const access = await this.organizationAccess(organizationId, userId);
+      return access.role === "owner" || access.role === "department_manager";
+    }
+    if (groupId) {
+      const { data: group } = await this.supabase.client
+        .from("groups")
+        .select("owner_id")
+        .eq("id", groupId)
+        .maybeSingle();
+      return group?.owner_id === userId;
+    }
+    return false;
   }
 
   // -------------------------------------------------------- Organizasyon

@@ -79,12 +79,18 @@ export function canRenderLocally(file: ProjectFile): boolean {
 
 const UNITS = ["B", "KB", "MB", "GB", "TB"];
 
-export function formatFileSize(bytes?: number): string {
+/**
+ * `hassas`: MB ve üstünde her zaman bir ondalık. Yükleme ilerlemesi için —
+ * "12 MB / 175 MB" gibi yuvarlanmış bir sayı 1 MB boyunca yerinde durur ve
+ * yükleme takılmış gibi görünür; "12,3 MB" 0,1 MB'da bir kıpırdar.
+ */
+export function formatFileSize(bytes?: number, hassas = false): string {
   if (bytes === undefined || bytes === null) return "—";
   if (bytes === 0) return "0 B";
   const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), UNITS.length - 1);
   const value = bytes / 1024 ** exponent;
-  return `${value.toFixed(value >= 10 || exponent === 0 ? 0 : 1)} ${UNITS[exponent]}`;
+  const ondalik = exponent === 0 ? 0 : hassas && exponent >= 2 ? 1 : value >= 10 ? 0 : 1;
+  return `${value.toFixed(ondalik)} ${UNITS[exponent]}`;
 }
 
 /** Dosya türüne göre kısa, okunur etiket. */

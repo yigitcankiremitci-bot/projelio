@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Z } from "./layout";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
@@ -130,8 +130,16 @@ export function useRefreshOnUndo(reload: () => void) {
  */
 export function useWithoutPendingDeletes<T extends { id: string }>(items: T[]): T[] {
   const { pendingDeleteIds } = useUndo();
-  if (pendingDeleteIds.length === 0) return items;
-  return items.filter((item) => !pendingDeleteIds.includes(item.id));
+  // useMemo ŞART: silme penceresinde geri sayım bildirimi her saniye
+  // sağlayıcıyı yeniden çizdiriyor. Süzülmüş liste her çizimde YENİ bir dizi
+  // olunca ona bağlı etkiler de her saniye çalışıyordu — ör. Dashboard'daki
+  // iş listesi "Tüm dosyalar"a veriliyor ve oradaki etki bütün dosyaları 6
+  // saniye boyunca 6 kez baştan çekiyordu (sayfa kendi kendine yenileniyor
+  // gibi görünüyordu).
+  return useMemo(
+    () => (pendingDeleteIds.length === 0 ? items : items.filter((item) => !pendingDeleteIds.includes(item.id))),
+    [items, pendingDeleteIds]
+  );
 }
 
 /**
@@ -536,10 +544,16 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeunload", flush);
   }, []);
 
+  // Değer sabitleniyor: geri sayım bildirimi (toast) her saniye bu sağlayıcıyı
+  // yeniden çiziyor; nesne her seferinde yeni olsaydı useUndo kullanan TÜM
+  // bileşenler de saniyede bir yeniden çizilirdi.
+  const value = useMemo(
+    () => ({ pushUndo, pushDestructive, pendingDeleteIds, refreshToken, undo, redo, canUndo, canRedo }),
+    [pushUndo, pushDestructive, pendingDeleteIds, refreshToken, undo, redo, canUndo, canRedo]
+  );
+
   return (
-    <UndoContext.Provider
-      value={{ pushUndo, pushDestructive, pendingDeleteIds, refreshToken, undo, redo, canUndo, canRedo }}
-    >
+    <UndoContext.Provider value={value}>
       {children}
       {toast && (
         <div

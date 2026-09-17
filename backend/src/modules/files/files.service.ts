@@ -3483,8 +3483,14 @@ export class FilesService {
    * Varsayılan olarak bulut deposundaki dosyaya dokunulmaz — kullanıcının kendi
    * depolamasındaki veriyi Projelio'daki bir tıklamayla yok etmek doğru olmaz.
    * `alsoTrash` yalnızca açıkça istenirse çöp kutusuna taşır (kalıcı silmez).
+   *
+   * Dönen `trashed`: bulutta çöpe taşıma istendiyse başarılı oldu mu. Eskiden
+   * hata yalnızca log'a düşüyordu; kayıt yine kaldırıldığı için kullanıcı
+   * "sildim" sanıyor, dosya Drive'da duruyordu ve sebebi hiçbir yerde
+   * görünmüyordu. Kaydı kaldırmak yine doğru (kullanıcı onu istedi), ama
+   * bulutun sonucunu bildirmek zorundayız.
    */
-  async remove(fileId: string, userId: string, alsoTrash = false): Promise<void> {
+  async remove(fileId: string, userId: string, alsoTrash = false): Promise<{ trashed?: boolean }> {
     const { row } = await this.findById(fileId, userId);
 
     const isUploader = row.uploaded_by === userId;
@@ -3496,13 +3502,16 @@ export class FilesService {
       throw new ForbiddenException("Bu dosyayı yalnızca yükleyen kişi veya sahibi/yöneticisi kaldırabilir");
     }
 
+    let trashed: boolean | undefined;
     if (alsoTrash) {
       try {
         const { provider, accountId } = storageOwner(row);
         const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
         await this.cloudStorage.trashFile(provider, accessToken, row.drive_file_id);
+        trashed = true;
       } catch (err) {
-        this.logger.warn(`Bulut çöp kutusuna taşınamadı (file=${fileId}): ${String(err)}`);
+        trashed = false;
+        this.logger.error(`Bulut çöp kutusuna taşınamadı (file=${fileId}): ${String(err)}`);
       }
     }
 
@@ -3511,6 +3520,7 @@ export class FilesService {
       .update({ archived_at: new Date().toISOString() })
       .eq("id", fileId);
     if (error) throw error;
+    return { trashed };
   }
 
   // ============================================================ bildirim

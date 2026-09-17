@@ -254,4 +254,19 @@ export const dosyalar: TranslationDict = {
     "— the work management app that keeps your projects, tasks, files and budget in one place.",
   "Dosyalarınızı ek olarak göndermek yerine, geri alabileceğiniz bağlantılarla paylaşın.":
     "Share files with links you can revoke, instead of sending attachments.",
+
+  // ─────────────────────────────────────────────── Arama ve sıralama
+  "Dosya ara": "Search files",
+  "Dosya ara…": "Search files…",
+  "Bu klasörde ara…": "Search this folder…",
+  "Aramayla eşleşen dosya yok.": "No files match your search.",
+  "Sıralama": "Sort",
+  "Eklenme: en yeni": "Date added: newest",
+  "Eklenme: en eski": "Date added: oldest",
+  "Ad: A → Z": "Name: A → Z",
+  "Ad: Z → A": "Name: Z → A",
+  "Boyut: en büyük": "Size: largest",
+  "Boyut: en küçük": "Size: smallest",
+  "{sayi} dosya Projelio'dan kaldırıldı ama bulut deposunda çöp kutusuna taşınamadı. Drive/OneDrive'dan elle silebilirsin.":
+    "{sayi} file(s) removed from Projelio but couldn't be moved to the cloud trash. You can delete them in Drive/OneDrive yourself.",
 };

@@ -5,6 +5,8 @@ import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from 
 import { useFileThumbnails } from "../lib/fileThumbnails";
 import { fileKey, parseKey, useFileSelection } from "../lib/fileSelection";
 import { useFileViewMode } from "../lib/fileViewMode";
+import { matchesSearch, sortFiles, useFileSort } from "../lib/fileSort";
+import { subscribeUploadDone } from "../lib/uploadQueue";
 import { useMarqueeSelection } from "../lib/useMarqueeSelection";
 import { useRefreshOnUndo, useUndo, useWithoutPendingDeletes } from "../lib/undo";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -14,6 +16,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
 import FileContextMenu from "./FileContextMenu";
 import FileDownloadLinkModal from "./FileDownloadLinkModal";
+import FileListControls from "./FileListControls";
 import FilePreviewModal from "./FilePreviewModal";
 import FileThumb from "./FileThumb";
 import LinkFileModal from "./LinkFileModal";
@@ -67,6 +70,8 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   /** "Bağla" penceresi (bkz. FilesPanel'deki eşi). Burada klasör yok. */
   const [linking, setLinking] = useState<LinkSource[] | null>(null);
   const [viewMode, toggleViewMode] = useFileViewMode();
+  const [siralama, setSiralama] = useFileSort();
+  const [arama, setArama] = useState("");
   const { pushUndo, pushDestructive } = useUndo();
   const [adding, setAdding] = useState(false);
   // Sürükleyip bırakılan dosyalar: hedefi kullanıcı pencerede seçecek.
@@ -159,8 +164,33 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   // Geri/ileri alma sunucuyu değiştiriyor; liste kendini tazelemeli.
   useRefreshOnUndo(reload);
 
+  /**
+   * Biten yüklemeyi listeye ekler.
+   *
+   * Yükleme penceresi kuyruğa verip hemen kapanıyor; o anda listeyi tazelemek
+   * yüklemesi henüz BİTMEMİŞ dosyayı getiremezdi — dosya ancak sayfa
+   * yenilenince görünüyordu. Kuyruk bitişi haber veriyor (bkz. lib/uploadQueue).
+   */
+  useEffect(
+    () =>
+      subscribeUploadDone((_kapsam, yeni) => {
+        const is = jobs.find((j) => j.id === yeni.jobId);
+        // Departman/şirket dosyası bu listeye ait değil.
+        if (!is) return;
+        setFiles((prev) =>
+          prev.some((f) => f.id === yeni.id) ? prev : [{ ...yeni, jobTitle: yeni.jobTitle ?? is.title }, ...prev]
+        );
+      }),
+    [jobs]
+  );
+
   /** Silinmeyi bekleyenler elenmiş liste (bkz. FilesPanel'deki aynı gerekçe). */
-  const gorunen = useWithoutPendingDeletes(files);
+  const silinmemis = useWithoutPendingDeletes(files);
+  /** Ekrana çizilen: aramaya uyan, seçilen sıraya dizilmiş. */
+  const gorunen = useMemo(
+    () => sortFiles(silinmemis.filter((f) => matchesSearch(f.name, arama)), siralama),
+    [silinmemis, arama, siralama]
+  );
   const thumbs = useFileThumbnails(gorunen);
   const sirali = useMemo(() => gorunen.map((f) => fileKey(f.id)), [gorunen]);
 
@@ -243,7 +273,13 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
       entityIds: list.map((f) => f.id),
       commit: async () => {
         try {
-          await Promise.all(list.map((f) => filesApi.remove(f.id, true)));
+          const sonuclar = await Promise.all(list.map((f) => filesApi.remove(f.id, true)));
+          const kalan = sonuclar.filter((r) => r.trashed === false).length;
+          if (kalan > 0) {
+            setError(
+              t("{sayi} dosya Projelio'dan kaldırıldı ama bulut deposunda çöp kutusuna taşınamadı. Drive/OneDrive'dan elle silebilirsin.", { sayi: kalan })
+            );
+          }
         } catch (e: any) {
           setError(e?.message ?? t("Dosya kaldırılamadı"));
           reload();
@@ -278,7 +314,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
         fontSize: 16,
       }}
     >
-      {t("Henüz dosya yok.")}
+      {silinmemis.length > 0 ? t("Aramayla eşleşen dosya yok.") : t("Henüz dosya yok.")}
     </div>
   ) : viewMode === "grid" ? (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
@@ -397,8 +433,8 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
       {/* Görünüm anahtarı FilesPanel'dekiyle AYNI tercihi okuyor
           (bkz. lib/fileViewMode.ts): kullanıcı simge görünümünü bir kez
           seçtiyse dosyaları nerede açarsa açsın öyle görmeli. */}
-      {!loading && !error && gorunen.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      {!loading && !error && silinmemis.length > 0 && (
+        <FileListControls query={arama} onQueryChange={setArama} sort={siralama} onSortChange={setSiralama}>
           <button
             type="button"
             title={viewMode === "grid" ? t("Liste görünümü") : t("Simge görünümü")}
@@ -415,7 +451,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
           >
             {viewMode === "grid" ? t("Liste") : t("Simge")}
           </button>
-        </div>
+        </FileListControls>
       )}
 
       {/* Kement kapsayıcısı: `position: relative` + altta boşluk

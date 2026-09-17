@@ -106,7 +106,7 @@ export default function UploadTray({ left }: { left: number }) {
                 <span style={{ fontSize: 11.5, color: c.textSecondary }}>
                   {u.status === "done"
                     ? `Yüklendi · ${formatFileSize(u.sizeBytes)}`
-                    : `${formatFileSize(u.uploadedBytes)} / ${formatFileSize(u.sizeBytes)} · %${pct}`}
+                    : `${formatFileSize(u.uploadedBytes, true)} / ${formatFileSize(u.sizeBytes, true)} · %${pct}`}
                 </span>
                 <div style={{ height: 3, borderRadius: 999, background: c.border, overflow: "hidden" }}>
                   <div

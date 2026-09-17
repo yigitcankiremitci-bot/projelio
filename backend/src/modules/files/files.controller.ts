@@ -781,7 +781,7 @@ export class FilesController {
   @Delete("files/:id")
   @UseGuards(AuthGuard("jwt"))
   async remove(@Param("id") id: string, @Query("trash") trash: string, @Req() req: any) {
-    await this.filesService.remove(id, req.user.userId, trash === "1");
-    return { ok: true };
+    const { trashed } = await this.filesService.remove(id, req.user.userId, trash === "1");
+    return { ok: true, trashed };
   }
 }

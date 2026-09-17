@@ -1,5 +1,6 @@
 import { getSocketId } from "../lib/socketId";
 import { getLocale } from "../lib/i18n/depo";
+import { sendWithProgress } from "../lib/xhrUpload";
 
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -160,16 +161,25 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return parseResponse<T>(res);
 }
 
-async function uploadFile<T>(path: string, formData: FormData, signal?: AbortSignal): Promise<T> {
+async function uploadFile<T>(
+  path: string,
+  formData: FormData,
+  signal?: AbortSignal,
+  /** Verilirse istek XHR ile gider ve gönderilen bayt bildirilir (bkz. lib/xhrUpload.ts). */
+  onProgress?: (loadedBytes: number) => void
+): Promise<T> {
   const token = localStorage.getItem("projelio_token");
-  const res = await fetch(`${API_URL}${path}`, {
+  const init = {
     method: "POST",
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } as Record<string, string>,
     body: formData,
     // İptal edilebilsin diye: kullanıcı yanlış dosya seçtiğinde yüklemenin
     // bitmesini beklemek zorunda kalmasın (bkz. FilesPanel iptal düğmesi).
     signal,
-  });
+  };
+  const res = onProgress
+    ? await sendWithProgress(`${API_URL}${path}`, init, onProgress)
+    : await fetch(`${API_URL}${path}`, init);
   if (!res.ok) {
     if (res.status === 401 && token) handleExpiredSession();
     // request() ile aynı ayıklama: eskiden ham gövde fırlatılıyordu ve kullanıcı
@@ -233,5 +243,6 @@ export const api = {
       keepalive: true,
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     }),
-  uploadFile: <T>(path: string, formData: FormData, signal?: AbortSignal) => uploadFile<T>(path, formData, signal),
+  uploadFile: <T>(path: string, formData: FormData, signal?: AbortSignal, onProgress?: (loadedBytes: number) => void) =>
+    uploadFile<T>(path, formData, signal, onProgress),
 };

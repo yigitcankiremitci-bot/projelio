@@ -1,5 +1,6 @@
 import type { GoogleDriveStatus, ProjectFile } from "@projelio/shared";
 import { API_URL, api } from "./client";
+import { sendWithProgress } from "../lib/xhrUpload";
 
 /** Bu boyutun altındaki dosyalar tek istekte backend üzerinden gider. */
 const INLINE_LIMIT = 8 * 1024 * 1024;
@@ -122,8 +123,9 @@ export const filesApi = {
   move: (fileId: string, folderId?: string) =>
     api.patch<ProjectFile>(`/files/${fileId}/folder`, { folderId: folderId ?? null }),
 
+  /** `trashed: false` → kayıt kaldırıldı ama bulutta çöpe taşınamadı; kullanıcıya söylenmeli. */
   remove: (fileId: string, alsoTrash = false) =>
-    api.delete<{ ok: boolean }>(`/files/${fileId}${alsoTrash ? "?trash=1" : ""}`),
+    api.delete<{ ok: boolean; trashed?: boolean }>(`/files/${fileId}${alsoTrash ? "?trash=1" : ""}`),
 
   syncShares: (jobId: string) =>
     api.post<{ granted: number; revoked: number }>(`/jobs/${jobId}/files/sync-shares`, {}),
@@ -386,8 +388,12 @@ export async function uploadFile(
     if (!isDepartment && context.outputId) form.append("outputId", context.outputId);
     if (context.folderId) form.append("folderId", context.folderId);
     if (context.relativePath) form.append("relativePath", context.relativePath);
-    onProgress?.(0.1);
-    const result = await api.uploadFile<ProjectFile>(`${base}/files`, form, signal);
+    // Gönderilen bayt gövdenin tamamına (form alanları dahil) göre geliyor;
+    // dosya boyutuna oranlayıp %99'da tutuyoruz: son bayt gittikten sonra da
+    // sunucu dosyayı buluta aktarıyor, "bitti" demek yanıt gelince doğru.
+    const result = await api.uploadFile<ProjectFile>(`${base}/files`, form, signal, (gonderilen) =>
+      onProgress?.(Math.min(0.99, gonderilen / Math.max(1, file.size)))
+    );
     onProgress?.(1);
     return result;
   }
@@ -439,12 +445,19 @@ async function uploadInChunks(
     const end = Math.min(offset + CHUNK_SIZE, file.size);
     const chunk = file.slice(offset, end);
 
-    const res = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Range": `bytes ${offset}-${end - 1}/${file.size}` },
-      body: chunk,
-      signal,
-    });
+    // Parça içindeki ilerleme de bildiriliyor: 8 MB'lık parça bitene kadar
+    // çubuk yerinde durursa yükleme takılmış gibi görünüyordu.
+    const parcaBasi = offset;
+    const res = await sendWithProgress(
+      uploadUrl,
+      {
+        method: "PUT",
+        headers: { "Content-Range": `bytes ${offset}-${end - 1}/${file.size}` },
+        body: chunk,
+        signal,
+      },
+      (gonderilen) => onProgress?.(Math.min(0.99, (parcaBasi + gonderilen) / file.size))
+    );
 
     // Google: parça alındı, sonraki parça bekleniyor.
     if (res.status === 308) {

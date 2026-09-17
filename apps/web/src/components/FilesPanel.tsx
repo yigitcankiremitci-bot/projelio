@@ -18,6 +18,7 @@ import { readDroppedFiles, type DroppedFile } from "../lib/dropFiles";
 import { fileKey, folderKey, parseKey, useFileSelection } from "../lib/fileSelection";
 import { useFileThumbnails } from "../lib/fileThumbnails";
 import { useFileViewMode } from "../lib/fileViewMode";
+import { matchesSearch, sortFiles, sortFolders, useFileSort } from "../lib/fileSort";
 import { useMarqueeSelection } from "../lib/useMarqueeSelection";
 import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -32,6 +33,7 @@ import type { CreateNativeFileMenuHandle } from "./CreateNativeFileMenu";
 import FileContextMenu from "./FileContextMenu";
 import FileDownloadLinkModal from "./FileDownloadLinkModal";
 import FilePreviewModal from "./FilePreviewModal";
+import FileListControls from "./FileListControls";
 import FileThumb from "./FileThumb";
 import LinkFileModal from "./LinkFileModal";
 import { useT } from "../lib/i18n";
@@ -213,8 +215,24 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
    * kaydı hâlâ döndürüyor, yani araya giren herhangi bir tazeleme silinen
    * dosyayı geri getiriyormuş gibi gösterirdi.
    */
-  const gorunenDosyalar = useWithoutPendingDeletes(files);
-  const gorunenKlasorler = useWithoutPendingDeletes(folders);
+  const silinmemisDosyalar = useWithoutPendingDeletes(files);
+  const silinmemisKlasorler = useWithoutPendingDeletes(folders);
+  /** Kapsamda (bu klasörde) gösterilecek hiçbir şey yok — arama hesaba katılmadan. */
+  const kapsamBos = silinmemisDosyalar.length === 0 && silinmemisKlasorler.length === 0;
+
+  // Arama bulunulan klasörün içinde yapılıyor: liste zaten o klasörün
+  // içeriği. Klasör değişince sıfırlanır — başka klasörde eski aramanın
+  // sessizce süzmeye devam etmesi "dosyalarım nerede" dedirtirdi.
+  const [arama, setArama] = useState("");
+  const [siralama, setSiralama] = useFileSort();
+  const gorunenDosyalar = useMemo(
+    () => sortFiles(silinmemisDosyalar.filter((f) => matchesSearch(f.name, arama)), siralama),
+    [silinmemisDosyalar, arama, siralama]
+  );
+  const gorunenKlasorler = useMemo(
+    () => sortFolders(silinmemisKlasorler.filter((f) => matchesSearch(f.name, arama)), siralama),
+    [silinmemisKlasorler, arama, siralama]
+  );
 
   const thumbs = useFileThumbnails(gorunenDosyalar);
   // Uygulama İÇİ sürükleme: satırı klasöre bırakarak taşıma. Bilgisayardan
@@ -276,6 +294,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   // Adres eşitlemesi yalnızca gezinilebilir, tam sayfa bağlamda.
   const urlSenkron = canBrowse && !compact;
   const folderId = urlSenkron ? searchParams.get("klasor") ?? undefined : yerelKlasor;
+  useEffect(() => setArama(""), [folderId]);
 
   const setFolderId = useCallback(
     (id?: string) => {
@@ -713,11 +732,19 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       entityIds: items.map((i) => i.id),
       commit: async () => {
         try {
-          await Promise.all(
+          const sonuclar = await Promise.all(
             items.map((i) =>
               i.kind === "file" ? filesApi.remove(i.id, buluttaDa) : filesApi.removeFolder(i.id)
             )
           );
+          // Kayıt kaldırıldı ama bulut reddetti: sessiz kalırsak kullanıcı
+          // dosyanın Drive'da da silindiğini sanıyor.
+          const kalan = sonuclar.filter((r) => "trashed" in r && r.trashed === false).length;
+          if (kalan > 0) {
+            setError(
+              t("{sayi} dosya Projelio'dan kaldırıldı ama bulut deposunda çöp kutusuna taşınamadı. Drive/OneDrive'dan elle silebilirsin.", { sayi: kalan })
+            );
+          }
         } catch (e: any) {
           setError(e?.message ?? t("Dosya kaldırılamadı"));
           load();
@@ -1029,6 +1056,16 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
         </div>
       )}
 
+      {!compact && !loading && !kapsamBos && (
+        <FileListControls
+          query={arama}
+          onQueryChange={setArama}
+          sort={siralama}
+          onSortChange={setSiralama}
+          placeholder={folderId ? t("Bu klasörde ara…") : t("Dosya ara…")}
+        />
+      )}
+
       {/*
         Görev/çıktı ekleri (compact) için ince araç çubuğu.
 
@@ -1041,7 +1078,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
         Boşken çizilmiyor: aynı iki düğme boş durum kutusunda zaten var, küçük
         bir modalda iki kez göstermek kalabalık yaratıyordu.
       */}
-      {compact && !readOnly && !driveMissing && (gorunenDosyalar.length > 0 || gorunenKlasorler.length > 0) && (
+      {compact && !readOnly && !driveMissing && !kapsamBos && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
           {connectedProvider && (
             <button
@@ -1127,7 +1164,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
         kez söylemek yeterli. Dosya varken sürükleyip bırakma yine çalışıyor —
         artık sayfanın her yerinde (bkz. usePageFileDrop).
       */}
-      {!readOnly && !loading && gorunenDosyalar.length === 0 && gorunenKlasorler.length === 0 && (
+      {!readOnly && !loading && kapsamBos && (
         <div
           /*
             Sayfa geneli bırakma açıkken kutunun KENDİ işleyicisi YOK.
@@ -1290,7 +1327,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                   {/* Boyut hem yüklenen hem toplam: yalnızca yüzde göstermek
                       büyük bir dosyada "takıldı mı?" sorusunu cevaplamıyordu. */}
                   <span style={{ color: c.textSecondary, flexShrink: 0 }}>
-                    {formatFileSize(u.uploadedBytes)} / {formatFileSize(u.sizeBytes)}
+                    {formatFileSize(u.uploadedBytes, true)} / {formatFileSize(u.sizeBytes, true)}
                   </span>
                 </>
               )}
@@ -1421,6 +1458,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
       {loading ? (
         <div style={{ color: c.textSecondary, fontSize: 15 }}>{t("Yükleniyor…")}</div>
+      ) : gorunenDosyalar.length === 0 && gorunenKlasorler.length === 0 && !kapsamBos ? (
+        <div style={{ color: c.textSecondary, fontSize: 15 }}>{t("Aramayla eşleşen dosya yok.")}</div>
       ) : gorunenDosyalar.length === 0 && gorunenKlasorler.length === 0 ? (
         // Yazılabilir ekranlarda boş durumu yukarıdaki bırakma kutusu anlatıyor;
         // burada ikinci kez yazmak aynı şeyi üst üste söylemek olurdu.

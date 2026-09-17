@@ -61,6 +61,9 @@ const listeners = new Set<() => void>();
 const doneListeners = new Set<(scope: string, file: ProjectFile) => void>();
 let working = false;
 
+/** İlerlemenin ekrana yansıdığı en küçük adım: 0,1 MB. */
+const ILERLEME_ADIMI = 100 * 1024;
+
 /** Biten yükleme köşede kısa süre "yüklendi" olarak kalır, sonra kendiliğinden düşer. */
 const DONE_LINGER_MS = 4000;
 
@@ -137,7 +140,13 @@ async function work(): Promise<void> {
           current.file,
           current.context,
           (ratio) => {
-            current.uploadedBytes = Math.round(ratio * current.sizeBytes);
+            const bayt = Math.round(ratio * current.sizeBytes);
+            // Ekran 0,1 MB'da bir güncellenir: tarayıcı ilerleme olayını çok
+            // sık veriyor ve her biri tepsiyi + dosya listesini yeniden
+            // çiziyor. Daha seyrek (eskiden parça başına, 8 MB) olunca da
+            // yükleme takılmış gibi görünüyordu.
+            if (bayt - current.uploadedBytes < ILERLEME_ADIMI && bayt < current.sizeBytes) return;
+            current.uploadedBytes = bayt;
             emit();
           },
           current.controller.signal,

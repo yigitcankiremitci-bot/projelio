@@ -7,8 +7,6 @@ interface Props {
   name: string;
   /** Düzenleme açık mı — sağ tık menüsü de açabildiği için kontrol dışarıda. */
   editing: boolean;
-  /** Verilmezse ad düzenlenemez (salt okunur ekran, Projelio klasörü). */
-  onStart?: () => void;
   /** Değişmeyen ya da boş ad için çağrılmaz; yalnızca kapanır. */
   onCommit: (name: string) => void;
   onClose: () => void;
@@ -16,17 +14,17 @@ interface Props {
 }
 
 /**
- * Dosya/klasör adı: normalde metin, çift tıklanınca yerinde düzenlenen kutu.
+ * Dosya/klasör adı: normalde metin, sağ tık > "Yeniden adlandır" ile yerinde
+ * düzenlenen kutu.
  *
- * Görev adıyla aynı davranış (bkz. TaskColumn renderTitle): Enter ya da
- * dışarı tıklamak kaydeder, Esc vazgeçer. Eskiden tarayıcının `prompt`
- * penceresi açılıyordu — sayfanın geri kalanından kopuk, temasız bir kutu.
+ * Enter ya da dışarı tıklamak kaydeder, Esc vazgeçer (görev adıyla aynı, bkz.
+ * TaskColumn renderTitle). Eskiden tarayıcının `prompt` penceresi açılıyordu —
+ * sayfanın geri kalanından kopuk, temasız bir kutu.
  *
- * Çift tık yalnızca ADIN ÜSTÜNDE düzenler; satırın geri kalanına (önizleme,
- * boşluk) çift tık dosyayı açmaya devam eder. Olay bu yüzden burada
- * durduruluyor.
+ * Çift tıkla AÇILMIYOR: dosya satırında çift tık zaten önizlemeyi açıyor ve
+ * ikisi bir arada denendiğinde tek hareket iki şey birden yapıyordu.
  */
-export default function InlineRenameText({ name, editing, onStart, onCommit, onClose, style }: Props) {
+export default function InlineRenameText({ name, editing, onCommit, onClose, style }: Props) {
   const c = useThemeColors();
   const t = useT();
   const [deger, setDeger] = useState(name);
@@ -102,18 +100,7 @@ export default function InlineRenameText({ name, editing, onStart, onCommit, onC
   }
 
   return (
-    <div
-      title={onStart ? t("{ad} — adı değiştirmek için çift tıkla", { ad: name }) : name}
-      onDoubleClick={
-        onStart
-          ? (e) => {
-              e.stopPropagation();
-              onStart();
-            }
-          : undefined
-      }
-      style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...style }}
-    >
+    <div title={name} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...style }}>
       {name}
     </div>
   );

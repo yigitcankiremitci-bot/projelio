@@ -1529,7 +1529,6 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               <InlineRenameText
                   name={folder.name}
                   editing={adDuzenlenen === folderKey(folder.id)}
-                  onStart={readOnly || folder.managed ? undefined : () => setAdDuzenlenen(folderKey(folder.id))}
                   onCommit={(ad) => void handleRenameFolder(folder, ad)}
                   onClose={() => setAdDuzenlenen(null)}
                   style={{ fontSize: 14, color: c.textPrimary }}
@@ -1573,7 +1572,6 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               <InlineRenameText
                   name={file.name}
                   editing={adDuzenlenen === fileKey(file.id)}
-                  onStart={readOnly ? undefined : () => setAdDuzenlenen(fileKey(file.id))}
                   onCommit={(ad) => void handleRenameFile(file, ad)}
                   onClose={() => setAdDuzenlenen(null)}
                   style={{ fontSize: 14, color: file.status === "missing" ? c.danger : c.textPrimary }}
@@ -1618,7 +1616,6 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 <InlineRenameText
                   name={folder.name}
                   editing={adDuzenlenen === folderKey(folder.id)}
-                  onStart={readOnly || folder.managed ? undefined : () => setAdDuzenlenen(folderKey(folder.id))}
                   onCommit={(ad) => void handleRenameFolder(folder, ad)}
                   onClose={() => setAdDuzenlenen(null)}
                   style={{ fontSize: 16, color: c.textPrimary }}
@@ -1660,7 +1657,6 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                   <InlineRenameText
                   name={file.name}
                   editing={adDuzenlenen === fileKey(file.id)}
-                  onStart={readOnly ? undefined : () => setAdDuzenlenen(fileKey(file.id))}
                   onCommit={(ad) => void handleRenameFile(file, ad)}
                   onClose={() => setAdDuzenlenen(null)}
                   style={{ fontSize: 16, color: file.status === "missing" ? c.danger : c.textPrimary }}

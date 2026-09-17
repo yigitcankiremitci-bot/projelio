@@ -280,5 +280,4 @@ export const dosyalar: TranslationDict = {
   "Seçimdeki klasörler {depo}'da her durumda çöp kutusuna taşınır.":
     "Folders in the selection are always moved to the {depo} trash.",
   "Yeni ad": "New name",
-  "{ad} — adı değiştirmek için çift tıkla": "{ad} — double-click to rename",
 };

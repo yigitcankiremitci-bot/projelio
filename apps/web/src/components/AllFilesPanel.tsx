@@ -363,7 +363,6 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
           <InlineRenameText
             name={file.name}
             editing={adDuzenlenen === file.id}
-            onStart={() => setAdDuzenlenen(file.id)}
             onCommit={(ad) => void handleRename(file, ad)}
             onClose={() => setAdDuzenlenen(null)}
             style={{ fontSize: 14, color: file.status === "missing" ? c.danger : c.textPrimary }}
@@ -410,7 +409,6 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
               <InlineRenameText
                 name={file.name}
                 editing={adDuzenlenen === file.id}
-                onStart={() => setAdDuzenlenen(file.id)}
                 onCommit={(ad) => void handleRename(file, ad)}
                 onClose={() => setAdDuzenlenen(null)}
                 style={{ fontSize: 16, color: file.status === "missing" ? c.danger : c.textPrimary }}

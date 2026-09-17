@@ -179,6 +179,7 @@ export const dosyalar: TranslationDict = {
   "{saglayici}'da aç": "Open in {saglayici}",
   // ─────────────────────────────────────────────── Boş durum / bırakma kutusu
   "Bilgisayardan seç": "Choose from computer",
+  "Cihazdan seç": "Choose from device",
   "veya sürükleyip bırakın": "or drag and drop",
   "Dosya ekleyebilmek için önce bir Drive ya da OneDrive hesabı bağlayın.":
     "Connect a Drive or OneDrive account before you can add files.",

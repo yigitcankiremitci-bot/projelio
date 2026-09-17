@@ -21,6 +21,7 @@ import { useFileViewMode } from "../lib/fileViewMode";
 import { useMarqueeSelection } from "../lib/useMarqueeSelection";
 import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { DOKUNMATIK_CIHAZ } from "../lib/dokunmatikCihaz";
 import { useThemeColors } from "../theme/useThemeColors";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { publishTaskAttachments } from "../lib/taskAttachmentEvents";
@@ -1080,7 +1081,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             }}
           >
             <IconUpload size={14} color={c.textSecondary} />
-            {t("Bilgisayardan seç")}
+            {t(DOKUNMATIK_CIHAZ ? "Cihazdan seç" : "Bilgisayardan seç")}
           </button>
         </div>
       )}
@@ -1227,10 +1228,11 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     cursor: "pointer",
                   }}
                 >
-                  {t("Bilgisayardan seç")}
+                  {t(DOKUNMATIK_CIHAZ ? "Cihazdan seç" : "Bilgisayardan seç")}
                 </button>
               </div>
-              <div style={{ fontSize: 13, marginTop: 10 }}>{t("veya sürükleyip bırakın")}</div>
+              {/* Telefonda sürükleyip bırakacak bir yer yok */}
+              {!DOKUNMATIK_CIHAZ && <div style={{ fontSize: 13, marginTop: 10 }}>{t("veya sürükleyip bırakın")}</div>}
             </>
           )}
         </div>

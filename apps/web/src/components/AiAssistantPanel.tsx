@@ -43,6 +43,7 @@ import {
 } from "../lib/tour/narrator";
 import { IconMic, IconSpeaker } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { DOKUNMATIK_CIHAZ } from "../lib/dokunmatikCihaz";
 
 interface Props {
   open: boolean;
@@ -538,10 +539,10 @@ export default function AiAssistantPanel({
     }
   };
 
-  /** Kredi yükleme henüz ayrı bir sayfa değil; bakiye ve hareketler burada. */
+  /** Bakiye yükleme henüz ayrı bir sayfa değil; bakiye ve hareketler burada. */
   const goToCredits = () => {
     onClose();
-    navigate("/settings/ai-credits");
+    navigate("/settings/lio-units");
   };
 
   /**
@@ -996,7 +997,7 @@ export default function AiAssistantPanel({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.2 }}>{t("Lio")}</div>
             <div style={{ fontSize: 12, opacity: 0.75 }}>
-              {credits ? `${formatCredits(credits.balance)} kredi` : "Yükleniyor…"}
+              {credits ? t("{n} birim", { n: formatCredits(credits.balance) }) : t("Yükleniyor…")}
             </div>
           </div>
 
@@ -1054,7 +1055,7 @@ export default function AiAssistantPanel({
               >
                 <option value="browser">{t("Tarayıcı sesi · ücretsiz")}</option>
                 <option value="server">
-                  Doğal ses · ~{SERVER_VOICE_CREDITS_PER_100_CHARS} kredi/100 karakter
+                  {t("Doğal ses · ~{n} birim/100 karakter", { n: SERVER_VOICE_CREDITS_PER_100_CHARS })}
                 </option>
               </select>
             </label>
@@ -1105,10 +1106,10 @@ export default function AiAssistantPanel({
                   }}
                 >
                   {samplingVoice
-                    ? "Hazırlanıyor…"
-                    : `Bu sesi dene (~${Math.ceil(
-                        (VOICE_SAMPLE.length / 100) * SERVER_VOICE_CREDITS_PER_100_CHARS
-                      )} kredi)`}
+                    ? t("Hazırlanıyor…")
+                    : t("Bu sesi dene (~{n} birim)", {
+                        n: Math.ceil((VOICE_SAMPLE.length / 100) * SERVER_VOICE_CREDITS_PER_100_CHARS),
+                      })}
                 </button>
               </div>
             )}
@@ -1150,7 +1151,7 @@ export default function AiAssistantPanel({
               <input type="checkbox" checked={autoSpeak} onChange={toggleAutoSpeak} />
               Yeni yanıtları kendiliğinden oku
               {voiceEngine === "server" && (
-                <span style={{ color: c.warning, fontSize: 11 }}>{t("(her yanıt kredi harcar)")}</span>
+                <span style={{ color: c.warning, fontSize: 11 }}>{t("(her yanıt Lio Bakiyesi harcar)")}</span>
               )}
             </label>
           </div>
@@ -1342,8 +1343,8 @@ export default function AiAssistantPanel({
           >
             {error ??
               (creditsBlocked
-                ? "AI kredin bu isteği tamamlamaya yetmedi."
-                : "AI krediniz azaldı. Kesintisiz kullanım için kredi yükleyin.")}
+                ? t("Lio Bakiyen bu isteği tamamlamaya yetmedi.")
+                : t("Lio Bakiyeniz azaldı. Kesintisiz kullanım için bakiye yükleyin."))}
             {(creditsBlocked || lowBalance) && (
               <div style={{ marginTop: 8 }}>
                 <button
@@ -1360,7 +1361,7 @@ export default function AiAssistantPanel({
                     cursor: "pointer",
                   }}
                 >
-                  {t("Kredi yükle")}
+                  {t("Bakiye yükle")}
                 </button>
               </div>
             )}
@@ -1403,7 +1404,7 @@ export default function AiAssistantPanel({
                   </span>
                   <span style={{ color: c.textSecondary }}>{attachment.detail}</span>
                   {attachment.creditsCharged > 0 && (
-                    <span style={{ color: c.warning }}>−{Math.round(attachment.creditsCharged)} kredi</span>
+                    <span style={{ color: c.warning }}>−{t("{n} birim", { n: Math.round(attachment.creditsCharged) })}</span>
                   )}
                   <button
                     type="button"
@@ -1459,7 +1460,7 @@ export default function AiAssistantPanel({
                 {cameraSupported && (
                   <MenuItem onClick={() => cameraInputRef.current?.click()}>{t("Fotoğraf çek")}</MenuItem>
                 )}
-                <MenuItem onClick={() => fileInputRef.current?.click()}>{t("Bilgisayardan yükle")}</MenuItem>
+                <MenuItem onClick={() => fileInputRef.current?.click()}>{t(DOKUNMATIK_CIHAZ ? "Cihazdan yükle" : "Bilgisayardan yükle")}</MenuItem>
                 <MenuItem onClick={() => void handleCloudPick()}>{t("Drive / OneDrive'dan seç")}</MenuItem>
               </div>
             </>
@@ -1594,7 +1595,7 @@ export default function AiAssistantPanel({
                   title={
                     recorder.recording
                       ? "Kaydı bitir ve yazıya çevir"
-                      : "Sesli komut ver (ses çözümleme kredi harcar)"
+                      : t("Sesli komut ver (ses çözümleme Lio Bakiyesi harcar)")
                   }
                   style={{
                     ...boxIconStyle,
@@ -1918,7 +1919,7 @@ function Bubble({
       {!isUser && (canSpeak || !!credits) && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "3px 4px 0" }}>
           {!!credits && (
-            <span style={{ fontSize: 10.5, color: c.textSecondary }}>{Math.round(credits)} kredi</span>
+            <span style={{ fontSize: 10.5, color: c.textSecondary }}>{t("{n} birim", { n: Math.round(credits) })}</span>
           )}
           {canSpeak && (
             <button

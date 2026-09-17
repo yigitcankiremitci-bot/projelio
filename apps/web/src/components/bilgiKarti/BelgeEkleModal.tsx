@@ -3,6 +3,7 @@ import type { BilgiKartiBelgeTuru, BilgiKartiKapsami, ProjectFile } from "@proje
 import { BILGI_KARTI_BELGE_ETIKET, BILGI_KARTI_BELGE_TURLERI } from "@projelio/shared";
 import { bilgiKartiApi } from "../../api/bilgiKarti";
 import { filesApi, uploadFile, type FileFolder, type FileTarget } from "../../api/files";
+import { DOKUNMATIK_CIHAZ } from "../../lib/dokunmatikCihaz";
 import { useThemeColors } from "../../theme/useThemeColors";
 import Modal from "../Modal";
 import { IconFile, IconFolder, IconLink, IconUpload } from "../icons";
@@ -181,7 +182,7 @@ export default function BelgeEkleModal({ scopeType, scopeId, onClose, onEklendi 
                 fontSize: 15,
               }}
             >
-              {yukleniyor ? "Yükleniyor…" : secilenDosya ? `Seçildi: ${secilenDosya.name}` : "Bilgisayardan dosya seç"}
+              {yukleniyor ? "Yükleniyor…" : secilenDosya ? `Seçildi: ${secilenDosya.name}` : DOKUNMATIK_CIHAZ ? "Cihazdan dosya seç" : "Bilgisayardan dosya seç"}
             </button>
           </div>
         )}

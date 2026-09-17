@@ -4693,6 +4693,9 @@ export class AiAssistantService {
       // görebiliyor musun" bilgisi var; kullanıcı adı, şifre, 2FA anahtarı ve
       // not İÇERİĞİ hiç okunmuyor (o sütunları okuyan servis, HesapKimlikService,
       // bu modüle hiç enjekte edilmedi — bkz. hesaplar.module.ts exports).
+      // liste() yetkili kullanıcıya `usernames` da döner (ekranda hesabı
+      // tanısın diye); aşağıdaki alan seçimi onu BİLEREK dışarıda bırakıyor —
+      // giriş e-postası modele gitmesin.
       //
       // Yetki kontrolü HesaplarService.liste'nin içinde: Lio ayrı bir yol
       // açmıyor, kullanıcının kendi yetkisiyle aynı kapıdan geçiyor.

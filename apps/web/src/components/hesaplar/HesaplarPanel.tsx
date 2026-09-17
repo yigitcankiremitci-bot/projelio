@@ -101,7 +101,7 @@ export default function HesaplarPanel({ organizationId, departmentId, jobId, can
     return hesaplar.filter((h) => {
       if (kategori && h.category !== kategori) return false;
       if (!q) return true;
-      return [h.name, h.plan, h.url, h.ownerName].some((alan) =>
+      return [h.name, h.plan, h.url, h.ownerName, ...(h.usernames ?? [])].some((alan) =>
         (alan ?? "").toLocaleLowerCase("tr").includes(q)
       );
     });
@@ -299,6 +299,9 @@ export default function HesaplarPanel({ organizationId, departmentId, jobId, can
                   {t(HESAP_KATEGORILERI[hesap.category].label)}
                 </span>
                 <span style={{ fontSize: 14, color: c.textPrimary, fontWeight: 500 }}>{hesap.name}</span>
+                {hesap.usernames && (
+                  <span style={{ fontSize: 13, color: c.textSecondary }}>{hesap.usernames.join(", ")}</span>
+                )}
                 {hesap.isPaid && hesap.amount && hesap.billingInterval && (
                   <span style={{ fontSize: 12, color: c.accent }}>
                     {paraYaz(hesap.amount, hesap.currency)} · {t(RECURRENCE_INTERVAL_LABEL[hesap.billingInterval])}

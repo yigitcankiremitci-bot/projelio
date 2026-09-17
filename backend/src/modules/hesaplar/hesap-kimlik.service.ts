@@ -14,9 +14,11 @@ import { hesapKimlikCrypto } from "./hesap-kripto";
 /**
  * Hesapların giriş bilgileri (kullanıcı adı + şifre + not + 2FA sırrı).
  *
- * KURAL: `service_account_credentials` tablosunu başka hiçbir servis okumaz.
- * Sır yalnızca `goster()` çağrısından çıkar; liste uçları sırrı DÖNMEZ,
- * yalnızca "böyle bir kayıt var" bilgisini döner. 076'da sosyal medya için
+ * KURAL: şifre, not ve 2FA sırrı yalnızca `goster()` çağrısından çıkar; liste
+ * uçları onları DÖNMEZ. TEK İSTİSNA kullanıcı adı: HesaplarService.liste onu
+ * görme yetkisi olana kilitsiz gösteriyor, yoksa aynı servisten iki hesabı
+ * olan kullanıcı hangisinin hangisi olduğunu anlamak için her birine
+ * girmek zorundaydı. 076'da sosyal medya için
  * kurulan sınırın aynısı ve aynı gerekçeyle.
  *
  * İKİ KAPI VAR VE İKİSİ DE GEÇİLMELİ:

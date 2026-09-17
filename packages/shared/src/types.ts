@@ -3445,6 +3445,12 @@ export interface ServiceAccount {
 
   /** Kaç giriş kaydı var. Sır değil: sayı, değerine dair bir şey söylemez. */
   credentialCount: number;
+  /**
+   * Giriş kayıtlarındaki kullanıcı adları (tekrarsız, kayıt sırasıyla).
+   * YALNIZCA canReveal olan kullanıcıya doldurulur ve kilit istemez: liste
+   * açılır açılmaz "bu hangi hesap" anlaşılsın diye. Şifre yine kilit arkasında.
+   */
+  usernames?: string[];
   /** Bu kullanıcı bu hesabın giriş bilgilerini görebilir mi. */
   canReveal: boolean;
   /** Görebiliyorsa hangi haktan. */

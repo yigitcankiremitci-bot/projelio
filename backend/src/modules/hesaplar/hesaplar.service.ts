@@ -24,6 +24,25 @@ import { abonelikDegisimi, abonelikKarari } from "./hesap-abonelik";
 import { hesapKimlikCrypto } from "./hesap-kripto";
 
 /**
+ * Şifreli kullanıcı adlarını çözer; çözülemeyeni (anahtar değişmiş, satır
+ * bozuk) SESSİZCE atlar. Liste tek bir bozuk kayıt yüzünden açılmaz olmasın —
+ * kaydın içine girildiğinde goster() zaten açık bir hata veriyor.
+ */
+function kullaniciAdlariniCoz(sifreli?: string[]): string[] | undefined {
+  if (!sifreli?.length || !hesapKimlikCrypto.isConfigured()) return undefined;
+  const adlar = new Set<string>();
+  for (const deger of sifreli) {
+    try {
+      const ad = hesapKimlikCrypto.decrypt(deger).trim();
+      if (ad) adlar.add(ad);
+    } catch {
+      // bkz. yukarı
+    }
+  }
+  return adlar.size ? Array.from(adlar) : undefined;
+}
+
+/**
  * Hesaplar modülü — üye olunan hesapların listesi.
  *
  * SIR BU SERVİSTEN ÇIKMAZ: giriş bilgilerinin şifreli sütunları
@@ -164,7 +183,7 @@ export class HesaplarService {
     const satirlar = data ?? [];
 
     const [sayimlar, paylasimlar, isimler, kasaBilgisi] = await Promise.all([
-      this.kimlikSayimlari(satirlar.map((r: any) => r.id)),
+      this.kimlikOzetleri(satirlar.map((r: any) => r.id)),
       this.paylasimlariTopla(kapsam, userId, access.canManageTeam),
       this.kullaniciAdlari(satirlar.map((r: any) => r.owner_user_id)),
       this.kasaBilgisi(kapsam, userId),
@@ -180,7 +199,8 @@ export class HesaplarService {
       });
       return this.map(row, {
         ownerName: row.owner_user_id ? isimler.get(row.owner_user_id) : undefined,
-        credentialCount: sayimlar.get(row.id) ?? 0,
+        credentialCount: sayimlar.get(row.id)?.sayi ?? 0,
+        usernames: karar.canReveal ? kullaniciAdlariniCoz(sayimlar.get(row.id)?.kullaniciAdlari) : undefined,
         canReveal: karar.canReveal,
         revealReason: karar.reason,
         grantCount: access.canManageTeam ? (paylasimlar.sayimlar.get(row.id) ?? 0) : undefined,
@@ -201,21 +221,35 @@ export class HesaplarService {
   }
 
   /**
-   * Hesap başına giriş kaydı sayısı.
+   * Hesap başına giriş kaydı sayısı + şifreli kullanıcı adları.
    *
    * SAYI SIR DEĞİL: "bu hesabın şifresi girilmiş" bilgisi, şifrenin kendisine
    * dair hiçbir şey söylemez ve listenin en çok işe yarayan sütunu — eksik
    * kalmış hesaplar ancak böyle görülüyor.
+   *
+   * Kullanıcı adları burada ŞİFRELİ dönüyor; çözmek çağıranın işi ve yalnızca
+   * canReveal olan hesaplar için yapılıyor. Eskiden kullanıcı adı da yalnızca
+   * kilitle görünüyordu ve aynı servisten iki hesabı olan kullanıcı hangisinin
+   * hangisi olduğunu anlamak için her birinin içine girmek zorundaydı.
+   * Şifre, not ve 2FA sırrı BU SORGUYA GİRMEZ.
    */
-  private async kimlikSayimlari(ids: string[]): Promise<Map<string, number>> {
+  private async kimlikOzetleri(
+    ids: string[]
+  ): Promise<Map<string, { sayi: number; kullaniciAdlari: string[] }>> {
     if (ids.length === 0) return new Map();
     const { data } = await this.supabase.client
       .from("service_account_credentials")
-      .select("account_id")
-      .in("account_id", ids);
-    const sayim = new Map<string, number>();
-    for (const row of data ?? []) sayim.set(row.account_id, (sayim.get(row.account_id) ?? 0) + 1);
-    return sayim;
+      .select("account_id, username_enc")
+      .in("account_id", ids)
+      .order("created_at", { ascending: true });
+    const ozet = new Map<string, { sayi: number; kullaniciAdlari: string[] }>();
+    for (const row of data ?? []) {
+      const kayit = ozet.get(row.account_id) ?? { sayi: 0, kullaniciAdlari: [] };
+      kayit.sayi += 1;
+      if (row.username_enc) kayit.kullaniciAdlari.push(row.username_enc);
+      ozet.set(row.account_id, kayit);
+    }
+    return ozet;
   }
 
   private async kullaniciAdlari(ids: (string | null | undefined)[]): Promise<Map<string, string>> {
@@ -310,7 +344,10 @@ export class HesaplarService {
     const kasaAdi = guncel.recurring_payment_id ? (await this.kasaBilgisi(kapsam, userId)).ad : undefined;
     return this.map(guncel, {
       ownerName: guncel.owner_user_id ? isimler.get(guncel.owner_user_id) : undefined,
-      credentialCount: (await this.kimlikSayimlari([id])).get(id) ?? 0,
+      ...(await this.kimlikOzetleri([id]).then((ozet) => ({
+        credentialCount: ozet.get(id)?.sayi ?? 0,
+        usernames: karar.canReveal ? kullaniciAdlariniCoz(ozet.get(id)?.kullaniciAdlari) : undefined,
+      }))),
       canReveal: karar.canReveal,
       revealReason: karar.reason,
       // Paylaşım sayısı listede dönüyor; tek kaydın güncellenmesinde ayrıca
@@ -887,6 +924,7 @@ export class HesaplarService {
     ek: {
       ownerName?: string;
       credentialCount: number;
+      usernames?: string[];
       canReveal: boolean;
       revealReason?: ServiceAccount["revealReason"];
       grantCount?: number;
@@ -918,6 +956,7 @@ export class HesaplarService {
       budgetScopeType: ek.budgetScopeType,
       budgetScopeName: ek.budgetScopeName,
       credentialCount: ek.credentialCount,
+      usernames: ek.usernames?.length ? ek.usernames : undefined,
       canReveal: ek.canReveal,
       revealReason: ek.revealReason,
       grantCount: ek.grantCount,

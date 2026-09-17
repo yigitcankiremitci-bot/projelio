@@ -30,7 +30,7 @@ export default function Header({ dict, locale }: { dict: Dict; locale: Locale })
     // diye bağlantı ana sayfanın çapasına gidiyor.
     { href: path(locale, "#demo-account"), label: dict.nav.demoAccount },
     { href: path(locale, "pricing"), label: dict.nav.pricing },
-    { href: path(locale, "credits"), label: dict.nav.credits },
+    { href: path(locale, "lio-units"), label: dict.nav.credits },
     { href: path(locale, "faq"), label: dict.nav.faq },
     { href: path(locale, "contact"), label: dict.nav.contact },
   ];

@@ -542,7 +542,7 @@ export class BillingService {
         abonelik.userId,
         plan.monthlyCredits,
         "topup",
-        `Paket kredisi: ${plan.name} (${donemIso.slice(0, 10)})`
+        `Paket bakiyesi: ${plan.name} (${donemIso.slice(0, 10)})`
       );
     } catch (error) {
       await this.supabase.client.from("subscription_credit_grants").delete().eq("id", yerTutma?.id);

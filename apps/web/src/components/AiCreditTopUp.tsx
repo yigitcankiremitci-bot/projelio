@@ -54,7 +54,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
         setPaymentConfigured(pkgs.paymentConfigured);
         setOrders(ords);
       })
-      .catch(() => setError(t("Kredi paketleri yüklenemedi. Sayfayı yenilemeyi dene.")))
+      .catch(() => setError(t("Bakiye paketleri yüklenemedi. Sayfayı yenilemeyi dene.")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -92,7 +92,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
 
   return (
     <section style={{ maxWidth: 480, marginBottom: 22 }}>
-      <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 10px" }}>{t("Kredi yükle")}</h2>
+      <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 10px" }}>{t("Bakiye yükle")}</h2>
 
       {loading ? (
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
@@ -119,7 +119,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
                   <IconSparkle size={17} color={active ? c.accentDark : c.accent} />
                   <span style={{ flex: 1 }}>
                     <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: c.textPrimary }}>
-                      {p.label} — {t("{n} kredi", { n: p.credits.toLocaleString("tr-TR") })}
+                      {p.label} — {t("{n} birim", { n: p.credits.toLocaleString("tr-TR") })}
                     </span>
                     <span style={{ display: "block", fontSize: 13, color: c.textSecondary }}>{p.description}</span>
                   </span>
@@ -146,7 +146,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
               }}
             >
               {t(
-                "Çevrim içi ödeme henüz açık değil. Siparişi oluşturduğunda ödeme talimatları için seninle iletişime geçilir; ödeme onaylandıktan sonra kredilerin hesabına yüklenir."
+                "Çevrim içi ödeme henüz açık değil. Siparişi oluşturduğunda ödeme talimatları için seninle iletişime geçilir; ödeme onaylandıktan sonra Lio Bakiyen hesabına yüklenir."
               )}
             </p>
           )}
@@ -189,7 +189,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
                     }}
                   >
                     <span style={{ flex: 1, color: c.textPrimary }}>
-                      {t("{n} kredi", { n: o.credits.toLocaleString("tr-TR") })}
+                      {t("{n} birim", { n: o.credits.toLocaleString("tr-TR") })}
                       <span style={{ color: c.textSecondary }}> · {formatTry(o.priceAmount)}</span>
                       <span style={{ display: "block", fontSize: 12.5, color: c.textSecondary }}>
                         {t(STATUS_LABEL[o.status])} · {new Date(o.createdAt).toLocaleDateString("tr-TR")}

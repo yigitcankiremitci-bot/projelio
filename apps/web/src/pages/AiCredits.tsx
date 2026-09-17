@@ -11,11 +11,11 @@ import { demoHesap } from "../lib/demoHesap";
 // Modül düzeyinde kanca çağrılamaz: Türkçe metin ANAHTAR olarak duruyor,
 // çeviri kullanıldığı yerde (t(TYPE_LABELS[...])) yapılıyor.
 const TYPE_LABELS: Record<AiCreditTransaction["type"], string> = {
-  topup: "Kredi yüklemesi", // dil:anahtar
+  topup: "Bakiye yüklemesi", // dil:anahtar
   usage: "AI kullanımı", // dil:anahtar
   refund: "İade", // dil:anahtar
   adjustment: "Düzeltme", // dil:anahtar
-  welcome: "Hoş geldin kredisi", // dil:anahtar
+  welcome: "Hoş geldin bakiyesi", // dil:anahtar
 };
 
 export default function AiCreditsPage() {
@@ -50,7 +50,7 @@ export default function AiCreditsPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>{t("AI Kredilerim")}</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>{t("Lio Bakiyesi")}</h1>
 
       {/* Bakiye kartı */}
       <div
@@ -70,7 +70,7 @@ export default function AiCreditsPage() {
         <div style={{ fontSize: 38, fontWeight: 600, margin: "8px 0 2px", letterSpacing: -0.5 }}>
           {loading ? "…" : Math.round(credits?.balance ?? 0).toLocaleString("tr-TR")}
         </div>
-        <div style={{ fontSize: 13, opacity: 0.75 }}>{t("Projelio Kredisi")}</div>
+        <div style={{ fontSize: 13, opacity: 0.75 }}>{t("Lio birimi")}</div>
 
         {credits && (
           <div style={{ display: "flex", gap: 22, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.15)" }}>
@@ -95,7 +95,7 @@ export default function AiCreditsPage() {
           }}
         >
           {t(
-            "Demo hesabındasın: Lio ücretsiz, krediden düşmüyor. Yukarıdaki sayı, bütün ziyaretçilerin paylaştığı saatlik deneme hakkından kalan kısım — dolarsa bir süre sonra kendiliğinden yenileniyor. Kendi hesabında böyle bir sınır yok."
+            "Demo hesabındasın: Lio ücretsiz, bakiyeden düşmüyor. Yukarıdaki sayı, bütün ziyaretçilerin paylaştığı saatlik deneme hakkından kalan kısım — dolarsa bir süre sonra kendiliğinden yenileniyor. Kendi hesabında böyle bir sınır yok."
           )}
         </div>
       )}
@@ -114,7 +114,7 @@ export default function AiCreditsPage() {
             lineHeight: 1.5,
           }}
         >
-          {t("Krediniz azaldı. Asistanı kesintisiz kullanmak için aşağıdan kredi yükleyebilirsiniz.")}
+          {t("Lio Bakiyeniz azaldı. Asistanı kesintisiz kullanmak için aşağıdan bakiye yükleyebilirsiniz.")}
         </div>
       )}
 

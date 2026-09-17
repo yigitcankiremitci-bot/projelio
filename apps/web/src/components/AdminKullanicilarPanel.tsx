@@ -216,12 +216,12 @@ export default function AdminKullanicilarPanel({ yenile = 0 }: { yenile?: number
         )}
       </div>
       <p style={{ color: c.textSecondary, fontSize: 14, margin: "0 0 16px", lineHeight: 1.5 }}>
-        {t("Bir kullanıcıya tıklayarak kredi yükleyip geri alabilir, askıya alabilir, oturumlarını kapatabilir ya da hesabını silebilirsin. Sütun başlıklarına tıklayarak sıralayabilirsin.")}
+        {t("Bir kullanıcıya tıklayarak bakiye yükleyip geri alabilir, askıya alabilir, oturumlarını kapatabilir ya da hesabını silebilirsin. Sütun başlıklarına tıklayarak sıralayabilirsin.")}
       </p>
 
       {migrationEksik && (
         <Uyari c={c}>
-          {t("Veritabanı güncellemesi (migration 108) henüz uygulanmamış: askıya alma, oturum kapatma, kredi geri alma ve işlem kaydı çalışmaz.")}
+          {t("Veritabanı güncellemesi (migration 108) henüz uygulanmamış: askıya alma, oturum kapatma, bakiye geri alma ve işlem kaydı çalışmaz.")}
         </Uyari>
       )}
 
@@ -331,7 +331,7 @@ export default function AdminKullanicilarPanel({ yenile = 0 }: { yenile?: number
                 {baslik("son30", t("Son 30 gün"), "right")}
                 {baslik("aktifGun", t("Aktif gün"), "right")}
                 {baslik("toplam", t("Toplam süre"), "right")}
-                {baslik("kredi", t("Kredi"), "right")}
+                {baslik("kredi", t("Birim"), "right")}
                 {baslik("abonelik", t("Abonelik"))}
                 {baslik("kayit", t("Kayıt"))}
               </tr>
@@ -539,7 +539,7 @@ function KullaniciDetayModal({ userId, onClose, onDegisti }: { userId: string; o
       {detay && u && (
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {detay.migrationEksik && (
-            <Uyari c={c}>{t("Migration 108 uygulanmadığı için askı, oturum kapatma ve kredi geri alma kapalı.")}</Uyari>
+            <Uyari c={c}>{t("Migration 108 uygulanmadığı için askı, oturum kapatma ve bakiye geri alma kapalı.")}</Uyari>
           )}
 
           {geriBildirim && (
@@ -634,7 +634,7 @@ function KullaniciDetayModal({ userId, onClose, onDegisti }: { userId: string; o
           </Bolum>
 
           {/* ---------------------------------------------------- Kredi */}
-          <Bolum c={c} baslik={t("Lio kredisi")}>
+          <Bolum c={c} baslik={t("Lio Bakiyesi")}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 24, marginBottom: 12 }}>
               <Metrik c={c} etiket={t("Bakiye")} deger={sayi(u.kredi.balance)} renk={u.kredi.balance < 0 ? c.danger : undefined} />
               <Metrik c={c} etiket={t("Toplam yüklenen")} deger={sayi(u.kredi.lifetimePurchased)} />
@@ -664,7 +664,7 @@ function KullaniciDetayModal({ userId, onClose, onDegisti }: { userId: string; o
                     await adminKullanicilar.krediYukle(u.id, miktarSayi, aciklama.trim() || undefined);
                     setMiktar("");
                     setAciklama("");
-                  }, t("{miktar} kredi yüklendi.", { miktar: sayi(miktarSayi) }))
+                  }, t("{miktar} birim yüklendi.", { miktar: sayi(miktarSayi) }))
                 }
               >
                 {t("Yükle")}
@@ -685,7 +685,7 @@ function KullaniciDetayModal({ userId, onClose, onDegisti }: { userId: string; o
                   <tr style={{ borderBottom: `1px solid ${c.border}` }}>
                     <th style={thStyle(c)}>{t("Tarih")}</th>
                     <th style={thStyle(c)}>{t("Tür")}</th>
-                    <th style={thStyle(c, "right")}>{t("Kredi")}</th>
+                    <th style={thStyle(c, "right")}>{t("Birim")}</th>
                     <th style={thStyle(c, "right")}>{t("Bakiye")}</th>
                     <th style={thStyle(c)}>{t("Açıklama")}</th>
                     <th style={thStyle(c)} />
@@ -723,7 +723,7 @@ function KullaniciDetayModal({ userId, onClose, onDegisti }: { userId: string; o
                   {detay.krediHareketleri.length === 0 && (
                     <tr>
                       <td colSpan={6} style={{ ...tdStyle(c), color: c.textSecondary, textAlign: "center", padding: 16 }}>
-                        {t("Henüz kredi hareketi yok.")}
+                        {t("Henüz bakiye hareketi yok.")}
                       </td>
                     </tr>
                   )}
@@ -877,7 +877,7 @@ function KullaniciDetayModal({ userId, onClose, onDegisti }: { userId: string; o
                   await adminKullanicilar.krediDus(u.id, o.miktar, aciklama.trim() || undefined);
                   setMiktar("");
                   setAciklama("");
-                }, t("{miktar} kredi düşüldü.", { miktar: sayi(o.miktar) }));
+                }, t("{miktar} birim düşüldü.", { miktar: sayi(o.miktar) }));
                 break;
               case "geri_al":
                 await calistir(() => adminKullanicilar.krediGeriAl(u.id, o.hareket.id), t("Yükleme geri alındı."));
@@ -935,8 +935,8 @@ function onayMetni(
           };
     case "kredi_dus":
       return {
-        title: t("Kredi düş"),
-        message: t("{ad} kullanıcısının bakiyesinden {miktar} kredi düşülecek. Belirli bir yüklemeyi geri almak istiyorsan listedeki \"Geri al\" düğmesini kullan.", {
+        title: t("Bakiye düş"),
+        message: t("{ad} kullanıcısının bakiyesinden {miktar} birim düşülecek. Belirli bir yüklemeyi geri almak istiyorsan listedeki \"Geri al\" düğmesini kullan.", {
           ad: u.fullName,
           miktar: sayi(onay.miktar),
         }),
@@ -946,7 +946,7 @@ function onayMetni(
     case "geri_al":
       return {
         title: t("Yüklemeyi geri al"),
-        message: t("{miktar} kredilik yükleme geri alınacak. Kredi harcanmışsa bakiye eksiye düşebilir.", { miktar: sayi(onay.hareket.credits) }),
+        message: t("{miktar} birimlik yükleme geri alınacak. Birimler harcanmışsa bakiye eksiye düşebilir.", { miktar: sayi(onay.hareket.credits) }),
         confirmLabel: t("Geri al"),
         danger: true,
       };
@@ -981,9 +981,9 @@ const ISLEM_ETIKETI: Record<string, string> = {
   oturumlari_kapat: "Oturumları kapattı", // dil:anahtar
   rol_degistir: "Rolü değiştirdi", // dil:anahtar
   eposta_dogrula: "E-postayı doğruladı", // dil:anahtar
-  kredi_yukle: "Kredi yükledi", // dil:anahtar
-  kredi_dus: "Kredi düştü", // dil:anahtar
-  kredi_geri_al: "Kredi yüklemesini geri aldı", // dil:anahtar
+  kredi_yukle: "Bakiye yükledi", // dil:anahtar
+  kredi_dus: "Bakiye düştü", // dil:anahtar
+  kredi_geri_al: "Bakiye yüklemesini geri aldı", // dil:anahtar
   mesaj_gonder: "Mesaj gönderdi", // dil:anahtar
   silme_planla: "Silmeyi planladı", // dil:anahtar
   silmeyi_iptal_et: "Silmeyi iptal etti", // dil:anahtar

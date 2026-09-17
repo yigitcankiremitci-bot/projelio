@@ -11,6 +11,7 @@ import {
   WELCOME_CREDITS,
 } from "./ai-credits.config";
 import { demoKullanicisiMi } from "../../common/demo-hesap";
+import { hataMetni } from "../../common/i18n";
 import { DemoAiKotasi, DEMO_SAATLIK_KREDI } from "./demo-ai-kotasi";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
@@ -19,8 +20,13 @@ import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
  * görünce "kredi yükle" akışını açar. NestJS'in hazır bir 402 sınıfı yoktur.
  */
 export class InsufficientCreditsException extends HttpException {
-  constructor(message: string) {
-    super({ statusCode: HttpStatus.PAYMENT_REQUIRED, message, error: "InsufficientCredits" }, HttpStatus.PAYMENT_REQUIRED);
+  // Değişkenli metin parametreleriyle ayrı taşınıyor: gömülü hâli sözlükte
+  // bulunamaz ve İngilizce kullanıcıya Türkçe kalırdı (bkz. hataMetni).
+  constructor(message: string, params?: Record<string, string | number>) {
+    super(
+      { statusCode: HttpStatus.PAYMENT_REQUIRED, ...hataMetni(message, params), error: "InsufficientCredits" },
+      HttpStatus.PAYMENT_REQUIRED
+    );
   }
 }
 
@@ -108,7 +114,7 @@ export class AiCreditsService {
 
     if (!data) {
       if (WELCOME_CREDITS > 0) {
-        await this.grant(userId, WELCOME_CREDITS, "welcome", "Hoş geldin kredisi");
+        await this.grant(userId, WELCOME_CREDITS, "welcome", "Hoş geldin bakiyesi");
         return { balance: WELCOME_CREDITS, lifetimePurchased: WELCOME_CREDITS, lifetimeSpent: 0 };
       }
       await this.supabase.client.from("ai_credit_balances").insert({ user_id: userId });
@@ -174,7 +180,7 @@ export class AiCreditsService {
         this.assertBalanceCovers(balance, amount);
         // assertBalanceCovers zaten fırlatır; buraya düşülürse yarışta bakiye
         // yeniden yeterli hâle gelmiş demektir, o zaman da net bir hata verilir.
-        throw new InsufficientCreditsException("AI kredin bu işlem için yeterli değil.");
+        throw new InsufficientCreditsException("Lio Bakiyen bu işlem için yeterli değil.");
       }
       this.logger.warn(`Kredi tutulamadı, koruma bu istek için atlanıyor: ${error.message}`);
       return null;
@@ -199,11 +205,12 @@ export class AiCreditsService {
 
     const balance = await this.getAvailable(userId);
     if (balance < MIN_BALANCE_TO_START) {
-      throw new InsufficientCreditsException(
-        balance <= 0
-          ? "AI kredin bitti. Devam etmek için kredi yüklemen gerekiyor."
-          : `AI kredin yetersiz (${Math.floor(balance)} kredi). Devam etmek için kredi yüklemen gerekiyor.`
-      );
+      throw balance <= 0
+        ? new InsufficientCreditsException("Lio Bakiyen bitti. Devam etmek için bakiye yüklemen gerekiyor.")
+        : new InsufficientCreditsException(
+            "Lio Bakiyen yetersiz ({bakiye} birim). Devam etmek için bakiye yüklemen gerekiyor.",
+            { bakiye: Math.floor(balance) }
+          );
     }
     return balance;
   }
@@ -219,9 +226,10 @@ export class AiCreditsService {
     const required = Math.ceil(requiredCredits);
     if (balance >= required) return;
     throw new InsufficientCreditsException(
-      `Bu işlem için yeterli AI kredin yok. Bakiyen ${Math.floor(balance)} kredi, ` +
-        `bu isteğin karşılanması için en az ${required} kredi gerekiyor. ` +
-        "Ayarlar > AI Kredileri sayfasından kredi yükleyebilirsin."
+      "Bu işlem için yeterli Lio Bakiyen yok. Bakiyen {bakiye} birim, " +
+        "bu isteğin karşılanması için en az {gereken} birim gerekiyor. " +
+        "Ayarlar > Lio Bakiyesi sayfasından bakiye yükleyebilirsin.",
+      { bakiye: Math.floor(balance), gereken: required }
     );
   }
 
@@ -242,7 +250,7 @@ export class AiCreditsService {
     orderId?: string
   ): Promise<CreditBalance> {
     if (!Number.isFinite(credits) || credits <= 0) {
-      throw new BadRequestException("Kredi miktarı pozitif bir sayı olmalı.");
+      throw new BadRequestException("Birim miktarı pozitif bir sayı olmalı.");
     }
 
     // Bakiye ve defter satırı tek transaction'da yazılır (bkz. migration 084).
@@ -275,7 +283,7 @@ export class AiCreditsService {
    */
   async deduct(userId: string, credits: number, description: string | undefined, createdBy: string): Promise<CreditBalance> {
     if (!Number.isFinite(credits) || credits <= 0) {
-      throw new BadRequestException("Kredi miktarı pozitif bir sayı olmalı.");
+      throw new BadRequestException("Birim miktarı pozitif bir sayı olmalı.");
     }
     try {
       await this.chargeAtomic({
@@ -288,7 +296,7 @@ export class AiCreditsService {
       });
     } catch (e) {
       if (e instanceof InsufficientCreditsException) {
-        throw new BadRequestException("Kullanıcının bakiyesi bu kadar krediyi karşılamıyor.");
+        throw new BadRequestException("Kullanıcının bakiyesi bu kadar birimi karşılamıyor.");
       }
       throw e;
     }
@@ -312,7 +320,7 @@ export class AiCreditsService {
       .maybeSingle();
     if (txError) throw txError;
     if (!tx || (tx as any).user_id !== userId) {
-      throw new BadRequestException("Kredi hareketi bulunamadı.");
+      throw new BadRequestException("Bakiye hareketi bulunamadı.");
     }
 
     const { error } = await this.supabase.client.rpc("ai_reverse_credit_transaction", {
@@ -323,12 +331,12 @@ export class AiCreditsService {
     if (error) {
       const mesaj = error.message ?? "";
       if (mesaj.includes("TX_NOT_REVERSIBLE")) {
-        throw new BadRequestException("Yalnızca kredi yüklemeleri geri alınabilir.");
+        throw new BadRequestException("Yalnızca bakiye yüklemeleri geri alınabilir.");
       }
       if (mesaj.includes("uniq_ai_credit_tx_reverses") || (error as any).code === "23505") {
         throw new BadRequestException("Bu yükleme zaten geri alınmış.");
       }
-      if (mesaj.includes("TX_NOT_FOUND")) throw new BadRequestException("Kredi hareketi bulunamadı.");
+      if (mesaj.includes("TX_NOT_FOUND")) throw new BadRequestException("Bakiye hareketi bulunamadı.");
       throw error;
     }
     return this.getBalance(userId);
@@ -828,7 +836,7 @@ export class AiCreditsService {
     });
     if (error) {
       if (error.message?.includes("INSUFFICIENT_CREDITS")) {
-        throw new InsufficientCreditsException("AI kredin yetersiz. Devam etmek için kredi yüklemen gerekiyor.");
+        throw new InsufficientCreditsException("Lio Bakiyen bu işlem için yeterli değil.");
       }
       throw error;
     }

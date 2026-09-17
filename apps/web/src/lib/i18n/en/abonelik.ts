@@ -10,8 +10,8 @@ export const abonelik: TranslationDict = {
 
   // ══════════════════════════════════════════════════════ Ekran
   Paketim: "My plan",
-  "Paketindeki krediler her ay yenilenir. Yıllık ödemede iki ay bedava; krediler yine her ay yüklenir.":
-    "Your plan's credits renew every month. Yearly billing gives you two months free; credits still arrive monthly.",
+  "Paketindeki Lio Bakiyesi her ay yenilenir. Yıllık ödemede iki ay bedava; bakiye yine her ay yüklenir.":
+    "Your plan's Lio Units renew every month. Yearly billing gives you two months free; Lio Units still arrive monthly.",
   "Mevcut paketin": "Your current plan",
   "Bu paketi seç": "Choose this plan",
   "Uygulamada kullanılamıyor": "Not available in the app",
@@ -34,7 +34,7 @@ export const abonelik: TranslationDict = {
   Popüler: "Popular",
   Aylık: "Monthly",
   "Yıllık — 2 ay bedava": "Yearly — 2 months free",
-  "kredi / ay": "credits / month",
+  "birim / ay": "units / month",
   " / ay": " / mo",
   " / yıl": " / yr",
   "Kartından {tutar} çekilir": "{tutar} will be charged to your card",
@@ -56,8 +56,8 @@ export const abonelik: TranslationDict = {
     "The last payment failed. Your access continues until the end of the period; updating your card avoids any interruption.",
 
   // ══════════════════════════════════════════════════════ Sonuç mesajları
-  "Paketin etkinleşti. Ayın kredisi hesabına yüklendi.":
-    "Your plan is active. This month's credits have been added to your account.",
+  "Paketin etkinleşti. Ayın Lio Bakiyesi hesabına yüklendi.":
+    "Your plan is active. This month's Lio Units have been added to your account.",
   "Paketin etkinleşti.": "Your plan is active.",
   "Ödeme henüz onaylanmadı. Birkaç dakika içinde tekrar bak.":
     "The payment hasn't been confirmed yet. Check again in a few minutes.",
@@ -88,9 +88,9 @@ export const abonelik: TranslationDict = {
 
   // ══════════════════════════════════════════════════════ Paket özellikleri
   // Katalogdan (backend billing.plans.ts) geldikleri için metinler orada yazılı.
-  "Aylık 20.000 Lio kredisi": "20,000 Lio credits per month",
-  "Aylık 50.000 Lio kredisi": "50,000 Lio credits per month",
-  "Aylık 150.000 Lio kredisi": "150,000 Lio credits per month",
+  "Aylık 20.000 birim Lio Bakiyesi": "20,000 Lio Units per month",
+  "Aylık 50.000 birim Lio Bakiyesi": "50,000 Lio Units per month",
+  "Aylık 150.000 birim Lio Bakiyesi": "150,000 Lio Units per month",
   "Sınırsız proje ve görev": "Unlimited projects and tasks",
   "Google Drive / OneDrive bağlantısı": "Google Drive / OneDrive connection",
   "E-posta desteği": "Email support",

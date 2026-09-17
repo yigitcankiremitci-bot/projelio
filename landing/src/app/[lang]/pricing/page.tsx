@@ -88,7 +88,7 @@ export default async function PricingPage({ params }: { params: Promise<{ lang: 
                 {dict.credits.hero.lede}
               </p>
             </div>
-            <Link className="btn btn-ghost" href={path(locale, "credits")}>
+            <Link className="btn btn-ghost" href={path(locale, "lio-units")}>
               {dict.nav.credits} <ArrowRight />
             </Link>
           </div>

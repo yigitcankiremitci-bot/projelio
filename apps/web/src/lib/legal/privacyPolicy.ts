@@ -69,7 +69,7 @@ export const privacyDoc: LegalDoc = {
       {
         h: "3. Otomatik olarak toplanan bilgiler",
         p: [
-          "Kullanım bilgileri: hangi ekranları açtığınız, oluşturduğunuz ve güncellediğiniz kayıt sayıları, modül kullanım istatistikleri, arama ve filtreleme davranışı, tur (onboarding) adımlarını tamamlama durumu, Lio ile yaptığınız istek sayısı ve harcanan kredi miktarı.",
+          "Kullanım bilgileri: hangi ekranları açtığınız, oluşturduğunuz ve güncellediğiniz kayıt sayıları, modül kullanım istatistikleri, arama ve filtreleme davranışı, tur (onboarding) adımlarını tamamlama durumu, Lio ile yaptığınız istek sayısı ve harcanan Lio Bakiyesi miktarı.",
           "Cihaz ve bağlantı bilgileri: IP adresi, tarayıcı ve işletim sistemi türü, cihaz tipi, ekran boyutu, dil ve saat dilimi tercihi, yönlendiren adres, uygulama sürümü ve hata/çökme kayıtları.",
           "Güvenlik ve oturum bilgileri: giriş denemeleri ve zamanları, oturum belirteçlerinin (JWT) geçerlilik bilgisi, e-posta doğrulama ve parola sıfırlama işlemleri, şüpheli erişim tespitine yarayan kayıtlar.",
           "Yerel depolama ve çerezler: oturumunuzu açık tutmak, tercihlerinizi hatırlamak ve temel işlevleri çalıştırmak için tarayıcınızın yerel depolamasını ve zorunlu çerezleri kullanırız. Ayrıntı için \"Çerezler ve yerel depolama\" bölümüne bakın.",
@@ -106,7 +106,7 @@ export const privacyDoc: LegalDoc = {
           "Hangi tedarikçinin ve modelin kullanılacağına Projelio yöneticisi karar verir; kullanıcı seçemez. Yürürlükteki tedarikçi listesini ve hangi ülkelere veri gittiğini bu politikada güncel tutarız.",
           "İçeriğiniz yapay zekâ modellerinin eğitiminde kullanılmaz. Birincil tedarikçimizle bu yönde bir veri işleme sözleşmesi bulunmaktadır; bir yedek tedarikçi ancak aynı taahhüdü veren bir sözleşme kurulduktan sonra devreye alınır.",
           "Lio, sizin panelde görme yetkiniz olmayan hiçbir veriye erişemez. Yetkilendirme kuralları arayüzde ve sohbette birebir aynı çalışır; Lio bir kaydı ancak siz de görebiliyorsanız okuyabilir, ancak siz de değiştirebiliyorsanız değiştirir.",
-          "Sohbet geçmişiniz, konuşmanın devamlılığı için saklanır ve son mesajından itibaren 90 gün dolduğunda mesajlarıyla birlikte kalıcı olarak silinir. Kredi sistemi gereği her isteğin tükettiği belirteç (token) miktarı ve maliyeti hesabınıza kaydedilir; bu kayıtlar mesajlarınızın içeriğini barındırmaz ve sohbet silindikten sonra da faturalandırma amacıyla kalır.",
+          "Sohbet geçmişiniz, konuşmanın devamlılığı için saklanır ve son mesajından itibaren 90 gün dolduğunda mesajlarıyla birlikte kalıcı olarak silinir. Lio Bakiyesi sistemi gereği her isteğin tükettiği belirteç (token) miktarı ve maliyeti hesabınıza kaydedilir; bu kayıtlar mesajlarınızın içeriğini barındırmaz ve sohbet silindikten sonra da faturalandırma amacıyla kalır.",
           "Yapay zekâ çıktıları hata içerebilir. Finansal, hukuki veya operasyonel kararlarınızı yalnızca Lio'nun yanıtına dayandırmamanızı öneririz.",
         ],
       },
@@ -144,7 +144,7 @@ export const privacyDoc: LegalDoc = {
         h: "10. Bilgileri kimlerle paylaşıyoruz",
         p: [
           "Organizasyonunuzdaki diğer kullanıcılarla: bir işe, projeye, departmana veya modül ekibine dahil olduğunuzda adınız, profil görseliniz, unvanınız ve o alanda ürettiğiniz içerik, aynı alana erişimi olan kişiler tarafından görülür. Görev atamaları, yorumlar ve akış paylaşımları ilgili ekibe açıktır.",
-          "Yöneticilerle: iş sahibi, departman yöneticisi ve organizasyon sahibi, yetkileri kapsamındaki içeriğe ve üyelik bilgilerine erişebilir. Kurumsal e-posta adresinizle katıldığınız bir organizasyonda yöneticinizin bu erişimi hizmetin doğal bir parçasıdır. Yöneticiler ayrıca yapay zekâ kredisi harcamasına ilişkin toplu raporlar alabilir.",
+          "Yöneticilerle: iş sahibi, departman yöneticisi ve organizasyon sahibi, yetkileri kapsamındaki içeriğe ve üyelik bilgilerine erişebilir. Kurumsal e-posta adresinizle katıldığınız bir organizasyonda yöneticinizin bu erişimi hizmetin doğal bir parçasıdır. Yöneticiler ayrıca Lio Bakiyesi harcamasına ilişkin toplu raporlar alabilir.",
           "Hizmet sağlayıcılarımızla: Hizmet'i çalıştırmak için sınırlı sayıda tedarikçi kullanırız. Bunlar: sunucu barındırma (Hosting Dünyam — sunucular Türkiye'de; uygulama, veritabanı ve yüklediğiniz dosyalar buradadır), tanıtım sitesi barındırma (Vercel Inc., ABD), e-posta gönderimi (Resend, Inc., ABD), yapay zekâ (Anthropic, PBC; tanımlıysa yedek olarak MiniMax ve Z.ai/Zhipu AI), anlık bildirim (tarayıcınızın üreticisinin push altyapısı — Google LLC, Mozilla, Apple veya Microsoft), yazı tipleri (Google Fonts) ve bağladığınız hâlde Google LLC, Microsoft Corporation ve Meta Platforms, Inc. hizmetleri. Her biri verileri yalnızca bizim adımıza, talimatımız doğrultusunda ve sözleşmeyle sınırlanmış biçimde işler.",
           "Yetkili makamlarla: yalnızca mevzuatın gerektirdiği, usulüne uygun ve yazılı bir talep olduğunda; talebin kapsamıyla sınırlı olarak. Hukuken engellenmediğimiz sürece sizi bilgilendirmeye çalışırız.",
           "Şirket işlemlerinde: birleşme, devir, bölünme veya varlık satışı hâlinde veriler alıcıya aktarılabilir. Böyle bir durumda sizi önceden bilgilendirir ve alıcının bu politikadaki taahhütlere uymasını sağlarız.",
@@ -166,7 +166,7 @@ export const privacyDoc: LegalDoc = {
           "Hesap ve içerik verileri: hesabınız etkin olduğu sürece saklanır.",
           "Hesap silme: silme talebinizden sonra 30 günlük bir bekleme süresi başlar. Bu süre içinde giriş yaparsanız talep iptal olur ve hiçbir şey silinmez. Süre dolduğunda hesabınız ve kişisel verileriniz kalıcı olarak silinir; yedeklerden tamamen temizlenmesi ek olarak birkaç haftayı bulabilir. İçinde başka üye bulunmayan işleriniz ve organizasyonlarınız da silinir; içinde başkalarının emeği olanlar korunur ve oradaki katkılarınız kimliksizleştirilir.",
           "Organizasyona ait içerik: hesabınızı silseniz de organizasyonun sahibi olduğu içerik (ör. ekip arkadaşlarınıza gönderdiğiniz yorumlar, tamamladığınız görev kayıtları) organizasyonda kalmaya devam eder. Bu içeriğin silinmesi organizasyon yöneticisinin talebine bağlıdır.",
-          "Lio sohbet geçmişi: son mesajından 90 gün sonra mesajlarıyla birlikte otomatik olarak silinir. Kredi ve kullanım kayıtları, faturalandırma nedeniyle daha uzun süre tutulur ve mesaj içeriği barındırmaz.",
+          "Lio sohbet geçmişi: son mesajından 90 gün sonra mesajlarıyla birlikte otomatik olarak silinir. Lio Bakiyesi ve kullanım kayıtları, faturalandırma nedeniyle daha uzun süre tutulur ve mesaj içeriği barındırmaz.",
           "WhatsApp konuşma kayıtları: en fazla 90 gün saklanır ve sonra otomatik olarak silinir. WhatsApp'tan gelen ham olay kayıtları (mesajın tam metnini içerir) işlendikten sonra en fazla 7 gün tutulur.",
           "Tek kullanımlık bağlantı ve kodlar (e-posta doğrulama, parola sıfırlama, WhatsApp bağlama): süresi dolduktan 30 gün sonra silinir.",
           "Sosyal medya parolası görüntüleme kayıtları: denetim izi olduğu için ilgili parola kaydı silinene kadar saklanır; kayıt silindiğinde bu izler de silinir.",
@@ -276,7 +276,7 @@ export const privacyDoc: LegalDoc = {
       {
         h: "3. Information collected automatically",
         p: [
-          "Usage information: which screens you open, how many records you create and update, module usage statistics, search and filtering behaviour, whether you completed onboarding tour steps, how many requests you made to Lio and how many credits they consumed.",
+          "Usage information: which screens you open, how many records you create and update, module usage statistics, search and filtering behaviour, whether you completed onboarding tour steps, how many requests you made to Lio and how many Lio Units they consumed.",
           "Device and connection information: IP address, browser and operating system, device type, screen size, language and time zone preference, referring address, application version, and error/crash logs.",
           "Security and session information: sign-in attempts and times, validity data for session tokens (JWT), email verification and password reset events, and records that help us detect suspicious access.",
           "Local storage and cookies: we use your browser's local storage and strictly necessary cookies to keep you signed in, remember your preferences and run core functions. See \"Cookies and local storage\" for detail.",
@@ -313,7 +313,7 @@ export const privacyDoc: LegalDoc = {
           "Which supplier and which model is used is decided by the Projelio administrator, not by users. We keep the list of suppliers in use, and the countries data goes to, current in this policy.",
           "Your content is not used to train AI models. We have a data processing agreement to that effect with our primary supplier, and a fallback supplier is only enabled once an agreement with the same commitment is in place.",
           "Lio cannot reach any data you are not permitted to see in the panel. Permission rules work identically in the interface and in chat: Lio can read a record only if you can, and change it only if you can.",
-          "Your chat history is kept so conversations stay coherent, and is permanently deleted together with its messages 90 days after the last message. For the credit system, the tokens each request consumed and its cost are recorded against your account; those records contain no message content and remain, for billing purposes, after the conversation is deleted.",
+          "Your chat history is kept so conversations stay coherent, and is permanently deleted together with its messages 90 days after the last message. For Lio Units accounting, the tokens each request consumed and its cost are recorded against your account; those records contain no message content and remain, for billing purposes, after the conversation is deleted.",
           "AI output can be wrong. We recommend you do not base financial, legal or operational decisions on Lio's answer alone.",
         ],
       },
@@ -351,7 +351,7 @@ export const privacyDoc: LegalDoc = {
         h: "10. Who we share information with",
         p: [
           "With other users in your organisation: when you join a job, project, department or module team, your name, profile picture, title and the content you create there are visible to everyone with access to that area. Task assignments, comments and feed posts are open to the relevant team.",
-          "With administrators: the job owner, the department manager and the organisation owner can access content and membership information within the scope of their permissions. If you joined an organisation with your work email address, this administrator access is an inherent part of the Service. Administrators may also receive aggregate reports on AI credit spending.",
+          "With administrators: the job owner, the department manager and the organisation owner can access content and membership information within the scope of their permissions. If you joined an organisation with your work email address, this administrator access is an inherent part of the Service. Administrators may also receive aggregate reports on Lio Units spending.",
           "With our service providers: we use a small number of suppliers to run the Service — server hosting (Hosting Dünyam, servers located in Türkiye; the application, the database and the files you upload all live there), marketing site hosting (Vercel Inc., USA), email delivery (Resend, Inc., USA), AI (Anthropic, PBC; where configured, MiniMax and Z.ai/Zhipu AI as fallbacks), push notifications (your browser vendor's push infrastructure — Google LLC, Mozilla, Apple or Microsoft), web fonts (Google Fonts), and, where you connect them, services from Google LLC, Microsoft Corporation and Meta Platforms, Inc. Each processes data only on our behalf, on our instructions and under contractual limits.",
           "With competent authorities: only where there is a duly made, written request required by law, and only to the extent of that request. Unless we are legally prevented, we will try to inform you.",
           "In corporate transactions: in a merger, acquisition, demerger or asset sale, data may be transferred to the acquirer. We will inform you beforehand and ensure the acquirer honours the commitments in this policy.",
@@ -373,7 +373,7 @@ export const privacyDoc: LegalDoc = {
           "Account and content data: kept for as long as your account is active.",
           "Account deletion: a 30-day waiting period starts when you request deletion. If you sign in during that period the request is cancelled and nothing is deleted. When the period ends your account and personal data are permanently deleted; clearing them from backups can take a few extra weeks. Jobs and organisations with no other members are deleted too; those containing other people's work are preserved and your contributions there are anonymised.",
           "Organisation-owned content: even if you delete your account, content owned by the organisation (comments you sent to teammates, task records you completed) stays with the organisation. Deleting that content depends on a request from the organisation's administrator.",
-          "Lio chat history: automatically deleted, along with its messages, 90 days after the last message. Credit and usage records are kept longer for billing purposes and contain no message content.",
+          "Lio chat history: automatically deleted, along with its messages, 90 days after the last message. Lio Units and usage records are kept longer for billing purposes and contain no message content.",
           "WhatsApp conversation records: kept for a maximum of 90 days and then deleted automatically. Raw event records received from WhatsApp (which contain the full message text) are kept for at most 7 days after processing.",
           "Single-use links and codes (email verification, password reset, WhatsApp linking): deleted 30 days after they expire.",
           "Social media password reveal logs: as an audit trail, kept until the password record itself is deleted; deleting the record deletes these traces too.",

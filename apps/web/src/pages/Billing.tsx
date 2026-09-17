@@ -84,7 +84,7 @@ export default function BillingPage() {
 
     const jeton = sessionStorage.getItem(JETON_ANAHTARI);
     if (durum === "basarili") {
-      setMesaj({ tur: "iyi", metin: t("Paketin etkinleşti. Ayın kredisi hesabına yüklendi.") });
+      setMesaj({ tur: "iyi", metin: t("Paketin etkinleşti. Ayın Lio Bakiyesi hesabına yüklendi.") });
       sessionStorage.removeItem(JETON_ANAHTARI);
       void yenile();
     } else if (jeton) {
@@ -182,7 +182,7 @@ export default function BillingPage() {
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
       <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 6px" }}>{t("Paketim")}</h1>
       <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 22px", maxWidth: 620, lineHeight: 1.6 }}>
-        {t("Paketindeki krediler her ay yenilenir. Yıllık ödemede iki ay bedava; krediler yine her ay yüklenir.")}
+        {t("Paketindeki Lio Bakiyesi her ay yenilenir. Yıllık ödemede iki ay bedava; bakiye yine her ay yüklenir.")}
       </p>
 
       {mesaj && (
@@ -364,7 +364,7 @@ export default function BillingPage() {
                   </div>
 
                   <div style={{ marginTop: 14, fontSize: 14, color: c.textPrimary, fontWeight: 500 }}>
-                    {plan.monthlyCredits.toLocaleString("tr-TR")} {t("kredi / ay")}
+                    {plan.monthlyCredits.toLocaleString("tr-TR")} {t("birim / ay")}
                   </div>
 
                   <ul style={{ margin: "12px 0 18px", padding: "0 0 0 18px", color: c.textSecondary, fontSize: 13.5, lineHeight: 1.75 }}>

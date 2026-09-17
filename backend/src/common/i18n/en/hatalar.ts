@@ -370,27 +370,29 @@ export const hatalar: TranslationDict = {
   "Şifre çözülemedi. Sunucudaki şifreleme anahtarı değişmiş olabilir; kaydı yeniden girin.": "The password couldn't be decrypted. The server's encryption key may have changed; enter the record again.",
 
   // Ödeme ve AI kredisi
-  "AI kredin bitti. Devam etmek için kredi yüklemen gerekiyor.": "You're out of AI credits. Add credits to continue.",
-  "AI kredin bu işlem için yeterli değil.": "You don't have enough AI credits for this.",
-  "AI kredin yetersiz. Devam etmek için kredi yüklemen gerekiyor.": "Not enough AI credits. Add credits to continue.",
+  "Lio Bakiyen bitti. Devam etmek için bakiye yüklemen gerekiyor.": "You're out of Lio Units. Top up to continue.",
+  "Lio Bakiyen bu işlem için yeterli değil.": "You don't have enough Lio Units for this.",
+  "Lio Bakiyen yetersiz ({bakiye} birim). Devam etmek için bakiye yüklemen gerekiyor.": "Not enough Lio Units ({bakiye}). Top up to continue.",
+  "Bu işlem için yeterli Lio Bakiyen yok. Bakiyen {bakiye} birim, bu isteğin karşılanması için en az {gereken} birim gerekiyor. Ayarlar > Lio Bakiyesi sayfasından bakiye yükleyebilirsin.":
+    "You don't have enough Lio Units for this. You have {bakiye}, and this request needs at least {gereken}. You can top up from Settings > Lio Units.",
   "Bu sipariş sana ait değil.": "This order isn't yours.",
-  "Bu siparişin kredisi zaten yüklenmiş.": "The credits for this order have already been added.",
+  "Bu siparişin bakiyesi zaten yüklenmiş.": "The Lio Units for this order have already been added.",
   "Bu siparişin ödemesi zaten onaylanmış.": "The payment for this order has already been approved.",
-  "Geçersiz kredi paketi.": "Invalid credit package.",
-  "Kredi miktarı pozitif bir sayı olmalı.": "The credit amount must be a positive number.",
+  "Geçersiz bakiye paketi.": "Invalid Lio Units package.",
+  "Birim miktarı pozitif bir sayı olmalı.": "The Lio Units amount must be a positive number.",
   "Sipariş bu sırada güncellendi, sayfayı yenile.": "The order was updated in the meantime. Refresh the page.",
   "Sipariş bulunamadı.": "Order not found.",
   "Tutar 0 veya pozitif bir sayı olmalı.": "The amount must be 0 or a positive number.",
   "Yalnızca ödeme bekleyen siparişler iptal edilebilir.": "Only orders awaiting payment can be cancelled.",
   "Yalnızca ödeme bekleyen siparişler onaylanabilir.": "Only orders awaiting payment can be approved.",
-  "Yalnızca ödemesi onaylanmış siparişin kredisi yüklenebilir.": "Credits can only be added for an order whose payment is approved.",
+  "Yalnızca ödemesi onaylanmış siparişin bakiyesi yüklenebilir.": "Lio Units can only be added for an order whose payment is approved.",
   "Yüklenen tutar pozitif bir sayı olmalı.": "The amount added must be a positive number.",
   "Ödeme bekleyen çok fazla siparişin var. Yenisini oluşturmadan önce mevcutlardan birini tamamla ya da iptal et.": "You have too many orders awaiting payment. Complete or cancel one of them before creating another.",
 
   // Lio ve AI sağlayıcıları
-  "AI sağlayıcısı hesabınızda kredi kalmamış. Sağlayıcı panelinden kredi yükleyin.": "Your AI provider account has run out of credit. Add credit from the provider's console.",
+  "AI sağlayıcısı hesabınızda bakiye kalmamış. Sağlayıcı panelinden bakiye yükleyin.": "Your AI provider account has run out of balance. Top up from the provider's console.",
   "AI sağlayıcısının API anahtarı geçersiz görünüyor. backend/.env içindeki anahtarı kontrol edin.": "The AI provider's API key looks invalid. Check the key in backend/.env.",
-  "AI sağlayıcısının hız sınırına takıldı ya da kredi limitiniz dolmuş olabilir. Biraz sonra tekrar deneyin.": "The AI provider's rate limit was hit, or your credit limit may be full. Try again shortly.",
+  "AI sağlayıcısının hız sınırına takıldı ya da harcama limitiniz dolmuş olabilir. Biraz sonra tekrar deneyin.": "The AI provider's rate limit was hit, or your spending limit may be reached. Try again shortly.",
   "AI servisi şu anda yanıt vermiyor. Biraz sonra tekrar deneyin.": "The AI service isn't responding right now. Try again shortly.",
   "Bu istek işlenemedi. Mesajı kısaltıp ya da ekleri azaltıp tekrar dener misin?": "This request couldn't be processed. Can you shorten the message or send fewer attachments and try again?",
   "Bu rapor artık hazır değil (bağlantının ömrü 30 dakika). Lio'dan yeniden üretmesini isteyebilirsin.": "This report is no longer available (the link lasts 30 minutes). You can ask Lio to build it again.",
@@ -694,10 +696,10 @@ export const hatalar: TranslationDict = {
   "Demo hesabında bu işlem yapılamaz.": "This action isn't available on the demo account.",
   "Geçersiz rol.": "Invalid role.",
   "Kalıcı olarak silinmiş bir hesap geri getirilemez.": "A permanently deleted account can't be restored.",
-  "Kredi hareketi bulunamadı.": "Credit transaction not found.",
-  "Kullanıcının bakiyesi bu kadar krediyi karşılamıyor.": "The user's balance doesn't cover that many credits.",
+  "Bakiye hareketi bulunamadı.": "Lio Units transaction not found.",
+  "Kullanıcının bakiyesi bu kadar birimi karşılamıyor.": "The user's balance doesn't cover that many Lio Units.",
   "Onay için hesabın e-posta adresini aynen yazmalısın.": "To confirm, type the account's email address exactly.",
-  "Yalnızca kredi yüklemeleri geri alınabilir.": "Only credit top-ups can be reversed.",
+  "Yalnızca bakiye yüklemeleri geri alınabilir.": "Only Lio Units top-ups can be reversed.",
   "Hesabın askıya alındı. Destek için bizimle iletişime geç.": "Your account has been suspended. Contact us for support.",
   "Oturumun sonlandırıldı, lütfen yeniden giriş yap.": "Your session was ended, please sign in again.",
   // ─────────────────────────────────────────────── Admin > kullanıcıya mesaj
@@ -756,8 +758,8 @@ export const hatalar: TranslationDict = {
   "Bu modülün ayarlarını değiştirme yetkin yok.": "You do not have permission to change this module's settings.",
   "Lio yalnızca PDF ve fotoğraf okuyabiliyor. Bu dosyayı elle girmen gerekiyor.":
     "Lio can only read PDFs and photos. You'll need to enter this file by hand.",
-  "Lio yardımını açmak için AI kredin olmalı. Ayarlar > AI Kredileri sayfasından kredi yükleyebilirsin.":
-    "You need AI credit to turn on Lio assistance. You can top up from Settings > AI Credits.",
+  "Lio yardımını açmak için Lio Bakiyen olmalı. Ayarlar > Lio Bakiyesi sayfasından bakiye yükleyebilirsin.":
+    "You need Lio Units to turn on Lio assistance. You can top up from Settings > Lio Units.",
   "Sunucuda belge okuyabilen bir AI sağlayıcısı tanımlı değil.":
     "No AI provider that can read documents is configured on the server.",
   "Belge okunamadı: yanıt anlaşılamadı.": "The document couldn't be read: the response was not understood.",

@@ -55,7 +55,7 @@ export const termsDoc: LegalDoc = {
           "Yönetici: Organizasyon sahibi, iş sahibi veya departman yöneticisi sıfatıyla başkalarının erişimini düzenleyebilen kullanıcı.",
           "İçerik: Hizmet'e yüklediğiniz veya Hizmet içinde ürettiğiniz her türlü veri, metin, dosya, görsel ve kayıt.",
           "Abonelik: seçtiğiniz paket kapsamında, belirli bir dönem için Hizmet'i kullanma hakkı.",
-          "Kredi: Lio'nun yapay zekâ özelliklerinin kullanımını ölçen ve satın alınabilen birim.",
+          "Lio Bakiyesi: Lio'nun yapay zekâ özelliklerinin kullanımını birim cinsinden ölçen ve satın alınabilen bakiye.",
         ],
       },
       {
@@ -119,8 +119,8 @@ export const termsDoc: LegalDoc = {
         p: [
           "Lio, Hizmet'e gömülü yapay zekâ asistanıdır. Lio yalnızca sizin görme ve değiştirme yetkiniz olan verilerle çalışır.",
           "Yapay zekâ çıktıları olasılıksaldır ve hata içerebilir. Çıktıların doğruluğu, eksiksizliği veya belirli bir amaca uygunluğu garanti edilmez. Finansal, hukuki, vergisel veya operasyonel kararlarınızı yalnızca Lio'nun yanıtına dayandırmamalısınız; doğrulama sorumluluğu size aittir.",
-          "Lio kullanımı Kredi tüketir. Her isteğin tükettiği kredi, işlenen ve üretilen metin miktarına göre hesaplanır ve hesabınızda görüntülenir. Paketinize dâhil krediler dönem sonunda devretmez; satın alınan krediler aksi belirtilmedikçe devreder.",
-          "Krediyi tüketmek amacıyla otomatik veya kötü niyetli kullanım, kredi bakiyesinin manipülasyonu ve Lio üzerinden Hizmet'in kabul edilebilir kullanım kurallarının aşılması yasaktır.",
+          "Lio kullanımı Lio Bakiyesi tüketir. Her isteğin tükettiği birim miktarı, işlenen ve üretilen metin miktarına göre hesaplanır ve hesabınızda görüntülenir. Paketinize dâhil birimler dönem sonunda devretmez; satın alınan birimler aksi belirtilmedikçe devreder.",
+          "Lio Bakiyesini tüketmek amacıyla otomatik veya kötü niyetli kullanım, Lio Bakiyesinin manipülasyonu ve Lio üzerinden Hizmet'in kabul edilebilir kullanım kurallarının aşılması yasaktır.",
           "Yapay zekâ altyapısını sağlayan tedarikçiyi değiştirebilir, model sürümünü güncelleyebiliriz. Bu değişiklikler çıktıların biçimini ve kalitesini etkileyebilir.",
         ],
       },
@@ -143,7 +143,7 @@ export const termsDoc: LegalDoc = {
       {
         h: "12. Paketler, ücretler ve faturalandırma",
         p: [
-          "Güncel paketler, kullanıcı başına fiyatlar ve kredi paketleri projelio.app üzerindeki fiyatlandırma sayfasında yayımlanır. Aksi belirtilmedikçe fiyatlara KDV dâhil değildir.",
+          "Güncel paketler, kullanıcı başına fiyatlar ve Lio Bakiyesi paketleri projelio.app üzerindeki fiyatlandırma sayfasında yayımlanır. Aksi belirtilmedikçe fiyatlara KDV dâhil değildir.",
           "Abonelik, seçtiğiniz dönemin (aylık veya yıllık) sonunda, iptal edilmedikçe aynı süreyle ve yenileme anındaki güncel fiyattan otomatik olarak yenilenir. Yenilemeyi durdurmak için dönem bitmeden aboneliğinizi iptal etmeniz yeterlidir.",
           "Kullanıcı başına fiyatlanan paketlerde dönem içinde kullanıcı eklerseniz, eklenen kullanıcılar için kalan döneme orantılı ücret tahakkuk eder. Dönem içinde kullanıcı çıkarmak, ödenmiş ücretin iadesini gerektirmez; azalma bir sonraki yenilemede geçerli olur.",
           "Ödemeler lisanslı bir ödeme kuruluşu üzerinden alınır; kart bilgileri bizim sunucularımızda saklanmaz. Fatura, verdiğiniz fatura bilgilerine göre düzenlenir; bilgilerin doğruluğundan siz sorumlusunuz.",
@@ -265,7 +265,7 @@ export const termsDoc: LegalDoc = {
           "Administrator: a user who can manage others' access as organisation owner, job owner or department manager.",
           "Content: any data, text, file, image or record you upload to or create within the Service.",
           "Subscription: the right to use the Service for a given period within the plan you have chosen.",
-          "Credit: the unit that measures and is purchased for use of Lio's AI features.",
+          "Lio Units: the purchasable units that measure use of Lio's AI features.",
         ],
       },
       {
@@ -329,8 +329,8 @@ export const termsDoc: LegalDoc = {
         p: [
           "Lio is the AI assistant embedded in the Service. Lio works only with data you are permitted to see and change.",
           "AI output is probabilistic and can be wrong. No warranty is given as to its accuracy, completeness or fitness for a particular purpose. You should not base financial, legal, tax or operational decisions on Lio's answer alone; verification is your responsibility.",
-          "Using Lio consumes Credits. The credits each request consumes are calculated from the amount of text processed and produced, and are shown in your account. Credits included in your plan do not carry over at the end of the period; purchased credits carry over unless stated otherwise.",
-          "Automated or bad-faith use aimed at consuming credits, manipulation of the credit balance, and using Lio to get around the acceptable use rules are prohibited.",
+          "Using Lio consumes Lio Units. The Lio Units each request consumes are calculated from the amount of text processed and produced, and are shown in your account. Lio Units included in your plan do not carry over at the end of the period; purchased Lio Units carry over unless stated otherwise.",
+          "Automated or bad-faith use aimed at consuming Lio Units, manipulation of the Lio Units balance, and using Lio to get around the acceptable use rules are prohibited.",
           "We may change the supplier providing the AI infrastructure and update the model version. Such changes may affect the form and quality of output.",
         ],
       },
@@ -353,7 +353,7 @@ export const termsDoc: LegalDoc = {
       {
         h: "12. Plans, fees and billing",
         p: [
-          "Current plans, per-user prices and credit packages are published on the pricing page at projelio.app. Unless stated otherwise, prices exclude VAT.",
+          "Current plans, per-user prices and Lio Units packages are published on the pricing page at projelio.app. Unless stated otherwise, prices exclude VAT.",
           "Unless cancelled, your Subscription renews automatically at the end of the chosen period (monthly or annual) for the same period, at the price current at renewal. To stop renewal, cancel your subscription before the period ends.",
           "On per-user plans, adding users mid-period is charged pro rata for the remainder of the period. Removing users mid-period does not entitle you to a refund of fees already paid; the reduction applies at the next renewal.",
           "Payments are taken through a licensed payment provider; card details are not stored on our servers. Invoices are issued using the billing details you provide, and you are responsible for their accuracy.",

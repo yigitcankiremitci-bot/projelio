@@ -302,17 +302,17 @@ export const bildirimler: TranslationDict = {
   // Lio bir isteği yarıda kestiğinde kullanıcıya gösterdiği metinler. Üç farklı
   // sebep, üç farklı cümle — aynı metni kullanmak kullanıcıyı yanıltıyordu.
   "Henüz kalıcı bir değişiklik yapılmadı": "Nothing has been changed yet",
-  "Durdurdum. {yapilan}. Bu istek toplam {harcanan} kredi harcadı.":
-    "Stopped. {yapilan}. This request used {harcanan} credits in total.",
-  "(Bu isteğin toplam bedeli: {harcanan} kredi.)": "(Total cost of this request: {harcanan} credits.)",
-  "Bu istek tahminen {tahmin} kredi tutacak — bu, tek seferde harcanması için yüksek bir tutar (eşik {esik} kredi). Henüz hiçbir kredi harcamadım. Devam edeyim mi?":
-    "This request is estimated at {tahmin} credits — a lot to spend in one go (the threshold is {esik}). I haven't spent anything yet. Shall I continue?",
-  "Bu istek şu ana kadar {harcanan} kredi harcadı ve henüz bitmedi. Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} kredi daha götürür. Devam edeyim mi?":
-    "This request has used {harcanan} credits so far and isn't finished. So far: {yapilan}. Each further step costs roughly {tahmin} more. Shall I continue?",
-  "Bu istek {n} adım sürdü ve hâlâ bitmedi ({harcanan} kredi). Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} kredi daha götürür. Devam edeyim mi?":
-    "This request has taken {n} steps and still isn't finished ({harcanan} credits). So far: {yapilan}. Each further step costs roughly {tahmin} more. Shall I continue?",
-  "AI kredin bu isteği sürdürmeye yetmiyor, bu yüzden burada durdum. {yapilan}. Kalan kredin {kalan}, devam etmek için en az {gereken} gerekiyor. Ayarlar > AI Kredileri sayfasından kredi yükleyip tekrar yazabilirsin.":
-    "You don't have enough AI credit to carry on, so I stopped here. {yapilan}. You have {kalan} left and need at least {gereken} to continue. You can top up from Settings > AI Credits and write again.",
+  "Durdurdum. {yapilan}. Bu istek toplam {harcanan} birim harcadı.":
+    "Stopped. {yapilan}. This request used {harcanan} Lio Units in total.",
+  "(Bu isteğin toplam bedeli: {harcanan} birim.)": "(Total cost of this request: {harcanan} Lio Units.)",
+  "Bu istek tahminen {tahmin} birim tutacak — bu, tek seferde harcanması için yüksek bir tutar (eşik {esik} birim). Henüz hiç bakiye harcamadım. Devam edeyim mi?":
+    "This request is estimated at {tahmin} Lio Units — a lot to spend in one go (the threshold is {esik}). I haven't spent anything yet. Shall I continue?",
+  "Bu istek şu ana kadar {harcanan} birim harcadı ve henüz bitmedi. Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} birim daha götürür. Devam edeyim mi?":
+    "This request has used {harcanan} Lio Units so far and isn't finished. So far: {yapilan}. Each further step costs roughly {tahmin} more. Shall I continue?",
+  "Bu istek {n} adım sürdü ve hâlâ bitmedi ({harcanan} birim). Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} birim daha götürür. Devam edeyim mi?":
+    "This request has taken {n} steps and still isn't finished ({harcanan} Lio Units). So far: {yapilan}. Each further step costs roughly {tahmin} more. Shall I continue?",
+  "Lio Bakiyen bu isteği sürdürmeye yetmiyor, bu yüzden burada durdum. {yapilan}. Kalan bakiyen {kalan} birim, devam etmek için en az {gereken} gerekiyor. Ayarlar > Lio Bakiyesi sayfasından bakiye yükleyip tekrar yazabilirsin.":
+    "You don't have enough Lio Units to carry on, so I stopped here. {yapilan}. You have {kalan} left and need at least {gereken} to continue. You can top up from Settings > Lio Units and write again.",
   // ─────────────────────────────────────────────── Lio: onay pencereleri
   //
   // Kullanıcı silme/arşivleme kararını BU cümleye bakarak veriyor. Kaydın adı

@@ -223,21 +223,21 @@ export class AdminKullanicilarService {
   // ============================================================ Kredi
 
   async krediYukle(adminId: string, userId: string, miktar: number, aciklama?: string) {
-    await this.hedefiDogrula(adminId, userId, "kredi yükleme", { kendineIzinVer: true });
+    await this.hedefiDogrula(adminId, userId, "bakiye yükleme", { kendineIzinVer: true });
     const bakiye = await this.credits.grant(userId, miktar, "topup", aciklama?.trim() || "Yönetici tarafından yüklendi", adminId);
     await this.kaydet(adminId, userId, "kredi_yukle", { miktar, aciklama });
     return bakiye;
   }
 
   async krediDus(adminId: string, userId: string, miktar: number, aciklama?: string) {
-    await this.hedefiDogrula(adminId, userId, "kredi düşme", { kendineIzinVer: true });
+    await this.hedefiDogrula(adminId, userId, "bakiye düşme", { kendineIzinVer: true });
     const bakiye = await this.credits.deduct(userId, miktar, aciklama?.trim() || "Yönetici tarafından düşüldü", adminId);
     await this.kaydet(adminId, userId, "kredi_dus", { miktar, aciklama });
     return bakiye;
   }
 
   async krediGeriAl(adminId: string, userId: string, hareketId: string, aciklama?: string) {
-    await this.hedefiDogrula(adminId, userId, "kredi geri alma", { kendineIzinVer: true });
+    await this.hedefiDogrula(adminId, userId, "bakiye geri alma", { kendineIzinVer: true });
     const bakiye = await this.credits.reverse(userId, hareketId, aciklama?.trim() || "Yönetici tarafından geri alındı", adminId);
     await this.kaydet(adminId, userId, "kredi_geri_al", { hareketId, aciklama });
     return bakiye;

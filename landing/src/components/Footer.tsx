@@ -17,7 +17,7 @@ export default function Footer({ dict, locale }: { dict: Dict; locale: Locale })
     { href: path(locale, "#modules"), label: dict.nav.modules },
     { href: path(locale, "screenshots"), label: dict.nav.screenshots },
     { href: path(locale, "pricing"), label: dict.nav.pricing },
-    { href: path(locale, "credits"), label: dict.nav.credits },
+    { href: path(locale, "lio-units"), label: dict.nav.credits },
   ];
 
   const company = [

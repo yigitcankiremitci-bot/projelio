@@ -19,7 +19,7 @@ interface Props {
 
 const ACIKLAMA =
   "Lio yardımı açıkken modüle bıraktığın fatura ya da fişi Lio okur: tarihini, tutarını ve karşı tarafını " +
-  "kendisi doldurur, belgeyi ayın klasörüne koyar ve kasaya gideri/geliri yazar. Her okuma AI kredisi harcar. " +
+  "kendisi doldurur, belgeyi ayın klasörüne koyar ve kasaya gideri/geliri yazar. Her okuma Lio Bakiyesi harcar. " +
   "Kapalıyken hiçbir şey değişmez — kaydı elle girersin.";
 
 /** Öneri balonu kişi başına bir kez kapatılıyor; modül modül tekrar çıkması bunaltıcı olurdu. */
@@ -155,7 +155,7 @@ export default function LioYardimiKutusu({ moduleKey, kapsam, departmentId, canW
         </button>
 
         <span style={{ marginLeft: "auto", fontSize: 12, color: c.textSecondary }}>
-          {t("{n} kredi", { n: String(Math.floor(durum.bakiye)) })}
+          {t("{n} birim", { n: String(Math.floor(durum.bakiye)) })}
         </span>
       </div>
 
@@ -175,10 +175,10 @@ export default function LioYardimiKutusu({ moduleKey, kapsam, departmentId, canW
           }}
         >
           <p style={{ fontSize: 13, color: c.textPrimary, margin: 0 }}>
-            {t("Lio yardımı için AI kredin yok. Her belge okumasında krediden düşülüyor.")}
+            {t("Lio yardımı için Lio Bakiyen yok. Her belge okuması bakiyeden düşülüyor.")}
           </p>
           <Link
-            to="/settings/ai-credits"
+            to="/settings/lio-units"
             style={{
               display: "inline-block",
               marginTop: 8,
@@ -190,7 +190,7 @@ export default function LioYardimiKutusu({ moduleKey, kapsam, departmentId, canW
               textDecoration: "none",
             }}
           >
-            {t("Kredi yükle")}
+            {t("Bakiye yükle")}
           </Link>
         </div>
       )}

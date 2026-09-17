@@ -88,7 +88,7 @@ export class LioYardimiService {
       const balance = await this.credits.getBalance(userId);
       if (balance.balance < MIN_BALANCE_TO_START) {
         throw new BadRequestException(
-          "Lio yardımını açmak için AI kredin olmalı. Ayarlar > AI Kredileri sayfasından kredi yükleyebilirsin."
+          "Lio yardımını açmak için Lio Bakiyen olmalı. Ayarlar > Lio Bakiyesi sayfasından bakiye yükleyebilirsin."
         );
       }
       if (!this.providers.visionChoice("smart")) {

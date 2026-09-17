@@ -18,7 +18,7 @@ export const tr = {
     screenshots: "Ekran Görüntüleri",
     demoAccount: "Demo Hesabı",
     pricing: "Fiyatlandırma",
-    credits: "Krediler",
+    credits: "Lio Bakiyesi",
     faq: "S.S.S.",
     contact: "İletişim",
     login: "Giriş Yap",
@@ -349,7 +349,7 @@ export const tr = {
     hero: {
       eyebrow: "Fiyatlandırma",
       title: "Şeffaf fiyat, gizli kalem yok",
-      lede: "Üç paket, tek liste. Her pakette Lio kredileri her ay yenilenir; yoğun aylarda ek kredi yükleyebilirsiniz.",
+      lede: "Üç paket, tek liste. Her pakette Lio Bakiyesi her ay yenilenir; yoğun aylarda ek bakiye yükleyebilirsiniz.",
     },
     /*
      * FİYATLAR BURADA DEĞİL. Tutarlar panelin açık ucundan (GET /billing/public/plans)
@@ -372,7 +372,7 @@ export const tr = {
         cta: "Hemen başla",
         featured: false,
         features: [
-          "Aylık 20.000 Lio kredisi",
+          "Aylık 20.000 birim Lio Bakiyesi",
           "Sınırsız proje ve görev",
           "Google Drive / OneDrive bağlantısı",
           "Mobil uygulama",
@@ -390,7 +390,7 @@ export const tr = {
         cta: "Pro'ya geç",
         featured: true,
         features: [
-          "Aylık 50.000 Lio kredisi",
+          "Aylık 50.000 birim Lio Bakiyesi",
           "Starter'daki her şey",
           "WhatsApp üzerinden Lio",
           "Gelir-gider ve proje bütçesi",
@@ -408,7 +408,7 @@ export const tr = {
         cta: "Business'a geç",
         featured: false,
         features: [
-          "Aylık 150.000 Lio kredisi",
+          "Aylık 150.000 birim Lio Bakiyesi",
           "Pro'daki her şey",
           "10 kullanıcıya kadar",
           "Departman bazlı yetkilendirme",
@@ -416,8 +416,8 @@ export const tr = {
         ],
       },
     ],
-    freeNote: "Ücretsiz plan süresiz açık: hoş geldin kredisiyle Lio'yu denersiniz.",
-    creditsLabel: "kredi / ay",
+    freeNote: "Ücretsiz plan süresiz açık: hoş geldin bakiyesiyle Lio'yu denersiniz.",
+    creditsLabel: "birim / ay",
     chargeNote: "Fiyatlar ABD doları üzerinden gösterilir; tahsilat Türk Lirası olarak yapılır.",
     enterprise: {
       title: "50+ kullanıcı ya da özel entegrasyon mu gerekiyor?",
@@ -441,11 +441,11 @@ export const tr = {
 
   credits: {
     hero: {
-      eyebrow: "Lio kredileri",
+      eyebrow: "Lio Bakiyesi",
       title: "Lio'yu ne kadar kullanırsanız o kadar ödeyin",
-      lede: "Paketinizde her ay yenilenen krediler var. Yoğun aylarda tükenirse, tek seferlik kredi yükleyip devam edersiniz. Kredilerin süresi dolmaz.",
+      lede: "Paketinizde her ay yenilenen Lio Bakiyesi var. Yoğun aylarda tükenirse, tek seferlik bakiye yükleyip devam edersiniz. Satın aldığınız bakiyenin süresi dolmaz.",
     },
-    packsTitle: "Kredi paketleri",
+    packsTitle: "Bakiye paketleri",
     packsLede: "Ne kadar büyük paket alırsanız birim fiyat o kadar düşer. Kurumsal hacimler için bize yazın.",
     packs: [
       { credits: 1000, price: 99, bonus: 0 },
@@ -453,22 +453,22 @@ export const tr = {
       { credits: 15000, price: 1199, bonus: 2500 },
       { credits: 50000, price: 3499, bonus: 12500 },
     ],
-    bonusLabel: "hediye kredi",
-    unitLabel: "1.000 kredi başına",
+    bonusLabel: "hediye birim",
+    unitLabel: "1.000 birim başına",
     selected: "Seçildi",
     select: "Seç",
-    buy: "Kredi yükle",
-    totalCredits: "Toplam kredi",
-    calcTitle: "Ne kadar krediye ihtiyacım var?",
+    buy: "Bakiye yükle",
+    totalCredits: "Toplam birim",
+    calcTitle: "Ne kadar Lio Bakiyesine ihtiyacım var?",
     calcLede: "Ekip büyüklüğünüzü ve günlük Lio kullanımınızı ayarlayın, aylık tahmini görün.",
     calcUsers: "Lio kullanan kişi sayısı",
     calcPerDay: "Kişi başına günlük işlem",
-    calcResult: "Aylık tahmini kredi",
+    calcResult: "Aylık tahmini birim",
     calcSuggestion: "Önerilen paket",
-    calcNote: "Ayda 22 iş günü üzerinden hesaplanır. Paketinizle gelen aylık krediler bu tutardan düşülür.",
-    usageTitle: "Kredi tüketim tablosu",
-    usageLede: "Şeffaf olsun diye hepsini yazdık. Panelden yaptığınız işlemler kredi harcamaz — sadece Lio harcar.",
-    usageHead: ["İşlem", "Kredi"],
+    calcNote: "Ayda 22 iş günü üzerinden hesaplanır. Paketinizle gelen aylık birimler bu tutardan düşülür.",
+    usageTitle: "Lio Bakiyesi tüketim tablosu",
+    usageLede: "Şeffaf olsun diye hepsini yazdık. Panelden yaptığınız işlemler bakiye harcamaz — sadece Lio harcar.",
+    usageHead: ["İşlem", "Birim"],
     usage: [
       ["Basit soru (\"bugün ne var?\")", "1"],
       ["Görev açma / kapatma", "1"],
@@ -479,13 +479,13 @@ export const tr = {
       ["Aylık finansal analiz", "20"],
       ["Panelde yapılan tüm işlemler", "0"],
     ],
-    faqTitle: "Kredilerle ilgili sorular",
+    faqTitle: "Lio Bakiyesi ile ilgili sorular",
     faq: [
-      { q: "Krediler her ay sıfırlanıyor mu?", a: "Paketinizle gelen aylık krediler her fatura döneminde yenilenir ve devretmez. Ayrıca satın aldığınız ek kredilerin ise süresi dolmaz, hesabınızda kalır." },
-      { q: "Hangi kredi önce harcanır?", a: "Önce paketinizin aylık kredisi, o bittikten sonra satın aldığınız ek krediler kullanılır. Böylece ek kredileriniz boşa gitmez." },
-      { q: "Kredim biterse ne olur?", a: "Projelio'nun tamamı çalışmaya devam eder; sadece Lio yeni istek almaz ve size bilgi verir. Panelden çalışmaya kaldığınız yerden devam edersiniz." },
-      { q: "Kredi iadesi yapılıyor mu?", a: "Kullanılmamış kredi paketleri için satın alma tarihinden itibaren 14 gün içinde iade talebinde bulunabilirsiniz. Detaylar İptal ve İade Koşulları sayfamızda." },
-      { q: "Ekip üyeleri ortak havuzdan mı harcıyor?", a: "Evet. Krediler şirket hesabına tanımlıdır. İsterseniz kullanıcı veya departman başına aylık limit koyabilirsiniz." },
+      { q: "Lio Bakiyesi her ay sıfırlanıyor mu?", a: "Paketinizle gelen aylık birimler her fatura döneminde yenilenir ve devretmez. Satın aldığınız ek bakiyenin ise süresi dolmaz, hesabınızda kalır." },
+      { q: "Hangi bakiye önce harcanır?", a: "Önce paketinizin aylık bakiyesi, o bittikten sonra satın aldığınız ek bakiye kullanılır. Böylece ek bakiyeniz boşa gitmez." },
+      { q: "Bakiyem biterse ne olur?", a: "Projelio'nun tamamı çalışmaya devam eder; sadece Lio yeni istek almaz ve size bilgi verir. Panelden çalışmaya kaldığınız yerden devam edersiniz." },
+      { q: "Bakiye iadesi yapılıyor mu?", a: "Kullanılmamış bakiye paketleri için satın alma tarihinden itibaren 14 gün içinde iade talebinde bulunabilirsiniz. Detaylar İptal ve İade Koşulları sayfamızda." },
+      { q: "Ekip üyeleri ortak havuzdan mı harcıyor?", a: "Evet. Lio Bakiyesi şirket hesabına tanımlıdır. İsterseniz kullanıcı veya departman başına aylık limit koyabilirsiniz." },
     ],
   },
 
@@ -520,7 +520,7 @@ export const tr = {
       {
         name: "Fiyat ve ödeme",
         items: [
-          { q: "Ücretsiz nasıl deneyebilirim?", a: "Kayıt olduğunuzda ücretsiz plan açılır ve hoş geldin kredisiyle Lio'yu denersiniz — kart bilgisi istemiyoruz, süre sınırı yok. Krediler bitince paket seçmek size kalmış." },
+          { q: "Ücretsiz nasıl deneyebilirim?", a: "Kayıt olduğunuzda ücretsiz plan açılır ve hoş geldin bakiyesiyle Lio'yu denersiniz — kart bilgisi istemiyoruz, süre sınırı yok. Bakiye bitince paket seçmek size kalmış." },
           { q: "Hangi ödeme yöntemlerini kabul ediyorsunuz?", a: "Kredi ve banka kartı ile online ödeme, havale/EFT ve kurumsal müşteriler için sözleşmeli faturalı ödeme. Ödemeler lisanslı yerel ödeme kuruluşu altyapısı üzerinden alınır; kart bilgileriniz bizim sunucularımızda saklanmaz." },
           { q: "Fatura kesiyor musunuz?", a: "Evet, her ödeme için e-arşiv/e-fatura düzenlenir. Şirket bilgilerinizi panelden girdiğinizde faturalar otomatik olarak e-postanıza gelir." },
           { q: "Paketimi sonradan değiştirebilir miyim?", a: "İstediğiniz an yükseltebilir veya düşürebilirsiniz. Yükseltmede kalan gün üzerinden fark alınır, düşürmede fark bir sonraki döneme alacak olarak işlenir." },
@@ -602,11 +602,11 @@ export const tr = {
     },
     distance: {
       title: "Mesafeli Satış Sözleşmesi",
-      lede: "Online abonelik ve kredi satın alımlarında geçerli sözleşme metni.",
+      lede: "Online abonelik ve Lio Bakiyesi satın alımlarında geçerli sözleşme metni.",
     },
     refund: {
       title: "İptal ve İade Koşulları",
-      lede: "Aboneliğinizi ve kredi alımlarınızı hangi koşullarda iptal edip iade alabileceğiniz.",
+      lede: "Aboneliğinizi ve Lio Bakiyesi alımlarınızı hangi koşullarda iptal edip iade alabileceğiniz.",
     },
     "hesap-silme": {
       title: "Hesap Silme Talebi",

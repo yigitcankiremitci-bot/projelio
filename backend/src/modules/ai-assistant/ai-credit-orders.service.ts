@@ -86,10 +86,10 @@ export class AiCreditOrdersService {
     // Demo hesabında kredi satın alınmaz: Lio zaten ücretsiz ve saatlik tavanla
     // sınırlı (bkz. demo-ai-kotasi.ts). Ziyaretçinin açtığı sipariş kayıtları
     // demo sıfırlamasının kapsamı dışında kalır, yani kalıcı çöp bırakırdı.
-    demoHesabindaYasak(userId, "kredi satın alma");
+    demoHesabindaYasak(userId, "bakiye satın alma");
 
     const pkg = findCreditPackage(packageKey);
-    if (!pkg) throw new BadRequestException("Geçersiz kredi paketi.");
+    if (!pkg) throw new BadRequestException("Geçersiz bakiye paketi.");
 
     const { count, error: countError } = await this.supabase.client
       .from("ai_credit_orders")
@@ -215,8 +215,8 @@ export class AiCreditOrdersService {
    */
   async retryCredit(orderId: string, approvedBy: string): Promise<CreditOrder> {
     const order = await this.findById(orderId);
-    if (order.status !== "paid") throw new ConflictException("Yalnızca ödemesi onaylanmış siparişin kredisi yüklenebilir.");
-    if (order.creditedAt) throw new ConflictException("Bu siparişin kredisi zaten yüklenmiş.");
+    if (order.status !== "paid") throw new ConflictException("Yalnızca ödemesi onaylanmış siparişin bakiyesi yüklenebilir.");
+    if (order.creditedAt) throw new ConflictException("Bu siparişin bakiyesi zaten yüklenmiş.");
     return this.creditOrder(order, approvedBy);
   }
 
@@ -242,7 +242,7 @@ export class AiCreditOrdersService {
         order.userId,
         order.credits,
         "topup",
-        `Kredi paketi: ${order.packageKey}`,
+        `Bakiye paketi: ${order.packageKey}`,
         approvedBy,
         order.id
       );

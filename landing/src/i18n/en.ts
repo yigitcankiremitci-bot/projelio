@@ -20,7 +20,7 @@ export const en: Dict = {
     screenshots: "Screenshots",
     demoAccount: "Demo account",
     pricing: "Pricing",
-    credits: "Credits",
+    credits: "Lio Units",
     faq: "FAQ",
     contact: "Contact",
     login: "Sign in",
@@ -351,7 +351,7 @@ export const en: Dict = {
     hero: {
       eyebrow: "Pricing",
       title: "Clear pricing, no hidden lines",
-      lede: "Three plans, one list. Every plan renews its Lio credits monthly; top up any time you need more.",
+      lede: "Three plans, one list. Every plan renews its Lio Units monthly; top up any time you need more.",
     },
     /* Prices come from GET /billing/public/plans; these are the fallback copy. */
     plans: [
@@ -366,7 +366,7 @@ export const en: Dict = {
         cta: "Get started",
         featured: false,
         features: [
-          "20,000 Lio credits per month",
+          "20,000 Lio Units per month",
           "Unlimited projects and tasks",
           "Google Drive / OneDrive connection",
           "Mobile app",
@@ -384,7 +384,7 @@ export const en: Dict = {
         cta: "Go Pro",
         featured: true,
         features: [
-          "50,000 Lio credits per month",
+          "50,000 Lio Units per month",
           "Everything in Starter",
           "Lio over WhatsApp",
           "Income, expenses and project budgets",
@@ -402,7 +402,7 @@ export const en: Dict = {
         cta: "Go Business",
         featured: false,
         features: [
-          "150,000 Lio credits per month",
+          "150,000 Lio Units per month",
           "Everything in Pro",
           "Up to 10 users",
           "Department-level permissions",
@@ -410,8 +410,8 @@ export const en: Dict = {
         ],
       },
     ],
-    freeNote: "The free plan stays open forever: try Lio with your welcome credits.",
-    creditsLabel: "credits / month",
+    freeNote: "The free plan stays open forever: try Lio with your welcome Lio Units.",
+    creditsLabel: "units / month",
     chargeNote: "Prices are shown in US dollars; payments are charged in Turkish lira.",
     enterprise: {
       title: "Need 50+ users or a custom integration?",
@@ -435,11 +435,11 @@ export const en: Dict = {
 
   credits: {
     hero: {
-      eyebrow: "Lio credits",
+      eyebrow: "Lio Units",
       title: "Pay for as much Lio as you actually use",
-      lede: "Your plan comes with credits that renew every month. If a busy month runs them out, top up once and keep going. Purchased credits never expire.",
+      lede: "Your plan comes with Lio Units that renew every month. If a busy month runs them out, top up once and keep going. Purchased Lio Units never expire.",
     },
-    packsTitle: "Credit packs",
+    packsTitle: "Lio Units packs",
     packsLede: "The bigger the pack, the lower the unit price. Write to us for enterprise volumes.",
     packs: [
       { credits: 1000, price: 99, bonus: 0 },
@@ -447,22 +447,22 @@ export const en: Dict = {
       { credits: 15000, price: 1199, bonus: 2500 },
       { credits: 50000, price: 3499, bonus: 12500 },
     ],
-    bonusLabel: "bonus credits",
-    unitLabel: "per 1,000 credits",
+    bonusLabel: "bonus units",
+    unitLabel: "per 1,000 units",
     selected: "Selected",
     select: "Select",
-    buy: "Top up credits",
-    totalCredits: "Total credits",
-    calcTitle: "How many credits do I need?",
+    buy: "Top up Lio Units",
+    totalCredits: "Total units",
+    calcTitle: "How many Lio Units do I need?",
     calcLede: "Set your team size and daily Lio usage to see a monthly estimate.",
     calcUsers: "People using Lio",
     calcPerDay: "Actions per person per day",
-    calcResult: "Estimated monthly credits",
+    calcResult: "Estimated monthly units",
     calcSuggestion: "Suggested pack",
-    calcNote: "Calculated over 22 working days. The monthly credits in your plan are deducted from this amount.",
-    usageTitle: "Credit consumption table",
-    usageLede: "We list all of it for transparency. Anything you do in the panel costs nothing — only Lio spends credits.",
-    usageHead: ["Action", "Credits"],
+    calcNote: "Calculated over 22 working days. The monthly Lio Units in your plan are deducted from this amount.",
+    usageTitle: "Lio Units consumption table",
+    usageLede: "We list all of it for transparency. Anything you do in the panel costs nothing — only Lio uses Lio Units.",
+    usageHead: ["Action", "Units"],
     usage: [
       ["Simple question (\"what's on today?\")", "1"],
       ["Creating or closing a task", "1"],
@@ -473,13 +473,13 @@ export const en: Dict = {
       ["Monthly financial analysis", "20"],
       ["Everything done in the panel", "0"],
     ],
-    faqTitle: "Questions about credits",
+    faqTitle: "Questions about Lio Units",
     faq: [
-      { q: "Do credits reset every month?", a: "The monthly credits included in your plan renew each billing period and don't roll over. Credits you purchase separately never expire and stay in your account." },
-      { q: "Which credits get used first?", a: "Your plan's monthly credits are used first; purchased credits are only touched afterwards, so nothing you bought goes to waste." },
+      { q: "Do Lio Units reset every month?", a: "The monthly Lio Units included in your plan renew each billing period and don't roll over. Lio Units you purchase separately never expire and stay in your account." },
+      { q: "Which Lio Units get used first?", a: "Your plan's monthly Lio Units are used first; purchased Lio Units are only touched afterwards, so nothing you bought goes to waste." },
       { q: "What happens if I run out?", a: "All of Projelio keeps working — only Lio stops taking new requests and lets you know. You carry on from the panel exactly where you left off." },
-      { q: "Are credits refundable?", a: "You can request a refund for unused credit packs within 14 days of purchase. Details are on our Cancellation and Refund page." },
-      { q: "Do team members share one pool?", a: "Yes. Credits belong to the company account. You can optionally set monthly limits per user or per department." },
+      { q: "Are Lio Units refundable?", a: "You can request a refund for unused Lio Units packs within 14 days of purchase. Details are on our Cancellation and Refund page." },
+      { q: "Do team members share one pool?", a: "Yes. Lio Units belong to the company account. You can optionally set monthly limits per user or per department." },
     ],
   },
 
@@ -514,7 +514,7 @@ export const en: Dict = {
       {
         name: "Pricing and payment",
         items: [
-          { q: "How can I try it for free?", a: "Signing up opens the free plan and your welcome credits let you try Lio — no card details, no time limit. Once the credits run out, picking a plan is up to you." },
+          { q: "How can I try it for free?", a: "Signing up opens the free plan and your welcome Lio Units let you try Lio — no card details, no time limit. Once they run out, picking a plan is up to you." },
           { q: "Which payment methods do you accept?", a: "Credit and debit cards online, bank transfer, and contractual invoiced billing for corporate customers. Payments run through a licensed payment provider; card details are never stored on our servers." },
           { q: "Do you issue invoices?", a: "Yes, an e-invoice is issued for every payment. Enter your company details in the panel and invoices arrive in your inbox automatically." },
           { q: "Can I change my plan later?", a: "Upgrade or downgrade whenever you like. Upgrades are prorated for the remaining days; downgrades are credited to the next period." },
@@ -596,11 +596,11 @@ export const en: Dict = {
     },
     distance: {
       title: "Distance Sales Agreement",
-      lede: "The agreement that applies to online subscription and credit purchases.",
+      lede: "The agreement that applies to online subscription and Lio Units purchases.",
     },
     refund: {
       title: "Cancellation and Refund Policy",
-      lede: "When and how you can cancel your subscription or get a refund on credits.",
+      lede: "When and how you can cancel your subscription or get a refund on Lio Units.",
     },
     "hesap-silme": {
       title: "Account Deletion Request",

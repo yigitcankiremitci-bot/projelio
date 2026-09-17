@@ -49,20 +49,20 @@ export function bakiyeUyarisi(input: BalanceAlertInput): SpendAlert | null {
   if (remainingUsd <= criticalUsd) {
     return {
       seviye: "kritik",
-      baslik: "Lio kredisi kritik seviyede",
+      baslik: "AI sağlayıcı bakiyesi kritik seviyede",
       govde:
         `Anthropic bakiyesi ${tutar}. ${gunMetni} ` +
         "Bakiye bittiğinde Lio tüm kullanıcılar için durur. " +
-        "console.anthropic.com üzerinden kredi yükleyip yönetici panelinden kaydedin.",
+        "console.anthropic.com üzerinden bakiye yükleyip yönetici panelinden kaydedin.",
     };
   }
 
   return {
     seviye: "uyarı",
-    baslik: "Lio kredisi azalıyor",
+    baslik: "AI sağlayıcı bakiyesi azalıyor",
     govde:
       `Anthropic bakiyesi ${tutar}. ${gunMetni} ` +
-      "Kesinti olmaması için kredi yüklemeyi planlayın.",
+      "Kesinti olmaması için bakiye yüklemeyi planlayın.",
   };
 }
 

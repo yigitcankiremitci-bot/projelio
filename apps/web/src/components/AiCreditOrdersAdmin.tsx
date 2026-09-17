@@ -83,9 +83,9 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
 
   return (
     <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: 16, marginBottom: 18 }}>
-      <h3 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 4px" }}>{t("Kredi siparişleri")}</h3>
+      <h3 style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, margin: "0 0 4px" }}>{t("Bakiye siparişleri")}</h3>
       <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>
-        {t("Ödemesi alınan siparişi onayla — kredi ancak onaydan sonra kullanıcının bakiyesine geçer.")}
+        {t("Ödemesi alınan siparişi onayla — birimler ancak onaydan sonra kullanıcının bakiyesine geçer.")}
       </p>
 
       {error && <p style={{ color: c.danger, fontSize: 13.5, margin: "0 0 10px" }}>{error}</p>}
@@ -101,20 +101,20 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
           }}
         >
           <p style={{ margin: 0, padding: "9px 12px", fontSize: 13.5, color: c.danger, lineHeight: 1.5 }}>
-            {t("Ödemesi onaylanmış ama kredisi yüklenememiş sipariş var. Yükleme yeniden denenmeli.")}
+            {t("Ödemesi onaylanmış ama bakiyesi yüklenememiş sipariş var. Yükleme yeniden denenmeli.")}
           </p>
           {stuck.map((o) => (
             <div key={o.id} style={{ ...rowStyle, borderTop: `1px solid ${c.danger}44` }}>
               <span style={{ flex: 1, color: c.textPrimary }}>
                 {o.userFullName ?? o.userEmail ?? o.userId} ·{" "}
-                {t("{n} kredi", { n: o.credits.toLocaleString("tr-TR") })}
+                {t("{n} birim", { n: o.credits.toLocaleString("tr-TR") })}
               </span>
               <button
                 onClick={() => act(o.id, () => aiChat.retryCreditOrder(o.id))}
                 disabled={busyId === o.id}
                 style={buttonStyle(true)}
               >
-                {busyId === o.id ? t("Yükleniyor…") : t("Krediyi yükle")}
+                {busyId === o.id ? t("Yükleniyor…") : t("Bakiyeyi yükle")}
               </button>
             </div>
           ))}
@@ -132,7 +132,7 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
               <span style={{ flex: 1, minWidth: 160, color: c.textPrimary }}>
                 {o.userFullName ?? o.userEmail ?? o.userId}
                 <span style={{ display: "block", fontSize: 12.5, color: c.textSecondary }}>
-                  {t("{n} kredi", { n: o.credits.toLocaleString("tr-TR") })} · {formatTry(o.priceAmount)} ·{" "}
+                  {t("{n} birim", { n: o.credits.toLocaleString("tr-TR") })} · {formatTry(o.priceAmount)} ·{" "}
                   {new Date(o.createdAt).toLocaleDateString("tr-TR")}
                 </span>
               </span>

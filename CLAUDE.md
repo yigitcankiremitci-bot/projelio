@@ -382,6 +382,11 @@ Değişmez kurallar:
   yorumları silme — çoğu geçmişte yaşanmış bir hatayı belgeliyor. Yeni yorumları
   aynı dilde ve aynı üslupta yaz.
 - **Kullanıcıya görünen tüm metinler Türkçe.**
+- **Kullanıcıya "kredi" / "credit" deme.** Ödeme kuruluşu bu terimi reddetti
+  (2026-09). Ad: **Lio Bakiyesi** (EN: **Lio Units**); miktar birimi "birim"
+  (EN: "units"). Kod tanımlayıcıları, tablo adları ve API yolları (`credits`,
+  `ai_credit_*`) bilerek eski adıyla kaldı — yalnızca metinler değişti.
+  Lio'nun sistem promptu da modele bu kelimeyi yasaklıyor.
 - **Renkler tek yerden gelir:** `packages/shared/src/theme.ts` — açık ve koyu tema
   paletleri orada tanımlı (`accent: #C0813F`, ana `#3E4858`). Yeni renk uydurma,
   bileşene sabit hex yazma; paletten al.

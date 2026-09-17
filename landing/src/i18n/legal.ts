@@ -63,7 +63,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
       {
         h: "3. Otomatik olarak toplanan bilgiler",
         p: [
-          "Kullanım bilgileri: hangi ekranları açtığınız, oluşturduğunuz ve güncellediğiniz kayıt sayıları, modül kullanım istatistikleri, arama ve filtreleme davranışı, tur (onboarding) adımlarını tamamlama durumu, Lio ile yaptığınız istek sayısı ve harcanan kredi miktarı.",
+          "Kullanım bilgileri: hangi ekranları açtığınız, oluşturduğunuz ve güncellediğiniz kayıt sayıları, modül kullanım istatistikleri, arama ve filtreleme davranışı, tur (onboarding) adımlarını tamamlama durumu, Lio ile yaptığınız istek sayısı ve harcanan Lio Bakiyesi miktarı.",
           "Cihaz ve bağlantı bilgileri: IP adresi, tarayıcı ve işletim sistemi türü, cihaz tipi, ekran boyutu, dil ve saat dilimi tercihi, yönlendiren adres, uygulama sürümü ve hata/çökme kayıtları.",
           "Güvenlik ve oturum bilgileri: giriş denemeleri ve zamanları, oturum belirteçlerinin (JWT) geçerlilik bilgisi, e-posta doğrulama ve parola sıfırlama işlemleri, şüpheli erişim tespitine yarayan kayıtlar.",
           "Yerel depolama ve çerezler: oturumunuzu açık tutmak, tercihlerinizi hatırlamak ve temel işlevleri çalıştırmak için tarayıcınızın yerel depolamasını ve zorunlu çerezleri kullanırız. Ayrıntı için \"Çerezler ve yerel depolama\" bölümüne bakın.",
@@ -100,7 +100,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
           "Hangi tedarikçinin ve modelin kullanılacağına Projelio yöneticisi karar verir; kullanıcı seçemez. Yürürlükteki tedarikçi listesini ve hangi ülkelere veri gittiğini bu politikada güncel tutarız.",
           "İçeriğiniz yapay zekâ modellerinin eğitiminde kullanılmaz. Birincil tedarikçimizle bu yönde bir veri işleme sözleşmesi bulunmaktadır; bir yedek tedarikçi ancak aynı taahhüdü veren bir sözleşme kurulduktan sonra devreye alınır.",
           "Lio, sizin panelde görme yetkiniz olmayan hiçbir veriye erişemez. Yetkilendirme kuralları arayüzde ve sohbette birebir aynı çalışır; Lio bir kaydı ancak siz de görebiliyorsanız okuyabilir, ancak siz de değiştirebiliyorsanız değiştirir.",
-          "Sohbet geçmişiniz, konuşmanın devamlılığı için saklanır ve son mesajından itibaren 90 gün dolduğunda mesajlarıyla birlikte kalıcı olarak silinir. Kredi sistemi gereği her isteğin tükettiği belirteç (token) miktarı ve maliyeti hesabınıza kaydedilir; bu kayıtlar mesajlarınızın içeriğini barındırmaz ve sohbet silindikten sonra da faturalandırma amacıyla kalır.",
+          "Sohbet geçmişiniz, konuşmanın devamlılığı için saklanır ve son mesajından itibaren 90 gün dolduğunda mesajlarıyla birlikte kalıcı olarak silinir. Lio Bakiyesi sistemi gereği her isteğin tükettiği belirteç (token) miktarı ve maliyeti hesabınıza kaydedilir; bu kayıtlar mesajlarınızın içeriğini barındırmaz ve sohbet silindikten sonra da faturalandırma amacıyla kalır.",
           "Yapay zekâ çıktıları hata içerebilir. Finansal, hukuki veya operasyonel kararlarınızı yalnızca Lio'nun yanıtına dayandırmamanızı öneririz.",
         ],
       },
@@ -138,7 +138,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "10. Bilgileri kimlerle paylaşıyoruz",
         p: [
           "Organizasyonunuzdaki diğer kullanıcılarla: bir işe, projeye, departmana veya modül ekibine dahil olduğunuzda adınız, profil görseliniz, unvanınız ve o alanda ürettiğiniz içerik, aynı alana erişimi olan kişiler tarafından görülür. Görev atamaları, yorumlar ve akış paylaşımları ilgili ekibe açıktır.",
-          "Yöneticilerle: iş sahibi, departman yöneticisi ve organizasyon sahibi, yetkileri kapsamındaki içeriğe ve üyelik bilgilerine erişebilir. Kurumsal e-posta adresinizle katıldığınız bir organizasyonda yöneticinizin bu erişimi hizmetin doğal bir parçasıdır. Yöneticiler ayrıca yapay zekâ kredisi harcamasına ilişkin toplu raporlar alabilir.",
+          "Yöneticilerle: iş sahibi, departman yöneticisi ve organizasyon sahibi, yetkileri kapsamındaki içeriğe ve üyelik bilgilerine erişebilir. Kurumsal e-posta adresinizle katıldığınız bir organizasyonda yöneticinizin bu erişimi hizmetin doğal bir parçasıdır. Yöneticiler ayrıca Lio Bakiyesi harcamasına ilişkin toplu raporlar alabilir.",
           "Hizmet sağlayıcılarımızla: Hizmet'i çalıştırmak için sınırlı sayıda tedarikçi kullanırız. Bunlar: sunucu barındırma (Hosting Dünyam — sunucular Türkiye'de; uygulama, veritabanı ve yüklediğiniz dosyalar buradadır), tanıtım sitesi barındırma (Vercel Inc., ABD), e-posta gönderimi (Resend, Inc., ABD), yapay zekâ (Anthropic, PBC; tanımlıysa yedek olarak MiniMax ve Z.ai/Zhipu AI), anlık bildirim (tarayıcınızın üreticisinin push altyapısı — Google LLC, Mozilla, Apple veya Microsoft), yazı tipleri (Google Fonts) ve bağladığınız hâlde Google LLC, Microsoft Corporation ve Meta Platforms, Inc. hizmetleri. Her biri verileri yalnızca bizim adımıza, talimatımız doğrultusunda ve sözleşmeyle sınırlanmış biçimde işler.",
           "Yetkili makamlarla: yalnızca mevzuatın gerektirdiği, usulüne uygun ve yazılı bir talep olduğunda; talebin kapsamıyla sınırlı olarak. Hukuken engellenmediğimiz sürece sizi bilgilendirmeye çalışırız.",
           "Şirket işlemlerinde: birleşme, devir, bölünme veya varlık satışı hâlinde veriler alıcıya aktarılabilir. Böyle bir durumda sizi önceden bilgilendirir ve alıcının bu politikadaki taahhütlere uymasını sağlarız.",
@@ -160,7 +160,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
           "Hesap ve içerik verileri: hesabınız etkin olduğu sürece saklanır.",
           "Hesap silme: silme talebinizden sonra 30 günlük bir bekleme süresi başlar. Bu süre içinde giriş yaparsanız talep iptal olur ve hiçbir şey silinmez. Süre dolduğunda hesabınız ve kişisel verileriniz kalıcı olarak silinir; yedeklerden tamamen temizlenmesi ek olarak birkaç haftayı bulabilir. İçinde başka üye bulunmayan işleriniz ve organizasyonlarınız da silinir; içinde başkalarının emeği olanlar korunur ve oradaki katkılarınız kimliksizleştirilir.",
           "Organizasyona ait içerik: hesabınızı silseniz de organizasyonun sahibi olduğu içerik (ör. ekip arkadaşlarınıza gönderdiğiniz yorumlar, tamamladığınız görev kayıtları) organizasyonda kalmaya devam eder. Bu içeriğin silinmesi organizasyon yöneticisinin talebine bağlıdır.",
-          "Lio sohbet geçmişi: son mesajından 90 gün sonra mesajlarıyla birlikte otomatik olarak silinir. Kredi ve kullanım kayıtları, faturalandırma nedeniyle daha uzun süre tutulur ve mesaj içeriği barındırmaz.",
+          "Lio sohbet geçmişi: son mesajından 90 gün sonra mesajlarıyla birlikte otomatik olarak silinir. Lio Bakiyesi ve kullanım kayıtları, faturalandırma nedeniyle daha uzun süre tutulur ve mesaj içeriği barındırmaz.",
           "WhatsApp konuşma kayıtları: en fazla 90 gün saklanır ve sonra otomatik olarak silinir. WhatsApp'tan gelen ham olay kayıtları (mesajın tam metnini içerir) işlendikten sonra en fazla 7 gün tutulur.",
           "Tek kullanımlık bağlantı ve kodlar (e-posta doğrulama, parola sıfırlama, WhatsApp bağlama): süresi dolduktan 30 gün sonra silinir.",
           "Sosyal medya parolası görüntüleme kayıtları: denetim izi olduğu için ilgili parola kaydı silinene kadar saklanır; kayıt silindiğinde bu izler de silinir.",
@@ -270,7 +270,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
       {
         h: "3. Information collected automatically",
         p: [
-          "Usage information: which screens you open, how many records you create and update, module usage statistics, search and filtering behaviour, whether you completed onboarding tour steps, how many requests you made to Lio and how many credits they consumed.",
+          "Usage information: which screens you open, how many records you create and update, module usage statistics, search and filtering behaviour, whether you completed onboarding tour steps, how many requests you made to Lio and how many Lio Units they consumed.",
           "Device and connection information: IP address, browser and operating system, device type, screen size, language and time zone preference, referring address, application version, and error/crash logs.",
           "Security and session information: sign-in attempts and times, validity data for session tokens (JWT), email verification and password reset events, and records that help us detect suspicious access.",
           "Local storage and cookies: we use your browser's local storage and strictly necessary cookies to keep you signed in, remember your preferences and run core functions. See \"Cookies and local storage\" for detail.",
@@ -307,7 +307,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
           "Which supplier and which model is used is decided by the Projelio administrator, not by users. We keep the list of suppliers in use, and the countries data goes to, current in this policy.",
           "Your content is not used to train AI models. We have a data processing agreement to that effect with our primary supplier, and a fallback supplier is only enabled once an agreement with the same commitment is in place.",
           "Lio cannot reach any data you are not permitted to see in the panel. Permission rules work identically in the interface and in chat: Lio can read a record only if you can, and change it only if you can.",
-          "Your chat history is kept so conversations stay coherent, and is permanently deleted together with its messages 90 days after the last message. For the credit system, the tokens each request consumed and its cost are recorded against your account; those records contain no message content and remain, for billing purposes, after the conversation is deleted.",
+          "Your chat history is kept so conversations stay coherent, and is permanently deleted together with its messages 90 days after the last message. For Lio Units accounting, the tokens each request consumed and its cost are recorded against your account; those records contain no message content and remain, for billing purposes, after the conversation is deleted.",
           "AI output can be wrong. We recommend you do not base financial, legal or operational decisions on Lio's answer alone.",
         ],
       },
@@ -345,7 +345,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "10. Who we share information with",
         p: [
           "With other users in your organisation: when you join a job, project, department or module team, your name, profile picture, title and the content you create there are visible to everyone with access to that area. Task assignments, comments and feed posts are open to the relevant team.",
-          "With administrators: the job owner, the department manager and the organisation owner can access content and membership information within the scope of their permissions. If you joined an organisation with your work email address, this administrator access is an inherent part of the Service. Administrators may also receive aggregate reports on AI credit spending.",
+          "With administrators: the job owner, the department manager and the organisation owner can access content and membership information within the scope of their permissions. If you joined an organisation with your work email address, this administrator access is an inherent part of the Service. Administrators may also receive aggregate reports on Lio Units spending.",
           "With our service providers: we use a small number of suppliers to run the Service — server hosting (Hosting Dünyam, servers located in Türkiye; the application, the database and the files you upload all live there), marketing site hosting (Vercel Inc., USA), email delivery (Resend, Inc., USA), AI (Anthropic, PBC; where configured, MiniMax and Z.ai/Zhipu AI as fallbacks), push notifications (your browser vendor's push infrastructure — Google LLC, Mozilla, Apple or Microsoft), web fonts (Google Fonts), and, where you connect them, services from Google LLC, Microsoft Corporation and Meta Platforms, Inc. Each processes data only on our behalf, on our instructions and under contractual limits.",
           "With competent authorities: only where there is a duly made, written request required by law, and only to the extent of that request. Unless we are legally prevented, we will try to inform you.",
           "In corporate transactions: in a merger, acquisition, demerger or asset sale, data may be transferred to the acquirer. We will inform you beforehand and ensure the acquirer honours the commitments in this policy.",
@@ -367,7 +367,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
           "Account and content data: kept for as long as your account is active.",
           "Account deletion: a 30-day waiting period starts when you request deletion. If you sign in during that period the request is cancelled and nothing is deleted. When the period ends your account and personal data are permanently deleted; clearing them from backups can take a few extra weeks. Jobs and organisations with no other members are deleted too; those containing other people's work are preserved and your contributions there are anonymised.",
           "Organisation-owned content: even if you delete your account, content owned by the organisation (comments you sent to teammates, task records you completed) stays with the organisation. Deleting that content depends on a request from the organisation's administrator.",
-          "Lio chat history: automatically deleted, along with its messages, 90 days after the last message. Credit and usage records are kept longer for billing purposes and contain no message content.",
+          "Lio chat history: automatically deleted, along with its messages, 90 days after the last message. Lio Units and usage records are kept longer for billing purposes and contain no message content.",
           "WhatsApp conversation records: kept for a maximum of 90 days and then deleted automatically. Raw event records received from WhatsApp (which contain the full message text) are kept for at most 7 days after processing.",
           "Single-use links and codes (email verification, password reset, WhatsApp linking): deleted 30 days after they expire.",
           "Social media password reveal logs: as an audit trail, kept until the password record itself is deleted; deleting the record deletes these traces too.",
@@ -472,7 +472,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
           "Yönetici: Organizasyon sahibi, iş sahibi veya departman yöneticisi sıfatıyla başkalarının erişimini düzenleyebilen kullanıcı.",
           "İçerik: Hizmet'e yüklediğiniz veya Hizmet içinde ürettiğiniz her türlü veri, metin, dosya, görsel ve kayıt.",
           "Abonelik: seçtiğiniz paket kapsamında, belirli bir dönem için Hizmet'i kullanma hakkı.",
-          "Kredi: Lio'nun yapay zekâ özelliklerinin kullanımını ölçen ve satın alınabilen birim.",
+          "Lio Bakiyesi: Lio'nun yapay zekâ özelliklerinin kullanımını birim cinsinden ölçen ve satın alınabilen bakiye.",
         ],
       },
       {
@@ -536,8 +536,8 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         p: [
           "Lio, Hizmet'e gömülü yapay zekâ asistanıdır. Lio yalnızca sizin görme ve değiştirme yetkiniz olan verilerle çalışır.",
           "Yapay zekâ çıktıları olasılıksaldır ve hata içerebilir. Çıktıların doğruluğu, eksiksizliği veya belirli bir amaca uygunluğu garanti edilmez. Finansal, hukuki, vergisel veya operasyonel kararlarınızı yalnızca Lio'nun yanıtına dayandırmamalısınız; doğrulama sorumluluğu size aittir.",
-          "Lio kullanımı Kredi tüketir. Her isteğin tükettiği kredi, işlenen ve üretilen metin miktarına göre hesaplanır ve hesabınızda görüntülenir. Paketinize dâhil krediler dönem sonunda devretmez; satın alınan krediler aksi belirtilmedikçe devreder.",
-          "Krediyi tüketmek amacıyla otomatik veya kötü niyetli kullanım, kredi bakiyesinin manipülasyonu ve Lio üzerinden Hizmet'in kabul edilebilir kullanım kurallarının aşılması yasaktır.",
+          "Lio kullanımı Lio Bakiyesi tüketir. Her isteğin tükettiği birim miktarı, işlenen ve üretilen metin miktarına göre hesaplanır ve hesabınızda görüntülenir. Paketinize dâhil birimler dönem sonunda devretmez; satın alınan birimler aksi belirtilmedikçe devreder.",
+          "Lio Bakiyesini tüketmek amacıyla otomatik veya kötü niyetli kullanım, Lio Bakiyesinin manipülasyonu ve Lio üzerinden Hizmet'in kabul edilebilir kullanım kurallarının aşılması yasaktır.",
           "Yapay zekâ altyapısını sağlayan tedarikçiyi değiştirebilir, model sürümünü güncelleyebiliriz. Bu değişiklikler çıktıların biçimini ve kalitesini etkileyebilir.",
         ],
       },
@@ -560,7 +560,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
       {
         h: "12. Paketler, ücretler ve faturalandırma",
         p: [
-          "Güncel paketler, kullanıcı başına fiyatlar ve kredi paketleri projelio.app üzerindeki fiyatlandırma sayfasında yayımlanır. Aksi belirtilmedikçe fiyatlara KDV dâhil değildir.",
+          "Güncel paketler, kullanıcı başına fiyatlar ve Lio Bakiyesi paketleri projelio.app üzerindeki fiyatlandırma sayfasında yayımlanır. Aksi belirtilmedikçe fiyatlara KDV dâhil değildir.",
           "Abonelik, seçtiğiniz dönemin (aylık veya yıllık) sonunda, iptal edilmedikçe aynı süreyle ve yenileme anındaki güncel fiyattan otomatik olarak yenilenir. Yenilemeyi durdurmak için dönem bitmeden aboneliğinizi iptal etmeniz yeterlidir.",
           "Kullanıcı başına fiyatlanan paketlerde dönem içinde kullanıcı eklerseniz, eklenen kullanıcılar için kalan döneme orantılı ücret tahakkuk eder. Dönem içinde kullanıcı çıkarmak, ödenmiş ücretin iadesini gerektirmez; azalma bir sonraki yenilemede geçerli olur.",
           "Ödemeler lisanslı bir ödeme kuruluşu üzerinden alınır; kart bilgileri bizim sunucularımızda saklanmaz. Fatura, verdiğiniz fatura bilgilerine göre düzenlenir; bilgilerin doğruluğundan siz sorumlusunuz.",
@@ -682,7 +682,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
           "Administrator: a user who can manage others' access as organisation owner, job owner or department manager.",
           "Content: any data, text, file, image or record you upload to or create within the Service.",
           "Subscription: the right to use the Service for a given period within the plan you have chosen.",
-          "Credit: the unit that measures and is purchased for use of Lio's AI features.",
+          "Lio Units: the purchasable units that measure use of Lio's AI features.",
         ],
       },
       {
@@ -746,8 +746,8 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         p: [
           "Lio is the AI assistant embedded in the Service. Lio works only with data you are permitted to see and change.",
           "AI output is probabilistic and can be wrong. No warranty is given as to its accuracy, completeness or fitness for a particular purpose. You should not base financial, legal, tax or operational decisions on Lio's answer alone; verification is your responsibility.",
-          "Using Lio consumes Credits. The credits each request consumes are calculated from the amount of text processed and produced, and are shown in your account. Credits included in your plan do not carry over at the end of the period; purchased credits carry over unless stated otherwise.",
-          "Automated or bad-faith use aimed at consuming credits, manipulation of the credit balance, and using Lio to get around the acceptable use rules are prohibited.",
+          "Using Lio consumes Lio Units. The Lio Units each request consumes are calculated from the amount of text processed and produced, and are shown in your account. Lio Units included in your plan do not carry over at the end of the period; purchased Lio Units carry over unless stated otherwise.",
+          "Automated or bad-faith use aimed at consuming Lio Units, manipulation of the Lio Units balance, and using Lio to get around the acceptable use rules are prohibited.",
           "We may change the supplier providing the AI infrastructure and update the model version. Such changes may affect the form and quality of output.",
         ],
       },
@@ -770,7 +770,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
       {
         h: "12. Plans, fees and billing",
         p: [
-          "Current plans, per-user prices and credit packages are published on the pricing page at projelio.app. Unless stated otherwise, prices exclude VAT.",
+          "Current plans, per-user prices and Lio Units packages are published on the pricing page at projelio.app. Unless stated otherwise, prices exclude VAT.",
           "Unless cancelled, your Subscription renews automatically at the end of the chosen period (monthly or annual) for the same period, at the price current at renewal. To stop renewal, cancel your subscription before the period ends.",
           "On per-user plans, adding users mid-period is charged pro rata for the remainder of the period. Removing users mid-period does not entitle you to a refund of fees already paid; the reduction applies at the next renewal.",
           "Payments are taken through a licensed payment provider; card details are not stored on our servers. Invoices are issued using the billing details you provide, and you are responsible for their accuracy.",
@@ -999,13 +999,13 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "1. Taraflar",
         p: [
           "SATICI: Yiğitcan Kiremitci (şahıs işletmesi), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye · Kozyatağı VD 25750888104 · info@projelio.app.",
-          "ALICI: Projelio hizmetine abone olan veya kredi satın alan gerçek ya da tüzel kişi.",
+          "ALICI: Projelio hizmetine abone olan veya Lio Bakiyesi satın alan gerçek ya da tüzel kişi.",
         ],
       },
       {
         h: "2. Sözleşmenin konusu",
         p: [
-          "Bu sözleşme, ALICI'nın elektronik ortamda satın aldığı dijital abonelik ve Lio kredilerinin sunulmasına ilişkin, 6502 sayılı Tüketicinin Korunması Hakkında Kanun ve Mesafeli Sözleşmeler Yönetmeliği hükümleri uyarınca tarafların hak ve yükümlülüklerini düzenler.",
+          "Bu sözleşme, ALICI'nın elektronik ortamda satın aldığı dijital abonelik ve Lio Bakiyesinin sunulmasına ilişkin, 6502 sayılı Tüketicinin Korunması Hakkında Kanun ve Mesafeli Sözleşmeler Yönetmeliği hükümleri uyarınca tarafların hak ve yükümlülüklerini düzenler.",
         ],
       },
       {
@@ -1024,7 +1024,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "5. Cayma hakkı",
         p: [
           "Mesafeli Sözleşmeler Yönetmeliği m.15/1-ğ uyarınca, elektronik ortamda anında ifa edilen ve tüketiciye anında teslim edilen gayrimaddi mallarda cayma hakkı bulunmamaktadır.",
-          "Buna rağmen SATICI, ticari politikası gereği, hiç kullanılmamış abonelik ve kredi alımları için satın alma tarihinden itibaren 14 gün içinde iade imkânı tanır. Detaylar İptal ve İade Koşulları sayfasındadır.",
+          "Buna rağmen SATICI, ticari politikası gereği, hiç kullanılmamış abonelik ve Lio Bakiyesi alımları için satın alma tarihinden itibaren 14 gün içinde iade imkânı tanır. Detaylar İptal ve İade Koşulları sayfasındadır.",
         ],
       },
       {
@@ -1039,13 +1039,13 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "1. Parties",
         p: [
           "SELLER: Yiğitcan Kiremitci (sole proprietorship), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye · Kozyatağı Tax Office, tax/ID no 25750888104 · info@projelio.app.",
-          "BUYER: the natural or legal person subscribing to Projelio or purchasing credits.",
+          "BUYER: the natural or legal person subscribing to Projelio or purchasing Lio Units.",
         ],
       },
       {
         h: "2. Subject",
         p: [
-          "This agreement governs the rights and obligations of the parties regarding digital subscriptions and Lio credits purchased electronically, under Turkish Consumer Protection Law no. 6502 and the Distance Contracts Regulation.",
+          "This agreement governs the rights and obligations of the parties regarding digital subscriptions and Lio Units purchased electronically, under Turkish Consumer Protection Law no. 6502 and the Distance Contracts Regulation.",
         ],
       },
       {
@@ -1064,7 +1064,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "5. Right of withdrawal",
         p: [
           "Under art. 15/1-ğ of the Distance Contracts Regulation, there is no right of withdrawal for intangible goods performed instantly in electronic form.",
-          "Nevertheless, as a matter of commercial policy the SELLER offers a refund for entirely unused subscriptions and credits within 14 days of purchase. See the Cancellation and Refund page.",
+          "Nevertheless, as a matter of commercial policy the SELLER offers a refund for entirely unused subscriptions and Lio Units within 14 days of purchase. See the Cancellation and Refund page.",
         ],
       },
       {
@@ -1098,10 +1098,10 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         ],
       },
       {
-        h: "4. Kredi iadesi",
+        h: "4. Lio Bakiyesi iadesi",
         p: [
-          "Satın alınan Lio kredilerinin hiç kullanılmamış olması şartıyla, satın alma tarihinden itibaren 14 gün içinde iade edilir. Kısmen kullanılmış paketlerde kalan kredi oranında iade değerlendirilir.",
-          "Hediye (bonus) krediler iade hesabına dâhil edilmez.",
+          "Satın alınan Lio Bakiyesinin hiç kullanılmamış olması şartıyla, satın alma tarihinden itibaren 14 gün içinde iade edilir. Kısmen kullanılmış paketlerde kalan birim oranında iade değerlendirilir.",
+          "Hediye (bonus) birimler iade hesabına dâhil edilmez.",
         ],
       },
       {
@@ -1138,10 +1138,10 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         ],
       },
       {
-        h: "4. Credit refunds",
+        h: "4. Lio Units refunds",
         p: [
-          "Purchased Lio credits are refunded within 14 days of purchase provided they are entirely unused. For partially used packs, a refund proportional to the remaining balance may be considered.",
-          "Bonus credits are excluded from refund calculations.",
+          "Purchased Lio Units are refunded within 14 days of purchase provided they are entirely unused. For partially used packs, a refund proportional to the remaining balance may be considered.",
+          "Bonus Lio Units are excluded from refund calculations.",
         ],
       },
       {

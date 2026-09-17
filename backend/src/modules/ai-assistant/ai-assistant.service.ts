@@ -787,7 +787,7 @@ export class AiAssistantService {
       // sorunu olduğu için genel "geçersiz istek" mesajının arkasına saklanmasın.
       if (/credit balance|insufficient|quota/i.test(err?.message ?? "")) {
         return new ServiceUnavailableException(
-          "AI sağlayıcısı hesabınızda kredi kalmamış. Sağlayıcı panelinden kredi yükleyin."
+          "AI sağlayıcısı hesabınızda bakiye kalmamış. Sağlayıcı panelinden bakiye yükleyin."
         );
       }
       // Ham sağlayıcı metni kullanıcıya GİTMEZ: 400 mesajları isteğin iç yapısını
@@ -800,7 +800,7 @@ export class AiAssistantService {
     }
     if (status === 429) {
       return new ServiceUnavailableException(
-        "AI sağlayıcısının hız sınırına takıldı ya da kredi limitiniz dolmuş olabilir. Biraz sonra tekrar deneyin."
+        "AI sağlayıcısının hız sınırına takıldı ya da harcama limitiniz dolmuş olabilir. Biraz sonra tekrar deneyin."
       );
     }
     if (status && status >= 500) {
@@ -1012,7 +1012,7 @@ export class AiAssistantService {
         "ya da silme aracın yok.",
       "İstek bu ikinci listedeki bir alana giriyorsa HİÇBİR ARAÇ ÇAĞIRMA. Tek cümleyle \"bunu şu an yapamıyorum\" de, " +
         "kullanıcının bunu uygulamada nereden yapabileceğini söyle ve dur. \"Acaba bir aracım var mı\" diye deneme " +
-        "yapma — her deneme kullanıcının kredisinden düşer.",
+        "yapma — her deneme kullanıcının Lio Bakiyesinden düşer.",
       "",
       "## İşe başlamadan önce",
       "Her istekte önce şunu belirle: bu iş elimdeki araçlarla TAM olarak yapılabilir mi?",
@@ -1186,7 +1186,7 @@ export class AiAssistantService {
         "\"Drive'da düzenle\" o pencerenin içinde. Drive/OneDrive adresi YAZMA: kullanıcıyı gereksiz " +
         "yere uygulamadan çıkarır. Bağlantının etrafına ** koyma, kalın yazı bağlantıyı bozar.",
       "- SES dosyalarını (mp3, m4a, wav…) kendiliğinden AÇMA. Ses okunabilmek için yazıya çevriliyor ve " +
-        "bunun bedeli dakika başına yaklaşık 70 kredi; iki müzik parçası beş yüz krediyi bulur ve " +
+        "bunun bedeli dakika başına yaklaşık 70 birim; iki müzik parçası beş yüz birimi bulur ve " +
         "müzikten anlamlı bir metin de çıkmaz. Kullanıcı sözlerini/konuşmasını gerçekten istiyorsa önce " +
         "tahmini bedeli söyle ve onay al.",
       "- \"Şu sözleşmeyi getir\", \"projedeki teklife bak\", \"bu projede hangi dosyalar var\" gibi " +
@@ -1289,8 +1289,10 @@ export class AiAssistantService {
         "cümle ekle; ısrar etme.",
       "- \"Bugün ne yaptım\", \"bu hafta kaç saat çalıştım\" gibi sorularda get_work_log'u çağır.",
       "",
-      "## Kredi disiplini",
-      "Kullanıcı her turun ve her araç çağrısının bedelini kredi olarak öder. Bu yüzden:",
+      "## Bakiye disiplini",
+      "Kullanıcı her turun ve her araç çağrısının bedelini Lio Bakiyesinden öder. Bu yüzden:",
+      "- Bu bedelden söz ederken \"kredi\" kelimesini KULLANMA: adı \"Lio Bakiyesi\", miktarın birimi \"birim\" " +
+        "(İngilizce konuşuyorsan \"Lio Units\"). Ödeme kuruluşu \"kredi\" terimini kabul etmiyor.",
       "- Aynı veriyi iki kez çekme; bir araçtan aldığın sonucu hatırla.",
       "- Geniş listeler yerine dar filtre kullan (search_tasks'a proje/durum/tarih ver).",
       "- Birden çok görev eklerken create_task'ı tekrarlamak yerine create_tasks ile tek çağrıda ekle. " +
@@ -1757,7 +1759,7 @@ export class AiAssistantService {
       // Durdurmak kredi harcamaz; yapılanın ne olduğunu söylemek ise şart —
       // kullanıcı yarım kalan işi elle tamamlayacaksa nereden devam edeceğini bilmeli.
       const text = cevir(run.locale, {
-        metin: "Durdurdum. {yapilan}. Bu istek toplam {harcanan} kredi harcadı.",
+        metin: "Durdurdum. {yapilan}. Bu istek toplam {harcanan} birim harcadı.",
         params: { yapilan: summarizeExecuted(run.executed, run.locale), harcanan: this.formatCredits(run.spentCredits) },
       });
       await this.safeRecord(run.conversationId, text);
@@ -1856,7 +1858,7 @@ export class AiAssistantService {
         const note =
           " " +
           cevir(run.locale, {
-            metin: "(Bu isteğin toplam bedeli: {harcanan} kredi.)",
+            metin: "(Bu isteğin toplam bedeli: {harcanan} birim.)",
             params: { harcanan: this.formatCredits(run.spentCredits) },
           });
         (result as any).text = `${(result as any).text}${note}`;
@@ -1909,16 +1911,16 @@ export class AiAssistantService {
       const text =
         reason === "estimate"
           ? t(
-              "Bu istek tahminen {tahmin} kredi tutacak — bu, tek seferde harcanması için yüksek bir tutar (eşik {esik} kredi). Henüz hiçbir kredi harcamadım. Devam edeyim mi?",
+              "Bu istek tahminen {tahmin} birim tutacak — bu, tek seferde harcanması için yüksek bir tutar (eşik {esik} birim). Henüz hiç bakiye harcamadım. Devam edeyim mi?",
               { tahmin: this.formatCredits(estimate), esik: this.formatCredits(run.creditCeiling) }
             )
           : reason === "budget"
             ? t(
-                "Bu istek şu ana kadar {harcanan} kredi harcadı ve henüz bitmedi. Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} kredi daha götürür. Devam edeyim mi?",
+                "Bu istek şu ana kadar {harcanan} birim harcadı ve henüz bitmedi. Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} birim daha götürür. Devam edeyim mi?",
                 { harcanan: this.formatCredits(spent), yapilan: done, tahmin: this.formatCredits(estimate) }
               )
             : t(
-                "Bu istek {n} adım sürdü ve hâlâ bitmedi ({harcanan} kredi). Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} kredi daha götürür. Devam edeyim mi?",
+                "Bu istek {n} adım sürdü ve hâlâ bitmedi ({harcanan} birim). Şimdiye kadar: {yapilan}. Devam edersem her adım yaklaşık {tahmin} birim daha götürür. Devam edeyim mi?",
                 {
                   n: run.iterationsUsed,
                   harcanan: this.formatCredits(spent),
@@ -1953,9 +1955,9 @@ export class AiAssistantService {
       const done = summarizeExecuted(run.executed, run.locale);
       const text = cevir(run.locale, {
         metin:
-          "AI kredin bu isteği sürdürmeye yetmiyor, bu yüzden burada durdum. {yapilan}. " +
-          "Kalan kredin {kalan}, devam etmek için en az {gereken} gerekiyor. " +
-          "Ayarlar > AI Kredileri sayfasından kredi yükleyip tekrar yazabilirsin.",
+          "Lio Bakiyen bu isteği sürdürmeye yetmiyor, bu yüzden burada durdum. {yapilan}. " +
+          "Kalan bakiyen {kalan} birim, devam etmek için en az {gereken} gerekiyor. " +
+          "Ayarlar > Lio Bakiyesi sayfasından bakiye yükleyip tekrar yazabilirsin.",
         params: {
           yapilan: done,
           kalan: this.formatCredits(Math.max(0, remaining)),
@@ -2535,7 +2537,7 @@ export class AiAssistantService {
       return {
         note:
           `"${meta.name}" bir ses dosyası. İçeriğini okuyabilmem için önce yazıya çevrilmesi gerekiyor ` +
-          `ve bu ücretli${estimate ? ` — bu dosya için tahminen ${estimate} kredi` : ""}. ` +
+          `ve bu ücretli${estimate ? ` — bu dosya için tahminen ${estimate} birim` : ""}. ` +
           "Kullanıcı dosyanın KENDİSİNİ istiyorsa açma: adını ve search_files'tan gelen webViewLink " +
           "bağlantısını ver, yeter. Sözlerini/içeriğini gerçekten istiyorsa önce bedeli söyleyip onay al, " +
           "sonra open_file'ı transcribe=true ile çağır.",
@@ -2578,7 +2580,7 @@ export class AiAssistantService {
           ? `Aynı anda en fazla ${MAX_ACTIVE_FILES} dosya taşınabildiği için şunlar sohbetten düştü: ` +
             `${dropped.map((f) => f.name).join(", ")}. `
           : "") +
-        (prepared.creditsCharged ? `Hazırlama bedeli ${prepared.creditsCharged} kredi. ` : "") +
+        (prepared.creditsCharged ? `Hazırlama bedeli ${prepared.creditsCharged} birim. ` : "") +
         "Dosya iş bitene kadar her turda elinde olacak; bittiğinde release_files ile bırak.",
       blocks,
     };

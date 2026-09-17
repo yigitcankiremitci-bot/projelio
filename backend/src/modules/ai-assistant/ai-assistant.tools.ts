@@ -187,7 +187,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
           type: "boolean",
           description:
             "Yalnızca SES dosyaları için. Ses, okunabilmesi için yazıya çevrilmek zorunda ve bu ÜCRETLİ " +
-            "(dakikası kabaca 70 kredi; dört dakikalık bir parça ~290). Bu yüzden ses dosyaları varsayılan " +
+            "(dakikası kabaca 70 birim; dört dakikalık bir parça ~290). Bu yüzden ses dosyaları varsayılan " +
             "olarak AÇILMAZ. Kullanıcı gerçekten içeriğini istiyorsa önce tahmini bedeli söyle, onay al, " +
             "sonra true ver. Kullanıcı sadece dosyayı istiyorsa hiç açma, bağlantısını ver.",
         },
@@ -400,7 +400,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     name: "create_todos",
     description:
       "Yapılacaklar sayfasına BİRDEN FAZLA kişisel görevi tek seferde ekler. Kullanıcı bir liste " +
-      "söylediğinde create_todo'yu tekrar tekrar çağırmak yerine bunu bir kez çağır (daha az tur = daha az kredi).",
+      "söylediğinde create_todo'yu tekrar tekrar çağırmak yerine bunu bir kez çağır (daha az tur = daha az harcama).",
     input_schema: {
       type: "object",
       properties: {
@@ -598,7 +598,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     description:
       "Yaptım sayfasına BİRDEN FAZLA işi tek seferde yazar. Kullanıcı gününü bir çırpıda anlattığında " +
       "(\"bugün şunu, şunu ve şunu yaptım\") log_work'ü tekrar tekrar çağırmak yerine bunu bir kez " +
-      "çağır — daha az tur, daha az kredi.",
+      "çağır — daha az tur, daha az harcama.",
     input_schema: {
       type: "object",
       properties: {
@@ -968,7 +968,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     description:
       "BİR projede ya da BİR departmanda birden fazla görevi tek seferde oluşturur. Kullanıcı \"şu projeye şu N " +
       "görevi ekle\" dediğinde her görev için ayrı ayrı create_task çağırmak yerine bunu bir kez çağır " +
-      "(daha az tur = daha az kredi). projectId veya departmentId'den TAM OLARAK BİRİNİ ver; hepsi aynı yere açılır. " +
+      "(daha az tur = daha az harcama). projectId veya departmentId'den TAM OLARAK BİRİNİ ver; hepsi aynı yere açılır. " +
       "Görevler farklı departmanlara dağıtılacaksa her departman için bu aracı AYRI çağır.",
     input_schema: {
       type: "object",
@@ -2029,7 +2029,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     name: "whatsapp_set_auto_reply",
     description:
       "Bir müşteri konuşmasında Lio'nun otomatik yanıt vermesini açar/kapatır. Açıkken müşteriden gelen " +
-      "her mesaja Lio, konuşma geçmişine bakarak kendi cevap yazar (kredi kullanıcıdan düşer). Bu araç " +
+      "her mesaja Lio, konuşma geçmişine bakarak kendi cevap yazar (bedeli kullanıcının Lio Bakiyesinden düşer). Bu araç " +
       "onay ister. threadId, partyId ya da telefonla konuşmayı belirt.",
     input_schema: {
       type: "object",

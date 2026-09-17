@@ -849,7 +849,9 @@ export default function App() {
                 <Route path="/worklog" element={<WorkLog />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/settings/archive" element={<Archive />} />
-                <Route path="/settings/ai-credits" element={<AiCreditsPage />} />
+                <Route path="/settings/lio-units" element={<AiCreditsPage />} />
+                {/* Eski adres: "kredi" terimi ödeme kuruluşunca reddedildi, bağlantılar kırılmasın. */}
+                <Route path="/settings/ai-credits" element={<Navigate to="/settings/lio-units" replace />} />
                 <Route path="/settings/billing" element={<BillingPage />} />
                 <Route path="/admin" element={<AdminPanel />} />
               </Routes>

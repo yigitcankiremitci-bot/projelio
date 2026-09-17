@@ -342,11 +342,11 @@ export const moduller: TranslationDict = {
   "modül": "module",
 
   // ─────────── AI kredisi hareketleri
-  "Kredi yüklemesi": "Credit top-up",
+  "Bakiye yüklemesi": "Lio Units top-up",
   "AI kullanımı": "AI usage",
   "İade": "Refund",
   "Düzeltme": "Adjustment",
-  "Hoş geldin kredisi": "Welcome credit",
+  "Hoş geldin bakiyesi": "Welcome Lio Units",
   "Ödeme bekleniyor": "Awaiting payment",
   "Ödendi": "Paid",
   "İptal edildi": "Cancelled",
@@ -1012,16 +1012,16 @@ export const moduller: TranslationDict = {
   // Lio yardımı kutusu (bkz. migration 113).
   "Lio yardımı": "Lio assistance",
   "Lio yardımı nedir?": "What is Lio assistance?",
-  "Lio yardımı açıkken modüle bıraktığın fatura ya da fişi Lio okur: tarihini, tutarını ve karşı tarafını kendisi doldurur, belgeyi ayın klasörüne koyar ve kasaya gideri/geliri yazar. Her okuma AI kredisi harcar. Kapalıyken hiçbir şey değişmez — kaydı elle girersin.":
-    "With Lio assistance on, Lio reads the invoice or receipt you drop into the module: it fills in the date, amount and counterparty, files the document in that month's folder, and writes the expense or income to the cash book. Each read spends AI credit. With it off nothing changes — you enter the record by hand.",
+  "Lio yardımı açıkken modüle bıraktığın fatura ya da fişi Lio okur: tarihini, tutarını ve karşı tarafını kendisi doldurur, belgeyi ayın klasörüne koyar ve kasaya gideri/geliri yazar. Her okuma Lio Bakiyesi harcar. Kapalıyken hiçbir şey değişmez — kaydı elle girersin.":
+    "With Lio assistance on, Lio reads the invoice or receipt you drop into the module: it fills in the date, amount and counterparty, files the document in that month's folder, and writes the expense or income to the cash book. Each read uses Lio Units. With it off nothing changes — you enter the record by hand.",
   "Faturaları tek tek yazmak yerine Lio'ya bırakabilirsin: belgeyi sürükle, gerisini o doldursun.":
     "Instead of typing invoices one by one, you can leave them to Lio: drop the document and let it fill in the rest.",
   "Faturayı buraya bırak, Lio işlesin": "Drop the invoice here and let Lio handle it",
   "PDF ya da fotoğraf. Fişin fotoğrafını çekip de bırakabilirsin.":
     "PDF or photo. You can snap a picture of the receipt and drop that too.",
   "Lio okuyor…": "Lio is reading…",
-  "Lio yardımı için AI kredin yok. Her belge okumasında krediden düşülüyor.":
-    "You have no AI credit for Lio assistance. Each document read is deducted from your credit.",
+  "Lio yardımı için Lio Bakiyen yok. Her belge okuması bakiyeden düşülüyor.":
+    "You have no Lio Units for Lio assistance. Each document read is deducted from your Lio Units.",
   "Belge okunamadı.": "The document couldn't be read.",
   "Okundu: {ozet} — kayıt ve kasa hareketi açıldı.":
     "Read: {ozet} — the record and the cash entry were created.",

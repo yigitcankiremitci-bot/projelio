@@ -575,10 +575,10 @@ export default function Settings() {
 
           <div style={{ borderTop: `1px solid ${c.border}` }} />
 
-          <button onClick={() => navigate("/settings/ai-credits")} style={linkRowStyle}>
+          <button onClick={() => navigate("/settings/lio-units")} style={linkRowStyle}>
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <IconSparkle size={17} color={c.accent} />
-              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("AI kredilerim")}</span>
+              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("Lio Bakiyem")}</span>
             </span>
             <IconChevronRight size={16} color={c.textSecondary} />
           </button>

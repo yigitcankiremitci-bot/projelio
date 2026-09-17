@@ -15,12 +15,12 @@ export const refundDoc: LegalDoc = {
   text: {
     tr: {
       title: "İptal ve İade Koşulları",
-      lede: "Aboneliğinizi ve kredi alımlarınızı hangi koşullarda iptal edip iade alabileceğiniz.",
+      lede: "Aboneliğinizi ve Lio Bakiyesi alımlarınızı hangi koşullarda iptal edip iade alabileceğiniz.",
       effective: "12 Ağustos 2026",
     },
     en: {
       title: "Cancellation and Refund Policy",
-      lede: "When you can cancel your subscription or credit purchases and get a refund.",
+      lede: "When you can cancel your subscription or Lio Units purchases and get a refund.",
       effective: "12 August 2026",
     },
   },
@@ -46,10 +46,10 @@ export const refundDoc: LegalDoc = {
         ],
       },
       {
-        h: "4. Kredi iadesi",
+        h: "4. Lio Bakiyesi iadesi",
         p: [
-          "Satın alınan Lio kredilerinin hiç kullanılmamış olması şartıyla, satın alma tarihinden itibaren 14 gün içinde iade edilir. Kısmen kullanılmış paketlerde kalan kredi oranında iade değerlendirilir.",
-          "Hediye (bonus) krediler iade hesabına dâhil edilmez.",
+          "Satın alınan Lio Bakiyesinin hiç kullanılmamış olması şartıyla, satın alma tarihinden itibaren 14 gün içinde iade edilir. Kısmen kullanılmış paketlerde kalan birim oranında iade değerlendirilir.",
+          "Hediye (bonus) birimler iade hesabına dâhil edilmez.",
         ],
       },
       {
@@ -86,10 +86,10 @@ export const refundDoc: LegalDoc = {
         ],
       },
       {
-        h: "4. Credit refunds",
+        h: "4. Lio Units refunds",
         p: [
-          "Purchased Lio credits are refunded within 14 days of purchase provided they are entirely unused. For partially used packs, a refund proportional to the remaining balance may be considered.",
-          "Bonus credits are excluded from refund calculations.",
+          "Purchased Lio Units are refunded within 14 days of purchase provided they are entirely unused. For partially used packs, a refund proportional to the remaining balance may be considered.",
+          "Bonus Lio Units are excluded from refund calculations.",
         ],
       },
       {

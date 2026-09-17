@@ -209,9 +209,9 @@ export class WhatsappLioService {
       case "message":
         return formatForWhatsapp(result.text ?? "", url) || null;
       case "out_of_credits":
-        return `Krediniz bu isteği tamamlamaya yetmedi.${result.doneSummary ? " " + result.doneSummary : ""}
+        return `Lio Bakiyeniz bu isteği tamamlamaya yetmedi.${result.doneSummary ? " " + result.doneSummary : ""}
 
-Kredi yüklemek için: ${url}`;
+Bakiye yüklemek için: ${url}`;
       case "continuation":
         // Web'de "devam edeyim mi?" diye sorulur; WhatsApp'ta o diyalog yok.
         return formatForWhatsapp(

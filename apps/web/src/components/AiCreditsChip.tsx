@@ -56,14 +56,14 @@ export default function AiCreditsChip({ compact = false }: Props) {
 
   return (
     <button
-      onClick={() => navigate("/settings/ai-credits")}
+      onClick={() => navigate("/settings/lio-units")}
       // Yükleme sözü verilmiyor: kredi yüklemeyi yönetici yapıyor
       // (bkz. AiCreditAdminPanel), kullanıcı burada bakiyesini ve nasıl
       // yükletebileceğini görüyor.
       title={
-        isLow ? t("Lio kredin azaldı — kredi sayfasını aç") : t("Lio kredilerin — kredi sayfasını aç")
+        isLow ? t("Lio Bakiyen azaldı — bakiye sayfasını aç") : t("Lio Bakiyen — bakiye sayfasını aç")
       }
-      aria-label={t("Lio kredisi: {bakiye}. Kredi sayfasını aç.", { bakiye: balance })}
+      aria-label={t("Lio Bakiyesi: {bakiye} birim. Bakiye sayfasını aç.", { bakiye: balance })}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -84,7 +84,7 @@ export default function AiCreditsChip({ compact = false }: Props) {
     >
       <IconSparkle size={compact ? 13 : 15} color={isLow ? c.accentDark : c.accent} />
       <span style={{ fontWeight: 500 }}>{balance}</span>
-      <span style={{ color: c.textSecondary, fontSize: compact ? 11.5 : 13 }}>{t("Lio kredisi")}</span>
+      <span style={{ color: c.textSecondary, fontSize: compact ? 11.5 : 13 }}>{t("Lio Bakiyesi")}</span>
     </button>
   );
 }

@@ -133,7 +133,7 @@ export default function AiCreditAdminPanel({ onKrediDegisti }: { onKrediDegisti?
       setProviderBalance(result);
       setTopupFeedback({
         ok: true,
-        text: t("${tutar} kaydedildi. Kalan bakiye: {bakiye} kredi karşılığı.", {
+        text: t("${tutar} kaydedildi. Kalan bakiye: {bakiye} birim karşılığı.", {
           tutar: amountUsd.toFixed(2),
           bakiye: result.remainingCredits.toLocaleString("tr-TR"),
         }),
@@ -183,7 +183,7 @@ export default function AiCreditAdminPanel({ onKrediDegisti }: { onKrediDegisti?
         }}
       >
         <IconSparkle size={18} color={c.accent} />
-        {t("AI kredi yönetimi")}
+        {t("Lio Bakiyesi yönetimi")}
       </h2>
 
       {/* Marj raporu + Anthropic bakiyesi: masaüstünde yan yana, mobilde alt alta. */}
@@ -220,7 +220,7 @@ export default function AiCreditAdminPanel({ onKrediDegisti }: { onKrediDegisti?
               value={`$${margin.grossProfitUsd?.toFixed(2) ?? "0.00"}`}
               highlight={c.success}
             />
-            <Metric label={t("Harcanan kredi")} value={Math.round(margin.creditsSpent ?? 0).toLocaleString("tr-TR")} />
+            <Metric label={t("Harcanan birim")} value={Math.round(margin.creditsSpent ?? 0).toLocaleString("tr-TR")} />
           </div>
 
           <div
@@ -238,7 +238,7 @@ export default function AiCreditAdminPanel({ onKrediDegisti }: { onKrediDegisti?
               value={`$${(margin.avgCostPerRequestUsd ?? 0).toFixed(4)}`}
             />
             <Metric
-              label={t("İstek başı kredi")}
+              label={t("İstek başı birim")}
               value={Math.round(margin.avgCreditsPerRequest ?? 0).toLocaleString("tr-TR")}
             />
           </div>
@@ -269,14 +269,14 @@ export default function AiCreditAdminPanel({ onKrediDegisti }: { onKrediDegisti?
             <Metric label={t("Yüklenen (ömür boyu)")} value={`$${providerBalance.toppedUpUsd.toFixed(2)}`} />
             <Metric label={t("Kullanılan (gerçek maliyet)")} value={`$${providerBalance.spentUsd.toFixed(2)}`} />
             <Metric
-              label={t("Kalan kredi")}
+              label={t("Kalan birim")}
               value={providerBalance.remainingCredits.toLocaleString("tr-TR")}
               highlight={providerBalance.remainingCredits < 20000 ? c.danger : c.success}
             />
           </div>
           <p style={{ fontSize: 11.5, color: c.textSecondary, margin: "0 0 6px", lineHeight: 1.5 }}>
             {t(
-              "\"Kalan kredi\", Anthropic'e yüklediğin gerçek bakiyenin ne kadarının kaldığını, aşağıdaki kullanıcı kredisi ile aynı birimde gösterir — kullanıcılara ne kadar kredi dağıtabileceğine karar vermek için buna bak. Anthropic konsolunda bakiye yükledikçe aşağıdan buraya ekle."
+              "\"Kalan birim\", Anthropic'e yüklediğin gerçek bakiyenin ne kadarının kaldığını, aşağıdaki kullanıcı bakiyesi ile aynı birimde gösterir — kullanıcılara ne kadar birim dağıtabileceğine karar vermek için buna bak. Anthropic konsolunda bakiye yükledikçe aşağıdan buraya ekle."
             )}
           </p>
           <p style={{ fontSize: 11.5, color: c.textSecondary, margin: "0 0 14px", lineHeight: 1.5 }}>
@@ -577,7 +577,7 @@ export default function AiCreditAdminPanel({ onKrediDegisti }: { onKrediDegisti?
 
           <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 12, lineHeight: 1.5 }}>
             {t(
-              "Sıra öncelik demektir: birincil sağlayıcı geçici olarak yanıt vermezse (hız sınırı, sunucu hatası, bağlantı) istek sıradakine devredilir ve kredi gerçekten kullanılan modelin fiyatından kesilir. Sağlayıcı açıp kapatmak ya da sırayı değiştirmek için sunucudaki"
+              "Sıra öncelik demektir: birincil sağlayıcı geçici olarak yanıt vermezse (hız sınırı, sunucu hatası, bağlantı) istek sıradakine devredilir ve Lio Bakiyesi gerçekten kullanılan modelin fiyatından düşülür. Sağlayıcı açıp kapatmak ya da sırayı değiştirmek için sunucudaki"
             )}{" "}
             {/* Ortam değişkeni adı çevrilmez; bkz. yukarıdaki not. */}
             <code>{"AI_PROVIDERS"}</code> {t("değişkenini düzenle.")}

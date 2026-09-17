@@ -17,12 +17,12 @@ export const distanceDoc: LegalDoc = {
   text: {
     tr: {
       title: "Mesafeli Satış Sözleşmesi",
-      lede: "Online abonelik ve kredi satın alımlarında geçerli sözleşme metni.",
+      lede: "Online abonelik ve Lio Bakiyesi satın alımlarında geçerli sözleşme metni.",
       effective: "12 Ağustos 2026",
     },
     en: {
       title: "Distance Sales Agreement",
-      lede: "The agreement that applies to online subscription and credit purchases.",
+      lede: "The agreement that applies to online subscription and Lio Units purchases.",
       effective: "12 August 2026",
     },
   },
@@ -32,13 +32,13 @@ export const distanceDoc: LegalDoc = {
         h: "1. Taraflar",
         p: [
           "SATICI: Yiğitcan Kiremitci (şahıs işletmesi), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye · Kozyatağı VD 25750888104 · info@projelio.app.",
-          "ALICI: Projelio hizmetine abone olan veya kredi satın alan gerçek ya da tüzel kişi.",
+          "ALICI: Projelio hizmetine abone olan veya Lio Bakiyesi satın alan gerçek ya da tüzel kişi.",
         ],
       },
       {
         h: "2. Sözleşmenin konusu",
         p: [
-          "Bu sözleşme, ALICI'nın elektronik ortamda satın aldığı dijital abonelik ve Lio kredilerinin sunulmasına ilişkin, 6502 sayılı Tüketicinin Korunması Hakkında Kanun ve Mesafeli Sözleşmeler Yönetmeliği hükümleri uyarınca tarafların hak ve yükümlülüklerini düzenler.",
+          "Bu sözleşme, ALICI'nın elektronik ortamda satın aldığı dijital abonelik ve Lio Bakiyesinin sunulmasına ilişkin, 6502 sayılı Tüketicinin Korunması Hakkında Kanun ve Mesafeli Sözleşmeler Yönetmeliği hükümleri uyarınca tarafların hak ve yükümlülüklerini düzenler.",
         ],
       },
       {
@@ -57,7 +57,7 @@ export const distanceDoc: LegalDoc = {
         h: "5. Cayma hakkı",
         p: [
           "Mesafeli Sözleşmeler Yönetmeliği m.15/1-ğ uyarınca, elektronik ortamda anında ifa edilen ve tüketiciye anında teslim edilen gayrimaddi mallarda cayma hakkı bulunmamaktadır.",
-          "Buna rağmen SATICI, ticari politikası gereği, hiç kullanılmamış abonelik ve kredi alımları için satın alma tarihinden itibaren 14 gün içinde iade imkânı tanır. Detaylar İptal ve İade Koşulları sayfasındadır.",
+          "Buna rağmen SATICI, ticari politikası gereği, hiç kullanılmamış abonelik ve Lio Bakiyesi alımları için satın alma tarihinden itibaren 14 gün içinde iade imkânı tanır. Detaylar İptal ve İade Koşulları sayfasındadır.",
         ],
       },
       {
@@ -72,13 +72,13 @@ export const distanceDoc: LegalDoc = {
         h: "1. Parties",
         p: [
           "SELLER: Yiğitcan Kiremitci (sole proprietorship), Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye · Kozyatağı Tax Office, tax/ID no 25750888104 · info@projelio.app.",
-          "BUYER: the natural or legal person subscribing to Projelio or purchasing credits.",
+          "BUYER: the natural or legal person subscribing to Projelio or purchasing Lio Units.",
         ],
       },
       {
         h: "2. Subject",
         p: [
-          "This agreement governs the rights and obligations of the parties regarding digital subscriptions and Lio credits purchased electronically, under Turkish Consumer Protection Law no. 6502 and the Distance Contracts Regulation.",
+          "This agreement governs the rights and obligations of the parties regarding digital subscriptions and Lio Units purchased electronically, under Turkish Consumer Protection Law no. 6502 and the Distance Contracts Regulation.",
         ],
       },
       {
@@ -97,7 +97,7 @@ export const distanceDoc: LegalDoc = {
         h: "5. Right of withdrawal",
         p: [
           "Under art. 15/1-ğ of the Distance Contracts Regulation, there is no right of withdrawal for intangible goods performed instantly in electronic form.",
-          "Nevertheless, as a matter of commercial policy the SELLER offers a refund for entirely unused subscriptions and credits within 14 days of purchase. See the Cancellation and Refund page.",
+          "Nevertheless, as a matter of commercial policy the SELLER offers a refund for entirely unused subscriptions and Lio Units within 14 days of purchase. See the Cancellation and Refund page.",
         ],
       },
       {

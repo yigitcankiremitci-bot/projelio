@@ -61,7 +61,7 @@ export const PLANS: Plan[] = [
     seats: 1,
     features: [
       "Sınırsız görev ve takvim",
-      "Hoş geldin kredisi ile Lio denemesi",
+      "Hoş geldin bakiyesi ile Lio denemesi",
       "Mobil uygulama",
     ],
   },
@@ -74,7 +74,7 @@ export const PLANS: Plan[] = [
     featured: false,
     seats: 1,
     features: [
-      "Aylık 20.000 Lio kredisi",
+      "Aylık 20.000 birim Lio Bakiyesi",
       "Sınırsız proje ve görev",
       "Google Drive / OneDrive bağlantısı",
       "E-posta desteği",
@@ -89,7 +89,7 @@ export const PLANS: Plan[] = [
     featured: true,
     seats: 1,
     features: [
-      "Aylık 50.000 Lio kredisi",
+      "Aylık 50.000 birim Lio Bakiyesi",
       "Starter'daki her şey",
       "WhatsApp üzerinden Lio",
       "Gelir-gider ve proje bütçesi",
@@ -105,7 +105,7 @@ export const PLANS: Plan[] = [
     featured: false,
     seats: 10,
     features: [
-      "Aylık 150.000 Lio kredisi",
+      "Aylık 150.000 birim Lio Bakiyesi",
       "Pro'daki her şey",
       "10 kullanıcıya kadar",
       "Departman bazlı yetkilendirme",

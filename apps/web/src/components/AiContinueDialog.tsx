@@ -58,7 +58,7 @@ export default function AiContinueDialog({ continuation, onContinue, onStop }: P
         {upfront
           ? t("Bu isteği yapmaya başlamadan önce onayını almak istedim; tahmini bedeli yüksek.")
           : continuation.reason === "budget"
-            ? t("Bu istek beklediğimden uzun sürdü ve kredi eşiğine geldi.")
+            ? t("Bu istek beklediğimden uzun sürdü ve harcama eşiğine geldi.")
             : t("Bu istek adım sınırına geldi ama henüz bitmedi.")}
       </p>
 
@@ -73,10 +73,10 @@ export default function AiContinueDialog({ continuation, onContinue, onStop }: P
       >
         {upfront ? (
           <>
-            <Row label={t("Şimdiye kadar harcanan")} value={t("{n} kredi", { n: 0 })} c={c} />
+            <Row label={t("Şimdiye kadar harcanan")} value={t("{n} birim", { n: 0 })} c={c} />
             <Row
               label={t("Tahmini bedel")}
-              value={t("~{n} kredi", {
+              value={t("~{n} birim", {
                 n: Math.round(continuation.estimatedNextCredits).toLocaleString("tr-TR"),
               })}
               c={c}
@@ -87,13 +87,13 @@ export default function AiContinueDialog({ continuation, onContinue, onStop }: P
           <>
             <Row label={t("Şimdiye kadar yapılan")} value={continuation.doneSummary} c={c} />
             <Row
-              label={t("Harcanan kredi")}
+              label={t("Harcanan birim")}
               value={`${Math.round(continuation.spentCredits).toLocaleString("tr-TR")}`}
               c={c}
             />
             <Row
               label={t("Devam edersem (adım başına)")}
-              value={t("~{n} kredi", {
+              value={t("~{n} birim", {
                 n: Math.round(continuation.estimatedNextCredits).toLocaleString("tr-TR"),
               })}
               c={c}
@@ -128,7 +128,7 @@ export default function AiContinueDialog({ continuation, onContinue, onStop }: P
         <span>
           {t("Bu istek boyunca tekrar sorma")}
           <span style={{ display: "block", fontSize: 11.5, opacity: 0.8 }}>
-            {t("Kredi biterse yine durulur; bu seçenek yalnızca onay pencerelerini kapatır.")}
+            {t("Lio Bakiyesi biterse yine durulur; bu seçenek yalnızca onay pencerelerini kapatır.")}
           </span>
         </span>
       </label>

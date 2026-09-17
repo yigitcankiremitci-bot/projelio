@@ -24,8 +24,6 @@ export const dosyalar: TranslationDict = {
   // Sağlayıcı adı (Drive / OneDrive) yer tutucudan geliyor, çevrilmiyor.
   "{saglayici}'da bulunamadı": "Not found on {saglayici}",
   "{saglayici}'da düzenle": "Edit on {saglayici}",
-  "{saglayici}'da da çöp kutusuna taşı": "Also move to the {saglayici} bin",
-  '"{dosya}" Projelio\'dan kaldırılacak.': '"{dosya}" will be removed from Projelio.',
 
   "Drive'dan seç": "Pick from Drive",
   "Dosya kaldırılamadı": "Could not remove the file",
@@ -98,7 +96,6 @@ export const dosyalar: TranslationDict = {
   Klasör: "Folder",
   "Projelio klasörü": "Projelio folder",
   "Klasör adı:": "Folder name:",
-  "Yeni ad:": "New name:",
   "Yeni klasör": "New folder",
   "Klasör yükle": "Upload folder",
   "Klasör oluşturulamadı": "The folder couldn't be created",
@@ -144,12 +141,8 @@ export const dosyalar: TranslationDict = {
   "{sayi} öğeyi üst klasöre taşı": "Move {sayi} items to the parent folder",
   "{sayi} öğeyi köke taşı": "Move {sayi} items to the top level",
   "{sayi} öğeyi kaldır": "Remove {sayi} items",
-  "{sayi} öğe Projelio'dan kaldırılacak.": "{sayi} items will be removed from Projelio.",
   "Klasörü kaldır": "Remove folder",
-  '"{ad}" klasörü İÇİNDEKİLERLE BİRLİKTE kaldırılacak.':
-    'The folder "{ad}" will be removed TOGETHER WITH ITS CONTENTS.',
   // Küme karışıksa (dosya + klasör) tek bir sağlayıcı adı yazılamıyor.
-  "Bulut deposunda da çöp kutusuna taşı": "Move to the trash in cloud storage too",
   "{sayi} öğeyi kaldırma": "Removing {sayi} items",
   Taşıma: "Moving",
   "Dosya çoğaltılamadı": "The file couldn't be duplicated",
@@ -269,4 +262,23 @@ export const dosyalar: TranslationDict = {
   "Boyut: en küçük": "Size: smallest",
   "{sayi} dosya Projelio'dan kaldırıldı ama bulut deposunda çöp kutusuna taşınamadı. Drive/OneDrive'dan elle silebilirsin.":
     "{sayi} file(s) removed from Projelio but couldn't be moved to the cloud trash. You can delete them in Drive/OneDrive yourself.",
+
+  // ─────────────────────────────────────────────── Kaldırma kapsamı, yerinde ad değiştirme
+  "Projelio'dan kaldır ve {depo}'dan da sil": "Remove from Projelio and delete from {depo}",
+  "Dosya {depo} çöp kutusuna taşınır; oradan bir süre geri alınabilir.":
+    "The file is moved to the {depo} trash and can be restored from there for a while.",
+  "Yalnızca Projelio'dan kaldır": "Remove from Projelio only",
+  "Dosya {depo}'da olduğu gibi kalır.": "The file stays in {depo} as it is.",
+  '"{dosya}" Projelio\'dan kaldırılacak ve {depo}\'dan da silinecek.':
+    '"{dosya}" will be removed from Projelio and deleted from {depo}.',
+  '"{dosya}" yalnızca Projelio\'dan kaldırılacak.': '"{dosya}" will be removed from Projelio only.',
+  "{sayi} öğe Projelio'dan kaldırılacak ve {depo}'dan da silinecek.":
+    "{sayi} items will be removed from Projelio and deleted from {depo}.",
+  "{sayi} öğe yalnızca Projelio'dan kaldırılacak.": "{sayi} items will be removed from Projelio only.",
+  '"{ad}" klasörü İÇİNDEKİLERLE BİRLİKTE Projelio\'dan kaldırılacak ve {depo}\'da da çöp kutusuna taşınacak.':
+    'The "{ad}" folder will be removed from Projelio TOGETHER WITH ITS CONTENTS and moved to the {depo} trash.',
+  "Seçimdeki klasörler {depo}'da her durumda çöp kutusuna taşınır.":
+    "Folders in the selection are always moved to the {depo} trash.",
+  "Yeni ad": "New name",
+  "{ad} — adı değiştirmek için çift tıkla": "{ad} — double-click to rename",
 };

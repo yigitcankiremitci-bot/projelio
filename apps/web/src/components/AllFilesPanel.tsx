@@ -16,7 +16,9 @@ import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
 import FileContextMenu from "./FileContextMenu";
 import FileDownloadLinkModal from "./FileDownloadLinkModal";
+import FileDeleteOptions from "./FileDeleteOptions";
 import FileListControls from "./FileListControls";
+import InlineRenameText from "./InlineRenameText";
 import FilePreviewModal from "./FilePreviewModal";
 import FileThumb from "./FileThumb";
 import LinkFileModal from "./LinkFileModal";
@@ -67,11 +69,16 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   const secim = useFileSelection();
   /** Onay bekleyen kaldırma; tek dosya da bir kümedir (bkz. FilesPanel). */
   const [pendingDelete, setPendingDelete] = useState<ProjectFile[] | null>(null);
+  // Varsayılan: bulutta da sil (bkz. FilesPanel'deki aynı gerekçe). Eskiden bu
+  // ekranda seçenek hiç yoktu ve dosya her zaman Drive'dan da siliniyordu.
+  const [alsoTrash, setAlsoTrash] = useState(true);
   /** "Bağla" penceresi (bkz. FilesPanel'deki eşi). Burada klasör yok. */
   const [linking, setLinking] = useState<LinkSource[] | null>(null);
   const [viewMode, toggleViewMode] = useFileViewMode();
   const [siralama, setSiralama] = useFileSort();
   const [arama, setArama] = useState("");
+  /** Adı yerinde düzenlenen dosya (bkz. InlineRenameText). */
+  const [adDuzenlenen, setAdDuzenlenen] = useState<string | null>(null);
   const { pushUndo, pushDestructive } = useUndo();
   const [adding, setAdding] = useState(false);
   // Sürükleyip bırakılan dosyalar: hedefi kullanıcı pencerede seçecek.
@@ -226,9 +233,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
     setMenu({ x: e.clientX, y: e.clientY, file, toplu: aktif.length > 1 ? aktif : undefined });
   };
 
-  const handleRename = async (file: ProjectFile) => {
-    const ad = window.prompt(t("Yeni ad:"), file.name)?.trim();
-    if (!ad || ad === file.name) return;
+  const handleRename = async (file: ProjectFile, ad: string) => {
     const eski = file.name;
     try {
       const guncel = await filesApi.rename(file.id, ad);
@@ -259,9 +264,16 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
     }
   };
 
+  // Seçilen dosyaların hepsi aynı depodaysa pencere onu adıyla söyler.
+  const silinecekDepo = useMemo(() => {
+    const adlar = new Set((pendingDelete ?? []).map(driveProviderLabel));
+    return adlar.size === 1 ? [...adlar][0] : undefined;
+  }, [pendingDelete]);
+
   const handleDelete = () => {
     if (!pendingDelete) return;
     const list = pendingDelete;
+    const buluttaDa = alsoTrash;
     setPendingDelete(null);
 
     const ids = new Set(list.map((f) => f.id));
@@ -273,7 +285,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
       entityIds: list.map((f) => f.id),
       commit: async () => {
         try {
-          const sonuclar = await Promise.all(list.map((f) => filesApi.remove(f.id, true)));
+          const sonuclar = await Promise.all(list.map((f) => filesApi.remove(f.id, buluttaDa)));
           const kalan = sonuclar.filter((r) => r.trashed === false).length;
           if (kalan > 0) {
             setError(
@@ -348,18 +360,14 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
           >
             <FileThumb file={file} thumbs={thumbs} variant="tile" />
           </div>
-          <div
-            title={file.name}
-            style={{
-              fontSize: 14,
-              color: file.status === "missing" ? c.danger : c.textPrimary,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {file.name}
-          </div>
+          <InlineRenameText
+            name={file.name}
+            editing={adDuzenlenen === file.id}
+            onStart={() => setAdDuzenlenen(file.id)}
+            onCommit={(ad) => void handleRename(file, ad)}
+            onClose={() => setAdDuzenlenen(null)}
+            style={{ fontSize: 14, color: file.status === "missing" ? c.danger : c.textPrimary }}
+          />
           <div
             title={altSatir(file)}
             style={{
@@ -398,18 +406,15 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
             style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}
           >
             <FileThumb file={file} thumbs={thumbs} variant="row" />
-            <div style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 16,
-                  color: file.status === "missing" ? c.danger : c.textPrimary,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {file.name}
-              </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <InlineRenameText
+                name={file.name}
+                editing={adDuzenlenen === file.id}
+                onStart={() => setAdDuzenlenen(file.id)}
+                onCommit={(ad) => void handleRename(file, ad)}
+                onClose={() => setAdDuzenlenen(null)}
+                style={{ fontSize: 16, color: file.status === "missing" ? c.danger : c.textPrimary }}
+              />
               <div style={{ fontSize: 13, color: c.textSecondary }}>{altSatir(file)}</div>
             </div>
           </div>
@@ -513,7 +518,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
                     label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file!) }),
                     onClick: () => window.open(driveEditUrl(menu.file!), "_blank", "noopener,noreferrer"),
                   },
-                  { label: t("Yeniden adlandır"), onClick: () => void handleRename(menu.file!) },
+                  { label: t("Yeniden adlandır"), onClick: () => setAdDuzenlenen(menu.file!.id) },
                   { label: t("Çoğalt"), onClick: () => void handleDuplicate([menu.file!]) },
                   { label: t("Bağla…"), onClick: () => setLinking([{ fileId: menu.file!.id }]) },
                   {
@@ -535,11 +540,18 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
       {pendingDelete && (
         <ConfirmDialog
           title={t("Dosyayı kaldır")}
-          message={
-            pendingDelete.length > 1
-              ? t("{sayi} öğe Projelio'dan kaldırılacak.", { sayi: pendingDelete.length })
-              : t('"{dosya}" Projelio\'dan kaldırılacak.', { dosya: pendingDelete[0].name })
-          }
+          message={(() => {
+            const depo = silinecekDepo ?? "Drive/OneDrive";
+            if (pendingDelete.length > 1) {
+              return alsoTrash
+                ? t("{sayi} öğe Projelio'dan kaldırılacak ve {depo}'dan da silinecek.", { sayi: pendingDelete.length, depo })
+                : t("{sayi} öğe yalnızca Projelio'dan kaldırılacak.", { sayi: pendingDelete.length });
+            }
+            return alsoTrash
+              ? t('"{dosya}" Projelio\'dan kaldırılacak ve {depo}\'dan da silinecek.', { dosya: pendingDelete[0].name, depo })
+              : t('"{dosya}" yalnızca Projelio\'dan kaldırılacak.', { dosya: pendingDelete[0].name });
+          })()}
+          extra={<FileDeleteOptions provider={silinecekDepo} alsoTrash={alsoTrash} onChange={setAlsoTrash} />}
           confirmLabel={t("Kaldır")}
           onConfirm={handleDelete}
           onCancel={() => setPendingDelete(null)}

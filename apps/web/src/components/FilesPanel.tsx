@@ -33,7 +33,9 @@ import type { CreateNativeFileMenuHandle } from "./CreateNativeFileMenu";
 import FileContextMenu from "./FileContextMenu";
 import FileDownloadLinkModal from "./FileDownloadLinkModal";
 import FilePreviewModal from "./FilePreviewModal";
+import FileDeleteOptions from "./FileDeleteOptions";
 import FileListControls from "./FileListControls";
+import InlineRenameText from "./InlineRenameText";
 import FileThumb from "./FileThumb";
 import LinkFileModal from "./LinkFileModal";
 import { useT } from "../lib/i18n";
@@ -249,6 +251,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
    * (telefonda Drive da böyle davranıyor).
    */
   const secim = useFileSelection();
+  /** Adı yerinde düzenlenen öğe (fileKey/folderKey); aynı anda yalnızca bir tane. */
+  const [adDuzenlenen, setAdDuzenlenen] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   // Ayrı bir input: webkitdirectory aynı elemanda açılıp kapatılamıyor
@@ -506,9 +510,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     }
   };
 
-  const handleRenameFolder = async (folder: FileFolder) => {
-    const ad = window.prompt(t("Yeni ad:"), folder.name)?.trim();
-    if (!ad || ad === folder.name) return;
+  const handleRenameFolder = async (folder: FileFolder, ad: string) => {
     const eski = folder.name;
     try {
       const guncel = await filesApi.renameFolder(folder.id, ad);
@@ -691,9 +693,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
         }
       : {};
 
-  const handleRenameFile = async (file: ProjectFile) => {
-    const ad = window.prompt(t("Yeni ad:"), file.name)?.trim();
-    if (!ad || ad === file.name) return;
+  const handleRenameFile = async (file: ProjectFile, ad: string) => {
     const eski = file.name;
     try {
       const guncel = await filesApi.rename(file.id, ad);
@@ -769,10 +769,28 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     }
     if (items.length === 1 && items[0].kind === "folder") {
       const klasor = gorunenKlasorler.find((f) => f.id === items[0].id);
-      setPendingDelete({ items, mode: "folder", label: klasor?.name ?? t("Klasör") });
+      setPendingDelete({
+        items,
+        mode: "folder",
+        label: klasor?.name ?? t("Klasör"),
+        // Klasörün kendi sağlayıcı bilgisi yok; kapsamın deposu onun deposu.
+        provider: connectedProvider === "microsoft" ? "OneDrive" : connectedProvider === "google" ? "Drive" : undefined,
+      });
       return;
     }
-    setPendingDelete({ items, mode: "many", label: t("{sayi} öğe", { sayi: items.length }) });
+    // Seçimdeki dosyaların hepsi aynı depodaysa adıyla söylenir.
+    const saglayicilar = new Set(
+      items.flatMap((i) => {
+        const f = i.kind === "file" ? gorunenDosyalar.find((d) => d.id === i.id) : undefined;
+        return f ? [driveProviderLabel(f)] : [];
+      })
+    );
+    setPendingDelete({
+      items,
+      mode: "many",
+      label: t("{sayi} öğe", { sayi: items.length }),
+      provider: saglayicilar.size === 1 ? [...saglayicilar][0] : undefined,
+    });
   };
 
   const handleDuplicateMany = async (items: { kind: "file" | "folder"; id: string }[]) => {
@@ -1508,18 +1526,14 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               <div style={{ height: 74, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <IconFolder size={40} color={c.accent} />
               </div>
-              <div
-                title={folder.name}
-                style={{
-                  fontSize: 14,
-                  color: c.textPrimary,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {folder.name}
-              </div>
+              <InlineRenameText
+                  name={folder.name}
+                  editing={adDuzenlenen === folderKey(folder.id)}
+                  onStart={readOnly || folder.managed ? undefined : () => setAdDuzenlenen(folderKey(folder.id))}
+                  onCommit={(ad) => void handleRenameFolder(folder, ad)}
+                  onClose={() => setAdDuzenlenen(null)}
+                  style={{ fontSize: 14, color: c.textPrimary }}
+                />
             </div>
           ))}
 
@@ -1556,18 +1570,14 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               >
                 <FileThumb file={file} thumbs={thumbs} variant="tile" />
               </div>
-              <div
-                title={file.name}
-                style={{
-                  fontSize: 14,
-                  color: file.status === "missing" ? c.danger : c.textPrimary,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {file.name}
-              </div>
+              <InlineRenameText
+                  name={file.name}
+                  editing={adDuzenlenen === fileKey(file.id)}
+                  onStart={readOnly ? undefined : () => setAdDuzenlenen(fileKey(file.id))}
+                  onCommit={(ad) => void handleRenameFile(file, ad)}
+                  onClose={() => setAdDuzenlenen(null)}
+                  style={{ fontSize: 14, color: file.status === "missing" ? c.danger : c.textPrimary }}
+                />
               <div style={{ fontSize: 12, color: c.textSecondary }}>
                 {file.sizeBytes ? formatFileSize(file.sizeBytes) : fileKindLabel(file)}
               </div>
@@ -1605,9 +1615,14 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             >
               <IconFolder size={18} color={c.accent} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 16, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {folder.name}
-                </div>
+                <InlineRenameText
+                  name={folder.name}
+                  editing={adDuzenlenen === folderKey(folder.id)}
+                  onStart={readOnly || folder.managed ? undefined : () => setAdDuzenlenen(folderKey(folder.id))}
+                  onCommit={(ad) => void handleRenameFolder(folder, ad)}
+                  onClose={() => setAdDuzenlenen(null)}
+                  style={{ fontSize: 16, color: c.textPrimary }}
+                />
                 <div style={{ fontSize: 13, color: c.textSecondary }}>
                   {folder.managed ? t("Projelio klasörü") : t("Klasör")}
                 </div>
@@ -1641,18 +1656,15 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 {/* Önizleme liste görünümünde de gösteriliyor: küçük bir kare
                     yeter, ama "hangi görsel bu?" sorusunu ikon cevaplayamıyor. */}
                 <FileThumb file={file} thumbs={thumbs} variant="row" />
-                <div style={{ minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 16,
-                      color: file.status === "missing" ? c.danger : c.textPrimary,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {file.name}
-                  </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <InlineRenameText
+                  name={file.name}
+                  editing={adDuzenlenen === fileKey(file.id)}
+                  onStart={readOnly ? undefined : () => setAdDuzenlenen(fileKey(file.id))}
+                  onCommit={(ad) => void handleRenameFile(file, ad)}
+                  onClose={() => setAdDuzenlenen(null)}
+                  style={{ fontSize: 16, color: file.status === "missing" ? c.danger : c.textPrimary }}
+                />
                   <div style={{ fontSize: 13, color: c.textSecondary }}>
                     {file.status === "missing"
                       ? t("{saglayici}'da bulunamadı", { saglayici: driveProviderLabel(file) })
@@ -1797,7 +1809,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     // Projelio üretimi klasörün adı projeden/görevden geliyor;
                     // burada değiştirmek yanıltıcı olurdu (bkz. FileFolder.managed).
                     disabled: menu.folder.managed || readOnly,
-                    onClick: () => void handleRenameFolder(menu.folder!),
+                    onClick: () => setAdDuzenlenen(folderKey(menu.folder!.id)),
                   },
                   {
                     label: t("Çoğalt"),
@@ -1839,7 +1851,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                   {
                     label: t("Yeniden adlandır"),
                     disabled: readOnly,
-                    onClick: () => void handleRenameFile(menu.file!),
+                    onClick: () => setAdDuzenlenen(fileKey(menu.file!.id)),
                   },
                   {
                     label: t("Çoğalt"),
@@ -1892,28 +1904,34 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       {pendingDelete && (
         <ConfirmDialog
           title={pendingDelete.mode === "folder" ? t("Klasörü kaldır") : t("Dosyayı kaldır")}
-          message={
-            pendingDelete.mode === "folder"
-              ? t('"{ad}" klasörü İÇİNDEKİLERLE BİRLİKTE kaldırılacak.', { ad: pendingDelete.label })
-              : pendingDelete.mode === "many"
-              ? t("{sayi} öğe Projelio'dan kaldırılacak.", { sayi: pendingDelete.items.length })
-              : t('"{dosya}" Projelio\'dan kaldırılacak.', { dosya: pendingDelete.label })
-          }
+          message={(() => {
+            const depo = pendingDelete.provider ?? "Drive/OneDrive";
+            if (pendingDelete.mode === "folder") {
+              // Klasörde seçenek YOK: sunucu klasörü bulutta her durumda çöp
+              // kutusuna taşıyor (bkz. FilesService.removeFolder). Söylemek şart.
+              return t('"{ad}" klasörü İÇİNDEKİLERLE BİRLİKTE Projelio\'dan kaldırılacak ve {depo}\'da da çöp kutusuna taşınacak.', {
+                ad: pendingDelete.label,
+                depo,
+              });
+            }
+            const klasorVar = pendingDelete.items.some((i) => i.kind === "folder");
+            const metin =
+              pendingDelete.mode === "many"
+                ? alsoTrash
+                  ? t("{sayi} öğe Projelio'dan kaldırılacak ve {depo}'dan da silinecek.", { sayi: pendingDelete.items.length, depo })
+                  : t("{sayi} öğe yalnızca Projelio'dan kaldırılacak.", { sayi: pendingDelete.items.length })
+                : alsoTrash
+                ? t('"{dosya}" Projelio\'dan kaldırılacak ve {depo}\'dan da silinecek.', { dosya: pendingDelete.label, depo })
+                : t('"{dosya}" yalnızca Projelio\'dan kaldırılacak.', { dosya: pendingDelete.label });
+            return klasorVar
+              ? `${metin} ${t("Seçimdeki klasörler {depo}'da her durumda çöp kutusuna taşınır.", { depo })}`
+              : metin;
+          })()}
           extra={
-            // Eskiden dosya Drive'da OLDUĞU GİBİ kalıyordu ve pencere bunu
-            // yazıyordu; kullanıcı için sonuç, sildiğini sandığı dosyanın
-            // Drive'da durmaya devam etmesiydi. Artık varsayılan "orada da
-            // kaldır" — çöp kutusuna taşındığı için geri alınabilir.
-            //
             // Kümede hiç DOSYA yoksa gösterilmiyor: klasör kaldırma bulutta
             // her hâlükârda çöp kutusuna taşıyor, seçenek sunmak yalan olurdu.
             !pendingDelete.items.some((i) => i.kind === "file") ? undefined : (
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, color: c.textSecondary }}>
-              <input type="checkbox" checked={alsoTrash} onChange={(e) => setAlsoTrash(e.target.checked)} />
-              {pendingDelete.provider
-                ? t("{saglayici}'da da çöp kutusuna taşı", { saglayici: pendingDelete.provider })
-                : t("Bulut deposunda da çöp kutusuna taşı")}
-            </label>
+              <FileDeleteOptions provider={pendingDelete.provider} alsoTrash={alsoTrash} onChange={setAlsoTrash} />
             )
           }
           confirmLabel={t("Kaldır")}

@@ -67,8 +67,11 @@ export default function CustomersPanel({
 
   const scopePath = jobId ? `/jobs/${jobId}/party` : `/organizations/${organizationId}/party`;
 
-  const load = () => {
-    setLoading(true);
+  // Yalnızca İLK yüklemede "Yükleniyor…" gösterilir. Kaydetme/arşivleme
+  // sonrası tazelemede de gösterilince liste bir an yok olup geri geliyor,
+  // kaydırma başa dönüyordu — sayfa kendi kendine yenileniyor gibi görünüyordu.
+  const load = (ilk = false) => {
+    if (ilk === true) setLoading(true);
     api
       .get<Party[]>(scopePath)
       .then(setParties)
@@ -76,7 +79,7 @@ export default function CustomersPanel({
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [scopePath]);
+  useEffect(() => load(true), [scopePath]);
 
   // Departman değişince o departmanın varsayılan rol filtresi uygulanır.
   useEffect(() => setRoleFilter(profile.defaultRole ?? ""), [profile.defaultRole]);

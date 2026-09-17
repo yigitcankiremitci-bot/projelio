@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { Department, Job, ModuleAccess, ModuleCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
+import { useBackTarget } from "../lib/backTarget";
+import { gezinti } from "../lib/gezintiGecmisi";
 import { useLiveRoom } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
 import ModuleSurface from "../components/ModuleSurface";
@@ -82,6 +84,19 @@ export default function ModulePage() {
       { to: `/jobs/${jobId}`, label: job?.title ?? "İş" }
     : { to: `/departments/${departmentId}?tab=modules`, label: department?.name ?? "Departman" };
 
+  // Geri, GELİNEN yere döner (bkz. lib/backTarget): modüle anasayfadan ya da
+  // Modüller sekmesinden girildiyse oraya. Eskiden hep departmanın Modüller
+  // sekmesine gidiyordu — kullanıcı hiç görmediği bir sayfaya düşüyordu.
+  // Önceki sayfa bilinmiyorsa (doğrudan bağlantı) sabit ebeveyn sürüyor.
+  const back = useBackTarget(parent);
+  const navigate = useNavigate();
+  const { key } = useLocation();
+  // Modülün adı geçmişe yazılır: buradan açılan sayfanın geri bağlantısı
+  // "← Faturalar" diyebilsin.
+  useEffect(() => {
+    if (entry?.name) gezinti.adiKaydet(key, entry.name);
+  }, [key, entry?.name]);
+
   if (loading) {
     return <p style={{ padding: 28, fontSize: 14, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
   }
@@ -94,11 +109,17 @@ export default function ModulePage() {
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <Link
-          to={parent.to}
+          to={back.to}
+          onClick={(e) => {
+            // Yeni sekmede açma (Cmd/Ctrl/orta tık) bağlantının kendi işi.
+            if (!back.geriGit || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            navigate(-1);
+          }}
           style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: c.textSecondary }}
         >
           <IconChevronLeft size={14} color={c.textSecondary} />
-          {parent.label}
+          {back.label}
         </Link>
         {/* Lio simgesi burada DEĞİL: modülün kendi yüzeyi (ModuleSurface) onu
             zaten çiziyor, buraya da koyarsak sayfada iki tane olurdu. */}

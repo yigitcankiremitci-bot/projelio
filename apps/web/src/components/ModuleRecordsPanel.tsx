@@ -108,8 +108,11 @@ export default function ModuleRecordsPanel({
     [config, references.resolve]
   );
 
-  const load = () => {
-    setLoading(true);
+  // Yalnızca İLK yüklemede "Yükleniyor…" gösterilir. Kaydetme/arşivleme
+  // sonrası tazelemede de gösterilince liste bir an yok olup geri geliyor,
+  // kaydırma başa dönüyordu — sayfa kendi kendine yenileniyor gibi görünüyordu.
+  const load = (ilk = false) => {
+    if (ilk === true) setLoading(true);
     api
       .get<ModuleRecord[]>(`${basePath}?moduleKey=${encodeURIComponent(moduleKey)}`)
       .then(setRecords)
@@ -117,7 +120,7 @@ export default function ModuleRecordsPanel({
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [basePath, moduleKey]);
+  useEffect(() => load(true), [basePath, moduleKey]);
 
   /**
    * Bu modül kayıtlarından doğmuş görevler.
@@ -470,7 +473,7 @@ export default function ModuleRecordsPanel({
           kapsam={jobId ? { scope: "job", scopeId: jobId } : { scope: "organization", scopeId: organizationId! }}
           departmentId={jobId ? undefined : departmentId}
           canWrite={canWrite}
-          onIslendi={load}
+          onIslendi={() => load()}
         />
       )}
 

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ThemeColors } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
-import AiCreditOrdersAdmin from "./AiCreditOrdersAdmin";
 import {
   aiChat,
   type AiHealth,
@@ -32,10 +31,12 @@ interface MarginReport {
  * listesine taşındı (AdminKullanicilarPanel). İki ayrı kullanıcı listesi
  * vardı ve buradaki yükleme işlem kaydına düşmüyordu.
  *
- * @param onKrediDegisti Bir sipariş onaylanıp kredi yüklendiğinde çağrılır;
- *                       Kullanıcılar listesindeki bakiyeler tazelensin diye.
+ * Admin sayfası sekmeli olduğu için panel iki bölüm olarak kullanılır:
+ * `bakiye` (marj raporu + sağlayıcı bakiyesi) ve `saglayicilar` (sağlayıcı
+ * durumu + kademe/model seçimi). Kredi siparişleri ayrı bir sekmede, doğrudan
+ * AiCreditOrdersAdmin olarak duruyor.
  */
-export default function AiCreditAdminPanel({ onKrediDegisti }: { onKrediDegisti?: () => void }) {
+export default function AiCreditAdminPanel({ bolum }: { bolum: "bakiye" | "saglayicilar" }) {
   const c = useThemeColors();
   const t = useT();
   const isDesktop = useIsDesktop();
@@ -183,9 +184,11 @@ export default function AiCreditAdminPanel({ onKrediDegisti }: { onKrediDegisti?
         }}
       >
         <IconSparkle size={18} color={c.accent} />
-        {t("Lio Bakiyesi yönetimi")}
+        {bolum === "bakiye" ? t("Lio Bakiyesi yönetimi") : t("AI sağlayıcıları")}
       </h2>
 
+      {bolum === "bakiye" && (
+      <>
       {/* Marj raporu + Anthropic bakiyesi: masaüstünde yan yana, mobilde alt alta. */}
       <div
         style={{
@@ -412,14 +415,14 @@ export default function AiCreditAdminPanel({ onKrediDegisti }: { onKrediDegisti?
         </div>
       )}
       </div>
-
-      <div style={{ height: isDesktop ? 18 : 0 }} />
+      </>
+      )}
 
       {/* AI sağlayıcıları: Lio çok sağlayıcılıdır (Anthropic, MiniMax, z.ai).
           Hangilerinin açık olduğu ve öncelik sırası SUNUCU ayarıdır (AI_PROVIDERS);
           burada yalnızca gösterilir. Arayüzden açıp kapatmak bilinçli olarak yok:
           hangi sağlayıcıya müşteri verisi gittiği tek tıkla değişmemeli. */}
-      {health && (
+      {bolum === "saglayicilar" && health && (
         <div
           style={{
             background: c.surface,
@@ -584,10 +587,6 @@ export default function AiCreditAdminPanel({ onKrediDegisti }: { onKrediDegisti?
           </div>
         </div>
       )}
-
-      {/* Self-servis kredi siparişleri: ödemesi alınanları onaylayıp krediyi yükler.
-          Onay sonrası Kullanıcılar listesindeki bakiyeler de tazelenmeli. */}
-      <AiCreditOrdersAdmin onCredited={onKrediDegisti} />
 
     </section>
   );

@@ -4,6 +4,7 @@ import { api, ApiError } from "../api/client";
 import { backState } from "../lib/backTarget";
 import SocialSignInButtons from "../components/SocialSignInButtons";
 import { demoHesap } from "../lib/demoHesap";
+import { demoZiyaretiBaslat } from "../lib/demoZiyaret";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 
@@ -65,6 +66,8 @@ export default function Login() {
         password: girisSifre,
       });
       localStorage.setItem("projelio_token", token);
+      // Her demo girişi yeni bir ziyaret (bkz. lib/demoZiyaret.ts).
+      if (girisEmail.trim().toLowerCase() === demoHesap.email) demoZiyaretiBaslat(demoIstendi ? "tanitim" : "giris");
       window.location.href = guvenliHedef();
     } catch (err) {
       // Backend bazı durumlarda (ör. Google ile kaydolmuş bir hesaba şifreyle
@@ -284,6 +287,12 @@ export default function Login() {
           <p style={{ margin: "10px 0 0", fontSize: 13, lineHeight: 1.5, color: c.textSecondary }}>
             {t(
               "Her şeyi deneyebilirsin: eklediğin, değiştirdiğin, sildiğin ne varsa bir sonraki girişte ilk haline döner. Hesap herkese açık olduğu için aynı anda başkaları da içeride olabilir — gerçek veri ya da kişisel bilgi girme."
+            )}
+          </p>
+          {/* Demo ziyaret ölçümü (lib/demoZiyaret.ts) burada açıkça söyleniyor; gizlilik politikası madde 14 ile birlikte değiştir. */}
+          <p style={{ margin: "6px 0 0", fontSize: 13, lineHeight: 1.5, color: c.textSecondary }}>
+            {t(
+              "Demoyu geliştirmek için bu ziyarette hangi sayfalara baktığın ve hangi düğmelere bastığın anonim olarak ölçülür; kim olduğun ve yazdıkların kaydedilmez."
             )}
           </p>
         </div>

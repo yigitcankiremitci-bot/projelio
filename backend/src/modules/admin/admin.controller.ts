@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
@@ -6,6 +6,7 @@ import { AdminService } from "./admin.service";
 import { UsersService } from "../users/users.service";
 import { DemoAnlikGoruntuService } from "../demo/demo-anlik-goruntu.service";
 import { DemoSifirlamaService } from "../demo/demo-sifirlama.service";
+import { DemoZiyaretService } from "../demo/demo-ziyaret.service";
 import { AdminKullanicilarService } from "./admin-kullanicilar.service";
 import { AdminMesajService } from "./admin-mesaj.service";
 import type { AdminMesajGirdisi } from "@projelio/shared";
@@ -19,6 +20,7 @@ export class AdminController {
     private usersService: UsersService,
     private demoAnlikGoruntu: DemoAnlikGoruntuService,
     private demoSifirlama: DemoSifirlamaService,
+    private demoZiyaret: DemoZiyaretService,
     private kullanicilar: AdminKullanicilarService,
     private mesaj: AdminMesajService
   ) {}
@@ -132,6 +134,13 @@ export class AdminController {
   // hâline dönüyor. Sahibi demoyu güzelleştirmek istediğinde araya bir
   // ziyaretçi girip emeğini silmesin diye "düzenleme kipi" var: açıkken
   // sıfırlama çalışmaz, kapatılırken o anki hâl yeni ilk hâl olarak kaydedilir.
+
+  /** Demo ziyaretçileri neye baktı (migration 116). `gun`: 1–90, varsayılan 30. */
+  @Get("demo/ziyaretler")
+  demoZiyaretleri(@Query("gun") gun?: string) {
+    const n = Math.round(Number(gun));
+    return this.demoZiyaret.ozet(Number.isFinite(n) ? Math.min(Math.max(n, 1), 90) : 30);
+  }
 
   @Get("demo")
   async demoDurumu() {

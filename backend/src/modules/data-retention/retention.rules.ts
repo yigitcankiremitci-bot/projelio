@@ -42,6 +42,12 @@ export const SAKLAMA_GUN = {
    * kaydın bir süre daha durması gerekiyor.
    */
   suresiDolmusJeton: 30,
+
+  /**
+   * Demo hesabının anonim ziyaret kayıtları (migration 116). Politika §14'te
+   * yayımlandı. Sayaç son görülmeden işler; olaylar ziyaretle birlikte gider.
+   */
+  demoZiyaret: 90,
 } as const;
 
 export type SaklamaAlani = keyof typeof SAKLAMA_GUN;

@@ -26,12 +26,12 @@ export const privacyDoc: LegalDoc = {
     tr: {
       title: "Gizlilik Politikası",
       lede: "Hangi veriyi neden topladığımızı, kimlerle paylaştığımızı ve haklarınızı nasıl kullanacağınızı anlatır.",
-      effective: "7 Eylül 2026",
+      effective: "17 Eylül 2026",
     },
     en: {
       title: "Privacy Policy",
       lede: "What data we collect and why, who we share it with, and how you can exercise your rights.",
-      effective: "7 September 2026",
+      effective: "17 September 2026",
     },
   },
   sections: {
@@ -194,6 +194,7 @@ export const privacyDoc: LegalDoc = {
         p: [
           "Zorunlu çerezler ve yerel depolama: oturumunuzu açık tutmak, dil ve tema tercihinizi hatırlamak, arayüz durumunuzu (açık sekme, sıralama, kapatılan uyarılar) korumak için kullanılır. Bunlar hizmetin çalışması için gereklidir ve kapatılamaz; tarayıcı ayarlarınızdan silerseniz oturumunuz kapanır.",
           "Şu an analitik, reklam veya profilleme çerezi kullanmıyoruz; sitede üçüncü taraf bir ölçümleme aracı çalışmıyor. Bu değişirse, analitik çerezler yalnızca onayınızla çalışacak ve onayınızı istediğiniz zaman geri çekebileceksiniz.",
+          "Herkese açık demo hesabı: demo hesabıyla girildiğinde, demoyu geliştirmek için o ziyarette açılan sayfalar, sayfalarda geçen süre ve basılan düğmelerin arayüz etiketleri anonim olarak kaydedilir. Bu kayıt çerez kullanmaz; ziyaret yalnızca tarayıcı sekmesinde tutulan rastgele bir kimlikle ayırt edilir. IP adresi, cihaz kimliği, yazdığınız içerik ya da sonradan açtığınız hesapla eşleştirme tutulmaz; kayıtlar 90 gün sonra silinir. Kendi hesabınızla kullanımda bu ölçüm yapılmaz.",
           "Sayfalarımız yazı tiplerini Google Fonts üzerinden yükler; bu sırada IP adresiniz Google'a ulaşır. Bunun dışında sayfalarımızda üçüncü taraf takip kodu bulunmaz.",
           "Verilerinizi reklam ağlarıyla paylaşmıyoruz.",
         ],
@@ -238,7 +239,7 @@ export const privacyDoc: LegalDoc = {
           "VERBİS: Veri Sorumluları Sicili'ne kayıt yükümlülüğü, yıllık çalışan sayısı 50'den az ve yıllık mali bilanço toplamı 25 milyon TL'nin altında olan, ana faaliyet konusu özel nitelikli kişisel veri işlemek olmayan veri sorumluları bakımından aranmamaktadır; işletmemiz bu kapsamdadır.",
           "Gizlilikle ilgili tüm sorularınız, talepleriniz ve şikâyetleriniz için: info@projelio.app",
           "Avrupa Ekonomik Alanı ve Birleşik Krallık'taki ilgili kişiler: Hizmet Türkiye'ye yöneliktir ve AB/BK'de atanmış bir temsilcimiz bulunmamaktadır; taleplerinizi doğrudan info@projelio.app adresine iletebilirsiniz.",
-          "Yürürlük tarihi: 7 Eylül 2026.",
+          "Yürürlük tarihi: 17 Eylül 2026.",
         ],
       },
     ],
@@ -401,6 +402,7 @@ export const privacyDoc: LegalDoc = {
         p: [
           "Strictly necessary cookies and local storage: used to keep you signed in, remember your language and theme, and preserve interface state (open tab, sort order, dismissed notices). These are required for the Service to work and cannot be turned off; clearing them in your browser signs you out.",
           "We currently use no analytics, advertising or profiling cookies, and no third-party measurement tool runs on the site. Should that change, analytics cookies will run only with your consent and you will be able to withdraw it at any time.",
+          "Public demo account: when you sign in with the demo account, the pages opened during that visit, the time spent on them and the interface labels of the buttons pressed are recorded anonymously to improve the demo. This uses no cookies; the visit is told apart only by a random identifier kept in the browser tab. No IP address, device identifier, content you type or link to an account you open later is kept, and records are deleted after 90 days. No such measurement takes place when you use your own account.",
           "Our pages load web fonts from Google Fonts, which means your IP address reaches Google. Apart from that, our pages carry no third-party tracking code.",
           "We do not share your data with ad networks.",
         ],
@@ -445,7 +447,7 @@ export const privacyDoc: LegalDoc = {
           "VERBIS: data controllers with fewer than 50 employees and an annual balance sheet total below TRY 25 million, whose principal activity is not the processing of special categories of personal data, are not required to register with the Data Controllers' Registry; our business falls within that exemption.",
           "For any privacy question, request or complaint: info@projelio.app",
           "Individuals in the European Economic Area and the United Kingdom: the Service is directed at Türkiye and we have not appointed a representative in the EEA or the UK; you can send your requests directly to info@projelio.app.",
-          "Effective date: 7 September 2026.",
+          "Effective date: 17 September 2026.",
         ],
       },
     ],

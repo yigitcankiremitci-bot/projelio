@@ -20,6 +20,8 @@ import { useIsDesktop } from "./lib/useIsDesktop";
 import { getSidebarDefaultOpen, useAppPrefs } from "./lib/appPrefs";
 import { refreshSession } from "./lib/session";
 import { useEtkinlikSayaci } from "./lib/etkinlikSayaci";
+import { useDemoZiyaret } from "./lib/demoZiyaret";
+import { demoHesap } from "./lib/demoHesap";
 import { SIDEBAR_WIDTH, pageGutter, Z, TOP_CHROME, SAFE_TOP, safeTop } from "./lib/layout";
 import { kabukDonusunuDinle } from "./lib/mobilKabuk";
 import UploadTray, { UPLOAD_TRAY_HEIGHT } from "./components/UploadTray";
@@ -621,6 +623,12 @@ export default function App() {
   // Uygulamada geçirilen süre (Admin > Kullanıcılar). Yalnızca oturum doğrulanmışken:
   // giriş ekranında ya da /auth/me yanıt vermeden sinyal atmak 401 zinciri başlatırdı.
   useEtkinlikSayaci(Boolean(me) && !isAuthScreen);
+  // Demo ziyaretçisi neye bakıyor (Admin > Demo ziyaretleri). Yalnızca herkese
+  // açık demo hesabında; gerçek kullanıcıların gezinmesi ölçülmüyor.
+  useDemoZiyaret(
+    !isAuthScreen && me?.email?.toLowerCase() === demoHesap.email,
+    location.pathname
+  );
 
   // Oturumu her açılışta tazele ki süre "son kullanımdan itibaren" işlesin —
   // düzenli kullanan biri token ömrü dolduğu için giriş ekranına düşmesin

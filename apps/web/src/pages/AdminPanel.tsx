@@ -8,6 +8,7 @@ import AdminKullanicilarPanel from "../components/AdminKullanicilarPanel";
 import BillingAdminPanel from "../components/BillingAdminPanel";
 import SupportAdminPanel from "../components/SupportAdminPanel";
 import DemoAdminPanel from "../components/DemoAdminPanel";
+import DemoZiyaretleriPanel from "../components/DemoZiyaretleriPanel";
 import WhatsappNumbersPanel from "../components/WhatsappNumbersPanel";
 import { useT } from "../lib/i18n";
 
@@ -106,6 +107,10 @@ export default function AdminPanel() {
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
         <DemoAdminPanel />
+      </div>
+
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
+        <DemoZiyaretleriPanel />
       </div>
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>

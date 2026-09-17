@@ -29,6 +29,13 @@ function subscribe(fn: () => void): () => void {
   };
 }
 
+export function isLioPanelOpen(): boolean {
+  return panelOpen;
+}
+
+/** Panel açılıp kapandıkça haber al (demo ziyaret ölçümü, bkz. demoZiyaret.ts). */
+export const onLioPanelChange = subscribe;
+
 export function useLioPanelOpen(): boolean {
   return useSyncExternalStore(
     subscribe,

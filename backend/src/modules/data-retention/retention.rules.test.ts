@@ -12,6 +12,7 @@ describe("SAKLAMA_GUN", () => {
   test("politikada yayımlanan süreler", () => {
     assert.equal(SAKLAMA_GUN.aiSohbet, 90, "politika §12: Lio sohbet geçmişi 90 gün");
     assert.equal(SAKLAMA_GUN.whatsappMesaj, 90, "politika §12: WhatsApp kayıtları en fazla 90 gün");
+    assert.equal(SAKLAMA_GUN.demoZiyaret, 90, "politika §14: demo ziyaret kayıtları 90 gün");
   });
 
   test("ham webhook olayı, mesajın kendisinden ÖNCE silinir", () => {

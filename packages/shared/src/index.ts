@@ -12,3 +12,4 @@ export * from "./bilgiKartiBelge";
 export * from "./adminKullanici";
 export * from "./urunIliskileri";
 export * from "./sosyalHesap";
+export * from "./demoZiyaret";

@@ -136,4 +136,6 @@ export const kimlik: TranslationDict = {
   "Yönlendiriliyor…": "Redirecting…",
   "Bu giriş yöntemi şu anda kullanılamıyor.": "This sign-in method isn't available right now.",
   "Giriş başlatılamadı.": "Could not start the sign-in.",
+  "Demoyu geliştirmek için bu ziyarette hangi sayfalara baktığın ve hangi düğmelere bastığın anonim olarak ölçülür; kim olduğun ve yazdıkların kaydedilmez.":
+    "To improve the demo, the pages you view and the buttons you press during this visit are measured anonymously; who you are and what you type are not recorded.",
 };

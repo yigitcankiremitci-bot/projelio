@@ -61,6 +61,11 @@ export class DataRetentionProcessor {
       sorgu.lt("updated_at", kesimTarihiIso("aiSohbet", simdi))
     );
 
+    // Demo ziyaretleri (olaylar CASCADE ile gider).
+    await this.sil("demoZiyaret", "demo_ziyaretler", (sorgu) =>
+      sorgu.lt("son_gorulme_at", kesimTarihiIso("demoZiyaret", simdi))
+    );
+
     // Süresi dolmuş tek kullanımlık jetonlar. Üçü de aynı süreye tabi.
     for (const tablo of ["password_reset_tokens", "email_verification_tokens", "whatsapp_link_codes"]) {
       await this.sil("suresiDolmusJeton", tablo, (sorgu) =>

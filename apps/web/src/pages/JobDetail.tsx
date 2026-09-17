@@ -31,6 +31,7 @@ import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/
 import { gorevDurumHatasiniBildir, altGorevHatasiniBildir } from "../lib/taskBlockNotice";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
+import { useBackTarget } from "../lib/backTarget";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
@@ -358,7 +359,9 @@ export default function JobDetail() {
   const coverRef = useRef<HTMLDivElement>(null);
   // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
   const backRef = useRef<HTMLDivElement>(null);
-  usePageHeader(job?.title, coverRef, [job?.title], { to: "/", label: t("İşler"), sourceRef: backRef });
+  // Geri, işe hangi sayfadan girildiyse oraya döner (bkz. lib/backTarget).
+  const back = useBackTarget({ to: "/", label: t("İşler") });
+  usePageHeader(job?.title, coverRef, [job?.title, back.to, back.label, back.geriGit], { ...back, sourceRef: backRef });
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
   // (bkz. ProjectDetail'deki aynı desen).
   // Akıştaki sekme çubuğunun DOM öğesi: sabit şerit ancak bu çubuk yukarı kayıp
@@ -406,7 +409,7 @@ export default function JobDetail() {
         coverRef={coverRef}
         back={
           <div ref={backRef}>
-            <CoverBackLink to="/" label={t("İşler")} />
+            <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} />
           </div>
         }
         coverImageUrl={job?.coverImageUrl}

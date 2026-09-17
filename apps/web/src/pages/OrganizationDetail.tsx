@@ -25,6 +25,7 @@ import { useCoverTheme } from "../theme/useCoverTheme";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
+import { useBackTarget } from "../lib/backTarget";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
@@ -128,9 +129,10 @@ export default function OrganizationDetail() {
   const coverRef = useRef<HTMLDivElement>(null);
   // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
   const backRef = useRef<HTMLDivElement>(null);
-  usePageHeader(organization?.name, coverRef, [organization?.name], {
-    to: "/organizations",
-    label: "Organizasyonlar",
+  // Geri, şirkete hangi sayfadan girildiyse oraya döner (bkz. lib/backTarget).
+  const back = useBackTarget({ to: "/organizations", label: "Organizasyonlar" });
+  usePageHeader(organization?.name, coverRef, [organization?.name, back.to, back.label, back.geriGit], {
+    ...back,
     sourceRef: backRef,
   });
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
@@ -164,7 +166,7 @@ export default function OrganizationDetail() {
         coverRef={coverRef}
         back={
           <div ref={backRef}>
-            <CoverBackLink to="/organizations" label="Organizasyonlar" />
+            <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} />
           </div>
         }
         coverImageUrl={organization?.coverImageUrl}
@@ -208,25 +210,22 @@ export default function OrganizationDetail() {
         // collapsible: mobilde yalnızca fotoğraf durur, kapsül dokununca yandan
         // kayarak çıkar — kapak fotoğrafının köşesi sürekli kapalı kalmasın.
         aside={
-          // Masaüstünde rozet kartın SOLUNDA: kart sağa dayanmak üzere kurulu
-          // (bkz. ProfileCard), sağına bir şey konulamaz.
-          //
-          // TELEFONDA ALTINDA. Kart katlıyken bile kendi açılır kapsülü kadar
-          // yer kaplıyor (yalnızca görünmüyor, kayıp duruyor); yan yana dizilen
-          // satır 375 px'lik ekranda 412 px'e çıkıp rozeti ekranın SOLUNA,
-          // başlığın üstüne itiyordu. Anasayfa aynı sebeple sütun kullanıyor
-          // (bkz. Dashboard) — burada da öyle.
+          // Rozet her ekranda kartın ALTINDA — anasayfa, şirket ve holding
+          // sayfaları aynı düzende olsun. Telefonda yan yana dizilen satır
+          // 375 px'lik ekranda 412 px'e çıkıp rozeti ekranın SOLUNA, başlığın
+          // üstüne itiyordu; masaüstünde de yan yana durmak sayfalar arasında
+          // tutarsızlık yaratıyordu (bkz. Dashboard). Masaüstündeki geniş
+          // boşluk, kartın hover'da büyüyüp rozetin üstüne binmemesi için.
           <div
             style={{
               display: "flex",
-              flexDirection: isDesktop ? "row" : "column",
-              alignItems: isDesktop ? "center" : "flex-end",
-              gap: 8,
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: isDesktop ? 12 : 8,
             }}
           >
-            {isDesktop && prefs.showLio && <AiCreditsChip />}
             <ProfileCard compact={!isDesktop} collapsible />
-            {!isDesktop && prefs.showLio && <AiCreditsChip compact />}
+            {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
           </div>
         }
         asideOnMobile

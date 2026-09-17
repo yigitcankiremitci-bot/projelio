@@ -1,5 +1,6 @@
 import { useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigationType } from "react-router-dom";
+import { gezinti } from "./gezintiGecmisi";
 
 /**
  * Geri bağlantısının hedefi: sabit ebeveyn mi, gelinen yer mi?
@@ -26,6 +27,12 @@ export interface BackTarget {
   to: string;
   /** Bağlantıda yazan ad. Genelde gelinen sayfanın adı ("Pist Development"). */
   label: string;
+  /**
+   * Hedef bir önceki geçmiş kaydıysa bağlantı yeni kayıt açmak yerine geri
+   * gider (navigate(-1)). Açsaydı şirket → departman → "geri" → şirketin geri
+   * bağlantısı yine departmanı gösterirdi: iki sayfa arasında sonsuz döngü.
+   */
+  geriGit?: boolean;
 }
 
 /** Atlamayı yapan taraf bunu `navigate(to, { state: { from } })` ile geçirir. */
@@ -126,11 +133,30 @@ export function useHereAsBack(): BackTarget | null {
   return hereAsBack(location.pathname, location.search);
 }
 
+/**
+ * Uygulama içi gezinti geçmişini günceller (bkz. lib/gezintiGecmisi). App'in
+ * gövdesinde, sayfalardan ÖNCE çağrılır: sayfa ilk render'ında geri hedefini
+ * okuduğunda yığın yeni konumu zaten bilmeli. İşlem aynı kayıt için
+ * tekrarlandığında hiçbir şey yapmaz, bu yüzden render içinde güvenli.
+ */
+export function useGezintiIzleyici(): void {
+  const location = useLocation();
+  const tur = useNavigationType();
+  gezinti.isle(tur, location.key, `${location.pathname}${location.search}`);
+  const sabit = hereAsBack(location.pathname, location.search);
+  if (sabit) gezinti.adiKaydet(location.key, sabit.label);
+}
+
 export function useBackTarget(fallback: BackTarget): BackTarget {
   const location = useLocation();
   const memo = useRef<BackMemo | null>(null);
   // Render sırasında hesaplanması bilerek: efekte bırakılsaydı ilk boyamada
   // sabit hedef görünüp bir kare sonra değişirdi.
   memo.current = nextBackMemo(memo.current, location.pathname, (location.state as { from?: unknown } | null)?.from);
-  return memo.current?.from ?? fallback;
+  const onceki = gezinti.onceki();
+  // Öncelik: atlamayı yapanın açıkça söylediği yer > gelinen sayfa > sabit ebeveyn.
+  const acik = memo.current?.from;
+  if (acik) return onceki?.to === acik.to ? { ...acik, geriGit: true } : acik;
+  if (onceki) return { to: onceki.to, label: onceki.label!, geriGit: true };
+  return fallback;
 }

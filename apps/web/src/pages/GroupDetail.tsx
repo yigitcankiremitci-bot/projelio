@@ -17,6 +17,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { usePageHeader } from "../lib/pageHeader";
+import { useBackTarget } from "../lib/backTarget";
 import { useT } from "../lib/i18n";
 
 // Not: "İşler" (job) kavramı yalnızca serbest çalışan/taşeron hesaplarına özgüdür;
@@ -55,7 +56,9 @@ export default function GroupDetail() {
   const coverRef = useRef<HTMLDivElement>(null);
   // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
   const backRef = useRef<HTMLDivElement>(null);
-  usePageHeader(group?.name, coverRef, [group?.name], { to: "/groups", label: "Gruplar", sourceRef: backRef });
+  // Geri, holdinge hangi sayfadan girildiyse oraya döner (bkz. lib/backTarget).
+  const back = useBackTarget({ to: "/groups", label: "Gruplar" });
+  usePageHeader(group?.name, coverRef, [group?.name, back.to, back.label, back.geriGit], { ...back, sourceRef: backRef });
 
   if (!id) return null;
 
@@ -65,7 +68,7 @@ export default function GroupDetail() {
         coverRef={coverRef}
         back={
           <div ref={backRef}>
-            <CoverBackLink to="/groups" label="Gruplar" />
+            <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} />
           </div>
         }
         coverImageUrl={group?.coverImageUrl}
@@ -91,9 +94,10 @@ export default function GroupDetail() {
           )
         }
         aside={
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {prefs.showLio && <AiCreditsChip />}
+          // Rozet kartın altında: anasayfa ve şirket sayfasıyla aynı düzen.
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: isDesktop ? 12 : 8 }}>
             <ProfileCard />
+            {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
           </div>
         }
         action={

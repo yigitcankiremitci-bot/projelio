@@ -15,6 +15,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { IconCalendar, IconCheck, IconEdit, IconSettings, IconUser } from "../components/icons";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader } from "../lib/pageHeader";
+import { useBackTarget } from "../lib/backTarget";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
@@ -174,9 +175,14 @@ export default function OperationDetail() {
   const coverRef = useRef<HTMLDivElement>(null);
   // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
   const backRef = useRef<HTMLDivElement>(null);
-  usePageHeader(operation?.title, coverRef, [operation?.title, operation?.jobId], {
+  // Geri, rutine hangi sayfadan girildiyse oraya döner; bilinmiyorsa işin
+  // Rutinler sekmesine (?tab=programs — varsayılan Projeler sekmesine değil).
+  const back = useBackTarget({
     to: operation ? `/jobs/${operation.jobId}?tab=programs` : "/",
     label: "Rutinler",
+  });
+  usePageHeader(operation?.title, coverRef, [operation?.title, operation?.jobId, back.to, back.label, back.geriGit], {
+    ...back,
     sourceRef: backRef,
   });
 
@@ -195,11 +201,9 @@ export default function OperationDetail() {
     <div style={{ minHeight: "100vh", background: c.background }}>
       <EntityCover
         coverRef={coverRef}
-        // ?tab=programs: geri dönünce işin varsayılan sekmesi (Projeler) değil,
-        // geldiğimiz Rutinler sekmesi açılsın (bkz. JobTabs "programs").
         back={
           <div ref={backRef}>
-            <CoverBackLink to={operation ? `/jobs/${operation.jobId}?tab=programs` : "/"} label="Rutinler" />
+            <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} />
           </div>
         }
         coverImageUrl={operation?.coverImageUrl}

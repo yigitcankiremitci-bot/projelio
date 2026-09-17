@@ -449,9 +449,10 @@ export default function ProjectDetail() {
     label: t("Projeler"),
   });
 
-  usePageHeader(project?.title, coverRef, [project?.title, project?.jobId, back.to, back.label], {
+  usePageHeader(project?.title, coverRef, [project?.title, project?.jobId, back.to, back.label, back.geriGit], {
     to: back.to,
     label: back.label,
+    geriGit: back.geriGit,
     sourceRef: backRef,
   });
   const isDesktop = useIsDesktop();
@@ -524,7 +525,7 @@ export default function ProjectDetail() {
                 içindi, artık bloğun tepesindeki boşluk (ya da kapaklı hâlde alta
                 yaslı düzen) o işi görüyor — burada daralmak başlığı erken kırıyordu. */}
             <div ref={backRef} style={{ position: "relative", marginBottom: 10 }}>
-              <CoverBackLink to={back.to} label={back.label} />
+              <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} />
             </div>
 
             <div style={{ position: "relative", marginBottom: project.description ? 8 : 14 }}>

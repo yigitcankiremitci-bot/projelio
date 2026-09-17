@@ -139,9 +139,10 @@ export default function DepartmentDetail() {
     label: "Departmanlar",
   });
 
-  usePageHeader(department?.name, coverRef, [department?.name, department?.organizationId, back.to, back.label], {
+  usePageHeader(department?.name, coverRef, [department?.name, department?.organizationId, back.to, back.label, back.geriGit], {
     to: back.to,
     label: back.label,
+    geriGit: back.geriGit,
     sourceRef: backRef,
   });
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
@@ -208,7 +209,7 @@ export default function DepartmentDetail() {
 
         <div style={{ paddingRight: 90 }}>
           <div ref={backRef} style={{ marginBottom: 10 }}>
-            <CoverBackLink to={back.to} label={back.label} onDark />
+            <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} onDark />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <IconLayers size={16} color="#fff" />

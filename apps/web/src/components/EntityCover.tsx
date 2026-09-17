@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode, RefObject } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { COVER_VEIL_HEIGHT, COVER_VEIL_HEIGHT_MOBILE, coverBackground } from "../lib/covers";
 import type { LioSubject } from "../lib/askLio";
 import AskLioButton from "./AskLioButton";
@@ -114,11 +114,14 @@ export function coverBadgeStyle(cover: { primary: string; dark: boolean }): CSSP
 export function CoverBackLink({
   to,
   label,
+  geriGit = false,
   onDark = false,
   floating = false,
 }: {
   to: string;
   label: string;
+  /** Hedef bir önceki geçmiş kaydı: yeni kayıt açmadan geri gider (bkz. lib/backTarget). */
+  geriGit?: boolean;
   /**
    * Departman kapağı gibi koyu perdeli, beyaz yazılı kapaklar için. Oradaki
    * yazı rengi kuralı EntityCover'ınkinden farklı (bkz. DepartmentDetail);
@@ -143,9 +146,16 @@ export function CoverBackLink({
   // görselinin koyu olup olmamasından bağımsız, app'in temasından geliyor.
   const dark = onDark || cover.dark;
   const fg = dark ? "rgba(255,255,255,0.92)" : c.textSecondary;
+  const navigate = useNavigate();
   return (
     <Link
       to={to}
+      onClick={(e) => {
+        // Yeni sekmede açma (Cmd/Ctrl/orta tık) bağlantının kendi işi.
+        if (!geriGit || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        navigate(-1);
+      }}
       className={floating ? "pill-liftoff" : undefined}
       style={{
         display: "inline-flex",

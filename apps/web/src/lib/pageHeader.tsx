@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo } from "react";
 import type { DependencyList, ReactNode, RefObject } from "react";
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
+import { gezinti } from "./gezintiGecmisi";
 
 export interface PageHeaderRegistration {
   /** Kaydırınca tepede sabitlenecek başlık (şirket/iş/proje adı). */
@@ -45,6 +47,8 @@ export interface PageHeaderBack {
   to: string;
   /** Okun yanındaki metin (ör. "Projeler"). */
   label: string;
+  /** Hedef bir önceki geçmiş kaydı: bağlantı geri gider (bkz. BackTarget.geriGit). */
+  geriGit?: boolean;
   /**
    * Sayfanın akışındaki gerçek geri bağlantısının DOM öğesi. Şeritteki kopya
    * ancak bu bağlantı yukarı kayıp gözden kaybolduktan sonra belirir; aksi halde
@@ -130,6 +134,12 @@ export function usePageHeader(
   back?: PageHeaderBack
 ) {
   const { setRegistration } = useContext(PageHeaderContext);
+  const { key } = useLocation();
+  // Sayfanın adı gezinti geçmişine yazılır: bir sonraki sayfanın geri
+  // bağlantısı "← Pist Development" diyebilsin (bkz. lib/gezintiGecmisi).
+  useEffect(() => {
+    if (title) gezinti.adiKaydet(key, title);
+  }, [key, title]);
   useEffect(() => {
     setRegistration(title ? { title, coverRef, back } : null);
     return () => setRegistration(null);

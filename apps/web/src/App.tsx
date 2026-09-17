@@ -10,6 +10,7 @@ import PresenceStrip from "./components/PresenceStrip";
 import AiLiveActivity from "./components/AiLiveActivity";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { initPush } from "./push";
+import { useGezintiIzleyici } from "./lib/backTarget";
 import { useThemeColors } from "./theme/useThemeColors";
 import { ProjectFabProvider } from "./lib/projectFab";
 import { PageHeaderProvider, usePageHeaderState } from "./lib/pageHeader";
@@ -527,7 +528,7 @@ function CoverStickyHeader({
           {/* Kapaktakiyle AYNI bileşen: tasarımın iki yerde ayrı ayrı yazılması
               karanlık modda iki farklı hap görünmesine yol açıyordu. */}
           <span style={{ pointerEvents: "auto", display: "inline-flex" }}>
-            <CoverBackLink to={registration.back.to} label={registration.back.label} floating />
+            <CoverBackLink to={registration.back.to} label={registration.back.label} geriGit={registration.back.geriGit} floating />
           </span>
         </div>
       )}
@@ -538,6 +539,7 @@ function CoverStickyHeader({
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  useGezintiIzleyici();
 
   // MOBİL KABUKTA SAĞLAYICI DÖNÜŞÜ.
   //

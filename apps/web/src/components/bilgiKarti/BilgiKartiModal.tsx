@@ -3,11 +3,12 @@ import { Link } from "react-router-dom";
 import type { BilgiKartiAlani, BilgiKartiKapsami, BilgiKartiSayfasi } from "@projelio/shared";
 import { BELGE_DURUM_ETIKET, BILGI_KARTI_BELGE_ETIKET, belgeDurumu } from "@projelio/shared";
 import { bilgiKartiApi, type BilgiKartiGirdisi } from "../../api/bilgiKarti";
+import { filesApi } from "../../api/files";
 import { useThemeColors } from "../../theme/useThemeColors";
 import Modal from "../Modal";
 import BelgeEkleModal from "./BelgeEkleModal";
 import { KUNYE_BOLUMLERI, formDurumu, kartBosMu, kunyeDegeri, type KunyeAlani } from "./kunyeAlanlari";
-import { IconCheck, IconCopy, IconEdit, IconExternalLink, IconFile, IconPlus, IconTrash } from "../icons";
+import { IconCheck, IconCopy, IconDownload, IconEdit, IconExternalLink, IconFile, IconPlus, IconTrash } from "../icons";
 
 type Sekme = "kunye" | "belgeler" | "ozet";
 
@@ -661,6 +662,23 @@ function Belgeler({
   onSil: (id: string) => Promise<void>;
 }) {
   const c = useThemeColors();
+  const [indirilen, setIndirilen] = useState<string | null>(null);
+  const [indirmeHatasi, setIndirmeHatasi] = useState<string | null>(null);
+
+  // Dosyalar ekranıyla aynı yol: kısa ömürlü jetonlu adres, `download=1` ile
+  // tarayıcı dosyayı açmak yerine kaydeder. Dış bağlantılı belgede indirilecek
+  // bir dosyamız yok — o yüzden simge yalnızca `fileId` olan belgede çıkıyor.
+  const indir = async (belgeId: string, fileId: string) => {
+    setIndirilen(belgeId);
+    setIndirmeHatasi(null);
+    try {
+      window.location.href = await filesApi.contentUrl(fileId, { download: true });
+    } catch {
+      setIndirmeHatasi("Belge indirilemedi. Dosyaya erişimin olmayabilir.");
+    } finally {
+      setIndirilen(null);
+    }
+  };
 
   if (sayfa.belgeler.length === 0) {
     return (
@@ -691,6 +709,7 @@ function Belgeler({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {indirmeHatasi && <p style={{ margin: 0, fontSize: 13, color: c.danger }}>{indirmeHatasi}</p>}
       {sayfa.belgeler.map((belge) => {
         const durum = belgeDurumu(belge.validUntil);
         const adres = belge.externalUrl ?? belge.webViewLink;
@@ -738,6 +757,25 @@ function Belgeler({
               </span>
             )}
 
+            {belge.fileId && (
+              <button
+                type="button"
+                aria-label="Belgeyi indir"
+                title="İndir"
+                disabled={indirilen === belge.id}
+                onClick={() => void indir(belge.id, belge.fileId!)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: 6,
+                  display: "flex",
+                  cursor: "pointer",
+                  opacity: indirilen === belge.id ? 0.5 : 1,
+                }}
+              >
+                <IconDownload size={16} color={c.textSecondary} />
+              </button>
+            )}
             {adres && (
               <a
                 href={adres}

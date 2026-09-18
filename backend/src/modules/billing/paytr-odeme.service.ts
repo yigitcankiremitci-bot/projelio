@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundExce
 import { SupabaseService } from "../../database/supabase.service";
 import { AiCreditOrdersService } from "../ai-assistant/ai-credit-orders.service";
 import { getWebAppUrl } from "../../common/config/env";
+import { describeError } from "../../common/network-errors";
 import { PayTRClient } from "./paytr.client";
 import { kurusaCevir, siparisNumarasiCoz, siparisNumarasiUret, telefonAlani } from "./paytr-imza";
 
@@ -50,7 +51,10 @@ export class PayTROdemeService {
 
     const kullanici = await this.kullaniciBilgisi(userId);
     const merchantOid = siparisNumarasiUret(siparis.id);
-    const donusTabani = `${getWebAppUrl()}/settings/credits`;
+    // Rota adı /settings/lio-units — "credits" DEĞİL. Yanlış yazılınca müşteri
+    // ödemeyi tamamladıktan sonra var olmayan bir sayfada kalıyor (canlıda
+    // yaşandı). Karşılığı: apps/web/src/App.tsx rota tablosu.
+    const donusTabani = `${getWebAppUrl()}/settings/lio-units`;
 
     const sonuc = await this.paytr.odemeBaslat({
       merchantOid,
@@ -124,7 +128,7 @@ export class PayTROdemeService {
     }
 
     try {
-      await this.orders.markPaid(orderId, "paytr", { provider: "paytr", reference: merchantOid });
+      await this.orders.markPaid(orderId, null, { provider: "paytr", reference: merchantOid });
       this.logger.log(`PayTR ödemesi tamamlandı: ${merchantOid}`);
     } catch (hata) {
       // Aynı ödeme için birden fazla bildirim gelmesi OLAĞAN (PayTR ağ sorunu
@@ -138,7 +142,7 @@ export class PayTROdemeService {
       // sipariş demektir. Yönetici panelindeki "bakiyeyi yeniden yükle" ile
       // çözülür (AiCreditOrdersService.retryCredit).
       this.logger.error(
-        `PayTR ödemesi alındı ama bakiye yüklenemedi (${merchantOid}): ${hata instanceof Error ? hata.message : hata}`
+        `PayTR ödemesi alındı ama bakiye yüklenemedi (${merchantOid}): ${describeError(hata)}`
       );
     }
   }

@@ -862,6 +862,9 @@ export default function App() {
                 <Route path="/settings/lio-units" element={<AiCreditsPage />} />
                 {/* Eski adres: "kredi" terimi ödeme kuruluşunca reddedildi, bağlantılar kırılmasın. */}
                 <Route path="/settings/ai-credits" element={<Navigate to="/settings/lio-units" replace />} />
+                {/* PayTR dönüşü bir süre yanlışlıkla buraya yollandı; o sırada başlatılmış
+                    ödemeler hâlâ bu adrese dönüyor. ?odeme=... korunmalı, mesaj ona bağlı. */}
+                <Route path="/settings/credits" element={<LioBirimleriYonlendir />} />
                 <Route path="/settings/billing" element={<BillingPage />} />
                 <Route path="/admin" element={<AdminPanel />} />
               </Routes>
@@ -878,4 +881,10 @@ export default function App() {
     </PageHeaderProvider>
     </UndoProvider>
   );
+}
+
+/** Eski ödeme dönüş adresini sorgu parametresiyle birlikte yeni rotaya taşır. */
+function LioBirimleriYonlendir() {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: "/settings/lio-units", search }} replace />;
 }

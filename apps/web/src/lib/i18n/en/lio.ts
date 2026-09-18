@@ -56,6 +56,11 @@ export const lio: TranslationDict = {
 
   // ─────────────────────────────────────────────── Krediler (kullanıcı)
   "Lio Bakiyesi": "Lio Units",
+  // PayTR ödeme formundan dönen kullanıcıyı karşılayan mesajlar.
+  "Ödemen alındı. Bakiyen birkaç saniye içinde yüklenecek; görünmezse sayfayı yenile.":
+    "Your payment went through. Your units will arrive in a few seconds — refresh the page if they don't show up.",
+  "Ödeme tamamlanmadı. Kartından para çekilmedi; dilediğin zaman tekrar deneyebilirsin.":
+    "The payment wasn't completed. Your card was not charged; you can try again whenever you like.",
   "Lio birimi": "Lio Units",
   "Lio Bakiyen — bakiye sayfasını aç": "Your Lio Units — open the Lio Units page",
   "Lio Bakiyen azaldı — bakiye sayfasını aç": "Your Lio Units are running low — open the Lio Units page",

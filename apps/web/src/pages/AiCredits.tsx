@@ -24,6 +24,7 @@ export default function AiCreditsPage() {
   const [credits, setCredits] = useState<AiCreditsData | null>(null);
   const [transactions, setTransactions] = useState<AiCreditTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [odemeDurumu, setOdemeDurumu] = useState<"bekleniyor" | "basarisiz" | null>(null);
   // Demo hesabında Lio ücretsiz: bakiye diye görünen sayı aslında saatlik
   // deneme tavanından kalan kısım (bkz. backend demo-ai-kotasi.ts). Kredi
   // yükleme arka uçta da kapalı, düğmeyi göstermek boşuna hataya çıkarırdı.
@@ -46,11 +47,58 @@ export default function AiCreditsPage() {
     reload();
   }, [reload]);
 
+  /**
+   * PayTR'den dönen müşteriyi karşılar (?odeme=bekleniyor | basarisiz).
+   *
+   * ÖDEME FORMUNDAN DÖNMEK BAKİYE YÜKLENDİ DEMEK DEĞİL: sonucu PayTR'nin
+   * sunucudan sunucuya gönderdiği imzalı bildirim belirliyor ve o bildirim
+   * tarayıcının dönüşünden saniyeler sonra gelebiliyor. Bu yüzden sayfa
+   * "yüklendi" demiyor, bakiyeyi birkaç kez tazeleyip bekliyor.
+   */
+  useEffect(() => {
+    const durum = new URLSearchParams(window.location.search).get("odeme");
+    if (!durum) return;
+    setOdemeDurumu(durum === "basarisiz" ? "basarisiz" : "bekleniyor");
+    // Adres çubuğu temizlenir: sayfa yenilenince mesaj tekrar çıkmasın.
+    window.history.replaceState({}, "", window.location.pathname);
+    if (durum === "basarisiz") return;
+
+    // Üç kez, ikişer saniye arayla: bildirim genelde birkaç saniyede geliyor.
+    // Sonsuz yoklama YOK — gelmediyse kullanıcıya sayfayı yenilemesini söylemek
+    // daha dürüst.
+    let kalan = 3;
+    const zamanlayici = window.setInterval(() => {
+      reload();
+      if (--kalan <= 0) window.clearInterval(zamanlayici);
+    }, 2000);
+    return () => window.clearInterval(zamanlayici);
+  }, [reload]);
+
   const isLow = !!credits && credits.balance < (credits.minBalanceToStart || 20);
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
       <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>{t("Lio Bakiyesi")}</h1>
+
+      {odemeDurumu && (
+        <div
+          style={{
+            maxWidth: 480,
+            marginBottom: 16,
+            padding: "12px 14px",
+            borderRadius: 10,
+            fontSize: 13,
+            lineHeight: 1.5,
+            border: `1px solid ${odemeDurumu === "basarisiz" ? c.danger : c.border}`,
+            color: odemeDurumu === "basarisiz" ? c.danger : c.textPrimary,
+            background: c.surface,
+          }}
+        >
+          {odemeDurumu === "basarisiz"
+            ? t("Ödeme tamamlanmadı. Kartından para çekilmedi; dilediğin zaman tekrar deneyebilirsin.")
+            : t("Ödemen alındı. Bakiyen birkaç saniye içinde yüklenecek; görünmezse sayfayı yenile.")}
+        </div>
+      )}
 
       {/* Bakiye kartı */}
       <div

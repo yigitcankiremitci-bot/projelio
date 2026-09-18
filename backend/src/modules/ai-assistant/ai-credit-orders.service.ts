@@ -173,7 +173,11 @@ export class AiCreditOrdersService {
    */
   async markPaid(
     orderId: string,
-    approvedBy: string,
+    // null = otomatik tahsilat (PayTR bildirimi). Sütun users(id)'ye bağlı bir
+    // uuid; "paytr" gibi bir etiket yazılınca güncelleme reddediliyor ve ödemesi
+    // alınmış sipariş bakiyesiz kalıyordu (canlıda yaşandı). Kaynağı
+    // payment_provider zaten söylüyor.
+    approvedBy: string | null,
     opts: { provider?: string; reference?: string; note?: string } = {}
   ): Promise<CreditOrder> {
     // Durum geçişi KOŞULLU yapılır (compare-and-set): iki yönetici aynı anda
@@ -229,7 +233,7 @@ export class AiCreditOrdersService {
    * Yalnızca (1) yeterli değildi: iki eşzamanlı çağrı da "hareket yok" görüp
    * krediyi iki kez yükleyebilirdi.
    */
-  private async creditOrder(order: CreditOrder, approvedBy: string): Promise<CreditOrder> {
+  private async creditOrder(order: CreditOrder, approvedBy: string | null): Promise<CreditOrder> {
     const { data: existing, error: existingError } = await this.supabase.client
       .from("ai_credit_transactions")
       .select("id")
@@ -243,7 +247,7 @@ export class AiCreditOrdersService {
         order.credits,
         "topup",
         `Bakiye paketi: ${order.packageKey}`,
-        approvedBy,
+        approvedBy ?? undefined,
         order.id
       );
     } else {

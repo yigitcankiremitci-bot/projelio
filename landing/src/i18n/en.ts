@@ -411,6 +411,7 @@ export const en: Dict = {
       },
     ],
     freeNote: "The free plan stays open forever: try Lio with your welcome Lio Units.",
+    billedYearly: "Billed {tutar} yearly",
     creditsLabel: "units / month",
     chargeNote: "Prices are shown in US dollars; payments are charged in Turkish lira.",
     enterprise: {

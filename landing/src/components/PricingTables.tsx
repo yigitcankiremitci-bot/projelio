@@ -35,13 +35,26 @@ export default function PricingTables({
   locale: Locale;
   canli?: CanliFiyat[];
 }) {
-  const [yearly, setYearly] = useState(false);
+  // VARSAYILAN YILLIK: kullanıcı kararı (2026-09-18). Yıllıkta büyük rakam AYLIK
+  // KARŞILIK olarak gösterilir, aylık fiyat üstü çizili yanında durur. Yıllık
+  // toplam ve tahsil edilecek TL tutar altta AÇIKÇA yazar — ucuz görünüp gerçek
+  // tutarı saklamak hem yanıltıcı hem de sanal POS denetiminde ret sebebi olurdu.
+  const [yearly, setYearly] = useState(true);
   const donem = yearly ? "yearly" : "monthly";
 
-  function fiyat(plan: Plan): number {
+  function aylikFiyat(plan: Plan): number {
     const eslesme = canli.find((c) => c.key === plan.key);
-    if (eslesme) return yearly ? eslesme.priceUsd.yearly : eslesme.priceUsd.monthly;
-    return yearly ? plan.priceYearly : plan.priceMonthly;
+    return eslesme ? eslesme.priceUsd.monthly : plan.priceMonthly;
+  }
+
+  function yillikFiyat(plan: Plan): number {
+    const eslesme = canli.find((c) => c.key === plan.key);
+    return eslesme ? eslesme.priceUsd.yearly : plan.priceYearly;
+  }
+
+  /** Gösterilen büyük rakam: aylıkta aylık fiyat, yıllıkta yıllık/12 (kuruşa aşağı değil, en yakına). */
+  function gosterilen(plan: Plan): number {
+    return yearly ? Math.round((yillikFiyat(plan) / 12) * 100) / 100 : aylikFiyat(plan);
   }
 
   /** Kartından gerçekten çekilecek tutar; yalnızca panel bildirirse gösterilir. */
@@ -55,11 +68,23 @@ export default function PricingTables({
   return (
     <>
       <div className="stack center" style={{ alignItems: "center", gap: 18 }}>
-        <div className="billing-toggle" role="group">
-          <button onClick={() => setYearly(false)} aria-pressed={!yearly}>
+        {/* Kaydırmalı anahtar: solda aylık, sağda yıllık. Etiketler de tıklanabilir. */}
+        <div className="period-switch">
+          <button type="button" className="period-label" data-active={!yearly} onClick={() => setYearly(false)}>
             {dict.common.monthly}
           </button>
-          <button onClick={() => setYearly(true)} aria-pressed={yearly}>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={yearly}
+            aria-label={dict.common.yearly}
+            className="switch-track"
+            data-on={yearly}
+            onClick={() => setYearly(!yearly)}
+          >
+            <span className="switch-thumb" />
+          </button>
+          <button type="button" className="period-label" data-active={yearly} onClick={() => setYearly(true)}>
             {dict.common.yearly}
             <span className="save-badge">{dict.common.save}</span>
           </button>
@@ -76,10 +101,12 @@ export default function PricingTables({
               <p className="plan-desc">{plan.desc}</p>
 
               <div className="price">
-                <span className="amount">{formatUSD(fiyat(plan), locale)}</span>
-                <span className="per">{yearly ? (locale === "en" ? "/yr" : "/yıl") : dict.common.perMonth}</span>
+                {yearly && <s className="price-was">{formatUSD(aylikFiyat(plan), locale)}</s>}
+                <span className="amount">{formatUSD(gosterilen(plan), locale)}</span>
+                <span className="per">{dict.common.perMonth}</span>
               </div>
               <div className="price-note">
+                {yearly && `${dict.pricing.billedYearly.replace("{tutar}", formatUSD(yillikFiyat(plan), locale))} · `}
                 {cekilecek
                   ? `${cekilecek} ${locale === "en" ? "charged" : "olarak tahsil edilir"}`
                   : plan.note}

@@ -418,6 +418,7 @@ export const tr = {
     ],
     freeNote: "Ücretsiz plan süresiz açık: hoş geldin bakiyesiyle Lio'yu denersiniz.",
     creditsLabel: "birim / ay",
+    billedYearly: "Yıllık {tutar} olarak faturalanır",
     chargeNote: "Fiyatlar ABD doları üzerinden gösterilir; tahsilat Türk Lirası olarak yapılır.",
     enterprise: {
       title: "50+ kullanıcı ya da özel entegrasyon mu gerekiyor?",

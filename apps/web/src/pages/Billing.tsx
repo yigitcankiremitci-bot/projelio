@@ -5,6 +5,7 @@ import { billingApi } from "../api/billing";
 import { kabuktaMi } from "../lib/mobilKabuk";
 import { ApiError } from "../api/client";
 import { IconSparkle, IconStar } from "../components/icons";
+import Anahtar from "../components/Anahtar";
 import { demoHesap } from "../lib/demoHesap";
 import { useT } from "../lib/i18n";
 import { useCurrentUser } from "../lib/useCurrentUser";
@@ -48,8 +49,10 @@ export default function BillingPage() {
    * AÇILMAZ — kullanıcı ne satın aldığını bir kez daha görüp onaylasın.
    */
   const istenenPlan = params.get("plan");
+  // VARSAYILAN YILLIK (kullanıcı kararı 2026-09-18); aylık yalnızca açıkça
+  // istenirse (anahtar ya da tanıtım sitesinden ?period=monthly).
   const [donem, setDonem] = useState<"monthly" | "yearly">(
-    params.get("period") === "yearly" ? "yearly" : "monthly"
+    params.get("period") === "monthly" ? "monthly" : "yearly"
   );
   const [yukleniyor, setYukleniyor] = useState(true);
   const [islemde, setIslemde] = useState<string | null>(null);
@@ -283,25 +286,26 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Dönem seçici */}
-      <div style={{ display: "inline-flex", background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 3, marginBottom: 18 }}>
-        {(["monthly", "yearly"] as const).map((secenek) => (
-          <button
-            key={secenek}
-            onClick={() => setDonem(secenek)}
-            style={{
-              border: "none",
-              cursor: "pointer",
-              borderRadius: 8,
-              padding: "8px 16px",
-              fontSize: 14,
-              background: donem === secenek ? c.primaryDark : "transparent",
-              color: donem === secenek ? "#fff" : c.textSecondary,
-            }}
-          >
-            {secenek === "monthly" ? t("Aylık") : t("Yıllık — 2 ay bedava")}
-          </button>
-        ))}
+      {/* Dönem seçici: kaydırmalı anahtar, solda aylık, sağda yıllık. Etiketler de tıklanabilir. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+        <button
+          onClick={() => setDonem("monthly")}
+          style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, fontSize: 14, fontWeight: 500, color: donem === "monthly" ? c.textPrimary : c.textSecondary }}
+        >
+          {t("Aylık")}
+        </button>
+        <Anahtar
+          checked={donem === "yearly"}
+          onChange={(yillik) => setDonem(yillik ? "yearly" : "monthly")}
+          label={t("Yıllık ödeme")}
+        />
+        <button
+          onClick={() => setDonem("yearly")}
+          style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, fontSize: 14, fontWeight: 500, color: donem === "yearly" ? c.textPrimary : c.textSecondary }}
+        >
+          {t("Yıllık")}
+        </button>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: c.success }}>{t("2 ay bedava")}</span>
       </div>
 
       {yukleniyor ? (
@@ -343,12 +347,22 @@ export default function BillingPage() {
                     )}
                   </div>
 
+                  {/* Yıllıkta büyük rakam AYLIK KARŞILIK; yıllık toplam hemen altında
+                      açıkça yazar — ucuz görünüp gerçek tutarı saklamak yanıltıcı olurdu. */}
                   <div style={{ margin: "12px 0 2px", fontSize: 30, fontWeight: 600, color: c.textPrimary, letterSpacing: -0.5 }}>
-                    ${usd.toFixed(2)}
-                    <span style={{ fontSize: 14, fontWeight: 400, color: c.textSecondary }}>
-                      {donem === "monthly" ? t(" / ay") : t(" / yıl")}
-                    </span>
+                    {donem === "yearly" && (
+                      <s style={{ fontSize: 16, fontWeight: 400, color: c.textSecondary, marginRight: 8 }}>
+                        ${plan.priceUsd.monthly.toFixed(2)}
+                      </s>
+                    )}
+                    ${(donem === "yearly" ? Math.round((usd / 12) * 100) / 100 : usd).toFixed(2)}
+                    <span style={{ fontSize: 14, fontWeight: 400, color: c.textSecondary }}>{t(" / ay")}</span>
                   </div>
+                  {donem === "yearly" && (
+                    <div style={{ fontSize: 13, color: c.textSecondary }}>
+                      {t("Yıllık {tutar} olarak faturalanır", { tutar: `$${usd.toFixed(2)}` })}
+                    </div>
+                  )}
 
                   {/*
                     Tahsilat tutarı AYRI gösteriliyor: vitrin $ ama kart ₺ ile

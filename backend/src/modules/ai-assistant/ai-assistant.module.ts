@@ -12,6 +12,7 @@ import { AiTranscriptionService } from "./ai-transcription.service";
 import { AiSpeechService } from "./ai-speech.service";
 import { AiSpendAlertProcessor } from "./ai-spend-alert.processor";
 import { AiExportsService } from "./ai-exports.service";
+import { PayTRModule } from "../billing/paytr.module";
 import { TasksModule } from "../tasks/tasks.module";
 import { ProjectsModule } from "../projects/projects.module";
 import { JobsModule } from "../jobs/jobs.module";
@@ -42,7 +43,7 @@ import { SupportModule } from "../support/support.module";
 import { WhatsappModule } from "../whatsapp/whatsapp.module";
 
 @Module({
-  imports: [
+  imports: [PayTRModule, 
     TasksModule,
     ProjectsModule,
     JobsModule,
@@ -122,6 +123,9 @@ import { WhatsappModule } from "../whatsapp/whatsapp.module";
   // LlmProviderRegistry dışarı açık: Lio'nun sohbeti dışındaki okuma işleri de
   // (ör. fatura belgesi) aynı sağlayıcı sırasından geçsin, ikinci bir istemci
   // kurmasın (bkz. faturalar/lio-yardimi.service.ts).
-  exports: [AiCreditsService, AiAssistantService, LlmProviderRegistry],
+  // AiCreditOrdersService dışa açık: PayTR bildirimi ödemeyi onayladığında
+  // bakiyeyi yükleyen tek yol bu servis (BillingModule kullanıyor). Kredi
+  // defteri mantığı orada KOPYALANMIYOR.
+  exports: [AiCreditsService, AiCreditOrdersService, AiAssistantService, LlmProviderRegistry],
 })
 export class AiAssistantModule {}

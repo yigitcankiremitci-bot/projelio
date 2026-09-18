@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Req, UseGuards } from "@nestjs/comm
 import { AuthGuard } from "@nestjs/passport";
 import { BillingService } from "./billing.service";
 import { StorePurchasesService } from "./store-purchases.service";
+import { PayTROdemeService } from "./paytr-odeme.service";
 
 /**
  * Abonelik ekranının uçları.
@@ -15,8 +16,24 @@ import { StorePurchasesService } from "./store-purchases.service";
 export class BillingController {
   constructor(
     private billing: BillingService,
-    private store: StorePurchasesService
+    private store: StorePurchasesService,
+    private paytrOdeme: PayTROdemeService
   ) {}
+
+  /**
+   * Lio Bakiyesi siparişi için PayTR ödeme formunu açar.
+   *
+   * Tutar GÖVDEDEN ALINMAZ: siparişin kendisinden okunur. İstemcinin ilettiği
+   * bir tutara güvenmek, ödenecek rakamı tarayıcıdan değiştirilebilir yapardı.
+   *
+   * Müşteri IP'si PayTR'nin sahtecilik kontrolüne giriyor ve imzaya dahil;
+   * Caddy'nin arkasında olduğumuz için gerçek IP req.ip'ten geliyor
+   * (main.ts'te "trust proxy" açık).
+   */
+  @Post("paytr/lio-bakiyesi/:orderId")
+  odemeBaslat(@Param("orderId") orderId: string, @Req() req: any) {
+    return this.paytrOdeme.bakiyeOdemesiBaslat(req.user.userId, orderId, req.ip ?? "");
+  }
 
   /** Paket listesi + mevcut abonelik + sağlayıcı durumu. */
   @Get("plans")

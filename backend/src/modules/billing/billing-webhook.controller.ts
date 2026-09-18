@@ -1,8 +1,9 @@
-import { Body, Controller, Headers, HttpCode, Logger, Post, Res, UnauthorizedException } from "@nestjs/common";
+import { Body, Controller, Header, Headers, HttpCode, Logger, Post, Res, UnauthorizedException } from "@nestjs/common";
 import type { Response } from "express";
 import { getWebAppUrl } from "../../common/config/env";
 import { BillingService } from "./billing.service";
 import { StorePurchasesService } from "./store-purchases.service";
+import { BILDIRIM_YANITI, PayTROdemeService } from "./paytr-odeme.service";
 import { abonelikWebhookDogrula, type AbonelikWebhookGovdesi } from "./iyzico-imza";
 
 /**
@@ -14,6 +15,9 @@ import { abonelikWebhookDogrula, type AbonelikWebhookGovdesi } from "./iyzico-im
  *     gidilebilir, o yüzden hiçbir şeye "ödendi" demez; token'ı iyzico'ya sorar.
  *   · /billing/iyzico/webhook  — iyzico'nun sunucusu gelir, imzalıdır ve
  *     yenileme/başarısızlık olaylarını taşır.
+ *   · /billing/paytr/bildirim  — PayTR'nin sunucusu gelir, imzalıdır. Ödemenin
+ *     sonucunu SADECE burası belirler; müşterinin döndüğü sayfa hiçbir şey
+ *     kanıtlamaz.
  */
 @Controller("billing")
 export class BillingWebhookController {
@@ -21,7 +25,8 @@ export class BillingWebhookController {
 
   constructor(
     private billing: BillingService,
-    private store: StorePurchasesService
+    private store: StorePurchasesService,
+    private paytr: PayTROdemeService
   ) {}
 
   /**
@@ -84,6 +89,27 @@ export class BillingWebhookController {
   async appleNotifications(@Body() body: { signedPayload?: string }): Promise<{ ok: true }> {
     await this.store.appleBildirimi(body?.signedPayload);
     return { ok: true };
+  }
+
+  /**
+   * PayTR ödeme sonuç bildirimi (Bildirim URL). Gövde form-encoded gelir.
+   *
+   * YANIT SADECE "OK" OLMALI — öncesinde ya da sonrasında tek karakter bile
+   * olmamalı. PayTR bu yanıtı alamazsa bildirimi başarısız sayar, siparişi
+   * "devam ediyor"da bırakır ve PARAYI AKTARMAZ. Bu yüzden:
+   *   · @Header ile içerik türü düz metne sabitlendi (Nest varsayılanı text/html),
+   *   · servis hiçbir durumda fırlatmıyor, sorunları log'a yazıyor.
+   *
+   * Aynı ödeme için birden fazla bildirim gelmesi olağandır; tekrarlarda da
+   * yalnızca OK dönülür (bakiye tek kez yüklenir, markPaid karşılaştır-ve-yaz
+   * yaptığı için).
+   */
+  @Post("paytr/bildirim")
+  @HttpCode(200)
+  @Header("Content-Type", "text/plain; charset=utf-8")
+  async paytrBildirim(@Body() body: Record<string, unknown>): Promise<string> {
+    await this.paytr.bildirimIsle(body ?? {});
+    return BILDIRIM_YANITI;
   }
 
   /** Google Play RTDN (Pub/Sub push). Gövde: { message: { data, messageId } }. */

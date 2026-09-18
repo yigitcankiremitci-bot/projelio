@@ -382,6 +382,7 @@ export const hatalar: TranslationDict = {
   "Birim miktarı pozitif bir sayı olmalı.": "The Lio Units amount must be a positive number.",
   "Sipariş bu sırada güncellendi, sayfayı yenile.": "The order was updated in the meantime. Refresh the page.",
   "Sipariş bulunamadı.": "Order not found.",
+  "Bu siparişin ödemesi zaten sonuçlanmış.": "This order's payment has already been settled.",
   "Tutar 0 veya pozitif bir sayı olmalı.": "The amount must be 0 or a positive number.",
   "Yalnızca ödeme bekleyen siparişler iptal edilebilir.": "Only orders awaiting payment can be cancelled.",
   "Yalnızca ödeme bekleyen siparişler onaylanabilir.": "Only orders awaiting payment can be approved.",

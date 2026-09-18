@@ -38,6 +38,17 @@ export const billingApi = {
       api.get<Subscription[]>(`/billing/admin/subscriptions${status ? `?status=${status}` : ""}`),
     runRenewals: () => api.post<{ krediYuklenen: number; suresiDolan: number }>("/billing/admin/run-renewals", {}),
   },
+  /**
+   * Lio Bakiyesi siparişi için PayTR ödeme formunu açar.
+   * Tutar gönderilmez — sunucu siparişin kendi tutarını kullanır.
+   */
+  paytr: {
+    bakiyeOdemesiBaslat: (orderId: string) =>
+      api.post<{ token: string; iframeUrl: string; testMode: boolean }>(
+        `/billing/paytr/lio-bakiyesi/${orderId}`,
+        {}
+      ),
+  },
 };
 
 export interface BillingAdminPlanRef {

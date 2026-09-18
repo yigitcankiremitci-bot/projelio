@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { billingApi } from "../api/billing";
 import { aiChat } from "../api/aiChat";
 import type { AiCreditOrder, AiCreditPackage } from "../api/aiChat";
 import { useT } from "../lib/i18n";
@@ -26,13 +27,17 @@ interface Props {
 /**
  * Kullanıcının kendi kredisini yüklediği bölüm.
  *
- * ÖDEME SAĞLAYICISI HENÜZ BAĞLI DEĞİL (bkz. AiPaymentProvider). Bağlanana kadar
- * akış şöyle: kullanıcı paket seçer, sipariş "ödeme bekleniyor" olarak açılır ve
- * ödeme elden/havale ile alınıp bir yönetici tarafından onaylanınca kredi yüklenir.
- * Arayüz bunu SAKLAMIYOR — kullanıcı, kredinin anında gelmeyeceğini sipariş
- * vermeden önce görüyor. Sağlayıcı bağlandığında `paymentConfigured` true döner ve
- * kullanıcı doğrudan ödeme sayfasına yönlendirilir; bu bileşende değişecek tek şey
- * odur.
+ * ÖDEME SAĞLAYICISI PayTR. Anahtarlar tanımlıysa (`paymentConfigured`) sipariş
+ * açıldıktan hemen sonra PayTR'nin ödeme formuna yönlendirilir; kart bilgisi
+ * oraya girilir, bize hiç uğramaz.
+ *
+ * ANAHTAR YOKSA ESKİ AKIŞ SÜRER: sipariş "ödeme bekleniyor" olarak açılır, ödeme
+ * elden/havale alınır ve bir yönetici onaylayınca bakiye yüklenir. Arayüz bunu
+ * SAKLAMIYOR — kullanıcı, bakiyenin anında gelmeyeceğini sipariş vermeden önce
+ * görüyor.
+ *
+ * ÖDEME FORMUNDAN DÖNMEK BAKİYE YÜKLENDİ DEMEK DEĞİLDİR: sonucu PayTR'nin
+ * imzalı bildirimi belirler, o yüzden dönüş adresi "ödeme=bekleniyor" der.
  */
 export default function AiCreditTopUp({ onChanged }: Props) {
   const c = useThemeColors();
@@ -63,10 +68,20 @@ export default function AiCreditTopUp({ onChanged }: Props) {
     setBusy(true);
     setError("");
     try {
-      const { checkoutUrl } = await aiChat.createCreditOrder(selected);
-      // Sağlayıcı bağlıysa ödeme sayfasına git; değilse sipariş listede belirir.
+      const { order, checkoutUrl } = await aiChat.createCreditOrder(selected);
+
+      // Ödeme sayfasının adresi iki yoldan gelebilir:
+      //   · checkoutUrl — sipariş ucunun kendi döndürdüğü adres (şu an kullanılmıyor),
+      //   · PayTR — sipariş açıldıktan sonra ayrı bir uçtan alınan form adresi.
+      // İkincisi ayrı bir çağrı çünkü ödeme oturumunu açan servis başka bir
+      // modülde; aynı yere koymak sunucuda modül döngüsü yaratıyordu.
       if (checkoutUrl) {
         window.location.href = checkoutUrl;
+        return;
+      }
+      if (paymentConfigured) {
+        const { iframeUrl } = await billingApi.paytr.bakiyeOdemesiBaslat(order.id);
+        window.location.href = iframeUrl;
         return;
       }
       setSelected(null);

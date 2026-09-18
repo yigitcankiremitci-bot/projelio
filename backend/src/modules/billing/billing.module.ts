@@ -10,6 +10,8 @@ import { BillingController } from "./billing.controller";
 import { BillingService } from "./billing.service";
 import { GooglePlayClient } from "./google-play.client";
 import { IyzicoClient } from "./iyzico.client";
+import { PayTROdemeService } from "./paytr-odeme.service";
+import { PayTRModule } from "./paytr.module";
 import { StorePurchasesService } from "./store-purchases.service";
 import { TcmbKuruService } from "./tcmb-kuru.service";
 
@@ -24,12 +26,13 @@ import { TcmbKuruService } from "./tcmb-kuru.service";
  * SupabaseService global modülden geliyor.
  */
 @Module({
-  imports: [AiAssistantModule],
+  imports: [AiAssistantModule, PayTRModule],
   controllers: [BillingController, BillingPublicController, BillingWebhookController, BillingAdminController],
   providers: [
     BillingService,
     BillingSettingsService,
     IyzicoClient,
+    PayTROdemeService,
     AppleStoreClient,
     GooglePlayClient,
     StorePurchasesService,

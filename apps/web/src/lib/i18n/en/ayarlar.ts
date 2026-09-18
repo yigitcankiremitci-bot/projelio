@@ -155,4 +155,8 @@ export const ayarlar: TranslationDict = {
   "Deneme e-postası gönderilemedi.": "The test email couldn't be sent.",
   "Bildirim e-postası ayarları yüklenemedi.": "Notification email settings couldn't be loaded.",
   "Ayar kaydedilemedi.": "The setting couldn't be saved.",
+  Paketim: "My plan",
+  "Paketleri gör": "See plans",
+  "{bakiye} birim": "{bakiye} units",
+  Ücretsiz: "Free",
 };

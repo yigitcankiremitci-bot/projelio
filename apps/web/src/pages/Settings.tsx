@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Locale, SidebarColorKey, SidebarPatternKey, ThemeColors, User } from "@projelio/shared";
 import { accentPresets, sidebarColorPresets, sidebarPatterns } from "@projelio/shared";
 import { api } from "../api/client";
+import { billingApi } from "../api/billing";
+import { aiChat } from "../api/aiChat";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useTheme } from "../theme/ThemeProvider";
 import { useCurrentUser } from "../lib/useCurrentUser";
@@ -53,21 +55,30 @@ import SupportPanel from "../components/SupportPanel";
  *
  * | Genişlik | Sekmeler | İçerik |
  * |---|---|---|
- * | masaüstü | solda dikey menü (NAV_WIDTH) | sağda tek sütun, CONTENT_MAX_WIDTH ile sınırlı; menü+içerik ORTALANIR |
+ * | masaüstü | solda dikey menü (NAV_WIDTH) | kalan genişliğin tamamı; kartlar sığdıkça yan yana |
  * | mobil    | üstte yana kaydırılan TabBar | tam genişlik |
  *
- * Ayar sayfası mobilde de masaüstünde de TEK sütundur: form satırları ve
- * anahtar/renk seçicileri geniş ekranda yan yana dizilince okunması zor,
- * hizası bozuk bir tabloya dönüşüyordu. Masaüstünde kazanılan genişlik ikinci
- * bir sütuna değil, soldaki menüye harcanır.
+ * Genişlik: içerik önce 560px'lik tek sütundu, sonra ortalandı; ikisinde de
+ * geniş ekranda her şey dar bir şeride sıkışıyordu. Artık içerik menünün
+ * sağındaki alanın tamamını kullanır ve KARTLAR (kartın içindeki form satırları
+ * değil) CARD_MIN_WIDTH'e sığdıkça yan yana dizilir. Kart İÇİNİ yan yana dizmek
+ * eskiden hizası bozuk bir tabloya dönüşmüştü — bölünen şey yalnızca kartların
+ * akışı. Tek kartlı sekmeler (ör. Destek) tam genişlik kalır: `auto-fit` boş
+ * sütunu düşürür.
+ *
+ * Aç/kapa gibi tek kontrollü kartlar `inline` ile kontrolü başlığın sağına alır.
+ *
+ * Paketim ve Lio Bakiyem hiçbir sekmenin içinde değil, başlığın hemen altında
+ * (PaketVeBakiye): Hesap sekmesinin dibindeki bir listede kimse bulamıyordu.
  *
  * Her bölüm kendi sekmesinde: eskiden "Genel" sekmesi hesap + gezinme + çalışma
  * ritmi + bağlı hesapları tek bir uzun kaydırmada topluyordu.
  */
-const CONTENT_MAX_WIDTH = 760;
-const NAV_WIDTH = 220;
-const NAV_GAP = 40;
-const PAGE_MAX_WIDTH = NAV_WIDTH + NAV_GAP + CONTENT_MAX_WIDTH;
+const NAV_WIDTH = 210;
+const NAV_GAP = 32;
+const CARD_MIN_WIDTH = 440;
+/** Çok geniş ekranda kartlar üçüncü sütuna yayılıp dağılmasın diye üst sınır. */
+const CONTENT_MAX_WIDTH = 1400;
 
 type SettingsTab = "hesap" | "gorunum" | "gezinme" | "yardimcilar" | "ritim" | "baglantilar" | "destek";
 
@@ -172,6 +183,101 @@ function SettingCard({
       {heading}
       <div style={{ marginTop: 14 }}>{children}</div>
     </section>
+  );
+}
+
+/**
+ * Paket ve bakiye kutucukları — sayfanın en üstünde, her sekmede görünür.
+ * Ücretli iki sayfaya giden yol Hesap sekmesinin dibindeki bir listedeydi.
+ * İstek düşerse kutucuk yine görünür, yalnızca değeri boş kalır: bakiyeyi "0"
+ * diye çizmek yanlış bilgi olurdu (bkz. AiCreditsChip).
+ */
+function PaketVeBakiye() {
+  const c = useThemeColors();
+  const t = useT();
+  const navigate = useNavigate();
+  const [paket, setPaket] = useState<string | null>(null);
+  const [bakiye, setBakiye] = useState<number | null>(null);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    billingApi
+      .overview(ctrl.signal)
+      .then((o) => {
+        const abone = o.subscription;
+        setPaket(abone ? o.plans.find((p) => p.key === abone.planKey)?.name ?? null : "Ücretsiz");
+      })
+      .catch(() => {});
+    aiChat
+      .getCredits()
+      .then((k) => {
+        if (!ctrl.signal.aborted) setBakiye(k.balance);
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, []);
+
+  const kutu = (onClick: () => void, icon: ReactNode, baslik: string, deger: string | null, eylem: string) => (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        flex: "1 1 280px",
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        padding: "16px 20px",
+        borderRadius: 12,
+        border: `1px solid ${c.border}`,
+        background: c.surface,
+        textAlign: "left",
+        cursor: "pointer",
+      }}
+    >
+      <span
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 10,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: `${c.accent}1F`,
+        }}
+      >
+        {icon}
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 13, color: c.textSecondary }}>{baslik}</span>
+        <span style={{ display: "block", fontSize: 18, fontWeight: 600, color: c.textPrimary, minHeight: 24 }}>
+          {deger ?? ""}
+        </span>
+      </span>
+      <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 14, fontWeight: 500, color: c.accent, flexShrink: 0 }}>
+        {eylem}
+        <IconChevronRight size={16} color={c.accent} />
+      </span>
+    </button>
+  );
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
+      {kutu(
+        () => navigate("/settings/billing"),
+        <IconStar size={20} color={c.accent} filled />,
+        t("Paketim"),
+        paket === null ? null : t(paket),
+        t("Paketleri gör")
+      )}
+      {kutu(
+        () => navigate("/settings/lio-units"),
+        <IconSparkle size={20} color={c.accent} />,
+        t("Lio Bakiyem"),
+        bakiye === null ? null : t("{bakiye} birim", { bakiye: Math.round(bakiye).toLocaleString("tr-TR") }),
+        t("Bakiye yükle")
+      )}
+    </div>
   );
 }
 
@@ -592,26 +698,6 @@ export default function Settings() {
             </>
           )}
 
-          <button onClick={() => navigate("/settings/billing")} style={linkRowStyle}>
-            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <IconStar size={17} color={c.accent} filled />
-              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("Paketim")}</span>
-            </span>
-            <IconChevronRight size={16} color={c.textSecondary} />
-          </button>
-
-          <div style={{ borderTop: `1px solid ${c.border}` }} />
-
-          <button onClick={() => navigate("/settings/lio-units")} style={linkRowStyle}>
-            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <IconSparkle size={17} color={c.accent} />
-              <span style={{ fontSize: 17, color: c.textPrimary }}>{t("Lio Bakiyem")}</span>
-            </span>
-            <IconChevronRight size={16} color={c.textSecondary} />
-          </button>
-
-          <div style={{ borderTop: `1px solid ${c.border}` }} />
-
           <button onClick={() => navigate("/settings/archive")} style={linkRowStyle}>
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <IconArchive size={17} color={c.textSecondary} />
@@ -1010,13 +1096,24 @@ export default function Settings() {
   // Sekme gövdesi: tüm kartlar aynı dikey boşlukla dizilir — kartların tek tek
   // marginTop taşıması bölümler arasında tutarsız aralıklara yol açıyordu.
   const contentColumn = (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>{TAB_CONTENT[tab]}</div>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(auto-fit, minmax(min(${CARD_MIN_WIDTH}px, 100%), 1fr))`,
+        gap: 16,
+        alignItems: "start",
+      }}
+    >
+      {TAB_CONTENT[tab]}
+    </div>
   );
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: `${isDesktop ? 32 : 20}px ${gutter}px 40px` }}>
-      <div style={{ maxWidth: isDesktop ? PAGE_MAX_WIDTH : undefined, margin: "0 auto" }}>
+      <div style={{ maxWidth: isDesktop ? NAV_WIDTH + NAV_GAP + CONTENT_MAX_WIDTH : undefined }}>
       <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>{t("Ayarlar")}</h1>
+
+      <PaketVeBakiye />
 
       {isDesktop ? (
         <div style={{ display: "flex", gap: NAV_GAP, alignItems: "flex-start" }}>
@@ -1032,7 +1129,7 @@ export default function Settings() {
               </button>
             ))}
           </nav>
-          <div style={{ flex: 1, minWidth: 0, maxWidth: CONTENT_MAX_WIDTH }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 16px" }}>{activeLabel}</h2>
             {contentColumn}
           </div>

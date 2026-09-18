@@ -53,7 +53,7 @@ import SupportPanel from "../components/SupportPanel";
  *
  * | Genişlik | Sekmeler | İçerik |
  * |---|---|---|
- * | masaüstü | solda dikey menü (NAV_WIDTH) | sağda tek sütun, CONTENT_MAX_WIDTH ile sınırlı |
+ * | masaüstü | solda dikey menü (NAV_WIDTH) | sağda tek sütun, CONTENT_MAX_WIDTH ile sınırlı; menü+içerik ORTALANIR |
  * | mobil    | üstte yana kaydırılan TabBar | tam genişlik |
  *
  * Ayar sayfası mobilde de masaüstünde de TEK sütundur: form satırları ve
@@ -64,8 +64,10 @@ import SupportPanel from "../components/SupportPanel";
  * Her bölüm kendi sekmesinde: eskiden "Genel" sekmesi hesap + gezinme + çalışma
  * ritmi + bağlı hesapları tek bir uzun kaydırmada topluyordu.
  */
-const CONTENT_MAX_WIDTH = 560;
-const NAV_WIDTH = 190;
+const CONTENT_MAX_WIDTH = 760;
+const NAV_WIDTH = 220;
+const NAV_GAP = 40;
+const PAGE_MAX_WIDTH = NAV_WIDTH + NAV_GAP + CONTENT_MAX_WIDTH;
 
 type SettingsTab = "hesap" | "gorunum" | "gezinme" | "yardimcilar" | "ritim" | "baglantilar" | "destek";
 
@@ -135,14 +137,39 @@ const DIL_SECENEKLERI: { value: Locale | null; kisa: string; ad: string }[] = [
   { value: "en", kisa: "EN", ad: "English" },
 ];
 
-function SettingCard({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+function SettingCard({
+  title,
+  description,
+  inline,
+  children,
+}: {
+  title: string;
+  description?: string;
+  /** Kontrolü başlığın altına değil sağına koyar (aç/kapa, tek düğme). */
+  inline?: boolean;
+  children: ReactNode;
+}) {
   const c = useThemeColors();
-  return (
-    <section style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: 16 }}>
+  const heading = (
+    <>
       <h3 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{title}</h3>
       {description && (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: "4px 0 0", lineHeight: 1.4 }}>{description}</p>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: "4px 0 0", lineHeight: 1.45 }}>{description}</p>
       )}
+    </>
+  );
+  const box: CSSProperties = { background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: "16px 20px" };
+  if (inline) {
+    return (
+      <section style={{ ...box, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>{heading}</div>
+        <div style={{ flexShrink: 0 }}>{children}</div>
+      </section>
+    );
+  }
+  return (
+    <section style={box}>
+      {heading}
       <div style={{ marginTop: 14 }}>{children}</div>
     </section>
   );
@@ -778,6 +805,7 @@ export default function Settings() {
         <SettingCard
           title="Hareketi azalt"
           description={t("Geçiş ve animasyonları neredeyse tamamen kapatır. Baş dönmesi/odaklanma sorunu yaşıyorsan ya da arayüzün daha hızlı hissettirmesini istiyorsan aç.")}
+          inline
         >
           <Toggle checked={prefs.reduceMotion} onChange={prefs.setReduceMotion} />
         </SettingCard>
@@ -896,6 +924,7 @@ export default function Settings() {
         <SettingCard
           title={t("Kenar çubuğu açık başlasın")}
           description={t("Bilgisayarda uygulamayı açtığında soldaki menü açık mı gelsin? Kapalı seçersen sol üstteki okla açarsın. Telefonda menü her zaman kapalı başlar.")}
+          inline
         >
           <Toggle checked={prefs.sidebarDefaultOpen} onChange={prefs.setSidebarDefaultOpen} />
         </SettingCard>
@@ -903,6 +932,7 @@ export default function Settings() {
         <SettingCard
           title={t("Özet sayılar açık başlasın")}
           description={t("İş ve rutin sayfalarındaki proje/görev sayıları kutusu (dar ekranda katlanan özet) açık mı gelsin?")}
+          inline
         >
           <Toggle checked={prefs.statsOpen} onChange={prefs.setStatsOpen} />
         </SettingCard>
@@ -915,6 +945,7 @@ export default function Settings() {
       <SettingCard
         title={t("Lio yardımcısı")}
         description={t("Sağ altta duran Lio balonu. Kapatırsan düğme gizlenir; Lio'yu Cmd/Ctrl + K ile yine açabilirsin.")}
+        inline
       >
         <Toggle checked={prefs.showLio} onChange={prefs.setShowLio} />
       </SettingCard>
@@ -922,6 +953,7 @@ export default function Settings() {
       <SettingCard
         title={t("Kim bu sayfada şeridi")}
         description={t("Aynı sayfada çalışan ekip arkadaşlarını sol altta gösteren ince şerit.")}
+        inline
       >
         <Toggle checked={prefs.showPresence} onChange={prefs.setShowPresence} />
       </SettingCard>
@@ -983,10 +1015,11 @@ export default function Settings() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: `${isDesktop ? 32 : 20}px ${gutter}px 40px` }}>
+      <div style={{ maxWidth: isDesktop ? PAGE_MAX_WIDTH : undefined, margin: "0 auto" }}>
       <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 20px" }}>{t("Ayarlar")}</h1>
 
       {isDesktop ? (
-        <div style={{ display: "flex", gap: 32, alignItems: "flex-start" }}>
+        <div style={{ display: "flex", gap: NAV_GAP, alignItems: "flex-start" }}>
           <nav style={{ width: NAV_WIDTH, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2, position: "sticky", top: 96 }}>
             {TABS.map((sekme) => (
               <button
@@ -1016,6 +1049,7 @@ export default function Settings() {
           {contentColumn}
         </>
       )}
+      </div>
 
       {homeTargetModalOpen && <HomeTargetModal onClose={() => setHomeTargetModalOpen(false)} />}
       {profileModalOpen && me && (

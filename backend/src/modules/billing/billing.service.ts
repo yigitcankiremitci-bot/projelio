@@ -537,12 +537,16 @@ export class BillingService {
       throw eklemeHatasi;
     }
 
+    let hareketId: string | null = null;
     try {
-      await this.credits.grant(
+      // Kullanım Koşulları: paketle gelen birimler dönem sonunda DEVRETMEZ.
+      // Bu yükleme önceki dönemden kalanı sona erdirir ve yenisini bir sonraki
+      // kredi ayının başında bitecek diye işaretler (migration 117).
+      hareketId = await this.credits.grantPlan(
         abonelik.userId,
         plan.monthlyCredits,
-        "topup",
-        `Paket bakiyesi: ${plan.name} (${donemIso.slice(0, 10)})`
+        `Paket bakiyesi: ${plan.name} (${donemIso.slice(0, 10)})`,
+        ayEkle(donemBasi, 1)
       );
     } catch (error) {
       await this.supabase.client.from("subscription_credit_grants").delete().eq("id", yerTutma?.id);
@@ -551,20 +555,14 @@ export class BillingService {
     }
 
     // Defter satırıyla bağı kurmak SADECE denetim içindir; kurulamazsa kredi
-    // yine yüklenmiştir, bu yüzden hata yutuluyor.
+    // yine yüklenmiştir, bu yüzden hata yutuluyor. Satırın id'si yükleme
+    // fonksiyonundan geliyor — "son topup satırı" diye aramak, aynı anda bir
+    // bakiye paketi yüklenirse yanlış satırı bağlardı.
     try {
-      const { data: hareket } = await this.supabase.client
-        .from("ai_credit_transactions")
-        .select("id")
-        .eq("user_id", abonelik.userId)
-        .eq("type", "topup")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (hareket?.id && yerTutma?.id) {
+      if (hareketId && yerTutma?.id) {
         await this.supabase.client
           .from("subscription_credit_grants")
-          .update({ transaction_id: hareket.id })
+          .update({ transaction_id: hareketId })
           .eq("id", yerTutma.id);
       }
     } catch {
@@ -779,8 +777,19 @@ export class BillingService {
    * billing.plans.ts). O yüzden kredi yüklemesi yenileme webhook'una bağlanamaz;
    * ay sınırını burada geçiyoruz.
    */
-  async donemleriIlerlet(): Promise<{ krediYuklenen: number; suresiDolan: number }> {
+  async donemleriIlerlet(): Promise<{ krediYuklenen: number; suresiDolan: number; birimiBiten: number }> {
     const simdi = new Date();
+
+    // Önce süresi dolan paket birimleri biter, SONRA yeni ayın yüklemesi gelir.
+    // Yükleme zaten eskisini bitiriyor; bu adım yenilenmeyen (iptal edilmiş,
+    // ödemesi düşmüş) aboneliklerin kalan birimini de dönem sonunda kapatır.
+    let birimiBiten = 0;
+    try {
+      birimiBiten = await this.credits.expirePlanCredits();
+    } catch (error) {
+      // Migration 117 uygulanmadan fonksiyon yok; yüklemeler yine sürsün.
+      this.logger.error(`Paket birimleri sona erdirilemedi: ${(error as Error).message}`);
+    }
 
     const { data: suresiDolanlar, error: dolanHata } = await this.supabase.client
       .from("subscriptions")
@@ -811,7 +820,7 @@ export class BillingService {
       }
     }
 
-    return { krediYuklenen, suresiDolan: (suresiDolanlar ?? []).length };
+    return { krediYuklenen, suresiDolan: (suresiDolanlar ?? []).length, birimiBiten };
   }
 
   // ================================================================== Yönetici

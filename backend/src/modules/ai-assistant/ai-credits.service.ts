@@ -34,11 +34,17 @@ export interface CreditBalance {
   balance: number;
   lifetimePurchased: number;
   lifetimeSpent: number;
+  /**
+   * Bakiyenin içindeki bu dönemin paket birimi (migration 117). Dönem sonunda
+   * (planExpiresAt) kalanı sona erer; harcama önce bu paydan düşer.
+   */
+  planBalance?: number;
+  planExpiresAt?: string | null;
 }
 
 export interface CreditTransaction {
   id: string;
-  type: "topup" | "usage" | "refund" | "adjustment" | "welcome";
+  type: "topup" | "usage" | "refund" | "adjustment" | "welcome" | "expire";
   credits: number;
   balanceAfter: number;
   description?: string;
@@ -107,7 +113,9 @@ export class AiCreditsService {
 
     const { data, error } = await this.supabase.client
       .from("ai_credit_balances")
-      .select("balance, lifetime_purchased, lifetime_spent")
+      // "*": plan_balance 117 ile geldi; migration uygulanmadan önce de bakiye
+      // okunabilsin diye sütun adıyla istenmiyor (istense sorgu düşerdi).
+      .select("*")
       .eq("user_id", userId)
       .maybeSingle();
     if (error) throw error;
@@ -121,11 +129,42 @@ export class AiCreditsService {
       return { balance: 0, lifetimePurchased: 0, lifetimeSpent: 0 };
     }
 
+    const planBalance = Number(data.plan_balance ?? 0);
     return {
       balance: Number(data.balance),
       lifetimePurchased: Number(data.lifetime_purchased),
       lifetimeSpent: Number(data.lifetime_spent),
+      planBalance: Math.min(planBalance, Math.max(Number(data.balance), 0)),
+      planExpiresAt: planBalance > 0 ? (data.plan_expires_at ?? null) : null,
     };
+  }
+
+  /**
+   * Dönemin paket birimini yükler (Kullanım Koşulları: dönem sonunda devretmez).
+   *
+   * Tek veritabanı işleminde: önceki dönemden kalan paket payı sona erdirilir
+   * ('expire' satırı), yenisi eklenir ve `expiresAt`'te bitecek diye işaretlenir.
+   * Satın alınan bakiyeye dokunulmaz. Defter satırının id'sini döner.
+   */
+  async grantPlan(userId: string, credits: number, description: string, expiresAt: Date): Promise<string | null> {
+    if (!Number.isFinite(credits) || credits <= 0) {
+      throw new BadRequestException("Birim miktarı pozitif bir sayı olmalı.");
+    }
+    const { data, error } = await this.supabase.client.rpc("ai_grant_plan_credits", {
+      p_user_id: userId,
+      p_credits: credits,
+      p_description: description,
+      p_expires_at: expiresAt.toISOString(),
+    });
+    if (error) throw error;
+    return typeof data === "string" ? data : null;
+  }
+
+  /** Süresi dolmuş paket paylarını bitirir (gece işi). Sona eren kullanıcı sayısını döner. */
+  async expirePlanCredits(): Promise<number> {
+    const { data, error } = await this.supabase.client.rpc("ai_expire_plan_credits");
+    if (error) throw error;
+    return Number(data) || 0;
   }
 
   /**

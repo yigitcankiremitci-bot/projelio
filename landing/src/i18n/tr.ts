@@ -487,7 +487,8 @@ export const tr = {
     ],
     faqTitle: "Lio Bakiyesi ile ilgili sorular",
     faq: [
-      { q: "Lio Bakiyesi her ay sıfırlanıyor mu?", a: "Satın aldığınız bakiyenin süresi dolmaz, hesabınızda kalır. Paketinizle her ay gelen birimler de aynı bakiyeye eklenir." },
+      { q: "Lio Bakiyesi her ay sıfırlanıyor mu?", a: "Paketinizle her ay gelen birimler o dönemin sonunda sona erer, bir sonraki aya devretmez. Satın aldığınız bakiyenin ise süresi dolmaz, hesabınızda kalır." },
+      { q: "Hangi bakiye önce harcanır?", a: "Önce paketinizle gelen aylık birimler, onlar bitince satın aldığınız bakiye kullanılır. Böylece satın aldığınız bakiye boşa gitmez." },
       { q: "Bakiyem biterse ne olur?", a: "Projelio'nun tamamı çalışmaya devam eder; sadece Lio yeni istek almaz ve size bilgi verir. Panelden çalışmaya kaldığınız yerden devam edersiniz." },
       { q: "Bakiye iadesi yapılıyor mu?", a: "Kullanılmamış bakiye paketleri için satın alma tarihinden itibaren 14 gün içinde iade talebinde bulunabilirsiniz. Detaylar İptal ve İade Koşulları sayfamızda." },
       { q: "Ekip üyeleri ortak havuzdan mı harcıyor?", a: "Hayır. Lio Bakiyesi kişiye tanımlıdır: her kullanıcı kendi bakiyesini kullanır ve kendi hareketlerini görür." },

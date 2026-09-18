@@ -135,6 +135,9 @@ export interface AiCredits {
   balance: number;
   lifetimePurchased: number;
   lifetimeSpent: number;
+  /** Bakiyenin içindeki bu dönemin paket birimi; planExpiresAt'te kalanı sona erer. */
+  planBalance?: number;
+  planExpiresAt?: string | null;
   minBalanceToStart: number;
   /** Tek bir istek bu krediyi aşacaksa Lio durup onay ister. */
   confirmThreshold: number;
@@ -142,7 +145,7 @@ export interface AiCredits {
 
 export interface AiCreditTransaction {
   id: string;
-  type: "topup" | "usage" | "refund" | "adjustment" | "welcome";
+  type: "topup" | "usage" | "refund" | "adjustment" | "welcome" | "expire";
   credits: number;
   balanceAfter: number;
   description?: string;

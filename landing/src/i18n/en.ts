@@ -472,7 +472,8 @@ export const en: Dict = {
     ],
     faqTitle: "Questions about Lio Units",
     faq: [
-      { q: "Do Lio Units reset every month?", a: "Lio Units you buy never expire and stay in your account. The units your plan adds each month go into the same balance." },
+      { q: "Do Lio Units reset every month?", a: "The units your plan adds each month expire at the end of that period and don't roll over. Lio Units you buy never expire and stay in your account." },
+      { q: "Which Lio Units get used first?", a: "Your plan's monthly units are used first; purchased Lio Units are only touched afterwards, so nothing you bought goes to waste." },
       { q: "What happens if I run out?", a: "All of Projelio keeps working — only Lio stops taking new requests and lets you know. You carry on from the panel exactly where you left off." },
       { q: "Are Lio Units refundable?", a: "You can request a refund for unused Lio Units packs within 14 days of purchase. Details are on our Cancellation and Refund page." },
       { q: "Do team members share one pool?", a: "No. Lio Units belong to each person: every user spends their own balance and sees their own history." },

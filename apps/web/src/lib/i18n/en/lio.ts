@@ -62,6 +62,11 @@ export const lio: TranslationDict = {
   "Ödeme tamamlanmadı. Kartından para çekilmedi; dilediğin zaman tekrar deneyebilirsin.":
     "The payment wasn't completed. Your card was not charged; you can try again whenever you like.",
   "Lio birimi": "Lio Units",
+  // Paket birimi dönem sonunda sona erer (migration 117).
+  "Bunun {n} birimi paketinden; {tarih} tarihinde kalanı sona erer. Harcamada önce paket birimi kullanılır.":
+    "{n} of these come with your plan; whatever is left expires on {tarih}. Plan units are used first.",
+  "Paket biriminin süresi doldu": "Plan units expired",
+  "Paket birimi bitti": "Plan units expired",
   "Lio Bakiyen — bakiye sayfasını aç": "Your Lio Units — open the Lio Units page",
   "Lio Bakiyen azaldı — bakiye sayfasını aç": "Your Lio Units are running low — open the Lio Units page",
   "Lio Bakiyesi: {bakiye} birim. Bakiye sayfasını aç.": "Lio Units: {bakiye}. Open the Lio Units page.",

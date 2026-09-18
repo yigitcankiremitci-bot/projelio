@@ -973,6 +973,7 @@ const HAREKET_ETIKETI: Record<string, string> = {
   refund: "İade", // dil:anahtar
   adjustment: "Düzeltme", // dil:anahtar
   welcome: "Hoş geldin", // dil:anahtar
+  expire: "Paket birimi bitti", // dil:anahtar
 };
 
 const ISLEM_ETIKETI: Record<string, string> = {

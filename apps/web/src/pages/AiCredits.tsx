@@ -17,6 +17,7 @@ const TYPE_LABELS: Record<AiCreditTransaction["type"], string> = {
   refund: "İade", // dil:anahtar
   adjustment: "Düzeltme", // dil:anahtar
   welcome: "Hoş geldin bakiyesi", // dil:anahtar
+  expire: "Paket biriminin süresi doldu", // dil:anahtar
 };
 
 export default function AiCreditsPage() {
@@ -120,6 +121,17 @@ export default function AiCreditsPage() {
           {loading ? "…" : Math.round(credits?.balance ?? 0).toLocaleString("tr-TR")}
         </div>
         <div style={{ fontSize: 13, opacity: 0.75 }}>{t("Lio birimi")}</div>
+
+        {/* Paketle gelen birim dönem sonunda sona eriyor (Kullanım Koşulları);
+            kullanıcı ne kadarının ne zaman gideceğini önceden görmeli. */}
+        {!!credits?.planBalance && credits.planBalance > 0 && credits.planExpiresAt && (
+          <div style={{ fontSize: 13, opacity: 0.85, marginTop: 8, lineHeight: 1.5 }}>
+            {t("Bunun {n} birimi paketinden; {tarih} tarihinde kalanı sona erer. Harcamada önce paket birimi kullanılır.", {
+              n: Math.round(credits.planBalance).toLocaleString("tr-TR"),
+              tarih: new Date(credits.planExpiresAt).toLocaleDateString("tr-TR"),
+            })}
+          </div>
+        )}
 
         {credits && (
           <div style={{ display: "flex", gap: 22, marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.15)" }}>

@@ -30,9 +30,9 @@ export class BillingRenewalProcessor {
   async gunlukBakim(): Promise<void> {
     try {
       const sonuc = await this.billing.donemleriIlerlet();
-      if (sonuc.krediYuklenen || sonuc.suresiDolan) {
+      if (sonuc.krediYuklenen || sonuc.suresiDolan || sonuc.birimiBiten) {
         this.logger.log(
-          `Abonelik bakımı: ${sonuc.krediYuklenen} aylık kredi yüklendi, ${sonuc.suresiDolan} abonelik süresi doldu.`
+          `Abonelik bakımı: ${sonuc.krediYuklenen} aylık kredi yüklendi, ${sonuc.suresiDolan} abonelik süresi doldu, ${sonuc.birimiBiten} kullanıcının paket birimi sona erdi.`
         );
       }
     } catch (error) {

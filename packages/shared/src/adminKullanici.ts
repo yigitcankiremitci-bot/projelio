@@ -84,7 +84,7 @@ export interface AdminKullaniciEtkinligi {
 
 export interface AdminKrediHareketi {
   id: string;
-  type: "topup" | "usage" | "refund" | "adjustment" | "welcome";
+  type: "topup" | "usage" | "refund" | "adjustment" | "welcome" | "expire";
   credits: number;
   balanceAfter: number;
   description?: string;

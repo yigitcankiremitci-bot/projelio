@@ -11,6 +11,9 @@ type Plan = Dict["pricing"]["plans"][number];
 /** Panelden gelen gerçek tutarlar (bkz. lib/plans.ts). */
 export interface CanliFiyat {
   key: string;
+  name?: string;
+  /** Paketle her ay gelen Lio birimi (Lio Bakiyesi sayfasındaki öneri bunu kullanır). */
+  monthlyCredits?: number;
   priceUsd: { monthly: number; yearly: number };
   charge: { monthly: { amount: number; currency: string } | null; yearly: { amount: number; currency: string } | null };
 }

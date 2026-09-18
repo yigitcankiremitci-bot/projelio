@@ -1,5 +1,6 @@
 import { catalogPricing, defaultModelForTier, PROVIDER_CATALOG } from "./providers/providers.config";
 import { tlFiyat } from "@projelio/shared";
+import { PLANS } from "../billing/billing.plans";
 
 /**
  * Projelio AI kredi ekonomisi.
@@ -361,34 +362,46 @@ export interface CreditPackage {
 }
 
 /**
- * Satılan paketler.
+ * EK BAKİYE — ABONELİĞİN YERİNE DEĞİL, YANINA.
  *
- * Fiyat UYDURULMAZ, mevcut ekonomiden türetilir: kredi × CREDIT_UNIT_USD zaten
- * komisyon EKLENMİŞ satış bedelidir (bkz. calculateUsageCost), o da kurla ₺'ye
- * çevrilir. Böylece paket fiyatı ile Lio'nun kredi düşme mantığı aynı tek kaynaktan
- * beslenir; birinin değişip diğerinin unutulması mümkün olmaz.
+ * Kurgu: abone her ay paketinin Lio Bakiyesini alır. Ek bakiye bittiğinde
+ * başvurulan pahalı bir seçenektir; düzenli ihtiyaçta bir üst pakete geçmek her
+ * zaman daha ucuz olmalı.
  *
- * Kademeli indirim (çok alana ucuz) BİLEREK yok: o bir fiyat politikası kararıdır,
- * teknik bir varsayılan değil. Gerekirse pakete bir `discountRate` eklenip burada
- * uygulanmalı.
+ * ESKİ HATA: paket fiyatı Lio'nun iç birim değerinden (CREDIT_UNIT_USD) türetiliyordu
+ * ve aboneliğin 2,5 KAT ALTINDAYDI (1.000 birim: ek paket 0,10 $, Starter 0,25 $).
+ * Abone olmadan 130 ₺'ye Lio kullanmak mümkündü; abonelik anlamsızlaşıyordu.
+ *
+ * ŞİMDİ: birim fiyatı en pahalı aboneliğin (birim başına) EK_BAKIYE_CARPANI katı,
+ * abonelik kataloğundan türetiliyor — abonelik fiyatı değişirse ek bakiye de
+ * kendiliğinden pahalı kalır. Paketler bilerek KÜÇÜK: büyük ek paketler üst
+ * pakete geçmeyi gereksiz kılardı.
  */
+export const EK_BAKIYE_CARPANI = 1.5;
+
+/** Aboneliklerin en pahalı birim fiyatı (USD / birim). Ek bakiye bunun üstünde olmak zorunda. */
+export function abonelikEnYuksekBirimUsd(): number {
+  return Math.max(
+    ...PLANS.filter((p) => p.priceUsdMonthly > 0 && p.monthlyCredits > 0).map((p) => p.priceUsdMonthly / p.monthlyCredits)
+  );
+}
+
 const PACKAGE_SIZES: { key: string; label: string; credits: number; description: string }[] = [
-  { key: "mini", label: "Mini", credits: 25_000, description: "Ara sıra kullanım için." },
-  { key: "standart", label: "Standart", credits: 50_000, description: "Günlük düzenli kullanım." },
-  { key: "profesyonel", label: "Profesyonel", credits: 150_000, description: "Yoğun kullanan ekipler." },
-  { key: "kurumsal", label: "Kurumsal", credits: 500_000, description: "Çok kullanıcılı yoğun kullanım." },
+  { key: "ek-10", label: "Ek 10.000", credits: 10_000, description: "Ay sonuna yetişmeyen birkaç gün için." },
+  { key: "ek-25", label: "Ek 25.000", credits: 25_000, description: "Yoğun geçen bir ay için." },
+  { key: "ek-50", label: "Ek 50.000", credits: 50_000, description: "Sık ihtiyaç duyuyorsan üst pakete geçmek daha ucuz." },
 ];
 
 export const CREDIT_PACKAGE_KEYS = PACKAGE_SIZES.map((p) => p.key);
 
-/** Bir birim miktarının USD satış bedeli (komisyon dahil, bkz. CREDIT_UNIT_USD). */
+/** Ek bakiyenin USD fiyatı: birim × en pahalı abonelik birim fiyatı × çarpan. */
 export function creditsToUsd(credits: number): number {
-  return credits * CREDIT_UNIT_USD;
+  return credits * abonelikEnYuksekBirimUsd() * EK_BAKIYE_CARPANI;
 }
 
 /**
  * Paketleri verilen kurla fiyatlar: USD × kur, 10 ₺'ye yukarı — aboneliklerle
- * AYNI hesap (shared/tlFiyat). Kur yoksa (hiç kaydedilmemiş) boş liste döner:
+ * AYNI TL hesabı (shared/tlFiyat). Kur yoksa (hiç kaydedilmemiş) boş liste döner:
  * uydurma bir kurla satış yapmaktansa satışı durdurmak doğru.
  */
 export function creditPackagesAt(kur: number | null): CreditPackage[] {

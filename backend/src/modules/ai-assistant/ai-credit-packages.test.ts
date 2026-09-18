@@ -1,56 +1,61 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { tlFiyat } from "@projelio/shared";
-import { CREDIT_UNIT_USD, creditPackagesAt, findCreditPackage } from "./ai-credits.config";
+import { PLANS } from "../billing/billing.plans";
+import { CREDIT_UNIT_USD, EK_BAKIYE_CARPANI, creditPackagesAt, creditsToUsd, findCreditPackage } from "./ai-credits.config";
 
-// Bu testler tasarımı değil PARA'yı korur. Paket fiyatı, Lio'nun kredi düşerken
-// kullandığı ekonomiyle (CREDIT_UNIT_USD) ve aboneliklerle AYNI kur/yuvarlama
-// hesabından türetilmek zorunda: biri değişip diğeri unutulursa Projelio krediyi
-// maliyetinin altına satar ya da iki ekranda iki fiyat görünür.
+// Bu testler tasarımı değil PARA'yı ve KURGUYU korur:
+//   · ek bakiye aboneliğin YERİNE geçemez — birim fiyatı her abonelikten pahalı
+//   · Lio'nun iç maliyetinin (CREDIT_UNIT_USD) altına satılamaz
+//   · TL hesabı aboneliklerle aynı (shared/tlFiyat)
+// 2026-09'da paket aboneliğin 2,5 kat altındaydı: abone olmadan Lio kullanmak
+// daha ucuzdu. Bu dosya o hatanın geri gelmesini engelliyor.
 
 const KUR = 48.7479; // 2026-09-18 admin panelindeki kur
 
-describe("kredi paketi fiyatlaması", () => {
-  test("fiyat = birim × CREDIT_UNIT_USD × kur, 10 ₺'ye yukarı — aboneliklerle aynı hesap", () => {
-    for (const pkg of creditPackagesAt(KUR)) {
-      assert.equal(pkg.priceTry, tlFiyat(pkg.credits * CREDIT_UNIT_USD, KUR), `${pkg.key} paketinin fiyatı sapmış`);
+describe("ek bakiye fiyatlaması", () => {
+  test("birim fiyatı HER abonelikten pahalı — ek bakiye aboneliğin yerine geçemez", () => {
+    for (const plan of PLANS.filter((p) => p.priceUsdMonthly > 0 && p.monthlyCredits > 0)) {
+      const planBirim = plan.priceUsdMonthly / plan.monthlyCredits;
+      for (const pkg of creditPackagesAt(KUR)) {
+        const paketBirim = creditsToUsd(pkg.credits) / pkg.credits;
+        assert.ok(paketBirim > planBirim, `${pkg.key}, ${plan.key} aboneliğinden ucuz`);
+      }
     }
   });
 
-  test("bilinen kurla bilinen fiyatlar", () => {
-    const fiyat = Object.fromEntries(creditPackagesAt(KUR).map((p) => [p.key, p.priceTry]));
-    assert.deepEqual(fiyat, { mini: 130, standart: 250, profesyonel: 740, kurumsal: 2440 });
+  test("birim fiyatı en pahalı aboneliğin çarpan katı", () => {
+    const starter = PLANS.find((p) => p.key === "starter")!;
+    const beklenen = (starter.priceUsdMonthly / starter.monthlyCredits) * EK_BAKIYE_CARPANI;
+    assert.ok(Math.abs(creditsToUsd(1) - beklenen) < 1e-12);
   });
 
-  test("yuvarlama hep YUKARI: hiçbir paket maliyetinin altına satılmaz", () => {
+  test("Lio'nun iç maliyetinin altına satılmaz", () => {
     for (const pkg of creditPackagesAt(KUR)) {
       assert.ok(pkg.priceTry >= pkg.credits * CREDIT_UNIT_USD * KUR, `${pkg.key} maliyetin altında`);
     }
   });
 
-  test("kur yoksa satış yok — uydurma bir kurla fiyat üretilmez", () => {
-    assert.deepEqual(creditPackagesAt(null), []);
-    assert.equal(findCreditPackage("mini", null), undefined);
-  });
-
-  test("her paket pozitif kredi ve pozitif fiyat taşır", () => {
-    const paketler = creditPackagesAt(KUR);
-    assert.ok(paketler.length > 0, "hiç paket tanımlı değil");
-    for (const pkg of paketler) {
-      assert.ok(pkg.credits > 0, `${pkg.key} kredisi pozitif değil`);
-      assert.ok(pkg.priceTry > 0, `${pkg.key} fiyatı pozitif değil — bedava kredi satılamaz`);
+  test("TL fiyatı aboneliklerle aynı hesaptan (USD × kur, 10 ₺'ye yukarı)", () => {
+    for (const pkg of creditPackagesAt(KUR)) {
+      assert.equal(pkg.priceTry, tlFiyat(creditsToUsd(pkg.credits), KUR));
     }
   });
 
-  test("paket anahtarları benzersiz — sipariş yanlış pakete bağlanmasın", () => {
-    const anahtarlar = creditPackagesAt(KUR).map((p) => p.key);
-    assert.equal(new Set(anahtarlar).size, anahtarlar.length);
+  test("bilinen kurla bilinen fiyatlar", () => {
+    const fiyat = Object.fromEntries(creditPackagesAt(KUR).map((p) => [p.key, p.priceTry]));
+    assert.deepEqual(fiyat, { "ek-10": 190, "ek-25": 460, "ek-50": 920 });
   });
 
-  test("bilinmeyen paket anahtarı bulunmaz", () => {
-    // Sipariş oluşturma bu kontrole dayanıyor: istemci uydurma bir anahtar
-    // gönderirse sipariş açılmamalı.
-    assert.equal(findCreditPackage("boyle-bir-paket-yok", KUR), undefined);
-    assert.ok(findCreditPackage("mini", KUR));
+  test("kur yoksa satış yok — uydurma bir kurla fiyat üretilmez", () => {
+    assert.deepEqual(creditPackagesAt(null), []);
+    assert.equal(findCreditPackage("ek-10", null), undefined);
+  });
+
+  test("paket anahtarları benzersiz ve bilinmeyen anahtar bulunmaz", () => {
+    const anahtarlar = creditPackagesAt(KUR).map((p) => p.key);
+    assert.equal(new Set(anahtarlar).size, anahtarlar.length);
+    assert.equal(findCreditPackage("mini", KUR), undefined);
+    assert.ok(findCreditPackage("ek-10", KUR));
   });
 });

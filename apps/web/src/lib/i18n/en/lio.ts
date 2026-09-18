@@ -62,6 +62,14 @@ export const lio: TranslationDict = {
   "Ödeme tamamlanmadı. Kartından para çekilmedi; dilediğin zaman tekrar deneyebilirsin.":
     "The payment wasn't completed. Your card was not charged; you can try again whenever you like.",
   "Lio birimi": "Lio Units",
+  // Ek bakiye (paket anahtarları backend ai-credits.config PACKAGE_SIZES'tan gelir).
+  "Ek bakiye": "Extra Lio Units",
+  "Ek bakiye, paketindeki aylık bakiyeden daha pahalıdır. Her ay yetmiyorsa": "Extra Lio Units cost more than the monthly units in your plan. If you run short every month,",
+  "bir üst pakete geçmek": "moving up a plan",
+  "daha ekonomik.": "works out cheaper.",
+  "Ay sonuna yetişmeyen birkaç gün için.": "For the last few days of the month.",
+  "Yoğun geçen bir ay için.": "For an unusually busy month.",
+  "Sık ihtiyaç duyuyorsan üst pakete geçmek daha ucuz.": "If you need this often, moving up a plan is cheaper.",
   // Paket birimi dönem sonunda sona erer (migration 117).
   "Bunun {n} birimi paketinden; {tarih} tarihinde kalanı sona erer. Harcamada önce paket birimi kullanılır.":
     "{n} of these come with your plan; whatever is left expires on {tarih}. Plan units are used first.",

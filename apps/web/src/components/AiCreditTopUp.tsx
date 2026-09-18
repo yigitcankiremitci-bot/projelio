@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { billingApi } from "../api/billing";
 import { aiChat } from "../api/aiChat";
 import type { AiCreditOrder, AiCreditPackage } from "../api/aiChat";
@@ -111,7 +112,17 @@ export default function AiCreditTopUp({ onChanged }: Props) {
 
   return (
     <section style={{ maxWidth: 480, marginBottom: 22 }}>
-      <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 10px" }}>{t("Bakiye yükle")}</h2>
+      <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 6px" }}>{t("Ek bakiye")}</h2>
+      {/* Kurgu: Lio Bakiyesi abonelikle gelir; ek bakiye bilerek daha pahalı
+          (bkz. backend ai-credits.config EK_BAKIYE_CARPANI). Kullanıcı düzenli
+          ihtiyaçta üst pakete geçmenin daha ucuz olduğunu satın almadan görmeli. */}
+      <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>
+        {t("Ek bakiye, paketindeki aylık bakiyeden daha pahalıdır. Her ay yetmiyorsa")}{" "}
+        <Link to="/settings/billing" style={{ color: c.accentDark }}>
+          {t("bir üst pakete geçmek")}
+        </Link>{" "}
+        {t("daha ekonomik.")}
+      </p>
 
       {loading ? (
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
@@ -138,9 +149,9 @@ export default function AiCreditTopUp({ onChanged }: Props) {
                   <IconSparkle size={17} color={active ? c.accentDark : c.accent} />
                   <span style={{ flex: 1 }}>
                     <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: c.textPrimary }}>
-                      {p.label} — {t("{n} birim", { n: p.credits.toLocaleString("tr-TR") })}
+                      {t("{n} birim", { n: p.credits.toLocaleString("tr-TR") })}
                     </span>
-                    <span style={{ display: "block", fontSize: 13, color: c.textSecondary }}>{p.description}</span>
+                    <span style={{ display: "block", fontSize: 13, color: c.textSecondary }}>{t(p.description)}</span>
                   </span>
                   <span style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary, whiteSpace: "nowrap" }}>
                     {formatTry(p.priceTry)}

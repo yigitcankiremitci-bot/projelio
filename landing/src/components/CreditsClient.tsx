@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Dict, Locale } from "@/i18n";
 import { bakiyeSatinAlHref, formatNumber, formatTRY, path } from "@/lib/site";
 import type { BakiyePaketi } from "@/lib/plans";
+import type { CanliFiyat } from "@/components/PricingTables";
 
 /**
  * Bir Lio işleminin ortalama birim karşılığı — canlı kullanımdan (2026-09, son
@@ -19,23 +20,36 @@ export default function CreditsClient({
   dict,
   locale,
   paketler,
+  planlar,
 }: {
   dict: Dict;
   locale: Locale;
   /** Panelden canlı paketler; boşsa (API kapalı) sözlükteki yedek kopya. */
   paketler: BakiyePaketi[];
+  /** Panelden canlı abonelikler — hesaplayıcı ek paket değil ABONELİK önerir. */
+  planlar: CanliFiyat[];
 }) {
   const packs: readonly BakiyePaketi[] = paketler.length > 0 ? paketler : dict.credits.packs;
   const [selected, setSelected] = useState(1);
-  const [users, setUsers] = useState(5);
+  const [users, setUsers] = useState(1);
   const [perDay, setPerDay] = useState(6);
 
-  const monthly = useMemo(() => users * perDay * 22 * ORTALAMA_ISLEM_BIRIMI, [users, perDay]);
+  const kisiBasi = perDay * 22 * ORTALAMA_ISLEM_BIRIMI;
+  const monthly = users * kisiBasi;
 
-  const suggested = useMemo(() => {
-    const idx = packs.findIndex((p) => p.credits >= monthly);
-    return idx === -1 ? packs.length - 1 : idx;
-  }, [monthly, packs]);
+  /**
+   * ÖNERİ BİR ABONELİKTİR, ek paket değil. Kurgu: Lio Bakiyesi abonelikle gelir,
+   * ek bakiye bilerek pahalı (bkz. backend ai-credits.config EK_BAKIYE_CARPANI).
+   * Bakiye kişiye tanımlı olduğu için öneri KİŞİ BAŞI ihtiyaca göre.
+   * En büyük paket de yetmiyorsa en büyüğü önerilir, fazlası ek bakiyeyle kapanır.
+   */
+  const onerilenPlan = useMemo(() => {
+    const sirali = planlar
+      .filter((p) => (p.monthlyCredits ?? 0) > 0)
+      .sort((a, b) => (a.monthlyCredits ?? 0) - (b.monthlyCredits ?? 0));
+    if (sirali.length === 0) return null;
+    return sirali.find((p) => (p.monthlyCredits ?? 0) >= kisiBasi) ?? sirali[sirali.length - 1];
+  }, [planlar, kisiBasi]);
 
   const active = packs[Math.min(selected, packs.length - 1)];
   const totalCredits = active.credits;
@@ -135,17 +149,15 @@ export default function CreditsClient({
               <div className="small muted">{dict.credits.calcResult}</div>
               <strong style={{ fontSize: "1.6rem" }}>{formatNumber(monthly, locale)}</strong>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <div className="small muted">{dict.credits.calcSuggestion}</div>
-              <button
-                type="button"
-                className="pill"
-                style={{ cursor: "pointer", marginTop: 4 }}
-                onClick={() => setSelected(suggested)}
-              >
-                {formatNumber(packs[suggested].credits, locale)} · {formatTRY(packs[suggested].price, locale)}
-              </button>
-            </div>
+            {onerilenPlan && (
+              <div style={{ textAlign: "right" }}>
+                <div className="small muted">{dict.credits.calcSuggestion}</div>
+                <Link className="pill" href={path(locale, "pricing")} style={{ marginTop: 4, display: "inline-block" }}>
+                  {onerilenPlan.name ?? onerilenPlan.key} · {formatNumber(onerilenPlan.monthlyCredits ?? 0, locale)}{" "}
+                  {dict.credits.calcPerMonth}
+                </Link>
+              </div>
+            )}
           </div>
 
           <p className="form-note">{dict.credits.calcNote}</p>

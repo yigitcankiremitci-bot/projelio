@@ -442,34 +442,34 @@ export const tr = {
   credits: {
     hero: {
       eyebrow: "Lio Bakiyesi",
-      title: "Lio'yu ne kadar kullanırsanız o kadar ödeyin",
-      lede: "Paketinizde her ay yenilenen Lio Bakiyesi var. Yoğun aylarda tükenirse, tek seferlik bakiye yükleyip devam edersiniz. Satın aldığınız bakiyenin süresi dolmaz.",
+      title: "Lio Bakiyesi paketinizle birlikte gelir",
+      lede: "Her paket her ay Lio Bakiyesi içerir. Yoğun bir ayda biterse ek bakiye alabilirsiniz; ek bakiye paketteki birimden daha pahalıdır, düzenli ihtiyaçta bir üst paket daha ekonomiktir.",
     },
-    packsTitle: "Bakiye paketleri",
-    packsLede: "Tüm paketlerde birim fiyatı aynı; ihtiyacınız kadarını alın. Daha büyük hacimler için bize yazın.",
+    packsTitle: "Ek bakiye",
+    packsLede: "Paketinizin aylık bakiyesi yetmediğinde. Satın aldığınız ek bakiyenin süresi dolmaz.",
     /**
      * YEDEK KOPYA. Paketler panelin açık ucundan (GET /billing/public/lio-packages)
      * okunur; bu liste yalnızca API kapalıyken görünür. Anahtarlar panelle AYNI
      * olmalı — "Bakiye yükle" paketi anahtarıyla seçili getiriyor.
      */
     packs: [
-      { key: "mini", credits: 25000, price: 130 },
-      { key: "standart", credits: 50000, price: 250 },
-      { key: "profesyonel", credits: 150000, price: 740 },
-      { key: "kurumsal", credits: 500000, price: 2440 },
+      { key: "ek-10", credits: 10000, price: 190 },
+      { key: "ek-25", credits: 25000, price: 460 },
+      { key: "ek-50", credits: 50000, price: 920 },
     ],
     unitLabel: "1.000 birim başına",
     selected: "Seçildi",
     select: "Seç",
-    buy: "Bakiye yükle",
+    buy: "Ek bakiye al",
     totalCredits: "Toplam birim",
     calcTitle: "Ne kadar Lio Bakiyesine ihtiyacım var?",
     calcLede: "Ekip büyüklüğünüzü ve günlük Lio kullanımınızı ayarlayın, aylık tahmini görün.",
     calcUsers: "Lio kullanan kişi sayısı",
     calcPerDay: "Kişi başına günlük işlem",
     calcResult: "Aylık tahmini birim",
-    calcSuggestion: "Önerilen paket",
-    calcNote: "Ayda 22 iş günü üzerinden hesaplanır. Paketinizle gelen aylık birimler bu tutardan düşülür.",
+    calcSuggestion: "Kişi başı önerilen paket",
+    calcPerMonth: "birim/ay",
+    calcNote: "Ayda 22 iş günü üzerinden hesaplanır. Lio Bakiyesi kişiye tanımlıdır; her kullanıcının kendi paketi olur.",
     usageTitle: "Lio Bakiyesi tüketim tablosu",
     usageLede: "Bir işlemin tutarı ne kadar okuyup yazdığına göre değişir; aralıklar gerçek kullanımdan yuvarlandı. Panelden yaptığınız işlemler bakiye harcamaz — sadece Lio harcar.",
     usageHead: ["İşlem", "Birim"],

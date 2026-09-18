@@ -4,7 +4,7 @@ import { getDict, type Locale } from "@/i18n";
 import { appLinks, path, site } from "@/lib/site";
 import CreditsClient from "@/components/CreditsClient";
 import Faq from "@/components/Faq";
-import { canliBakiyePaketleri } from "@/lib/plans";
+import { canliBakiyePaketleri, canliFiyatlar } from "@/lib/plans";
 
 export async function generateMetadata({
   params,
@@ -24,7 +24,7 @@ export default async function CreditsPage({ params }: { params: Promise<{ lang: 
   const { lang } = await params;
   const locale = lang as Locale;
   const dict = getDict(lang);
-  const paketler = await canliBakiyePaketleri();
+  const [paketler, planlar] = await Promise.all([canliBakiyePaketleri(), canliFiyatlar()]);
 
   return (
     <>
@@ -45,7 +45,7 @@ export default async function CreditsPage({ params }: { params: Promise<{ lang: 
             </p>
           </div>
 
-          <CreditsClient dict={dict} locale={locale} paketler={paketler} />
+          <CreditsClient dict={dict} locale={locale} paketler={paketler} planlar={planlar} />
         </div>
       </section>
 

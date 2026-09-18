@@ -453,10 +453,10 @@ export const tr = {
      * olmalı — "Bakiye yükle" paketi anahtarıyla seçili getiriyor.
      */
     packs: [
-      { key: "mini", credits: 25000, price: 105 },
-      { key: "standart", credits: 50000, price: 210 },
-      { key: "profesyonel", credits: 150000, price: 630 },
-      { key: "kurumsal", credits: 500000, price: 2100 },
+      { key: "mini", credits: 25000, price: 130 },
+      { key: "standart", credits: 50000, price: 250 },
+      { key: "profesyonel", credits: 150000, price: 740 },
+      { key: "kurumsal", credits: 500000, price: 2440 },
     ],
     unitLabel: "1.000 birim başına",
     selected: "Seçildi",

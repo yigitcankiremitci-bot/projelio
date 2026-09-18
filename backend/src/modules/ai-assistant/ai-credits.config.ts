@@ -1,4 +1,5 @@
 import { catalogPricing, defaultModelForTier, PROVIDER_CATALOG } from "./providers/providers.config";
+import { tlFiyat } from "@projelio/shared";
 
 /**
  * Projelio AI kredi ekonomisi.
@@ -343,16 +344,12 @@ export const SPEND_SPIKE_MULTIPLIER = Number(process.env.AI_SPEND_SPIKE_MULTIPLI
 export const SPEND_SPIKE_FLOOR_USD = Number(process.env.AI_SPEND_SPIKE_FLOOR_USD ?? 1);
 
 // --- Kredi paketleri (self-servis yükleme) -------------------------------
-/**
- * USD -> TRY kuru.
- *
- * DİKKAT: sabit bir sayıdır, canlı kur ÇEKİLMEZ. Kredi ekonomisinin tamamı USD
- * üzerine kurulu (bkz. CREDIT_UNIT_USD), oysa kullanıcı ₺ ödüyor. Kur düştüğünde
- * Projelio zarar eder — bu yüzden değer, ödeme entegrasyonu bağlanırken gözden
- * geçirilmeli ve düzenli güncellenmeli (ya da AI_USD_TRY_RATE ile dışarıdan
- * verilmeli). Buradaki varsayılan bir PLACEHOLDER'dır, fiyat politikası değildir.
+/*
+ * KUR BURADA YOK. Eskiden AI_USD_TRY_RATE (varsayılan 42) ile ayrı bir kur
+ * tutuluyordu; abonelikler ise admin panelindeki kurla fiyatlanıyordu. İki kur
+ * iki farklı fiyat demekti. Artık tek kur: billing_config.usd_try_rate (Admin >
+ * Paketler ve ödeme), okuyan yer common/usd-try-kuru.ts.
  */
-export const USD_TRY_RATE = Number(process.env.AI_USD_TRY_RATE ?? 42);
 
 export interface CreditPackage {
   key: string;
@@ -382,16 +379,28 @@ const PACKAGE_SIZES: { key: string; label: string; credits: number; description:
   { key: "kurumsal", label: "Kurumsal", credits: 500_000, description: "Çok kullanıcılı yoğun kullanım." },
 ];
 
-/** Bir kredi miktarının ₺ karşılığı (2 ondalığa yuvarlanır). */
-export function creditsToTry(credits: number): number {
-  return Math.round(credits * CREDIT_UNIT_USD * USD_TRY_RATE * 100) / 100;
+export const CREDIT_PACKAGE_KEYS = PACKAGE_SIZES.map((p) => p.key);
+
+/** Bir birim miktarının USD satış bedeli (komisyon dahil, bkz. CREDIT_UNIT_USD). */
+export function creditsToUsd(credits: number): number {
+  return credits * CREDIT_UNIT_USD;
 }
 
-export const CREDIT_PACKAGES: CreditPackage[] = PACKAGE_SIZES.map((p) => ({
-  ...p,
-  priceTry: creditsToTry(p.credits),
-}));
+/**
+ * Paketleri verilen kurla fiyatlar: USD × kur, 10 ₺'ye yukarı — aboneliklerle
+ * AYNI hesap (shared/tlFiyat). Kur yoksa (hiç kaydedilmemiş) boş liste döner:
+ * uydurma bir kurla satış yapmaktansa satışı durdurmak doğru.
+ */
+export function creditPackagesAt(kur: number | null): CreditPackage[] {
+  if (kur === null) return [];
+  const sonuc: CreditPackage[] = [];
+  for (const p of PACKAGE_SIZES) {
+    const priceTry = tlFiyat(creditsToUsd(p.credits), kur);
+    if (priceTry !== null) sonuc.push({ ...p, priceTry });
+  }
+  return sonuc;
+}
 
-export function findCreditPackage(key: string): CreditPackage | undefined {
-  return CREDIT_PACKAGES.find((p) => p.key === key);
+export function findCreditPackage(key: string, kur: number | null): CreditPackage | undefined {
+  return creditPackagesAt(kur).find((p) => p.key === key);
 }

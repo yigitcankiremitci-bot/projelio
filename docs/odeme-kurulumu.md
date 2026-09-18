@@ -62,15 +62,25 @@ Her plan için üretilen **referans kodunu** kopyala.
 
 ## 4. Panele gir (SSH gerekmez)
 
-**Admin paneli > Paketler ve ödeme**: her plan/dönem satırına referans kodunu ve
-iyzico planındaki **TRY tutarını** yaz.
+> **2026-09-18'den beri TL tutarlar elle girilmiyor.** Web tahsilatı PayTR'ye
+> geçti; PayTR'de tutarı her ödemede biz gönderiyoruz, sağlayıcıda sabit bir
+> plan yok. Aşağıdaki iyzico adımları iyzico'ya dönülürse geçerli.
 
-> Buradaki tutar iyzico'daki planla **birebir aynı olmalı**. Ayrışırsa kullanıcıya
-> bir tutar gösterip başka bir tutar çekmiş oluruz. Tutar boş bırakılırsa o plan
-> satın alınamaz hâle gelir (yanlış tutar göstermektense düğmeyi kapatmak doğru).
+**Admin paneli > Paketler ve ödeme > USD/TRY kuru**: kuru yaz (ya da "Bu kuru
+yaz" ile TCMB kurunu al) ve **Kaydet**. Kaydedince:
 
-İsteğe bağlı: **USD/TRY kuru** alanı yalnızca vitrinde "$4,99 ≈ … ₺" göstermek
-için; tahsilatta kullanılmaz.
+- Her paketin aylık/yıllık TL tutarı **USD × kur, 10 ₺'ye yukarı yuvarlanarak**
+  hesaplanıp yazılır (`packages/shared/src/tlFiyat.ts`).
+- **Lio Bakiyesi paketleri** de aynı kur ve aynı yuvarlamayla fiyatlanır
+  (`creditPackagesAt`, kur okuma `backend/src/common/usd-try-kuru.ts`).
+  Eski `AI_USD_TRY_RATE` artık okunmuyor — iki kur iki fiyat demekti.
+- Landing hem abonelik hem paket fiyatını sunucudan okur; elle yazılmaz.
+
+Kur hiç kaydedilmemişse (ve `BILLING_USD_TRY` de yoksa) Lio paketleri satışa
+çıkmaz: uydurma bir kurla fiyat üretmektense satışı kapatmak doğru.
+
+Açılmış bir siparişin tutarı sipariş anında dondurulur; kur sonradan değişse
+de o sipariş eski tutarla ödenir.
 
 ## 5. Ortam değişkenleri
 

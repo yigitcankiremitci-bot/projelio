@@ -1,7 +1,7 @@
 import { Controller, Get } from "@nestjs/common";
 import { BillingSettingsService } from "./billing-settings.service";
 import { PLANS } from "./billing.plans";
-import { CREDIT_PACKAGES } from "../ai-assistant/ai-credits.config";
+import { AiCreditOrdersService } from "../ai-assistant/ai-credit-orders.service";
 
 /**
  * Fiyat listesinin herkese açık hâli — tanıtım sitesi (projelio.app) bunu okur.
@@ -16,7 +16,10 @@ import { CREDIT_PACKAGES } from "../ai-assistant/ai-credits.config";
  */
 @Controller("billing/public")
 export class BillingPublicController {
-  constructor(private settings: BillingSettingsService) {}
+  constructor(
+    private settings: BillingSettingsService,
+    private creditOrders: AiCreditOrdersService
+  ) {}
 
   @Get("plans")
   async plans() {
@@ -45,12 +48,14 @@ export class BillingPublicController {
    *
    * Aynı sebep: landing'de paketler elle yazılmıştı ve satılanlarla HİÇ
    * örtüşmüyordu (1.000 birim / 99 ₺ görünürken 25.000 birim / 105 ₺ satılıyordu).
-   * Fiyat, siparişin dondurduğu tutarla aynı kaynaktan (CREDIT_PACKAGES) gelir.
+   * Fiyat, sipariş açılırken dondurulan tutarla aynı hesaptan (admin kuru ×
+   * USD, 10 ₺'ye yukarı) gelir — uygulamadaki paket ekranıyla birebir.
    */
   @Get("lio-packages")
-  lioPackages() {
+  async lioPackages() {
+    const paketler = await this.creditOrders.listPackages();
     return {
-      packages: CREDIT_PACKAGES.map((p) => ({ key: p.key, credits: p.credits, price: p.priceTry })),
+      packages: paketler.map((p) => ({ key: p.key, credits: p.credits, price: p.priceTry })),
     };
   }
 }

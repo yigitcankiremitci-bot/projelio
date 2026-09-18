@@ -304,11 +304,11 @@ export class AiAssistantController {
   // --- Kredi yükleme (self-servis) ----------------------------------------
 
   // Satılan paketler. Fiyat sunucuda hesaplanır (bkz. ai-credits.config
-  // CREDIT_PACKAGES); istemci fiyat göndermez, yalnızca paket anahtarı seçer.
+  // creditPackagesAt, admin kuruyla); istemci fiyat göndermez, yalnızca paket anahtarı seçer.
   @Get("credit-packages")
-  creditPackages() {
+  async creditPackages() {
     return {
-      packages: this.creditOrders.listPackages(),
+      packages: await this.creditOrders.listPackages(),
       // Arayüz, ödeme otomatik alınamıyorsa havale yönergesi gösterir.
       paymentConfigured: this.payment.isConfigured(),
     };

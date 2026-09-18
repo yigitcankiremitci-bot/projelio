@@ -443,10 +443,10 @@ export const en: Dict = {
     packsLede: "Every pack has the same unit price, so buy only what you need. Write to us for larger volumes.",
     /* Yedek kopya: fiyatlar GET /billing/public/lio-packages ucundan gelir (bkz. lib/plans.ts). */
     packs: [
-      { key: "mini", credits: 25000, price: 105 },
-      { key: "standart", credits: 50000, price: 210 },
-      { key: "profesyonel", credits: 150000, price: 630 },
-      { key: "kurumsal", credits: 500000, price: 2100 },
+      { key: "mini", credits: 25000, price: 130 },
+      { key: "standart", credits: 50000, price: 250 },
+      { key: "profesyonel", credits: 150000, price: 740 },
+      { key: "kurumsal", credits: 500000, price: 2440 },
     ],
     unitLabel: "per 1,000 units",
     selected: "Selected",

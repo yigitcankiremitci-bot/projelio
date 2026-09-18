@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { tlFiyat } from "@projelio/shared";
+import { USD_TRY_AYAR_ANAHTARI } from "../../common/usd-try-kuru";
 import { AuthGuard } from "@nestjs/passport";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
@@ -126,7 +127,7 @@ export class BillingAdminController {
   async setUsdTry(@Body() body: { rate?: number | null }, @Req() req: any) {
     const kur = body?.rate === null || body?.rate === undefined ? null : Number(body.rate);
     if (kur !== null && (!Number.isFinite(kur) || kur <= 0)) return { ok: false, error: "Kur geçersiz." };
-    await this.settings.setConfig("usd_try_rate", kur === null ? null : String(kur), req.user.userId);
+    await this.settings.setConfig(USD_TRY_AYAR_ANAHTARI, kur === null ? null : String(kur), req.user.userId);
     // Kur silinirse tutarlara dokunulmaz: son bilinen fiyatla satış sürer,
     // kursuz bir "0 ₺" ya da boş tutar yazmak satışı durdururdu.
     if (kur === null) return { ok: true };

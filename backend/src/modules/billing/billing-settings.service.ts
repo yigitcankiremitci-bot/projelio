@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
+import { kurDegeri, USD_TRY_AYAR_ANAHTARI } from "../../common/usd-try-kuru";
 import type { BillingPeriod, PlanKey } from "./billing.plans";
 import { isBillingPeriod, isPlanKey, PLANS } from "./billing.plans";
 
@@ -59,12 +60,11 @@ export class BillingSettingsService {
     return refs.find((r) => r.provider === provider && r.planKey === planKey && r.period === period) ?? null;
   }
 
-  /** Vitrinde $ tutarını ₺ göstermek için kullanılan kur (tahsilatta KULLANILMAZ). */
+  /** Paket fiyatlarının hesaplandığı USD/TRY kuru (kaydedilince TL tutarlar yeniden yazılır). */
   async usdTryKuru(): Promise<number | null> {
+    // Aynı öncelik common/usd-try-kuru.ts'te (Lio paketleri oradan okur).
     const config = (await this.yukle()).config;
-    const ham = config["usd_try_rate"] ?? process.env.BILLING_USD_TRY;
-    const sayi = Number(ham);
-    return Number.isFinite(sayi) && sayi > 0 ? sayi : null;
+    return kurDegeri(config[USD_TRY_AYAR_ANAHTARI]) ?? kurDegeri(process.env.BILLING_USD_TRY);
   }
 
   async setPlanRef(

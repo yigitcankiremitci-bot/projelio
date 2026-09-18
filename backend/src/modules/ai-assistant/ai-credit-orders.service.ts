@@ -1,7 +1,8 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { AiCreditsService } from "./ai-credits.service";
-import { CREDIT_PACKAGES, findCreditPackage } from "./ai-credits.config";
+import { creditPackagesAt, findCreditPackage } from "./ai-credits.config";
+import { usdTryKuruOku } from "../../common/usd-try-kuru";
 import { demoHesabindaYasak } from "../../common/demo-hesap";
 import type { CreditPackage } from "./ai-credits.config";
 
@@ -73,8 +74,9 @@ export class AiCreditOrdersService {
     private credits: AiCreditsService
   ) {}
 
-  listPackages(): CreditPackage[] {
-    return CREDIT_PACKAGES;
+  /** Satıştaki paketler, admin panelindeki kurla fiyatlanmış (bkz. creditPackagesAt). */
+  async listPackages(): Promise<CreditPackage[]> {
+    return creditPackagesAt(await usdTryKuruOku(this.supabase));
   }
 
   /**
@@ -88,7 +90,9 @@ export class AiCreditOrdersService {
     // demo sıfırlamasının kapsamı dışında kalır, yani kalıcı çöp bırakırdı.
     demoHesabindaYasak(userId, "bakiye satın alma");
 
-    const pkg = findCreditPackage(packageKey);
+    // Fiyat BU ANDAKİ kurla hesaplanıp siparişe dondurulur (price_amount);
+    // sonradan kur değişse de açılmış siparişin tutarı değişmez.
+    const pkg = findCreditPackage(packageKey, await usdTryKuruOku(this.supabase));
     if (!pkg) throw new BadRequestException("Geçersiz bakiye paketi.");
 
     const { count, error: countError } = await this.supabase.client

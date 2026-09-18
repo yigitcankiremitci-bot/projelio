@@ -3,7 +3,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { AiCreditOrdersService } from "../ai-assistant/ai-credit-orders.service";
 import { getWebAppUrl } from "../../common/config/env";
 import { PayTRClient } from "./paytr.client";
-import { kurusaCevir, siparisNumarasiCoz, siparisNumarasiUret } from "./paytr-imza";
+import { kurusaCevir, siparisNumarasiCoz, siparisNumarasiUret, telefonAlani } from "./paytr-imza";
 
 /** Bildirim ucunun PayTR'ye vereceği yanıt. Gövde SADECE "OK" olmalı. */
 export const BILDIRIM_YANITI = "OK";
@@ -58,7 +58,7 @@ export class PayTROdemeService {
       tutar: siparis.priceAmount,
       userIp,
       userName: kullanici.ad,
-      userPhone: kullanici.telefon ?? "",
+      userPhone: telefonAlani(kullanici.telefon),
       // Fatura adresi PayTR'de zorunlu ama bizde toplanmıyor ve ürün sanal.
       // Boş göndermek reddedilir, yer tutucu gidiyor. Fatura bilgisi toplamaya
       // başlanırsa BURASI gerçek adresle değişmeli (iyzico tarafındaki notun aynısı).

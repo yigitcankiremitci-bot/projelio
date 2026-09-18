@@ -195,6 +195,25 @@ export function siparisNumarasiCoz(merchantOid: string): string | null {
 }
 
 /**
+ * PayTR'nin `user_phone` alanı ZORUNLU ve boş gönderilirse istek reddediliyor
+ * ("Zorunlu alan degeri gecersiz veya gonderilmedi (get-token): user_phone").
+ * Kullanıcılarımızın çoğunda telefon kayıtlı değil ve ürün sanal olduğu için
+ * telefon gerçekten gerekmiyor.
+ *
+ * Bu yüzden boşsa yer tutucu gidiyor — fatura adresinde verilen kararın aynısı.
+ * Telefon toplamaya başlanırsa yer tutucu kendiliğinden devre dışı kalır.
+ * Rakam dışındaki karakterler ayıklanıyor: "+90 (541) 863..." gibi bir değer
+ * 20 karakter sınırını aşabiliyor.
+ */
+const TELEFON_YER_TUTUCU = "0000000000";
+
+export function telefonAlani(telefon?: string | null): string {
+  const rakamlar = String(telefon ?? "").replace(/\D/g, "");
+  if (!rakamlar) return TELEFON_YER_TUTUCU;
+  return rakamlar.slice(0, 20);
+}
+
+/**
  * Tutarı PayTR'nin iFrame API'sinin beklediği biçime çevirir: kuruş, tam sayı.
  * 34.56 TL -> "3456". Yuvarlama bilerek `Math.round`: kayan nokta artığı
  * yüzünden 1 kuruş eksik göndermek imzayı değil tutarı bozardı.

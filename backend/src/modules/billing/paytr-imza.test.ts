@@ -10,6 +10,7 @@ import {
   kurusaCevir,
   siparisNumarasiCoz,
   siparisNumarasiUret,
+  telefonAlani,
 } from "./paytr-imza";
 
 const KEY = "test-merchant-key";
@@ -175,6 +176,22 @@ test("tanınmayan sipariş numarası null döner", () => {
   assert.equal(siparisNumarasiCoz("BASKA123"), null);
   assert.equal(siparisNumarasiCoz("LIOxyz"), null);
   assert.equal(siparisNumarasiCoz(""), null);
+});
+
+test("telefon boşsa yer tutucu gider", () => {
+  // Boş user_phone ile istek PayTR tarafından reddediliyor; canlıda yaşandı.
+  assert.equal(telefonAlani(undefined), "0000000000");
+  assert.equal(telefonAlani(null), "0000000000");
+  assert.equal(telefonAlani("   "), "0000000000");
+});
+
+test("telefondaki rakam dışı karakterler ayıklanır", () => {
+  assert.equal(telefonAlani("+90 (541) 863 67 53"), "905418636753");
+  assert.equal(telefonAlani("0541-863-67-53"), "05418636753");
+});
+
+test("telefon 20 karakteri aşmaz", () => {
+  assert.equal(telefonAlani("1".repeat(40)).length, 20);
 });
 
 test("tutar kuruşa çevrilir", () => {

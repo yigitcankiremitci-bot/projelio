@@ -3,34 +3,51 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Dict, Locale } from "@/i18n";
-import { appLinks, formatNumber, formatTRY, path } from "@/lib/site";
+import { bakiyeSatinAlHref, formatNumber, formatTRY, path } from "@/lib/site";
+import type { BakiyePaketi } from "@/lib/plans";
 
-export default function CreditsClient({ dict, locale }: { dict: Dict; locale: Locale }) {
-  const packs = dict.credits.packs;
+/**
+ * Bir Lio işleminin ortalama birim karşılığı — canlı kullanımdan (2026-09, son
+ * 30 gün: ortalama ~300, ortanca ~140). Aylık TOPLAM tahmin edildiği için
+ * ortanca değil ortalama. Eskiden 3 yazıyordu — birimler yeniden
+ * ölçeklenmeden önceki değer; hesaplayıcı her ekibe en küçük paketi öneriyordu.
+ * Tüketim tablosuyla uyumlu tutun (i18n/tr.ts credits.usage).
+ */
+const ORTALAMA_ISLEM_BIRIMI = 300;
+
+export default function CreditsClient({
+  dict,
+  locale,
+  paketler,
+}: {
+  dict: Dict;
+  locale: Locale;
+  /** Panelden canlı paketler; boşsa (API kapalı) sözlükteki yedek kopya. */
+  paketler: BakiyePaketi[];
+}) {
+  const packs: readonly BakiyePaketi[] = paketler.length > 0 ? paketler : dict.credits.packs;
   const [selected, setSelected] = useState(1);
   const [users, setUsers] = useState(5);
   const [perDay, setPerDay] = useState(6);
 
-  /** Ortalama bir Lio işleminin maliyeti ~3 kredi kabul edilir. */
-  const monthly = useMemo(() => users * perDay * 22 * 3, [users, perDay]);
+  const monthly = useMemo(() => users * perDay * 22 * ORTALAMA_ISLEM_BIRIMI, [users, perDay]);
 
   const suggested = useMemo(() => {
-    const idx = packs.findIndex((p) => p.credits + p.bonus >= monthly);
+    const idx = packs.findIndex((p) => p.credits >= monthly);
     return idx === -1 ? packs.length - 1 : idx;
   }, [monthly, packs]);
 
-  const active = packs[selected];
-  const totalCredits = active.credits + active.bonus;
+  const active = packs[Math.min(selected, packs.length - 1)];
+  const totalCredits = active.credits;
 
   return (
     <>
       <div className="credit-grid">
         {packs.map((pack, i) => {
-          const total = pack.credits + pack.bonus;
-          const unit = (pack.price / total) * 1000;
+          const unit = (pack.price / pack.credits) * 1000;
           return (
             <button
-              key={pack.credits}
+              key={pack.key}
               type="button"
               className="credit-pack"
               data-selected={selected === i}
@@ -38,14 +55,9 @@ export default function CreditsClient({ dict, locale }: { dict: Dict; locale: Lo
               aria-pressed={selected === i}
             >
               <div className="credit-amount">{formatNumber(pack.credits, locale)}</div>
-              {pack.bonus > 0 && (
-                <span className="credit-bonus">
-                  +{formatNumber(pack.bonus, locale)} {dict.credits.bonusLabel}
-                </span>
-              )}
               <div className="credit-price">{formatTRY(pack.price, locale)}</div>
               <div className="credit-unit">
-                {formatTRY(Math.round(unit), locale)} · {dict.credits.unitLabel}
+                {formatTRY(unit, locale)} · {dict.credits.unitLabel}
               </div>
             </button>
           );
@@ -70,7 +82,7 @@ export default function CreditsClient({ dict, locale }: { dict: Dict; locale: Lo
           </strong>
           <span className="muted"> · {formatTRY(active.price, locale)}</span>
         </div>
-        <a className="btn btn-primary" href={appLinks.credits}>
+        <a className="btn btn-primary" href={bakiyeSatinAlHref(active.key)}>
           {dict.credits.buy}
         </a>
       </div>
@@ -153,7 +165,7 @@ export default function CreditsClient({ dict, locale }: { dict: Dict; locale: Lo
               {dict.credits.usage.map((row) => (
                 <tr key={row[0]}>
                   <td>{row[0]}</td>
-                  <td>{row[1]}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{row[1]}</td>
                 </tr>
               ))}
             </tbody>

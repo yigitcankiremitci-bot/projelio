@@ -86,6 +86,17 @@ export function checkoutHref(planKey: string, period: "monthly" | "yearly"): str
   return `${site.appUrl}/settings/billing?plan=${encodeURIComponent(planKey)}&period=${period}`;
 }
 
+/**
+ * "Bakiye yükle" bağlantısı — panelin Lio Bakiyesi ekranına, paket önceden
+ * seçili olarak gider. Eskiden panelin ana sayfasına gidiyordu (NEXT_PUBLIC_
+ * CREDITS_URL hiç tanımlanmamıştı): seçilen paket kayboluyor, kullanıcı satın
+ * alma ekranını kendisi aramak zorunda kalıyordu. Giriş yoksa panel girişten
+ * sonra bu adrese geri getirir; ödeme formu yine kendiliğinden açılmaz.
+ */
+export function bakiyeSatinAlHref(paketKey: string): string {
+  return `${site.appUrl}/settings/lio-units?paket=${encodeURIComponent(paketKey)}`;
+}
+
 /** Panelin herkese açık fiyat ucu (bkz. backend billing-public.controller.ts). */
 export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.projelio.app";
 

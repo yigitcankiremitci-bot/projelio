@@ -57,6 +57,10 @@ export default function AiCreditTopUp({ onChanged }: Props) {
       .then(([pkgs, ords]) => {
         setPackages(pkgs.packages);
         setPaymentConfigured(pkgs.paymentConfigured);
+        // Tanıtım sitesinden gelen seçim (?paket=mini). Yalnızca İŞARETLENİR;
+        // ödeme formu kendiliğinden açılmaz, kullanıcı ne aldığını görüp onaylar.
+        const gelen = new URLSearchParams(window.location.search).get("paket");
+        if (gelen && pkgs.packages.some((p) => p.key === gelen)) setSelected(gelen);
         setOrders(ords);
       })
       .catch(() => setError(t("Bakiye paketleri yüklenemedi. Sayfayı yenilemeyi dene.")))

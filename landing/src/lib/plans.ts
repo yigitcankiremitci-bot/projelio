@@ -27,3 +27,28 @@ export async function canliFiyatlar(): Promise<CanliFiyat[]> {
     return [];
   }
 }
+
+/** Lio Bakiyesi paketi — panelin açık ucundan (GET /billing/public/lio-packages). */
+export interface BakiyePaketi {
+  key: string;
+  credits: number;
+  price: number;
+}
+
+/**
+ * Panelden canlı bakiye paketleri. Kurallar canliFiyatlar ile aynı: sunucuda
+ * çekilir, hata yutulur (boş dizi = sözlükteki yedek kopya), zaman aşımı şart.
+ */
+export async function canliBakiyePaketleri(): Promise<BakiyePaketi[]> {
+  try {
+    const yanit = await fetch(`${apiUrl}/billing/public/lio-packages`, {
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!yanit.ok) return [];
+    const veri = (await yanit.json()) as { packages?: BakiyePaketi[] };
+    return Array.isArray(veri?.packages) ? veri.packages : [];
+  } catch {
+    return [];
+  }
+}

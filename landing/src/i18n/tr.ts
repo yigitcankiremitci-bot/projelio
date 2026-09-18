@@ -446,14 +446,18 @@ export const tr = {
       lede: "Paketinizde her ay yenilenen Lio Bakiyesi var. Yoğun aylarda tükenirse, tek seferlik bakiye yükleyip devam edersiniz. Satın aldığınız bakiyenin süresi dolmaz.",
     },
     packsTitle: "Bakiye paketleri",
-    packsLede: "Ne kadar büyük paket alırsanız birim fiyat o kadar düşer. Kurumsal hacimler için bize yazın.",
+    packsLede: "Tüm paketlerde birim fiyatı aynı; ihtiyacınız kadarını alın. Daha büyük hacimler için bize yazın.",
+    /**
+     * YEDEK KOPYA. Paketler panelin açık ucundan (GET /billing/public/lio-packages)
+     * okunur; bu liste yalnızca API kapalıyken görünür. Anahtarlar panelle AYNI
+     * olmalı — "Bakiye yükle" paketi anahtarıyla seçili getiriyor.
+     */
     packs: [
-      { credits: 1000, price: 99, bonus: 0 },
-      { credits: 5000, price: 449, bonus: 500 },
-      { credits: 15000, price: 1199, bonus: 2500 },
-      { credits: 50000, price: 3499, bonus: 12500 },
+      { key: "mini", credits: 25000, price: 105 },
+      { key: "standart", credits: 50000, price: 210 },
+      { key: "profesyonel", credits: 150000, price: 630 },
+      { key: "kurumsal", credits: 500000, price: 2100 },
     ],
-    bonusLabel: "hediye birim",
     unitLabel: "1.000 birim başına",
     selected: "Seçildi",
     select: "Seç",
@@ -467,25 +471,26 @@ export const tr = {
     calcSuggestion: "Önerilen paket",
     calcNote: "Ayda 22 iş günü üzerinden hesaplanır. Paketinizle gelen aylık birimler bu tutardan düşülür.",
     usageTitle: "Lio Bakiyesi tüketim tablosu",
-    usageLede: "Şeffaf olsun diye hepsini yazdık. Panelden yaptığınız işlemler bakiye harcamaz — sadece Lio harcar.",
+    usageLede: "Bir işlemin tutarı ne kadar okuyup yazdığına göre değişir; aralıklar gerçek kullanımdan yuvarlandı. Panelden yaptığınız işlemler bakiye harcamaz — sadece Lio harcar.",
     usageHead: ["İşlem", "Birim"],
+    /**
+     * Aralıklar canlı kullanımdan (2026-09, son 30 gün, 249 işlem): ortanca
+     * ~140, ortalama ~300, en pahalı %10 600+ birim. Eski tablo 1-20 yazıyordu
+     * (birimler yeniden ölçeklenmeden önceki değerler). Hesaplayıcıdaki
+     * ORTALAMA_ISLEM_BIRIMI ile uyumlu tutun (components/CreditsClient.tsx).
+     */
     usage: [
-      ["Basit soru (\"bugün ne var?\")", "1"],
-      ["Görev açma / kapatma", "1"],
-      ["Müşteri veya proje özeti", "3"],
-      ["Haftalık yönetici raporu", "8"],
-      ["Belge okuma ve özetleme (sayfa başına)", "4"],
-      ["Otomatik teklif metni oluşturma", "12"],
-      ["Aylık finansal analiz", "20"],
+      ["Kısa soru ya da tek işlem (görev açma, durum sorma)", "50–150"],
+      ["Özet, rapor ya da birkaç adımlı iş", "150–600"],
+      ["Belge okuma, uzun analiz", "600+"],
       ["Panelde yapılan tüm işlemler", "0"],
     ],
     faqTitle: "Lio Bakiyesi ile ilgili sorular",
     faq: [
-      { q: "Lio Bakiyesi her ay sıfırlanıyor mu?", a: "Paketinizle gelen aylık birimler her fatura döneminde yenilenir ve devretmez. Satın aldığınız ek bakiyenin ise süresi dolmaz, hesabınızda kalır." },
-      { q: "Hangi bakiye önce harcanır?", a: "Önce paketinizin aylık bakiyesi, o bittikten sonra satın aldığınız ek bakiye kullanılır. Böylece ek bakiyeniz boşa gitmez." },
+      { q: "Lio Bakiyesi her ay sıfırlanıyor mu?", a: "Satın aldığınız bakiyenin süresi dolmaz, hesabınızda kalır. Paketinizle her ay gelen birimler de aynı bakiyeye eklenir." },
       { q: "Bakiyem biterse ne olur?", a: "Projelio'nun tamamı çalışmaya devam eder; sadece Lio yeni istek almaz ve size bilgi verir. Panelden çalışmaya kaldığınız yerden devam edersiniz." },
       { q: "Bakiye iadesi yapılıyor mu?", a: "Kullanılmamış bakiye paketleri için satın alma tarihinden itibaren 14 gün içinde iade talebinde bulunabilirsiniz. Detaylar İptal ve İade Koşulları sayfamızda." },
-      { q: "Ekip üyeleri ortak havuzdan mı harcıyor?", a: "Evet. Lio Bakiyesi şirket hesabına tanımlıdır. İsterseniz kullanıcı veya departman başına aylık limit koyabilirsiniz." },
+      { q: "Ekip üyeleri ortak havuzdan mı harcıyor?", a: "Hayır. Lio Bakiyesi kişiye tanımlıdır: her kullanıcı kendi bakiyesini kullanır ve kendi hareketlerini görür." },
     ],
   },
 

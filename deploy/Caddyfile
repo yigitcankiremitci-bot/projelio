@@ -246,7 +246,12 @@ www.yigitcankiremitci.com {
 # (~projelio/apps/budnal/docker-compose.yml). budnal-app yalnız HTTP konuşuyor;
 # `projelio` ağına da bağlı olduğu için adıyla çözülüyor. Yığın kapalıysa
 # YALNIZ bu alan adı 502 verir; projelio ve diğer siteler etkilenmez.
-budnal.app {
+#
+# İki alan adı da AYNI konteynere gidiyor; hangisinin ne sunacağına uygulama
+# Host başlığına bakarak karar veriyor (budnal deposu, server/index.ts):
+#   budnal.app      → tanıtım sayfası
+#   app.budnal.app  → uygulamanın kendisi + /api
+budnal.app, app.budnal.app {
 	encode zstd gzip
 	reverse_proxy budnal-app:8787 {
 		# Budy'nin SSE akışı tamponlanmadan iletilsin.

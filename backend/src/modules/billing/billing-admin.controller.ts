@@ -45,7 +45,7 @@ export class BillingAdminController {
       plans: PLANS.filter((p) => p.key !== "free").map((p) => ({
         key: p.key,
         name: p.name,
-        priceUsd: { monthly: p.priceUsdMonthly, yearly: p.priceUsdYearly },
+        priceUsd: { monthly: p.priceUsdMonthly, yearly: p.priceUsdYearly, yearlyMonthly: p.priceUsdYearlyMonthly },
         monthlyCredits: p.monthlyCredits,
       })),
       providers: SAGLAYICILAR,

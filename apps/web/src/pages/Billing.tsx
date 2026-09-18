@@ -185,7 +185,7 @@ export default function BillingPage() {
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
       <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 6px" }}>{t("Paketim")}</h1>
       <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 22px", maxWidth: 620, lineHeight: 1.6 }}>
-        {t("Paketindeki Lio Bakiyesi her ay yenilenir. Yıllık ödemede iki ay bedava; bakiye yine her ay yüklenir.")}
+        {t("Paketindeki Lio Bakiyesi her ay yenilenir. Yıllık ödemede %20 tasarruf; bakiye yine her ay yüklenir.")}
       </p>
 
       {mesaj && (
@@ -305,7 +305,7 @@ export default function BillingPage() {
         >
           {t("Yıllık")}
         </button>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: c.success }}>{t("2 ay bedava")}</span>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: c.success }}>{t("%20 tasarruf")}</span>
       </div>
 
       {yukleniyor ? (
@@ -355,7 +355,7 @@ export default function BillingPage() {
                         ${plan.priceUsd.monthly.toFixed(2)}
                       </s>
                     )}
-                    ${(donem === "yearly" ? Math.round((usd / 12) * 100) / 100 : usd).toFixed(2)}
+                    ${(donem === "yearly" ? plan.priceUsd.yearlyMonthly : usd).toFixed(2)}
                     <span style={{ fontSize: 14, fontWeight: 400, color: c.textSecondary }}>{t(" / ay")}</span>
                   </div>
                   {donem === "yearly" && (

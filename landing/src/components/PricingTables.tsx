@@ -14,7 +14,7 @@ export interface CanliFiyat {
   name?: string;
   /** Paketle her ay gelen Lio birimi (Lio Bakiyesi sayfasındaki öneri bunu kullanır). */
   monthlyCredits?: number;
-  priceUsd: { monthly: number; yearly: number };
+  priceUsd: { monthly: number; yearly: number; yearlyMonthly?: number };
   charge: { monthly: { amount: number; currency: string } | null; yearly: { amount: number; currency: string } | null };
 }
 
@@ -52,9 +52,15 @@ export default function PricingTables({
     return eslesme ? eslesme.priceUsd.yearly : plan.priceYearly;
   }
 
-  /** Gösterilen büyük rakam: aylıkta aylık fiyat, yıllıkta yıllık/12 (kuruşa aşağı değil, en yakına). */
+  /**
+   * Gösterilen büyük rakam: aylıkta aylık fiyat, yıllıkta katalogdaki AYLIK
+   * KARŞILIK (x,99). Yıllık / 12 hesaplanmıyor: 99,90 / 12 = 8,33 gibi
+   * küsuratlar çıkıyordu; yıllık toplam zaten bu karşılıktan türetiliyor.
+   */
   function gosterilen(plan: Plan): number {
-    return yearly ? Math.round((yillikFiyat(plan) / 12) * 100) / 100 : aylikFiyat(plan);
+    if (!yearly) return aylikFiyat(plan);
+    const eslesme = canli.find((c) => c.key === plan.key);
+    return eslesme?.priceUsd.yearlyMonthly ?? plan.priceYearlyMonthly;
   }
 
   /** Kartından gerçekten çekilecek tutar; yalnızca panel bildirirse gösterilir. */

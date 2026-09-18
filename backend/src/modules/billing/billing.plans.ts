@@ -27,7 +27,9 @@ export interface Plan {
   name: string;
   /** Vitrin fiyatı — USD, aylık ödemede. free için 0. */
   priceUsdMonthly: number;
-  /** Vitrin fiyatı — USD, yıllık ödemede (12 ay yerine 10 ay). */
+  /** Yıllık ödemede AYLIK KARŞILIK — vitrinde büyük rakam bu (ör. 7,99 $/ay). */
+  priceUsdYearlyMonthly: number;
+  /** Vitrin fiyatı — USD, yıllık ödemede toplam = aylık karşılık × 12. */
   priceUsdYearly: number;
   /** Her ay bakiyeye yüklenen Lio kredisi. */
   monthlyCredits: number;
@@ -39,15 +41,20 @@ export interface Plan {
 }
 
 /**
- * Yıllık ödemede 12 ay yerine 10 ay: ekran görüntüsündeki $49,90 / $99,90 /
- * $249,90 tam olarak bu. Sayıyı elle yazmak yerine çarpanı yazıyoruz ki fiyat
- * değişince ikisi ayrışmasın (bir test bunu doğruluyor).
+ * YILLIK FİYAT AYLIK KARŞILIKTAN TÜRETİLİR, tersi değil.
+ *
+ * Eskiden yıllık = aylık × 10 (2 ay bedava) idi; vitrinde aylık karşılık
+ * 99,90 / 12 = 8,33 $ gibi küsuratlı çıkıyor ve amatör duruyordu (kullanıcı
+ * kararı 2026-09-18). Şimdi aylık karşılık x,99 olarak seçiliyor ve yıllık
+ * toplam ondan hesaplanıyor. Üç pakette de indirim %20 — YILLIK_INDIRIM_YUZDE
+ * vitrindeki "%20 tasarruf" rozetinin dayanağı, bir test ikisinin ayrışmasını
+ * engelliyor.
  */
-export const YEARLY_MONTHS = 10;
+export const YILLIK_INDIRIM_YUZDE = 20;
 
-function yillik(aylik: number): number {
-  // 4.99 * 10 = 49.900000000000006 — kayan nokta artığını kuruşta kesiyoruz.
-  return Math.round(aylik * YEARLY_MONTHS * 100) / 100;
+function yillik(aylikKarsilik: number): number {
+  // 3.99 * 12 = 47.88000000000001 — kayan nokta artığını kuruşta kesiyoruz.
+  return Math.round(aylikKarsilik * 12 * 100) / 100;
 }
 
 export const PLANS: Plan[] = [
@@ -55,6 +62,7 @@ export const PLANS: Plan[] = [
     key: "free",
     name: "Ücretsiz",
     priceUsdMonthly: 0,
+    priceUsdYearlyMonthly: 0,
     priceUsdYearly: 0,
     monthlyCredits: 0,
     featured: false,
@@ -69,7 +77,8 @@ export const PLANS: Plan[] = [
     key: "starter",
     name: "Starter",
     priceUsdMonthly: 4.99,
-    priceUsdYearly: yillik(4.99),
+    priceUsdYearlyMonthly: 3.99,
+    priceUsdYearly: yillik(3.99),
     monthlyCredits: 20_000,
     featured: false,
     seats: 1,
@@ -84,7 +93,8 @@ export const PLANS: Plan[] = [
     key: "pro",
     name: "Pro",
     priceUsdMonthly: 9.99,
-    priceUsdYearly: yillik(9.99),
+    priceUsdYearlyMonthly: 7.99,
+    priceUsdYearly: yillik(7.99),
     monthlyCredits: 50_000,
     featured: true,
     seats: 1,
@@ -100,7 +110,8 @@ export const PLANS: Plan[] = [
     key: "business",
     name: "Business",
     priceUsdMonthly: 24.99,
-    priceUsdYearly: yillik(24.99),
+    priceUsdYearlyMonthly: 19.99,
+    priceUsdYearly: yillik(19.99),
     monthlyCredits: 150_000,
     featured: false,
     seats: 10,

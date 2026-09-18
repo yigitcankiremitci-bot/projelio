@@ -47,11 +47,11 @@ iyzico panelinde **bir ürün** (ör. "Projelio") ve altında **altı ödeme pla
 | Plan | Dönem | Vitrin (USD) | iyzico planındaki tutar |
 |---|---|---|---|
 | Starter | Aylık | $4,99 | kur × 4,99 |
-| Starter | Yıllık | $49,90 | kur × 49,90 |
+| Starter | Yıllık | $47,88 (3,99 × 12) | kur × 47,88 |
 | Pro | Aylık | $9,99 | kur × 9,99 |
-| Pro | Yıllık | $99,90 | kur × 99,90 |
+| Pro | Yıllık | $95,88 (7,99 × 12) | kur × 95,88 |
 | Business | Aylık | $24,99 | kur × 24,99 |
-| Business | Yıllık | $249,90 | kur × 249,90 |
+| Business | Yıllık | $239,88 (19,99 × 12) | kur × 239,88 |
 
 **Kur canlı değil, bilerek.** Abonelikte tutar bir kez sabitlenir ve her
 yenilemede oynamaz; iyzico'nun ödeme planı da tutarı sabitler. Fiyatı

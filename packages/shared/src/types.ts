@@ -3233,7 +3233,8 @@ export interface BillingCharge {
 export interface BillingPlanView {
   key: BillingPlanKey;
   name: string;
-  priceUsd: { monthly: number; yearly: number };
+  /** yearlyMonthly: yıllık ödemede aylık karşılık (vitrinde büyük rakam). */
+  priceUsd: { monthly: number; yearly: number; yearlyMonthly: number };
   charge: { monthly: BillingCharge | null; yearly: BillingCharge | null };
   monthlyCredits: number;
   featured: boolean;

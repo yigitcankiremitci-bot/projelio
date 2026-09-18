@@ -143,7 +143,7 @@ export class BillingService {
     plans: Array<{
       key: PlanKey;
       name: string;
-      priceUsd: { monthly: number; yearly: number };
+      priceUsd: { monthly: number; yearly: number; yearlyMonthly: number };
       /** Sağlayıcıdaki gerçek tahsilat tutarı; null ise bu dönem satın alınamaz. */
       charge: { monthly: { amount: number; currency: string } | null; yearly: { amount: number; currency: string } | null };
       monthlyCredits: number;
@@ -174,7 +174,7 @@ export class BillingService {
       plans: PLANS.map((plan) => ({
         key: plan.key,
         name: plan.name,
-        priceUsd: { monthly: plan.priceUsdMonthly, yearly: plan.priceUsdYearly },
+        priceUsd: { monthly: plan.priceUsdMonthly, yearly: plan.priceUsdYearly, yearlyMonthly: plan.priceUsdYearlyMonthly },
         charge:
           plan.key === "free"
             ? { monthly: null, yearly: null }

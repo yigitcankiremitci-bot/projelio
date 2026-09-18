@@ -34,7 +34,7 @@ export class BillingPublicController {
       plans: PLANS.filter((p) => p.key !== "free").map((plan) => ({
         key: plan.key,
         name: plan.name,
-        priceUsd: { monthly: plan.priceUsdMonthly, yearly: plan.priceUsdYearly },
+        priceUsd: { monthly: plan.priceUsdMonthly, yearly: plan.priceUsdYearly, yearlyMonthly: plan.priceUsdYearlyMonthly },
         charge: { monthly: tutar(plan.key, "monthly"), yearly: tutar(plan.key, "yearly") },
         monthlyCredits: plan.monthlyCredits,
         featured: plan.featured,

@@ -147,6 +147,23 @@ export class AiCreditOrdersService {
   async cancel(userId: string, orderId: string): Promise<CreditOrder> {
     const order = await this.findById(orderId);
     if (order.userId !== userId) throw new ForbiddenException("Bu sipariş sana ait değil.");
+    return this.iptalEt(order);
+  }
+
+  /**
+   * Yönetici başkasının bekleyen siparişini iptal eder.
+   *
+   * Takılı kalan siparişleri temizlemek için: ödeme formunu açıp vazgeçen ya da
+   * test ödemesi yapan kullanıcıların siparişleri "ödeme bekliyor"da birikiyor
+   * ve kullanıcı başına açık sipariş tavanını dolduruyor. Kural kullanıcının
+   * iptaliyle AYNI (yalnızca bekleyen sipariş, koşullu güncelleme).
+   */
+  async adminCancel(orderId: string): Promise<CreditOrder> {
+    return this.iptalEt(await this.findById(orderId));
+  }
+
+  private async iptalEt(order: CreditOrder): Promise<CreditOrder> {
+    const orderId = order.id;
     if (order.status !== "pending_payment") {
       throw new ConflictException("Yalnızca ödeme bekleyen siparişler iptal edilebilir.");
     }

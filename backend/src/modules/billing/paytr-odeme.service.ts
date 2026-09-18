@@ -135,7 +135,17 @@ export class PayTROdemeService {
       // olduğunda tekrar gönderiyor). markPaid ikinci çağrıda ConflictException
       // atar; bu bir hata değil, beklenen sonuçtur.
       if (hata instanceof ConflictException) {
-        this.logger.log(`PayTR bildirimi tekrar geldi, sipariş zaten işlenmiş: ${merchantOid}`);
+        const durum = await this.siparisDurumu(orderId);
+        if (durum === "paid") {
+          this.logger.log(`PayTR bildirimi tekrar geldi, sipariş zaten işlenmiş: ${merchantOid}`);
+        } else {
+          // İptal edilmiş siparişin parası gelmiş: müşteri ödedi, bakiye almadı.
+          // Tekrarlanan bildirimle karıştırılmasın diye HATA olarak yazılır;
+          // yönetici ya iade eder ya da bakiyeyi elle yükler.
+          this.logger.error(
+            `PayTR ödemesi alındı ama sipariş '${durum ?? "bilinmiyor"}' durumunda, bakiye YÜKLENMEDİ: ${merchantOid}`
+          );
+        }
         return;
       }
       // Buraya düşen her kayıt, ödemesi alınmış ama bakiyesi yüklenmemiş bir
@@ -155,6 +165,15 @@ export class PayTROdemeService {
       .maybeSingle();
     if (error) throw error;
     return data ? { id: data.id, priceAmount: Number(data.price_amount) } : null;
+  }
+
+  private async siparisDurumu(orderId: string): Promise<string | null> {
+    const { data } = await this.supabase.client
+      .from("ai_credit_orders")
+      .select("status")
+      .eq("id", orderId)
+      .maybeSingle();
+    return data?.status ?? null;
   }
 
   private async kullaniciBilgisi(userId: string): Promise<{ ad: string; email: string; telefon?: string }> {

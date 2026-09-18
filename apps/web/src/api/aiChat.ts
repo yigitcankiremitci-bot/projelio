@@ -392,6 +392,7 @@ export const aiChat = {
     api.get<AiCreditOrder[]>(`/ai/admin/credit-orders${status ? `?status=${status}` : ""}`),
   markCreditOrderPaid: (id: string, reference?: string, note?: string) =>
     api.post<AiCreditOrder>(`/ai/admin/credit-orders/${id}/mark-paid`, { reference, note }),
+  adminCancelCreditOrder: (id: string) => api.post<AiCreditOrder>(`/ai/admin/credit-orders/${id}/cancel`, {}),
   retryCreditOrder: (id: string) => api.post<AiCreditOrder>(`/ai/admin/credit-orders/${id}/retry-credit`, {}),
 
   getMarginReport: (days = 30) => api.get<Record<string, unknown>>(`/ai/admin/margin?days=${days}`),

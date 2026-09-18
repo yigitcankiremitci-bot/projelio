@@ -359,6 +359,13 @@ export class AiAssistantController {
     return this.creditOrders.markPaid(id, req.user.userId, { reference: body?.reference, note: body?.note });
   }
 
+  // Takılı kalan bekleyen siparişi iptal eder (bkz. AiCreditOrdersService.adminCancel).
+  @Post("admin/credit-orders/:id/cancel")
+  adminCancelCreditOrder(@Req() req: any, @Param("id") id: string) {
+    this.assertAdmin(req);
+    return this.creditOrders.adminCancel(id);
+  }
+
   // "Ödendi ama kredi yüklenemedi" durumunda yeniden dener (bkz. retryCredit).
   @Post("admin/credit-orders/:id/retry-credit")
   retryCreditOrder(@Req() req: any, @Param("id") id: string) {

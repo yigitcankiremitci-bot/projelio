@@ -143,6 +143,18 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
               >
                 {busyId === o.id ? t("İşleniyor…") : t("Ödemeyi onayla")}
               </button>
+              <button
+                onClick={() => {
+                  // Bildirimi henüz gelmemiş gerçek bir ödeme de burada görünebilir;
+                  // iptal edilen sipariş sonradan gelen bildirimle bakiye YÜKLEMEZ.
+                  if (!window.confirm(t("Bu sipariş iptal edilsin mi? Ödemesi sonradan gelirse bakiye otomatik yüklenmez."))) return;
+                  act(o.id, () => aiChat.adminCancelCreditOrder(o.id));
+                }}
+                disabled={busyId === o.id}
+                style={buttonStyle(false)}
+              >
+                {t("İptal")}
+              </button>
             </div>
           ))}
         </div>

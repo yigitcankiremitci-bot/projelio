@@ -91,6 +91,8 @@ export const lio: TranslationDict = {
   "Ödeme bekleyen sipariş yok.": "No orders awaiting payment.",
   "Ödemeye geç": "Go to payment",
   "Ödemeyi onayla": "Confirm payment",
+  "Bu sipariş iptal edilsin mi? Ödemesi sonradan gelirse bakiye otomatik yüklenmez.":
+    "Cancel this order? If its payment arrives later, the units won't be added automatically.",
   "Ödemesi alınan siparişi onayla — birimler ancak onaydan sonra kullanıcının bakiyesine geçer.":
     "Confirm an order that has been paid — the Lio Units reach the user's balance only after confirmation.",
   "Ödemesi onaylanmış ama bakiyesi yüklenememiş sipariş var. Yükleme yeniden denenmeli.":

@@ -182,6 +182,8 @@ export const lio: TranslationDict = {
   "Lio Bakiyem": "My Lio Units",
   "Lio Bakiyen bu isteği tamamlamaya yetmedi.": "Your Lio Units weren't enough to finish this request.",
   "Lio Bakiyeniz azaldı. Kesintisiz kullanım için bakiye yükleyin.": "You're running low on Lio Units. Top up to keep going without interruption.",
+  // Mobil uygulamada yükleme çağrısı gösterilmiyor (mağaza kuralı).
+  "Lio Bakiyeniz azaldı.": "You're running low on Lio Units.",
   "Sesli komut ver (ses çözümleme Lio Bakiyesi harcar)": "Give a voice command (transcription uses Lio Units)",
   "Sesli anlatım": "Narration",
   "Sesli kullanım anlatımı": "Narrated walkthrough",

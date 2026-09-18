@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { faturalarApi, type FaturaKapsami, type LioGirisSonucu, type LioYardimiDurumu } from "../api/faturalar";
 import { useT } from "../lib/i18n";
+import { satinAlmaGosterilir } from "../lib/mobilKabuk";
 import { useThemeColors } from "../theme/useThemeColors";
 import Anahtar from "./Anahtar";
 import { IconInfo, IconSparkle, IconX } from "./icons";
@@ -177,21 +178,24 @@ export default function LioYardimiKutusu({ moduleKey, kapsam, departmentId, canW
           <p style={{ fontSize: 13, color: c.textPrimary, margin: 0 }}>
             {t("Lio yardımı için Lio Bakiyen yok. Her belge okuması bakiyeden düşülüyor.")}
           </p>
-          <Link
-            to="/settings/lio-units"
-            style={{
-              display: "inline-block",
-              marginTop: 8,
-              padding: "7px 14px",
-              borderRadius: 8,
-              background: c.primary,
-              color: c.onPrimary,
-              fontSize: 13,
-              textDecoration: "none",
-            }}
-          >
-            {t("Bakiye yükle")}
-          </Link>
+          {/* Mobil kabukta yükleme çağrısı YOK (mağaza kuralı, bkz. satinAlmaGosterilir). */}
+          {satinAlmaGosterilir() && (
+            <Link
+              to="/settings/lio-units"
+              style={{
+                display: "inline-block",
+                marginTop: 8,
+                padding: "7px 14px",
+                borderRadius: 8,
+                background: c.primary,
+                color: c.onPrimary,
+                fontSize: 13,
+                textDecoration: "none",
+              }}
+            >
+              {t("Bakiye yükle")}
+            </Link>
+          )}
         </div>
       )}
 

@@ -7,6 +7,7 @@ import { IconSparkle } from "../components/icons";
 import AiCreditTopUp from "../components/AiCreditTopUp";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { demoHesap } from "../lib/demoHesap";
+import { satinAlmaGosterilir } from "../lib/mobilKabuk";
 
 // Modül düzeyinde kanca çağrılamaz: Türkçe metin ANAHTAR olarak duruyor,
 // çeviri kullanıldığı yerde (t(TYPE_LABELS[...])) yapılıyor.
@@ -166,7 +167,7 @@ export default function AiCreditsPage() {
         </div>
       )}
 
-      {!demoHesabi && <AiCreditTopUp onChanged={reload} />}
+      {!demoHesabi && satinAlmaGosterilir() && <AiCreditTopUp onChanged={reload} />}
 
       <h2 style={{ fontSize: 15, fontWeight: 500, color: c.textSecondary, margin: "0 0 10px", maxWidth: 480 }}>
         {t("Hareketler")}

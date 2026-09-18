@@ -62,6 +62,21 @@ export function kabuktaMi(): boolean {
 }
 
 /**
+ * Ödeme akışı (paket, Lio Bakiyesi) gösterilebilir mi?
+ *
+ * MAĞAZA KURALI: Lio Bakiyesi ve paketler uygulama içinde tüketilen dijital
+ * içerik. App Store (3.1.1) ve Google Play bunların uygulama içinde yalnızca
+ * mağazanın kendi ödeme sistemiyle satılmasına izin veriyor; kartla ödeme
+ * formu açmak da, "web'den satın al" diye yönlendirmek de ret sebebi. Bu
+ * yüzden kabukta satın alma HİÇ görünmez — fiyat, paket listesi, "bakiye yükle"
+ * çağrısı dahil. Bakiyeyi ve hareketleri GÖRMEK serbest; web'de alınan bakiye
+ * telefonda da kullanılır (hesap aynı).
+ */
+export function satinAlmaGosterilir(): boolean {
+  return !kabuktaMi();
+}
+
+/**
  * Sistem çubuklarının (durum çubuğu, gezinme çubuğu) İÇERİK rengini
  * uygulamanın temasına uydurur.
  *

@@ -43,6 +43,7 @@ import {
 } from "../lib/tour/narrator";
 import { IconMic, IconSpeaker } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { satinAlmaGosterilir } from "../lib/mobilKabuk";
 import { DOKUNMATIK_CIHAZ } from "../lib/dokunmatikCihaz";
 
 interface Props {
@@ -1344,8 +1345,11 @@ export default function AiAssistantPanel({
             {error ??
               (creditsBlocked
                 ? t("Lio Bakiyen bu isteği tamamlamaya yetmedi.")
-                : t("Lio Bakiyeniz azaldı. Kesintisiz kullanım için bakiye yükleyin."))}
-            {(creditsBlocked || lowBalance) && (
+                : satinAlmaGosterilir()
+                  ? t("Lio Bakiyeniz azaldı. Kesintisiz kullanım için bakiye yükleyin.")
+                  : t("Lio Bakiyeniz azaldı."))}
+            {/* Mobil kabukta yükleme çağrısı YOK (mağaza kuralı, bkz. satinAlmaGosterilir). */}
+            {(creditsBlocked || lowBalance) && satinAlmaGosterilir() && (
               <div style={{ marginTop: 8 }}>
                 <button
                   type="button"

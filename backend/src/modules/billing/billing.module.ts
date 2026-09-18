@@ -11,6 +11,7 @@ import { BillingService } from "./billing.service";
 import { GooglePlayClient } from "./google-play.client";
 import { IyzicoClient } from "./iyzico.client";
 import { StorePurchasesService } from "./store-purchases.service";
+import { TcmbKuruService } from "./tcmb-kuru.service";
 
 /**
  * Abonelik (paket) modülü — iyzico + App Store + Google Play.
@@ -33,6 +34,7 @@ import { StorePurchasesService } from "./store-purchases.service";
     GooglePlayClient,
     StorePurchasesService,
     BillingRenewalProcessor,
+    TcmbKuruService,
   ],
   exports: [BillingService],
 })

@@ -6,6 +6,8 @@ import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { BillingService } from "./billing.service";
 import { BillingSettingsService, type OdemeSaglayici } from "./billing-settings.service";
 import { isBillingPeriod, isPlanKey, PLANS } from "./billing.plans";
+import { kurSapmasi } from "./tcmb-kuru";
+import { TcmbKuruService } from "./tcmb-kuru.service";
 
 const SAGLAYICILAR: OdemeSaglayici[] = ["iyzico", "app_store", "play_store"];
 
@@ -23,13 +25,18 @@ const SAGLAYICILAR: OdemeSaglayici[] = ["iyzico", "app_store", "play_store"];
 export class BillingAdminController {
   constructor(
     private billing: BillingService,
-    private settings: BillingSettingsService
+    private settings: BillingSettingsService,
+    private tcmb: TcmbKuruService
   ) {}
 
   /** Katalog + sağlayıcıdaki karşılıkları yan yana: eksik olan hemen görünsün. */
   @Get("settings")
   async getSettings() {
-    const [refs, kur] = await Promise.all([this.settings.planRefs(), this.settings.usdTryKuru()]);
+    const [refs, kur, tcmb] = await Promise.all([
+      this.settings.planRefs(),
+      this.settings.usdTryKuru(),
+      this.tcmb.usdKuru(),
+    ]);
     return {
       plans: PLANS.filter((p) => p.key !== "free").map((p) => ({
         key: p.key,
@@ -40,6 +47,18 @@ export class BillingAdminController {
       providers: SAGLAYICILAR,
       refs,
       usdTryRate: kur,
+      /**
+       * TCMB günlük bülteni — yalnızca BİLGİ. Tahsilat tutarı `refs` içinde
+       * sabittir, bu kurla hesaplanmaz (bkz. billing.plans.ts başlığı).
+       * Bülten alınamazsa null gelir ve ekran kur satırını hiç göstermez.
+       */
+      tcmb: tcmb && {
+        tarih: tcmb.tarih,
+        forexSelling: tcmb.forexSelling,
+        banknoteSelling: tcmb.banknoteSelling,
+        /** Elle girilen kurun efektif satışa göre ne kadar geride kaldığı. */
+        sapma: kur === null ? null : kurSapmasi(kur, tcmb.banknoteSelling),
+      },
     };
   }
 

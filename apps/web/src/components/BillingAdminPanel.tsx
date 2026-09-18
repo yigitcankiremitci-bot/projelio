@@ -209,6 +209,42 @@ export default function BillingAdminPanel() {
         </button>
       </div>
 
+      {/*
+        TCMB günlük kuru — TL fiyatları ne zaman güncellemek gerektiğini
+        göstermek için. Tahsilat tutarı yukarıdaki tablodaki sabit tutardır,
+        BU KURLA HESAPLANMAZ; bankalar ayrıca kendi marjını eklediği için
+        gerçek kart kuru buradaki efektif satışın bir miktar üstündedir.
+        Bülten alınamazsa (hafta sonu, tatil, TCMB erişilemiyor) satır hiç
+        görünmez — boş bir kur göstermek yanlış karar verdirirdi.
+      */}
+      {ayarlar?.tcmb && (
+        <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={etiket}>
+            {t("TCMB")} {ayarlar.tcmb.tarih}: {t("efektif satış")} {ayarlar.tcmb.banknoteSelling.toFixed(4)} ₺ ·{" "}
+            {t("döviz satış")} {ayarlar.tcmb.forexSelling.toFixed(4)} ₺
+          </span>
+          <button
+            onClick={() => setKur(String(ayarlar.tcmb!.banknoteSelling))}
+            style={{ border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}
+          >
+            {t("Bu kuru yaz")}
+          </button>
+          {/*
+            %5 eşiği: bunun altındaki oynama, fiyatı yukarı yuvarlarken zaten
+            bırakılan pay içinde kalıyor. Üstüne çıkınca TL fiyat gerçekten
+            geride kalmış demektir ve yeni bir ödeme planı açmak gerekir.
+          */}
+          {ayarlar.tcmb.sapma !== null && ayarlar.tcmb.sapma > 0.05 && (
+            <span style={{ ...etiket, color: c.danger }}>
+              {t("Kayıtlı kur güncelin %{oran} gerisinde — TL fiyatları gözden geçir.").replace(
+                "{oran}",
+                String(Math.round(ayarlar.tcmb.sapma * 100))
+              )}
+            </span>
+          )}
+        </div>
+      )}
+
       <div style={{ marginTop: 24 }}>
         <h3 style={{ color: c.textPrimary, fontSize: 15, fontWeight: 500, margin: "0 0 8px" }}>
           {t("Abonelikler")} ({abonelikler.length})

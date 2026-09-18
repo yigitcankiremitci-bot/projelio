@@ -60,4 +60,15 @@ export interface BillingAdminSettings {
   providers: string[];
   refs: BillingAdminPlanRef[];
   usdTryRate: number | null;
+  /**
+   * TCMB günlük kuru — yalnızca bilgi amaçlı. Tahsilat tutarı bu kurla
+   * hesaplanmaz; bülten alınamazsa null gelir.
+   */
+  tcmb: {
+    tarih: string;
+    forexSelling: number;
+    banknoteSelling: number;
+    /** Elle girilen kur efektif satışın ne kadar gerisinde (0.08 = %8). */
+    sapma: number | null;
+  } | null;
 }

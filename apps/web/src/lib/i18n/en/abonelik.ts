@@ -113,6 +113,12 @@ export const abonelik: TranslationDict = {
   "Mağaza belirler": "Set by the store",
   "Vitrinde gösterilen USD/TRY kuru (tahsilatta kullanılmaz)":
     "USD/TRY rate shown on the site (not used for charging)",
+  TCMB: "CBRT",
+  "efektif satış": "banknote selling",
+  "döviz satış": "forex selling",
+  "Bu kuru yaz": "Use this rate",
+  "Kayıtlı kur güncelin %{oran} gerisinde — TL fiyatları gözden geçir.":
+    "The saved rate is {oran}% behind the current one — review the TRY prices.",
   Abonelikler: "Subscriptions",
   "Henüz abonelik yok.": "No subscriptions yet.",
   Yıllık: "Yearly",

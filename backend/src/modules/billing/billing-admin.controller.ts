@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { tlFiyat } from "@projelio/shared";
 import { AuthGuard } from "@nestjs/passport";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
@@ -10,6 +11,8 @@ import { kurSapmasi } from "./tcmb-kuru";
 import { TcmbKuruService } from "./tcmb-kuru.service";
 
 const SAGLAYICILAR: OdemeSaglayici[] = ["iyzico", "app_store", "play_store"];
+/** Web'de TL tahsilatın tutar satırları. Tablodaki adı hâlâ "iyzico"; PayTR aboneliği gelince aynı satırlar kullanılmalı. */
+const TL_SAGLAYICI: OdemeSaglayici = "iyzico";
 
 /**
  * Yönetici uçları: sağlayıcıdaki plan kodları/tutarları ve abonelik listesi.
@@ -106,12 +109,43 @@ export class BillingAdminController {
     return { ok: true };
   }
 
-  /** Vitrinde $ tutarını ₺ göstermek için kullanılan kur. Tahsilatta KULLANILMAZ. */
+  /**
+   * USD/TRY kurunu kaydeder VE paketlerin TL tutarlarını bu kurdan yeniden yazar
+   * (USD × kur, 10 ₺'ye yukarı yuvarlanmış — bkz. shared/tlFiyat).
+   *
+   * Eskiden kur yalnızca vitrindeydi, TL tutarlar elle giriliyordu: kur
+   * güncellenip tutarlar unutulunca panel "kur %X geride" deyip duruyordu.
+   * Artık tek adım. Referans kodu KORUNUR, yalnızca tutar değişir.
+   *
+   * TAHSİLAT: PayTR'de tutarı her ödemede biz gönderiyoruz, yani yeni tutar bir
+   * sonraki ödemede geçerli olur. iyzico'nun sabit tutarlı planlarıyla çalışırken
+   * bu otomatik yazma YANLIŞ olurdu (planı yeniden açmak gerekirdi); iyzico'ya
+   * dönülürse burası gözden geçirilmeli.
+   */
   @Patch("settings/usd-try")
   async setUsdTry(@Body() body: { rate?: number | null }, @Req() req: any) {
     const kur = body?.rate === null || body?.rate === undefined ? null : Number(body.rate);
     if (kur !== null && (!Number.isFinite(kur) || kur <= 0)) return { ok: false, error: "Kur geçersiz." };
     await this.settings.setConfig("usd_try_rate", kur === null ? null : String(kur), req.user.userId);
+    // Kur silinirse tutarlara dokunulmaz: son bilinen fiyatla satış sürer,
+    // kursuz bir "0 ₺" ya da boş tutar yazmak satışı durdururdu.
+    if (kur === null) return { ok: true };
+
+    const refs = await this.settings.planRefs();
+    for (const plan of PLANS.filter((p) => p.priceUsdMonthly > 0)) {
+      for (const period of ["monthly", "yearly"] as const) {
+        const tutar = tlFiyat(period === "monthly" ? plan.priceUsdMonthly : plan.priceUsdYearly, kur);
+        if (tutar === null) continue;
+        const mevcut = refs.find((r) => r.provider === TL_SAGLAYICI && r.planKey === plan.key && r.period === period);
+        await this.settings.setPlanRef(
+          TL_SAGLAYICI,
+          plan.key,
+          period,
+          { referenceCode: mevcut?.referenceCode ?? null, priceAmount: tutar, currency: "TRY" },
+          req.user.userId
+        );
+      }
+    }
     return { ok: true };
   }
 

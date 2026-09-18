@@ -105,20 +105,22 @@ export const abonelik: TranslationDict = {
 
   // ══════════════════════════════════════════════════════ Yönetici paneli
   "Paketler ve ödeme": "Plans and payments",
-  "Paketlerin sağlayıcıdaki karşılığı. Buradaki tutar, sağlayıcıdaki planda yazan tutarla birebir aynı olmalı — ayrışırsa kullanıcıya gösterilen fiyatla çekilen tutar farklı olur.":
-    "How each plan maps to the provider. The amount here must match the provider's plan exactly — if they drift apart, the price shown and the amount charged will differ.",
+  "Paketlerin sağlayıcıdaki karşılığı. TL tutarlar aşağıdaki kurdan hesaplanır; kur kaydedilince hepsi birlikte güncellenir ve bir sonraki ödemeden itibaren geçerli olur.":
+    "How each plan maps to the provider. TRY amounts are calculated from the rate below; saving the rate updates them all at once, effective from the next payment.",
   "Ödeme planı referans kodu": "Pricing plan reference code",
   "Mağaza ürün kimliği": "Store product id",
-  "Tahsilat tutarı (₺)": "Charge amount (₺)",
+  "Kurdan hesaplanır": "Calculated from the rate",
+  "Kaydedince: {tutar} ₺": "After saving: ₺{tutar}",
+  "Kur kaydedildi, TL tutarlar yeniden hesaplandı.": "Rate saved, TRY amounts recalculated.",
   "Mağaza belirler": "Set by the store",
-  "Vitrinde gösterilen USD/TRY kuru (tahsilatta kullanılmaz)":
-    "USD/TRY rate shown on the site (not used for charging)",
+  "USD/TRY kuru — kaydedince TL tutarlar USD × kur ile hesaplanıp 10 ₺'ye yukarı yuvarlanır":
+    "USD/TRY rate — saving it recalculates TRY amounts as USD × rate, rounded up to the next ₺10",
   TCMB: "CBRT",
   "efektif satış": "banknote selling",
   "döviz satış": "forex selling",
   "Bu kuru yaz": "Use this rate",
-  "Kayıtlı kur güncelin %{oran} gerisinde — TL fiyatları gözden geçir.":
-    "The saved rate is {oran}% behind the current one — review the TRY prices.",
+  "Kayıtlı kur güncelin %{oran} gerisinde — güncel kuru yazıp kaydet.":
+    "The saved rate is {oran}% behind the current one — enter the current rate and save.",
   Abonelikler: "Subscriptions",
   "Henüz abonelik yok.": "No subscriptions yet.",
   Yıllık: "Yearly",

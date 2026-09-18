@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Subscription } from "@projelio/shared";
+import { tlFiyat, type Subscription } from "@projelio/shared";
 import { billingApi, type BillingAdminPlanRef, type BillingAdminSettings } from "../api/billing";
 import { ApiError } from "../api/client";
 import { useT } from "../lib/i18n";
@@ -82,7 +82,9 @@ export default function BillingAdminPanel() {
     setKaydediliyor("kur");
     try {
       const sonuc = await billingApi.admin.saveUsdTry(kur.trim() === "" ? null : Number(kur));
-      setMesaj(sonuc.ok ? t("Kaydedildi.") : (sonuc.error ?? t("Kaydedilemedi.")));
+      setMesaj(sonuc.ok ? t("Kur kaydedildi, TL tutarlar yeniden hesaplandı.") : (sonuc.error ?? t("Kaydedilemedi.")));
+      // Sunucu tutarları yeniden yazdı; tablo onları göstersin.
+      if (sonuc.ok) yenile();
     } catch {
       setMesaj(t("Kaydedilemedi."));
     } finally {
@@ -108,7 +110,7 @@ export default function BillingAdminPanel() {
       <h2 style={{ color: c.textPrimary, fontSize: 18, fontWeight: 500, margin: "0 0 6px" }}>{t("Paketler ve ödeme")}</h2>
       <p style={{ color: c.textSecondary, fontSize: 14, margin: "0 0 16px", maxWidth: 640, lineHeight: 1.55 }}>
         {t(
-          "Paketlerin sağlayıcıdaki karşılığı. Buradaki tutar, sağlayıcıdaki planda yazan tutarla birebir aynı olmalı — ayrışırsa kullanıcıya gösterilen fiyatla çekilen tutar farklı olur."
+          "Paketlerin sağlayıcıdaki karşılığı. TL tutarlar aşağıdaki kurdan hesaplanır; kur kaydedilince hepsi birlikte güncellenir ve bir sonraki ödemeden itibaren geçerli olur."
         )}
       </p>
 
@@ -168,13 +170,29 @@ export default function BillingAdminPanel() {
                   style={girdi}
                 />
 
-                <input
-                  value={deger.price}
-                  onChange={(e) => setTaslak({ ...taslak, [k]: { ...deger, price: e.target.value } })}
-                  placeholder={saglayici === "iyzico" ? t("Tahsilat tutarı (₺)") : t("Mağaza belirler")}
-                  disabled={saglayici !== "iyzico"}
-                  style={{ ...girdi, opacity: saglayici === "iyzico" ? 1 : 0.5 }}
-                />
+                {/* TL tutar ELLE GİRİLMEZ: kur kaydedilince sunucu USD × kur'dan
+                    hesaplayıp yazar. Kur kutusunda kaydedilmemiş bir değer varsa
+                    yeni tutar önizleme olarak yanında görünür. */}
+                <div>
+                  <input
+                    value={saglayici === "iyzico" && deger.price !== "" ? `${deger.price} ₺` : ""}
+                    readOnly
+                    placeholder={saglayici === "iyzico" ? t("Kurdan hesaplanır") : t("Mağaza belirler")}
+                    style={{ ...girdi, opacity: 0.75 }}
+                  />
+                  {saglayici === "iyzico" &&
+                    (() => {
+                      const onizleme = tlFiyat(
+                        period === "monthly" ? plan.priceUsd.monthly : plan.priceUsd.yearly,
+                        Number(kur)
+                      );
+                      return onizleme !== null && String(onizleme) !== deger.price ? (
+                        <div style={{ ...etiket, color: c.accentDark, marginTop: 3 }}>
+                          {t("Kaydedince: {tutar} ₺", { tutar: onizleme.toLocaleString("tr-TR") })}
+                        </div>
+                      ) : null;
+                    })()}
+                </div>
 
                 <button
                   onClick={() => kaydet(plan.key, period)}
@@ -198,7 +216,7 @@ export default function BillingAdminPanel() {
       </div>
 
       <div style={{ marginTop: 18, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={etiket}>{t("Vitrinde gösterilen USD/TRY kuru (tahsilatta kullanılmaz)")}</span>
+        <span style={etiket}>{t("USD/TRY kuru — kaydedince TL tutarlar USD × kur ile hesaplanıp 10 ₺'ye yukarı yuvarlanır")}</span>
         <input value={kur} onChange={(e) => setKur(e.target.value)} style={{ ...girdi, width: 110 }} placeholder="—" />
         <button
           onClick={kurKaydet}
@@ -210,10 +228,10 @@ export default function BillingAdminPanel() {
       </div>
 
       {/*
-        TCMB günlük kuru — TL fiyatları ne zaman güncellemek gerektiğini
-        göstermek için. Tahsilat tutarı yukarıdaki tablodaki sabit tutardır,
-        BU KURLA HESAPLANMAZ; bankalar ayrıca kendi marjını eklediği için
-        gerçek kart kuru buradaki efektif satışın bir miktar üstündedir.
+        TCMB günlük kuru — "Bu kuru yaz" kur kutusunu doldurur, Kaydet'e
+        basınca TL tutarlar ondan hesaplanır. Bankalar kendi marjını eklediği
+        için gerçek kart kuru buradaki efektif satışın bir miktar üstündedir;
+        10 ₺'ye yukarı yuvarlama o farkı büyük ölçüde karşılıyor.
         Bülten alınamazsa (hafta sonu, tatil, TCMB erişilemiyor) satır hiç
         görünmez — boş bir kur göstermek yanlış karar verdirirdi.
       */}
@@ -236,7 +254,7 @@ export default function BillingAdminPanel() {
           */}
           {ayarlar.tcmb.sapma !== null && ayarlar.tcmb.sapma > 0.05 && (
             <span style={{ ...etiket, color: c.danger }}>
-              {t("Kayıtlı kur güncelin %{oran} gerisinde — TL fiyatları gözden geçir.").replace(
+              {t("Kayıtlı kur güncelin %{oran} gerisinde — güncel kuru yazıp kaydet.").replace(
                 "{oran}",
                 String(Math.round(ayarlar.tcmb.sapma * 100))
               )}

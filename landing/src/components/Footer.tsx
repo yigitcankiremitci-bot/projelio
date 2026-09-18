@@ -31,6 +31,7 @@ export default function Footer({ dict, locale }: { dict: Dict; locale: Locale })
     { href: path(locale, "legal/kvkk"), label: dict.legal.kvkk.title },
     { href: path(locale, "legal/distance"), label: dict.legal.distance.title },
     { href: path(locale, "legal/refund"), label: dict.legal.refund.title },
+    { href: path(locale, "legal/teslimat"), label: dict.legal.teslimat.title },
     { href: path(locale, "legal/hesap-silme"), label: dict.legal["hesap-silme"].title },
   ];
 

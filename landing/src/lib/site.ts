@@ -22,8 +22,15 @@ export const site = {
     email: "ceo@celikhan.test",
     password: "Celikhan2026!",
   },
-  /** Uluslararası formatta, sadece rakam. Örn: 905551112233 */
-  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP ?? "",
+  /**
+   * Uluslararası formatta, sadece rakam. Örn: 905551112233
+   * Aynı numara iletişim sayfasında telefon ve WhatsApp bağlantısı olarak da
+   * yazılı (src/i18n/{tr,en}.ts > contact.channels) — biri değişirse diğeri de
+   * değişmeli.
+   */
+  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP ?? "905418636753",
+  /** İletişim sayfasında ve yasal metinlerde görünen telefon. */
+  phone: "+90 541 863 67 53",
   social: {
     linkedin: "https://www.linkedin.com/company/projelio",
     instagram: "https://www.instagram.com/projelio",
@@ -85,7 +92,19 @@ export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.projelio.a
 // "hesap-silme" Google Play'in zorunlu tuttuğu hesap silme sayfasıdır: mağaza
 // girişinde gösterilen bu URL'nin, uygulamayı indirmeden de erişilebilir olması
 // ve silme adımlarını anlatması gerekiyor (bkz. Veri güvenliği beyanı).
-export const legalSlugs = ["privacy", "terms", "kvkk", "distance", "refund", "hesap-silme"] as const;
+// "teslimat" hizmetin nasıl ifa edildiğini anlatır. Fiziki teslimat olmayan bir
+// yazılımda gereksiz görünüyor ama sanal POS başvurularında ayrı ve bulunabilir
+// bir "teslimat koşulları" sayfası isteniyor; mesafeli sözleşmenin içindeki
+// madde tek başına yeterli sayılmıyordu.
+export const legalSlugs = [
+  "privacy",
+  "terms",
+  "kvkk",
+  "distance",
+  "refund",
+  "teslimat",
+  "hesap-silme",
+] as const;
 export type LegalSlug = (typeof legalSlugs)[number];
 
 export function path(locale: Locale | string, sub = ""): string {

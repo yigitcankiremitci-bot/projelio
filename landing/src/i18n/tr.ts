@@ -564,7 +564,10 @@ export const tr = {
     infoTitle: "Doğrudan ulaşın",
     channels: [
       { label: "E-posta", value: "info@projelio.app", href: "mailto:info@projelio.app" },
-      { label: "WhatsApp", value: "Lio'ya yazın", href: "" },
+      // Telefon ve WhatsApp aynı numara; src/lib/site.ts içindeki `phone` ve
+      // `whatsapp` alanlarıyla birlikte güncellenmeli.
+      { label: "Telefon", value: "+90 541 863 67 53", href: "tel:+905418636753" },
+      { label: "WhatsApp", value: "+90 541 863 67 53", href: "https://wa.me/905418636753" },
       { label: "Destek saatleri", value: "Hafta içi 09:00 – 18:00 (TSİ)", href: "" },
       {
         label: "Adres",
@@ -607,6 +610,10 @@ export const tr = {
     refund: {
       title: "İptal ve İade Koşulları",
       lede: "Aboneliğinizi ve Lio Bakiyesi alımlarınızı hangi koşullarda iptal edip iade alabileceğiniz.",
+    },
+    teslimat: {
+      title: "Teslimat ve İfa Koşulları",
+      lede: "Projelio dijital bir hizmettir: ödeme onaylandığı anda hesabınıza tanımlanır, kargo ve teslimat ücreti yoktur.",
     },
     "hesap-silme": {
       title: "Hesap Silme Talebi",

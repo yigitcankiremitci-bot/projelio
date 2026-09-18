@@ -24,6 +24,7 @@ export const legalUpdatedAt: Record<LegalSlug, string> = {
   kvkk: "04.09.2026",
   distance: "12.08.2026",
   refund: "12.08.2026",
+  teslimat: "18.09.2026",
   "hesap-silme": "15.09.2026",
 };
 
@@ -1167,6 +1168,82 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
    * Politikası'ndaki tablodan kopyalanmıştır — biri değişirse diğeri de
    * güncellenmeli, iki farklı süre yayımlamak beyan uyuşmazlığıdır.
    */
+  teslimat: {
+    tr: [
+      {
+        h: "Kısaca",
+        p: [
+          "Projelio dijital bir hizmettir; fiziki bir ürün gönderilmez. Bu nedenle kargo, teslimat ücreti veya teslimat süresi söz konusu değildir.",
+          "Ödemeniz onaylandığı anda satın aldığınız paket ya da Lio Bakiyesi hesabınıza tanımlanır ve hizmeti kullanmaya hemen başlarsınız.",
+        ],
+      },
+      {
+        h: "Teslimat şekli ve süresi",
+        p: [
+          "Abonelik paketleri: ödeme onaylandığında hesabınızın paketi yükseltilir, paketin hakları (koltuk sayısı, modüller, aylık Lio Bakiyesi) aynı anda açılır.",
+          "Lio Bakiyesi paketleri: ödeme onaylandığında satın alınan birim hesabınıza yüklenir.",
+          "İfa süresi anlıktır. Ödeme sağlayıcısından onay bilgisi bize ulaştığı anda tanımlama otomatik yapılır; işlem yoğunluğuna bağlı olarak birkaç dakikayı geçmez.",
+          "Teslimat, hesabınızın kayıtlı olduğu e-posta adresine bağlıdır. Satın alma sonrası bilgilendirme de aynı adrese gönderilir.",
+        ],
+      },
+      {
+        h: "Teslimat masrafı",
+        p: [
+          "Fiziki teslimat olmadığı için kargo ya da teslimat masrafı alınmaz. Ödeme sayfasında gördüğünüz tutar dışında bir bedel yansıtılmaz.",
+        ],
+      },
+      {
+        h: "Hizmete erişilememesi",
+        p: [
+          "Ödemeniz alındığı hâlde paketiniz veya bakiyeniz hesabınıza tanımlanmadıysa info@projelio.app adresine yazın ya da +90 541 863 67 53 numarasından ulaşın. Tanımlamayı elle tamamlar, mümkün olmazsa ödemenizi iade ederiz.",
+          "İade koşulları için İptal ve İade Koşulları sayfasına bakın.",
+        ],
+      },
+      {
+        h: "Satıcı",
+        p: [
+          "Yiğitcan Kiremitci · Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A İç Kapı No: 48, Ataşehir/İstanbul, Türkiye · Kozyatağı VD 25750888104 · info@projelio.app · +90 541 863 67 53",
+        ],
+      },
+    ],
+    en: [
+      {
+        h: "In short",
+        p: [
+          "Projelio is a digital service; nothing physical is shipped. There is no cargo, no delivery fee and no delivery window.",
+          "The moment your payment is confirmed, the plan or Lio Units you bought are provisioned to your account and you can start using the service.",
+        ],
+      },
+      {
+        h: "How and when delivery happens",
+        p: [
+          "Subscription plans: once payment is confirmed your account is upgraded and the plan's entitlements (seats, modules, monthly Lio Units) become available at the same moment.",
+          "Lio Units packages: once payment is confirmed the purchased units are added to your balance.",
+          "Performance is immediate. Provisioning runs automatically as soon as the payment provider confirms the payment; it does not take more than a few minutes.",
+          "Delivery is tied to the e-mail address registered on your account, and the purchase confirmation is sent to that same address.",
+        ],
+      },
+      {
+        h: "Delivery costs",
+        p: [
+          "Because nothing is shipped, no cargo or delivery charge applies. You are never charged beyond the amount shown at checkout.",
+        ],
+      },
+      {
+        h: "If you cannot access the service",
+        p: [
+          "If your payment went through but the plan or units were not added to your account, write to info@projelio.app or call +90 541 863 67 53. We will provision it manually, or refund you if that is not possible.",
+          "See the Cancellation and Refund Policy for refund terms.",
+        ],
+      },
+      {
+        h: "Seller",
+        p: [
+          "Yiğitcan Kiremitci · Küçükbakkalköy Mah. Dereboyu Cad. R5 Blok No: 3A, Interior Door No: 48, Ataşehir/İstanbul, Türkiye · Kozyatağı Tax Office 25750888104 · info@projelio.app · +90 541 863 67 53",
+        ],
+      },
+    ],
+  },
   "hesap-silme": {
     tr: [
       {

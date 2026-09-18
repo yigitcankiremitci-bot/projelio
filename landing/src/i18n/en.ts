@@ -558,7 +558,10 @@ export const en: Dict = {
     infoTitle: "Reach us directly",
     channels: [
       { label: "Email", value: "info@projelio.app", href: "mailto:info@projelio.app" },
-      { label: "WhatsApp", value: "Message Lio", href: "" },
+      // Phone and WhatsApp are the same number; keep in sync with `phone` and
+      // `whatsapp` in src/lib/site.ts.
+      { label: "Phone", value: "+90 541 863 67 53", href: "tel:+905418636753" },
+      { label: "WhatsApp", value: "+90 541 863 67 53", href: "https://wa.me/905418636753" },
       { label: "Support hours", value: "Weekdays 09:00 – 18:00 (GMT+3)", href: "" },
       {
         label: "Address",
@@ -601,6 +604,10 @@ export const en: Dict = {
     refund: {
       title: "Cancellation and Refund Policy",
       lede: "When and how you can cancel your subscription or get a refund on Lio Units.",
+    },
+    teslimat: {
+      title: "Delivery and Performance Terms",
+      lede: "Projelio is a digital service: access is provisioned the moment payment is confirmed. There is no shipping and no delivery fee.",
     },
     "hesap-silme": {
       title: "Account Deletion Request",

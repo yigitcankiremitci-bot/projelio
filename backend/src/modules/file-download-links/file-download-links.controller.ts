@@ -31,6 +31,15 @@ export class FileDownloadLinksController {
     return this.links.create(fileId, req.user.userId, body ?? {});
   }
 
+  /**
+   * Birden fazla dosya için TEK bağlantı (bkz. migration 121). Dosyalar
+   * adreste değil gövdede (`fileIds`): liste uzun olabiliyor ve sırası anlamlı.
+   */
+  @Post("file-download-links")
+  createMany(@Body() body: CreateFileDownloadLinkInput, @Req() req: any) {
+    return this.links.createMany(req.user.userId, body ?? {});
+  }
+
   @Patch("file-download-links/:id")
   update(@Param("id") id: string, @Body() body: UpdateFileDownloadLinkInput, @Req() req: any) {
     return this.links.update(id, req.user.userId, body ?? {});

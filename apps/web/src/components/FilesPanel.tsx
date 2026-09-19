@@ -154,7 +154,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   // üretmek bir OKUMA eylemi — dosyayı zaten indirip elden gönderebilecek biri
   // için engel olmanın anlamı yok, üstelik bağlantı geri alınabilir olduğu için
   // eki e-postaya koymaktan daha güvenli.
-  const [sharing, setSharing] = useState<ProjectFile | null>(null);
+  const [sharing, setSharing] = useState<ProjectFile[] | null>(null);
   /** "Bağla" penceresi: dosyayı ya da klasörü bir göreve/kişiye/kayda iliştirir. */
   const [linking, setLinking] = useState<LinkSource[] | null>(null);
   /**
@@ -604,6 +604,12 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       : m.file
       ? [{ kind: "file", id: m.file.id }]
       : [];
+
+  /** Menüdeki seçimin DOSYALARI, ekrandaki sırayla — klasörler atlanır. */
+  const menuDosyalari = (m: MenuState): ProjectFile[] => {
+    const ids = new Set(menuHedefleri(m).filter((i) => i.kind === "file").map((i) => i.id));
+    return gorunenDosyalar.filter((f) => ids.has(f.id));
+  };
 
   /** Menüdeki seçimi bağlantı kaynaklarına çevirir (dosya ve klasör). */
   const menuKaynaklari = (m: MenuState): LinkSource[] =>
@@ -1781,6 +1787,20 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     label: t("{sayi} öğeyi bağla…", { sayi: menu.toplu.length }),
                     onClick: () => setLinking(menuKaynaklari(menu)),
                   },
+                  // Tek bağlantıda birden fazla dosya (bkz. migration 121).
+                  // Klasörler pakete girmiyor: bağlantı bir dosya listesi,
+                  // klasörün içeriği ise sonradan değişebilir.
+                  ...(() => {
+                    const secilenler = menuDosyalari(menu);
+                    return secilenler.length
+                      ? [
+                          {
+                            label: t("{sayi} dosya için bağlantı oluştur/gönder…", { sayi: secilenler.length }),
+                            onClick: () => setSharing(secilenler),
+                          },
+                        ]
+                      : [];
+                  })(),
                   {
                     label: t("{sayi} öğeyi kaldır", { sayi: menu.toplu.length }),
                     danger: true,
@@ -1838,7 +1858,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                   { label: t("İndir"), onClick: () => void handleDownload(menu.file!) },
                   {
                     label: t("Bağlantı oluştur/gönder…"),
-                    onClick: () => setSharing(menu.file!),
+                    onClick: () => setSharing([menu.file!]),
                   },
                   {
                     label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file!) }),
@@ -1895,7 +1915,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
         <FilePreviewModal file={preview} onClose={() => setPreview(null)} onMaybeChanged={load} />
       )}
 
-      {sharing && <FileDownloadLinkModal file={sharing} onClose={() => setSharing(null)} />}
+      {sharing && <FileDownloadLinkModal files={sharing} onClose={() => setSharing(null)} />}
 
       {pendingDelete && (
         <ConfirmDialog

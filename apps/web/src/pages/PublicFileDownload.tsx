@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { PublicFileAccess, PublicFileView } from "@projelio/shared";
+import type { PublicFileAccess, PublicFileItem, PublicFileView } from "@projelio/shared";
 import { fileDownloadLinksApi } from "../api/fileDownloadLinks";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -36,7 +36,8 @@ export default function PublicFileDownload() {
     if (res.state === "open" && res.view) {
       setView(res.view);
       setState("ready");
-      document.title = `${res.view.name} · Projelio`;
+      const sayi = res.view.files?.length ?? 1;
+      document.title = sayi > 1 ? `${t("{sayi} dosya", { sayi })} · Projelio` : `${res.view.name} · Projelio`;
       return;
     }
     if (res.state === "email_required") {
@@ -156,7 +157,7 @@ export default function PublicFileDownload() {
           </form>
         )}
 
-        {state === "ready" && view && <DosyaKarti view={view} />}
+        {state === "ready" && view && ((view.files?.length ?? 1) > 1 ? <PaketKarti view={view} /> : <DosyaKarti view={view} />)}
       </div>
 
       {(state === "ready" || state === "gone") && <Tanitim />}
@@ -287,6 +288,173 @@ function DosyaKarti({ view }: { view: PublicFileView }) {
         </p>
       )}
     </>
+  );
+}
+
+/**
+ * Çok dosyalı bağlantı (bkz. migration 121): dosyalar alt alta, her birinin
+ * kendi indirme düğmesi.
+ *
+ * "HEPSİNİ İNDİR" YOK, bilerek: tarayıcılar tek tıkla art arda başlatılan
+ * indirmelerin ilkinden sonrasını sessizce engelliyor — düğme çalışıyor
+ * görünüp üç dosyadan birini indirirdi. Sunucuda zip üretmek ise dosyaların
+ * tamamını buluttan çekip bellekte paketlemek demek.
+ *
+ * Önizleme satırın altında AÇILIR, hepsi birden değil: on PDF'lik bir paket
+ * sayfayı on iframe'le açardı.
+ */
+function PaketKarti({ view }: { view: PublicFileView }) {
+  const c = useThemeColors();
+  const t = useT();
+  const [acik, setAcik] = useState<number | null>(null);
+  const toplam = view.files.every((f) => f.sizeBytes !== undefined)
+    ? view.files.reduce((s, f) => s + (f.sizeBytes ?? 0), 0)
+    : undefined;
+
+  return (
+    <>
+      <div style={{ marginBottom: 16 }}>
+        <h1 style={{ margin: 0, fontSize: 18, color: c.textPrimary }}>
+          {view.sharedByName
+            ? t("{ad} sizinle {sayi} dosya paylaştı", { ad: view.sharedByName, sayi: view.files.length })
+            : t("Sizinle {sayi} dosya paylaşıldı", { sayi: view.files.length })}
+        </h1>
+        {toplam !== undefined && (
+          <div style={{ fontSize: 13, color: c.textSecondary }}>{t("Toplam {boyut}", { boyut: boyut(toplam) })}</div>
+        )}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {view.files.map((dosya, i) => (
+          <PaketSatiri
+            key={dosya.contentToken}
+            dosya={dosya}
+            indirmeAcik={view.downloadEnabled}
+            onizlemeAcik={acik === i}
+            onOnizle={() => setAcik(acik === i ? null : i)}
+          />
+        ))}
+      </div>
+
+      {!view.downloadEnabled && (
+        <p
+          style={{
+            margin: "14px 0 0",
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: `1px solid ${c.border}`,
+            fontSize: 14,
+            lineHeight: 1.6,
+            color: c.textSecondary,
+          }}
+        >
+          {t(
+            "Bu dosyalar yalnızca görüntülenmek üzere paylaşıldı; indirme kapatılmış. Kopyasına ihtiyacınız varsa dosyaları paylaşan kişiye yazın."
+          )}
+        </p>
+      )}
+    </>
+  );
+}
+
+function PaketSatiri({
+  dosya,
+  indirmeAcik,
+  onizlemeAcik,
+  onOnizle,
+}: {
+  dosya: PublicFileItem;
+  indirmeAcik: boolean;
+  onizlemeAcik: boolean;
+  onOnizle: () => void;
+}) {
+  const c = useThemeColors();
+  const t = useT();
+  const [onizlemeHatasi, setOnizlemeHatasi] = useState(false);
+  const icerikUrl = fileDownloadLinksApi.contentUrl(dosya.contentToken);
+  const onizlenebilir = (dosya.canPreview || dosya.hasThumbnail) && !onizlemeHatasi;
+
+  const dugme: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "7px 12px",
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 600,
+    textDecoration: "none",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  };
+
+  return (
+    <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, padding: 12 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 9,
+            background: `${c.accent}1f`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <IconFile size={18} color={c.accent} />
+        </div>
+        <div style={{ minWidth: 0, flex: "1 1 160px" }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary, overflowWrap: "anywhere" }}>{dosya.name}</div>
+          <div style={{ fontSize: 12, color: c.textSecondary }}>
+            {dosya.kindLabel}
+            {dosya.sizeBytes !== undefined ? ` · ${boyut(dosya.sizeBytes)}` : ""}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {onizlenebilir && (
+            <button
+              type="button"
+              onClick={onOnizle}
+              style={{ ...dugme, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary }}
+            >
+              {onizlemeAcik ? t("Kapat") : t("Önizle")}
+            </button>
+          )}
+          {indirmeAcik && (
+            <a
+              href={fileDownloadLinksApi.contentUrl(dosya.contentToken, { download: true })}
+              style={{ ...dugme, border: "none", background: c.accent, color: "#fff" }}
+            >
+              <IconDownload size={14} color="#fff" />
+              {t("İndir")}
+            </a>
+          )}
+        </div>
+      </div>
+
+      {onizlemeAcik && onizlenebilir && (
+        <div style={{ marginTop: 10, border: `1px solid ${c.border}`, borderRadius: 10, overflow: "hidden", background: c.background }}>
+          {!dosya.canPreview ? (
+            <img
+              src={fileDownloadLinksApi.thumbnailUrl(dosya.contentToken)}
+              alt={dosya.name}
+              onError={() => setOnizlemeHatasi(true)}
+              style={{ display: "block", width: "100%", maxHeight: 320, objectFit: "contain" }}
+            />
+          ) : dosya.mimeType.startsWith("image/") ? (
+            <img
+              src={icerikUrl}
+              alt={dosya.name}
+              onError={() => setOnizlemeHatasi(true)}
+              style={{ display: "block", width: "100%", maxHeight: 420, objectFit: "contain" }}
+            />
+          ) : (
+            <iframe src={icerikUrl} title={dosya.name} style={{ display: "block", width: "100%", height: 460, border: "none" }} />
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

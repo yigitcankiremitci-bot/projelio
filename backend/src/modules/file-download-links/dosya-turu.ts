@@ -31,3 +31,13 @@ export function boyutMetni(bytes?: number | null): string | undefined {
   const deger = bytes / 1024 ** us;
   return `${deger.toFixed(deger >= 10 || us === 0 ? 0 : 1)} ${birimler[us]}`;
 }
+
+/**
+ * Bağlantının tek satırlık adı: tek dosyada dosyanın adı, pakette
+ * "a.pdf ve 2 dosya daha". E-posta konusu ve sahibin listesi aynı adı görsün.
+ */
+export function gorunenAd(adlar: string[]): string {
+  if (!adlar.length) return "Dosya";
+  if (adlar.length === 1) return adlar[0];
+  return `${adlar[0]} ve ${adlar.length - 1} dosya daha`;
+}

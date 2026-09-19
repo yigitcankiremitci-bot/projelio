@@ -2109,8 +2109,13 @@ export type FileDownloadLinkClosedReason = "revoked" | "expired";
 /** Sahibin gördüğü link kaydı. `token`/`url` yalnızca onu YÖNETEN kişiye döner. */
 export interface FileDownloadLink {
   id: string;
+  /** Tek dosyalık bağlantıda dosyanın kendisi; çok dosyalıda listenin İLKİ. */
   fileId: string;
+  /** Görünen ad: tek dosyada dosyanın adı, çok dosyada "a.pdf ve 2 dosya daha". */
   fileName: string;
+  /** Bağlantının açtığı TÜM dosyalar, seçilen sırayla (bkz. migration 121). */
+  fileIds: string[];
+  fileNames: string[];
   token: string;
   /** Kopyalanmaya hazır tam adres; sunucu WEB_APP_URL'den üretir. */
   url: string;
@@ -2137,6 +2142,11 @@ export interface FileDownloadLink {
 }
 
 export interface CreateFileDownloadLinkInput {
+  /**
+   * Çok dosyalı bağlantı (`POST /file-download-links`). Tek dosyalık uçta
+   * (`POST /files/:id/download-links`) yok sayılır — dosya adreste.
+   */
+  fileIds?: string[];
   label?: string;
   /** Gün cinsinden ömür. Verilmezse süresiz. */
   expiresInDays?: number | null;
@@ -2176,6 +2186,23 @@ export interface FileDownloadLinkSendResult {
  */
 export type FileDownloadAccessState = "open" | "email_required" | "closed";
 
+/**
+ * Çok dosyalı bağlantıda dosyalardan biri.
+ *
+ * Her dosyanın KENDİ içerik jetonu var: jeton hangi dosyanın açılacağını da
+ * taşıyor, yoksa alıcı adresteki kimliği değiştirip paketin dışındaki bir
+ * dosyayı isteyebilirdi.
+ */
+export interface PublicFileItem {
+  name: string;
+  mimeType: string;
+  sizeBytes?: number;
+  kindLabel: string;
+  canPreview: boolean;
+  hasThumbnail: boolean;
+  contentToken: string;
+}
+
 /** Linki açan kişinin gördüğü TÜM veri. Dosyanın bağlamı (iş, proje, klasör) yok. */
 export interface PublicFileView {
   name: string;
@@ -2195,6 +2222,11 @@ export interface PublicFileView {
   /** İçerik/önizleme adreslerine eklenecek kısa ömürlü imzalı jeton. */
   contentToken: string;
   contentTokenExpiresInSeconds: number;
+  /**
+   * Bağlantıdaki dosyalar (en az bir). Tek dosyada üstteki alanlarla aynı
+   * dosya; çok dosyada üstteki alanlar İLK dosyayı anlatır, sayfa listeyi çizer.
+   */
+  files: PublicFileItem[];
 }
 
 export interface PublicFileAccess {

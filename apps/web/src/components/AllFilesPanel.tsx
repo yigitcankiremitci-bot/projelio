@@ -55,7 +55,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   // üretmek bir OKUMA eylemi — dosyayı zaten indirip elden gönderebilecek biri
   // için engel olmanın anlamı yok, üstelik bağlantı geri alınabilir olduğu için
   // eki e-postaya koymaktan daha güvenli.
-  const [sharing, setSharing] = useState<ProjectFile | null>(null);
+  const [sharing, setSharing] = useState<ProjectFile[] | null>(null);
   /**
    * Sağ tık, seçim ve görünüm FilesPanel'dekiyle AYNI kancalardan geliyor:
    * kullanıcı için burası da "dosyalar sayfası" ve listenin birden çok işten
@@ -499,6 +499,11 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
                     label: t("{sayi} öğeyi bağla…", { sayi: menu.toplu.length }),
                     onClick: () => setLinking(menuDosyalari(menu).map((f) => ({ fileId: f.id }))),
                   },
+                  // Tek bağlantıda birden fazla dosya (bkz. migration 121).
+                  {
+                    label: t("{sayi} dosya için bağlantı oluştur/gönder…", { sayi: menu.toplu.length }),
+                    onClick: () => setSharing(menuDosyalari(menu)),
+                  },
                   {
                     label: t("{sayi} öğeyi kaldır", { sayi: menu.toplu.length }),
                     danger: true,
@@ -510,7 +515,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
                   { label: t("İndir"), onClick: () => void handleDownload(menu.file!) },
                   {
                     label: t("Bağlantı oluştur/gönder…"),
-                    onClick: () => setSharing(menu.file!),
+                    onClick: () => setSharing([menu.file!]),
                   },
                   {
                     label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file!) }),
@@ -533,7 +538,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
 
       {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} />}
 
-      {sharing && <FileDownloadLinkModal file={sharing} onClose={() => setSharing(null)} />}
+      {sharing && <FileDownloadLinkModal files={sharing} onClose={() => setSharing(null)} />}
 
       {pendingDelete && (
         <ConfirmDialog

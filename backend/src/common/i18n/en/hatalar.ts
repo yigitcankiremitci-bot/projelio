@@ -777,6 +777,8 @@ export const hatalar: TranslationDict = {
   "Bağlantının süresi doldu, sayfayı yenileyin": "The link expired; refresh the page",
   "Bu bağlantıda indirme kapatılmış": "Downloading is turned off for this link",
   "Kapalı bir bağlantı gönderilemez": "A closed link can't be sent",
+  "En az bir dosya seçin": "Select at least one file",
+  "Bir bağlantıda en fazla 50 dosya olabilir": "A link can hold at most 50 files",
   "Girilen adreslerden biri geçerli görünmüyor. Adresleri virgülle ayırdığınızdan emin olun.":
     "One of the addresses doesn't look valid. Make sure they're separated by commas.",
   "Tek seferde en fazla 20 adrese gönderilebilir": "You can send to at most 20 addresses at once",

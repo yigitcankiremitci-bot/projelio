@@ -9,7 +9,12 @@ import Modal from "./Modal";
 import { IconCopy, IconLink, IconSend, IconTrash } from "./icons";
 
 interface Props {
-  file: ProjectFile;
+  /**
+   * Paylaşılacak dosyalar. Birden fazlaysa TEK bağlantı üretilir (bkz.
+   * migration 121) — alıcı tek adreste hepsini görür, gönderen tek bağlantıyı
+   * kapatarak hepsini geri alır.
+   */
+  files: ProjectFile[];
   onClose: () => void;
 }
 
@@ -38,28 +43,36 @@ interface Props {
  */
 type Mod = "secim" | "baglanti" | "eposta";
 
-export default function FileDownloadLinkModal({ file, onClose }: Props) {
+export default function FileDownloadLinkModal({ files, onClose }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const paket = files.length > 1;
+  const tekDosyaId = paket ? undefined : files[0]?.id;
   const [mod, setMod] = useState<Mod>("secim");
   const [links, setLinks] = useState<FileDownloadLink[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Pakette önceki bağlantılar aranmıyor: aynı dosya kümesiyle üretilmiş bir
+  // bağlantı neredeyse hiç olmaz ve seçimi "birebir aynı küme" diye eşlemek,
+  // kullanıcının beklemediği eski bir bağlantıyı önüne çıkarırdı.
+  const [loading, setLoading] = useState(!paket);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!tekDosyaId) return;
     fileDownloadLinksApi
-      .list(file.id)
+      .list(tekDosyaId)
       .then(setLinks)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [file.id]);
+  }, [tekDosyaId]);
 
   const olustur = async (): Promise<boolean> => {
     setBusy(true);
     setError("");
     try {
-      const link = await fileDownloadLinksApi.create(file.id);
+      const link = paket
+        ? await fileDownloadLinksApi.createMany(files.map((f) => f.id))
+        : await fileDownloadLinksApi.create(files[0].id);
       setLinks((onceki) => [link, ...onceki]);
       return true;
     } catch (e: any) {
@@ -73,7 +86,10 @@ export default function FileDownloadLinkModal({ file, onClose }: Props) {
   const degistir = (guncel: FileDownloadLink) =>
     setLinks((onceki) => onceki.map((l) => (l.id === guncel.id ? guncel : l)));
 
-  const acikVar = links.some((l) => l.active);
+  // Yalnızca BU seçimin bağlantısı sayılır: dosyanın listesinde onu içeren
+  // paketler de var, ama "bu dosyayı gönder" diyen kişiye başka dosyaları da
+  // açan bir paketi vermek, istemediği dosyaları paylaşmak olurdu.
+  const acikVar = links.some((l) => l.active && l.fileIds.length === files.length);
 
   /** Seçim yapıldı: açık bir bağlantı yoksa hemen üret, sonra ekrana geç. */
   const sec = async (hedef: Mod) => {
@@ -82,10 +98,20 @@ export default function FileDownloadLinkModal({ file, onClose }: Props) {
   };
 
   const baslik =
-    mod === "eposta" ? t("Bağlantıyı e-postayla gönder") : mod === "baglanti" ? t("İndirme bağlantısı") : t("Dosyayı paylaş");
+    mod === "eposta"
+      ? t("Bağlantıyı e-postayla gönder")
+      : mod === "baglanti"
+      ? t("İndirme bağlantısı")
+      : paket
+      ? t("Dosyaları paylaş")
+      : t("Dosyayı paylaş");
+
+  const altBaslik = paket
+    ? t("{ilk} ve {sayi} dosya daha", { ilk: files[0].name, sayi: files.length - 1 })
+    : files[0]?.name;
 
   return (
-    <Modal title={baslik} subtitle={file.name} onClose={onClose} maxWidth={520}>
+    <Modal title={baslik} subtitle={altBaslik} onClose={onClose} maxWidth={520}>
       {error && <div style={{ color: c.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
       {loading ? (
@@ -93,10 +119,16 @@ export default function FileDownloadLinkModal({ file, onClose }: Props) {
       ) : mod === "secim" ? (
         <>
           <p style={{ margin: "0 0 16px", fontSize: 14, lineHeight: 1.6, color: c.textSecondary }}>
-            {t(
-              "Bağlantıyı açan kişi Projelio hesabı olmadan dosyayı önizleyip indirebilir. Bağlantıyı istediğiniz an kaldırabilirsiniz."
-            )}
+            {paket
+              ? t(
+                  "{sayi} dosya tek bağlantıda paylaşılır. Bağlantıyı açan kişi Projelio hesabı olmadan hepsini önizleyip indirebilir; bağlantıyı istediğiniz an kaldırabilirsiniz.",
+                  { sayi: files.length }
+                )
+              : t(
+                  "Bağlantıyı açan kişi Projelio hesabı olmadan dosyayı önizleyip indirebilir. Bağlantıyı istediğiniz an kaldırabilirsiniz."
+                )}
           </p>
+          {paket && <DosyaListesi adlar={files.map((f) => f.name)} />}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <SecimKarti
               icon={<IconLink size={18} color={c.accent} />}
@@ -166,6 +198,35 @@ export default function FileDownloadLinkModal({ file, onClose }: Props) {
         </>
       )}
     </Modal>
+  );
+}
+
+/**
+ * Pakete girecek dosyalar. Uzun seçimde kaydırılır: pencere, altındaki iki
+ * seçeneği ekranın dışına itmesin.
+ */
+function DosyaListesi({ adlar }: { adlar: string[] }) {
+  const c = useThemeColors();
+  return (
+    <div
+      style={{
+        maxHeight: 150,
+        overflowY: "auto",
+        margin: "0 0 16px",
+        padding: "8px 12px",
+        borderRadius: 10,
+        border: `1px solid ${c.border}`,
+        fontSize: 13,
+        lineHeight: 1.7,
+        color: c.textPrimary,
+      }}
+    >
+      {adlar.map((ad, i) => (
+        <div key={i} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {ad}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -388,6 +449,14 @@ function LinkKarti({
   return (
     <div style={kutu}>
       {gonderim && gonderimFormu}
+
+      {/* Paket bağlantısı tek dosyanın penceresinde de listeleniyor (kapatılabilsin
+          diye); içinde başka neler olduğu burada görünmeli. */}
+      {link.fileIds.length > 1 && (
+        <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 8, lineHeight: 1.5 }}>
+          {t("{sayi} dosyalık bağlantı: {adlar}", { sayi: link.fileIds.length, adlar: link.fileNames.join(", ") })}
+        </div>
+      )}
 
       <KopyalaSatiri url={link.url} />
 

@@ -42,7 +42,7 @@ export class PublicFileLinkController {
     @Res() res: Response
   ) {
     const indir = download === "1";
-    const { response, fileName, mimeType, link } = await this.links.icerikIcinCoz(contentToken, indir);
+    const { response, fileName, mimeType, link, fileId } = await this.links.icerikIcinCoz(contentToken, indir);
 
     res.setHeader("Content-Type", mimeType);
     const length = response.headers.get("content-length");
@@ -73,7 +73,7 @@ export class PublicFileLinkController {
     // Sayaç ve bildirim akış BAŞLADIKTAN sonra, beklenmeden: burada çıkacak bir
     // hata (e-posta sağlayıcısı, veritabanı) indirmeyi bozmamalı.
     if (indir) {
-      void this.links.indirmeyiKaydet(link).catch(() => undefined);
+      void this.links.indirmeyiKaydet(link, fileId).catch(() => undefined);
     }
 
     if (!response.body) {

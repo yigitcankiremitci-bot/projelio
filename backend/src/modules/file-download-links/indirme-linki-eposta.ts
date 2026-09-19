@@ -14,6 +14,12 @@ import { epostaKabugu, kacir, MARKA } from "../auth/email-shell";
 
 interface PaylasimParams {
   dosyaAdi: string;
+  /**
+   * Çok dosyalı bağlantıda dosyaların adları (bkz. migration 121). Doluysa
+   * kutuda tek ad yerine liste çizilir: alıcı "hepsi geldi mi" sorusunu
+   * bağlantıyı açmadan cevaplayabilsin.
+   */
+  dosyaAdlari?: string[];
   /** Paylaşan kişinin adı. Boşsa cümle kişisiz kurulur. */
   paylasanAdi?: string;
   /** Gönderenin yazdığı serbest not. Boş olabilir. */
@@ -28,10 +34,16 @@ interface PaylasimParams {
   kopyaAlicilari?: string[];
 }
 
-export function paylasimKonusu(params: { dosyaAdi: string; paylasanAdi?: string }): string {
+export function paylasimKonusu(params: { dosyaAdi: string; paylasanAdi?: string; dosyaSayisi?: number }): string {
+  const ne = neKadar(params.dosyaSayisi);
   return params.paylasanAdi
-    ? `${params.paylasanAdi} sizinle bir dosya paylaştı: ${params.dosyaAdi}`
-    : `Sizinle bir dosya paylaşıldı: ${params.dosyaAdi}`;
+    ? `${params.paylasanAdi} sizinle ${ne} paylaştı: ${params.dosyaAdi}`
+    : `Sizinle ${ne} paylaşıldı: ${params.dosyaAdi}`;
+}
+
+/** "bir dosya" / "3 dosya" — konu ve gövde aynı ifadeyi kullansın. */
+function neKadar(sayi?: number): string {
+  return sayi && sayi > 1 ? `${sayi} dosya` : "bir dosya";
 }
 
 /** Gönderenin kendi kopyasının konusu — gelen kutusunda alıcının mesajıyla karışmasın. */
@@ -42,6 +54,15 @@ export function kopyaKonusu(dosyaAdi: string): string {
 export function paylasimHtml(p: PaylasimParams): string {
   const kim = p.paylasanAdi ? `<strong>${kacir(p.paylasanAdi)}</strong>` : "Bir Projelio kullanıcısı";
   const boyut = p.boyutMetni ? ` · ${kacir(p.boyutMetni)}` : "";
+  const paket = (p.dosyaAdlari?.length ?? 0) > 1;
+  const ne = neKadar(p.dosyaAdlari?.length);
+  const adKutusu = paket
+    ? p
+        .dosyaAdlari!.map(
+          (ad) => `<div style="font-size:14px;color:${MARKA.yaziKoyu};font-weight:600;padding:2px 0;">${kacir(ad)}</div>`
+        )
+        .join("")
+    : `<div style="font-size:15px;color:${MARKA.yaziKoyu};font-weight:600;">${kacir(p.dosyaAdi)}</div>`;
   const kopyaSeridi = p.kopyaAlicilari?.length
     ? `<div style="margin:0 0 18px;padding:10px 12px;border-radius:9px;background:${MARKA.zemin};font-size:13px;line-height:1.6;color:${MARKA.yaziOrta};">
   <strong style="color:${MARKA.yaziKoyu};">Bu sizin kopyanız.</strong> Aşağıdaki mesaj şu adreslere gönderildi:<br />${kacir(
@@ -53,12 +74,12 @@ export function paylasimHtml(p: PaylasimParams): string {
   return epostaKabugu(
     "tr",
     `${kopyaSeridi}
-<h1 style="margin:0 0 16px;font-size:20px;color:${MARKA.yaziKoyu};">Sizinle bir dosya paylaşıldı</h1>
+<h1 style="margin:0 0 16px;font-size:20px;color:${MARKA.yaziKoyu};">Sizinle ${ne} paylaşıldı</h1>
 <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:${MARKA.yaziOrta};">
-  ${kim} sizinle bir dosya paylaştı. Aşağıdaki bağlantıdan önizleyebilir ve indirebilirsiniz.
+  ${kim} sizinle ${ne} paylaştı. Aşağıdaki bağlantıdan önizleyebilir ve indirebilirsiniz.
 </p>
 <div style="margin:0 0 20px;padding:14px 16px;border:1px solid ${MARKA.cizgi};border-radius:10px;">
-  <div style="font-size:15px;color:${MARKA.yaziKoyu};font-weight:600;">${kacir(p.dosyaAdi)}</div>
+  ${adKutusu}
   <div style="font-size:13px;color:${MARKA.yaziSoluk};margin-top:4px;">Projelio üzerinden paylaşıldı${boyut}</div>
 </div>
 ${
@@ -69,28 +90,32 @@ ${
     : ""
 }
 <p style="margin:0 0 24px;">
-  <a href="${p.url}" style="display:inline-block;background:${MARKA.vurgu};color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-size:15px;font-weight:600;">Dosyayı aç</a>
+  <a href="${p.url}" style="display:inline-block;background:${MARKA.vurgu};color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-size:15px;font-weight:600;">${paket ? "Dosyaları aç" : "Dosyayı aç"}</a>
 </p>
 <p style="margin:0;font-size:12px;line-height:1.6;color:${MARKA.yaziSoluk};">
-  Bu bağlantı yalnızca bu dosya içindir; paylaşan kişi istediği an kapatabilir.
+  Bu bağlantı yalnızca ${paket ? "bu dosyalar" : "bu dosya"} içindir; paylaşan kişi istediği an kapatabilir.
   Bağlantı çalışmıyorsa adresi tarayıcınıza yapıştırın:<br />${p.url}
 </p>`
   );
 }
 
 export function paylasimMetni(p: PaylasimParams): string {
+  const paket = (p.dosyaAdlari?.length ?? 0) > 1;
+  const ne = neKadar(p.dosyaAdlari?.length);
   return [
     ...(p.kopyaAlicilari?.length
       ? [`Bu sizin kopyanız. Aşağıdaki mesaj şu adreslere gönderildi: ${p.kopyaAlicilari.join(", ")}`, ""]
       : []),
-    p.paylasanAdi ? `${p.paylasanAdi} sizinle bir dosya paylaştı.` : "Sizinle bir dosya paylaşıldı.",
+    p.paylasanAdi ? `${p.paylasanAdi} sizinle ${ne} paylaştı.` : `Sizinle ${ne} paylaşıldı.`,
     "",
-    p.dosyaAdi + (p.boyutMetni ? ` (${p.boyutMetni})` : ""),
+    ...(paket
+      ? [...p.dosyaAdlari!.map((ad) => `- ${ad}`), ...(p.boyutMetni ? [`Toplam ${p.boyutMetni}`] : [])]
+      : [p.dosyaAdi + (p.boyutMetni ? ` (${p.boyutMetni})` : "")]),
     ...(p.not ? ["", p.not] : []),
     "",
     p.url,
     "",
-    "Bu bağlantı yalnızca bu dosya içindir; paylaşan kişi istediği an kapatabilir.",
+    `Bu bağlantı yalnızca ${paket ? "bu dosyalar" : "bu dosya"} içindir; paylaşan kişi istediği an kapatabilir.`,
   ].join("\n");
 }
 

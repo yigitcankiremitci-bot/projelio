@@ -55,7 +55,7 @@ export default function LinkedFilesPanel({
   // üretmek bir OKUMA eylemi — dosyayı zaten indirip elden gönderebilecek biri
   // için engel olmanın anlamı yok, üstelik bağlantı geri alınabilir olduğu için
   // eki e-postaya koymaktan daha güvenli.
-  const [sharing, setSharing] = useState<ProjectFile | null>(null);
+  const [sharing, setSharing] = useState<ProjectFile[] | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; file: ProjectFile } | null>(null);
   const [error, setError] = useState("");
   const [picking, setPicking] = useState(false);
@@ -269,7 +269,7 @@ export default function LinkedFilesPanel({
             { label: t("İndir"), onClick: () => void indir(menu.file) },
             {
               label: t("Bağlantı oluştur/gönder…"),
-              onClick: () => setSharing(menu.file),
+              onClick: () => setSharing([menu.file]),
             },
             {
               label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file) }),
@@ -293,7 +293,7 @@ export default function LinkedFilesPanel({
 
       {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} />}
 
-      {sharing && <FileDownloadLinkModal file={sharing} onClose={() => setSharing(null)} />}
+      {sharing && <FileDownloadLinkModal files={sharing} onClose={() => setSharing(null)} />}
     </div>
   );
 }

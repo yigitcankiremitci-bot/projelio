@@ -20,6 +20,10 @@ export const fileDownloadLinksApi = {
   create: (fileId: string, input: CreateFileDownloadLinkInput = {}) =>
     api.post<FileDownloadLink>(`/files/${fileId}/download-links`, input),
 
+  /** Birden fazla dosya için TEK bağlantı (bkz. migration 121). */
+  createMany: (fileIds: string[], input: CreateFileDownloadLinkInput = {}) =>
+    api.post<FileDownloadLink>(`/file-download-links`, { ...input, fileIds }),
+
   update: (id: string, input: UpdateFileDownloadLinkInput) =>
     api.patch<FileDownloadLink>(`/file-download-links/${id}`, input),
 

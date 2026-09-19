@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { boyutMetni, dosyaTuruEtiketi } from "./dosya-turu";
+import { boyutMetni, dosyaTuruEtiketi, gorunenAd } from "./dosya-turu";
 
 describe("dosyaTuruEtiketi", () => {
   it("bilinen türleri adlandırır", () => {
@@ -30,5 +30,13 @@ describe("boyutMetni", () => {
     assert.equal(boyutMetni(900), "900 B");
     assert.equal(boyutMetni(1536), "1.5 KB");
     assert.equal(boyutMetni(20 * 1024 * 1024), "20 MB");
+  });
+});
+
+describe("gorunenAd", () => {
+  it("tek dosyada dosyanın adı, pakette ilk ad + kalan sayısı", () => {
+    assert.equal(gorunenAd(["rapor.pdf"]), "rapor.pdf");
+    assert.equal(gorunenAd(["a.pdf", "b.pdf", "c.pdf"]), "a.pdf ve 2 dosya daha");
+    assert.equal(gorunenAd([]), "Dosya");
   });
 });

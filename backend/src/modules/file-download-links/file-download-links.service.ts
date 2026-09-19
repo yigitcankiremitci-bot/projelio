@@ -17,7 +17,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { EmailService } from "../auth/email.service";
 import { FilesService } from "../files/files.service";
 import { NotificationsService } from "../notifications/notifications.service";
-import { boyutMetni, dosyaTuruEtiketi } from "./dosya-turu";
+import { boyutMetni, dosyaTuruEtiketi, gorunenAd } from "./dosya-turu";
 import {
   indirildiHtml,
   indirildiKonusu,
@@ -34,7 +34,22 @@ import { linkGondereni } from "./link-gondereni";
 interface IcerikJetonu {
   typ: "file_link_content";
   linkId: string;
+  /**
+   * Çok dosyalı bağlantıda hangi dosya. Jetonun İÇİNDE, adreste değil: adreste
+   * olsaydı alıcı kimliği değiştirip paketin dışındaki bir dosyayı isteyebilirdi.
+   * Yoksa (114'ün jetonları) bağlantının tek dosyası.
+   */
+  fileId?: string;
 }
+
+/**
+ * Bir bağlantıdaki dosya tavanı.
+ *
+ * Alıcının sayfası her dosya için buluttan künye okuyor (erişim her açılışta
+ * yeniden doğrulanıyor, bkz. sınıf yorumu). Tavansız bir paket, tek bir sayfa
+ * açılışını yüzlerce bulut çağrısına çevirirdi.
+ */
+export const PAKET_DOSYA_TAVANI = 50;
 
 /**
  * Jetonun ömrü.
@@ -90,7 +105,7 @@ export class FileDownloadLinksService {
    * Dosyaya erişimi olmayan kişi listeyi göremez: findById yetkiyi çözüyor.
    */
   async list(fileId: string, userId: string): Promise<FileDownloadLink[]> {
-    const { file } = await this.files.findById(fileId, userId);
+    await this.files.findById(fileId, userId);
 
     const { data, error } = await this.supabase.client
       .from("file_download_links")
@@ -101,7 +116,35 @@ export class FileDownloadLinksService {
       .limit(LISTE_TAVANI);
     if (error) throw error;
 
-    return (data ?? []).map((row) => this.mapLink(row, file.name));
+    // Bu dosyayı İÇEREN paket bağlantıları da listede: paketi kapatmak
+    // isteyen kişinin başka bir yolu yok — paket penceresi yalnızca
+    // oluşturulurken açılıyor. İlk dosyası bu olan paketler zaten yukarıda.
+    const { data: paketSatirlari, error: paketHatasi } = await this.supabase.client
+      .from("file_download_link_files")
+      .select("link_id")
+      .eq("file_id", fileId)
+      .limit(LISTE_TAVANI);
+    // Tablo okunamazsa (121 henüz uygulanmadıysa) tek dosyalık liste yine
+    // döner: paket özelliği yüzünden 114'ün penceresi de açılmaz olmasın.
+    if (paketHatasi) this.logger.warn(`Paket bağlantıları okunamadı: ${paketHatasi.message}`);
+
+    const bilinen = new Set((data ?? []).map((r: any) => r.id));
+    const eksik = (paketSatirlari ?? []).map((r: any) => r.link_id).filter((id: string) => !bilinen.has(id));
+    let paketler: any[] = [];
+    if (eksik.length) {
+      const { data: ek, error: ekHatasi } = await this.supabase.client
+        .from("file_download_links")
+        .select()
+        .in("id", eksik)
+        .eq("created_by", userId);
+      if (ekHatasi) throw ekHatasi;
+      paketler = ek ?? [];
+    }
+
+    const satirlar = [...(data ?? []), ...paketler].sort((a, b) =>
+      String(b.created_at).localeCompare(String(a.created_at))
+    );
+    return Promise.all(satirlar.map((row) => this.mapRow(row)));
   }
 
   async create(
@@ -129,7 +172,59 @@ export class FileDownloadLinksService {
       .single();
     if (error) throw error;
 
-    return this.mapLink(data, file.name);
+    return this.mapLink(data, [fileId], [file.name]);
+  }
+
+  /**
+   * Birden fazla dosyayı TEK bağlantıda paylaşır (bkz. migration 121).
+   *
+   * Her dosyaya erişim AYRI AYRI doğrulanıyor: seçimin tamamı aynı ekrandan
+   * gelse de kimlikler istemciden geliyor ve biri erişilemeyen bir dosyanın
+   * kimliğini listeye ekleyebilir. Tek bir dosya bile reddedilirse bağlantı
+   * hiç üretilmez — "9'u paylaşıldı, 1'i sessizce düştü" alıcıya eksik bir
+   * paket göndermek olurdu.
+   */
+  async createMany(userId: string, input: CreateFileDownloadLinkInput): Promise<FileDownloadLink> {
+    const ids = [...new Set((input?.fileIds ?? []).filter((id) => typeof id === "string" && id))];
+    if (!ids.length) throw new BadRequestException("En az bir dosya seçin");
+    if (ids.length > PAKET_DOSYA_TAVANI) {
+      // Sabit metin: istisna mesajları çeviri anahtarı, şablon dizesi olamaz.
+      throw new BadRequestException("Bir bağlantıda en fazla 50 dosya olabilir");
+    }
+    // Tek dosya: 114'ün yolu. Paket tablosuna tek satır yazmak, aynı şeyin
+    // iki farklı biçimde saklanması olurdu.
+    if (ids.length === 1) return this.create(ids[0], userId, input);
+
+    const dosyalar = await Promise.all(ids.map((id) => this.files.findById(id, userId)));
+
+    const { data, error } = await this.supabase.client
+      .from("file_download_links")
+      .insert({
+        file_id: ids[0],
+        file_count: ids.length,
+        token: yeniToken(),
+        label: temizEtiket(input?.label),
+        recipient_email: temizAlici(input?.recipientEmail),
+        download_enabled: input?.downloadEnabled !== false,
+        notify_on_download: input?.notifyOnDownload !== false,
+        expires_at: sureden(input?.expiresInDays),
+        created_by: userId,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    const { error: listeHatasi } = await this.supabase.client
+      .from("file_download_link_files")
+      .insert(ids.map((fileId, position) => ({ link_id: data.id, file_id: fileId, position })));
+    if (listeHatasi) {
+      // Dosya listesi yazılamadıysa bağlantı da kalmamalı: yalnızca ilk
+      // dosyayı açan, sayısı yanlış bir paket kimsenin istediği şey değil.
+      await this.supabase.client.from("file_download_links").delete().eq("id", data.id);
+      throw listeHatasi;
+    }
+
+    return this.mapLink(data, ids, dosyalar.map((d) => d.file.name));
   }
 
   /**
@@ -148,7 +243,7 @@ export class FileDownloadLinksService {
     if (input.notifyOnDownload !== undefined) guncel.notify_on_download = input.notifyOnDownload === true;
     if (input.expiresInDays !== undefined) guncel.expires_at = sureden(input.expiresInDays);
 
-    if (Object.keys(guncel).length === 0) return this.mapLink(mevcut, await this.dosyaAdi(mevcut.file_id));
+    if (Object.keys(guncel).length === 0) return this.mapRow(mevcut);
 
     const { data, error } = await this.supabase.client
       .from("file_download_links")
@@ -157,14 +252,14 @@ export class FileDownloadLinksService {
       .select()
       .single();
     if (error) throw error;
-    return this.mapLink(data, await this.dosyaAdi(mevcut.file_id));
+    return this.mapRow(data);
   }
 
   /** Linki kapatır. Satır SİLİNMEZ, `revoked_at` damgalanır (bkz. migration 114). */
   async revoke(id: string, userId: string): Promise<FileDownloadLink> {
     const mevcut = await this.kendiLinki(id, userId);
     // Zaten kapalı linki yeniden damgalamak, "ne zaman kapattım" cevabını bozardı.
-    if (mevcut.revoked_at) return this.mapLink(mevcut, await this.dosyaAdi(mevcut.file_id));
+    if (mevcut.revoked_at) return this.mapRow(mevcut);
 
     const { data, error } = await this.supabase.client
       .from("file_download_links")
@@ -173,7 +268,7 @@ export class FileDownloadLinksService {
       .select()
       .single();
     if (error) throw error;
-    return this.mapLink(data, await this.dosyaAdi(mevcut.file_id));
+    return this.mapRow(data);
   }
 
   /**
@@ -198,18 +293,22 @@ export class FileDownloadLinksService {
 
     const adresler = adresleriAyikla([...(input?.emails ?? []), input?.email ?? ""]);
 
-    const dosyaAdi = await this.dosyaAdi(row.file_id);
+    const ozet = await this.dosyaOzeti(row);
+    const dosyaAdi = gorunenAd(ozet.adlar);
     const gonderen = await this.kullanici(userId);
 
     const govde = {
       dosyaAdi,
+      // Pakette alıcı NE geldiğini mesajdan görebilmeli; "a.pdf ve 4 dosya
+      // daha" tek başına muhasebecinin "hepsi geldi mi" sorusunu cevaplamaz.
+      dosyaAdlari: ozet.adlar.length > 1 ? ozet.adlar : undefined,
       paylasanAdi: gonderen?.full_name || undefined,
       not: input?.note?.trim() ? input.note.trim().slice(0, 1000) : undefined,
       url: linkUrl(row.token),
-      boyutMetni: boyutMetni(await this.dosyaBoyutu(row.file_id)),
+      boyutMetni: boyutMetni(ozet.toplamBoyut),
     };
     const mail = {
-      subject: paylasimKonusu({ dosyaAdi, paylasanAdi: govde.paylasanAdi }),
+      subject: paylasimKonusu({ dosyaAdi, paylasanAdi: govde.paylasanAdi, dosyaSayisi: ozet.adlar.length }),
       html: paylasimHtml(govde),
       text: paylasimMetni(govde),
       from: linkGondereni(process.env.EMAIL_FROM, process.env.EMAIL_FROM_LINK) ?? undefined,
@@ -245,7 +344,7 @@ export class FileDownloadLinksService {
         .catch(() => undefined);
     }
 
-    return { results, link: this.mapLink(row, dosyaAdi) };
+    return { results, link: this.mapLink(row, ozet.ids, ozet.adlar) };
   }
 
   // ===================================================== Linki açan kişi (public)
@@ -291,8 +390,8 @@ export class FileDownloadLinksService {
   async icerikIcinCoz(
     contentToken: string,
     indir: boolean
-  ): Promise<{ response: Response; fileName: string; mimeType: string; link: any }> {
-    const link = await this.jetondanLink(contentToken);
+  ): Promise<{ response: Response; fileName: string; mimeType: string; link: any; fileId: string }> {
+    const { link, fileId } = await this.jetondanLink(contentToken);
 
     // "İndirme kapalı" ile "link yok" AYRI: burada gerçek sebebi söylemek
     // güvenlik açığı değil, çünkü kişi zaten linki açabilmiş durumda.
@@ -300,14 +399,14 @@ export class FileDownloadLinksService {
       throw new BadRequestException("Bu bağlantıda indirme kapatılmış");
     }
 
-    const { response, fileName, mimeType } = await this.files.openDownload(link.file_id, link.created_by);
-    return { response, fileName, mimeType, link };
+    const { response, fileName, mimeType } = await this.files.openDownload(fileId, link.created_by);
+    return { response, fileName, mimeType, link, fileId };
   }
 
   /** Önizlemesi olmayan türler için sağlayıcının küçük resmi. */
   async icerikIcinKucukResim(contentToken: string): Promise<Response | null> {
-    const link = await this.jetondanLink(contentToken);
-    return this.files.openThumbnail(link.file_id, link.created_by).catch(() => null);
+    const { link, fileId } = await this.jetondanLink(contentToken);
+    return this.files.openThumbnail(fileId, link.created_by).catch(() => null);
   }
 
   /**
@@ -316,11 +415,12 @@ export class FileDownloadLinksService {
    * ÇAĞRAN BEKLEMEZ (bkz. controller): dosya akmaya başladıktan sonra tetikleniyor,
    * burada çıkan bir hata indirmeyi bozmamalı.
    */
-  async indirmeyiKaydet(link: any): Promise<void> {
+  async indirmeyiKaydet(link: any, fileId: string = link.file_id): Promise<void> {
     const sayilar = await this.sayacArtir(link, "download");
     if (link.notify_on_download !== true) return;
 
-    const dosyaAdi = await this.dosyaAdi(link.file_id);
+    // Pakette indirilen DOSYANIN adı: sahibi "hangisini aldı" diye merak ediyor.
+    const dosyaAdi = await this.dosyaAdi(fileId);
     const sahip = await this.kullanici(link.created_by);
 
     // Uygulama içi bildirim: notifyUserSafe, çünkü sonucunu beklemiyoruz ve
@@ -354,12 +454,26 @@ export class FileDownloadLinksService {
   // ==================================================================== İçeriden
 
   private async gorunum(row: any): Promise<PublicFileView> {
-    const { file } = await this.files.findById(row.file_id, row.created_by);
-    if (file.status === "missing") throw new NotFoundException("Dosya bulunamadı");
+    const ids = await this.dosyaListesi(row);
+    const paket = ids.length > 1;
+
+    // Pakette erişilemeyen ya da kaybolan dosya ATLANIR, bağlantı kalanlarla
+    // açılır: gönderenin bir dosyayı silmesi ya da taşıması diğer dokuzunu da
+    // kapatmamalı. Hiçbiri kalmadıysa bağlantı kapalı sayılır.
+    const okunanlar = await Promise.all(
+      ids.map((id) =>
+        this.files
+          .findById(id, row.created_by)
+          .then(({ file }) => (file.status === "missing" ? null : { id, file }))
+          .catch(() => null)
+      )
+    );
+    const dosyalar = okunanlar.filter((d): d is NonNullable<typeof d> => d !== null);
+    if (!dosyalar.length) throw new NotFoundException("Dosya bulunamadı");
 
     const sahip = await this.kullanici(row.created_by);
 
-    return {
+    const ogeler = dosyalar.map(({ id, file }) => ({
       name: file.name,
       mimeType: file.mimeType,
       sizeBytes: file.sizeBytes,
@@ -368,18 +482,29 @@ export class FileDownloadLinksService {
       // Diğerlerinde içerik ucu zaten indirmeye zorluyor (bkz. files.controller).
       canPreview: !file.isGoogleDoc && (file.mimeType.startsWith("image/") || file.mimeType === "application/pdf"),
       hasThumbnail: file.hasThumbnail === true,
+      // Tek dosyada jeton 114'teki biçimde (fileId'siz) kalıyor; pakette
+      // hangi dosyanın açılacağı jetonun içinde.
+      contentToken: this.jwt.sign(
+        (paket
+          ? { typ: "file_link_content", linkId: row.id, fileId: id }
+          : { typ: "file_link_content", linkId: row.id }) satisfies IcerikJetonu,
+        { expiresIn: ICERIK_JETONU_SANIYE }
+      ),
+    }));
+    const ilk = ogeler[0];
+
+    return {
+      ...ilk,
       downloadEnabled: row.download_enabled === true,
       sharedByName: sahip?.full_name || undefined,
       sharedAt: row.created_at,
-      contentToken: this.jwt.sign({ typ: "file_link_content", linkId: row.id } satisfies IcerikJetonu, {
-        expiresIn: ICERIK_JETONU_SANIYE,
-      }),
       contentTokenExpiresInSeconds: ICERIK_JETONU_SANIYE,
+      files: ogeler,
     };
   }
 
   /** Jetondan linke — kapalı/ölmüş link burada eleniyor. */
-  private async jetondanLink(contentToken: string): Promise<any> {
+  private async jetondanLink(contentToken: string): Promise<{ link: any; fileId: string }> {
     if (!contentToken) throw new NotFoundException("Bağlantı bulunamadı");
     let claims: IcerikJetonu;
     try {
@@ -398,7 +523,15 @@ export class FileDownloadLinksService {
       .maybeSingle();
     if (error) throw error;
     if (!data || kapanmaSebebi(data)) throw new NotFoundException("Bağlantı bulunamadı");
-    return data;
+
+    // Jeton imzalı olsa da paketin listesi O AN yeniden okunuyor: jeton
+    // üretildikten sonra dosya paketten düşmüş (silinmiş) olabilir.
+    const fileId = claims.fileId ?? data.file_id;
+    if (fileId !== data.file_id || (data.file_count ?? 1) > 1) {
+      const ids = await this.dosyaListesi(data);
+      if (!ids.includes(fileId)) throw new NotFoundException("Bağlantı bulunamadı");
+    }
+    return { link: data, fileId };
   }
 
   private async tokenlaBul(token: string): Promise<any | null> {
@@ -448,9 +581,46 @@ export class FileDownloadLinksService {
     return data?.name ?? "Dosya";
   }
 
-  private async dosyaBoyutu(fileId: string): Promise<number | undefined> {
-    const { data } = await this.supabase.client.from("files").select("size_bytes").eq("id", fileId).maybeSingle();
-    return data?.size_bytes !== null && data?.size_bytes !== undefined ? Number(data.size_bytes) : undefined;
+  /**
+   * Bağlantının dosyaları, seçilen sırayla.
+   *
+   * Tek dosyalık bağlantının paket tablosunda satırı YOK (bkz. migration 121);
+   * onu okumaya gitmemek 114'ün her isteğinden bir sorgu tasarrufu.
+   */
+  private async dosyaListesi(row: any): Promise<string[]> {
+    if ((row.file_count ?? 1) <= 1) return [row.file_id];
+    const { data, error } = await this.supabase.client
+      .from("file_download_link_files")
+      .select("file_id")
+      .eq("link_id", row.id)
+      .order("position", { ascending: true })
+      .limit(PAKET_DOSYA_TAVANI);
+    if (error) throw error;
+    return (data ?? []).map((r: any) => r.file_id);
+  }
+
+  /** Dosyaların adları ve toplam boyutu — sahibin listesi ve e-posta için. */
+  private async dosyaOzeti(row: any): Promise<{ ids: string[]; adlar: string[]; toplamBoyut?: number }> {
+    const ids = await this.dosyaListesi(row);
+    const { data } = await this.supabase.client.from("files").select("id, name, size_bytes").in("id", ids);
+    const bilgi = new Map((data ?? []).map((f: any) => [f.id, f]));
+    // Silinmiş dosya listeden düşer (cascade); burada kalan tek sebep yarış.
+    const mevcut = ids.filter((id) => bilgi.has(id));
+    const boyutlar = mevcut.map((id) => bilgi.get(id)?.size_bytes);
+    return {
+      ids: mevcut,
+      adlar: mevcut.map((id) => bilgi.get(id)?.name ?? "Dosya"),
+      // Boyutu bilinmeyen bir dosya varsa toplam YAZILMAZ: eksik toplam, doğru
+      // görünen yanlış bir sayı olurdu.
+      toplamBoyut: boyutlar.every((b) => b !== null && b !== undefined)
+        ? boyutlar.reduce((t: number, b) => t + Number(b), 0)
+        : undefined,
+    };
+  }
+
+  private async mapRow(row: any): Promise<FileDownloadLink> {
+    const { ids, adlar } = await this.dosyaOzeti(row);
+    return this.mapLink(row, ids, adlar);
   }
 
   private async kullanici(userId: string): Promise<{ full_name?: string; email?: string } | null> {
@@ -462,12 +632,14 @@ export class FileDownloadLinksService {
     return data ?? null;
   }
 
-  private mapLink(row: any, fileName: string): FileDownloadLink {
+  private mapLink(row: any, fileIds: string[], fileNames: string[]): FileDownloadLink {
     const sebep = kapanmaSebebi(row);
     return {
       id: row.id,
       fileId: row.file_id,
-      fileName,
+      fileName: gorunenAd(fileNames),
+      fileIds,
+      fileNames,
       token: row.token,
       url: linkUrl(row.token),
       label: row.label ?? undefined,

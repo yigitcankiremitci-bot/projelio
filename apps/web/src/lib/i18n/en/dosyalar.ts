@@ -187,6 +187,19 @@ export const dosyalar: TranslationDict = {
   // TARAYICIDAN geliyor, yani İngilizce karşılığı olmadan sayfa Türkçe kalırdı.
   "Bağlantı oluştur/gönder…": "Create or send link…",
   "Dosyayı paylaş": "Share file",
+  // Çok dosyalı bağlantı (bkz. migration 121).
+  "Dosyaları paylaş": "Share files",
+  "{sayi} dosya için bağlantı oluştur/gönder…": "Create or send link for {sayi} files…",
+  "{ilk} ve {sayi} dosya daha": "{ilk} and {sayi} more",
+  "{sayi} dosya tek bağlantıda paylaşılır. Bağlantıyı açan kişi Projelio hesabı olmadan hepsini önizleyip indirebilir; bağlantıyı istediğiniz an kaldırabilirsiniz.":
+    "{sayi} files are shared in a single link. Whoever opens it can preview and download all of them without a Projelio account; you can remove the link at any time.",
+  "{sayi} dosyalık bağlantı: {adlar}": "Link with {sayi} files: {adlar}",
+  "{sayi} dosya": "{sayi} files",
+  "{ad} sizinle {sayi} dosya paylaştı": "{ad} shared {sayi} files with you",
+  "Sizinle {sayi} dosya paylaşıldı": "{sayi} files were shared with you",
+  "Toplam {boyut}": "{boyut} in total",
+  "Bu dosyalar yalnızca görüntülenmek üzere paylaşıldı; indirme kapatılmış. Kopyasına ihtiyacınız varsa dosyaları paylaşan kişiye yazın.":
+    "These files were shared for viewing only; downloading is turned off. If you need a copy, contact the person who shared them.",
   "Bağlantı al": "Get a link",
   "Adresi kopyalayın, istediğiniz yere yapıştırın.": "Copy the address and paste it wherever you like.",
   "E-postayla gönder": "Send by email",

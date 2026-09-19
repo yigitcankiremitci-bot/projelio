@@ -21,6 +21,7 @@ export const tr = {
     credits: "Lio Bakiyesi",
     faq: "S.S.S.",
     contact: "İletişim",
+    liveDemo: "Canlı demo",
     login: "Giriş Yap",
     cta: "Ücretsiz Başla",
     journey: "Nasıl çalışır",
@@ -37,6 +38,7 @@ export const tr = {
       credits: "Lio kullanımı için bakiye",
       faq: "En çok sorulanlar",
       contact: "Satış ve destek ekibi",
+      liveDemo: "40 dakikalık online tanıtım",
     },
     menu: "Menü",
     close: "Kapat",
@@ -164,6 +166,8 @@ export const tr = {
     resetNote:
       "Eklediğiniz, değiştirdiğiniz ve sildiğiniz her şey bir sonraki girişte geri alınır.",
     ownAccount: "Kendi verinizle başlamak isterseniz",
+    liveDemo: "Birlikte gezmek ister misiniz?",
+    liveDemoCta: "40 dakikalık canlı demo randevusu alın",
   },
 
   live: {
@@ -390,7 +394,7 @@ export const tr = {
     title: "Ekibiniz bu hafta daha az soru sorsun",
     text: "Ücretsiz planla başlayın. Kart bilgisi istemiyoruz, kurulum ücreti yok, istediğiniz an bırakabilirsiniz.",
     primary: "Ücretsiz hesap aç",
-    secondary: "Demo talep et",
+    secondary: "Canlı demo randevusu al",
   },
 
   pricing: {
@@ -635,7 +639,8 @@ export const tr = {
       },
     ],
     demoTitle: "Canlı demo isteyin",
-    demoText: "30 dakikalık ekran paylaşımıyla Projelio'yu kendi iş akışınız üzerinden gösterelim. Ücretsiz ve satış baskısı yok.",
+    demoText: "40 dakikalık online görüşmede Projelio'yu kendi iş akışınız üzerinden gösterelim. Ücretsiz ve satış baskısı yok — takvimden size uyan saati seçin.",
+    demoCta: "Randevu al",
   },
 
   footer: {

@@ -228,6 +228,10 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
                   {dict.demoAccount.ownAccount}{" "}
                   <a href={appLinks.signup}>{dict.common.startFree}</a>
                 </p>
+                <p className="small" style={{ marginTop: 8 }}>
+                  {dict.demoAccount.liveDemo}{" "}
+                  <a href={appLinks.demoRandevu}>{dict.demoAccount.liveDemoCta}</a>
+                </p>
               </div>
             </Reveal>
           </div>
@@ -448,9 +452,9 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
               <a className="btn btn-primary btn-lg" href={appLinks.signup}>
                 {dict.ctaBand.primary}
               </a>
-              <Link className="btn btn-ghost btn-lg" href={path(locale, "contact")}>
+              <a className="btn btn-ghost btn-lg" href={appLinks.demoRandevu}>
                 {dict.ctaBand.secondary}
-              </Link>
+              </a>
             </div>
           </div>
         </div>

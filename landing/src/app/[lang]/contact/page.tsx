@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getDict, type Locale } from "@/i18n";
-import { site } from "@/lib/site";
+import { appLinks, site } from "@/lib/site";
 import ContactForm from "@/components/ContactForm";
 
 export async function generateMetadata({
@@ -73,6 +73,9 @@ export default async function ContactPage({ params }: { params: Promise<{ lang: 
                   {dict.contact.demoTitle}
                 </h3>
                 <p>{dict.contact.demoText}</p>
+                <a className="btn btn-primary" style={{ marginTop: 14 }} href={appLinks.demoRandevu}>
+                  {dict.contact.demoCta}
+                </a>
               </div>
             </div>
           </div>

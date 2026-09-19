@@ -72,6 +72,12 @@ export const appLinks = {
    * içeren bir adres yazılırsa sorgu parametresi yanlış yere iliştirilirdi.
    */
   demo: process.env.NEXT_PUBLIC_DEMO_URL || `${site.appUrl}/login?demo=1`,
+  /**
+   * 40 dakikalık canlı demo randevusu — panelin herkese açık sayfası
+   * (apps/web/src/pages/DemoRandevu.tsx). Üyelik gerektirmez; ziyaretçi
+   * yöneticinin açtığı bloklardan birini seçer.
+   */
+  demoRandevu: process.env.NEXT_PUBLIC_DEMO_RANDEVU_URL || `${site.appUrl}/demo-randevu`,
 };
 
 /**

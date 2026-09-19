@@ -23,6 +23,7 @@ export const en: Dict = {
     credits: "Lio Units",
     faq: "FAQ",
     contact: "Contact",
+    liveDemo: "Live demo",
     login: "Sign in",
     cta: "Start free",
     journey: "How it works",
@@ -38,6 +39,7 @@ export const en: Dict = {
       credits: "Balance for using Lio",
       faq: "Most asked questions",
       contact: "Sales and support team",
+      liveDemo: "A 40-minute online walkthrough",
     },
     menu: "Menu",
     close: "Close",
@@ -165,6 +167,8 @@ export const en: Dict = {
     resetNote:
       "Anything you add, change or delete is rolled back on the next sign-in.",
     ownAccount: "If you'd rather start with your own data",
+    liveDemo: "Prefer a guided tour?",
+    liveDemoCta: "Book a 40-minute live demo",
   },
 
   live: {
@@ -389,7 +393,7 @@ export const en: Dict = {
     title: "Let your team ask fewer questions this week",
     text: "Start on the free plan. No card required, no setup fee, cancel whenever you like.",
     primary: "Create a free account",
-    secondary: "Request a demo",
+    secondary: "Book a live demo",
   },
 
   pricing: {
@@ -617,7 +621,8 @@ export const en: Dict = {
       },
     ],
     demoTitle: "Request a live demo",
-    demoText: "In a 30-minute screen share we'll walk through Projelio using your own workflow. Free, and no sales pressure.",
+    demoText: "In a 40-minute online session we'll walk through Projelio using your own workflow. Free, no sales pressure — pick a time that suits you.",
+    demoCta: "Book a time",
   },
 
   footer: {

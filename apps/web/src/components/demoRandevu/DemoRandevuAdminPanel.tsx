@@ -30,13 +30,28 @@ export default function DemoRandevuAdminPanel() {
   const t = useT();
   const [bolum, setBolum] = useState<Bolum>("randevular");
   const [sunucular, setSunucular] = useState<DemoSunucu[]>([]);
+  const [ayar, setAyar] = useState<DemoAyarlari | null>(null);
+  // Şerit ayarı değiştirince Çalışma saatleri formu yeniden yüklensin: formda
+  // kaydedilmemiş eski "kapalı" değeri kalıp bir sonraki Kaydet'te ezmesin.
+  const [surum, setSurum] = useState(0);
 
   useEffect(() => {
     demoRandevuAdminApi.sunucular().then(setSunucular).catch(() => undefined);
+    demoRandevuAdminApi.ayarlar().then(setAyar).catch(() => undefined);
   }, []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {ayar && (
+        <DurumSeridi
+          ayar={ayar}
+          onDegisti={(yeni) => {
+            setAyar(yeni);
+            setSurum((n) => n + 1);
+          }}
+          saatlereGit={() => setBolum("saatler")}
+        />
+      )}
       <TabBar
         tabs={[
           { key: "randevular", label: t("Randevular") },
@@ -47,8 +62,93 @@ export default function DemoRandevuAdminPanel() {
         onChange={(k) => setBolum(k as Bolum)}
       />
       {bolum === "randevular" && <Randevular sunucular={sunucular} />}
-      {bolum === "saatler" && <Saatler />}
+      {bolum === "saatler" && <Saatler key={surum} onKaydedildi={setAyar} />}
       {bolum === "sunucular" && <Sunucular liste={sunucular} onDegisti={setSunucular} />}
+    </div>
+  );
+}
+
+/**
+ * Randevu almanın açık mı kapalı mı olduğu — panelin EN ÜSTÜNDE.
+ *
+ * NEDEN: aç/kapa eskiden yalnızca Çalışma saatleri formunun içinde bir onay
+ * kutusuydu. Saatleri girip kaydeden yönetici kutuyu atlıyor, herkese açık
+ * sayfa "şu an kapalı" demeye devam ediyordu ve sebebi hiçbir yerde
+ * görünmüyordu (canlıda ilk kurulumda yaşandı).
+ */
+function DurumSeridi({
+  ayar,
+  onDegisti,
+  saatlereGit,
+}: {
+  ayar: DemoAyarlari;
+  onDegisti: (a: DemoAyarlari) => void;
+  saatlereGit: () => void;
+}) {
+  const c = useThemeColors();
+  const t = useT();
+  const [calisiyor, setCalisiyor] = useState(false);
+  const [hata, setHata] = useState("");
+  const saatVar = ayar.calismaSaatleri.length > 0;
+
+  const degistir = async (aktif: boolean) => {
+    setCalisiyor(true);
+    setHata("");
+    try {
+      onDegisti(await demoRandevuAdminApi.ayarlariKaydet({ aktif }));
+    } catch (e) {
+      setHata(e instanceof Error ? e.message : t("Kaydedilemedi."));
+    } finally {
+      setCalisiyor(false);
+    }
+  };
+
+  const renk = ayar.aktif ? c.success : c.warning;
+  return (
+    <div
+      style={{
+        border: `1px solid ${renk}`,
+        borderRadius: 12,
+        padding: "12px 14px",
+        background: c.surface,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        flexWrap: "wrap",
+      }}
+    >
+      <span style={{ width: 10, height: 10, borderRadius: "50%", background: renk, flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary }}>
+          {ayar.aktif ? t("Randevu alma açık") : t("Randevu alma kapalı")}
+        </div>
+        <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 2, lineHeight: 1.5 }}>
+          {ayar.aktif
+            ? t("Herkese açık sayfa ve Ayarlar'daki kart boş blokları gösteriyor.")
+            : saatVar
+              ? t("Çalışma saatleri hazır, ama herkese açık sayfa \"şu an kapalı\" gösteriyor.")
+              : t("Önce çalışma saatlerini gir; bloklar oradan üretiliyor.")}
+        </div>
+        {hata && <div style={{ fontSize: 13, color: c.danger, marginTop: 4 }}>{hata}</div>}
+      </div>
+      {ayar.aktif ? (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <a href="/demo-randevu" target="_blank" rel="noopener noreferrer" style={{ ...ikincilDugme(c), textDecoration: "none" }}>
+            {t("Sayfayı aç")} ↗
+          </a>
+          <button type="button" disabled={calisiyor} onClick={() => void degistir(false)} style={ikincilDugme(c)}>
+            {t("Kapat")}
+          </button>
+        </div>
+      ) : saatVar ? (
+        <button type="button" disabled={calisiyor} onClick={() => void degistir(true)} style={anaDugme(c)}>
+          {calisiyor ? t("Açılıyor…") : t("Randevu almayı aç")}
+        </button>
+      ) : (
+        <button type="button" onClick={saatlereGit} style={anaDugme(c)}>
+          {t("Çalışma saatlerine git")}
+        </button>
+      )}
     </div>
   );
 }
@@ -363,7 +463,7 @@ function TasiPenceresi({
 
 const GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
 
-function Saatler() {
+function Saatler({ onKaydedildi }: { onKaydedildi: (a: DemoAyarlari) => void }) {
   const c = useThemeColors();
   const t = useT();
   const [ayar, setAyar] = useState<DemoAyarlari | null>(null);
@@ -401,7 +501,14 @@ function Saatler() {
       const yeni = await demoRandevuAdminApi.ayarlariKaydet(ayar);
       setAyar(yeni);
       setKayitli(JSON.stringify(yeni));
-      setMesaj({ tur: "ok", metin: t("Kaydedildi.") });
+      onKaydedildi(yeni);
+      setMesaj({
+        tur: "ok",
+        metin:
+          !yeni.aktif && yeni.calismaSaatleri.length
+            ? t("Kaydedildi. Randevu alma hâlâ kapalı — açmak için yukarıdaki düğmeyi kullan.")
+            : t("Kaydedildi."),
+      });
     } catch (e) {
       setMesaj({ tur: "hata", metin: e instanceof Error ? e.message : t("Kaydedilemedi.") });
     } finally {

@@ -80,6 +80,8 @@ export default function Header({ dict, locale }: { dict: Dict; locale: Locale })
       id: "support",
       label: dict.nav.groups.support,
       links: [
+        // Panelin sayfası (başka alan adı): Next'in Link'i mutlak adresi düz <a> olarak çizer.
+        { href: appLinks.demoRandevu, label: dict.nav.liveDemo, desc: d.liveDemo },
         { href: path(locale, "faq"), label: dict.nav.faq, desc: d.faq },
         { href: path(locale, "contact"), label: dict.nav.contact, desc: d.contact },
       ],

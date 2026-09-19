@@ -13,6 +13,8 @@ import {
   STICKY_TOP_ROW,
   BOTTOM_NAV_HEIGHT,
   lioBottomCss,
+  lioKucukMu,
+  lioLauncherSize,
 } from "./layout";
 
 // Bu testler görünüşü değil KATMAN SIRASINI sabitler. Sıra bozulduğunda ortaya
@@ -137,5 +139,34 @@ describe("Lio bildirim şeridinin yeri", () => {
     const anchor = lioActivityAnchor({ isDesktop: false, panelOpen: true, launcherVisible: true });
     assert.equal(anchor.bottom, undefined);
     assert.ok((anchor.top ?? 0) > 0);
+  });
+});
+
+describe("Lio balonunun boyu ve taşınması", () => {
+  test("çalışma alanlarında küçük, ana sayfalarda tam boy", () => {
+    for (const yol of ["/jobs/1", "/projects/1", "/operations/1", "/departments/1", "/organizations/1", "/groups/1", "/tasks", "/calendar", "/worklog", "/jobs/1/modules/x"]) {
+      assert.ok(lioKucukMu(yol), `${yol} bir çalışma alanı`);
+    }
+    for (const yol of ["/", "/organizations", "/groups", "/settings", "/settings/billing", "/admin", "/tasksx"]) {
+      assert.ok(!lioKucukMu(yol), `${yol} bir ana sayfa`);
+    }
+  });
+
+  test("küçük boy tam boydan gerçekten küçük", () => {
+    for (const isDesktop of [true, false]) {
+      assert.ok(lioLauncherSize(isDesktop, true) < lioLauncherSize(isDesktop, false));
+    }
+  });
+
+  test("şerit küçülmüş ve yukarı taşınmış balonun da üstünde durur", () => {
+    const lift = 120;
+    const anchor = lioActivityAnchor({ isDesktop: true, panelOpen: false, launcherVisible: true, compact: true, lift });
+    assert.ok(
+      pxDegeri(anchor.bottom) >= LIO_LAUNCHER.bottomDesktop + lift + LIO_LAUNCHER.sizeDesktopCompact,
+      "şerit taşınan balonun içine girmemeli"
+    );
+    // Küçük balonun üstündeki şerit, tam boydakinin üstünde boşlukta asılı kalmasın.
+    const tamBoy = lioActivityAnchor({ isDesktop: true, panelOpen: false, launcherVisible: true, lift });
+    assert.ok(pxDegeri(anchor.bottom) < pxDegeri(tamBoy.bottom));
   });
 });

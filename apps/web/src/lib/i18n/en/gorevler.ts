@@ -207,8 +207,6 @@ export const gorevler: TranslationDict = {
   "Görev ara…": "Search tasks…",
   "Görev eklemek için önce bir proje oluşturman gerekiyor.":
     "You need to create a project before you can add a task.",
-  "Bu görevi senden başkası görmez.": "Nobody but you sees this task.",
-  "Kişisel görevi düzenle": "Edit personal task",
   "Çıktı (opsiyonel)": "Output (optional)",
   "Çıktıdan çıkar": "Remove from output",
   "Çıktısız — proje görevi": "No output — project task",
@@ -241,4 +239,27 @@ export const gorevler: TranslationDict = {
 
   // ─────────────────────────────────────────────── Toplu seçim
   "Tümünü seç": "Select all",
+
+  // ─────────────────────────────────────────────── Konum (görev nerede yaşıyor)
+  "Görevin yeri": "Task location",
+  "Kişisel — bu görevi senden başkası görmez.": "Personal — nobody but you sees this task.",
+  "Proje: {ad}": "Project: {ad}",
+  "Departman: {ad}": "Department: {ad}",
+  "Projeye / departmana ata": "Assign to project / department",
+  "Başka yere taşı": "Move elsewhere",
+  "Görev seçtiğin yerde sana atanmış olarak açılır; ekip onu görebilir. Kişisel kopyası kaldırılır.":
+    "The task opens there assigned to you, and the team can see it. The personal copy is removed.",
+  "Erişebildiğin proje yok.": "No projects you can access.",
+  "Erişebildiğin departman yok.": "No departments you can access.",
+  "Görev taşınamadı": "Could not move the task",
+  "Görev taşındı": "Task moved",
+  "Görev atandı": "Task assigned",
+  Ata: "Assign",
+  '"{baslik}" kişisel görevini silmek istediğine emin misin? Cmd/Ctrl+Z ile geri getirebilirsin.':
+    'Are you sure you want to delete the personal task "{baslik}"? You can bring it back with Cmd/Ctrl+Z.',
+  "Tarihi değiştirmek için çift tıkla": "Double-click to change the date",
+  // ─────────────────────────────────────────────── İş panosu
+  "Tek satıra küçült": "Collapse to one line",
+  "Listeyi aç": "Expand list",
+  "Yeni görevler şu projeye:": "New tasks go to:",
 };

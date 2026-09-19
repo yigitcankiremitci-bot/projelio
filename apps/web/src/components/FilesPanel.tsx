@@ -274,6 +274,43 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   // o yüzden her satırda kaynağını yazmak gerekiyor.
   const aggregated = Boolean(organizationId || groupId);
 
+  /**
+   * Proje Dosyalar sekmesi de klasörlerle çalışır: gezinme projenin işin
+   * ağacındaki kendi klasörünün (kind='project') İÇİNDE yapılır.
+   *
+   * Eskiden proje sekmesi süzülmüş bir düz listeydi ve klasör açmanın yolu
+   * yoktu; kullanıcı klasör için işin Dosyalar sekmesine gitmek zorundaydı.
+   * Kökte liste yine projenin tüm dosyaları (görev ekleri dahil) — yalnızca
+   * kullanıcının açtığı klasörlere konanlar klasörün içinde görünür.
+   */
+  const projeGezinme =
+    Boolean(projectId) && !compact && !taskId && !outputId && !jobId && !departmentId && !organizationId && !groupId;
+  const [projeKoku, setProjeKoku] = useState<{ jobId: string; folderId?: string } | null>(null);
+  useEffect(() => {
+    if (!projeGezinme || !projectId) return;
+    let iptal = false;
+    filesApi
+      .projectRootFolder(projectId)
+      .then((r) => {
+        if (!iptal) setProjeKoku({ jobId: r.jobId, folderId: r.folder?.id });
+      })
+      .catch(() => undefined);
+    return () => {
+      iptal = true;
+    };
+  }, [projeGezinme, projectId]);
+  /** Kapsamın kökü: iş/departman/şirkette yok (undefined), projede projenin klasörü. */
+  const kokKlasor = projeGezinme ? projeKoku?.folderId : undefined;
+
+  /** Proje klasörü henüz yoksa (projeye hiç dosya yüklenmemiş) oluşturur. */
+  const projeKokunuHazirla = async (): Promise<string | undefined> => {
+    if (!projeGezinme || !projectId) return undefined;
+    if (projeKoku?.folderId) return projeKoku.folderId;
+    const r = await filesApi.ensureProjectRootFolder(projectId);
+    setProjeKoku({ jobId: r.jobId, folderId: r.folder?.id });
+    return r.folder?.id;
+  };
+
   const folderOwner: FileFolderOwner | undefined = useMemo(
     () =>
       departmentId
@@ -282,8 +319,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
         ? { kind: "organization", id: organizationId }
         : jobId
         ? { kind: "job", id: jobId }
+        : projeGezinme && projeKoku
+        ? { kind: "job", id: projeKoku.jobId }
         : undefined,
-    [departmentId, organizationId, jobId]
+    [departmentId, organizationId, jobId, projeGezinme, projeKoku]
   );
 
   /**
@@ -293,7 +332,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
    * klasör ağacı göstermek, kullanıcının aradığı dosyayı gizlerdi. Grup ekranı
    * da salt okunur bir toplama.
    */
-  const canBrowse = Boolean(folderOwner) && !compact && !taskId && !outputId && !projectId && !groupId;
+  const canBrowse =
+    Boolean(folderOwner) && !compact && !taskId && !outputId && (!projectId || projeGezinme) && !groupId;
 
   // Adres eşitlemesi yalnızca gezinilebilir, tam sayfa bağlamda.
   const urlSenkron = canBrowse && !compact;
@@ -356,12 +396,17 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           // oluşur, kapalıyken eski düz liste korunur.
           atRoot: canBrowse && !folderId ? "1" : undefined,
         })
-      : filesApi.listByProject(projectId!, { taskId, outputId });
+      : filesApi.listByProject(projectId!, { taskId, outputId, folderId: canBrowse ? folderId : undefined });
 
-    // Klasörler ayrı uçtan; ikisi paralel gidiyor.
+    // Klasörler ayrı uçtan; ikisi paralel gidiyor. Proje kökünde yalnızca
+    // kullanıcı klasörleri: görev/çıktı klasörlerinin dosyaları kökte zaten
+    // düz listede, klasör olarak da çizilseler iki kez görünürlerdi.
     const folderRequest =
-      canBrowse && folderOwner
-        ? filesApi.folders(folderOwner, folderId).catch(() => [] as FileFolder[])
+      canBrowse && folderOwner && (folderId || !projeGezinme || kokKlasor)
+        ? filesApi
+            .folders(folderOwner, folderId ?? kokKlasor)
+            .then((list) => (projeGezinme && !folderId ? list.filter((f) => f.kind === "user") : list))
+            .catch(() => [] as FileFolder[])
         : Promise.resolve([] as FileFolder[]);
 
     return Promise.all([request, folderRequest])
@@ -372,7 +417,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, groupId, departmentId, jobId, projectId, taskId, outputId, scope, folderId, canBrowse]);
+  }, [organizationId, groupId, departmentId, jobId, projectId, taskId, outputId, scope, folderId, canBrowse, kokKlasor]);
 
   useEffect(() => {
     void load();
@@ -431,18 +476,32 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
   const handleFiles = useCallback((selected: FileList | DroppedFile[] | null) => {
     if (!selected?.length) return;
-    // Kuyruk sıralı ilerliyor, hız sınırını ve hataları da o yönetiyor
-    // (bkz. lib/uploadQueue). Panel yalnızca işi teslim ediyor.
-    enqueueUploads({
-      target,
-      files: selected,
-      // Klasör yüklemesinde göreli yolu kuyruk dosyanın kendisinden okuyor
-      // (webkitRelativePath ya da bırakılan ağaçtaki yol); burada yalnızca
-      // bulunulan klasörü veriyoruz.
-      context: { taskId, outputId, folderId },
-    });
+    const gonder = (klasor?: string) =>
+      // Kuyruk sıralı ilerliyor, hız sınırını ve hataları da o yönetiyor
+      // (bkz. lib/uploadQueue). Panel yalnızca işi teslim ediyor.
+      enqueueUploads({
+        target,
+        files: selected,
+        // Klasör yüklemesinde göreli yolu kuyruk dosyanın kendisinden okuyor
+        // (webkitRelativePath ya da bırakılan ağaçtaki yol); burada yalnızca
+        // bulunulan klasörü veriyoruz.
+        context: { taskId, outputId, folderId: klasor },
+      });
+    // Proje kökünde klasör YÜKLENİYORSA kök klasör önce hazırlanmalı: yoksa
+    // alt klasörler işin köküne kurulur ve proje sekmesinde hiç görünmez.
+    // Düz dosya yüklemesinde gerek yok, sunucu onu zaten projenin klasörüne koyar.
+    const klasorYuklemesi = Array.from(selected as ArrayLike<File | DroppedFile>).some((f) =>
+      Boolean((f as any).webkitRelativePath || (f as any).relativePath)
+    );
+    if (projeGezinme && !folderId && klasorYuklemesi) {
+      projeKokunuHazirla()
+        .then((kok) => gonder(kok))
+        .catch((e: any) => setError(e?.message ?? t("Klasör oluşturulamadı")));
+      return;
+    }
+    gonder(folderId ?? kokKlasor);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, taskId, outputId, folderId]);
+  }, [target, taskId, outputId, folderId, kokKlasor, projeGezinme]);
 
   // Ekmek kırıntısı sunucudan: kullanıcı derin bir klasöre doğrudan da girebilir.
   useEffect(() => {
@@ -466,8 +525,9 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     if (!folderOwner) return;
     const ad = window.prompt(t("Klasör adı:"))?.trim();
     if (!ad) return;
-    const altinda = folderId;
     try {
+      // Proje kökünde yeni klasör projenin klasörünün İÇİNE açılır.
+      const altinda = folderId ?? (projeGezinme ? await projeKokunuHazirla() : undefined);
       const klasor = await filesApi.createFolder(folderOwner, ad, altinda);
       setFolders((prev) => [...prev, klasor].sort((a, b) => a.name.localeCompare(b.name, "tr")));
       // Geri alma listeyi kendi tazeliyor (bkz. useRefreshOnUndo), bu yüzden
@@ -633,9 +693,12 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
    * `hedef` verilmezse kapsamın kökü. Eski yer BURADA biliniyor: kullanıcı
    * bulunduğu klasörden taşıyor, yani kaynak her zaman `folderId`.
    */
-  const tasi = async (items: { kind: "file" | "folder"; id: string }[], hedefId?: string) => {
+  const tasi = async (items: { kind: "file" | "folder"; id: string }[], hedef?: string) => {
     if (!items.length) return;
-    const eskiKlasor = folderId;
+    // "Kök" projede projenin klasörü demek (bkz. kokKlasor); işin köküne
+    // çıkarmak öğeyi proje sekmesinden kaybettirirdi.
+    const hedefId = hedef ?? kokKlasor;
+    const eskiKlasor = folderId ?? kokKlasor;
 
     const uygula = (nereye?: string) =>
       Promise.all(
@@ -677,7 +740,11 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   };
 
   /** Bir üst klasör — sağ tık menüsündeki "Üst klasöre taşı" için (dokunmatikte sürükleme yok). */
-  const parentFolderId = crumbs.length > 1 ? crumbs[crumbs.length - 2].id : undefined;
+  // Projede kırıntılar projenin klasöründen SONRA başlar: işin kök klasörü ve
+  // projenin kendi klasörü bu sekmenin "Dosyalar" kökü zaten.
+  const kokSirasi = kokKlasor ? crumbs.findIndex((k) => k.id === kokKlasor) : -1;
+  const gorunenCrumbs = kokSirasi >= 0 ? crumbs.slice(kokSirasi + 1) : crumbs;
+  const parentFolderId = gorunenCrumbs.length > 1 ? gorunenCrumbs[gorunenCrumbs.length - 2].id : undefined;
 
   const moveToParent = (items: { kind: "file" | "folder"; id: string }[]) => tasi(items, parentFolderId);
 
@@ -1435,10 +1502,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           >
             {t("Dosyalar")}
           </button>
-          {crumbs.map((k, i) => (
+          {gorunenCrumbs.map((k, i) => (
             <span key={k.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ color: c.textSecondary }}>/</span>
-              {i === crumbs.length - 1 ? (
+              {i === gorunenCrumbs.length - 1 ? (
                 <span style={{ color: c.textPrimary }}>{k.name}</span>
               ) : (
                 <button

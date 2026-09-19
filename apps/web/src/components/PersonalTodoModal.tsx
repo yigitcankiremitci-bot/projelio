@@ -1,9 +1,15 @@
-import { useState } from "react";
-import type { PersonalBoardItem, TaskPriority } from "@projelio/shared";
+import { useId, useRef, useState } from "react";
+import type { PersonalBoardItem, Task, TaskPriority } from "@projelio/shared";
 import { MAX_TASK_PRIORITY } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import AutoGrowTextarea from "./AutoGrowTextarea";
+import AutoGrowNotes from "./AutoGrowNotes";
+import EntityDangerZone from "./EntityDangerZone";
+import GorevKonumu from "./GorevKonumu";
+import type { KonumHedefi } from "./GorevKonumu";
+import { halfField, twoColumnRow } from "./gorevFormDuzeni";
 import { IconStar } from "./icons";
 import { useUndo } from "../lib/undo";
 import { useT } from "../lib/i18n";
@@ -16,15 +22,26 @@ interface Props {
   item: PersonalBoardItem;
   onClose: () => void;
   onChanged: () => void;
+  /**
+   * Görev bir projeye/departmana atandığında çağrılır: kişisel kayıt artık
+   * yok, yerine gerçek bir görev açıldı. Sayfa düzenleyiciyi o görevle
+   * (TaskEditModal) yeniden açar — kullanıcı ekip, bütçe gibi alanları hemen
+   * doldurabilsin diye.
+   */
+  onPromoted?: (task: Task) => void;
 }
 
 /**
- * Kişisel görev düzenleyicisi. Gerçek görevlerin TaskEditModal'ıyla aynı iskelet
- * (ortak Modal, aynı alan düzeni, aynı kaydet/sil yerleşimi); yalnızca kişisel
- * görevde karşılığı olmayan alanlar (atanan kişi, bütçe, yorumlar, dosyalar)
- * yok — bunlar kişisel bir yapılacakta anlamsız.
+ * Kişisel görev düzenleyicisi. Gerçek görevlerin TaskEditModal'ıyla AYNI
+ * pencere: aynı genişlik, aynı alan sırası ve bileşenleri, altta yapışkan
+ * Kaydet, aynı "Konum" ve arşivle/sil bölümleri. Eskiden dar ve farklı
+ * dizilmiş ayrı bir form vardı; aynı panoda iki kart iki farklı ekran açıyordu.
+ *
+ * Kişisel görevde karşılığı olmayan alanlar (ekip, bütçe, yorumlar, dosyalar)
+ * yok. Onlar gerekiyorsa görev "Konum"dan bir projeye/departmana atanır ve
+ * gerçek göreve dönüşür (bkz. PersonalTodosService.promote).
  */
-export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
+export default function PersonalTodoModal({ item, onClose, onChanged, onPromoted }: Props) {
   const c = useThemeColors();
   const t = useT();
   const { pushUndo } = useUndo();
@@ -37,27 +54,55 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
   const [reminderLead, setReminderLead] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const formId = useId();
+
+  const formPayload = () => ({
+    title,
+    description: description.trim() ? description : null,
+    priority,
+    dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+    dueTime: dueTime || null,
+    // Saat yoksa hatırlatma da yok — sunucu ve veritabanı aynı kuralda.
+    reminderLeadMinutes: dueTime && reminderLead !== "" ? Number(reminderLead) : null,
+  });
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSaving(true);
     try {
-      await api.patch(`/todos/${item.itemId}`, {
-        title,
-        description: description.trim() ? description : null,
-        priority,
-        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
-        dueTime: dueTime || null,
-        // Saat yoksa hatırlatma da yok — sunucu ve veritabanı aynı kuralda.
-        reminderLeadMinutes: dueTime && reminderLead !== "" ? Number(reminderLead) : null,
-      });
+      await api.patch(`/todos/${item.itemId}`, formPayload());
       onChanged();
     } catch {
       setError(t("Görev güncellenemedi. Tekrar dene."));
       setSaving(false);
     }
+  };
+
+  /**
+   * Projeye/departmana ata. Formdaki kaydedilmemiş değişiklikler önce yazılır:
+   * yeni görev kişisel kayıttan kopyalanıyor, kullanıcı başlığı düzeltip
+   * hemen "Ata"ya bastıysa düzeltme kaybolmasın.
+   */
+  const handlePromote = async (hedef: KonumHedefi) => {
+    if (!title.trim()) throw new Error(t("Görev başlığı gerekli"));
+    await api.patch(`/todos/${item.itemId}`, formPayload());
+    let task = await api.post<Task>(`/todos/${item.itemId}/promote`, hedef);
+    // Geri alma: açılan görevi sil, kişisel kaydı geri getir. İleri alma yeni
+    // bir görev açar (kimliği değişir), bir sonraki geri alma onu siler.
+    pushUndo({
+      label: t("Görev atandı"),
+      run: async () => {
+        await api.delete(`/tasks/${task.id}`);
+        await api.patch(`/todos/${item.itemId}/restore`, {});
+      },
+      redo: async () => {
+        task = await api.post<Task>(`/todos/${item.itemId}/promote`, hedef);
+      },
+    });
+    if (onPromoted) onPromoted(task);
+    else onChanged();
   };
 
   const handleDelete = async () => {
@@ -85,27 +130,52 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
   };
 
   return (
-    <Modal title={t("Kişisel görevi düzenle")} onClose={onClose} maxWidth={520}>
-      <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Bu görevi senden başkası görmez.")}</p>
-
+    <Modal
+      title={t("Görevi düzenle")}
+      onClose={onClose}
+      maxWidth={1280}
+      footer={
+        <button
+          type="submit"
+          form={formId}
+          disabled={saving}
+          style={{ width: "100%", background: c.primary, color: c.onPrimary, padding: "10px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
+        >
+          {saving ? t("Kaydediliyor…") : t("Kaydet")}
+        </button>
+      }
+    >
+      <form id={formId} ref={formRef} onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlık")}</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} style={{ width: "100%" }} />
+          <AutoGrowTextarea
+            value={title}
+            onChange={setTitle}
+            onSubmit={() => formRef.current?.requestSubmit()}
+            onCancel={onClose}
+            ariaLabel={t("Başlık")}
+            maxLength={200}
+            required
+            minHeight={42}
+          />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Notlar")}</label>
-          <textarea
+          <AutoGrowNotes
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={setDescription}
+            placeholder={t("Görevle ilgili notlar (opsiyonel)")}
+            ariaLabel={t("Notlar")}
+            maxLength={2000}
             rows={4}
-            style={{ width: "100%", resize: "vertical" }}
           />
         </div>
 
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 180px" }}>
+        {/* Proje görevindeki "Başlangıç / Bitiş" satırının yerinde: kişisel
+            görevin başlangıç tarihi yok, göz öncelikle doluyor. */}
+        <div style={twoColumnRow}>
+          <div style={halfField}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Öncelik")}</label>
             {/* Kanban kartlarındakiyle aynı 0-5 yıldız ölçeği. */}
             <div role="radiogroup" aria-label={t("Öncelik")} style={{ display: "flex", gap: 2, alignItems: "center", height: 34 }}>
@@ -130,16 +200,15 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
               })}
             </div>
           </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 160px" }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tarih")}</label>
+          <div style={halfField}>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bitiş tarihi")}</label>
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: "100%" }} />
           </div>
         </div>
 
         {/* Saat opsiyonel; girilince hatırlatma seçeneği açılır. */}
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 140px" }}>
+        <div style={twoColumnRow}>
+          <div style={halfField}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bitiş saati (opsiyonel)")}</label>
             <input
               type="time"
@@ -151,7 +220,7 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
               style={{ width: "100%" }}
             />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: "1 1 140px" }}>
+          <div style={halfField}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Hatırlat")}</label>
             <select
               value={reminderLead}
@@ -168,56 +237,17 @@ export default function PersonalTodoModal({ item, onClose, onChanged }: Props) {
           </div>
         </div>
 
-        {error && <p style={{ fontSize: 14, color: c.danger, margin: 0 }}>{error}</p>}
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-          {confirmingDelete ? (
-            <>
-              <span style={{ fontSize: 14, color: c.textSecondary }}>Silinsin mi?</span>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={saving}
-                style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: c.danger, color: "#fff", fontSize: 15 }}
-              >
-                {t("Evet, sil")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(false)}
-                style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 15 }}
-              >
-                {t("Vazgeç")}
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(true)}
-              style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.danger, fontSize: 15 }}
-            >
-              {t("Sil")}
-            </button>
-          )}
-
-          <button
-            type="submit"
-            disabled={saving}
-            style={{
-              marginLeft: "auto",
-              padding: "8px 18px",
-              borderRadius: 8,
-              border: "none",
-              background: c.primary,
-              color: c.onPrimary,
-              fontSize: 16,
-              fontWeight: 500,
-            }}
-          >
-            {saving ? "Kaydediliyor…" : "Kaydet"}
-          </button>
-        </div>
+        {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
       </form>
+
+      <GorevKonumu onSec={handlePromote} />
+
+      <EntityDangerZone
+        entityLabel={t("Görevi")}
+        onDelete={handleDelete}
+        archiveMessage=""
+        deleteMessage={t('"{baslik}" kişisel görevini silmek istediğine emin misin? Cmd/Ctrl+Z ile geri getirebilirsin.', { baslik: item.title })}
+      />
     </Modal>
   );
 }

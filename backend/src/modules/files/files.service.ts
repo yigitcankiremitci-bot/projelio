@@ -1417,12 +1417,17 @@ export class FilesService {
   ): Promise<FileFolderEntry> {
     const temiz = this.safeFileName(name ?? "");
     if (!temiz.trim()) throw new BadRequestException("Klasör adı gerekli");
-    await this.assertOwnerAccess(owner, userId);
+    const access = await this.assertOwnerAccess(owner, userId);
 
     const { provider, accountId, rootFolderId } = await this.ownerRoot(owner, userId);
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
 
     let parentDriveId = rootFolderId;
+    // Proje klasörünün (ya da onun altındaki bir klasörün) içinde açılan klasör
+    // o projeye aittir: project_id üst klasörden miras kalır. Kalmazsa yalnızca
+    // projeye eklenmiş ekip üyesi kendi açtığı klasörü göremez (bkz. listFolders
+    // — proje düzeyindeki kullanıcıya project_id'siz klasörler kapalı).
+    let projectId: string | null = null;
     if (parentFolderId) {
       const { data: parent } = await this.supabase.client
         .from("file_folders")
@@ -1434,7 +1439,10 @@ export class FilesService {
       if (parent[this.ownerColumn(owner)] !== owner.id) {
         throw new ForbiddenException("Bu klasör bu alana ait değil");
       }
+      // Proje düzeyindeki kullanıcı başka bir projenin klasörüne yazamaz.
+      this.assertFolderAllowed(access, parent);
       parentDriveId = parent.drive_folder_id;
+      projectId = parent.project_id ?? null;
     }
 
     const folder = await this.cloudStorage.findOrCreateFolder(provider, accessToken, temiz, parentDriveId);
@@ -1445,6 +1453,7 @@ export class FilesService {
         [this.ownerColumn(owner)]: owner.id,
         parent_folder_id: parentFolderId ?? null,
         kind: "user",
+        project_id: projectId,
         name: temiz,
         drive_folder_id: folder.id,
       })
@@ -2487,9 +2496,75 @@ export class FilesService {
   }
 
   /** Proje ekranından çağrılır: işi kendisi bulur. */
-  async listByProject(projectId: string, userId: string, filter: FileContext = {}): Promise<ProjectFile[]> {
+  /**
+   * Proje Dosyalar sekmesi.
+   *
+   * Kökte projenin TÜM dosyaları düz liste olarak gelir (görev/çıktı ekleri
+   * dahil — sekme eskiden beri böyle). Tek istisna kullanıcının projede açtığı
+   * klasörlere konmuş dosyalar: onlar klasörün içinde görünür, kökte ikinci
+   * kez listelenmez. `folderId` verilirse yalnızca o klasörün içi.
+   */
+  async listByProject(
+    projectId: string,
+    userId: string,
+    filter: FileContext & { folderId?: string } = {}
+  ): Promise<ProjectFile[]> {
     const jobId = await this.jobIdOfProject(projectId);
-    return this.listByJob(jobId, userId, { ...filter, projectId: filter.taskId || filter.outputId ? undefined : projectId });
+    if (filter.folderId) {
+      const access = await this.assertJobAccess(jobId, userId);
+      this.assertContextAllowed(access, projectId);
+      return this.listByJob(jobId, userId, { folderId: filter.folderId });
+    }
+    const files = await this.listByJob(jobId, userId, {
+      ...filter,
+      projectId: filter.taskId || filter.outputId ? undefined : projectId,
+    });
+    if (filter.taskId || filter.outputId || !(await this.foldersAvailable())) return files;
+
+    const { data: klasorler } = await this.supabase.client
+      .from("file_folders")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("project_id", projectId)
+      .eq("kind", "user")
+      .limit(LISTE_TAVANI);
+    const kullaniciKlasorleri = new Set((klasorler ?? []).map((k: any) => k.id as string));
+    if (!kullaniciKlasorleri.size) return files;
+    return files.filter((f) => !f.folderId || !kullaniciKlasorleri.has(f.folderId));
+  }
+
+  /**
+   * Projenin işin ağacındaki klasörü (kind='project') — proje Dosyalar
+   * sekmesinin klasör gezinmesi bunun İÇİNDE yapılır.
+   *
+   * `ensure` yoksa yalnızca bakılır: klasör, projeye ilk dosya yüklenince ya da
+   * ilk klasör açılınca oluşuyor; sekmeyi açmak bulutta klasör açmamalı.
+   */
+  async projectRootFolder(
+    projectId: string,
+    userId: string,
+    ensure = false
+  ): Promise<{ jobId: string; folder: FileFolderEntry | null }> {
+    const jobId = await this.jobIdOfProject(projectId);
+    const access = await this.assertJobAccess(jobId, userId);
+    this.assertContextAllowed(access, projectId);
+    if (!(await this.foldersAvailable())) return { jobId, folder: null };
+
+    const bul = () =>
+      this.supabase.client
+        .from("file_folders")
+        .select()
+        .eq("job_id", jobId)
+        .eq("kind", "project")
+        .eq("project_id", projectId)
+        .maybeSingle();
+    const { data: mevcut } = await bul();
+    if (mevcut || !ensure) return { jobId, folder: mevcut ? mapFolder(mevcut) : null };
+
+    const { provider, accountId, rootFolderId } = await this.ownerRoot({ kind: "job", id: jobId }, userId);
+    await this.ensureContextFolder(jobId, provider, accountId, rootFolderId, { resolvedProjectId: projectId });
+    const { data: yeni } = await bul();
+    return { jobId, folder: yeni ? mapFolder(yeni) : null };
   }
 
   /**

@@ -95,6 +95,11 @@ interface Props {
   // aynısı). Görevleri başka bir uçta yaşayan listeler (Yapılacaklar'daki kişisel
   // kartlar) burayı geçerek kendi isteğini atar; güncellenmiş görevi döndürmelidir.
   onSetPriority?: (task: Task, priority: TaskPriority) => Promise<Task>;
+  // Karttaki bitiş tarihine çift tıklayınca tarih yerinde değişir (ad
+  // değiştirmenin karşılığı; onTaskRenamed verildiğinde açık). İstek varsayılan
+  // olarak PATCH /tasks/:id'ye gider; kişisel kartlar kendi ucunu buradan verir.
+  // `deadline` ISO dizesidir.
+  onSetDeadline?: (task: Task, deadline: string) => Promise<Task>;
   // Verilirse (ör. iş ekibi sekmesinden bir göreve tıklanıp buraya yönlendirildiğinde),
   // eşleşen görev/alt görev otomatik görünüre kaydırılır ve kısa süreliğine parlayarak
   // fark edilir hale getirilir.
@@ -175,6 +180,13 @@ const columnLabel: Record<TaskStatus, string> = {
  * Kişisel Yapılacaklar kartlarının tarihi olmayabilir — "Invalid Date" basmak
  * yerine o alanı boş bırakıyoruz.
  */
+/** Tarih kutusunun değeri ("YYYY-AA-GG"); görev düzenleyicisindeki dönüşümün aynısı. */
+function toDateInputValue(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+}
+
 function formatDay(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -200,6 +212,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   getTaskMeta,
   getTaskAvatar,
   onSetPriority,
+  onSetDeadline,
   highlightTaskId,
   selectionMode,
   selectedIds,
@@ -245,6 +258,9 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   // Başlığa çift tıklayınca yerinde ad değiştirme (bkz. renderTitle).
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  // Bitiş tarihine çift tıklayınca yerinde tarih değiştirme (bkz. renderDue).
+  const [dateEditId, setDateEditId] = useState<string | null>(null);
+  const [dateValue, setDateValue] = useState("");
   const { pushUndo } = useUndo();
 
   // Hedef görev bir alt görevse, önce ait olduğu üst görevin açılır listesini genişlet
@@ -906,6 +922,107 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     }
   }, []);
 
+  // ------------------------------------------------------------ Tarih değiştirme
+  // Ad değiştirmenin karşılığı: karttaki bitiş tarihine çift tıklamak onu aynı
+  // boyutta bir tarih kutusuna çevirir. Enter ya da odak kaybı kaydeder, Esc
+  // vazgeçer; kaydetme geri alınabilir. Tarihi değiştirmek için modali açıp
+  // tek alanı düzeltip kapatmak, en sık yapılan düzeltme için fazla adımdı.
+  const startDateEdit = (task: Task) => {
+    if (selectionMode || !onTaskRenamed) return;
+    setDateEditId(task.id);
+    setDateValue(toDateInputValue(task.deadline));
+  };
+
+  const commitDateEdit = async (task: Task) => {
+    const value = dateValue;
+    setDateEditId(null);
+    const previous = toDateInputValue(task.deadline);
+    // Boş bırakmak tarihi silmek değildir: görevde bitiş tarihi zorunlu.
+    if (!onTaskRenamed || !value || value === previous) return;
+    const applyDate = async (day: string) => {
+      const iso = new Date(day).toISOString();
+      const updated = onSetDeadline
+        ? await onSetDeadline(task, iso)
+        : await api.patch<Task>(`/tasks/${task.id}`, { deadline: iso });
+      onTaskRenamed(updated);
+    };
+    try {
+      await applyDate(value);
+      if (previous) {
+        pushUndo({
+          label: t("Bitiş tarihi"),
+          run: () => applyDate(previous),
+          redo: () => applyDate(value),
+        });
+      }
+    } catch {
+      // güncellenemedi, kullanıcı tekrar deneyebilir
+    }
+  };
+
+  /** Karttaki bitiş tarihi: normalde metin, çift tıklanınca aynı ölçüde tarih kutusu. */
+  const renderDue = (task: Task, due: string) => {
+    if (dateEditId === task.id) {
+      return (
+        <div ref={stopPressRef} className="no-drag" style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <input
+            type="date"
+            autoFocus
+            value={dateValue}
+            aria-label={t("Bitiş tarihi")}
+            onChange={(e) => setDateValue(e.target.value)}
+            onBlur={() => void commitDateEdit(task)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void commitDateEdit(task);
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                setDateEditId(null);
+              }
+            }}
+            // Ölçüler yerini aldığı metinle aynı: kart yüksekliği oynamasın.
+            style={{
+              fontSize: 12,
+              lineHeight: "inherit",
+              height: "auto",
+              padding: 0,
+              margin: 0,
+              border: "none",
+              borderBottom: `1px solid ${c.accent}`,
+              borderRadius: 0,
+              background: "transparent",
+              color: c.textPrimary,
+              fontFamily: "inherit",
+              width: "auto",
+              minWidth: 0,
+            }}
+          />
+          {task.deadlineTime && <span style={{ fontSize: 12, color: c.textSecondary }}>{task.deadlineTime}</span>}
+        </div>
+      );
+    }
+    const editable = Boolean(onTaskRenamed) && !selectionMode;
+    return (
+      <span
+        onClick={editable ? (e) => e.stopPropagation() : undefined}
+        onDoubleClick={
+          editable
+            ? (e) => {
+                e.stopPropagation();
+                startDateEdit(task);
+              }
+            : undefined
+        }
+        title={editable ? t("Tarihi değiştirmek için çift tıkla") : undefined}
+        style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0, cursor: editable ? "text" : undefined }}
+      >
+        {due}
+      </span>
+    );
+  };
+
   /** Görev/alt görev başlığı: normalde metin, çift tıklanınca düzenlenebilir input. */
   const renderTitle = (task: Task, fontSize: number, color: string) => {
     if (renamingId === task.id) {
@@ -1511,7 +1628,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                       ) : (
                         <span style={{ flex: 1, minWidth: 24 }} />
                       )}
-                      <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{due}</span>
+                      {gorev.deadline ? renderDue(gorev, due) : <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{due}</span>}
                     </div>
                   );
                 })()}

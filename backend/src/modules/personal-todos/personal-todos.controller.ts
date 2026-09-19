@@ -75,6 +75,16 @@ export class PersonalTodosController {
     return this.personalTodosService.update(req.user.userId, id, body);
   }
 
+  /**
+   * Kişisel görevi bir projeye ya da departmana bağlar: aynı alanlarla gerçek
+   * bir görev açılır (kullanıcıya atanmış olarak), kişisel kayıt arşivlenir.
+   * Yanıt yeni görevin tam kaydıdır — sayfa düzenleyiciyi onunla açar.
+   */
+  @Post(":id/promote")
+  promote(@Req() req: any, @Param("id") id: string, @Body() body: { projectId?: string; departmentId?: string }) {
+    return this.personalTodosService.promote(req.user.userId, id, body ?? {});
+  }
+
   /** Kalıcı silmez, arşivler — yanlışlıkla silme geri alınabilsin diye. */
   @Delete(":id")
   archive(@Req() req: any, @Param("id") id: string) {

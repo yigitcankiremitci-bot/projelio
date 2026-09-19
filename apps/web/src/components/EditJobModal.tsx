@@ -7,6 +7,8 @@ import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 import TabVisibilitySection from "./TabVisibilitySection";
+import { JOB_TABS } from "./JobTabs";
+import type { JobTab } from "./JobTabs";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import HireMemberModal from "./HireMemberModal";
 import { IconUser } from "./icons";
@@ -36,6 +38,14 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
   // Kapatılan sekmeler (bkz. TabVisibilitySection). Kaydedene kadar yalnızca
   // burada durur; sayfadaki çubuk "Kaydet"ten sonra tazelenir.
   const [hiddenTabs, setHiddenTabs] = useState<string[]>(job.hiddenTabs ?? []);
+  // İş sayfasının açılış sekmesi (bkz. migration 122). İşe özgü: görevle
+  // yaşayan bir iş "İşler"le, yalnızca bütçesi tutulan bir iş "Bütçe"yle açılabilir.
+  const kayitliAcilis = (job.defaultTab as JobTab) || "projects";
+  const [defaultTab, setDefaultTab] = useState<JobTab>(kayitliAcilis);
+  // Yalnızca AÇIK sekmelerden seçilebilir (bkz. DepartmentSettingsModal, aynı
+  // kural): kapatılan sekme açılış olarak kalırsa sayfa sessizce Projeler'e düşer.
+  const acikSekmeler = JOB_TABS.filter((sekme) => !hiddenTabs.includes(sekme.key));
+  const gecerliAcilis: JobTab = acikSekmeler.some((sekme) => sekme.key === defaultTab) ? defaultTab : "projects";
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [hiring, setHiring] = useState(false);
@@ -65,6 +75,9 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
         title,
         description: description || undefined,
         hiddenTabs,
+        // Yalnızca değiştiyse: migration 122 uygulanmamış bir sunucuda
+        // bilinmeyen kolona yazmak işin diğer ayarlarının kaydını da düşürürdü.
+        ...(gecerliAcilis !== kayitliAcilis ? { defaultTab: gecerliAcilis } : {}),
         // Hazır kapak seçimi (ya da kapağı kaldırma) doğrudan bu alanla kaydedilir;
         // dosya yüklemesi ayrı uçtan gider. Değişmediyse hiç gönderilmez.
         ...(coverValue !== job.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
@@ -124,6 +137,20 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}
         />
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Açılış sekmesi")}</label>
+          <select value={gecerliAcilis} onChange={(e) => setDefaultTab(e.target.value as JobTab)} style={{ width: "100%" }}>
+            {acikSekmeler.map((sekme) => (
+              <option key={sekme.key} value={sekme.key}>
+                {t(sekme.label)}
+              </option>
+            ))}
+          </select>
+          <p style={{ fontSize: 12.5, color: c.textSecondary, margin: 0, lineHeight: 1.45 }}>
+            {t("Bu iş açıldığında ilk görünecek sekme. Yalnızca bu iş için geçerli.")}
+          </p>
+        </div>
 
         <TabVisibilitySection scope="job" value={hiddenTabs} onChange={setHiddenTabs} />
 

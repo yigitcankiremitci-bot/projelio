@@ -42,6 +42,37 @@ function readBoardOpen(): boolean {
   }
 }
 
+/**
+ * "Bugün yapılacaklar" tek satıra inebilir: liste uzadığında panoyu ekranın
+ * altına itiyordu. Tek satırda görevler yan yana kısa çipler olarak durur,
+ * pano hemen altında başlar. Tercih cihazda, tüm işler için ortak.
+ */
+const TODAY_COMPACT_KEY = "projelio_job_today_compact";
+
+function readTodayCompact(): boolean {
+  try {
+    return localStorage.getItem(TODAY_COMPACT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Panodaki hızlı "Görev ekle" satırının yazacağı proje, iş başına hatırlanır.
+ * İş panosu birden çok projeyi birleştiriyor; proje panosundaki satırın
+ * birebir aynısı olabilmesi için yeni görevin hangi projeye gideceği belli
+ * olmalı.
+ */
+const boardProjectKey = (jobId: string) => `projelio_job_board_project:${jobId}`;
+
+function readBoardProject(jobId: string): string {
+  try {
+    return localStorage.getItem(boardProjectKey(jobId)) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export interface JobTasksPanelHandle {
   openCreate: () => void;
 }
@@ -94,6 +125,8 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [boardOpen, setBoardOpen] = useState(readBoardOpen);
+  const [todayCompact, setTodayCompact] = useState(readTodayCompact);
+  const [boardProjectPref, setBoardProjectPref] = useState(() => readBoardProject(jobId));
   // Bugün listesindeki kart için: kaydırmayı bir kez yap (bkz. TaskColumn'daki
   // aynı gerekçe — liste tazelendikçe sayfa yeniden zıplamasın).
   const todayListRef = useRef<HTMLDivElement>(null);
@@ -253,6 +286,46 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
     });
   };
 
+  const toggleTodayCompact = () => {
+    setTodayCompact((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(TODAY_COMPACT_KEY, next ? "1" : "0");
+      } catch {
+        // Gizli sekmede yazım hata verebilir; tercih o oturumda hatırlanmaz.
+      }
+      return next;
+    });
+  };
+
+  // Hatırlanan proje artık yoksa (arşivlendi, işten çıktı) ilk projeye düşülür.
+  const boardProject = projects.find((p) => p.id === boardProjectPref) ?? projects[0];
+  const chooseBoardProject = (projectId: string) => {
+    setBoardProjectPref(projectId);
+    try {
+      localStorage.setItem(boardProjectKey(jobId), projectId);
+    } catch {
+      // tercih yalnızca bu oturumda geçerli kalır
+    }
+  };
+
+  /**
+   * Sütunun altındaki hızlı "Görev ekle" — proje panosundakinin aynısı
+   * (bkz. ProjectDetail.handleCreateTask): aynı varsayılan bitiş tarihi, aynı
+   * geri alma. Tek fark, projenin panonun üstündeki seçiciden gelmesi.
+   */
+  const handleQuickCreate = async (status: TaskStatus, title: string) => {
+    if (!boardProject) return;
+    const deadline = boardProject.deadline ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    try {
+      const created = await api.post<Task>(`/projects/${boardProject.id}/tasks`, { title, status, deadline });
+      onTasksReload();
+      registerTaskCreateUndo(created);
+    } catch {
+      // görev oluşturulamadı, kullanıcı tekrar deneyebilir
+    }
+  };
+
   // Parlama tek seferlik: aynı göreve tekrar çift tıklandığında yeniden
   // tetiklenebilsin diye bir süre sonra temizleniyor.
   useEffect(() => {
@@ -401,7 +474,9 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
         )}
       </div>
 
-      {tasks.length === 0 ? (
+      {/* Görev yoksa ama proje varsa pano yine çizilir: proje panosunda olduğu
+          gibi ilk görev sütunun altındaki satırdan yazılabilsin. */}
+      {tasks.length === 0 && !boardProject ? (
         <div
           style={{
             border: `1px dashed ${c.border}`,
@@ -417,14 +492,47 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {todayTasks.length > 0 && (
-            <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <h4 style={{ color: c.textPrimary, fontSize: 16, fontWeight: 500, margin: 0 }}>{t("Bugün yapılacaklar")}</h4>
+            <div
+              style={{
+                background: c.surface,
+                border: `1px solid ${c.border}`,
+                borderRadius: 10,
+                padding: todayCompact ? "8px 10px" : 12,
+                // Tek satırda başlık ve çipler yan yana; çipler taşarsa satır
+                // büyümez, kendi içinde yana kayar.
+                display: todayCompact ? "flex" : undefined,
+                alignItems: todayCompact ? "center" : undefined,
+                gap: todayCompact ? 10 : undefined,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: todayCompact ? 0 : 10, flexShrink: 0 }}>
+                <h4 style={{ color: c.textPrimary, fontSize: todayCompact ? 14 : 16, fontWeight: 500, margin: 0, whiteSpace: "nowrap" }}>
+                  {t("Bugün yapılacaklar")}
+                </h4>
                 <span style={{ fontSize: 13, color: c.textSecondary, background: c.background, border: `1px solid ${c.border}`, borderRadius: 20, padding: "1px 7px" }}>
                   {todayTasks.length}
                 </span>
+                {!todayCompact && <span style={{ flex: 1 }} />}
+                {!todayCompact && (
+                  <button
+                    type="button"
+                    onClick={toggleTodayCompact}
+                    aria-label={t("Tek satıra küçült")}
+                    title={t("Tek satıra küçült")}
+                    style={{ marginLeft: "auto", display: "flex", padding: 4, border: "none", background: "transparent", cursor: "pointer" }}
+                  >
+                    <IconChevronUp size={16} color={c.textSecondary} />
+                  </button>
+                )}
               </div>
-              <div ref={todayListRef} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div
+                ref={todayListRef}
+                style={
+                  todayCompact
+                    ? { display: "flex", gap: 6, flex: 1, minWidth: 0, overflowX: "auto", scrollbarWidth: "thin" }
+                    : { display: "flex", flexDirection: "column", gap: 6 }
+                }
+              >
                 {todayTasks.map((gorev) => (
                   <button
                     key={gorev.id}
@@ -437,27 +545,65 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
                       e.stopPropagation();
                       click.double(() => openTaskSource(gorev, "today"));
                     }}
-                    title={t("Tıkla: görevi aç · Çift tıkla: görevin bulunduğu sayfaya git")}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "8px 10px",
-                      borderRadius: 8,
-                      border: `1px solid ${c.border}`,
-                      background: c.background,
-                      textAlign: "left",
-                    }}
+                    title={
+                      todayCompact
+                        ? `${gorev.title}${getTaskMeta(gorev) ? ` · ${getTaskMeta(gorev)}` : ""}`
+                        : t("Tıkla: görevi aç · Çift tıkla: görevin bulunduğu sayfaya git")
+                    }
+                    style={
+                      todayCompact
+                        ? {
+                            flexShrink: 0,
+                            maxWidth: 220,
+                            padding: "4px 10px",
+                            borderRadius: 20,
+                            border: `1px solid ${c.border}`,
+                            background: c.background,
+                            fontSize: 13,
+                            color: c.textPrimary,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            textAlign: "left",
+                          }
+                        : {
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "8px 10px",
+                            borderRadius: 8,
+                            border: `1px solid ${c.border}`,
+                            background: c.background,
+                            textAlign: "left",
+                          }
+                    }
                   >
-                    <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, minWidth: 0, overflowWrap: "break-word", wordBreak: "break-word" }}>
-                      {gorev.title}
-                    </span>
-                    {getTaskMeta(gorev) && (
-                      <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{getTaskMeta(gorev)}</span>
+                    {todayCompact ? (
+                      gorev.title
+                    ) : (
+                      <>
+                        <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, minWidth: 0, overflowWrap: "break-word", wordBreak: "break-word" }}>
+                          {gorev.title}
+                        </span>
+                        {getTaskMeta(gorev) && (
+                          <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{getTaskMeta(gorev)}</span>
+                        )}
+                      </>
                     )}
                   </button>
                 ))}
               </div>
+              {todayCompact && (
+                <button
+                  type="button"
+                  onClick={toggleTodayCompact}
+                  aria-label={t("Listeyi aç")}
+                  title={t("Listeyi aç")}
+                  style={{ flexShrink: 0, display: "flex", padding: 4, border: "none", background: "transparent", cursor: "pointer" }}
+                >
+                  <IconChevronDown size={16} color={c.textSecondary} />
+                </button>
+              )}
             </div>
           )}
 
@@ -506,6 +652,28 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
             )}
           </button>
 
+          {/* Hızlı ekleme satırının hedef projesi. Tek proje varsa seçilecek
+              bir şey yok, satır çizilmez. */}
+          {boardOpen && projects.length > 1 && boardProject && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: -4 }}>
+              <label htmlFor={`job-board-project-${jobId}`} style={{ fontSize: 13, color: c.textSecondary }}>
+                {t("Yeni görevler şu projeye:")}
+              </label>
+              <select
+                id={`job-board-project-${jobId}`}
+                value={boardProject.id}
+                onChange={(e) => chooseBoardProject(e.target.value)}
+                style={{ fontSize: 13, padding: "4px 8px", maxWidth: 240 }}
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Masaüstünde üç sütun yan yana, dar ekranda alt alta. */}
           {boardOpen && (
           <div
@@ -526,6 +694,9 @@ const JobTasksPanel = forwardRef<JobTasksPanelHandle, Props>(function JobTasksPa
                 <TaskColumn
                   status={status}
                   allTasks={sortedTasks}
+                  // Proje panosundaki gibi sütunun altında hızlı ekleme; işte hiç
+                  // proje yoksa yazacak yer olmadığı için satır gizli kalır.
+                  onCreate={boardProject ? handleQuickCreate : undefined}
                   onCreateSubtask={onCreateSubtask}
                   onMove={onMoveTask}
                   onToggleComplete={onToggleComplete}

@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { LIO_LAUNCHER, Z, lioBottomCss } from "../lib/layout";
+import type { PointerEvent as ReactPointerEvent } from "react";
+import { useLocation } from "react-router-dom";
+import { LIO_LAUNCHER, Z, lioBottomCss, lioKucukMu, lioLauncherSize } from "../lib/layout";
+import { setLioCompact, setLioLift, useLioLift, useLioModalAcik } from "../lib/lioBalon";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { onAskLio } from "../lib/askLio";
 import { setLioPanelOpen } from "../lib/lioPanel";
@@ -14,6 +17,13 @@ const HOVER_SCALE = 1.28;
 const EYES_CLOSED_DURATION = 300;
 const IDLE_BLINK_RANGE: [number, number] = [10000, 12000];
 const HOVER_BLINK_RANGE: [number, number] = [4000, 6000];
+/**
+ * Bu kadar pikselden az kayan basış sürükleme değil tıklamadır. Eşik olmasa
+ * elin titremesi bile tıklamayı yutup paneli açılmaz hale getirirdi.
+ */
+const DRAG_THRESHOLD = 5;
+/** Balon yukarı taşınırken üst bantta (çan, yardım düğmesi) bırakılacak pay. */
+const TOP_CLEARANCE = 96;
 
 /**
  * Lio'nun (Projelio AI asistanı) uygulama genelindeki giriş noktası: sağ altta
@@ -36,6 +46,24 @@ export default function AiLauncher() {
   // halde panel her açıldığında aynı mesaj tekrar gelirdi.
   const [pendingRequest, setPendingRequest] = useState<AskLioRequest | null>(null);
   const hoveredRef = useRef(hovered);
+  const location = useLocation();
+  const modalAcik = useLioModalAcik();
+  // Çalışma alanlarında ve bir pencere açıkken küçük (bkz. lioKucukMu, lib/lioBalon).
+  const compact = modalAcik || lioKucukMu(location.pathname);
+  const lift = useLioLift();
+  /**
+   * Sürükleme durumu. Ref'te: her pointermove'da render tetiklemesin, yalnızca
+   * yükseklik (depo) değişsin. `moved` bırakıştan sonraki click'i yutmak için —
+   * yoksa balonu taşıyan her kullanıcı paneli de açardı.
+   */
+  const drag = useRef<{ startY: number; startLift: number; moved: boolean; pointerId: number } | null>(null);
+  const suppressClick = useRef(false);
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    setLioCompact(compact);
+  }, [compact]);
+  useEffect(() => () => setLioCompact(false), []);
 
   useEffect(() => {
     hoveredRef.current = hovered;
@@ -96,19 +124,66 @@ export default function AiLauncher() {
   // Mobilde alt menünün üstünde kalsın; masaüstünde ekranın sağ altına otursun.
   // Sayı değil CSS: çentikli telefonlarda menü güvenli alan kadar büyüyor ve
   // düz 96 px'te duran balon menünün üstüne biniyordu (bkz. lioBottomCss).
-  const bottom = lioBottomCss(isDesktop);
-  const size = isDesktop ? LIO_LAUNCHER.sizeDesktop : LIO_LAUNCHER.sizeMobile;
+  const size = lioLauncherSize(isDesktop, compact);
+  // Pencere küçülünce balon ekranın dışında kalmasın: taşıma payı her çizimde
+  // o anki yüksekliğe göre kırpılır (kayıtlı değer değişmez).
+  const maxLift = () => Math.max(0, window.innerHeight - size - TOP_CLEARANCE - LIO_LAUNCHER.bottomMobile);
+  const effectiveLift = Math.min(lift, maxLift());
+  const bottom = lioBottomCss(isDesktop, effectiveLift);
+
+  // Tut-taşı: yalnızca dikey. Balonun altında kalan kartın düğmesine ulaşmak
+  // için onu biraz yukarı itmek yetiyor; serbest konum ise "Lio nerede?"
+  // sorusunu doğururdu. Konum cihazda hatırlanır.
+  const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    drag.current = { startY: e.clientY, startLift: effectiveLift, moved: false, pointerId: e.pointerId };
+  };
+  const onPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const d = drag.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    const dy = e.clientY - d.startY;
+    if (!d.moved) {
+      if (Math.abs(dy) < DRAG_THRESHOLD) return;
+      d.moved = true;
+      // Parmak/imleç balondan çıksa da olaylar gelmeye devam etsin.
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setHovered(false);
+      setDragging(true);
+    }
+    setLioLift(Math.min(maxLift(), Math.max(0, d.startLift - dy)));
+  };
+  const endDrag = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const d = drag.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    drag.current = null;
+    if (!d.moved) return;
+    setDragging(false);
+    suppressClick.current = true;
+    setLioLift(Math.min(maxLift(), Math.max(0, d.startLift - (e.clientY - d.startY))), true);
+  };
 
   return (
     <>
       {!open && (
         <button
           {...tourAnchor("lio-launcher")}
-          onClick={() => setOpen(true)}
-          onMouseEnter={() => setHovered(true)}
+          onClick={() => {
+            if (suppressClick.current) {
+              suppressClick.current = false;
+              return;
+            }
+            setOpen(true);
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onMouseEnter={() => {
+            if (!drag.current?.moved) setHovered(true);
+          }}
           onMouseLeave={() => setHovered(false)}
           aria-label={t("Lio'yu aç")}
-          title="Lio (⌘K)"
+          title={t("Lio (⌘K) · yukarı sürükleyerek taşıyabilirsin")}
           style={{
             position: "fixed",
             right: LIO_LAUNCHER.right,
@@ -120,7 +195,12 @@ export default function AiLauncher() {
             background: "transparent",
             overflow: "visible",
             zIndex: Z.aiLauncher,
-            cursor: "pointer",
+            cursor: dragging ? "grabbing" : "pointer",
+            // Dokunmatikte basılı tutup kaydırmak sayfayı değil balonu taşısın.
+            touchAction: "none",
+            // Boy değişimi (çalışma alanına girip çıkarken) ve bırakış yumuşak;
+            // sürüklerken geçiş kapalı, yoksa balon parmağın gerisinde kalır.
+            transition: dragging ? "none" : "width 0.25s ease, height 0.25s ease, bottom 0.2s ease",
           }}
         >
           <div

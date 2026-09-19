@@ -484,7 +484,11 @@ export default function TasksOverview() {
 
   const handleRenamed = (updated: Task) => {
     setItems((prev) =>
-      prev.map((i) => (i.itemId === updated.id ? { ...i, title: updated.title, priority: updated.priority } : i))
+      prev.map((i) =>
+        i.itemId === updated.id
+          ? { ...i, title: updated.title, priority: updated.priority, effectiveDueDate: updated.deadline || i.effectiveDueDate }
+          : i
+      )
     );
   };
 
@@ -500,6 +504,20 @@ export default function TasksOverview() {
       await api.patch(`/tasks/${task.id}`, { priority });
     }
     return { ...task, priority };
+  };
+
+  /**
+   * Karttaki tarihe çift tıklayıp değiştirme (bkz. TaskColumn.renderDue).
+   * Kişisel kartın tarihi kendi ucunda (dueDate), atanan kartınki görevde.
+   */
+  const handleSetDeadline = async (task: Task, deadline: string): Promise<Task> => {
+    const source = sourceById.get(task.id);
+    if (source === "personal") {
+      await api.patch(`/todos/${task.id}`, { dueDate: deadline });
+    } else {
+      await api.patch(`/tasks/${task.id}`, { deadline });
+    }
+    return { ...task, deadline };
   };
 
   // "Üzerinde çalışıyorum" yalnızca gerçek görevlerde anlamlı: users.active_task_id
@@ -708,6 +726,7 @@ export default function TasksOverview() {
                 onTaskRenamed={handleRenamed}
                 onRenameTask={handleRename}
                 onSetPriority={handleSetPriority}
+                onSetDeadline={handleSetDeadline}
                 // Başka bir ölçütle sıralıyken kolon içinde sürükleyip sıra
                 // değiştirmek anlamsız: kart bırakıldığı yerde durmaz, ölçüte göre
                 // geri sıçrar. Bu yüzden sıralama kapatılıyor — kolonlar arası
@@ -731,7 +750,8 @@ export default function TasksOverview() {
       )}
 
       {/* Atanan kart gerçek görev düzenleyicisini açar — proje sayfasındakiyle
-          birebir aynı ekran. Kişisel kartın kendi hafif düzenleyicisi var. */}
+          birebir aynı ekran. Kişisel kartın düzenleyicisi aynı iskeleti taşır
+          (bkz. PersonalTodoModal); farkı yalnızca kişisel görevde olmayan alanlar. */}
       {editingTask && (
         <TaskEditModal
           task={editingTask}
@@ -748,6 +768,12 @@ export default function TasksOverview() {
             setEditingTask(null);
             load();
           }}
+          // Pano projeden bağımsız: taşınan görev kullanıcıya atanmış kaldığı
+          // sürece yine burada, yalnızca alt yazısı (proje adı) değişir.
+          onMoved={() => {
+            setEditingTask(null);
+            load();
+          }}
         />
       )}
 
@@ -757,6 +783,14 @@ export default function TasksOverview() {
           onClose={() => setEditingPersonal(null)}
           onChanged={() => {
             setEditingPersonal(null);
+            load();
+          }}
+          // Kişisel görev projeye/departmana atandı: aynı pencere bu kez gerçek
+          // görevin düzenleyicisi olarak açılır (ekip, bütçe, dosyalar hemen
+          // doldurulabilsin). Kart panoda "atanan" olarak kalıyor.
+          onPromoted={(task) => {
+            setEditingPersonal(null);
+            setEditingTask(task);
             load();
           }}
         />

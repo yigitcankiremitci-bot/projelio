@@ -98,7 +98,7 @@ export const filesApi = {
     api.get<ProjectFile[]>(`/jobs/${jobId}/files${query(filter as Record<string, string | undefined>)}`),
 
   /** Proje/görev/çıktı ekranı: işi backend projeden türetir. */
-  listByProject: (projectId: string, filter: Omit<FileContext, "projectId"> = {}) =>
+  listByProject: (projectId: string, filter: Omit<FileContext, "projectId"> & { folderId?: string } = {}) =>
     api.get<ProjectFile[]>(
       `/projects/${projectId}/files${query(filter as Record<string, string | undefined>)}`
     ),
@@ -169,6 +169,14 @@ export const filesApi = {
     api.get<FileFolder[]>(
       `/file-folders${query({ ownerKind: owner.kind, ownerId: owner.id, parentId })}`
     ),
+  /**
+   * Projenin işin ağacındaki klasörü: proje Dosyalar sekmesinde gezinmenin
+   * kökü. GET yalnızca bakar (yoksa `folder: null`), POST yoksa oluşturur.
+   */
+  projectRootFolder: (projectId: string) =>
+    api.get<{ jobId: string; folder: FileFolder | null }>(`/projects/${projectId}/file-folder`),
+  ensureProjectRootFolder: (projectId: string) =>
+    api.post<{ jobId: string; folder: FileFolder | null }>(`/projects/${projectId}/file-folder`, {}),
   folderPath: (folderId: string) => api.get<FileFolder[]>(`/file-folders/${folderId}/path`),
   createFolder: (owner: FileFolderOwner, name: string, parentFolderId?: string) =>
     api.post<FileFolder>("/file-folders", {

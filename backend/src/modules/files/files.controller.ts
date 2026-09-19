@@ -365,9 +365,28 @@ export class FilesController {
     @Param("projectId") projectId: string,
     @Req() req: any,
     @Query("taskId") taskId?: string,
-    @Query("outputId") outputId?: string
+    @Query("outputId") outputId?: string,
+    @Query("folderId") folderId?: string
   ) {
-    return this.filesService.listByProject(projectId, req.user.userId, { taskId, outputId });
+    return this.filesService.listByProject(projectId, req.user.userId, {
+      taskId,
+      outputId,
+      folderId: folderId || undefined,
+    });
+  }
+
+  /** Projenin işin ağacındaki klasörü; proje sekmesindeki gezinmenin kökü. */
+  @Get("projects/:projectId/file-folder")
+  @UseGuards(AuthGuard("jwt"))
+  projectRootFolder(@Param("projectId") projectId: string, @Req() req: any) {
+    return this.filesService.projectRootFolder(projectId, req.user.userId);
+  }
+
+  /** Aynısı, yoksa oluşturarak — projede ilk klasör açılırken. */
+  @Post("projects/:projectId/file-folder")
+  @UseGuards(AuthGuard("jwt"))
+  ensureProjectRootFolder(@Param("projectId") projectId: string, @Req() req: any) {
+    return this.filesService.projectRootFolder(projectId, req.user.userId, true);
   }
 
   // Hiyerarşi: üst kademeler altındaki her şeyi tek listede görür.

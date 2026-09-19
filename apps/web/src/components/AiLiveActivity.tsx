@@ -6,6 +6,7 @@ import { onLioActivity } from "../lib/liveRoom";
 import { useAppPrefs } from "../lib/appPrefs";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useLioPanelOpen } from "../lib/lioPanel";
+import { useLioCompact, useLioLift } from "../lib/lioBalon";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconSparkle } from "./icons";
 
@@ -38,6 +39,9 @@ export default function AiLiveActivity() {
   const location = useLocation();
   const isDesktop = useIsDesktop();
   const panelOpen = useLioPanelOpen();
+  // Balon küçülmüş ya da yukarı taşınmış olabilir; şerit hep onun üstünde.
+  const compact = useLioCompact();
+  const lift = useLioLift();
   const { showLio } = useAppPrefs();
   const [activity, setActivity] = useState<LioActivityPayload | null>(null);
 
@@ -83,7 +87,7 @@ export default function AiLiveActivity() {
 
   if (!activity) return null;
 
-  const anchor = lioActivityAnchor({ isDesktop, panelOpen, launcherVisible: showLio });
+  const anchor = lioActivityAnchor({ isDesktop, panelOpen, launcherVisible: showLio, compact, lift });
   // Şerit sağa yaslı: sola doğru büyürken ekrandan taşmasın.
   const maxWidth = `min(calc(100vw - ${anchor.right + 16}px), 420px)`;
 

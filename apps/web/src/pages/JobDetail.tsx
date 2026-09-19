@@ -91,9 +91,13 @@ export default function JobDetail() {
   // Sahibinin ayarlardan kapattığı sekmeler de daraltır (bkz. Job.hiddenTabs).
   const hiddenTabs = job?.hiddenTabs;
   const validTabs: JobTab[] = visibleJobTabs(isSubcontractor, hiddenTabs).map((t) => t.key);
-  const activeTab: JobTab = validTabs.includes(tabParam as JobTab) ? (tabParam as JobTab) : "projects";
+  // Açılış sekmesi işin kendi ayarı (bkz. Job.defaultTab, migration 122).
+  // Kapatılmış bir sekmeyi gösteriyorsa kilitli "Projeler"e düşülür.
+  const preferredTab = (job?.defaultTab as JobTab) || "projects";
+  const defaultTab: JobTab = validTabs.includes(preferredTab) ? preferredTab : "projects";
+  const activeTab: JobTab = validTabs.includes(tabParam as JobTab) ? (tabParam as JobTab) : defaultTab;
   const setActiveTab = (next: JobTab) => {
-    setSearchParams(next === "projects" ? {} : { tab: next }, { replace: true });
+    setSearchParams(next === defaultTab ? {} : { tab: next }, { replace: true });
   };
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [parentCompletePrompt, setParentCompletePrompt] = useState<Task | null>(null);

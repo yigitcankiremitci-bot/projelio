@@ -234,6 +234,11 @@ export interface Job {
   projectCount?: number;
   // Sahibinin kapattığı sekmeler (bkz. hiddenTabs açıklaması / TabScope).
   hiddenTabs?: string[];
+  /**
+   * İş sayfasının açılış sekmesi (bkz. migration 122). Tanımsızsa "projects".
+   * Kapatılmış bir sekmeyi gösteriyorsa sayfa Projeler'e düşer.
+   */
+  defaultTab?: string;
   // İlk girişte açılan eğitici örnek iş (bkz. migration 118). Arayüz bu işte
   // "Örnekleri sil" şeridini gösterir.
   isSample?: boolean;

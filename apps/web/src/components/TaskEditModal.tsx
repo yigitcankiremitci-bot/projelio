@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState } from "react";
-import type { CSSProperties } from "react";
 import type { Output, Task, TaskComment } from "@projelio/shared";
 import { dakikayiMetneCevir } from "@projelio/shared";
 import { api } from "../api/client";
@@ -13,6 +12,8 @@ import TaskAttachmentsPanel from "./TaskAttachmentsPanel";
 import TaskDependenciesPanel from "./TaskDependenciesPanel";
 import AutoGrowTextarea from "./AutoGrowTextarea";
 import AutoGrowNotes from "./AutoGrowNotes";
+import GorevKonumu from "./GorevKonumu";
+import { halfField, twoColumnRow } from "./gorevFormDuzeni";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { IconIndent, IconOutdent } from "./icons";
 import { useUndo } from "../lib/undo";
@@ -39,41 +40,18 @@ interface Props {
   onTaskPatched?: (updated: Task) => void;
   onDeleted?: (deletedTaskId: string) => void;
   onArchived?: (archivedTaskId: string) => void;
+  /**
+   * Verilirse "Konum" bölümü çıkar: görev pencereden başka bir projeye ya da
+   * departmana taşınabilir. İsteğe bağlı, çünkü taşınan görev çağıran listeden
+   * ÇIKMALI — `onSaved` ile kaydı yerinde güncelleyen sayfalar onu başka bir
+   * projenin görevi olarak kendi panosunda göstermeye devam ederdi.
+   */
+  onMoved?: (moved: Task) => void;
 }
 
 function toDateInputValue(iso?: string) {
   return iso ? new Date(iso).toISOString().slice(0, 10) : "";
 }
-
-/**
- * İki sütunlu form satırı (tarihler, saat/hatırlatma, ekip/bütçe).
- *
- * NEDEN sabit bir kırılma noktası (useIsDesktop) değil: bu satırların
- * genişliğini pencere değil MODALİN kendisi belirliyor — dar ekranda tam ekran,
- * geniş ekranda 1280 px'e kadar. Sarma (wrap) modalin o anki genişliğine göre
- * kendiliğinden karar verir; iki göz yan yana sığmadığı anda alt alta geçerler.
- */
-const twoColumnRow: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 10 };
-
-/**
- * O satırların tek bir gözü.
- *
- * `minWidth: 0` ŞART: flex gözleri varsayılan olarak `min-width: auto` alır,
- * yani içindeki alanın asgari genişliğinin altına inemezler. Telefonda tarih
- * alanının asgari genişliği (177 px) gözün payına düşenden büyük olduğu için
- * satır dışarı taşıyor, modal yatay kaydırılır hale geliyor ve alanlar üst üste
- * binmiş gibi görünüyordu.
- *
- * 190 px'lik taban ölçü de bu asgari genişliklerden geliyor: iki tarih alanı
- * ancak bu kadar yer bulunca yan yana durabiliyor, bulamayınca satır sarıyor.
- */
-const halfField: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 6,
-  flex: "1 1 190px",
-  minWidth: 0,
-};
 
 export default function TaskEditModal({
   task,
@@ -83,6 +61,7 @@ export default function TaskEditModal({
   onTaskPatched,
   onDeleted,
   onArchived,
+  onMoved,
 }: Props) {
   const c = useThemeColors();
   const t = useT();
@@ -499,6 +478,34 @@ export default function TaskEditModal({
             {t("Görevden ayrıl")}
           </button>
         </div>
+      )}
+
+      {/* Konum: kişisel görev penceresindekiyle aynı bölüm (bkz. GorevKonumu).
+          Alt görev tek başına taşınmaz — üst görevinin kapsamında yaşar. Rutin
+          tekrarının projesi/departmanı yok; bölüm onu "kişisel" sanmasın. */}
+      {onMoved && !isSubtask && (task.projectId || task.departmentId) && (
+        <GorevKonumu
+          projectId={task.projectId}
+          departmentId={task.departmentId}
+          onSec={async (hedef) => {
+            const moved = await api.patch<Task[]>("/tasks/move", { ids: [task.id], ...hedef });
+            const previous = { projectId: task.projectId, departmentId: task.departmentId };
+            pushUndo({
+              label: t("Görev taşındı"),
+              run: async () => {
+                await api.patch("/tasks/move", {
+                  ids: [task.id],
+                  projectId: previous.projectId,
+                  departmentId: previous.projectId ? undefined : previous.departmentId,
+                });
+              },
+              redo: async () => {
+                await api.patch("/tasks/move", { ids: [task.id], ...hedef });
+              },
+            });
+            onMoved(moved.find((m) => m.id === task.id) ?? moved[0] ?? task);
+          }}
+        />
       )}
 
       {/* Çıktı: görevin projenin hangi teslim parçasına ait olduğu. Değişiklik

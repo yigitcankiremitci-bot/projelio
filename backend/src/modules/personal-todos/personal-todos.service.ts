@@ -8,6 +8,7 @@ import type {
   TaskStatus,
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { TasksService } from "../tasks/tasks.service";
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "completed"];
 
@@ -29,7 +30,10 @@ const STATUSES: TaskStatus[] = ["todo", "in_progress", "completed"];
  */
 @Injectable()
 export class PersonalTodosService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private tasksService: TasksService
+  ) {}
 
   // ------------------------------------------------------------------ Pano
 
@@ -222,6 +226,56 @@ export class PersonalTodosService {
     if (error) throw error;
     if (!data) throw new NotFoundException("Görev bulunamadı");
     return { ok: true };
+  }
+
+  /**
+   * Kişisel görevi bir projeye ya da departmana bağlar.
+   *
+   * Kişisel görev ayrı bir tabloda yaşıyor ve proje/departman kavramı yok; onu
+   * "bağlamak" = aynı alanlarla GERÇEK bir görev açmak + kişisel kaydı
+   * arşivlemek. Görev TasksService üzerinden açılıyor ki yetki kontrolü
+   * (projeye görev ekleyebiliyor mu) ve atama kuralı (atanmamış görev
+   * oluşturana düşer) tek yerden gelsin — kart kullanıcının panosunda
+   * "atanan" olarak kalır.
+   *
+   * Sıra ÖNEMLİ: önce görev açılır, sonra kişisel kayıt arşivlenir. Tersinde
+   * yetki hatası kişisel görevi ortadan kaldırmış olurdu. Arşivleme düşerse
+   * en kötü ihtimalle iki kopya kalır; kayıp olmaz.
+   */
+  async promote(
+    userId: string,
+    id: string,
+    body: { projectId?: string; departmentId?: string }
+  ): Promise<Task> {
+    const hedefSayisi = Number(Boolean(body.projectId)) + Number(Boolean(body.departmentId));
+    if (hedefSayisi !== 1) throw new BadRequestException("Bir proje ya da bir departman seçilmeli");
+
+    const todo = await this.findOne(userId, id);
+    if (todo.archivedAt) throw new NotFoundException("Görev bulunamadı");
+
+    const data: Partial<Task> = {
+      title: todo.title,
+      description: todo.description,
+      status: todo.status,
+      // Görevde bitiş tarihi zorunlu; tarihsiz kişisel görev bugüne düşer
+      // (görev oluşturmadaki varsayılanın aynısı).
+      deadline: todo.dueDate,
+      deadlineTime: todo.dueTime,
+      reminderLeadMinutes: todo.reminderLeadMinutes,
+    };
+    const created = body.projectId
+      ? await this.tasksService.create(body.projectId, data, userId)
+      : await this.tasksService.createForDepartment(body.departmentId!, data, userId);
+
+    // Öncelik oluşturma yolunda yok (her yeni görev 0 ile başlıyor); kişisel
+    // kartın yıldızları kaybolmasın diye ayrıca yazılır.
+    if (todo.priority) {
+      await this.supabase.client.from("tasks").update({ priority: todo.priority }).eq("id", created.id);
+      created.priority = todo.priority;
+    }
+
+    await this.archive(userId, id);
+    return created;
   }
 
   async restore(userId: string, id: string): Promise<PersonalTodo> {

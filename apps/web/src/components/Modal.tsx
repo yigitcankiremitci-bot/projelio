@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
 import { FabSuppressed } from "../lib/projectFab";
+import { lioModalAcildi } from "../lib/lioBalon";
 import { IconX } from "./icons";
 
 /**
@@ -99,6 +100,10 @@ export default function Modal({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // Pencere açıkken Lio küçülür: sağ alttaki tam boy balon modalin yapışkan
+  // Kaydet çubuğunun üstüne oturuyordu (bkz. lib/lioBalon).
+  useEffect(() => lioModalAcildi(), []);
 
   useEffect(() => {
     const box = boxRef.current;

@@ -218,7 +218,8 @@ export default function SidebarTree() {
         />
         {isExpanded &&
           JOB_LEAF_TABS.map((t) => {
-            const tabActive = jobActive && (searchTab === t.tab || (!searchTab && t.tab === "projects"));
+            // Adreste sekme yoksa sayfa işin açılış sekmesindedir (bkz. Job.defaultTab).
+            const tabActive = jobActive && (searchTab === t.tab || (!searchTab && t.tab === (job.defaultTab || "projects")));
 
             // "Projeler"/"Rutinler": kendi kapak resmiyle tek tek listelenen açık
             // öğeleri olduğu için (bkz. useSidebarHierarchy openProjectsByJobId/
@@ -232,7 +233,9 @@ export default function SidebarTree() {
               return (
                 <div key={t.tab}>
                   <Row
-                    to={isProjects ? `/jobs/${job.id}` : `/jobs/${job.id}?tab=${t.tab}`}
+                    // Projeler de sekmesiyle birlikte: işin açılış sekmesi başka
+                    // olabilir, çıplak adres oraya düşerdi (bkz. Job.defaultTab).
+                    to={`/jobs/${job.id}?tab=${t.tab}`}
                     icon={t.icon}
                     label={t.label}
                     depth={depth + 1}

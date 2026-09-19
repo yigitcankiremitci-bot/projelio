@@ -366,4 +366,8 @@ export const projeler: TranslationDict = {
   // ─────────────────────────────────────────────── Departman çıktıları
   'Çıktı, departmanın ortaya çıkaracağı somut şey — pazarlamada "Kampanya görselleri", "Aylık rapor" gibi. Görevleri bunların altında toplayabilirsin; zorunlu değil, istersen görevler görünümünde düz liste olarak da çalışabilirsin.':
     'A deliverable is something concrete the department produces — in marketing, "Campaign visuals" or "Monthly report". You can group tasks under them; it is optional, and you can keep working from a flat list in the tasks view.',
+
+  // ─────────────────────────────────────────────── İş ayarları
+  "Bu iş açıldığında ilk görünecek sekme. Yalnızca bu iş için geçerli.":
+    "The tab shown first when this job opens. Applies to this job only.",
 };

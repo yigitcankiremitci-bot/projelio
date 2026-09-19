@@ -206,7 +206,34 @@ export const LIO_LAUNCHER = {
   /** Dar ekranda balon küçülüyor: 132 px telefonun genişliğinin üçte birini yiyordu. */
   sizeDesktop: 132,
   sizeMobile: 88,
+  /**
+   * Çalışma alanlarındaki ve pencere açıkken kullanılan küçük boy (bkz.
+   * lioKucukMu). Tam boy kartların ve modal düğmelerinin üstüne oturuyordu.
+   */
+  sizeDesktopCompact: 72,
+  sizeMobileCompact: 56,
 } as const;
+
+/** Balonun o anki boyu. */
+export function lioLauncherSize(isDesktop: boolean, compact = false): number {
+  if (compact) return isDesktop ? LIO_LAUNCHER.sizeDesktopCompact : LIO_LAUNCHER.sizeMobileCompact;
+  return isDesktop ? LIO_LAUNCHER.sizeDesktop : LIO_LAUNCHER.sizeMobile;
+}
+
+/**
+ * Bu sayfa bir ÇALIŞMA ALANI mı — Lio orada küçük durur.
+ *
+ * Ana sayfalar (panel, organizasyon/grup listeleri, ayarlar) Lio'nun tam boy
+ * durduğu yerler: orada kart düzenlenmiyor, balon bir şeyin üstünü örtmüyor.
+ * İş, proje, rutin, departman, organizasyon/grup ayrıntısı, modül, Yapılacaklar,
+ * Takvim ve Yaptım ise kartlarla dolu; tam boy balon sağ alttaki kartın
+ * düğmelerini kapatıyordu.
+ */
+export function lioKucukMu(pathname: string): boolean {
+  if (/^\/(jobs|projects|operations|departments)\//.test(pathname)) return true;
+  if (/^\/(organizations|groups)\/[^/]+/.test(pathname)) return true;
+  return /^\/(tasks|calendar|worklog)(\/|$)/.test(pathname);
+}
 
 /**
  * Telefondaki alt menünün yüksekliği (güvenli alan HARİÇ).
@@ -255,8 +282,12 @@ export function lioActivityAnchor(opts: {
   panelOpen: boolean;
   /** Lio Ayarlar > Yardımcılar'dan gizlenmişse üstünde durulacak bir balon yok. */
   launcherVisible: boolean;
+  /** Balon küçük mü (bkz. lioKucukMu) — şerit onun hemen üstünde başlasın. */
+  compact?: boolean;
+  /** Kullanıcının balonu yukarı taşıdığı mesafe (bkz. lib/lioBalon). */
+  lift?: number;
 }): { right: number; top?: number; bottom?: string } {
-  const { isDesktop, panelOpen, launcherVisible } = opts;
+  const { isDesktop, panelOpen, launcherVisible, compact = false, lift = 0 } = opts;
 
   if (panelOpen) {
     return isDesktop
@@ -264,10 +295,10 @@ export function lioActivityAnchor(opts: {
       : { right: LIO_LAUNCHER.right, top: AI_PANEL_HEADER_HEIGHT + 8 };
   }
 
-  const size = isDesktop ? LIO_LAUNCHER.sizeDesktop : LIO_LAUNCHER.sizeMobile;
+  const size = lioLauncherSize(isDesktop, compact);
   return {
     right: LIO_LAUNCHER.right,
-    bottom: lioBottomCss(isDesktop, launcherVisible ? size + LIO_ACTIVITY_GAP : 0),
+    bottom: lioBottomCss(isDesktop, launcherVisible ? lift + size + LIO_ACTIVITY_GAP : 0),
   };
 }
 

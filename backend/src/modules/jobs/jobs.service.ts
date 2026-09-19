@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { Job } from "@projelio/shared";
-import { sanitizeHiddenTabs } from "@projelio/shared";
+import { ENTITY_TAB_KEYS, sanitizeHiddenTabs } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { ProjectsService } from "../projects/projects.service";
@@ -30,6 +30,8 @@ function mapJob(row: any): Job {
     sortOrder: row.sort_order ?? 0,
     // Kolon yoksa (migration 091 uygulanmadan) boş dizi: hiçbir sekme kapalı değil.
     hiddenTabs: sanitizeHiddenTabs("job", row.hidden_tabs),
+    // Kolon yoksa (migration 122 uygulanmadan) eski davranış: Projeler.
+    defaultTab: row.default_tab ?? "projects",
     isSample: row.is_sample === true || undefined,
   };
 }
@@ -285,6 +287,14 @@ export class JobsService {
     if (data.coverImageUrl !== undefined) patch.cover_image_url = data.coverImageUrl;
     // Tanınmayan/kilitli anahtarlar ve "hepsini gizle" listesi kayıttan önce elenir.
     if (data.hiddenTabs !== undefined) patch.hidden_tabs = sanitizeHiddenTabs("job", data.hiddenTabs);
+    // Açılış sekmesinin kapatılması ENGELLENMİYOR (departmandaki gibi): sayfa
+    // kapalı sekmeyi atlayıp kilitli "Projeler"e düşüyor (bkz. JobDetail).
+    if (data.defaultTab !== undefined) {
+      if (typeof data.defaultTab !== "string" || !ENTITY_TAB_KEYS.job.includes(data.defaultTab)) {
+        throw new BadRequestException("Geçersiz açılış sekmesi");
+      }
+      patch.default_tab = data.defaultTab;
+    }
     if (data.organizationId !== undefined || data.groupId !== undefined) {
       const nextOrgId = data.organizationId !== undefined ? data.organizationId : undefined;
       const nextGroupId = data.groupId !== undefined ? data.groupId : undefined;

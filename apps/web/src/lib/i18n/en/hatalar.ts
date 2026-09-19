@@ -48,4 +48,5 @@ export const hatalar: TranslationDict = {
     "You don't have a Google Drive or OneDrive account connected. You can connect one in Settings.",
   "Kapak yüklenemedi. Tekrar dene.": "Could not upload the cover. Try again.",
   "Kapak kaldırılamadı. Tekrar dene.": "Could not remove the cover. Try again.",
+  "Bir proje ya da bir departman seçilmeli": "Pick a project or a department",
 };

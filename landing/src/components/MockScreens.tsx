@@ -201,13 +201,13 @@ export default function MockScreen({ kind, locale }: { kind: string; locale: Loc
   return (
     <div
       style={{
-        background: "#f4f1ec",
+        background: "#161a21",
         padding: 18,
         display: "flex",
         flexDirection: "column",
         gap: 10,
         minHeight: 300,
-        backgroundImage: "radial-gradient(rgba(62,72,88,.05) 1px, transparent 1px)",
+        backgroundImage: "radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px)",
         backgroundSize: "18px 18px",
       }}
     >

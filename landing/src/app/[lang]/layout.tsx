@@ -1,9 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "../globals.css";
 import { getDict, isLocale, locales, defaultLocale, type Locale } from "@/i18n";
 import { site } from "@/lib/site";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+
+// Tarayıcı çubuğu da sitenin koyu zeminine uysun (bkz. globals.css --paper).
+export const viewport: Viewport = {
+  themeColor: "#12151b",
+  colorScheme: "dark",
+};
 
 export function generateStaticParams() {
   return locales.map((lang) => ({ lang }));
@@ -110,6 +116,8 @@ export default async function LangLayout({
         <a className="skip-link" href="#main">
           {locale === "en" ? "Skip to content" : "İçeriğe geç"}
         </a>
+        {/* İnce film greni: koyu düz yüzeylerin "dijital" görünmesini kırar. */}
+        <div className="grain" aria-hidden="true" />
         <Header dict={dict} locale={locale} />
         <main id="main">{children}</main>
         <Footer dict={dict} locale={locale} />

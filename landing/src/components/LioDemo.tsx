@@ -169,7 +169,9 @@ export default function LioDemo({ dict }: { dict: Dict }) {
           {messages.map((m) => (
             <div key={m.id} className={m.from === "user" ? "bubble bubble-user" : "bubble bubble-lio"}>
               {m.text}
-              <time>{m.at}</time>
+              {/* İlk mesajın saati sunucuda (UTC) ve tarayıcıda (yerel saat)
+                  ayrı hesaplanıyor; farkı hydration hatası saymasın. */}
+              <time suppressHydrationWarning>{m.at}</time>
             </div>
           ))}
           {typing && (

@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { getDict, type Locale } from "@/i18n";
 import { appLinks, path, site } from "@/lib/site";
@@ -9,7 +8,10 @@ import MockScreen from "@/components/MockScreens";
 import Stats from "@/components/Stats";
 import HowSteps from "@/components/HowSteps";
 import LiveProduct from "@/components/LiveProduct";
-import { ArrowRight, CheckSmall, featureIcons, lioIcons, securityIcons } from "@/components/Icons";
+import FeatureFilm from "@/components/FeatureFilm";
+import JourneyFilm from "@/components/JourneyFilm";
+import DepartmentModules from "@/components/DepartmentModules";
+import { ArrowRight, CheckSmall, lioIcons, securityIcons } from "@/components/Icons";
 
 export default async function HomePage({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = await params;
@@ -17,6 +19,8 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
   const dict = getDict(lang);
 
   const faqPreview = dict.faq.categories[0].items.slice(0, 5);
+  // Aynı modül birden çok departmanda olabiliyor (ör. Hesaplar); şeritte bir kez.
+  const allModules = [...new Set(dict.modules.items.flatMap((m) => m.modules))];
   const faqJsonLd = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -65,6 +69,15 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
           <span className="orb orb-1" />
           <span className="orb orb-2" />
           <span className="orb orb-3" />
+          {/* Pist ışıkları: ufukta sırayla yanıp sönen bronz noktalar. */}
+          <span className="runway">
+            <i />
+            <i />
+            <i />
+            <i />
+            <i />
+            <i />
+          </span>
         </div>
         <div className="wrap hero-grid">
           <div>
@@ -95,7 +108,12 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
             </div>
           </div>
 
-          <LioDemo dict={dict} />
+          <div className="hero-product">
+            <span className="lio-orbit" aria-hidden="true">
+              <i />
+            </span>
+            <LioDemo dict={dict} />
+          </div>
         </div>
       </section>
 
@@ -128,6 +146,10 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
           </div>
         </div>
       </section>
+
+      {/* ------------------------------------------------------- JOURNEY -- */}
+      {/* Dört sahne, aşağı kaydırdıkça yana akar (bkz. JourneyFilm.tsx). */}
+      <JourneyFilm dict={dict} />
 
       {/* ----------------------------------------------------------- HOW -- */}
       <section className="section">
@@ -213,7 +235,12 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
       </section>
 
       {/* ----------------------------------------------------------- LIO -- */}
-      <section className="section section-dark" id="lio">
+      <section className="section section-dark lio-section" id="lio">
+        <div className="lio-aura" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </div>
         <div className="wrap">
           <div className="section-head center">
             <span className="eyebrow">{dict.lio.eyebrow}</span>
@@ -262,62 +289,35 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
             <h2 className="h2">{dict.modules.title}</h2>
             <p className="lede">{dict.modules.lede}</p>
           </div>
-          <div className="grid grid-4">
-            {dict.modules.items.map((m, i) => (
-              <Reveal key={m.slug} delay={(i % 4) * 70}>
-                <article className="module-card" style={{ height: "100%" }}>
-                  <figure>
-                    <Image
-                      src={`/modules/${m.slug}.webp`}
-                      alt={m.title}
-                      width={800}
-                      height={600}
-                      sizes="(max-width: 700px) 100vw, (max-width: 1000px) 50vw, 25vw"
-                      loading="lazy"
-                    />
-                  </figure>
-                  <div className="body">
-                    <h3>{m.title}</h3>
-                    <p>{m.text}</p>
-                  </div>
-                </article>
-              </Reveal>
-            ))}
-          </div>
+          {/* Departmanlar tek sıra yana kayar; seçilenin modülleri altında. */}
+          <DepartmentModules dict={dict} />
           <div className="center" style={{ marginTop: 34 }}>
             <Link className="btn btn-ghost" href={path(locale, "contact")}>
               {dict.modules.cta} <ArrowRight />
             </Link>
           </div>
         </div>
-      </section>
 
-      {/* ------------------------------------------------------ FEATURES -- */}
-      <section className="section section-alt" id="features">
-        <div className="wrap">
-          <div className="section-head">
-            <span className="eyebrow">{dict.features.eyebrow}</span>
-            <h2 className="h2">{dict.features.title}</h2>
-            <p className="lede">{dict.features.lede}</p>
-          </div>
-          <div className="grid grid-4">
-            {dict.features.items.map((item, i) => {
-              const Icon = featureIcons[i % featureIcons.length];
-              return (
-                <Reveal key={item.title} delay={(i % 4) * 60}>
-                  <div className="card card-hover" style={{ height: "100%" }}>
-                    <span className="icon-badge">
-                      <Icon />
-                    </span>
-                    <h3 className="h3">{item.title}</h3>
-                    <p>{item.text}</p>
-                  </div>
-                </Reveal>
-              );
-            })}
+        {/* Kataloğun genişliğini gösteren kayan şerit: tüm modül adları, bir
+            kez. Liste iki kez basılıyor, animasyon yarıda başa sarınca dikiş
+            görünmesin diye; ikinci kopya ekran okuyucudan gizli. */}
+        <div className="module-marquee" style={{ marginTop: 56, marginBottom: 0 }}>
+          <div className="marquee-track">
+            {[0, 1].map((copy) =>
+              allModules.map((name, i) => (
+                <span key={`${copy}-${name}`} aria-hidden={copy === 1 ? true : undefined}>
+                  <i>{String(i + 1).padStart(2, "0")}</i>
+                  {name}
+                </span>
+              )),
+            )}
           </div>
         </div>
       </section>
+
+      {/* ------------------------------------------------------ FEATURES -- */}
+      {/* Aşağı kaydırdıkça yana akan şerit (bkz. FeatureFilm.tsx). */}
+      <FeatureFilm dict={dict} />
 
       {/* --------------------------------------------------- SCREENSHOTS -- */}
       <section className="section">
@@ -437,6 +437,11 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
       <section className="section-tight">
         <div className="wrap">
           <div className="cta-band on-dark">
+            <span className="cta-orbit" aria-hidden="true">
+              <i />
+              <i />
+              <b>✦</b>
+            </span>
             <h2 className="h2">{dict.ctaBand.title}</h2>
             <p>{dict.ctaBand.text}</p>
             <div className="btn-row">

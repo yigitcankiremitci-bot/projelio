@@ -2,6 +2,7 @@ import type {
   CreateFileDownloadLinkInput,
   FileDownloadLink,
   FileDownloadLinkSendResult,
+  Locale,
   PublicFileAccess,
   UpdateFileDownloadLinkInput,
 } from "@projelio/shared";
@@ -39,9 +40,11 @@ export const fileDownloadLinksApi = {
    *
    * Adresler SERBEST YAZILIR (virgül, noktalı virgül, boşluk ya da alt alta);
    * ayrıştırma sunucuda — ikinci bir kopya iki yerde ayrışırdı.
+   *
+   * `locale` e-postanın dili: alıcının hesabı olmadığı için gönderen seçiyor.
    */
-  send: (id: string, emails: string, note?: string) =>
-    api.post<FileDownloadLinkSendResult>(`/file-download-links/${id}/send`, { email: emails, note }),
+  send: (id: string, emails: string, note?: string, locale?: Locale) =>
+    api.post<FileDownloadLinkSendResult>(`/file-download-links/${id}/send`, { email: emails, note, locale }),
 
   /** Bağlantıyı açan sayfanın ilk çağrısı. */
   open: (token: string) => api.get<PublicFileAccess>(`/public/file-links/${encodeURIComponent(token)}`),

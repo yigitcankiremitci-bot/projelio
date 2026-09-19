@@ -202,7 +202,7 @@ function DosyaKarti({ view }: { view: PublicFileView }) {
             {view.name}
           </h1>
           <div style={{ fontSize: 13, color: c.textSecondary }}>
-            {view.kindLabel}
+            {turEtiketi(t, view.kindLabel)}
             {view.sizeBytes !== undefined ? ` · ${boyut(view.sizeBytes)}` : ""}
             {view.sharedByName ? ` · ${t("{ad} paylaştı", { ad: view.sharedByName })}` : ""}
           </div>
@@ -407,7 +407,7 @@ function PaketSatiri({
         <div style={{ minWidth: 0, flex: "1 1 160px" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary, overflowWrap: "anywhere" }}>{dosya.name}</div>
           <div style={{ fontSize: 12, color: c.textSecondary }}>
-            {dosya.kindLabel}
+            {turEtiketi(t, dosya.kindLabel)}
             {dosya.sizeBytes !== undefined ? ` · ${boyut(dosya.sizeBytes)}` : ""}
           </div>
         </div>
@@ -482,6 +482,33 @@ function Tanitim() {
       </p>
     </div>
   );
+}
+
+/**
+ * Sunucunun ürettiği tür etiketi ("Belge", "E-Tablo") Türkçe gelir (bkz.
+ * backend dosya-turu.ts). Alıcının dili TARAYICIDAN geldiği için çeviri
+ * burada yapılıyor; sözlükte olmayan bir etiket Türkçesiyle kalır.
+ *
+ * Anahtarlar aşağıda AÇIKÇA yazılı: `t(view.kindLabel)` dil denetiminin
+ * göremeyeceği bir anahtar olurdu ve sözlükteki karşılıklar "artık" sayılırdı.
+ */
+function turEtiketi(t: ReturnType<typeof useT>, etiket: string): string {
+  const etiketler: Record<string, string> = {
+    "Google Dokümanı": t("Google Dokümanı"),
+    "Google E-Tablo": t("Google E-Tablo"),
+    "Google Sunu": t("Google Sunu"),
+    Görsel: t("Görsel"),
+    PDF: t("PDF"),
+    Video: t("Video"),
+    Ses: t("Ses"),
+    "E-Tablo": t("E-Tablo"),
+    Sunu: t("Sunu"),
+    Belge: t("Belge"),
+    Arşiv: t("Arşiv"),
+    Metin: t("Metin"),
+    Dosya: t("Dosya"),
+  };
+  return etiketler[etiket] ?? etiket;
 }
 
 /** Kapıyı geçen adresin sekme ömrü boyunca saklandığı anahtar. */

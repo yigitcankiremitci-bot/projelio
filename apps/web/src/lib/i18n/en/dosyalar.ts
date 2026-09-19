@@ -189,6 +189,20 @@ export const dosyalar: TranslationDict = {
   "Dosyayı paylaş": "Share file",
   // Çok dosyalı bağlantı (bkz. migration 121).
   "Dosyaları paylaş": "Share files",
+  // Alıcı sayfasındaki dosya türü etiketleri (sunucu Türkçe üretiyor).
+  // Görsel, PDF, Video, Dosya, Arşiv başka sözlüklerde zaten var.
+  "Google Dokümanı": "Google Doc",
+  "Google E-Tablo": "Google Sheet",
+  "Google Sunu": "Google Slides",
+  "Ses": "Audio",
+  "E-Tablo": "Spreadsheet",
+  "Sunu": "Presentation",
+  "Belge": "Document",
+  "Metin": "Text",
+  // E-posta dili seçimi (paylaşım penceresi).
+  "E-posta dili": "Email language",
+  "Türkçe": "Turkish",
+  "İngilizce": "English",
   "{sayi} dosya için bağlantı oluştur/gönder…": "Create or send link for {sayi} files…",
   "{ilk} ve {sayi} dosya daha": "{ilk} and {sayi} more",
   "{sayi} dosya tek bağlantıda paylaşılır. Bağlantıyı açan kişi Projelio hesabı olmadan hepsini önizleyip indirebilir; bağlantıyı istediğiniz an kaldırabilirsiniz.":

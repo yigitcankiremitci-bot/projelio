@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { FileDownloadLink, FileDownloadLinkSendResult } from "@projelio/shared";
+import type { FileDownloadLink, FileDownloadLinkSendResult, Locale } from "@projelio/shared";
 import type { ProjectFile } from "@projelio/shared";
 import { fileDownloadLinksApi } from "../api/fileDownloadLinks";
 import { formatDateTime } from "../lib/dates";
-import { useT } from "../lib/i18n";
+import { useLocale, useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconCopy, IconLink, IconSend, IconTrash } from "./icons";
@@ -310,6 +310,11 @@ function LinkKarti({
   const [alici, setAlici] = useState(link.recipientEmail ?? "");
   const [gonderAdres, setGonderAdres] = useState(link.recipientEmail ?? "");
   const [not, setNot] = useState("");
+  // E-postanın dili. Alıcının hesabı yok, dilini bilmiyoruz; alıcısını tanıyan
+  // gönderen seçiyor. Varsayılan gönderenin kendi dili: çoğu paylaşım kendi
+  // dilini konuşan birine gidiyor.
+  const { locale } = useLocale();
+  const [dil, setDil] = useState<Locale>(locale);
   // Gönderim sonucu ADRES BAŞINA tutuluyor: "3 adrese gönderildi" ile
   // "2 gitti, 1 gitmedi" arasındaki farkı kullanıcı görmeli.
   const [sonuclar, setSonuclar] = useState<FileDownloadLinkSendResult["results"] | null>(null);
@@ -348,7 +353,7 @@ function LinkKarti({
     setHata("");
     setSonuclar(null);
     try {
-      const sonuc = await fileDownloadLinksApi.send(link.id, gonderAdres, not.trim() || undefined);
+      const sonuc = await fileDownloadLinksApi.send(link.id, gonderAdres, not.trim() || undefined, dil);
       onChange(sonuc.link);
       setSonuclar(sonuc.results);
       // Hepsi gittiyse alanlar temizlenir: aynı listeye ikinci kez basılması
@@ -404,6 +409,20 @@ function LinkKarti({
             rows={2}
             style={{ width: "100%", fontSize: 13, padding: "7px 9px", resize: "vertical" }}
           />
+          <label
+            style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, fontSize: 13, color: c.textSecondary }}
+          >
+            {t("E-posta dili")}
+            <select
+              value={dil}
+              disabled={busy}
+              onChange={(e) => setDil(e.target.value as Locale)}
+              style={{ fontSize: 13, padding: "5px 8px" }}
+            >
+              <option value="tr">{t("Türkçe")}</option>
+              <option value="en">{t("İngilizce")}</option>
+            </select>
+          </label>
           <button
             type="submit"
             data-primary

@@ -60,7 +60,7 @@ export class FileDownloadLinksController {
   @Post("file-download-links/:id/send")
   send(
     @Param("id") id: string,
-    @Body() body: { email?: string; emails?: string[]; note?: string },
+    @Body() body: { email?: string; emails?: string[]; note?: string; locale?: string },
     @Req() req: any
   ) {
     return this.links.sendByEmail(id, req.user.userId, body ?? {});

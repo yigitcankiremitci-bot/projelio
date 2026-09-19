@@ -10,7 +10,8 @@ import type {
   PublicFileView,
   UpdateFileDownloadLinkInput,
 } from "@projelio/shared";
-import { isLikelyEmail, normalizeShareEmail, shareEmailMatches } from "@projelio/shared";
+import type { Locale } from "@projelio/shared";
+import { isLikelyEmail, isLocale, normalizeShareEmail, shareEmailMatches } from "@projelio/shared";
 import { getWebAppUrl } from "../../common/config/env";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { SupabaseService } from "../../database/supabase.service";
@@ -285,7 +286,7 @@ export class FileDownloadLinksService {
   async sendByEmail(
     id: string,
     userId: string,
-    input: { email?: string; emails?: string[]; note?: string }
+    input: { email?: string; emails?: string[]; note?: string; locale?: string }
   ): Promise<FileDownloadLinkSendResult> {
     const row = await this.kendiLinki(id, userId);
     const kapali = kapanmaSebebi(row);
@@ -297,7 +298,12 @@ export class FileDownloadLinksService {
     const dosyaAdi = gorunenAd(ozet.adlar);
     const gonderen = await this.kullanici(userId);
 
+    // Dil GÖNDERENİN seçimi (bkz. indirme-linki-eposta.ts). Tanınmayan değer
+    // Türkçeye düşer: eski istemciler alanı göndermiyor.
+    const dil: Locale = isLocale(input?.locale) ? input.locale : "tr";
+
     const govde = {
+      dil,
       dosyaAdi,
       // Pakette alıcı NE geldiğini mesajdan görebilmeli; "a.pdf ve 4 dosya
       // daha" tek başına muhasebecinin "hepsi geldi mi" sorusunu cevaplamaz.
@@ -308,7 +314,7 @@ export class FileDownloadLinksService {
       boyutMetni: boyutMetni(ozet.toplamBoyut),
     };
     const mail = {
-      subject: paylasimKonusu({ dosyaAdi, paylasanAdi: govde.paylasanAdi, dosyaSayisi: ozet.adlar.length }),
+      subject: paylasimKonusu({ dosyaAdi, paylasanAdi: govde.paylasanAdi, dosyaSayisi: ozet.adlar.length, dil }),
       html: paylasimHtml(govde),
       text: paylasimMetni(govde),
       from: linkGondereni(process.env.EMAIL_FROM, process.env.EMAIL_FROM_LINK) ?? undefined,
@@ -336,7 +342,7 @@ export class FileDownloadLinksService {
       const kopya = { ...govde, kopyaAlicilari: gidenler };
       void this.email
         .sendPrepared(gonderen.email, {
-          subject: kopyaKonusu(dosyaAdi),
+          subject: kopyaKonusu(dosyaAdi, dil),
           html: paylasimHtml(kopya),
           text: paylasimMetni(kopya),
           from: mail.from,

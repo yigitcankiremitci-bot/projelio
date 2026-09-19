@@ -125,4 +125,30 @@ export const epostalar: TranslationDict = {
   "Bu mesaj Projelio yönetimi tarafından hesabınla ilgili olarak gönderildi.": "This message was sent by the Projelio team about your account.",
   "Bağlantıyı aç": "Open link",
   "Bir sorun ya da sorunun olursa bu e-postayı yanıtlaman yeterli.": "If you have a problem or question, just reply to this email.",
+
+  // ─────────────────────────────────────────────── Dosya paylaşım bağlantısı
+  // Alıcı Projelio kullanıcısı değil; dili gönderen seçiyor (bkz. indirme-linki-eposta.ts).
+  "{ad} sizinle bir dosya paylaştı: {dosya}": "{ad} shared a file with you: {dosya}",
+  "{ad} sizinle {sayi} dosya paylaştı: {dosya}": "{ad} shared {sayi} files with you: {dosya}",
+  "Sizinle bir dosya paylaşıldı: {dosya}": "A file was shared with you: {dosya}",
+  "Sizinle {sayi} dosya paylaşıldı: {dosya}": "{sayi} files were shared with you: {dosya}",
+  "Kopya: {dosya} paylaşıldı": "Copy: {dosya} shared",
+  "Sizinle bir dosya paylaşıldı": "A file was shared with you",
+  "Sizinle {sayi} dosya paylaşıldı": "{sayi} files were shared with you",
+  "{ad} sizinle bir dosya paylaştı.": "{ad} shared a file with you.",
+  "{ad} sizinle {sayi} dosya paylaştı.": "{ad} shared {sayi} files with you.",
+  "Bir Projelio kullanıcısı sizinle bir dosya paylaştı.": "A Projelio user shared a file with you.",
+  "Bir Projelio kullanıcısı sizinle {sayi} dosya paylaştı.": "A Projelio user shared {sayi} files with you.",
+  "Aşağıdaki bağlantıdan önizleyebilir ve indirebilirsiniz.": "You can preview and download it using the link below.",
+  "Projelio üzerinden paylaşıldı": "Shared via Projelio",
+  "Toplam {boyut}": "{boyut} in total",
+  "Dosyayı aç": "Open file",
+  "Dosyaları aç": "Open files",
+  "Bu bağlantı yalnızca bu dosya içindir; paylaşan kişi istediği an kapatabilir.":
+    "This link is for this file only; the person who shared it can turn it off at any time.",
+  "Bu bağlantı yalnızca bu dosyalar içindir; paylaşan kişi istediği an kapatabilir.":
+    "This link is for these files only; the person who shared it can turn it off at any time.",
+  "Bağlantı çalışmıyorsa adresi tarayıcınıza yapıştırın:": "If the link doesn't work, paste this address into your browser:",
+  "Bu sizin kopyanız.": "This is your copy.",
+  "Aşağıdaki mesaj şu adreslere gönderildi:": "The message below was sent to:",
 };

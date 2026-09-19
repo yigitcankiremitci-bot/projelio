@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { isLocale } from "@projelio/shared";
+import { gercekEpostaMi, isLocale } from "@projelio/shared";
 import type { Locale } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { EmailService } from "../auth/email.service";
@@ -257,7 +257,10 @@ export class IpucuEpostaProcessor {
     }
     const adaylar: Aday[] = [];
     for (const row of satirlar as any[]) {
-      if (!row.email || !row.email_verified_at || demoEpostasiMi(row.email)) continue;
+      // Gerçek olmayan adres (.test, .invalid, example.com) de elenir: ilk
+      // turda security-test-b@projelio.test'e ipucu gitti — geri dönen her
+      // e-posta gönderen itibarını düşürüyor.
+      if (!row.email || !row.email_verified_at || demoEpostasiMi(row.email) || !gercekEpostaMi(row.email)) continue;
       const ham = Array.isArray(row.notification_email_prefs)
         ? row.notification_email_prefs[0]
         : row.notification_email_prefs;

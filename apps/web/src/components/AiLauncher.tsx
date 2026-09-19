@@ -56,7 +56,14 @@ export default function AiLauncher() {
    * yükseklik (depo) değişsin. `moved` bırakıştan sonraki click'i yutmak için —
    * yoksa balonu taşıyan her kullanıcı paneli de açardı.
    */
-  const drag = useRef<{ startY: number; startLift: number; moved: boolean; pointerId: number } | null>(null);
+  const drag = useRef<{
+    startY: number;
+    startLift: number;
+    /** Son uygulanan yükseklik: bırakış bu değeri kaydeder (bkz. endDrag). */
+    lastLift: number;
+    moved: boolean;
+    pointerId: number;
+  } | null>(null);
   const suppressClick = useRef(false);
   const [dragging, setDragging] = useState(false);
 
@@ -136,7 +143,13 @@ export default function AiLauncher() {
   // sorusunu doğururdu. Konum cihazda hatırlanır.
   const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
-    drag.current = { startY: e.clientY, startLift: effectiveLift, moved: false, pointerId: e.pointerId };
+    drag.current = {
+      startY: e.clientY,
+      startLift: effectiveLift,
+      lastLift: effectiveLift,
+      moved: false,
+      pointerId: e.pointerId,
+    };
   };
   const onPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
     const d = drag.current;
@@ -150,7 +163,8 @@ export default function AiLauncher() {
       setHovered(false);
       setDragging(true);
     }
-    setLioLift(Math.min(maxLift(), Math.max(0, d.startLift - dy)));
+    d.lastLift = Math.min(maxLift(), Math.max(0, d.startLift - dy));
+    setLioLift(d.lastLift);
   };
   const endDrag = (e: ReactPointerEvent<HTMLButtonElement>) => {
     const d = drag.current;
@@ -159,7 +173,12 @@ export default function AiLauncher() {
     if (!d.moved) return;
     setDragging(false);
     suppressClick.current = true;
-    setLioLift(Math.min(maxLift(), Math.max(0, d.startLift - (e.clientY - d.startY))), true);
+    // Bırakışın koordinatına BAKILMAZ, son harekette uygulanan değer kaydedilir.
+    // AYIKLANAN HATA: yükseklik bırakış olayındaki clientY'den yeniden
+    // hesaplanıyordu. Tarayıcı sürüklemeyi iptal ettiğinde (pointercancel)
+    // clientY 0 geliyor; balon ekranın tepesine fırlayıp orada kaydediliyor,
+    // bir daha aşağı indirilemiyordu.
+    setLioLift(d.lastLift, true);
   };
 
   return (
@@ -178,12 +197,18 @@ export default function AiLauncher() {
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
+          // Görseller tarayıcının kendi "resmi sürükle" davranışına kapalı:
+          // açıkken sürükleme bizim yerimize tarayıcının resim sürüklemesine
+          // dönüşüyor, hayalet görsel yalnızca üstteki göz katmanı oluyor ve
+          // masaüstüne bırakılınca göz görseli iniyordu. O sürükleme başlayınca
+          // tarayıcı bizimkini de iptal ediyordu (bkz. endDrag).
+          onDragStart={(e) => e.preventDefault()}
           onMouseEnter={() => {
             if (!drag.current?.moved) setHovered(true);
           }}
           onMouseLeave={() => setHovered(false)}
           aria-label={t("Lio'yu aç")}
-          title={t("Lio (⌘K) · yukarı sürükleyerek taşıyabilirsin")}
+          title={t("Lio (⌘K) · yukarı-aşağı sürükleyerek taşıyabilirsin")}
           style={{
             position: "fixed",
             right: LIO_LAUNCHER.right,
@@ -198,6 +223,8 @@ export default function AiLauncher() {
             cursor: dragging ? "grabbing" : "pointer",
             // Dokunmatikte basılı tutup kaydırmak sayfayı değil balonu taşısın.
             touchAction: "none",
+            userSelect: "none",
+            WebkitUserSelect: "none",
             // Boy değişimi (çalışma alanına girip çıkarken) ve bırakış yumuşak;
             // sürüklerken geçiş kapalı, yoksa balon parmağın gerisinde kalır.
             transition: dragging ? "none" : "width 0.25s ease, height 0.25s ease, bottom 0.2s ease",
@@ -217,7 +244,9 @@ export default function AiLauncher() {
             <img
               src="/lio-base.png"
               alt="Lio"
+              draggable={false}
               style={{
+                pointerEvents: "none",
                 position: "absolute",
                 inset: 0,
                 width: "100%",
@@ -230,7 +259,9 @@ export default function AiLauncher() {
               src="/lio-eyes.png"
               alt=""
               aria-hidden="true"
+              draggable={false}
               style={{
+                pointerEvents: "none",
                 position: "absolute",
                 inset: 0,
                 width: "100%",

@@ -233,5 +233,5 @@ export const lio: TranslationDict = {
   Metin: "Text",
   Ses: "Audio",
   "Önizleme yüklenemedi.": "Could not load the preview.",
-  "Lio (⌘K) · yukarı sürükleyerek taşıyabilirsin": "Lio (⌘K) · drag up to move",
+  "Lio (⌘K) · yukarı-aşağı sürükleyerek taşıyabilirsin": "Lio (⌘K) · drag up or down to move",
 };

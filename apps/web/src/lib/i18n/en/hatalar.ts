@@ -49,4 +49,5 @@ export const hatalar: TranslationDict = {
   "Kapak yüklenemedi. Tekrar dene.": "Could not upload the cover. Try again.",
   "Kapak kaldırılamadı. Tekrar dene.": "Could not remove the cover. Try again.",
   "Bir proje ya da bir departman seçilmeli": "Pick a project or a department",
+  "Bu klasör bu projeye ait değil": "This folder does not belong to this project",
 };

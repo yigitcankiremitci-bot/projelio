@@ -3,7 +3,7 @@ import type { EpostaAyarlariDto, EpostaIpucuSatiri } from "@projelio/shared";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { epostaYonetimi, type IpucuYamasi } from "../../api/epostaYonetimi";
-import { alan, dugme, etiket, kart, rozet } from "./stiller";
+import { alan, dugme, etiket, kart, metinAlani, rozet } from "./stiller";
 
 /**
  * Admin > E-posta > İpuçları.
@@ -293,9 +293,9 @@ function IpucuFormu({
         <textarea
           value={govde}
           onChange={(e) => setGovde(e.target.value)}
-          rows={6}
+          rows={10}
           maxLength={3000}
-          style={{ ...alan(c), resize: "vertical", lineHeight: 1.5 }}
+          style={metinAlani(c, 10)}
         />
         <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>{t("Paragrafları boş satırla ayır.")}</div>
       </div>

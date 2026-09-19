@@ -33,7 +33,8 @@ import { zamanDamgasi } from "./ipucu-eposta.processor";
  * kez gitmez.
  *
  * TEKİL gönderim (tek kişi) kuyruğu beklemez, istek içinde gider: yönetici
- * "gitti mi" cevabını hemen görmeli.
+ * "gitti mi" cevabını hemen görmeli. PLANLI gönderim (bkz. migration 123)
+ * tekil de olsa kuyrukta bekler; tur yalnızca zamanı gelmiş olanı alır.
  *
  * KİME GİTMEZ: silinmiş/anonimleştirilmiş hesap, doğrulanmamış adres, demo
  * kadrosu ve gerçek olmayan adresler (.test vb.). Toplu gönderim ayrıca
@@ -92,6 +93,7 @@ export class KampanyaService {
         hedef: k.hedef,
         alici_sayisi: alicilar.length,
         olusturan: adminId,
+        planlanan_at: k.planlananAt ?? null,
       })
       .select("id")
       .single();
@@ -112,7 +114,8 @@ export class KampanyaService {
       `E-posta kampanyası oluşturuldu: "${k.konu}" · ${alicilar.length} alıcı · lio=${k.lioIle} · yönetici ${adminId}`
     );
 
-    if (tekil) await this.isle(data.id);
+    // Planlı tekil gönderim kuyruğa kalır; zamanı gelince tur gönderir.
+    if (tekil && !k.planlananAt) await this.isle(data.id);
     return this.bul(data.id);
   }
 
@@ -222,9 +225,12 @@ export class KampanyaService {
       const { data, error } = await this.supabase.client
         .from("eposta_kampanyalari")
         .select("id")
-        // Tekil gönderim istek içinde gidiyor; tur ona dokunursa ikisi aynı
-        // alıcıyı aynı anda görüp e-postayı iki kez gönderebilirdi.
-        .eq("tur", "toplu")
+        // Plansız tekil gönderim istek içinde gidiyor; tur ona dokunursa ikisi
+        // aynı alıcıyı aynı anda görüp e-postayı iki kez gönderebilirdi.
+        // Planlı tekil ise yalnızca tura kalıyor (bkz. olustur).
+        .or("tur.eq.toplu,planlanan_at.not.is.null")
+        // Zamanı gelmemiş planlı gönderim beklemede kalır.
+        .or(`planlanan_at.is.null,planlanan_at.lte.${new Date().toISOString()}`)
         .in("durum", ["bekliyor", "gonderiliyor"])
         .order("created_at", { ascending: true })
         .limit(1);
@@ -426,6 +432,7 @@ function satirCevir(r: any): EpostaKampanyasi {
     atlanan: r.atlanan ?? 0,
     createdAt: r.created_at,
     bittiAt: r.bitti_at ?? undefined,
+    planlananAt: r.planlanan_at ?? undefined,
   };
 }
 

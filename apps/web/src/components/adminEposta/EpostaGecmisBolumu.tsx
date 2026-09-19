@@ -4,6 +4,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { useLocale, useT } from "../../lib/i18n";
 import { epostaYonetimi } from "../../api/epostaYonetimi";
 import { birimYaz, dugme, kart, rozet } from "./stiller";
+import { tarihYaz } from "./EpostaGonderBolumu";
 
 /**
  * Admin > E-posta > Geçmiş: gönderilen ve kuyrukta bekleyen e-postalar.
@@ -59,7 +60,11 @@ export default function EpostaGecmisBolumu({ yenile }: { yenile: number }) {
         <section key={k.id} style={{ ...kart(c), padding: 14 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <strong style={{ fontSize: 15, color: c.textPrimary }}>{k.konu}</strong>
-            <span style={rozet(c, k.durum === "gonderiliyor")}>{DURUM[k.durum]}</span>
+            <span style={rozet(c, k.durum === "gonderiliyor" || planliBekliyor(k))}>
+              {planliBekliyor(k)
+                ? t("Planlandı: {zaman}", { zaman: tarihYaz(k.planlananAt!, locale) })
+                : DURUM[k.durum]}
+            </span>
             {k.lioIle && <span style={rozet(c, true)}>{t("Lio")}</span>}
           </div>
           <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 4, lineHeight: 1.6 }}>
@@ -69,20 +74,30 @@ export default function EpostaGecmisBolumu({ yenile }: { yenile: number }) {
             {k.atlanan > 0 && ` · ${t("{n} atlandı", { n: k.atlanan })}`}
             {k.lioIle && ` · ${t("{birim} birim", { birim: birimYaz(k.birim ?? 0, locale) })}`}
           </div>
-          {(k.durum === "bekliyor" || k.durum === "gonderiliyor") && k.tur === "toplu" && (
+          {(k.durum === "bekliyor" || k.durum === "gonderiliyor") && (k.tur === "toplu" || planliBekliyor(k)) && (
             <button
               type="button"
               style={{ ...dugme(c, "tehlike"), padding: "5px 10px", fontSize: 13, marginTop: 8 }}
               onClick={() => {
-                if (window.confirm(t("Kalan alıcılara gönderim durdurulsun mu?")))
+                const soru = planliBekliyor(k)
+                  ? t("Planlanan gönderim iptal edilsin mi?")
+                  : t("Kalan alıcılara gönderim durdurulsun mu?");
+                if (window.confirm(soru))
                   void epostaYonetimi.kampanyaIptal(k.id).then(() => yukle());
               }}
             >
-              {t("Gönderimi durdur")}
+              {planliBekliyor(k) ? t("Planı iptal et") : t("Gönderimi durdur")}
             </button>
           )}
         </section>
       ))}
     </div>
   );
+}
+
+/** Zamanı henüz gelmemiş planlı gönderim. */
+function planliBekliyor(k: EpostaKampanyasi): boolean {
+  if (k.durum !== "bekliyor" || !k.planlananAt) return false;
+  const an = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(k.planlananAt) ? k.planlananAt : `${k.planlananAt}Z`);
+  return an.getTime() > Date.now();
 }

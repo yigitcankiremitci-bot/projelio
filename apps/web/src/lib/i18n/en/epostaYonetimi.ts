@@ -293,4 +293,31 @@ export const epostaYonetimi: TranslationDict = {
     "Open Yaptım",
   "E-posta maliyeti":
     "Email costs",
+  // Planlı gönderim (migration 123)
+  "Daha sonra gönder":
+    "Send later",
+  "E-posta planlandı.":
+    "Email scheduled.",
+  "Gönderim zamanı":
+    "Send time",
+  "Hemen gönder":
+    "Send now",
+  "Planla":
+    "Schedule",
+  "Planlanan gönderim iptal edilsin mi?":
+    "Cancel the scheduled send?",
+  "Planlandı: {zaman}":
+    "Scheduled: {zaman}",
+  "Planı iptal et":
+    "Cancel schedule",
+  "Saat, bu cihazın saatiyle. Alıcı listesi şimdi belirlenir; gönderim seçtiğin anda başlar. Planı Geçmiş sekmesinden iptal edebilirsin.":
+    "The time is in this device's time zone. The recipient list is set now; sending starts at the time you pick. You can cancel the schedule from the History tab.",
+  "{zaman} tarihinde {n} kişiye gidecek. Geçmiş sekmesinden iptal edebilirsin.":
+    "It will go to {n} people on {zaman}. You can cancel it from the History tab.",
+  "En fazla 60 gün ilerisine planlanabilir.":
+    "You can schedule at most 60 days ahead.",
+  "Geçersiz gönderim zamanı.":
+    "Invalid send time.",
+  "Gönderim zamanı geçmişte olamaz.":
+    "The send time can't be in the past.",
 };

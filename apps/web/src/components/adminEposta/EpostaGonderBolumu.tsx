@@ -11,7 +11,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { useLocale, useT } from "../../lib/i18n";
 import { adminKullanicilar } from "../../api/adminKullanicilar";
 import { epostaYonetimi } from "../../api/epostaYonetimi";
-import { alan, birimYaz, dugme, etiket, kart, rozet } from "./stiller";
+import { alan, birimYaz, dugme, etiket, kart, metinAlani, rozet } from "./stiller";
 
 /**
  * Admin > E-posta > Gönder.
@@ -28,7 +28,44 @@ import { alan, birimYaz, dugme, etiket, kart, rozet } from "./stiller";
  * gösterip toplam için kaba bir tahmin veriyor.
  *
  * Gönder Enter'a bağlı DEĞİL: toplu gönderim geri alınamaz.
+ *
+ * PLANLAMA: "Daha sonra gönder" seçilince kampanya kuyrukta bekler ve seçilen
+ * anda gider (bkz. migration 123). Planlanan gönderim Geçmiş'ten iptal edilir.
+ *
+ * TASLAK TARAYICIDA SAKLANIYOR: yazılan metin sayfa yenilense ya da sekme
+ * kapansa da kaybolmasın. Yalnızca bu tarayıcıya ait bir kolaylık — asıl
+ * kayıt, gönderildiğinde ya da planlandığında sunucuda.
  */
+
+const TASLAK_ANAHTARI = "projelio_admin_eposta_taslak_v1";
+
+interface SaklananTaslak {
+  konu: string;
+  baslik: string;
+  govde: string;
+  link: string;
+  dugme: string;
+  lioIle: boolean;
+  istek: string;
+}
+
+function taslakOku(): Partial<SaklananTaslak> {
+  try {
+    const ham = localStorage.getItem(TASLAK_ANAHTARI);
+    return ham ? (JSON.parse(ham) as Partial<SaklananTaslak>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** datetime-local değeri (yerel saat): yarın 10:00. */
+function varsayilanPlan(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(10, 0, 0, 0);
+  const iki = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${iki(d.getMonth() + 1)}-${iki(d.getDate())}T10:00`;
+}
 
 type Kip = "kisiler" | "kitle";
 type KitleTuru = "herkes" | "yeni" | "pasif";
@@ -46,16 +83,28 @@ export default function EpostaGonderBolumu({ onGonderildi }: { onGonderildi: () 
   const [gun, setGun] = useState(14);
   const [kitleSayisi, setKitleSayisi] = useState<number | null>(null);
 
-  const [istek, setIstek] = useState("");
+  const ilkTaslak = useMemo(taslakOku, []);
+  const [istek, setIstek] = useState(ilkTaslak.istek ?? "");
   const [taslakDili, setTaslakDili] = useState<"tr" | "en">("tr");
   const [taslakYaziliyor, setTaslakYaziliyor] = useState(false);
 
-  const [konu, setKonu] = useState("");
-  const [baslik, setBaslik] = useState("");
-  const [govde, setGovde] = useState("");
-  const [link, setLink] = useState("");
-  const [dugmeMetni, setDugmeMetni] = useState("");
-  const [lioIle, setLioIle] = useState(false);
+  const [konu, setKonu] = useState(ilkTaslak.konu ?? "");
+  const [baslik, setBaslik] = useState(ilkTaslak.baslik ?? "");
+  const [govde, setGovde] = useState(ilkTaslak.govde ?? "");
+  const [link, setLink] = useState(ilkTaslak.link ?? "");
+  const [dugmeMetni, setDugmeMetni] = useState(ilkTaslak.dugme ?? "");
+  const [lioIle, setLioIle] = useState(ilkTaslak.lioIle ?? false);
+  const [planli, setPlanli] = useState(false);
+  const [planAni, setPlanAni] = useState(varsayilanPlan);
+
+  useEffect(() => {
+    try {
+      const taslak: SaklananTaslak = { konu, baslik, govde, link, dugme: dugmeMetni, lioIle, istek };
+      localStorage.setItem(TASLAK_ANAHTARI, JSON.stringify(taslak));
+    } catch {
+      /* depolama kapalıysa taslak yalnızca bu sayfada yaşar */
+    }
+  }, [konu, baslik, govde, link, dugmeMetni, lioIle, istek]);
 
   const [onizleme, setOnizleme] = useState<{ konu: string; html: string; lio: boolean; birim: number } | null>(null);
   const [onizleniyor, setOnizleniyor] = useState(false);
@@ -106,7 +155,9 @@ export default function EpostaGonderBolumu({ onGonderildi }: { onGonderildi: () 
 
   const tekil = kip === "kisiler" && secilenler.length === 1;
   const aliciSayisi = kip === "kisiler" ? secilenler.length : kitleSayisi;
-  const girdi = { konu, baslik, govde, link, dugme: dugmeMetni, lioIle, hedef };
+  // datetime-local yerel saattir; sunucuya UTC gider.
+  const planlananAt = planli && planAni ? new Date(planAni).toISOString() : undefined;
+  const girdi = { konu, baslik, govde, link, dugme: dugmeMetni, lioIle, hedef, planlananAt };
   const dogrulama = kampanyaGirdisiniDogrula(girdi);
 
   const taslakYazdir = async () => {
@@ -154,7 +205,7 @@ export default function EpostaGonderBolumu({ onGonderildi }: { onGonderildi: () 
       setHata(t(dogrulama.hata));
       return;
     }
-    if (!tekil) {
+    if (!tekil && !planli) {
       const onay = window.confirm(
         t("{n} kişiye e-posta gönderilecek. Bu işlem geri alınamaz. Devam edilsin mi?", { n: aliciSayisi ?? "?" })
       );
@@ -166,6 +217,11 @@ export default function EpostaGonderBolumu({ onGonderildi }: { onGonderildi: () 
     try {
       const k = await epostaYonetimi.kampanyaOlustur(dogrulama.temiz);
       setSonuc(k);
+      try {
+        localStorage.removeItem(TASLAK_ANAHTARI);
+      } catch {
+        /* yoksay */
+      }
       onGonderildi();
     } catch (err) {
       setHata(err instanceof Error ? err.message : t("E-posta gönderilemedi."));
@@ -185,7 +241,28 @@ export default function EpostaGonderBolumu({ onGonderildi }: { onGonderildi: () 
     setIstek("");
     setSecilenler([]);
     setBilgi("");
+    setPlanli(false);
+    setPlanAni(varsayilanPlan());
   };
+
+  if (sonuc?.planlananAt) {
+    return (
+      <div style={{ ...kart(c), display: "flex", flexDirection: "column", gap: 10 }}>
+        <strong style={{ fontSize: 16, color: c.textPrimary }}>{t("E-posta planlandı.")}</strong>
+        <span style={{ fontSize: 14, color: c.textSecondary, lineHeight: 1.5 }}>
+          {t("{zaman} tarihinde {n} kişiye gidecek. Geçmiş sekmesinden iptal edebilirsin.", {
+            zaman: tarihYaz(sonuc.planlananAt, locale),
+            n: sonuc.aliciSayisi,
+          })}
+        </span>
+        <div>
+          <button type="button" style={dugme(c, "birincil")} onClick={yeniden}>
+            {t("Yeni e-posta yaz")}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (sonuc) {
     const gitti = sonuc.tur === "tekil" && sonuc.gonderilen > 0;
@@ -336,10 +413,10 @@ export default function EpostaGonderBolumu({ onGonderildi }: { onGonderildi: () 
         <textarea
           value={istek}
           onChange={(e) => setIstek(e.target.value)}
-          rows={3}
+          rows={4}
           maxLength={EPOSTA_KAMPANYA_SINIRI.istek}
           placeholder={t("Örn: Yeni bütçe özelliğini anlatan, kısa ve samimi bir e-posta. Sonunda bütçe sekmesini denemeye davet etsin.")}
-          style={{ ...alan(c), resize: "vertical", lineHeight: 1.5 }}
+          style={metinAlani(c, 4)}
         />
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
           <select value={taslakDili} onChange={(e) => setTaslakDili(e.target.value as "tr" | "en")} style={{ ...alan(c), width: "auto" }}>
@@ -372,9 +449,9 @@ export default function EpostaGonderBolumu({ onGonderildi }: { onGonderildi: () 
           <textarea
             value={govde}
             onChange={(e) => setGovde(e.target.value)}
-            rows={8}
+            rows={16}
             maxLength={EPOSTA_KAMPANYA_SINIRI.govde}
-            style={{ ...alan(c), resize: "vertical", lineHeight: 1.5 }}
+            style={metinAlani(c, 16)}
           />
           <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
             {t("Paragrafları boş satırla ayır. Selam satırı alıcının adıyla kendiliğinden eklenir.")}
@@ -409,6 +486,38 @@ export default function EpostaGonderBolumu({ onGonderildi }: { onGonderildi: () 
             </span>
           </span>
         </label>
+      </section>
+
+      {/* ───────────── Ne zaman */}
+      <section style={{ ...kart(c), display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          {([false, true] as const).map((p) => (
+            <button
+              key={String(p)}
+              type="button"
+              onClick={() => setPlanli(p)}
+              style={{ ...dugme(c, planli === p ? "birincil" : "ikincil"), padding: "6px 12px" }}
+            >
+              {p ? t("Daha sonra gönder") : t("Hemen gönder")}
+            </button>
+          ))}
+        </div>
+        {planli && (
+          <>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 14, color: c.textPrimary }}>
+              {t("Gönderim zamanı")}
+              <input
+                type="datetime-local"
+                value={planAni}
+                onChange={(e) => setPlanAni(e.target.value)}
+                style={{ ...alan(c), width: "auto" }}
+              />
+            </label>
+            <p style={{ fontSize: 12.5, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
+              {t("Saat, bu cihazın saatiyle. Alıcı listesi şimdi belirlenir; gönderim seçtiğin anda başlar. Planı Geçmiş sekmesinden iptal edebilirsin.")}
+            </p>
+          </>
+        )}
       </section>
 
       {onizleme && (
@@ -451,9 +560,11 @@ export default function EpostaGonderBolumu({ onGonderildi }: { onGonderildi: () 
         >
           {gonderiliyor
             ? t("Gönderiliyor…")
-            : tekil
-              ? t("Gönder")
-              : t("{n} kişiye gönder", { n: aliciSayisi ?? "…" })}
+            : planli
+              ? t("Planla")
+              : tekil
+                ? t("Gönder")
+                : t("{n} kişiye gönder", { n: aliciSayisi ?? "…" })}
         </button>
       </div>
       {"hata" in dogrulama && (konu || baslik || govde) && (
@@ -461,4 +572,13 @@ export default function EpostaGonderBolumu({ onGonderildi }: { onGonderildi: () 
       )}
     </div>
   );
+}
+
+/**
+ * Sunucudan gelen an saat dilimsiz (`timestamp`) olabilir; UTC olarak okunup
+ * yöneticinin yerel saatinde gösterilir.
+ */
+export function tarihYaz(deger: string, locale: string): string {
+  const an = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(deger) ? deger : `${deger}Z`);
+  return an.toLocaleString(locale === "en" ? "en-GB" : "tr-TR", { dateStyle: "medium", timeStyle: "short" });
 }

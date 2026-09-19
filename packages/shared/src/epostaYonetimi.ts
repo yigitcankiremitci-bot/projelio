@@ -35,6 +35,11 @@ export interface EpostaKampanyaGirdisi {
   /** Lio her alıcıya metni yeniden yazsın. */
   lioIle: boolean;
   hedef: EpostaHedefi;
+  /**
+   * Gönderimin başlayacağı an (ISO, UTC). Yoksa hemen. Alıcı listesi
+   * planlandığı an belirlenir (bkz. migration 123).
+   */
+  planlananAt?: string;
 }
 
 export const EPOSTA_KAMPANYA_SINIRI = {
@@ -48,7 +53,28 @@ export const EPOSTA_KAMPANYA_SINIRI = {
   gun: 365,
   /** Taslak isteği. */
   istek: 2000,
+  /** En fazla bu kadar gün ilerisine planlanabilir. */
+  planGun: 60,
 } as const;
+
+/**
+ * Planlanan anın geçerliliği. Birkaç dakikalık geçmiş kabul ediliyor: form
+ * doldurulurken seçilen "şimdiden 5 dk sonra" gönderilene kadar geçmiş
+ * olabilir; o durumda hemen gitmesi doğru davranış.
+ */
+export function planlananAniDogrula(
+  deger: unknown,
+  simdi: Date = new Date()
+): { hata: string } | { temiz: string | undefined } {
+  if (deger === undefined || deger === null || deger === "") return { temiz: undefined };
+  const an = typeof deger === "string" ? new Date(deger) : null;
+  if (!an || Number.isNaN(an.getTime())) return { hata: "Geçersiz gönderim zamanı." }; // dil:anahtar
+  if (an.getTime() < simdi.getTime() - 10 * 60_000) return { hata: "Gönderim zamanı geçmişte olamaz." }; // dil:anahtar
+  if (an.getTime() > simdi.getTime() + EPOSTA_KAMPANYA_SINIRI.planGun * 86_400_000) {
+    return { hata: "En fazla 60 gün ilerisine planlanabilir." }; // dil:anahtar
+  }
+  return { temiz: an.toISOString() };
+}
 
 export function kampanyaGirdisiniDogrula(
   g: Partial<EpostaKampanyaGirdisi>
@@ -91,6 +117,9 @@ export function kampanyaGirdisiniDogrula(
     hedef = { tur: "secili", kullaniciIds: ids };
   } else return { hata: "Kime gideceğini seç." }; // dil:anahtar
 
+  const plan = planlananAniDogrula(g.planlananAt);
+  if ("hata" in plan) return plan;
+
   return {
     temiz: {
       konu,
@@ -100,6 +129,7 @@ export function kampanyaGirdisiniDogrula(
       dugme: dugme || undefined,
       lioIle: g.lioIle === true,
       hedef,
+      planlananAt: plan.temiz,
     },
   };
 }
@@ -127,6 +157,8 @@ export interface EpostaKampanyasi {
   atlanan: number;
   createdAt: string;
   bittiAt?: string;
+  /** Planlı gönderimde başlama anı. */
+  planlananAt?: string;
   /** Tekil gönderimde alıcının adı (listede kime gittiği görünsün). */
   aliciAdi?: string;
   /** Bu kampanyada Lio'nun harcadığı birim (maliyet defterinden). */

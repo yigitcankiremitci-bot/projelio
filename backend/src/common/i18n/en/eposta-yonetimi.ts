@@ -160,4 +160,11 @@ export const epostaYonetimi: TranslationDict = {
     "🎓 Meet Projelio: subcontractor (sample)",
   "🎓 Projelio'yu tanı: şirket (örnek)":
     "🎓 Meet Projelio: company (sample)",
+  // Planlı gönderim (migration 123)
+  "En fazla 60 gün ilerisine planlanabilir.":
+    "You can schedule at most 60 days ahead.",
+  "Geçersiz gönderim zamanı.":
+    "Invalid send time.",
+  "Gönderim zamanı geçmişte olamaz.":
+    "The send time can't be in the past.",
 };

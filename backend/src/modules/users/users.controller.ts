@@ -29,6 +29,7 @@ import type { AccountType } from "./users.service";
 import type { Sector, TeamSize, UseCase } from "@projelio/shared";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { GroupsService } from "../groups/groups.service";
+import { OrnekIsService } from "../ornek-is/ornek-is.service";
 
 @Controller("users")
 @UseGuards(AuthGuard("jwt"))
@@ -38,7 +39,8 @@ export class UsersController {
     private organizationsService: OrganizationsService,
     private groupsService: GroupsService,
     private accountDeletion: AccountDeletionService,
-    private accountExport: AccountExportService
+    private accountExport: AccountExportService,
+    private ornekIs: OrnekIsService
   ) {}
 
   // Tüm kullanıcı dizini. Arayüzde kullanılmıyor (kişi eklerken /users/search
@@ -81,6 +83,16 @@ export class UsersController {
    * Görülen eğitim turları. Eskiden yalnızca localStorage'daydı, yani her yeni
    * tarayıcıda eğitim baştan açılıyordu (bkz. migration 093).
    */
+  /**
+   * "?" menüsündeki başlangıç rehberinin kendiliğinden açılıp açılmayacağı
+   * için: kullanıcının uygulamada geçirdiği toplam süre (bkz. migration 109).
+   * Karar arayüzde (lib/baslangicRehberi.ts); burası yalnızca sayıyı verir.
+   */
+  @Get("me/yardim-durumu")
+  yardimDurumu(@Req() req: any) {
+    return this.usersService.yardimDurumu(req.user.userId);
+  }
+
   @Patch("me/tours-seen")
   updateToursSeen(@Req() req: any, @Body("toursSeen") toursSeen: unknown) {
     return this.usersService.updateToursSeen(req.user.userId, toursSeen);
@@ -200,6 +212,11 @@ export class UsersController {
       useCases: body.useCases,
       onboardingModules: body.onboardingModules,
     });
+    // Eğitici örnek iş (bkz. migration 118). İçerik hesap tipine göre
+    // (bireysel / şirket / taşeron); şirket örneği az önce kurulan şirkete
+    // bağlanıyor. Sessiz: açılamazsa sihirbaz yine tamamlanır.
+    await this.ornekIs.olusturSessiz(userId, { organizationId, groupId });
+
     // Frontend, sihirbaz kapanınca kullanıcıyı doğrudan oluşturulan organizasyona/gruba
     // yönlendirebilsin diye kimlikleri de döneriz (departman seçimine hemen başlasın diye).
     return { ...user, organizationId, groupId };

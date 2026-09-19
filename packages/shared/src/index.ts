@@ -14,3 +14,4 @@ export * from "./urunIliskileri";
 export * from "./sosyalHesap";
 export * from "./demoZiyaret";
 export * from "./tlFiyat";
+export * from "./epostaYonetimi";

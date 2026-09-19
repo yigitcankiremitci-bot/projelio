@@ -48,6 +48,12 @@ interface TourApi {
   rate: number;
   autoAdvance: boolean;
   seen: string[];
+  /**
+   * Bir kimliği "görüldü" listesine ekler (sunucuya da yazar). Turların
+   * dışında başlangıç rehberinin "bir daha kendiliğinden açma" tercihi de
+   * bu listede tutuluyor — cihazlar arasında taşınsın diye.
+   */
+  markSeen: (id: string) => void;
 
   start: (tourId: string, opts?: { fromStepId?: string }) => void;
   stop: (opts?: { completed?: boolean }) => void;
@@ -349,6 +355,7 @@ export function TourProvider({
     rate,
     autoAdvance,
     seen,
+    markSeen,
     start,
     stop,
     next,

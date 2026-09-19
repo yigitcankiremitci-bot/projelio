@@ -30,6 +30,7 @@ function mapJob(row: any): Job {
     sortOrder: row.sort_order ?? 0,
     // Kolon yoksa (migration 091 uygulanmadan) boş dizi: hiçbir sekme kapalı değil.
     hiddenTabs: sanitizeHiddenTabs("job", row.hidden_tabs),
+    isSample: row.is_sample === true || undefined,
   };
 }
 

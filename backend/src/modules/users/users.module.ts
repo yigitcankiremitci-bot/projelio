@@ -7,9 +7,10 @@ import { AccountExportService } from "./account-export.service";
 import { AccountPurgeProcessor } from "./account-purge.processor";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { GroupsModule } from "../groups/groups.module";
+import { OrnekIsModule } from "../ornek-is/ornek-is.module";
 
 @Module({
-  imports: [OrganizationsModule, GroupsModule, EmailModule],
+  imports: [OrganizationsModule, GroupsModule, EmailModule, OrnekIsModule],
   controllers: [UsersController],
   providers: [UsersService, AccountDeletionService, AccountExportService, AccountPurgeProcessor],
   exports: [UsersService, AccountDeletionService],

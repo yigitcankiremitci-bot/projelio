@@ -48,6 +48,8 @@ import { ModuleRecordsModule } from "./modules/module-records/module-records.mod
 import { FaturalarModule } from "./modules/faturalar/faturalar.module";
 import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.module";
 import { WorklogModule } from "./modules/worklog/worklog.module";
+import { OrnekIsModule } from "./modules/ornek-is/ornek-is.module";
+import { EpostaYonetimiModule } from "./modules/eposta-yonetimi/eposta-yonetimi.module";
 import { PlanningModule } from "./modules/planning/planning.module";
 import { CreationRequestsModule } from "./modules/creation-requests/creation-requests.module";
 import { SocialMediaModule } from "./modules/social-media/social-media.module";
@@ -114,6 +116,8 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     // Yaptım: kişisel iş günlüğü. Yapılacaklar'ın (PersonalTodosModule) tersi —
     // orada "yapacağım", burada "yaptım" (bkz. 097_yaptim.sql).
     WorklogModule,
+    OrnekIsModule,
+    EpostaYonetimiModule,
     PlanningModule,
     // Sosyal medya: kendi tablolarını kullanan ilk modül (bkz. 054_social_media.sql).
     SocialMediaModule,

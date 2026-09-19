@@ -8,6 +8,7 @@ import { demoEpostasiMi } from "../../common/demo-hesap";
 import { isLocale } from "@projelio/shared";
 import {
   NotificationEmailPrefsService,
+  BOS_DAMGALAR,
   satiriCevir,
   VARSAYILAN_TERCIH,
   type TercihSatiri,
@@ -232,7 +233,7 @@ export class NotificationEmailProcessor {
     // olmalı — yoksa denemesi çalışıp asıl özeti yanlış saatte gelirdi.
     const tercih = await this.tercihler.findForUser(userId);
     const alicilar = await this.aliciBilgileri([
-      { ...tercih, userId, lastInstantAt: null, lastDigestAt: null, lastDigestOn: null },
+      { ...tercih, userId, ...BOS_DAMGALAR },
     ]);
     const alici = alicilar[0];
     if (!alici) return { sent: false };
@@ -307,7 +308,7 @@ export class NotificationEmailProcessor {
         : (row as any).notification_email_prefs;
       const tercih: TercihSatiri = ham
         ? satiriCevir({ ...ham, user_id: row.id })
-        : { ...VARSAYILAN_TERCIH, userId: row.id, lastInstantAt: null, lastDigestAt: null, lastDigestOn: null };
+        : { ...VARSAYILAN_TERCIH, userId: row.id, ...BOS_DAMGALAR };
       if (!tercih.dailyEnabled) continue;
       const alici = this.aliciYap(row, tercih);
       if (alici) alicilar.push(alici);

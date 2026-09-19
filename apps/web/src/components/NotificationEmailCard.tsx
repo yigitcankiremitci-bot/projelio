@@ -63,6 +63,7 @@ export default function NotificationEmailCard() {
   const [hata, setHata] = useState("");
   const [bilgi, setBilgi] = useState("");
   const [denemeGonderiliyor, setDenemeGonderiliyor] = useState(false);
+  const [ipucuGonderiliyor, setIpucuGonderiliyor] = useState(false);
 
   // Yükleme kart AÇILINCA: kapalı duran bir kart için her ayarlar ziyaretinde
   // istek atmanın anlamı yok.
@@ -117,6 +118,25 @@ export default function NotificationEmailCard() {
       setHata(err instanceof Error ? err.message : t("Deneme e-postası gönderilemedi."));
     } finally {
       setDenemeGonderiliyor(false);
+    }
+  };
+
+  // Sıradaki ipucunu şimdi gönderir; dizi ilerlemez (bkz. IpucuEpostaProcessor.denemeGonder).
+  const ipucuDene = async () => {
+    setHata("");
+    setBilgi("");
+    setIpucuGonderiliyor(true);
+    try {
+      const { sent } = await api.post<{ sent: boolean }>("/notifications/email-prefs/test-tip", {});
+      setBilgi(
+        sent
+          ? t("Örnek ipucu gönderildi. Birkaç dakika içinde gelmezse spam klasörüne bak.")
+          : t("Örnek ipucu gönderilemedi. E-posta adresin doğrulanmamış olabilir.")
+      );
+    } catch (err) {
+      setHata(err instanceof Error ? err.message : t("Örnek ipucu gönderilemedi."));
+    } finally {
+      setIpucuGonderiliyor(false);
     }
   };
 
@@ -197,14 +217,70 @@ export default function NotificationEmailCard() {
                 })}
               </div>
 
+              {/* İpuçları bildirim kanallarından BAĞIMSIZ (bkz. migration 118):
+                  bildirimleri kapatan kişi ipuçlarını, ipuçlarından sıkılan
+                  kişi bildirimlerini kaybetmemeli. */}
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: `1.5px solid ${prefs.tipsEnabled ? c.primary : c.border}`,
+                  background: prefs.tipsEnabled ? c.background : "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={prefs.tipsEnabled}
+                  onChange={(e) => void kaydet({ tipsEnabled: e.target.checked })}
+                  disabled={kaydediliyor}
+                  style={{ width: 17, height: 17, marginTop: 2, flexShrink: 0 }}
+                />
+                <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 15, fontWeight: prefs.tipsEnabled ? 500 : 400, color: c.textPrimary }}>
+                    {t("Projelio ipuçları ve duyuruları")}
+                  </span>
+                  <span style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.4 }}>
+                    {t("Yeni başlayanlara günde bir kısa ipucu (özetle aynı saatte, dizi birkaç haftada biter) ve ara sıra yenilik duyuruları.")}
+                  </span>
+                  {prefs.tipsEnabled && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        // Etiketin içinde: tıklama onay kutusunu da değiştirmesin.
+                        e.preventDefault();
+                        void ipucuDene();
+                      }}
+                      disabled={ipucuGonderiliyor}
+                      style={{
+                        alignSelf: "flex-start",
+                        marginTop: 6,
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${c.border}`,
+                        background: c.surface,
+                        color: c.textPrimary,
+                        fontSize: 13,
+                      }}
+                    >
+                      {ipucuGonderiliyor ? t("Gönderiliyor…") : t("Örnek ipucu gönder")}
+                    </button>
+                  )}
+                </span>
+              </label>
+
               {hepsiKapali && (
                 <span style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.4 }}>
                   {t("İkisi de kapalı: sana bildirim e-postası gönderilmiyor. Bildirimler uygulama içinde görünmeye devam ediyor.")}
                 </span>
               )}
 
-              {gunluk && (
-                <>
+              {/* Saat hem özetin hem ipucunun saati: özet kapalıyken de ipucu
+                  geliyorsa kişi saatini seçebilmeli. */}
+              {(gunluk || prefs.tipsEnabled) && (
                   <label style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 14, color: c.textPrimary }}>{t("Her gün saat")}</span>
                     <select
@@ -230,6 +306,10 @@ export default function NotificationEmailCard() {
                       {t("({zamanDilimi} saatiyle)", { zamanDilimi: cihazZamanDilimi() })}
                     </span>
                   </label>
+              )}
+
+              {gunluk && (
+                <>
 
                   <label style={{ display: "flex", alignItems: "flex-start", gap: 9, cursor: "pointer" }}>
                     <input

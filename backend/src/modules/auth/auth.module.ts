@@ -6,6 +6,7 @@ import { AuthService } from "./auth.service";
 import { JwtStrategy } from "./jwt.strategy";
 import { PasswordResetService } from "./password-reset.service";
 import { EmailVerificationService } from "./email-verification.service";
+import { DogrulamaHatirlatmaProcessor } from "./dogrulama-hatirlatma.processor";
 import { LoginAttemptService } from "./login-attempt.service";
 import { EmailModule } from "./email.module";
 import { UsersModule } from "../users/users.module";
@@ -24,7 +25,16 @@ import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, PasswordResetService, EmailVerificationService, LoginAttemptService],
+  // DogrulamaHatirlatmaProcessor: doğrulanmamış hesaplara günlük "hesabını
+  // onayla" e-postası (bkz. migration 119).
+  providers: [
+    AuthService,
+    JwtStrategy,
+    PasswordResetService,
+    EmailVerificationService,
+    LoginAttemptService,
+    DogrulamaHatirlatmaProcessor,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

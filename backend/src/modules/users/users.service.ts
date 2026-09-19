@@ -550,6 +550,20 @@ export class UsersService {
    * burada içerik doğrulanmıyor, yalnızca boyut sınırlanıyor — bilinmeyen bir
    * kimlik hiçbir şeye zarar vermez, sadece hiçbir tura karşılık gelmez.
    */
+  /**
+   * Uygulamada geçirilen toplam süre. Satır yoksa (hiç sinyal gelmemiş ya da
+   * tablo okunamıyor) 0: rehber açısından "henüz hiç kullanmamış" sayılır.
+   */
+  async yardimDurumu(userId: string): Promise<{ toplamSaniye: number }> {
+    const { data, error } = await this.supabase.client
+      .from("user_activity_state")
+      .select("total_seconds")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return { toplamSaniye: 0 };
+    return { toplamSaniye: Number(data?.total_seconds) || 0 };
+  }
+
   async updateToursSeen(userId: string, ids: unknown): Promise<{ toursSeen: string[] }> {
     if (!Array.isArray(ids)) throw new BadRequestException("Tur listesi bekleniyor");
     const temiz = Array.from(

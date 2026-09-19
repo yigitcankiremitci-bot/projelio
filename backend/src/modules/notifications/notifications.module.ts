@@ -39,6 +39,8 @@ import { EmailModule } from "../auth/email.module";
     NotificationEmailProcessor,
   ],
   // Gateway de dışarı açık: WhatsApp modülü bağlantı durumunu aynı odaya basıyor.
-  exports: [NotificationsService, NotificationsGateway],
+  // Tercih servisi dışarı açık: ipucu ve toplu e-postalar (eposta-yonetimi)
+  // aynı tercih satırını ve saat dilimini kullanıyor.
+  exports: [NotificationsService, NotificationsGateway, NotificationEmailPrefsService],
 })
 export class NotificationsModule {}

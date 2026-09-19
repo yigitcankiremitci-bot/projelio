@@ -38,6 +38,10 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | Geçiş anahtarı (WebAuthn) doğrulaması | `backend/src/common/webauthn/` — elle yazıldı, bağımlılık yok; `backend/src/modules/passkeys/` kullanıcının cihazları |
 | Admin kullanıcı yönetimi (askı, oturum iptali, kredi, silme) | `backend/src/modules/admin/admin-kullanicilar.service.ts`, `apps/web/src/components/AdminKullanicilarPanel.tsx` — oturum engeli `backend/src/common/hesap-durumu/` |
 | WhatsApp köprüsü (WAHA yan-servisi + modül) | `backend/src/modules/whatsapp/`, `deploy/docker-compose.prod.yml` `waha` servisi, tasarım `docs/whatsapp-qr-plan.md` |
+| Admin > E-posta (ipuçları, toplu/tekil gönderim, Lio ile kişiselleştirme, maliyet) | `backend/src/modules/eposta-yonetimi/`, `apps/web/src/components/adminEposta/` — Lio harcaması kimsenin bakiyesinden düşmez, `eposta_ai_kullanimi` defterine yazılır |
+| İpucu dizisi varsayılanları (14 ipucu) | `backend/src/modules/notifications/ipucu.icerik.ts` — yönetici panelden üstüne yazar; `kimlik` kalıcı, değiştirmek ipucunu herkese yeniden gönderir |
+| Eğitici örnek iş (bireysel / şirket / taşeron) | `backend/src/modules/ornek-is/`, `apps/web/src/components/OrnekIsSeridi.tsx` — `jobs.is_sample`, silme yalnızca işaretli işlere |
+| "?" menüsü: başlangıç rehberi + sesli turlar | `apps/web/src/components/tour/TourLauncher.tsx`, içerik ve kendiliğinden açılma kuralı `apps/web/src/lib/baslangicRehberi.ts` |
 
 Backend'de 48 modül, 500'den fazla HTTP ucu var (`node scripts/uc-listesi.mjs` ile
 listelenir — elle yazılmış liste bayatlıyor). Lio =

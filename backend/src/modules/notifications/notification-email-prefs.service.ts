@@ -18,6 +18,7 @@ export const VARSAYILAN_TERCIH: NotificationEmailPrefs = {
   dailyHour: 9,
   timezone: "Europe/Istanbul",
   includeTasks: true,
+  tipsEnabled: true,
 };
 
 /** Veritabanı satırı — işleyicinin ayrıca iki su seviyesine ihtiyacı var. */
@@ -29,6 +30,8 @@ export interface TercihSatiri extends NotificationEmailPrefs {
   lastDigestAt: string | null;
   /** Son günlük özetin yerel günü; aynı günde ikinci gönderimi engeller. */
   lastDigestOn: string | null;
+  /** Son ipucunun yerel günü; aynı günde ikinci ipucunu engeller. */
+  lastTipOn: string | null;
 }
 
 export function satiriCevir(row: any): TercihSatiri {
@@ -39,9 +42,12 @@ export function satiriCevir(row: any): TercihSatiri {
     dailyHour: Number.isInteger(row.daily_hour) ? row.daily_hour : VARSAYILAN_TERCIH.dailyHour,
     timezone: row.timezone || VARSAYILAN_TERCIH.timezone,
     includeTasks: row.include_tasks !== false,
+    // Kolon yoksa (migration 118 uygulanmadan) varsayılan: açık.
+    tipsEnabled: row.tips_enabled !== false,
     lastInstantAt: row.last_instant_at ?? null,
     lastDigestAt: row.last_digest_at ?? null,
     lastDigestOn: row.last_digest_on ?? null,
+    lastTipOn: row.last_tip_on ?? null,
   };
 }
 
@@ -53,6 +59,7 @@ export function satirdanTercih(satir: TercihSatiri): NotificationEmailPrefs {
     dailyHour: satir.dailyHour,
     timezone: satir.timezone,
     includeTasks: satir.includeTasks,
+    tipsEnabled: satir.tipsEnabled,
   };
 }
 
@@ -71,6 +78,14 @@ function sikliktanAnahtarlar(frequency: unknown): Partial<NotificationEmailPrefs
   return null;
 }
 
+/** Hiç gönderim yapılmamış bir satırın damgaları. */
+export const BOS_DAMGALAR = {
+  lastInstantAt: null,
+  lastDigestAt: null,
+  lastDigestOn: null,
+  lastTipOn: null,
+} as const;
+
 @Injectable()
 export class NotificationEmailPrefsService {
   private readonly logger = new Logger(NotificationEmailPrefsService.name);
@@ -78,7 +93,7 @@ export class NotificationEmailPrefsService {
   constructor(private supabase: SupabaseService) {}
 
   private readonly KOLONLAR =
-    "user_id, instant_enabled, daily_enabled, daily_hour, timezone, include_tasks, last_instant_at, last_digest_at, last_digest_on";
+    "user_id, instant_enabled, daily_enabled, daily_hour, timezone, include_tasks, tips_enabled, last_tip_on, last_instant_at, last_digest_at, last_digest_on";
 
   /**
    * Kullanıcının tercihi; satır yoksa varsayılan.
@@ -118,7 +133,7 @@ export class NotificationEmailPrefsService {
     } catch {
       // findForUser zaten logladı; damgasız devam etmek gönderimi engellemez.
     }
-    return { ...tercih, userId, lastInstantAt: null, lastDigestAt: null, lastDigestOn: null };
+    return { ...tercih, userId, ...BOS_DAMGALAR };
   }
 
   /**
@@ -147,9 +162,14 @@ export class NotificationEmailPrefsService {
       dailyHour: girdi.dailyHour ?? mevcut.dailyHour,
       timezone: (girdi.timezone ?? mevcut.timezone).trim(),
       includeTasks: girdi.includeTasks ?? mevcut.includeTasks,
+      tipsEnabled: girdi.tipsEnabled ?? mevcut.tipsEnabled,
     };
 
-    if (typeof yeni.instantEnabled !== "boolean" || typeof yeni.dailyEnabled !== "boolean") {
+    if (
+      typeof yeni.instantEnabled !== "boolean" ||
+      typeof yeni.dailyEnabled !== "boolean" ||
+      typeof yeni.tipsEnabled !== "boolean"
+    ) {
       throw new BadRequestException("Bildirim e-postası anahtarları doğru/yanlış olmalı.");
     }
     if (!Number.isInteger(yeni.dailyHour) || yeni.dailyHour < 0 || yeni.dailyHour > 23) {
@@ -167,6 +187,7 @@ export class NotificationEmailPrefsService {
         daily_hour: yeni.dailyHour,
         timezone: yeni.timezone,
         include_tasks: yeni.includeTasks,
+        tips_enabled: yeni.tipsEnabled,
       },
       { onConflict: "user_id" }
     );
@@ -185,6 +206,30 @@ export class NotificationEmailPrefsService {
     const { error } = await this.supabase.client
       .from("notification_email_prefs")
       .upsert({ user_id: userId, instant_enabled: false, daily_enabled: false }, { onConflict: "user_id" });
+    if (error) throw error;
+  }
+
+  /**
+   * Yalnızca ipuçlarını kapatır — ipucu e-postasındaki "artık gönderme"
+   * bağlantısı buraya düşer. Bildirim kanallarına DOKUNMAZ (bkz.
+   * ipucu-eposta.template.ts başlığı). Satır yoksa açılır, hepsiniKapat ile
+   * aynı gerekçe: varsayılan "açık".
+   */
+  async ipuclariniKapat(userId: string): Promise<void> {
+    const { error } = await this.supabase.client
+      .from("notification_email_prefs")
+      .upsert({ user_id: userId, tips_enabled: false }, { onConflict: "user_id" });
+    if (error) throw error;
+  }
+
+  /**
+   * İpucunun gönderildiği yerel günü yazar — aynı gün ikinci ipucu gitmesin.
+   * Hangi ipucunun gittiği ayrı tabloda (ipucu_gonderimleri, bkz. 119).
+   */
+  async ipucuGunuDamgala(userId: string, gun: string): Promise<void> {
+    const { error } = await this.supabase.client
+      .from("notification_email_prefs")
+      .upsert({ user_id: userId, last_tip_on: gun }, { onConflict: "user_id" });
     if (error) throw error;
   }
 

@@ -22,6 +22,7 @@ import TabBar from "../components/TabBar";
 import CloudAccountsCard from "../components/CloudAccountsCard";
 import WhatsappCard from "../components/WhatsappCard";
 import NotificationEmailCard from "../components/NotificationEmailCard";
+import OrnekIsAyari from "../components/OrnekIsAyari";
 import PasskeysCard from "../components/PasskeysCard";
 import WhatsappProfileCard from "../components/WhatsappProfileCard";
 import {
@@ -1068,6 +1069,13 @@ export default function Settings() {
         >
           {t("Turu yeniden başlat")}
         </button>
+      </SettingCard>
+
+      <SettingCard
+        title={t("Örnek iş")}
+        description={t("Projelio'yu kurcalayarak öğrenmen için hazırlanmış örnek iş, proje, görev ve rutin. İstediğin zaman ekleyip işin bitince tek tıkla silebilirsin.")}
+      >
+        <OrnekIsAyari />
       </SettingCard>
     </>
   );

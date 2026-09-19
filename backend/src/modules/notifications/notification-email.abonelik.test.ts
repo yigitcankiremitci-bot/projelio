@@ -1,6 +1,11 @@
 import { strict as assert } from "node:assert";
 import { before, describe, it } from "node:test";
-import { abonelikImzasi, abonelikImzasiGecerliMi, abonelikKapatmaAdresi } from "./notification-email.abonelik";
+import {
+  abonelikImzasi,
+  abonelikImzasiGecerliMi,
+  abonelikKapatmaAdresi,
+  ipucuKapatmaAdresi,
+} from "./notification-email.abonelik";
 
 // Gizli anahtar İMZA ANINDA okunuyor (getJwtSecret her çağrıda process.env'e
 // bakıyor), bu yüzden modülü dinamik yüklemeye gerek yok — testten önce
@@ -41,5 +46,19 @@ describe("abonelik imzası", () => {
     assert.ok(adres.includes(`u=${KULLANICI}`));
     assert.ok(adres.includes(`i=${abonelikImzasi(KULLANICI)}`));
     assert.ok(adres.includes("/notifications/eposta-kapat"));
+  });
+
+  it("ipucu imzası bildirimleri kapatamaz, bildirim imzası da ipuçlarını", () => {
+    // İki bağlantı ayrı uçlara gidiyor; imza da ayrı olmalı ki biri diğerinin
+    // yerine kullanılamasın (bkz. IPUCU_AMAC).
+    assert.equal(abonelikImzasiGecerliMi(KULLANICI, abonelikImzasi(KULLANICI, "ipucu")), false);
+    assert.equal(abonelikImzasiGecerliMi(KULLANICI, abonelikImzasi(KULLANICI), "ipucu"), false);
+    assert.equal(abonelikImzasiGecerliMi(KULLANICI, abonelikImzasi(KULLANICI, "ipucu"), "ipucu"), true);
+  });
+
+  it("ipucu adresi kendi ucuna gider", () => {
+    const adres = ipucuKapatmaAdresi(KULLANICI);
+    assert.ok(adres.includes("/notifications/ipucu-kapat"));
+    assert.ok(adres.includes(`i=${abonelikImzasi(KULLANICI, "ipucu")}`));
   });
 });

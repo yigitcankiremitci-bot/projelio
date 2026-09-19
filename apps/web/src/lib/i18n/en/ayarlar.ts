@@ -159,4 +159,28 @@ export const ayarlar: TranslationDict = {
   "Paketleri gör": "See plans",
   "{bakiye} birim": "{bakiye} units",
   Ücretsiz: "Free",
+
+  // ─────────────────────────────────────────────── Yeni üye yardımları (migration 118)
+  "Projelio ipuçları": "Projelio tips",
+  "Yeni başlayanlara günde bir kısa ipucu; özetle aynı saatte gelir, dizi birkaç haftada biter.":
+    "A short daily tip for newcomers; arrives at the same time as your summary, and the series ends after a few weeks.",
+  "Örnek ipucu gönder": "Send a sample tip",
+  "Örnek ipucu gönderildi. Birkaç dakika içinde gelmezse spam klasörüne bak.":
+    "Sample tip sent. If it doesn't arrive in a few minutes, check your spam folder.",
+  "Örnek ipucu gönderilemedi.": "Couldn't send the sample tip.",
+  "Örnek ipucu gönderilemedi. E-posta adresin doğrulanmamış olabilir.":
+    "Couldn't send the sample tip. Your email address may not be verified.",
+  "Örnek iş": "Sample job",
+  "Projelio'yu kurcalayarak öğrenmen için hazırlanmış örnek iş, proje, görev ve rutin. İstediğin zaman ekleyip işin bitince tek tıkla silebilirsin.":
+    "A sample job, project, tasks and routine to learn Projelio by trying things out. Add it any time and delete it in one click when you're done.",
+  "Örnek iş ekle": "Add sample job",
+  "Örnek iş eklenemedi.": "Couldn't add the sample job.",
+  "Örnek işi aç": "Open the sample job",
+  "Bu bir örnek iş": "This is a sample job",
+  "Projeyi, görevleri ve rutini aç, dene, değiştir. İşin bitince hepsini tek tıkla kaldırabilirsin.":
+    "Open the project, tasks and routine — try things out and change them. When you're done, remove it all in one click.",
+  "Örnekleri sil": "Delete samples",
+  "Örnekler silinsin mi?": "Delete the samples?",
+  "Bu örnek iş; içindeki proje, görevler ve rutinle birlikte silinecek. Senin açtığın diğer işlere dokunulmaz.":
+    "This sample job will be deleted together with its project, tasks and routine. Your other jobs won't be touched.",
 };

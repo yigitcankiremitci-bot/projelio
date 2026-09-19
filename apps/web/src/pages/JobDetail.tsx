@@ -17,6 +17,7 @@ import JobTeamPanel, { JobTeamPanelHandle } from "../components/JobTeamPanel";
 import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import JobInviteBanner from "../components/JobInviteBanner";
+import OrnekIsSeridi from "../components/OrnekIsSeridi";
 import JobTasksPanel, { JobTasksPanelHandle } from "../components/JobTasksPanel";
 import FilesPanel from "../components/FilesPanel";
 import TodayCompletedPanel from "../components/TodayCompletedPanel";
@@ -463,6 +464,9 @@ export default function JobDetail() {
         {/* Bildirimdeki davetten gelindiyse kararı burada da verebilsin; bekleyen
             davet yoksa bileşen hiçbir şey çizmez. */}
         <JobInviteBanner jobId={id} />
+
+        {/* Eğitici örnek iş (bkz. migration 118): silme yolu yalnızca sahibine. */}
+        {job?.isSample && currentUser?.id === job.ownerId && <OrnekIsSeridi />}
 
         {/* Bu çubuk eskiden position:sticky idi; ama kaydırınca beliren üst şerit
             (zIndex 34) onun üstüne bindiği için sekmeler ekranda duruyor gözükmesine

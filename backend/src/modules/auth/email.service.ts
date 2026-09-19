@@ -68,14 +68,15 @@ export class EmailService {
     });
   }
 
-  async sendVerificationEmail(to: string, verifyUrl: string, locale: Locale): Promise<void> {
+  /** Gönderim gerçekten yapıldıysa true (hatırlatma turu buna bakıyor). */
+  async sendVerificationEmail(to: string, verifyUrl: string, locale: Locale): Promise<boolean> {
     if (!this.apiKey) {
       this.logUndeliverable("e-posta doğrulama", to, verifyUrl);
-      return;
+      return false;
     }
 
     const t = cevirmen(locale);
-    await this.send({
+    return this.send({
       to,
       subject: t("Projelio hesabını doğrula"),
       html: verificationHtml(verifyUrl, t, locale),

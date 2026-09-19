@@ -50,7 +50,7 @@ export class EmailVerificationService {
    * kaydın hemen ardından gidiyor ve o an `users.locale` henüz dolmamış
    * olabiliyor. Çağıran, kayıt isteğinden gelen dili biliyor.
    */
-  async sendVerification(userId: string, email: string, locale: Locale = defaultLocale): Promise<void> {
+  async sendVerification(userId: string, email: string, locale: Locale = defaultLocale): Promise<boolean> {
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + TOKEN_TTL_MS).toISOString();
 
@@ -62,7 +62,7 @@ export class EmailVerificationService {
     if (error) throw error;
 
     const webAppUrl = getWebAppUrl();
-    await this.emailService.sendVerificationEmail(email, `${webAppUrl}/verify-email?token=${token}`, locale);
+    return this.emailService.sendVerificationEmail(email, `${webAppUrl}/verify-email?token=${token}`, locale);
   }
 
   /**

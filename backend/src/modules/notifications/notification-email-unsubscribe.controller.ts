@@ -6,7 +6,7 @@ import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 import { epostaKabugu, MARKA } from "../auth/email-shell";
 import { getWebAppUrl } from "../../common/config/env";
 import { NotificationEmailPrefsService } from "./notification-email-prefs.service";
-import { abonelikImzasiGecerliMi } from "./notification-email.abonelik";
+import { abonelikImzasiGecerliMi, type AbonelikTuru } from "./notification-email.abonelik";
 
 /**
  * TEK TIK ABONELİĞİ BIRAK — kimlik doğrulaması YOK, imza var.
@@ -41,28 +41,48 @@ export class NotificationEmailUnsubscribeController {
 
   @Post("eposta-kapat")
   async kapatPost(@Query("u") userId: string, @Query("i") imza: string) {
-    const oldu = await this.kapat(userId, imza);
+    const oldu = await this.kapat(userId, imza, "bildirim");
     return { ok: oldu };
   }
 
   @Get("eposta-kapat")
   @Header("Content-Type", "text/html; charset=utf-8")
   async kapatGet(@Query("u") userId: string, @Query("i") imza: string): Promise<string> {
-    const oldu = await this.kapat(userId, imza);
+    const oldu = await this.kapat(userId, imza, "bildirim");
     const locale: Locale = oldu ? await this.guvenliDil(userId) : "tr";
-    return this.sayfa(locale, oldu);
+    return this.sayfa(locale, oldu, "bildirim");
   }
 
-  private async kapat(userId: unknown, imza: unknown): Promise<boolean> {
-    if (typeof userId !== "string" || !abonelikImzasiGecerliMi(userId, imza)) {
+  /**
+   * İpucu e-postalarının çıkışı — YALNIZCA ipuçlarını kapatır, bildirimler
+   * sürer (bkz. ipucu-eposta.template.ts başlığı). Ayrı uç, çünkü imzası da
+   * ayrı: biri diğerinin yerine kullanılamaz.
+   */
+  @Post("ipucu-kapat")
+  async ipucuKapatPost(@Query("u") userId: string, @Query("i") imza: string) {
+    const oldu = await this.kapat(userId, imza, "ipucu");
+    return { ok: oldu };
+  }
+
+  @Get("ipucu-kapat")
+  @Header("Content-Type", "text/html; charset=utf-8")
+  async ipucuKapatGet(@Query("u") userId: string, @Query("i") imza: string): Promise<string> {
+    const oldu = await this.kapat(userId, imza, "ipucu");
+    const locale: Locale = oldu ? await this.guvenliDil(userId) : "tr";
+    return this.sayfa(locale, oldu, "ipucu");
+  }
+
+  private async kapat(userId: unknown, imza: unknown, tur: AbonelikTuru): Promise<boolean> {
+    if (typeof userId !== "string" || !abonelikImzasiGecerliMi(userId, imza, tur)) {
       // Geçersiz imzada BİLGİ SIZDIRMIYORUZ: "böyle bir kullanıcı yok" ile
       // "imza yanlış" ayrımı, adres uydurarak kullanıcı varlığı taramaya izin
       // verirdi. İkisi de aynı sayfayı görür.
       return false;
     }
     try {
-      await this.prefs.hepsiniKapat(userId);
-      this.logger.log(`Bildirim e-postaları tek tıkla kapatıldı: ${userId}`);
+      if (tur === "ipucu") await this.prefs.ipuclariniKapat(userId);
+      else await this.prefs.hepsiniKapat(userId);
+      this.logger.log(`${tur === "ipucu" ? "İpucu" : "Bildirim"} e-postaları tek tıkla kapatıldı: ${userId}`);
       return true;
     } catch (err) {
       this.logger.error(`Abonelik kapatılamadı (${userId}): ${err instanceof Error ? err.message : err}`);
@@ -79,14 +99,23 @@ export class NotificationEmailUnsubscribeController {
     }
   }
 
-  private sayfa(locale: Locale, oldu: boolean): string {
+  private sayfa(locale: Locale, oldu: boolean, tur: AbonelikTuru): string {
     const t = cevirmen(locale);
-    const baslik = oldu ? t("Bildirim e-postaların kapatıldı") : t("Bağlantı geçersiz");
-    const govde = oldu
-      ? t(
-          "Bundan sonra sana bildirim e-postası göndermeyeceğiz. Bildirimler uygulama içinde görünmeye devam edecek; fikrin değişirse Ayarlar > Yardımcılar'dan yeniden açabilirsin."
-        )
-      : t("Bu bağlantı artık geçerli değil. Ayarlar > Yardımcılar bölümünden tercihini kendin değiştirebilirsin.");
+    const ipucu = tur === "ipucu";
+    const baslik = !oldu
+      ? t("Bağlantı geçersiz")
+      : ipucu
+        ? t("İpucu e-postaları kapatıldı")
+        : t("Bildirim e-postaların kapatıldı");
+    const govde = !oldu
+      ? t("Bu bağlantı artık geçerli değil. Ayarlar > Yardımcılar bölümünden tercihini kendin değiştirebilirsin.")
+      : ipucu
+        ? t(
+            "Bundan sonra sana ipucu e-postası göndermeyeceğiz. Bildirim e-postaların bundan etkilenmedi; onları Ayarlar > Yardımcılar'dan yönetebilirsin."
+          )
+        : t(
+            "Bundan sonra sana bildirim e-postası göndermeyeceğiz. Bildirimler uygulama içinde görünmeye devam edecek; fikrin değişirse Ayarlar > Yardımcılar'dan yeniden açabilirsin."
+          );
 
     return epostaKabugu(
       locale,

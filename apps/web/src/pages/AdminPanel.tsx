@@ -13,6 +13,8 @@ import SupportAdminPanel from "../components/SupportAdminPanel";
 import DemoAdminPanel from "../components/DemoAdminPanel";
 import DemoZiyaretleriPanel from "../components/DemoZiyaretleriPanel";
 import WhatsappNumbersPanel from "../components/WhatsappNumbersPanel";
+import AdminEpostaPanel from "../components/adminEposta/AdminEpostaPanel";
+import AdminEpostaMaliyetPanel from "../components/adminEposta/AdminEpostaMaliyetPanel";
 import TabBar from "../components/TabBar";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
@@ -21,6 +23,8 @@ import type { ThemeColors } from "@projelio/shared";
 
 type AdminTab =
   | "kullanicilar"
+  | "eposta"
+  | "epostaMaliyet"
   | "bakiye"
   | "siparisler"
   | "saglayicilar"
@@ -40,6 +44,8 @@ type AdminTab =
  */
 const TABS: { key: AdminTab; label: string }[] = [
   { key: "kullanicilar", label: "Kullanıcılar" },
+  { key: "eposta", label: "E-posta" },
+  { key: "epostaMaliyet", label: "E-posta maliyeti" },
   { key: "bakiye", label: "Lio Bakiyesi" },
   { key: "siparisler", label: "Bakiye siparişleri" },
   { key: "saglayicilar", label: "AI sağlayıcıları" },
@@ -159,6 +165,8 @@ export default function AdminPanel() {
   // çekiyor, dokuzunu birden yüklemek sayfayı gereksiz yavaşlatırdı.
   const TAB_CONTENT: Record<AdminTab, () => ReactNode> = {
     kullanicilar: () => <AdminKullanicilarPanel yenile={kullaniciYenile} />,
+    eposta: () => <AdminEpostaPanel />,
+    epostaMaliyet: () => <AdminEpostaMaliyetPanel />,
     bakiye: () => <AiCreditAdminPanel bolum="bakiye" />,
     // Sipariş onaylanınca Kullanıcılar sekmesine dönüldüğünde bakiyeler taze olsun.
     siparisler: () => <AiCreditOrdersAdmin onCredited={() => setKullaniciYenile((n) => n + 1)} />,

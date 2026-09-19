@@ -234,6 +234,9 @@ export interface Job {
   projectCount?: number;
   // Sahibinin kapattığı sekmeler (bkz. hiddenTabs açıklaması / TabScope).
   hiddenTabs?: string[];
+  // İlk girişte açılan eğitici örnek iş (bkz. migration 118). Arayüz bu işte
+  // "Örnekleri sil" şeridini gösterir.
+  isSample?: boolean;
 }
 
 // Holding katmanı. Tamamen opsiyonel — bir Grup birden çok Organization'a ve/veya
@@ -1997,6 +2000,11 @@ export interface NotificationEmailPrefs {
   timezone: string;
   /** Günlük özete "bugün biten görevlerim" listesi de eklensin mi. */
   includeTasks: boolean;
+  /**
+   * Yeni üyelere günde bir "Projelio ipucu" e-postası (bkz. migration 118).
+   * Bildirim kanallarından BAĞIMSIZ; dizi bitince kendiliğinden durur.
+   */
+  tipsEnabled: boolean;
 }
 
 /**

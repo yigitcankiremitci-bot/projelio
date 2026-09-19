@@ -1,9 +1,11 @@
 /**
- * Her sayfada sağ üstte duran "?" düğmesi: bulunduğun sayfayla ilgili sesli
- * anlatımları listeler, istediğini baştan başlatır.
+ * Her sayfada sağ üstte duran "?" düğmesi: en üstte başlangıç rehberi (örnek
+ * iş kartlarını ve temel kavramları anlatan yardım listesi), altında sesli
+ * anlatımlar — önce bu sayfaya ait olanlar, sonra diğerleri.
  *
- * Turun kendisi istenildiği an başlatılabilsin diye buradaki liste iki bölümdür:
- * önce bu sayfaya ait olanlar, sonra uygulamadaki diğer bütün anlatımlar.
+ * Menü yeni üyelerde ve çok az vakit geçirmiş, geri dönen kullanıcılarda
+ * KENDİLİĞİNDEN açılır (kural: lib/baslangicRehberi.ts). Uygulamayı biraz
+ * kullanmış biri rehberi ancak "?"ye basınca görür.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -13,13 +15,61 @@ import { useTour } from "../../lib/tour/TourContext";
 import { AREA_LABELS, tourAnchor } from "../../lib/tour/types";
 import { IconCheck, IconX } from "../icons";
 import { useT } from "../../lib/i18n";
+import { api } from "../../api/client";
+import {
+  ILK_TUR_KIMLIGI,
+  REHBER_KAPALI_KIMLIGI,
+  rehberKendiligindenAcilsinMi,
+} from "../../lib/baslangicRehberi";
+import BaslangicRehberi from "./BaslangicRehberi";
+
+/** Rehberin bu tarayıcı oturumunda kendiliğinden açıldığını tutan anahtar. */
+const OTURUM_ANAHTARI = "projelio_rehber_acildi_v1";
+
+function oturumdaAcildiMi(): boolean {
+  try {
+    return sessionStorage.getItem(OTURUM_ANAHTARI) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export default function TourLauncher() {
   const c = useThemeColors();
   const t = useT();
-  const { toursHere, allTours, seen, start, tour, voiceEnabled, setVoiceEnabled } = useTour();
+  const { toursHere, allTours, seen, markSeen, start, tour, voiceEnabled, setVoiceEnabled } = useTour();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [toplamSaniye, setToplamSaniye] = useState<number | null>(null);
+  const [kendiligindenAcildi, setKendiligindenAcildi] = useState(false);
+  const rehberKapali = seen.includes(REHBER_KAPALI_KIMLIGI);
+
+  useEffect(() => {
+    api
+      .get<{ toplamSaniye: number }>("/users/me/yardim-durumu")
+      .then((r) => setToplamSaniye(r.toplamSaniye))
+      // Sunucu cevap vermezse kendiliğinden açılmıyor: emin olmadığımız bir
+      // durumda her girişte açılan bir liste, açılmamasından daha kötü.
+      .catch(() => setToplamSaniye(null));
+  }, []);
+
+  useEffect(() => {
+    const ac = rehberKendiligindenAcilsinMi({
+      toplamSaniye,
+      kapatildi: rehberKapali,
+      buOturumdaAcildi: oturumdaAcildiMi(),
+      turSuruyor: Boolean(tour),
+      ilkTurGoruldu: seen.includes(ILK_TUR_KIMLIGI),
+    });
+    if (!ac) return;
+    try {
+      sessionStorage.setItem(OTURUM_ANAHTARI, "1");
+    } catch {
+      /* depolama kapalıysa bu oturumda bir kez daha açılabilir; zararsız */
+    }
+    setKendiligindenAcildi(true);
+    setOpen(true);
+  }, [toplamSaniye, rehberKapali, tour, seen]);
 
   useEffect(() => {
     if (!open) return;
@@ -89,8 +139,8 @@ export default function TourLauncher() {
         type="button"
         {...tourAnchor("tour-launcher")}
         onClick={() => setOpen((v) => !v)}
-        aria-label={t("Sesli kullanım anlatımı")}
-        title={t("Sesli kullanım anlatımı")}
+        aria-label={t("Yardım")}
+        title={t("Yardım")}
         style={{
           width: 40,
           height: 40,
@@ -117,9 +167,9 @@ export default function TourLauncher() {
             position: "absolute",
             top: 48,
             right: 0,
-            width: 330,
+            width: 360,
             maxWidth: "calc(100vw - 24px)",
-            maxHeight: "70vh",
+            maxHeight: "75vh",
             overflowY: "auto",
             background: c.surface,
             border: `1px solid ${c.border}`,
@@ -129,7 +179,7 @@ export default function TourLauncher() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px 8px" }}>
-            <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{t("Sesli anlatım")}</span>
+            <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{t("Yardım")}</span>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -140,6 +190,37 @@ export default function TourLauncher() {
             </button>
           </div>
 
+          <div style={{ fontSize: 11.5, letterSpacing: 0.3, textTransform: "uppercase", color: c.textSecondary, padding: "2px 10px 4px" }}>
+            {t("Başlangıç rehberi")}
+          </div>
+          <BaslangicRehberi onEylem={() => setOpen(false)} turuBaslat={start} />
+          {kendiligindenAcildi && !rehberKapali && (
+            <button
+              type="button"
+              onClick={() => {
+                markSeen(REHBER_KAPALI_KIMLIGI);
+                setOpen(false);
+              }}
+              style={{
+                display: "block",
+                margin: "4px 10px 2px",
+                padding: 0,
+                border: "none",
+                background: "transparent",
+                color: c.textSecondary,
+                fontSize: 12.5,
+                textDecoration: "underline",
+                cursor: "pointer",
+              }}
+            >
+              {t("Bu listeyi bir daha kendiliğinden açma")}
+            </button>
+          )}
+
+          <div style={{ height: 1, background: c.border, margin: "10px 8px 8px" }} />
+          <div style={{ fontSize: 11.5, letterSpacing: 0.3, textTransform: "uppercase", color: c.textSecondary, padding: "2px 10px 6px" }}>
+            {t("Sesli anlatım")}
+          </div>
           <label
             style={{
               display: "flex",

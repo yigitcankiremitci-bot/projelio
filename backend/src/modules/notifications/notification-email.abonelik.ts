@@ -21,13 +21,28 @@ import { getApiPublicUrl, getJwtSecret } from "../../common/config/env";
 
 const AMAC = "bildirim-eposta-abonelik-v1";
 
-export function abonelikImzasi(userId: string): string {
-  return createHmac("sha256", getJwtSecret()).update(`${AMAC}:${userId}`).digest("hex").slice(0, 32);
+/**
+ * İpucu e-postalarının imzası BAŞKA bir amaçla üretiliyor: aynı imza iki uçta
+ * da geçseydi, ipucu e-postasındaki bağlantının adresi elle "eposta-kapat"a
+ * çevrilerek bildirimler de kapatılabilirdi. Kötü niyet gerektirmiyor —
+ * yanlış kopyalanmış bir bağlantı bile kişinin görev atamalarından habersiz
+ * kalmasına yetiyordu.
+ */
+const IPUCU_AMAC = "ipucu-eposta-abonelik-v1";
+
+export type AbonelikTuru = "bildirim" | "ipucu";
+
+function amacOf(tur: AbonelikTuru): string {
+  return tur === "ipucu" ? IPUCU_AMAC : AMAC;
 }
 
-export function abonelikImzasiGecerliMi(userId: string, imza: unknown): boolean {
+export function abonelikImzasi(userId: string, tur: AbonelikTuru = "bildirim"): string {
+  return createHmac("sha256", getJwtSecret()).update(`${amacOf(tur)}:${userId}`).digest("hex").slice(0, 32);
+}
+
+export function abonelikImzasiGecerliMi(userId: string, imza: unknown, tur: AbonelikTuru = "bildirim"): boolean {
   if (typeof imza !== "string" || imza.length === 0) return false;
-  const beklenen = Buffer.from(abonelikImzasi(userId));
+  const beklenen = Buffer.from(abonelikImzasi(userId, tur));
   const gelen = Buffer.from(imza);
   // timingSafeEqual farklı uzunlukta fırlatıyor; uzunluk zaten gizli değil.
   if (beklenen.length !== gelen.length) return false;
@@ -37,4 +52,9 @@ export function abonelikImzasiGecerliMi(userId: string, imza: unknown): boolean 
 /** E-postaya gömülecek tek tık kapatma adresi. */
 export function abonelikKapatmaAdresi(userId: string): string {
   return `${getApiPublicUrl()}/notifications/eposta-kapat?u=${encodeURIComponent(userId)}&i=${abonelikImzasi(userId)}`;
+}
+
+/** İpucu e-postasının tek tık kapatma adresi — YALNIZCA ipuçlarını kapatır. */
+export function ipucuKapatmaAdresi(userId: string): string {
+  return `${getApiPublicUrl()}/notifications/ipucu-kapat?u=${encodeURIComponent(userId)}&i=${abonelikImzasi(userId, "ipucu")}`;
 }

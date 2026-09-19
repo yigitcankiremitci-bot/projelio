@@ -1,4 +1,4 @@
-import { googleTakvimUrl, type DemoRandevuGorunumu } from "@projelio/shared";
+import { demoOnaylandiMi, googleTakvimUrl, type DemoRandevuGorunumu } from "@projelio/shared";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { demoRandevuApi } from "../../api/demoRandevu";
@@ -10,10 +10,21 @@ import { demoRandevuApi } from "../../api/demoRandevu";
  * önce iki hatırlatma o dosyada. Google'ın etkinlik bağlantısı hatırlatma
  * parametresi almıyor — orada kullanıcının varsayılan bildirimi geçerli; iki
  * hatırlatmayı Google'da da isteyen .ics'i içe aktarabilir (e-postada ekli).
+ *
+ * YALNIZCA ONAYLI RANDEVUDA (demoOnaylandiMi): sunucu ve bağlantı hazır
+ * değilken takvime eklenen etkinlik bağlantısız kalıyordu. Onay bekleyen
+ * randevuda düğmeler yerine ne olacağını anlatan bir not çıkar.
  */
 export default function TakvimeEkle({ randevu }: { randevu: DemoRandevuGorunumu }) {
   const c = useThemeColors();
   const t = useT();
+  if (!demoOnaylandiMi(randevu)) {
+    return (
+      <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: c.textSecondary }}>
+        {t("Onay bekleniyor: görüşmeyi yapacak ekip arkadaşımızı atadığımızda onay e-postası gelecek. Görüşme bağlantısı ve takvime ekleme o e-postada ve bu sayfada olacak.")}
+      </p>
+    );
+  }
   const yonetim = `${window.location.origin}/demo-randevu/${randevu.yonetimToken}`;
   const google = googleTakvimUrl({
     baslangic: randevu.baslangic,

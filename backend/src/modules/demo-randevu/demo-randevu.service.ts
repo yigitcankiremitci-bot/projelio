@@ -4,6 +4,7 @@ import {
   DEMO_ETKIN_DURUMLAR,
   DEMO_VARSAYILAN_AYARLAR,
   demoEpostaGecerli,
+  demoOnaylandiMi,
   demoSlotlariUret,
   demoTelefonGecerli,
   gecerliSaat,
@@ -22,6 +23,7 @@ import { EmailService } from "../auth/email.service";
 import { DemoMeetService } from "./demo-meet.service";
 import type { DemoMeetEtkinligi } from "./google-takvim";
 import { getWebAppUrl } from "../../common/config/env";
+import { destekGondereni } from "../auth/destek-gondereni";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import {
   demoEkipEpostasi,
@@ -566,15 +568,51 @@ export class DemoRandevuService {
     const yeni = data as unknown as RandevuSatiri;
 
     if (takvimDegisti) {
-      // İlk atamada "kesinleşti", sonrakilerde "güncellendi".
-      const olay: DemoKatilimciOlayi = r.durum === "bekliyor" && yeni.durum === "planlandi" ? "kesinlesti" : "degisti";
-      void this.katilimciyaYaz(olay, yeni, ayar);
+      // Katılımcıya ONAY yalnızca sunucu + bağlantı birlikte hazır olunca gider
+      // (demoOnaylandiMi). Bağlantısız atama katılımcıya hiçbir şey yollamaz:
+      // eskiden "kesinleşti" gidiyordu ama içinde bağlantı yoktu ve kişi
+      // takvimine bağlantısız bir etkinlik ekliyordu (canlıda yaşandı).
+      const onceOnayli = demoOnaylandiMi({ durum: r.durum, toplantiLinki: r.toplanti_linki });
+      const simdiOnayli = demoOnaylandiMi({ durum: yeni.durum, toplantiLinki: yeni.toplanti_linki });
+      const olay: DemoKatilimciOlayi | null = simdiOnayli ? (onceOnayli ? "degisti" : "kesinlesti") : onceOnayli ? "degisti" : null;
+      if (olay) void this.katilimciyaYaz(olay, yeni, ayar);
       if (atamaDegisti && yeni.sunucu_id) void this.ekibeYaz("atandi", yeni, ayar, await this.kullaniciAdresi(yeni.sunucu_id));
       else if (yeni.sunucu_id) void this.ekibeYaz("degisti", yeni, ayar, await this.kullaniciAdresi(yeni.sunucu_id));
       // Görevden alınan sunucuya iptal kaydı: takviminde boşa bir etkinlik kalmasın.
       if (atamaDegisti && r.sunucu_id) void this.ekibeYaz("iptal", r, ayar, await this.kullaniciAdresi(r.sunucu_id), "Görev başka birine verildi.");
     }
     return this.yoneticiSatiri(yeni, ayar);
+  }
+
+  /**
+   * Atanmış sunucunun Google takviminde Meet açar ve randevuya yazar.
+   *
+   * Ne zaman gerekir: sunucu Google'ı atamadan SONRA bağladıysa ya da atama
+   * anında Google'a ulaşılamadıysa. Bağlantı yazılınca onay e-postası,
+   * normal bağlantı güncellemesiyle aynı yoldan (guncelle) gider.
+   */
+  async meetOlustur(id: string, yapanId: string): Promise<DemoRandevuYonetici> {
+    const r = await this.idIleBul(id);
+    if (!DEMO_ETKIN_DURUMLAR.includes(r.durum)) throw new BadRequestException("Bu randevu zaten kapanmış.");
+    if (!r.sunucu_id) throw new BadRequestException("Önce görüşmeyi yapacak kişiyi seç.");
+    const meet = await this.meet.olustur(r.sunucu_id, this.meetEtkinligi(r));
+    if (!meet) {
+      throw new BadRequestException(
+        "Meet oluşturulamadı: görüşmeyi yapacak kişinin Google Meet bağlantısı yok ya da Google'a ulaşılamadı."
+      );
+    }
+    // Önce bağlantı (e-postalar buradan gider), sonra etkinlik kimliği: ters
+    // sırada guncelle eski etkinlik sanıp yeni açtığımızı silerdi.
+    if (r.google_etkinlik_id && r.google_etkinlik_sahibi) void this.meet.sil(r.google_etkinlik_sahibi, r.google_etkinlik_id);
+    await this.supabase.client.from("demo_randevulari").update({ google_etkinlik_id: null, google_etkinlik_sahibi: null }).eq("id", id);
+    await this.guncelle(id, { toplantiLinki: meet.link }, { userId: yapanId, yonetici: true });
+    const { data } = await this.supabase.client
+      .from("demo_randevulari")
+      .update({ google_etkinlik_id: meet.etkinlikId, google_etkinlik_sahibi: r.sunucu_id })
+      .eq("id", id)
+      .select(RANDEVU_ALANLARI)
+      .single();
+    return this.yoneticiSatiri(data as unknown as RandevuSatiri, await this.ayarlariOku());
   }
 
   async yoneticiIptal(id: string, neden?: string): Promise<DemoRandevuGorunumu> {
@@ -593,7 +631,7 @@ export class DemoRandevuService {
   }
 
   /** Yöneticiler + eklenmiş moderatörler. Yönetici her zaman görev alabilir. */
-  async sunucular(): Promise<DemoSunucu[]> {
+  async sunucular(benId?: string): Promise<DemoSunucu[]> {
     const db = this.supabase.client;
     const [yon, mod] = await Promise.all([
       db.from("users").select("id, full_name, email").eq("role", "admin").is("deleted_at", null),
@@ -611,17 +649,18 @@ export class DemoRandevuService {
         toplantiLinki: m.toplanti_linki,
         // Şifreli token yalnızca var/yok bilgisi için okunuyor; yanıta girmez.
         googleMeetEposta: m.google_refresh_token ? m.google_eposta ?? null : null,
+        ben: u.id === benId,
       });
     }
     for (const u of yon.data ?? []) {
       if (!liste.has(u.id)) {
-        liste.set(u.id, { userId: u.id, ad: u.full_name || u.email, eposta: u.email, yonetici: true, toplantiLinki: null, googleMeetEposta: null });
+        liste.set(u.id, { userId: u.id, ad: u.full_name || u.email, eposta: u.email, yonetici: true, toplantiLinki: null, googleMeetEposta: null, ben: u.id === benId });
       }
     }
     return [...liste.values()].sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
   }
 
-  async sunucuEkle(eposta: string, toplantiLinki?: string | null): Promise<DemoSunucu[]> {
+  async sunucuEkle(eposta: string, toplantiLinki: string | null | undefined, benId: string): Promise<DemoSunucu[]> {
     const adres = kirp(eposta, 254)?.toLowerCase();
     if (!adres) throw new BadRequestException("E-posta adresi yaz.");
     const { data: u } = await this.supabase.client.from("users").select("id").ilike("email", adres).is("deleted_at", null).maybeSingle();
@@ -630,21 +669,21 @@ export class DemoRandevuService {
     if (link && !toplantiLinkiGecerli(link)) throw new BadRequestException("Görüşme bağlantısı https:// ile başlamalı.");
     const { error } = await this.supabase.client.from("demo_sunuculari").upsert({ user_id: u.id, toplanti_linki: link });
     if (error) throw new BadRequestException(error.message);
-    return this.sunucular();
+    return this.sunucular(benId);
   }
 
-  async sunucuGuncelle(userId: string, toplantiLinki: string | null): Promise<DemoSunucu[]> {
+  async sunucuGuncelle(userId: string, toplantiLinki: string | null, benId: string): Promise<DemoSunucu[]> {
     const link = kirp(toplantiLinki, 500);
     if (link && !toplantiLinkiGecerli(link)) throw new BadRequestException("Görüşme bağlantısı https:// ile başlamalı.");
     // Yönetici listede satırı olmadan da görünüyor; bağlantı verince satırı açılır.
     const { error } = await this.supabase.client.from("demo_sunuculari").upsert({ user_id: userId, toplanti_linki: link });
     if (error) throw new BadRequestException(error.message);
-    return this.sunucular();
+    return this.sunucular(benId);
   }
 
-  async sunucuSil(userId: string): Promise<DemoSunucu[]> {
+  async sunucuSil(userId: string, benId: string): Promise<DemoSunucu[]> {
     await this.supabase.client.from("demo_sunuculari").delete().eq("user_id", userId);
-    return this.sunucular();
+    return this.sunucular(benId);
   }
 
   /** Moderatörün kendi görevleri (Ayarlar kartı). */
@@ -684,15 +723,22 @@ export class DemoRandevuService {
     const ayar = await this.ayarlariOku();
 
     for (const satir of data as any[]) {
-      const kalan = new Date(satir.baslangic).getTime() - simdi;
       const r = satir as RandevuSatiri;
+      const baslangic = new Date(r.baslangic).getTime();
+      const kalan = baslangic - simdi;
+      // Randevu ne kadar önceden alındı: görüşmeden 1 saat önce alınan bir
+      // randevuya 3 dakika sonra "1 saat kaldı" yazmak anlamsızdı (canlıda
+      // yaşandı). Onay e-postası zaten az önce gitti.
+      const oncedenAlindi = baslangic - new Date(r.created_at).getTime();
+      const onayli = demoOnaylandiMi({ durum: r.durum, toplantiLinki: r.toplanti_linki });
+
       let alan: "hatirlatma_gun_at" | "hatirlatma_saat_at" | null = null;
-      if (kalan <= 65 * 60_000 && !satir.hatirlatma_saat_at) alan = "hatirlatma_saat_at";
-      // Randevu 1 günden kısa süre önce alındıysa "yarın" e-postası anlamsız:
-      // onay e-postası daha yeni geldi. 3 saatten az kaldıysa atla.
-      else if (kalan <= 24 * 3_600_000 && kalan > 3 * 3_600_000 && !satir.hatirlatma_gun_at) {
-        const alinali = simdi - new Date(r.created_at).getTime();
-        if (alinali > 2 * 3_600_000) alan = "hatirlatma_gun_at";
+      if (onayli && kalan <= 65 * 60_000 && !satir.hatirlatma_saat_at && oncedenAlindi > 3 * 3_600_000) {
+        alan = "hatirlatma_saat_at";
+      } else if (kalan <= 24 * 3_600_000 && kalan > 65 * 60_000 && !satir.hatirlatma_gun_at) {
+        // Onaysız randevuda bu damga katılımcıya değil YÖNETİCİLERE gider:
+        // "yarın görüşme var ama kimse atanmadı / bağlantı yok".
+        if (!onayli || oncedenAlindi > 26 * 3_600_000) alan = "hatirlatma_gun_at";
       }
       if (!alan) continue;
 
@@ -707,8 +753,10 @@ export class DemoRandevuService {
       if (alan === "hatirlatma_saat_at") {
         await this.katilimciyaYaz("hatirlatma_saat", r, ayar);
         if (r.sunucu_id) await this.ekibeYaz("hatirlatma_saat", r, ayar, await this.kullaniciAdresi(r.sunucu_id));
-      } else {
+      } else if (onayli) {
         await this.katilimciyaYaz("hatirlatma_gun", r, ayar);
+      } else {
+        await this.ekibeYaz("onaysiz", r, ayar, await this.yoneticiAdresleri(ayar));
       }
     }
   }
@@ -868,6 +916,7 @@ export class DemoRandevuService {
       sunucuAdi: this.sunucuAdi(r),
       takvimSirasi: r.takvim_sirasi,
       uye,
+      durum: r.durum,
     };
   }
 
@@ -876,12 +925,20 @@ export class DemoRandevuService {
       const e = this.epostaRandevusu(r, ayar, await this.hesabiVar(r));
       const a = this.adresler(r);
       const mail = demoKatilimciEpostasi(olay, e, a);
-      // Hatırlatmalarda ek yok: etkinlik zaten takvimde ya da hiç olmayacak.
-      const ekli = !olay.startsWith("hatirlatma");
+      // .ics eki yalnızca takvime girmesi gereken olaylarda: onay, onaylı bir
+      // randevunun değişmesi ve onaylı bir randevunun iptali (takvimden düşsün).
+      const onayli = demoOnaylandiMi({ durum: r.durum, toplantiLinki: r.toplanti_linki });
+      const iptal = olay === "iptal";
+      const ekli = iptal ? Boolean(r.sunucu_id && r.toplanti_linki) : onayli && (olay === "kesinlesti" || olay === "degisti");
+      // GÖNDEREN destek@: yanıtlanabilir bir kişi adresi, "bildirim" adresine
+      // göre Gmail'in Tanıtımlar sekmesine daha az düşüyor ve katılımcının
+      // "saati değiştirebilir miyiz" yanıtı bir insana ulaşıyor.
+      const gonderen = destekGondereni(process.env.EMAIL_FROM, process.env.EMAIL_FROM_DESTEK);
       await this.email.sendPrepared(r.eposta, {
         ...mail,
+        ...(gonderen ?? {}),
         attachments: ekli
-          ? [{ filename: "projelio-demo.ics", content: Buffer.from(demoIcsDosyasi(e, a.yonetimUrl, new Date(), olay === "iptal")) }]
+          ? [{ filename: "projelio-demo.ics", content: Buffer.from(demoIcsDosyasi(e, a.yonetimUrl, new Date(), iptal)) }]
           : undefined,
       });
     } catch (err) {

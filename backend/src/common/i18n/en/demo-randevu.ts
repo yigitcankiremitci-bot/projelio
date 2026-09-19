@@ -19,8 +19,6 @@ export const demoRandevu: TranslationDict = {
   "Görüşmeniz yarın": "Your session is tomorrow",
   "Görüşmeye katıl": "Join the meeting",
   "Hesabımı oluştur": "Create my account",
-  "Merhaba {ad}, Projelio canlı demo randevunuzu aldık. Sizi karşılayacak ekip arkadaşımızı atadığımızda görüşme bağlantısını da göndereceğiz.":
-    "Hi {ad}, we've received your Projelio live demo booking. We'll send the meeting link once we assign the team member who will host you.",
   "Merhaba {ad}, Projelio canlı demonuz yarın. Aşağıdaki saat size uymuyorsa tek tıkla değiştirebilirsiniz.":
     "Hi {ad}, your Projelio live demo is tomorrow. If the time below no longer works, you can change it with one click.",
   "Merhaba {ad}, aşağıdaki randevu iptal edildi. Dilediğiniz zaman yeni bir saat seçebilirsiniz.":
@@ -33,11 +31,9 @@ export const demoRandevu: TranslationDict = {
     "Hi {ad}, your booking details have changed. The current version is below; if you added it to your calendar before, just add it again and it will replace the old entry.",
   "Projelio canlı demo": "Projelio live demo",
   "Projelio demo görüşmeniz kesinleşti": "Your Projelio demo is confirmed",
-  "Projelio demo randevunuz alındı": "Your Projelio demo is booked",
   "Projelio demo randevunuz güncellendi": "Your Projelio demo booking was updated",
   "Projelio demo randevunuz iptal edildi": "Your Projelio demo booking was cancelled",
   "Projelio ekibiyle 40 dakikalık canlı tanıtım görüşmesi.": "A 40-minute live walkthrough with the Projelio team.",
-  "Randevunuz alındı": "You're booked",
   "Randevunuz güncellendi": "Your booking was updated",
   "Randevunuz iptal edildi": "Your booking was cancelled",
   "Randevuyu değiştir ya da iptal et": "Reschedule or cancel",
@@ -66,6 +62,13 @@ export const demoRandevu: TranslationDict = {
   "Geçerli bir telefon numarası yaz.": "Enter a valid phone number.",
   "Görüşme bağlantısı https:// ile başlamalı.": "The meeting link must start with https://.",
   "Randevu bulunamadı": "Booking not found",
+  "Merhaba {ad}, Projelio canlı demo talebinizi aldık. Görüşmeyi yapacak ekip arkadaşımızı atadığımızda onay e-postası göndereceğiz; görüşme bağlantısı ve takvime ekleme o e-postada olacak.":
+    "Hi {ad}, we've received your Projelio live demo request. Once we assign the team member who will host you, we'll send a confirmation email with the meeting link and add-to-calendar options.",
+  "Projelio demo talebiniz alındı": "Your Projelio demo request was received",
+  "Talebiniz alındı": "Request received",
+  "Meet oluşturulamadı: görüşmeyi yapacak kişinin Google Meet bağlantısı yok ya da Google'a ulaşılamadı.":
+    "Couldn't create a Meet: the host hasn't connected Google Meet, or Google couldn't be reached.",
+  "Önce görüşmeyi yapacak kişiyi seç.": "Choose the host first.",
   "Google entegrasyonu sunucuda yapılandırılmamış.": "Google integration isn't configured on the server.",
   "Google kalıcı erişim vermedi. Tekrar bağlanmayı dene.": "Google didn't grant lasting access. Try connecting again.",
   "Takvim izni verilmedi. Bağlarken takvim kutusunu işaretli bırak.": "Calendar permission wasn't granted. Keep the calendar box checked when connecting.",

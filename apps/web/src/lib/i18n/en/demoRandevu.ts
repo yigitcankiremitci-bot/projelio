@@ -9,8 +9,24 @@ export const demoRandevu: TranslationDict = {
   "1. Saat seç": "1. Pick a time",
   "2. Bilgilerin": "2. Your details",
   "40 dakikalık online görüşme. Bilgilerin hesabından alınır.": "A 40-minute online session. Your details come from your account.",
-  "Apple Takvim dosyası 1 gün ve 1 saat önce iki hatırlatma kurar.": "The Apple Calendar file sets two reminders: 1 day and 1 hour before.",
   "Aralığı sil": "Remove range",
+  "E-postamızı gelen kutunda göremezsen Tanıtımlar (Promotions) ve Spam klasörlerine bak. Onu Birincil'e taşırsan onay e-postası da kaçmaz.":
+    "If you can't see our email in your inbox, check the Promotions and Spam folders. Move it to Primary so the confirmation won't be missed either.",
+  "Google Meet oluştur": "Create Google Meet",
+  "Google Meet oluştur ya da aşağıya bir bağlantı yaz; onay e-postası takvim bağlantılarıyla birlikte o an gider.":
+    "Create a Google Meet or enter a link below; the confirmation email with calendar links goes out right away.",
+  "Google Meet'in bağlı değil: sana atanan randevulara otomatik bağlantı açılamaz.":
+    "Your Google Meet isn't connected: bookings assigned to you can't get an automatic link.",
+  "Google Meet'ini bağlarsan buradan tek tıkla Meet oluşturabilirsin. Ya da aşağıya bir bağlantı yaz.":
+    "Connect your Google Meet to create a Meet here in one click. Or enter a link below.",
+  "Katılımcıya henüz onay gitmedi: görüşme bağlantısı yok.": "No confirmation sent to the attendee yet: there's no meeting link.",
+  "Katılımcıya henüz onay gitmedi: görüşmeyi yapacak kişiyi seç.": "No confirmation sent to the attendee yet: choose a host.",
+  "Onay bekleniyor: görüşmeyi yapacak ekip arkadaşımızı atadığımızda onay e-postası gelecek. Görüşme bağlantısı ve takvime ekleme o e-postada ve bu sayfada olacak.":
+    "Awaiting confirmation: once we assign the team member who will host you, you'll get a confirmation email. The meeting link and add-to-calendar options will be in that email and on this page.",
+  "Talebin alındı ve {eposta} adresine bir e-posta gönderdik. Görüşmeyi yapacak ekip arkadaşımızı atadığımızda onay e-postası gelecek: görüşme bağlantısı ve takvime ekleme o e-postada olacak.":
+    "Your request was received and we've emailed {eposta}. Once we assign the team member who will host you, you'll get a confirmation email with the meeting link and add-to-calendar options.",
+  "{ad} Google Meet'ini bağlamamış. Aşağıya bir bağlantı yaz ya da kendisinden Ayarlar > Yardımcılar'dan bağlamasını iste.":
+    "{ad} hasn't connected Google Meet. Enter a link below, or ask them to connect it from Settings > Helpers.",
   "Herkese açık sayfa ve Ayarlar'daki kart boş blokları gösteriyor.": "The public page and the Settings card show the free slots.",
   "Kaydedildi. Randevu alma hâlâ kapalı — açmak için yukarıdaki anahtarı kaydır.": "Saved. Bookings are still closed — flip the switch above to open them.",
   "Randevu alma açık": "Bookings are open",
@@ -67,8 +83,6 @@ export const demoRandevu: TranslationDict = {
   "Kişisel görüşme bağlantısı (isteğe bağlı)": "Personal meeting link (optional)",
   "Moderatör ekle": "Add moderator",
   "Onay e-postası birkaç dakika içinde gelecek.": "Your confirmation email will arrive in a few minutes.",
-  "Onay e-postası {eposta} adresine gitti. Seni karşılayacak ekip arkadaşımızı atadığımızda görüşme bağlantısını da göndereceğiz.":
-    "A confirmation email was sent to {eposta}. We'll send the meeting link once we assign the team member who will host you.",
   "Planlandı": "Scheduled",
   "Projelio hesabının e-postası": "Email of their Projelio account",
   "Projelio'yu canlı öğren": "Learn Projelio live",

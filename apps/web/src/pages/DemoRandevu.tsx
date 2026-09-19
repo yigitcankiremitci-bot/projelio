@@ -278,14 +278,11 @@ function Basarili({ randevu }: { randevu: DemoRandevuGorunumu | null }) {
         <>
           <OzetKutusu randevu={randevu} />
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: c.textSecondary }}>
-            {t("Onay e-postası {eposta} adresine gitti. Seni karşılayacak ekip arkadaşımızı atadığımızda görüşme bağlantısını da göndereceğiz.", {
+            {t("Talebin alındı ve {eposta} adresine bir e-posta gönderdik. Görüşmeyi yapacak ekip arkadaşımızı atadığımızda onay e-postası gelecek: görüşme bağlantısı ve takvime ekleme o e-postada olacak.", {
               eposta: randevu.eposta,
             })}
           </p>
-          <TakvimeEkle randevu={randevu} />
-          <p style={{ margin: 0, fontSize: 12, color: c.textSecondary }}>
-            {t("Apple Takvim dosyası 1 gün ve 1 saat önce iki hatırlatma kurar.")}
-          </p>
+          <PostaKutusuUyarisi />
           {randevu.hesapGerekli && (
             <HesapCagrisi eposta={randevu.eposta} />
           )}
@@ -299,6 +296,7 @@ function Basarili({ randevu }: { randevu: DemoRandevuGorunumu | null }) {
           {t("Onay e-postası birkaç dakika içinde gelecek.")}
         </p>
       )}
+      {!randevu && <PostaKutusuUyarisi />}
     </div>
   );
 }
@@ -493,6 +491,21 @@ function Yonetim({ token }: { token: string }) {
 }
 
 // ───────────────────────────────────────────── Parçalar
+
+/**
+ * Gmail e-postalarımızı zaman zaman "Tanıtımlar" sekmesine koyuyor; bunu
+ * gönderen tarafında tamamen önlemek mümkün değil. Onay e-postası kaçarsa
+ * kişi bağlantısız kalır — bu yüzden nereye bakacağını baştan söylüyoruz.
+ */
+function PostaKutusuUyarisi() {
+  const c = useThemeColors();
+  const t = useT();
+  return (
+    <div style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${c.warning}`, fontSize: 13, lineHeight: 1.6, color: c.textPrimary }}>
+      {t("E-postamızı gelen kutunda göremezsen Tanıtımlar (Promotions) ve Spam klasörlerine bak. Onu Birincil'e taşırsan onay e-postası da kaçmaz.")}
+    </div>
+  );
+}
 
 function HesapCagrisi({ eposta }: { eposta: string }) {
   const c = useThemeColors();

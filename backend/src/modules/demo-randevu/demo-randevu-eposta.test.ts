@@ -18,6 +18,7 @@ const r: DemoEpostaRandevusu = {
   sunucuAdi: null,
   takvimSirasi: 0,
   uye: false,
+  durum: "bekliyor",
 };
 const a = {
   yonetimUrl: "https://app.projelio.app/demo-randevu/tok",
@@ -30,14 +31,25 @@ test("zaman İstanbul saatiyle yazılır", () => {
   assert.equal(demoZamanMetni(r, "tr"), "21 Eylül 2026 Pazartesi, 10:00–10:40 (Türkiye saati)");
 });
 
-test("üye olmayana hesap çağrısı ve iki takvim düğmesi gider; ad kaçırılır", () => {
+test("talep e-postası takvimsiz gider; üye olmayana hesap çağrısı var, ad kaçırılır", () => {
   const m = demoKatilimciEpostasi("alindi", r, a);
   assert.match(m.html, /register\?email=ayse%40firma\.com/);
-  assert.match(m.html, /calendar\.google\.com/);
-  assert.match(m.html, /takvim=ics/);
+  assert.doesNotMatch(m.html, /calendar\.google\.com/);
+  assert.doesNotMatch(m.html, /takvim=ics/);
   assert.doesNotMatch(m.html, /<b>Yılmaz/);
   const uye = demoKatilimciEpostasi("alindi", { ...r, uye: true }, a);
   assert.doesNotMatch(uye.html, /register\?email/);
+});
+
+test("onay e-postası (sunucu + bağlantı) takvim düğmelerini taşır", () => {
+  const onayli = { ...r, durum: "planlandi" as const, toplantiLinki: "https://meet.google.com/abc-defg-hij", sunucuAdi: "Can" };
+  const m = demoKatilimciEpostasi("kesinlesti", onayli, a);
+  assert.match(m.html, /calendar\.google\.com/);
+  assert.match(m.html, /takvim=ics/);
+  assert.match(m.html, /meet\.google\.com\/abc-defg-hij/);
+  // Bağlantısız "planlandı" onay sayılmaz: takvim yok.
+  const baglantisiz = demoKatilimciEpostasi("degisti", { ...onayli, toplantiLinki: null }, a);
+  assert.doesNotMatch(baglantisiz.html, /calendar\.google\.com/);
 });
 
 test("iptal e-postası takvime ekletmez, yeni saat seçtirir", () => {
@@ -49,10 +61,11 @@ test("iptal e-postası takvime ekletmez, yeni saat seçtirir", () => {
 test("İngilizce randevu İngilizce yazılır", () => {
   const m = demoKatilimciEpostasi("alindi", { ...r, dil: "en" }, a);
   assert.match(m.subject, /demo/i);
-  assert.doesNotMatch(m.subject, /randevunuz/);
+  assert.doesNotMatch(m.subject, /talebiniz/);
 });
 
 test("ekip e-postası kişi bilgilerini taşır, ics iki alarm içerir", () => {
+  assert.match(demoEkipEpostasi("onaysiz", r, a).subject, /Onaylanmamış/);
   const m = demoEkipEpostasi("yeni", r, a);
   assert.match(m.html, /\+90 532 000 00 00/);
   assert.match(m.html, /Üye değil/);

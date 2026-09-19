@@ -34,10 +34,12 @@ export class DemoRandevuController {
     return this.meet.durum(req.user.userId);
   }
 
+  /** `donus`: Google'dan sonra dönülecek sayfa (ör. Admin paneli); yalnızca uygulama içi yol. */
   @Get("google/baglan")
-  async googleBaglan(@Req() req: any) {
+  async googleBaglan(@Req() req: any, @Query("donus") donus?: string) {
     await this.sunucuOlmali(req);
-    return { url: this.meet.baglantiAdresi(req.user.userId) };
+    const next = donus && donus.startsWith("/") && !donus.startsWith("//") ? donus : "/settings";
+    return { url: this.meet.baglantiAdresi(req.user.userId, next) };
   }
 
   @Delete("google")
@@ -120,28 +122,33 @@ export class DemoRandevuAdminController {
     return this.demo.yoneticiIptal(id, neden);
   }
 
+  @Post("randevular/:id/meet")
+  meetOlustur(@Param("id") id: string, @Req() req: any) {
+    return this.demo.meetOlustur(id, req.user.userId);
+  }
+
   @Post("randevular/:id/tasi")
   tasi(@Param("id") id: string, @Body("baslangic") baslangic?: string) {
     return this.demo.yoneticiTasi(id, baslangic);
   }
 
   @Get("sunucular")
-  sunucular() {
-    return this.demo.sunucular();
+  sunucular(@Req() req: any) {
+    return this.demo.sunucular(req.user.userId);
   }
 
   @Post("sunucular")
-  sunucuEkle(@Body() body: { eposta?: string; toplantiLinki?: string | null }) {
-    return this.demo.sunucuEkle(body?.eposta ?? "", body?.toplantiLinki);
+  sunucuEkle(@Body() body: { eposta?: string; toplantiLinki?: string | null }, @Req() req: any) {
+    return this.demo.sunucuEkle(body?.eposta ?? "", body?.toplantiLinki, req.user.userId);
   }
 
   @Patch("sunucular/:userId")
-  sunucuGuncelle(@Param("userId") userId: string, @Body("toplantiLinki") toplantiLinki?: string | null) {
-    return this.demo.sunucuGuncelle(userId, toplantiLinki ?? null);
+  sunucuGuncelle(@Param("userId") userId: string, @Req() req: any, @Body("toplantiLinki") toplantiLinki?: string | null) {
+    return this.demo.sunucuGuncelle(userId, toplantiLinki ?? null, req.user.userId);
   }
 
   @Delete("sunucular/:userId")
-  sunucuSil(@Param("userId") userId: string) {
-    return this.demo.sunucuSil(userId);
+  sunucuSil(@Param("userId") userId: string, @Req() req: any) {
+    return this.demo.sunucuSil(userId, req.user.userId);
   }
 }

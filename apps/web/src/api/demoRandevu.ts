@@ -37,7 +37,9 @@ export const demoRandevuApi = {
 
   // Sunucunun otomatik Google Meet bağlantısı (bkz. backend demo-meet.service.ts)
   meetDurum: () => api.get<DemoMeetDurumu>("/demo-randevu/google"),
-  meetBaglantiAdresi: () => api.get<{ url: string }>("/demo-randevu/google/baglan"),
+  /** `donus`: Google'dan sonra dönülecek uygulama içi sayfa (varsayılan Ayarlar). */
+  meetBaglantiAdresi: (donus?: string) =>
+    api.get<{ url: string }>(`/demo-randevu/google/baglan${donus ? `?donus=${encodeURIComponent(donus)}` : ""}`),
   meetKes: () => api.delete<DemoMeetDurumu>("/demo-randevu/google"),
 };
 
@@ -52,6 +54,8 @@ export const demoRandevuAdminApi = {
     yama: { sunucuId?: string | null; toplantiLinki?: string | null; icNot?: string | null; durum?: DemoRandevuDurumu }
   ) => api.patch<DemoRandevuYonetici>(`/admin/demo-randevu/randevular/${id}`, yama),
   iptal: (id: string, neden?: string) => api.post<DemoRandevuGorunumu>(`/admin/demo-randevu/randevular/${id}/iptal`, { neden }),
+  /** Atanmış sunucunun Google takviminde Meet açar; onay e-postası buradan gider. */
+  meetOlustur: (id: string) => api.post<DemoRandevuYonetici>(`/admin/demo-randevu/randevular/${id}/meet`, {}),
   tasi: (id: string, baslangic: string) =>
     api.post<DemoRandevuGorunumu>(`/admin/demo-randevu/randevular/${id}/tasi`, { baslangic }),
   sunucular: () => api.get<DemoSunucu[]>("/admin/demo-randevu/sunucular"),

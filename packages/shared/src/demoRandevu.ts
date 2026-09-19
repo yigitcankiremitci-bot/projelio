@@ -23,6 +23,18 @@ export const DEMO_DURUM_ETIKETI: Record<DemoRandevuDurumu, string> = {
   iptal: "İptal",
 };
 
+/**
+ * Randevu ONAYLANDI mı: bir sunucu atanmış VE görüşme bağlantısı hazır.
+ *
+ * Katılımcıya "takvime ekle" yalnızca bundan sonra gösterilir. Talep anında
+ * takvime eklenen bir görüşmenin henüz ne sunucusu ne bağlantısı vardı;
+ * kişi takviminde bağlantısız bir etkinlikle kalıyordu (canlıda yaşandı).
+ * Sunucu, e-posta ve arayüz aynı kurala baksın diye burada.
+ */
+export function demoOnaylandiMi(r: { durum: DemoRandevuDurumu; toplantiLinki: string | null }): boolean {
+  return r.durum === "planlandi" && Boolean(r.toplantiLinki);
+}
+
 /** Takvime eklenen iki hatırlatma: 1 gün ve 1 saat önce (dakika). */
 export const DEMO_HATIRLATMALARI_DK = [24 * 60, 60] as const;
 
@@ -137,6 +149,8 @@ export interface DemoSunucu {
   toplantiLinki: string | null;
   /** Google takvimini bağladıysa hangi hesapla — her randevuya otomatik Meet açılır. */
   googleMeetEposta: string | null;
+  /** Listeyi isteyen yöneticinin kendisi mi (Meet'i yalnızca kişi kendisi bağlayabilir). */
+  ben: boolean;
 }
 
 /** Sunucunun (moderatör/yönetici) kendi Google Meet bağlantı durumu. */

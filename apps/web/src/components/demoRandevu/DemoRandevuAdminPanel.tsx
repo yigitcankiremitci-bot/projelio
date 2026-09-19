@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   DEMO_DURUM_ETIKETI,
+  demoOnaylandiMi,
   type DemoAyarlari,
   type DemoCalismaAraligi,
   type DemoMusaitlik,
   type DemoRandevuYonetici,
   type DemoSunucu,
 } from "@projelio/shared";
-import { demoRandevuAdminApi } from "../../api/demoRandevu";
+import { demoRandevuAdminApi, demoRandevuApi } from "../../api/demoRandevu";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useLocale, useT } from "../../lib/i18n";
 import TabBar from "../TabBar";
@@ -19,6 +20,16 @@ import { gunAnahtari, uzunTarih } from "./demoBicim";
 import { anaDugme, girdi, ikincilDugme } from "./stiller";
 
 type Bolum = "randevular" | "saatler" | "sunucular";
+
+/**
+ * Kendi Google hesabını Meet için bağla. Google'dan sonra bu panele dönülür.
+ * Bağlantıyı yalnızca kişi KENDİSİ verebilir (Google izni hesabın sahibinden
+ * istenir); yönetici başka bir sunucu adına bağlayamaz.
+ */
+async function meetBagla(): Promise<void> {
+  const { url } = await demoRandevuApi.meetBaglantiAdresi("/admin?sekme=demoRandevu");
+  window.location.href = url;
+}
 
 /**
  * Admin > Demo randevuları.
@@ -46,6 +57,7 @@ export default function DemoRandevuAdminPanel() {
       {ayar && (
         <DurumSeridi
           ayar={ayar}
+          ben={sunucular.find((x) => x.ben) ?? null}
           onDegisti={(yeni) => {
             setAyar(yeni);
             setSurum((n) => n + 1);
@@ -79,10 +91,12 @@ export default function DemoRandevuAdminPanel() {
  */
 function DurumSeridi({
   ayar,
+  ben,
   onDegisti,
   saatlereGit,
 }: {
   ayar: DemoAyarlari;
+  ben: DemoSunucu | null;
   onDegisti: (a: DemoAyarlari) => void;
   saatlereGit: () => void;
 }) {
@@ -137,6 +151,15 @@ function DurumSeridi({
               : t("Önce çalışma saatlerini gir; bloklar oradan üretiliyor.")}
         </div>
         {hata && <div style={{ fontSize: 13, color: c.danger, marginTop: 4 }}>{hata}</div>}
+        {ben && !ben.googleMeetEposta && (
+          // Atama Meet üretemezse katılımcıya onay gitmez; en sık sebep bu.
+          <div style={{ fontSize: 13, color: c.warning, marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span>{t("Google Meet'in bağlı değil: sana atanan randevulara otomatik bağlantı açılamaz.")}</span>
+            <button type="button" onClick={() => void meetBagla().catch((e) => setHata(e instanceof Error ? e.message : String(e)))} style={{ ...ikincilDugme(c), padding: "6px 12px", fontSize: 13 }}>
+              {t("Google Meet'i bağla")}
+            </button>
+          </div>
+        )}
       </div>
       {ayar.aktif ? (
         <a href="/demo-randevu" target="_blank" rel="noopener noreferrer" style={{ ...ikincilDugme(c), textDecoration: "none" }}>
@@ -261,6 +284,20 @@ function RandevuSatiri({
 
   const etkin = r.durum === "bekliyor" || r.durum === "planlandi";
   const bitti = Date.parse(r.bitis) < Date.now();
+  const onayli = demoOnaylandiMi(r);
+  const sunucu = sunucular.find((x) => x.userId === r.sunucuId) ?? null;
+
+  const meetOlustur = async () => {
+    setCalisiyor(true);
+    setHata("");
+    try {
+      onDegisti(await demoRandevuAdminApi.meetOlustur(r.id));
+    } catch (e) {
+      setHata(e instanceof Error ? e.message : t("Kaydedilemedi."));
+    } finally {
+      setCalisiyor(false);
+    }
+  };
 
   const kaydet = async (yama: Parameters<typeof demoRandevuAdminApi.guncelle>[1]) => {
     setCalisiyor(true);
@@ -326,6 +363,49 @@ function RandevuSatiri({
       )}
       {r.iptalNedeni && <div style={{ fontSize: 13, color: c.danger }}>{t("İptal nedeni")}: {r.iptalNedeni}</div>}
 
+      {etkin && !onayli && (
+        <div
+          style={{
+            border: `1px solid ${c.warning}`,
+            borderRadius: 10,
+            padding: "10px 12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600, color: c.warning }}>
+            {!r.sunucuId
+              ? t("Katılımcıya henüz onay gitmedi: görüşmeyi yapacak kişiyi seç.")
+              : t("Katılımcıya henüz onay gitmedi: görüşme bağlantısı yok.")}
+          </div>
+          {r.sunucuId && (
+            <div style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
+              {sunucu?.googleMeetEposta
+                ? t("Google Meet oluştur ya da aşağıya bir bağlantı yaz; onay e-postası takvim bağlantılarıyla birlikte o an gider.")
+                : sunucu?.ben
+                  ? t("Google Meet'ini bağlarsan buradan tek tıkla Meet oluşturabilirsin. Ya da aşağıya bir bağlantı yaz.")
+                  : t("{ad} Google Meet'ini bağlamamış. Aşağıya bir bağlantı yaz ya da kendisinden Ayarlar > Yardımcılar'dan bağlamasını iste.", {
+                      ad: sunucu?.ad ?? "",
+                    })}
+            </div>
+          )}
+          {r.sunucuId && (sunucu?.googleMeetEposta || sunucu?.ben) && (
+            <div>
+              {sunucu?.googleMeetEposta ? (
+                <button type="button" disabled={calisiyor} onClick={() => void meetOlustur()} style={anaDugme(c)}>
+                  {calisiyor ? t("Oluşturuluyor…") : t("Google Meet oluştur")}
+                </button>
+              ) : (
+                <button type="button" onClick={() => void meetBagla().catch((e) => setHata(e instanceof Error ? e.message : String(e)))} style={anaDugme(c)}>
+                  {t("Google Meet'i bağla")}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {etkin && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 8 }}>
           <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -336,6 +416,7 @@ function RandevuSatiri({
                 <option key={s.userId} value={s.userId}>
                   {s.ad}
                   {s.yonetici ? ` (${t("yönetici")})` : ""}
+                  {s.googleMeetEposta ? " · Meet ✓" : ""}
                 </option>
               ))}
             </select>
@@ -769,6 +850,11 @@ function SunucuSatiri({
         placeholder={t("Kişisel görüşme bağlantısı")}
         style={{ ...girdi(c), flex: 2, minWidth: 200 }}
       />
+      {s.ben && !s.googleMeetEposta && (
+        <button type="button" onClick={() => void meetBagla()} style={anaDugme(c)}>
+          {t("Google Meet'i bağla")}
+        </button>
+      )}
       {!s.yonetici && (
         <button type="button" disabled={calisiyor} onClick={() => void calistir(() => demoRandevuAdminApi.sunucuSil(s.userId))} style={{ ...ikincilDugme(c), color: c.danger }}>
           {t("Çıkar")}

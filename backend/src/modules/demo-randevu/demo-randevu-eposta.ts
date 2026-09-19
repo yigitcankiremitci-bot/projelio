@@ -1,4 +1,4 @@
-import { demoIcsOlustur, googleTakvimUrl, type Locale } from "@projelio/shared";
+import { demoIcsOlustur, demoOnaylandiMi, googleTakvimUrl, type DemoRandevuDurumu, type Locale } from "@projelio/shared";
 import { cevirmen } from "../../common/i18n";
 import { epostaKabugu, kacir, MARKA } from "../auth/email-shell";
 
@@ -30,6 +30,7 @@ export interface DemoEpostaRandevusu {
   sunucuAdi: string | null;
   takvimSirasi: number;
   uye: boolean;
+  durum: DemoRandevuDurumu;
 }
 
 export interface DemoEpostaAdresleri {
@@ -126,9 +127,9 @@ export function demoKatilimciEpostasi(
 
   const metinler: Record<DemoKatilimciOlayi, { konu: string; baslik: string; giris: string }> = {
     alindi: {
-      konu: t("Projelio demo randevunuz alındı"),
-      baslik: t("Randevunuz alındı"),
-      giris: t("Merhaba {ad}, Projelio canlı demo randevunuzu aldık. Sizi karşılayacak ekip arkadaşımızı atadığımızda görüşme bağlantısını da göndereceğiz.", { ad }),
+      konu: t("Projelio demo talebiniz alındı"),
+      baslik: t("Talebiniz alındı"),
+      giris: t("Merhaba {ad}, Projelio canlı demo talebinizi aldık. Görüşmeyi yapacak ekip arkadaşımızı atadığımızda onay e-postası göndereceğiz; görüşme bağlantısı ve takvime ekleme o e-postada olacak.", { ad }),
     },
     kesinlesti: {
       konu: t("Projelio demo görüşmeniz kesinleşti"),
@@ -160,6 +161,10 @@ export function demoKatilimciEpostasi(
   };
   const m = metinler[olay];
   const iptal = olay === "iptal";
+  // Takvim düğmeleri ve hesap çağrısı yalnızca ONAYLANMIŞ randevuda: talep
+  // anında gitmiyor (bkz. demoOnaylandiMi). Onaysız "değişti" e-postası da
+  // takvimsiz — kişi saatin kaydığını öğrenir, etkinliği onaydan sonra ekler.
+  const onayli = !iptal && demoOnaylandiMi({ durum: r.durum, toplantiLinki: r.toplantiLinki });
 
   const baglanti = !iptal && r.toplantiLinki
     ? `<div style="margin-top:10px;font-size:14px;"><a href="${kacir(r.toplantiLinki)}" style="color:${MARKA.vurgu};">${kacir(
@@ -179,10 +184,12 @@ export function demoKatilimciEpostasi(
 
   const takvimDugmeleri = iptal
     ? dugme(a.yonetimUrl, t("Yeni saat seç"))
-    : [
-        dugme(googleTakvimUrl(demoTakvimEtkinligi(r, a.yonetimUrl)), t("Google Takvim'e ekle"), true),
-        dugme(a.icsUrl, t("Apple Takvim'e ekle"), true),
-      ].join("");
+    : onayli
+      ? [
+          dugme(googleTakvimUrl(demoTakvimEtkinligi(r, a.yonetimUrl)), t("Google Takvim'e ekle"), true),
+          dugme(a.icsUrl, t("Apple Takvim'e ekle"), true),
+        ].join("")
+      : "";
 
   const html = epostaKabugu(
     r.dil,
@@ -190,9 +197,9 @@ export function demoKatilimciEpostasi(
 <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:${MARKA.yaziOrta};">${m.giris}</p>
 ${zamanKutusu(r, baglanti)}
 ${hesapCagrisi}
-<div style="margin:0 0 16px;">${takvimDugmeleri}</div>
+${takvimDugmeleri ? `<div style="margin:0 0 16px;">${takvimDugmeleri}</div>` : ""}
 ${
-  iptal
+  !onayli
     ? ""
     : `<p style="margin:0 0 16px;font-size:12px;line-height:1.6;color:${MARKA.yaziSoluk};">${kacir(
         t("Takvime eklediğinizde 1 gün ve 1 saat önce iki hatırlatma kurulur. Outlook ve diğer takvimler için ekteki .ics dosyasını açabilirsiniz.")
@@ -243,7 +250,7 @@ ${satirlar
 </table>`;
 }
 
-export type DemoEkipOlayi = "yeni" | "atandi" | "degisti" | "iptal" | "hatirlatma_saat";
+export type DemoEkipOlayi = "yeni" | "atandi" | "degisti" | "iptal" | "hatirlatma_saat" | "onaysiz";
 
 /** Yöneticilere (yeni randevu) ve atanan sunucuya giden e-posta. */
 export function demoEkipEpostasi(
@@ -274,6 +281,12 @@ export function demoEkipEpostasi(
       baslik: "Demo iptal edildi",
       giris: ek?.iptalNedeni ? `Neden: ${kacir(ek.iptalNedeni)}` : "Randevu iptal edildi; blok yeniden açıldı.",
     },
+    onaysiz: {
+      konu: `Onaylanmamış demo: ${r.ad} — ${zaman}`,
+      baslik: "Bu demo henüz onaylanmadı",
+      giris:
+        "Görüşmeye bir günden az kaldı ama katılımcıya onay gitmedi: sunucu atanmamış ya da görüşme bağlantısı yok. Katılımcının elinde bağlantı olmadan görüşme yapılamaz.",
+    },
     hatirlatma_saat: {
       konu: `1 saat sonra demo: ${r.ad}`,
       baslik: "Demon 1 saat sonra",
@@ -294,7 +307,7 @@ export function demoEkipEpostasi(
   ${olay === "iptal" ? "" : baglanti}
 </div>
 ${kisiTablosu(r)}
-<p style="margin:0;">${dugme(a.adminUrl, olay === "yeni" ? "Görevi ata" : "Randevuları aç")}</p>`,
+<p style="margin:0;">${dugme(a.adminUrl, olay === "yeni" || olay === "onaysiz" ? "Görevi ata" : "Randevuları aç")}</p>`,
     520
   );
 

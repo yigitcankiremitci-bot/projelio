@@ -57,11 +57,11 @@ export class DemoMeetService {
   }
 
   /** Google onay ekranının adresi. Dönüş google.controller'daki ortak callback'e düşer. */
-  baglantiAdresi(userId: string): string {
+  baglantiAdresi(userId: string, next = "/settings"): string {
     if (!this.yapilandirildi()) {
       throw new BadRequestException("Google entegrasyonu sunucuda yapılandırılmamış.");
     }
-    const state = this.oauth.signState({ mode: "demo_takvim", userId, next: "/settings" });
+    const state = this.oauth.signState({ mode: "demo_takvim", userId, next });
     // Hesap seçme ekranı zorunlu: kişi Projelio'ya kişisel Gmail'iyle girmiş
     // olabilir ama demoları şirket hesabından yapmak isteyebilir.
     return this.oauth.buildAuthUrl({ scopes: [...LOGIN_SCOPES, DEMO_TAKVIM_IZNI], state, selectAccount: true });

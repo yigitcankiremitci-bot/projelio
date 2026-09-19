@@ -2755,19 +2755,43 @@ export class FilesService {
     projectId: string,
     userId: string,
     file: Express.Multer.File,
-    context: Omit<FileContext, "projectId">
+    context: Omit<FileContext, "projectId">,
+    placement?: { folderId?: string; relativePath?: string }
   ): Promise<ProjectFile> {
     const jobId = await this.jobIdOfProject(projectId);
-    return this.uploadInline(jobId, userId, file, { ...context, projectId });
+    await this.assertProjectFolder(projectId, placement?.folderId);
+    return this.uploadInline(jobId, userId, file, { ...context, projectId }, placement);
   }
 
   async createUploadSessionForProject(
     projectId: string,
     userId: string,
-    payload: { name: string; mimeType: string; sizeBytes?: number } & Omit<FileContext, "projectId">
+    payload: { name: string; mimeType: string; sizeBytes?: number; folderId?: string; relativePath?: string } &
+      Omit<FileContext, "projectId">
   ): Promise<{ sessionId: string; uploadUrl: string }> {
     const jobId = await this.jobIdOfProject(projectId);
+    await this.assertProjectFolder(projectId, payload?.folderId);
     return this.createUploadSession(jobId, userId, { ...payload, projectId });
+  }
+
+  /**
+   * Proje ucundan gelen klasör kimliği O projenin klasörü (ya da altı) olmalı.
+   *
+   * resolvePlacement yalnızca klasörün AYNI İŞE ait olduğuna bakıyor; proje
+   * ucunda bu yetmez. Yalnızca bu projeye eklenmiş biri kimliği elle yazıp
+   * dosyasını işin başka bir projesinin klasörüne koyabilirdi. Proje
+   * klasörünün ve altındaki kullanıcı klasörlerinin project_id'si dolu
+   * (bkz. createFolder — üst klasörden miras).
+   */
+  private async assertProjectFolder(projectId: string, folderId?: string): Promise<void> {
+    if (!folderId) return;
+    const { data: row } = await this.supabase.client
+      .from("file_folders")
+      .select("project_id")
+      .eq("id", folderId)
+      .maybeSingle();
+    if (!row) throw new NotFoundException("Klasör bulunamadı");
+    if (row.project_id !== projectId) throw new ForbiddenException("Bu klasör bu projeye ait değil");
   }
 
   /**

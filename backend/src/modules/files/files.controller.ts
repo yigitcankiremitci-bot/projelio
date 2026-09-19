@@ -471,20 +471,38 @@ export class FilesController {
   uploadToProject(
     @Param("projectId") projectId: string,
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: { taskId?: string; outputId?: string },
+    @Body() body: { taskId?: string; outputId?: string; folderId?: string; relativePath?: string },
     @Req() req: any
   ) {
-    return this.filesService.uploadInlineForProject(projectId, req.user.userId, file, {
-      taskId: body?.taskId || undefined,
-      outputId: body?.outputId || undefined,
-    });
+    return this.filesService.uploadInlineForProject(
+      projectId,
+      req.user.userId,
+      file,
+      {
+        taskId: body?.taskId || undefined,
+        outputId: body?.outputId || undefined,
+      },
+      // Proje Dosyalar sekmesinde klasörün içindeyken ya da klasör yüklerken.
+      // Bu alanlar eskiden okunmuyordu: klasör yüklemesinin dosyaları ağaç
+      // kurulmadan projenin klasörüne düz iniyordu.
+      { folderId: body?.folderId || undefined, relativePath: body?.relativePath || undefined }
+    );
   }
 
   @Post("projects/:projectId/files/upload-session")
   @UseGuards(AuthGuard("jwt"), UploadRateLimitGuard)
   createProjectUploadSession(
     @Param("projectId") projectId: string,
-    @Body() body: { name: string; mimeType: string; sizeBytes?: number; taskId?: string; outputId?: string },
+    @Body()
+    body: {
+      name: string;
+      mimeType: string;
+      sizeBytes?: number;
+      taskId?: string;
+      outputId?: string;
+      folderId?: string;
+      relativePath?: string;
+    },
     @Req() req: any
   ) {
     return this.filesService.createUploadSessionForProject(projectId, req.user.userId, body);

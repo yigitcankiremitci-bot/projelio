@@ -12,6 +12,7 @@ import { demoRandevuAdminApi } from "../../api/demoRandevu";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useLocale, useT } from "../../lib/i18n";
 import TabBar from "../TabBar";
+import Anahtar from "../Anahtar";
 import Modal from "../Modal";
 import SlotSecici from "./SlotSecici";
 import { gunAnahtari, uzunTarih } from "./demoBicim";
@@ -107,47 +108,46 @@ function DurumSeridi({
   return (
     <div
       style={{
-        border: `1px solid ${renk}`,
-        borderRadius: 12,
-        padding: "12px 14px",
+        border: `2px solid ${renk}`,
+        borderRadius: 14,
+        padding: "16px 18px",
         background: c.surface,
         display: "flex",
         alignItems: "center",
-        gap: 12,
+        gap: 16,
         flexWrap: "wrap",
       }}
     >
-      <span style={{ width: 10, height: 10, borderRadius: "50%", background: renk, flexShrink: 0 }} />
-      <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary }}>
-          {ayar.aktif ? t("Randevu alma açık") : t("Randevu alma kapalı")}
+      <Anahtar
+        buyuk
+        checked={ayar.aktif}
+        disabled={calisiyor || (!ayar.aktif && !saatVar)}
+        onChange={(v) => void degistir(v)}
+        label={t("Randevu alma")}
+      />
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: renk }}>
+          {calisiyor ? t("Kaydediliyor…") : ayar.aktif ? t("Randevu alma açık") : t("Randevu alma kapalı")}
         </div>
-        <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 2, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 3, lineHeight: 1.5 }}>
           {ayar.aktif
             ? t("Herkese açık sayfa ve Ayarlar'daki kart boş blokları gösteriyor.")
             : saatVar
-              ? t("Çalışma saatleri hazır, ama herkese açık sayfa \"şu an kapalı\" gösteriyor.")
+              ? t("Herkese açık sayfa \"şu an kapalı\" gösteriyor. Açmak için anahtarı kaydır.")
               : t("Önce çalışma saatlerini gir; bloklar oradan üretiliyor.")}
         </div>
         {hata && <div style={{ fontSize: 13, color: c.danger, marginTop: 4 }}>{hata}</div>}
       </div>
       {ayar.aktif ? (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <a href="/demo-randevu" target="_blank" rel="noopener noreferrer" style={{ ...ikincilDugme(c), textDecoration: "none" }}>
-            {t("Sayfayı aç")} ↗
-          </a>
-          <button type="button" disabled={calisiyor} onClick={() => void degistir(false)} style={ikincilDugme(c)}>
-            {t("Kapat")}
-          </button>
-        </div>
-      ) : saatVar ? (
-        <button type="button" disabled={calisiyor} onClick={() => void degistir(true)} style={anaDugme(c)}>
-          {calisiyor ? t("Açılıyor…") : t("Randevu almayı aç")}
-        </button>
+        <a href="/demo-randevu" target="_blank" rel="noopener noreferrer" style={{ ...ikincilDugme(c), textDecoration: "none" }}>
+          {t("Sayfayı aç")} ↗
+        </a>
       ) : (
-        <button type="button" onClick={saatlereGit} style={anaDugme(c)}>
-          {t("Çalışma saatlerine git")}
-        </button>
+        !saatVar && (
+          <button type="button" onClick={saatlereGit} style={anaDugme(c)}>
+            {t("Çalışma saatlerine git")}
+          </button>
+        )
       )}
     </div>
   );
@@ -498,7 +498,10 @@ function Saatler({ onKaydedildi }: { onKaydedildi: (a: DemoAyarlari) => void }) 
     setCalisiyor(true);
     setMesaj(null);
     try {
-      const yeni = await demoRandevuAdminApi.ayarlariKaydet(ayar);
+      // `aktif` GÖNDERİLMEZ: aç/kapa üstteki şeridin işi. Form açıkken şeritten
+      // açılırsa formdaki eski değer bunu geri kapatmasın.
+      const { aktif: _aktif, ...yama } = ayar;
+      const yeni = await demoRandevuAdminApi.ayarlariKaydet(yama);
       setAyar(yeni);
       setKayitli(JSON.stringify(yeni));
       onKaydedildi(yeni);
@@ -506,7 +509,7 @@ function Saatler({ onKaydedildi }: { onKaydedildi: (a: DemoAyarlari) => void }) 
         tur: "ok",
         metin:
           !yeni.aktif && yeni.calismaSaatleri.length
-            ? t("Kaydedildi. Randevu alma hâlâ kapalı — açmak için yukarıdaki düğmeyi kullan.")
+            ? t("Kaydedildi. Randevu alma hâlâ kapalı — açmak için yukarıdaki anahtarı kaydır.")
             : t("Kaydedildi."),
       });
     } catch (e) {
@@ -526,10 +529,6 @@ function Saatler({ onKaydedildi }: { onKaydedildi: (a: DemoAyarlari) => void }) 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <Kart baslik={t("Randevu alma")}>
-        <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 14, color: c.textPrimary }}>
-          <input type="checkbox" checked={ayar.aktif} onChange={(e) => guncelle({ aktif: e.target.checked })} style={{ width: 17, height: 17 }} />
-          {t("Herkese açık sayfa ve Ayarlar'daki kart randevu alsın")}
-        </label>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: 10 }}>
           <SayiAlani etiket={t("Görüşme süresi (dk)")} deger={ayar.sureDk} onChange={(v) => guncelle({ sureDk: v })} />
           <SayiAlani etiket={t("Görüşmeler arası (dk)")} deger={ayar.tamponDk} onChange={(v) => guncelle({ tamponDk: v })} />

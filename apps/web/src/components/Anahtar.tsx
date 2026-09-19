@@ -9,11 +9,14 @@ interface Props {
   label: string;
   /** Küçük (14px yükseklik) hâli sıkışık satırlar için. Varsayılan normal. */
   kucuk?: boolean;
+  /** Sayfanın ana aç/kapa'sı için büyük hâl (ör. demo randevu alma). */
+  buyuk?: boolean;
 }
 
 const OLCU = {
   normal: { g: 46, y: 26, top: 20 },
   kucuk: { g: 36, y: 20, top: 15 },
+  buyuk: { g: 64, y: 36, top: 30 },
 };
 
 /** Topuzun kenarlardan boşluğu (iç kutu içinde, piksel). */
@@ -37,14 +40,14 @@ const IC_BOSLUK = 2;
  * Hareketsiz bırakılan (yani tıklama olan) sürükleme de anahtarı çeviriyor,
  * yoksa "tıkladım, olmadı" hissi doğuyordu.
  */
-export default function Anahtar({ checked, onChange, disabled = false, label, kucuk = false }: Props) {
+export default function Anahtar({ checked, onChange, disabled = false, label, kucuk = false, buyuk = false }: Props) {
   const c = useThemeColors();
   const ref = useRef<HTMLButtonElement>(null);
   const baslangic = useRef<{ x: number; tasindi: boolean } | null>(null);
   // Sürüklerken topuzun anlık konumu (0 = kapalı, 1 = açık). null ise animasyon serbest.
   const [surukleme, setSurukleme] = useState<number | null>(null);
 
-  const { g, y, top } = kucuk ? OLCU.kucuk : OLCU.normal;
+  const { g, y, top } = buyuk ? OLCU.buyuk : kucuk ? OLCU.kucuk : OLCU.normal;
   // Kenarlıklar box-sizing ile ölçünün İÇİNDE: mutlak konumlanan topuz iç
   // kutuya göre yerleşiyor, o yüzden genişlikten iki kenarlık düşülüyor.
   const icGenislik = g - 2;

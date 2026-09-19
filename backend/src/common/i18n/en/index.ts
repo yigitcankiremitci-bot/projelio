@@ -6,6 +6,7 @@ import { whatsapp } from "./whatsapp";
 import { ipuclari } from "./ipuclari";
 import { ornekIs } from "./ornek-is";
 import { epostaYonetimi } from "./eposta-yonetimi";
+import { demoRandevu } from "./demo-randevu";
 
 /**
  * Sunucu metinlerinin Türkçe → İngilizce sözlüğü.
@@ -31,4 +32,5 @@ export const en: TranslationDict = {
   ...ipuclari,
   ...ornekIs,
   ...epostaYonetimi,
+  ...demoRandevu,
 };

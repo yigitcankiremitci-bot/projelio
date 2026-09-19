@@ -12,6 +12,7 @@ import BillingAdminPanel from "../components/BillingAdminPanel";
 import SupportAdminPanel from "../components/SupportAdminPanel";
 import DemoAdminPanel from "../components/DemoAdminPanel";
 import DemoZiyaretleriPanel from "../components/DemoZiyaretleriPanel";
+import DemoRandevuAdminPanel from "../components/demoRandevu/DemoRandevuAdminPanel";
 import WhatsappNumbersPanel from "../components/WhatsappNumbersPanel";
 import AdminEpostaPanel from "../components/adminEposta/AdminEpostaPanel";
 import AdminEpostaMaliyetPanel from "../components/adminEposta/AdminEpostaMaliyetPanel";
@@ -30,6 +31,7 @@ type AdminTab =
   | "saglayicilar"
   | "paketler"
   | "destek"
+  | "demoRandevu"
   | "demo"
   | "ziyaretler"
   | "whatsapp";
@@ -51,6 +53,7 @@ const TABS: { key: AdminTab; label: string }[] = [
   { key: "saglayicilar", label: "AI sağlayıcıları" },
   { key: "paketler", label: "Paketler ve ödeme" },
   { key: "destek", label: "Destek" },
+  { key: "demoRandevu", label: "Demo randevuları" },
   { key: "demo", label: "Demo hesabı" },
   { key: "ziyaretler", label: "Demo ziyaretleri" },
   { key: "whatsapp", label: "WhatsApp numaraları" },
@@ -173,6 +176,7 @@ export default function AdminPanel() {
     saglayicilar: () => <AiCreditAdminPanel bolum="saglayicilar" />,
     paketler: () => <BillingAdminPanel />,
     destek: () => <SupportAdminPanel />,
+    demoRandevu: () => <DemoRandevuAdminPanel />,
     demo: () => <DemoAdminPanel />,
     ziyaretler: () => <DemoZiyaretleriPanel />,
     whatsapp: () => <WhatsappNumbersPanel />,

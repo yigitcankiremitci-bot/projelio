@@ -42,6 +42,7 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | İpucu dizisi varsayılanları (14 ipucu) | `backend/src/modules/notifications/ipucu.icerik.ts` — yönetici panelden üstüne yazar; `kimlik` kalıcı, değiştirmek ipucunu herkese yeniden gönderir |
 | Eğitici örnek iş (bireysel / şirket / taşeron) | `backend/src/modules/ornek-is/`, `apps/web/src/components/OrnekIsSeridi.tsx` — `jobs.is_sample`, silme yalnızca işaretli işlere |
 | "?" menüsü: başlangıç rehberi + sesli turlar | `apps/web/src/components/tour/TourLauncher.tsx`, içerik ve kendiliğinden açılma kuralı `apps/web/src/lib/baslangicRehberi.ts` |
+| Canlı demo randevuları (herkese açık takvim, Ayarlar kartı, admin atama, .ics + hatırlatma) | `backend/src/modules/demo-randevu/`, `apps/web/src/pages/DemoRandevu.tsx`, `apps/web/src/components/demoRandevu/`; slot/.ics hesabı `packages/shared/src/demoRandevu.ts` — moderatör bir ROL değil, `demo_sunuculari` satırı; otomatik Meet `demo-meet.service.ts` + `google-takvim.ts` (ortak Google callback'inde `demo_takvim` modu) |
 
 Backend'de 48 modül, 500'den fazla HTTP ucu var (`node scripts/uc-listesi.mjs` ile
 listelenir — elle yazılmış liste bayatlıyor). Lio =

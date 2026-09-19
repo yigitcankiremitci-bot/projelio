@@ -1,0 +1,123 @@
+import type { TranslationDict } from "@projelio/shared";
+
+/**
+ * Canlı demo randevuları: herkese açık /demo-randevu sayfası, Ayarlar >
+ * Yardımcılar'daki kart ve Admin > Demo randevuları. E-posta metinleri ve
+ * sunucu hataları sunucu sözlüğünde (backend common/i18n/en/demo-randevu.ts).
+ */
+export const demoRandevu: TranslationDict = {
+  "1. Saat seç": "1. Pick a time",
+  "2. Bilgilerin": "2. Your details",
+  "40 dakikalık online görüşme. Bilgilerin hesabından alınır.": "A 40-minute online session. Your details come from your account.",
+  "Apple Takvim dosyası 1 gün ve 1 saat önce iki hatırlatma kurar.": "The Apple Calendar file sets two reminders: 1 day and 1 hour before.",
+  "Aralığı sil": "Remove range",
+  "Atanmadı": "Unassigned",
+  "Ayarlar'dan": "From Settings",
+  "Aydınlatma metni": "Privacy notice",
+  "Bağlantı eksik kopyalanmış olabilir. E-postandaki bağlantıyı yeniden açmayı dene.":
+    "The link may have been copied incompletely. Try opening the link in your email again.",
+  "Bilgilerimin yalnızca bu görüşmeyi planlamak için işlenmesini kabul ediyorum.":
+    "I agree that my details are processed only to schedule this session.",
+  "Bloklar her aralığın başından başlar: {sure} dk görüşme + {tampon} dk ara. Haftada {n} blok açılıyor.":
+    "Blocks start at the beginning of each range: {sure} min session + {tampon} min break. {n} blocks open per week.",
+  "Bu saate taşı": "Move to this time",
+  "Bulunduğun yerin saati farklı olabilir.": "Your local time may differ.",
+  "Canlı demo": "Live demo",
+  "Canlı demo randevusu": "Live demo booking",
+  "Demo görüşmesi yapabilecek kişiler. Yöneticiler her zaman listede. Moderatör olarak eklenen kişi kendisine atanan görüşmeleri Ayarlar > Yardımcılar'da görür; başka bir yetki almaz.":
+    "People who can host demos. Admins are always listed. A moderator sees the sessions assigned to them under Settings > Helpers and gets no other permission.",
+  "Demo randevuları şu an kapalı. Kısa süre sonra yeniden açılacak.": "Demo bookings are closed for now. They'll reopen soon.",
+  "Demo randevuları": "Demo bookings",
+  "Demo randevun": "Your demo booking",
+  "Demo randevusu al": "Book a demo",
+  "Demoda kendi hesabında birlikte ilerleyeceğiz. Ücretsiz hesabını bu e-posta adresiyle şimdiden açarsan görüşmenin tamamı sana ayrılır.":
+    "During the demo we'll work together in your own account. Create your free account with this email address beforehand so the whole session is spent on you.",
+  "Ekibimizden biriyle 40 dakikalık online görüşmede Projelio'yu kendi işine göre birlikte kuralım. Ücretsiz.":
+    "Let's set up Projelio for your work together in a 40-minute online session with our team. Free.",
+  "Ekibimizden biriyle 40 dakikalık online görüşmede Projelio'yu kendi işine göre birlikte kuralım. Ücretsiz; sana uyan saati seç.":
+    "Let's set up Projelio for your work together in a 40-minute online session with our team. It's free — pick a time that suits you.",
+  "Ekip büyüklüğü (isteğe bağlı)": "Team size (optional)",
+  "En erken (saat sonra)": "Earliest (hours ahead)",
+  "Evet, iptal et": "Yes, cancel",
+  "Geçmiş ve iptal": "Past and cancelled",
+  "Görüşme süresi (dk)": "Session length (min)",
+  "Görüşme tamamlandı": "Session completed",
+  "Görüşmeden önce hesabını oluştur": "Create your account before the session",
+  "Görüşmeler arası (dk)": "Break between sessions (min)",
+  "Görüşmeyi yapacak kişi": "Host",
+  "Haftalık çalışma saatleri (Türkiye saati)": "Weekly working hours (Türkiye time)",
+  "Henüz geçmiş randevu yok.": "No past bookings yet.",
+  "Henüz hesap açmadı": "No account yet",
+  "Herkese açık sayfa ve Ayarlar'daki kart randevu alsın": "Accept bookings from the public page and the Settings card",
+  "Herkese açık sayfadan": "From the public page",
+  "Herkese açık sayfayı aç": "Open public page",
+  "Hesabı var": "Has an account",
+  "Kapalı günler": "Closed days",
+  "Katılmadı": "No-show",
+  "Katılımcıya ve sunucuya güncel bilgiler e-postayla gider.": "The attendee and the host get the updated details by email.",
+  "Kaç gün ileri": "Days ahead",
+  "Kişisel görüşme bağlantısı": "Personal meeting link",
+  "Kişisel görüşme bağlantısı (isteğe bağlı)": "Personal meeting link (optional)",
+  "Moderatör ekle": "Add moderator",
+  "Onay e-postası birkaç dakika içinde gelecek.": "Your confirmation email will arrive in a few minutes.",
+  "Onay e-postası {eposta} adresine gitti. Seni karşılayacak ekip arkadaşımızı atadığımızda görüşme bağlantısını da göndereceğiz.":
+    "A confirmation email was sent to {eposta}. We'll send the meeting link once we assign the team member who will host you.",
+  "Planlandı": "Scheduled",
+  "Projelio hesabının e-postası": "Email of their Projelio account",
+  "Projelio'yu canlı öğren": "Learn Projelio live",
+  "Randevu alma": "Bookings",
+  "Randevu alınamadı. Birkaç dakika sonra tekrar dene.": "Couldn't book. Try again in a few minutes.",
+  "Randevu hesabındaki bilgilerle alınacak: {eposta}": "The booking will use your account details: {eposta}",
+  "Randevu iptal edildi": "Booking cancelled",
+  "Randevular": "Bookings",
+  "Randevun alındı": "You're booked",
+  "Randevuyu iptal et": "Cancel booking",
+  "Randevuyu onayla": "Confirm booking",
+  "Saati değiştir": "Change time",
+  "Saatler Türkiye saatiyle (GMT+3).": "Times are in Türkiye time (GMT+3).",
+  "Saatler {dilim} saat dilimiyle.": "Times are in the {dilim} time zone.",
+  "Sana atanan demolar": "Demos assigned to you",
+  "Sorun mu yaşıyorsun? destek@projelio.app adresine yazabilirsin.": "Having trouble? Write to destek@projelio.app.",
+  "Sunucu bekliyor": "Awaiting host",
+  "Sunucular": "Hosts",
+  "Takvim şu anda açılamadı. Birkaç dakika sonra tekrar dene.": "The calendar couldn't be loaded. Try again in a few minutes.",
+  "Tatil ve izin günleri: o gün hiç blok açılmaz.": "Holidays and days off: no blocks open on these days.",
+  "Telefon (isteğe bağlı — hesabında yoksa)": "Phone (optional — if not in your account)",
+  "Varsayılan görüşme bağlantısı (sunucunun otomatik Meet'i ve kişisel bağlantısı yoksa)":
+    "Default meeting link (if the host has neither automatic Meet nor a personal link)",
+  "Google Meet bağlantısı kesilsin mi? Yeni randevulara otomatik Meet açılmaz; mevcut bağlantılar çalışmaya devam eder.":
+    "Disconnect Google Meet? New bookings won't get an automatic Meet; existing links keep working.",
+  "Google Meet'i bağla": "Connect Google Meet",
+  "Google hesabını bağlarsan sana atanan her demo için takviminde ayrı bir Meet odası açılır; katılımcı beklemeden içeri girer.":
+    "Connect your Google account and every demo assigned to you gets its own Meet room in your calendar; the attendee joins without waiting.",
+  "Google'a bağlanılamadı.": "Couldn't connect to Google.",
+  "Her kişi kendi Google hesabını Ayarlar > Yardımcılar > Canlı demo kartından bağlarsa, ona atanan randevulara otomatik ve ayrı bir Meet bağlantısı açılır. Bağlamayanlarda aşağıdaki kişisel bağlantı, o da yoksa varsayılan bağlantı kullanılır.":
+    "If each person connects their Google account from Settings > Helpers > Live demo, bookings assigned to them get their own automatic Meet link. For those who don't, the personal link below is used, or the default link if there is none.",
+  "Otomatik Google Meet": "Automatic Google Meet",
+  "Otomatik Meet bağlı değil": "Automatic Meet not connected",
+  "Otomatik Meet: {eposta}": "Automatic Meet: {eposta}",
+  "{eposta} ile bağlı. Sana atanan her demo Google Takvim'inde açılır ve katılımcıya ayrı bir Meet bağlantısı gider.":
+    "Connected as {eposta}. Every demo assigned to you is created in your Google Calendar and the attendee gets its own Meet link.",
+  "Yaklaşan": "Upcoming",
+  "Yaklaşan bir randevun var": "You have an upcoming booking",
+  "Yaklaşan demo randevusu yok.": "No upcoming demo bookings.",
+  "Yalnızım": "Just me",
+  "Yeni randevu al": "Book again",
+  "Yeni randevuyu ayrıca bildir (virgülle ayır; yöneticilere her zaman gider)":
+    "Also notify about new bookings (comma-separated; admins always get it)",
+  "Yeni saat kaydedildi. Güncel bilgiler e-postana gönderildi.": "New time saved. The updated details were sent to your email.",
+  "Yüklenemedi.": "Couldn't load.",
+  "Zaten üye misin?": "Already a member?",
+  "{n} randevu sunucu bekliyor": { one: "{n} booking awaiting a host", other: "{n} bookings awaiting a host" },
+  "Çalışma saatleri": "Working hours",
+  "Önümüzdeki günlerde boş saat kalmadı. Birkaç gün sonra tekrar bakabilirsin.": "No free slots in the coming days. Check back in a few days.",
+  "Ör. ekibimle görev dağıtımı, bütçe takibi, sosyal medya takvimi": "E.g. assigning tasks to my team, budget tracking, social media calendar",
+  "Özellikle neyi görmek istersin? (isteğe bağlı)": "Anything in particular you'd like to see? (optional)",
+  "İptal et": "Cancel",
+  "İptal nedeni": "Cancellation reason",
+  "İptal nedeni (ekip için not, isteğe bağlı)": "Cancellation reason (note for the team, optional)",
+  "İstersen nedenini yaz (isteğe bağlı)": "Tell us why if you like (optional)",
+  "İç not (katılımcı görmez)": "Internal note (attendee can't see)",
+  "Şirket (isteğe bağlı)": "Company (optional)",
+  "— randevu hesabına bağlanır.": "— the booking will be linked to your account.",
+};

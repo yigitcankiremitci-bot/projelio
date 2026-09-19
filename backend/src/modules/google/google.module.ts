@@ -5,6 +5,7 @@ import { MicrosoftCoreModule } from "../microsoft/microsoft-core.module";
 import { GoogleAuthService } from "./google-auth.service";
 import { GoogleController } from "./google.controller";
 import { GoogleCoreModule } from "./google-core.module";
+import { DemoMeetModule } from "../demo-randevu/demo-meet.module";
 
 /**
  * "Google ile giriş" akışı ve Ayarlar'daki Drive bağlantı ekranı.
@@ -19,7 +20,7 @@ import { GoogleCoreModule } from "./google-core.module";
  * MicrosoftModule değil: o UsersModule'ü çeker ve döngü doğar.
  */
 @Module({
-  imports: [GoogleCoreModule, MicrosoftCoreModule, UsersModule, PassportModule],
+  imports: [GoogleCoreModule, MicrosoftCoreModule, UsersModule, PassportModule, DemoMeetModule],
   controllers: [GoogleController],
   providers: [GoogleAuthService],
   exports: [GoogleCoreModule],

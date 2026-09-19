@@ -21,7 +21,8 @@ export const LOGIN_SCOPES = ["openid", "email", "profile"];
  */
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
-export type OAuthMode = "login" | "connect";
+/** demo_takvim: demo sunucusunun Google Meet bağlantısı (bkz. demo-randevu/demo-meet.service.ts). */
+export type OAuthMode = "login" | "connect" | "demo_takvim";
 
 export interface OAuthStatePayload {
   typ: "google_oauth";

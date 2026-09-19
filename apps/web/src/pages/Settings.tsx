@@ -23,6 +23,7 @@ import CloudAccountsCard from "../components/CloudAccountsCard";
 import WhatsappCard from "../components/WhatsappCard";
 import NotificationEmailCard from "../components/NotificationEmailCard";
 import OrnekIsAyari from "../components/OrnekIsAyari";
+import DemoRandevuKarti from "../components/demoRandevu/DemoRandevuKarti";
 import PasskeysCard from "../components/PasskeysCard";
 import WhatsappProfileCard from "../components/WhatsappProfileCard";
 import {
@@ -1076,6 +1077,13 @@ export default function Settings() {
         description={t("Projelio'yu kurcalayarak öğrenmen için hazırlanmış örnek iş, proje, görev ve rutin. İstediğin zaman ekleyip işin bitince tek tıkla silebilirsin.")}
       >
         <OrnekIsAyari />
+      </SettingCard>
+
+      <SettingCard
+        title={t("Canlı demo")}
+        description={t("Ekibimizden biriyle 40 dakikalık online görüşmede Projelio'yu kendi işine göre birlikte kuralım. Ücretsiz.")}
+      >
+        <DemoRandevuKarti />
       </SettingCard>
     </>
   );

@@ -17,6 +17,7 @@ import { yaptim } from "./yaptim";
 import { butce } from "./butce";
 import { hesaplar } from "./hesaplar";
 import { epostaYonetimi } from "./epostaYonetimi";
+import { demoRandevu } from "./demoRandevu";
 
 /**
  * Türkçe → İngilizce sözlük.
@@ -66,4 +67,5 @@ export const en: TranslationDict = {
   ...hesaplar,
   ...hatalar,
   ...epostaYonetimi,
+  ...demoRandevu,
 };

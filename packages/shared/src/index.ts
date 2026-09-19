@@ -15,3 +15,4 @@ export * from "./sosyalHesap";
 export * from "./demoZiyaret";
 export * from "./tlFiyat";
 export * from "./epostaYonetimi";
+export * from "./demoRandevu";

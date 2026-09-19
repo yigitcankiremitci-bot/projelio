@@ -238,6 +238,8 @@ export class EmailService {
       from?: string;
       /** Yanıtların gideceği adres. Yanıt beklenen e-postada gönderen itibarına katkı sağlar. */
       replyTo?: string;
+      /** Ör. demo randevusunun .ics dosyası — bkz. demo-randevu-eposta.ts. */
+      attachments?: { filename: string; content: Buffer }[];
     }
   ): Promise<boolean> {
     if (!this.apiKey) {

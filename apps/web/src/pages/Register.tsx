@@ -8,7 +8,9 @@ import { useT } from "../lib/i18n";
 
 export default function Register() {
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  // Demo randevusu e-postasındaki "Hesabımı oluştur" adresi hazır getiriyor
+  // (/register?email=…): randevu bu adrese bağlı, farklı yazılırsa eşleşmez.
+  const [email, setEmail] = useState(() => new URLSearchParams(window.location.search).get("email") ?? "");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");

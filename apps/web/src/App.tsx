@@ -55,6 +55,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Login = lazy(() => import("./pages/Login"));
 const PublicProject = lazy(() => import("./pages/PublicProject"));
 const PublicFileDownload = lazy(() => import("./pages/PublicFileDownload"));
+const DemoRandevu = lazy(() => import("./pages/DemoRandevu"));
 const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -586,7 +587,11 @@ export default function App() {
     location.pathname.startsWith("/takip/") ||
     // Dosya indirme bağlantısı (bkz. pages/PublicFileDownload.tsx). Takip
     // linkiyle aynı gerekçe: açan kişinin hesabı yok, /login'e atılmamalı.
-    location.pathname.startsWith("/dosya/");
+    location.pathname.startsWith("/dosya/") ||
+    // Canlı demo randevusu (bkz. pages/DemoRandevu.tsx): randevu alanların
+    // çoğu henüz üye değil; üye gelirse sayfa oturumu kendisi okuyor.
+    location.pathname === "/demo-randevu" ||
+    location.pathname.startsWith("/demo-randevu/");
   const hasToken = !!localStorage.getItem("projelio_token");
   // Bilgisayarda (geniş ekran) sol sidebar + üstte tam genişlik header;
   // telefonda (dar ekran) sidebar kaybolur, alt menü (BottomNav) ve
@@ -661,6 +666,8 @@ export default function App() {
           <Route path="/refund" element={<Refund />} />
           <Route path="/takip/:token" element={<PublicProject />} />
           <Route path="/dosya/:token" element={<PublicFileDownload />} />
+          <Route path="/demo-randevu" element={<DemoRandevu />} />
+          <Route path="/demo-randevu/:token" element={<DemoRandevu />} />
         </Routes>
       </Suspense>
     );

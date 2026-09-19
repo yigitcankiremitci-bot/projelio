@@ -121,6 +121,18 @@ export function getCorsOrigins(): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Tanıtım sitesinin (landing) alan adları — yalnızca demo takvimi uçları için
+ * CORS'a açılır (bkz. cors-karari.ts). Varsayılan canlı alan adları; başka bir
+ * kurulumda LANDING_ORIGINS ile değiştirilir.
+ */
+export function getLandingOrigins(): string[] {
+  return (process.env.LANDING_ORIGINS ?? "https://projelio.app,https://www.projelio.app")
+    .split(",")
+    .map((origin) => normalizeOrigin(origin))
+    .filter(Boolean);
+}
+
 /** Sondaki eğik çizgileri atar ve küçük harfe çevirir. Origin'de yol kısmı olmaz. */
 function normalizeOrigin(raw: string): string {
   return raw.trim().replace(/\/+$/, "").toLowerCase();

@@ -230,7 +230,7 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
                 </p>
                 <p className="small" style={{ marginTop: 8 }}>
                   {dict.demoAccount.liveDemo}{" "}
-                  <a href={appLinks.demoRandevu}>{dict.demoAccount.liveDemoCta}</a>
+                  <Link href={path(locale, "live-demo")}>{dict.demoAccount.liveDemoCta}</Link>
                 </p>
               </div>
             </Reveal>
@@ -452,9 +452,9 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
               <a className="btn btn-primary btn-lg" href={appLinks.signup}>
                 {dict.ctaBand.primary}
               </a>
-              <a className="btn btn-ghost btn-lg" href={appLinks.demoRandevu}>
+              <Link className="btn btn-ghost btn-lg" href={path(locale, "live-demo")}>
                 {dict.ctaBand.secondary}
-              </a>
+              </Link>
             </div>
           </div>
         </div>

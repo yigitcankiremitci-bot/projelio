@@ -21,7 +21,8 @@ if (envPath) {
 }
 
 import { Logger, ValidationPipe } from "@nestjs/common";
-import { assertRequiredEnv, getCorsOrigins, isProduction } from "./common/config/env";
+import { assertRequiredEnv, getCorsOrigins, getLandingOrigins, isProduction } from "./common/config/env";
+import { corsKarari } from "./common/config/cors-karari";
 
 // Yapılandırma doğrulaması AppModule import edilmeden ÖNCE, burada çalışır.
 //
@@ -163,8 +164,13 @@ async function bootstrap() {
     // yani pratikte her API çağrısı iki gidiş-dönüş oluyor (ölçüldü: ön uçuş
     // tek başına ~70-90 ms). 7200 Chrome'un üst sınırı — daha büyük yazmak
     // işe yaramaz, sessizce 7200'e kırpılır.
-    app.enableCors({ origin: corsOrigins, credentials: true, maxAge: 7200 });
-    logger.log(`CORS kısıtlı: ${corsOrigins.join(", ")}`);
+    // İstek başına karar: tanıtım sitesi yalnızca demo takvimi uçlarına ve
+    // çerezsiz açılır, geri kalan her şey CORS_ORIGINS'e (bkz. cors-karari.ts).
+    const landingOrigins = getLandingOrigins();
+    app.enableCors((req: any, cb: (err: Error | null, options: any) => void) => {
+      cb(null, corsKarari(req.header?.("Origin"), req.originalUrl ?? req.url ?? "", corsOrigins, landingOrigins));
+    });
+    logger.log(`CORS kısıtlı: ${corsOrigins.join(", ")} (+ demo takvimi: ${landingOrigins.join(", ")})`);
   } else {
     // Üretimde buraya hiç düşülmez: assertRequiredEnv() boş CORS_ORIGINS'i
     // açılışta hata sayar. Yine de savunma amaçlı ikinci bir kontrol duruyor —

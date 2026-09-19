@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { locales } from "@/i18n";
 import { legalSlugs, site } from "@/lib/site";
 
-const pages = ["", "pricing", "lio-units", "screenshots", "faq", "contact"];
+const pages = ["", "pricing", "lio-units", "screenshots", "live-demo", "faq", "contact"];
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();

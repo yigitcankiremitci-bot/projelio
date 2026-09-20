@@ -26,6 +26,13 @@ COPY --from=build /app/public ./public
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 
+# ISR ÖNBELLEĞİ İÇİN YAZILABİLİR KLASÖR. Kopyalanan dosyalar root'a ait, süreç
+# ise "node" kullanıcısıyla koşuyor: Next /app/.next/cache'i açamayınca her
+# istekte EACCES alıyor ve revalidate ÇALIŞMIYOR. Sonuç: sayfalar imaj
+# derlenirken alınan kopyada donuyordu — fiyatlar panelde değişse de tanıtım
+# sitesi eski rakamı göstermeye devam ediyordu (2026-09-20'de yakalandı).
+RUN mkdir -p /app/.next/cache && chown -R node:node /app/.next
+
 USER node
 EXPOSE 3001
 CMD ["node", "server.js"]

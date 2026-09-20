@@ -15,7 +15,11 @@ export interface CanliFiyat {
   /** Paketle her ay gelen Lio birimi (Lio Bakiyesi sayfasındaki öneri bunu kullanır). */
   monthlyCredits?: number;
   priceUsd: { monthly: number; yearly: number; yearlyMonthly?: number };
-  charge: { monthly: { amount: number; currency: string } | null; yearly: { amount: number; currency: string } | null };
+  charge: {
+    monthly: { amount: number; currency: string } | null;
+    yearly: { amount: number; currency: string } | null;
+    yearlyMonthly: number | null;
+  };
 }
 
 /**
@@ -63,12 +67,32 @@ export default function PricingTables({
     return eslesme?.priceUsd.yearlyMonthly ?? plan.priceYearlyMonthly;
   }
 
-  /** Kartından gerçekten çekilecek tutar; yalnızca panel bildirirse gösterilir. */
-  function tahsilat(plan: Plan): string | null {
+  /**
+   * TAHSİLAT HER ZAMAN TL. Türkçe vitrinde büyük rakam da budur; dolar yalnızca
+   * İngilizce sürümde, yurt dışından bakanlar fikir edinsin diye gösterilir ve
+   * orada da "TL olarak tahsil edilir" notu düşülür.
+   *
+   * Sebebi yalnızca tercih değil: Türkiye'de yerleşik müşterilere dövizle
+   * fiyatlama mevzuatça sınırlı (32 sayılı Karar / 2008-32/34 Tebliği) ve sanal
+   * POS başvurusunda da soruldu. Kart her koşulda TL çekiliyor
+   * (bkz. backend paytr.client.ts, para birimi sabit "TL").
+   */
+  function tahsilatTutari(plan: Plan): { amount: number; currency: string } | null {
     const eslesme = canli.find((c) => c.key === plan.key);
-    const veri = eslesme ? eslesme.charge[donem] : null;
+    return eslesme ? eslesme.charge[donem] : null;
+  }
+
+  function tahsilat(plan: Plan): string | null {
+    const veri = tahsilatTutari(plan);
     if (!veri) return null;
     return veri.currency === "TRY" ? formatTRY(veri.amount, locale) : `${veri.amount} ${veri.currency}`;
+  }
+
+  /** Türkçe vitrindeki büyük rakam: aylıkta aylık TL, yıllıkta aylık karşılığın TL'si. */
+  function buyukTl(plan: Plan): number | null {
+    const eslesme = canli.find((c) => c.key === plan.key);
+    if (!eslesme) return null;
+    return yearly ? eslesme.charge.yearlyMonthly : (eslesme.charge.monthly?.amount ?? null);
   }
 
   return (
@@ -100,6 +124,11 @@ export default function PricingTables({
       <div className="plans" style={{ marginTop: 34 }}>
         {dict.pricing.plans.map((plan) => {
           const cekilecek = tahsilat(plan);
+          const buyuk = buyukTl(plan);
+          // Türkçe vitrin ancak TL tutar gerçekten varsa TL'ye geçer.
+          const trVitrin = locale !== "en" && buyuk !== null;
+          const aylikTl = canli.find((c) => c.key === plan.key)?.charge.monthly?.amount ?? null;
+          const yillikTl = tahsilat(plan);
           return (
             <div key={plan.key} className={plan.featured ? "plan plan-featured" : "plan"}>
               {plan.featured && <span className="plan-flag">{dict.common.mostPopular}</span>}
@@ -107,15 +136,36 @@ export default function PricingTables({
               <p className="plan-desc">{plan.desc}</p>
 
               <div className="price">
-                {yearly && <s className="price-was">{formatUSD(aylikFiyat(plan), locale)}</s>}
-                <span className="amount">{formatUSD(gosterilen(plan), locale)}</span>
+                {/*
+                  Büyük rakam: Türkçede TL, İngilizcede USD. TL tutar API'den
+                  gelmezse (kur tanımsız) dolara düşülür — sayfanın fiyatsız
+                  kalması, referans bir rakam göstermekten kötü.
+                */}
+                {trVitrin ? (
+                  <>
+                    {yearly && aylikTl !== null && <s className="price-was">{formatTRY(aylikTl, locale)}</s>}
+                    <span className="amount">{formatTRY(buyuk!, locale)}</span>
+                  </>
+                ) : (
+                  <>
+                    {yearly && <s className="price-was">{formatUSD(aylikFiyat(plan), locale)}</s>}
+                    <span className="amount">{formatUSD(gosterilen(plan), locale)}</span>
+                  </>
+                )}
                 <span className="per">{dict.common.perMonth}</span>
               </div>
               <div className="price-note">
-                {yearly && `${dict.pricing.billedYearly.replace("{tutar}", formatUSD(yillikFiyat(plan), locale))} · `}
-                {cekilecek
-                  ? `${cekilecek} ${locale === "en" ? "charged" : "olarak tahsil edilir"}`
-                  : plan.note}
+                {trVitrin
+                  ? yearly && yillikTl
+                    ? dict.pricing.billedYearly.replace("{tutar}", yillikTl)
+                    : plan.note
+                  : `${yearly ? `${dict.pricing.billedYearly.replace("{tutar}", formatUSD(yillikFiyat(plan), locale))} · ` : ""}${
+                      cekilecek
+                        ? locale === "en"
+                          ? `charged as ${cekilecek}`
+                          : `${cekilecek} olarak tahsil edilir`
+                        : plan.note
+                    }`}
               </div>
 
               <div className="price-note" style={{ fontWeight: 600 }}>

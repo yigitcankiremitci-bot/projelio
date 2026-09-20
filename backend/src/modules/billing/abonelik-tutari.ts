@@ -14,10 +14,12 @@ import type { BillingPeriod, Plan } from "./billing.plans";
  * mevzuatça sınırlı olduğu için vitrin de TL gösterir; dolar yalnızca İngilizce
  * sürümde bilgilendirme amacıyla görünür.
  *
- * ÖNCELİK: sağlayıcıda sabitlenmiş tutar > kurdan hesaplanan tutar.
- * Sebebi, bir sağlayıcı planında (iyzico'nun ödeme planı gibi) tutar SABİTSE
- * karttan çekilecek olan odur; hesaplanmış bir rakam göstermek kullanıcıya bir
- * tutar deyip başkasını çekmek olurdu.
+ * ÖNCELİK: sağlayıcıda SABİTLENMİŞ tutar > kurdan hesaplanan tutar. Sabitlenmiş
+ * saymak için referans KODU da gerekir: iyzico gibi sağlayıcılarda tutar ancak
+ * bir ödeme planına bağlıysa sabittir ve karttan çekilecek olan odur.
+ * Kodsuz satırlar yalnızca panelin yazdığı bir ÖNBELLEKTİR; onları öncelikli
+ * saymak, fiyat değişince ekranda eski tutarı bırakıyordu (2026-09-20'de
+ * yıllık fiyatlar değişince yaşandı: katalog 2.520 derken vitrin 2.440 dedi).
  *
  * KUR YOKSA null. Uydurma bir kurla satış yapmaktansa düğmeyi kapatmak doğru
  * (Lio Bakiyesi paketlerinde verilen kararın aynısı).
@@ -37,13 +39,21 @@ export function abonelikTutari(
   // Ücretsiz plan satın alınmaz; 0 ₺ göstermek "satın al" düğmesini anlamsızca açardı.
   if (plan.key === "free") return null;
 
-  if (ref?.priceAmount !== null && ref?.priceAmount !== undefined) {
+  if (ref?.referenceCode && ref.priceAmount !== null && ref.priceAmount !== undefined) {
     return { amount: ref.priceAmount, currency: ref.currency || "TRY" };
   }
 
   if (kur === null) return null;
-  const usd = period === "yearly" ? plan.priceUsdYearly : plan.priceUsdMonthly;
-  const tutar = tlFiyat(usd, kur);
+
+  // YILLIK TOPLAM = AYLIK KARŞILIĞIN 12 KATI, kurdan ayrıca hesaplanmaz.
+  // İkisi ayrı ayrı 10 ₺'ye yuvarlanınca birbirini tutmuyordu: vitrin
+  // "200 ₺/ay" derken toplam 2.440 ₺ görünüyordu (2.440 / 12 = 203,33).
+  if (period === "yearly") {
+    const aylikKarsilik = aylikKarsilikTl(plan, kur);
+    return aylikKarsilik === null ? null : { amount: aylikKarsilik * 12, currency: "TRY" };
+  }
+
+  const tutar = tlFiyat(plan.priceUsdMonthly, kur);
   return tutar === null ? null : { amount: tutar, currency: "TRY" };
 }
 
@@ -51,9 +61,11 @@ export function abonelikTutari(
  * Yıllık ödemede vitrinde gösterilen AYLIK KARŞILIĞIN TL tutarı.
  *
  * Yıllık toplamı 12'ye bölerek hesaplanmıyor: bölme küsuratlı bir rakam
- * üretebilir (2.390 / 12 = 199,17) ve vitrinde amatör durur. Katalogdaki
- * aylık karşılık (x,99) doğrudan kurla çarpılıp aynı 10 ₺ adımına yuvarlanır,
- * yani aylık fiyatla aynı kuraldan geçer.
+ * üretir (2.500 / 12 = 208,33) ve vitrinde amatör durur. Katalogdaki aylık
+ * karşılık (aylık × 10/12) kurla çarpılıp aynı 10 ₺ adımına yuvarlanır, yani
+ * aylık fiyatla aynı kuraldan geçer. YILLIK TOPLAM DA BUNUN 12 KATIDIR
+ * (bkz. abonelikTutari), böylece vitrindeki iki rakam birbirini tutar.
+ * Sonuç ~10 aylık ücret: 250 ₺/ay -> 210 ₺/ay, yıllık 2.520 ₺ (~%16 indirim).
  */
 export function aylikKarsilikTl(plan: Plan, kur: number | null): number | null {
   if (plan.key === "free" || kur === null) return null;

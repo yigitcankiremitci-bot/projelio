@@ -10,8 +10,8 @@ export const abonelik: TranslationDict = {
 
   // ══════════════════════════════════════════════════════ Ekran
   Paketim: "My plan",
-  "Paketindeki Lio Bakiyesi her ay yenilenir. Yıllık ödemede %20 tasarruf; bakiye yine her ay yüklenir.":
-    "Your plan's Lio Units renew every month. Yearly billing saves 20%; Lio Units still arrive monthly.",
+  "Paketindeki Lio Bakiyesi her ay yenilenir. Yıllık ödemede 2 ay bedava; bakiye yine her ay yüklenir.":
+    "Your plan's Lio Units renew every month. Yearly billing gives you two months free; Lio Units still arrive monthly.",
   "Mevcut paketin": "Your current plan",
   "Bu paketi seç": "Choose this plan",
   "Uygulamada kullanılamıyor": "Not available in the app",
@@ -34,7 +34,7 @@ export const abonelik: TranslationDict = {
   Popüler: "Popular",
   Aylık: "Monthly",
   "Yıllık ödeme": "Pay yearly",
-  "%20 tasarruf": "Save 20%",
+  "2 ay bedava": "2 months free",
   "Yıllık {tutar} olarak faturalanır": "Billed {tutar} yearly",
   "birim / ay": "units / month",
   " / ay": " / mo",

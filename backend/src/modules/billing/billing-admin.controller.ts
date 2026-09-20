@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
-import { tlFiyat } from "@projelio/shared";
+import { abonelikTutari } from "./abonelik-tutari";
 import { USD_TRY_AYAR_ANAHTARI } from "../../common/usd-try-kuru";
 import { AuthGuard } from "@nestjs/passport";
 import { Roles } from "../../common/decorators/roles.decorator";
@@ -135,7 +135,11 @@ export class BillingAdminController {
     const refs = await this.settings.planRefs();
     for (const plan of PLANS.filter((p) => p.priceUsdMonthly > 0)) {
       for (const period of ["monthly", "yearly"] as const) {
-        const tutar = tlFiyat(period === "monthly" ? plan.priceUsdMonthly : plan.priceUsdYearly, kur);
+        // Hesap TEK YERDE (abonelik-tutari.ts): panelin yazdığı tutar ile
+        // vitrinin gösterdiği tutar ayrışmasın. Burada ref VERİLMİYOR, yoksa
+        // panel kendi yazdığı eski tutarı yeniden yazardı.
+        const hesap = abonelikTutari(plan, period, kur);
+        const tutar = hesap?.amount ?? null;
         if (tutar === null) continue;
         const mevcut = refs.find((r) => r.provider === TL_SAGLAYICI && r.planKey === plan.key && r.period === period);
         await this.settings.setPlanRef(

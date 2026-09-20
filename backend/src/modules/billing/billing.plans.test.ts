@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { ayEkle, findPlan, krediAyiBasi, PLANS, planPriceUsd, SATIN_ALINABILIR, YILLIK_INDIRIM_YUZDE } from "./billing.plans";
+import { ayEkle, findPlan, krediAyiBasi, PLANS, planPriceUsd, SATIN_ALINABILIR, YEARLY_MONTHS } from "./billing.plans";
 
 test("vitrin fiyatları duyurulan liste ile birebir aynı", () => {
   // Bu sayılar tanıtım sitesinde ve mağaza listelerinde yazılı. Değiştirmek
@@ -15,34 +15,33 @@ test("vitrin fiyatları duyurulan liste ile birebir aynı", () => {
       p.monthlyCredits,
     ]),
     [
-      ["starter", 4.99, 3.99, 47.88, 20_000],
-      ["pro", 9.99, 7.99, 95.88, 50_000],
-      ["business", 24.99, 19.99, 239.88, 150_000],
+      ["starter", 4.99, 4.16, 49.9, 20_000],
+      ["pro", 9.99, 8.33, 99.9, 50_000],
+      ["business", 24.99, 20.83, 249.9, 150_000],
     ]
   );
 });
 
-test("yıllık toplam = aylık karşılık × 12 ve kuruşta yuvarlanmış", () => {
+test("yıllık USD = 10 aylık ücret, aylık karşılık da onun 12'de biri", () => {
   for (const plan of PLANS) {
-    assert.equal(plan.priceUsdYearly, Math.round(plan.priceUsdYearlyMonthly * 12 * 100) / 100, `${plan.key} yıllık toplamı`);
+    assert.equal(plan.priceUsdYearly, Math.round(plan.priceUsdMonthly * YEARLY_MONTHS * 100) / 100, `${plan.key} yıllık toplamı`);
+    assert.equal(
+      plan.priceUsdYearlyMonthly,
+      Math.round((plan.priceUsdYearly / 12) * 100) / 100,
+      `${plan.key} aylık karşılığı`
+    );
     // Kayan nokta artığı (49.900000000000006) vitrinde "49.900000000000006 $"
     // olarak görünürdü.
     assert.equal(plan.priceUsdYearly, Number(plan.priceUsdYearly.toFixed(2)));
   }
 });
 
-test("vitrindeki '%20 tasarruf' rozeti her pakette doğru", () => {
-  // Rozet sözlüklerde sabit yazılı; bir paketin yıllık fiyatı değişip indirim
-  // %20'den saparsa vitrin yanlış söz vermiş olur.
+test("yıllıkta indirim ~2 ay: toplam 12 aylık ücretin altında, 10 aya eşit", () => {
+  // Vitrindeki "2 ay bedava" rozetinin dayanağı. Fiyat değişip indirim kaybolursa
+  // ya da yanlışlıkla 12 aya çıkarsa burada düşer.
   for (const plan of PLANS.filter((p) => p.priceUsdMonthly > 0)) {
-    const indirim = Math.round((1 - plan.priceUsdYearlyMonthly / plan.priceUsdMonthly) * 100);
-    assert.equal(indirim, YILLIK_INDIRIM_YUZDE, `${plan.key} indirimi %${indirim}`);
-  }
-});
-
-test("yıllıktaki aylık karşılık x,99 ile biter — küsuratlı fiyat yok", () => {
-  for (const plan of PLANS.filter((p) => p.priceUsdMonthly > 0)) {
-    assert.equal(Math.round(plan.priceUsdYearlyMonthly * 100) % 100, 99, `${plan.key}: ${plan.priceUsdYearlyMonthly}`);
+    assert.ok(plan.priceUsdYearly < plan.priceUsdMonthly * 12, `${plan.key} yıllıkta indirim yok`);
+    assert.equal(Math.round((plan.priceUsdYearly / plan.priceUsdMonthly) * 100) / 100, YEARLY_MONTHS);
   }
 });
 
@@ -61,7 +60,7 @@ test("plan anahtarları tekil ve ücretsiz plan satın alınabilir listesinde de
 test("planPriceUsd dönem farkını çözer", () => {
   const pro = findPlan("pro")!;
   assert.equal(planPriceUsd(pro, "monthly"), 9.99);
-  assert.equal(planPriceUsd(pro, "yearly"), 95.88);
+  assert.equal(planPriceUsd(pro, "yearly"), 99.9);
 });
 
 test("ayEkle ayın son gününü taşırmaz", () => {

@@ -3280,7 +3280,15 @@ export interface BillingPlanView {
   name: string;
   /** yearlyMonthly: yıllık ödemede aylık karşılık (vitrinde büyük rakam). */
   priceUsd: { monthly: number; yearly: number; yearlyMonthly: number };
-  charge: { monthly: BillingCharge | null; yearly: BillingCharge | null };
+  charge: {
+    monthly: BillingCharge | null;
+    yearly: BillingCharge | null;
+    /**
+     * Yıllık ödemede vitrinde gösterilen aylık karşılığın TL tutarı.
+     * Yıllık toplamı 12'ye bölerek hesaplanmaz (küsurat çıkar), katalogdan gelir.
+     */
+    yearlyMonthly: number | null;
+  };
   monthlyCredits: number;
   featured: boolean;
   seats: number;

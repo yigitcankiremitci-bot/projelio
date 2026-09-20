@@ -7,7 +7,7 @@ import { ApiError } from "../api/client";
 import { IconSparkle, IconStar } from "../components/icons";
 import Anahtar from "../components/Anahtar";
 import { demoHesap } from "../lib/demoHesap";
-import { useT } from "../lib/i18n";
+import { useLocale, useT } from "../lib/i18n";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { useThemeColors } from "../theme/useThemeColors";
 
@@ -38,6 +38,10 @@ export default function BillingPage() {
   const kabukta = kabuktaMi();
   const c = useThemeColors();
   const t = useT();
+  const { locale } = useLocale();
+
+  /** Tutarı TL olarak yazar. Tahsilat her durumda TL (bkz. paytr.client.ts). */
+  const tlYaz = (tutar: number) => `${tutar.toLocaleString("tr-TR")} ₺`;
   const [params, setParams] = useSearchParams();
   const { user: me } = useCurrentUser();
   const demoHesabi = me?.email?.toLowerCase() === demoHesap.email;
@@ -185,7 +189,7 @@ export default function BillingPage() {
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
       <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: "0 0 6px" }}>{t("Paketim")}</h1>
       <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 22px", maxWidth: 620, lineHeight: 1.6 }}>
-        {t("Paketindeki Lio Bakiyesi her ay yenilenir. Yıllık ödemede %20 tasarruf; bakiye yine her ay yüklenir.")}
+        {t("Paketindeki Lio Bakiyesi her ay yenilenir. Yıllık ödemede 2 ay bedava; bakiye yine her ay yüklenir.")}
       </p>
 
       {mesaj && (
@@ -305,7 +309,7 @@ export default function BillingPage() {
         >
           {t("Yıllık")}
         </button>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: c.success }}>{t("%20 tasarruf")}</span>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: c.success }}>{t("2 ay bedava")}</span>
       </div>
 
       {yukleniyor ? (
@@ -317,6 +321,10 @@ export default function BillingPage() {
             .map((plan) => {
               const tahsilat = donem === "monthly" ? plan.charge.monthly : plan.charge.yearly;
               const usd = donem === "monthly" ? plan.priceUsd.monthly : plan.priceUsd.yearly;
+              // Büyük rakamın TL karşılığı: aylıkta aylık tutar, yıllıkta aylık karşılık.
+              const buyukTl = donem === "yearly" ? plan.charge.yearlyMonthly : (plan.charge.monthly?.amount ?? null);
+              // TL tutar gelmediyse (kur tanımsız) dolara düşülür; fiyatsız kart göstermek daha kötü.
+              const tlVitrin = locale !== "en" && buyukTl !== null;
               const bu = yururlukte && abonelik?.planKey === plan.key;
               // MAĞAZA KURALI: uygulama içinden mağazanın ödeme sistemini
               // atlayan bir satın alma akışı gösterilemez — Play ve App Store
@@ -347,34 +355,56 @@ export default function BillingPage() {
                     )}
                   </div>
 
-                  {/* Yıllıkta büyük rakam AYLIK KARŞILIK; yıllık toplam hemen altında
-                      açıkça yazar — ucuz görünüp gerçek tutarı saklamak yanıltıcı olurdu. */}
+                  {/*
+                    BÜYÜK RAKAM TL. Tahsilat her durumda TL yapılıyor
+                    (backend paytr.client.ts'te para birimi sabit) ve Türkiye'de
+                    yerleşik müşterilere dövizle fiyat göstermek mevzuatça
+                    sınırlı; bu yüzden ekrandaki fiyat karttan çekilecek tutarın
+                    kendisi. Dolar karşılığı yalnızca İngilizce arayüzde, fikir
+                    versin diye ikinci satırda duruyor.
+
+                    Yıllıkta büyük rakam AYLIK KARŞILIK; yıllık toplam hemen
+                    altında açıkça yazar — ucuz görünüp gerçek tutarı saklamak
+                    yanıltıcı olurdu.
+                  */}
                   <div style={{ margin: "12px 0 2px", fontSize: 30, fontWeight: 600, color: c.textPrimary, letterSpacing: -0.5 }}>
-                    {donem === "yearly" && (
-                      <s style={{ fontSize: 16, fontWeight: 400, color: c.textSecondary, marginRight: 8 }}>
-                        ${plan.priceUsd.monthly.toFixed(2)}
-                      </s>
+                    {tlVitrin ? (
+                      <>
+                        {donem === "yearly" && plan.charge.monthly && (
+                          <s style={{ fontSize: 16, fontWeight: 400, color: c.textSecondary, marginRight: 8 }}>
+                            {tlYaz(plan.charge.monthly.amount)}
+                          </s>
+                        )}
+                        {tlYaz(buyukTl!)}
+                      </>
+                    ) : (
+                      <>
+                        {donem === "yearly" && (
+                          <s style={{ fontSize: 16, fontWeight: 400, color: c.textSecondary, marginRight: 8 }}>
+                            ${plan.priceUsd.monthly.toFixed(2)}
+                          </s>
+                        )}
+                        ${(donem === "yearly" ? plan.priceUsd.yearlyMonthly : usd).toFixed(2)}
+                      </>
                     )}
-                    ${(donem === "yearly" ? plan.priceUsd.yearlyMonthly : usd).toFixed(2)}
                     <span style={{ fontSize: 14, fontWeight: 400, color: c.textSecondary }}>{t(" / ay")}</span>
                   </div>
                   {donem === "yearly" && (
                     <div style={{ fontSize: 13, color: c.textSecondary }}>
-                      {t("Yıllık {tutar} olarak faturalanır", { tutar: `$${usd.toFixed(2)}` })}
+                      {t("Yıllık {tutar} olarak faturalanır", {
+                        tutar: tlVitrin && tahsilat ? tlYaz(tahsilat.amount) : `$${usd.toFixed(2)}`,
+                      })}
                     </div>
                   )}
 
-                  {/*
-                    Tahsilat tutarı AYRI gösteriliyor: vitrin $ ama kart ₺ ile
-                    çekiliyor. Kullanıcının ekstresinde göreceği rakam bu.
-                  */}
                   <div style={{ fontSize: 13, color: c.textSecondary, minHeight: 20 }}>
-                    {tahsilat
-                      ? t("Kartından {tutar} çekilir").replace(
-                          "{tutar}",
-                          `${tahsilat.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ${tahsilat.currency === "TRY" ? "₺" : tahsilat.currency}`
-                        )
-                      : t("Bu dönem şu an satın alınamıyor")}
+                    {!tahsilat
+                      ? t("Bu dönem şu an satın alınamıyor")
+                      : tlVitrin
+                        ? // TL vitrinde tutar zaten büyük rakamda; burada yalnızca
+                          // yıllıkta toplam farkı görünür, aylıkta satır boş kalır.
+                          ""
+                        : t("Kartından {tutar} çekilir").replace("{tutar}", tlYaz(tahsilat.amount))}
                   </div>
 
                   <div style={{ marginTop: 14, fontSize: 14, color: c.textPrimary, fontWeight: 500 }}>

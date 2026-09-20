@@ -13,7 +13,7 @@ test("tutar kurdan hesaplanır ve TL döner", () => {
 test("yıllık dönemde yıllık toplam kullanılır", () => {
   const yillik = abonelikTutari(starter, "yearly", 50)!;
   const aylik = abonelikTutari(starter, "monthly", 50)!;
-  // Yıllıkta %20 indirim var (YILLIK_INDIRIM_YUZDE), yani toplam 12 aylık
+  // Yıllıkta ~2 ay bedava (10 ay hesabı), yani toplam 12 aylık
   // tutarın altında ama aylık tutarın belirgin katı. Aralık bilerek geniş:
   // bu test fiyat değişince değil, "yıllık dönem aylık tutarı dönüyor" gibi
   // bir hata olunca düşsün.
@@ -36,6 +36,17 @@ test("kur yoksa null — uydurma kurla satış yapılmaz", () => {
 
 test("ücretsiz plan için tutar yok", () => {
   assert.equal(abonelikTutari(FREE_PLAN, "monthly", 50), null);
+});
+
+test("kodsuz satır fiyatı EZMEZ — panelin yazdığı tutar yalnızca önbellek", () => {
+  // Fiyat değişince panelin eski yazdığı tutar vitrinde kalıyordu: katalog
+  // 2.520 derken site 2.440 gösteriyordu (2026-09-20).
+  const sonuc = abonelikTutari(starter, "monthly", 50, {
+    referenceCode: null,
+    priceAmount: 199,
+    currency: "TRY",
+  });
+  assert.deepEqual(sonuc, { amount: 250, currency: "TRY" });
 });
 
 test("sağlayıcıda sabitlenmiş tutar hesaplanandan ÖNCE gelir", () => {
@@ -61,10 +72,17 @@ test("sağlayıcı satırı tutarsızsa kurdan hesaplamaya düşer", () => {
 });
 
 test("yıllığın aylık karşılığı bölmeyle değil katalogdan hesaplanır", () => {
-  // 3,99 × 50 = 199,50 -> 200. Yıllık toplamı (2.400) 12'ye bölmek de 200
-  // veriyor ama başka bir kurda küsurat çıkardı; kural aynı kalsın diye
-  // katalogdaki aylık karşılıktan gidiliyor.
-  assert.equal(aylikKarsilikTl(starter, 50), 200);
+  // 4,16 × 50 = 208 -> 10 ₺ adımıyla yukarı: 210. Yıllık toplamı 12'ye bölmek
+  // küsurat verirdi (2.520 / 12 = 210 tutuyor ama başka kurda tutmaz); kural
+  // aynı kalsın diye katalogdaki aylık karşılıktan gidiliyor.
+  assert.equal(aylikKarsilikTl(starter, 50), 210);
+});
+
+test("yıllık toplam, vitrindeki aylık karşılığın TAM 12 katı", () => {
+  // Vitrin "210 ₺/ay" derken toplamın 2.440 çıkması (2.440 / 12 = 203,33)
+  // müşteriye iki farklı rakam göstermekti; ikisi tek kaynaktan gelmeli.
+  const aylikKarsilik = aylikKarsilikTl(starter, 50)!;
+  assert.equal(abonelikTutari(starter, "yearly", 50)!.amount, aylikKarsilik * 12);
 });
 
 test("aylık karşılık: kur yoksa ve ücretsiz planda null", () => {

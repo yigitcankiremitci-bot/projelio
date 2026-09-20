@@ -1,4 +1,16 @@
 import { apiUrl } from "./site";
+
+/**
+ * Fiyatların tazelenme aralığı (saniye).
+ *
+ * 1 SAAT DEĞİL, 1 DAKİKA: sayfanın ilk hâli imaj derlenirken üretiliyor ve o
+ * sırada API'ye ulaşılamazsa yedek (sözlükteki) fiyat kalıyor. Bir saatlik
+ * aralıkta bu, her dağıtımdan sonra sitenin bir saat boyunca yanlış fiyat
+ * göstermesi demekti — 2026-09-20'de yaşandı: panel TL fiyat verirken site
+ * dolar gösterdi. Dakikalık aralıkta kendi kendini düzeltiyor ve yük de
+ * önemsiz (dakikada en fazla bir istek, yanıt önbelleğe alınıyor).
+ */
+const FIYAT_TAZELEME_SN = 60;
 import type { CanliFiyat } from "@/components/PricingTables";
 
 /**
@@ -17,7 +29,7 @@ import type { CanliFiyat } from "@/components/PricingTables";
 export async function canliFiyatlar(): Promise<CanliFiyat[]> {
   try {
     const yanit = await fetch(`${apiUrl}/billing/public/plans`, {
-      next: { revalidate: 3600 },
+      next: { revalidate: FIYAT_TAZELEME_SN },
       signal: AbortSignal.timeout(5000),
     });
     if (!yanit.ok) return [];
@@ -42,7 +54,7 @@ export interface BakiyePaketi {
 export async function canliBakiyePaketleri(): Promise<BakiyePaketi[]> {
   try {
     const yanit = await fetch(`${apiUrl}/billing/public/lio-packages`, {
-      next: { revalidate: 3600 },
+      next: { revalidate: FIYAT_TAZELEME_SN },
       signal: AbortSignal.timeout(5000),
     });
     if (!yanit.ok) return [];

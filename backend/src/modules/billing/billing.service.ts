@@ -14,6 +14,7 @@ import { demoHesabindaYasak } from "../../common/demo-hesap";
 import { getWebAppUrl } from "../../common/config/env";
 import { BillingSettingsService, type OdemeSaglayici } from "./billing-settings.service";
 import { IyzicoClient, IyzicoHatasi } from "./iyzico.client";
+import { abonelikTutari, aylikKarsilikTl } from "./abonelik-tutari";
 import {
   ayEkle,
   krediAyiBasi,
@@ -145,7 +146,11 @@ export class BillingService {
       name: string;
       priceUsd: { monthly: number; yearly: number; yearlyMonthly: number };
       /** Sağlayıcıdaki gerçek tahsilat tutarı; null ise bu dönem satın alınamaz. */
-      charge: { monthly: { amount: number; currency: string } | null; yearly: { amount: number; currency: string } | null };
+      charge: {
+        monthly: { amount: number; currency: string } | null;
+        yearly: { amount: number; currency: string } | null;
+        yearlyMonthly: number | null;
+      };
       monthlyCredits: number;
       featured: boolean;
       seats: number;
@@ -164,11 +169,11 @@ export class BillingService {
       this.aktifAbonelik(userId),
     ]);
 
-    const tutar = (plan: Plan, period: BillingPeriod) => {
-      const ref = refs.find((r) => r.provider === "iyzico" && r.planKey === plan.key && r.period === period);
-      if (!ref?.referenceCode || ref.priceAmount === null) return null;
-      return { amount: ref.priceAmount, currency: ref.currency };
-    };
+    // Ortak hesap (abonelik-tutari.ts): katalog USD × admin kuru, 10 ₺'ye yukarı;
+    // sağlayıcıda sabitlenmiş tutar varsa o öncelikli. Tanıtım sitesinin okuduğu
+    // herkese açık uç da AYNI fonksiyondan geçiyor, ikisi ayrışmasın diye.
+    const tutar = (plan: Plan, period: BillingPeriod) =>
+      abonelikTutari(plan, period, kur, refs.find((r) => r.planKey === plan.key && r.period === period));
 
     return {
       plans: PLANS.map((plan) => ({
@@ -177,8 +182,12 @@ export class BillingService {
         priceUsd: { monthly: plan.priceUsdMonthly, yearly: plan.priceUsdYearly, yearlyMonthly: plan.priceUsdYearlyMonthly },
         charge:
           plan.key === "free"
-            ? { monthly: null, yearly: null }
-            : { monthly: tutar(plan, "monthly"), yearly: tutar(plan, "yearly") },
+            ? { monthly: null, yearly: null, yearlyMonthly: null }
+            : {
+                monthly: tutar(plan, "monthly"),
+                yearly: tutar(plan, "yearly"),
+                yearlyMonthly: aylikKarsilikTl(plan, kur),
+              },
         monthlyCredits: plan.monthlyCredits,
         featured: plan.featured,
         seats: plan.seats,

@@ -1,6 +1,7 @@
 import { Controller, Get } from "@nestjs/common";
 import { BillingSettingsService } from "./billing-settings.service";
-import { PLANS } from "./billing.plans";
+import { PLANS, type Plan } from "./billing.plans";
+import { abonelikTutari, aylikKarsilikTl } from "./abonelik-tutari";
 import { AiCreditOrdersService } from "../ai-assistant/ai-credit-orders.service";
 
 /**
@@ -23,19 +24,25 @@ export class BillingPublicController {
 
   @Get("plans")
   async plans() {
-    const refs = await this.settings.planRefs();
-    const tutar = (planKey: string, period: "monthly" | "yearly") => {
-      const ref = refs.find((r) => r.provider === "iyzico" && r.planKey === planKey && r.period === period);
-      if (!ref?.referenceCode || ref.priceAmount === null) return null;
-      return { amount: ref.priceAmount, currency: ref.currency };
-    };
+    const [refs, kur] = await Promise.all([this.settings.planRefs(), this.settings.usdTryKuru()]);
+    // Tahsilat tutarı katalog + kurdan hesaplanır; sağlayıcıda sabitlenmiş bir
+    // tutar varsa o öne geçer (bkz. abonelik-tutari.ts). Eskiden yalnızca
+    // iyzico plan kodu varsa tutar gösteriliyordu: iyzico'dan vazgeçilince
+    // site aylarca TL fiyat göstermedi, yalnızca dolar göründü.
+    const tutar = (plan: Plan, period: "monthly" | "yearly") =>
+      abonelikTutari(plan, period, kur, refs.find((r) => r.planKey === plan.key && r.period === period));
 
     return {
       plans: PLANS.filter((p) => p.key !== "free").map((plan) => ({
         key: plan.key,
         name: plan.name,
         priceUsd: { monthly: plan.priceUsdMonthly, yearly: plan.priceUsdYearly, yearlyMonthly: plan.priceUsdYearlyMonthly },
-        charge: { monthly: tutar(plan.key, "monthly"), yearly: tutar(plan.key, "yearly") },
+        charge: {
+          monthly: tutar(plan, "monthly"),
+          yearly: tutar(plan, "yearly"),
+          /** Yıllık ödemede vitrindeki büyük rakamın TL karşılığı. */
+          yearlyMonthly: aylikKarsilikTl(plan, kur),
+        },
         monthlyCredits: plan.monthlyCredits,
         featured: plan.featured,
         seats: plan.seats,

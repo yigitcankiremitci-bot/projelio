@@ -107,8 +107,9 @@ export default function TabBar({ tabs, active, onChange, style, scrollable }: Pr
             border: "none",
             background: active === sekme.key ? c.primary : "transparent",
             color: active === sekme.key ? "#fff" : c.textSecondary,
-            fontSize: isDesktop ? 16 : 15,
+            fontSize: isDesktop ? 14 : 13,
             fontWeight: 500,
+            textTransform: "uppercase",
             cursor: "pointer",
             transition: "background 0.12s ease, color 0.12s ease",
           }}
@@ -175,8 +176,9 @@ function FittedTabBar({ tabs, active, onChange, style }: Props) {
             border: "none",
             background: active === sekme.key ? c.primary : "transparent",
             color: active === sekme.key ? "#fff" : c.textSecondary,
-            fontSize: 15,
+            fontSize: 13,
             fontWeight: 500,
+            textTransform: "uppercase",
             cursor: "pointer",
             transition: "background 0.12s ease, color 0.12s ease",
           }}
@@ -297,8 +299,9 @@ function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
               border: "none",
               background: active === sekme.key ? c.primary : "transparent",
               color: active === sekme.key ? "#fff" : c.textSecondary,
-              fontSize: 15,
+              fontSize: 13,
               fontWeight: 500,
+              textTransform: "uppercase",
               cursor: "pointer",
               transition: "background 0.12s ease, color 0.12s ease",
             }}

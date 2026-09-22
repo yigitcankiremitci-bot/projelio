@@ -44,9 +44,9 @@ export const ornekIs: TranslationDict = {
   "Sağ alttaki Lio, Projelio'nun yapay zekâ yardımcısı. Ona düz cümlelerle yaz: \"Örnek projeye 'iletişim formunu test et' diye bir görev ekle\" ya da \"bu hafta neler var?\".\n\nLio'yu Cmd/Ctrl + K ile de açabilirsin.":
     "Lio, in the bottom right corner, is Projelio's AI assistant. Write to it in plain sentences: \"Add a task called 'test the contact form' to the sample project\" or \"what's on this week?\".\n\nYou can also open Lio with Cmd/Ctrl + K.",
 
-  "7 · Yaptım'a bugün ne yaptığını yaz": "7 · Write what you did today in Yaptım",
+  "7 · Yaptım'a bugün ne yaptığını yaz": "7 · Write what you did today in Work log",
   "Yaptım, kişisel iş günlüğün: planlı görevlerin dışında kalan işleri de kaydetmenin yeri. Menüden Yaptım'ı aç ve bugün yaptığın bir işi yaz; istersen kronometreyle süresini tut.":
-    "Yaptım is your personal work log: the place to record work that falls outside your planned tasks. Open Yaptım from the menu and write down something you did today; time it with the stopwatch if you like.",
+    "The Work log is your personal log of what you did: the place to record work that falls outside your planned tasks. Open Work log from the menu and write down something you did today; time it with the stopwatch if you like.",
 
   "Örnek: tamamlanmış bir görev": "Sample: a completed task",
   "Tamamlanan görevler böyle görünür. Yanlışlıkla tamamladıysan geri açabilirsin.":

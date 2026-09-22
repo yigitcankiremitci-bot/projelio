@@ -27,7 +27,7 @@ export const epostaYonetimi: TranslationDict = {
   "5 · Şirket bütçesini tek defterde tut":
     "5 · Keep the company budget in one ledger",
   "6 · Yaptım'a yaptığın işi yaz":
-    "6 · Log your work in Yaptım",
+    "6 · Log your work in Work log",
   "6 · Şirketin künyesini doldur":
     "6 · Fill in your company's details",
   "7 · Lio'ya şirketini sor":
@@ -127,7 +127,7 @@ export const epostaYonetimi: TranslationDict = {
   "Taşeronları ilgili modüle bağla":
     "Link subcontractors to the right module",
   "Yaptım, kişisel iş günlüğün. Gün içinde yaptığın işleri kısaca yaz, istersen kronometreyle süresini tut. Ne kadar çalıştığını iş verenine gösterirken işine yarar.":
-    "Yaptım is your personal work log. Jot down what you worked on during the day, and time it with the stopwatch if you like. It helps when you show your client how much you worked.",
+    "The Work log is your personal log of what you did. Jot down what you worked on during the day, and time it with the stopwatch if you like. It helps when you show your client how much you worked.",
   "Çalışanları kadroya davet et":
     "Invite employees to the staff",
   "Örnek proje: Müşteriye verilen hizmet":

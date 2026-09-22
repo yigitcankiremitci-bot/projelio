@@ -250,11 +250,11 @@ export const bildirimler: TranslationDict = {
   "yapılacak durumu değiştirildi": "to-do status changed",
   "toplu yapılacak eklendi": "to-dos added in bulk",
   "yapılacaklar sıralandı": "to-dos reordered",
-  // Yaptım (097). Ürün adı çevrilmiyor; İngilizce arayüzde de "Yaptım".
-  "Yaptım'a kaydedildi": "saved to Yaptım",
-  "Yaptım'a toplu kayıt eklendi": "entries added to Yaptım in bulk",
-  "Yaptım kaydı güncellendi": "Yaptım entry updated",
-  "Yaptım kaydı bağlandı": "Yaptım entry linked",
+  // Yaptım (097). İngilizce adı "Work log".
+  "Yaptım'a kaydedildi": "saved to Work log",
+  "Yaptım'a toplu kayıt eklendi": "entries added to Work log in bulk",
+  "Yaptım kaydı güncellendi": "Work log entry updated",
+  "Yaptım kaydı bağlandı": "Work log entry linked",
   "rapor dosyası üretildi": "report file generated",
 
   // Ek türleri (Lio panelinde ve WhatsApp'ta görünür)

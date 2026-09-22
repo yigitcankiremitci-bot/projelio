@@ -3,14 +3,14 @@ import type { TranslationDict } from "@projelio/shared";
 /**
  * Yaptım — kişisel iş günlüğü (sayfa + "Nereye ait?" penceresi).
  *
- * ÜRÜN ADI ÇEVRİLMEDİ. "Yaptım" bu ekranın adı, bir cümle değil; İngilizce
- * arayüzde de "Yaptım" kalıyor — tıpkı Kasa gibi ürünün kendi sözlüğüne ait
- * bir kelime. Çevirsek ("Done", "Did") menüde başka bir şeyi işaret ediyormuş
- * gibi okunurdu; Yapılacaklar (To-dos) ile karışması ise kesin.
+ * İngilizce adı "Work log". Önceden ürün adı diye çevrilmeden bırakılmıştı;
+ * yabancı test kullanıcıları için anlamsız bir kelimeydi (2026-09, kullanıcı
+ * kararı). "Done"/"Did" bilerek seçilmedi: Yapılacaklar (To do) ve görev
+ * durumu "Done" ile karışırdı.
  */
 export const yaptim: TranslationDict = {
   // ─────────────────────────────────────────────── Sayfa
-  Yaptım: "Yaptım",
+  Yaptım: "Work log",
   "Yaptığın işi buraya yaz, nereye ait olduğunu sonra seç. Hiç seçmesen de kaydın durur — önemli olan yapılan işin kaybolmaması.":
     "Write down what you did; pick where it belongs later. The entry stays even if you never pick — what matters is that the work isn't lost.",
   "Ne yaptın?": "What did you do?",
@@ -88,7 +88,7 @@ export const yaptim: TranslationDict = {
   "Başlangıç saati": "Start time",
   "Bitiş saati": "End time",
   "Harcanan: {sure}": "Spent: {sure}",
-  "Yaptım kayıtlarından": "from Yaptım entries",
+  "Yaptım kayıtlarından": "from Work log entries",
 
   // ─────────────────────────────────────────────── "Nereye ait?" penceresi
   "Nereye ait?": "Where does it belong?",

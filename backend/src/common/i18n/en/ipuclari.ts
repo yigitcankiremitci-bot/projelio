@@ -62,10 +62,10 @@ export const ipuclari: TranslationDict = {
     "You can add teammates to a job and assign tasks to them. The person you assign gets notified, and you hear back when the task is done.\n\nInstead of asking who's working on what, just look at the task list.",
   "Bir iş aç ve ekibini ekle": "Create a job and add your team",
 
-  "Yaptım: bugün ne yaptın?": "Yaptım: what did you do today?",
+  "Yaptım: bugün ne yaptın?": "Work log: what did you do today?",
   "Yaptım, kişisel iş günlüğün. Gün içinde yaptığın işleri kısaca yaz, istersen kronometreyle süresini tut.\n\nPlanlı görevlerin dışında kalan işler de böylece kaybolmaz; hafta sonunda vaktinin nereye gittiğini görürsün.":
-    "Yaptım is your personal work log. Jot down what you worked on during the day, and time it with the stopwatch if you like.\n\nWork that falls outside your planned tasks doesn't get lost, and at the end of the week you can see where your time went.",
-  "Yaptım'ı aç": "Open Yaptım",
+    "The Work log is your personal log of what you did. Jot down what you worked on during the day, and time it with the stopwatch if you like.\n\nWork that falls outside your planned tasks doesn't get lost, and at the end of the week you can see where your time went.",
+  "Yaptım'ı aç": "Open Work log",
 
   "Saat ver, hatırlatılsın": "Add a time, get a reminder",
   "Bir göreve bitiş tarihinin yanında saat de verebilirsin. Saatli görevlerde, vaktinden önce hatırlatma kurmak mümkün.\n\nHer sabahki özet e-postasının saatini de Ayarlar > Yardımcılar'dan kendine göre ayarlayabilirsin.":

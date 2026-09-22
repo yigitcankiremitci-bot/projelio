@@ -161,7 +161,7 @@ export const epostaYonetimi: TranslationDict = {
   "Projelio ipuçları ve duyuruları":
     "Projelio tips and announcements",
   "Sana atanan bir görevi tamamlandı olarak işaretlediğinde görevi veren kişi bunu görür. Yaptım sayfasında da yaptığın işleri ve sürelerini kayıt altında tutabilirsin.":
-    "When you mark a task assigned to you as complete, the person who gave it to you sees it. On the Yaptım page you can also keep a record of the work you did and how long it took.",
+    "When you mark a task assigned to you as complete, the person who gave it to you sees it. On the Work log page you can also keep a record of the work you did and how long it took.",
   "Sayılıyor…":
     "Counting…",
   "Sağ alttaki yapay zekâ yardımcısına düz cümlelerle yaz: \"yarın için üç görev ekle\", \"bu hafta neler gecikti?\". Cmd/Ctrl + K ile de açılır.":
@@ -290,7 +290,7 @@ export const epostaYonetimi: TranslationDict = {
   "Yapılacaklar'ı aç":
     "Open To-do",
   "Yaptım'ı aç":
-    "Open Yaptım",
+    "Open Work log",
   "E-posta maliyeti":
     "Email costs",
   // Planlı gönderim (migration 123)

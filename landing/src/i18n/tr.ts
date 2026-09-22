@@ -474,7 +474,10 @@ export const tr = {
     freeNote: "Ücretsiz plan süresiz açık: hoş geldin bakiyesiyle Lio'yu denersiniz.",
     creditsLabel: "birim / ay",
     billedYearly: "Yıllık {tutar} olarak faturalanır",
-    chargeNote: "Fiyatlar ABD doları üzerinden gösterilir; tahsilat Türk Lirası olarak yapılır.",
+    // Vitrin TL'ye geçti (PayTR dövizle tahsilat yapılıp yapılmadığını sordu);
+    // bu not eskiden "fiyatlar ABD doları üzerinden gösterilir" diyordu ve
+    // Türkçe sayfada gösterilenle çelişiyordu.
+    chargeNote: "Fiyatlar Türk Lirası'dır ve Türk Lirası olarak tahsil edilir.",
     enterprise: {
       title: "50+ kullanıcı ya da özel entegrasyon mu gerekiyor?",
       desc: "Hizmet seviyesi anlaşması, ayrılmış altyapı ve özel geliştirme için bizimle konuşun.",

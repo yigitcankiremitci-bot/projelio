@@ -22,7 +22,7 @@ export const legalUpdatedAt: Record<LegalSlug, string> = {
   privacy: "17.09.2026",
   terms: "21.08.2026",
   kvkk: "04.09.2026",
-  distance: "12.08.2026",
+  distance: "22.09.2026",
   refund: "12.08.2026",
   teslimat: "18.09.2026",
   "hesap-silme": "15.09.2026",
@@ -1015,6 +1015,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "3. Hizmet ve bedel",
         p: [
           "Satın alınan paketin adı, süresi ve KDV dahil toplam bedeli sipariş özetinde ve fatura üzerinde gösterilir. Ödeme, kredi/banka kartı veya havale/EFT ile peşin olarak yapılır.",
+          "Tüm bedeller Türk Lirası cinsindendir ve Türk Lirası olarak tahsil edilir. Sitenin İngilizce sürümünde ABD doları karşılığı yalnızca bilgi amacıyla gösterilir; tahsil edilen tutar her durumda sipariş özetindeki Türk Lirası tutardır.",
         ],
       },
       {
@@ -1055,6 +1056,7 @@ export const legalContent: Record<LegalSlug, LegalDoc> = {
         h: "3. Service and price",
         p: [
           "The name, period and total price including VAT of the purchased plan are shown in the order summary and on the invoice. Payment is made in advance by card or bank transfer.",
+          "All prices are denominated in Turkish lira and are charged in Turkish lira. US dollar amounts on the English version of the site are shown for information only; the amount charged is always the Turkish lira amount in the order summary.",
         ],
       },
       {

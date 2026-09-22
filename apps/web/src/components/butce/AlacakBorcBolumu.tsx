@@ -4,6 +4,8 @@ import { api } from "../../api/client";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { useUndo } from "../../lib/undo";
+import { useModuleReferences } from "../../lib/moduleReferences";
+import { displayReference } from "../../lib/moduleConfigs";
 import { kalanGun, sirala, YAKLASAN_GUN, type SiralamaKey } from "../../lib/butceOzeti";
 import AddModuleRecordModal from "../AddModuleRecordModal";
 import VadeRozeti from "../VadeRozeti";
@@ -53,6 +55,11 @@ const AlacakBorcBolumu = forwardRef<AlacakBorcHandle, Props>(function AlacakBorc
   const [kapatilan, setKapatilan] = useState<string | null>(null);
   const [siralama] = useState<SiralamaKey>("yakin");
   const [kapananlarGorunsun, setKapananlarGorunsun] = useState(false);
+  // "Kimden / Kime" müşteri kartına bağlı bir alan: kartı seçilen (ya da Lio'nun
+  // karta bağladığı) kayıtta ad değil kartın KİMLİĞİ durur. Çözülmeden
+  // basıldığında listede UUID görünüyordu; eski kayıtlardaki düz adlar ise
+  // displayReference'tan olduğu gibi geçer.
+  const referanslar = useModuleReferences({ organizationId }, true);
 
   const yukle = () => {
     setYukleniyor(true);
@@ -198,7 +205,7 @@ const AlacakBorcBolumu = forwardRef<AlacakBorcHandle, Props>(function AlacakBorc
                 </span>
                 <div style={{ flex: 1, minWidth: 150 }}>
                   <div style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {(r.data.counterparty as string) ?? ""}
+                    {displayReference(r.data.counterparty, referanslar.resolve) ?? ""}
                     {r.data.category ? ` · ${r.data.category}` : ""}
                   </div>
                   <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
@@ -256,7 +263,11 @@ const AlacakBorcBolumu = forwardRef<AlacakBorcHandle, Props>(function AlacakBorc
           moduleKey={duzenlenen.moduleKey}
           record={duzenlenen}
           onClose={() => setDuzenlenen(null)}
-          onSaved={(kaydedilen) => duzenlendi(duzenlenen, kaydedilen)}
+          onSaved={(kaydedilen) => {
+            // Kayıt penceresinden yeni müşteri kartı açılmış olabilir; adı da gelsin.
+            referanslar.reload();
+            duzenlendi(duzenlenen, kaydedilen);
+          }}
         />
       )}
 
@@ -267,7 +278,10 @@ const AlacakBorcBolumu = forwardRef<AlacakBorcHandle, Props>(function AlacakBorc
           presetData={{ type: hizliEkle, status: "open" }}
           titleOverride={hizliEkle === "payable" ? t("Borç ekle") : t("Alacak ekle")}
           onClose={() => setHizliEkle(null)}
-          onSaved={yukle}
+          onSaved={() => {
+            referanslar.reload();
+            yukle();
+          }}
         />
       )}
     </section>

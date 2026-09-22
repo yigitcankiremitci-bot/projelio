@@ -40,6 +40,7 @@ import { GroupsModule } from "../groups/groups.module";
 import { OperationsModule } from "../operations/operations.module";
 import { ProductsModule } from "../products/products.module";
 import { SupportModule } from "../support/support.module";
+import { PartyModule } from "../party/party.module";
 import { WhatsappModule } from "../whatsapp/whatsapp.module";
 
 @Module({
@@ -98,6 +99,9 @@ import { WhatsappModule } from "../whatsapp/whatsapp.module";
     ProductsModule,
     // Destek talebi açmak ve kendi taleplerini okumak için.
     SupportModule,
+    // Müşteri/tedarikçi kartları: Müşteriler modülü module_records'a değil
+    // ortak party varlığına yazıyor, Lio'nun oraya ayrı araçlarla gitmesi gerek.
+    PartyModule,
     // WhatsApp araçları (müşteriye yaz, konuşmayı oku). İki yönlü bağımlılık:
     // WhatsApp modülü otomatik yanıt için draftText()'i çağırıyor.
     forwardRef(() => WhatsappModule),

@@ -2,7 +2,13 @@
 // gereği), bu yüzden namespace import kullanılıyor.
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { describeModuleFields, hasRecordConfig, normalizeModuleData } from "./ai-modules";
+import {
+  describeModuleFields,
+  hasRecordConfig,
+  linkPartyReferences,
+  normalizeModuleData,
+  partyFieldKeys,
+} from "./ai-modules";
 
 // Lio'nun modül kaydına yazdığı veri buradan geçiyor. Buradaki bir hata
 // kullanıcıya "kayıt eklendi" der ama ekranda boş satır gösterir — bu yüzden
@@ -131,5 +137,55 @@ describe("describeModuleFields", () => {
       described.fields.map((f: any) => f.key),
       ["title", "status", "date", "notes"]
     );
+  });
+});
+
+describe("linkPartyReferences — müşteri adını karta bağlama", () => {
+  const ABC = { id: "11111111-1111-4111-8111-111111111111", displayName: "ABC Danışmanlık Ltd. Şti." };
+  const XYZ = { id: "22222222-2222-4222-8222-222222222222", displayName: "Xyz", legalName: "XYZ Yazılım A.Ş." };
+  const XYZ2 = { id: "33333333-3333-4333-8333-333333333333", displayName: "xyz yazılım" };
+  const keys = ["counterparty"];
+
+  test("Alacak-Borç'ün müşteri alanı bulunur", () => {
+    assert.deepEqual(partyFieldKeys(ALACAK_BORC, "Alacak-Borç"), ["counterparty"]);
+  });
+
+  test("ad, hukuki ek ve Türkçe harf farkına rağmen tek karta bağlanır", () => {
+    const { data, warnings } = linkPartyReferences(keys, { counterparty: "abc danismanlik" }, [ABC, XYZ]);
+    assert.equal(data.counterparty, ABC.id);
+    assert.deepEqual(warnings, []);
+  });
+
+  test("resmî unvandan da eşleşir", () => {
+    const { data } = linkPartyReferences(keys, { counterparty: "XYZ Yazılım" }, [ABC, XYZ]);
+    assert.equal(data.counterparty, XYZ.id);
+  });
+
+  test("iki kart eşleşirse BAĞLAMAZ, adaylar uyarıda döner", () => {
+    const { data, warnings } = linkPartyReferences(keys, { counterparty: "Xyz Yazılım" }, [XYZ, XYZ2]);
+    assert.equal(data.counterparty, "Xyz Yazılım");
+    assert.equal(warnings.length, 1);
+    assert.ok(warnings[0].includes(XYZ.id) && warnings[0].includes(XYZ2.id));
+  });
+
+  test("kart yoksa ad düz metin kalır ve uyarı üretir", () => {
+    const { data, warnings } = linkPartyReferences(keys, { counterparty: "Bilinmeyen Firma" }, [ABC]);
+    assert.equal(data.counterparty, "Bilinmeyen Firma");
+    assert.equal(warnings.length, 1);
+  });
+
+  test("kapsamdaki bir kartın kimliği olduğu gibi kabul edilir", () => {
+    const { data } = linkPartyReferences(keys, { counterparty: ABC.id }, [ABC]);
+    assert.equal(data.counterparty, ABC.id);
+  });
+
+  test("başka şirketin kart kimliği reddedilir", () => {
+    assert.throws(() => linkPartyReferences(keys, { counterparty: XYZ2.id }, [ABC]));
+  });
+
+  test("girdideki nesneyi değiştirmez", () => {
+    const girdi = { counterparty: "abc danismanlik", amount: 5 };
+    linkPartyReferences(keys, girdi, [ABC]);
+    assert.equal(girdi.counterparty, "abc danismanlik");
   });
 });

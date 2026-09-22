@@ -166,4 +166,7 @@ export const butce: TranslationDict = {
     "A record is created for this payment in the Invoices module; the amount, date and counterparty are copied from here. You upload the document afterwards.",
   "Bağı kaldırmak fatura kaydını ve belgelerini silmez; yalnızca bu ödemeyle ilişkisini koparır.":
     "Removing the link does not delete the invoice record or its documents; it only detaches it from this payment.",
+  "+ Alacak": "+ Receivable",
+  "+ Borç": "+ Payable",
+  "Bu müşteriyle kayıtlı alacak ya da borç yok.": "No receivables or payables recorded with this customer.",
 };

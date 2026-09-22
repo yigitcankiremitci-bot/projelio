@@ -21,7 +21,13 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { PlanningService } from "../planning/planning.service";
 import { OutputsService } from "../outputs/outputs.service";
 import { AI_TOOLS, CRITICAL_TOOLS, toolsForChannel } from "./ai-assistant.tools";
-import { describeModuleFields, hasRecordConfig, normalizeModuleData } from "./ai-modules";
+import {
+  describeModuleFields,
+  hasRecordConfig,
+  linkPartyReferences,
+  normalizeModuleData,
+  partyFieldKeys,
+} from "./ai-modules";
 import { taskTarget } from "./ai-task-target";
 import {
   BELGE_DURUM_ETIKET,
@@ -45,6 +51,11 @@ import { GroupsService } from "../groups/groups.service";
 import { OperationsService } from "../operations/operations.service";
 import { ProductsService, type ProductWriteInput } from "../products/products.service";
 import { SupportService } from "../support/support.service";
+import { PartyService } from "../party/party.service";
+import { ORG_RECEIVABLE_MODULE_KEY } from "../budget/sirket-defteri";
+import { addRole } from "../party/party-dedup";
+import { AccessService } from "../../common/access/access.service";
+import { isReferenceValue, type Party, type PartyAddress, type PartyRole } from "@projelio/shared";
 import { AiExportsService } from "./ai-exports.service";
 import { type ExportFormat, type ExportTable } from "./ai-export-builder";
 import {
@@ -390,6 +401,52 @@ function pruneEmpty<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return out as Partial<T>;
 }
 
+// Müşteri modülü ortak `party` varlığına yazar, module_records'a değil
+// (bkz. packages/shared/src/moduleConfigs/index.ts).
+const CUSTOMER_MODULE_KEY = "crm_musteri";
+
+/** Modele dönen müşteri kartı — yalnızca işine yarayan alanlar. */
+function customerSummary(p: Party) {
+  return pruneEmpty({
+    partyId: p.id,
+    ad: p.displayName,
+    tur: p.partyType,
+    roller: p.roles,
+    durum: p.status === "active" ? undefined : p.status,
+    unvan: p.legalName,
+    vergiNo: p.taxNumber,
+    eposta: p.email,
+    telefon: p.phone,
+    sehir: p.address?.city,
+  });
+}
+
+/** create/update_customer'ın düz alanları; verilmeyenler undefined kalır. */
+function customerFields(input: Record<string, any>): Partial<Party> {
+  const str = (v: unknown) => (v === undefined || v === null ? undefined : String(v).trim());
+  return {
+    partyType: input.partyType === "person" || input.partyType === "company" ? input.partyType : undefined,
+    roles: Array.isArray(input.roles) && input.roles.length ? (input.roles as PartyRole[]) : undefined,
+    legalName: str(input.legalName),
+    taxNumber: str(input.taxNumber),
+    taxOffice: str(input.taxOffice),
+    email: str(input.email),
+    phone: str(input.phone),
+    website: str(input.website),
+    notes: str(input.notes),
+  };
+}
+
+/** Adres jsonb'dir: şehir/satır verilince mevcut adresin ÜSTÜNE yazılır, silinmez. */
+function customerAddress(current: PartyAddress | undefined, input: Record<string, any>): PartyAddress | undefined {
+  if (input.city === undefined && input.address === undefined) return current;
+  return pruneEmpty({
+    ...(current ?? {}),
+    city: input.city !== undefined ? String(input.city).trim() : current?.city,
+    line: input.address !== undefined ? String(input.address).trim() : current?.line,
+  }) as PartyAddress;
+}
+
 /**
  * Dakikaları saate çevirirken kullanılan yuvarlama.
  *
@@ -715,6 +772,11 @@ export class AiAssistantService {
     private productsService: ProductsService,
     // Destek talebi: kullanıcının Projelio ekibine yazdığı mesaj.
     private supportService: SupportService,
+    // Müşteri/tedarikçi kartları (party). Yazma yetkisi servisin içinde,
+    // crm_musteri modülünün yetkisinden çözülüyor; okumada controller'ın
+    // yaptığı taşeron kontrolü AccessService ile burada tekrarlanıyor.
+    private partyService: PartyService,
+    private access: AccessService,
     // Rapor/dışa aktarma dosyalarını üretir ve indirilebilir tutar.
     private exportsService: AiExportsService,
     private realtime: RealtimeGateway,
@@ -1263,6 +1325,11 @@ export class AiAssistantService {
         "yalnızca kullanıcı açıkça isterse yap, kayıt eklemek için modülü kendiliğinden açma. " +
         "Açılabilecekleri görmek için list_modules'u includeAvailable:true ile çağır.",
       "- Modül kapatmak kayıtları silmez ama modülü ekiplerin ekranlarından kaldırır; bunu kullanıcıya söyle.",
+      "- ALACAK-BORÇ (fm_alacak_borc) şirketin Bütçe sekmesindedir ve her şirkette açıktır: " +
+        "\"X'ten 5.000 TL alacağımız var\", \"Y'ye borcumuz var\" denince create_module_record ile buraya yaz " +
+        "(type: receivable/payable). Bu henüz gerçekleşmemiş paradır — gelir/gider defterine (add_budget_transaction) YAZMA.",
+      "- MÜŞTERİLER (crm_musteri) de kendi araçlarıyla çalışır: list_customers / create_customer / update_customer. " +
+        "Yeni kart açmadan önce list_customers ile aynı adda kart var mı bak.",
       "- Her modül kayıt defteri DEĞİLDİR: müşteri, ürünler ve sosyal medya kendi ekranlarına yazar, " +
         "analiz/raporlama/denetim gibi türev paneller ise veriyi başka modüllerden üretir. " +
         "describe_module bunlara \"kayitDefteriMi: false\" der — buraya module_record EKLEME.",
@@ -4232,6 +4299,13 @@ export class AiAssistantService {
         const moduleName = await this.moduleDisplayName(input.moduleKey);
         const described = describeModuleFields(input.moduleKey, moduleName);
         if (hasRecordConfig(input.moduleKey)) return described;
+        if (input.moduleKey === CUSTOMER_MODULE_KEY) {
+          return {
+            moduleKey: input.moduleKey,
+            kayitDefteriMi: false,
+            not: "Müşteri kartları için list_customers / create_customer / update_customer araçlarını kullan.",
+          };
+        }
         // Kayıt defteri OLMAYAN modüller: türev panel (kendi verisi yok, başka
         // modülleri okur), ortak varlık (müşteri -> party), ürünler ve sosyal
         // medya kendi tablolarına yazar. Bunlara module_record yazmak, hiçbir
@@ -4257,22 +4331,51 @@ export class AiAssistantService {
               input.moduleKey,
               userId
             );
-        return records.slice(0, limit).map((r) =>
-          pruneEmpty({ id: r.id, olusturuldu: shortDate(r.createdAt), veri: r.data })
-        );
+        const shown = records.slice(0, limit);
+        // Müşteri alanlarında kartın kimliği durur (bkz. linkPartyReferences);
+        // model kullanıcıya UUID okumasın diye adı yanına konuyor. `veri`
+        // bilerek ham kalıyor: update_module_record'a aynen geri yazılabilsin.
+        const partyKeys = hasRecordConfig(input.moduleKey) ? partyFieldKeys(input.moduleKey, input.moduleKey) : [];
+        const needsNames = shown.some((r) => partyKeys.some((k) => isReferenceValue(r.data[k])));
+        const partyNames = needsNames
+          ? new Map(
+              (await this.partyService.findAll(input.jobId ? { jobId: input.jobId } : { organizationId: input.organizationId }))
+                .map((p) => [p.id, p.displayName] as const)
+            )
+          : new Map<string, string>();
+        return shown.map((r) => {
+          const kartlar: Record<string, string> = {};
+          for (const k of partyKeys) {
+            const v = r.data[k];
+            if (isReferenceValue(v)) kartlar[k] = partyNames.get(v) ?? "(silinmiş kart)";
+          }
+          return pruneEmpty({
+            id: r.id,
+            olusturuldu: shortDate(r.createdAt),
+            veri: r.data,
+            musteriAdlari: Object.keys(kartlar).length ? kartlar : undefined,
+          });
+        });
       }
 
       case "create_module_record": {
         const moduleName = await this.moduleDisplayName(input.moduleKey);
         if (!hasRecordConfig(input.moduleKey)) {
           // Bkz. describe_module: bu modüller module_records kullanmıyor.
+          if (input.moduleKey === CUSTOMER_MODULE_KEY) {
+            throw new BadRequestException("Müşteri kartı modül kaydı değil; create_customer aracını kullan.");
+          }
           throw new BadRequestException(
             `"${moduleName}" bir kayıt defteri değil; buraya kayıt eklenemez. ` +
               "Modülün kendi sayfasından girilmesi gerekiyor."
           );
         }
-        const { data, warnings } = normalizeModuleData(input.moduleKey, moduleName, input.data, {
+        const normalized = normalizeModuleData(input.moduleKey, moduleName, input.data, {
           requireMandatory: true,
+        });
+        const { data, warnings } = await this.linkRecordParties(input.moduleKey, moduleName, normalized, {
+          organizationId: input.jobId ? undefined : input.organizationId,
+          jobId: input.jobId,
         });
         const record = input.jobId
           ? await this.moduleRecordsService.createForJob(
@@ -4303,7 +4406,12 @@ export class AiAssistantService {
             hataMetni("\"{moduleName}\" bir kayıt defteri değil; kayıtları buradan düzenlenemez.", { moduleName })
           );
         }
-        const { data: patch, warnings } = normalizeModuleData(existing.moduleKey, moduleName, input.data);
+        const { data: patch, warnings } = await this.linkRecordParties(
+          existing.moduleKey,
+          moduleName,
+          normalizeModuleData(existing.moduleKey, moduleName, input.data),
+          { organizationId: existing.organizationId, jobId: existing.jobId }
+        );
         // Kısmi güncelleme burada birleştiriliyor: servis `data`yı bütün olarak
         // değiştiriyor, ham gönderilse verilmeyen alanlar sessizce silinirdi.
         const record = await this.moduleRecordsService.update(
@@ -4762,6 +4870,54 @@ export class AiAssistantService {
 
       case "export_report":
         return this.exportReport(userId, userRole, input);
+
+      // ============================================================ Müşteriler
+      case "list_customers": {
+        const scope = await this.customerScope(userId, input);
+        const q = String(input.query ?? "").trim().toLocaleLowerCase("tr");
+        const parties = await this.partyService.findAll(scope, { role: input.role as PartyRole | undefined });
+        return parties
+          .filter(
+            (p) =>
+              !q ||
+              [p.displayName, p.legalName, p.email, p.phone].some((v) => v?.toLocaleLowerCase("tr").includes(q))
+          )
+          .slice(0, 50)
+          .map((p) => customerSummary(p));
+      }
+
+      case "create_customer": {
+        const scope = await this.customerScope(userId, input);
+        const party = await this.partyService.create(
+          { ...scope, departmentId: input.departmentId },
+          {
+            ...customerFields(input),
+            displayName: String(input.displayName ?? ""),
+            address: customerAddress(undefined, input),
+            // Lio'nun açtığı kart ayırt edilebilsin; elle açılanlarda boş.
+            source: "lio",
+          },
+          userId
+        );
+        return customerSummary(party);
+      }
+
+      case "update_customer": {
+        const existing = await this.partyService.findOne(String(input.partyId ?? ""));
+        const patch: Partial<Party> = { ...customerFields(input) };
+        if (input.displayName !== undefined) patch.displayName = String(input.displayName);
+        if (input.status !== undefined) patch.status = input.status;
+        // Roller EKLENİR, silinmez (bkz. PartyRole): "tedarikçi de yap" denince
+        // müşteri rolü kaybolmamalı.
+        if (Array.isArray(input.roles)) {
+          patch.roles = (input.roles as PartyRole[]).reduce((acc, r) => addRole(acc, r), existing.roles);
+        }
+        if (input.city !== undefined || input.address !== undefined) {
+          patch.address = customerAddress(existing.address, input);
+        }
+        const party = await this.partyService.update(existing.id, patch, userId);
+        return customerSummary(party);
+      }
 
       // ============================================================ WhatsApp
       case "whatsapp_search_customers":
@@ -5383,6 +5539,44 @@ export class AiAssistantService {
    * Modülün katalogdaki adı. Aynı zamanda anahtarın GERÇEK olduğunu doğrular:
    * model anahtar uydurursa kayıt açılmadan burada durur.
    */
+  /**
+   * Modül kaydındaki müşteri adlarını kayıtlı kartlara bağlar (bkz.
+   * linkPartyReferences). Kart listesi yalnızca kayıtta gerçekten bir müşteri
+   * alanı dolduysa okunur — çoğu modülde böyle bir alan yok.
+   *
+   * Kapsam kaydın sahibinden gelir; burada ayrıca yetki bakılmıyor çünkü
+   * çağıran (create/update) kapsamı zaten doğrulamış ve kaydı yazma yetkisi
+   * moduleRecordsService'te denetleniyor.
+   */
+  private async linkRecordParties(
+    moduleKey: string,
+    moduleName: string,
+    normalized: { data: Record<string, unknown>; warnings: string[] },
+    scope: { organizationId?: string; jobId?: string }
+  ): Promise<{ data: Record<string, unknown>; warnings: string[] }> {
+    const keys = partyFieldKeys(moduleKey, moduleName).filter((k) => normalized.data[k] !== undefined);
+    if (!keys.length || (!scope.organizationId && !scope.jobId)) return normalized;
+    const parties = await this.partyService.findAll(scope);
+    const linked = linkPartyReferences(keys, normalized.data, parties);
+    return { data: linked.data, warnings: [...normalized.warnings, ...linked.warnings] };
+  }
+
+  /**
+   * Müşteri araçlarının kapsamı. Party uç noktalarındaki kontrolün aynısı:
+   * organizasyonu/işi görebilmek yetmez, taşeron müşteri listesini göremez
+   * (bkz. PartyController). Yazma yetkisi ayrıca PartyService içinde.
+   */
+  private async customerScope(
+    userId: string,
+    input: Record<string, any>
+  ): Promise<{ organizationId?: string; jobId?: string }> {
+    const scope = input.jobId
+      ? { jobId: await this.requireOwnJob(userId, input.jobId) }
+      : { organizationId: await this.requireOwnOrganization(userId, input.organizationId) };
+    await this.access.assertNotSubcontractor(userId, "partners");
+    return scope;
+  }
+
   private async moduleDisplayName(moduleKey: string): Promise<string> {
     if (!moduleKey) throw new BadRequestException("moduleKey gerekli");
     const modules = await this.catalogService.findModules();
@@ -5447,22 +5641,36 @@ export class AiAssistantService {
     const organizasyonlar = [];
     for (const org of targets) {
       const stats = await this.moduleRecordsService.organizationModuleStats(org.id, userId);
+      const acikModuller: Record<string, unknown>[] = stats.modules.map((m) =>
+        pruneEmpty({
+          moduleKey: m.moduleKey,
+          ad: m.moduleName,
+          kayitSayisi: m.recordCount,
+          sonHareket: shortDate(m.lastActivityAt),
+          banaAtanmis: m.assignedToMe || undefined,
+        })
+      );
+      // Alacak-Borç, modül olarak açılmasa da şirketin Bütçe sekmesinde HER
+      // ZAMAN duruyor (bkz. OrgBudgetPanel). organization_modules'ta satırı
+      // olmadığı için burada çıkmıyordu ve Lio "modül açık değil" deyip kayıt
+      // girmeyi reddediyordu — kullanıcı ise bölümü ekranında görüyordu.
+      if (!stats.modules.some((m) => m.moduleKey === ORG_RECEIVABLE_MODULE_KEY)) {
+        acikModuller.push({
+          moduleKey: ORG_RECEIVABLE_MODULE_KEY,
+          ad: nameOf(ORG_RECEIVABLE_MODULE_KEY),
+          not: "Bütçe sekmesinde her zaman açık; açmadan kayıt eklenebilir.",
+        });
+      }
       organizasyonlar.push(
         pruneEmpty({
           organizationId: org.id,
           ad: org.name,
-          acikModuller: stats.modules.map((m) =>
-            pruneEmpty({
-              moduleKey: m.moduleKey,
-              ad: m.moduleName,
-              kayitSayisi: m.recordCount,
-              sonHareket: shortDate(m.lastActivityAt),
-              banaAtanmis: m.assignedToMe || undefined,
-            })
-          ),
+          acikModuller,
           acilabilirModuller: wantAvailable
             ? catalog
-                .filter((m) => !stats.modules.some((s) => s.moduleKey === m.key))
+                .filter(
+                  (m) => m.key !== ORG_RECEIVABLE_MODULE_KEY && !stats.modules.some((s) => s.moduleKey === m.key)
+                )
                 .map((m) => ({ moduleKey: m.key, ad: m.name }))
             : undefined,
         })

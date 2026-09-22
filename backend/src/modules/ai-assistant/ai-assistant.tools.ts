@@ -91,6 +91,10 @@ export const WRITE_TOOLS = new Set<string>([
   "create_module_record",
   "update_module_record",
   "enable_module",
+  // Müşteri/tedarikçi kartı (ortak party varlığı). Arşivleme bilerek araç
+  // olarak yok: müşteri kartını ekrandan kaldırmak arayüzden yapılsın.
+  "create_customer",
+  "update_customer",
   // Bilgi kartı: künye düzenlemek geri alınabilir bir değişiklik (silme değil),
   // o yüzden kritik değil — ama yazmadır, "hiçbir şeyi değiştirme" denmişse kapanır.
   "update_info_card",
@@ -1342,7 +1346,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "create_module_record",
     description:
-      "Modüle yeni bir kayıt ekler (ör. Gelir-Gider'e bir gider satırı, Fatura'ya bir fatura). " +
+      "Modüle yeni bir kayıt ekler (ör. Alacak-Borç'a bir alacak, Fatura'ya bir fatura). " +
       "ÖNCE describe_module ile alanları öğren. organizationId ya da jobId'den biri verilmeli. " +
       "Yetki: organizasyon sahibi, departman yöneticisi ya da modüle atanmış kişi.",
     input_schema: {
@@ -1421,6 +1425,94 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         jobId: { type: "string", description: "İşten çıkarmak için." },
       },
       required: ["moduleKey"],
+    },
+  },
+  // --- Müşteriler (ortak party varlığı) ------------------------------------
+  // Müşteri modülü (crm_musteri) bir kayıt defteri DEĞİL: module_records'a
+  // değil `party` tablosuna yazar ve Satış ile Müşteri İlişkileri aynı karta
+  // bakar. create_module_record bu yüzden onu reddediyor; yolu bu araçlar.
+  {
+    name: "list_customers",
+    description:
+      "Organizasyonun (ya da serbest çalışan işinin) müşteri/tedarikçi kartlarını listeler: " +
+      "partyId, ad, roller, iletişim. update_customer ve modüllerdeki müşteri alanları bu kimlikleri kullanır. " +
+      "organizationId ya da jobId'den biri verilmeli (list_organizations / list_jobs'tan).",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string", description: "Şirket tarafı: organizasyon kimliği." },
+        jobId: { type: "string", description: "Serbest çalışan tarafı: iş kimliği." },
+        query: { type: "string", description: "Ada, e-postaya ya da telefona göre süzgeç (opsiyonel)." },
+        role: {
+          type: "string",
+          enum: ["lead", "customer", "supplier", "candidate", "distributor", "other"],
+          description: "Yalnızca bu roldekiler (opsiyonel).",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "create_customer",
+    description:
+      "Yeni bir müşteri/tedarikçi kartı açar (Müşteriler modülü). ÖNCE list_customers ile aynı adda kart " +
+      "var mı bak; varsa yenisini açma, update_customer kullan. organizationId ya da jobId'den biri verilmeli. " +
+      "Yetki: organizasyon sahibi, departman yöneticisi ya da Müşteriler modülüne atanmış kişi.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string", description: "Şirket tarafı: organizasyon kimliği." },
+        jobId: { type: "string", description: "Serbest çalışan tarafı: iş kimliği." },
+        departmentId: { type: "string", description: "Kullanıcı departman belirttiyse (opsiyonel)." },
+        displayName: { type: "string", description: "Kartta görünecek ad (firma ya da kişi adı)." },
+        partyType: { type: "string", enum: ["company", "person"], description: "Firma mı kişi mi. Varsayılan company." },
+        roles: {
+          type: "array",
+          items: { type: "string", enum: ["lead", "customer", "supplier", "candidate", "distributor", "other"] },
+          description:
+            "Roller. Kullanıcı 'müşteri' dediyse [customer], 'tedarikçi' dediyse [supplier]. " +
+            "Verilmezse aday müşteri (lead) sayılır.",
+        },
+        legalName: { type: "string", description: "Resmî unvan." },
+        taxNumber: { type: "string", description: "Vergi / TC kimlik no." },
+        taxOffice: { type: "string", description: "Vergi dairesi." },
+        email: { type: "string" },
+        phone: { type: "string" },
+        website: { type: "string" },
+        city: { type: "string", description: "Şehir." },
+        address: { type: "string", description: "Açık adres satırı." },
+        notes: { type: "string", description: "Serbest not." },
+      },
+      required: ["displayName"],
+    },
+  },
+  {
+    name: "update_customer",
+    description:
+      "Mevcut bir müşteri/tedarikçi kartını günceller. Yalnızca DEĞİŞEN alanları ver. " +
+      "roles verilirse mevcut rollere EKLENİR (rol silinmez). partyId'yi list_customers'tan al.",
+    input_schema: {
+      type: "object",
+      properties: {
+        partyId: { type: "string", description: "Kart kimliği." },
+        displayName: { type: "string" },
+        partyType: { type: "string", enum: ["company", "person"] },
+        roles: {
+          type: "array",
+          items: { type: "string", enum: ["lead", "customer", "supplier", "candidate", "distributor", "other"] },
+        },
+        status: { type: "string", enum: ["active", "passive", "blocked"] },
+        legalName: { type: "string" },
+        taxNumber: { type: "string" },
+        taxOffice: { type: "string" },
+        email: { type: "string" },
+        phone: { type: "string" },
+        website: { type: "string" },
+        city: { type: "string" },
+        address: { type: "string" },
+        notes: { type: "string" },
+      },
+      required: ["partyId"],
     },
   },
   // --- Gruplar, organizasyonlar ve departmanlar --------------------------

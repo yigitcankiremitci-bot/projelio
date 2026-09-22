@@ -2,10 +2,12 @@ import { BadRequestException } from "@nestjs/common";
 import {
   CURRENCY_OPTIONS,
   getModuleRecordConfig,
+  isReferenceValue,
   MODULE_RECORD_CONFIGS,
   type ModuleFieldConfig,
 } from "@projelio/shared";
 import { hataMetni } from "../../common/i18n/index";
+import { normalizeName } from "../party/party-dedup";
 
 // Lio'nun modül kayıtlarıyla çalışabilmesi için alan tanımlarının backend'de de
 // okunabilmesi gerekiyor. Tanımlar packages/shared/src/moduleConfigs/ altında —
@@ -57,7 +59,9 @@ export function describeModuleFields(moduleKey: string, moduleName: string) {
         out.note = "YYYY-MM-DD biçiminde yaz.";
         break;
       case "entity_ref":
-        out.note = "Ortak varlık (müşteri/tedarikçi) referansı. Kimliği yoksa düz ad yazabilirsin.";
+        out.note =
+          "Müşteri/tedarikçi kartına bağlanır. Kartın adını ya da partyId'sini yaz; ad kayıtlı bir kartla " +
+          "eşleşirse sistem karta bağlar. Kart yoksa ad düz metin kalır ve uyarı döner.";
         break;
       case "user_ref":
         out.note = "Organizasyon üyesi referansı. Kimliği yoksa düz ad yazabilirsin.";
@@ -186,4 +190,78 @@ export function normalizeModuleData(
   }
 
   return { data, warnings };
+}
+
+/** Eşleştirme için gereken kadarı — Party'nin tamamı değil, test kolay kurulsun. */
+export interface PartyCandidate {
+  id: string;
+  displayName: string;
+  legalName?: string;
+}
+
+/** Modülün müşteri kartına bağlanan alanları (entity_ref + party). */
+export function partyFieldKeys(moduleKey: string, moduleName: string): string[] {
+  return getModuleRecordConfig(moduleKey, moduleName)
+    .fields.filter((f) => f.type === "entity_ref" && (f.entity ?? "party") === "party")
+    .map((f) => f.key);
+}
+
+/**
+ * Müşteri alanına yazılan ADI kayıtlı karta bağlar (değer kartın kimliği olur).
+ *
+ * Arayüz bu alanlara kartın kimliğini yazıyor; Lio ise kullanıcının söylediği
+ * adı yazıyordu. Düz ad ekranda doğru görünür ama karta bağlı değildir: kart
+ * yeniden adlandırılınca eskide kalır, Kasa'daki karşı taraf çözümlemesi de onu
+ * tanımaz. Eşleşme party-dedup'ın normalleştirmesiyle yapılıyor ("ABC Ltd. Şti."
+ * ~ "abc") — yinelenen kart uyarısının kullandığı kuralın aynısı.
+ *
+ * Belirsizlikte BAĞLAMAZ: iki kart aynı ada düşerse yanlış müşteriye alacak
+ * yazmak, bağlamamaktan çok daha kötü. Ad olduğu gibi kalır, adaylar uyarıda
+ * döner; model kullanıcıya sorup partyId ile günceller.
+ *
+ * Kimlik verilmişse kapsamdaki kartlardan biri OLMAK ZORUNDA: başka bir
+ * şirketin kartına bağlanmış kayıt ekranda "(silinmiş kayıt)" görünürdü.
+ */
+export function linkPartyReferences(
+  keys: string[],
+  data: Record<string, unknown>,
+  parties: PartyCandidate[]
+): { data: Record<string, unknown>; warnings: string[] } {
+  const out = { ...data };
+  const warnings: string[] = [];
+  for (const key of keys) {
+    const value = out[key];
+    if (typeof value !== "string" || !value.trim()) continue;
+
+    if (isReferenceValue(value)) {
+      if (!parties.some((p) => p.id === value)) {
+        throw new BadRequestException(
+          hataMetni("\"{key}\" alanındaki müşteri kartı ({value}) bu şirkette bulunamadı.", { key, value })
+        );
+      }
+      continue;
+    }
+
+    const aranan = normalizeName(value);
+    const eslesen = aranan
+      ? parties.filter(
+          (p) => normalizeName(p.displayName) === aranan || (p.legalName && normalizeName(p.legalName) === aranan)
+        )
+      : [];
+    if (eslesen.length === 1) {
+      out[key] = eslesen[0].id;
+    } else if (eslesen.length > 1) {
+      warnings.push(
+        `"${value}" birden fazla müşteri kartıyla eşleşti, karta BAĞLANMADI: ` +
+          eslesen.map((p) => `${p.displayName} (${p.id})`).join(", ") +
+          ". Kullanıcıya hangisi olduğunu sor, update_module_record ile partyId'yi yaz."
+      );
+    } else {
+      warnings.push(
+        `"${value}" adında müşteri kartı yok; düz ad olarak yazıldı. Kullanıcı isterse create_customer ile ` +
+          "kart açıp update_module_record ile kaydı karta bağla."
+      );
+    }
+  }
+  return { data: out, warnings };
 }

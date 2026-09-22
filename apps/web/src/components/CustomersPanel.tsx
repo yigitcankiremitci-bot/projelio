@@ -7,6 +7,7 @@ import { useUndo } from "../lib/undo";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { IconTrash, IconX } from "./icons";
 import { useT } from "../lib/i18n";
+import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 
 interface Props {
   organizationId?: string;
@@ -505,7 +506,12 @@ export default function CustomersPanel({
                 )}
               </div>
 
-              {openPartyId === p.id && <PartyDetail party={p} canWrite={canWrite} profile={profile.primaryActionLabel} />}
+              {openPartyId === p.id && <PartyDetail
+                  party={p}
+                  canWrite={canWrite}
+                  profile={profile.primaryActionLabel}
+                  organizationId={organizationId}
+                />}
             </div>
           ))}
         </div>
@@ -538,10 +544,23 @@ function Field({
  * Geçmiş akışına diğer modüller de yazar (fatura kesildi, destek talebi
  * açıldı) — "modüller birbirini besliyor" tezinin görünür yüzü burasıdır.
  */
-function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boolean; profile: string }) {
+function PartyDetail({
+  party,
+  canWrite,
+  profile,
+  organizationId,
+}: {
+  party: Party;
+  canWrite: boolean;
+  profile: string;
+  organizationId?: string;
+}) {
   const c = useThemeColors();
   const t = useT();
-  const [tab, setTab] = useState<"activity" | "contacts">("activity");
+  const [tab, setTab] = useState<"activity" | "contacts" | "alacakBorc">("activity");
+  // null = şirket kartı değil ya da kullanıcının alacak/borç defterini görme
+  // yetkisi yok; sekme o zaman hiç çıkmaz (bkz. useMusteriAlacakBorcu).
+  const alacakBorc = useMusteriAlacakBorcu(party, organizationId);
   const [activities, setActivities] = useState<PartyActivity[]>([]);
   const [contacts, setContacts] = useState<PartyContact[]>([]);
   const [draft, setDraft] = useState("");
@@ -606,9 +625,14 @@ function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boo
         <button onClick={() => setTab("contacts")} style={tabStyle(tab === "contacts")}>
           {t("Kişiler")} {contacts.length > 0 && `(${contacts.length})`}
         </button>
+        {alacakBorc.kayitlar && (
+          <button onClick={() => setTab("alacakBorc")} style={tabStyle(tab === "alacakBorc")}>
+            {t("Alacak-Borç")} {alacakBorc.kayitlar.length > 0 && `(${alacakBorc.kayitlar.length})`}
+          </button>
+        )}
       </div>
 
-      {canWrite && (
+      {canWrite && tab !== "alacakBorc" && (
         <div style={{ display: "flex", gap: 6 }}>
           <input
             value={draft}
@@ -635,7 +659,15 @@ function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boo
         </div>
       )}
 
-      {tab === "activity" ? (
+      {tab === "alacakBorc" && alacakBorc.kayitlar && organizationId ? (
+        <MusteriAlacakBorcu
+          party={party}
+          organizationId={organizationId}
+          kayitlar={alacakBorc.kayitlar}
+          yazabilir={alacakBorc.yazabilir}
+          yenile={alacakBorc.yenile}
+        />
+      ) : tab === "activity" ? (
         activities.length === 0 ? (
           <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{t("Henüz temas kaydı yok.")}</p>
         ) : (

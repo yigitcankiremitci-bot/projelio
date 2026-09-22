@@ -43,6 +43,8 @@ export const hatalar: TranslationDict = {
   "Bu modüle şifre ekleme yetkiniz yok": "You don't have permission to add passwords to this module",
   "Bu modülü görme yetkiniz yok": "You don't have permission to view this module",
   "Bu organizasyona erişimin yok.": "You don't have access to this organization.",
+  "\"{key}\" alanındaki müşteri kartı ({value}) bu şirkette bulunamadı.": "The customer card in \"{key}\" ({value}) was not found in this company.",
+  "Müşteri kartı modül kaydı değil; create_customer aracını kullan.": "A customer card is not a module record; use the create_customer tool.",
   "Bu organizasyonu görüntüleme yetkiniz yok": "You don't have permission to view this organization",
   "Bu organizasyonu yalnızca sahibi düzenleyebilir": "Only the owner can edit this organization",
   "Bu paylaşımı görüntüleme yetkiniz yok": "You don't have permission to view this share",

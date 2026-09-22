@@ -75,7 +75,11 @@ export class UsersController {
    * bir istek, hata değil (bkz. UsersService.updateLocale).
    */
   @Patch("me/locale")
-  updateLocale(@Req() req: any, @Body("locale") locale: unknown) {
+  async updateLocale(@Req() req: any, @Body("locale") locale: unknown) {
+    // Demo hesabı herkese açık ve ORTAK: bir ziyaretçinin dil seçimi hesaba
+    // yazılsaydı sonraki herkesin dilini değiştirirdi. Seçim yalnızca o
+    // ziyaretçinin tarayıcısında kalır (bkz. web lib/i18n HesapDili).
+    if (req.user.role === "demo") return this.usersService.findByIdPublic(req.user.userId);
     return this.usersService.updateLocale(req.user.userId, locale);
   }
 

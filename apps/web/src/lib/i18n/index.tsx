@@ -42,6 +42,9 @@ function browserLocale(): Locale {
  * tarayıcısı başka bir dilde diye Türkçe kayıt ekranı çıkmamalı.
  * Bir seçim sayılır ve bu tarayıcıya yazılır; hesap açılınca oraya da geçer.
  */
+/** Giriş ekranında (ya da ?lang= ile) yapılmış, henüz hesaba yazılmamış dil seçimi (sessionStorage). */
+const GIRIS_SECIMI = "projelio_locale_giris";
+
 function adrestekiDil(): Locale | null {
   try {
     const lang = new URLSearchParams(window.location.search).get("lang");
@@ -56,6 +59,15 @@ function initialLocale(): Locale {
   const adres = adrestekiDil();
   if (adres) {
     writeStored(adres);
+    // Adresteki dil de açık bir seçim: girişten sonra hesaptaki eski dil onu
+    // ezmesin (bkz. useAccountLocale). Eskiden yalnızca seçici tıklanınca
+    // işaretleniyordu; sitenin /en sayfasından gelen kişi giriş yapınca
+    // arayüz hesabın kayıtlı Türkçesine dönüyordu.
+    try {
+      sessionStorage.setItem(GIRIS_SECIMI, adres);
+    } catch {
+      // sessionStorage yoksa seçim bu tarayıcıda yine geçerli, hesaba yazılmaz.
+    }
     return adres;
   }
   return readStored() ?? browserLocale();
@@ -82,8 +94,6 @@ interface I18nValue {
 
 const Ctx = createContext<I18nValue | null>(null);
 
-/** Giriş ekranında yapılmış, henüz hesaba yazılmamış dil seçimi (sessionStorage). */
-const GIRIS_SECIMI = "projelio_locale_giris";
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
@@ -165,8 +175,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 function HesapDili() {
   const { user } = useCurrentUser();
   const { locale } = useI18n();
+  // Demo hesabı herkese açık ve ORTAK: hesaptaki dil ne okunur ne yazılır.
+  // Okunsaydı ziyaretçi tarayıcısından bağımsız olarak son ziyaretçinin
+  // dilini görürdü; yazılsaydı bir ziyaretçinin seçimi herkesinkini değiştirirdi.
+  const demo = user?.role === "demo";
   // undefined = kullanıcı henüz yüklenmedi; null = hesapta dil seçilmemiş.
-  useAccountLocale(user ? (user.locale ?? null) : undefined);
+  useAccountLocale(user && !demo ? (user.locale ?? null) : undefined);
 
   // Hesapta dil YOKSA ekranda görünen dil bir kez hesaba yazılır.
   //
@@ -178,10 +192,10 @@ function HesapDili() {
   // Oturum başına bir kez; hata yutuluyor (bkz. setLocale'deki gerekçe).
   const yazildi = useRef(false);
   useEffect(() => {
-    if (!user || user.locale != null || yazildi.current) return;
+    if (!user || demo || user.locale != null || yazildi.current) return;
     yazildi.current = true;
     api.patch("/users/me/locale", { locale }).catch(() => {});
-  }, [user, locale]);
+  }, [user, demo, locale]);
   return null;
 }
 

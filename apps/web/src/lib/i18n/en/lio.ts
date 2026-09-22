@@ -234,4 +234,10 @@ export const lio: TranslationDict = {
   Ses: "Audio",
   "Önizleme yüklenemedi.": "Could not load the preview.",
   "Lio (⌘K) · yukarı-aşağı sürükleyerek taşıyabilirsin": "Lio (⌘K) · drag up or down to move",
+  // Mesaj kopyalama ve toplu seçim
+  "{n} mesaj seçildi": { one: "{n} message selected", other: "{n} messages selected" },
+  "{n} mesaj kopyalandı": { one: "{n} message copied", other: "{n} messages copied" },
+  "Kopyalanamadı": "Couldn't copy",
+  "Birden fazla seç": "Select multiple",
+  Sen: "You",
 };

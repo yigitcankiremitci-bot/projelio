@@ -361,6 +361,12 @@ export default function AiAssistantPanel({
 
   const [showHistory, setShowHistory] = useState(false);
 
+  // Mesaja uzun basınca (masaüstünde sağ tıkla) açılan menü ve toplu seçim.
+  // Seçim modunda balona dokunmak onu seçer; bağlantılar o sırada açılmaz.
+  const [messageMenu, setMessageMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string> | null>(null);
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -688,6 +694,48 @@ export default function AiAssistantPanel({
     setActiveFiles([]);
     aiChat.clearActiveFiles(activeId).catch(() => {});
   };
+
+  // Sohbet değişince seçim ve menü bırakılır: başka konuşmanın kimlikleri
+  // yeni listede anlamsız, "3 mesaj seçildi" yazısı yalan olurdu.
+  useEffect(() => {
+    setSelectedIds(null);
+    setMessageMenu(null);
+  }, [activeId, open]);
+
+  useEffect(() => {
+    if (!copyNotice) return;
+    const timer = window.setTimeout(() => setCopyNotice(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [copyNotice]);
+
+  const copyText = async (text: string, count: number) => {
+    const ok = await panoyaYaz(text);
+    setCopyNotice(ok ? (count > 1 ? t("{n} mesaj kopyalandı", { n: count }) : t("Kopyalandı")) : t("Kopyalanamadı"));
+  };
+
+  /**
+   * Seçilenler sohbetteki SIRAYLA kopyalanır (seçilme sırasıyla değil) ve
+   * kimin söylediği başa yazılır: yapıştırıldığı yerde soru ile cevap
+   * birbirinden ayırt edilebilmeli.
+   */
+  const copySelected = () => {
+    if (!selectedIds?.size) return;
+    const chosen = messages.filter((m) => selectedIds.has(m.id) && m.content);
+    const text = chosen.map((m) => `${m.role === "user" ? t("Sen") : "Lio"}:\n${m.content}`).join("\n\n");
+    void copyText(text, chosen.length);
+    setSelectedIds(null);
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev ?? []);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const copyableMessages = messages.filter((m) => !!m.content);
 
   const removeAttachment = (id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
@@ -1268,6 +1316,38 @@ export default function AiAssistantPanel({
           </div>
         )}
 
+        {/* Toplu seçim şeridi: seçim modundayken mesajların üstünde durur. */}
+        {selectedIds && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 14px",
+              borderBottom: `1px solid ${c.border}`,
+              background: c.background,
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ flex: 1, fontSize: 13, color: c.textPrimary, fontWeight: 600 }}>
+              {t("{n} mesaj seçildi", { n: selectedIds.size })}
+            </span>
+            <SelectionButton
+              onClick={() =>
+                setSelectedIds(
+                  selectedIds.size === copyableMessages.length ? new Set() : new Set(copyableMessages.map((m) => m.id))
+                )
+              }
+            >
+              {selectedIds.size === copyableMessages.length ? t("Seçimi kaldır") : t("Tümünü seç")}
+            </SelectionButton>
+            <SelectionButton primary disabled={selectedIds.size === 0} onClick={copySelected}>
+              {t("Kopyala")}
+            </SelectionButton>
+            <SelectionButton onClick={() => setSelectedIds(null)}>{t("İptal")}</SelectionButton>
+          </div>
+        )}
+
         {/* Mesajlar */}
         <div
           ref={scrollRef}
@@ -1315,8 +1395,79 @@ export default function AiAssistantPanel({
               preparing={preparingId === m.id}
               onSpeak={() => void playMessage(m)}
               onOpenFile={(fileId) => void openFilePreview(fileId)}
+              selecting={!!selectedIds && !!m.content}
+              selected={!!selectedIds?.has(m.id)}
+              onToggleSelect={() => toggleSelected(m.id)}
+              onMenu={m.content && !selectedIds ? (x, y) => setMessageMenu({ id: m.id, x, y }) : undefined}
             />
           ))}
+
+          {/* Uzun basınca açılan menü. Katman ekranı kaplıyor: dışarı dokunmak kapatır. */}
+          {messageMenu && (
+            <>
+              <div
+                onClick={() => setMessageMenu(null)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setMessageMenu(null);
+                }}
+                style={{ position: "fixed", inset: 0, zIndex: 20 }}
+              />
+              <div
+                role="menu"
+                style={{
+                  position: "fixed",
+                  // Ekranın kenarından taşmasın: menü ~180×90.
+                  left: Math.max(8, Math.min(messageMenu.x, window.innerWidth - 188)),
+                  top: Math.max(8, Math.min(messageMenu.y, window.innerHeight - 100)),
+                  width: 180,
+                  zIndex: 21,
+                  background: c.surface,
+                  border: `1px solid ${c.border}`,
+                  borderRadius: 10,
+                  boxShadow: "0 8px 24px rgba(26,31,41,0.18)",
+                  overflow: "hidden",
+                }}
+              >
+                <MenuItem
+                  onClick={() => {
+                    const m = messages.find((x) => x.id === messageMenu.id);
+                    setMessageMenu(null);
+                    if (m) void copyText(m.content, 1);
+                  }}
+                >
+                  {t("Kopyala")}
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setSelectedIds(new Set([messageMenu.id]));
+                    setMessageMenu(null);
+                  }}
+                >
+                  {t("Birden fazla seç")}
+                </MenuItem>
+              </div>
+            </>
+          )}
+
+          {copyNotice && (
+            <div
+              role="status"
+              style={{
+                position: "sticky",
+                bottom: 0,
+                alignSelf: "center",
+                padding: "7px 14px",
+                borderRadius: 999,
+                background: c.primaryDark,
+                color: "#fff",
+                fontSize: 12.5,
+                boxShadow: "0 4px 14px rgba(26,31,41,0.18)",
+              }}
+            >
+              {copyNotice}
+            </div>
+          )}
 
           {sending && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, color: c.textSecondary, fontSize: 13 }}>
@@ -1728,6 +1879,140 @@ function IconMessagesGlyph({ color = "currentColor" }: { color?: string }) {
   );
 }
 
+/**
+ * Uzun basmayı yakalar (dokunmatik) ve sağ tıkı (fare) aynı menüye bağlar.
+ *
+ * Fareyle basılı tutmak metin seçmenin başlangıcıdır, o yüzden zamanlayıcı
+ * yalnızca dokunuşta kurulur; masaüstünde menü sağ tıkla açılır. Parmak
+ * kayarsa (sohbeti kaydırıyorsa) iptal edilir. Menü açıldıktan sonra gelen
+ * tıklama yutulur, yoksa parmak kalkınca altındaki bağlantı da açılırdı.
+ */
+function useLongPress(onMenu?: (x: number, y: number) => void): Partial<
+  Pick<
+    React.HTMLAttributes<HTMLDivElement>,
+    | "onPointerDown"
+    | "onPointerMove"
+    | "onPointerUp"
+    | "onPointerCancel"
+    | "onPointerLeave"
+    | "onContextMenu"
+    | "onClickCapture"
+  >
+> {
+  const timer = useRef<number | null>(null);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const fired = useRef(false);
+
+  const cancel = () => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+    start.current = null;
+  };
+
+  if (!onMenu) return {};
+
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      fired.current = false;
+      if (e.pointerType === "mouse") return;
+      const x = e.clientX;
+      const y = e.clientY;
+      start.current = { x, y };
+      timer.current = window.setTimeout(() => {
+        fired.current = true;
+        timer.current = null;
+        navigator.vibrate?.(10);
+        onMenu(x, y);
+      }, 450);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (!start.current) return;
+      if (Math.abs(e.clientX - start.current.x) > 8 || Math.abs(e.clientY - start.current.y) > 8) cancel();
+    },
+    onPointerUp: cancel,
+    onPointerCancel: cancel,
+    onPointerLeave: cancel,
+    onContextMenu: (e: React.MouseEvent) => {
+      // Masaüstünde metnin bir PARÇASI seçiliyse tarayıcının kendi menüsü
+      // kalsın: kullanıcı yalnızca o parçayı kopyalamak istiyor.
+      if (!DOKUNMATIK_CIHAZ && window.getSelection()?.toString()) return;
+      e.preventDefault();
+      // Android uzun basmada contextmenu da gönderiyor; menü zaten açıldıysa ikinciyi açma.
+      if (fired.current) return;
+      cancel();
+      fired.current = true;
+      onMenu(e.clientX, e.clientY);
+    },
+    onClickCapture: (e: React.MouseEvent) => {
+      if (!fired.current) return;
+      fired.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+  };
+}
+
+/** Panoya yazar; `navigator.clipboard` olmayan (http, eski WebView) yerde eski yola düşer. */
+async function panoyaYaz(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Aşağıdaki yola düş.
+  }
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(area);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function SelectionButton({
+  children,
+  onClick,
+  primary,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  primary?: boolean;
+  disabled?: boolean;
+}) {
+  const c = useThemeColors();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: "5px 10px",
+        borderRadius: 8,
+        border: primary ? "none" : `1px solid ${c.border}`,
+        background: primary ? c.accent : "transparent",
+        color: primary ? "#fff" : c.textPrimary,
+        fontSize: 12.5,
+        fontWeight: primary ? 600 : 500,
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.5 : 1,
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function MenuItem({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   const c = useThemeColors();
   return (
@@ -1762,6 +2047,10 @@ function Bubble({
   preparing,
   onSpeak,
   onOpenFile,
+  selecting,
+  selected,
+  onToggleSelect,
+  onMenu,
 }: {
   role: "user" | "assistant";
   text: string;
@@ -1773,12 +2062,64 @@ function Bubble({
   onSpeak?: () => void;
   /** Lio'nun verdiği dosya adına tıklanınca önizleme penceresini açar. */
   onOpenFile?: (fileId: string) => void;
+  /** Toplu seçim açık mı: balona dokunmak onu seçer/bırakır. */
+  selecting?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
+  /** Uzun basma / sağ tık: kopyalama menüsünü o noktada açar. */
+  onMenu?: (x: number, y: number) => void;
 }) {
   const c = useThemeColors();
   const t = useT();
   const isUser = role === "user";
+  const longPress = useLongPress(onMenu);
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: isUser ? "flex-end" : "flex-start" }}>
+    <div
+      {...(selecting ? {} : longPress)}
+      // Seçim modunda balonun içindeki bağlantı/dosya düğmesi açılmasın:
+      // tıklama yakalama aşamasında durdurulup seçime çevriliyor.
+      onClickCapture={
+        selecting
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleSelect?.();
+            }
+          : longPress.onClickCapture
+      }
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: isUser ? "flex-end" : "flex-start",
+        position: "relative",
+        cursor: selecting ? "pointer" : undefined,
+        // Dokunmatikte uzun basma tarayıcının kendi seçim/büyüteç menüsünü de
+        // açıyordu; ikisi üst üste binmesin diye metin seçimi kapatıldı —
+        // kopyalama zaten bizim menüden. Masaüstünde fareyle seçim serbest.
+        ...(DOKUNMATIK_CIHAZ || selecting ? { userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" } : {}),
+      }}
+    >
+      {selecting && (
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: 8,
+            [isUser ? "left" : "right"]: 0,
+            width: 20,
+            height: 20,
+            borderRadius: 999,
+            border: `2px solid ${selected ? c.accent : c.border}`,
+            background: selected ? c.accent : "transparent",
+            color: "#fff",
+            fontSize: 12,
+            lineHeight: "16px",
+            textAlign: "center",
+          }}
+        >
+          {selected ? "✓" : ""}
+        </span>
+      )}
       {/* Dosya künyeleri balonun üstünde durur: içeriğin tamamı burada gösterilmez,
           yalnızca ne gönderildiği görünür (çıkarılan metin arayüze hiç gelmiyor). */}
       {!!attachments?.length && (
@@ -1836,6 +2177,8 @@ function Bubble({
             borderBottomLeftRadius: isUser ? 14 : 4,
             background: isUser ? c.primaryDark : c.background,
             color: isUser ? "#fff" : c.textPrimary,
+            outline: selected ? `2px solid ${c.accent}` : "none",
+            outlineOffset: 2,
             fontSize: 14,
             lineHeight: 1.5,
             whiteSpace: "pre-wrap",

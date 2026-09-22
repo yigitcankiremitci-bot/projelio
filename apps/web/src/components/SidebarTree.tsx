@@ -379,10 +379,12 @@ export default function SidebarTree() {
   const orgsActive = location.pathname === "/organizations";
 
   return (
-    <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+    // Ağaç artık sidebar'ın en üstünde, sayfa bağlantılarının üstünde duruyor;
+    // ayırıcı çizgi bu yüzden altta.
+    <div style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
       <div
         style={{
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 600,
           letterSpacing: 0.5,
           textTransform: "uppercase",
@@ -544,14 +546,14 @@ function Row({
           }}
         />
       ) : (
-        <Icon size={15} color={active ? c.accent : INACTIVE_ICON} />
+        <Icon size={16} color={active ? c.accent : INACTIVE_ICON} />
       )}
       <span
         style={{
           // iOS Safari, 16px altındaki metinlerde okunabilirlik için otomatik
           // ölçekleme/zoom uygulayabiliyor; sidebar satırlarını 16px'in altına
           // düşürmüyoruz.
-          fontSize: 16,
+          fontSize: 17,
           color: active ? "#fff" : INACTIVE_TEXT,
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -642,10 +644,10 @@ function LeafRow({
           borderLeft: active ? `2px solid ${c.accent}` : "2px solid transparent",
         }}
       >
-        {Icon && <Icon size={15} color={active ? c.accent : INACTIVE_ICON} />}
+        {Icon && <Icon size={16} color={active ? c.accent : INACTIVE_ICON} />}
         <span
           style={{
-            fontSize: 16,
+            fontSize: 17,
             color: active ? "#fff" : "#98A2B0",
             overflow: "hidden",
             textOverflow: "ellipsis",

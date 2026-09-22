@@ -169,6 +169,14 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
           </button>
         </div>
 
+        {/* Grup > Organizasyon > İş gezinme ağacı: yalnızca kullanıcının erişebildiği
+            en az bir grup/organizasyon/iş varsa bir şey render eder. Günlük iş
+            çoğunlukla bir işin içinde geçtiği için ağaç sayfa bağlantılarının
+            ÜSTÜNDE duruyor. */}
+        <div {...tourAnchor("sidebar-tree")}>
+          <SidebarTree />
+        </div>
+
         {/* Sayfa bağlantıları ikonsuz, buton görünümlü satırlar. Hover/aktif
             durumları ve geçiş animasyonları src/index.css'teki .sidebar-nav-btn
             sınıfında (inline style ile :hover yazılamıyor). */}
@@ -204,12 +212,6 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
             </div>
           );
         })}
-
-      {/* Grup > Organizasyon > İş gezinme ağacı: yalnızca kullanıcının erişebildiği
-          en az bir grup/organizasyon/iş varsa bir şey render eder. */}
-      <div {...tourAnchor("sidebar-tree")}>
-        <SidebarTree />
-      </div>
 
       {/* Buradaki alt öbek kaldırıldı: "Ayarlar" yukarıdaki gezinme listesine
           taşındı, "Çıkış yap" ise yalnızca Ayarlar > Hesap'ta duruyor. Çıkışın

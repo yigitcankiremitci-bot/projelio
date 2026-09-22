@@ -82,6 +82,12 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
       )}
       <aside
         className="app-sidebar"
+        // Çekmece hâlindeyken bir bağlantı seçilince kapanır; yoksa açılan
+        // sayfa çekmecenin altında kalıyor, kişi bir de kapatmak zorunda
+        // kalıyordu. Tek tek her Link'e değil buraya bağlı ki sonradan
+        // eklenen bağlantılar da unutulmasın. Etkin sayfanın bağlantısında
+        // adres değişmediği için "konum değişince kapan" yetmezdi.
+        onClick={overlay ? (e) => { if ((e.target as HTMLElement).closest("a")) onClose(); } : undefined}
         {...tourAnchor("sidebar")}
         style={{
           // Çekmece genişliği ekran genişliğine de bağlı: arkada dokunulabilir

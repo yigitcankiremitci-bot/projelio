@@ -26,7 +26,7 @@ import {
 } from "../lib/urunKarti";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useT } from "../lib/i18n";
-import { bicimDili } from "../lib/i18n/depo";
+import { bicimDili, yuzde } from "../lib/i18n/depo";
 
 interface Props {
   organizationId: string;
@@ -297,7 +297,7 @@ export default function ProductDetailModal({ organizationId, product: ilk, onClo
               {metrik(t("Birim kâr"), formatPara(kar, product.currency), kar !== null && kar < 0 ? { renk: c.danger } : undefined)}
               {metrik(
                 t("Brüt marj"),
-                marj !== null ? `%${marj.toFixed(1).replace(".", ",")}` : null,
+                marj !== null ? yuzde(marj.toLocaleString(bicimDili(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })) : null,
                 marj !== null && marj < 0 ? { renk: c.danger } : undefined
               )}
               {!hizmet &&

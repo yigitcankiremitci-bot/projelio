@@ -155,7 +155,7 @@ const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projec
                   </span>
                 </div>
                 <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
-                  {done}/{total} görev
+                  {t("{biten}/{toplam} görev", { biten: done, toplam: total })}
                 </span>
               </button>
             );

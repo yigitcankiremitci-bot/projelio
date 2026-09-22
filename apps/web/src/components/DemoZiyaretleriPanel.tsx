@@ -9,7 +9,7 @@ import {
 import { demoZiyaretleri, type DemoZiyaretAnalitigi } from "../api/demoZiyaretleri";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
-import { bicimDili } from "../lib/i18n/depo";
+import { bicimDili, yuzde } from "../lib/i18n/depo";
 
 /**
  * Admin > Demo ziyaretleri — demoya girenler önce neyi merak ediyor?
@@ -64,7 +64,7 @@ function sayfaAdi(sayfa: string): string {
   return oz ? ozellikAdi(oz) : sayfa;
 }
 
-const yuzde = (oran: number) => `%${Math.round(oran * 100)}`;
+const yuzdeYaz = (oran: number) => yuzde(Math.round(oran * 100));
 const tarih = (iso: string) =>
   new Date(/[zZ]$/.test(iso) ? iso : `${iso}Z`).toLocaleString(bicimDili(), {
     day: "2-digit",
@@ -117,7 +117,7 @@ export default function DemoZiyaretleriPanel() {
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 14, color: c.textPrimary }}>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad(s.anahtar)}</span>
               <span style={{ color: c.textSecondary, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                {s.ziyaret} · {yuzde(s.oran)}
+                {s.ziyaret} · {yuzdeYaz(s.oran)}
               </span>
             </div>
             <div style={{ height: 6, borderRadius: 3, background: c.background, marginTop: 4 }}>
@@ -174,9 +174,9 @@ export default function DemoZiyaretleriPanel() {
               [t("Ortanca süre"), etkinlikSuresiYaz(veri.medyanSureSn)],
               [t("Ortalama süre"), etkinlikSuresiYaz(veri.ortSureSn)],
               [t("Ziyaret başına sayfa"), veri.ortSayfa.toLocaleString(bicimDili())],
-              [t("Panodan öteye geçmeyen"), veri.ziyaret ? yuzde(veri.hemenCikma) : "—"],
-              [t("Tanıtım sitesinden"), veri.ziyaret ? yuzde(veri.kaynak.tanitim / veri.ziyaret) : "—"],
-              ["Telefondan", veri.ziyaret ? yuzde(veri.cihaz.mobil / veri.ziyaret) : "—"],
+              [t("Panodan öteye geçmeyen"), veri.ziyaret ? yuzdeYaz(veri.hemenCikma) : "—"],
+              [t("Tanıtım sitesinden"), veri.ziyaret ? yuzdeYaz(veri.kaynak.tanitim / veri.ziyaret) : "—"],
+              ["Telefondan", veri.ziyaret ? yuzdeYaz(veri.cihaz.mobil / veri.ziyaret) : "—"],
             ].map(([ad, deger]) => (
               <div key={ad} style={{ ...kart, padding: "12px 14px" }}>
                 <div style={{ fontSize: 12, color: c.textSecondary }}>{ad}</div>

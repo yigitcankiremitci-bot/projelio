@@ -200,11 +200,22 @@ export function daysFromNow(days: number, from: Date = new Date()): string {
   return todayISO(d);
 }
 
+/**
+ * Para biçiminin dili. Web açılışta arayüz diline bağlar (bkz. apps/web
+ * lib/i18n/index.tsx); kaydedilmezse (sunucu, testler) Türkçe biçim.
+ * Sabit "tr-TR" yüzünden İngilizce arayüzde kayıt listeleri "₺132.000,00"
+ * gösteriyordu, aynı sayfadaki ürün kartları ise "TRY 132,000.00".
+ */
+let bicimDiliSaglayici: () => string = () => "tr-TR";
+export function setBicimDiliSaglayici(fn: () => string): void {
+  bicimDiliSaglayici = fn;
+}
+
 export function fmtMoney(amount: unknown, currency: unknown): string {
   const n = Number(amount);
   if (Number.isNaN(n)) return "";
   try {
-    return new Intl.NumberFormat("tr-TR", { style: "currency", currency: (currency as string) || "TRY" }).format(n);
+    return new Intl.NumberFormat(bicimDiliSaglayici(), { style: "currency", currency: (currency as string) || "TRY" }).format(n);
   } catch {
     return `${amount} ${currency ?? ""}`.trim();
   }

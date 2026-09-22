@@ -513,4 +513,23 @@ export const uygulama: TranslationDict = {
   "{n} tekrar": { one: "{n} occurrence", other: "{n} occurrences" },
   "{tarih} başladı": "Started {tarih}",
   "{tarih} kapandı": "Closed {tarih}",
+  // Kartlardaki sayaçlar ve tarih ekleri (demo gezisinde bulundu)
+  "Kime: {alicilar}": "To: {alicilar}",
+  "Kod: {kod}": "Code: {kod}",
+  "Sıradaki: {tarih}": "Next: {tarih}",
+  "{biten}/{toplam} görev": "{biten}/{toplam} tasks",
+  "{n} / {toplam} kayıt": "{n} / {toplam} records",
+  "{n} fotoğraf": { one: "{n} photo", other: "{n} photos" },
+  "{n} iş": { one: "{n} job", other: "{n} jobs" },
+  "{n} kullanıcı": { one: "{n} user", other: "{n} users" },
+  "{n} organizasyon": { one: "{n} organization", other: "{n} organizations" },
+  // Lio'ya sor düğmesindeki konu türleri (lib/askLio.ts KIND_LABEL). Küçük harfli
+  // tek kelime oldukları için denetim onları tanımlayıcı sanıp atlıyor — elle eklendi.
+  "proje": "project",
+  "rutin": "routine",
+  "departman": "department",
+  "organizasyon": "organization",
+  "grup": "group",
+  "ürün": "product",
+  "{sure} tamamlandı": "{sure} done",
 };

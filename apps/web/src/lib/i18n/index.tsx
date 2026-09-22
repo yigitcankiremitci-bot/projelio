@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { createTranslator, defaultLocale, isLocale, resolveLocale, setEtiketCevirmeni } from "@projelio/shared";
+import { createTranslator, defaultLocale, isLocale, resolveLocale, setBicimDiliSaglayici, setEtiketCevirmeni } from "@projelio/shared";
 import type { Locale, Translate } from "@projelio/shared";
 import { api } from "../../api/client";
 import { setCachedLocale, useCurrentUser } from "../useCurrentUser";
 import { en } from "./en/index";
-import { getLocale as readStored, setStoredLocale as writeStored } from "./depo";
+import { bicimDili, getLocale as readStored, setStoredLocale as writeStored } from "./depo";
 
 /**
  * Arayüz dili.
@@ -278,3 +278,4 @@ import { cevirmenSuAn } from "./anlik";
 // Ortak paketteki modül özetleri (labelOf) çevirmeni buradan alır; dil her
 // çağrıda depodan okunur, yani dil değişince yeni çizimde doğru dil gelir.
 setEtiketCevirmeni((metin, params) => cevirmenSuAn()(metin, params));
+setBicimDiliSaglayici(bicimDili);

@@ -182,7 +182,7 @@ export default function DepartmentCard({ department, onCoverUpdated }: Props) {
           }}
         >
           <IconUser size={13} color={c.textSecondary} />
-          <span>{department.memberCount ?? 0} kişi</span>
+          <span>{t("{n} kişi", { n: department.memberCount ?? 0 })}</span>
         </div>
       </div>
     </Link>

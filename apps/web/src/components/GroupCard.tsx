@@ -3,12 +3,14 @@ import type { Group } from "@projelio/shared";
 import { coverBackground } from "../lib/covers";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconFolder, IconBuilding } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   group: Group;
 }
 
 export default function GroupCard({ group }: Props) {
+  const t = useT();
   const c = useThemeColors();
   return (
     <Link
@@ -35,11 +37,11 @@ export default function GroupCard({ group }: Props) {
         <div style={{ display: "flex", gap: 14, fontSize: 15, paddingTop: 10, borderTop: `1px solid ${c.border}`, color: c.textSecondary }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <IconBuilding size={13} color={c.textSecondary} />
-            <span>{group.organizationCount ?? 0} organizasyon</span>
+            <span>{t("{n} organizasyon", { n: group.organizationCount ?? 0 })}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <IconFolder size={13} color={c.textSecondary} />
-            <span>{group.jobCount ?? 0} iş</span>
+            <span>{t("{n} iş", { n: group.jobCount ?? 0 })}</span>
           </div>
         </div>
       </div>

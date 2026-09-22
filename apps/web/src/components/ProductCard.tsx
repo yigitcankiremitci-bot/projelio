@@ -193,7 +193,7 @@ export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) 
               background: "rgba(26,31,41,0.62)",
             }}
           >
-            {imageCount} fotoğraf
+            {t("{n} fotoğraf", { n: imageCount })}
           </span>
         )}
 
@@ -298,7 +298,7 @@ export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) 
 
         <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 15, color: c.textSecondary, marginBottom: 10 }}>
           {product.sku && (
-            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Kod: {product.sku}</div>
+            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("Kod: {kod}", { kod: product.sku })}</div>
           )}
         </div>
 

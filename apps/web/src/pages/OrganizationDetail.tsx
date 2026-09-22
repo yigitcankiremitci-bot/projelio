@@ -199,7 +199,7 @@ export default function OrganizationDetail() {
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <IconCalendar size={12} color={cover.secondary} />
-                {new Date(organization.createdAt).toLocaleDateString(bicimDili())} kuruldu
+                {t("{tarih} kuruldu", { tarih: new Date(organization.createdAt).toLocaleDateString(bicimDili()) })}
               </span>
             </>
           )

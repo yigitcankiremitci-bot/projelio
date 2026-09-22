@@ -60,3 +60,11 @@ export function etkinDil(): Locale {
 export function bicimDili(): string {
   return etkinDil() === "en" ? "en-GB" : "tr-TR";
 }
+
+/**
+ * Yüzde yazımı: Türkçede işaret önde ("%40"), İngilizcede arkada ("40%").
+ * Şablonlarda `%${n}` sabit yazılıydı; İngilizce arayüzde "%40" görünüyordu.
+ */
+export function yuzde(n: number | string): string {
+  return etkinDil() === "en" ? `${n}%` : `%${n}`;
+}

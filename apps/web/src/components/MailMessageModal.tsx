@@ -153,7 +153,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
             )}
           </div>
           <span style={{ fontSize: 11, color: c.textSecondary }}>
-            Kime: {message.to.map((t) => t.address).join(", ") || "—"}
+            {t("Kime: {alicilar}", { alicilar: message.to.map((a) => a.address).join(", ") || "—" })}
             {message.cc.length > 0 && ` · CC: ${message.cc.map((t) => t.address).join(", ")}`}
           </span>
           {message.attachments.length > 0 && (

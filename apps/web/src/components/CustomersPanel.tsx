@@ -436,7 +436,7 @@ export default function CustomersPanel({
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {hasActiveFilter && (
             <span style={{ fontSize: 12, color: c.textSecondary }}>
-              {visible.length} / {parties.length} kayıt
+              {t("{n} / {toplam} kayıt", { n: visible.length, toplam: parties.length })}
             </span>
           )}
           {visible.map((p) => (

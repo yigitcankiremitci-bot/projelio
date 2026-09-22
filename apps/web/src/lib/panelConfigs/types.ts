@@ -1,5 +1,6 @@
 import type { ModuleRecord } from "@projelio/shared";
 import { MODULE_RECORD_CONFIGS, fmtMoney, sumByCurrency, todayISO } from "../moduleConfigs";
+import { yuzde } from "../i18n/depo";
 
 /**
  * A6 — Türev Panel arketipi.
@@ -200,5 +201,5 @@ export function groupBy(
 /** Yüzde; payda sıfırsa "—" (0 yazmak yanıltıcı olurdu). */
 export function percent(part: number, total: number): string {
   if (!total) return NA;
-  return `%${Math.round((part / total) * 100)}`;
+  return yuzde(Math.round((part / total) * 100));
 }

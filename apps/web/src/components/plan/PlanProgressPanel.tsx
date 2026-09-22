@@ -2,6 +2,7 @@ import type { PlanPeriodProgress } from "@projelio/shared";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { formatDuration } from "../../lib/planGrid";
 import { useT } from "../../lib/i18n";
+import { yuzde } from "../../lib/i18n/depo";
 
 interface Props {
   progress: PlanPeriodProgress;
@@ -54,8 +55,8 @@ export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount
       </div>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-        <Stat label={t("Doluluk")} value={`%${Math.round(progress.fillPct)}`} hint={`${formatDuration(progress.plannedMinutes)} / ${formatDuration(progress.capacityMinutes)}`} />
-        <Stat label={t("Plana sadakat")} value={`%${Math.round(progress.adherencePct)}`} hint={`${formatDuration(progress.doneMinutes)} tamamlandı`} />
+        <Stat label={t("Doluluk")} value={yuzde(Math.round(progress.fillPct))} hint={`${formatDuration(progress.plannedMinutes)} / ${formatDuration(progress.capacityMinutes)}`} />
+        <Stat label={t("Plana sadakat")} value={yuzde(Math.round(progress.adherencePct))} hint={t("{sure} tamamlandı", { sure: formatDuration(progress.doneMinutes) })} />
       </div>
 
       {progress.sharePctTotal > 100 && (

@@ -89,7 +89,7 @@ export default function GroupDetail() {
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <IconCalendar size={12} color={cover.secondary} />
-                {new Date(group.createdAt).toLocaleDateString(bicimDili())} kuruldu
+                {t("{tarih} kuruldu", { tarih: new Date(group.createdAt).toLocaleDateString(bicimDili()) })}
               </span>
             </>
           )

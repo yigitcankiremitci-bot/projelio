@@ -97,7 +97,7 @@ export default function WhatsappConnectionPanel({
           {status === "working" ? t("bağlı") : status === "scan_qr" ? t("QR bekliyor") : status === "starting" ? t("hazırlanıyor") : status === "failed" ? "koptu" : "durduruldu"}
         </div>
         {number.phoneMasked && <div style={{ fontSize: 14, color: c.textSecondary }}>{number.phoneMasked}</div>}
-        <div style={{ fontSize: 14, color: c.textSecondary, marginLeft: "auto" }}>{number.assignedUsers ?? 0} kullanıcı</div>
+        <div style={{ fontSize: 14, color: c.textSecondary, marginLeft: "auto" }}>{t("{n} kullanıcı", { n: number.assignedUsers ?? 0 })}</div>
       </div>
 
       {paused && (

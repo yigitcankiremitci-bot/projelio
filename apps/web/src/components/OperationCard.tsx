@@ -6,7 +6,7 @@ import CardDescription from "./CardDescription";
 import OperationHealthBadge from "./OperationHealthBadge";
 import AskLioButton from "./AskLioButton";
 import { useT } from "../lib/i18n";
-import { bicimDili } from "../lib/i18n/depo";
+import { bicimDili, yuzde } from "../lib/i18n/depo";
 
 interface Props {
   operation: Operation;
@@ -58,7 +58,7 @@ export default function OperationCard({ operation }: Props) {
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: c.textSecondary, marginBottom: 5 }}>
             <span>{t("Uyum")}</span>
-            <span>{adherence != null ? `%${adherence}` : t("henüz veri yok")}</span>
+            <span>{adherence != null ? yuzde(adherence) : t("henüz veri yok")}</span>
           </div>
           <div style={{ height: 5, borderRadius: 3, background: c.border, overflow: "hidden" }}>
             <div
@@ -72,10 +72,10 @@ export default function OperationCard({ operation }: Props) {
         </div>
 
         <div style={{ display: "flex", gap: 14, fontSize: 13, color: c.textSecondary, marginBottom: 12 }}>
-          <span>{operation.activeRoutineCount ?? 0} rutin</span>
-          {missed > 0 && <span style={{ color: c.danger }}>{missed} kaçırıldı</span>}
+          <span>{t("{n} rutin", { n: operation.activeRoutineCount ?? 0 })}</span>
+          {missed > 0 && <span style={{ color: c.danger }}>{t("{n} kaçırıldı", { n: missed })}</span>}
           {operation.nextDueOn && (
-            <span>Sıradaki: {new Date(operation.nextDueOn).toLocaleDateString(bicimDili())}</span>
+            <span>{t("Sıradaki: {tarih}", { tarih: new Date(operation.nextDueOn).toLocaleDateString(bicimDili()) })}</span>
           )}
         </div>
 
@@ -92,7 +92,7 @@ export default function OperationCard({ operation }: Props) {
             {operation.budgetPerPeriod.toLocaleString(bicimDili())} ₺/{t(periodLabel[operation.budgetPeriod] ?? "ay")}
           </span>
           <span style={{ color: c.textSecondary }}>
-            {new Date(operation.startedOn).toLocaleDateString(bicimDili())} başladı
+            {t("{tarih} başladı", { tarih: new Date(operation.startedOn).toLocaleDateString(bicimDili()) })}
           </span>
         </div>
       </div>

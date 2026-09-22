@@ -23,7 +23,7 @@ import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { isOperationInSidebar } from "../lib/useSidebarHierarchy";
 import { cevirmenSuAn, useT } from "../lib/i18n";
-import { bicimDili } from "../lib/i18n/depo";
+import { bicimDili, yuzde } from "../lib/i18n/depo";
 
 const periodLabel: Record<string, string> = { weekly: "hafta", monthly: "ay", yearly: "yıl" }; // dil:anahtar
 
@@ -192,7 +192,7 @@ export default function OperationDetail() {
   // Tek dizi, iki yerleşim: geniş ekranda kapağın içinde, dar ekranda akışta
   // (bkz. StatGrid).
   const stats: StatItem[] = [
-    { label: t("Uyum"), value: operation?.adherencePct != null ? `%${operation.adherencePct}` : "—" },
+    { label: t("Uyum"), value: operation?.adherencePct != null ? yuzde(operation.adherencePct) : "—" },
     { label: t("Rutin"), value: operation?.activeRoutineCount ?? 0 },
     { label: t("Kaçırılan"), value: overdue.length, tone: overdue.length > 0 ? c.danger : undefined },
     { label: t("Yaklaşan"), value: upcoming.length },

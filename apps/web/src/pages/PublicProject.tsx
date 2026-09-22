@@ -7,7 +7,7 @@ import { PROJECT_STATUS_LABELS, PROJECT_STATUS_STYLE } from "../lib/projectStatu
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useT } from "../lib/i18n";
-import { bicimDili } from "../lib/i18n/depo";
+import { bicimDili, yuzde } from "../lib/i18n/depo";
 
 /**
  * Paylaşım linkinin açtığı sayfa — ÜYELİK GEREKTİRMEZ.
@@ -644,7 +644,7 @@ function ProgressBar({ view }: { view: PublicProjectView }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <span style={{ fontSize: 24, fontWeight: 600, color: c.textPrimary }}>%{percent}</span>
+        <span style={{ fontSize: 24, fontWeight: 600, color: c.textPrimary }}>{yuzde(percent)}</span>
         <span style={{ fontSize: 13, color: c.textSecondary }}>
           {t("{done}/{total} görev tamamlandı", { done: counts.completed, total: counts.total })}
         </span>

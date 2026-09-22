@@ -4,12 +4,14 @@ import type { Organization } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import CardDescription from "./CardDescription";
 import { IconFolder, IconLayers } from "./icons";
+import { useT } from "../lib/i18n";
 
 interface Props {
   organization: Organization;
 }
 
 export default function OrganizationCard({ organization }: Props) {
+  const t = useT();
   const c = useThemeColors();
   return (
     <Link
@@ -50,7 +52,7 @@ export default function OrganizationCard({ organization }: Props) {
           }}
         >
           <IconFolder size={13} color={c.textSecondary} />
-          <span>{organization.jobCount ?? 0} iş</span>
+          <span>{t("{n} iş", { n: organization.jobCount ?? 0 })}</span>
         </div>
       </div>
     </Link>

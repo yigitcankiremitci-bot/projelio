@@ -679,7 +679,7 @@ export default function ModuleRecordsPanel({
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {hasActiveFilter && (
             <span style={{ fontSize: 12, color: c.textSecondary }}>
-              {visible.length} / {records.length} kayıt
+              {t("{n} / {toplam} kayıt", { n: visible.length, toplam: records.length })}
             </span>
           )}
 

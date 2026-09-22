@@ -30,6 +30,8 @@ export interface PartyProfile {
 
 // dil:anahtar-baslangic — hepsi sözlükte olmak zorunda: detail() bu etiketleri
 // birleşik metne gömüyor, eksik anahtar sessizce Türkçe kalır.
+// Rol etiketleri `{ ctx: "rol" }` ile çevrilir: düz "Müşteri" anahtarı yönetim
+// panelindeki SAYAÇ için "Customers" (çoğul); tek bir kaydın rolü "Customer".
 export const ROLE_LABELS: Record<PartyRole, string> = {
   lead: "Potansiyel",
   customer: "Müşteri",
@@ -70,7 +72,7 @@ const BASE_PROFILE: PartyProfile = {
   detail: (p) => {
     const t = cevirmenSuAn();
     return joinDetail(
-      p.roles.map((r) => t(ROLE_LABELS[r])).join(", "),
+      p.roles.map((r) => t(ROLE_LABELS[r], { ctx: "rol" })).join(", "),
       t(STATUS_LABELS[p.status]),
       p.phone ?? p.email
     );
@@ -86,7 +88,7 @@ const PROFILES: Record<string, PartyProfile> = {
     detail: (p) => {
       const t = cevirmenSuAn();
       return joinDetail(
-        p.roles.map((r) => t(ROLE_LABELS[r])).join(", "),
+        p.roles.map((r) => t(ROLE_LABELS[r], { ctx: "rol" })).join(", "),
         p.ownerName && t("Sorumlu: {ad}", { ad: p.ownerName }),
         p.source,
         p.phone ?? p.email

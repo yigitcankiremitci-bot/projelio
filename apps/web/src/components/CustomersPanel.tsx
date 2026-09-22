@@ -281,7 +281,7 @@ export default function CustomersPanel({
             <option value="">{t("Rol: tümü")}</option>
             {ALL_ROLES.map((r) => (
               <option key={r} value={r}>
-                {t(ROLE_LABELS[r])}
+                {t(ROLE_LABELS[r], { ctx: "rol" })}
               </option>
             ))}
           </select>
@@ -334,7 +334,7 @@ export default function CustomersPanel({
               >
                 {ALL_ROLES.map((r) => (
                   <option key={r} value={r}>
-                    {t(ROLE_LABELS[r])}
+                    {t(ROLE_LABELS[r], { ctx: "rol" })}
                   </option>
                 ))}
               </select>
@@ -477,7 +477,7 @@ export default function CustomersPanel({
                           border: `1px solid ${ROLE_COLORS[r]}40`,
                         }}
                       >
-                        {t(ROLE_LABELS[r])}
+                        {t(ROLE_LABELS[r], { ctx: "rol" })}
                       </span>
                     ))}
                   </div>

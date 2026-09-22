@@ -745,6 +745,10 @@ export const moduller: TranslationDict = {
   // party kayıt satırının birleşik özeti: "Müşteri · Aktif · e-posta"
   // (bkz. lib/partyProfiles.ts). Eksik anahtar burada sessizce Türkçe kalır.
   "Sorumlu: {ad}": "Owner: {ad}",
+  // Tek bir kaydın ROLÜ (tekil). Düz anahtarlar başka yerde çoğul/sayaç
+  // anlamında kullanılıyor; bağlamsız hâlleri yedek olarak kalıyor.
+  "Müşteri ##rol": "Customer",
+  "Potansiyel ##rol": "Lead",
   "Sağlayıcı": "Provider",
   "Talep edildi": "Requested",
   "Sipariş verildi": "Ordered",

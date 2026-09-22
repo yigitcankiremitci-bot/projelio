@@ -74,9 +74,13 @@ export interface WahaClient {
   sendSeen(name: string, chatId: string, messageIds?: string[]): Promise<void>;
   /** LID (@lid) adresini telefon JID'ine (@c.us) çevirir; bilinmiyorsa null. */
   resolveLid(name: string, lid: string): Promise<string | null>;
+  /** Gelen mesajın WAHA'nın indirdiği medya dosyası (payload.media.url). */
+  downloadMedia(url: string, maxBytes: number): Promise<Buffer>;
 }
 
 const REQUEST_TIMEOUT_MS = 15_000;
+/** Medya indirme: aynı makinedeki konteynerden, ama dosya 20 MB'a kadar çıkabiliyor. */
+const MEDIA_TIMEOUT_MS = 60_000;
 
 @Injectable()
 export class WahaHttpClient implements WahaClient {
@@ -189,6 +193,33 @@ export class WahaHttpClient implements WahaClient {
     } catch (e) {
       this.logger.warn(`LID çözülemedi (${lid}): ${e instanceof Error ? e.message : e}`);
       return null;
+    }
+  }
+
+  async downloadMedia(url: string, maxBytes: number): Promise<Buffer> {
+    // WAHA adresi kendi gözünden yazıyor (çoğu zaman http://localhost:3000/...);
+    // backend'den oraya ulaşılamaz. Yalnızca yol alınır, bizim WAHA_URL'imize
+    // eklenir — yolun dışına (başka bir sunucuya) istek atılmasın diye de.
+    const path = new URL(url, "http://waha").pathname;
+    if (!path.startsWith("/api/files/")) throw new WahaError(`Beklenmeyen medya yolu: ${path}`, 400, "");
+    if (!this.baseUrl || !this.apiKey) throw new WahaError("WAHA yapılandırılmamış", 503, "");
+    // Gövde de zaman aşımının içinde okunur: raw() zamanlayıcıyı başlıklar
+    // gelince kapatıyor, büyük dosyada gövde asılı kalabilirdi.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), MEDIA_TIMEOUT_MS);
+    try {
+      const res = await fetch(this.baseUrl + path, {
+        headers: { "X-Api-Key": this.apiKey, Accept: "*/*" },
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new WahaError(`WAHA medya ${res.status}`, res.status, await res.text());
+      const length = Number(res.headers.get("content-length") ?? 0);
+      if (length > maxBytes) throw new WahaError("Medya çok büyük", 413, "");
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length > maxBytes) throw new WahaError("Medya çok büyük", 413, "");
+      return buf;
+    } finally {
+      clearTimeout(timer);
     }
   }
 

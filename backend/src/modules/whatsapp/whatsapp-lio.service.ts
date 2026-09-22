@@ -5,6 +5,9 @@ import { getWebAppUrl } from "../../common/config/env";
 import { AccessService } from "../../common/access/access.service";
 import { SupabaseService } from "../../database/supabase.service";
 import type { AiAssistantService, ChatResult } from "../ai-assistant/ai-assistant.service";
+import type { AiAttachmentsService } from "../ai-assistant/ai-attachments.service";
+import { MAX_ATTACHMENT_UPLOAD_BYTES } from "../ai-assistant/ai-attachments.service";
+import type { WahaClient } from "./waha.client";
 import { decideLioKomut, lioKomutConfigFromEnv } from "./lio-komut-sinir";
 import { formatForWhatsapp } from "./whatsapp-lio-format";
 import { maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
@@ -55,6 +58,12 @@ export class WhatsappLioService {
    */
   private async ai(): Promise<AiAssistantService> {
     const { AiAssistantService: cls } = await import("../ai-assistant/ai-assistant.service");
+    return this.moduleRef.get(cls, { strict: false });
+  }
+
+  /** Aynı gerekçeyle (bkz. ai()) ek servisi de çağrı anında çözülür. */
+  private async attachments(): Promise<AiAttachmentsService> {
+    const { AiAttachmentsService: cls } = await import("../ai-assistant/ai-attachments.service");
     return this.moduleRef.get(cls, { strict: false });
   }
 
@@ -167,9 +176,15 @@ export class WhatsappLioService {
     contact: ContactRow,
     conn: ConnectionRow,
     userId: string,
-    text: string
+    text: string,
+    // WhatsApp'tan gelen dosya (Excel, PDF, görsel, sesli not). Eskiden hiç
+    // iletilmiyordu: açıklamasız dosya "boş mesaj" sayılıp atlanıyor,
+    // açıklamalısında Lio yalnızca metni görüyordu.
+    media?: { waha: WahaClient; url: string; mimetype?: string | null; filename?: string | null }
   ): Promise<void> {
     const config = lioKomutConfigFromEnv();
+    // Açıklamasız dosya: modele ne yapacağını söyleyen kısa bir istek.
+    if (media && !text.trim()) text = "Gönderdiğim dosyaya bak.";
     const karar = decideLioKomut(config, text, {
       sentLastHour: await this.komutSayisiSonSaat(thread.id),
     });
@@ -183,13 +198,42 @@ export class WhatsappLioService {
     const convId = await this.komutSohbeti(thread);
     const role = await this.kullaniciRolu(userId);
 
+    let attachmentIds: string[] | undefined;
+    if (media) {
+      try {
+        const buffer = await media.waha.downloadMedia(media.url, MAX_ATTACHMENT_UPLOAD_BYTES);
+        const ek = await (await this.attachments()).prepareFromBuffer(
+          userId,
+          buffer,
+          media.filename || dosyaAdi(media.url),
+          media.mimetype ?? "application/octet-stream",
+          convId
+        );
+        attachmentIds = [ek.id];
+      } catch (e) {
+        // Desteklenmeyen tür / çok büyük dosya: sebebi kullanıcıya söylenir,
+        // yoksa yine cevapsız kalırdı. Ek hazırlama hataları zaten Türkçe
+        // ve kullanıcıya yönelik (BadRequestException); diğerleri genel mesaj.
+        const status = (e as any)?.status ?? (e as any)?.getStatus?.();
+        this.logger.warn(`WhatsApp dosyası Lio'ya verilemedi (${thread.id}): ${e instanceof Error ? e.message : e}`);
+        const mesaj =
+          status === 400 && e instanceof Error
+            ? e.message
+            : status === 413
+              ? "Dosya çok büyük, Lio okuyamadı. Uygulamadaki Lio'ya yüklemeyi deneyin."
+              : "Dosyayı alamadım. Birazdan yeniden göndermeyi deneyin.";
+        await this.gonder(thread.id, userId, mesaj, false);
+        return;
+      }
+    }
+
     const result = await (await this.ai()).chat(
       userId,
       role,
       karar.text,
       convId,
       "fast",
-      undefined,
+      attachmentIds,
       { channel: "whatsapp", allowWrites: contact.lio_allow_writes !== false }
     );
 
@@ -353,3 +397,10 @@ Bakiye yüklemek için: ${url}`;
 }
 
 export { mapMessage };
+
+/** WAHA dosyayı "<mesaj-id>.<uzantı>" adıyla saklıyor; adı gelmemişse uzantı buradan. */
+function dosyaAdi(url: string): string {
+  const son = new URL(url, "http://waha").pathname.split("/").pop() ?? "";
+  const ext = son.includes(".") ? son.slice(son.lastIndexOf(".")) : "";
+  return `whatsapp-dosyasi${ext}`;
+}

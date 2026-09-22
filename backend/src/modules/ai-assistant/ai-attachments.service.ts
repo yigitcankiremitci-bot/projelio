@@ -254,6 +254,21 @@ export class AiAttachmentsService {
     return this.prepare(userId, file.buffer, file.originalname || "dosya", file.mimetype, conversationId);
   }
 
+  /**
+   * Başka bir kanaldan gelmiş, belleğe alınmış dosya (ör. WhatsApp'tan
+   * gönderilen Excel). Yükleme ile aynı yoldan geçer: tür, boyut ve ücret
+   * kuralları kanal fark etmeksizin tek yerde.
+   */
+  async prepareFromBuffer(
+    userId: string,
+    buffer: Buffer,
+    name: string,
+    mimeType: string,
+    conversationId?: string
+  ): Promise<AttachmentSummary> {
+    return this.prepare(userId, buffer, name || "dosya", mimeType, conversationId);
+  }
+
   /** Zaten Projelio'da kayıtlı bir dosya (yetki kontrolü FilesService'te yapılır). */
   async prepareFromProjelioFile(
     userId: string,

@@ -259,7 +259,13 @@ export class WhatsappWebhookService {
       // Aday (pending_user_id) yetmez: kimlik henüz EVET ile doğrulanmadı.
       if (!contact.user_id || contact.opt_in_state !== "opted_in") return;
       const body: string = typeof payload.body === "string" ? payload.body : "";
-      if (!body.trim()) return;
+      // Dosya: WAHA indirip payload.media.url'e koyuyor. İndirme başarısızsa
+      // media.error dolu gelir; o durumda da en azından metin işlenir.
+      const media =
+        payload.hasMedia && typeof payload.media?.url === "string" && !payload.media?.error
+          ? { waha: this.waha, url: payload.media.url, mimetype: payload.media.mimetype, filename: payload.media.filename }
+          : undefined;
+      if (!body.trim() && !media) return;
       await this.waha.sendSeen(conn.session_name, contact.wa_jid, payload.id ? [payload.id] : undefined).catch(() => {});
       // "Yazıyor…" göstergesi: araçlı tur 15 saniye sürebiliyor ve o süre
       // boyunca kullanıcı hiçbir şey görmüyordu — mesajı aldık mı belli
@@ -275,7 +281,7 @@ export class WhatsappWebhookService {
       // Beklenmeyen hata kuyruğu tıkamasın: olay işlenmiş sayılır, kullanıcı
       // cevapsız kalır ama sonraki mesajları çalışır.
       await this.lio
-        .handleUserCommand(thread, contact, conn, contact.user_id, body)
+        .handleUserCommand(thread, contact, conn, contact.user_id, body, media)
         .catch((e) => this.logger.warn(`Lio komutu başarısız (${thread.id}): ${e instanceof Error ? e.message : e}`))
         // Gösterge her hâlükârda kapanmalı: hata durumunda açık kalırsa
         // kullanıcı gelmeyecek bir cevabı bekler.

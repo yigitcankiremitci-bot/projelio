@@ -162,12 +162,23 @@ export class WhatsappWebhookService {
     if (!phone && isLidJid(from)) {
       // GOWS 2026.8+ gizli kimliğin (LID) telefon adresini yükün içinde de
       // veriyor; önce oraya bakılır, yoksa WAHA'ya sorulur.
-      const senderAlt: unknown = payload?._data?.Info?.SenderAlt;
-      phone = jidToE164(typeof senderAlt === "string" ? senderAlt : null);
+      // Birebir sohbette gönderen LID'le adreslenmişse telefon SenderAlt'ta,
+      // tersi durumda Sender/Chat'te durur; hangisi kişi JID'iyse o alınır.
+      const info = payload?._data?.Info ?? {};
+      for (const cand of [info.SenderAlt, info.Sender, info.Chat]) {
+        phone = jidToE164(typeof cand === "string" ? cand : null);
+        if (phone) break;
+      }
       if (!phone) phone = jidToE164(await this.waha.resolveLid(conn.session_name, from));
     }
     if (!phone) {
-      this.logger.warn(`Gönderen numarası çözülemedi: ${from}`);
+      // Hangi alanların geldiğini yaz: bir sonraki biçim değişikliğinde
+      // mesajın neden atıldığı log'dan anlaşılsın (numara yazılmaz, yalnız biçim).
+      const info = payload?._data?.Info ?? {};
+      const bicim = (v: unknown) => (typeof v === "string" ? v.replace(/\d/g, "9") : String(v));
+      this.logger.warn(
+        `Gönderen numarası çözülemedi: ${from} (SenderAlt=${bicim(info.SenderAlt)} Sender=${bicim(info.Sender)} Chat=${bicim(info.Chat)})`
+      );
       return;
     }
 

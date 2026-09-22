@@ -35,6 +35,10 @@ describe("JID dönüşümü", () => {
   test("JID → E.164 yalnızca kişi adresleri", () => {
     assert.equal(jidToE164("905321234567@c.us"), "+905321234567");
     assert.equal(jidToE164("905321234567@s.whatsapp.net"), "+905321234567");
+    // Cihaz/ajan ekli biçim (GOWS SenderAlt).
+    assert.equal(jidToE164("905321234567:12@s.whatsapp.net"), "+905321234567");
+    assert.equal(jidToE164("905321234567.0:3@s.whatsapp.net"), "+905321234567");
+    assert.equal(jidToE164("123456789012345:4@lid"), null);
     assert.equal(jidToE164("120363012345678901@g.us"), null);
     assert.equal(jidToE164("123456789012345@lid"), null);
     assert.equal(jidToE164(undefined), null);

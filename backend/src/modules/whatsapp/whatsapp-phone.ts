@@ -48,7 +48,11 @@ export function e164ToJid(phoneE164: string): string {
  */
 export function jidToE164(jid: string | null | undefined): string | null {
   if (!jid) return null;
-  const match = /^(\d{8,15})@(c\.us|s\.whatsapp\.net)$/.exec(jid);
+  // whatsmeow JID'i cihaz/ajan ekiyle yazabiliyor ("905321234567:12@s.whatsapp.net").
+  // GOWS'un SenderAlt'ı bu biçimde geliyor; ek yüzünden eşleşmeyince LID'li
+  // gönderenin numarası çözülemiyor, mesaj sessizce atılıyor ve Lio hiç
+  // cevap vermiyordu. Ek numaranın parçası değil, atılır.
+  const match = /^(\d{8,15})(?:\.\d+)?(?::\d+)?@(c\.us|s\.whatsapp\.net)$/.exec(jid);
   return match ? "+" + match[1] : null;
 }
 

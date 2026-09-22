@@ -1946,7 +1946,7 @@ function Bubble({
               }}
             >
               <IconSpeaker size={13} color={speaking ? c.accent : c.textSecondary} muted={false} />
-              {preparing ? t("hazırlanıyor…") : speaking ? "durdur" : "dinle"}
+              {preparing ? t("hazırlanıyor…") : speaking ? t("durdur") : t("dinle")}
             </button>
           )}
         </div>

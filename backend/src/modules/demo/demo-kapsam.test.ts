@@ -42,3 +42,19 @@ test("iki demo hesabı da demo sayılır, gerçek adresler sayılmaz", () => {
   // Serbest çalışan demosunun kimlikleri de `ce11` aralığında (migration 124).
   assert.ok(demoKullanicisiMi("ce11f000-0000-4000-8000-000000000001"));
 });
+
+// Lio sohbetleri anlık görüntüye GİRMİYOR ama siliniyor: her ziyaretçi Lio'yu
+// boş açsın diye. Kapsam "kullanicilar" olduğu için kural iki demo hesabını da
+// (şirket + serbest çalışan) kendiliğinden kapsıyor — `users` kuralı e-postayı
+// DEMO_EPOSTA_SONLARI listesinden topluyor.
+test("Lio sohbetleri her demo girişinde siliniyor ama geri yazılmıyor", () => {
+  const silinen = SILME_DALGALARI.flat().find((k) => k.tablo === "ai_conversations");
+  assert.ok(silinen, "ai_conversations silme kuralı yok");
+  assert.equal(silinen!.kapsam, "kullanicilar");
+  assert.ok(
+    !YAKALAMA_KURALLARI.some((k) => k.tablo === "ai_conversations"),
+    "ai_conversations yakalanıyor: sohbet geri yazılır ve ziyaretçiye eski sohbet görünür"
+  );
+  // ai_messages ayrı silinmiyor; conversation_id'den cascade ediyor (migration 019).
+  assert.ok(!SILME_DALGALARI.flat().some((k) => k.tablo === "ai_messages"));
+});

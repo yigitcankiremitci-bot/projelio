@@ -223,6 +223,11 @@ export const SILME_DALGALARI: SilmeKurali[][] = [
     { tablo: "post_comments", sutun: "user_id", kapsam: "kullanicilar" },
     { tablo: "module_record_versions", sutun: "approved_by", kapsam: "kullanicilar" },
     { tablo: "notifications", sutun: "user_id", kapsam: "kullanicilar" },
+    // Lio sohbetleri. Anlık görüntüde KARŞILIĞI YOK, yani silinip geri
+    // yazılmıyorlar: her ziyaretçi Lio'yu boş sohbetle açsın diye. Kapsam dışı
+    // kaldıkları sürece bir ziyaretçinin yazdıkları bir sonrakine görünüyordu.
+    // ai_messages ayrıca silinmiyor: conversation_id'den cascade ediyor (019).
+    { tablo: "ai_conversations", sutun: "user_id", kapsam: "kullanicilar" },
     { tablo: "personal_todos", sutun: "user_id", kapsam: "kullanicilar" },
     { tablo: "plan_periods", sutun: "user_id", kapsam: "kullanicilar" },
     { tablo: "plan_focus_areas", sutun: "user_id", kapsam: "kullanicilar" },

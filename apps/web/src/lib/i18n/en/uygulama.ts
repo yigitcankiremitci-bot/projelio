@@ -370,6 +370,8 @@ export const uygulama: TranslationDict = {
   "haftada bir": "once a week",
   "hazırlanıyor": "preparing",
   "hazırlanıyor…": "preparing…",
+  "dinle": "listen",
+  "durdur": "stop",
   "hedef %{p1} · ": "target {p1}% · ",
   "henüz veri yok": "no data yet",
   "henüz yazılmadı": "not written yet",

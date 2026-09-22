@@ -742,6 +742,9 @@ export const moduller: TranslationDict = {
   "Talep ekle": "Add request",
   "Henüz tedarik kaydı yok.": "No procurement records yet.",
   "Tedarikçi": "Supplier",
+  // party kayıt satırının birleşik özeti: "Müşteri · Aktif · e-posta"
+  // (bkz. lib/partyProfiles.ts). Eksik anahtar burada sessizce Türkçe kalır.
+  "Sorumlu: {ad}": "Owner: {ad}",
   "Sağlayıcı": "Provider",
   "Talep edildi": "Requested",
   "Sipariş verildi": "Ordered",

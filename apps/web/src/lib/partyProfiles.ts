@@ -1,5 +1,6 @@
 // dil:anahtar-dosya — etiketler; çeviri render anında (t(...)) yapılıyor.
 import type { Party, PartyRole } from "@projelio/shared";
+import { cevirmenSuAn } from "./i18n/anlik";
 
 /**
  * Departman profilleri: aynı veri, farklı bakış.
@@ -27,13 +28,15 @@ export interface PartyProfile {
   primaryActionLabel: string;
 }
 
+// dil:anahtar-baslangic — hepsi sözlükte olmak zorunda: detail() bu etiketleri
+// birleşik metne gömüyor, eksik anahtar sessizce Türkçe kalır.
 export const ROLE_LABELS: Record<PartyRole, string> = {
   lead: "Potansiyel",
-  customer: "Müşteri", // dil:anahtar
-  supplier: "Tedarikçi", // dil:anahtar
+  customer: "Müşteri",
+  supplier: "Tedarikçi",
   distributor: "Bayi",
   candidate: "Aday",
-  other: "Diğer", // dil:anahtar
+  other: "Diğer",
 };
 
 export const ROLE_COLORS: Record<PartyRole, string> = {
@@ -50,17 +53,28 @@ export const STATUS_LABELS: Record<Party["status"], string> = {
   passive: "Pasif",
   blocked: "Engelli",
 };
+// dil:anahtar-bitis
 
 function joinDetail(...parts: (string | undefined | false)[]): string | undefined {
   const s = parts.filter(Boolean).join(" · ");
   return s || undefined;
 }
 
+// NEDEN cevirmenSuAn: `detail` birleşik bir metin üretiyor ("Müşteri · Aktif ·
+// e-posta"), yani parçaları çağıran yerde t()'den geçirilemiyor. Burası da düz
+// bir modül, kanca çağıramaz. Çevirmen çizim anında alınıyor: panel dil
+// değişince yeniden çizildiği için metin de tazeleniyor.
 const BASE_PROFILE: PartyProfile = {
   key: "base",
   label: "Tümü", // dil:anahtar
-  detail: (p) =>
-    joinDetail(p.roles.map((r) => ROLE_LABELS[r]).join(", "), STATUS_LABELS[p.status], p.phone ?? p.email),
+  detail: (p) => {
+    const t = cevirmenSuAn();
+    return joinDetail(
+      p.roles.map((r) => t(ROLE_LABELS[r])).join(", "),
+      t(STATUS_LABELS[p.status]),
+      p.phone ?? p.email
+    );
+  },
   primaryActionLabel: "Aktivite ekle", // dil:anahtar
 };
 
@@ -69,21 +83,29 @@ const PROFILES: Record<string, PartyProfile> = {
     key: "satis_is_gelistirme",
     label: "Satış görünümü", // dil:anahtar
     defaultRole: "lead",
-    detail: (p) =>
-      joinDetail(
-        p.roles.map((r) => ROLE_LABELS[r]).join(", "),
-        p.ownerName && `Sorumlu: ${p.ownerName}`,
+    detail: (p) => {
+      const t = cevirmenSuAn();
+      return joinDetail(
+        p.roles.map((r) => t(ROLE_LABELS[r])).join(", "),
+        p.ownerName && t("Sorumlu: {ad}", { ad: p.ownerName }),
         p.source,
         p.phone ?? p.email
-      ),
+      );
+    },
     primaryActionLabel: "Görüşme ekle", // dil:anahtar
   },
   musteri_iliskileri: {
     key: "musteri_iliskileri",
     label: "Müşteri ilişkileri görünümü", // dil:anahtar
     defaultRole: "customer",
-    detail: (p) =>
-      joinDetail(STATUS_LABELS[p.status], p.email ?? p.phone, p.ownerName && `Sorumlu: ${p.ownerName}`),
+    detail: (p) => {
+      const t = cevirmenSuAn();
+      return joinDetail(
+        t(STATUS_LABELS[p.status]),
+        p.email ?? p.phone,
+        p.ownerName && t("Sorumlu: {ad}", { ad: p.ownerName })
+      );
+    },
     primaryActionLabel: "Temas ekle", // dil:anahtar
   },
 };

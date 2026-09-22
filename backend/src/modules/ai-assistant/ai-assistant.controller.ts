@@ -20,6 +20,7 @@ import type { Response } from "express";
 import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guard";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
+import { istemciDili } from "../../common/i18n";
 import { AiAssistantService } from "./ai-assistant.service";
 import { AiCreditsService } from "./ai-credits.service";
 import { AiCreditOrdersService } from "./ai-credit-orders.service";
@@ -86,7 +87,10 @@ export class AiAssistantController {
       body.message,
       body.conversationId,
       undefined,
-      body.attachmentIds
+      body.attachmentIds,
+      // Cevabın dili arayüzün dilidir. Hesaptan okumak demo hesaplarında
+      // çalışmıyor: paylaşıldıkları için `users.locale` bilerek boş bırakılır.
+      { locale: istemciDili(req) }
     );
   }
 

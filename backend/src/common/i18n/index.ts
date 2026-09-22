@@ -73,6 +73,26 @@ export function tarayiciDili(req: { headers: Record<string, string | string[] | 
 }
 
 /**
+ * İstemcinin O AN gösterdiği arayüz dili (`X-Projelio-Locale` başlığı).
+ *
+ * Accept-Language'den farkı: bu bir tarayıcı İPUCU değil, arayüzün hangi dilde
+ * çizildiğinin kesin bilgisi — istemci hesap tercihini de hesaba katarak zaten
+ * hesaplamış durumda (bkz. apps/web lib/i18n/depo.ts `etkinDil`).
+ *
+ * Başlık yoksa `undefined`: istek tarayıcıdan gelmiyor (WhatsApp köprüsü,
+ * zamanlanmış işler). Çağıran o zaman hesabın diline düşmeli.
+ *
+ * NEDEN GEREKLİ: Lio dili yalnızca `users.locale`'dan okuyordu. Demo hesapları
+ * PAYLAŞILDIĞI için oraya dil YAZILMIYOR (bir ziyaretçinin seçimi diğerinin
+ * arayüzünü değiştirirdi), dolayısıyla kolon hep boş kalıyor ve Türkçeye
+ * düşülüyordu: arayüzü İngilizce gezen ziyaretçiye Lio Türkçe cevap veriyordu.
+ */
+export function istemciDili(req: { headers: Record<string, string | string[] | undefined> }): Locale | undefined {
+  const baslik = req.headers["x-projelio-locale"];
+  return isLocale(baslik) ? baslik : undefined;
+}
+
+/**
  * Değişken içeren bir istisna mesajını çevrilebilir hâle getirir.
  *
  * ## Sorun

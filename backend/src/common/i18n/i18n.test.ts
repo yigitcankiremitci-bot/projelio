@@ -2,7 +2,7 @@ import { test } from "node:test";
 // Backend tsconfig'inde esModuleInterop kapalı (NestJS CommonJS derlemesi
 // gereği), bu yüzden namespace import kullanılıyor.
 import * as assert from "node:assert/strict";
-import { cevir, cevirmen, hataMetni, istekDili } from "./index";
+import { cevir, cevirmen, hataMetni, istekDili, istemciDili } from "./index";
 
 test("istekDili hesap tercihini Accept-Language'e tercih eder", () => {
   assert.equal(istekDili("en", "tr-TR,tr;q=0.9"), "en");
@@ -53,4 +53,19 @@ test("hataMetni anahtarı ve parametreleri ayrı tutar", () => {
     t(ANAHTAR, { bayt: 80, sinir: 72 }),
     "That password is too long (80 bytes). The limit is 72 bytes; Turkish characters take 2 bytes each."
   );
+});
+
+// Lio dili hesaptan okuyordu; demo hesaplarında `users.locale` PAYLAŞIM
+// yüzünden bilerek boş olduğu için arayüzü İngilizce gezen ziyaretçiye
+// Türkçe cevap veriyordu. Artık isteğin başlığı belirliyor.
+test("istemciDili yalnızca geçerli X-Projelio-Locale başlığını kabul eder", () => {
+  assert.equal(istemciDili({ headers: { "x-projelio-locale": "en" } }), "en");
+  assert.equal(istemciDili({ headers: { "x-projelio-locale": "tr" } }), "tr");
+  // Başlık yoksa undefined: istek tarayıcıdan gelmiyor olabilir (WhatsApp
+  // köprüsü, zamanlanmış işler). Çağıran hesabın diline düşer.
+  assert.equal(istemciDili({ headers: {} }), undefined);
+  assert.equal(istemciDili({ headers: { "x-projelio-locale": "de" } }), undefined);
+  assert.equal(istemciDili({ headers: { "x-projelio-locale": ["en"] } }), undefined);
+  // Accept-Language BURAYA karışmaz: o bir ipucu, bu arayüzün kesin dili.
+  assert.equal(istemciDili({ headers: { "accept-language": "en-US" } }), undefined);
 });

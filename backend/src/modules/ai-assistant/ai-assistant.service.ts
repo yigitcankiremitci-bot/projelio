@@ -1486,7 +1486,17 @@ export class AiAssistantService {
      * Kanal seçenekleri. Verilmezse web: mevcut çağıranların davranışı aynen
      * korunur. WhatsApp köprüsü için bkz. whatsapp-lio.service.ts.
      */
-    options?: { channel?: "web" | "whatsapp"; allowWrites?: boolean; model?: string | null }
+    options?: {
+      channel?: "web" | "whatsapp";
+      allowWrites?: boolean;
+      model?: string | null;
+      /**
+       * İstemcinin gösterdiği arayüz dili. Verilmezse hesabın diline düşülür —
+       * demo hesaplarında o kolon bilerek boş olduğu için Lio herkese Türkçe
+       * cevap veriyordu (bkz. common/i18n `istemciDili`).
+       */
+      locale?: Locale;
+    }
   ): Promise<ChatResult> {
     // Ekler mesajdan önce çözülür: süresi dolmuş bir ek varsa hiç API çağrısı yapmadan hata verilir.
     const attachments = this.attachmentsService.take(userId, attachmentIds ?? []);
@@ -1584,7 +1594,7 @@ export class AiAssistantService {
       id: randomUUID(),
       userId,
       userRole,
-      locale: await this.diller.diliniBul(userId),
+      locale: options?.locale ?? (await this.diller.diliniBul(userId)),
       conversationId: convId,
       tier,
       preferredModel,

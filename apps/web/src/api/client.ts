@@ -1,6 +1,7 @@
 import { getSocketId } from "../lib/socketId";
 import { etkinDil } from "../lib/i18n/depo";
 import { sendWithProgress } from "../lib/xhrUpload";
+import { sunucuZamanlariniIsaretle } from "../lib/sunucuZamani";
 
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -59,7 +60,9 @@ async function parseResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   if (!text) return undefined as T;
   try {
-    return JSON.parse(text) as T;
+    // Eksiz zaman damgaları burada bir kez UTC diye işaretleniyor; yoksa her
+    // ekran onları yerel saat sanıyordu (bkz. lib/sunucuZamani.ts).
+    return sunucuZamanlariniIsaretle(JSON.parse(text)) as T;
   } catch {
     return undefined as T;
   }

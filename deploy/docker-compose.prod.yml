@@ -119,8 +119,14 @@ services:
       - -c
       - cron.database_name=postgres
       - -c
-      - timezone=Europe/Istanbul
+      # UTC ZORUNLU: kodun tamamı "timestamp without time zone sütunlarında UTC
+      # durur" varsayıyor (Supabase da UTC'ydi, backend konteyneri de UTC).
+      # Burada Europe/Istanbul durduğu 3 hafta boyunca `default now()` İstanbul
+      # saati yazdı ve her şey 3 saat kaymış göründü (bkz. migration 127).
+      # Kullanıcıya gösterilecek saat dilimini tarayıcı seçer, veritabanı değil.
+      - timezone=UTC
       - -c
+      # Yalnızca günlük satırları; okuyan biz olduğumuz için yerel saat kalabilir.
       - log_timezone=Europe/Istanbul
     volumes:
       - /srv/projelio/data/postgres:/var/lib/postgresql/data

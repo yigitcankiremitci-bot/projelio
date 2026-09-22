@@ -36,9 +36,10 @@ export function formatTaskDuration(
   if (value == null || !unit) return undefined;
   const n = Number(value);
   if (!Number.isFinite(n)) return undefined;
-  const trimmed = n % 1 === 0 ? n.toString() : n.toString().replace(".", ",");
+  const trimmed = n.toLocaleString(bicimDili(), { maximumFractionDigits: 2 });
+  const t = cevirmenSuAn();
   // "dakika" birimi 15 dakikalık işler için eklendi (bkz. migration 099);
   // öncesinde en küçük ifade edilebilir süre yarım saatti.
-  if (unit === "minutes") return `${trimmed} dk`;
-  return unit === "hours" ? `${trimmed} sa` : `${trimmed} gün`;
+  if (unit === "minutes") return t("{n} dk", { n: trimmed });
+  return unit === "hours" ? t("{n} sa", { n: trimmed }) : t("{n} gün", { n: trimmed });
 }

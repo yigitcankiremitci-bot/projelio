@@ -8,6 +8,12 @@ import { useT } from "../lib/i18n";
 export interface TabBarItem {
   key: string;
   label: string;
+  /**
+   * Çeviri bağlamı: aynı Türkçe etiket farklı sayfalarda farklı anlama
+   * geliyorsa (iş sayfasındaki "İşler" sekmesi GÖREVLERİ açar, ana sayfadaki
+   * "İşler" işleri). Sözlükte "İşler ##gorevSekmesi" gibi ayrı anahtar.
+   */
+  ctx?: string;
   /** Yeni gelen sekmenin tek seferlik işareti (bkz. moduleLayout.ts). */
   isNew?: boolean;
 }
@@ -107,7 +113,7 @@ export default function TabBar({ tabs, active, onChange, style, scrollable }: Pr
             transition: "background 0.12s ease, color 0.12s ease",
           }}
         >
-          {t(sekme.label)}
+          {t(sekme.label, sekme.ctx ? { ctx: sekme.ctx } : undefined)}
           {sekme.isNew && (
             <span
               title={t("Sık kullandığın için üste alındı")}
@@ -154,7 +160,7 @@ function FittedTabBar({ tabs, active, onChange, style }: Props) {
         <button
           key={sekme.key}
           onClick={() => onChange(sekme.key)}
-          title={t(sekme.label)}
+          title={t(sekme.label, sekme.ctx ? { ctx: sekme.ctx } : undefined)}
           style={{
             flex: "1 1 0",
             // Varsayılan `min-width: auto` uzun etiketin düğmeyi germesine izin
@@ -176,7 +182,7 @@ function FittedTabBar({ tabs, active, onChange, style }: Props) {
           }}
         >
           <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {t(sekme.label)}
+            {t(sekme.label, sekme.ctx ? { ctx: sekme.ctx } : undefined)}
           </span>
           {sekme.isNew && (
             <span
@@ -297,7 +303,7 @@ function ScrollableTabBar({ tabs, active, onChange, style }: Props) {
               transition: "background 0.12s ease, color 0.12s ease",
             }}
           >
-            {t(sekme.label)}
+            {t(sekme.label, sekme.ctx ? { ctx: sekme.ctx } : undefined)}
             {sekme.isNew && (
               <span
                 title={t("Sık kullandığın için üste alındı")}

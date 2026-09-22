@@ -539,4 +539,16 @@ export const uygulama: TranslationDict = {
   "Serbest çalışan": "Freelancer",
   "Serbest çalışan demosuyla gir": "Sign in with the freelancer demo",
   "Şirket demosuyla gir": "Sign in with the company demo",
+  // İş sayfasındaki görev panosu sekmesi (JobTabs): Türkçede "İşler", anlamı görevler.
+  "İşler ##gorevSekmesi": "Tasks",
+  // Görev kartındaki tahmini süre (lib/dates formatTaskDuration)
+  "{n} dk": "{n} min",
+  "{n} sa": "{n} h",
+  "{n} gün": { one: "{n} day", other: "{n} days" },
+  adet: "items",
+  // Yaptım süre kısaltmaları (shared workLogDuration dakikayiMetneCevir)
+  "{dk}dk": "{dk}m",
+  "{sa}s": "{sa}h",
+  "{sa}s {dk}dk": "{sa}h {dk}m",
+  "{n} kayıt": { one: "{n} entry", other: "{n} entries" },
 };

@@ -443,7 +443,9 @@ export default function BudgetPanel() {
 
                 <span style={{ fontSize: 14, fontWeight: 500, color: r.type === "income" ? c.success : c.danger }}>
                   {r.type === "income" ? "+" : "−"}
-                  {formatMoney(r.amount)}
+                  {/* Düzenli ödeme kendi para biriminde: formatMoney her zaman ₺
+                      yazıyordu ve €59,99'luk bir abonelik "59,99 ₺" görünüyordu. */}
+                  {formatCurrency(r.amount, r.currency || "TRY")}
                 </span>
 
                 {/* Ödemeyi deftere işleyen tek düğme. Vadesi gelmemişse de
@@ -776,7 +778,9 @@ function HareketSutunu({
                     ? ` · ${hareket.departmentName}`
                     : hareket.organizationName
                       ? ` · ${hareket.organizationName}`
-                      : t(" · genel")}
+                      : hareket.jobTitle
+                        ? ` · ${hareket.jobTitle}`
+                        : t(" · genel")}
                 {/* Hizmet verilen projeden yansıyan ödeme: kimden geldiği. */}
                 {hareket.mirror && hareket.counterpartyName && ` · ${hareket.counterpartyName}`}
               </div>

@@ -5,11 +5,13 @@ export type JobTab = "projects" | "programs" | "team" | "tasks" | "budget" | "fi
 // Projeler süreli ve biten işleri, Rutinler (kodda "program"/"operation") süresiz
 // ve tekrarlayan işleri tutar. İkisi de bu işin altında yaşadığı için sekmeler
 // yan yana durur.
-export const JOB_TABS: { key: JobTab; label: string }[] = [
+export const JOB_TABS: { key: JobTab; label: string; ctx?: string }[] = [
   { key: "projects", label: "Projeler" }, // dil:anahtar
   { key: "programs", label: "Rutinler" }, // dil:anahtar
   { key: "team", label: "Ekip" }, // dil:anahtar
-  { key: "tasks", label: "İşler" }, // dil:anahtar
+  // Türkçede "İşler" ama bu sekme işin GÖREV panosunu açıyor; İngilizcede
+  // "Jobs" yanlış olurdu. Bağlamlı ayrı çeviri: "İşler ##gorevSekmesi".
+  { key: "tasks", label: "İşler", ctx: "gorevSekmesi" }, // dil:anahtar
   // Bütçe de işe aittir: altındaki projelerin bütçeleri burada TOPLANIR ve
   // projeye dağıtılmayan (işin kendisine ait) gelir/giderler burada tutulur.
   { key: "budget", label: "Bütçe" }, // dil:anahtar
@@ -35,7 +37,7 @@ const SUBCONTRACTOR_HIDDEN: JobTab[] = ["team", "budget"];
  * kapattığı sekmeler, bkz. Job.hiddenTabs). Kapatma tercihi yetki değildir:
  * taşerona kapalı bir sekmeyi açamaz.
  */
-export function visibleJobTabs(isSubcontractor: boolean, hiddenTabs?: string[]): { key: JobTab; label: string }[] {
+export function visibleJobTabs(isSubcontractor: boolean, hiddenTabs?: string[]): { key: JobTab; label: string; ctx?: string }[] {
   const hidden = new Set(hiddenTabs ?? []);
   return JOB_TABS.filter((t) => {
     if (hidden.has(t.key)) return false;

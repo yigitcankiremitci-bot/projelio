@@ -71,7 +71,7 @@ export const gorevler: TranslationDict = {
   "Üzerinde çalışmayı bırak": "Stop working on this",
   'görevini tamamlandı olarak işaretleyip "{sutun}" bölümüne taşımak istiyor musun?':
     'do you want to mark it done and move it to "{sutun}"?',
-  "{sutun}'de": "in {sutun}",
+  "{sutun}'de": "in the {sutun} column",
 
   // ─────────────────────────────────────────────── Silme / arşivleme
   Sil: "Delete",

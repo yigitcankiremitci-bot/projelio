@@ -349,7 +349,7 @@ export default function WorkLog() {
         ))}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 13.5, color: c.textSecondary }}>
-          {entries.length} {t("kayıt")}
+          {t("{n} kayıt", { n: entries.length })}
           {toplamDakika > 0 && ` · ${dakikayiMetneCevir(toplamDakika)}`}
           {bagsizSayisi > 0 && ` · ${bagsizSayisi} ${t("bağlanmamış")}`}
           {calisanSayisi > 0 && ` · ${t("{n} kronometre çalışıyor", { n: calisanSayisi })}`}

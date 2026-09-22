@@ -1,3 +1,4 @@
+import { etiketCevir } from "./moduleConfigs/shared";
 /**
  * Yaptım kayıtlarındaki sürenin tek yorumcusu.
  *
@@ -91,9 +92,12 @@ export function dakikayiMetneCevir(minutes: number | null | undefined): string {
   const toplam = Math.round(minutes);
   const saat = Math.floor(toplam / 60);
   const dakika = toplam % 60;
-  if (!saat) return `${dakika}dk`;
-  if (!dakika) return `${saat}s`;
-  return `${saat}s ${dakika}dk`;
+  // Arayüz dilinde ("1s 30dk" / "1h 30m"). Ayrıştırıcı iki biçimi de
+  // okuyor (SAAT_BIRIMLERI / DAKIKA_BIRIMLERI), düzenleme alanına geri
+  // yazılan metin yine anlaşılır.
+  if (!saat) return etiketCevir("{dk}dk", { dk: dakika });
+  if (!dakika) return etiketCevir("{sa}s", { sa: saat });
+  return etiketCevir("{sa}s {dk}dk", { sa: saat, dk: dakika });
 }
 
 /**

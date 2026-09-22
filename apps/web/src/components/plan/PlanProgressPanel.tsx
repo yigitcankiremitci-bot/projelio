@@ -107,7 +107,7 @@ export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount
                   üst üste bindirilince "hangisi hangisi" sorusu her seferinde
                   yeniden soruluyordu. */}
               <Bar
-                label="takvimde"
+                label={t("takvimde")}
                 pct={row.plannedSharePct ?? 0}
                 targetPct={row.sharePct}
                 color={color}
@@ -118,7 +118,7 @@ export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount
               {row.targetCount != null && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7 }}>
                   <span style={{ fontSize: 12, color: c.textSecondary }}>
-                    {row.doneCount} / {row.targetCount} {row.unit ?? "adet"}
+                    {row.doneCount} / {row.targetCount} {row.unit ?? t("adet")}
                   </span>
                   {row.targetId && (
                     <>
@@ -204,7 +204,7 @@ function Bar({
         )}
       </div>
       <span style={{ fontSize: 10, color: c.textSecondary, width: 32, textAlign: "right", flexShrink: 0 }}>
-        %{Math.round(pct)}
+        {yuzde(Math.round(pct))}
       </span>
     </div>
   );

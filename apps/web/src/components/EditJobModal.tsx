@@ -143,7 +143,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
           <select value={gecerliAcilis} onChange={(e) => setDefaultTab(e.target.value as JobTab)} style={{ width: "100%" }}>
             {acikSekmeler.map((sekme) => (
               <option key={sekme.key} value={sekme.key}>
-                {t(sekme.label)}
+                {t(sekme.label, sekme.ctx ? { ctx: sekme.ctx } : undefined)}
               </option>
             ))}
           </select>

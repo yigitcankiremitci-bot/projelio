@@ -16,7 +16,7 @@ import { useT } from "../lib/i18n";
  * Sıra ENTITY_TAB_KEYS'ten değil bu dizilerden geliyor: kullanıcı ayarlardaki
  * satırları çubuktaki sırayla görsün.
  */
-const TABS_BY_SCOPE: Record<TabScope, { key: string; label: string }[]> = {
+const TABS_BY_SCOPE: Record<TabScope, { key: string; label: string; ctx?: string }[]> = {
   organization: ORG_TABS,
   job: JOB_TABS,
   department: DEPARTMENT_TABS,
@@ -98,7 +98,7 @@ export default function TabVisibilitySection({ scope, value, onChange, unavailab
             >
               <input type="checkbox" checked={acik} disabled={kilitli} onChange={() => toggle(tab.key)} />
               <span style={{ fontSize: 15, color: c.textPrimary, minWidth: 0, overflowWrap: "anywhere" }}>
-                {t(tab.label)}
+                {t(tab.label, tab.ctx ? { ctx: tab.ctx } : undefined)}
               </span>
             </label>
           );

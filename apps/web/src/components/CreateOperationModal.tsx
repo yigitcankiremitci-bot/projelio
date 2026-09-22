@@ -13,9 +13,9 @@ interface Props {
 }
 
 const periods: { value: OperationBudgetPeriod; label: string }[] = [
-  { value: "weekly", label: "Haftalık" },
-  { value: "monthly", label: "Aylık" },
-  { value: "yearly", label: "Yıllık" },
+  { value: "weekly", label: "Haftalık" }, // dil:anahtar
+  { value: "monthly", label: "Aylık" }, // dil:anahtar
+  { value: "yearly", label: "Yıllık" }, // dil:anahtar
 ];
 
 export default function CreateOperationModal({ jobId, onClose, onCreated }: Props) {
@@ -53,10 +53,9 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
   };
 
   return (
-    <Modal title="Yeni rutin" onClose={onClose}>
+    <Modal title={t("Yeni rutin")} onClose={onClose}>
       <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 14px", lineHeight: 1.5 }}>
-        Rutin, bitiş tarihi olmayan ve tekrarlayan işlerden oluşan bir çalışmadır — sosyal medya
-        yönetimi, aylık bakım, haftalık raporlama gibi. Bitişi olan işler için proje aç.
+        {t("Rutin, bitiş tarihi olmayan ve tekrarlayan işlerden oluşan bir çalışmadır — sosyal medya yönetimi, aylık bakım, haftalık raporlama gibi. Bitişi olan işler için proje aç.")}
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -83,7 +82,7 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
 
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 2 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Dönemsel ücret (₺)</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Dönemsel ücret (₺)")}</label>
             <input
               type="number"
               min={0}
@@ -102,7 +101,7 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
             >
               {periods.map((p) => (
                 <option key={p.value} value={p.value}>
-                  {p.label}
+                  {t(p.label)}
                 </option>
               ))}
             </select>
@@ -139,10 +138,10 @@ export default function CreateOperationModal({ jobId, onClose, onCreated }: Prop
             fontWeight: 500,
           }}
         >
-          {loading ? "Oluşturuluyor…" : "Rutin oluştur"}
+          {loading ? t("Oluşturuluyor…") : t("Rutin oluştur")}
         </button>
         <span style={{ fontSize: 13, color: c.textSecondary, textAlign: "center" }}>
-          Sonraki adımda tekrar eden işleri (rutinleri) tanımlayacaksın.
+          {t("Sonraki adımda tekrar eden işleri (rutinleri) tanımlayacaksın.")}
         </span>
       </form>
     </Modal>

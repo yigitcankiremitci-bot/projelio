@@ -292,8 +292,9 @@ export default function OrgTasksPanel({ organizationId, organizationName }: Prop
       {parentCompletePrompt && (
         <Modal title={t("Görevi tamamla")} onClose={() => setParentCompletePrompt(null)}>
           <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
-            <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{parentCompletePrompt.title}</strong> görevinin tüm alt
-            görevleri tamamlandı. Bu görevi de tamamlandı olarak işaretlemek ister misin?
+            {t("{gorev} görevinin tüm alt görevleri tamamlandı. Bu görevi de tamamlandı olarak işaretlemek ister misin?", {
+              gorev: parentCompletePrompt.title,
+            })}
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button

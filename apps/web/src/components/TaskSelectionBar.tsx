@@ -270,7 +270,7 @@ export default function TaskSelectionBar({
           Seç'e bastığı için hiçbir bilgi taşımıyor ve dar ekranda eylemleri bir alt
           satıra itiyordu. Sayaç yalnızca gerçekten bir sayı olduğunda görünür. */}
       {selectedCount > 0 && (
-        <span style={{ fontSize: 15, color: c.textPrimary, fontWeight: 500 }}>{selectedCount} görev seçili</span>
+        <span style={{ fontSize: 15, color: c.textPrimary, fontWeight: 500 }}>{t("{n} görev seçili", { n: selectedCount })}</span>
       )}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div>
     </div>

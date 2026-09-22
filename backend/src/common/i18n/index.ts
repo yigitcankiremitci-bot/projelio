@@ -58,6 +58,21 @@ export function istekDili(hesapDili: unknown, acceptLanguage?: string | null): L
 }
 
 /**
+ * Yeni açılan hesaba yazılacak dil: tarayıcının Accept-Language başlığı.
+ *
+ * Başlık yoksa `undefined` — hesabın dili boş kalır ("seçim yapılmadı").
+ * Kayıt anında dili yazmamak şu hataya yol açıyordu: sunucu, tarayıcı
+ * kapalıyken ürettiği her şeyde (doğrulama e-postası, örnek iş, ipuçları,
+ * bildirimler) dili YALNIZCA hesaptan öğrenebiliyor ve boşsa Türkçeye
+ * düşüyor. Arayüzü İngilizce gören yabancı kullanıcı, kendisine ilk giden
+ * her şeyi Türkçe alıyordu.
+ */
+export function tarayiciDili(req: { headers: Record<string, string | string[] | undefined> }): Locale | undefined {
+  const baslik = req.headers["accept-language"];
+  return typeof baslik === "string" && baslik.trim() ? istekDili(null, baslik) : undefined;
+}
+
+/**
  * Değişken içeren bir istisna mesajını çevrilebilir hâle getirir.
  *
  * ## Sorun

@@ -1,3 +1,5 @@
+import { defaultLocale } from "@projelio/shared";
+import { cevir, type Metin } from "../../common/i18n";
 /**
  * İşe davet kurallarının saf (yan etkisiz) hali.
  *
@@ -45,18 +47,44 @@ export function reinviteDecision(existing: { status?: string | null } | null | u
   return countsAsTeamMember(existing.status) ? "already-member" : "revive";
 }
 
-/** Davet bildirimi: kimin hangi işe eklediği metinde geçmeli. */
-export function inviteNotificationBody(inviterName: string | null | undefined, jobTitle: string | null | undefined): string {
-  return `${inviterName || "Bir kullanıcı"} seni "${jobTitle || "bir iş"}" işine ekledi. Kabul ediyor musun?`;
+/**
+ * Davet bildirimi: kimin hangi işe eklediği metinde geçmeli.
+ *
+ * Bildirim alıcının dilinde yazılıyor (bkz. notifications.service.ts), bu yüzden
+ * gövde hazır bir cümle değil, parametreli bir Metin. Hazır cümle sözlükte
+ * hiçbir zaman bulunamıyor ve İngilizce kullanıcıya Türkçe gidiyordu.
+ * Yedek adlar ("Bir kullanıcı") da ayrıca çevrilsin diye parametre değil,
+ * ayrı anahtarlı cümle.
+ */
+export function inviteNotificationMetin(inviterName: string | null | undefined, jobTitle: string | null | undefined): Metin {
+  return {
+    metin: inviterName ? '{kisi} seni "{is}" işine ekledi. Kabul ediyor musun?' : 'Bir kullanıcı seni "{is}" işine ekledi. Kabul ediyor musun?',
+    params: { kisi: inviterName ?? undefined, is: jobTitle || cevir(defaultLocale, "bir iş") },
+  };
 }
 
-/** İş sahibine giden yanıt bildirimi. */
+/** İş sahibine giden yanıt bildirimi (Metin; bkz. inviteNotificationMetin). */
+export function inviteAnswerNotificationMetin(
+  responderName: string | null | undefined,
+  jobTitle: string | null | undefined,
+  approve: boolean
+): Metin {
+  const kim = responderName ? "{kisi}" : "Davet ettiğin kişi";
+  return {
+    metin: approve ? `${kim}, "{is}" işine katılma davetini kabul etti.` : `${kim}, "{is}" işine katılma davetini reddetti.`,
+    params: { kisi: responderName ?? undefined, is: jobTitle || "bir iş" },
+  };
+}
+
+/** Türkçe hâli — testler ve log için. */
+export function inviteNotificationBody(inviterName: string | null | undefined, jobTitle: string | null | undefined): string {
+  return cevir(defaultLocale, inviteNotificationMetin(inviterName, jobTitle));
+}
+
 export function inviteAnswerNotificationBody(
   responderName: string | null | undefined,
   jobTitle: string | null | undefined,
   approve: boolean
 ): string {
-  return `${responderName || "Davet ettiğin kişi"}, "${jobTitle || "bir iş"}" işine katılma davetini ${
-    approve ? "kabul etti" : "reddetti"
-  }.`;
+  return cevir(defaultLocale, inviteAnswerNotificationMetin(responderName, jobTitle, approve));
 }

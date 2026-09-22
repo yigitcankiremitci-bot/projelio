@@ -603,7 +603,7 @@ export default function TasksOverview() {
   }, [highlightTaskId]);
 
   const filterButtons = (
-    <div role="group" aria-label="Kaynak filtresi" style={{ display: "flex", gap: 4 }}>
+    <div role="group" aria-label={t("Kaynak filtresi")} style={{ display: "flex", gap: 4 }}>
       {FILTERS.map((f) => (
         <button
           key={f.value}

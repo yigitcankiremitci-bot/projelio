@@ -1,9 +1,10 @@
 import { kalanGun, vadeDurumu } from "../lib/butceOzeti";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(value).toLocaleDateString(bicimDili(), { day: "numeric", month: "short", year: "numeric" });
 }
 
 /**

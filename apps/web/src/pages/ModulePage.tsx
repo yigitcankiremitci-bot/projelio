@@ -78,11 +78,11 @@ export default function ModulePage() {
       .finally(() => setLoading(false));
   }, [departmentId, jobId, moduleKey]);
 
-  const title = entry?.name ?? "Modül";
+  const title = entry?.name ?? t("Modül");
   const parent = jobId
     ? // İşin Modüller sekmesi kalktı: modüller Projeler sekmesinin altında.
-      { to: `/jobs/${jobId}`, label: job?.title ?? "İş" }
-    : { to: `/departments/${departmentId}?tab=modules`, label: department?.name ?? "Departman" };
+      { to: `/jobs/${jobId}`, label: job?.title ?? t("İş") }
+    : { to: `/departments/${departmentId}?tab=modules`, label: department?.name ?? t("Departman") };
 
   // Geri, GELİNEN yere döner (bkz. lib/backTarget): modüle anasayfadan ya da
   // Modüller sekmesinden girildiyse oraya. Eskiden hep departmanın Modüller

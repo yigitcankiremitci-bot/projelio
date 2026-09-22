@@ -7,6 +7,7 @@ import { useRefreshOnUndo, useUndo } from "../lib/undo";
 import { IconArchive, IconRestore, IconTrash } from "../components/icons";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 type EntityKind = "jobs" | "projects" | "tasks" | "outputs";
 
@@ -367,7 +368,7 @@ function Row({
         </div>
         {archived && archivedAt && (
           <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 2 }}>
-            {t("{tarih} tarihinde arşivlendi", { tarih: new Date(archivedAt).toLocaleDateString("tr-TR") })}
+            {t("{tarih} tarihinde arşivlendi", { tarih: new Date(archivedAt).toLocaleDateString(bicimDili()) })}
           </div>
         )}
       </div>

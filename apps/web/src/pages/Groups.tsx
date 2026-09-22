@@ -49,7 +49,7 @@ export default function Groups() {
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: 28 }}>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>Gruplar (Holding)</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Gruplar (Holding)")}</h1>
       </div>
 
       {visibleGroups.length === 0 ? (

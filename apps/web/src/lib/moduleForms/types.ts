@@ -118,8 +118,7 @@ export function missingForApproval(
  */
 export function changedFields(
   config: ModuleFormConfig,
-  current: Record<string, unknown>,
-  draft: Record<string, unknown> | null | undefined
+  current: Record<string, unknown>, draft: Record<string, unknown> | null | undefined
 ): string[] {
   if (!draft) return [];
   return config.fields

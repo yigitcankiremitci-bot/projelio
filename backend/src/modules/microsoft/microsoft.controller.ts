@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Logger, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import type { Response } from "express";
+import { tarayiciDili } from "../../common/i18n";
 import { GoogleAccountsService } from "../google/google-accounts.service";
 import { MicrosoftAccountsService } from "./microsoft-accounts.service";
 import { MicrosoftAuthService } from "./microsoft-auth.service";
@@ -92,7 +93,8 @@ export class MicrosoftController {
     @Query("code") code: string,
     @Query("state") state: string,
     @Query("error") error: string,
-    @Res() res: Response
+    @Res() res: Response,
+    @Req() req: { headers: Record<string, string | string[] | undefined> }
   ) {
     const web = this.oauth.webAppUrl;
 
@@ -120,7 +122,7 @@ export class MicrosoftController {
       const next = parsed.next && parsed.next.startsWith("/") ? parsed.next : undefined;
 
       if (parsed.mode === "login") {
-        const { token, isNewUser } = await this.microsoftAuth.loginWithMicrosoft(identity);
+        const { token, isNewUser } = await this.microsoftAuth.loginWithMicrosoft(identity, tarayiciDili(req));
         // Oturum jetonu URL'e KONMAZ; tek kullanımlık devir kodu verilir
         // (gerekçe: common/auth/oauth-handoff.ts).
         const loginParams = new URLSearchParams({ code: this.microsoftAuth.createHandoff(token) });

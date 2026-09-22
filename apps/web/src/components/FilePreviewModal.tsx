@@ -69,7 +69,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
       const url = await filesApi.contentUrl(file.id, { download: true });
       window.location.href = url;
     } catch {
-      setLoadError("Dosya indirilemedi.");
+      setLoadError(t("Dosya indirilemedi."));
     }
   };
 
@@ -172,12 +172,12 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
             }}
           >
             <IconExternalLink size={16} color="#fff" />
-            {driveProviderLabel(file)}'da düzenle
+            {t("{saglayici}'da düzenle", { saglayici: driveProviderLabel(file) })}
           </button>
 
           <button
             onClick={onClose}
-            aria-label="Kapat"
+            aria-label={t("Kapat")}
             style={{ background: "transparent", border: "none", padding: 6, display: "flex", cursor: "pointer" }}
           >
             <IconX size={18} color={c.textSecondary} />
@@ -188,8 +188,8 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
         <div style={{ flex: 1, background: c.background, position: "relative" }}>
           {file.status === "missing" ? (
             <EmptyState
-              title={`Dosya ${driveProviderLabel(file)}'da bulunamadı`}
-              detail={`Dosya ${driveProviderLabel(file)} üzerinden silinmiş veya taşınmış olabilir.`}
+              title={t("Dosya {p1}'da bulunamadı", { p1: driveProviderLabel(file) })}
+              detail={t("Dosya {p1} üzerinden silinmiş veya taşınmış olabilir.", { p1: driveProviderLabel(file) })}
             />
           ) : loadError ? (
             <EmptyState title={t("Önizleme açılamadı")} detail={loadError} />
@@ -247,9 +247,10 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
                     fontSize: 14,
                   }}
                 >
-                  Önizleme boş görünüyorsa {driveProviderLabel(file)} hesabınız bu klasöre henüz
-                  eklenmemiş olabilir. Ayarlar'dan {driveProviderLabel(file)}'ı bağlayın; dosyayı her
-                  hâlükârda İndir ile açabilirsiniz.
+                  {t(
+                    "Önizleme boş görünüyorsa {saglayici} hesabınız bu klasöre henüz eklenmemiş olabilir. Ayarlar'dan {saglayici}'ı bağlayın; dosyayı her hâlükârda İndir ile açabilirsiniz.",
+                    { saglayici: driveProviderLabel(file) }
+                  )}
                 </div>
               )}
             </>

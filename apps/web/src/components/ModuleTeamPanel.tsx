@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { IconX } from "./icons";
-import { useT } from "../lib/i18n";
+import { cevirmenSuAn, useT } from "../lib/i18n";
 
 // Kayıtların sahibi module_records ile aynı desende iki türlü olabilir: bir
 // organizasyon (departman modülleri) ya da bir iş (serbest çalışan modülleri).
@@ -34,7 +34,9 @@ const ROLE_HINTS: Record<ModuleMemberRole, string> = {
 // dil:anahtar-bitis
 
 function displayName(m: { fullName?: string; username?: string; email?: string; inviteEmail?: string }): string {
-  return m.fullName ?? m.username ?? m.email ?? m.inviteEmail ?? "İsimsiz";
+  // Bileşen dışında, kanca yok: dili depodan okuyan çevirmen.
+  const t = cevirmenSuAn();
+  return m.fullName ?? m.username ?? m.email ?? m.inviteEmail ?? t("İsimsiz");
 }
 
 /**
@@ -147,7 +149,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
       setAdding(false);
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Atanamadı");
+      setError(err instanceof Error ? err.message : t("Atanamadı"));
     } finally {
       setBusyId(null);
     }
@@ -160,7 +162,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
       await api.patch(`/module-members/${id}`, { role });
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Rol değiştirilemedi");
+      setError(err instanceof Error ? err.message : t("Rol değiştirilemedi"));
     } finally {
       setBusyId(null);
     }
@@ -175,7 +177,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
       await api.delete(`/module-members/${id}`);
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Çıkarılamadı");
+      setError(err instanceof Error ? err.message : t("Çıkarılamadı"));
     } finally {
       setBusyId(null);
     }
@@ -188,7 +190,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
   const fabAvailable = useFabAvailable();
   useProjectFabAction(
     canManage && fabAvailable && !loading && resolved?.role !== "subcontractor"
-      ? { label: "Kişi ata", onClick: () => setAdding(true) }
+      ? { label: t("Kişi ata"), onClick: () => setAdding(true) }
       : null,
     [canManage, fabAvailable, loading, resolved?.role, moduleKey],
     FAB_PRIORITY.panel
@@ -203,7 +205,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary }}>
-          Modül ekibi{members.length > 0 ? ` · ${members.length}` : ""}
+          {t("Modül ekibi")}{members.length > 0 ? ` · ${members.length}` : ""}
         </span>
         {canManage && !fabAvailable && (
           <button
@@ -219,7 +221,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
               cursor: "pointer",
             }}
           >
-            {adding ? "Vazgeç" : "Kişi ata"}
+            {adding ? t("Vazgeç") : t("Kişi ata")}
           </button>
         )}
       </div>
@@ -227,8 +229,8 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
       {members.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
           {canManage
-            ? "Bu modüle henüz kimse atanmadı. Atanan kişiler burada kayıt oluşturup düzenleyebilir."
-            : "Bu modüle henüz kimse atanmadı."}
+            ? t("Bu modüle henüz kimse atanmadı. Atanan kişiler burada kayıt oluşturup düzenleyebilir.")
+            : t("Bu modüle henüz kimse atanmadı.")}
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -317,13 +319,15 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
           {candidates.length === 0 ? (
             <p style={{ fontSize: 13, color: candidateState.hata ? c.danger : c.textSecondary, margin: 0 }}>
               {candidateState.hata
-                ? "Kadro listesi yüklenemedi. Sayfayı yenileyip tekrar dene."
+                ? t("Kadro listesi yüklenemedi. Sayfayı yenileyip tekrar dene.")
                 : candidateState.toplam === 0
                   ? jobId
-                    ? "Bu işin ekibi henüz boş. Önce ekibe kişi ekle."
-                    : "Bu departmanın kadrosu henüz boş. Önce kadroya kişi ekle."
-                  : "Kadrodaki herkes ya bu modüle zaten atanmış ya da daveti henüz kabul etmemiş. " +
-                    "Daveti bekleyenler kabul edince burada görünür."}
+                    ? t("Bu işin ekibi henüz boş. Önce ekibe kişi ekle.")
+                    : t("Bu departmanın kadrosu henüz boş. Önce kadroya kişi ekle.")
+                  : t(
+                      "Kadrodaki herkes ya bu modüle zaten atanmış ya da daveti henüz kabul etmemiş. " +
+                        "Daveti bekleyenler kabul edince burada görünür."
+                    )}
             </p>
           ) : (
             candidates.map((p) => (

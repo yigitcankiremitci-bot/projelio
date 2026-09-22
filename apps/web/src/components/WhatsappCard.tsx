@@ -28,7 +28,7 @@ export default function WhatsappCard() {
         setOverview(o);
         setError("");
       })
-      .catch((e: any) => setError(e?.message ?? "WhatsApp durumu alınamadı."));
+      .catch((e: any) => setError(e?.message ?? t("WhatsApp durumu alınamadı.")));
   }, []);
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function WhatsappCard() {
         <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 4px" }}>{t("Bu özellik sunucuda henüz yapılandırılmamış.")}</p>
       ) : overview && !overview.poolReady && !overview.myNumber ? (
         <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 4px", lineHeight: 1.5 }}>
-          Henüz bağlı bir Projelio numarası yok; yönetici bir numara bağladığında burada görünecek.
+          {t("Henüz bağlı bir Projelio numarası yok; yönetici bir numara bağladığında burada görünecek.")}
         </p>
       ) : overview ? (
         <>

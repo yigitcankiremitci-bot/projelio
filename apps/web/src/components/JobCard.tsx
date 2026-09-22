@@ -9,6 +9,7 @@ import CardDescription from "./CardDescription";
 import { IconFolder, IconUser, IconCalendar, IconPlus } from "./icons";
 import AskLioButton from "./AskLioButton";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   job: Job;
@@ -171,7 +172,7 @@ export default function JobCard({ job, projectCount }: Props) {
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <IconCalendar size={12} color={c.textSecondary} />
-            <span>{t("{tarih} kuruldu", { tarih: new Date(job.createdAt).toLocaleDateString("tr-TR") })}</span>
+            <span>{t("{tarih} kuruldu", { tarih: new Date(job.createdAt).toLocaleDateString(bicimDili()) })}</span>
           </div>
         </div>
 

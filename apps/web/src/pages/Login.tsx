@@ -7,6 +7,7 @@ import { demoHesap } from "../lib/demoHesap";
 import { demoZiyaretiBaslat } from "../lib/demoZiyaret";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import GirisDilSecici from "../components/GirisDilSecici";
 
 /** 905 -> "15:05". Geri sayım dakika:saniye okunması en kolay biçim. */
 function formatSure(saniye: number): string {
@@ -107,6 +108,7 @@ export default function Login() {
         padding: 24,
       }}
     >
+      <GirisDilSecici />
       <div
         style={{
           width: "100%",

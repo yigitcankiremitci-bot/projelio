@@ -18,17 +18,17 @@ export const CORE_ORG_TABS = ENTITY_TAB_KEYS.organization;
 // bağlı TÜM departmanların akışlarını (+ organizasyona doğrudan yapılan
 // paylaşımları) tek zaman çizelgesinde toplar (bkz. FeedPanel).
 export const ORG_TABS = [
-  { key: "home", label: "Anasayfa" },
-  { key: "flow", label: "Sosyal" },
-  { key: "departments", label: "Departmanlar" },
+  { key: "home", label: "Anasayfa" }, // dil:anahtar
+  { key: "flow", label: "Sosyal" }, // dil:anahtar
+  { key: "departments", label: "Departmanlar" }, // dil:anahtar
   // Departmanlarda dağınık duran görevlerin tek panosu (bkz. OrgTasksPanel).
-  { key: "tasks", label: "Görevler" },
-  { key: "products", label: "Ürün/Hizmet" },
+  { key: "tasks", label: "Görevler" }, // dil:anahtar
+  { key: "products", label: "Ürün/Hizmet" }, // dil:anahtar
   // Etiket "Kasa": sayfa bir plan değil, gerçekleşen gelir/gider defteri
   // (bkz. Dashboard.tsx'teki aynı gerekçe). Anahtar "budget" KALDI —
   // adresler (?tab=budget), kayıtlı hedefler ve tur çapaları ona bağlı.
-  { key: "budget", label: "Kasa" },
-  { key: "files", label: "Dosyalar" },
+  { key: "budget", label: "Kasa" }, // dil:anahtar
+  { key: "files", label: "Dosyalar" }, // dil:anahtar
 ];
 
 /**

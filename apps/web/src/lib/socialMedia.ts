@@ -58,8 +58,8 @@ export const SOCIAL_PLATFORMS: Record<SocialPlatform, PlatformMeta> = {
   youtube: { label: "YouTube", color: "#C13434", captionLimit: 5000, profilePrefix: "https://youtube.com/@" },
   pinterest: { label: "Pinterest", color: "#BD081C", captionLimit: 500, profilePrefix: "https://pinterest.com/" },
   threads: { label: "Threads", color: "#3E4858", captionLimit: 500, profilePrefix: "https://threads.net/@" },
-  blog: { label: "Blog / web", color: "#C0813F" },
-  other: { label: "Diğer", color: "#66707F" },
+  blog: { label: "Blog / web", color: "#C0813F" }, // dil:anahtar
+  other: { label: "Diğer", color: "#66707F" }, // dil:anahtar
 };
 
 export const PLATFORM_ORDER: SocialPlatform[] = [
@@ -316,21 +316,21 @@ export function fromDateTimeLocal(value: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-export const WEEKDAY_LABELS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+export const WEEKDAY_LABELS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]; // dil:anahtar
 
 export const MONTH_LABELS = [
-  "Ocak",
-  "Şubat",
-  "Mart",
-  "Nisan",
-  "Mayıs",
-  "Haziran",
-  "Temmuz",
-  "Ağustos",
-  "Eylül",
-  "Ekim",
-  "Kasım",
-  "Aralık",
+  "Ocak", // dil:anahtar
+  "Şubat", // dil:anahtar
+  "Mart", // dil:anahtar
+  "Nisan", // dil:anahtar
+  "Mayıs", // dil:anahtar
+  "Haziran", // dil:anahtar
+  "Temmuz", // dil:anahtar
+  "Ağustos", // dil:anahtar
+  "Eylül", // dil:anahtar
+  "Ekim", // dil:anahtar
+  "Kasım", // dil:anahtar
+  "Aralık", // dil:anahtar
 ];
 
 /**

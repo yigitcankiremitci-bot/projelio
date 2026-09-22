@@ -124,7 +124,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
   const registerTaskCreateUndo = (createdId: string, payload: Record<string, unknown>) => {
     let currentId = createdId;
     pushUndo({
-      label: "Görev oluşturma",
+      label: t("Görev oluşturma"),
       run: async () => {
         await api.delete(`/tasks/${currentId}`);
         load();
@@ -196,7 +196,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
     // başka bir işlemin yan etkisi (örn. üst görev tamamlanınca alt görevler).
     if (registerUndo && previousStatus && previousStatus !== status) {
       pushUndo({
-        label: "Görev durumu",
+        label: t("Görev durumu"),
         run: async () => {
           await api.patch(`/tasks/${taskId}/status`, { status: previousStatus });
           load();
@@ -292,8 +292,9 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
       {parentCompletePrompt && (
         <Modal title={t("Görevi tamamla")} onClose={() => setParentCompletePrompt(null)}>
           <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
-            <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{parentCompletePrompt.title}</strong> görevinin tüm alt
-            görevleri tamamlandı. Bu görevi de tamamlandı olarak işaretlemek ister misin?
+            {t("{gorev} görevinin tüm alt görevleri tamamlandı. Bu görevi de tamamlandı olarak işaretlemek ister misin?", {
+              gorev: parentCompletePrompt.title,
+            })}
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button

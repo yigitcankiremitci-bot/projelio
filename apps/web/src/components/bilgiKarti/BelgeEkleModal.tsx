@@ -7,6 +7,7 @@ import { DOKUNMATIK_CIHAZ } from "../../lib/dokunmatikCihaz";
 import { useThemeColors } from "../../theme/useThemeColors";
 import Modal from "../Modal";
 import { IconFile, IconFolder, IconLink, IconUpload } from "../icons";
+import { useT } from "../../lib/i18n";
 
 type Kaynak = "yukle" | "sec" | "baglanti";
 
@@ -33,6 +34,7 @@ interface Props {
  * kullanıcının pencereyi kapatıp "eklendi mi?" diye merak etmesi demekti.
  */
 export default function BelgeEkleModal({ scopeType, scopeId, onClose, onEklendi }: Props) {
+  const t = useT();
   const c = useThemeColors();
   const [kaynak, setKaynak] = useState<Kaynak>("yukle");
   const [docType, setDocType] = useState<BilgiKartiBelgeTuru>("vergi_levhasi");
@@ -59,7 +61,7 @@ export default function BelgeEkleModal({ scopeType, scopeId, onClose, onEklendi 
       // yazmasın. Yazdıysa dokunulmaz.
       setTitle((mevcut) => mevcut || yuklenen.name);
     } catch {
-      setHata("Dosya yüklenemedi. Bulut deposu bağlı mı diye bak, sonra tekrar dene.");
+      setHata(t("Dosya yüklenemedi. Bulut deposu bağlı mı diye bak, sonra tekrar dene."));
     } finally {
       setYukleniyor(false);
     }
@@ -68,18 +70,18 @@ export default function BelgeEkleModal({ scopeType, scopeId, onClose, onEklendi 
   const kaydet = async () => {
     setHata("");
     if (kaynak === "baglanti" && !externalUrl.trim()) {
-      setHata("Bağlantı adresi gerekiyor.");
+      setHata(t("Bağlantı adresi gerekiyor."));
       return;
     }
     if (kaynak !== "baglanti" && !secilenDosya) {
-      setHata("Önce bir dosya seç.");
+      setHata(t("Önce bir dosya seç."));
       return;
     }
     setKaydediliyor(true);
     try {
       await bilgiKartiApi.belgeEkle(scopeType, scopeId, {
         docType,
-        title: title.trim() || (kaynak === "baglanti" ? BILGI_KARTI_BELGE_ETIKET[docType] : secilenDosya?.name),
+        title: title.trim() || (kaynak === "baglanti" ? t(BILGI_KARTI_BELGE_ETIKET[docType]) : secilenDosya?.name),
         fileId: kaynak === "baglanti" ? undefined : secilenDosya?.id,
         externalUrl: kaynak === "baglanti" ? externalUrl.trim() : undefined,
         issuedOn,
@@ -89,7 +91,7 @@ export default function BelgeEkleModal({ scopeType, scopeId, onClose, onEklendi 
       onEklendi();
       onClose();
     } catch {
-      setHata("Belge eklenemedi. Tekrar dene.");
+      setHata(t("Belge eklenemedi. Tekrar dene."));
       setKaydediliyor(false);
     }
   };
@@ -123,8 +125,8 @@ export default function BelgeEkleModal({ scopeType, scopeId, onClose, onEklendi 
 
   return (
     <Modal
-      title="Belge ekle"
-      subtitle="Vergi levhası, imza sirküleri, sicil gazetesi…"
+      title={t("Belge ekle")}
+      subtitle={t("Vergi levhası, imza sirküleri, sicil gazetesi…")}
       onClose={onClose}
       maxWidth={560}
       mobileFullScreen
@@ -145,15 +147,15 @@ export default function BelgeEkleModal({ scopeType, scopeId, onClose, onEklendi 
             fontWeight: 500,
           }}
         >
-          {kaydediliyor ? "Ekleniyor…" : "Belgeyi ekle"}
+          {kaydediliyor ? t("Ekleniyor…") : t("Belgeyi ekle")}
         </button>
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", gap: 8 }}>
-          {sekme("yukle", "Yükle", <IconUpload size={15} color={kaynak === "yukle" ? c.accentDark : c.textSecondary} />)}
-          {sekme("sec", "Dosyalarımdan", <IconFile size={15} color={kaynak === "sec" ? c.accentDark : c.textSecondary} />)}
-          {sekme("baglanti", "Bağlantı", <IconLink size={15} color={kaynak === "baglanti" ? c.accentDark : c.textSecondary} />)}
+          {sekme("yukle", t("Yükle"), <IconUpload size={15} color={kaynak === "yukle" ? c.accentDark : c.textSecondary} />)}
+          {sekme("sec", t("Dosyalarımdan"), <IconFile size={15} color={kaynak === "sec" ? c.accentDark : c.textSecondary} />)}
+          {sekme("baglanti", t("Bağlantı"), <IconLink size={15} color={kaynak === "baglanti" ? c.accentDark : c.textSecondary} />)}
         </div>
 
         {kaynak === "yukle" && (
@@ -182,7 +184,7 @@ export default function BelgeEkleModal({ scopeType, scopeId, onClose, onEklendi 
                 fontSize: 15,
               }}
             >
-              {yukleniyor ? "Yükleniyor…" : secilenDosya ? `Seçildi: ${secilenDosya.name}` : DOKUNMATIK_CIHAZ ? "Cihazdan dosya seç" : "Bilgisayardan dosya seç"}
+              {yukleniyor ? t("Yükleniyor…") : secilenDosya ? `Seçildi: ${secilenDosya.name}` : DOKUNMATIK_CIHAZ ? t("Cihazdan dosya seç") : t("Bilgisayardan dosya seç")}
             </button>
           </div>
         )}
@@ -200,7 +202,7 @@ export default function BelgeEkleModal({ scopeType, scopeId, onClose, onEklendi 
         )}
 
         {kaynak === "baglanti" && (
-          <Alan etiket="Bağlantı adresi">
+          <Alan etiket={t("Bağlantı adresi")}>
             <input
               value={externalUrl}
               onChange={(e) => setExternalUrl(e.target.value)}
@@ -210,35 +212,35 @@ export default function BelgeEkleModal({ scopeType, scopeId, onClose, onEklendi 
           </Alan>
         )}
 
-        <Alan etiket="Belge türü">
+        <Alan etiket={t("Belge türü")}>
           <select value={docType} onChange={(e) => setDocType(e.target.value as BilgiKartiBelgeTuru)} style={{ width: "100%" }}>
             {BILGI_KARTI_BELGE_TURLERI.map((tur) => (
               <option key={tur} value={tur}>
-                {BILGI_KARTI_BELGE_ETIKET[tur]}
+                {t(BILGI_KARTI_BELGE_ETIKET[tur])}
               </option>
             ))}
           </select>
         </Alan>
 
-        <Alan etiket="Belge adı">
+        <Alan etiket={t("Belge adı")}>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={BILGI_KARTI_BELGE_ETIKET[docType]}
+            placeholder={t(BILGI_KARTI_BELGE_ETIKET[docType])}
             style={{ width: "100%" }}
           />
         </Alan>
 
         <div style={{ display: "flex", gap: 12 }}>
-          <Alan etiket="Düzenlenme tarihi">
+          <Alan etiket={t("Düzenlenme tarihi")}>
             <input type="date" value={issuedOn} onChange={(e) => setIssuedOn(e.target.value)} style={{ width: "100%" }} />
           </Alan>
-          <Alan etiket="Geçerlilik bitişi">
+          <Alan etiket={t("Geçerlilik bitişi")}>
             <input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} style={{ width: "100%" }} />
           </Alan>
         </div>
 
-        <Alan etiket="Not (opsiyonel)">
+        <Alan etiket={t("Not (opsiyonel)")}>
           <input value={note} onChange={(e) => setNote(e.target.value)} style={{ width: "100%" }} />
         </Alan>
 
@@ -275,6 +277,7 @@ function DosyaSecici({
   secilen: ProjectFile | null;
   onSec: (dosya: ProjectFile) => void;
 }) {
+  const t = useT();
   const c = useThemeColors();
   const [klasorler, setKlasorler] = useState<FileFolder[]>([]);
   const [dosyalar, setDosyalar] = useState<ProjectFile[]>([]);
@@ -319,7 +322,7 @@ function DosyaSecici({
         }}
       >
         <button type="button" onClick={() => setYol([])} style={{ background: "none", border: "none", color: c.textSecondary, padding: 0 }}>
-          Kök
+          {t("Kök")}
         </button>
         {yol.map((klasor, i) => (
           <span key={klasor.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -329,16 +332,16 @@ function DosyaSecici({
               onClick={() => setYol(yol.slice(0, i + 1))}
               style={{ background: "none", border: "none", color: c.textSecondary, padding: 0 }}
             >
-              {klasor.name}
+              {klasor.kind === "general" ? t(klasor.name) : klasor.name}
             </button>
           </span>
         ))}
       </div>
 
       <div style={{ maxHeight: 220, overflowY: "auto" }}>
-        {yukleniyor && <p style={{ padding: 12, margin: 0, fontSize: 14, color: c.textSecondary }}>Yükleniyor…</p>}
+        {yukleniyor && <p style={{ padding: 12, margin: 0, fontSize: 14, color: c.textSecondary }}>{t("Yükleniyor…")}</p>}
         {!yukleniyor && klasorler.length === 0 && dosyalar.length === 0 && (
-          <p style={{ padding: 12, margin: 0, fontSize: 14, color: c.textSecondary }}>Bu klasörde dosya yok.</p>
+          <p style={{ padding: 12, margin: 0, fontSize: 14, color: c.textSecondary }}>{t("Bu klasörde dosya yok.")}</p>
         )}
         {klasorler.map((klasor) => (
           <button
@@ -348,7 +351,7 @@ function DosyaSecici({
             style={satirStili(c, false)}
           >
             <IconFolder size={16} color={c.textSecondary} />
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{klasor.name}</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{klasor.kind === "general" ? t(klasor.name) : klasor.name}</span>
           </button>
         ))}
         {dosyalar.map((dosya) => (

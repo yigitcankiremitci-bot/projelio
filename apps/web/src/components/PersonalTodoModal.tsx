@@ -114,7 +114,7 @@ export default function PersonalTodoModal({ item, onClose, onChanged, onPromoted
       // Cmd/Ctrl+Z ile geri alınabilir olsun — arşivleme süresiz geri alınabilir
       // olduğu için burada pushDestructive değil, doğrudan pushUndo kullanılır.
       pushUndo({
-        label: "Kişisel görev silme",
+        label: t("Kişisel görev silme"),
         run: async () => {
           await api.patch(`/todos/${item.itemId}/restore`, {});
         },
@@ -189,7 +189,7 @@ export default function PersonalTodoModal({ item, onClose, onChanged, onPromoted
                     role="radio"
                     aria-checked={priority === value}
                     aria-label={`${value} yıldız`}
-                    title={priority === value ? "Önceliği kaldır" : `${value} yıldız`}
+                    title={priority === value ? t("Önceliği kaldır") : `${value} yıldız`}
                     // Aynı yıldıza tekrar basmak önceliği kaldırır.
                     onClick={() => setPriority(priority === value ? 0 : value)}
                     style={{ display: "flex", padding: 2, border: "none", background: "transparent", lineHeight: 0 }}

@@ -6,6 +6,7 @@ import type { AiCreditOrder, AiCreditPackage } from "../api/aiChat";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconSparkle, IconCheck } from "./icons";
+import { bicimDili } from "../lib/i18n/depo";
 
 // Modül düzeyinde kanca çağrılamaz: Türkçe metin ANAHTAR olarak duruyor,
 // çeviri kullanıldığı yerde (t(STATUS_LABEL[...])) yapılıyor.
@@ -17,7 +18,7 @@ const STATUS_LABEL: Record<AiCreditOrder["status"], string> = {
 };
 
 function formatTry(amount: number): string {
-  return `${amount.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
+  return `${amount.toLocaleString(bicimDili(), { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
 }
 
 interface Props {
@@ -149,7 +150,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
                   <IconSparkle size={17} color={active ? c.accentDark : c.accent} />
                   <span style={{ flex: 1 }}>
                     <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: c.textPrimary }}>
-                      {t("{n} birim", { n: p.credits.toLocaleString("tr-TR") })}
+                      {t("{n} birim", { n: p.credits.toLocaleString(bicimDili()) })}
                     </span>
                     <span style={{ display: "block", fontSize: 13, color: c.textSecondary }}>{t(p.description)}</span>
                   </span>
@@ -219,10 +220,10 @@ export default function AiCreditTopUp({ onChanged }: Props) {
                     }}
                   >
                     <span style={{ flex: 1, color: c.textPrimary }}>
-                      {t("{n} birim", { n: o.credits.toLocaleString("tr-TR") })}
+                      {t("{n} birim", { n: o.credits.toLocaleString(bicimDili()) })}
                       <span style={{ color: c.textSecondary }}> · {formatTry(o.priceAmount)}</span>
                       <span style={{ display: "block", fontSize: 12.5, color: c.textSecondary }}>
-                        {t(STATUS_LABEL[o.status])} · {new Date(o.createdAt).toLocaleDateString("tr-TR")}
+                        {t(STATUS_LABEL[o.status])} · {new Date(o.createdAt).toLocaleDateString(bicimDili())}
                       </span>
                     </span>
                     <button

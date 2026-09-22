@@ -31,6 +31,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings, IconLayers, IconIdCard } from "../components/icons";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 // Şirket AKIŞINDA görev/tamamlanan-görev karışımı yok: paylaşımlar ile görevler
 // ayrı şeyler ve akışın altına görev listesi asmak ikisini karıştırıyordu.
@@ -130,7 +131,7 @@ export default function OrganizationDetail() {
   // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
   const backRef = useRef<HTMLDivElement>(null);
   // Geri, şirkete hangi sayfadan girildiyse oraya döner (bkz. lib/backTarget).
-  const back = useBackTarget({ to: "/organizations", label: "Organizasyonlar" });
+  const back = useBackTarget({ to: "/organizations", label: t("Organizasyonlar") });
   usePageHeader(organization?.name, coverRef, [organization?.name, back.to, back.label, back.geriGit], {
     ...back,
     sourceRef: backRef,
@@ -180,7 +181,7 @@ export default function OrganizationDetail() {
         meta={
           organization && (
             <>
-              <span style={coverBadgeStyle(cover)}>{ORG_TYPE_LABEL[organization.orgType]}</span>
+              <span style={coverBadgeStyle(cover)}>{t(ORG_TYPE_LABEL[organization.orgType])}</span>
               {organization.ownerName && (
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                   <IconUser size={12} color={cover.secondary} />
@@ -198,7 +199,7 @@ export default function OrganizationDetail() {
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <IconCalendar size={12} color={cover.secondary} />
-                {new Date(organization.createdAt).toLocaleDateString("tr-TR")} kuruldu
+                {new Date(organization.createdAt).toLocaleDateString(bicimDili())} kuruldu
               </span>
             </>
           )
@@ -236,7 +237,7 @@ export default function OrganizationDetail() {
                 sorununu hata gibi gösteriyordu. canViewCommercial tam olarak
                 bu ayrımı taşıyor. */}
             {access?.canViewCommercial !== false && (
-              <button onClick={() => setBilgiKarti(true)} aria-label="Şirket bilgi kartı" style={coverActionButton(c)}>
+              <button onClick={() => setBilgiKarti(true)} aria-label={t("Şirket bilgi kartı")} style={coverActionButton(c)}>
                 <IconIdCard size={20} color={c.textSecondary} />
               </button>
             )}
@@ -329,8 +330,8 @@ export default function OrganizationDetail() {
       {addingFile && (
         <QuickFileUploadModal
           targets={departments.map((d) => ({ id: d.id, label: d.name, target: { departmentId: d.id } }))}
-          pickerLabel="Departman"
-          emptyMessage="Dosya yükleyebilmek için önce en az bir departman kurman gerekiyor."
+          pickerLabel={t("Departman")}
+          emptyMessage={t("Dosya yükleyebilmek için önce en az bir departman kurman gerekiyor.")}
           onClose={() => setAddingFile(false)}
           onUploaded={() => setAddingFile(false)}
         />
@@ -346,10 +347,11 @@ export default function OrganizationDetail() {
 // null ile ezerdi (efektler çocuktan ebeveyne doğru çalışır) — anasayfadaki
 // "+" düğmesinin kaybolmasının sebebi buydu.
 function FlowFabRegistrar({ feedRef }: { feedRef: React.RefObject<FeedPanelHandle | null> }) {
+  const t = useT();
   // feedRef nesnesinin kendisi her render'da aynı kalır (useRef), bu yüzden
   // efekt yalnızca mount/unmount'ta çalışır; onClick içindeki feedRef.current
   // her tıklamada güncel değeri okur.
-  useProjectFabAction({ label: "Yeni paylaşım", onClick: () => feedRef.current?.openCreate() }, [feedRef]);
+  useProjectFabAction({ label: t("Yeni paylaşım"), onClick: () => feedRef.current?.openCreate() }, [feedRef]);
   return null;
 }
 
@@ -357,14 +359,15 @@ function FlowFabRegistrar({ feedRef }: { feedRef: React.RefObject<FeedPanelHandl
 // sunar: gelir/gider/alacak/borç dört ayrı hızlı ekleme kısayolu (bkz.
 // OrgBudgetPanel.openQuickAdd).
 function BudgetFabRegistrar({ budgetRef }: { budgetRef: React.RefObject<OrgBudgetPanelHandle | null> }) {
+  const t = useT();
   useProjectFabAction(
     {
-      label: "Kayıt ekle",
+      label: t("Kayıt ekle"),
       options: [
-        { label: "Gelir ekle", onClick: () => budgetRef.current?.openQuickAdd("income") },
-        { label: "Gider ekle", onClick: () => budgetRef.current?.openQuickAdd("expense") },
-        { label: "Alacak ekle", onClick: () => budgetRef.current?.openQuickAdd("receivable") },
-        { label: "Borç ekle", onClick: () => budgetRef.current?.openQuickAdd("payable") },
+        { label: t("Gelir ekle"), onClick: () => budgetRef.current?.openQuickAdd("income") },
+        { label: t("Gider ekle"), onClick: () => budgetRef.current?.openQuickAdd("expense") },
+        { label: t("Alacak ekle"), onClick: () => budgetRef.current?.openQuickAdd("receivable") },
+        { label: t("Borç ekle"), onClick: () => budgetRef.current?.openQuickAdd("payable") },
       ],
     },
     [budgetRef]
@@ -391,17 +394,18 @@ function HomeAddFabRegistrar({
   setAddingFile: (value: boolean) => void;
   onGelirGider: () => void;
 }) {
+  const t = useT();
   useProjectFabAction(
     {
-      label: "Ekle",
+      label: t("Ekle"),
       options: [
-        { label: "Ürün ekle", onClick: () => productsRef.current?.openAdd() },
-        { label: "İşe al", onClick: () => setAddingRecordModule("ik_ise_alim_oryantasyon") },
+        { label: t("Ürün ekle"), onClick: () => productsRef.current?.openAdd() },
+        { label: t("İşe al"), onClick: () => setAddingRecordModule("ik_ise_alim_oryantasyon") },
         // Gelir/gider artık bir modül kaydı değil, defterin kendisi: kısayol
         // Bütçe sekmesine götürüyor (bkz. migration 104, tek defter kararı).
-        { label: "Gelir/gider ekle", onClick: onGelirGider },
-        { label: "Departman kur", onClick: () => departmentsRef.current?.openAdd() },
-        { label: "Dosya ekle", onClick: () => setAddingFile(true) },
+        { label: t("Gelir/gider ekle"), onClick: onGelirGider },
+        { label: t("Departman kur"), onClick: () => departmentsRef.current?.openAdd() },
+        { label: t("Dosya ekle"), onClick: () => setAddingFile(true) },
       ],
     },
     [productsRef, departmentsRef, setAddingRecordModule, setAddingFile, onGelirGider]

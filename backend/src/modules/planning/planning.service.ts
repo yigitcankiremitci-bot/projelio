@@ -35,6 +35,7 @@ import {
 } from "./planning.dates";
 import { RITUALS, ritualTitle } from "./planning.rituals";
 import { MIN_SUGGESTED_BLOCK_MINUTES, distribute } from "./planning.scheduler";
+import { hataMetni } from "../../common/i18n/index";
 
 /**
  * GÜVENLİK NOTU
@@ -197,7 +198,7 @@ export class PlanningService {
     // Aynı isimde aktif bir alan varsa benzersizlik indeksi devreye girer;
     // kullanıcıya ham veritabanı hatası göstermek yerine niyeti anlatıyoruz.
     if (error) {
-      if (error.code === "23505") throw new BadRequestException(`"${name}" adında bir odak alanın zaten var.`);
+      if (error.code === "23505") throw new BadRequestException(hataMetni("\"{name}\" adında bir odak alanın zaten var.", { name }));
       throw error;
     }
     return mapFocusArea(data);
@@ -1431,7 +1432,7 @@ function assertTimeInput(value: string): string {
   try {
     return assertTime(value);
   } catch {
-    throw new BadRequestException(`Geçersiz saat: ${value}`);
+    throw new BadRequestException(hataMetni("Geçersiz saat: {value}", { value }));
   }
 }
 

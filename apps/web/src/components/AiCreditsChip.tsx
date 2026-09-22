@@ -5,6 +5,7 @@ import type { AiCredits } from "../api/aiChat";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconSparkle } from "./icons";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   // Mobilde anasayfa başlığının altında dar bir alanda duruyor; orada yazı ve
@@ -52,7 +53,7 @@ export default function AiCreditsChip({ compact = false }: Props) {
   if (failed || !credits) return null;
 
   const isLow = credits.balance < (credits.minBalanceToStart || 20);
-  const balance = Math.round(credits.balance).toLocaleString("tr-TR");
+  const balance = Math.round(credits.balance).toLocaleString(bicimDili());
 
   return (
     <button

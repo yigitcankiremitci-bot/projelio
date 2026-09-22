@@ -42,7 +42,7 @@ export default function TeamMemberModal({ member, tasks, onClose, onTaskUpdated 
   });
 
   return (
-    <Modal title={member.fullName ?? "Ekip üyesi"} onClose={onClose} maxWidth={420}>
+    <Modal title={member.fullName ?? t("Ekip üyesi")} onClose={onClose} maxWidth={420}>
       <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 14px" }}>
         {t("Bu üyeye atamak istediğin görevleri işaretle. Bir görev yalnızca tek kişiye atanabilir.")}
       </p>

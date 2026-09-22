@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, Logger } from "@nestjs/common"
 import { SupabaseService } from "../../database/supabase.service";
 import { isValidTier, normalizeModelKey, normalizeTier, TIERS } from "./ai-model-settings.validate";
 import type { ModelTier } from "./ai-credits.config";
+import { hataMetni } from "../../common/i18n/index";
 
 export interface AiModelSettingRow {
   tier: ModelTier;
@@ -130,7 +131,7 @@ export class AiModelSettingsService {
         { tier, model_key: temiz, updated_at: new Date().toISOString(), updated_by: adminUserId },
         { onConflict: "tier" }
       );
-    if (error) throw new BadRequestException(`Ayar kaydedilemedi: ${error.message}`);
+    if (error) throw new BadRequestException(hataMetni("Ayar kaydedilemedi: {message}", { message: error.message }));
 
     this.invalidate();
     this.logger.log(`Model ayarı değişti · kademe=${tier} model=${temiz ?? "(varsayılan)"} admin=${adminUserId.slice(0, 8)}…`);
@@ -146,7 +147,7 @@ export class AiModelSettingsService {
         { id: true, default_tier: tier, updated_at: new Date().toISOString(), updated_by: adminUserId },
         { onConflict: "id" }
       );
-    if (error) throw new BadRequestException(`Ayar kaydedilemedi: ${error.message}`);
+    if (error) throw new BadRequestException(hataMetni("Ayar kaydedilemedi: {message}", { message: error.message }));
 
     this.invalidate();
     this.logger.log(`Varsayılan kademe değişti · ${tier} · admin=${adminUserId.slice(0, 8)}…`);

@@ -152,7 +152,7 @@ export default function ModulePanelView({ config, organizationId, jobId }: Props
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <div style={{ minWidth: 0 }}>
-          <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{config.title}</h5>
+          <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t(config.title)}</h5>
           <p style={{ fontSize: 12, color: c.textSecondary, margin: "2px 0 0" }}>{config.purpose}</p>
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -164,7 +164,7 @@ export default function ModulePanelView({ config, organizationId, jobId }: Props
           >
             {PERIOD_KEYS.map((k) => (
               <option key={k} value={k}>
-                {buildPeriod(k).label}
+                {t(buildPeriod(k).label)}
               </option>
             ))}
           </select>
@@ -210,9 +210,9 @@ export default function ModulePanelView({ config, organizationId, jobId }: Props
                 border: `1px solid ${c.border}`,
               }}
             >
-              <span style={{ fontSize: 11, color: c.textSecondary }}>{metric.label}</span>
+              <span style={{ fontSize: 11, color: c.textSecondary }}>{t(metric.label)}</span>
               <span style={{ fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{metric.compute(ctx)}</span>
-              {hint && <span style={{ fontSize: 11, color: c.textSecondary }}>{hint}</span>}
+              {hint && <span style={{ fontSize: 11, color: c.textSecondary }}>{t(hint)}</span>}
             </div>
           );
         })}
@@ -223,10 +223,10 @@ export default function ModulePanelView({ config, organizationId, jobId }: Props
         const max = Math.max(...rows.map((r) => Math.abs(r.value)), 1);
         return (
           <div key={breakdown.title} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary }}>{breakdown.title}</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary }}>{t(breakdown.title)}</span>
             {rows.length === 0 ? (
               <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>
-                {breakdown.emptyLabel ?? "Veri yok."}
+                {breakdown.emptyLabel ? t(breakdown.emptyLabel) : t("Veri yok.")}
               </p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -242,9 +242,9 @@ export default function ModulePanelView({ config, organizationId, jobId }: Props
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                       }}
-                      title={row.label}
+                      title={t(row.label)}
                     >
-                      {row.label}
+                      {t(row.label)}
                     </span>
                     <div style={{ flex: 1, height: 8, background: c.background, borderRadius: 4, overflow: "hidden" }}>
                       <div
@@ -276,7 +276,7 @@ export default function ModulePanelView({ config, organizationId, jobId }: Props
             paddingTop: 8,
           }}
         >
-          Bu panel şu modüllerden de okur ama onlar henüz etkin değil:{" "}
+          {t("Bu panel şu modüllerden de okur ama onlar henüz etkin değil:")}{" "}
           {missingSources.map((k) => MODULE_RECORD_CONFIGS[k]?.title ?? k).join(", ")}.
         </div>
       )}

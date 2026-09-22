@@ -7,6 +7,8 @@ import { nowInSeconds } from "../auth/session-payload";
 import { UsersService } from "../users/users.service";
 import { MicrosoftAccountsService } from "./microsoft-accounts.service";
 import { MicrosoftIdentity } from "./microsoft-oauth.service";
+import type { Locale } from "@projelio/shared";
+import { hataMetni } from "../../common/i18n/index";
 
 /**
  * "Microsoft ile giriş" — google-auth.service.ts'in birebir karşılığı.
@@ -38,7 +40,7 @@ export class MicrosoftAuthService {
    * açan biri, `mail` özniteliğine kurbanın adresini yazarak onun hesabına
    * girebilirdi.
    */
-  async loginWithMicrosoft(identity: MicrosoftIdentity): Promise<{ token: string; isNewUser: boolean }> {
+  async loginWithMicrosoft(identity: MicrosoftIdentity, locale?: Locale): Promise<{ token: string; isNewUser: boolean }> {
     const existingAccount = await this.accounts.findByMsSub(identity.sub);
 
     let userId: string;
@@ -70,6 +72,7 @@ export class MicrosoftAuthService {
           fullName: identity.name || email.split("@")[0],
           email,
           usernameSeed: email.split("@")[0],
+          locale,
           // Doğrulanmamış adresle hesap açılabilir (kimseninkini devralmıyor)
           // ama doğrulanmış sayılmaz: e-posta doğrulaması bekler.
           emailVerified: Boolean(identity.verifiedEmail),
@@ -84,7 +87,7 @@ export class MicrosoftAuthService {
     const currentForUser = await this.accounts.findLoginIdentity(userId);
     if (currentForUser && currentForUser.msSub !== identity.sub) {
       throw new ConflictException(
-        `Bu Projelio hesabına zaten ${currentForUser.email} Microsoft hesabı bağlı. Önce mevcut bağlantıyı kaldırın.`
+        hataMetni("Bu Projelio hesabına zaten {email} Microsoft hesabı bağlı. Önce mevcut bağlantıyı kaldırın.", { email: currentForUser.email })
       );
     }
 

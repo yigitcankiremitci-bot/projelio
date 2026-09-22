@@ -29,6 +29,7 @@ import { coverBackground } from "../lib/covers";
 import { assigneeLabels } from "../lib/taskAssignees";
 import { useT } from "../lib/i18n";
 import { isTaskBlocked } from "../lib/taskDependencies";
+import { bicimDili } from "../lib/i18n/depo";
 
 
 export interface TaskColumnHandle {
@@ -190,7 +191,7 @@ function toDateInputValue(iso?: string): string {
 function formatDay(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("tr-TR");
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(bicimDili());
 }
 
 const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({

@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconExternalLink, IconSparkle } from "./icons";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   accountId: string;
@@ -18,9 +19,9 @@ interface Props {
 type ReplyMode = "reply" | "replyAll" | "forward";
 
 const MODE_LABELS: Record<ReplyMode, string> = {
-  reply: "Yanıtla",
-  replyAll: "Tümünü yanıtla",
-  forward: "İlet",
+  reply: "Yanıtla", // dil:anahtar
+  replyAll: "Tümünü yanıtla", // dil:anahtar
+  forward: "İlet", // dil:anahtar
 };
 
 /**
@@ -79,7 +80,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
       });
       setReplyText(text);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Taslak üretilemedi");
+      setError(err instanceof Error ? err.message : t("Taslak üretilemedi"));
     } finally {
       setDrafting(false);
     }
@@ -99,10 +100,10 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
         mode: replyMode,
         to: replyMode === "forward" ? forwardTo.split(/[,;\s]+/).filter(Boolean) : undefined,
       });
-      onSent(`${MODE_LABELS[replyMode]} işlemi tamamlandı.`);
+      onSent(t("{islem} işlemi tamamlandı.", { islem: t(MODE_LABELS[replyMode]) }));
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Yanıt gönderilemedi");
+      setError(err instanceof Error ? err.message : t("Yanıt gönderilemedi"));
     } finally {
       setSending(false);
     }
@@ -115,7 +116,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
    * metni sessizce çöpe atıyordu. Boş kutuda soru sorulmaz.
    */
   const requestClose = () => {
-    if (replyText.trim() && !window.confirm("Yazdığınız yanıt kaybolacak. Kapatılsın mı?")) return;
+    if (replyText.trim() && !window.confirm(t("Yazdığınız yanıt kaybolacak. Kapatılsın mı?"))) return;
     onClose();
   };
 
@@ -139,11 +140,11 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 13, color: c.textPrimary }}>
-              {message.from?.name || message.from?.address || "(gönderen yok)"}
+              {message.from?.name || message.from?.address || t("(gönderen yok)")}
             </span>
             <span style={{ fontSize: 12, color: c.textSecondary }}>&lt;{message.from?.address}&gt;</span>
             <span style={{ fontSize: 12, color: c.textSecondary, marginLeft: "auto" }}>
-              {new Date(message.receivedAt).toLocaleString("tr-TR")}
+              {new Date(message.receivedAt).toLocaleString(bicimDili())}
             </span>
             {message.webLink && (
               <a href={message.webLink} target="_blank" rel="noreferrer" title={t("Outlook'ta aç")} style={{ display: "flex" }}>
@@ -157,7 +158,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
           </span>
           {message.attachments.length > 0 && (
             <span style={{ fontSize: 11, color: c.textSecondary }}>
-              📎 {message.attachments.map((a) => a.name).join(", ")} — indirmek için Outlook'ta açın
+              📎 {message.attachments.map((a) => a.name).join(", ")} {t("— indirmek için Outlook'ta açın")}
             </span>
           )}
         </div>
@@ -212,7 +213,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
                   color: replyMode === mode ? c.primary : c.textPrimary,
                 }}
               >
-                {MODE_LABELS[mode]}
+                {t(MODE_LABELS[mode])}
               </button>
             ))}
           </div>
@@ -251,8 +252,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
             />
 
             <span style={{ fontSize: 11, color: c.textSecondary }}>
-              Gönderdiğinizde Outlook orijinal iletiyi altına kendisi alıntılar; siz yalnızca üstte
-              görünecek metni yazıyorsunuz.
+              {t("Gönderdiğinizde Outlook orijinal iletiyi altına kendisi alıntılar; siz yalnızca üstte görünecek metni yazıyorsunuz.")}
             </span>
 
             {error && <span style={{ fontSize: 12, color: c.danger }}>{error}</span>}
@@ -275,7 +275,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
                 }}
               >
                 <IconSparkle size={14} color={c.accent} />
-                {drafting ? "Lio yazıyor…" : "Lio ile taslak"}
+                {drafting ? t("Lio yazıyor…") : t("Lio ile taslak")}
               </button>
               <span style={{ fontSize: 11, color: c.textSecondary, flex: "1 1 200px" }}>
                 {t("Lio taslak yazar, göndermez — okuyup düzelttikten sonra siz gönderirsiniz.")}
@@ -311,7 +311,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
                   opacity: sending || drafting ? 0.6 : 1,
                 }}
               >
-                {sending ? "Gönderiliyor…" : "Gönder"}
+                {sending ? t("Gönderiliyor…") : t("Gönder")}
               </button>
             </div>
           </div>

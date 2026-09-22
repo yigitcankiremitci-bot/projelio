@@ -6,13 +6,13 @@ import { useT } from "../../lib/i18n";
 
 /** 0 = Pazar … 6 = Cumartesi (JS getDay() ile aynı ölçek, sunucu da öyle bekliyor). */
 const DAYS: { value: number; label: string }[] = [
-  { value: 1, label: "Pzt" },
-  { value: 2, label: "Sal" },
-  { value: 3, label: "Çar" },
-  { value: 4, label: "Per" },
-  { value: 5, label: "Cum" },
-  { value: 6, label: "Cmt" },
-  { value: 0, label: "Paz" },
+  { value: 1, label: "Pzt" }, // dil:anahtar
+  { value: 2, label: "Sal" }, // dil:anahtar
+  { value: 3, label: "Çar" }, // dil:anahtar
+  { value: 4, label: "Per" }, // dil:anahtar
+  { value: 5, label: "Cum" }, // dil:anahtar
+  { value: 6, label: "Cmt" }, // dil:anahtar
+  { value: 0, label: "Paz" }, // dil:anahtar
 ];
 
 /**
@@ -77,7 +77,7 @@ export default function WorkRhythmSettings() {
       setDraft(updated);
       setJustSaved(true);
     } catch (err: any) {
-      setError(String(err?.message ?? "Ayarlar kaydedilemedi."));
+      setError(String(err?.message ?? t("Ayarlar kaydedilemedi.")));
     } finally {
       setSaving(false);
     }
@@ -87,7 +87,7 @@ export default function WorkRhythmSettings() {
     return (
       <div style={cardStyle(c)}>
         <p style={{ margin: 0, fontSize: 14, color: c.textSecondary }}>
-          {error ?? "Yükleniyor…"}
+          {error ?? t("Yükleniyor…")}
         </p>
       </div>
     );
@@ -117,14 +117,14 @@ export default function WorkRhythmSettings() {
                   cursor: "pointer",
                 }}
               >
-                {d.label}
+                {t(d.label)}
               </button>
             );
           })}
         </div>
       </Field>
 
-      <Field label="Mesai saatleri" hint={t("Takvim gridi bu aralıkta çizilir. Dışına taşan bloklar yine görünür.")}>
+      <Field label={t("Mesai saatleri")} hint={t("Takvim gridi bu aralıkta çizilir. Dışına taşan bloklar yine görünür.")}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input
             type="time"
@@ -164,7 +164,7 @@ export default function WorkRhythmSettings() {
           <NumberInput
             value={draft.focusBlockMinutes}
             onChange={(v) => patch({ focusBlockMinutes: Math.round(v) })}
-            suffix="dk blok"
+            suffix={t("dk blok")}
             step={15}
             min={15}
             max={480}
@@ -194,7 +194,7 @@ export default function WorkRhythmSettings() {
             style={{ width: 17, height: 17 }}
           />
           <span style={{ fontSize: 14, color: c.textPrimary }}>
-            {draft.ritualsEnabled ? "Açık" : "Kapalı"}
+            {draft.ritualsEnabled ? t("Açık") : t("Kapalı")}
           </span>
         </label>
       </Field>
@@ -209,7 +209,7 @@ export default function WorkRhythmSettings() {
             >
               {DAYS.map((d) => (
                 <option key={d.value} value={d.value}>
-                  {d.label}
+                  {t(d.label)}
                 </option>
               ))}
             </select>
@@ -231,7 +231,7 @@ export default function WorkRhythmSettings() {
             <NumberInput
               value={draft.monthlyRitualDay}
               onChange={(v) => patch({ monthlyRitualDay: Math.round(v) })}
-              suffix=". gün"
+              suffix={t(". gün")}
               step={1}
               min={1}
               max={28}
@@ -260,7 +260,7 @@ export default function WorkRhythmSettings() {
           cursor: dirty && !saving ? "pointer" : "default",
         }}
       >
-        {saving ? "Kaydediliyor…" : "Kaydet"}
+        {saving ? t("Kaydediliyor…") : t("Kaydet")}
       </button>
     </div>
   );

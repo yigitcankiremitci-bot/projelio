@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import GirisDilSecici from "../components/GirisDilSecici";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -44,6 +45,7 @@ export default function ResetPassword() {
         padding: 24,
       }}
     >
+      <GirisDilSecici />
       <div
         style={{
           width: "100%",

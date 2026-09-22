@@ -30,12 +30,12 @@ interface Section {
 // Sabit uygulama sayfaları. Kasa ve Dosyalar anasayfanın sekmeleridir (bkz.
 // Dashboard.tsx ?tab=), bu yüzden yolları sorgu parametreli.
 const PAGE_OPTIONS: Option[] = [
-  { path: "/", label: "Ana Sayfa", icon: IconDashboard },
-  { path: "/?tab=budget", label: "Kasa", icon: IconActivity },
-  { path: "/?tab=files", label: "Dosyalar", icon: IconFile },
-  { path: "/calendar", label: "Takvim", icon: IconCalendar },
-  { path: "/tasks", label: "Yapılacaklar", icon: IconListCheck },
-  { path: "/worklog", label: "Yaptım", icon: IconCheck },
+  { path: "/", label: "Ana Sayfa", icon: IconDashboard }, // dil:anahtar
+  { path: "/?tab=budget", label: "Kasa", icon: IconActivity }, // dil:anahtar
+  { path: "/?tab=files", label: "Dosyalar", icon: IconFile }, // dil:anahtar
+  { path: "/calendar", label: "Takvim", icon: IconCalendar }, // dil:anahtar
+  { path: "/tasks", label: "Yapılacaklar", icon: IconListCheck }, // dil:anahtar
+  { path: "/worklog", label: "Yaptım", icon: IconCheck }, // dil:anahtar
 ];
 
 interface Props {
@@ -63,23 +63,23 @@ export default function HomeTargetModal({ onClose }: Props) {
     ];
 
     return [
-      { title: "Sayfalar", options: PAGE_OPTIONS },
+      { title: t("Sayfalar"), options: PAGE_OPTIONS },
       {
-        title: "Gruplar",
+        title: t("Gruplar"),
         options: groups.map((g) => ({ path: `/groups/${g.group.id}`, label: g.group.name, icon: IconLayers })),
       },
       {
-        title: "Şirketler",
+        title: t("Şirketler"),
         options: orgNodes.map((o) => ({ path: `/organizations/${o.org.id}`, label: o.org.name, icon: IconBuilding })),
       },
       {
-        title: "Departmanlar",
+        title: t("Departmanlar"),
         options: orgNodes.flatMap((o) =>
           o.departments.map((d) => ({ path: `/departments/${d.id}`, label: d.name, icon: IconListCheck }))
         ),
       },
       {
-        title: "İşler",
+        title: t("İşler"),
         options: allJobs.map((j) => ({ path: `/jobs/${j.id}`, label: j.title, icon: IconBriefcase })),
       },
     ];
@@ -89,7 +89,7 @@ export default function HomeTargetModal({ onClose }: Props) {
   const visibleSections = sections
     .map((s) => ({
       ...s,
-      options: normalized ? s.options.filter((o) => o.label.toLocaleLowerCase("tr").includes(normalized)) : s.options,
+      options: normalized ? s.options.filter((o) => t(o.label).toLocaleLowerCase().includes(normalized)) : s.options,
     }))
     .filter((s) => s.options.length > 0);
 
@@ -101,15 +101,14 @@ export default function HomeTargetModal({ onClose }: Props) {
   return (
     <Modal title={t("Ana Sayfa düğmesi")} onClose={onClose} maxWidth={460}>
       <p style={{ margin: "0 0 14px", fontSize: 14, color: c.textSecondary, lineHeight: 1.5 }}>
-        {t("Menüdeki")} <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{t("Ana Sayfa")}</strong> düğmesine bastığında
-        nereye gitmek istersin? Bu tercih yalnızca bu cihazda geçerlidir.
+        {t("Menüdeki")} <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{t("Ana Sayfa")}</strong> {t("düğmesine bastığında nereye gitmek istersin? Bu tercih yalnızca bu cihazda geçerlidir.")}
       </p>
 
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Ara"
-        aria-label="Hedef ara"
+        placeholder={t("Ara")}
+        aria-label={t("Hedef ara")}
         style={{ width: "100%", marginBottom: 12 }}
       />
 
@@ -159,7 +158,7 @@ export default function HomeTargetModal({ onClose }: Props) {
                   >
                     <Icon size={15} color={selected ? c.accentDark : c.textSecondary} />
                     <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {option.label}
+                      {t(option.label)}
                     </span>
                     {selected && <IconCheck size={15} color={c.accentDark} />}
                   </button>

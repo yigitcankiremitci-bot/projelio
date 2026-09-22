@@ -1,5 +1,7 @@
+// dil:anahtar-dosya — etiketler; çeviri render anında (t(...)) yapılıyor.
 import type { BilgiKarti } from "@projelio/shared";
 import type { BilgiKartiGirdisi } from "../../api/bilgiKarti";
+import { bicimDili } from "../../lib/i18n/depo";
 
 /**
  * Künye alanlarının TEK tanımı.
@@ -30,12 +32,12 @@ export const KUNYE_BOLUMLERI: KunyeBolumu[] = [
     key: "kimlik",
     title: "Kimlik",
     alanlar: [
-      { key: "legalName", label: "Ticari ünvan", placeholder: "Örn. Projelio Yazılım A.Ş." },
-      { key: "brandName", label: "Marka / kısa ad" },
-      { key: "sector", label: "Sektör" },
-      { key: "foundedOn", label: "Kuruluş tarihi", tur: "date" },
-      { key: "employeeCount", label: "Çalışan sayısı", tur: "number" },
-      { key: "about", label: "Şirket hakkında", tur: "multiline", genis: true },
+      { key: "legalName", label: "Ticari ünvan", placeholder: "Örn. Projelio Yazılım A.Ş." }, // dil:anahtar
+      { key: "brandName", label: "Marka / kısa ad" }, // dil:anahtar
+      { key: "sector", label: "Sektör" }, // dil:anahtar
+      { key: "foundedOn", label: "Kuruluş tarihi", tur: "date" }, // dil:anahtar
+      { key: "employeeCount", label: "Çalışan sayısı", tur: "number" }, // dil:anahtar
+      { key: "about", label: "Şirket hakkında", tur: "multiline", genis: true }, // dil:anahtar
     ],
   },
   {
@@ -45,15 +47,15 @@ export const KUNYE_BOLUMLERI: KunyeBolumu[] = [
       { key: "taxOffice", label: "Vergi dairesi" },
       { key: "taxNumber", label: "Vergi / TC kimlik no" },
       { key: "tradeRegistryNo", label: "Ticaret sicil no" },
-      { key: "mersisNo", label: "MERSİS no" },
+      { key: "mersisNo", label: "MERSİS no" }, // dil:anahtar
       { key: "naceCode", label: "Faaliyet (NACE) kodu" },
-      { key: "sgkNo", label: "SGK işyeri sicil no" },
+      { key: "sgkNo", label: "SGK işyeri sicil no" }, // dil:anahtar
       { key: "kepAddress", label: "KEP adresi", tur: "email" },
     ],
   },
   {
     key: "iletisim",
-    title: "İletişim",
+    title: "İletişim", // dil:anahtar
     alanlar: [
       { key: "phone", label: "Telefon", tur: "tel" },
       { key: "email", label: "E-posta", tur: "email" },
@@ -62,13 +64,13 @@ export const KUNYE_BOLUMLERI: KunyeBolumu[] = [
   },
   {
     key: "adres",
-    title: "Adres",
+    title: "Adres", // dil:anahtar
     alanlar: [
-      { key: "address", label: "Açık adres", tur: "multiline", genis: true },
-      { key: "district", label: "İlçe" },
-      { key: "city", label: "İl" },
+      { key: "address", label: "Açık adres", tur: "multiline", genis: true }, // dil:anahtar
+      { key: "district", label: "İlçe" }, // dil:anahtar
+      { key: "city", label: "İl" }, // dil:anahtar
       { key: "postalCode", label: "Posta kodu" },
-      { key: "country", label: "Ülke" },
+      { key: "country", label: "Ülke" }, // dil:anahtar
     ],
   },
   {
@@ -85,7 +87,7 @@ export const KUNYE_BOLUMLERI: KunyeBolumu[] = [
     alanlar: [
       {
         key: "accountantEmail",
-        label: "Muhasebeci e-postası",
+        label: "Muhasebeci e-postası", // dil:anahtar
         tur: "email",
         genis: true,
         placeholder: "muhasebe@ornek.com",
@@ -95,7 +97,7 @@ export const KUNYE_BOLUMLERI: KunyeBolumu[] = [
   {
     key: "notlar",
     title: "Notlar",
-    alanlar: [{ key: "notes", label: "Not", tur: "multiline", genis: true }],
+    alanlar: [{ key: "notes", label: "Not", tur: "multiline", genis: true }], // dil:anahtar
   },
 ];
 
@@ -124,7 +126,7 @@ export function kunyeDegeri(kart: BilgiKarti | null, alan: KunyeAlani): string {
   if (ham === undefined || ham === null || ham === "") return "";
   if (alan.tur === "date") {
     const tarih = new Date(String(ham));
-    return Number.isNaN(tarih.getTime()) ? String(ham) : tarih.toLocaleDateString("tr-TR");
+    return Number.isNaN(tarih.getTime()) ? String(ham) : tarih.toLocaleDateString(bicimDili());
   }
   return String(ham);
 }

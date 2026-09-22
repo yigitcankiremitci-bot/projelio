@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { DepartmentMember, JobMember, Party } from "@projelio/shared";
 import { api } from "../api/client";
 import { displayReference, type ModuleFieldConfig, type ModuleRecordConfig } from "./moduleConfigs";
+import { useT } from "./i18n";
+import { cevirmenSuAn } from "./i18n/anlik";
 
 /**
  * Referans alanlarının (entity_ref / user_ref) seçenekleri ve ad çözümlemesi.
@@ -36,6 +38,7 @@ interface Scope {
 }
 
 export function useModuleReferences(scope: Scope, enabled: boolean): ReferenceSource {
+  const t = useT();
   const [parties, setParties] = useState<ReferenceOption[]>([]);
   const [users, setUsers] = useState<ReferenceOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,7 +76,7 @@ export function useModuleReferences(scope: Scope, enabled: boolean): ReferenceSo
             .filter((x: any) => x.userId && (x.status ?? "approved") === "approved")
             .map((x: any) => ({
               id: x.userId as string,
-              label: x.fullName ?? x.username ?? x.email ?? "İsimsiz",
+              label: x.fullName ?? x.username ?? x.email ?? t("İsimsiz"),
               hint: x.title ?? undefined,
             }))
         );

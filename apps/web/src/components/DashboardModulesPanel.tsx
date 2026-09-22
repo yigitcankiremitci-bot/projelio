@@ -60,7 +60,7 @@ export default function DashboardModulesPanel({ jobs }: Props) {
       setPickerFor(null);
       loadAssignments();
       pushUndo({
-        label: "Modül atama",
+        label: t("Modül atama"),
         run: async () => {
           await api.delete(`/jobs/${jobId}/modules/${moduleKey}`);
           loadAssignments();
@@ -81,7 +81,7 @@ export default function DashboardModulesPanel({ jobs }: Props) {
       await api.delete(`/jobs/${jobId}/modules/${moduleKey}`);
       loadAssignments();
       pushUndo({
-        label: "Modül kaldırma",
+        label: t("Modül kaldırma"),
         run: async () => {
           await api.post(`/jobs/${jobId}/modules`, { moduleKey });
           loadAssignments();
@@ -118,8 +118,7 @@ export default function DashboardModulesPanel({ jobs }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 4px" }}>
-        Aşağıdaki modülleri istediğin işe atayabilirsin. Bir şirket ya da işletme kurduğunda bu görünüm yerini
-        departmanlara bırakır.
+        {t("Aşağıdaki modülleri istediğin işe atayabilirsin. Bir şirket ya da işletme kurduğunda bu görünüm yerini departmanlara bırakır.")}
       </p>
       {catalog.map((entry) => {
         const assignedJobs = assignedJobsFor(entry.key);

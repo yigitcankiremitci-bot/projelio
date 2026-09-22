@@ -19,6 +19,7 @@ import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { usePageHeader } from "../lib/pageHeader";
 import { useBackTarget } from "../lib/backTarget";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 // Not: "İşler" (job) kavramı yalnızca serbest çalışan/taşeron hesaplarına özgüdür;
 // bir holding doğrudan iş değil, organizasyon (ve onların departmanlarını) yönetir.
@@ -57,7 +58,7 @@ export default function GroupDetail() {
   // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
   const backRef = useRef<HTMLDivElement>(null);
   // Geri, holdinge hangi sayfadan girildiyse oraya döner (bkz. lib/backTarget).
-  const back = useBackTarget({ to: "/groups", label: "Gruplar" });
+  const back = useBackTarget({ to: "/groups", label: t("Gruplar") });
   usePageHeader(group?.name, coverRef, [group?.name, back.to, back.label, back.geriGit], { ...back, sourceRef: backRef });
 
   if (!id) return null;
@@ -88,7 +89,7 @@ export default function GroupDetail() {
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <IconCalendar size={12} color={cover.secondary} />
-                {new Date(group.createdAt).toLocaleDateString("tr-TR")} kuruldu
+                {new Date(group.createdAt).toLocaleDateString(bicimDili())} kuruldu
               </span>
             </>
           )

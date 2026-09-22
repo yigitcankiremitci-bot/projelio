@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import type { SupportRequest } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { hataMetni } from "../../common/i18n/index";
 
 /** Formdan gelen metinlerin üst sınırları — sunucu tarafında da uygulanır. */
 const MAX_NAME = 80;
@@ -29,8 +30,8 @@ function mapRequest(row: any): SupportRequest {
 
 function required(value: unknown, field: string, max: number): string {
   const text = typeof value === "string" ? value.trim() : "";
-  if (!text) throw new BadRequestException(`${field} boş olamaz.`);
-  if (text.length > max) throw new BadRequestException(`${field} en fazla ${max} karakter olabilir.`);
+  if (!text) throw new BadRequestException(hataMetni("{field} boş olamaz.", { field }));
+  if (text.length > max) throw new BadRequestException(hataMetni("{field} en fazla {max} karakter olabilir.", { field, max }));
   return text;
 }
 

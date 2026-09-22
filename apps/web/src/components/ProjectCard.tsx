@@ -12,6 +12,7 @@ import AskLioButton from "./AskLioButton";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { isProjectInSidebar } from "../lib/useSidebarHierarchy";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   project: Project;
@@ -198,10 +199,10 @@ export default function ProjectCard({ project, canManage, onStatusChanged }: Pro
           }}
         >
           <span style={{ color: c.accentDark, fontWeight: 500 }}>
-            {project.totalBudget.toLocaleString("tr-TR")} ₺
+            {project.totalBudget.toLocaleString(bicimDili())} ₺
           </span>
           <span style={{ color: c.textSecondary }}>
-            {new Date(project.deadline).toLocaleDateString("tr-TR")}
+            {new Date(project.deadline).toLocaleDateString(bicimDili())}
           </span>
         </div>
       </div>

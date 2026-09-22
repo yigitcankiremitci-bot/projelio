@@ -8,6 +8,7 @@ import AiCreditTopUp from "../components/AiCreditTopUp";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { demoHesap } from "../lib/demoHesap";
 import { satinAlmaGosterilir } from "../lib/mobilKabuk";
+import { bicimDili } from "../lib/i18n/depo";
 
 // Modül düzeyinde kanca çağrılamaz: Türkçe metin ANAHTAR olarak duruyor,
 // çeviri kullanıldığı yerde (t(TYPE_LABELS[...])) yapılıyor.
@@ -118,7 +119,7 @@ export default function AiCreditsPage() {
           {t("Kullanılabilir bakiye")}
         </div>
         <div style={{ fontSize: 38, fontWeight: 600, margin: "8px 0 2px", letterSpacing: -0.5 }}>
-          {loading ? "…" : Math.round(credits?.balance ?? 0).toLocaleString("tr-TR")}
+          {loading ? "…" : Math.round(credits?.balance ?? 0).toLocaleString(bicimDili())}
         </div>
         <div style={{ fontSize: 13, opacity: 0.75 }}>{t("Lio birimi")}</div>
 
@@ -127,8 +128,8 @@ export default function AiCreditsPage() {
         {!!credits?.planBalance && credits.planBalance > 0 && credits.planExpiresAt && (
           <div style={{ fontSize: 13, opacity: 0.85, marginTop: 8, lineHeight: 1.5 }}>
             {t("Bunun {n} birimi paketinden; {tarih} tarihinde kalanı sona erer. Harcamada önce paket birimi kullanılır.", {
-              n: Math.round(credits.planBalance).toLocaleString("tr-TR"),
-              tarih: new Date(credits.planExpiresAt).toLocaleDateString("tr-TR"),
+              n: Math.round(credits.planBalance).toLocaleString(bicimDili()),
+              tarih: new Date(credits.planExpiresAt).toLocaleDateString(bicimDili()),
             })}
           </div>
         )}
@@ -215,13 +216,13 @@ export default function AiCreditsPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, color: c.textPrimary }}>{t(TYPE_LABELS[tx.type] ?? tx.type)}</div>
                   <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
-                    {new Date(tx.createdAt).toLocaleString("tr-TR", {
+                    {new Date(tx.createdAt).toLocaleString(bicimDili(), {
                       day: "2-digit",
                       month: "short",
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
-                    {tx.description ? ` · ${tx.description}` : ""}
+                    {tx.description ? ` · ${t(tx.description)}` : ""}
                   </div>
                 </div>
                 <div
@@ -233,7 +234,7 @@ export default function AiCreditsPage() {
                   }}
                 >
                   {positive ? "+" : ""}
-                  {Math.round(tx.credits).toLocaleString("tr-TR")}
+                  {Math.round(tx.credits).toLocaleString(bicimDili())}
                 </div>
               </div>
             );
@@ -249,7 +250,7 @@ function Stat({ label, value }: { label: string; value: number }) {
     <div>
       <div style={{ fontSize: 11, opacity: 0.7 }}>{label}</div>
       <div style={{ fontSize: 17, fontWeight: 600, marginTop: 2 }}>
-        {Math.round(value).toLocaleString("tr-TR")}
+        {Math.round(value).toLocaleString(bicimDili())}
       </div>
     </div>
   );

@@ -3,9 +3,10 @@ import { aiChat } from "../api/aiChat";
 import type { AiCreditOrder } from "../api/aiChat";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
+import { bicimDili } from "../lib/i18n/depo";
 
 function formatTry(amount: number): string {
-  return `${amount.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
+  return `${amount.toLocaleString(bicimDili(), { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
 }
 
 interface Props {
@@ -107,7 +108,7 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
             <div key={o.id} style={{ ...rowStyle, borderTop: `1px solid ${c.danger}44` }}>
               <span style={{ flex: 1, color: c.textPrimary }}>
                 {o.userFullName ?? o.userEmail ?? o.userId} ·{" "}
-                {t("{n} birim", { n: o.credits.toLocaleString("tr-TR") })}
+                {t("{n} birim", { n: o.credits.toLocaleString(bicimDili()) })}
               </span>
               <button
                 onClick={() => act(o.id, () => aiChat.retryCreditOrder(o.id))}
@@ -132,8 +133,8 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
               <span style={{ flex: 1, minWidth: 160, color: c.textPrimary }}>
                 {o.userFullName ?? o.userEmail ?? o.userId}
                 <span style={{ display: "block", fontSize: 12.5, color: c.textSecondary }}>
-                  {t("{n} birim", { n: o.credits.toLocaleString("tr-TR") })} · {formatTry(o.priceAmount)} ·{" "}
-                  {new Date(o.createdAt).toLocaleDateString("tr-TR")}
+                  {t("{n} birim", { n: o.credits.toLocaleString(bicimDili()) })} · {formatTry(o.priceAmount)} ·{" "}
+                  {new Date(o.createdAt).toLocaleDateString(bicimDili())}
                 </span>
               </span>
               <button

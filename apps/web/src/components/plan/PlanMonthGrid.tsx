@@ -13,6 +13,7 @@ import {
   weekdayOf,
   type DraggedItem,
 } from "../../lib/planGrid";
+import { useT } from "../../lib/i18n";
 
 interface Props {
   from: string;
@@ -44,6 +45,7 @@ export default function PlanMonthGrid({
   onSelectDay,
   onDropItem,
 }: Props) {
+  const t = useT();
   const c = useThemeColors();
   const today = todayStr();
 
@@ -80,7 +82,7 @@ export default function PlanMonthGrid({
         {/* Başlıklar pazartesiden başlar; hafta pazartesi başlıyor. */}
         {[1, 2, 3, 4, 5, 6, 0].map((d) => (
           <div key={d} style={{ padding: "8px 0", textAlign: "center", fontSize: 12, color: c.textSecondary }}>
-            {WEEKDAY_LABELS[d]}
+            {t(WEEKDAY_LABELS[d])}
           </div>
         ))}
       </div>

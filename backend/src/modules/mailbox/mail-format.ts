@@ -23,6 +23,20 @@ function toAddresses(recipients: GraphRecipient[] | undefined): MailAddress[] {
 }
 
 /**
+ * Graph hatalarının kullanıcıya dönen metinleri. İstisna mesajı olarak
+ * fırlatılıyor ve HTTP sınırında çevriliyor; anahtar oldukları için burada
+ * işaretli bir blokta duruyorlar.
+ */
+// dil:anahtar-baslangic
+const GRAPH_HATASI = {
+  suresiDoldu: "Posta bağlantısının süresi dolmuş. Kutuyu yeniden bağlayın.",
+  izinYok: "Bu kutuya erişim izni yok. Paylaşılan kutuda 'tam erişim' yetkisi gerekiyor olabilir.",
+  bulunamadi: "İleti bulunamadı; başka bir yere taşınmış ya da silinmiş olabilir.",
+  sinir: "Microsoft istek sınırına takıldı, biraz sonra tekrar deneyin.",
+};
+// dil:anahtar-bitis
+
+/**
  * HTML gövdeden okunabilir düz metin.
  *
  * Tam bir HTML ayrıştırıcı değil ve olmamalı: bu metin ekranda gösterilmiyor,
@@ -148,16 +162,16 @@ export function describeGraphError(status: number, body: string): string {
   }
 
   if (status === 401 || code === "InvalidAuthenticationToken") {
-    return "Posta bağlantısının süresi dolmuş. Kutuyu yeniden bağlayın.";
+    return GRAPH_HATASI.suresiDoldu;
   }
   if (status === 403 || code === "ErrorAccessDenied") {
-    return "Bu kutuya erişim izni yok. Paylaşılan kutuda 'tam erişim' yetkisi gerekiyor olabilir.";
+    return GRAPH_HATASI.izinYok;
   }
   if (status === 404 || code === "ErrorItemNotFound") {
-    return "İleti bulunamadı; başka bir yere taşınmış ya da silinmiş olabilir.";
+    return GRAPH_HATASI.bulunamadi;
   }
   if (status === 429) {
-    return "Microsoft istek sınırına takıldı, biraz sonra tekrar deneyin.";
+    return GRAPH_HATASI.sinir;
   }
   return message || `Posta servisi hata döndürdü (${status}).`;
 }

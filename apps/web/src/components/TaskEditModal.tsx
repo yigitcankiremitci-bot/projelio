@@ -18,6 +18,7 @@ import { useCurrentUser } from "../lib/useCurrentUser";
 import { IconIndent, IconOutdent } from "./icons";
 import { useUndo } from "../lib/undo";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   task: Task;
@@ -663,7 +664,7 @@ export default function TaskEditModal({
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                   <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{cm.authorName}</span>
                   <span style={{ fontSize: 13, color: c.textSecondary }}>
-                    {new Date(cm.createdAt).toLocaleDateString("tr-TR")}
+                    {new Date(cm.createdAt).toLocaleDateString(bicimDili())}
                   </span>
                 </div>
                 <p style={{ fontSize: 16, color: c.textPrimary, margin: 0, lineHeight: 1.4 }}>{cm.body}</p>
@@ -692,7 +693,7 @@ export default function TaskEditModal({
       </div>
 
       <EntityDangerZone
-        entityLabel={isSubtask ? t("Alt görevi") : t("Görevi")}
+        entityLabel={isSubtask ? t("Alt görevi", { ctx: "nesne" }) : t("Görevi", { ctx: "nesne" })}
         resourcePath={`/tasks/${task.id}`}
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}

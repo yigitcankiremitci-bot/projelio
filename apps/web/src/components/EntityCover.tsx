@@ -6,6 +6,7 @@ import AskLioButton from "./AskLioButton";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { COVER_TOP_CLEARANCE, pageGutter, SAFE_TOP, TOP_CHROME_BOTTOM, safeTop } from "../lib/layout";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import { IconChevronLeft } from "./icons";
 import { PROFILE_CARD_MOBILE_WIDTH } from "./ProfileCard";
@@ -140,6 +141,9 @@ export function CoverBackLink({
   floating?: boolean;
 }) {
   const c = useThemeColors();
+  // Etiket ya sabit bir sayfa adı ("Ana Sayfa", sözlükte) ya da kaydın kendi
+  // adıdır; ikincisi sözlükte olmadığı için olduğu gibi kalır.
+  const t = useT();
   const cover = useCoverTheme();
   // Kapağın altındaki perde karanlık modda koyuya döndüğü için (bkz.
   // useCoverTheme), çip de o zaman "onDark" gibi davranmalı — cover'ın kendi
@@ -186,7 +190,7 @@ export function CoverBackLink({
       }}
     >
       <IconChevronLeft size={14} color={fg} />
-      {label}
+      {t(label)}
     </Link>
   );
 }

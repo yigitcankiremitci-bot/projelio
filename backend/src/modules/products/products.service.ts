@@ -7,6 +7,7 @@ import { ModuleRecordsService } from "../module-records/module-records.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 import { safeExternalUrl } from "../../common/safe-url";
+import { hataMetni } from "../../common/i18n/index";
 
 const COVER_BUCKET = "product-covers";
 
@@ -91,9 +92,9 @@ function parseOptionalNumber(value: unknown, label: string, { min = 0, max }: { 
   if (value === undefined) return undefined;
   if (value === null || value === "") return null;
   const parsed = typeof value === "number" ? value : Number(String(value).replace(",", "."));
-  if (!Number.isFinite(parsed)) throw new BadRequestException(`${label} sayı olmalı`);
-  if (parsed < min) throw new BadRequestException(`${label} ${min} değerinden küçük olamaz`);
-  if (max !== undefined && parsed > max) throw new BadRequestException(`${label} en fazla ${max} olabilir`);
+  if (!Number.isFinite(parsed)) throw new BadRequestException(hataMetni("{label} sayı olmalı", { label }));
+  if (parsed < min) throw new BadRequestException(hataMetni("{label} {min} değerinden küçük olamaz", { label, min }));
+  if (max !== undefined && parsed > max) throw new BadRequestException(hataMetni("{label} en fazla {max} olabilir", { label, max }));
   return parsed;
 }
 
@@ -140,11 +141,11 @@ function parseFeatures(value: unknown): string[] | undefined {
   for (const item of value) {
     const text = String(item ?? "").trim();
     if (!text || seen.has(text)) continue;
-    if (text.length > MAX_LIST_TEXT) throw new BadRequestException(`Bir özellik en fazla ${MAX_LIST_TEXT} karakter olabilir`);
+    if (text.length > MAX_LIST_TEXT) throw new BadRequestException(hataMetni("Bir özellik en fazla {MAX_LIST_TEXT} karakter olabilir", { MAX_LIST_TEXT }));
     seen.add(text);
     list.push(text);
   }
-  if (list.length > MAX_FEATURES) throw new BadRequestException(`En fazla ${MAX_FEATURES} özellik eklenebilir`);
+  if (list.length > MAX_FEATURES) throw new BadRequestException(hataMetni("En fazla {MAX_FEATURES} özellik eklenebilir", { MAX_FEATURES }));
   return list;
 }
 
@@ -164,11 +165,11 @@ function parseSpecs(value: unknown): ProductSpec[] | undefined {
     if (!specValue) continue;
     if (!label) throw new BadRequestException("Teknik özelliğin adı boş bırakılamaz");
     if (label.length > MAX_LIST_TEXT || specValue.length > MAX_LIST_TEXT) {
-      throw new BadRequestException(`Teknik özellik en fazla ${MAX_LIST_TEXT} karakter olabilir`);
+      throw new BadRequestException(hataMetni("Teknik özellik en fazla {MAX_LIST_TEXT} karakter olabilir", { MAX_LIST_TEXT }));
     }
     list.push({ label, value: specValue });
   }
-  if (list.length > MAX_SPECS) throw new BadRequestException(`En fazla ${MAX_SPECS} teknik özellik eklenebilir`);
+  if (list.length > MAX_SPECS) throw new BadRequestException(hataMetni("En fazla {MAX_SPECS} teknik özellik eklenebilir", { MAX_SPECS }));
   return list;
 }
 
@@ -327,7 +328,7 @@ export class ProductsService {
     // hatası kullanıcıya ham haliyle gidiyordu.
     for (const [field, label] of [["warranty", "Garanti"], ["leadTime", "Teslim süresi"]] as const) {
       const value = patch[field === "leadTime" ? "lead_time" : field];
-      if (typeof value === "string" && value.length > 120) throw new BadRequestException(`${label} en fazla 120 karakter olabilir`);
+      if (typeof value === "string" && value.length > 120) throw new BadRequestException(hataMetni("{label} en fazla 120 karakter olabilir", { label }));
     }
 
     if (data.unit !== undefined) {
@@ -633,7 +634,7 @@ export class ProductsService {
 
     const current = existing.images ?? [];
     if (current.length >= MAX_IMAGES_PER_PRODUCT) {
-      throw new BadRequestException(`Bir ürüne en fazla ${MAX_IMAGES_PER_PRODUCT} fotoğraf eklenebilir`);
+      throw new BadRequestException(hataMetni("Bir ürüne en fazla {MAX_IMAGES_PER_PRODUCT} fotoğraf eklenebilir", { MAX_IMAGES_PER_PRODUCT }));
     }
 
     // Tür ve uzantı istemcinin sözüne değil, dosyanın ilk baytlarındaki

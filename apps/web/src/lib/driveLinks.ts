@@ -1,4 +1,5 @@
 import type { ProjectFile } from "@projelio/shared";
+import { cevirmenSuAn } from "./i18n/anlik";
 
 /**
  * Drive/OneDrive dosyaları için önizleme ve düzenleme adresleri.
@@ -95,15 +96,16 @@ export function formatFileSize(bytes?: number, hassas = false): string {
 
 /** Dosya türüne göre kısa, okunur etiket. */
 export function fileKindLabel(file: ProjectFile): string {
-  if (file.mimeType === "application/vnd.google-apps.document") return "Google Dokümanı";
-  if (file.mimeType === "application/vnd.google-apps.spreadsheet") return "Google E-Tablo";
-  if (file.mimeType === "application/vnd.google-apps.presentation") return "Google Sunu";
-  if (file.mimeType.startsWith("image/")) return "Görsel";
+  const t = cevirmenSuAn();
+  if (file.mimeType === "application/vnd.google-apps.document") return t("Google Dokümanı");
+  if (file.mimeType === "application/vnd.google-apps.spreadsheet") return t("Google E-Tablo");
+  if (file.mimeType === "application/vnd.google-apps.presentation") return t("Google Sunu");
+  if (file.mimeType.startsWith("image/")) return t("Görsel");
   if (file.mimeType === "application/pdf") return "PDF";
   if (file.mimeType.startsWith("video/")) return "Video";
-  if (file.mimeType.startsWith("audio/")) return "Ses";
+  if (file.mimeType.startsWith("audio/")) return t("Ses");
   if (file.mimeType.includes("spreadsheet") || file.mimeType.includes("excel")) return "E-Tablo";
-  if (file.mimeType.includes("word") || file.mimeType.includes("document")) return "Belge";
-  if (file.mimeType.includes("presentation")) return "Sunum";
-  return "Dosya";
+  if (file.mimeType.includes("word") || file.mimeType.includes("document")) return t("Belge");
+  if (file.mimeType.includes("presentation")) return t("Sunum");
+  return t("Dosya");
 }

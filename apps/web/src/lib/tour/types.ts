@@ -53,14 +53,14 @@ export type TourArea =
   | "ayarlar";
 
 export const AREA_LABELS: Record<TourArea, string> = {
-  genel: "Genel",
-  isler: "İşler",
-  butce: "Bütçe",
-  dosyalar: "Dosyalar",
-  takvim: "Takvim",
-  moduller: "Modüller",
-  lio: "Lio (AI)",
-  ayarlar: "Ayarlar",
+  genel: "Genel", // dil:anahtar
+  isler: "İşler", // dil:anahtar
+  butce: "Bütçe", // dil:anahtar
+  dosyalar: "Dosyalar", // dil:anahtar
+  takvim: "Takvim", // dil:anahtar
+  moduller: "Modüller", // dil:anahtar
+  lio: "Lio (AI)", // dil:anahtar
+  ayarlar: "Ayarlar", // dil:anahtar
 };
 
 export interface Tour {

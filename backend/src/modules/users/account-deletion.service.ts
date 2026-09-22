@@ -11,6 +11,8 @@ import {
   describeBlockers,
   type BlockingOwnership,
 } from "./account-deletion.rules";
+import { cevirmen } from "../../common/i18n";
+import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 
 /**
  * Hesap silme (KVKK m.11 / GDPR silme hakkı).
@@ -56,8 +58,14 @@ export class AccountDeletionService {
   constructor(
     private supabase: SupabaseService,
     private usersService: UsersService,
-    private emailService: EmailService
+    private emailService: EmailService,
+    private diller: KullaniciDiliService
   ) {}
+
+  /** Engel mesajı kullanıcının dilinde kuruluyor (bkz. describeBlockers). */
+  private async engelMetni(userId: string, engeller: Parameters<typeof describeBlockers>[0]): Promise<string | null> {
+    return describeBlockers(engeller, cevirmen(await this.diller.diliniBul(userId)));
+  }
 
   /**
    * Silmeden ÖNCE kullanıcıya ne olacağını anlatabilmek için: engel var mı ve
@@ -70,7 +78,7 @@ export class AccountDeletionService {
   }> {
     const [orglar, isler] = await Promise.all([this.classifyOwnedOrgs(userId), this.classifyOwnedJobs(userId)]);
     return {
-      blocker: describeBlockers(orglar.engeller),
+      blocker: await this.engelMetni(userId, orglar.engeller),
       silinecekIsler: [...isler.silinecek.map((j) => j.title), ...orglar.silinecekAdlar],
       korunacakIsler: isler.korunacak.map((j) => j.title),
     };
@@ -100,7 +108,7 @@ export class AccountDeletionService {
     }
 
     const { engeller } = await this.classifyOwnedOrgs(userId);
-    const engel = describeBlockers(engeller);
+    const engel = await this.engelMetni(userId, engeller);
     if (engel) throw new BadRequestException(engel);
 
     // Bu aşamada HİÇBİR ŞEY silinmiyor: yalnızca saat başlatılıyor. Veri 30 gün
@@ -172,7 +180,7 @@ export class AccountDeletionService {
 
   private async engelVarsaDurdur(userId: string): Promise<void> {
     const { engeller } = await this.classifyOwnedOrgs(userId);
-    const engel = describeBlockers(engeller);
+    const engel = await this.engelMetni(userId, engeller);
     if (engel) throw new BadRequestException(engel);
   }
 

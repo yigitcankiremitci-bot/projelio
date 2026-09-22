@@ -95,7 +95,7 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
       return;
     }
     if (!targetId) {
-      setError(targetType === "project" ? "Bir proje seç" : "Bir departman seç");
+      setError(targetType === "project" ? t("Bir proje seç") : t("Bir departman seç"));
       return;
     }
     setError("");
@@ -109,7 +109,7 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
       onMoved(moved, targetType);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Görev taşınamadı");
+      setError(err instanceof Error ? err.message : t("Görev taşınamadı"));
       setSaving(false);
     }
   };
@@ -130,7 +130,7 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
     try {
       const moved = await api.patch<Task[]>("/tasks/bulk-output", { ids: taskIds, outputId: nextId });
       pushUndo({
-        label: nextId ? "Görevler çıktıya taşındı" : "Görevler çıktıdan çıkarıldı",
+        label: nextId ? t("Görevler çıktıya taşındı") : t("Görevler çıktıdan çıkarıldı"),
         // Her kayıt KENDİ eski çıktısına döner; seçim farklı çıktılardan gelmiş olabilir.
         run: async () => {
           const groups = new Map<string | null, string[]>();
@@ -149,7 +149,7 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
       onMoved(moved, "output");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Görevler çıktıya taşınamadı");
+      setError(err instanceof Error ? err.message : t("Görevler çıktıya taşınamadı"));
       setSaving(false);
     }
   };
@@ -158,7 +158,9 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
     <Modal title={t("Görevi taşı")} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-          {taskIds.length > 1 ? `${taskIds.length} görev` : "Görev"} seçtiğin hedefe taşınacak (varsa alt görevleriyle birlikte).
+          {taskIds.length > 1
+            ? t("{n} görev seçtiğin hedefe taşınacak (varsa alt görevleriyle birlikte).", { n: taskIds.length })
+            : t("Görev seçtiğin hedefe taşınacak (varsa alt görevleriyle birlikte).")}
         </p>
 
         <div style={{ display: "flex", gap: 6 }}>
@@ -226,19 +228,19 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
               ))}
             </select>
             <p style={{ fontSize: 12.5, color: c.textSecondary, margin: 0, lineHeight: 1.45 }}>
-              Görevler projede kalır; yalnızca hangi çıktıya ait oldukları değişir.
+              {t("Görevler projede kalır; yalnızca hangi çıktıya ait oldukları değişir.")}
             </p>
           </div>
         ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>
-            {targetType === "project" ? "Hedef proje" : "Hedef departman"}
+            {targetType === "project" ? t("Hedef proje") : t("Hedef departman")}
           </label>
           {loading ? (
             <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
           ) : options.length === 0 ? (
             <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-              {targetType === "project" ? "Erişebildiğin proje yok." : "Erişebildiğin departman yok."}
+              {targetType === "project" ? t("Erişebildiğin proje yok.") : t("Erişebildiğin departman yok.")}
             </p>
           ) : (
             <select value={targetId} onChange={(e) => setTargetId(e.target.value)} style={{ width: "100%" }}>
@@ -270,7 +272,7 @@ export default function MoveTaskModal({ taskIds, scopeTasks, onClose, onMoved }:
             opacity: !targetId ? 0.6 : 1,
           }}
         >
-          {saving ? "Taşınıyor…" : "Taşı"}
+          {saving ? t("Taşınıyor…") : t("Taşı")}
         </button>
       </div>
     </Modal>

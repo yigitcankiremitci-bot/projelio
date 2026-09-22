@@ -132,7 +132,7 @@ export default function CreateTaskModal({
   const noOutputs = Boolean(projectId) && !loadingOutputs && outputs.length === 0;
 
   return (
-    <Modal title={fixedAssignedToName ? `${fixedAssignedToName} için yeni görev` : "Yeni görev"} onClose={onClose}>
+    <Modal title={fixedAssignedToName ? t("{fixedAssignedToName} için yeni görev", { fixedAssignedToName }) : t("Yeni görev")} onClose={onClose}>
       {loadingProjects ? (
         <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>{t("Projeler yükleniyor…")}</p>
       ) : noProjects ? (
@@ -181,7 +181,7 @@ export default function CreateTaskModal({
                   onChange={setTitle}
                   onSubmit={() => formRef.current?.requestSubmit()}
                   onCancel={onClose}
-                  ariaLabel="Görev başlığı"
+                  ariaLabel={t("Görev başlığı")}
                   placeholder={t("Örn. Logo revizyonu")}
                   maxLength={200}
                   required
@@ -234,7 +234,7 @@ export default function CreateTaskModal({
                       fontSize: 16,
                     }}
                   >
-                    {fixedAssignedToName ?? "Seçili kişi"}
+                    {fixedAssignedToName ?? t("Seçili kişi")}
                   </div>
                 ) : (
                   // Tüm kullanıcılar yerine yalnızca seçili projenin ekibi, arama ile
@@ -256,7 +256,7 @@ export default function CreateTaskModal({
                 disabled={loading}
                 style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
               >
-                {loading ? "Oluşturuluyor…" : "Görev oluştur"}
+                {loading ? t("Oluşturuluyor…") : t("Görev oluştur")}
               </button>
             </>
           )}

@@ -9,7 +9,7 @@ test("istekDili hesap tercihini Accept-Language'e tercih eder", () => {
   assert.equal(istekDili("tr", "en-US"), "tr");
   // Seçim yoksa (null) tarayıcıya bakılır — null "Türkçe" DEĞİL.
   assert.equal(istekDili(null, "en-US,en;q=0.9"), "en");
-  assert.equal(istekDili(undefined, "de-DE"), "tr");
+  assert.equal(istekDili(undefined, "de-DE"), "en");
   assert.equal(istekDili(null, undefined), "tr");
 });
 

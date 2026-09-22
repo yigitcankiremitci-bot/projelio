@@ -61,6 +61,8 @@ const ZATEN_IKI_DILLI = [
   "apps/web/src/lib/legal/privacyPolicy.ts",
   "apps/web/src/lib/legal/termsOfService.ts",
   "apps/web/src/lib/legal/kvkkNotice.ts",
+  "apps/web/src/lib/legal/distanceSales.ts",
+  "apps/web/src/lib/legal/refundPolicy.ts",
 ];
 
 const MODELE_GIDEN = [
@@ -281,7 +283,9 @@ for (const kok of TARANAN) {
       const sarili =
         /\bt\(\s*$/.test(once) ||
         /\bt\(\s*$/.test(once.replace(/\s+$/, " ")) ||
-        /\bcevirmen\([^)]*\)\(\s*$/.test(once);
+        /\b(?:cevirmen|yanitCevirmeni|cevirmenSuAn)\([^)]*\)\(\s*$/.test(once) ||
+        // Ortak paketteki etiket çevirmeni (moduleConfigs/shared.ts etiketCevir).
+        /\betiketCevir\(\s*$/.test(once);
 
       // Bildirim çağrısının içindeki metin de anahtardır (yukarıdaki gerekçe).
       // Ama çağrının son argümanı bir BAĞLANTI ("/projects/…") ve o çevrilmez;
@@ -395,6 +399,8 @@ for (const kok of TARANAN) {
           // Tanımlayıcılar: camelCase, snake_case ve kebab-case
           // (tur adım kimlikleri böyle: "ana-sayfa-sekmeleri").
           if (/^[a-z][a-zA-Z0-9_-]*$/.test(metin)) continue;
+          // Rakamla başlayan nesne anahtarları ("2_5", "50_plus").
+          if (/^\d+_[a-z0-9_]+$/.test(metin)) continue;
           if (/^\/|^https?:\/\//.test(metin)) continue;
           if (!kullanilan.has(anahtarMetni)) kullanilan.set(anahtarMetni, []);
           kullanilan.get(anahtarMetni).push(`${goreli}:${dize.satir}`);
@@ -501,15 +507,41 @@ function sozlukAnahtarlari(yol) {
 
 // Sözlük alan alan bölünmüş; hepsi taranıp tek küme yapılıyor.
 const sozluk = new Set();
+// Her tarafın kendi sözlüğü AYRICA tutuluyor: çalışma anında sunucu yalnızca
+// backend sözlüğüne, arayüz yalnızca web sözlüğüne bakıyor. Tek kümede
+// birleştirilince, yalnızca web sözlüğünde duran bir anahtarı sunucu kodu
+// kullandığında denetim "tamam" diyordu ama sunucunun ürettiği metin (e-posta,
+// dışa aktarma) sessizce Türkçe kalıyordu.
+const tarafSozlugu = { web: new Set(), backend: new Set() };
 for (const klasor of SOZLUK_KLASORLERI) {
+  const taraf = klasor.startsWith("backend/") ? "backend" : "web";
   for (const dosya of readdirSync(join(KOK, klasor))) {
     if (dosya === "index.ts") continue;
-    for (const anahtar of sozlukAnahtarlari(join(klasor, dosya))) sozluk.add(anahtar);
+    for (const anahtar of sozlukAnahtarlari(join(klasor, dosya))) {
+      sozluk.add(anahtar);
+      tarafSozlugu[taraf].add(anahtar);
+    }
   }
 }
 
-const eksik = [...kullanilan.keys()].filter((k) => !sozluk.has(k)).sort();
-const artik = [...sozluk].filter((k) => !kullanilan.has(k)).sort();
+// Anahtarları KODDA değil veritabanında duran sözlükler (departman/modül
+// kataloğu). Kodda hiç geçmedikleri için "artık anahtar" sayılmamalılar;
+// sayılsalar gerçekten artmış anahtarlar o kalabalıkta görünmez olurdu.
+const VERITABANI_SOZLUKLERI = ["backend/src/common/i18n/en/katalog.ts"];
+const veritabaniAnahtarlari = new Set();
+for (const yol of VERITABANI_SOZLUKLERI) for (const a of sozlukAnahtarlari(yol)) veritabaniAnahtarlari.add(a);
+
+// Anahtar, kullanıldığı HER tarafın sözlüğünde bulunmalı. packages/shared
+// arayüzde de sunucuda da çalışıyor; iki sözlükte de aranıyor.
+const eksik = [...kullanilan.keys()]
+  .filter((k) => {
+    const yerler = kullanilan.get(k);
+    const backendde = yerler.some((y) => y.startsWith("backend/"));
+    const webde = yerler.some((y) => y.startsWith("apps/web/") || y.startsWith("packages/shared/"));
+    return (backendde && !tarafSozlugu.backend.has(k)) || (webde && !tarafSozlugu.web.has(k));
+  })
+  .sort();
+const artik = [...sozluk].filter((k) => !kullanilan.has(k) && !veritabaniAnahtarlari.has(k)).sort();
 
 const bayrak = process.argv[2];
 const suzgec = process.argv[3];

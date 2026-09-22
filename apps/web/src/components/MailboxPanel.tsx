@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import MailMessageModal from "./MailMessageModal";
 import { IconTrash } from "./icons";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   organizationId?: string;
@@ -18,8 +19,8 @@ function formatDate(iso: string): string {
   const today = new Date();
   const sameDay = d.toDateString() === today.toDateString();
   return sameDay
-    ? d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" });
+    ? d.toLocaleTimeString(bicimDili(), { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString(bicimDili(), { day: "2-digit", month: "short" });
 }
 
 /**
@@ -81,7 +82,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
         setAccountId((current) => current || rows.find((r) => r.active)?.id || "");
         setError("");
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Kutular yüklenemedi"))
+      .catch((err) => setError(err instanceof Error ? err.message : t("Kutular yüklenemedi")))
       .finally(() => setLoadingAccounts(false));
   };
 
@@ -104,8 +105,8 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
     const detail = rest.join(":");
     setBanner(
       kind === "connected"
-        ? { kind: "ok", text: `${detail} kutusu modüle bağlandı.` }
-        : { kind: "error", text: detail || "Posta bağlantısı tamamlanamadı." }
+        ? { kind: "ok", text: t("{detail} kutusu modüle bağlandı.", { detail }) }
+        : { kind: "error", text: detail || t("Posta bağlantısı tamamlanamadı.") }
     );
     if (kind === "connected") loadAccounts();
 
@@ -135,7 +136,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
       })
       .catch((err) => {
         setMessages([]);
-        setError(err instanceof Error ? err.message : "İletiler yüklenemedi");
+        setError(err instanceof Error ? err.message : t("İletiler yüklenemedi"));
       })
       .finally(() => setLoadingList(false));
   }, [accountId, folderId, search]);
@@ -154,7 +155,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
         mailboxApi.markRead(accountId, message.id, true).catch(() => undefined);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "İleti açılamadı");
+      setError(err instanceof Error ? err.message : t("İleti açılamadı"));
     } finally {
       setOpeningId(null);
     }
@@ -170,25 +171,25 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
         sharedAddress.trim() || undefined
       );
       if (!ok || !url) {
-        setBanner({ kind: "error", text: "Posta entegrasyonu bu kurulumda yapılandırılmamış." });
+        setBanner({ kind: "error", text: t("Posta entegrasyonu bu kurulumda yapılandırılmamış.") });
         return;
       }
       window.location.href = url;
     } catch (err) {
-      setBanner({ kind: "error", text: err instanceof Error ? err.message : "Bağlantı başlatılamadı" });
+      setBanner({ kind: "error", text: err instanceof Error ? err.message : t("Bağlantı başlatılamadı") });
     } finally {
       setConnecting(false);
     }
   };
 
   const unlink = async (target: MailAccount) => {
-    if (!window.confirm(`${target.address} kutusu modülden kaldırılsın mı? Microsoft bağlantınız durur.`)) return;
+    if (!window.confirm(t("{address} kutusu modülden kaldırılsın mı? Microsoft bağlantınız durur.", { address: target.address }))) return;
     try {
       await mailboxApi.unlink(target.id);
       setAccountId("");
       loadAccounts();
     } catch (err) {
-      setBanner({ kind: "error", text: err instanceof Error ? err.message : "Kutu kaldırılamadı" });
+      setBanner({ kind: "error", text: err instanceof Error ? err.message : t("Kutu kaldırılamadı") });
     }
   };
 
@@ -213,19 +214,18 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
         >
           <span style={{ fontSize: 14, color: c.textPrimary }}>{t("Bir Outlook kutusu bağlayın")}</span>
           <span style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
-            {t("Bağladığınız kutuyu")} <strong>{t("bu modüle atanmış herkes")}</strong> okuyabilir ve o kutudan yanıt
-            yazabilir. Kişisel postanızı değil, ekibin ortak kutusunu (info@, satis@ gibi) bağlamanız önerilir.
+            {t("Bağladığınız kutuyu")} <strong>{t("bu modüle atanmış herkes")}</strong> {t("okuyabilir ve o kutudan yanıt yazabilir. Kişisel postanızı değil, ekibin ortak kutusunu (info@, satis@ gibi) bağlamanız önerilir.")}
           </span>
           {!configured && (
             <span style={{ fontSize: 12, color: c.danger }}>
-              Posta entegrasyonu bu kurulumda yapılandırılmamış (MICROSOFT_CLIENT_ID / MAIL_REDIRECT_URI).
+              {t("Posta entegrasyonu bu kurulumda yapılandırılmamış (MICROSOFT_CLIENT_ID / MAIL_REDIRECT_URI).")}
             </span>
           )}
 
           {showShared && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <label style={{ fontSize: 12, color: c.textSecondary }}>
-                Paylaşılan kutunun adresi (kendi kutunuzu bağlayacaksanız boş bırakın)
+                {t("Paylaşılan kutunun adresi (kendi kutunuzu bağlayacaksanız boş bırakın)")}
               </label>
               <input
                 value={sharedAddress}
@@ -255,13 +255,13 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
                   opacity: connecting || !configured ? 0.6 : 1,
                 }}
               >
-                {connecting ? "Yönlendiriliyor…" : "Outlook kutusunu bağla"}
+                {connecting ? t("Yönlendiriliyor…") : t("Outlook kutusunu bağla")}
               </button>
               <button
                 onClick={() => setShowShared((s) => !s)}
                 style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
               >
-                {showShared ? "Kendi kutumu bağlayacağım" : "Paylaşılan bir kutu bağlayacağım"}
+                {showShared ? t("Kendi kutumu bağlayacağım") : t("Paylaşılan bir kutu bağlayacağım")}
               </button>
             </div>
           )}
@@ -284,7 +284,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
           {accounts.map((a) => (
             <option key={a.id} value={a.id}>
               {a.address}
-              {a.sharedMailbox ? " (paylaşılan)" : ""}
+              {a.sharedMailbox ? t(" (paylaşılan)") : ""}
             </option>
           ))}
         </select>
@@ -293,7 +293,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
-          placeholder="Kutuda ara ve Enter…"
+          placeholder={t("Kutuda ara ve Enter…")}
           style={{ fontSize: 13, padding: "4px 8px", flex: "1 1 200px", minWidth: 160 }}
         />
         {search && (
@@ -310,7 +310,8 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
 
         {account && (
           <span style={{ fontSize: 11, color: c.textSecondary, marginLeft: "auto" }}>
-            {account.connectedByName ? `${account.connectedByName} bağladı` : "Modüle bağlı kutu"} · ekip erişebilir
+            {account.connectedByName ? t("{kisi} bağladı", { kisi: account.connectedByName }) : t("Modüle bağlı kutu")} ·{" "}
+            {t("ekip erişebilir")}
           </span>
         )}
         {canWrite && account && (
@@ -376,7 +377,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
           )}
           {!loadingList && messages.length === 0 && (
             <div style={{ padding: 10, fontSize: 12, color: c.textSecondary }}>
-              {search ? "Aramaya uyan ileti yok." : "Bu klasörde ileti yok."}
+              {search ? t("Aramaya uyan ileti yok.") : t("Bu klasörde ileti yok.")}
             </div>
           )}
           {messages.map((m) => (
@@ -407,10 +408,10 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {m.from?.name || m.from?.address || "(gönderen yok)"}
+                  {m.from?.name || m.from?.address || t("(gönderen yok)")}
                 </span>
                 <span style={{ fontSize: 11, color: c.textSecondary, flexShrink: 0 }}>
-                  {openingId === m.id ? "açılıyor…" : formatDate(m.receivedAt)}
+                  {openingId === m.id ? t("açılıyor…") : formatDate(m.receivedAt)}
                 </span>
               </div>
               <span
@@ -471,6 +472,7 @@ function Banner({
   banner: { kind: "ok" | "error"; text: string };
   onClose: () => void;
 }) {
+  const t = useT();
   const c = useThemeColors();
   return (
     <div
@@ -490,7 +492,7 @@ function Banner({
       <span style={{ flex: 1 }}>{banner.text}</span>
       <button
         onClick={onClose}
-        aria-label="Kapat"
+        aria-label={t("Kapat")}
         style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, color: "inherit" }}
       >
         ×

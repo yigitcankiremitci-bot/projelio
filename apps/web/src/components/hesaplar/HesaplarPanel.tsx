@@ -16,6 +16,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import HesapKimlikModal from "./HesapKimlikModal";
 import HesapModal from "./HesapModal";
 import HesapPaylasModal from "./HesapPaylasModal";
+import { bicimDili } from "../../lib/i18n/depo";
 
 interface Props {
   organizationId?: string;
@@ -25,7 +26,7 @@ interface Props {
 }
 
 function paraYaz(tutar: number, birim: string): string {
-  return `${tutar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ${birim}`;
+  return `${tutar.toLocaleString(bicimDili(), { maximumFractionDigits: 2 })} ${birim}`;
 }
 
 /**
@@ -343,7 +344,7 @@ export default function HesaplarPanel({ organizationId, departmentId, jobId, can
                   hesap.credentialCount === 0 ? t("giriş bilgisi girilmemiş") : null,
                   hesap.isPaid && hesap.nextDueDate
                     ? t("sıradaki ödeme {tarih}", {
-                        tarih: new Date(hesap.nextDueDate).toLocaleDateString("tr-TR", { dateStyle: "medium" }),
+                        tarih: new Date(hesap.nextDueDate).toLocaleDateString(bicimDili(), { dateStyle: "medium" }),
                       })
                     : null,
                   hesap.isPaid && !hesap.recurringPaymentId ? t("kasaya bağlı değil") : null,

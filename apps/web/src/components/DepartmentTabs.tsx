@@ -9,15 +9,15 @@ export type DepartmentTab = "flow" | "team" | "tasks" | "budget" | "modules" | "
 // hesaplanan özetler + genel defter), Modüller (departmana özel etkinleştirilen
 // araçlar), Dosyalar (departmana özel Drive klasörü).
 export const DEPARTMENT_TABS: { key: DepartmentTab; label: string }[] = [
-  { key: "flow", label: "Sosyal" },
-  { key: "team", label: "Ekip" },
-  { key: "tasks", label: "Görevler" },
+  { key: "flow", label: "Sosyal" }, // dil:anahtar
+  { key: "team", label: "Ekip" }, // dil:anahtar
+  { key: "tasks", label: "Görevler" }, // dil:anahtar
   // Etiket "Kasa": sayfa bir plan değil, gerçekleşen gelir/gider defteri
   // (bkz. Dashboard.tsx'teki aynı gerekçe). Anahtar "budget" KALDI —
   // adresler (?tab=budget), kayıtlı hedefler ve tur çapaları ona bağlı.
-  { key: "budget", label: "Kasa" },
-  { key: "modules", label: "Modüller" },
-  { key: "files", label: "Dosyalar" },
+  { key: "budget", label: "Kasa" }, // dil:anahtar
+  { key: "modules", label: "Modüller" }, // dil:anahtar
+  { key: "files", label: "Dosyalar" }, // dil:anahtar
 ];
 
 /**

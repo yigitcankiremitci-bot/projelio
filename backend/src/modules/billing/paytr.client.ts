@@ -162,7 +162,7 @@ export class PayTRClient {
       // `reason` kullanıcıya gösterilmiyor: PayTR burada entegrasyon hatasını
       // (eksik alan, geçersiz token) anlatıyor, müşterinin işine yaramaz.
       this.logger.error(`PayTR token reddedildi: ${sonuc?.reason ?? "sebep bildirilmedi"}`);
-      throw new PayTRHatasi("Ödeme formu açılamadı.");
+      throw new PayTRHatasi("Ödeme formu açılamadı."); // dil:anahtar
     }
 
     return { token: sonuc.token, iframeUrl: `${IFRAME_TABANI}/${sonuc.token}` };

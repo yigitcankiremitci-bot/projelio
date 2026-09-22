@@ -7,6 +7,8 @@ import { GoogleAccount, GoogleAccountsService } from "./google-accounts.service"
 import { GoogleIdentity } from "./google-oauth.service";
 import { nowInSeconds } from "../auth/session-payload";
 import { OAuthHandoffStore } from "../../common/auth/oauth-handoff";
+import type { Locale } from "@projelio/shared";
+import { hataMetni } from "../../common/i18n/index";
 
 @Injectable()
 export class GoogleAuthService {
@@ -33,7 +35,8 @@ export class GoogleAuthService {
    */
   async loginWithGoogle(
     identity: GoogleIdentity,
-    tokens: { refreshToken?: string; scopes: string[] }
+    tokens: { refreshToken?: string; scopes: string[] },
+    locale?: Locale
   ): Promise<{ token: string; isNewUser: boolean }> {
     const existingAccount = await this.googleAccounts.findByGoogleSub(identity.sub);
 
@@ -65,6 +68,7 @@ export class GoogleAuthService {
           fullName: identity.name || identity.email.split("@")[0],
           email: identity.email,
           usernameSeed: identity.email.split("@")[0],
+          locale,
           avatarUrl: identity.picture,
           // Google'da adres her zaman Google tarafından doğrulanmış kabul edilir
           // (bu akış bugüne kadar da hesabı doğrulanmış açıyordu).
@@ -82,7 +86,7 @@ export class GoogleAuthService {
     const currentForUser = await this.googleAccounts.findLoginIdentity(userId);
     if (currentForUser && currentForUser.googleSub !== identity.sub) {
       throw new ConflictException(
-        `Bu Projelio hesabına zaten ${currentForUser.email} Google hesabı bağlı. Önce mevcut bağlantıyı kaldırın.`
+        hataMetni("Bu Projelio hesabına zaten {email} Google hesabı bağlı. Önce mevcut bağlantıyı kaldırın.", { email: currentForUser.email })
       );
     }
 

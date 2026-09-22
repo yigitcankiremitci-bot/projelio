@@ -13,6 +13,23 @@ import {
 import { PasswordResetService } from "./password-reset.service";
 import { EmailVerificationService } from "./email-verification.service";
 import { absoluteSessionExpired } from "./session-payload";
+import { cevirmen, istekDili, tarayiciDili } from "../../common/i18n";
+
+type BaslikliIstek = { headers: Record<string, string | string[] | undefined> };
+
+/**
+ * Başarı yanıtlarının dili. Hata mesajları HTTP sınırındaki filtrede
+ * çevriliyor (all-exceptions.filter.ts) ama başarılı yanıtlar oradan geçmiyor;
+ * sözlükte karşılıkları olduğu hâlde bu metinler hep Türkçe dönüyordu ve
+ * doğrulama sayfası İngilizce arayüzün ortasında Türkçe bir cümle gösteriyordu.
+ */
+function yanitCevirmeni(req: BaslikliIstek) {
+  const baslik = (ad: string) => {
+    const deger = req.headers[ad];
+    return typeof deger === "string" ? deger : undefined;
+  };
+  return cevirmen(istekDili(baslik("x-projelio-locale"), baslik("accept-language")));
+}
 
 @Controller("auth")
 export class AuthController {
@@ -24,8 +41,12 @@ export class AuthController {
 
   @Post("register")
   @UseGuards(AuthRateLimitGuard)
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto.fullName, dto.email, dto.password, dto.username, dto.locale);
+  register(@Body() dto: RegisterDto, @Req() req: BaslikliIstek) {
+    // Eski istemci dili göndermiyor; o hâlde tarayıcının Accept-Language
+    // başlığı tek ipucu. Hesabın dili boş kalırsa sonradan üretilen her şey
+    // (doğrulama e-postası, örnek iş, ipuçları) Türkçeye düşüyor.
+    const locale = dto.locale ?? tarayiciDili(req);
+    return this.authService.register(dto.fullName, dto.email, dto.password, dto.username, locale);
   }
 
   @Post("login")
@@ -74,26 +95,27 @@ export class AuthController {
   // için (bkz. PasswordResetService.requestReset).
   @Post("forgot-password")
   @UseGuards(AuthRateLimitGuard)
-  async forgotPassword(@Body() dto: RequestPasswordResetDto) {
+  async forgotPassword(@Body() dto: RequestPasswordResetDto, @Req() req: BaslikliIstek) {
     await this.passwordResetService.requestReset(dto.email);
-    return { message: "Bu e-posta adresi kayıtlıysa, şifre sıfırlama bağlantısı gönderildi." };
+    return { message: yanitCevirmeni(req)("Bu e-posta adresi kayıtlıysa, şifre sıfırlama bağlantısı gönderildi.") };
   }
 
   @Post("reset-password")
   @UseGuards(AuthRateLimitGuard)
-  async resetPassword(@Body() dto: ResetPasswordDto) {
+  async resetPassword(@Body() dto: ResetPasswordDto, @Req() req: BaslikliIstek) {
     await this.passwordResetService.resetPassword(dto.token, dto.password);
-    return { message: "Şifreniz güncellendi. Şimdi giriş yapabilirsiniz." };
+    return { message: yanitCevirmeni(req)("Şifreniz güncellendi. Şimdi giriş yapabilirsiniz.") };
   }
 
   @Post("verify-email")
   @UseGuards(AuthRateLimitGuard)
-  async verifyEmail(@Body() dto: VerifyEmailDto) {
+  async verifyEmail(@Body() dto: VerifyEmailDto, @Req() req: BaslikliIstek) {
     const { alreadyVerified } = await this.emailVerificationService.verify(dto.token);
+    const t = yanitCevirmeni(req);
     return {
       message: alreadyVerified
-        ? "Bu hesap zaten doğrulanmış. Giriş yapabilirsiniz."
-        : "E-posta adresiniz doğrulandı. Şimdi giriş yapabilirsiniz.",
+        ? t("Bu hesap zaten doğrulanmış. Giriş yapabilirsiniz.")
+        : t("E-posta adresiniz doğrulandı. Şimdi giriş yapabilirsiniz."),
     };
   }
 
@@ -101,8 +123,8 @@ export class AuthController {
   // yanıt her zaman aynı (bkz. EmailVerificationService.resend).
   @Post("resend-verification")
   @UseGuards(AuthRateLimitGuard)
-  async resendVerification(@Body() dto: ResendVerificationDto) {
+  async resendVerification(@Body() dto: ResendVerificationDto, @Req() req: BaslikliIstek) {
     await this.emailVerificationService.resend(dto.email);
-    return { message: "Bu adres kayıtlı ve henüz doğrulanmamışsa, yeni bir doğrulama bağlantısı gönderildi." };
+    return { message: yanitCevirmeni(req)("Bu adres kayıtlı ve henüz doğrulanmamışsa, yeni bir doğrulama bağlantısı gönderildi.") };
   }
 }

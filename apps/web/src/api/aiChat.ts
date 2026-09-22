@@ -1,3 +1,4 @@
+import { cevirmenSuAn } from "../lib/i18n/anlik";
 import { api, API_URL } from "./client";
 
 export interface AiChatMessage {
@@ -307,7 +308,7 @@ export const aiChat = {
     if (!res.ok) {
       // Süresi dolan rapor 404 döner; kullanıcıya "yeniden üret" demek için
       // sunucunun kendi cümlesi taşınıyor.
-      let message = "Rapor indirilemedi.";
+      let message = cevirmenSuAn()("Rapor indirilemedi.");
       try {
         const parsed = JSON.parse(await res.text());
         if (parsed?.message) message = Array.isArray(parsed.message) ? parsed.message.join(", ") : parsed.message;

@@ -94,7 +94,7 @@ const AlacakBorcBolumu = forwardRef<AlacakBorcHandle, Props>(function AlacakBorc
   const sil = async (id: string) => {
     setKayitlar((prev) => prev.filter((r) => r.id !== id));
     pushDestructive({
-      label: "Kayıt silme",
+      label: t("Kayıt silme"),
       commit: async () => {
         await api.delete(`/module-records/${id}`).catch(() => {});
       },
@@ -110,7 +110,7 @@ const AlacakBorcBolumu = forwardRef<AlacakBorcHandle, Props>(function AlacakBorc
   const duzenlendi = (onceki: ModuleRecord, kaydedilen: ModuleRecord) => {
     yukle();
     pushUndo({
-      label: "Alacak/borç kaydı düzenlendi",
+      label: t("Alacak/borç kaydı düzenlendi"),
       run: () => veriyiUygula(onceki.id, onceki.data),
       redo: () => veriyiUygula(kaydedilen.id, kaydedilen.data),
     });
@@ -265,7 +265,7 @@ const AlacakBorcBolumu = forwardRef<AlacakBorcHandle, Props>(function AlacakBorc
           organizationId={organizationId}
           moduleKey={RP_KEY}
           presetData={{ type: hizliEkle, status: "open" }}
-          titleOverride={hizliEkle === "payable" ? "Borç ekle" : "Alacak ekle"}
+          titleOverride={hizliEkle === "payable" ? t("Borç ekle") : t("Alacak ekle")}
           onClose={() => setHizliEkle(null)}
           onSaved={yukle}
         />

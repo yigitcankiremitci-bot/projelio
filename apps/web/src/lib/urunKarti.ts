@@ -1,5 +1,6 @@
 import type { Product } from "@projelio/shared";
 import { PRODUCT_UNIT_LABEL } from "@projelio/shared";
+import { bicimDili } from "./i18n/depo";
 
 // Ürün kartında gösterilen türev rakamlar. Hiçbiri veritabanında tutulmuyor:
 // fiyat ya da maliyet değişince yeniden hesaplanması gereken bir kopya, bir gün
@@ -48,7 +49,7 @@ export function stokDurumu(stockQuantity?: number, minStock?: number): StokDurum
 export function formatPara(value: number | null | undefined, currency?: string): string | null {
   if (value === undefined || value === null) return null;
   try {
-    return new Intl.NumberFormat("tr-TR", { style: "currency", currency: currency || "TRY" }).format(value);
+    return new Intl.NumberFormat(bicimDili(), { style: "currency", currency: currency || "TRY" }).format(value);
   } catch {
     return `${value} ${currency ?? ""}`.trim();
   }
@@ -56,7 +57,7 @@ export function formatPara(value: number | null | undefined, currency?: string):
 
 export function formatMiktar(value: number | null | undefined, product: Pick<Product, "unit">): string | null {
   if (value === undefined || value === null) return null;
-  const miktar = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(value);
+  const miktar = new Intl.NumberFormat(bicimDili(), { maximumFractionDigits: 2 }).format(value);
   return product.unit ? `${miktar} ${PRODUCT_UNIT_LABEL[product.unit].toLocaleLowerCase("tr-TR")}` : miktar;
 }
 

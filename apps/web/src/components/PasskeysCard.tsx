@@ -4,6 +4,7 @@ import { passkeysApi } from "../api/passkeys";
 import { anahtarOlustur, cihazAdiOner, desteklenirMi } from "../lib/gecisAnahtari";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * GEÇİŞ ANAHTARLARI — kullanıcının cihazları.
@@ -85,7 +86,7 @@ export default function PasskeysCard({ hasPassword = true }: { hasPassword?: boo
   };
 
   const tarih = (deger?: string) =>
-    deger ? new Date(deger).toLocaleDateString("tr-TR", { dateStyle: "medium" }) : "—";
+    deger ? new Date(deger).toLocaleDateString(bicimDili(), { dateStyle: "medium" }) : "—";
 
   if (!desteklenirMi() && anahtarlar.length === 0) {
     return (

@@ -13,16 +13,16 @@ interface Props {
 }
 
 const intervalOptions: { value: RecurrenceInterval; label: string }[] = [
-  { value: "weekly", label: "Her hafta" },
-  { value: "monthly", label: "Her ay" },
-  { value: "yearly", label: "Her yıl" },
+  { value: "weekly", label: "Her hafta" }, // dil:anahtar
+  { value: "monthly", label: "Her ay" }, // dil:anahtar
+  { value: "yearly", label: "Her yıl" }, // dil:anahtar
 ];
 
 const reminderOptions = [
-  { value: 0, label: "Hatırlatma yok" },
-  { value: 1, label: "1 gün önce" },
-  { value: 3, label: "3 gün önce" },
-  { value: 7, label: "1 hafta önce" },
+  { value: 0, label: "Hatırlatma yok" }, // dil:anahtar
+  { value: 1, label: "1 gün önce" }, // dil:anahtar
+  { value: 3, label: "3 gün önce" }, // dil:anahtar
+  { value: 7, label: "1 hafta önce" }, // dil:anahtar
 ];
 
 function todayString() {
@@ -67,24 +67,24 @@ export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: 
       onSaved();
       onClose();
     } catch {
-      setError("Kaydedilemedi. Tekrar dene.");
+      setError(t("Kaydedilemedi. Tekrar dene."));
       setLoading(false);
     }
   };
 
   return (
-    <Modal title={payment ? "Düzenli ödemeyi düzenle" : "Düzenli ödeme ekle"} onClose={onClose}>
+    <Modal title={payment ? t("Düzenli ödemeyi düzenle") : t("Düzenli ödeme ekle")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tür")}</label>
           <select value={type} onChange={(e) => setType(e.target.value as "income" | "expense")} style={{ width: "100%" }}>
-            <option value="expense">Gider (kira, abonelik…)</option>
-            <option value="income">Gelir (düzenli tahsilat…)</option>
+            <option value="expense">{t("Gider (kira, abonelik…)")}</option>
+            <option value="income">{t("Gelir (düzenli tahsilat…)")}</option>
           </select>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Tutar (₺)</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tutar (₺)")}</label>
           <input
             type="number"
             min={0}
@@ -116,7 +116,7 @@ export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: 
             >
               {intervalOptions.map((o) => (
                 <option key={o.value} value={o.value}>
-                  {o.label}
+                  {t(o.label)}
                 </option>
               ))}
             </select>
@@ -142,7 +142,7 @@ export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: 
           >
             {reminderOptions.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {t(o.label)}
               </option>
             ))}
           </select>
@@ -152,7 +152,7 @@ export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: 
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Proje (opsiyonel)</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Proje (opsiyonel)")}</label>
           <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={{ width: "100%" }}>
             <option value="">{t("Projesiz — genel kayıt")}</option>
             {projects.map((p) => (
@@ -170,7 +170,7 @@ export default function AddRecurringPaymentModal({ payment, onClose, onSaved }: 
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Kaydediliyor…" : "Kaydet"}
+          {loading ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       </form>
     </Modal>

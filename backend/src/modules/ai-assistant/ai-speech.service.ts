@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
+import { hataMetni } from "../../common/i18n/index";
 
 /**
  * Tek seferde seslendirilecek azami karakter.
@@ -111,7 +112,7 @@ export class AiSpeechService {
       );
     } catch (err: any) {
       throw new ServiceUnavailableException(
-        `Ses servisine ulaşılamadı: ${err?.message ?? "bağlantı hatası"}`
+        hataMetni("Ses servisine ulaşılamadı: {p1}", { p1: err?.message ?? "bağlantı hatası" })
       );
     }
 

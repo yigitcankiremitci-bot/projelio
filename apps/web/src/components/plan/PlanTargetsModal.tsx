@@ -94,7 +94,7 @@ export default function PlanTargetsModal({ period, targets, focusAreas, onClose,
       onSaved();
       onClose();
     } catch (err: any) {
-      setError(String(err?.message ?? "Hedefler kaydedilemedi."));
+      setError(String(err?.message ?? t("Hedefler kaydedilemedi.")));
     } finally {
       setSaving(false);
     }
@@ -187,8 +187,7 @@ export default function PlanTargetsModal({ period, targets, focusAreas, onClose,
       </button>
 
       <p style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.5, margin: "14px 0 0" }}>
-        Yüzde, dönemin zamanını böler. Adet ise zamanla ölçülmeyen hedefler içindir — "10 içerik" gibi.
-        İkisini aynı satırda birlikte kullanabilirsin.
+        {t("Yüzde, dönemin zamanını böler. Adet ise zamanla ölçülmeyen hedefler içindir — \"10 içerik\" gibi. İkisini aynı satırda birlikte kullanabilirsin.")}
       </p>
 
       {error && <p style={{ color: c.danger, fontSize: 13, margin: "12px 0 0" }}>{error}</p>}
@@ -199,7 +198,7 @@ export default function PlanTargetsModal({ period, targets, focusAreas, onClose,
         </button>
         <button onClick={save} disabled={saving} style={primaryButton(c, saving)}>
           data-primary
-          {saving ? "Kaydediliyor…" : "Kaydet"}
+          {saving ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       </div>
     </Modal>

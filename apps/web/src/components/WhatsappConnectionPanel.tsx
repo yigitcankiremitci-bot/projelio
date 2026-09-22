@@ -4,6 +4,7 @@ import { whatsappApi } from "../api/whatsapp";
 import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 /** QR görselinin tazelenme aralığı; WhatsApp QR'ı ~20 sn'de bir değiştirir. */
 const QR_REFRESH_MS = 15_000;
@@ -60,7 +61,7 @@ export default function WhatsappConnectionPanel({
       await fn();
       onChanged();
     } catch (e: any) {
-      setError(e?.message ?? "İşlem başarısız.");
+      setError(e?.message ?? t("İşlem başarısız."));
     } finally {
       setBusy(false);
     }
@@ -93,7 +94,7 @@ export default function WhatsappConnectionPanel({
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
         <div style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary }}>{number.label}</div>
         <div style={{ fontSize: 14, color: status === "working" ? c.success : status === "failed" ? c.danger : c.textSecondary }}>
-          {status === "working" ? "bağlı" : status === "scan_qr" ? "QR bekliyor" : status === "starting" ? "hazırlanıyor" : status === "failed" ? "koptu" : "durduruldu"}
+          {status === "working" ? t("bağlı") : status === "scan_qr" ? t("QR bekliyor") : status === "starting" ? t("hazırlanıyor") : status === "failed" ? "koptu" : "durduruldu"}
         </div>
         {number.phoneMasked && <div style={{ fontSize: 14, color: c.textSecondary }}>{number.phoneMasked}</div>}
         <div style={{ fontSize: 14, color: c.textSecondary, marginLeft: "auto" }}>{number.assignedUsers ?? 0} kullanıcı</div>
@@ -101,7 +102,9 @@ export default function WhatsappConnectionPanel({
 
       {paused && (
         <p style={{ fontSize: 14, color: c.warning, margin: "0 0 8px", lineHeight: 1.5 }}>
-          WhatsApp gönderimi kısıtladı; {new Date(number.pausedUntil!).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}'e kadar kuyrukta.
+          {t("WhatsApp gönderimi kısıtladı; {saat}'e kadar kuyrukta.", {
+            saat: new Date(number.pausedUntil!).toLocaleTimeString(bicimDili(), { hour: "2-digit", minute: "2-digit" }),
+          })}
           {number.pauseReason ? ` (${number.pauseReason})` : ""}
         </p>
       )}
@@ -141,12 +144,12 @@ export default function WhatsappConnectionPanel({
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
         {(status === "stopped" || status === "failed") && (
           <button onClick={() => run(() => whatsappApi.admin.start(number.id))} disabled={busy} style={primaryButton}>
-            {status === "failed" ? "Yeniden bağla" : "Bağla"}
+            {status === "failed" ? t("Yeniden bağla") : t("Bağla")}
           </button>
         )}
         {(status === "working" || status === "scan_qr" || status === "starting") && (
           <button onClick={() => setConfirm("logout")} disabled={busy} style={{ ...ghostButton, color: c.danger }}>
-            {status === "working" ? "Bağlantıyı kes" : "Vazgeç"}
+            {status === "working" ? t("Bağlantıyı kes") : t("Vazgeç")}
           </button>
         )}
         <button onClick={() => setConfirm("remove")} disabled={busy} style={{ ...ghostButton, color: c.textSecondary }}>
@@ -159,7 +162,7 @@ export default function WhatsappConnectionPanel({
       {confirm === "logout" && (
         <ConfirmDialog
           title={t("WhatsApp bağlantısını kes")}
-          message="Numara Projelio'dan ayrılacak; bu numaraya atanmış kullanıcılara bildirim gitmeyecek ve Lio bu numaradan yazamayacak. Kayıtlar ve atamalar silinmez, yeniden bağlanabilir."
+          message={t("Numara Projelio'dan ayrılacak; bu numaraya atanmış kullanıcılara bildirim gitmeyecek ve Lio bu numaradan yazamayacak. Kayıtlar ve atamalar silinmez, yeniden bağlanabilir.")}
           confirmLabel={t("Bağlantıyı kes")}
           onConfirm={async () => {
             setConfirm(null);
@@ -171,7 +174,7 @@ export default function WhatsappConnectionPanel({
       {confirm === "remove" && (
         <ConfirmDialog
           title={t("Numarayı havuzdan çıkar")}
-          message="Bu numaraya atanmış kullanıcılar başka bir bağlı numaraya taşınır; müşterileri artık farklı bir numaradan mesaj görür. Başka bağlı numara yoksa işlem reddedilir."
+          message={t("Bu numaraya atanmış kullanıcılar başka bir bağlı numaraya taşınır; müşterileri artık farklı bir numaradan mesaj görür. Başka bağlı numara yoksa işlem reddedilir.")}
           confirmLabel={t("Havuzdan çıkar")}
           onConfirm={async () => {
             setConfirm(null);

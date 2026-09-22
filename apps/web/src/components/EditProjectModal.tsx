@@ -124,7 +124,7 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Anlaşılan ücret (₺)</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Anlaşılan ücret (₺)")}</label>
           <input type="number" min={0} value={totalBudget} onChange={(e) => setTotalBudget(e.target.value)} style={{ width: "100%" }} />
         </div>
 
@@ -144,7 +144,7 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
           <select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)} style={{ width: "100%" }}>
             {PROJECT_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {PROJECT_STATUS_LABELS[s]}
+                {t(PROJECT_STATUS_LABELS[s])}
               </option>
             ))}
           </select>
@@ -184,18 +184,18 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Kaydediliyor…" : "Kaydet"}
+          {loading ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       </form>
 
       <EntityDangerZone
-        entityLabel="Projeyi"
+        entityLabel={t("Projeyi", { ctx: "nesne" })}
         resourcePath={`/projects/${project.id}`}
         affectsSidebar
         onArchive={handleArchive}
         onDelete={handleDelete}
-        archiveMessage={`"${project.title}" projesini arşive eklemek istediğine emin misin? Bu projeye bağlı tüm görevler, alt görevler ve çıktılar da arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}
-        deleteMessage={`"${project.title}" projesini silmek istediğine emin misin? Bu projeye bağlı tüm görevler ve alt görevler de silinecek. Bu işlem geri alınamaz.`}
+        archiveMessage={t("\"{title}\" projesini arşive eklemek istediğine emin misin? Bu projeye bağlı tüm görevler, alt görevler ve çıktılar da arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.", { title: project.title })}
+        deleteMessage={t("\"{title}\" projesini silmek istediğine emin misin? Bu projeye bağlı tüm görevler ve alt görevler de silinecek. Bu işlem geri alınamaz.", { title: project.title })}
       />
     </Modal>
   );

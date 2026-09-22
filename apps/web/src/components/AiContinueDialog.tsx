@@ -3,6 +3,7 @@ import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import type { AiContinuation, AiModelTier, AiModelTierInfo } from "../api/aiChat";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   continuation: AiContinuation;
@@ -77,7 +78,7 @@ export default function AiContinueDialog({ continuation, onContinue, onStop }: P
             <Row
               label={t("Tahmini bedel")}
               value={t("~{n} birim", {
-                n: Math.round(continuation.estimatedNextCredits).toLocaleString("tr-TR"),
+                n: Math.round(continuation.estimatedNextCredits).toLocaleString(bicimDili()),
               })}
               c={c}
               last
@@ -88,13 +89,13 @@ export default function AiContinueDialog({ continuation, onContinue, onStop }: P
             <Row label={t("Şimdiye kadar yapılan")} value={continuation.doneSummary} c={c} />
             <Row
               label={t("Harcanan birim")}
-              value={`${Math.round(continuation.spentCredits).toLocaleString("tr-TR")}`}
+              value={`${Math.round(continuation.spentCredits).toLocaleString(bicimDili())}`}
               c={c}
             />
             <Row
               label={t("Devam edersem (adım başına)")}
               value={t("~{n} birim", {
-                n: Math.round(continuation.estimatedNextCredits).toLocaleString("tr-TR"),
+                n: Math.round(continuation.estimatedNextCredits).toLocaleString(bicimDili()),
               })}
               c={c}
               last

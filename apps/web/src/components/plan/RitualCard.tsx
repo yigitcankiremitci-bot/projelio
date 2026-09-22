@@ -11,15 +11,15 @@ interface Props {
 }
 
 const KIND_LABEL: Record<string, string> = {
-  daily: "Günlük plan",
-  weekly: "Haftalık planlama",
-  monthly: "Aylık planlama",
+  daily: "Günlük plan", // dil:anahtar
+  weekly: "Haftalık planlama", // dil:anahtar
+  monthly: "Aylık planlama", // dil:anahtar
 };
 
 const KIND_INTRO: Record<string, string> = {
-  daily: "Bugünü kuralım. Tek bir işi bitirmiş olarak günü kapatmak, yarısı yapılmış beş işten iyidir.",
-  weekly: "Haftaya başlamadan önce nereye ağırlık vereceğine karar ver; takvim gerisini halleder.",
-  monthly: "Ay ölçeğinde saat değil sonuç konuşulur: ay sonunda neyin bitmiş olacağını yaz.",
+  daily: "Bugünü kuralım. Tek bir işi bitirmiş olarak günü kapatmak, yarısı yapılmış beş işten iyidir.", // dil:anahtar
+  weekly: "Haftaya başlamadan önce nereye ağırlık vereceğine karar ver; takvim gerisini halleder.", // dil:anahtar
+  monthly: "Ay ölçeğinde saat değil sonuç konuşulur: ay sonunda neyin bitmiş olacağını yaz.", // dil:anahtar
 };
 
 /**
@@ -77,10 +77,10 @@ export default function RitualCard({ ritual, onDone }: Props) {
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary }}>
-          {KIND_LABEL[ritual.kind]} zamanı
+          {t("{ad} zamanı", { ad: t(KIND_LABEL[ritual.kind]) })}
         </div>
         <p style={{ margin: "4px 0 0", fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
-          {KIND_INTRO[ritual.kind]}
+          {t(KIND_INTRO[ritual.kind])}
         </p>
 
         {ritual.previousSummary && (

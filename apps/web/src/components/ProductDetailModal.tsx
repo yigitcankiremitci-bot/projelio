@@ -26,6 +26,7 @@ import {
 } from "../lib/urunKarti";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   organizationId: string;
@@ -542,7 +543,7 @@ export default function ProductDetailModal({ organizationId, product: ilk, onClo
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
                       <span style={{ fontSize: 12.5, color: c.textSecondary }}>
-                        {new Date(record.createdAt).toLocaleDateString("tr-TR")}
+                        {new Date(record.createdAt).toLocaleDateString(bicimDili())}
                       </span>
                       <span style={{ fontSize: 11.5, color: c.textSecondary }}>
                         {matchedBy === "sku" ? t("stok kodu eşleşti") : t("ad eşleşti")}
@@ -640,7 +641,7 @@ export default function ProductDetailModal({ organizationId, product: ilk, onClo
             }}
           />
           <EntityDangerZone
-            entityLabel="Ürün/Hizmeti"
+            entityLabel={t("Ürün/Hizmeti", { ctx: "nesne" })}
             resourcePath={`/products/${product.id}`}
             onArchive={async () => {
               await api.patch(`/products/${product.id}/archive`, {});
@@ -649,8 +650,8 @@ export default function ProductDetailModal({ organizationId, product: ilk, onClo
             // DELETE isteğini EntityDangerZone geciktirmeli olarak atar (bkz.
             // resourcePath); burada yalnızca silme sonrası arayüz davranışı kalır.
             onDelete={async () => onDeleted()}
-            archiveMessage={`"${product.name}" ürün/hizmetini arşive eklemek istediğine emin misin?`}
-            deleteMessage={`"${product.name}" ürün/hizmetini silmek istediğine emin misin? Bu işlem geri alınamaz.`}
+            archiveMessage={t("\"{name}\" ürün/hizmetini arşive eklemek istediğine emin misin?", { name: product.name })}
+            deleteMessage={t("\"{name}\" ürün/hizmetini silmek istediğine emin misin? Bu işlem geri alınamaz.", { name: product.name })}
           />
         </>
       )}

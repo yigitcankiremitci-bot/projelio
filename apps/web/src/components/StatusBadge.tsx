@@ -99,7 +99,7 @@ export default function StatusBadge({ status, onChange }: Props) {
   }, [open]);
 
   if (!onChange) {
-    return <span style={badgeStyle(s)}>{PROJECT_STATUS_LABELS[status]}</span>;
+    return <span style={badgeStyle(s)}>{t(PROJECT_STATUS_LABELS[status])}</span>;
   }
 
   // Rozet kart içindeyken bir <Link>'in içinde yaşıyor (bkz. ProjectCard):
@@ -133,7 +133,7 @@ export default function StatusBadge({ status, onChange }: Props) {
           fontWeight: 500,
         }}
       >
-        {PROJECT_STATUS_LABELS[status]}
+        {t(PROJECT_STATUS_LABELS[status])}
         <span style={{ display: "inline-flex", transform: "rotate(90deg)" }}>
           <IconChevronRight size={11} color={s.text} />
         </span>
@@ -189,7 +189,7 @@ export default function StatusBadge({ status, onChange }: Props) {
                 <span style={{ width: 14, display: "flex", flexShrink: 0 }}>
                   {status === value && <IconCheck size={14} color={c.primary} />}
                 </span>
-                {PROJECT_STATUS_LABELS[value]}
+                {t(PROJECT_STATUS_LABELS[value])}
               </button>
             ))}
           </div>,

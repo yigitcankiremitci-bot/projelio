@@ -37,6 +37,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 /** GET /jobs/:id/members/me — kullanıcının bu işe bağlanma yolları. */
 interface JobTies {
@@ -436,7 +437,7 @@ export default function JobDetail() {
               )}
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <IconCalendar size={12} color={cover.secondary} />
-                {t("{tarih} kuruldu", { tarih: new Date(job.createdAt).toLocaleDateString("tr-TR") })}
+                {t("{tarih} kuruldu", { tarih: new Date(job.createdAt).toLocaleDateString(bicimDili()) })}
               </span>
             </>
           )
@@ -445,7 +446,7 @@ export default function JobDetail() {
         action={
           <div style={{ display: "flex", gap: 8 }}>
             {!isSubcontractor && (
-              <button onClick={() => setBilgiKarti(true)} aria-label="İş bilgi kartı" style={coverActionButton(c)}>
+              <button onClick={() => setBilgiKarti(true)} aria-label={t("İş bilgi kartı")} style={coverActionButton(c)}>
                 <IconIdCard size={20} color={c.textSecondary} />
               </button>
             )}

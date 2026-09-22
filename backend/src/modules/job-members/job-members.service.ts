@@ -5,8 +5,8 @@ import { atamalariBirak } from "../../common/atamalari-birak";
 import { parcalara } from "../../common/parcali-liste";
 import {
   canRespondToInvite,
-  inviteAnswerNotificationBody,
-  inviteNotificationBody,
+  inviteAnswerNotificationMetin,
+  inviteNotificationMetin,
   reinviteDecision,
 } from "./job-invite";
 import { FilesService } from "../files/files.service";
@@ -188,7 +188,7 @@ export class JobMembersService {
       userId,
       "job_invite",
       "İşe davet edildin",
-      inviteNotificationBody((job as any).users?.full_name, job.title),
+      inviteNotificationMetin((job as any).users?.full_name, job.title),
       `/jobs/${jobId}`
     );
 
@@ -245,13 +245,14 @@ export class JobMembersService {
       .select("owner_id, title")
       .eq("id", existing.job_id)
       .maybeSingle();
-    const responderName = member.fullName ?? "Davet ettiğin kişi";
+    // Ad yoksa yedek cümle Metin içinde (bkz. inviteAnswerNotificationMetin).
+    const responderName = member.fullName ?? null;
     if (job?.owner_id) {
       void this.notificationsService.notifyUser(
         job.owner_id,
         "job_invite_answered",
         approve ? "Davet kabul edildi" : "Davet reddedildi",
-        inviteAnswerNotificationBody(responderName, job.title, approve),
+        inviteAnswerNotificationMetin(responderName, job.title, approve),
         `/jobs/${existing.job_id}`
       );
     }

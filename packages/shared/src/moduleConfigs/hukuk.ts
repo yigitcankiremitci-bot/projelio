@@ -16,6 +16,7 @@ import {
   opts,
   partyField,
   todayISO,
+  etiketCevir,
   type ModuleRecordConfig,
 } from "./shared";
 
@@ -157,7 +158,7 @@ export const regulationConfig: ModuleRecordConfig = {
   detail: (d) =>
     joinDetail(
       labelOf(COMPLIANCE, d.complianceStatus),
-      d.relevance ? `Önem: ${labelOf(RELEVANCE, d.relevance)}` : undefined,
+      d.relevance ? etiketCevir("Önem: {deger}", { deger: labelOf(RELEVANCE, d.relevance) }) : undefined,
       d.effectiveDate as string
     ),
   computeStats: (records) => [

@@ -102,9 +102,9 @@ export default function CustomersPanel({
 
   const stats = useMemo(
     () => [
-      { label: "Toplam", value: String(parties.length) },
-      { label: "Müşteri", value: String(parties.filter((p) => p.roles.includes("customer")).length) },
-      { label: "Potansiyel", value: String(parties.filter((p) => p.roles.includes("lead")).length) },
+      { label: t("Toplam"), value: String(parties.length) },
+      { label: t("Müşteri"), value: String(parties.filter((p) => p.roles.includes("customer")).length) },
+      { label: t("Potansiyel"), value: String(parties.filter((p) => p.roles.includes("lead")).length) },
     ],
     [parties]
   );
@@ -143,7 +143,7 @@ export default function CustomersPanel({
   // modal içinde (bkz. Modal.tsx) "+" ulaşılamadığı için orada geri gelir.
   const fabAvailable = useFabAvailable();
   useProjectFabAction(
-    canWrite && fabAvailable ? { label: "Müşteri ekle", onClick: openCreate } : null,
+    canWrite && fabAvailable ? { label: t("Müşteri ekle"), onClick: openCreate } : null,
     [canWrite, fabAvailable, organizationId, departmentId, jobId],
     FAB_PRIORITY.panel
   );
@@ -169,7 +169,7 @@ export default function CustomersPanel({
 
   const handleSave = async () => {
     if (!form.displayName.trim()) {
-      setError("Ad gerekli");
+      setError(t("Ad gerekli"));
       return;
     }
     setError("");
@@ -196,7 +196,7 @@ export default function CustomersPanel({
       closeForm();
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kaydedilemedi");
+      setError(err instanceof Error ? err.message : t("Kaydedilemedi"));
     } finally {
       setSaving(false);
     }
@@ -207,7 +207,7 @@ export default function CustomersPanel({
     if (openPartyId === p.id) setOpenPartyId(null);
     load();
     pushUndo({
-      label: "Müşteri arşivleme",
+      label: t("Müşteri arşivleme"),
       run: async () => {
         await api.patch(`/party/${p.id}/restore`, {});
         load();
@@ -225,7 +225,7 @@ export default function CustomersPanel({
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
           <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Müşteriler")}</h5>
           {profile.key !== "base" && (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>{profile.label}</span>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>{t(profile.label)}</span>
           )}
         </div>
         {!canWrite ? (
@@ -236,7 +236,7 @@ export default function CustomersPanel({
               onClick={() => (formMode ? closeForm() : openCreate())}
               style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
             >
-              {formMode ? "Vazgeç" : "+ Müşteri ekle"}
+              {formMode ? t("Vazgeç") : t("+ Müşteri ekle")}
             </button>
           )
         )}
@@ -258,7 +258,7 @@ export default function CustomersPanel({
                 minWidth: 84,
               }}
             >
-              <span style={{ fontSize: 11, color: c.textSecondary }}>{s.label}</span>
+              <span style={{ fontSize: 11, color: c.textSecondary }}>{t(s.label)}</span>
               <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{s.value}</span>
             </div>
           ))}
@@ -270,7 +270,7 @@ export default function CustomersPanel({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Ara…"
+            placeholder={t("Ara…")}
             style={{ flex: "1 1 140px", minWidth: 120, fontSize: 13, padding: "5px 8px" }}
           />
           <select
@@ -281,7 +281,7 @@ export default function CustomersPanel({
             <option value="">{t("Rol: tümü")}</option>
             {ALL_ROLES.map((r) => (
               <option key={r} value={r}>
-                {ROLE_LABELS[r]}
+                {t(ROLE_LABELS[r])}
               </option>
             ))}
           </select>
@@ -305,7 +305,7 @@ export default function CustomersPanel({
             <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Kaydı düzenliyorsun")}</span>
           )}
 
-          <Field label="Ad / Unvan *">
+          <Field label={t("Ad / Unvan *")}>
             <input
               value={form.displayName}
               onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
@@ -326,7 +326,7 @@ export default function CustomersPanel({
                 <option value="person">{t("Kişi")}</option>
               </select>
             </Field>
-            <Field label="Rol" style={{ flex: 1 }}>
+            <Field label={t("Rol")} style={{ flex: 1 }}>
               <select
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as PartyRole }))}
@@ -334,7 +334,7 @@ export default function CustomersPanel({
               >
                 {ALL_ROLES.map((r) => (
                   <option key={r} value={r}>
-                    {ROLE_LABELS[r]}
+                    {t(ROLE_LABELS[r])}
                   </option>
                 ))}
               </select>
@@ -342,7 +342,7 @@ export default function CustomersPanel({
           </div>
 
           <div style={{ display: "flex", gap: 8 }}>
-            <Field label="E-posta" style={{ flex: 1 }}>
+            <Field label={t("E-posta")} style={{ flex: 1 }}>
               <input
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
@@ -350,7 +350,7 @@ export default function CustomersPanel({
                 style={{ width: "100%" }}
               />
             </Field>
-            <Field label="Telefon" style={{ flex: 1 }}>
+            <Field label={t("Telefon")} style={{ flex: 1 }}>
               <input
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
@@ -359,17 +359,17 @@ export default function CustomersPanel({
             </Field>
           </div>
 
-          <Field label="Vergi / TC No">
+          <Field label={t("Vergi / TC No")}>
             <input
               value={form.taxNumber}
               onChange={(e) => setForm((f) => ({ ...f, taxNumber: e.target.value }))}
               onBlur={checkDuplicates}
-              placeholder="Fatura kesilecekse gerekli"
+              placeholder={t("Fatura kesilecekse gerekli")}
               style={{ width: "100%" }}
             />
           </Field>
 
-          <Field label="Not">
+          <Field label={t("Not")}>
             <textarea
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
@@ -394,7 +394,7 @@ export default function CustomersPanel({
                 {duplicates.map((d) => (
                   <li key={d.party.id}>
                     {d.party.displayName}
-                    {d.severity === "block" ? " — aynı vergi numarası, kayıt açılamaz" : ""}
+                    {d.severity === "block" ? t(" — aynı vergi numarası, kayıt açılamaz") : ""}
                   </li>
                 ))}
               </ul>
@@ -411,7 +411,7 @@ export default function CustomersPanel({
               disabled={saving}
               style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14 }}
             >
-              {saving ? "Kaydediliyor…" : formMode.kind === "edit" ? "Güncelle" : "Kaydet"}
+              {saving ? t("Kaydediliyor…") : formMode.kind === "edit" ? t("Güncelle") : t("Kaydet")}
             </button>
             <button
               onClick={closeForm}
@@ -427,8 +427,8 @@ export default function CustomersPanel({
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
       ) : parties.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
-          Henüz müşteri kaydı yok. Satış ve Müşteri İlişkileri aynı listeyi görür.
-          {canWrite && fabAvailable ? ' Eklemek için sayfadaki "+" düğmesini kullan.' : ""}
+          {t("Henüz müşteri kaydı yok. Satış ve Müşteri İlişkileri aynı listeyi görür.")}
+          {canWrite && fabAvailable ? t(' Eklemek için sayfadaki "+" düğmesini kullan.') : ""}
         </p>
       ) : visible.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Aramanla eşleşen kayıt yok.")}</p>
@@ -477,7 +477,7 @@ export default function CustomersPanel({
                           border: `1px solid ${ROLE_COLORS[r]}40`,
                         }}
                       >
-                        {ROLE_LABELS[r]}
+                        {t(ROLE_LABELS[r])}
                       </span>
                     ))}
                   </div>
@@ -601,10 +601,10 @@ function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boo
     >
       <div style={{ display: "flex", gap: 6 }}>
         <button onClick={() => setTab("activity")} style={tabStyle(tab === "activity")}>
-          Geçmiş {activities.length > 0 && `(${activities.length})`}
+          {t("Geçmiş")} {activities.length > 0 && `(${activities.length})`}
         </button>
         <button onClick={() => setTab("contacts")} style={tabStyle(tab === "contacts")}>
-          Kişiler {contacts.length > 0 && `(${contacts.length})`}
+          {t("Kişiler")} {contacts.length > 0 && `(${contacts.length})`}
         </button>
       </div>
 
@@ -613,7 +613,7 @@ function PartyDetail({ party, canWrite, profile }: { party: Party; canWrite: boo
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={tab === "activity" ? profile : "Kişi adı"}
+            placeholder={tab === "activity" ? profile : t("Kişi adı")}
             onKeyDown={(e) => e.key === "Enter" && (tab === "activity" ? addActivity() : addContact())}
             style={{ flex: 1, fontSize: 13, padding: "5px 8px" }}
           />

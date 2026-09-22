@@ -45,18 +45,18 @@ type AdminTab =
  * aranan bölümü bulmak kaydırmaya dönüşmüştü. Her özellik artık kendi sekmesinde.
  */
 const TABS: { key: AdminTab; label: string }[] = [
-  { key: "kullanicilar", label: "Kullanıcılar" },
+  { key: "kullanicilar", label: "Kullanıcılar" }, // dil:anahtar
   { key: "eposta", label: "E-posta" },
   { key: "epostaMaliyet", label: "E-posta maliyeti" },
   { key: "bakiye", label: "Lio Bakiyesi" },
-  { key: "siparisler", label: "Bakiye siparişleri" },
-  { key: "saglayicilar", label: "AI sağlayıcıları" },
-  { key: "paketler", label: "Paketler ve ödeme" },
+  { key: "siparisler", label: "Bakiye siparişleri" }, // dil:anahtar
+  { key: "saglayicilar", label: "AI sağlayıcıları" }, // dil:anahtar
+  { key: "paketler", label: "Paketler ve ödeme" }, // dil:anahtar
   { key: "destek", label: "Destek" },
-  { key: "demoRandevu", label: "Demo randevuları" },
-  { key: "demo", label: "Demo hesabı" },
+  { key: "demoRandevu", label: "Demo randevuları" }, // dil:anahtar
+  { key: "demo", label: "Demo hesabı" }, // dil:anahtar
   { key: "ziyaretler", label: "Demo ziyaretleri" },
-  { key: "whatsapp", label: "WhatsApp numaraları" },
+  { key: "whatsapp", label: "WhatsApp numaraları" }, // dil:anahtar
 ];
 
 const NAV_WIDTH = 200;

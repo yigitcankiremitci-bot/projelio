@@ -45,6 +45,7 @@ import { IconMic, IconSpeaker } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { satinAlmaGosterilir } from "../lib/mobilKabuk";
 import { DOKUNMATIK_CIHAZ } from "../lib/dokunmatikCihaz";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   open: boolean;
@@ -318,7 +319,7 @@ export default function AiAssistantPanel({
       speak({ text: VOICE_SAMPLE, audioUrl: `data:${res.mimeType};base64,${res.audioBase64}` });
     } catch (err: any) {
       if (err?.status === 402) setCreditsBlocked(true);
-      setError(String(err?.message ?? "Ses denemesi yapılamadı."));
+      setError(String(err?.message ?? t("Ses denemesi yapılamadı.")));
     } finally {
       setSamplingVoice(false);
     }
@@ -450,7 +451,7 @@ export default function AiAssistantPanel({
       setConversations((prev) => prev.filter((conv) => conv.id !== id));
       if (activeId === id) startNewConversation();
     } catch {
-      setError("Sohbet silinemedi.");
+      setError(t("Sohbet silinemedi."));
     }
   };
 
@@ -466,7 +467,7 @@ export default function AiAssistantPanel({
     try {
       setFilePreview(await filesApi.getById(fileId));
     } catch (err: any) {
-      setError(String(err?.message ?? "Dosya açılamadı."));
+      setError(String(err?.message ?? t("Dosya açılamadı.")));
     }
   };
 
@@ -489,7 +490,7 @@ export default function AiAssistantPanel({
     } catch (err: any) {
       // Ses çözümleme ücretli; bakiye yetmiyorsa buradan da 402 gelebilir.
       if (err?.status === 402) setCreditsBlocked(true);
-      setError(String(err?.message ?? "Dosya okunamadı."));
+      setError(String(err?.message ?? t("Dosya okunamadı.")));
     } finally {
       setAttaching((prev) => {
         const index = prev.indexOf(label);
@@ -536,7 +537,7 @@ export default function AiAssistantPanel({
         void addAttachment(picked.name, () => aiChat.attachCloudFile(picked.id, activeId ?? undefined));
       });
     } catch (err: any) {
-      setError(String(err?.message ?? "Drive açılamadı."));
+      setError(String(err?.message ?? t("Drive açılamadı.")));
     }
   };
 
@@ -606,7 +607,7 @@ export default function AiAssistantPanel({
       } catch (err: any) {
         setPreparingId(null);
         if (err?.status === 402) setCreditsBlocked(true);
-        setError(String(err?.message ?? "Doğal ses üretilemedi, tarayıcı sesine düşüldü."));
+        setError(String(err?.message ?? t("Doğal ses üretilemedi, tarayıcı sesine düşüldü.")));
         startBrowser();
       }
     },
@@ -675,7 +676,7 @@ export default function AiAssistantPanel({
       inputRef.current?.focus();
     } catch (err: any) {
       if (err?.status === 402) setCreditsBlocked(true);
-      setError(String(err?.message ?? "Ses çözümlenemedi."));
+      setError(String(err?.message ?? t("Ses çözümlenemedi.")));
     } finally {
       setTranscribing(false);
     }
@@ -732,7 +733,7 @@ export default function AiAssistantPanel({
 
       applyResult(result);
     } catch (err: any) {
-      const message = String(err?.message ?? "bilinmeyen hata");
+      const message = String(err?.message ?? t("bilinmeyen hata"));
       // 402: kredi yetersiz — kullanıcıyı bilgilendir, hata balonu yerine uyarı göster.
       if (err?.status === 402) setCreditsBlocked(true);
       setError(message);
@@ -847,7 +848,7 @@ export default function AiAssistantPanel({
       applyResult(await aiChat.continueRun(pending.runId, true, approveAll));
     } catch (err: any) {
       if (err?.status === 402) setCreditsBlocked(true);
-      setError(String(err?.message ?? "Devam edilemedi."));
+      setError(String(err?.message ?? t("Devam edilemedi.")));
       refreshCredits();
     } finally {
       setSending(false);
@@ -864,7 +865,7 @@ export default function AiAssistantPanel({
         setMessages((prev) => [
           ...prev,
           // Durdurma her zaman düz bir mesajla döner; tip birleşimi yüzünden yine de daraltılıyor.
-          { id: `c-${Date.now()}`, role: "assistant", content: res.type === "message" ? res.text : "Durduruldu." },
+          { id: `c-${Date.now()}`, role: "assistant", content: res.type === "message" ? res.text : t("Durduruldu.") },
         ])
       )
       .catch(() => {});
@@ -882,7 +883,7 @@ export default function AiAssistantPanel({
       applyResult(await aiChat.confirm(actionId, confirmed));
     } catch (err: any) {
       if (err?.status === 402) setCreditsBlocked(true);
-      setError(String(err?.message ?? "İşlem tamamlanamadı."));
+      setError(String(err?.message ?? t("İşlem tamamlanamadı.")));
       refreshCredits();
     } finally {
       setSending(false);
@@ -1010,10 +1011,10 @@ export default function AiAssistantPanel({
           <HeaderButton title={t("Sohbet geçmişi")} onClick={() => setShowHistory((v) => !v)} active={showHistory}>
             <IconMessagesGlyph color="#fff" />
           </HeaderButton>
-          <HeaderButton title="Yeni sohbet" onClick={startNewConversation}>
+          <HeaderButton title={t("Yeni sohbet")} onClick={startNewConversation}>
             <IconPlus size={17} color="#fff" />
           </HeaderButton>
-          <HeaderButton title="Kapat" onClick={onClose}>
+          <HeaderButton title={t("Kapat")} onClick={onClose}>
             <IconX size={17} color="#fff" />
           </HeaderButton>
         </header>
@@ -1143,14 +1144,13 @@ export default function AiAssistantPanel({
 
             {voiceEngine === "browser" && turkishVoiceMissing && (
               <div style={{ fontSize: 11.5, color: c.warning, lineHeight: 1.4 }}>
-                Cihazında Türkçe ses yok; okunuş bozuk olabilir. Sistem ayarlarından Türkçe bir ses
-                yükleyebilir ya da "Doğal ses"e geçebilirsin.
+                {t("Cihazında Türkçe ses yok; okunuş bozuk olabilir. Sistem ayarlarından Türkçe bir ses yükleyebilir ya da \"Doğal ses\"e geçebilirsin.")}
               </div>
             )}
 
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: c.textPrimary, cursor: "pointer" }}>
               <input type="checkbox" checked={autoSpeak} onChange={toggleAutoSpeak} />
-              Yeni yanıtları kendiliğinden oku
+              {t("Yeni yanıtları kendiliğinden oku")}
               {voiceEngine === "server" && (
                 <span style={{ color: c.warning, fontSize: 11 }}>{t("(her yanıt Lio Bakiyesi harcar)")}</span>
               )}
@@ -1196,11 +1196,11 @@ export default function AiAssistantPanel({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {conv.title}
+                    {t(conv.title)}
                   </span>
                   <button
                     onClick={(e) => handleDeleteConversation(conv.id, e)}
-                    aria-label="Sohbeti sil"
+                    aria-label={t("Sohbeti sil")}
                     style={{ background: "transparent", border: "none", padding: 4, display: "flex", cursor: "pointer" }}
                   >
                     <IconTrash size={14} color={c.textSecondary} />
@@ -1230,7 +1230,7 @@ export default function AiAssistantPanel({
               {activeFiles.map((file) => (
                 <span
                   key={file.id}
-                  title={`${file.detail} — iş bitene kadar her turda Lio'ya gönderiliyor`}
+                  title={t("{detail} — iş bitene kadar her turda Lio'ya gönderiliyor", { detail: file.detail })}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1434,7 +1434,7 @@ export default function AiAssistantPanel({
                     color: c.textSecondary,
                   }}
                 >
-                  {name} · okunuyor…
+                  {t("{ad} · okunuyor…", { ad: name })}
                 </span>
               ))}
             </div>
@@ -1514,7 +1514,7 @@ export default function AiAssistantPanel({
                       animation: "projelioAiPulse 1.2s ease infinite",
                     }}
                   />
-                  Dinliyorum… {recorder.seconds} sn — bitirmek için mikrofona tekrar bas
+                  {t("Dinliyorum… {sn} sn — bitirmek için mikrofona tekrar bas", { sn: recorder.seconds })}
                   <button
                     type="button"
                     onClick={recorder.cancel}
@@ -1532,7 +1532,7 @@ export default function AiAssistantPanel({
                   </button>
                 </>
               ) : (
-                "Ses yazıya çevriliyor…"
+                t("Ses yazıya çevriliyor…")
               )}
             </div>
           )}
@@ -1573,7 +1573,7 @@ export default function AiAssistantPanel({
                     }
                   }}
                   rows={1}
-                  placeholder="Ne yapmak istersin?"
+                  placeholder={t("Ne yapmak istersin?")}
                   disabled={sending}
                   style={{ color: c.textPrimary }}
                 />
@@ -1583,8 +1583,8 @@ export default function AiAssistantPanel({
                 type="button"
                 onClick={() => setAttachMenu((v) => !v)}
                 disabled={sending}
-                aria-label="Dosya ekle"
-                title="Dosya ekle"
+                aria-label={t("Dosya ekle")}
+                title={t("Dosya ekle")}
                 style={{ ...boxIconStyle, left: 7, opacity: sending ? 0.4 : 1 }}
               >
                 <IconPaperclip size={18} color={c.textSecondary} />
@@ -1595,10 +1595,10 @@ export default function AiAssistantPanel({
                   type="button"
                   onClick={() => void toggleRecording()}
                   disabled={sending || transcribing}
-                  aria-label={recorder.recording ? "Kaydı bitir" : "Sesli komut"}
+                  aria-label={recorder.recording ? t("Kaydı bitir") : t("Sesli komut")}
                   title={
                     recorder.recording
-                      ? "Kaydı bitir ve yazıya çevir"
+                      ? t("Kaydı bitir ve yazıya çevir")
                       : t("Sesli komut ver (ses çözümleme Lio Bakiyesi harcar)")
                   }
                   style={{
@@ -1662,9 +1662,9 @@ export default function AiAssistantPanel({
 
       {confirmation && (
         <ConfirmDialog
-          title="Onay gerekiyor"
+          title={t("Onay gerekiyor")}
           message={confirmation.summary}
-          confirmLabel="Onayla"
+          confirmLabel={t("Onayla")}
           cancelLabel={t("Vazgeç")}
           danger
           onConfirm={handleConfirmAction}
@@ -1682,7 +1682,7 @@ export default function AiAssistantPanel({
 }
 
 function formatCredits(value: number): string {
-  return Math.round(value).toLocaleString("tr-TR");
+  return Math.round(value).toLocaleString(bicimDili());
 }
 
 function HeaderButton({
@@ -1887,9 +1887,9 @@ function Bubble({
                     // ne olduğunu söylüyor, o cümleyi olduğu gibi gösteriyoruz.
                     aiChat
                       .downloadExport(segment.exportId, segment.label)
-                      .catch((e) => alert(e instanceof Error ? e.message : "Rapor indirilemedi."));
+                      .catch((e) => alert(e instanceof Error ? e.message : t("Rapor indirilemedi.")));
                   }}
-                  title="Raporu indir"
+                  title={t("Raporu indir")}
                   style={{
                     ...linkStyle,
                     display: "inline",
@@ -1930,8 +1930,8 @@ function Bubble({
               type="button"
               onClick={onSpeak}
               disabled={preparing}
-              aria-label={speaking ? "Okumayı durdur" : "Bu yanıtı dinle"}
-              title={preparing ? "Ses hazırlanıyor…" : speaking ? "Okumayı durdur" : "Bu yanıtı dinle"}
+              aria-label={speaking ? t("Okumayı durdur") : t("Bu yanıtı dinle")}
+              title={preparing ? t("Ses hazırlanıyor…") : speaking ? t("Okumayı durdur") : t("Bu yanıtı dinle")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -1946,7 +1946,7 @@ function Bubble({
               }}
             >
               <IconSpeaker size={13} color={speaking ? c.accent : c.textSecondary} muted={false} />
-              {preparing ? "hazırlanıyor…" : speaking ? "durdur" : "dinle"}
+              {preparing ? t("hazırlanıyor…") : speaking ? "durdur" : "dinle"}
             </button>
           )}
         </div>

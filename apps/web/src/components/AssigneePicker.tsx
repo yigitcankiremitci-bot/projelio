@@ -40,13 +40,14 @@ export default function AssigneePicker({
   departmentId,
   value,
   onChange,
-  placeholder = "İsim yazarak ara…",
+  placeholder: placeholderProp,
   multiple = false,
   values = [],
   onChangeValues,
 }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const placeholder = placeholderProp ?? t("İsim yazarak ara…");
   const [members, setMembers] = useState<PickableMember[]>([]);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -101,7 +102,7 @@ export default function AssigneePicker({
   // eklemek diye bir şey yok, listede durması yalnızca kafa karıştırır.
   const filtered = members.filter((m) => matches(m) && !(multiple && values.includes(m.userId)));
 
-  const label = (m?: PickableMember) => m?.fullName ?? m?.username ?? "Seçili kişi";
+  const label = (m?: PickableMember) => m?.fullName ?? m?.username ?? t("Seçili kişi");
   const selectedMembers = multiple
     ? values.map((id) => members.find((m) => m.userId === id) ?? { userId: id })
     : [];
@@ -116,7 +117,7 @@ export default function AssigneePicker({
                 key={m.userId}
                 // İlk rozet birincil atanan: listelerde tek yüz gösterildiğinde
                 // görünen kişi bu (bkz. tasks.assigned_to).
-                title={i === 0 ? "Birincil atanan" : undefined}
+                title={i === 0 ? t("Birincil atanan") : undefined}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -133,7 +134,7 @@ export default function AssigneePicker({
                 <button
                   type="button"
                   onClick={() => onChangeValues?.(values.filter((id) => id !== m.userId))}
-                  aria-label={`${label(m as PickableMember)} atamasını kaldır`}
+                  aria-label={t("{p1} atamasını kaldır", { p1: label(m as PickableMember) })}
                   style={{ background: "transparent", border: "none", color: c.textSecondary, fontSize: 15, padding: 0, cursor: "pointer" }}
                 >
                   ×
@@ -153,9 +154,9 @@ export default function AssigneePicker({
           placeholder={
             members.length === 0
               ? departmentId
-                ? "Bu departmanda kadro üyesi yok"
-                : "Bu projede ekip üyesi yok"
-              : "Kişi eklemek için isim yaz…"
+                ? t("Bu departmanda kadro üyesi yok")
+                : t("Bu projede ekip üyesi yok")
+              : t("Kişi eklemek için isim yaz…")
           }
           disabled={members.length === 0}
           style={{ width: "100%", fontSize: 16 }}
@@ -228,7 +229,7 @@ export default function AssigneePicker({
           }}
         >
           <span style={{ fontSize: 16, color: c.textPrimary }}>
-            {selected.fullName ?? selected.username ?? "Seçili kişi"}
+            {selected.fullName ?? selected.username ?? t("Seçili kişi")}
             {selected.username && (
               <span style={{ fontSize: 13, color: c.textSecondary, marginLeft: 6 }}>@{selected.username}</span>
             )}
@@ -254,7 +255,7 @@ export default function AssigneePicker({
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder={members.length === 0 ? (departmentId ? "Bu departmanda kadro üyesi yok" : "Bu projede ekip üyesi yok") : placeholder}
+          placeholder={members.length === 0 ? (departmentId ? t("Bu departmanda kadro üyesi yok") : t("Bu projede ekip üyesi yok")) : placeholder}
           disabled={members.length === 0}
           style={{ width: "100%", fontSize: 16 }}
         />

@@ -41,6 +41,7 @@ const cokSatirliStil = {
  * yalnızca bu dosyaya dokunmayı gerektiriyor.
  */
 export default function ModuleFieldInput({ field, form, setValue, references, createPartyPath }: Props) {
+  const t = useT();
   const c = useThemeColors();
   const value = form[field.key] ?? "";
   const inputStyle = { width: "100%" } as const;
@@ -52,7 +53,7 @@ export default function ModuleFieldInput({ field, form, setValue, references, cr
           {!field.required && <option value="">—</option>}
           {field.options?.map((o) => (
             <option key={o.value} value={o.value}>
-              {o.label}
+              {t(o.label)}
             </option>
           ))}
         </select>
@@ -102,11 +103,11 @@ export default function ModuleFieldInput({ field, form, setValue, references, cr
             value={form[field.currencyKey ?? "currency"] ?? "TRY"}
             onChange={(e) => setValue(field.currencyKey ?? "currency", e.target.value)}
             style={{ width: 80 }}
-            aria-label="Para birimi"
+            aria-label={t("Para birimi")}
           >
             {(field.options ?? CURRENCY_OPTIONS).map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {t(o.label)}
               </option>
             ))}
           </select>
@@ -137,7 +138,7 @@ export default function ModuleFieldInput({ field, form, setValue, references, cr
                   color: selected ? c.primary : c.textSecondary,
                 }}
               >
-                {o.label}
+                {t(o.label)}
               </button>
             );
           })}
@@ -195,6 +196,7 @@ function TagsInput({
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
+  const t = useT();
   const c = useThemeColors();
   const [draft, setDraft] = useState("");
   const tags = value.split(",").map((t) => t.trim()).filter(Boolean);
@@ -223,7 +225,7 @@ function TagsInput({
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {tags.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {tags.map((t, sira) => (
+          {tags.map((etiket, sira) => (
             <span
               // Anahtar SIRAYA bağlı: etiketin kendisi anahtar olduğunda,
               // eski kayıtlardan gelen yinelenen bir etiket iki kardeşe aynı
@@ -241,7 +243,7 @@ function TagsInput({
                 color: c.primary,
               }}
             >
-              {t}
+              {etiket}
               <button
                 type="button"
                 // SIRAYA göre siliniyor, değere göre değil: değere göre
@@ -249,7 +251,7 @@ function TagsInput({
                 // kaldırıyordu — kullanıcı bir tanesine bastığında iki üç
                 // tanesi birden gidiyordu.
                 onClick={() => onChange(tags.filter((_, x) => x !== sira).join(","))}
-                aria-label={`${t} etiketini kaldır`}
+                aria-label={t("{etiket} etiketini kaldır", { etiket })}
                 style={{ background: "transparent", border: "none", cursor: "pointer", color: c.primary, padding: 0 }}
               >
                 ×
@@ -274,7 +276,7 @@ function TagsInput({
           e.preventDefault();
           add();
         }}
-        placeholder={placeholder ?? "Yaz ve Enter'a bas"}
+        placeholder={placeholder ?? t("Yaz ve Enter'a bas")}
         style={{ width: "100%" }}
       />
     </div>
@@ -381,7 +383,7 @@ function ReferencePicker({
           setValue(ilk.id);
           setQuery("");
         }}
-        placeholder={references.loading ? "Yükleniyor…" : field.placeholder ?? "Aramak için yaz…"}
+        placeholder={references.loading ? t("Yükleniyor…") : field.placeholder ?? t("Aramak için yaz…")}
         style={{ width: "100%" }}
       />
       {query.trim() && (
@@ -413,7 +415,7 @@ function ReferencePicker({
                 color: c.textPrimary,
               }}
             >
-              {o.label}
+              {t(o.label)}
               {o.hint && <span style={{ fontSize: 11, color: c.textSecondary }}> · {o.hint}</span>}
             </button>
           ))}
@@ -435,7 +437,7 @@ function ReferencePicker({
                 color: c.primary,
               }}
             >
-              {creating ? "Ekleniyor…" : `"${query.trim()}" adıyla yeni kayıt aç`}
+              {creating ? t("Ekleniyor…") : t("\"{p1}\" adıyla yeni kayıt aç", { p1: query.trim() })}
             </button>
           )}
         </div>

@@ -4,7 +4,8 @@ import { api } from "../api/client";
 import { backState } from "../lib/backTarget";
 import SocialSignInButtons from "../components/SocialSignInButtons";
 import { useThemeColors } from "../theme/useThemeColors";
-import { useT } from "../lib/i18n";
+import { useLocale, useT } from "../lib/i18n";
+import GirisDilSecici from "../components/GirisDilSecici";
 
 export default function Register() {
   const [fullName, setFullName] = useState("");
@@ -21,6 +22,7 @@ export default function Register() {
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
   const c = useThemeColors();
   const t = useT();
+  const { locale } = useLocale();
   // Yasal metinlerin geri bağlantısı buraya dönsün (bkz. lib/backTarget.ts).
   const registerBack = { to: "/register", label: t("Kayıt sayfası") };
 
@@ -29,7 +31,11 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      await api.post("/auth/register", { fullName, email, password, username });
+      // Ekranda görünen dil hesaba yazılır. Gönderilmediği sürece hesabın dili
+      // boş kalıyordu ve arayüzü İngilizce gören kullanıcıya doğrulama
+      // e-postası, örnek iş ve ipucu e-postaları Türkçe gidiyordu — sunucu
+      // tarayıcı kapalıyken üretilen içerikte dili yalnızca hesaptan bilir.
+      await api.post("/auth/register", { fullName, email, password, username, locale });
       setRegistered(true);
     } catch (err) {
       // "E-posta zaten kullanılıyor" ARTIK BİR HATA DEĞİL: adres kayıtlıysa sunucu
@@ -64,6 +70,7 @@ export default function Register() {
           padding: 24,
         }}
       >
+        <GirisDilSecici />
         <div
           style={{
             width: "100%",
@@ -146,6 +153,7 @@ export default function Register() {
         padding: 24,
       }}
     >
+      <GirisDilSecici />
       <div
         style={{
           width: "100%",

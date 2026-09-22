@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
+import { hataMetni } from "../../common/i18n/index";
 
 /** OpenAI transkripsiyon uç noktasının kabul ettiği azami dosya boyutu. */
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
@@ -97,7 +98,7 @@ export class AiTranscriptionService implements OnModuleInit {
       );
     } catch (err: any) {
       throw new ServiceUnavailableException(
-        `Ses çözümleme servisine ulaşılamadı: ${err?.message ?? "bağlantı hatası"}`
+        hataMetni("Ses çözümleme servisine ulaşılamadı: {p1}", { p1: err?.message ?? "bağlantı hatası" })
       );
     }
 

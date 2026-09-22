@@ -31,7 +31,7 @@ interface Props {
  * kanıtlıyor, "bunu istediğimi" değil. Yanlışlıkla silmeye karşı ikinci bir
  * kasıt adımı gerekiyor.
  */
-const ONAY_METNI = "HESABIMI SİL";
+const ONAY_METNI = "HESABIMI SİL"; // dil:anahtar
 
 /**
  * Silmeden önce sunulan alternatifler.
@@ -83,7 +83,7 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
     api
       .get<DeletionPreview>("/users/me/deletion-preview")
       .then(setPreview)
-      .catch((e) => setHata(e instanceof Error ? e.message : "Bilgiler alınamadı."))
+      .catch((e) => setHata(e instanceof Error ? e.message : t("Bilgiler alınamadı.")))
       .finally(() => setYukleniyor(false));
   }, []);
 
@@ -96,7 +96,7 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
       localStorage.removeItem("projelio_token");
       window.location.href = "/login";
     } catch (e) {
-      setHata(e instanceof ApiError ? e.message : "Hesap silinemedi. Tekrar dene.");
+      setHata(e instanceof ApiError ? e.message : t("Hesap silinemedi. Tekrar dene."));
       setSiliniyor(false);
     }
   };
@@ -110,7 +110,7 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
       const res = await fetch(`${API_URL}/users/me/export`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) throw new Error("Dosya oluşturulamadı.");
+      if (!res.ok) throw new Error(t("Dosya oluşturulamadı."));
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -119,13 +119,13 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setHata(e instanceof Error ? e.message : "Veriler indirilemedi.");
+      setHata(e instanceof Error ? e.message : t("Veriler indirilemedi."));
     } finally {
       setIndiriliyor(false);
     }
   };
 
-  const hazir = onay.trim() === ONAY_METNI && (!hasPassword || sifre.length > 0) && !preview?.blocker;
+  const hazir = onay.trim() === t(ONAY_METNI) && (!hasPassword || sifre.length > 0) && !preview?.blocker;
 
   return (
     <Modal title={t("Hesabını sil")} onClose={onClose}>
@@ -164,15 +164,14 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
               {t("Verilerini yanına al")}
             </p>
             <p style={{ margin: 0, fontSize: 14, color: c.textSecondary, lineHeight: 1.6 }}>
-              Görevlerin, işlerin, projelerin ve bütçe kayıtların tek bir Excel dosyasında. Silsen de
-              elinde kalır.
+              {t("Görevlerin, işlerin, projelerin ve bütçe kayıtların tek bir Excel dosyasında. Silsen de elinde kalır.")}
             </p>
             <button
               onClick={veriyiIndir}
               disabled={indiriliyor}
               style={{ ...dugme(c.border, c.textPrimary), marginTop: 8, fontSize: 14 }}
             >
-              {indiriliyor ? "Hazırlanıyor…" : "Excel olarak indir"}
+              {indiriliyor ? t("Hazırlanıyor…") : t("Excel olarak indir")}
             </button>
           </div>
 
@@ -195,23 +194,18 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
 
           <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, padding: "11px 13px" }}>
             <p style={{ margin: 0, fontSize: 14, color: c.textSecondary, lineHeight: 1.6 }}>
-              {t("Fikrin değişirse bu 30 gün içinde")} <strong style={{ color: c.textPrimary }}>aynı e-posta ve
-              şifreyle giriş yapman yeterli</strong> — hesabın olduğu gibi geri açılır, hiçbir şey kaybolmaz.
-              Bu bilgiyi e-postayla da göndereceğiz.
+              {t("Fikrin değişirse bu 30 gün içinde")} <strong style={{ color: c.textPrimary }}>{t("aynı e-posta ve şifreyle giriş yapman yeterli")}</strong> {t("— hesabın olduğu gibi geri açılır, hiçbir şey kaybolmaz. Bu bilgiyi e-postayla da göndereceğiz.")}
             </p>
           </div>
 
           <p style={{ color: c.textSecondary, fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-            30 gün dolduğunda kişisel verilerin (bildirimler, kişisel yapılacaklar, bağlı Drive/OneDrive
-            hesapların, Lio sohbetlerin) kalıcı olarak silinir. Ekip arkadaşlarınla birlikte çalıştığın
-            işlerdeki görev, yorum ve bütçe kayıtları organizasyonda kalır; adın yerine
-            “Silinmiş kullanıcı” görünür.
+            {t("30 gün dolduğunda kişisel verilerin (bildirimler, kişisel yapılacaklar, bağlı Drive/OneDrive hesapların, Lio sohbetlerin) kalıcı olarak silinir. Ekip arkadaşlarınla birlikte çalıştığın işlerdeki görev, yorum ve bütçe kayıtları organizasyonda kalır; adın yerine “Silinmiş kullanıcı” görünür.")}
           </p>
 
           {preview && preview.silinecekIsler.length > 0 && (
             <div style={{ border: `1px solid ${c.danger}`, borderRadius: 10, padding: "10px 12px" }}>
               <p style={{ margin: "0 0 6px", fontSize: 14, color: c.danger, fontWeight: 600 }}>
-                30 gün sonra bunlar tamamen silinecek (içlerinde senden başka kimse yok):
+                {t("30 gün sonra bunlar tamamen silinecek (içlerinde senden başka kimse yok):")}
               </p>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, color: c.textPrimary }}>
                 {preview.silinecekIsler.map((ad) => (
@@ -242,7 +236,7 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
           )}
 
           <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 14, color: c.textSecondary }}>
-            {t("Onaylamak için")} <strong style={{ color: c.textPrimary }}>{ONAY_METNI}</strong> {t("yaz")}
+            {t("Onaylamak için")} <strong style={{ color: c.textPrimary }}>{t(ONAY_METNI)}</strong> {t("yaz")}
             <input value={onay} onChange={(e) => setOnay(e.target.value)} style={girdi(c)} />
           </label>
 
@@ -262,7 +256,7 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
                 cursor: hazir && !siliniyor ? "pointer" : "not-allowed",
               }}
             >
-              {siliniyor ? "Kapatılıyor…" : "Hesabımı kapat"}
+              {siliniyor ? t("Kapatılıyor…") : t("Hesabımı kapat")}
             </button>
           </div>
         </div>

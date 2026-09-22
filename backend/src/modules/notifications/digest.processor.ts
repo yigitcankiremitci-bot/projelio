@@ -32,7 +32,7 @@ export class DigestProcessor {
   async sendDailyDigest() {
     const today = startOfDay(new Date());
     const tomorrow = addDays(today, 1);
-    await this.sendDigestForRange(today, tomorrow, "daily_digest", "Bugünün işleri");
+    await this.sendDigestForRange(today, tomorrow, "daily_digest", "Bugünün işleri"); // dil:anahtar
   }
 
   // Her Pazartesi 08:30 (sunucu saatiyle)
@@ -40,7 +40,7 @@ export class DigestProcessor {
   async sendWeeklyDigest() {
     const today = startOfDay(new Date());
     const weekEnd = addDays(today, 7);
-    await this.sendDigestForRange(today, weekEnd, "weekly_digest", "Bu haftanın işleri");
+    await this.sendDigestForRange(today, weekEnd, "weekly_digest", "Bu haftanın işleri"); // dil:anahtar
   }
 
   private async sendDigestForRange(from: Date, to: Date, type: "daily_digest" | "weekly_digest", title: string) {

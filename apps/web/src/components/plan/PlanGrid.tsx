@@ -19,6 +19,7 @@ import {
   weekdayOf,
   type DraggedItem,
 } from "../../lib/planGrid";
+import { useT } from "../../lib/i18n";
 
 interface Props {
   from: string;
@@ -172,6 +173,7 @@ function DayColumn({
   onMoveBlock,
   onDropItem,
 }: ColumnProps) {
+  const t = useT();
   const c = useThemeColors();
   const bodyRef = useRef<HTMLDivElement>(null);
   const layout = useMemo(() => layoutColumns(blocks), [blocks]);
@@ -242,7 +244,7 @@ function DayColumn({
           <span>{shortDayLabel(day)}</span>
         ) : (
           <>
-            <span style={{ color: c.textSecondary, fontWeight: 400 }}>{WEEKDAY_LABELS[weekdayOf(day)]}</span>
+            <span style={{ color: c.textSecondary, fontWeight: 400 }}>{t(WEEKDAY_LABELS[weekdayOf(day)])}</span>
             <span>{shortDayLabel(day)}</span>
           </>
         )}
@@ -356,6 +358,7 @@ function BlockCard({
   onOpen: () => void;
   onToggleDone: () => void;
 }) {
+  const t = useT();
   const c = useThemeColors();
   const { top, height } = blockGeometry(block, startHour);
   const accent = block.focusAreaColor ?? block.color ?? c.primary;
@@ -365,7 +368,7 @@ function BlockCard({
   const width = `calc(${100 / layout.columns}% - 6px)`;
   const left = `calc(${(100 / layout.columns) * layout.column}% + 3px)`;
 
-  const label = block.title ?? block.linkedTitle ?? block.focusAreaName ?? "Blok";
+  const label = block.title ?? block.linkedTitle ?? block.focusAreaName ?? t("Blok");
 
   return (
     <div
@@ -407,7 +410,7 @@ function BlockCard({
             e.stopPropagation();
             onToggleDone();
           }}
-          aria-label={done ? "Tamamlandı işaretini kaldır" : "Tamamlandı işaretle"}
+          aria-label={done ? t("Tamamlandı işaretini kaldır") : t("Tamamlandı işaretle")}
           style={{
             width: 13,
             height: 13,

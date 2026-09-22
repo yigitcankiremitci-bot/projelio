@@ -4,6 +4,7 @@ import { whatsappApi } from "../api/whatsapp";
 import WhatsappLioWritesToggle from "./WhatsappLioWritesToggle";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * Kullanıcının kendi WhatsApp bildirim paneli.
@@ -29,7 +30,7 @@ export default function WhatsappNotifyPanel({ overview, onChanged }: { overview:
     try {
       await fn();
     } catch (e: any) {
-      setError(e?.message ?? "İşlem başarısız.");
+      setError(e?.message ?? t("İşlem başarısız."));
     } finally {
       setBusy(false);
     }
@@ -85,8 +86,8 @@ export default function WhatsappNotifyPanel({ overview, onChanged }: { overview:
     <div>
       <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>
         {state === "opted_out"
-          ? "WhatsApp bildirimleriniz durdurulmuş. Yeniden açmak için kod alıp Projelio numaranıza gönderin ya da WhatsApp'tan BAŞLAT yazın."
-          : "Bildirimleri WhatsApp'tan almak için bir kod alın ve aşağıdaki bağlantıyla Projelio numaranıza gönderin. Telefonunuz bu mesajla eşleşir."}
+          ? t("WhatsApp bildirimleriniz durdurulmuş. Yeniden açmak için kod alıp Projelio numaranıza gönderin ya da WhatsApp'tan BAŞLAT yazın.")
+          : t("Bildirimleri WhatsApp'tan almak için bir kod alın ve aşağıdaki bağlantıyla Projelio numaranıza gönderin. Telefonunuz bu mesajla eşleşir.")}
       </p>
 
       {link ? (
@@ -96,14 +97,18 @@ export default function WhatsappNotifyPanel({ overview, onChanged }: { overview:
             {t("WhatsApp'ta gönder")}
           </a>
           <p style={{ fontSize: 14, color: c.textSecondary, margin: "10px 0 0", lineHeight: 1.5 }}>
-            Bağlantı telefonunuzda ya da WhatsApp Web'de açılır; mesaj {link.numberMasked} numarasına hazır yazılı gelir, yalnızca
-            gönderin. Gönderdikten sonra bu sayfa kendiliğinden güncellenir. Kod{" "}
-            {new Date(link.expiresAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}'e kadar geçerli.
+            {t(
+              "Bağlantı telefonunuzda ya da WhatsApp Web'de açılır; mesaj {numara} numarasına hazır yazılı gelir, yalnızca gönderin. Gönderdikten sonra bu sayfa kendiliğinden güncellenir. Kod {saat}'e kadar geçerli.",
+              {
+                numara: link.numberMasked,
+                saat: new Date(link.expiresAt).toLocaleTimeString(bicimDili(), { hour: "2-digit", minute: "2-digit" }),
+              }
+            )}
           </p>
         </div>
       ) : (
         <button onClick={() => run(async () => setLink(await whatsappApi.linkCode()))} disabled={busy} style={primaryButton}>
-          {busy ? "Kod alınıyor…" : "Kod al"}
+          {busy ? t("Kod alınıyor…") : t("Kod al")}
         </button>
       )}
 

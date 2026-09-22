@@ -136,7 +136,7 @@ export default function WorkLogTargetModal({ entry, baslik, onClose, onDone, onS
       const sonuc = await worklog.push(entry!.id, body);
       onDone?.(sonuc.entry, sonuc.path);
     } catch (err) {
-      setHata(err instanceof Error ? err.message : "Aktarılamadı");
+      setHata(err instanceof Error ? err.message : t("Aktarılamadı"));
       setKaydediliyor(false);
     }
   };
@@ -171,7 +171,7 @@ export default function WorkLogTargetModal({ entry, baslik, onClose, onDone, onS
       // Bağlama bir yer imi; kullanıcıyı başka bir sayfaya SÜRÜKLEMİYORUZ.
       onDone?.(guncel);
     } catch (err) {
-      setHata(err instanceof Error ? err.message : "Bağlanamadı");
+      setHata(err instanceof Error ? err.message : t("Bağlanamadı"));
       setKaydediliyor(false);
     }
   };

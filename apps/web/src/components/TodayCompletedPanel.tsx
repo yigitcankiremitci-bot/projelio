@@ -3,6 +3,7 @@ import type { Task } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconCheck, IconChevronRight } from "./icons";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   tasks: Task[];
@@ -95,9 +96,9 @@ export default function TodayCompletedPanel({ tasks }: Props) {
             <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>{t("Bugün henüz tamamlanan görev yok.")}</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto" }}>
-              {completedToday.map((t) => (
+              {completedToday.map((gorev) => (
                 <div
-                  key={t.id}
+                  key={gorev.id}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -118,10 +119,10 @@ export default function TodayCompletedPanel({ tasks }: Props) {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {t.parentTaskId ? "↳ " : ""}
-                      {t.title}
+                      {gorev.parentTaskId ? "↳ " : ""}
+                      {gorev.title}
                     </div>
-                    {t.projectTitle && (
+                    {gorev.projectTitle && (
                       <span
                         style={{
                           display: "inline-block",
@@ -134,15 +135,15 @@ export default function TodayCompletedPanel({ tasks }: Props) {
                           marginTop: 3,
                         }}
                       >
-                        {t.projectTitle}
+                        {gorev.projectTitle}
                       </span>
                     )}
                   </div>
                   <span style={{ fontSize: 13, color: c.accentDark, fontWeight: 500, flexShrink: 0, whiteSpace: "nowrap" }}>
-                    {t.completedByName ?? "Bilinmeyen"}
+                    {gorev.completedByName ?? t("Bilinmeyen")}
                   </span>
                   <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>
-                    {new Date(t.completedAt!).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(gorev.completedAt!).toLocaleTimeString(bicimDili(), { hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </div>
               ))}

@@ -103,8 +103,7 @@ export default function DashboardAssignedModules({ jobs }: Props) {
         </span>
       </div>
       <p style={{ margin: "0 0 12px", fontSize: 13, color: c.textSecondary }}>
-        İşlerine attığın modüller. Kayıtlarını görmek için bir karta tıkla — yenisini "Modüller" sekmesinden
-        ekleyebilirsin.
+        {t("İşlerine attığın modüller. Kayıtlarını görmek için bir karta tıkla — yenisini \"Modüller\" sekmesinden ekleyebilirsin.")}
       </p>
 
       {/* Şirket sayfasındaki Modüller sekmesiyle (bkz. ModulesPanel + ModuleCard)
@@ -197,7 +196,7 @@ export default function DashboardAssignedModules({ jobs }: Props) {
             to={`/jobs/${open.job.id}`}
             style={{ display: "inline-block", marginTop: 12, fontSize: 13, color: c.primary }}
           >
-            {open.job.title} işine git →
+            {t("{is} işine git →", { is: open.job.title })}
           </Link>
         </Modal>
       )}

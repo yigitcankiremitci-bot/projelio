@@ -15,9 +15,10 @@ import AddRecurringPaymentModal from "./AddRecurringPaymentModal";
 import { useUndo } from "../lib/undo";
 import { IconTrash, IconEdit, IconCalendar, IconFolder } from "./icons";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 function formatMoney(amount: number): string {
-  return `${amount.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
+  return `${amount.toLocaleString(bicimDili(), { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
 }
 
 /**
@@ -27,14 +28,14 @@ function formatMoney(amount: number): string {
  */
 function formatCurrency(amount: number, currency: string): string {
   try {
-    return new Intl.NumberFormat("tr-TR", { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
+    return new Intl.NumberFormat(bicimDili(), { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
   } catch {
     return `${amount} ${currency}`;
   }
 }
 
 function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(value).toLocaleDateString(bicimDili(), { day: "numeric", month: "short", year: "numeric" });
 }
 
 // Metinler t() ile burada değil, kullanıldıkları yerde çevriliyor: modül

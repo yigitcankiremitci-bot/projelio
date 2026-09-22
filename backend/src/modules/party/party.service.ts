@@ -10,6 +10,7 @@ import type {
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { addRole, findDuplicates } from "./party-dedup";
+import { hataMetni } from "../../common/i18n/index";
 
 // Müşteri modülü bu varlığa bakar; yetki de o modülün üzerinden çözülür.
 const MODULE_KEY = "crm_musteri";
@@ -213,7 +214,7 @@ export class PartyService {
     const blocking = duplicates.find((d) => d.severity === "block");
     if (blocking) {
       throw new BadRequestException(
-        `Bu vergi numarası zaten "${blocking.party.displayName}" kaydında kayıtlı`
+        hataMetni("Bu vergi numarası zaten \"{displayName}\" kaydında kayıtlı", { displayName: blocking.party.displayName })
       );
     }
 

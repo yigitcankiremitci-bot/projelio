@@ -1,4 +1,4 @@
-import { isLocale } from "@projelio/shared";
+import { isLocale, resolveLocale } from "@projelio/shared";
 import type { Locale } from "@projelio/shared";
 
 /**
@@ -31,4 +31,32 @@ export function setStoredLocale(locale: Locale | null): void {
   } catch {
     // Yazılamazsa tercih o oturumda hatırlanmaz, dil çalışmaya devam eder.
   }
+}
+
+/**
+ * Ekranda görünen dil: seçim varsa o, yoksa tarayıcının dili.
+ *
+ * Sunucuya giden `X-Projelio-Locale` başlığı eskiden yalnızca SEÇİM varken
+ * yazılıyordu; dil otomatik algılandığında sunucu arayüzün hangi dilde
+ * olduğunu bilmiyor ve tarayıcının ham başlığıyla tahmin yürütüyordu.
+ */
+export function etkinDil(): Locale {
+  const secim = getLocale();
+  if (secim) return secim;
+  // Tarayıcı dışında (Node test koşucusu) kaynak dil. Node 21+ `navigator`
+  // tanımlıyor ve dilini "en-US" bildiriyor; bakılsaydı testler makinenin
+  // diline göre değişirdi.
+  if (typeof window === "undefined" || typeof navigator === "undefined") return resolveLocale([]);
+  return resolveLocale(navigator.languages?.length ? navigator.languages : [navigator.language]);
+}
+
+/**
+ * Tarih ve sayı biçimlendirmenin dili ("tr-TR" / "en-GB").
+ *
+ * Biçimlendirme çağrılarında dil sabit "tr-TR" yazılıydı; İngilizce arayüzde
+ * tarihler "12 Eyl 2026" diye çıkıyordu. en-GB seçildi: gün-ay-yıl sırası
+ * Türkçe biçimle aynı, yalnızca adlar ve ayraçlar değişiyor.
+ */
+export function bicimDili(): string {
+  return etkinDil() === "en" ? "en-GB" : "tr-TR";
 }

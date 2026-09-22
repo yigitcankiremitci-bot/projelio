@@ -3,6 +3,7 @@ import type { SupportRequest, User } from "@projelio/shared";
 import { support } from "../api/support";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * Ayarlar > Destek — kullanıcının öneri/dilek/şikâyet bıraktığı ve yanıtları
@@ -50,7 +51,7 @@ export default function SupportPanel({ me }: { me: User | null }) {
       setSent(true);
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Talep gönderilemedi.");
+      setError(err instanceof Error ? err.message : t("Talep gönderilemedi."));
     } finally {
       setSending(false);
     }
@@ -91,7 +92,7 @@ export default function SupportPanel({ me }: { me: User | null }) {
               setSubject(e.target.value);
               setSent(false);
             }}
-            placeholder="Konu"
+            placeholder={t("Konu")}
             maxLength={120}
             required
             style={{ width: "100%" }}
@@ -122,7 +123,7 @@ export default function SupportPanel({ me }: { me: User | null }) {
               fontWeight: 500,
             }}
           >
-            {sending ? "Gönderiliyor…" : "Gönder"}
+            {sending ? t("Gönderiliyor…") : t("Gönder")}
           </button>
         </form>
 
@@ -163,11 +164,11 @@ export default function SupportPanel({ me }: { me: User | null }) {
                       color: r.status === "answered" ? c.success : c.textSecondary,
                     }}
                   >
-                    {r.status === "answered" ? "Yanıtlandı" : "Bekliyor"}
+                    {r.status === "answered" ? t("Yanıtlandı") : t("Bekliyor")}
                   </span>
                 </div>
                 <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 8 }}>
-                  {new Date(r.createdAt).toLocaleString("tr-TR")}
+                  {new Date(r.createdAt).toLocaleString(bicimDili())}
                 </div>
                 <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, whiteSpace: "pre-wrap" }}>{r.message}</p>
 
@@ -180,7 +181,7 @@ export default function SupportPanel({ me }: { me: User | null }) {
                     }}
                   >
                     <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 4 }}>
-                      Projelio ekibi{r.repliedAt ? ` · ${new Date(r.repliedAt).toLocaleString("tr-TR")}` : ""}
+                      {t("Projelio ekibi")}{r.repliedAt ? ` · ${new Date(r.repliedAt).toLocaleString(bicimDili())}` : ""}
                     </div>
                     <p style={{ fontSize: 14, color: c.textPrimary, margin: 0, whiteSpace: "pre-wrap" }}>{r.reply}</p>
                   </div>

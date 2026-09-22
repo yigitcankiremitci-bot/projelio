@@ -110,7 +110,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
           disabled={loading}
           style={{ width: "100%", background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Kaydediliyor…" : "Kaydet"}
+          {loading ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       }
     >
@@ -184,13 +184,13 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
       {hiring && <HireMemberModal jobId={job.id} existingUserIds={[]} onClose={() => setHiring(false)} onHired={() => setHiring(false)} />}
 
       <EntityDangerZone
-        entityLabel="İşi"
+        entityLabel={t("İşi", { ctx: "nesne" })}
         resourcePath={`/jobs/${job.id}`}
         affectsSidebar
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
-        archiveMessage={`"${job.title}" işini arşive eklemek istediğine emin misin? Bu işe bağlı tüm projeler ve görevler de arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}
-        deleteMessage={`"${job.title}" işini silmek istediğine emin misin? Bu işe bağlı tüm projeler ve görevler de silinecek. Bu işlem geri alınamaz.`}
+        archiveMessage={t("\"{title}\" işini arşive eklemek istediğine emin misin? Bu işe bağlı tüm projeler ve görevler de arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.", { title: job.title })}
+        deleteMessage={t("\"{title}\" işini silmek istediğine emin misin? Bu işe bağlı tüm projeler ve görevler de silinecek. Bu işlem geri alınamaz.", { title: job.title })}
       />
     </Modal>
   );

@@ -34,6 +34,7 @@ import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { isProjectInSidebar } from "../lib/useSidebarHierarchy";
 import { useT } from "../lib/i18n";
 import { gorevDurumHatasiniBildir, altGorevHatasiniBildir } from "../lib/taskBlockNotice";
+import { bicimDili } from "../lib/i18n/depo";
 
 export default function ProjectDetail() {
   const t = useT();
@@ -584,13 +585,13 @@ export default function ProjectDetail() {
                 }}
               >
                 <span style={{ whiteSpace: "nowrap" }}>
-                  {t("Ücret:")} <span style={{ color: c.accentDark, fontWeight: 500 }}>{project.totalBudget.toLocaleString("tr-TR")} ₺</span>
+                  {t("Ücret:")} <span style={{ color: c.accentDark, fontWeight: 500 }}>{project.totalBudget.toLocaleString(bicimDili())} ₺</span>
                 </span>
                 {/* Başlangıç ve bitiş tek blok: satır kırılırsa birlikte iner, asla
                     birbirinden ayrılıp alt alta düşmez. */}
                 <div style={{ display: "flex", columnGap: isDesktop ? 24 : 12, whiteSpace: "nowrap" }}>
-                  <span>{t("Başlangıç: {tarih}", { tarih: new Date(project.startDate).toLocaleDateString("tr-TR") })}</span>
-                  <span>{t("Bitiş: {tarih}", { tarih: new Date(project.deadline).toLocaleDateString("tr-TR") })}</span>
+                  <span>{t("Başlangıç: {tarih}", { tarih: new Date(project.startDate).toLocaleDateString(bicimDili()) })}</span>
+                  <span>{t("Bitiş: {tarih}", { tarih: new Date(project.deadline).toLocaleDateString(bicimDili()) })}</span>
                 </div>
               </div>
 

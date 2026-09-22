@@ -54,8 +54,8 @@ export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount
       </div>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-        <Stat label="Doluluk" value={`%${Math.round(progress.fillPct)}`} hint={`${formatDuration(progress.plannedMinutes)} / ${formatDuration(progress.capacityMinutes)}`} />
-        <Stat label="Plana sadakat" value={`%${Math.round(progress.adherencePct)}`} hint={`${formatDuration(progress.doneMinutes)} tamamlandı`} />
+        <Stat label={t("Doluluk")} value={`%${Math.round(progress.fillPct)}`} hint={`${formatDuration(progress.plannedMinutes)} / ${formatDuration(progress.capacityMinutes)}`} />
+        <Stat label={t("Plana sadakat")} value={`%${Math.round(progress.adherencePct)}`} hint={`${formatDuration(progress.doneMinutes)} tamamlandı`} />
       </div>
 
       {progress.sharePctTotal > 100 && (
@@ -70,20 +70,21 @@ export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount
             marginBottom: 12,
           }}
         >
-          Hedef yüzdelerinin toplamı %{Math.round(progress.sharePctTotal)} — haftanda olmayan bir zamanı bölüştürüyorsun.
+          {t("Hedef yüzdelerinin toplamı %{yuzde} — haftanda olmayan bir zamanı bölüştürüyorsun.", {
+            yuzde: Math.round(progress.sharePctTotal),
+          })}
         </div>
       )}
 
       {!hasTargets && rows.length === 0 && (
         <p style={{ margin: 0, fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
-          Bu dönem için henüz hedef yok. Vaktini hangi alanlara yüzde kaç ayıracağını belirlersen takvim
-          dağılımı buradan takip edilir.
+          {t("Bu dönem için henüz hedef yok. Vaktini hangi alanlara yüzde kaç ayıracağını belirlersen takvim dağılımı buradan takip edilir.")}
         </p>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {rows.map((row) => {
-          const name = row.focusAreaName ?? row.targetTitle ?? "Kategorisiz";
+          const name = row.focusAreaName ?? row.targetTitle ?? t("Kategorisiz");
           const color = row.focusAreaColor ?? c.primary;
           // Hedefi olmayan satır "plan dışı çalışma"dır: takvimde var ama
           // kullanıcı bu döneme onu koymayı planlamamıştı.
@@ -96,7 +97,7 @@ export default function PlanProgressPanel({ progress, onEditTargets, onBumpCount
                 <span style={{ fontSize: 13, color: c.textPrimary, fontWeight: 500 }}>{name}</span>
                 {unplanned && <span style={{ fontSize: 11, color: c.textSecondary }}>{t("plan dışı")}</span>}
                 <span style={{ marginLeft: "auto", fontSize: 12, color: c.textSecondary }}>
-                  {row.sharePct != null && `hedef %${Math.round(row.sharePct)} · `}
+                  {row.sharePct != null && t("hedef %{p1} · ", { p1: Math.round(row.sharePct) })}
                   {formatDuration(row.doneMinutes)} / {formatDuration(row.plannedMinutes)}
                 </span>
               </div>
@@ -171,6 +172,7 @@ function Bar({
   color: string;
   muted?: boolean;
 }) {
+  const t = useT();
   const c = useThemeColors();
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 3 }}>
@@ -187,7 +189,7 @@ function Bar({
         />
         {targetPct != null && targetPct > 0 && targetPct <= 100 && (
           <div
-            title={`Hedef %${Math.round(targetPct)}`}
+            title={t("Hedef %{p1}", { p1: Math.round(targetPct) })}
             style={{
               position: "absolute",
               top: -1,

@@ -17,6 +17,7 @@ import { ModuleRecordsService } from "../module-records/module-records.service";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { PlanningService } from "../planning/planning.service";
+import { hataMetni } from "../../common/i18n/index";
 
 /**
  * YAPTIM — kullanıcının kişisel iş günlüğü.
@@ -722,7 +723,7 @@ export class WorklogService {
 
     if (dakika <= 0) throw new BadRequestException("Bitiş saati başlangıçtan sonra olmalı");
     if (dakika > MAX_WORK_LOG_MINUTES) {
-      throw new BadRequestException(`Bir kayıt en fazla ${MAX_WORK_LOG_MINUTES / 60} saat sürebilir.`);
+      throw new BadRequestException(hataMetni("Bir kayıt en fazla {p1} saat sürebilir.", { p1: MAX_WORK_LOG_MINUTES / 60 }));
     }
     return { baslangic, bitis, dakika };
   }
@@ -738,7 +739,7 @@ export class WorklogService {
     const dakika = sureyiDakikayaCevir(ham);
     if (dakika == null) {
       throw new BadRequestException(
-        `Süreyi anlayamadım. Örnek: "45", "1s 30dk", "2 saat". En fazla ${MAX_WORK_LOG_MINUTES / 60} saat.`
+        hataMetni("Süreyi anlayamadım. Örnek: \"45\", \"1s 30dk\", \"2 saat\". En fazla {p1} saat.", { p1: MAX_WORK_LOG_MINUTES / 60 })
       );
     }
     return dakika;

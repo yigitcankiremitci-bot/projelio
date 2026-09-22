@@ -788,7 +788,7 @@ export default function App() {
             </button>
             <Link
               to="/"
-              aria-label="Projelio - Ana sayfa"
+              aria-label={t("Projelio - Ana sayfa")}
               style={{
                 position: "fixed",
                 top: safeTop(10),

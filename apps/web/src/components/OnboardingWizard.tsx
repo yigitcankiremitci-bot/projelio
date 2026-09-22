@@ -209,9 +209,9 @@ export default function OnboardingWizard({ onCompleted }: Props) {
   // Bir sonraki adıma geçmeden önceki doğrulama. Yalnızca hesap tipi ve (kendi
   // yapısını kuranlarda) ad zorunlu; kalan adımlar boş geçilebilir.
   const validate = (): string => {
-    if (step === "account" && !selected) return "Devam etmek için bir seçenek seç";
+    if (step === "account" && !selected) return t("Devam etmek için bir seçenek seç");
     if (step === "org" && !name.trim()) {
-      return selected === "organization_owner" ? "Şirket/işletme adını gir" : "Grup adını gir";
+      return selected === "organization_owner" ? t("Şirket/işletme adını gir") : t("Grup adını gir");
     }
     return "";
   };
@@ -283,7 +283,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
       else if (result?.groupId) navigate(`/groups/${result.groupId}`, { replace: true });
       onCompleted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bir şeyler ters gitti, tekrar dene.");
+      setError(err instanceof Error ? err.message : t("Bir şeyler ters gitti, tekrar dene."));
       setLoading(false);
     }
   };
@@ -346,7 +346,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
             ))}
           </div>
           <span style={{ fontSize: 13, color: c.textSecondary }}>
-            Adım {stepIndex + 1} / {steps.length}
+            {t("Adım {n} / {toplam}", { n: stepIndex + 1, toplam: steps.length })}
           </span>
         </div>
 
@@ -427,7 +427,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
           <>
             <Header
               heading={t("Seni tanıyalım")}
-              sub="Bu bilgiler profilinde görünür ve ekip arkadaşlarının seni tanımasını kolaylaştırır. Tamamı isteğe bağlı."
+              sub={t("Bu bilgiler profilinde görünür ve ekip arkadaşlarının seni tanımasını kolaylaştırır. Tamamı isteğe bağlı.")}
             />
 
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 20 }}>
@@ -464,7 +464,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
                 }}
               >
                 <IconUpload size={15} color={c.textSecondary} />
-                {avatarFile ? "Fotoğrafı değiştir" : "Profil fotoğrafı ekle"}
+                {avatarFile ? t("Fotoğrafı değiştir") : t("Profil fotoğrafı ekle")}
                 <input
                   type="file"
                   accept="image/*"
@@ -513,7 +513,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
                       onClick={() => setSector((prev) => (prev === key ? null : key))}
                       style={{ ...cardStyle(sector === key), padding: "7px 12px", fontSize: 14, borderRadius: 999 }}
                     >
-                      {SECTOR_LABEL[key]}
+                      {t(SECTOR_LABEL[key])}
                     </button>
                   ))}
                 </div>
@@ -528,7 +528,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
                       onClick={() => setTeamSize((prev) => (prev === key ? null : key))}
                       style={{ ...cardStyle(teamSize === key), padding: "7px 12px", fontSize: 14, borderRadius: 999 }}
                     >
-                      {TEAM_SIZE_LABEL[key]}
+                      {t(TEAM_SIZE_LABEL[key])}
                     </button>
                   ))}
                 </div>
@@ -553,21 +553,21 @@ export default function OnboardingWizard({ onCompleted }: Props) {
         {step === "org" && (
           <>
             <Header
-              heading={selected === "organization_owner" ? "Şirketini kuralım" : "Grubunu kuralım"}
+              heading={selected === "organization_owner" ? t("Şirketini kuralım") : t("Grubunu kuralım")}
               sub={
                 selected === "organization_owner"
-                  ? "İşlerini toplayacağın şirket/işletme birazdan oluşturulacak."
-                  : "Birden fazla organizasyonu altında toplayacağın holding yapısı oluşturulacak."
+                  ? t("İşlerini toplayacağın şirket/işletme birazdan oluşturulacak.")
+                  : t("Birden fazla organizasyonu altında toplayacağın holding yapısı oluşturulacak.")
               }
             />
 
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 }}>
-              <label style={fieldLabel}>{selected === "organization_owner" ? "Şirket/işletme adı" : "Grup (holding) adı"}</label>
+              <label style={fieldLabel}>{selected === "organization_owner" ? t("Şirket/işletme adı") : t("Grup (holding) adı")}</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={onEnter(() => !loading && goNext())}
-                placeholder={selected === "organization_owner" ? "Örn. Acme Yazılım A.Ş." : "Örn. Acme Holding"}
+                placeholder={selected === "organization_owner" ? t("Örn. Acme Yazılım A.Ş.") : t("Örn. Acme Holding")}
                 style={{ width: "100%" }}
                 autoFocus
               />
@@ -593,7 +593,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
           <>
             <Header
               heading={t("Departmanlarını seç")}
-              sub={`"${name.trim()}" için ISO 9001 uyumlu standart departmanlardan istediklerini işaretle. Bu adımı boş geçip departmanları sonra da ekleyebilirsin.`}
+              sub={t('"{ad}" için ISO 9001 uyumlu standart departmanlardan istediklerini işaretle. Bu adımı boş geçip departmanları sonra da ekleyebilirsin.', { ad: name.trim() })}
             />
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8, marginBottom: 16 }}>
@@ -609,7 +609,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={fieldLabel}>Ya da özel departman adı (opsiyonel)</label>
+              <label style={fieldLabel}>{t("Ya da özel departman adı (opsiyonel)")}</label>
               <input
                 value={customDept}
                 onChange={(e) => setCustomDept(e.target.value)}
@@ -625,7 +625,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
           <>
             <Header
               heading={t("Projelio'yu ne için kullanacaksın?")}
-              sub="Birden fazla seçebilirsin. Buna göre hangi ekranların öne çıkacağına karar veriyoruz."
+              sub={t("Birden fazla seçebilirsin. Buna göre hangi ekranların öne çıkacağına karar veriyoruz.")}
             />
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
@@ -648,7 +648,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
                     >
                       {active && <IconCheck size={12} color="#fff" />}
                     </span>
-                    {USE_CASE_LABEL[key]}
+                    {t(USE_CASE_LABEL[key])}
                   </button>
                 );
               })}
@@ -660,14 +660,14 @@ export default function OnboardingWizard({ onCompleted }: Props) {
           <>
             <Header
               heading={t("Kullanacağın modüller")}
-              sub="Şimdilik işine yarayacakları işaretle — bu bir tercih kaydı, hepsini sonradan açıp kapatabilirsin."
+              sub={t("Şimdilik işine yarayacakları işaretle — bu bir tercih kaydı, hepsini sonradan açıp kapatabilirsin.")}
             />
 
             {modulesLoading ? (
               <p style={{ fontSize: 15, color: c.textSecondary, textAlign: "center", margin: 0 }}>{t("Modüller yükleniyor…")}</p>
             ) : modules.length === 0 ? (
               <p style={{ fontSize: 15, color: c.textSecondary, textAlign: "center", margin: 0, lineHeight: 1.5 }}>
-                Seçilebilecek bir modül bulunamadı. Bu adımı geçebilirsin; modülleri daha sonra departman sayfalarından açabilirsin.
+                {t("Seçilebilecek bir modül bulunamadı. Bu adımı geçebilirsin; modülleri daha sonra departman sayfalarından açabilirsin.")}
               </p>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
@@ -689,22 +689,22 @@ export default function OnboardingWizard({ onCompleted }: Props) {
 
         {step === "summary" && (
           <>
-            <Header heading={t("Her şey hazır")} sub="Seçtiklerini bir kez gözden geçir; istersen geri dönüp değiştirebilirsin." />
+            <Header heading={t("Her şey hazır")} sub={t("Seçtiklerini bir kez gözden geçir; istersen geri dönüp değiştirebilirsin.")} />
 
             <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: "4px 16px", marginBottom: 4 }}>
               {[
-                { label: "Çalışma şekli", value: accountLabel },
-                { label: selected === "group_owner" ? "Grup" : "Şirket/işletme", value: needsName ? name.trim() : "" },
-                { label: "Unvan", value: title.trim() },
-                { label: "Telefon", value: phone.trim() },
-                { label: "Sektör", value: sector ? SECTOR_LABEL[sector] : "" },
-                { label: "Ekip büyüklüğü", value: teamSize ? TEAM_SIZE_LABEL[teamSize] : "" },
+                { label: t("Çalışma şekli"), value: accountLabel ? t(accountLabel) : "" },
+                { label: selected === "group_owner" ? t("Grup") : t("Şirket/işletme"), value: needsName ? name.trim() : "" },
+                { label: t("Unvan"), value: title.trim() },
+                { label: t("Telefon"), value: phone.trim() },
+                { label: t("Sektör"), value: sector ? t(SECTOR_LABEL[sector]) : "" },
+                { label: t("Ekip büyüklüğü"), value: teamSize ? t(TEAM_SIZE_LABEL[teamSize]) : "" },
                 {
-                  label: "Departmanlar",
+                  label: t("Departmanlar"),
                   value: [...selectedDeptNames, customDept.trim()].filter(Boolean).join(", "),
                 },
-                { label: "Kullanım amacı", value: useCases.map((u) => USE_CASE_LABEL[u]).join(", ") },
-                { label: "Modüller", value: selectedModuleNames.join(", ") },
+                { label: t("Kullanım amacı"), value: useCases.map((u) => t(USE_CASE_LABEL[u])).join(", ") },
+                { label: t("Modüller"), value: selectedModuleNames.join(", ") },
               ]
                 .filter((row) => row.value)
                 .map((row) => (
@@ -767,7 +767,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
               fontWeight: 500,
             }}
           >
-            {loading ? "Kuruluyor…" : step === "summary" ? "Projelio'yu kullanmaya başla" : "Devam et"}
+            {loading ? t("Kuruluyor…") : step === "summary" ? t("Projelio'yu kullanmaya başla") : t("Devam et")}
             {!loading && step !== "summary" && <IconChevronRight size={16} color="#fff" />}
           </button>
         </div>

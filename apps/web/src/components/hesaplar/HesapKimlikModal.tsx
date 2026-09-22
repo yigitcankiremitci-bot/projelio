@@ -12,6 +12,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import Modal from "../Modal";
 import SifreGirdisi from "../SifreGirdisi";
 import HesapKilidi, { useKilit } from "./HesapKilidi";
+import { bicimDili } from "../../lib/i18n/depo";
 
 interface Props {
   hesap: ServiceAccount;
@@ -26,7 +27,7 @@ const GOSTERIM_SANIYE = 45;
 
 function tarih(deger?: string): string {
   if (!deger) return "—";
-  return new Date(deger).toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" });
+  return new Date(deger).toLocaleString(bicimDili(), { dateStyle: "medium", timeStyle: "short" });
 }
 
 /**

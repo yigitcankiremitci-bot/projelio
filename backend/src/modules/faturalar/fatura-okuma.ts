@@ -145,23 +145,23 @@ export class FaturaOkunamadi extends Error {}
  */
 export function faturaCevabiniCoz(yanit: string): OkunanFatura {
   const ham = jsonuAyikla(yanit) as Record<string, unknown> | null;
-  if (!ham || typeof ham !== "object") throw new FaturaOkunamadi("Belge okunamadı: yanıt anlaşılamadı.");
+  if (!ham || typeof ham !== "object") throw new FaturaOkunamadi("Belge okunamadı: yanıt anlaşılamadı."); // dil:anahtar
 
   const confidence = typeof ham.confidence === "number" ? ham.confidence : 0;
   if (confidence < GUVEN_ESIGI) {
     throw new FaturaOkunamadi(
-      "Belge yeterince okunamadı. Daha net bir fotoğraf deneyebilir ya da faturayı elle girebilirsin."
+      "Belge yeterince okunamadı. Daha net bir fotoğraf deneyebilir ya da faturayı elle girebilirsin." // dil:anahtar
     );
   }
 
   const amount = sayiyaCevir(ham.amount);
   if (amount === null || amount <= 0) {
-    throw new FaturaOkunamadi("Belgedeki tutar okunamadı. Faturayı elle girebilirsin.");
+    throw new FaturaOkunamadi("Belgedeki tutar okunamadı. Faturayı elle girebilirsin."); // dil:anahtar
   }
 
   const issueDate = metin(ham.issueDate, 10);
   if (!issueDate || !ISO_TARIH.test(issueDate) || Number.isNaN(Date.parse(issueDate))) {
-    throw new FaturaOkunamadi("Belgedeki tarih okunamadı. Faturayı elle girebilirsin.");
+    throw new FaturaOkunamadi("Belgedeki tarih okunamadı. Faturayı elle girebilirsin."); // dil:anahtar
   }
 
   return {

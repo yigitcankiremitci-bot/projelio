@@ -1,3 +1,4 @@
+// dil:anahtar-dosya — etiketler; çeviri render anında (t(...)) yapılıyor.
 import type { Party, PartyRole } from "@projelio/shared";
 
 /**
@@ -28,11 +29,11 @@ export interface PartyProfile {
 
 export const ROLE_LABELS: Record<PartyRole, string> = {
   lead: "Potansiyel",
-  customer: "Müşteri",
-  supplier: "Tedarikçi",
+  customer: "Müşteri", // dil:anahtar
+  supplier: "Tedarikçi", // dil:anahtar
   distributor: "Bayi",
   candidate: "Aday",
-  other: "Diğer",
+  other: "Diğer", // dil:anahtar
 };
 
 export const ROLE_COLORS: Record<PartyRole, string> = {
@@ -57,16 +58,16 @@ function joinDetail(...parts: (string | undefined | false)[]): string | undefine
 
 const BASE_PROFILE: PartyProfile = {
   key: "base",
-  label: "Tümü",
+  label: "Tümü", // dil:anahtar
   detail: (p) =>
     joinDetail(p.roles.map((r) => ROLE_LABELS[r]).join(", "), STATUS_LABELS[p.status], p.phone ?? p.email),
-  primaryActionLabel: "Aktivite ekle",
+  primaryActionLabel: "Aktivite ekle", // dil:anahtar
 };
 
 const PROFILES: Record<string, PartyProfile> = {
   satis_is_gelistirme: {
     key: "satis_is_gelistirme",
-    label: "Satış görünümü",
+    label: "Satış görünümü", // dil:anahtar
     defaultRole: "lead",
     detail: (p) =>
       joinDetail(
@@ -75,15 +76,15 @@ const PROFILES: Record<string, PartyProfile> = {
         p.source,
         p.phone ?? p.email
       ),
-    primaryActionLabel: "Görüşme ekle",
+    primaryActionLabel: "Görüşme ekle", // dil:anahtar
   },
   musteri_iliskileri: {
     key: "musteri_iliskileri",
-    label: "Müşteri ilişkileri görünümü",
+    label: "Müşteri ilişkileri görünümü", // dil:anahtar
     defaultRole: "customer",
     detail: (p) =>
       joinDetail(STATUS_LABELS[p.status], p.email ?? p.phone, p.ownerName && `Sorumlu: ${p.ownerName}`),
-    primaryActionLabel: "Temas ekle",
+    primaryActionLabel: "Temas ekle", // dil:anahtar
   },
 };
 

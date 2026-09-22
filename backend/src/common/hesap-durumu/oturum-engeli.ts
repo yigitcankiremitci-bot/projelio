@@ -52,6 +52,6 @@ export function utcMs(deger: string | null | undefined): number | null {
 }
 
 export const OTURUM_KARARI_MESAJI: Record<Exclude<OturumKarari, "gecerli">, string> = {
-  askida: "Hesabın askıya alındı. Destek için bizimle iletişime geç.",
-  oturum_iptal: "Oturumun sonlandırıldı, lütfen yeniden giriş yap.",
+  askida: "Hesabın askıya alındı. Destek için bizimle iletişime geç.", // dil:anahtar
+  oturum_iptal: "Oturumun sonlandırıldı, lütfen yeniden giriş yap.", // dil:anahtar
 };

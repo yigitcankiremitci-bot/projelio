@@ -20,6 +20,7 @@ import {
   sumByCurrency,
   todayISO,
   userField,
+  etiketCevir,
   type ModuleRecordConfig,
 } from "./shared";
 
@@ -141,7 +142,7 @@ export const taxTrackingConfig: ModuleRecordConfig = {
   ],
   summary: (d) =>
     `${labelOf(TAX_TYPE, d.taxType) ?? "Vergi"}${d.period ? ` · ${d.period}` : ""}${d.amount ? ` · ${fmtMoney(d.amount, d.currency)}` : ""}`,
-  detail: (d) => joinDetail(labelOf(TAX_STATUS, d.status), d.dueDate ? `Son ödeme: ${d.dueDate}` : undefined),
+  detail: (d) => joinDetail(labelOf(TAX_STATUS, d.status), d.dueDate ? etiketCevir("Son ödeme: {tarih}", { tarih: d.dueDate as string }) : undefined),
   computeStats: (records) => {
     const pending = records.filter((r) => r.data.status !== "paid");
     // Vadesi geçmiş ve hâlâ ödenmemiş olanlar ayrıca uyarılır — bu modülün en
@@ -272,7 +273,7 @@ export const riskConfig: ModuleRecordConfig = {
     joinDetail(
       labelOf(RISK_CATEGORY, d.category),
       d.likelihood && d.impact
-        ? `Olasılık: ${labelOf(RISK_LEVEL, d.likelihood)} · Etki: ${labelOf(RISK_LEVEL, d.impact)}`
+        ? etiketCevir("Olasılık: {olasilik} · Etki: {etki}", { olasilik: labelOf(RISK_LEVEL, d.likelihood), etki: labelOf(RISK_LEVEL, d.impact) })
         : undefined,
       labelOf(RISK_STATUS, d.status),
       d.owner as string

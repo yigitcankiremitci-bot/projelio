@@ -64,7 +64,7 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
 
   const fabAvailable = useFabAvailable();
   useProjectFabAction(
-    useFab && fabAvailable ? { label: "Ürün/Hizmet ekle", onClick: () => setAdding(true) } : null,
+    useFab && fabAvailable ? { label: t("Ürün/Hizmet ekle"), onClick: () => setAdding(true) } : null,
     [useFab, fabAvailable, organizationId, departmentId],
     FAB_PRIORITY.panel
   );
@@ -86,7 +86,7 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
             fontSize: 15,
           }}
         >
-          {'Henüz ürün/hizmet yok. Sayfadaki "+" ile Ürün Yönetimi departmanına ürün/hizmet ekleyebilirsin.'}
+          {t('Henüz ürün/hizmet yok. Sayfadaki "+" ile Ürün Yönetimi departmanına ürün/hizmet ekleyebilirsin.')}
         </div>
       ) : (
         <div

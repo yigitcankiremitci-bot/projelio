@@ -1,8 +1,11 @@
+// dil:anahtar-dosya — bölüm başlıkları ve satır etiketleri ozet() içinde kullanıcının diline çevriliyor.
 import { Injectable, Logger } from "@nestjs/common";
 import type { BilgiKartiKapsami, BilgiKartiOzetBolumu, BilgiKartiOzeti, BilgiKartiOzetSatiri } from "@projelio/shared";
 import { paraBirimiBazinda } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { ButceHiyerarsiService } from "../budget/butce-hiyerarsi.service";
+import { cevirmen } from "../../common/i18n";
+import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 
 /**
  * Kartın "şirket özeti" bölümü: diğer modüllerden toplanan sayılar.
@@ -24,7 +27,8 @@ export class BilgiKartiOzetService {
 
   constructor(
     private supabase: SupabaseService,
-    private butce: ButceHiyerarsiService
+    private butce: ButceHiyerarsiService,
+    private diller: KullaniciDiliService
   ) {}
 
   async ozet(scopeType: BilgiKartiKapsami, scopeId: string, userId?: string): Promise<BilgiKartiOzeti> {
@@ -33,9 +37,23 @@ export class BilgiKartiOzetService {
         ? await this.organizasyonOzeti(scopeId, userId)
         : await this.isOzeti(scopeId, userId);
 
+    // Başlık ve etiketler isteyenin dilinde. Satır DEĞERLERİ de sözlükten
+    // geçiyor ("Şirket"/"İşletme" gibi sabitler için); kayıt adı, tarih ve sayı
+    // sözlükte olmadığından olduğu gibi kalır.
+    const t = cevirmen(userId ? await this.diller.diliniBul(userId) : "tr");
+    const cevrilmis = sections.map((b) => ({
+      ...b,
+      title: t(b.title),
+      rows: b.rows.map((r) => ({
+        ...r,
+        label: t(r.label),
+        value: t(r.value),
+      })),
+    }));
+
     // Boş bölüm çizilmez: başlığı olup satırı olmayan bir kutu, veri yokluğunu
     // yükleme hatası gibi okutuyordu.
-    return { sections: sections.filter((b) => b.rows.length > 0) };
+    return { sections: cevrilmis.filter((b) => b.rows.length > 0) };
   }
 
   // ------------------------------------------------------------- Organizasyon
@@ -46,7 +64,7 @@ export class BilgiKartiOzetService {
     const org = await this.guvenli(async () => {
       const { data } = await this.supabase.client
         .from("organizations")
-        .select("created_at, org_type, group_id, groups(name), users(full_name)")
+        .select("created_at, org_type, group_id, groups(name), users(full_name)") // dil:atla
         .eq("id", organizationId)
         .maybeSingle();
       return data;
@@ -139,7 +157,7 @@ export class BilgiKartiOzetService {
     const job = await this.guvenli(async () => {
       const { data } = await this.supabase.client
         .from("jobs")
-        .select("created_at, organization_id, organizations(name), users(full_name)")
+        .select("created_at, organization_id, organizations(name), users(full_name)") // dil:atla
         .eq("id", jobId)
         .maybeSingle();
       return data;
@@ -217,6 +235,7 @@ export class BilgiKartiOzetService {
     scopeId: string,
     userId?: string
   ): Promise<BilgiKartiOzetBolumu> {
+    const dilde = cevirmen(userId ? await this.diller.diliniBul(userId) : "tr");
     const rows = await this.guvenli(async () => {
       const hareketler = await this.butce.tumHareketler(scopeType, scopeId, userId);
       // Kur dönüşümü YOK (bkz. CLAUDE.md / migration 104): her para birimi
@@ -224,10 +243,12 @@ export class BilgiKartiOzetService {
       return paraBirimiBazinda(hareketler).map<BilgiKartiOzetSatiri>((t) => ({
         key: `para-${t.currency}`,
         label: t.currency,
-        value: `Gelir ${fmtPara(t.income, t.currency)} · Gider ${fmtPara(t.expense, t.currency)} · Bakiye ${fmtPara(
-          t.net,
-          t.currency
-        )}`,
+        // Değer bir cümle; parametreli olduğu için burada, isteyenin dilinde kuruluyor.
+        value: dilde("Gelir {gelir} · Gider {gider} · Bakiye {bakiye}", {
+          gelir: fmtPara(t.income, t.currency),
+          gider: fmtPara(t.expense, t.currency),
+          bakiye: fmtPara(t.net, t.currency),
+        }),
         href: `/${scopeType === "organization" ? "organizations" : "jobs"}/${scopeId}?tab=budget`,
       }));
     });

@@ -1,3 +1,4 @@
+// dil:anahtar-dosya — etiketler; çeviri render anında (t(...)) yapılıyor.
 import { fmtMoney, sumByCurrency, todayISO } from "../moduleConfigs";
 import {
   NA,

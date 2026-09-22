@@ -6,6 +6,7 @@ import { satinAlmaGosterilir } from "../lib/mobilKabuk";
 import { useThemeColors } from "../theme/useThemeColors";
 import Anahtar from "./Anahtar";
 import { IconInfo, IconSparkle, IconX } from "./icons";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   moduleKey: string;
@@ -18,16 +19,18 @@ interface Props {
   onIslendi: () => void;
 }
 
+// dil:anahtar-baslangic
 const ACIKLAMA =
   "Lio yardımı açıkken modüle bıraktığın fatura ya da fişi Lio okur: tarihini, tutarını ve karşı tarafını " +
   "kendisi doldurur, belgeyi ayın klasörüne koyar ve kasaya gideri/geliri yazar. Her okuma Lio Bakiyesi harcar. " +
   "Kapalıyken hiçbir şey değişmez — kaydı elle girersin.";
+// dil:anahtar-bitis
 
 /** Öneri balonu kişi başına bir kez kapatılıyor; modül modül tekrar çıkması bunaltıcı olurdu. */
 const BALON_ANAHTARI = "projelio_lio_yardimi_balonu";
 
 function okundu(bilgi: LioGirisSonucu, t: ReturnType<typeof useT>): string {
-  const tutar = new Intl.NumberFormat("tr-TR", { style: "currency", currency: bilgi.fatura.currency }).format(
+  const tutar = new Intl.NumberFormat(bicimDili(), { style: "currency", currency: bilgi.fatura.currency }).format(
     bilgi.fatura.amount
   );
   const parcalar = [tutar, bilgi.fatura.counterpartyName, bilgi.fatura.issueDate].filter(Boolean).join(" · ");

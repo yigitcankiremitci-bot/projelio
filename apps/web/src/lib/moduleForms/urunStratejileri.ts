@@ -1,3 +1,4 @@
+// dil:anahtar-dosya — etiketler; çeviri render anında (t(...)) yapılıyor.
 import { opts } from "../moduleConfigs";
 import type { ModuleFormConfig } from "./types";
 
@@ -33,7 +34,7 @@ export const urunStratejileriConfig: ModuleFormConfig = {
     { key: "konum", label: "Konumlandırma", hint: "Bu ürün kime, neden?" }, // dil:anahtar
     { key: "pazar", label: "Pazar", hint: "Kiminle yarışıyor, nasıl fiyatlanıyor?" }, // dil:anahtar
     { key: "plan", label: "Plan", hint: "Nereden satılacak, başarısı nasıl ölçülecek?" }, // dil:anahtar
-    { key: "durum", label: "Durum" },
+    { key: "durum", label: "Durum" }, // dil:anahtar
   ],
 
   fields: [
@@ -102,7 +103,7 @@ export const urunStratejileriConfig: ModuleFormConfig = {
     { key: "reviewAt", label: "Sonraki gözden geçirme", type: "date", group: "durum" }, // dil:anahtar
     {
       key: "status",
-      label: "Durum",
+      label: "Durum", // dil:anahtar
       type: "select",
       group: "durum",
       defaultValue: "draft",

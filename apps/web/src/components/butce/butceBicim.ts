@@ -1,3 +1,4 @@
+import { bicimDili } from "../../lib/i18n/depo";
 /**
  * Bütçe ekranlarının ortak biçimlendirmesi.
  *
@@ -17,24 +18,27 @@ export const PARA_BIRIMLERI = ["TRY", "USD", "EUR", "GBP", "CHF", "SAR", "AED", 
  */
 export function fmtPara(amount: number, currency = "TRY", kisa = false): string {
   try {
-    return new Intl.NumberFormat("tr-TR", {
+    return new Intl.NumberFormat(bicimDili(), {
       style: "currency",
       currency,
       ...(kisa ? { notation: "compact" as const, maximumFractionDigits: 1 } : { maximumFractionDigits: 2 }),
     }).format(amount);
   } catch {
     // Tanınmayan kod (kullanıcı elle girdiyse) Intl'i patlatır; rakamı yine de göster.
-    return `${amount.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ${currency}`;
+    return `${amount.toLocaleString(bicimDili(), { maximumFractionDigits: 2 })} ${currency}`;
   }
 }
 
 export function fmtTarih(value: string): string {
-  return new Date(value).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(value).toLocaleDateString(bicimDili(), { day: "numeric", month: "short", year: "numeric" });
 }
 
 /** "2026-09" → "Eyl 26". Grafik ekseni dar; yıl iki hane. */
 export function fmtDonem(donem: string): string {
   const [y, m] = donem.split("-");
-  const aylar = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-  return `${aylar[Number(m) - 1] ?? m} ${y.slice(2)}`;
+  // Kısa ay adı arayüz diliyle ("Eyl" / "Sep").
+  const ay = new Intl.DateTimeFormat(bicimDili(), { month: "short", timeZone: "UTC" })
+    .format(new Date(Date.UTC(Number(y), Number(m) - 1, 1)))
+    .replace(".", "");
+  return `${ay} ${y.slice(2)}`;
 }

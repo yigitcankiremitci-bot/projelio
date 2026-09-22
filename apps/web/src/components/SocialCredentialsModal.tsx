@@ -15,6 +15,7 @@ import { useT } from "../lib/i18n";
 import { SOCIAL_PLATFORMS } from "../lib/socialMedia";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   scope: SocialScope;
@@ -38,7 +39,7 @@ function reasonLabel(t: Translate, reason: SocialCredentialView["reason"]): stri
 
 function formatDate(value?: string): string {
   if (!value) return "—";
-  return new Date(value).toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" });
+  return new Date(value).toLocaleString(bicimDili(), { dateStyle: "medium", timeStyle: "short" });
 }
 
 /**

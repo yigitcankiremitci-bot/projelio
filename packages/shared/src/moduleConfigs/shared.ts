@@ -234,6 +234,9 @@ export function sumByCurrency(rows: ModuleRecord[], amountField = "amount"): Map
 /** Para birimi başına bir gösterge kutucuğu üretir; hiç kayıt yoksa sıfırlı tek kutucuk. */
 export function moneyStats(label: string, rows: ModuleRecord[], amountField = "amount"): ModuleSummaryStat[] {
   const totals = sumByCurrency(rows, amountField);
+  // Etiket burada çevriliyor: para birimi eki ("Toplam (USD)") eklendikten
+  // sonra sözlükte bulunamazdı.
+  label = etiketCevir(label);
   if (totals.size === 0) return [{ label, value: fmtMoney(0, "TRY") }];
   return Array.from(totals.entries()).map(([currency, sum]) => ({
     label: totals.size > 1 ? `${label} (${currency})` : label,
@@ -247,8 +250,34 @@ export function opts(map: Record<string, string>): ModuleFieldOption[] {
 }
 
 /** Kayıttaki ham değerin okunabilir etiketi. Bilinmeyen değer için undefined. */
+/**
+ * Etiketlerin arayüz diline çevrilmesi.
+ *
+ * Özet ve detay satırları (summary/detail) bu pakette, dilden habersiz üretiliyor;
+ * içlerindeki seçenek etiketleri ("Aktif", "Süresi doldu") İngilizce arayüzde
+ * Türkçe kalıyordu. Web, açılışta kendi çevirmenini buraya kaydeder
+ * (bkz. apps/web/src/lib/i18n/index.tsx); kaydedilmezse (sunucu, testler)
+ * etiket olduğu gibi döner.
+ */
+type EtiketParametreleri = Record<string, string | number | undefined>;
+let etiketCevirmeni: (metin: string, params?: EtiketParametreleri) => string = (metin, params) =>
+  params ? metin.replace(/\{(\w+)\}/g, (_, ad) => String(params[ad] ?? "")) : metin;
+export function setEtiketCevirmeni(fn: (metin: string, params?: EtiketParametreleri) => string): void {
+  etiketCevirmeni = fn;
+}
+/**
+ * Kayıtlı çevirmenden geçirir — özet/detay içindeki sabit metinler için.
+ * Değişken içeren metin şablon dizesi OLMAMALI (anahtar her seferinde değişir):
+ * `etiketCevir("Önem: {deger}", { deger })`.
+ */
+export function etiketCevir(metin: string, params?: EtiketParametreleri): string {
+  return etiketCevirmeni(metin, params);
+}
+
 export function labelOf(map: Record<string, string>, value: unknown): string | undefined {
-  return typeof value === "string" ? map[value] : undefined;
+  if (typeof value !== "string") return undefined;
+  const label = map[value];
+  return label === undefined ? undefined : etiketCevirmeni(label);
 }
 
 /** " · " ile birleştirilmiş, boşları atılmış detay satırı. */

@@ -3,6 +3,7 @@ import type { SupportRequest } from "@projelio/shared";
 import { support } from "../api/support";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * Admin > Destek panosu.
@@ -127,7 +128,7 @@ export default function SupportAdminPanel() {
                     color: answered ? c.success : c.accentDark,
                   }}
                 >
-                  {answered ? "Yanıtlandı" : "Bekliyor"}
+                  {answered ? t("Yanıtlandı") : "Bekliyor"}
                 </span>
               </div>
 
@@ -136,7 +137,7 @@ export default function SupportAdminPanel() {
               <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 10 }}>
                 {r.name}
                 {r.userFullName && r.userFullName !== r.name ? ` (hesap: ${r.userFullName})` : ""}
-                {r.userEmail ? ` · ${r.userEmail}` : ""} · {new Date(r.createdAt).toLocaleString("tr-TR")}
+                {r.userEmail ? ` · ${r.userEmail}` : ""} · {new Date(r.createdAt).toLocaleString(bicimDili())}
               </div>
 
               <p style={{ fontSize: 14, color: c.textPrimary, margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
@@ -146,7 +147,7 @@ export default function SupportAdminPanel() {
               {r.reply && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${c.border}` }}>
                   <div style={{ fontSize: 12, color: c.textSecondary, marginBottom: 4 }}>
-                    Yanıtın{r.repliedAt ? ` · ${new Date(r.repliedAt).toLocaleString("tr-TR")}` : ""}
+                    Yanıtın{r.repliedAt ? ` · ${new Date(r.repliedAt).toLocaleString(bicimDili())}` : ""}
                   </div>
                   <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, whiteSpace: "pre-wrap" }}>{r.reply}</p>
                 </div>
@@ -178,7 +179,7 @@ export default function SupportAdminPanel() {
                         fontWeight: 500,
                       }}
                     >
-                      {sendingId === r.id ? "Gönderiliyor…" : "Yanıtla ve bildir"}
+                      {sendingId === r.id ? t("Gönderiliyor…") : t("Yanıtla ve bildir")}
                     </button>
                     <button
                       type="button"
@@ -216,7 +217,7 @@ export default function SupportAdminPanel() {
                     fontSize: 14,
                   }}
                 >
-                  {answered ? "Yanıtı güncelle" : "Yanıtla"}
+                  {answered ? t("Yanıtı güncelle") : t("Yanıtla")}
                 </button>
               )}
             </div>

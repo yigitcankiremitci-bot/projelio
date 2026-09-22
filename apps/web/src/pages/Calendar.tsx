@@ -31,7 +31,7 @@ import { useT } from "../lib/i18n";
 
 type ViewMode = PlanPeriodKind;
 
-const VIEW_LABELS: Record<ViewMode, string> = { day: "Günlük", week: "Haftalık", month: "Aylık" };
+const VIEW_LABELS: Record<ViewMode, string> = { day: "Günlük", week: "Haftalık", month: "Aylık" }; // dil:anahtar
 
 /**
  * Takvim — Projelio'nun kişisel planlama sayfası.
@@ -77,7 +77,7 @@ export default function CalendarView() {
     planning
       .getCalendar(view, anchor)
       .then(setData)
-      .catch((err) => setError(String(err?.message ?? "Takvim yüklenemedi.")))
+      .catch((err) => setError(String(err?.message ?? t("Takvim yüklenemedi."))))
       .finally(() => setLoading(false));
   }, [view, anchor]);
 
@@ -171,7 +171,7 @@ export default function CalendarView() {
       setSuggestion(apply ? null : result);
       if (apply) load();
     } catch (err: any) {
-      setError(String(err?.message ?? "Dağıtım yapılamadı."));
+      setError(String(err?.message ?? t("Dağıtım yapılamadı.")));
       setSuggestion(null);
     } finally {
       setSuggesting(false);
@@ -198,7 +198,7 @@ export default function CalendarView() {
   // modalde değiştirilebiliyor.
   useProjectFabAction(
     {
-      label: "Plan bloğu ekle",
+      label: t("Plan bloğu ekle"),
       onClick: () =>
         setDraftBlock({
           blockDate: view === "day" ? anchor : todayStr(),
@@ -261,7 +261,7 @@ export default function CalendarView() {
                 opacity: suggesting ? 0.6 : 1,
               }}
             >
-              {suggesting ? "Hesaplanıyor…" : "Otomatik dağıt"}
+              {suggesting ? t("Hesaplanıyor…") : t("Otomatik dağıt")}
             </button>
           )}
         </div>
@@ -322,7 +322,7 @@ export default function CalendarView() {
         >
           <span style={{ fontSize: 12, color: c.textSecondary, flexShrink: 0 }}>{t("Bu dönemin niyeti")}</span>
           <span style={{ fontSize: 15, color: data.progress.period.theme ? c.textPrimary : c.textSecondary, flex: 1, minWidth: 0 }}>
-            {data.progress.period.theme ?? "henüz yazılmadı"}
+            {data.progress.period.theme ?? t("henüz yazılmadı")}
           </span>
           <button
             onClick={() => setTargetsOpen(true)}
@@ -337,7 +337,7 @@ export default function CalendarView() {
               flexShrink: 0,
             }}
           >
-            {data.progress.period.theme ? "Düzenle" : "Yaz"}
+            {data.progress.period.theme ? t("Düzenle") : t("Yaz")}
           </button>
         </div>
       )}
@@ -374,7 +374,7 @@ export default function CalendarView() {
                     cursor: "pointer",
                   }}
                 >
-                  {VIEW_LABELS[v]}
+                  {t(VIEW_LABELS[v])}
                 </button>
               ))}
             </div>
@@ -493,11 +493,12 @@ export default function CalendarView() {
 }
 
 function NavButton({ label, onClick }: { label: string; onClick: () => void }) {
+  const t = useT();
   const c = useThemeColors();
   return (
     <button
       onClick={onClick}
-      aria-label={label === "‹" ? "Önceki" : "Sonraki"}
+      aria-label={label === "‹" ? t("Önceki") : t("Sonraki")}
       style={{
         width: 30,
         height: 30,
@@ -548,7 +549,7 @@ function SuggestionPreview({
       }}
     >
       <div style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary, marginBottom: 6 }}>
-        {suggestion.proposedCount} blok · {formatDuration(suggestion.proposedMinutes)} önerildi
+        {t("{n} blok · {sure} önerildi", { n: suggestion.proposedCount, sure: formatDuration(suggestion.proposedMinutes) })}
       </div>
       <p style={{ margin: 0, fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
         {t("Hedeflerin çalışma saatlerine göre dağıtıldı. Elle koyduğun bloklara dokunulmadı.")}
@@ -567,9 +568,10 @@ function SuggestionPreview({
             lineHeight: 1.5,
           }}
         >
-          Takvimde yer kalmadığı için yerleşemeyen süre:{" "}
-          {suggestion.shortfall.map((s) => `${s.focusAreaName ?? "?"} ${formatDuration(s.minutes)}`).join(", ")}.
-          Kapasiteyi artırabilir, bir hedefi küçültebilir ya da bir işi sonraki döneme atabilirsin.
+          {t(
+            "Takvimde yer kalmadığı için yerleşemeyen süre: {liste}. Kapasiteyi artırabilir, bir hedefi küçültebilir ya da bir işi sonraki döneme atabilirsin.",
+            { liste: suggestion.shortfall.map((s) => `${s.focusAreaName ?? "?"} ${formatDuration(s.minutes)}`).join(", ") }
+          )}
         </div>
       )}
 

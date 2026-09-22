@@ -7,6 +7,7 @@ import { PROJECT_STATUS_LABELS, PROJECT_STATUS_STYLE } from "../lib/projectStatu
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * Paylaşım linkinin açtığı sayfa — ÜYELİK GEREKTİRMEZ.
@@ -374,8 +375,8 @@ export default function PublicProject() {
         )}
 
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 13, color: c.textSecondary }}>
-          <span>{t("Başlangıç: {tarih}", { tarih: new Date(v.startDate).toLocaleDateString("tr-TR") })}</span>
-          <span>{t("Bitiş: {tarih}", { tarih: new Date(v.deadline).toLocaleDateString("tr-TR") })}</span>
+          <span>{t("Başlangıç: {tarih}", { tarih: new Date(v.startDate).toLocaleDateString(bicimDili()) })}</span>
+          <span>{t("Bitiş: {tarih}", { tarih: new Date(v.deadline).toLocaleDateString(bicimDili()) })}</span>
           {v.ownerName && <span>{t("Sorumlu: {kisi}", { kisi: v.ownerName })}</span>}
         </div>
 
@@ -385,11 +386,11 @@ export default function PublicProject() {
       {v.budget && (
         <Card title={t("Bütçe")}>
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            <Figure label={t("Toplam")} value={`${v.budget.total.toLocaleString("tr-TR")} ₺`} />
-            <Figure label={t("Harcanan")} value={`${v.budget.spent.toLocaleString("tr-TR")} ₺`} />
+            <Figure label={t("Toplam")} value={`${v.budget.total.toLocaleString(bicimDili())} ₺`} />
+            <Figure label={t("Harcanan")} value={`${v.budget.spent.toLocaleString(bicimDili())} ₺`} />
             <Figure
               label={t("Kalan")}
-              value={`${Math.max(0, v.budget.total - v.budget.spent).toLocaleString("tr-TR")} ₺`}
+              value={`${Math.max(0, v.budget.total - v.budget.spent).toLocaleString(bicimDili())} ₺`}
             />
           </div>
         </Card>
@@ -450,7 +451,7 @@ export default function PublicProject() {
                   )}
                   {t.deadline && (
                     <span style={{ fontSize: 12, color: c.textSecondary, whiteSpace: "nowrap" }}>
-                      {new Date(t.deadline).toLocaleDateString("tr-TR")}
+                      {new Date(t.deadline).toLocaleDateString(bicimDili())}
                     </span>
                   )}
                 </div>
@@ -486,7 +487,7 @@ export default function PublicProject() {
               {v.feed.map((p) => (
                 <div key={p.id} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   <div style={{ fontSize: 12, color: c.textSecondary }}>
-                    {p.authorName} · {parseServerDate(p.createdAt).toLocaleDateString("tr-TR")}
+                    {p.authorName} · {parseServerDate(p.createdAt).toLocaleDateString(bicimDili())}
                   </div>
                   <div style={{ fontSize: 14, color: c.textPrimary, whiteSpace: "pre-wrap", lineHeight: 1.55 }}>
                     {p.body}
@@ -622,7 +623,7 @@ function LiveBadge({ refreshedAt }: { refreshedAt: Date | null }) {
           display: "inline-block",
         }}
       />
-      {t("Canlı · {saat}", { saat: refreshedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) })}
+      {t("Canlı · {saat}", { saat: refreshedAt.toLocaleTimeString(bicimDili(), { hour: "2-digit", minute: "2-digit" }) })}
     </span>
   );
 }

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { SchedulableTask } from "@projelio/shared";
 import { gorevleriAra } from "@projelio/shared";
 import { api, isAbortError } from "../api/client";
+import { useT } from "./i18n";
+import { cevirmenSuAn } from "./i18n/anlik";
 
 /** Öneri listesinde gösterilecek en fazla satır. */
 const TAVAN = 8;
@@ -53,6 +55,7 @@ export interface Oneri {
  * toleransı yok) ama bu bir yedek: hiç bulamamaktan iyi.
  */
 export function useTaskSearch(query: string, enabled = true) {
+  const t = useT();
   const [gorevler, setGorevler] = useState<SchedulableTask[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [hata, setHata] = useState("");
@@ -77,7 +80,7 @@ export function useTaskSearch(query: string, enabled = true) {
         if (isAbortError(err) || ac.signal.aborted) return;
         // HATAYI YUTMUYORUZ: sessizce boş kalan liste, kullanıcıya "arama
         // çalışmıyor" dedirtiyor ve nedenini görebileceği hiçbir yer olmuyor.
-        setHata(err instanceof Error ? err.message : "Görevlerin yüklenemedi");
+        setHata(err instanceof Error ? err.message : t("Görevlerin yüklenemedi"));
       })
       .finally(() => {
         if (!ac.signal.aborted) setYukleniyor(false);
@@ -152,12 +155,13 @@ export function useTaskSearch(query: string, enabled = true) {
 
 /** SchedulableTask -> listedeki satır. */
 function oneriyeCevir(g: SchedulableTask): Oneri {
+  const t = cevirmenSuAn();
   return {
     id: g.id,
     baslik: g.title,
     altBaslik: [
-      g.parentTaskId ? "alt görev" : null,
-      g.status === "completed" ? "tamamlandı" : null,
+      g.parentTaskId ? t("alt görev") : null,
+      g.status === "completed" ? t("tamamlandı") : null,
       g.projectTitle ?? departmanEtiketi(g.departmentName, g.departmentOrganizationName) ?? g.operationTitle,
       g.jobTitle,
     ]

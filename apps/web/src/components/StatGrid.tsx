@@ -3,6 +3,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import { useIsDesktop, useIsWide } from "../lib/useIsDesktop";
 import { IconChevronDown, IconChevronUp } from "./icons";
+import { useT } from "../lib/i18n";
 
 export interface StatItem {
   /**
@@ -56,6 +57,7 @@ function readOpen(): boolean {
  * (bkz. CoverStats).
  */
 export function StatSummary({ items }: { items: StatItem[] }) {
+  const t = useT();
   const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const isWide = useIsWide();
@@ -101,7 +103,7 @@ export function StatSummary({ items }: { items: StatItem[] }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label={open ? "Özeti kapat" : "Özeti aç"}
+        aria-label={open ? t("Özeti kapat") : t("Özeti aç")}
         style={{
           width: "100%",
           display: "flex",

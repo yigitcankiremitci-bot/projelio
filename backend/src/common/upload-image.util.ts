@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { hataMetni } from "./i18n/index";
 
 /**
  * Yüklenen bir görselin GERÇEKTEN görsel olduğunu doğrular.
@@ -108,7 +109,7 @@ export function detectImageUpload(file: { buffer?: Buffer; size?: number; origin
   const size = file.size ?? buffer.length;
   if (size > MAX_IMAGE_BYTES) {
     throw new BadRequestException(
-      `Görsel en fazla ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB olabilir.`
+      hataMetni("Görsel en fazla {p1} MB olabilir.", { p1: Math.floor(MAX_IMAGE_BYTES / (1024 * 1024)) })
     );
   }
 
@@ -120,7 +121,7 @@ export function detectImageUpload(file: { buffer?: Buffer; size?: number; origin
     const basi = buffer.subarray(0, 512).toString("utf8").trimStart().toLowerCase();
     if (basi.startsWith("<svg") || basi.startsWith("<?xml")) {
       throw new BadRequestException(
-        `SVG kabul edilmiyor (içine çalıştırılabilir kod gömülebildiği için). ${ACCEPTED_LABEL} yükleyin.`
+        hataMetni("SVG kabul edilmiyor (içine çalıştırılabilir kod gömülebildiği için). {ACCEPTED_LABEL} yükleyin.", { ACCEPTED_LABEL })
       );
     }
     if (isHeic(buffer)) {
@@ -130,7 +131,7 @@ export function detectImageUpload(file: { buffer?: Buffer; size?: number; origin
           "(iPhone: Ayarlar > Kamera > Formatlar > En Uyumlu)."
       );
     }
-    throw new BadRequestException(`Dosya bir görsel değil. ${ACCEPTED_LABEL} yükleyin.`);
+    throw new BadRequestException(hataMetni("Dosya bir görsel değil. {ACCEPTED_LABEL} yükleyin.", { ACCEPTED_LABEL }));
   }
 
   return { contentType: match.contentType, ext: match.ext };

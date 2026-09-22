@@ -62,8 +62,7 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
       <Modal title={t("Onaya gönderildi")} onClose={onClose}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <p style={{ fontSize: 16, color: c.textPrimary, margin: 0, lineHeight: 1.5 }}>
-            <strong>{title}</strong> talebiniz işin sahibine iletildi. Onaylandığında bildirim
-            alacak ve proje listenizde göreceksiniz.
+            <strong>{title}</strong> {t("talebiniz işin sahibine iletildi. Onaylandığında bildirim alacak ve proje listenizde göreceksiniz.")}
           </p>
           <button
             type="button"
@@ -78,11 +77,11 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
   }
 
   return (
-    <Modal title="Yeni proje" onClose={onClose}>
+    <Modal title={t("Yeni proje")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Başlık")}</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Marka yenileme" style={{ width: "100%" }} />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder={t("Marka yenileme")} style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -91,7 +90,7 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Anlaşılan ücret (₺)</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Anlaşılan ücret (₺)")}</label>
           <input type="number" min={0} value={totalBudget} onChange={(e) => setTotalBudget(e.target.value)} placeholder="0" style={{ width: "100%" }} />
           <span style={{ fontSize: 13, color: c.textSecondary }}>
             {t("Müşteriden tahsil edeceğin toplam tutar. Aldığın ödemeler bundan düşülür.")}
@@ -116,7 +115,7 @@ export default function CreateProjectModal({ jobId, onClose, onCreated }: Props)
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Oluşturuluyor…" : "Proje oluştur"}
+          {loading ? t("Oluşturuluyor…") : t("Proje oluştur")}
         </button>
       </form>
     </Modal>

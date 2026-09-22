@@ -22,9 +22,10 @@ import { pageGutter } from "../lib/layout";
 import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { isOperationInSidebar } from "../lib/useSidebarHierarchy";
-import { useT } from "../lib/i18n";
+import { cevirmenSuAn, useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
-const periodLabel: Record<string, string> = { weekly: "hafta", monthly: "ay", yearly: "yıl" };
+const periodLabel: Record<string, string> = { weekly: "hafta", monthly: "ay", yearly: "yıl" }; // dil:anahtar
 
 // Bir tekrarın o anki hali. "missed" yalnızca vade + tolerans geçtiğinde oluşur;
 // bilinçli atlananlar (skipped) kaçırılmış sayılmaz.
@@ -80,7 +81,7 @@ export default function OperationDetail() {
 
   // Alt navigasyondaki "+" butonu bu sayfada doğrudan rutin ekler.
   useProjectFabAction(
-    operation ? { label: "Yeni rutin", onClick: () => setRoutineModal({}) } : null,
+    operation ? { label: t("Yeni rutin"), onClick: () => setRoutineModal({}) } : null,
     [operation]
   );
 
@@ -179,7 +180,7 @@ export default function OperationDetail() {
   // Rutinler sekmesine (?tab=programs — varsayılan Projeler sekmesine değil).
   const back = useBackTarget({
     to: operation ? `/jobs/${operation.jobId}?tab=programs` : "/",
-    label: "Rutinler",
+    label: t("Rutinler"),
   });
   usePageHeader(operation?.title, coverRef, [operation?.title, operation?.jobId, back.to, back.label, back.geriGit], {
     ...back,
@@ -191,10 +192,10 @@ export default function OperationDetail() {
   // Tek dizi, iki yerleşim: geniş ekranda kapağın içinde, dar ekranda akışta
   // (bkz. StatGrid).
   const stats: StatItem[] = [
-    { label: "Uyum", value: operation?.adherencePct != null ? `%${operation.adherencePct}` : "—" },
-    { label: "Rutin", value: operation?.activeRoutineCount ?? 0 },
-    { label: "Kaçırılan", value: overdue.length, tone: overdue.length > 0 ? c.danger : undefined },
-    { label: "Yaklaşan", value: upcoming.length },
+    { label: t("Uyum"), value: operation?.adherencePct != null ? `%${operation.adherencePct}` : "—" },
+    { label: t("Rutin"), value: operation?.activeRoutineCount ?? 0 },
+    { label: t("Kaçırılan"), value: overdue.length, tone: overdue.length > 0 ? c.danger : undefined },
+    { label: t("Yaklaşan"), value: upcoming.length },
   ];
 
   return (
@@ -223,12 +224,13 @@ export default function OperationDetail() {
             <>
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <IconCalendar size={12} color={cover.secondary} />
-                {new Date(operation.startedOn).toLocaleDateString("tr-TR")} başladı
+                {t("{tarih} başladı", { tarih: new Date(operation.startedOn).toLocaleDateString(bicimDili()) })}
                 {/* Rutinin bitiş tarihi yoktur; kapatılana kadar çalışır. */}
-                {operation.endedOn && ` · ${new Date(operation.endedOn).toLocaleDateString("tr-TR")} kapandı`}
+                {operation.endedOn &&
+                  " · " + t("{tarih} kapandı", { tarih: new Date(operation.endedOn).toLocaleDateString(bicimDili()) })}
               </span>
               <span style={{ color: c.accentDark, fontWeight: 500 }}>
-                {operation.budgetPerPeriod.toLocaleString("tr-TR")} ₺/{periodLabel[operation.budgetPeriod] ?? "ay"}
+                {operation.budgetPerPeriod.toLocaleString(bicimDili())} ₺/{t(periodLabel[operation.budgetPeriod] ?? "ay")}
               </span>
             </>
           )
@@ -274,8 +276,7 @@ export default function OperationDetail() {
         <SectionTitle>{t("Rutinler")}</SectionTitle>
         {routines.length === 0 ? (
           <EmptyBox>
-            Bu rutinde henüz tanımlı rutin yok. Rutini ayakta tutan tekrarlayan işleri buraya ekle —
-            görevler bu kurallardan otomatik açılır.
+            {t("Bu rutinde henüz tanımlı rutin yok. Rutini ayakta tutan tekrarlayan işleri buraya ekle — görevler bu kurallardan otomatik açılır.")}
           </EmptyBox>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14, marginBottom: 24 }}>
@@ -305,9 +306,9 @@ export default function OperationDetail() {
                 </div>
 
                 <div style={{ display: "flex", gap: 12, fontSize: 13, color: c.textSecondary, paddingTop: 10, borderTop: `1px solid ${c.border}` }}>
-                  <span>{r.adherencePct != null ? `%${r.adherencePct} uyum` : "veri yok"}</span>
-                  {(r.missedCount ?? 0) > 0 && <span style={{ color: c.danger }}>{r.missedCount} kaçırıldı</span>}
-                  {r.nextDueOn && <span>Sıradaki {new Date(r.nextDueOn).toLocaleDateString("tr-TR")}</span>}
+                  <span>{r.adherencePct != null ? t("%{oran} uyum", { oran: r.adherencePct }) : t("veri yok")}</span>
+                  {(r.missedCount ?? 0) > 0 && <span style={{ color: c.danger }}>{t("{n} kaçırıldı", { n: r.missedCount ?? 0 })}</span>}
+                  {r.nextDueOn && <span>{t("Sıradaki {tarih}", { tarih: new Date(r.nextDueOn).toLocaleDateString(bicimDili()) })}</span>}
                 </div>
               </div>
             ))}
@@ -337,8 +338,8 @@ export default function OperationDetail() {
         {upcoming.length === 0 ? (
           <EmptyBox>
             {routines.length === 0
-              ? "Rutin eklediğinde tekrarlar burada otomatik görünecek."
-              : "Yaklaşan tekrar yok. Rutin duraklatılmış olabilir."}
+              ? t("Rutin eklediğinde tekrarlar burada otomatik görünecek.")
+              : t("Yaklaşan tekrar yok. Rutin duraklatılmış olabilir.")}
           </EmptyBox>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -377,7 +378,7 @@ export default function OperationDetail() {
             >
               {t("Geçmiş")}
               <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 400 }}>
-                {history.length} tekrar · {historyOpen ? "gizle" : "göster"}
+                {t("{n} tekrar", { n: history.length })} · {historyOpen ? t("gizle") : t("göster")}
               </span>
             </button>
 
@@ -435,20 +436,20 @@ export default function OperationDetail() {
 
       {statusPrompt && (
         <Modal
-          title={statusPrompt === "paused" ? "Rutini duraklat" : "Rutini kapat"}
+          title={statusPrompt === "paused" ? t("Rutini duraklat") : t("Rutini kapat")}
           onClose={() => setStatusPrompt(null)}
         >
           <p style={{ fontSize: 16, color: c.textSecondary, margin: "0 0 18px", lineHeight: 1.5 }}>
             {statusPrompt === "paused"
-              ? "Gelecekteki, henüz üzerinde çalışılmamış tekrarlar geri çekilir. Geçmiş kayıtlar ve tamamlanmış görevler olduğu gibi kalır. İstediğin zaman devam ettirebilirsin."
-              : "Rutin kapatılır ve yeni tekrar üretilmez. Bir proje gibi \"tamamlanmaz\" — sadece durdurulur. Geçmiş kayıtlar korunur."}
+              ? t("Gelecekteki, henüz üzerinde çalışılmamış tekrarlar geri çekilir. Geçmiş kayıtlar ve tamamlanmış görevler olduğu gibi kalır. İstediğin zaman devam ettirebilirsin.")
+              : t("Rutin kapatılır ve yeni tekrar üretilmez. Bir proje gibi \"tamamlanmaz\" — sadece durdurulur. Geçmiş kayıtlar korunur.")}
           </p>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button onClick={() => setStatusPrompt(null)} style={ghostButton(c)}>
               {t("Vazgeç")}
             </button>
             <button data-primary onClick={() => changeStatus(statusPrompt)} style={primaryButton(c)}>
-              {statusPrompt === "paused" ? "Duraklat" : "Kapat"}
+              {statusPrompt === "paused" ? t("Duraklat") : t("Kapat")}
             </button>
           </div>
         </Modal>
@@ -512,13 +513,13 @@ function OccurrenceRow({
         <div
           onClick={onOpen}
           role={onOpen ? "button" : undefined}
-          title={onOpen ? "Tekrarı aç: düzenle, link/dosya ekle" : undefined}
+          title={onOpen ? t("Tekrarı aç: düzenle, link/dosya ekle") : undefined}
           style={{ fontSize: 15, color: c.textPrimary, cursor: onOpen ? "pointer" : "default" }}
         >
           {occurrence.title}
         </div>
         <div style={{ display: "flex", gap: 10, fontSize: 13, color: overdue ? c.danger : c.textSecondary }}>
-          <span>{new Date(occurrence.occurrenceOn).toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long" })}</span>
+          <span>{new Date(occurrence.occurrenceOn).toLocaleDateString(bicimDili(), { day: "numeric", month: "long", weekday: "long" })}</span>
           {occurrence.assignedToName && (
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <IconUser size={11} color={c.textSecondary} />
@@ -574,29 +575,42 @@ function OccurrenceRow({
 }
 
 // Kuralı kullanıcının okuyabileceği bir cümleye çevirir.
+//
+// Her kalıp ayrı bir cümle: "Her 2 haftada bir" İngilizcede "Every 2 weeks",
+// tek başına "haftada bir" "weekly". Parçaları birleştirmek yerine bütün
+// cümle çevriliyor; gün adları Intl'den, arayüz diliyle geliyor.
 function describeRoutine(r: OperationRoutine): string {
-  const dayNames = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
-  const every = r.intervalN > 1 ? `${r.intervalN} ` : "";
+  const t = cevirmenSuAn();
+  const gunAdi = (d: number) =>
+    // 2023-01-01 bir pazar: d gün sonrası haftanın d. günü (0 = pazar).
+    new Intl.DateTimeFormat(bicimDili(), { weekday: "long", timeZone: "UTC" }).format(new Date(Date.UTC(2023, 0, 1 + d)));
+  const n = r.intervalN;
+  const saat = r.dueTime;
 
-  if (r.freq === "daily") return `Her ${every}günde bir · ${r.dueTime}`;
+  if (r.freq === "daily") return n > 1 ? t("Her {n} günde bir · {saat}", { n, saat }) : t("Her gün · {saat}", { saat });
 
   if (r.freq === "weekly") {
-    const days = (r.byWeekday ?? []).map((d) => dayNames[d]).join(", ");
-    return `Her ${every}haftada bir${days ? ` · ${days}` : ""} · ${r.dueTime}`;
+    const gunler = (r.byWeekday ?? []).map(gunAdi).join(", ");
+    const temel = n > 1 ? t("Her {n} haftada bir", { n }) : t("Her hafta");
+    return `${temel}${gunler ? ` · ${gunler}` : ""} · ${saat}`;
   }
 
   if (r.freq === "monthly") {
+    const temel = n > 1 ? t("Her {n} ayda bir", { n }) : t("Her ay");
     if (r.bySetPos != null) {
-      const pos = r.bySetPos === -1 ? "son" : `${r.bySetPos}.`;
-      const day = dayNames[r.byWeekday?.[0] ?? 1];
-      return `Her ${every}ayın ${pos} ${day} günü · ${r.dueTime}`;
+      const gun = gunAdi(r.byWeekday?.[0] ?? 1);
+      const ne =
+        r.bySetPos === -1
+          ? t("ayın son {gun} günü", { gun })
+          : t("ayın {sira}. {gun} günü", { sira: r.bySetPos, gun });
+      return `${temel} · ${ne} · ${saat}`;
     }
     const d = r.byMonthDay?.[0];
-    const dayText = d === -1 ? "son günü" : `${d ?? 1}. günü`;
-    return `Her ${every}ayın ${dayText} · ${r.dueTime}`;
+    const ne = d === -1 ? t("ayın son günü") : t("ayın {n}. günü", { n: d ?? 1 });
+    return `${temel} · ${ne} · ${saat}`;
   }
 
-  return `Her ${every}yıl · ${r.dueTime}`;
+  return n > 1 ? t("Her {n} yılda bir · {saat}", { n, saat }) : t("Her yıl · {saat}", { saat });
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {

@@ -15,6 +15,7 @@ import {
   labelOf,
   moneyStats,
   opts,
+  etiketCevir,
   type ModuleRecordConfig,
 } from "./shared";
 
@@ -58,7 +59,7 @@ export const emailCampaignConfig: ModuleRecordConfig = {
       labelOf(EMAIL_STATUS, d.status),
       d.audience as string,
       d.recipientCount ? `${d.recipientCount} alıcı` : undefined,
-      d.openRate ? `Açılma %${d.openRate}` : undefined,
+      d.openRate ? etiketCevir("Açılma %{oran}", { oran: d.openRate as number }) : undefined,
       d.sendDate as string
     ),
   computeStats: (records) => {
@@ -138,7 +139,7 @@ export const seoSemConfig: ModuleRecordConfig = {
     { key: "status", label: "Durum", type: "select", defaultValue: "tracking", options: opts(SEO_STATUS) },
     { key: "lastCheckDate", label: "Son kontrol", type: "date" },
   ],
-  summary: (d) => `${d.keyword ?? ""}${d.currentRank ? ` · ${d.currentRank}. sıra` : ""}`,
+  summary: (d) => `${d.keyword ?? ""}${d.currentRank ? ` · ${etiketCevir("{n}. sıra", { n: d.currentRank as number })}` : ""}`,
   detail: (d) =>
     joinDetail(
       labelOf(SEO_CHANNEL, d.channel),
@@ -188,7 +189,7 @@ export const competitorConfig: ModuleRecordConfig = {
     joinDetail(
       d.threatLevel ? `Tehdit: ${labelOf(THREAT_LEVEL, d.threatLevel)}` : undefined,
       labelOf(PRICE_POSITION, d.pricePosition),
-      d.lastReviewDate ? `İnceleme: ${d.lastReviewDate}` : undefined
+      d.lastReviewDate ? etiketCevir("İnceleme: {tarih}", { tarih: d.lastReviewDate as string }) : undefined
     ),
   computeStats: (records) => [
     { label: "Rakip", value: String(records.length) },

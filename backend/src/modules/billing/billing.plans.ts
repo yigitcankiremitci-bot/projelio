@@ -64,7 +64,7 @@ function aylikKarsilik(aylik: number): number {
 export const PLANS: Plan[] = [
   {
     key: "free",
-    name: "Ücretsiz",
+    name: "Ücretsiz", // dil:anahtar
     priceUsdMonthly: 0,
     priceUsdYearlyMonthly: 0,
     priceUsdYearly: 0,
@@ -72,9 +72,9 @@ export const PLANS: Plan[] = [
     featured: false,
     seats: 1,
     features: [
-      "Sınırsız görev ve takvim",
-      "Hoş geldin bakiyesi ile Lio denemesi",
-      "Mobil uygulama",
+      "Sınırsız görev ve takvim", // dil:anahtar
+      "Hoş geldin bakiyesi ile Lio denemesi", // dil:anahtar
+      "Mobil uygulama", // dil:anahtar
     ],
   },
   {
@@ -87,10 +87,10 @@ export const PLANS: Plan[] = [
     featured: false,
     seats: 1,
     features: [
-      "Aylık 20.000 birim Lio Bakiyesi",
-      "Sınırsız proje ve görev",
-      "Google Drive / OneDrive bağlantısı",
-      "E-posta desteği",
+      "Aylık 20.000 birim Lio Bakiyesi", // dil:anahtar
+      "Sınırsız proje ve görev", // dil:anahtar
+      "Google Drive / OneDrive bağlantısı", // dil:anahtar
+      "E-posta desteği", // dil:anahtar
     ],
   },
   {
@@ -103,11 +103,11 @@ export const PLANS: Plan[] = [
     featured: true,
     seats: 1,
     features: [
-      "Aylık 50.000 birim Lio Bakiyesi",
-      "Starter'daki her şey",
-      "WhatsApp üzerinden Lio",
-      "Gelir-gider ve proje bütçesi",
-      "Öncelikli destek",
+      "Aylık 50.000 birim Lio Bakiyesi", // dil:anahtar
+      "Starter'daki her şey", // dil:anahtar
+      "WhatsApp üzerinden Lio", // dil:anahtar
+      "Gelir-gider ve proje bütçesi", // dil:anahtar
+      "Öncelikli destek", // dil:anahtar
     ],
   },
   {
@@ -120,11 +120,11 @@ export const PLANS: Plan[] = [
     featured: false,
     seats: 10,
     features: [
-      "Aylık 150.000 birim Lio Bakiyesi",
-      "Pro'daki her şey",
-      "10 kullanıcıya kadar",
-      "Departman bazlı yetkilendirme",
-      "Dışa aktarma ve raporlar",
+      "Aylık 150.000 birim Lio Bakiyesi", // dil:anahtar
+      "Pro'daki her şey", // dil:anahtar
+      "10 kullanıcıya kadar", // dil:anahtar
+      "Departman bazlı yetkilendirme", // dil:anahtar
+      "Dışa aktarma ve raporlar", // dil:anahtar
     ],
   },
 ];

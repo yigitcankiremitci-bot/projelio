@@ -4,6 +4,7 @@ import { Z } from "../lib/layout";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconX } from "./icons";
+import { useT } from "../lib/i18n";
 
 /**
  * Süren yüklemelerin köşedeki göstergesi.
@@ -23,6 +24,7 @@ import { IconX } from "./icons";
 export const UPLOAD_TRAY_HEIGHT = 92;
 
 export default function UploadTray({ left }: { left: number }) {
+  const t = useT();
   const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const uploads = useUploads();
@@ -56,7 +58,7 @@ export default function UploadTray({ left }: { left: number }) {
       }}
     >
       <div style={{ fontSize: 12, fontWeight: 500, color: c.textSecondary }}>
-        {active > 0 ? `${active} dosya yükleniyor` : "Yükleme tamamlandı"}
+        {active > 0 ? t("{n} dosya yükleniyor", { n: active }) : t("Yükleme tamamlandı")}
       </div>
 
       {uploads.map((u) => {
@@ -81,8 +83,8 @@ export default function UploadTray({ left }: { left: number }) {
               <button
                 type="button"
                 onClick={() => (u.status === "uploading" ? cancelUpload(u.id) : dismissUpload(u.id))}
-                aria-label={u.status === "uploading" ? "Yüklemeyi durdur" : "Kaldır"}
-                title={u.status === "uploading" ? "Yüklemeyi durdur" : "Kaldır"}
+                aria-label={u.status === "uploading" ? t("Yüklemeyi durdur") : t("Kaldır")}
+                title={u.status === "uploading" ? t("Yüklemeyi durdur") : t("Kaldır")}
                 style={{
                   flexShrink: 0,
                   display: "flex",
@@ -105,7 +107,7 @@ export default function UploadTray({ left }: { left: number }) {
                     cevaplamıyordu. */}
                 <span style={{ fontSize: 11.5, color: c.textSecondary }}>
                   {u.status === "done"
-                    ? `Yüklendi · ${formatFileSize(u.sizeBytes)}`
+                    ? t("Yüklendi · {p1}", { p1: formatFileSize(u.sizeBytes) })
                     : `${formatFileSize(u.uploadedBytes, true)} / ${formatFileSize(u.sizeBytes, true)} · %${pct}`}
                 </span>
                 <div style={{ height: 3, borderRadius: 999, background: c.border, overflow: "hidden" }}>

@@ -147,8 +147,8 @@ function MineList({ items }: { items: PersonalBoardItem[] }) {
           title={item.title}
           meta={[
             item.source === "personal"
-              ? "Kişisel"
-              : (item.projectTitle ?? item.operationTitle ?? item.departmentName ?? "Atanan"),
+              ? t("Kişisel")
+              : (item.projectTitle ?? item.operationTitle ?? item.departmentName ?? t("Atanan")),
             item.effectiveDueDate ? shortDayLabel(item.effectiveDueDate.slice(0, 10)) : undefined,
           ]}
         />
@@ -176,14 +176,14 @@ function ProjectTaskList({
   // hangi görevleri olduğunu görmek, düz bir listede aramaktan hızlı.
   const groups = useMemo(() => {
     const map = new Map<string, { label: string; items: SchedulableTask[] }>();
-    for (const t of tasks ?? []) {
-      const key = t.jobId ?? "_";
+    for (const gorev of tasks ?? []) {
+      const key = gorev.jobId ?? "_";
       let group = map.get(key);
       if (!group) {
-        group = { label: t.jobTitle ?? "Diğer", items: [] };
+        group = { label: gorev.jobTitle ?? t("Diğer"), items: [] };
         map.set(key, group);
       }
-      group.items.push(t);
+      group.items.push(gorev);
     }
     return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, "tr"));
   }, [tasks]);
@@ -214,7 +214,7 @@ function ProjectTaskList({
 
       {tasks !== null && tasks.length === 0 && (
         <p style={{ margin: 0, fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
-          {query ? `"${query}" ile eşleşen açık görev yok.` : "Erişebildiğin projelerde açık görev yok."}
+          {query ? t("\"{query}\" ile eşleşen açık görev yok.", { query }) : t("Erişebildiğin projelerde açık görev yok.")}
         </p>
       )}
 

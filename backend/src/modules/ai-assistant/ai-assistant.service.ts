@@ -3089,16 +3089,18 @@ export class AiAssistantService {
       };
     };
 
-    if (!confirmed) return record("İşlem iptal edildi.");
+    if (!confirmed) return record(cevir(locale, "İşlem iptal edildi."));
 
     try {
       await this.executeTool(pending.toolName, pending.input, pending.userId, pending.userRole);
       return record(
         `✅ ${cevir(locale, RESULT_LABELS[pending.toolName] ?? "İşlem tamamlandı.")} ` +
-          "(Bu isteğin geri kalanına devam edemedim, süresi dolmuştu — kalan kısmı tekrar yazar mısın?)"
+          cevir(locale, "(Bu isteğin geri kalanına devam edemedim, süresi dolmuştu — kalan kısmı tekrar yazar mısın?)")
       );
     } catch (err: any) {
-      return record(`İşlem başarısız oldu: ${err?.message ?? "bilinmeyen hata"}`);
+      return record(
+        cevir(locale, { metin: "İşlem başarısız oldu: {hata}", params: { hata: err?.message ?? cevir(locale, "bilinmeyen hata") } })
+      );
     }
   }
 
@@ -4288,7 +4290,7 @@ export class AiAssistantService {
           // Alan tanımı olmadan her anahtar "tanımsız" sayılır ve düşerdi:
           // güncelleme sessizce hiçbir şey yapmaz, model ise yaptı sanır.
           throw new BadRequestException(
-            `"${moduleName}" bir kayıt defteri değil; kayıtları buradan düzenlenemez.`
+            hataMetni("\"{moduleName}\" bir kayıt defteri değil; kayıtları buradan düzenlenemez.", { moduleName })
           );
         }
         const { data: patch, warnings } = normalizeModuleData(existing.moduleKey, moduleName, input.data);
@@ -4809,7 +4811,7 @@ export class AiAssistantService {
     const found = sheets.find((sheet) => normalizeKey(sheet.name) === wanted);
     if (!found) {
       throw new BadRequestException(
-        `"${input.sayfa}" adlı sayfa yok. Sayfalar: ${sheets.map((s) => s.name).join(", ")}`
+        hataMetni("\"{sayfa}\" adlı sayfa yok. Sayfalar: {p2}", { sayfa: input.sayfa, p2: sheets.map((s) => s.name).join(", ") })
       );
     }
     return found;
@@ -4931,7 +4933,7 @@ export class AiAssistantService {
     const moduleName = await this.moduleDisplayName(input.moduleKey);
     if (!hasRecordConfig(input.moduleKey)) {
       throw new BadRequestException(
-        `"${moduleName}" bir kayıt defteri değil; buraya toplu kayıt yazılamaz (bkz. describe_module).`
+        hataMetni("\"{moduleName}\" bir kayıt defteri değil; buraya toplu kayıt yazılamaz (bkz. describe_module).", { moduleName })
       );
     }
 
@@ -5162,6 +5164,8 @@ export class AiAssistantService {
     defaultName: string;
     target: { projectId?: string; departmentId?: string; jobId?: string };
   }> {
+    // Dosyayı kullanıcı indiriyor: başlıklar ve durum adları onun dilinde.
+    const t = cevirmen(await this.diller.diliniBul(userId));
     const today = new Date().toISOString().slice(0, 10);
     const cell = (value: unknown): string | number | undefined => {
       if (value === undefined || value === null || value === "") return undefined;
@@ -5174,9 +5178,9 @@ export class AiAssistantService {
     switch (input.veri) {
       case "gorevler": {
         const durum: Record<string, string> = {
-          todo: "Yapılacak",
-          in_progress: "Yapılıyor",
-          completed: "Tamamlandı",
+          todo: t("Yapılacak"),
+          in_progress: t("Yapılıyor"),
+          completed: t("Tamamlandı"),
         };
         let tasks;
         let baslik: string;
@@ -5198,8 +5202,8 @@ export class AiAssistantService {
           defaultName: `gorevler-${baslik}-${today}`,
           target: { projectId: input.projectId, departmentId: input.departmentId },
           table: {
-            title: "Görevler",
-            headers: ["Başlık", "Durum", "Öncelik", "Başlangıç", "Teslim", "Atanan", "Bütçe", "Açıklama"],
+            title: t("Görevler"),
+            headers: [t("Başlık"), t("Durum"), t("Öncelik"), t("Başlangıç"), t("Teslim"), t("Atanan"), t("Bütçe"), t("Açıklama")],
             rows: tasks.map((t: any) => [
               cell(t.title),
               durum[t.status] ?? t.status,
@@ -5222,13 +5226,13 @@ export class AiAssistantService {
           this.projectsService.findOne(input.projectId),
           this.budgetService.findByProject(input.projectId, userId),
         ]);
-        const tur: Record<string, string> = { income: "Gelir", expense: "Gider", payout: "Ödeme" };
+        const tur: Record<string, string> = { income: t("Gelir"), expense: t("Gider"), payout: t("Ödeme") };
         return {
           defaultName: `butce-${project.title}-${today}`,
           target: { projectId: input.projectId },
           table: {
-            title: "Bütçe hareketleri",
-            headers: ["Tarih", "Tür", "Tutar", "Açıklama"],
+            title: t("Bütçe hareketleri"),
+            headers: [t("Tarih"), t("Tür"), t("Tutar"), t("Açıklama")],
             rows: transactions.map((t: any) => [
               shortDate(t.occurredAt),
               tur[t.type] ?? t.type,
@@ -5243,7 +5247,7 @@ export class AiAssistantService {
         const moduleName = await this.moduleDisplayName(input.moduleKey);
         if (!hasRecordConfig(input.moduleKey)) {
           throw new BadRequestException(
-            `"${moduleName}" bir kayıt defteri değil; dışa aktarılacak kaydı yok (bkz. describe_module).`
+            hataMetni("\"{moduleName}\" bir kayıt defteri değil; dışa aktarılacak kaydı yok (bkz. describe_module).", { moduleName })
           );
         }
         const config = getModuleRecordConfig(input.moduleKey, moduleName);
@@ -5260,7 +5264,7 @@ export class AiAssistantService {
           target: { jobId: input.jobId },
           table: {
             title: moduleName,
-            headers: ["Oluşturuldu", ...config.fields.map((f) => f.label)],
+            headers: [t("Oluşturuldu"), ...config.fields.map((f) => f.label)],
             rows: records.map((r: any) => [
               shortDate(r.createdAt),
               ...config.fields.map((f) => cell(r.data?.[f.key])),
@@ -5276,20 +5280,20 @@ export class AiAssistantService {
           defaultName: `urunler-${today}`,
           target: {},
           table: {
-            title: "Ürünler",
+            title: t("Ürünler"),
             headers: [
-              "Ad",
-              "Stok kodu",
-              "Kategori",
-              "Marka",
-              "Birim",
-              "Stok",
-              "Fiyat",
-              "Para birimi",
-              "Maliyet",
-              "KDV %",
-              "Durum",
-              "Notlar",
+              t("Ad"),
+              t("Stok kodu"),
+              t("Kategori"),
+              t("Marka"),
+              t("Birim"),
+              t("Stok"),
+              t("Fiyat"),
+              t("Para birimi"),
+              t("Maliyet"),
+              t("KDV %"),
+              t("Durum"),
+              t("Notlar"),
             ],
             rows: products.map((p: any) => [
               cell(p.name),
@@ -5302,7 +5306,7 @@ export class AiAssistantService {
               cell(p.currency),
               cell(p.costPrice),
               cell(p.taxRate),
-              p.status === "inactive" ? "Pasif" : "Aktif",
+              p.status === "inactive" ? t("Pasif") : t("Aktif"),
               cell(p.notes),
             ]),
           },
@@ -5312,19 +5316,19 @@ export class AiAssistantService {
       case "yapilacaklar": {
         const board = await this.personalTodosService.getBoard(userId, { source: "all", includeHidden: false });
         const durum: Record<string, string> = {
-          todo: "Yapılacak",
-          in_progress: "Yapılıyor",
-          completed: "Tamamlandı",
+          todo: t("Yapılacak"),
+          in_progress: t("Yapılıyor"),
+          completed: t("Tamamlandı"),
         };
         return {
           defaultName: `yapilacaklar-${today}`,
           target: {},
           table: {
-            title: "Yapılacaklar",
-            headers: ["Başlık", "Kaynak", "Durum", "Teslim", "Saat", "Proje", "Kişisel not"],
+            title: t("Yapılacaklar"),
+            headers: [t("Başlık"), t("Kaynak"), t("Durum"), t("Teslim"), t("Saat"), t("Proje"), t("Kişisel not")],
             rows: board.map((item: any) => [
               cell(item.title),
-              item.source === "assigned" ? "Atanmış görev" : "Kişisel",
+              item.source === "assigned" ? t("Atanmış görev") : t("Kişisel"),
               durum[item.status] ?? item.status,
               shortDate(item.effectiveDueDate),
               cell(item.deadlineTime),
@@ -5344,8 +5348,8 @@ export class AiAssistantService {
           defaultName: `projeler-${job.title}-${today}`,
           target: { jobId },
           table: {
-            title: "Projeler",
-            headers: ["Proje", "Durum", "Bütçe", "Başlangıç", "Teslim", "Açıklama"],
+            title: t("Projeler"),
+            headers: [t("Proje"), t("Durum"), t("Bütçe"), t("Başlangıç"), t("Teslim"), t("Açıklama")],
             rows: projects.map((p: any) => [
               cell(p.title),
               cell(p.status),
@@ -5359,7 +5363,7 @@ export class AiAssistantService {
       }
 
       default:
-        throw new BadRequestException(`Bilinmeyen veri kümesi: ${input.veri}`);
+        throw new BadRequestException(hataMetni("Bilinmeyen veri kümesi: {veri}", { veri: input.veri }));
     }
   }
 

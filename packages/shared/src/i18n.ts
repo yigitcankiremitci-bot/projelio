@@ -39,13 +39,24 @@ export function normalizeLocale(tag: string | null | undefined): Locale | null {
 }
 
 /**
- * Adaylar arasından ilk tanınan dili seçer; hiçbiri tanınmazsa varsayılana düşer.
- * Aday sırası çağıranın önceliğidir (ör. hesap tercihi > tarayıcı dili).
+ * Tarayıcının (ya da Accept-Language başlığının) dil listesinden arayüz dilini seçer.
+ * Aday sırası çağıranın önceliğidir; boş adaylar atlanır.
+ *
+ * Kural: İLK dil Türkçe ise Türkçe, değilse İngilizce. Hiç aday yoksa Türkçe.
+ *
+ * Neden "ilk tanınan" değil de "ilk": ["de-DE", "tr"] bildiren tarayıcı
+ * öncelikle Almanca okuyan birine ait; listede ikinci sırada Türkçe var diye
+ * ona Türkçe açmak, yabancı test kullanıcılarının "Türkçe yüzünden
+ * kullanamıyoruz" şikâyetinin kaynağıydı. Tarayıcısının birinci dili Türkçe
+ * olmayan herkes İngilizce görür; Türkçe isteyen giriş ekranından seçer.
+ *
+ * Eskiden desteklenmeyen dil (de, es, ru) doğrudan Türkçeye düşüyordu —
+ * İngilizce yalnızca tarayıcısı İngilizce olana çıkıyordu.
  */
 export function resolveLocale(candidates: readonly (string | null | undefined)[]): Locale {
   for (const candidate of candidates) {
-    const locale = normalizeLocale(candidate);
-    if (locale) return locale;
+    if (!candidate || !candidate.trim()) continue;
+    return normalizeLocale(candidate) === "tr" ? "tr" : "en";
   }
   return defaultLocale;
 }

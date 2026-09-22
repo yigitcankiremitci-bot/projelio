@@ -110,7 +110,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Hesap kaydedilemedi");
+      setError(err instanceof Error ? err.message : t("Hesap kaydedilemedi"));
     } finally {
       setSaving(false);
     }
@@ -121,7 +121,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
 
   return (
     <Modal
-      title={account ? "Hesabı düzenle" : "Sosyal medya hesabı ekle"}
+      title={account ? t("Hesabı düzenle") : t("Sosyal medya hesabı ekle")}
       subtitle={t("Hesabın kimliği, kitlesi ve yayın ritmi — içerik yazarken bu bilgiler composer'da hatırlatılır.")}
       onClose={onClose}
       maxWidth={560}
@@ -138,13 +138,13 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
             >
               {PLATFORM_ORDER.map((p) => (
                 <option key={p} value={p}>
-                  {SOCIAL_PLATFORMS[p].label}
+                  {t(SOCIAL_PLATFORMS[p].label)}
                 </option>
               ))}
             </select>
           </div>
           <div style={{ flex: "1 1 180px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("Kullanıcı adı *")}
+            {label(t("Kullanıcı adı *"))}
             <input
               value={form.handle}
               onChange={(e) => set("handle", e.target.value)}
@@ -156,7 +156,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 180px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("Görünen ad")}
+            {label(t("Görünen ad"))}
             {/* Listede "@projelio" yerine "Projelio TR" yazması, aynı markanın
                 birden çok hesabı olduğunda hangisinin hangisi olduğunu ayırıyor. */}
             <input
@@ -167,7 +167,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
             />
           </div>
           <div style={{ flex: "1 1 120px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("Takipçi")}
+            {label(t("Takipçi"))}
             <input
               type="number"
               value={form.followerCount}
@@ -179,7 +179,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {label("Profil adresi")}
+          {label(t("Profil adresi"))}
           <input
             value={form.profileUrl}
             onChange={(e) => set("profileUrl", e.target.value)}
@@ -189,7 +189,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {label("Kitle")}
+          {label(t("Kitle"))}
           <textarea
             value={form.audienceNote}
             onChange={(e) => set("audienceNote", e.target.value)}
@@ -200,7 +200,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {label("Ton / marka sesi")}
+          {label(t("Ton / marka sesi"))}
           <textarea
             value={form.toneNote}
             onChange={(e) => set("toneNote", e.target.value)}
@@ -212,7 +212,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 160px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("Yayın ritmi")}
+            {label(t("Yayın ritmi"))}
             <input
               value={form.postingFrequency}
               onChange={(e) => set("postingFrequency", e.target.value)}
@@ -221,7 +221,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
             />
           </div>
           <div style={{ flex: "1 1 160px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {label("Sorumlu")}
+            {label(t("Sorumlu"))}
             <select value={form.ownerUserId} onChange={(e) => set("ownerUserId", e.target.value)} style={field}>
               <option value="">{t("Belirtilmedi")}</option>
               {members.map((m) => (
@@ -264,9 +264,8 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
             lineHeight: 1.5,
           }}
         >
-          Buradaki bilgiler hesabın kimliği ve çalışma biçimi. Projelio'nun bu hesaba{" "}
-          <strong>{t("doğrudan yayımlaması")}</strong> için Hesaplar sekmesindeki “Instagram'a bağla” adımı gerekiyor —
-          bağlanmayan hesaplarda plan ve metin burada durur, yayını siz yaparsınız.
+          {t("Buradaki bilgiler hesabın kimliği ve çalışma biçimi. Projelio'nun bu hesaba")}{" "}
+          <strong>{t("doğrudan yayımlaması")}</strong> {t("için Hesaplar sekmesindeki “Instagram'a bağla” adımı gerekiyor — bağlanmayan hesaplarda plan ve metin burada durur, yayını siz yaparsınız.")}
         </div>
 
         {error && <span style={{ fontSize: 12, color: c.danger }}>{error}</span>}
@@ -301,7 +300,7 @@ export default function SocialAccountModal({ scope, account, members, onClose, o
               opacity: saving ? 0.6 : 1,
             }}
           >
-            {saving ? "Kaydediliyor…" : account ? "Kaydet" : "Hesabı ekle"}
+            {saving ? t("Kaydediliyor…") : account ? t("Kaydet") : t("Hesabı ekle")}
           </button>
         </div>
       </div>

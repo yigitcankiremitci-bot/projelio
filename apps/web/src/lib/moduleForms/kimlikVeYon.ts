@@ -1,3 +1,4 @@
+// dil:anahtar-dosya — etiketler; çeviri render anında (t(...)) yapılıyor.
 import { opts } from "../moduleConfigs";
 import type { ModuleFormConfig } from "./types";
 
@@ -93,7 +94,7 @@ export const kimlikVeYonConfig: ModuleFormConfig = {
     },
     {
       key: "status",
-      label: "Durum",
+      label: "Durum", // dil:anahtar
       type: "select",
       group: "durum",
       defaultValue: "draft",

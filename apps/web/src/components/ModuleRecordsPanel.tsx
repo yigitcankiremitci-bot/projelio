@@ -318,7 +318,7 @@ export default function ModuleRecordsPanel({
       }
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kaydedilemedi");
+      setError(err instanceof Error ? err.message : t("Kaydedilemedi"));
     } finally {
       setSaving(false);
     }
@@ -457,7 +457,7 @@ export default function ModuleRecordsPanel({
                 minWidth: 92,
               }}
             >
-              <span style={{ fontSize: 11, color: c.textSecondary }}>{stat.label}</span>
+              <span style={{ fontSize: 11, color: c.textSecondary }}>{t(stat.label)}</span>
               <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{stat.value}</span>
             </div>
           ))}
@@ -511,7 +511,7 @@ export default function ModuleRecordsPanel({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Ara…"
+            placeholder={t("Ara…")}
             style={{ flex: "1 1 140px", minWidth: 120, fontSize: 13, padding: "5px 8px" }}
           />
           {filterableFields.map((field) => (
@@ -578,7 +578,7 @@ export default function ModuleRecordsPanel({
                 color: view === v ? c.primary : c.textSecondary,
               }}
             >
-              {v === "list" ? "Liste" : `Pano · ${boardField.label}`}
+              {v === "list" ? t("Liste") : t("Pano · {label}", { label: t(boardField.label) })}
             </button>
           ))}
         </div>
@@ -626,7 +626,7 @@ export default function ModuleRecordsPanel({
                 cursor: "pointer",
               }}
             >
-              Tüm alanlar ({config.fields.length - visibleFields.length} tane daha)
+              {t("Tüm alanlar ({n} tane daha)", { n: config.fields.length - visibleFields.length })}
             </button>
           )}
 

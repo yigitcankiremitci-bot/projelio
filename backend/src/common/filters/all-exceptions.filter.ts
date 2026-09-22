@@ -115,7 +115,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const i18n = kayit.i18n as { metin?: unknown; params?: unknown } | undefined;
     if (i18n && typeof i18n.metin === "string") {
       const { i18n: _i18n, ...kalan } = kayit;
-      return { ...kalan, message: t(i18n.metin, i18n.params as Record<string, string | number>) };
+      // Metin parametreleri de sözlükten geçiriliyor: "{field} boş olamaz" gibi
+      // mesajlarda parametre çoğu zaman bir alan adı ("Konu", "Tutar") ve
+      // çevrilmezse İngilizce cümlenin ortasında Türkçe kalıyordu. Sözlükte
+      // olmayan değer (kullanıcının yazdığı ad, e-posta) olduğu gibi döner.
+      const params = Object.fromEntries(
+        Object.entries((i18n.params ?? {}) as Record<string, string | number>).map(([k, v]) => [
+          k,
+          typeof v === "string" ? t(v) : v,
+        ])
+      );
+      return { ...kalan, message: t(i18n.metin, params) };
     }
 
     const mesaj = kayit.message;

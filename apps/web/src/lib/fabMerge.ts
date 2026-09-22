@@ -1,3 +1,4 @@
+import { cevirmenSuAn } from "./i18n/anlik";
 /**
  * "+" düğmesine aynı anda kaydedilmiş eylemleri tek bir eyleme indirger.
  *
@@ -50,6 +51,7 @@ export interface FabRegistration {
  * ekleme düğmesi açmak yerine.
  */
 export function mergeFabActions(list: FabRegistration[]): ProjectFabAction | null {
+  const t = cevirmenSuAn();
   if (list.length === 0) return null;
   const top = Math.max(...list.map((e) => e.priority));
   const winners = list.filter((e) => e.priority === top).sort((a, b) => a.id - b.id);
@@ -65,5 +67,5 @@ export function mergeFabActions(list: FabRegistration[]): ProjectFabAction | nul
   if (options.length === 0) return null;
   // Tek seçenek kalmışsa menü açmaya değmez: "+" doğrudan onu tetikler.
   if (options.length === 1) return { label: options[0].label, onClick: options[0].onClick };
-  return { label: "Ekle", options };
+  return { label: t("Ekle"), options };
 }

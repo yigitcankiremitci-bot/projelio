@@ -63,7 +63,7 @@ export default function BrowseDriveModal({ target, taskId, outputId, onClose, on
       onImported(created);
       onClose();
     } catch (e: any) {
-      setError(e?.message ?? "Dosya içe aktarılamadı");
+      setError(e?.message ?? t("Dosya içe aktarılamadı"));
       setImportingId(null);
     }
   };

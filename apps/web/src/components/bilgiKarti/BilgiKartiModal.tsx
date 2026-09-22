@@ -9,6 +9,8 @@ import Modal from "../Modal";
 import BelgeEkleModal from "./BelgeEkleModal";
 import { KUNYE_BOLUMLERI, formDurumu, kartBosMu, kunyeDegeri, type KunyeAlani } from "./kunyeAlanlari";
 import { IconCheck, IconCopy, IconDownload, IconEdit, IconExternalLink, IconFile, IconPlus, IconTrash } from "../icons";
+import { useT } from "../../lib/i18n";
+import { bicimDili } from "../../lib/i18n/depo";
 
 type Sekme = "kunye" | "belgeler" | "ozet";
 
@@ -34,6 +36,7 @@ interface Props {
  * "şirket ne durumda" (özet).
  */
 export default function BilgiKartiModal({ scopeType, scopeId, onClose }: Props) {
+  const t = useT();
   const c = useThemeColors();
   const [sayfa, setSayfa] = useState<BilgiKartiSayfasi | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
@@ -52,7 +55,7 @@ export default function BilgiKartiModal({ scopeType, scopeId, onClose }: Props) 
       setForm(formDurumu(veri.kart));
       setHata("");
     } catch {
-      setHata("Bilgi kartı açılamadı. Bu kartı görme yetkin olmayabilir.");
+      setHata(t("Bilgi kartı açılamadı. Bu kartı görme yetkin olmayabilir."));
     } finally {
       setYukleniyor(false);
     }
@@ -83,7 +86,7 @@ export default function BilgiKartiModal({ scopeType, scopeId, onClose }: Props) 
       await yukle();
       setDuzenleme(false);
     } catch {
-      setHata("Kaydedilemedi. Tekrar dene.");
+      setHata(t("Kaydedilemedi. Tekrar dene."));
     } finally {
       setKaydediliyor(false);
     }
@@ -93,8 +96,8 @@ export default function BilgiKartiModal({ scopeType, scopeId, onClose }: Props) 
 
   return (
     <Modal
-      title={sayfa?.scopeName ?? "Bilgi kartı"}
-      subtitle={scopeType === "organization" ? "Şirket bilgi kartı" : "İş bilgi kartı"}
+      title={sayfa?.scopeName ?? t("Bilgi kartı")}
+      subtitle={scopeType === "organization" ? t("Şirket bilgi kartı") : t("İş bilgi kartı")}
       onClose={onClose}
       maxWidth={720}
       mobileFullScreen
@@ -117,7 +120,7 @@ export default function BilgiKartiModal({ scopeType, scopeId, onClose }: Props) 
                 fontSize: 16,
               }}
             >
-              Vazgeç
+              {t("Vazgeç")}
             </button>
             <button
               type="button"
@@ -135,13 +138,13 @@ export default function BilgiKartiModal({ scopeType, scopeId, onClose }: Props) 
                 fontWeight: 500,
               }}
             >
-              {kaydediliyor ? "Kaydediliyor…" : "Kaydet"}
+              {kaydediliyor ? t("Kaydediliyor…") : t("Kaydet")}
             </button>
           </div>
         ) : undefined
       }
     >
-      {yukleniyor && <p style={{ color: c.textSecondary, fontSize: 15 }}>Yükleniyor…</p>}
+      {yukleniyor && <p style={{ color: c.textSecondary, fontSize: 15 }}>{t("Yükleniyor…")}</p>}
       {!yukleniyor && hata && <p style={{ color: c.danger, fontSize: 15 }}>{hata}</p>}
 
       {sayfa && (
@@ -149,13 +152,13 @@ export default function BilgiKartiModal({ scopeType, scopeId, onClose }: Props) 
           <Basliklik sayfa={sayfa} />
 
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <SekmeDugmesi aktif={sekme === "kunye"} onClick={() => setSekme("kunye")} etiket="Künye" />
+            <SekmeDugmesi aktif={sekme === "kunye"} onClick={() => setSekme("kunye")} etiket={t("Künye")} />
             <SekmeDugmesi
               aktif={sekme === "belgeler"}
               onClick={() => setSekme("belgeler")}
-              etiket={`Belgeler${sayfa.belgeler.length ? ` (${sayfa.belgeler.length})` : ""}`}
+              etiket={t("Belgeler{p1}", { p1: sayfa.belgeler.length ? ` (${sayfa.belgeler.length})` : "" })}
             />
-            <SekmeDugmesi aktif={sekme === "ozet"} onClick={() => setSekme("ozet")} etiket="Şirket özeti" />
+            <SekmeDugmesi aktif={sekme === "ozet"} onClick={() => setSekme("ozet")} etiket={t("Şirket özeti")} />
 
             {sekme === "kunye" && canEdit && !duzenleme && (
               <button
@@ -175,7 +178,7 @@ export default function BilgiKartiModal({ scopeType, scopeId, onClose }: Props) 
                 }}
               >
                 <IconEdit size={14} color={c.textSecondary} />
-                Düzenle
+                {t("Düzenle")}
               </button>
             )}
             {sekme === "belgeler" && canEdit && (
@@ -196,7 +199,7 @@ export default function BilgiKartiModal({ scopeType, scopeId, onClose }: Props) 
                 }}
               >
                 <IconPlus size={14} color={c.textSecondary} />
-                Belge ekle
+                {t("Belge ekle")}
               </button>
             )}
           </div>
@@ -251,6 +254,7 @@ export default function BilgiKartiModal({ scopeType, scopeId, onClose }: Props) 
 
 /** Kartın tepesindeki şerit: kapak, ünvan, sektör ve son güncelleme. */
 function Basliklik({ sayfa }: { sayfa: BilgiKartiSayfasi }) {
+  const t = useT();
   const c = useThemeColors();
   const kart = sayfa.kart;
   const unvan = kart?.legalName || kart?.brandName || sayfa.scopeName;
@@ -293,11 +297,11 @@ function Basliklik({ sayfa }: { sayfa: BilgiKartiSayfasi }) {
         <p style={{ margin: 0, fontSize: 17, fontWeight: 500, color: c.textPrimary }}>{unvan}</p>
         <p style={{ margin: "3px 0 0", fontSize: 13, color: c.textSecondary }}>
           {[kart?.sector, kart?.city, kart?.taxNumber ? `VKN ${kart.taxNumber}` : null].filter(Boolean).join(" · ") ||
-            "Künye henüz doldurulmadı"}
+            t("Künye henüz doldurulmadı")}
         </p>
         {kart?.updatedAt && (
           <p style={{ margin: "3px 0 0", fontSize: 12, color: c.textSecondary }}>
-            Son güncelleme: {new Date(kart.updatedAt).toLocaleDateString("tr-TR")}
+            {t("Son güncelleme:")} {new Date(kart.updatedAt).toLocaleDateString(bicimDili())}
             {kart.updatedByName ? ` · ${kart.updatedByName}` : ""}
           </p>
         )}
@@ -341,14 +345,14 @@ function KunyeGorunumu({
   canEdit: boolean;
   onDuzenle: () => void;
 }) {
+  const t = useT();
   const c = useThemeColors();
 
   if (kartBosMu(sayfa.kart) && sayfa.alanlar.length === 0) {
     return (
       <div style={{ padding: "26px 18px", textAlign: "center", border: `1px dashed ${c.border}`, borderRadius: 12 }}>
         <p style={{ margin: 0, fontSize: 15, color: c.textSecondary }}>
-          Bu kart henüz boş. Vergi dairesi, adres ve sicil bilgilerini bir kez girdiğinde ekipteki herkes buradan
-          bulabilir.
+          {t("Bu kart henüz boş. Vergi dairesi, adres ve sicil bilgilerini bir kez girdiğinde ekipteki herkes buradan bulabilir.")}
         </p>
         {canEdit && (
           <button
@@ -364,7 +368,7 @@ function KunyeGorunumu({
               fontSize: 15,
             }}
           >
-            Bilgileri gir
+            {t("Bilgileri gir")}
           </button>
         )}
       </div>
@@ -385,7 +389,7 @@ function KunyeGorunumu({
               {dolu.map((alan) => (
                 <DegerSatiri
                   key={String(alan.key)}
-                  etiket={alan.label}
+                  etiket={t(alan.label)}
                   deger={kunyeDegeri(sayfa.kart, alan)}
                   kopyalandi={kopyalanan === String(alan.key)}
                   onKopyala={() => onKopyala(String(alan.key), kunyeDegeri(sayfa.kart, alan))}
@@ -398,12 +402,12 @@ function KunyeGorunumu({
 
       {sayfa.alanlar.length > 0 && (
         <div>
-          <BolumBasligi>Ek bilgiler</BolumBasligi>
+          <BolumBasligi>{t("Ek bilgiler")}</BolumBasligi>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
             {sayfa.alanlar.map((alan) => (
               <DegerSatiri
                 key={alan.id}
-                etiket={alan.label}
+                etiket={t(alan.label)}
                 deger={alan.value ?? ""}
                 kopyalandi={kopyalanan === alan.id}
                 onKopyala={() => onKopyala(alan.id, alan.value ?? "")}
@@ -444,12 +448,13 @@ function DegerSatiri({
   kopyalandi: boolean;
   onKopyala: () => void;
 }) {
+  const t = useT();
   const c = useThemeColors();
   return (
     <button
       type="button"
       onClick={onKopyala}
-      title="Kopyalamak için tıkla"
+      title={t("Kopyalamak için tıkla")}
       style={{
         display: "flex",
         alignItems: "flex-start",
@@ -514,6 +519,7 @@ function KunyeFormu({
 }
 
 function FormAlani({ alan, deger, onDegis }: { alan: KunyeAlani; deger: string; onDegis: (v: string) => void }) {
+  const t = useT();
   const c = useThemeColors();
   const ortak = {
     value: deger,
@@ -523,7 +529,7 @@ function FormAlani({ alan, deger, onDegis }: { alan: KunyeAlani; deger: string; 
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5, gridColumn: alan.genis ? "1 / -1" : undefined }}>
-      <label style={{ fontSize: 13, color: c.textSecondary }}>{alan.label}</label>
+      <label style={{ fontSize: 13, color: c.textSecondary }}>{t(alan.label)}</label>
       {alan.tur === "multiline" ? (
         <textarea {...ortak} rows={3} />
       ) : (
@@ -555,6 +561,7 @@ function EkAlanlar({
   scopeId: string;
   onDegisti: () => Promise<void>;
 }) {
+  const t = useT();
   const c = useThemeColors();
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
@@ -572,7 +579,7 @@ function EkAlanlar({
 
   return (
     <div>
-      <BolumBasligi>Ek bilgiler</BolumBasligi>
+      <BolumBasligi>{t("Ek bilgiler")}</BolumBasligi>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {alanlar.map((alan) => (
           <div key={alan.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -602,7 +609,7 @@ function EkAlanlar({
             />
             <button
               type="button"
-              aria-label="Alanı sil"
+              aria-label={t("Alanı sil")}
               onClick={() => {
                 void bilgiKartiApi.alanSil(scopeType, scopeId, alan.id).then(onDegisti).catch(() => undefined);
               }}
@@ -617,20 +624,20 @@ function EkAlanlar({
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="Alan adı (ör. Oda sicil no)"
+            placeholder={t("Alan adı (ör. Oda sicil no)")}
             style={{ flex: 1, minWidth: 0 }}
           />
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Değer"
+            placeholder={t("Değer")}
             style={{ flex: 2, minWidth: 0 }}
           />
           <button
             type="button"
             onClick={ekle}
             disabled={isleniyor || !label.trim()}
-            aria-label="Alan ekle"
+            aria-label={t("Alan ekle")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -661,6 +668,7 @@ function Belgeler({
   onEkle: () => void;
   onSil: (id: string) => Promise<void>;
 }) {
+  const t = useT();
   const c = useThemeColors();
   const [indirilen, setIndirilen] = useState<string | null>(null);
   const [indirmeHatasi, setIndirmeHatasi] = useState<string | null>(null);
@@ -674,7 +682,7 @@ function Belgeler({
     try {
       window.location.href = await filesApi.contentUrl(fileId, { download: true });
     } catch {
-      setIndirmeHatasi("Belge indirilemedi. Dosyaya erişimin olmayabilir.");
+      setIndirmeHatasi(t("Belge indirilemedi. Dosyaya erişimin olmayabilir."));
     } finally {
       setIndirilen(null);
     }
@@ -684,7 +692,7 @@ function Belgeler({
     return (
       <div style={{ padding: "26px 18px", textAlign: "center", border: `1px dashed ${c.border}`, borderRadius: 12 }}>
         <p style={{ margin: 0, fontSize: 15, color: c.textSecondary }}>
-          Henüz belge yok. Vergi levhası, imza sirküleri ve sicil gazetesi burada dursun; her istendiğinde aranmasın.
+          {t("Henüz belge yok. Vergi levhası, imza sirküleri ve sicil gazetesi burada dursun; her istendiğinde aranmasın.")}
         </p>
         {canEdit && (
           <button
@@ -700,7 +708,7 @@ function Belgeler({
               fontSize: 15,
             }}
           >
-            Belge ekle
+            {t("Belge ekle")}
           </button>
         )}
       </div>
@@ -731,10 +739,10 @@ function Belgeler({
               <p style={{ margin: 0, fontSize: 15, color: c.textPrimary, wordBreak: "break-word" }}>{belge.title}</p>
               <p style={{ margin: "2px 0 0", fontSize: 12.5, color: c.textSecondary }}>
                 {[
-                  BILGI_KARTI_BELGE_ETIKET[belge.docType],
-                  belge.issuedOn ? `Düzenlenme ${new Date(belge.issuedOn).toLocaleDateString("tr-TR")}` : null,
-                  belge.validUntil ? `Geçerlilik ${new Date(belge.validUntil).toLocaleDateString("tr-TR")}` : null,
-                  belge.externalUrl ? "Dış bağlantı" : null,
+                  t(BILGI_KARTI_BELGE_ETIKET[belge.docType]),
+                  belge.issuedOn ? `Düzenlenme ${new Date(belge.issuedOn).toLocaleDateString(bicimDili())}` : null,
+                  belge.validUntil ? `Geçerlilik ${new Date(belge.validUntil).toLocaleDateString(bicimDili())}` : null,
+                  belge.externalUrl ? t("Dış bağlantı") : null,
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -753,15 +761,15 @@ function Belgeler({
                   background: `${durum === "doldu" ? c.danger : c.warning}1A`,
                 }}
               >
-                {BELGE_DURUM_ETIKET[durum]}
+                {t(BELGE_DURUM_ETIKET[durum])}
               </span>
             )}
 
             {belge.fileId && (
               <button
                 type="button"
-                aria-label="Belgeyi indir"
-                title="İndir"
+                aria-label={t("Belgeyi indir")}
+                title={t("İndir")}
                 disabled={indirilen === belge.id}
                 onClick={() => void indir(belge.id, belge.fileId!)}
                 style={{
@@ -781,7 +789,7 @@ function Belgeler({
                 href={adres}
                 target="_blank"
                 rel="noreferrer"
-                aria-label="Belgeyi aç"
+                aria-label={t("Belgeyi aç")}
                 style={{ display: "flex", padding: 6 }}
               >
                 <IconExternalLink size={16} color={c.textSecondary} />
@@ -790,8 +798,8 @@ function Belgeler({
             {canEdit && (
               <button
                 type="button"
-                aria-label="Belgeyi karttan kaldır"
-                title="Karttan kaldırır, dosyayı silmez"
+                aria-label={t("Belgeyi karttan kaldır")}
+                title={t("Karttan kaldırır, dosyayı silmez")}
                 onClick={() => void onSil(belge.id)}
                 style={{ background: "transparent", border: "none", padding: 6, display: "flex" }}
               >
@@ -808,10 +816,11 @@ function Belgeler({
 // -------------------------------------------------------------------- Özet
 
 function Ozet({ sayfa, onKapat }: { sayfa: BilgiKartiSayfasi; onKapat: () => void }) {
+  const t = useT();
   const c = useThemeColors();
 
   if (sayfa.ozet.sections.length === 0) {
-    return <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>Özetlenecek veri bulunamadı.</p>;
+    return <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>{t("Özetlenecek veri bulunamadı.")}</p>;
   }
 
   return (
@@ -823,7 +832,7 @@ function Ozet({ sayfa, onKapat }: { sayfa: BilgiKartiSayfasi; onKapat: () => voi
             {bolum.rows.map((satir) => {
               const govde = (
                 <>
-                  <span style={{ display: "block", fontSize: 12, color: c.textSecondary }}>{satir.label}</span>
+                  <span style={{ display: "block", fontSize: 12, color: c.textSecondary }}>{t(satir.label)}</span>
                   <span style={{ display: "block", fontSize: 15, color: c.textPrimary, wordBreak: "break-word" }}>
                     {satir.value}
                   </span>

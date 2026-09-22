@@ -13,16 +13,16 @@ export interface DepartmentMembersListHandle {
 }
 
 const roleLabel: Record<DepartmentMemberRole, string> = {
-  manager: "Departman Yöneticisi",
-  employee: "Üretici Çalışan",
-  subcontractor: "Taşeron",
+  manager: "Departman Yöneticisi", // dil:anahtar
+  employee: "Üretici Çalışan", // dil:anahtar
+  subcontractor: "Taşeron", // dil:anahtar
 };
 
 const statusLabel: Record<string, string> = {
-  invited: "Davet gönderildi",
-  pending: "Onay bekliyor",
-  approved: "Kadroda",
-  rejected: "Reddedildi",
+  invited: "Davet gönderildi", // dil:anahtar
+  pending: "Onay bekliyor", // dil:anahtar
+  approved: "Kadroda", // dil:anahtar
+  rejected: "Reddedildi", // dil:anahtar
 };
 
 interface Props {
@@ -145,7 +145,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
       return;
     }
     if (mode === "email" && !email.trim()) {
-      setError("E-posta gerekli");
+      setError(t("E-posta gerekli"));
       return;
     }
     setError("");
@@ -161,7 +161,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
       load();
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Davet gönderilemedi");
+      setError(err instanceof Error ? err.message : t("Davet gönderilemedi"));
     }
   };
 
@@ -185,7 +185,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
     : undefined;
 
   const handleLeave = async () => {
-    if (!window.confirm("Bu departmanın kadrosundan ayrılmak istediğine emin misin?")) return;
+    if (!window.confirm(t("Bu departmanın kadrosundan ayrılmak istediğine emin misin?"))) return;
     // Son yönetici ayrılıyorsa sunucu ayrılmayı hemen uygulamaz, organizasyon
     // sahibinin onayına düşürür (bkz. 061) — kullanıcı beklediğini sanmasın.
     const result = await api
@@ -193,7 +193,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
       .catch(() => null);
     if (result?.pendingApproval) {
       window.alert(
-        "Bu departmanın son yöneticisisin. Ayrılma talebin şirket kurucusuna iletildi; onaylanana kadar yöneticiliğin sürüyor."
+        t("Bu departmanın son yöneticisisin. Ayrılma talebin şirket kurucusuna iletildi; onaylanana kadar yöneticiliğin sürüyor.")
       );
     }
     load();
@@ -274,8 +274,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
           }}
         >
           <div style={{ fontSize: 15, color: c.textPrimary }}>
-            <strong>{m.fullName ?? m.inviteEmail ?? "Bir yönetici"}</strong> bu departmanın son yöneticisi ve
-            ayrılmak istiyor. Onaylarsan departman yöneticisiz kalır — önce yerine birini atamak isteyebilirsin.
+            <strong>{m.fullName ?? m.inviteEmail ?? t("Bir yönetici")}</strong> {t("bu departmanın son yöneticisi ve ayrılmak istiyor. Onaylarsan departman yöneticisiz kalır — önce yerine birini atamak isteyebilirsin.")}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
@@ -309,8 +308,12 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
           }}
         >
           <div style={{ fontSize: 15, color: c.textPrimary }}>
-            Bu departmana{myPendingInvite.title ? ` "${myPendingInvite.title}"` : ""} pozisyonu için davet edildin
-            ({roleLabel[myPendingInvite.role]}).
+            {myPendingInvite.title
+              ? t('Bu departmana "{pozisyon}" pozisyonu için davet edildin ({rol}).', {
+                  pozisyon: myPendingInvite.title,
+                  rol: t(roleLabel[myPendingInvite.role]),
+                })
+              : t("Bu departmana davet edildin ({rol}).", { rol: t(roleLabel[myPendingInvite.role]) })}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
@@ -341,7 +344,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
             }}
             style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none" }}
           >
-            {inviting ? "Vazgeç" : "+ Kişi davet et"}
+            {inviting ? t("Vazgeç") : t("+ Kişi davet et")}
           </button>
         )}
       </div>
@@ -467,10 +470,10 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
               </>
             )
           ) : (
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-posta adresi" style={{ width: "100%" }} />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("E-posta adresi")} style={{ width: "100%" }} />
           )}
 
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Pozisyon/unvan (opsiyonel)" style={{ width: "100%" }} />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("Pozisyon/unvan (opsiyonel)")} style={{ width: "100%" }} />
           <select value={role} onChange={(e) => setRole(e.target.value as DepartmentMemberRole)} style={{ width: "100%" }}>
             <option value="employee">{t("Üretici Çalışan")}</option>
             <option value="manager">{t("Departman Yöneticisi")}</option>
@@ -510,10 +513,10 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
               style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, background: c.background }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, color: c.textPrimary }}>{m.fullName ?? m.inviteEmail ?? m.email ?? "Davet bekleniyor"}</div>
+                <div style={{ fontSize: 14, color: c.textPrimary }}>{m.fullName ?? m.inviteEmail ?? m.email ?? t("Davet bekleniyor")}</div>
                 <div style={{ fontSize: 12, color: c.textSecondary }}>
                   {m.title ? `${m.title} · ` : ""}
-                  {roleLabel[m.role]} · {statusLabel[m.status] ?? m.status}
+                  {t(roleLabel[m.role])} · {t(statusLabel[m.status] ?? m.status)}
                 </div>
               </div>
               <button onClick={() => handleRemove(m.id)} aria-label={t("Kadrodan çıkar")} style={{ background: "transparent", border: "none" }}>

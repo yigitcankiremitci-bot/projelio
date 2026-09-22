@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { useUndo } from "../lib/undo";
 import Modal from "./Modal";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   operationId: string;
@@ -15,21 +16,21 @@ interface Props {
 }
 
 const freqOptions: { value: RoutineFreq; label: string; unit: string }[] = [
-  { value: "daily", label: "Günlük", unit: "günde bir" },
-  { value: "weekly", label: "Haftalık", unit: "haftada bir" },
-  { value: "monthly", label: "Aylık", unit: "ayda bir" },
-  { value: "yearly", label: "Yıllık", unit: "yılda bir" },
+  { value: "daily", label: "Günlük", unit: "günde bir" }, // dil:anahtar
+  { value: "weekly", label: "Haftalık", unit: "haftada bir" }, // dil:anahtar
+  { value: "monthly", label: "Aylık", unit: "ayda bir" }, // dil:anahtar
+  { value: "yearly", label: "Yıllık", unit: "yılda bir" }, // dil:anahtar
 ];
 
 // Veritabanı 0=Pazar kabul ediyor; kullanıcıya haftayı pazartesiden başlatarak gösteriyoruz.
 const weekdays = [
-  { value: 1, label: "Pzt" },
-  { value: 2, label: "Sal" },
-  { value: 3, label: "Çar" },
-  { value: 4, label: "Per" },
-  { value: 5, label: "Cum" },
-  { value: 6, label: "Cmt" },
-  { value: 0, label: "Paz" },
+  { value: 1, label: "Pzt" }, // dil:anahtar
+  { value: 2, label: "Sal" }, // dil:anahtar
+  { value: 3, label: "Çar" }, // dil:anahtar
+  { value: 4, label: "Per" }, // dil:anahtar
+  { value: 5, label: "Cum" }, // dil:anahtar
+  { value: 6, label: "Cmt" }, // dil:anahtar
+  { value: 0, label: "Paz" }, // dil:anahtar
 ];
 
 const setPosOptions = [
@@ -37,7 +38,7 @@ const setPosOptions = [
   { value: 2, label: "2." },
   { value: 3, label: "3." },
   { value: 4, label: "4." },
-  { value: -1, label: "Son" },
+  { value: -1, label: "Son" }, // dil:anahtar
 ];
 
 type MonthlyMode = "day-of-month" | "nth-weekday";
@@ -141,7 +142,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
       onSaved();
       onClose();
     } catch {
-      setError("Rutin kaydedilemedi. Tekrar dene.");
+      setError(t("Rutin kaydedilemedi. Tekrar dene."));
       setLoading(false);
     }
   };
@@ -152,7 +153,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
     try {
       // Silme birkaç saniye geciktirilir; bu pencerede Cmd/Ctrl+Z ile vazgeçilebilir.
       pushDestructive({
-        label: "Rutin silme",
+        label: t("Rutin silme"),
         commit: async () => {
           await api.delete(`/routines/${routine.id}`).catch(() => {});
         },
@@ -162,7 +163,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
       onSaved();
       onClose();
     } catch {
-      setError("Rutin silinemedi.");
+      setError(t("Rutin silinemedi."));
       setLoading(false);
     }
   };
@@ -179,7 +180,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
   });
 
   return (
-    <Modal title={editing ? "Rutini düzenle" : "Yeni rutin"} onClose={onClose}>
+    <Modal title={editing ? t("Rutini düzenle") : t("Yeni rutin")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={label}>{t("Başlık")}</label>
@@ -188,7 +189,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={label}>{t("Açıklama")}</label>
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opsiyonel" style={{ width: "100%" }} />
+          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("Opsiyonel")} style={{ width: "100%" }} />
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
@@ -196,7 +197,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
             <label style={label}>{t("Tekrar")}</label>
             <select value={freq} onChange={(e) => setFreq(e.target.value as RoutineFreq)} style={{ width: "100%" }}>
               {freqOptions.map((f) => (
-                <option key={f.value} value={f.value}>{f.label}</option>
+                <option key={f.value} value={f.value}>{t(f.label)}</option>
               ))}
             </select>
           </div>
@@ -205,7 +206,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
             <input type="number" min={1} value={intervalN} onChange={(e) => setIntervalN(e.target.value)} style={{ width: "100%" }} />
           </div>
           <span style={{ fontSize: 14, color: c.textSecondary, paddingBottom: 10 }}>
-            {freqOptions.find((f) => f.value === freq)?.unit}
+            {t(freqOptions.find((f) => f.value === freq)?.unit ?? "")}
           </span>
         </div>
 
@@ -215,7 +216,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
               {weekdays.map((d) => (
                 <button key={d.value} type="button" onClick={() => toggleWeekday(d.value)} style={chip(byWeekday.includes(d.value))}>
-                  {d.label}
+                  {t(d.label)}
                 </button>
               ))}
             </div>
@@ -238,7 +239,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <select value={monthDay} onChange={(e) => setMonthDay(e.target.value)} style={{ width: "100%" }}>
                   {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                    <option key={d} value={d}>{d}. gün</option>
+                    <option key={d} value={d}>{t("{n}. gün", { n: d })}</option>
                   ))}
                   <option value={-1}>{t("Ayın son günü")}</option>
                 </select>
@@ -250,12 +251,12 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
               <div style={{ display: "flex", gap: 8 }}>
                 <select value={bySetPos} onChange={(e) => setBySetPos(Number(e.target.value))} style={{ flex: 1 }}>
                   {setPosOptions.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
+                    <option key={s.value} value={s.value}>{t(s.label)}</option>
                   ))}
                 </select>
                 <select value={nthWeekday} onChange={(e) => setNthWeekday(Number(e.target.value))} style={{ flex: 2 }}>
                   {weekdays.map((d) => (
-                    <option key={d.value} value={d.value}>{d.label}</option>
+                    <option key={d.value} value={d.value}>{t(d.label)}</option>
                   ))}
                 </select>
               </div>
@@ -320,7 +321,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
                     color: c.textPrimary,
                   }}
                 >
-                  {new Date(d).toLocaleDateString("tr-TR", { day: "numeric", month: "short", weekday: "short" })}
+                  {new Date(d).toLocaleDateString(bicimDili(), { day: "numeric", month: "short", weekday: "short" })}
                 </span>
               ))}
             </div>
@@ -334,7 +335,7 @@ export default function RoutineModal({ operationId, routine, onClose, onSaved, o
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Kaydediliyor…" : editing ? "Kaydet" : "Rutin oluştur"}
+          {loading ? t("Kaydediliyor…") : editing ? t("Kaydet") : t("Rutin oluştur")}
         </button>
 
         {editing && (

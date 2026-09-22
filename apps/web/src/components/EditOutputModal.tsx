@@ -78,17 +78,17 @@ export default function EditOutputModal({ output, onClose, onSaved, onDeleted, o
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Kaydediliyor…" : "Kaydet"}
+          {loading ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       </form>
 
       <EntityDangerZone
-        entityLabel="Çıktıyı"
+        entityLabel={t("Çıktıyı", { ctx: "nesne" })}
         resourcePath={`/outputs/${output.id}`}
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
-        archiveMessage={`"${output.title}" çıktısını arşive eklemek istediğine emin misin? Bu çıktıya bağlı görevler etkilenmez. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}
-        deleteMessage={`"${output.title}" çıktısını silmek istediğine emin misin? Bu çıktıya bağlı görevler silinmez, sadece çıktıdan ayrılır. Bu işlem geri alınamaz.`}
+        archiveMessage={t("\"{title}\" çıktısını arşive eklemek istediğine emin misin? Bu çıktıya bağlı görevler etkilenmez. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.", { title: output.title })}
+        deleteMessage={t("\"{title}\" çıktısını silmek istediğine emin misin? Bu çıktıya bağlı görevler silinmez, sadece çıktıdan ayrılır. Bu işlem geri alınamaz.", { title: output.title })}
       />
     </Modal>
   );

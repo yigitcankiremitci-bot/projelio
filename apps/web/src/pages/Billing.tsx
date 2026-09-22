@@ -10,6 +10,7 @@ import { demoHesap } from "../lib/demoHesap";
 import { useLocale, useT } from "../lib/i18n";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { useThemeColors } from "../theme/useThemeColors";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * Paket (abonelik) ekranı.
@@ -41,7 +42,7 @@ export default function BillingPage() {
   const { locale } = useLocale();
 
   /** Tutarı TL olarak yazar. Tahsilat her durumda TL (bkz. paytr.client.ts). */
-  const tlYaz = (tutar: number) => `${tutar.toLocaleString("tr-TR")} ₺`;
+  const tlYaz = (tutar: number) => `${tutar.toLocaleString(bicimDili())} ₺`;
   const [params, setParams] = useSearchParams();
   const { user: me } = useCurrentUser();
   const demoHesabi = me?.email?.toLowerCase() === demoHesap.email;
@@ -244,7 +245,7 @@ export default function BillingPage() {
           <div style={{ fontSize: 13, opacity: 0.8 }}>
             {t(DURUM_METINLERI[abonelik.status])}
             {abonelik.currentPeriodEnd &&
-              ` · ${new Date(abonelik.currentPeriodEnd).toLocaleDateString("tr-TR")} ${
+              ` · ${new Date(abonelik.currentPeriodEnd).toLocaleDateString(bicimDili())} ${
                 abonelik.cancelAtPeriodEnd ? t("tarihinde sona erecek") : t("tarihinde yenilenecek")
               }`}
           </div>
@@ -347,7 +348,7 @@ export default function BillingPage() {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 17, fontWeight: 600, color: c.textPrimary }}>{plan.name}</span>
+                    <span style={{ fontSize: 17, fontWeight: 600, color: c.textPrimary }}>{t(plan.name)}</span>
                     {plan.featured && (
                       <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: c.accent }}>
                         <IconStar size={13} color={c.accent} filled /> {t("Popüler")}
@@ -408,7 +409,7 @@ export default function BillingPage() {
                   </div>
 
                   <div style={{ marginTop: 14, fontSize: 14, color: c.textPrimary, fontWeight: 500 }}>
-                    {plan.monthlyCredits.toLocaleString("tr-TR")} {t("birim / ay")}
+                    {plan.monthlyCredits.toLocaleString(bicimDili())} {t("birim / ay")}
                   </div>
 
                   <ul style={{ margin: "12px 0 18px", padding: "0 0 0 18px", color: c.textSecondary, fontSize: 13.5, lineHeight: 1.75 }}>

@@ -17,6 +17,7 @@ import {
   parseCsv,
   type SheetData,
 } from "./ai-sheet-import";
+import { hataMetni } from "../../common/i18n/index";
 
 /** Lio'nun okuyabildiği ek türleri. */
 export type AttachmentKind = "image" | "pdf" | "document" | "sheet" | "text" | "audio";
@@ -337,7 +338,7 @@ export class AiAttachmentsService {
     this.sweep();
     if (!ids?.length) return [];
     if (ids.length > MAX_ATTACHMENTS_PER_MESSAGE) {
-      throw new BadRequestException(`Tek mesajda en fazla ${MAX_ATTACHMENTS_PER_MESSAGE} dosya gönderebilirsin.`);
+      throw new BadRequestException(hataMetni("Tek mesajda en fazla {MAX_ATTACHMENTS_PER_MESSAGE} dosya gönderebilirsin.", { MAX_ATTACHMENTS_PER_MESSAGE }));
     }
     return ids.map((id) => {
       const found = this.prepared.get(id);
@@ -483,7 +484,7 @@ export class AiAttachmentsService {
     }
 
     if (!record.text && !record.base64) {
-      throw new BadRequestException(`"${name}" içinden okunabilir bir içerik çıkmadı.`);
+      throw new BadRequestException(hataMetni("\"{name}\" içinden okunabilir bir içerik çıkmadı.", { name }));
     }
 
     this.prepared.set(record.id, record);
@@ -524,10 +525,10 @@ export class AiAttachmentsService {
     }
     if (mimeType.startsWith("image/")) {
       throw new BadRequestException(
-        `Bu görsel biçimi (${mimeType}) okunamıyor. JPEG, PNG, GIF ya da WebP olarak kaydedip tekrar dene.`
+        hataMetni("Bu görsel biçimi ({mimeType}) okunamıyor. JPEG, PNG, GIF ya da WebP olarak kaydedip tekrar dene.", { mimeType })
       );
     }
-    throw new BadRequestException(`"${name}" türünü (${mimeType}) okuyamıyorum.`);
+    throw new BadRequestException(hataMetni("\"{name}\" türünü ({mimeType}) okuyamıyorum.", { name, mimeType }));
   }
 
   private assertSize(kind: AttachmentKind, bytes: number, name: string): void {
@@ -541,7 +542,7 @@ export class AiAttachmentsService {
     };
     const limit = limits[kind];
     if (bytes > limit) {
-      throw new BadRequestException(`"${name}" çok büyük (${humanSize(bytes)}). Bu tür için sınır ${humanSize(limit)}.`);
+      throw new BadRequestException(hataMetni("\"{name}\" çok büyük ({p2}). Bu tür için sınır {p3}.", { name, p2: humanSize(bytes), p3: humanSize(limit) }));
     }
   }
 
@@ -557,7 +558,7 @@ export class AiAttachmentsService {
         rows: rows.slice(0, MAX_RETAINED_ROWS),
         truncated: rows.length > MAX_RETAINED_ROWS,
       };
-      if (!sheet.rows.length) throw new BadRequestException(`"${name}" içinde dolu bir satır bulunamadı.`);
+      if (!sheet.rows.length) throw new BadRequestException(hataMetni("\"{name}\" içinde dolu bir satır bulunamadı.", { name }));
       return {
         text: this.sheetText([sheet]),
         detail: `CSV · ${rows.length} satır`,
@@ -603,7 +604,7 @@ export class AiAttachmentsService {
       sheets.push({ name: sheet.name, rows, truncated: kesildi || undefined });
     });
 
-    if (totalRows === 0) throw new BadRequestException(`"${name}" içinde dolu bir satır bulunamadı.`);
+    if (totalRows === 0) throw new BadRequestException(hataMetni("\"{name}\" içinde dolu bir satır bulunamadı.", { name }));
     return {
       text: this.sheetText(sheets),
       detail: `Excel · ${sheets.length} sayfa · ${totalRows} satır`,

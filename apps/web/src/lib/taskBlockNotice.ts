@@ -1,3 +1,4 @@
+import { cevirmenSuAn } from "./i18n/anlik";
 /**
  * Görev durumu sunucuda reddedildiğinde sebebini kullanıcıya söyler.
  *
@@ -32,11 +33,12 @@ export function gorevDurumHatasiniBildir(err: unknown): void {
  * üstüne bir de kutu açmak aynı olayı iki kez anlatmak olurdu.
  */
 export function altGorevHatasiniBildir(err: unknown): void {
+  const t = cevirmenSuAn();
   const hata = err as { status?: number; message?: string } | null;
   if (hata?.status === 401) return;
   if (hata?.status === 400 && hata.message) {
     window.alert(hata.message);
     return;
   }
-  window.alert("Alt görev kaydedilemedi. Lütfen tekrar deneyin.");
+  window.alert(t("Alt görev kaydedilemedi. Lütfen tekrar deneyin."));
 }

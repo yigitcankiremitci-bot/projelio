@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Dict, Locale } from "@/i18n";
-import { appLinks, path, site } from "@/lib/site";
+import { appLinks, dilliAdres, path, site } from "@/lib/site";
 import { Menu, Close } from "./Icons";
 
 type NavLink = { href: string; label: string; desc?: string };
@@ -157,10 +157,10 @@ export default function Header({ dict, locale }: { dict: Dict; locale: Locale })
               EN
             </Link>
           </div>
-          <a className="nav-login" href={appLinks.login}>
+          <a className="nav-login" href={dilliAdres(appLinks.login, locale)}>
             {dict.nav.login}
           </a>
-          <a className="btn btn-primary btn-sm" href={appLinks.signup}>
+          <a className="btn btn-primary btn-sm" href={dilliAdres(appLinks.signup, locale)}>
             {dict.nav.cta}
           </a>
         </div>
@@ -193,10 +193,10 @@ export default function Header({ dict, locale }: { dict: Dict; locale: Locale })
             </Link>
           </div>
           <div className="btn-row">
-            <a className="btn btn-ghost btn-sm" href={appLinks.login}>
+            <a className="btn btn-ghost btn-sm" href={dilliAdres(appLinks.login, locale)}>
               {dict.nav.login}
             </a>
-            <a className="btn btn-primary btn-sm" href={appLinks.signup}>
+            <a className="btn btn-primary btn-sm" href={dilliAdres(appLinks.signup, locale)}>
               {dict.nav.cta}
             </a>
             <span className="lang-switch">

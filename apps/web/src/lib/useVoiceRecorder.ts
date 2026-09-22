@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useT } from "./i18n";
+import { cevirmenSuAn } from "./i18n/anlik";
 
 /**
  * Tarayıcı sesi kayıtları için MIME adayları.
@@ -107,8 +108,8 @@ export function useVoiceRecorder(): VoiceRecorder {
       cleanup();
       setError(
         err?.name === "NotAllowedError"
-          ? "Mikrofon izni verilmedi. Tarayıcı adres çubuğundaki izin simgesinden açabilirsin."
-          : "Mikrofona erişilemedi."
+          ? t("Mikrofon izni verilmedi. Tarayıcı adres çubuğundaki izin simgesinden açabilirsin.")
+          : t("Mikrofona erişilemedi.")
       );
     }
   }, [supported, cleanup]);

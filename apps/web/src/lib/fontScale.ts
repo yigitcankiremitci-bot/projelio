@@ -19,11 +19,11 @@ export const FONT_SCALE_VALUES: Record<FontScaleOption, number> = {
 };
 
 export const FONT_SCALE_LABELS: Record<FontScaleOption, string> = {
-  xsmall: "Çok küçük",
-  small: "Küçük",
-  normal: "Normal",
-  large: "Büyük",
-  xlarge: "En büyük",
+  xsmall: "Çok küçük", // dil:anahtar
+  small: "Küçük", // dil:anahtar
+  normal: "Normal", // dil:anahtar
+  large: "Büyük", // dil:anahtar
+  xlarge: "En büyük", // dil:anahtar
 };
 
 export function getFontScaleOption(): FontScaleOption {

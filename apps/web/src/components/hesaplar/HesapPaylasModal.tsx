@@ -4,6 +4,7 @@ import { hesaplarApi, type HesapKapsami } from "../../api/hesaplar";
 import { useT } from "../../lib/i18n";
 import { useThemeColors } from "../../theme/useThemeColors";
 import Modal from "../Modal";
+import { bicimDili } from "../../lib/i18n/depo";
 
 interface Props {
   kapsam: HesapKapsami;
@@ -16,7 +17,7 @@ interface Props {
 
 function tarih(deger?: string): string {
   if (!deger) return "—";
-  return new Date(deger).toLocaleDateString("tr-TR", { dateStyle: "medium" });
+  return new Date(deger).toLocaleDateString(bicimDili(), { dateStyle: "medium" });
 }
 
 /**

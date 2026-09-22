@@ -1,7 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import type { Department, DepartmentAccess, DepartmentMemberRole } from "@projelio/shared";
-import { ENTITY_TAB_KEYS, sanitizeHiddenTabs } from "@projelio/shared";
+import { defaultLocale, ENTITY_TAB_KEYS, sanitizeHiddenTabs } from "@projelio/shared";
+import { cevirmen } from "../../common/i18n";
+import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 import { applyOrder } from "../../common/reorder.util";
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
@@ -36,7 +38,10 @@ function mapDepartment(row: any): Department {
 
 @Injectable()
 export class DepartmentsService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private kullaniciDili: KullaniciDiliService
+  ) {}
 
   // Organizasyonu sadece sahibi yönetebilir (organizations modülündeki desenle aynı).
   private async assertOrgOwner(organizationId: string, userId?: string): Promise<void> {
@@ -270,8 +275,12 @@ export class DepartmentsService {
         .maybeSingle();
       if (catalogError) throw catalogError;
       if (!catalogRow) throw new BadRequestException("Geçersiz departman kataloğu anahtarı");
-      if (!name) name = catalogRow.name;
-      if (!description) description = catalogRow.description ?? undefined;
+      // Katalogdaki ad yalnızca Türkçe; departman, açan kişinin dilinde
+      // oluşturulur. Oluştuktan sonra kullanıcının kendi verisi sayılır ve
+      // dil değişince çevrilmez — kendi yazdığı adlar gibi.
+      const t = cevirmen(requestingUserId ? await this.kullaniciDili.diliniBul(requestingUserId) : defaultLocale);
+      if (!name) name = t(catalogRow.name);
+      if (!description) description = catalogRow.description ? t(catalogRow.description) : undefined;
     }
 
     if (!name) throw new BadRequestException("Departman adı gerekli");

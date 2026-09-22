@@ -33,15 +33,15 @@ interface Props {
 }
 
 const GOOGLE_KINDS: { kind: NativeFileKind; label: string }[] = [
-  { kind: "gdoc", label: "Google Doküman" },
-  { kind: "gsheet", label: "Google E-Tablo" },
-  { kind: "gslide", label: "Google Sunum" },
+  { kind: "gdoc", label: "Google Doküman" }, // dil:anahtar
+  { kind: "gsheet", label: "Google E-Tablo" }, // dil:anahtar
+  { kind: "gslide", label: "Google Sunum" }, // dil:anahtar
 ];
 
 const MICROSOFT_KINDS: { kind: NativeFileKind; label: string }[] = [
-  { kind: "docx", label: "Word Belgesi" },
-  { kind: "xlsx", label: "Excel Tablosu" },
-  { kind: "pptx", label: "PowerPoint Sunumu" },
+  { kind: "docx", label: "Word Belgesi" }, // dil:anahtar
+  { kind: "xlsx", label: "Excel Tablosu" }, // dil:anahtar
+  { kind: "pptx", label: "PowerPoint Sunumu" }, // dil:anahtar
 ];
 
 /**
@@ -97,7 +97,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
       onCreated(created);
       setPendingKind(null);
     } catch (e: any) {
-      setError(e?.message ?? "Dosya oluşturulamadı");
+      setError(e?.message ?? t("Dosya oluşturulamadı"));
     } finally {
       setSaving(false);
     }
@@ -105,7 +105,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
 
   /** Ad sorma adımı; hem açılır menü hem modal yolunda aynı. */
   const pendingModal = pendingKind && (
-    <Modal title={pendingKind.label} onClose={() => (saving ? undefined : setPendingKind(null))} maxWidth={380}>
+    <Modal title={t(pendingKind.label)} onClose={() => (saving ? undefined : setPendingKind(null))} maxWidth={380}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Dosya adı")}</label>
@@ -135,7 +135,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
             cursor: saving || !name.trim() ? "not-allowed" : "pointer",
           }}
         >
-          {saving ? "Oluşturuluyor…" : "Oluştur"}
+          {saving ? t("Oluşturuluyor…") : t("Oluştur")}
         </button>
       </div>
     </Modal>
@@ -163,7 +163,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
       >
         <IconFile size={16} color={c.textSecondary} />
-        {item.label}
+        {t(item.label)}
       </button>
     ));
 
@@ -171,7 +171,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
     return (
       <>
         {open && (
-          <Modal title="Yeni dosya" onClose={() => setOpen(false)} maxWidth={340}>
+          <Modal title={t("Yeni dosya")} onClose={() => setOpen(false)} maxWidth={340}>
             <div style={{ display: "flex", flexDirection: "column" }}>{kindList(true)}</div>
           </Modal>
         )}

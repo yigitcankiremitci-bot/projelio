@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import GirisDilSecici from "../components/GirisDilSecici";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -40,6 +41,7 @@ export default function ForgotPassword() {
         padding: 24,
       }}
     >
+      <GirisDilSecici />
       <div
         style={{
           width: "100%",

@@ -47,13 +47,13 @@ interface CachedAccessToken {
 }
 
 export class DriveNotConnectedError extends BadRequestException {
-  constructor(message = "Google Drive bağlı değil. Ayarlar'dan Drive hesabınızı bağlayın.") {
+  constructor(message = "Google Drive bağlı değil. Ayarlar'dan Drive hesabınızı bağlayın.") { // dil:anahtar
     super(message);
   }
 }
 
 export class DriveReauthRequiredError extends BadRequestException {
-  constructor(message = "Google Drive erişimi sona ermiş. Ayarlar'dan yeniden bağlanın.") {
+  constructor(message = "Google Drive erişimi sona ermiş. Ayarlar'dan yeniden bağlanın.") { // dil:anahtar
     super(message);
   }
 }

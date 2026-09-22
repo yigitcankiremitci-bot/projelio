@@ -14,6 +14,7 @@ import { AiCreditsService } from "../ai-assistant/ai-credits.service";
 import { HesapDurumuService } from "../../common/hesap-durumu/hesap-durumu.service";
 import { utcMs } from "../../common/hesap-durumu/oturum-engeli";
 import { demoKullanicisiMi } from "../../common/demo-hesap";
+import { hataMetni } from "../../common/i18n/index";
 
 /**
  * Admin paneli kullanıcı yönetimi: liste, detay, askı, oturum iptali, rol,
@@ -291,7 +292,7 @@ export class AdminKullanicilarService {
     secenek: { kendineIzinVer?: boolean } = {}
   ): Promise<void> {
     if (!secenek.kendineIzinVer && adminId === userId) {
-      throw new BadRequestException(`Kendi hesabında ${islem} yapamazsın.`);
+      throw new BadRequestException(hataMetni("Kendi hesabında {islem} yapamazsın.", { islem }));
     }
     // Demo hesabı herkese açık ve ortak: askıya almak ya da silmek ziyaretçileri
     // kapıda bırakır. Kredi işlemleri serbest (demo kendi kotasıyla çalışıyor).

@@ -18,6 +18,7 @@ export type AccountType = "freelancer" | "organization_owner" | "group_owner" | 
 // Kullanıcı kendi unvanını yazmadıysa (User.title boşsa) profilinde hesap tipine göre
 // bu varsayılan unvan gösterilir. Kullanıcı ayarlardan kendi metnini girerse o öncelikli
 // olur; alanı tekrar boşaltırsa otomatik unvana geri dönülür.
+// dil:anahtar-baslangic — etiketler; çeviri kullanıldığı yerde t() ile.
 export const DEFAULT_TITLE_BY_ACCOUNT_TYPE: Record<AccountType, string> = {
   freelancer: "Serbest Çalışan",
   organization_owner: "Organizasyon Sahibi",
@@ -25,6 +26,7 @@ export const DEFAULT_TITLE_BY_ACCOUNT_TYPE: Record<AccountType, string> = {
   employee: "Çalışan",
   subcontractor: "Taşeron",
 };
+// dil:anahtar-bitis
 
 // ---------------------------------------------------------- Onboarding profili
 
@@ -33,6 +35,7 @@ export const DEFAULT_TITLE_BY_ACCOUNT_TYPE: Record<AccountType, string> = {
 // ayrışmasın — serbest metin olsaydı aynı sektör on farklı yazımla kaydedilirdi.
 
 export type TeamSize = "tek_kisi" | "2_5" | "6_20" | "21_50" | "50_plus";
+// dil:anahtar-baslangic — etiketler; çeviri kullanıldığı yerde t() ile.
 export const TEAM_SIZE_LABEL: Record<TeamSize, string> = {
   tek_kisi: "Yalnızca ben",
   "2_5": "2-5 kişi",
@@ -40,6 +43,7 @@ export const TEAM_SIZE_LABEL: Record<TeamSize, string> = {
   "21_50": "21-50 kişi",
   "50_plus": "50+ kişi",
 };
+// dil:anahtar-bitis
 export const TEAM_SIZES = Object.keys(TEAM_SIZE_LABEL) as TeamSize[];
 
 // Sektör listesi kapalı uçlu: "diger" seçilirse kullanıcı serbest metin yazmaz,
@@ -56,6 +60,7 @@ export type Sector =
   | "lojistik"
   | "finans"
   | "diger";
+// dil:anahtar-baslangic — etiketler; çeviri kullanıldığı yerde t() ile.
 export const SECTOR_LABEL: Record<Sector, string> = {
   yazilim: "Yazılım / Teknoloji",
   insaat: "İnşaat / Mimarlık",
@@ -69,6 +74,7 @@ export const SECTOR_LABEL: Record<Sector, string> = {
   finans: "Finans / Muhasebe",
   diger: "Diğer",
 };
+// dil:anahtar-bitis
 export const SECTORS = Object.keys(SECTOR_LABEL) as Sector[];
 
 // Kullanıcının Projelio'yu ne için kullanacağı — çoklu seçim. Arayüzü kişiselleştirmek
@@ -81,6 +87,7 @@ export type UseCase =
   | "butce_finans"
   | "dosya_dokuman"
   | "planlama_takvim";
+// dil:anahtar-baslangic — etiketler; çeviri kullanıldığı yerde t() ile.
 export const USE_CASE_LABEL: Record<UseCase, string> = {
   gorev_takibi: "Görev takibi",
   proje_yonetimi: "Proje yönetimi",
@@ -90,14 +97,17 @@ export const USE_CASE_LABEL: Record<UseCase, string> = {
   dosya_dokuman: "Dosya ve doküman yönetimi",
   planlama_takvim: "Planlama ve takvim",
 };
+// dil:anahtar-bitis
 export const USE_CASES = Object.keys(USE_CASE_LABEL) as UseCase[];
 
 // Organizasyonun ölçeği. Aynı şema, ölçek farkı — sihirbazda kullanıcı seçer.
 export type OrgType = "sirket" | "isletme";
+// dil:anahtar-baslangic — etiketler; çeviri kullanıldığı yerde t() ile.
 export const ORG_TYPE_LABEL: Record<OrgType, string> = {
   sirket: "Şirket",
   isletme: "İşletme",
 };
+// dil:anahtar-bitis
 
 export function resolveUserTitle(user: { title?: string; accountType?: AccountType }): string {
   const custom = user.title?.trim();
@@ -822,11 +832,11 @@ export type ProjectStatus = "active" | "on_hold" | "passive" | "completed" | "ar
 export const PROJECT_STATUSES: ProjectStatus[] = ["active", "on_hold", "passive", "completed", "archived"];
 
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
-  active: "Aktif",
-  on_hold: "Beklemede",
-  passive: "Pasif",
-  completed: "Tamamlandı",
-  archived: "Arşivlendi",
+  active: "Aktif", // dil:anahtar
+  on_hold: "Beklemede", // dil:anahtar
+  passive: "Pasif", // dil:anahtar
+  completed: "Tamamlandı", // dil:anahtar
+  archived: "Arşivlendi", // dil:anahtar
 };
 
 export interface Project {
@@ -3742,19 +3752,19 @@ export const BILGI_KARTI_BELGE_TURLERI: BilgiKartiBelgeTuru[] = [
 ];
 
 export const BILGI_KARTI_BELGE_ETIKET: Record<BilgiKartiBelgeTuru, string> = {
-  vergi_levhasi: "Vergi levhası",
-  imza_sirkuleri: "İmza sirküleri",
-  ticaret_sicil_gazetesi: "Ticaret sicil gazetesi",
-  faaliyet_belgesi: "Faaliyet belgesi",
-  vergi_mukellefiyet_yazisi: "Vergi mükellefiyet yazısı",
-  sgk_belgesi: "SGK belgesi",
-  kimlik: "Kimlik / imza beyannamesi",
-  sozlesme: "Sözleşme",
-  ruhsat: "Ruhsat / izin belgesi",
-  sigorta_policesi: "Sigorta poliçesi",
-  marka_tescil: "Marka tescil belgesi",
-  logo: "Logo / kurumsal kimlik",
-  diger: "Diğer",
+  vergi_levhasi: "Vergi levhası", // dil:anahtar
+  imza_sirkuleri: "İmza sirküleri", // dil:anahtar
+  ticaret_sicil_gazetesi: "Ticaret sicil gazetesi", // dil:anahtar
+  faaliyet_belgesi: "Faaliyet belgesi", // dil:anahtar
+  vergi_mukellefiyet_yazisi: "Vergi mükellefiyet yazısı", // dil:anahtar
+  sgk_belgesi: "SGK belgesi", // dil:anahtar
+  kimlik: "Kimlik / imza beyannamesi", // dil:anahtar
+  sozlesme: "Sözleşme", // dil:anahtar
+  ruhsat: "Ruhsat / izin belgesi", // dil:anahtar
+  sigorta_policesi: "Sigorta poliçesi", // dil:anahtar
+  marka_tescil: "Marka tescil belgesi", // dil:anahtar
+  logo: "Logo / kurumsal kimlik", // dil:anahtar
+  diger: "Diğer", // dil:anahtar
 };
 
 /**

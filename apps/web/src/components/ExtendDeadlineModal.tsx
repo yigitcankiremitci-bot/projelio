@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   project: Project;
@@ -46,7 +47,7 @@ export default function ExtendDeadlineModal({ project, onClose, onSaved }: Props
     <Modal title={t("Deadline'ı değiştir")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>
-          {t("Mevcut bitiş tarihi:")} <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{new Date(project.deadline).toLocaleDateString("tr-TR")}</strong>
+          {t("Mevcut bitiş tarihi:")} <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{new Date(project.deadline).toLocaleDateString(bicimDili())}</strong>
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -68,7 +69,7 @@ export default function ExtendDeadlineModal({ project, onClose, onSaved }: Props
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Kaydediliyor…" : "Deadline'ı güncelle"}
+          {loading ? t("Kaydediliyor…") : t("Deadline'ı güncelle")}
         </button>
       </form>
     </Modal>

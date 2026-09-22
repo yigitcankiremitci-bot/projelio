@@ -517,7 +517,7 @@ export class TasksService {
   ): Promise<void> {
     if (!task || !userId) return;
     if (task.projectId) {
-      await this.assertProjectAccess(task.projectId, userId, "Bu görevi yalnızca proje sahibi veya ekibi yönetebilir");
+      await this.assertProjectAccess(task.projectId, userId, "Bu görevi yalnızca proje sahibi veya ekibi yönetebilir"); // dil:anahtar
     } else if (task.departmentId) {
       await this.assertDepartmentAccess(task.departmentId, userId);
     }
@@ -614,7 +614,7 @@ export class TasksService {
   }
 
   async create(projectId: string, data: Partial<Task>, requestingUserId?: string): Promise<Task> {
-    await this.assertProjectAccess(projectId, requestingUserId, "Bu projeye görev ekleme yetkiniz yok");
+    await this.assertProjectAccess(projectId, requestingUserId, "Bu projeye görev ekleme yetkiniz yok"); // dil:anahtar
 
     // Yeni görev/alt görev her zaman kendi listesinin EN ALTINA eklensin:
     // kardeşleri arasındaki en büyük sort_order'ın bir fazlasını alır. (Önceden
@@ -717,7 +717,7 @@ export class TasksService {
     }
 
     if (target.projectId) {
-      await this.assertProjectAccess(target.projectId, requestingUserId, "Bu projeye görev ekleme yetkiniz yok");
+      await this.assertProjectAccess(target.projectId, requestingUserId, "Bu projeye görev ekleme yetkiniz yok"); // dil:anahtar
     } else {
       await this.assertDepartmentAccess(target.departmentId!, requestingUserId);
     }
@@ -1596,7 +1596,7 @@ export class TasksService {
     }
     const projectIds = new Set(rows.filter((r: any) => r.project_id).map((r: any) => r.project_id as string));
     for (const projectId of projectIds) {
-      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri arşivleme yetkiniz yok");
+      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri arşivleme yetkiniz yok"); // dil:anahtar
     }
 
     const idSet = new Set(rows.map((r: any) => r.id as string));
@@ -1645,7 +1645,7 @@ export class TasksService {
     }
     const projectIds = new Set(rows.filter((r: any) => r.project_id).map((r: any) => r.project_id as string));
     for (const projectId of projectIds) {
-      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri silme yetkiniz yok");
+      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri silme yetkiniz yok"); // dil:anahtar
     }
 
     const idsToDelete = rows.map((r: any) => r.id as string);
@@ -1694,7 +1694,7 @@ export class TasksService {
     // erişimi olmayan bir projenin görevleri, erişimi olduğu bir yere kopyalanabilirdi.
     const sourceProjectIds = new Set(rows.filter((r: any) => r.project_id).map((r: any) => r.project_id as string));
     for (const projectId of sourceProjectIds) {
-      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri çoğaltma yetkiniz yok");
+      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri çoğaltma yetkiniz yok"); // dil:anahtar
     }
 
     const nextOrderCache = new Map<string, number>();
@@ -1858,7 +1858,7 @@ export class TasksService {
     if (target.projectId && target.departmentId) {
       throw new BadRequestException("Hedef olarak yalnızca proje ya da departmandan biri seçilebilir");
     }
-    if (target.projectId) await this.assertProjectAccess(target.projectId, requestingUserId, "Bu projeye görev taşıma yetkiniz yok");
+    if (target.projectId) await this.assertProjectAccess(target.projectId, requestingUserId, "Bu projeye görev taşıma yetkiniz yok"); // dil:anahtar
     if (target.departmentId) await this.assertDepartmentAccess(target.departmentId, requestingUserId);
 
     const { data: rows, error } = await this.supabase.client
@@ -1873,7 +1873,7 @@ export class TasksService {
     // yalnızca hedefe erişimi olması, başkasının görevini taşımaya yetmemeli.
     const sourceProjectIds = new Set(rows.filter((r: any) => r.project_id).map((r: any) => r.project_id as string));
     for (const projectId of sourceProjectIds) {
-      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri taşıma yetkiniz yok");
+      await this.assertProjectAccess(projectId, requestingUserId, "Bu görevleri taşıma yetkiniz yok"); // dil:anahtar
     }
     const sourceDepartmentIds = new Set(rows.filter((r: any) => r.department_id).map((r: any) => r.department_id as string));
     for (const departmentId of sourceDepartmentIds) {

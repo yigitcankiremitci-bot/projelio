@@ -6,6 +6,7 @@ import { formatDateTime } from "../../lib/dates";
 import { useRefreshOnUndo } from "../../lib/undo";
 import { IconCheck, IconHeart, IconMessageCircle } from "../icons";
 import { useT } from "../../lib/i18n";
+import { bicimDili } from "../../lib/i18n/depo";
 
 export interface FeedPanelHandle {
   openCreate: () => void;
@@ -265,10 +266,10 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
           onChange={handleBodyChange}
           placeholder={
             organizationId
-              ? "Şirketle bir şey paylaş… @ ile herhangi bir departman kadrosundan birini etiketleyebilirsin (140 karakter)"
+              ? t("Şirketle bir şey paylaş… @ ile herhangi bir departman kadrosundan birini etiketleyebilirsin (140 karakter)")
               : departmentId
-              ? "Departmanla bir şey paylaş… @ ile kadrodan birini etiketleyebilirsin (140 karakter)"
-              : "Ekiple bir şey paylaş… @ ile ekipten birini etiketleyebilirsin (140 karakter)"
+              ? t("Departmanla bir şey paylaş… @ ile kadrodan birini etiketleyebilirsin (140 karakter)")
+              : t("Ekiple bir şey paylaş… @ ile ekipten birini etiketleyebilirsin (140 karakter)")
           }
           rows={2}
           style={{ width: "100%", resize: "none", fontSize: 16, border: "none", outline: "none", background: "transparent", color: c.textPrimary }}
@@ -320,7 +321,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
                   borderBottom: `1px solid ${c.border}`,
                 }}
               >
-                <span style={{ fontSize: 15, color: c.textPrimary }}>{m.fullName ?? "Bilinmeyen kullanıcı"}</span>
+                <span style={{ fontSize: 15, color: c.textPrimary }}>{m.fullName ?? t("Bilinmeyen kullanıcı")}</span>
                 <span style={{ fontSize: 13, color: c.textSecondary }}>@{m.username}</span>
               </button>
             ))}
@@ -377,9 +378,9 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
               <div key={`comment-${item.id}`} style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "10px 12px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                   <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{item.authorName}</span>
-                  <span style={{ fontSize: 13, color: c.textSecondary }}>{new Date(item.createdAt).toLocaleDateString("tr-TR")}</span>
+                  <span style={{ fontSize: 13, color: c.textSecondary }}>{new Date(item.createdAt).toLocaleDateString(bicimDili())}</span>
                 </div>
-                <p style={{ fontSize: 13, color: c.accentDark, margin: "0 0 4px" }}>"{item.taskTitle}" görevine yorum yaptı</p>
+                <p style={{ fontSize: 13, color: c.accentDark, margin: "0 0 4px" }}>{t('"{gorev}" görevine yorum yaptı', { gorev: item.taskTitle })}</p>
                 <p style={{ fontSize: 16, color: c.textPrimary, margin: 0, lineHeight: 1.45 }}>{item.body}</p>
               </div>
             )
@@ -496,7 +497,7 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
             </span>
           )}
         </div>
-        <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>{new Date(post.createdAt).toLocaleDateString("tr-TR")}</span>
+        <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>{new Date(post.createdAt).toLocaleDateString(bicimDili())}</span>
       </div>
       <p style={{ fontSize: 16, color: c.textPrimary, margin: "0 0 8px", lineHeight: 1.45 }}>{renderMentions(post.body, c.primary)}</p>
 
@@ -508,16 +509,16 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
         >
           <IconHeart size={16} color={post.likedByMe ? c.accentDark : c.textSecondary} filled={post.likedByMe} />
           <span style={{ fontSize: 13, color: post.likedByMe ? c.accentDark : c.textSecondary }}>
-            {post.likeCount > 0 ? post.likeCount : "Beğen"}
+            {post.likeCount > 0 ? post.likeCount : t("Beğen")}
           </span>
         </button>
         <button
           onClick={toggleExpanded}
-          aria-label="Yorumlar"
+          aria-label={t("Yorumlar")}
           style={{ display: "flex", alignItems: "center", gap: 5, background: "transparent", border: "none", padding: 0 }}
         >
           <IconMessageCircle size={16} color={c.textSecondary} />
-          <span style={{ fontSize: 13, color: c.textSecondary }}>{post.commentCount > 0 ? post.commentCount : "Yorum yap"}</span>
+          <span style={{ fontSize: 13, color: c.textSecondary }}>{post.commentCount > 0 ? post.commentCount : t("Yorum yap")}</span>
         </button>
       </div>
 
@@ -545,7 +546,7 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
             <input
               value={commentDraft}
               onChange={(e) => setCommentDraft(e.target.value)}
-              placeholder="Yorum yaz…"
+              placeholder={t("Yorum yaz…")}
               style={{ flex: 1, fontSize: 14 }}
             />
             <button
@@ -592,7 +593,7 @@ function CommentRow({ comment, onLikeToggled }: CommentRowProps) {
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <span style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary }}>{comment.authorName}</span>
-        <span style={{ fontSize: 12, color: c.textSecondary }}>{new Date(comment.createdAt).toLocaleDateString("tr-TR")}</span>
+        <span style={{ fontSize: 12, color: c.textSecondary }}>{new Date(comment.createdAt).toLocaleDateString(bicimDili())}</span>
       </div>
       <p style={{ fontSize: 14, color: c.textPrimary, margin: "0 0 3px" }}>{renderMentions(comment.body, c.primary)}</p>
       <button
@@ -602,7 +603,7 @@ function CommentRow({ comment, onLikeToggled }: CommentRowProps) {
       >
         <IconHeart size={13} color={comment.likedByMe ? c.accentDark : c.textSecondary} filled={comment.likedByMe} />
         <span style={{ fontSize: 12, color: comment.likedByMe ? c.accentDark : c.textSecondary }}>
-          {comment.likeCount > 0 ? comment.likeCount : "Beğen"}
+          {comment.likeCount > 0 ? comment.likeCount : t("Beğen")}
         </span>
       </button>
     </div>

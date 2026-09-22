@@ -60,7 +60,7 @@ export default function CreateOrganizationModal({ onClose, onCreated, fixedGroup
   // Başlık, modalın hangi kapıdan açıldığını yansıtır: serbest çalışan anasayfasındaki
   // "Şirket kur" / "İşletme aç" seçenekleri kendi adlarıyla açılsın, genel giriş
   // (Organizasyonlar sayfası) eski başlığını korusun.
-  const title = initialOrgType === "isletme" ? "İşletme aç" : initialOrgType === "sirket" ? "Şirket kur" : "Yeni organizasyon (şirket/marka)";
+  const title = initialOrgType === "isletme" ? t("İşletme aç") : initialOrgType === "sirket" ? t("Şirket kur") : t("Yeni organizasyon (şirket/marka)");
 
   return (
     <Modal title={title} onClose={onClose}>
@@ -70,8 +70,7 @@ export default function CreateOrganizationModal({ onClose, onCreated, fixedGroup
             kuruyor. Bu güvence olmadan kullanıcı denemeye çekiniyor. */}
         {initialOrgType && (
           <p style={{ margin: 0, fontSize: 14, color: c.textSecondary, lineHeight: 1.45 }}>
-            Mevcut işlerin ve verilerin olduğu gibi kalır. Burada kuracağın yapıya departman ekleyip
-            ekip alabilirsin; hazır olmadan hiçbir şeyi taşımak zorunda değilsin.
+            {t("Mevcut işlerin ve verilerin olduğu gibi kalır. Burada kuracağın yapıya departman ekleyip ekip alabilirsin; hazır olmadan hiçbir şeyi taşımak zorunda değilsin.")}
           </p>
         )}
 
@@ -90,7 +89,7 @@ export default function CreateOrganizationModal({ onClose, onCreated, fixedGroup
           <select value={orgType} onChange={(e) => setOrgType(e.target.value as OrgType)} style={{ width: "100%" }}>
             {(Object.keys(ORG_TYPE_LABEL) as OrgType[]).map((type) => (
               <option key={type} value={type}>
-                {ORG_TYPE_LABEL[type]}
+                {t(ORG_TYPE_LABEL[type])}
               </option>
             ))}
           </select>
@@ -98,7 +97,7 @@ export default function CreateOrganizationModal({ onClose, onCreated, fixedGroup
 
         {!fixedGroupId && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Bağlı olduğu grup (opsiyonel)</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bağlı olduğu grup (opsiyonel)")}</label>
             <select value={groupId} onChange={(e) => setGroupId(e.target.value)} style={{ width: "100%" }}>
               <option value="">{t("Yok — tek başına organizasyon")}</option>
               {groups.map((g) => (
@@ -117,7 +116,7 @@ export default function CreateOrganizationModal({ onClose, onCreated, fixedGroup
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Oluşturuluyor…" : initialOrgType ? title : "Organizasyon oluştur"}
+          {loading ? t("Oluşturuluyor…") : initialOrgType ? title : t("Organizasyon oluştur")}
         </button>
       </form>
     </Modal>

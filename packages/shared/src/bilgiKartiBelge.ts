@@ -22,7 +22,7 @@ export function belgeDurumu(validUntil: string | undefined, bugun: Date = new Da
 }
 
 export const BELGE_DURUM_ETIKET: Record<BelgeDurumu, string> = {
-  gecerli: "Geçerli",
-  yaklasiyor: "Süresi yaklaşıyor",
-  doldu: "Süresi doldu",
+  gecerli: "Geçerli", // dil:anahtar
+  yaklasiyor: "Süresi yaklaşıyor", // dil:anahtar
+  doldu: "Süresi doldu", // dil:anahtar
 };

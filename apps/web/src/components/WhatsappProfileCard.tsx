@@ -5,6 +5,7 @@ import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * Ayarlar › Hesap'taki "WhatsApp numarası" satırı — SALT OKUNUR.
@@ -52,7 +53,7 @@ export default function WhatsappProfileCard() {
       await whatsappApi.unlink();
       await reload();
     } catch (e: any) {
-      setError(e?.message ?? "Bağlantı kaldırılamadı.");
+      setError(e?.message ?? t("Bağlantı kaldırılamadı."));
     } finally {
       setBusy(false);
     }
@@ -70,8 +71,9 @@ export default function WhatsappProfileCard() {
             </div>
             {me.verifiedAt && (
               <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 2 }}>
-                {new Date(me.verifiedAt).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })} tarihinde telefonunuzdan
-                gönderdiğiniz mesajla eşleşti.
+                {t("{tarih} tarihinde telefonunuzdan gönderdiğiniz mesajla eşleşti.", {
+                  tarih: new Date(me.verifiedAt).toLocaleDateString(bicimDili(), { day: "numeric", month: "long", year: "numeric" }),
+                })}
               </div>
             )}
           </div>
@@ -93,15 +95,14 @@ export default function WhatsappProfileCard() {
         </div>
       ) : (
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
-          Doğrulanmış bir WhatsApp numaranız yok. Numara elle yazılmaz: Bağlı hesaplar sekmesinden kod alıp telefonunuzdan gönderin;
-          numara kendiliğinden burada görünür.
+          {t("Doğrulanmış bir WhatsApp numaranız yok. Numara elle yazılmaz: Bağlı hesaplar sekmesinden kod alıp telefonunuzdan gönderin; numara kendiliğinden burada görünür.")}
         </p>
       )}
       {error && <p style={{ fontSize: 14, color: c.danger, margin: "8px 0 0" }}>{error}</p>}
       {confirmUnlink && (
         <ConfirmDialog
           title={t("WhatsApp numarasını hesaptan ayır")}
-          message="Bu numaraya artık bildirim gitmez. Yeni numara ya da cihaz için Bağlı hesaplar'dan yeniden kod alırsınız."
+          message={t("Bu numaraya artık bildirim gitmez. Yeni numara ya da cihaz için Bağlı hesaplar'dan yeniden kod alırsınız.")}
           confirmLabel={t("Ayır")}
           onConfirm={handleUnlink}
           onCancel={() => setConfirmUnlink(false)}

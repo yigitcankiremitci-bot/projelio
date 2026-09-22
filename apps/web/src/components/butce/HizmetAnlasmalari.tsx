@@ -4,6 +4,7 @@ import { api } from "../../api/client";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { IconTrash } from "../icons";
 import { useT } from "../../lib/i18n";
+import { bicimDili } from "../../lib/i18n/depo";
 
 interface Props {
   projectId: string;
@@ -12,7 +13,7 @@ interface Props {
   onChanged?: () => void;
 }
 
-const para = (n: number) => `${n.toLocaleString("tr-TR")} ₺`;
+const para = (n: number) => `${n.toLocaleString(bicimDili())} ₺`;
 
 /**
  * Hizmet alan ile hizmet veren arasındaki anlaşma — iki biçimde: proje sahibi ↔
@@ -240,7 +241,7 @@ function AnlasmaKarti({
         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
           {a.payments.map((o) => (
             <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-              <span style={{ color: c.textSecondary, flexShrink: 0 }}>{new Date(o.occurredAt).toLocaleDateString("tr-TR")}</span>
+              <span style={{ color: c.textSecondary, flexShrink: 0 }}>{new Date(o.occurredAt).toLocaleDateString(bicimDili())}</span>
               <span style={{ color: c.textPrimary, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {odeyen} → {alan}
                 {(o.description || o.taskTitle) && (

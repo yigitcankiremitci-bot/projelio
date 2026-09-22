@@ -275,7 +275,7 @@ export default function TourOverlay() {
           <button
             type="button"
             onClick={() => stop()}
-            aria-label="Turu kapat"
+            aria-label={t("Turu kapat")}
             title={t("Turu kapat (Esc)")}
             style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4, lineHeight: 0 }}
           >
@@ -293,7 +293,7 @@ export default function TourOverlay() {
               key={s.id}
               type="button"
               onClick={() => goTo(i)}
-              aria-label={`${i + 1}. adım: ${s.title}`}
+              aria-label={t("{p1}. adım: {title}", { p1: i + 1, title: s.title })}
               title={t(s.title)}
               style={{
                 width: i === stepIndex ? 22 : 8,
@@ -315,7 +315,7 @@ export default function TourOverlay() {
             type="button"
             onClick={() => setVoiceEnabled(!voiceEnabled)}
             style={{ ...controlBtn, width: 38, padding: 0 }}
-            aria-label={voiceEnabled ? "Sesi kapat" : "Sesi aç"}
+            aria-label={voiceEnabled ? t("Sesi kapat") : t("Sesi aç")}
             title={voiceEnabled ? t("Sesi kapat") : t("Sesi aç")}
           >
             <span aria-hidden style={{ fontSize: 15 }}>{voiceEnabled ? "🔊" : "🔇"}</span>
@@ -326,7 +326,7 @@ export default function TourOverlay() {
               type="button"
               onClick={togglePlay}
               style={{ ...controlBtn, width: 38, padding: 0 }}
-              aria-label={speaking ? "Duraklat" : "Devam et"}
+              aria-label={speaking ? t("Duraklat") : t("Devam et")}
               title={speaking ? t("Duraklat") : t("Devam et")}
             >
               <span aria-hidden style={{ fontSize: 13 }}>{speaking ? "❚❚" : "▶"}</span>
@@ -362,7 +362,7 @@ export default function TourOverlay() {
               fontWeight: 500,
             }}
           >
-            {isLast ? "Bitir" : "İleri"}
+            {isLast ? t("Bitir") : t("İleri")}
             {isLast ? <IconCheck size={14} color="#fff" /> : <IconChevronRight size={14} color="#fff" />}
           </button>
         </div>

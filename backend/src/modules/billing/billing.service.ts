@@ -30,6 +30,7 @@ import {
   type Plan,
   type PlanKey,
 } from "./billing.plans";
+import { hataMetni } from "../../common/i18n/index";
 
 export type AbonelikDurumu = "pending" | "trialing" | "active" | "past_due" | "canceled" | "expired";
 export type AbonelikKapsami = "user" | "organization";
@@ -356,7 +357,7 @@ export class BillingService {
     } catch (error) {
       if (error instanceof IyzicoHatasi) {
         this.logger.warn(`Checkout başlatılamadı (${planKey}/${period}): ${error.message}`);
-        throw new BadRequestException(`Ödeme başlatılamadı: ${error.message}`);
+        throw new BadRequestException(hataMetni("Ödeme başlatılamadı: {message}", { message: error.message }));
       }
       throw error;
     }
@@ -730,7 +731,7 @@ export class BillingService {
     if (!data) {
       // Tanımadığımız bir abonelik: ödeme alınmış ama bizde kaydı yok. Olay
       // tabloda duruyor; yönetici elle bağlayabilsin diye hata olarak işaretlenir.
-      throw new NotFoundException(`Webhook'taki abonelik bulunamadı: ${providerRef}`);
+      throw new NotFoundException(hataMetni("Webhook'taki abonelik bulunamadı: {providerRef}", { providerRef }));
     }
 
     const abonelik = mapAbonelik(data);

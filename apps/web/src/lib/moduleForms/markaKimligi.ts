@@ -1,3 +1,4 @@
+// dil:anahtar-dosya — etiketler; çeviri render anında (t(...)) yapılıyor.
 import { opts } from "../moduleConfigs";
 import type { ModuleFormConfig } from "./types";
 
@@ -102,7 +103,7 @@ const TOUCHPOINT = {
   web: "Web sitesi",
   sosyal: "Sosyal medya",
   eposta: "E-posta",
-  teklif: "Teklif ve sunum",
+  teklif: "Teklif ve sunum", // dil:anahtar
   fatura: "Fatura ve sözleşme", // dil:anahtar
   ambalaj: "Ambalaj / etiket",
   magaza: "Mağaza / ofis", // dil:anahtar
@@ -118,7 +119,7 @@ const TOUCHPOINT = {
 };
 
 const TRADEMARK = {
-  yok: "Tescil yok",
+  yok: "Tescil yok", // dil:anahtar
   arastirma: "Araştırılıyor", // dil:anahtar
   basvuru: "Başvuruldu", // dil:anahtar
   tescilli: "Tescilli",
@@ -169,7 +170,7 @@ export const markaKimligiConfig: ModuleFormConfig = {
     },
     {
       key: "category",
-      label: "Kategori",
+      label: "Kategori", // dil:anahtar
       type: "text",
       group: "konum",
       requiredForApproval: true,
@@ -457,7 +458,7 @@ export const markaKimligiConfig: ModuleFormConfig = {
     },
     {
       key: "status",
-      label: "Durum",
+      label: "Durum", // dil:anahtar
       type: "select",
       group: "durum",
       defaultValue: "draft",

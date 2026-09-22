@@ -2,6 +2,7 @@ import { askLioAbout, lioSubjectLabel } from "../lib/askLio";
 import type { LioSubject } from "../lib/askLio";
 import { useAppPrefs } from "../lib/appPrefs";
 import { useTheme } from "../theme/ThemeProvider";
+import { useT } from "../lib/i18n";
 
 /**
  * "Lio'ya sor" simgesi. Moda göre İKİ AYRI DOSYA kullanılır:
@@ -54,13 +55,14 @@ interface Props {
  * hiçbir şey yapmayan ölü bir kontrole dönüşürdü.
  */
 export default function AskLioButton({ subject, size = 26, withBackground = false }: Props) {
+  const t = useT();
   const { showLio } = useAppPrefs();
   const { mode } = useTheme();
   if (!showLio) return null;
 
   const dark = mode === "dark";
 
-  const label = `${subject.title} — bu ${lioSubjectLabel(subject.kind)} hakkında Lio'ya sor`;
+  const label = t("{title} — bu {tur} hakkında Lio'ya sor", { title: subject.title, tur: t(lioSubjectLabel(subject.kind)) });
 
   return (
     <button

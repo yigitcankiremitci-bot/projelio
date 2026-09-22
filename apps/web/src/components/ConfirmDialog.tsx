@@ -25,14 +25,16 @@ export default function ConfirmDialog({
   title,
   message,
   extra,
-  confirmLabel = "Sil",
-  cancelLabel = "Vazgeç",
+  confirmLabel: confirmLabelProp,
+  cancelLabel: cancelLabelProp,
   danger = true,
   onConfirm,
   onCancel,
 }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const confirmLabel = confirmLabelProp ?? t("Sil");
+  const cancelLabel = cancelLabelProp ?? t("Vazgeç");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -88,7 +90,7 @@ export default function ConfirmDialog({
             fontWeight: 500,
           }}
         >
-          {loading ? "Siliniyor…" : confirmLabel}
+          {loading ? t("Siliniyor…") : confirmLabel}
         </button>
       </div>
     </Modal>

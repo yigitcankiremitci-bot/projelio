@@ -4,6 +4,7 @@ import { Z, SAFE_TOP, SAFE_BOTTOM } from "../lib/layout";
 import { createPortal } from "react-dom";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 import { FabSuppressed } from "../lib/projectFab";
 import { lioModalAcildi } from "../lib/lioBalon";
 import { IconX } from "./icons";
@@ -90,6 +91,7 @@ export default function Modal({
   footer,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const boxRef = useRef<HTMLDivElement>(null);
   const fullScreen = mobileFullScreen && typeof window !== "undefined" && window.innerWidth < 768;
 
@@ -233,7 +235,7 @@ export default function Modal({
           </div>
           <button
             onClick={onClose}
-            aria-label="Kapat"
+            aria-label={t("Kapat")}
             style={{ background: "transparent", border: "none", padding: 4, display: "flex", flexShrink: 0 }}
           >
             <IconX size={18} color={c.textSecondary} />

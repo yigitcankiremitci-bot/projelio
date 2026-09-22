@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { hataMetni } from "../i18n/index";
 
 /**
  * Sunucu tarafı girdi doğrulama yardımcıları.
@@ -42,13 +43,13 @@ export function requireAmount(value: unknown, field = "Tutar"): number {
   const amount = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
 
   if (typeof amount !== "number" || !Number.isFinite(amount)) {
-    throw new BadRequestException(`${field} geçerli bir sayı olmalı.`);
+    throw new BadRequestException(hataMetni("{field} geçerli bir sayı olmalı.", { field }));
   }
   if (amount < 0) {
-    throw new BadRequestException(`${field} negatif olamaz.`);
+    throw new BadRequestException(hataMetni("{field} negatif olamaz.", { field }));
   }
   if (amount > MAX_MONEY_AMOUNT) {
-    throw new BadRequestException(`${field} çok büyük.`);
+    throw new BadRequestException(hataMetni("{field} çok büyük.", { field }));
   }
   return amount;
 }
@@ -64,7 +65,7 @@ export function paraBirimiDogrula(value: unknown, field = "Para birimi"): string
   if (value === undefined || value === null || value === "") return "TRY";
   const kod = String(value).trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(kod)) {
-    throw new BadRequestException(`${field} 3 harfli ISO kodu olmalı (örn. TRY, USD, EUR).`);
+    throw new BadRequestException(hataMetni("{field} 3 harfli ISO kodu olmalı (örn. TRY, USD, EUR).", { field }));
   }
   return kod;
 }
@@ -81,7 +82,7 @@ export function paraBirimiDogrula(value: unknown, field = "Para birimi"): string
  */
 export function requireOneOf<T extends string>(value: unknown, allowed: readonly T[], field: string): T {
   if (typeof value !== "string" || !allowed.includes(value as T)) {
-    throw new BadRequestException(`${field} şunlardan biri olmalı: ${allowed.join(", ")}`);
+    throw new BadRequestException(hataMetni("{field} şunlardan biri olmalı: {p2}", { field, p2: allowed.join(", ") }));
   }
   return value as T;
 }
@@ -113,7 +114,7 @@ const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  */
 export function requireUuid(value: unknown, field: string): string {
   if (typeof value !== "string" || !UUID_SHAPE.test(value)) {
-    throw new BadRequestException(`${field} geçerli bir kimlik değil.`);
+    throw new BadRequestException(hataMetni("{field} geçerli bir kimlik değil.", { field }));
   }
   return value;
 }

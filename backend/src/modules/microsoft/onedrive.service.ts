@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { BLANK_DOCX_BASE64, BLANK_PPTX_BASE64, BLANK_XLSX_BASE64 } from "./office-templates";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
+import { hataMetni } from "../../common/i18n/index";
 
 const GRAPH_API = "https://graph.microsoft.com/v1.0";
 
@@ -108,7 +109,7 @@ export class OneDriveService {
         );
       }
       this.logger.error(`Graph API hatası ${res.status} ${path}: ${body}`);
-      throw new BadRequestException(`OneDrive isteği başarısız (${res.status}).`);
+      throw new BadRequestException(hataMetni("OneDrive isteği başarısız ({status}).", { status: res.status }));
     }
 
     if (res.status === 204) return undefined as T;

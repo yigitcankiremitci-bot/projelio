@@ -28,7 +28,7 @@ export default function EditProfileModal({ user, onClose, onSaved }: Props) {
   const [loading, setLoading] = useState(false);
 
   // Unvan alanı boş bırakılırsa hesap tipine göre otomatik atanan unvan gösterilir.
-  const autoTitle = DEFAULT_TITLE_BY_ACCOUNT_TYPE[user.accountType ?? "freelancer"];
+  const autoTitle = t(DEFAULT_TITLE_BY_ACCOUNT_TYPE[user.accountType ?? "freelancer"]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +93,7 @@ export default function EditProfileModal({ user, onClose, onSaved }: Props) {
 
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <label style={{ fontSize: 14, color: c.accentDark, fontWeight: 500, cursor: "pointer" }}>
-              {avatarFile ? "Başka fotoğraf seç" : "Fotoğraf değiştir"}
+              {avatarFile ? t("Başka fotoğraf seç") : t("Fotoğraf değiştir")}
               <input
                 type="file"
                 accept="image/*"
@@ -134,7 +134,7 @@ export default function EditProfileModal({ user, onClose, onSaved }: Props) {
             style={{ width: "100%" }}
           />
           <span style={{ fontSize: 13, color: c.textSecondary }}>
-            Boş bırakırsan üyelik tipine göre "{autoTitle}" olarak görünür.
+            {t('Boş bırakırsan üyelik tipine göre "{unvan}" olarak görünür.', { unvan: autoTitle })}
           </span>
         </div>
 
@@ -157,7 +157,7 @@ export default function EditProfileModal({ user, onClose, onSaved }: Props) {
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Kaydediliyor…" : "Kaydet"}
+          {loading ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       </form>
     </Modal>

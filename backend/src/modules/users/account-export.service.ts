@@ -3,6 +3,9 @@ import * as ExcelJS from "exceljs";
 import { SupabaseService } from "../../database/supabase.service";
 import { UsersService } from "./users.service";
 import { SECTOR_LABEL, TEAM_SIZE_LABEL, USE_CASE_LABEL } from "@projelio/shared";
+import type { Translate } from "@projelio/shared";
+import { cevirmen } from "../../common/i18n";
+import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 
 /**
  * Kullanıcının kendi verisinin Excel çıktısı.
@@ -22,11 +25,15 @@ import { SECTOR_LABEL, TEAM_SIZE_LABEL, USE_CASE_LABEL } from "@projelio/shared"
 export class AccountExportService {
   constructor(
     private supabase: SupabaseService,
-    private usersService: UsersService
+    private usersService: UsersService,
+    private diller: KullaniciDiliService
   ) {}
 
   async buildWorkbook(userId: string): Promise<{ buffer: Buffer; fileName: string }> {
     const user = await this.usersService.findById(userId);
+    // Dosya kullanıcının dilinde: sayfa adları, başlıklar ve açıklamalar.
+    const locale = await this.diller.diliniBul(userId);
+    const t = cevirmen(locale);
 
     const [gorevler, isler, projeler, butce, yapilacaklar] = await Promise.all([
       this.gorevlerim(userId),
@@ -41,36 +48,36 @@ export class AccountExportService {
     wb.created = new Date();
 
     // --- Kapak: kapsam ---
-    const kapak = wb.addWorksheet("Hakkında");
+    const kapak = wb.addWorksheet(t("Hakkında"));
     kapak.columns = [{ width: 26 }, { width: 70 }];
     kapak.addRows([
-      ["Projelio veri çıktısı", ""],
-      ["Hesap", user?.email ?? ""],
-      ["Ad soyad", user?.fullName ?? ""],
-      ["Kullanıcı adı", user?.username ?? ""],
-      ["Oluşturulma", new Date().toLocaleString("tr-TR")],
+      [t("Projelio veri çıktısı"), ""],
+      [t("Hesap"), user?.email ?? ""],
+      [t("Ad soyad"), user?.fullName ?? ""],
+      [t("Kullanıcı adı"), user?.username ?? ""],
+      [t("Oluşturulma"), new Date().toLocaleString(locale === "en" ? "en-GB" : "tr-TR")],
       ["", ""],
       // Profil/sihirbaz alanları da kişisel veri; KVKK çıktısı bunları da içermeli.
       // Boş olanlar da satır olarak kalıyor: kullanıcı neyin TUTULMADIĞINI da görsün.
-      ["Profil bilgilerim", ""],
-      ["Unvan", user?.title ?? ""],
-      ["Kısa tanıtım", user?.bio ?? ""],
-      ["Telefon", user?.phone ?? ""],
-      ["Sektör", user?.sector ? SECTOR_LABEL[user.sector] : ""],
-      ["Ekip büyüklüğü", user?.teamSize ? TEAM_SIZE_LABEL[user.teamSize] : ""],
-      ["Kullanım amacı", (user?.useCases ?? []).map((u) => USE_CASE_LABEL[u]).join(", ")],
-      ["Seçtiğim modüller", (user?.onboardingModules ?? []).join(", ")],
+      [t("Profil bilgilerim"), ""],
+      [t("Unvan"), user?.title ?? ""],
+      [t("Kısa tanıtım"), user?.bio ?? ""],
+      [t("Telefon"), user?.phone ?? ""],
+      [t("Sektör"), user?.sector ? t(SECTOR_LABEL[user.sector]) : ""],
+      [t("Ekip büyüklüğü"), user?.teamSize ? t(TEAM_SIZE_LABEL[user.teamSize]) : ""],
+      [t("Kullanım amacı"), (user?.useCases ?? []).map((u) => t(USE_CASE_LABEL[u])).join(", ")],
+      [t("Seçtiğim modüller"), (user?.onboardingModules ?? []).join(", ")],
       ["", ""],
-      ["Bu dosyada ne var", "Profil bilgilerin, sana atanmış görevler, sahibi olduğun işler ve projeler, kendi bütçe kayıtların, kişisel yapılacakların."],
-      ["Bu dosyada ne YOK", "Ekip arkadaşlarının verisi, Drive/OneDrive'daki dosyaların (onlar kendi bulut hesabında duruyor), Lio sohbet geçmişi."],
+      [t("Bu dosyada ne var"), t("Profil bilgilerin, sana atanmış görevler, sahibi olduğun işler ve projeler, kendi bütçe kayıtların, kişisel yapılacakların.")],
+      [t("Bu dosyada ne YOK"), t("Ekip arkadaşlarının verisi, Drive/OneDrive'daki dosyaların (onlar kendi bulut hesabında duruyor), Lio sohbet geçmişi.")],
     ]);
     kapak.getRow(1).font = { bold: true, size: 14 };
 
-    this.sayfaEkle(wb, "Görevlerim", ["Başlık", "Durum", "Öncelik", "Bitiş", "Proje"], gorevler);
-    this.sayfaEkle(wb, "İşlerim", ["Başlık", "Açıklama", "Oluşturulma"], isler);
-    this.sayfaEkle(wb, "Projelerim", ["Başlık", "Durum", "Bitiş", "İş"], projeler);
-    this.sayfaEkle(wb, "Bütçe kayıtlarım", ["Tür", "Tutar", "Açıklama", "Tarih"], butce);
-    this.sayfaEkle(wb, "Kişisel yapılacaklar", ["Başlık", "Durum", "Bitiş"], yapilacaklar);
+    this.sayfaEkle(wb, t, t("Görevlerim"), [t("Başlık"), t("Durum"), t("Öncelik"), t("Bitiş"), t("Proje")], gorevler);
+    this.sayfaEkle(wb, t, t("İşlerim"), [t("Başlık"), t("Açıklama"), t("Oluşturulma")], isler);
+    this.sayfaEkle(wb, t, t("Projelerim"), [t("Başlık"), t("Durum"), t("Bitiş"), t("İş")], projeler);
+    this.sayfaEkle(wb, t, t("Bütçe kayıtlarım"), [t("Tür"), t("Tutar"), t("Açıklama"), t("Tarih")], butce);
+    this.sayfaEkle(wb, t, t("Kişisel yapılacaklar"), [t("Başlık"), t("Durum"), t("Bitiş")], yapilacaklar);
 
     const buffer = Buffer.from(await wb.xlsx.writeBuffer());
     const tarih = new Date().toISOString().slice(0, 10);
@@ -78,13 +85,13 @@ export class AccountExportService {
   }
 
   /** Başlık satırı kalın, sütunlar içeriğe göre; boş sayfada açıklama. */
-  private sayfaEkle(wb: ExcelJS.Workbook, ad: string, basliklar: string[], satirlar: unknown[][]): void {
+  private sayfaEkle(wb: ExcelJS.Workbook, t: Translate, ad: string, basliklar: string[], satirlar: unknown[][]): void {
     const ws = wb.addWorksheet(ad);
     ws.addRow(basliklar).font = { bold: true };
     ws.columns = basliklar.map(() => ({ width: 28 }));
 
     if (satirlar.length === 0) {
-      ws.addRow(["Kayıt yok"]);
+      ws.addRow([t("Kayıt yok")]);
       return;
     }
     satirlar.forEach((s) => ws.addRow(s));

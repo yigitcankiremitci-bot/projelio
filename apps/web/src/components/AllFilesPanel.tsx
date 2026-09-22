@@ -95,7 +95,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
     for (const job of jobs) {
       listed.add(job.id);
       if (myUserId && job.ownerId === myUserId) {
-        out.push({ id: `job:${job.id}`, label: "İş geneli", group: job.title, target: { jobId: job.id } });
+        out.push({ id: `job:${job.id}`, label: t("İş geneli"), group: job.title, target: { jobId: job.id } });
       }
       for (const p of projects.filter((pr) => pr.jobId === job.id)) {
         out.push({ id: `project:${p.id}`, label: p.title, group: job.title, target: { projectId: p.id } });
@@ -104,7 +104,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
 
     // İşi listede olmayan projeler (örn. iş kartı gizlenmiş) kaybolmasın.
     for (const p of projects.filter((pr) => !listed.has(pr.jobId))) {
-      out.push({ id: `project:${p.id}`, label: p.title, group: "Diğer", target: { projectId: p.id } });
+      out.push({ id: `project:${p.id}`, label: p.title, group: t("Diğer"), target: { projectId: p.id } });
     }
 
     return out;
@@ -124,7 +124,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
 
 
 
-  useProjectFabAction({ label: "Dosya ekle", onClick: () => setAdding(true) }, []);
+  useProjectFabAction({ label: t("Dosya ekle"), onClick: () => setAdding(true) }, []);
 
   useEffect(() => {
     if (jobs.length === 0) {
@@ -163,7 +163,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
     try {
       window.location.href = await filesApi.contentUrl(file.id, { download: true });
     } catch (e: any) {
-      setError(e?.message ?? "Dosya indirilemedi");
+      setError(e?.message ?? t("Dosya indirilemedi"));
     }
   };
 
@@ -595,8 +595,8 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
       {(adding || dropped.length > 0) && (
         <QuickFileUploadModal
           targets={uploadTargets}
-          pickerLabel="Nereye"
-          emptyMessage="Dosya yükleyebilmek için önce bir işe ya da projeye eklenmen gerekiyor."
+          pickerLabel={t("Nereye")}
+          emptyMessage={t("Dosya yükleyebilmek için önce bir işe ya da projeye eklenmen gerekiyor.")}
           pendingFiles={dropped.length ? dropped : undefined}
           onClose={() => {
             setAdding(false);

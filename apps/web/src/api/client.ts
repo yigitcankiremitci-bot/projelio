@@ -1,5 +1,5 @@
 import { getSocketId } from "../lib/socketId";
-import { getLocale } from "../lib/i18n/depo";
+import { etkinDil } from "../lib/i18n/depo";
 import { sendWithProgress } from "../lib/xhrUpload";
 
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -119,7 +119,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // okuyamıyor (jeton 7 gün yaşıyor, dil değişirse bayatlar) — istemci hangi
   // dili gösterdiğini zaten biliyor, o yüzden burada yazılıyor.
   // Bkz. backend common/filters/all-exceptions.filter.ts.
-  const locale = getLocale();
+  const locale = etkinDil();
   const timeout = signalWithTimeout(options.signal);
   let res: Response;
   try {

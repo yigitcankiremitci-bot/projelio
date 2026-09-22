@@ -35,6 +35,7 @@ import {
   type DemoEpostaRandevusu,
   type DemoKatilimciOlayi,
 } from "./demo-randevu-eposta";
+import { hataMetni } from "../../common/i18n/index";
 
 /** Sütun listesi tek yerde: her okuma aynı biçime çevrilsin. */
 const RANDEVU_ALANLARI =
@@ -148,7 +149,7 @@ export class DemoRandevuService {
     const yama: Record<string, unknown> = { updated_by: userId, updated_at: new Date().toISOString() };
     const sayi = (v: unknown, alt: number, ust: number, ad: string) => {
       if (typeof v !== "number" || !Number.isInteger(v) || v < alt || v > ust) {
-        throw new BadRequestException(`${ad} ${alt} ile ${ust} arasında olmalı.`);
+        throw new BadRequestException(hataMetni("{ad} {alt} ile {ust} arasında olmalı.", { ad, alt, ust }));
       }
       return v;
     };
@@ -175,7 +176,7 @@ export class DemoRandevuService {
         .map((e) => String(e).trim().toLowerCase())
         .filter(Boolean);
       const hatali = liste.find((e) => !demoEpostaGecerli(e));
-      if (hatali) throw new BadRequestException(`Geçersiz e-posta adresi: ${hatali}`);
+      if (hatali) throw new BadRequestException(hataMetni("Geçersiz e-posta adresi: {hatali}", { hatali }));
       yama.bildirim_epostalari = [...new Set(liste)].slice(0, 20);
     }
 

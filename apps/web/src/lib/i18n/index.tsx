@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { createTranslator, defaultLocale, isLocale, resolveLocale } from "@projelio/shared";
+import { createTranslator, defaultLocale, isLocale, resolveLocale, setEtiketCevirmeni } from "@projelio/shared";
 import type { Locale, Translate } from "@projelio/shared";
 import { api } from "../../api/client";
 import { setCachedLocale, useCurrentUser } from "../useCurrentUser";
@@ -31,11 +31,33 @@ import { getLocale as readStored, setStoredLocale as writeStored } from "./depo"
 function browserLocale(): Locale {
   if (typeof navigator === "undefined") return defaultLocale;
   const tags = navigator.languages?.length ? navigator.languages : [navigator.language];
+  // Tanınmayan bir tarayıcı dili ("de-DE") İngilizceye düşer, Türkçeye değil
+  // (bkz. resolveLocale).
   return resolveLocale(tags);
+}
+
+/**
+ * Adresteki `?lang=en` — tanıtım sitesinin /en sayfasından gelen bağlantılar
+ * bunu taşıyor. Sitede İngilizce okuyup "Sign up"a basan birinin karşısına,
+ * tarayıcısı başka bir dilde diye Türkçe kayıt ekranı çıkmamalı.
+ * Bir seçim sayılır ve bu tarayıcıya yazılır; hesap açılınca oraya da geçer.
+ */
+function adrestekiDil(): Locale | null {
+  try {
+    const lang = new URLSearchParams(window.location.search).get("lang");
+    return isLocale(lang) ? lang : null;
+  } catch {
+    return null;
+  }
 }
 
 /** İlk boyamadaki dil — senkron okunur, sunucu beklenmez. */
 function initialLocale(): Locale {
+  const adres = adrestekiDil();
+  if (adres) {
+    writeStored(adres);
+    return adres;
+  }
   return readStored() ?? browserLocale();
 }
 
@@ -60,6 +82,9 @@ interface I18nValue {
 
 const Ctx = createContext<I18nValue | null>(null);
 
+/** Giriş ekranında yapılmış, henüz hesaba yazılmamış dil seçimi (sessionStorage). */
+const GIRIS_SECIMI = "projelio_locale_giris";
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
   const [chosen, setChosen] = useState<boolean>(() => readStored() !== null);
@@ -73,7 +98,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = locale;
     document.title =
-      locale === "en" ? "Projelio — Freelance Project & Task Management" : "Projelio — Freelance Proje & Görev Yönetimi";
+      locale === "en" ? "Projelio — Freelance Project & Task Management" : "Projelio — Freelance Proje & Görev Yönetimi"; // dil:atla
   }, [locale]);
 
   const setLocale = useCallback((next: Locale | null) => {
@@ -87,6 +112,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     // kapalıyken gidiyor, orada localStorage diye bir şey yok.
     // Oturum yoksa (giriş/kayıt ekranı) çağrı anlamsız, atlanır.
     try {
+      // Oturum yokken (giriş ekranındaki seçici) seçim bekletilir: girişten
+      // sonra hesaptaki ESKİ dil gelip bu seçimi ezmesin, hesaba yazılsın
+      // (bkz. useAccountLocale).
+      if (!localStorage.getItem("projelio_token")) {
+        if (next) sessionStorage.setItem(GIRIS_SECIMI, next);
+        else sessionStorage.removeItem(GIRIS_SECIMI);
+      }
       if (localStorage.getItem("projelio_token")) {
         // Sonucu beklemiyoruz: dil zaten ekranda değişti, kayıt arka planda.
         // Hata yutuluyor — kaydedilememesi kullanıcıya gösterilecek bir şey
@@ -132,7 +164,24 @@ export function I18nProvider({ children }: { children: ReactNode }) {
  */
 function HesapDili() {
   const { user } = useCurrentUser();
-  useAccountLocale(user?.locale);
+  const { locale } = useI18n();
+  // undefined = kullanıcı henüz yüklenmedi; null = hesapta dil seçilmemiş.
+  useAccountLocale(user ? (user.locale ?? null) : undefined);
+
+  // Hesapta dil YOKSA ekranda görünen dil bir kez hesaba yazılır.
+  //
+  // Kayıt ekranı eskiden dili göndermiyordu; o dönemde açılmış hesaplarda ve
+  // Google/Microsoft ile açılanlarda kolon boş kaldı. Sunucu tarayıcı
+  // kapalıyken ürettiği her şeyde (örnek iş, ipucu e-postaları, bildirimler)
+  // dili yalnızca hesaptan biliyor ve boşsa Türkçeye düşüyordu — arayüzü
+  // İngilizce gören yabancı test kullanıcıları tam olarak bunu yaşadı.
+  // Oturum başına bir kez; hata yutuluyor (bkz. setLocale'deki gerekçe).
+  const yazildi = useRef(false);
+  useEffect(() => {
+    if (!user || user.locale != null || yazildi.current) return;
+    yazildi.current = true;
+    api.patch("/users/me/locale", { locale }).catch(() => {});
+  }, [user, locale]);
   return null;
 }
 
@@ -181,6 +230,27 @@ export function useAccountLocale(accountLocale: Locale | null | undefined) {
   // yenilendikten sonra değişmiş görünüyordu.
   const uygulanan = useRef<Locale | null>(null);
   useEffect(() => {
+    // Giriş ekranında dil seçildiyse o kazanır: kişi ekranda o dili görüp
+    // bilerek seçti. Hesaptaki dil farklıysa (ya da boşsa) hesaba yazılır;
+    // yoksa girişten hemen sonra arayüz eski dile geri dönerdi.
+    if (accountLocale !== undefined) {
+      let bekleyen: string | null = null;
+      try {
+        bekleyen = sessionStorage.getItem(GIRIS_SECIMI);
+        sessionStorage.removeItem(GIRIS_SECIMI);
+      } catch {
+        // sessionStorage okunamıyorsa bekleyen seçim yok sayılır.
+      }
+      if (isLocale(bekleyen)) {
+        uygulanan.current = bekleyen;
+        applyFromAccount(bekleyen);
+        if (bekleyen !== accountLocale) {
+          setCachedLocale(bekleyen);
+          api.patch("/users/me/locale", { locale: bekleyen }).catch(() => {});
+        }
+        return;
+      }
+    }
     if (!isLocale(accountLocale)) return;
     if (uygulanan.current === accountLocale) return;
     uygulanan.current = accountLocale;
@@ -188,17 +258,9 @@ export function useAccountLocale(accountLocale: Locale | null | undefined) {
   }, [accountLocale, applyFromAccount]);
 }
 
-/**
- * Kanca kullanamayan yerler için çevirmen.
- *
- * React sınıf bileşenleri (hata sınırı) ve React ağacının dışındaki kod
- * (api katmanı, olay işleyicileri) kanca çağıramıyor. Bu fonksiyon dili
- * doğrudan depodan okuyor — sağlayıcıya bağlı değil.
- *
- * Bedeli: dil değişince bu metinler KENDİLİĞİNDEN yenilenmiyor, bileşen
- * yeniden çizilene kadar eski dilde kalıyorlar. Hata ekranı ve tek seferlik
- * uyarılar için sorun değil; normal arayüzde `useT()` kullan.
- */
-export function cevirmenSuAn(): Translate {
-  return createTranslator(readStored() ?? browserLocale(), en);
-}
+export { cevirmenSuAn } from "./anlik";
+import { cevirmenSuAn } from "./anlik";
+
+// Ortak paketteki modül özetleri (labelOf) çevirmeni buradan alır; dil her
+// çağrıda depodan okunur, yani dil değişince yeni çizimde doğru dil gelir.
+setEtiketCevirmeni((metin, params) => cevirmenSuAn()(metin, params));

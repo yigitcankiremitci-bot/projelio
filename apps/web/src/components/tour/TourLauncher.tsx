@@ -183,7 +183,7 @@ export default function TourLauncher() {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Kapat"
+              aria-label={t("Kapat")}
               style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4, lineHeight: 0 }}
             >
               <IconX size={15} color={c.textSecondary} />

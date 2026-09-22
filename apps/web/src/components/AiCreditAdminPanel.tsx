@@ -10,6 +10,7 @@ import {
 import { IconSparkle } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface MarginReport {
   days: number;
@@ -136,7 +137,7 @@ export default function AiCreditAdminPanel({ bolum }: { bolum: "bakiye" | "sagla
         ok: true,
         text: t("${tutar} kaydedildi. Kalan bakiye: {bakiye} birim karşılığı.", {
           tutar: amountUsd.toFixed(2),
-          bakiye: result.remainingCredits.toLocaleString("tr-TR"),
+          bakiye: result.remainingCredits.toLocaleString(bicimDili()),
         }),
       });
       setTopupNote("");
@@ -223,7 +224,7 @@ export default function AiCreditAdminPanel({ bolum }: { bolum: "bakiye" | "sagla
               value={`$${margin.grossProfitUsd?.toFixed(2) ?? "0.00"}`}
               highlight={c.success}
             />
-            <Metric label={t("Harcanan birim")} value={Math.round(margin.creditsSpent ?? 0).toLocaleString("tr-TR")} />
+            <Metric label={t("Harcanan birim")} value={Math.round(margin.creditsSpent ?? 0).toLocaleString(bicimDili())} />
           </div>
 
           <div
@@ -242,7 +243,7 @@ export default function AiCreditAdminPanel({ bolum }: { bolum: "bakiye" | "sagla
             />
             <Metric
               label={t("İstek başı birim")}
-              value={Math.round(margin.avgCreditsPerRequest ?? 0).toLocaleString("tr-TR")}
+              value={Math.round(margin.avgCreditsPerRequest ?? 0).toLocaleString(bicimDili())}
             />
           </div>
           <p style={{ fontSize: 11.5, color: c.textSecondary, margin: "10px 0 0", lineHeight: 1.5 }}>
@@ -273,7 +274,7 @@ export default function AiCreditAdminPanel({ bolum }: { bolum: "bakiye" | "sagla
             <Metric label={t("Kullanılan (gerçek maliyet)")} value={`$${providerBalance.spentUsd.toFixed(2)}`} />
             <Metric
               label={t("Kalan birim")}
-              value={providerBalance.remainingCredits.toLocaleString("tr-TR")}
+              value={providerBalance.remainingCredits.toLocaleString(bicimDili())}
               highlight={providerBalance.remainingCredits < 20000 ? c.danger : c.success}
             />
           </div>
@@ -289,7 +290,7 @@ export default function AiCreditAdminPanel({ bolum }: { bolum: "bakiye" | "sagla
                   "\"Kullanılan\" rakamı, {tarih} tarihinde Console'dan girdiğin ${tutar} referans noktası + o tarihten sonraki kendi tahminimiz. Yeni bir referans noktası girersen bunun üzerine yazılır.",
                   {
                     tarih: providerBalance.lastCheckpoint
-                      ? new Date(providerBalance.lastCheckpoint.createdAt).toLocaleDateString("tr-TR")
+                      ? new Date(providerBalance.lastCheckpoint.createdAt).toLocaleDateString(bicimDili())
                       : "—",
                     tutar: providerBalance.lastCheckpoint?.amountUsd.toFixed(2) ?? "0.00",
                   }

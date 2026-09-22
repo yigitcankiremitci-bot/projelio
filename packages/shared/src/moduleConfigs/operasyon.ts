@@ -14,6 +14,7 @@ import {
   labelOf,
   opts,
   partyField,
+  etiketCevir,
   type ModuleRecordConfig,
 } from "./shared";
 
@@ -76,7 +77,7 @@ export const warehouseConfig: ModuleRecordConfig = {
     joinDetail(
       d.sku ? `Kod: ${d.sku}` : undefined,
       d.location as string,
-      d.lastCountDate ? `Son sayım: ${d.lastCountDate}` : undefined
+      d.lastCountDate ? etiketCevir("Son sayım: {tarih}", { tarih: d.lastCountDate as string }) : undefined
     ),
   computeStats: (records) => {
     const isCritical = (d: Record<string, unknown>) => {
@@ -167,7 +168,7 @@ export const qualityControlConfig: ModuleRecordConfig = {
     joinDetail(
       labelOf(QUALITY_TYPE, d.issueType),
       labelOf(QUALITY_STATUS, d.status),
-      d.severity ? `Önem: ${labelOf(QUALITY_SEVERITY, d.severity)}` : undefined,
+      d.severity ? etiketCevir("Önem: {deger}", { deger: labelOf(QUALITY_SEVERITY, d.severity) }) : undefined,
       d.detectedDate as string
     ),
   computeStats: (records) => [

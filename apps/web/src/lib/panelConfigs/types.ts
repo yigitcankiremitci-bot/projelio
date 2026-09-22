@@ -35,7 +35,7 @@ export function buildPeriod(key: PeriodKey, today = new Date()): Period {
   const m = today.getMonth();
   switch (key) {
     case "this_month":
-      return { key, label: "Bu ay", from: iso(new Date(y, m, 1)), to: iso(new Date(y, m + 1, 0)) };
+      return { key, label: "Bu ay", from: iso(new Date(y, m, 1)), to: iso(new Date(y, m + 1, 0)) }; // dil:anahtar
     case "last_month":
       return { key, label: "Geçen ay", from: iso(new Date(y, m - 1, 1)), to: iso(new Date(y, m, 0)) }; // dil:anahtar
     case "this_quarter": {

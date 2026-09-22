@@ -40,6 +40,7 @@ import { useDragScroll } from "../lib/useDragScroll";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { popupSettingsHint } from "../lib/popupSettings";
 import { getAccountOrder, moveItem, setAccountOrder, sortByOrder } from "../lib/socialAccountOrder";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   organizationId?: string;
@@ -1132,7 +1133,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
             <span style={{ fontSize: 12, color: c.textSecondary }}>
               {[
                 a.followerCount !== undefined
-                  ? t("{n} takipçi", { n: a.followerCount.toLocaleString("tr-TR") })
+                  ? t("{n} takipçi", { n: a.followerCount.toLocaleString(bicimDili()) })
                   : null,
                 a.postingFrequency,
                 a.ownerName ? t("Sorumlu: {kisi}", { kisi: a.ownerName }) : null,

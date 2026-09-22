@@ -14,6 +14,7 @@ import {
   labelOf,
   opts,
   userField,
+  etiketCevir,
   type ModuleRecordConfig,
 } from "./shared";
 
@@ -119,7 +120,7 @@ export const networkSecurityConfig: ModuleRecordConfig = {
     joinDetail(
       labelOf(SECURITY_TYPE, d.type),
       labelOf(SECURITY_STATUS, d.status),
-      d.severity ? `Önem: ${labelOf(SEVERITY, d.severity)}` : undefined,
+      d.severity ? etiketCevir("Önem: {deger}", { deger: labelOf(SEVERITY, d.severity) }) : undefined,
       d.detectedDate as string
     ),
   computeStats: (records) => [

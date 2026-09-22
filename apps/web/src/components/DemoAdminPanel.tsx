@@ -3,6 +3,7 @@ import { demoAdmin, type DemoDurumu } from "../api/demoAdmin";
 import { demoHesap } from "../lib/demoHesap";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * Admin > Demo hesabı.
@@ -29,7 +30,7 @@ export default function DemoAdminPanel() {
     demoAdmin
       .durum()
       .then(setDurum)
-      .catch((e) => setHata(e instanceof Error ? e.message : "Demo durumu okunamadı."));
+      .catch((e) => setHata(e instanceof Error ? e.message : t("Demo durumu okunamadı.")));
   };
 
   useEffect(yukle, []);
@@ -45,7 +46,7 @@ export default function DemoAdminPanel() {
       setMesaj(await is());
       yukle();
     } catch (e) {
-      setHata(e instanceof Error ? e.message : "İşlem tamamlanamadı.");
+      setHata(e instanceof Error ? e.message : t("İşlem tamamlanamadı."));
     } finally {
       setIslem("");
     }
@@ -95,7 +96,7 @@ export default function DemoAdminPanel() {
 
         {aktif && durum?.duzenlemeKipi.acildi && (
           <p style={{ margin: "8px 0 0", fontSize: 13, color: c.textSecondary }}>
-            {new Date(durum.duzenlemeKipi.acildi).toLocaleString("tr-TR")} tarihinde açıldı.
+            {new Date(durum.duzenlemeKipi.acildi).toLocaleString(bicimDili())} tarihinde açıldı.
             Açık kaldığı sürece ziyaretçilerin bıraktıkları da temizlenmez.
           </p>
         )}
@@ -104,7 +105,7 @@ export default function DemoAdminPanel() {
           {ozet && ozet.kaynak === "veritabani" && (
             <>
               Kayıtlı ilk hâl: {ozet.tabloSayisi} tablo, {ozet.satirSayisi} satır
-              {ozet.alindi ? ` — ${new Date(ozet.alindi).toLocaleString("tr-TR")}` : ""}.
+              {ozet.alindi ? ` — ${new Date(ozet.alindi).toLocaleString(bicimDili())}` : ""}.
             </>
           )}
           {ozet && ozet.kaynak === "dosya" && (
@@ -129,19 +130,19 @@ export default function DemoAdminPanel() {
                 disabled={islem !== ""}
                 style={dugme(true)}
               >
-                {islem === "kaydediliyor" ? "Kaydediliyor…" : "Kaydet ve kapat"}
+                {islem === "kaydediliyor" ? "Kaydediliyor…" : t("Kaydet ve kapat")}
               </button>
               <button
                 onClick={() =>
                   calistir("atiliyor", async () => {
                     await demoAdmin.duzenlemeKipi(false, false);
-                    return "Kaydedilmedi. Bir sonraki girişte demo eski hâline dönecek.";
+                    return t("Kaydedilmedi. Bir sonraki girişte demo eski hâline dönecek.");
                   })
                 }
                 disabled={islem !== ""}
                 style={dugme(false)}
               >
-                {islem === "atiliyor" ? "Kapatılıyor…" : "Kaydetmeden kapat"}
+                {islem === "atiliyor" ? t("Kapatılıyor…") : "Kaydetmeden kapat"}
               </button>
             </>
           ) : (
@@ -150,25 +151,25 @@ export default function DemoAdminPanel() {
                 onClick={() =>
                   calistir("aciliyor", async () => {
                     await demoAdmin.duzenlemeKipi(true);
-                    return "Düzenleme kipi açıldı. Artık demo hesabına girip düzenleyebilirsin.";
+                    return t("Düzenleme kipi açıldı. Artık demo hesabına girip düzenleyebilirsin.");
                   })
                 }
                 disabled={islem !== ""}
                 style={dugme(true)}
               >
-                {islem === "aciliyor" ? "Açılıyor…" : "Düzenleme kipini aç"}
+                {islem === "aciliyor" ? t("Açılıyor…") : t("Düzenleme kipini aç")}
               </button>
               <button
                 onClick={() =>
                   calistir("sifirlaniyor", async () => {
                     await demoAdmin.sifirla();
-                    return "Demo verisi ilk hâline döndürüldü.";
+                    return t("Demo verisi ilk hâline döndürüldü.");
                   })
                 }
                 disabled={islem !== ""}
                 style={dugme(false)}
               >
-                {islem === "sifirlaniyor" ? "Sıfırlanıyor…" : "Demoyu şimdi sıfırla"}
+                {islem === "sifirlaniyor" ? t("Sıfırlanıyor…") : t("Demoyu şimdi sıfırla")}
               </button>
             </>
           )}

@@ -6,6 +6,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { IconWhatsapp } from "./icons";
 import WhatsappConnectionPanel from "./WhatsappConnectionPanel";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * Yönetici: WhatsApp numara havuzu. Numara ekle → QR okut → bağlı. Her
@@ -103,7 +104,7 @@ export default function WhatsappNumbersPanel() {
             cursor: busy ? "wait" : "pointer",
           }}
         >
-          {busy ? "Ekleniyor…" : "Numara ekle"}
+          {busy ? "Ekleniyor…" : t("Numara ekle")}
         </button>
       </div>
 
@@ -111,7 +112,7 @@ export default function WhatsappNumbersPanel() {
 
       {numbers && numbers.length === 0 && (
         <p style={{ fontSize: 15, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
-          Havuz boş. Bir etiket yazıp "Numara ekle" deyin; ardından o numaranın telefonuyla QR'ı okutun.
+          {t("Havuz boş. Bir etiket yazıp \"Numara ekle\" deyin; ardından o numaranın telefonuyla QR'ı okutun.")}
         </p>
       )}
 
@@ -153,7 +154,7 @@ export default function WhatsappNumbersPanel() {
                       {u.optInState === "opted_in" ? "açık" : u.optInState === "opted_out" ? "durdurulmuş" : "—"}
                     </td>
                     <td style={{ padding: "6px 8px", color: c.textSecondary }}>
-                      {u.verifiedAt ? new Date(u.verifiedAt).toLocaleDateString("tr-TR") : "—"}
+                      {u.verifiedAt ? new Date(u.verifiedAt).toLocaleDateString(bicimDili()) : "—"}
                     </td>
                   </tr>
                 ))}

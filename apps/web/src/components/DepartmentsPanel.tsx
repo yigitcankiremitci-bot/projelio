@@ -96,7 +96,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
 
   const fabAvailable = useFabAvailable();
   useProjectFabAction(
-    useFab && fabAvailable ? { label: "Departman ekle", onClick: () => setAdding((v) => !v) } : null,
+    useFab && fabAvailable ? { label: t("Departman ekle"), onClick: () => setAdding((v) => !v) } : null,
     [useFab, fabAvailable, organizationId],
     FAB_PRIORITY.panel
   );
@@ -133,8 +133,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
             fontSize: 15,
           }}
         >
-          Henüz departman yok. ISO 9001 uyumlu standart departman listesinden seçebilir ya da özel bir departman
-          açabilirsin.
+          {t("Henüz departman yok. ISO 9001 uyumlu standart departman listesinden seçebilir ya da özel bir departman açabilirsin.")}
         </div>
       ) : (
         <div
@@ -213,7 +212,7 @@ function AddDepartmentForm({
       notifySidebarChanged();
       onAdded();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Departman eklenemedi");
+      setError(err instanceof Error ? err.message : t("Departman eklenemedi"));
       setSaving(false);
     }
   };
@@ -222,7 +221,7 @@ function AddDepartmentForm({
     <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{t("Standart departmanlardan seç")}</span>
-        <button onClick={onClose} aria-label="Kapat" style={{ background: "transparent", border: "none" }}>
+        <button onClick={onClose} aria-label={t("Kapat")} style={{ background: "transparent", border: "none" }}>
           <IconX size={16} color={c.textSecondary} />
         </button>
       </div>
@@ -272,7 +271,7 @@ function AddDepartmentForm({
         disabled={saving}
         style={{ padding: "9px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
       >
-        {saving ? "Ekleniyor…" : "Departmanları ekle"}
+        {saving ? t("Ekleniyor…") : t("Departmanları ekle")}
       </button>
     </div>
   );

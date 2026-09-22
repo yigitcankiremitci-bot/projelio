@@ -58,9 +58,7 @@ const INTERACTIVE_SELECTOR = "input, textarea, select, [contenteditable='true']"
  *                    kendi ok düğmeleri için kaydırma konumunu ölçüyor) o ref
  *                    verilir; kanca düğümü oraya da yazar.
  */
-export function useDragScroll<T extends HTMLElement = HTMLDivElement>(
-  enabled = true,
-  externalRef?: MutableRefObject<T | null>
+export function useDragScroll<T extends HTMLElement = HTMLDivElement>( enabled = true, externalRef?: MutableRefObject<T | null>
 ) {
   const [el, setEl] = useState<T | null>(null);
 

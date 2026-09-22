@@ -9,6 +9,7 @@ import { coverBackground, isCoverPreset } from "../lib/covers";
 import { IconPlus } from "./icons";
 import { useT } from "../lib/i18n";
 import { stokDurumu } from "../lib/urunKarti";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   product: Product;
@@ -33,7 +34,7 @@ const CARD_HEIGHT = 368;
 function formatPrice(price?: number, currency?: string): string | null {
   if (price === undefined || price === null) return null;
   try {
-    return new Intl.NumberFormat("tr-TR", { style: "currency", currency: currency || "TRY" }).format(price);
+    return new Intl.NumberFormat(bicimDili(), { style: "currency", currency: currency || "TRY" }).format(price);
   } catch {
     return `${price} ${currency ?? ""}`.trim();
   }
@@ -41,7 +42,7 @@ function formatPrice(price?: number, currency?: string): string | null {
 
 function formatStock(product: Product): string | null {
   if (product.stockQuantity === undefined || product.stockQuantity === null) return null;
-  const miktar = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(product.stockQuantity);
+  const miktar = new Intl.NumberFormat(bicimDili(), { maximumFractionDigits: 2 }).format(product.stockQuantity);
   return product.unit ? `${miktar} ${PRODUCT_UNIT_LABEL[product.unit].toLocaleLowerCase("tr-TR")}` : miktar;
 }
 
@@ -82,7 +83,7 @@ export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) 
       // Sunucunun mesajı gösteriliyor: "Dosya bir görsel değil", "HEIC
       // desteklenmiyor" gibi ayrımlar kullanıcının ne yapacağını söylüyor,
       // tek tip "Yüklenemedi" ise söylemiyordu.
-      setUploadError(err instanceof Error ? err.message : "Yüklenemedi, tekrar dene");
+      setUploadError(err instanceof Error ? err.message : t("Yüklenemedi, tekrar dene"));
       setTimeout(() => setUploadError(""), 5000);
     } finally {
       setUploading(false);
@@ -314,7 +315,7 @@ export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) 
           }}
         >
           <span style={{ color: priceLabel ? c.textPrimary : c.textSecondary, fontWeight: priceLabel ? 500 : 400 }}>
-            {priceLabel ?? "Fiyat belirtilmedi"}
+            {priceLabel ?? t("Fiyat belirtilmedi")}
           </span>
           {stockLabel && (
             <span

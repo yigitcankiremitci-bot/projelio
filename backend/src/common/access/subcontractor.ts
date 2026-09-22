@@ -61,12 +61,12 @@ export function seesAllProjectsOfJob(facts: ProjectScopeFacts): boolean {
 export type RestrictedSurface = "budget" | "team" | "members" | "settings" | "partners" | "products";
 
 export const SURFACE_MESSAGE: Record<RestrictedSurface, string> = {
-  budget: "Taşeron hesapları bütçe bilgilerini görüntüleyemez",
-  team: "Taşeron hesapları ekip listesini görüntüleyemez",
-  members: "Taşeron hesapları kadro listesini görüntüleyemez",
-  settings: "Taşeron hesapları bu ayarları değiştiremez",
-  partners: "Taşeron hesapları iş ortağı bilgilerini görüntüleyemez",
-  products: "Taşeron hesapları ürün/hizmet kayıtlarını görüntüleyemez",
+  budget: "Taşeron hesapları bütçe bilgilerini görüntüleyemez", // dil:anahtar
+  team: "Taşeron hesapları ekip listesini görüntüleyemez", // dil:anahtar
+  members: "Taşeron hesapları kadro listesini görüntüleyemez", // dil:anahtar
+  settings: "Taşeron hesapları bu ayarları değiştiremez", // dil:anahtar
+  partners: "Taşeron hesapları iş ortağı bilgilerini görüntüleyemez", // dil:anahtar
+  products: "Taşeron hesapları ürün/hizmet kayıtlarını görüntüleyemez", // dil:anahtar
 };
 
 /** Görünürlük hesabı için gereken en az bilgi — satırın kendisi değil. */

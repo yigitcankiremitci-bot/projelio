@@ -51,6 +51,7 @@ import { useAppPrefs } from "../lib/appPrefs";
 import { useTour } from "../lib/tour/TourContext";
 import WorkRhythmSettings from "../components/plan/WorkRhythmSettings";
 import SupportPanel from "../components/SupportPanel";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * AYARLAR — iki yerleşim, tek içerik.
@@ -90,13 +91,13 @@ type SettingsTab = "hesap" | "gorunum" | "gezinme" | "yardimcilar" | "ritim" | "
  * bkz. aşağıda TabBar'a verilen liste.
  */
 const TABS: { key: SettingsTab; label: string }[] = [
-  { key: "hesap", label: "Hesap" },
+  { key: "hesap", label: "Hesap" }, // dil:anahtar
   { key: "gorunum", label: "Görünüm" }, // dil:anahtar
-  { key: "gezinme", label: "Gezinme" },
+  { key: "gezinme", label: "Gezinme" }, // dil:anahtar
   { key: "yardimcilar", label: "Yardımcılar" }, // dil:anahtar
   { key: "ritim", label: "Çalışma ritmi" }, // dil:anahtar
   { key: "baglantilar", label: "Bağlı hesaplar" }, // dil:anahtar
-  { key: "destek", label: "Destek" },
+  { key: "destek", label: "Destek" }, // dil:anahtar
 ];
 
 const linkRowStyle: CSSProperties = {
@@ -145,7 +146,7 @@ const swatchBtnStyle = (active: boolean, c: ThemeColors): CSSProperties => ({
  * listede kendi dilini tanıyamaz.
  */
 const DIL_SECENEKLERI: { value: Locale | null; kisa: string; ad: string }[] = [
-  { value: null, kisa: "A", ad: "Otomatik" },
+  { value: null, kisa: "A", ad: "Otomatik" }, // dil:anahtar
   { value: "tr", kisa: "TR", ad: "Türkçe" }, // dil:atla — dil adı kendi dilinde kalır
   { value: "en", kisa: "EN", ad: "English" },
 ];
@@ -207,7 +208,7 @@ function PaketVeBakiye() {
       .overview(ctrl.signal)
       .then((o) => {
         const abone = o.subscription;
-        setPaket(abone ? o.plans.find((p) => p.key === abone.planKey)?.name ?? null : "Ücretsiz");
+        setPaket(abone ? o.plans.find((p) => p.key === abone.planKey)?.name ?? null : t("Ücretsiz"));
       })
       .catch(() => {});
     aiChat
@@ -276,7 +277,7 @@ function PaketVeBakiye() {
         () => navigate("/settings/lio-units"),
         <IconSparkle size={20} color={c.accent} />,
         t("Lio Bakiyem"),
-        bakiye === null ? null : t("{bakiye} birim", { bakiye: Math.round(bakiye).toLocaleString("tr-TR") }),
+        bakiye === null ? null : t("{bakiye} birim", { bakiye: Math.round(bakiye).toLocaleString(bicimDili()) }),
         t("Bakiye yükle")
       )}
     </div>
@@ -458,12 +459,12 @@ export default function Settings() {
   // isAuthScreen); geri bağlantısı Ayarlar'a dönsün diye nereden gelindiği
   // taşınıyor (bkz. lib/backTarget.ts).
   const openLegal = (to: string) =>
-    navigate(to, { state: backState({ to: "/settings", label: "Ayarlar" }) });
+    navigate(to, { state: backState({ to: "/settings", label: t("Ayarlar") }) });
 
   const hesapTab = (
     <>
       <SettingCard
-        title="Profil"
+        title={t("Profil")}
         description={t("Ad soyad, unvan, kısa açıklama ve profil fotoğrafın — anasayfadaki kişi kartında görünür.")}
       >
         <button
@@ -575,7 +576,7 @@ export default function Settings() {
             disabled={savingUsername || !me || username === me?.username}
             style={{ background: c.primary, color: c.onPrimary, padding: "0 16px", borderRadius: 8, border: "none", fontSize: 15, fontWeight: 500 }}
           >
-            {savingUsername ? "Kaydediliyor…" : "Kaydet"}
+            {savingUsername ? t("Kaydediliyor…") : t("Kaydet")}
           </button>
         </form>
         {usernameError && <p style={{ color: c.danger, fontSize: 14, margin: "8px 0 0" }}>{usernameError}</p>}
@@ -734,7 +735,7 @@ export default function Settings() {
 
       {/* Yasal metinler giriş ekranından da açılabiliyor ama oturum açmış
           kullanıcının politikaya ulaşabileceği tek yer burası. */}
-      <CardGroup label="Yasal">
+      <CardGroup label={t("Yasal")}>
         <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, overflow: "hidden" }}>
           <button onClick={() => openLegal("/terms")} style={linkRowStyle}>
             <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -882,7 +883,7 @@ export default function Settings() {
                     {t("A")}
                   </span>
                   <span style={{ fontSize: 11, color: active ? c.primary : c.textSecondary, fontWeight: active ? 500 : 400 }}>
-                    {FONT_SCALE_LABELS[option]}
+                    {t(FONT_SCALE_LABELS[option])}
                   </span>
                 </button>
               );
@@ -891,7 +892,7 @@ export default function Settings() {
         </SettingCard>
 
         <SettingCard
-          title="Hareketi azalt"
+          title={t("Hareketi azalt")}
           description={t("Geçiş ve animasyonları neredeyse tamamen kapatır. Baş dönmesi/odaklanma sorunu yaşıyorsan ya da arayüzün daha hızlı hissettirmesini istiyorsan aç.")}
           inline
         >
@@ -899,8 +900,8 @@ export default function Settings() {
         </SettingCard>
       </CardGroup>
 
-      <CardGroup label="Tema ve renkler">
-        <SettingCard title="Tema" description={t("Aydınlık veya karanlık görünümü seç. Tercih bu cihazda saklanır.")}>
+      <CardGroup label={t("Tema ve renkler")}>
+        <SettingCard title={t("Tema")} description={t("Aydınlık veya karanlık görünümü seç. Tercih bu cihazda saklanır.")}>
           <SwatchRow>
             <SwatchButton
               active={theme.mode === "light"}
@@ -918,7 +919,7 @@ export default function Settings() {
         </SettingCard>
 
         <SettingCard
-          title="Vurgu rengi"
+          title={t("Vurgu rengi")}
           description={t("Düğmelerde ve seçili öğelerde kullanılan rengi Projelio paletinden değiştir.")}
         >
           <SwatchRow>
@@ -1002,7 +1003,7 @@ export default function Settings() {
           }}
         >
           <span style={{ fontSize: 15, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {homeTarget.label}
+            {t(homeTarget.label)}
           </span>
           <IconChevronRight size={16} color={c.textSecondary} />
         </button>
@@ -1095,8 +1096,7 @@ export default function Settings() {
     gorunum: gorunumTab,
     gezinme: gezinmeTab,
     yardimcilar: yardimcilarTab,
-    ritim: <WorkRhythmSettings />,
-    baglantilar: (
+    ritim: <WorkRhythmSettings />, baglantilar: (
       <>
         <CloudAccountsCard />
         <WhatsappCard />

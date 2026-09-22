@@ -147,7 +147,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Bağlı olduğu grup (opsiyonel)</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Bağlı olduğu grup (opsiyonel)")}</label>
           <select value={groupId} onChange={(e) => setGroupId(e.target.value)} style={{ width: "100%" }}>
             <option value="">{t("Yok — tek başına organizasyon")}</option>
             {groups.map((g) => (
@@ -163,7 +163,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
           <select value={orgType} onChange={(e) => setOrgType(e.target.value as OrgType)} style={{ width: "100%" }}>
             {(Object.keys(ORG_TYPE_LABEL) as OrgType[]).map((type) => (
               <option key={type} value={type}>
-                {ORG_TYPE_LABEL[type]}
+                {t(ORG_TYPE_LABEL[type])}
               </option>
             ))}
           </select>
@@ -196,7 +196,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Kaydediliyor…" : "Kaydet"}
+          {loading ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       </form>
 
@@ -251,13 +251,13 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
 
       {isOwner && (
         <EntityDangerZone
-          entityLabel="Organizasyonu"
+          entityLabel={t("Organizasyonu", { ctx: "nesne" })}
           resourcePath={`/organizations/${organization.id}`}
           affectsSidebar
           onArchive={onArchived ? handleArchive : undefined}
           onDelete={onDeleted ? handleDelete : undefined}
-          archiveMessage={`"${organization.name}" organizasyonunu arşive eklemek istediğine emin misin? Bu organizasyona bağlı tüm projeler de arşive taşınır.`}
-          deleteMessage={`"${organization.name}" organizasyonunu silmek istediğine emin misin? Bu organizasyona bağlı projelerin organizasyon bağlantısı kaldırılır (projeler silinmez). Bu işlem geri alınamaz.`}
+          archiveMessage={t("\"{name}\" organizasyonunu arşive eklemek istediğine emin misin? Bu organizasyona bağlı tüm projeler de arşive taşınır.", { name: organization.name })}
+          deleteMessage={t("\"{name}\" organizasyonunu silmek istediğine emin misin? Bu organizasyona bağlı projelerin organizasyon bağlantısı kaldırılır (projeler silinmez). Bu işlem geri alınamaz.", { name: organization.name })}
         />
       )}
     </Modal>

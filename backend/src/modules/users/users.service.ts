@@ -240,6 +240,8 @@ export class UsersService {
      * olur — kullanıcı /auth/resend-verification ile bağlantı isteyebilir.
      */
     emailVerified: boolean;
+    /** Girişi başlatan tarayıcının dili; bkz. UsersService.create'teki alan. */
+    locale?: Locale;
   }): Promise<UserRecord> {
     const username = await this.findAvailableUsername(data.usernameSeed);
     const email = normalizeEmail(data.email);
@@ -256,6 +258,7 @@ export class UsersService {
         // adresin sahibi olduğu zaten kanıtlanmış oluyor (bkz.
         // google-auth.service.ts'teki identity.emailVerified kontrolü).
         email_verified_at: data.emailVerified ? new Date().toISOString() : null,
+        locale: data.locale ?? null,
       })
       .select()
       .single();

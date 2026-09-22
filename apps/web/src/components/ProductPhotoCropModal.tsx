@@ -134,7 +134,7 @@ export default function ProductPhotoCropModal({ files, onCancel, onDone }: Props
 
   return (
     <Modal
-      title={files.length > 1 ? `Fotoğrafı yerleştir (${index + 1}/${files.length})` : "Fotoğrafı yerleştir"}
+      title={files.length > 1 ? t("Fotoğrafı yerleştir ({p1}/{length})", { p1: index + 1, length: files.length }) : t("Fotoğrafı yerleştir")}
       onClose={onCancel}
       maxWidth={460}
     >
@@ -191,8 +191,8 @@ export default function ProductPhotoCropModal({ files, onCancel, onDone }: Props
 
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, textAlign: "center" }}>
           {maxOffsetX || maxOffsetY
-            ? "Fotoğrafı sürükleyerek konumlandır, aşağıdan yakınlaştır."
-            : "Aşağıdan yakınlaştırıp fotoğrafı sürükleyebilirsin."}
+            ? t("Fotoğrafı sürükleyerek konumlandır, aşağıdan yakınlaştır.")
+            : t("Aşağıdan yakınlaştırıp fotoğrafı sürükleyebilirsin.")}
         </p>
 
         <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: FRAME_W }}>
@@ -228,7 +228,7 @@ export default function ProductPhotoCropModal({ files, onCancel, onDone }: Props
               cursor: "pointer",
             }}
           >
-            {busy ? "İşleniyor…" : sonuncu ? "Ekle" : "Sonraki"}
+            {busy ? t("İşleniyor…") : sonuncu ? t("Ekle") : t("Sonraki")}
           </button>
         </div>
       </div>

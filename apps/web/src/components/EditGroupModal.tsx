@@ -103,18 +103,18 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Kaydediliyor…" : "Kaydet"}
+          {loading ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       </form>
 
       <EntityDangerZone
-        entityLabel="Grubu"
+        entityLabel={t("Grubu", { ctx: "nesne" })}
         resourcePath={`/groups/${group.id}`}
         affectsSidebar
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
-        archiveMessage={`"${group.name}" grubunu arşive eklemek istediğine emin misin? Bu gruba bağlı tüm organizasyonlar ve projeler de arşive taşınır.`}
-        deleteMessage={`"${group.name}" grubunu silmek istediğine emin misin? Bu gruba bağlı organizasyon/proje bağlantıları kaldırılır (kendileri silinmez). Bu işlem geri alınamaz.`}
+        archiveMessage={t("\"{name}\" grubunu arşive eklemek istediğine emin misin? Bu gruba bağlı tüm organizasyonlar ve projeler de arşive taşınır.", { name: group.name })}
+        deleteMessage={t("\"{name}\" grubunu silmek istediğine emin misin? Bu gruba bağlı organizasyon/proje bağlantıları kaldırılır (kendileri silinmez). Bu işlem geri alınamaz.", { name: group.name })}
       />
     </Modal>
   );

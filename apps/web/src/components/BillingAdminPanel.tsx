@@ -4,6 +4,7 @@ import { billingApi, type BillingAdminPlanRef, type BillingAdminSettings } from 
 import { ApiError } from "../api/client";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * Yönetici: sağlayıcıdaki paket karşılıkları.
@@ -188,7 +189,7 @@ export default function BillingAdminPanel() {
                       );
                       return onizleme !== null && String(onizleme) !== deger.price ? (
                         <div style={{ ...etiket, color: c.accentDark, marginTop: 3 }}>
-                          {t("Kaydedince: {tutar} ₺", { tutar: onizleme.toLocaleString("tr-TR") })}
+                          {t("Kaydedince: {tutar} ₺", { tutar: onizleme.toLocaleString(bicimDili()) })}
                         </div>
                       ) : null;
                     })()}
@@ -277,7 +278,7 @@ export default function BillingAdminPanel() {
                 <span>{a.period}</span>
                 <span>{a.status}</span>
                 <span>{a.source}</span>
-                <span>{a.currentPeriodEnd ? new Date(a.currentPeriodEnd).toLocaleDateString("tr-TR") : "—"}</span>
+                <span>{a.currentPeriodEnd ? new Date(a.currentPeriodEnd).toLocaleDateString(bicimDili()) : "—"}</span>
               </div>
             ))}
           </div>

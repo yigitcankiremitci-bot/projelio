@@ -44,15 +44,17 @@ export default function CreateBudgetTransactionModal({ projectId, transaction, o
     } catch {
       setError(
         editing
-          ? "Kayıt güncellenemedi. Tekrar dene."
-          : `${type === "income" ? "Ödeme" : "Gider"} eklenemedi. Tekrar dene.`
+          ? t("Kayıt güncellenemedi. Tekrar dene.")
+          : type === "income"
+            ? t("Ödeme eklenemedi. Tekrar dene.")
+            : t("Gider eklenemedi. Tekrar dene.")
       );
       setLoading(false);
     }
   };
 
   return (
-    <Modal title={editing ? "Kaydı düzenle" : "Ödeme / gider ekle"} onClose={onClose}>
+    <Modal title={editing ? t("Kaydı düzenle") : t("Ödeme / gider ekle")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -94,7 +96,7 @@ export default function CreateBudgetTransactionModal({ projectId, transaction, o
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder={type === "income" ? "Örn. Müşteri ön ödemesi" : "Örn. Ekipman kirası"}
+            placeholder={type === "income" ? t("Örn. Müşteri ön ödemesi") : t("Örn. Ekipman kirası")}
             autoFocus
             style={{ width: "100%" }}
           />
@@ -106,7 +108,7 @@ export default function CreateBudgetTransactionModal({ projectId, transaction, o
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Tutar (₺)</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tutar (₺)")}</label>
           <input
             type="number"
             min={0}
@@ -127,13 +129,13 @@ export default function CreateBudgetTransactionModal({ projectId, transaction, o
         >
           {loading
             ? editing
-              ? "Kaydediliyor…"
-              : "Ekleniyor…"
+              ? t("Kaydediliyor…")
+              : t("Ekleniyor…")
             : editing
-              ? "Kaydet"
+              ? t("Kaydet")
               : type === "income"
-                ? "Ödemeyi ekle"
-                : "Gideri ekle"}
+                ? t("Ödemeyi ekle")
+                : t("Gideri ekle")}
         </button>
       </form>
     </Modal>

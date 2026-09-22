@@ -30,9 +30,9 @@ interface Props {
 }
 
 const TUR_ETIKET: Record<BudgetTransactionType, string> = {
-  income: "Gelir",
-  expense: "Gider",
-  payout: "Hakediş/Ödeme",
+  income: "Gelir", // dil:anahtar
+  expense: "Gider", // dil:anahtar
+  payout: "Hakediş/Ödeme", // dil:anahtar
 };
 
 /** Alt kademe kartına tıklayınca gidilecek sayfa. */
@@ -204,7 +204,7 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
         const onceki = duzenlenen;
         const kaydedilen = await api.patch<BudgetTransaction>(`/budget/transactions/${duzenlenen.id}`, govde);
         pushUndo({
-          label: "Bütçe kaydı düzenlendi",
+          label: t("Bütçe kaydı düzenlendi"),
           run: () => degerleriUygula(onceki),
           redo: () => degerleriUygula(kaydedilen),
         });
@@ -221,7 +221,7 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
         // Ekleme de geri alınabilir olmalı: bütçe girerken en sık yapılan hata
         // yanlış tutar yazmak.
         pushUndo({
-          label: "Bütçe kaydı eklendi",
+          label: t("Bütçe kaydı eklendi"),
           run: async () => {
             await api.delete(`/budget/transactions/${olusan.id}`).catch(() => {});
             yukle();
@@ -270,7 +270,7 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
   const sil = async (id: string) => {
     setSayfa((prev) => (prev ? { ...prev, hareketler: prev.hareketler.filter((h) => h.id !== id) } : prev));
     pushDestructive({
-      label: "Kayıt silme",
+      label: t("Kayıt silme"),
       commit: async () => {
         await api.delete(`/budget/transactions/${id}`).catch(() => {});
       },

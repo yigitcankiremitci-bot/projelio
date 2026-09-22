@@ -21,9 +21,9 @@ interface Props {
 }
 
 const roleLabel: Record<string, string> = {
-  owner: "Sahip",
-  member: "Ekip üyesi",
-  subcontractor: "Taşeron",
+  owner: "Sahip", // dil:anahtar
+  member: "Ekip üyesi", // dil:anahtar
+  subcontractor: "Taşeron", // dil:anahtar
 };
 
 const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projectId, tasks, ownerId, onTaskUpdated }, ref) {
@@ -69,7 +69,7 @@ const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projec
   const isProjectOwner = currentUser?.id === ownerId;
 
   const handleLeave = async () => {
-    if (!window.confirm("Bu projeden ayrılmak istediğine emin misin? Sana atanmış görevler ekipte kalır.")) return;
+    if (!window.confirm(t("Bu projeden ayrılmak istediğine emin misin? Sana atanmış görevler ekipte kalır."))) return;
     await api.delete(`/projects/${projectId}/members/me`).catch(() => {});
     load();
   };
@@ -141,7 +141,7 @@ const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projec
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: 16, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {m.fullName ?? "Bilinmeyen kullanıcı"}
+                      {m.fullName ?? t("Bilinmeyen kullanıcı")}
                     </span>
                     {m.userId === ownerId && (
                       <span style={{ fontSize: 12, color: c.accentDark, background: `${c.accent}22`, borderRadius: 20, padding: "1px 7px" }}>
@@ -150,8 +150,8 @@ const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projec
                     )}
                   </div>
                   <span style={{ fontSize: 13, color: c.textSecondary }}>
-                    {m.title ? m.title : roleLabel[m.role] ?? m.role}
-                    {m.title && ` · ${roleLabel[m.role] ?? m.role}`}
+                    {m.title ? m.title : t(roleLabel[m.role] ?? m.role)}
+                    {m.title && ` · ${t(roleLabel[m.role] ?? m.role)}`}
                   </span>
                 </div>
                 <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>

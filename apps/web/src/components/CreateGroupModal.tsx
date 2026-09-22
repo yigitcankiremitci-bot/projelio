@@ -35,7 +35,7 @@ export default function CreateGroupModal({ onClose, onCreated }: Props) {
   };
 
   return (
-    <Modal title="Yeni grup (holding)" onClose={onClose}>
+    <Modal title={t("Yeni grup (holding)")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Ad")}</label>
@@ -54,7 +54,7 @@ export default function CreateGroupModal({ onClose, onCreated }: Props) {
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Oluşturuluyor…" : "Grup oluştur"}
+          {loading ? t("Oluşturuluyor…") : t("Grup oluştur")}
         </button>
       </form>
     </Modal>

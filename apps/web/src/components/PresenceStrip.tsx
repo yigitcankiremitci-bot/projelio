@@ -1,4 +1,5 @@
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 import { Z } from "../lib/layout";
 import { usePresence } from "../lib/liveRoom";
 import { useCurrentUser } from "../lib/useCurrentUser";
@@ -25,20 +26,21 @@ export default function PresenceStrip({
   lift?: number;
 }) {
   const c = useThemeColors();
+  const t = useT();
   const isDesktop = useIsDesktop();
   const users = usePresence();
   const { user: me } = useCurrentUser();
   const others = users.filter((u) => u.userId !== me?.id);
   if (others.length === 0) return null;
 
-  const names = others.map((u) => u.fullName ?? "Bir kullanıcı");
+  const names = others.map((u) => u.fullName ?? t("Bir kullanıcı"));
   // Uzun ekip listelerinde şerit satır satır büyümesin: en fazla iki isim.
   const text =
     names.length === 1
-      ? `${names[0]} bu sayfada`
+      ? t("{p1} bu sayfada", { p1: names[0] })
       : names.length === 2
-      ? `${names[0]} ve ${names[1]} bu sayfada`
-      : `${names[0]} ve ${names.length - 1} kişi daha bu sayfada`;
+      ? t("{p1} ve {p2} bu sayfada", { p1: names[0], p2: names[1] })
+      : t("{p1} ve {p2} kişi daha bu sayfada", { p1: names[0], p2: names.length - 1 });
 
   return (
     <div

@@ -6,15 +6,16 @@ import CardDescription from "./CardDescription";
 import OperationHealthBadge from "./OperationHealthBadge";
 import AskLioButton from "./AskLioButton";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   operation: Operation;
 }
 
 const periodLabel: Record<string, string> = {
-  weekly: "hafta",
-  monthly: "ay",
-  yearly: "yıl",
+  weekly: "hafta", // dil:anahtar
+  monthly: "ay", // dil:anahtar
+  yearly: "yıl", // dil:anahtar
 };
 
 export default function OperationCard({ operation }: Props) {
@@ -57,7 +58,7 @@ export default function OperationCard({ operation }: Props) {
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: c.textSecondary, marginBottom: 5 }}>
             <span>{t("Uyum")}</span>
-            <span>{adherence != null ? `%${adherence}` : "henüz veri yok"}</span>
+            <span>{adherence != null ? `%${adherence}` : t("henüz veri yok")}</span>
           </div>
           <div style={{ height: 5, borderRadius: 3, background: c.border, overflow: "hidden" }}>
             <div
@@ -74,7 +75,7 @@ export default function OperationCard({ operation }: Props) {
           <span>{operation.activeRoutineCount ?? 0} rutin</span>
           {missed > 0 && <span style={{ color: c.danger }}>{missed} kaçırıldı</span>}
           {operation.nextDueOn && (
-            <span>Sıradaki: {new Date(operation.nextDueOn).toLocaleDateString("tr-TR")}</span>
+            <span>Sıradaki: {new Date(operation.nextDueOn).toLocaleDateString(bicimDili())}</span>
           )}
         </div>
 
@@ -88,10 +89,10 @@ export default function OperationCard({ operation }: Props) {
           }}
         >
           <span style={{ color: c.accentDark, fontWeight: 500 }}>
-            {operation.budgetPerPeriod.toLocaleString("tr-TR")} ₺/{periodLabel[operation.budgetPeriod] ?? "ay"}
+            {operation.budgetPerPeriod.toLocaleString(bicimDili())} ₺/{t(periodLabel[operation.budgetPeriod] ?? "ay")}
           </span>
           <span style={{ color: c.textSecondary }}>
-            {new Date(operation.startedOn).toLocaleDateString("tr-TR")} başladı
+            {new Date(operation.startedOn).toLocaleDateString(bicimDili())} başladı
           </span>
         </div>
       </div>

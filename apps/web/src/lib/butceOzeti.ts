@@ -1,4 +1,5 @@
 import type { BudgetTransaction } from "@projelio/shared";
+import { bicimDili } from "./i18n/depo";
 
 /**
  * Kasa sayfasının hesapları: aylık gelir/gider özeti ve vade durumu.
@@ -47,7 +48,7 @@ export function aylikOzet(transactions: KasaHareketi[], aySayisi: number, bugun 
     const d = new Date(bugun.getFullYear(), bugun.getMonth() - i, 1);
     aylar.push({
       anahtar: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      etiket: d.toLocaleDateString("tr-TR", { month: "short" }),
+      etiket: d.toLocaleDateString(bicimDili(), { month: "short" }),
       gelir: 0,
       gider: 0,
     });

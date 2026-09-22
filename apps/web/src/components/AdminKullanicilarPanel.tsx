@@ -19,6 +19,7 @@ import Modal from "./Modal";
 import ConfirmDialog from "./ConfirmDialog";
 import AdminMesajModal from "./AdminMesajModal";
 import { IconUser } from "./icons";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * Admin paneli > Kullanıcılar: tüm hesapların tek listesi ve hesap başına
@@ -38,11 +39,11 @@ const TR_TARIH_SAAT: Intl.DateTimeFormatOptions = { ...TR_TARIH, hour: "2-digit"
 function tarih(deger: string | undefined, saatli = false): string {
   if (!deger) return "—";
   const d = new Date(/(Z|[+-]\d{2}:?\d{2})$/.test(deger) ? deger : `${deger}Z`);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("tr-TR", saatli ? TR_TARIH_SAAT : TR_TARIH);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString(bicimDili(), saatli ? TR_TARIH_SAAT : TR_TARIH);
 }
 
 function sayi(n: number): string {
-  return n.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+  return n.toLocaleString(bicimDili(), { maximumFractionDigits: 2 });
 }
 
 function durumRengi(c: ThemeColors, durum: AdminKullaniciDurumu): string {

@@ -1,3 +1,6 @@
+import { defaultLocale } from "@projelio/shared";
+import type { Translate } from "@projelio/shared";
+import { cevirmen } from "../../common/i18n";
 /**
  * Hesap silinirken kullanıcının SAHİP OLDUĞU kaynaklara ne olacağı — saf karar.
  *
@@ -80,14 +83,17 @@ export interface BlockingOwnership {
  * sorumluluğunu yüklemek olurdu; silmek ise başkalarının verisini yok etmek.
  * İkisi de kullanıcının vereceği karar (bkz. docs/hesap-silme.md).
  */
-export function describeBlockers(blockers: BlockingOwnership[]): string | null {
+export function describeBlockers(blockers: BlockingOwnership[], t: Translate = cevirmen(defaultLocale)): string | null {
   if (blockers.length === 0) return null;
 
-  const liste = blockers.map((b) => `${b.ad} (${b.tur})`).join(", ");
-  return (
-    `Şunlarda senden başka kişiler de var: ${liste}. Hesabını silmeden önce bunların ` +
-    "sahipliğini o kişilerden birine devretmen gerekiyor — içlerindeki veri artık " +
-    "yalnızca sana ait değil. Sadece sana ait olan organizasyon ve gruplar hesapla " +
-    "birlikte silinir, onlar için bir şey yapmana gerek yok."
+  // Tür adı da çevriliyor ("organizasyon" → "organization"): cümle
+  // kullanıcının dilinde kuruluyor, parçalar ayrı ayrı değil.
+  const liste = blockers.map((b) => `${b.ad} (${t(b.tur)})`).join(", ");
+  return t(
+    "Şunlarda senden başka kişiler de var: {liste}. Hesabını silmeden önce bunların " +
+      "sahipliğini o kişilerden birine devretmen gerekiyor — içlerindeki veri artık " +
+      "yalnızca sana ait değil. Sadece sana ait olan organizasyon ve gruplar hesapla " +
+      "birlikte silinir, onlar için bir şey yapmana gerek yok.",
+    { liste }
   );
 }

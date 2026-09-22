@@ -1,3 +1,5 @@
+// dil:anahtar-dosya — etiketler; çeviri render anında (t(...)) yapılıyor.
+import { etiketCevir } from "@projelio/shared";
 import { fmtMoney, sumByCurrency } from "../moduleConfigs";
 import { NA, countRecords, groupBy, percent, recordsOf, recordsOfAll, sumMoney, BUTCE_DEFTERI, type PanelConfig } from "./types";
 
@@ -87,7 +89,7 @@ export const managementAnalysisPanel: PanelConfig = {
       compute: (ctx) => {
         const LABELS: Record<string, string> = {
           not_started: "Başlanmadı", // dil:anahtar
-          in_progress: "Devam ediyor",
+          in_progress: "Devam ediyor", // dil:anahtar
           done: "Tamamlandı", // dil:anahtar
         };
         return groupBy(recordsOf(ctx, GOALS), "status", (v) => LABELS[v] ?? v);
@@ -221,7 +223,7 @@ export const digitalMarketingPanel: PanelConfig = {
         ),
       hint: (ctx) => {
         const toplam = countRecords(ctx, [SEO]);
-        return toplam ? `${toplam} kelime takipte` : undefined;
+        return toplam ? etiketCevir("{toplam} kelime takipte", { toplam }) : undefined;
       },
     },
   ],

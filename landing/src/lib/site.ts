@@ -75,6 +75,18 @@ export const appLinks = {
 };
 
 /**
+ * Panel bağlantısına sitenin dilini ekler (`?lang=en`).
+ *
+ * Panel dili tarayıcıdan tahmin ediyor; sitede İngilizce okuyan birinin
+ * tarayıcısı başka bir dilde olabilir ve panele geçince Türkçe bir kayıt
+ * ekranıyla karşılaşıyordu. Panel bu parametreyi okuyup seçim sayıyor
+ * (bkz. apps/web/src/lib/i18n/index.tsx adrestekiDil).
+ */
+export function dilliAdres(url: string, locale: string): string {
+  return `${url}${url.includes("?") ? "&" : "?"}lang=${encodeURIComponent(locale)}`;
+}
+
+/**
  * "Bu paketi seç" bağlantısı — panelin paket ekranına, seçim önceden işaretli
  * olarak gider. Giriş yapılmamışsa panel kişiyi giriş ekranına yollar ve
  * girişten sonra BU adrese geri getirir (bkz. apps/web/src/App.tsx hedef).

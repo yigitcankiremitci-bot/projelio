@@ -66,7 +66,7 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
       onSaved();
       onClose();
     } catch (err: any) {
-      setError(String(err?.message ?? "Blok kaydedilemedi."));
+      setError(String(err?.message ?? t("Blok kaydedilemedi.")));
     } finally {
       setSaving(false);
     }
@@ -80,13 +80,13 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
       onSaved();
       onClose();
     } catch (err: any) {
-      setError(String(err?.message ?? "Blok silinemedi."));
+      setError(String(err?.message ?? t("Blok silinemedi.")));
       setSaving(false);
     }
   };
 
   return (
-    <Modal title={editing ? "Zaman bloğu" : "Yeni zaman bloğu"} onClose={onClose} maxWidth={440}>
+    <Modal title={editing ? t("Zaman bloğu") : t("Yeni zaman bloğu")} onClose={onClose} maxWidth={440}>
       {block?.linkedTitle && (
         <div
           style={{
@@ -107,7 +107,7 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder={block?.linkedTitle ?? "Ne üzerinde çalışacaksın?"}
+        placeholder={block?.linkedTitle ?? t("Ne üzerinde çalışacaksın?")}
         style={inputStyle(c)}
       />
 
@@ -126,7 +126,7 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
         </div>
       </div>
       <div style={{ fontSize: 12, color: minutes > 0 ? c.textSecondary : c.danger, marginTop: 4 }}>
-        {minutes > 0 ? formatDuration(minutes) : "Bitiş saati başlangıçtan sonra olmalı"}
+        {minutes > 0 ? formatDuration(minutes) : t("Bitiş saati başlangıçtan sonra olmalı")}
       </div>
 
       <label style={{ ...labelStyle(c), marginTop: 14 }}>{t("Odak alanı")}</label>
@@ -164,14 +164,14 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
           </button>
           <button onClick={save} disabled={saving} style={primaryButton(c, saving)}>
             data-primary
-            {saving ? "Kaydediliyor…" : "Kaydet"}
+            {saving ? t("Kaydediliyor…") : t("Kaydet")}
           </button>
         </div>
       </div>
 
       {editing && (
         <p style={{ fontSize: 12, color: c.textSecondary, margin: "12px 0 0", lineHeight: 1.5 }}>
-          Bloğu silmek bağlı olduğu işi silmez; yalnızca o işe ayırdığın zamanı takvimden kaldırır.
+          {t("Bloğu silmek bağlı olduğu işi silmez; yalnızca o işe ayırdığın zamanı takvimden kaldırır.")}
         </p>
       )}
     </Modal>

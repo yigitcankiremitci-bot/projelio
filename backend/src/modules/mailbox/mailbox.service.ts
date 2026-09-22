@@ -339,7 +339,7 @@ export class MailboxService {
       return { row, token };
     } catch (err) {
       // Bağlantı düştüyse kullanıcıya tek cümleyle söylüyoruz; ham hata log'da.
-      const message = "Posta bağlantısı geçersiz. Kutuyu bağlayan kişinin yeniden bağlanması gerekiyor.";
+      const message = "Posta bağlantısı geçersiz. Kutuyu bağlayan kişinin yeniden bağlanması gerekiyor."; // dil:anahtar
       this.logger.warn(`Posta jetonu alınamadı (kutu ${accountId}): ${(err as Error).message}`);
       await this.supabase.client
         .from("mail_accounts")

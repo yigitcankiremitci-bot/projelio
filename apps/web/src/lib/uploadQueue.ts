@@ -3,6 +3,7 @@ import type { ProjectFile } from "@projelio/shared";
 import { filesApi, uploadFile, type FileContext, type UploadTarget } from "../api/files";
 import { toDroppedFiles, type DroppedFile } from "./dropFiles";
 import { uploadScope } from "./uploadScope";
+import { cevirmenSuAn } from "./i18n/anlik";
 
 /**
  * Dosya yükleme kuyruğu — bileşenlerin DIŞINDA yaşar.
@@ -87,9 +88,10 @@ export function getUploads(scope?: string): UploadJob[] {
  * koptuğunda tarayıcının verdiği ham metin bu oluyor. Ne olduğunu söyleyelim.
  */
 function uploadHatasi(e: any): string {
-  const mesaj = e?.message ?? "Yüklenemedi";
+  const t = cevirmenSuAn();
+  const mesaj = e?.message ?? t("Yüklenemedi");
   if (/failed to fetch|networkerror|load failed/i.test(mesaj)) {
-    return "Bağlantı koptu, dosya yüklenemedi. İnternetini kontrol edip tekrar dene.";
+    return t("Bağlantı koptu, dosya yüklenemedi. İnternetini kontrol edip tekrar dene.");
   }
   return mesaj;
 }
@@ -123,6 +125,7 @@ function remove(id: string): void {
 }
 
 async function work(): Promise<void> {
+  const t = cevirmenSuAn();
   if (working) return;
   working = true;
   try {
@@ -196,7 +199,7 @@ async function work(): Promise<void> {
           for (const waiting of queue) {
             if (waiting.status !== "uploading") continue;
             waiting.status = "error";
-            waiting.error = "Çok fazla dosya yüklendi, biraz sonra tekrar dene.";
+            waiting.error = t("Çok fazla dosya yüklendi, biraz sonra tekrar dene.");
           }
           emit();
           break;

@@ -14,6 +14,7 @@ import { selectedLioTasks } from "../../lib/askLio";
 import { sortTasks, type TaskSortMode } from "../../lib/taskSort";
 import { useUndo } from "../../lib/undo";
 import { useT } from "../../lib/i18n";
+import { bicimDili } from "../../lib/i18n/depo";
 
 type CreateOptions = { weekNumber?: number; deadline?: string; startDate?: string };
 export type ViewMode = "project" | "day" | "week" | "month" | "year";
@@ -170,7 +171,7 @@ export default function ProcessPanel({
       // Arşivleme geri alınabilir: her görev zaten tekil /restore uç noktasına
       // sahip ve o uç nokta alt görevleri de kendiliğinden geri getiriyor.
       pushUndo({
-        label: `${ids.length} görev arşivleme`,
+        label: t("{n} görev arşivleme", { n: ids.length }),
         run: async () => {
           await Promise.all(ids.map((id) => api.patch(`/tasks/${id}/restore`, {})));
         },
@@ -194,7 +195,7 @@ export default function ProcessPanel({
     if (ids.length === 0) return;
     onTasksDeleted?.(ids);
     pushDestructive({
-      label: `${ids.length} görev silme`,
+      label: t("{n} görev silme", { n: ids.length }),
       commit: () => api.post("/tasks/bulk-delete", { ids }),
       restore: () => {},
       entityIds: ids,
@@ -309,7 +310,7 @@ export default function ProcessPanel({
     Math.min(totalWeeks, Math.max(1, Math.ceil((d.getTime() - rangeStart + 1) / MS_PER_WEEK)));
 
   const dayLabel = (d: Date) =>
-    isSameDate(d, today) ? "Bugün" : d.toLocaleDateString("tr-TR", { weekday: "short", day: "numeric", month: "short" });
+    isSameDate(d, today) ? t("Bugün") : d.toLocaleDateString(bicimDili(), { weekday: "short", day: "numeric", month: "short" });
 
   // Balon renk durumu: seçili (dolu primary) / güncel ama seçili değil (hafif accent vurgu) / normal / aralık dışı
   const bubbleStyle = (active: boolean, isCurrent: boolean, inRange: boolean) => {
@@ -334,7 +335,7 @@ export default function ProcessPanel({
   const rightWeek = viewingWeek < currentWeekNum ? currentWeekNum : viewingWeek + 1;
   const weekBubbles = [leftWeek, viewingWeek, rightWeek];
   const weekIsInRange = (w: number) => w >= 1 && w <= totalWeeks;
-  const weekBubbleLabel = (w: number) => (w === currentWeekNum ? `Bu hafta · ${w}. hafta` : `${w}. hafta`);
+  const weekBubbleLabel = (w: number) => (w === currentWeekNum ? t("Bu hafta · {w}. hafta", { w }) : t("{w}. hafta", { w }));
 
   // Ay gezinme: gün ve hafta seçeneklerindeki ile aynı ok tabanlı gezinme.
   const monthNumberForDate = (d: Date) => Math.min(totalMonths, Math.max(1, Math.ceil(weekNumberForDate(d) / WEEKS_PER_MONTH)));
@@ -389,11 +390,11 @@ export default function ProcessPanel({
   });
 
   const modeButtons: { key: ViewMode; label: string }[] = [
-    { key: "project", label: "Proje" },
-    { key: "day", label: "Gün" },
-    { key: "week", label: "Hafta" },
-    { key: "month", label: "Ay" },
-    ...(showYearOption ? [{ key: "year" as ViewMode, label: "Yıl" }] : []),
+    { key: "project", label: t("Proje") },
+    { key: "day", label: t("Gün") },
+    { key: "week", label: t("Hafta") },
+    { key: "month", label: t("Ay") },
+    ...(showYearOption ? [{ key: "year" as ViewMode, label: t("Yıl") }] : []),
   ];
 
   return (
@@ -401,17 +402,17 @@ export default function ProcessPanel({
       <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
-            {new Date(project.startDate).toLocaleDateString("tr-TR")}
+            {new Date(project.startDate).toLocaleDateString(bicimDili())}
           </span>
           <div style={{ flex: 1, height: 8, borderRadius: 4, background: c.border, overflow: "hidden", position: "relative" }}>
             <div style={{ width: `${pct}%`, height: "100%", background: c.accent, borderRadius: 4, transition: "width 0.15s ease" }} />
           </div>
           <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
-            {new Date(project.deadline).toLocaleDateString("tr-TR")}
+            {new Date(project.deadline).toLocaleDateString(bicimDili())}
           </span>
         </div>
         <p style={{ textAlign: "center", fontSize: 15, color: c.textPrimary, margin: "10px 0 0" }}>
-          Görevlerin %{pct}'si tamamlandı ({done}/{total})
+          {t("Görevlerin %{yuzde}'si tamamlandı ({biten}/{toplam})", { yuzde: pct, biten: done, toplam: total })}
         </p>
 
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${c.border}` }}>
@@ -460,7 +461,7 @@ export default function ProcessPanel({
                   const inRange = isWithinProject(d);
                   const active = isSameDate(d, selectedDay);
                   const isCurrent = isSameDate(d, today);
-                  const label = isCurrent ? `Bugün · ${d.toLocaleDateString("tr-TR")}` : dayLabel(d);
+                  const label = isCurrent ? t("Bugün · {p1}", { p1: d.toLocaleDateString(bicimDili()) }) : dayLabel(d);
                   const s = bubbleStyle(active, isCurrent, inRange);
                   return (
                     <button
@@ -556,7 +557,7 @@ export default function ProcessPanel({
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {inRange ? weekBubbleLabel(w) : `${w}. hafta`}
+                      {inRange ? weekBubbleLabel(w) : t("{w}. hafta", { w })}
                     </button>
                   );
                 })}
@@ -565,7 +566,7 @@ export default function ProcessPanel({
               <button
                 onClick={goNextWeek}
                 disabled={!canGoNextWeek}
-                aria-label="Sonraki hafta"
+                aria-label={t("Sonraki hafta")}
                 style={{
                   width: 26,
                   height: 26,
@@ -638,7 +639,7 @@ export default function ProcessPanel({
               <button
                 onClick={goNextMonth}
                 disabled={!canGoNextMonth}
-                aria-label="Sonraki ay"
+                aria-label={t("Sonraki ay")}
                 style={{
                   width: 26,
                   height: 26,
@@ -678,7 +679,7 @@ export default function ProcessPanel({
                       fontWeight: 500,
                     }}
                   >
-                    {y}. yıl
+                    {t("{n}. yıl", { n: y })}
                     {count > 0 && (
                       <span
                         style={{
@@ -705,29 +706,29 @@ export default function ProcessPanel({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
             <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
               {viewMode === "project" && project.title}
-              {viewMode === "day" && `${dayLabel(selectedDay)} · ${selectedDay.toLocaleDateString("tr-TR")}`}
-              {viewMode === "week" && selectedWeek != null && `${selectedWeek}. hafta`}
+              {viewMode === "day" && `${dayLabel(selectedDay)} · ${selectedDay.toLocaleDateString(bicimDili())}`}
+              {viewMode === "week" && selectedWeek != null && t("{selectedWeek}. hafta", { selectedWeek })}
               {viewMode === "month" && selectedMonth != null && `Ay ${selectedMonth}`}
-              {viewMode === "year" && selectedYear != null && `${selectedYear}. yıl`}
+              {viewMode === "year" && selectedYear != null && t("{selectedYear}. yıl", { selectedYear })}
             </h4>
             {viewMode === "project" && (
               <span style={{ fontSize: 13, color: c.textSecondary }}>
-                {new Date(project.startDate).toLocaleDateString("tr-TR")} – {new Date(project.deadline).toLocaleDateString("tr-TR")}
+                {new Date(project.startDate).toLocaleDateString(bicimDili())} – {new Date(project.deadline).toLocaleDateString(bicimDili())}
               </span>
             )}
             {viewMode === "week" && selectedWeek != null && (
               <span style={{ fontSize: 13, color: c.textSecondary }}>
-                {weekRange(selectedWeek).start.toLocaleDateString("tr-TR")} – {weekRange(selectedWeek).end.toLocaleDateString("tr-TR")}
+                {weekRange(selectedWeek).start.toLocaleDateString(bicimDili())} – {weekRange(selectedWeek).end.toLocaleDateString(bicimDili())}
               </span>
             )}
             {viewMode === "month" && selectedMonth != null && (
               <span style={{ fontSize: 13, color: c.textSecondary }}>
-                {monthRange(selectedMonth).start.toLocaleDateString("tr-TR")} – {monthRange(selectedMonth).end.toLocaleDateString("tr-TR")}
+                {monthRange(selectedMonth).start.toLocaleDateString(bicimDili())} – {monthRange(selectedMonth).end.toLocaleDateString(bicimDili())}
               </span>
             )}
             {viewMode === "year" && selectedYear != null && (
               <span style={{ fontSize: 13, color: c.textSecondary }}>
-                {yearRange(selectedYear).start.toLocaleDateString("tr-TR")} – {yearRange(selectedYear).end.toLocaleDateString("tr-TR")}
+                {yearRange(selectedYear).start.toLocaleDateString(bicimDili())} – {yearRange(selectedYear).end.toLocaleDateString(bicimDili())}
               </span>
             )}
           </div>
@@ -813,7 +814,7 @@ export default function ProcessPanel({
           {confirmingBulkAction === "archive" && (
             <ConfirmDialog
               title={t("Görevleri arşivle")}
-              message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.`}
+              message={t("{n} görevi (varsa alt görevleriyle birlikte) arşive taşımak istediğine emin misin? Arşivlenen görevler bu listeden kalkar, arşivden geri getirilebilir.", { n: selection.selectedIds.size })}
               confirmLabel={t("Arşivle")}
               danger={false}
               onCancel={() => setConfirmingBulkAction(null)}
@@ -823,8 +824,8 @@ export default function ProcessPanel({
           {confirmingBulkAction === "delete" && (
             <ConfirmDialog
               title={t("Görevleri sil")}
-              message={`${selection.selectedIds.size} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.`}
-              confirmLabel="Sil"
+              message={t("{n} görevi (varsa alt görevleriyle birlikte) silmek istediğine emin misin? Silindikten sonra birkaç saniye içinde Cmd/Ctrl+Z ile geri alabilirsin, sonrasında kalıcı olarak silinir.", { n: selection.selectedIds.size })}
+              confirmLabel={t("Sil")}
               danger
               onCancel={() => setConfirmingBulkAction(null)}
               onConfirm={handleDeleteSelected}

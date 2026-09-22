@@ -67,7 +67,7 @@ export default function CreateOutputModal({ projectId, departmentId, onClose, on
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Oluşturuluyor…" : "Çıktı oluştur"}
+          {loading ? t("Oluşturuluyor…") : t("Çıktı oluştur")}
         </button>
       </form>
     </Modal>

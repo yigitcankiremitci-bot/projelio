@@ -1,4 +1,6 @@
 import type { PlanTimeBlock } from "@projelio/shared";
+import { etkinDil } from "./i18n/depo";
+import { cevirmenSuAn } from "./i18n/anlik";
 
 /**
  * Takvim gridinin ölçü ve tarih matematiği.
@@ -18,20 +20,20 @@ export const SNAP_MINUTES = 15;
 /** Blok yüksekliği ne kadar kısa olursa olsun başlık okunabilsin. */
 export const MIN_BLOCK_HEIGHT = 22;
 
-export const WEEKDAY_LABELS = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+export const WEEKDAY_LABELS = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"]; // dil:anahtar
 export const MONTH_LABELS = [
-  "Ocak",
-  "Şubat",
-  "Mart",
-  "Nisan",
-  "Mayıs",
-  "Haziran",
-  "Temmuz",
-  "Ağustos",
-  "Eylül",
-  "Ekim",
-  "Kasım",
-  "Aralık",
+  "Ocak", // dil:anahtar
+  "Şubat", // dil:anahtar
+  "Mart", // dil:anahtar
+  "Nisan", // dil:anahtar
+  "Mayıs", // dil:anahtar
+  "Haziran", // dil:anahtar
+  "Temmuz", // dil:anahtar
+  "Ağustos", // dil:anahtar
+  "Eylül", // dil:anahtar
+  "Ekim", // dil:anahtar
+  "Kasım", // dil:anahtar
+  "Aralık", // dil:anahtar
 ];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -85,23 +87,28 @@ export function dayOfMonth(value: string): number {
   return parseDay(value).getUTCDate();
 }
 
-/** "12 Ağustos 2026 Çarşamba" */
+// Tarih etiketleri arayüz diliyle üretilir. Ay ve gün adları elle yazılmış
+// Türkçe dizilerden geliyordu; İngilizce arayüzde takvim "12 Ağustos 2026
+// Çarşamba" gösteriyordu. Intl her iki dilde de aynı biçimi veriyor.
+const tarihDili = () => (etkinDil() === "en" ? "en-GB" : "tr-TR");
+
+/** "12 Ağustos 2026 Çarşamba" / "12 August 2026 Wednesday" */
 export function longDayLabel(value: string): string {
   const d = parseDay(value);
-  const weekdayFull = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
-  return `${d.getUTCDate()} ${MONTH_LABELS[d.getUTCMonth()]} ${d.getUTCFullYear()} ${weekdayFull[d.getUTCDay()]}`;
+  const f = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(tarihDili(), { timeZone: "UTC", ...o }).format(d);
+  return `${f({ day: "numeric", month: "long", year: "numeric" })} ${f({ weekday: "long" })}`;
 }
 
-/** "12 Ağu" */
+/** "12 Ağu" / "12 Aug" */
 export function shortDayLabel(value: string): string {
   const d = parseDay(value);
-  return `${d.getUTCDate()} ${MONTH_LABELS[d.getUTCMonth()].slice(0, 3)}`;
+  return new Intl.DateTimeFormat(tarihDili(), { timeZone: "UTC", day: "numeric", month: "short" }).format(d).replace(".", "");
 }
 
 /** "Ağustos 2026" */
 export function monthLabel(value: string): string {
   const d = parseDay(value);
-  return `${MONTH_LABELS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  return new Intl.DateTimeFormat(tarihDili(), { timeZone: "UTC", month: "long", year: "numeric" }).format(d);
 }
 
 export function eachDay(from: string, to: string): string[] {
@@ -132,9 +139,10 @@ export function formatDuration(minutes: number): string {
   const m = Math.max(0, Math.round(minutes));
   const h = Math.floor(m / 60);
   const rest = m % 60;
-  if (h === 0) return `${rest} dk`;
-  if (rest === 0) return `${h} sa`;
-  return `${h} sa ${rest} dk`;
+  const t = cevirmenSuAn();
+  if (h === 0) return t("{dk} dk", { dk: rest });
+  if (rest === 0) return t("{sa} sa", { sa: h });
+  return t("{sa} sa {dk} dk", { sa: h, dk: rest });
 }
 
 /**

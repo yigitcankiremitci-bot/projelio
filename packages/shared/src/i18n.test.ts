@@ -19,11 +19,15 @@ test("normalizeLocale bölgeli etiketi ana dile indirger", () => {
   assert.equal(normalizeLocale(undefined), null);
 });
 
-test("resolveLocale ilk tanınan adayı seçer, yoksa Türkçeye düşer", () => {
+test("resolveLocale: ilk dil Türkçeyse Türkçe, değilse İngilizce, aday yoksa Türkçe", () => {
   assert.equal(resolveLocale([null, "de", "en-GB"]), "en");
+  // Listede Türkçe olsa da birinci dil Almanca: İngilizce.
+  assert.equal(resolveLocale(["de-DE", "tr"]), "en");
+  assert.equal(resolveLocale(["tr-TR", "en"]), "tr");
   assert.equal(resolveLocale(["tr", "en"]), "tr");
   assert.equal(resolveLocale([]), "tr");
-  assert.equal(resolveLocale(["fr", "de"]), "tr");
+  assert.equal(resolveLocale(["fr", "de"]), "en");
+  assert.equal(resolveLocale([null, undefined, ""]), "tr");
 });
 
 test("parseAcceptLanguage q değerine göre sıralar", () => {

@@ -1,4 +1,5 @@
 import { ForbiddenException } from "@nestjs/common";
+import { hataMetni } from "./i18n/index";
 
 /**
  * HERKESE AÇIK DEMO HESABI
@@ -46,6 +47,6 @@ export function demoKullanicisiMi(userId: string | null | undefined): boolean {
 export function demoHesabindaYasak(userId: string, islem: string): void {
   if (!demoKullanicisiMi(userId)) return;
   throw new ForbiddenException(
-    `Bu bir demo hesabı; ${islem} kapalı. Kendi hesabını açarsan her şeyi değiştirebilirsin.`
+    hataMetni("Bu bir demo hesabı; {islem} kapalı. Kendi hesabını açarsan her şeyi değiştirebilirsin.", { islem })
   );
 }

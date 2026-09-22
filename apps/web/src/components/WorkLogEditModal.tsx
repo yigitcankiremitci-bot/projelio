@@ -69,7 +69,7 @@ export default function WorkLogEditModal({ entry, onClose, onSaved }: Props) {
       });
       onSaved(guncel);
     } catch (err) {
-      setHata(err instanceof Error ? err.message : "Kayıt güncellenemedi");
+      setHata(err instanceof Error ? err.message : t("Kayıt güncellenemedi"));
       setKaydediliyor(false);
     }
   };

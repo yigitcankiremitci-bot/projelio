@@ -9,6 +9,12 @@ import { useT } from "../lib/i18n";
 
 interface Props {
   /** Türkçe -i hâli, örn. "İşi", "Projeyi", "Görevi", "Alt görevi", "Çıktıyı" */
+  /**
+   * Cümle içindeki nesne: "{nesne} sil", "{nesne} arşive ekle". Türkçede belirtme
+   * hâlinde gelir ("İşi"), çağıran `t("İşi", { ctx: "nesne" })` ile çevirir —
+   * İngilizcede küçük harfli ad ("job") olur ve kalıp "Delete job" diye kurulur.
+   * Eskiden kalıp burada Türkçe yazılıydı; İngilizce arayüzde "İşi sil" çıkıyordu.
+   */
   entityLabel: string;
   archiveMessage: string;
   deleteMessage: string;
@@ -59,7 +65,7 @@ export default function EntityDangerZone({
     if (affectsSidebar) notifySidebarChanged();
     if (!resourcePath) return;
     pushUndo({
-      label: `${entityLabel} arşivleme`,
+      label: t("{nesne} arşivleme", { nesne: entityLabel }),
       run: async () => {
         await api.patch(`${resourcePath}/restore`, {});
         if (affectsSidebar) notifySidebarChanged();
@@ -80,7 +86,7 @@ export default function EntityDangerZone({
     // silinmiş gibi davranır, gerçek DELETE birkaç saniye sonra gider. Bu
     // pencerede Cmd+Z basılırsa istek hiç gönderilmez.
     pushDestructive({
-      label: `${entityLabel} silme`,
+      label: t("{nesne} silme", { nesne: entityLabel }),
       // Sidebar haberi DELETE gittikten SONRA verilir: geri alma penceresi
       // boyunca kayıt sunucuda hâlâ duruyor, erken tazeleme onu geri getirirdi.
       commit: async () => {
@@ -104,7 +110,7 @@ export default function EntityDangerZone({
           style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: c.textSecondary, fontSize: 16, padding: 0 }}
         >
           <IconArchive size={14} color={c.textSecondary} />
-          {entityLabel} arşive ekle
+          {t("{nesne} arşive ekle", { nesne: entityLabel })}
         </button>
       )}
       {onDelete && (
@@ -114,13 +120,13 @@ export default function EntityDangerZone({
           style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: c.danger, fontSize: 16, padding: 0 }}
         >
           <IconTrash size={14} color={c.danger} />
-          {entityLabel} sil
+          {t("{nesne} sil", { nesne: entityLabel })}
         </button>
       )}
 
       {confirming === "archive" && onArchive && (
         <ConfirmDialog
-          title={`${entityLabel} arşive ekle`}
+          title={t("{nesne} arşive ekle", { nesne: entityLabel })}
           message={archiveMessage}
           confirmLabel={t("Arşive ekle")}
           danger={false}
@@ -130,9 +136,9 @@ export default function EntityDangerZone({
       )}
       {confirming === "delete" && onDelete && (
         <ConfirmDialog
-          title={`${entityLabel} sil`}
+          title={t("{nesne} sil", { nesne: entityLabel })}
           message={deleteMessage}
-          confirmLabel="Sil"
+          confirmLabel={t("Sil")}
           danger
           onCancel={() => setConfirming(null)}
           onConfirm={handleDelete}

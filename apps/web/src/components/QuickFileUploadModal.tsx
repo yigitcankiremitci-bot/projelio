@@ -98,7 +98,7 @@ export default function QuickFileUploadModal({
   );
 
   return (
-    <Modal title="Dosya ekle" onClose={onClose}>
+    <Modal title={t("Dosya ekle")} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {targets.length === 0 ? (
           <p style={{ fontSize: 15, color: c.textSecondary, margin: 0 }}>{emptyMessage}</p>
@@ -150,8 +150,7 @@ export default function QuickFileUploadModal({
 
             {driveMissing ? (
               <p style={{ fontSize: 15, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
-                Dosya yükleyebilmek için önce Google Drive ya da OneDrive hesabını bağla (Ayarlar &gt; Bağlı
-                hesaplar).
+                {t("Dosya yükleyebilmek için önce Google Drive ya da OneDrive hesabını bağla (Ayarlar > Bağlı hesaplar).")}
               </p>
             ) : pendingFiles?.length ? null : (
               <>

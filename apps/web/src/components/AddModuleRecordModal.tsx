@@ -95,7 +95,7 @@ export default function AddModuleRecordModal({
       onSaved(saved);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kaydedilemedi");
+      setError(err instanceof Error ? err.message : t("Kaydedilemedi"));
       setSaving(false);
     }
   };
@@ -107,7 +107,7 @@ export default function AddModuleRecordModal({
             `data` alanını günceller, kaydı başka departmana taşımaz. */}
         {!record && departments && departments.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Departman (opsiyonel)</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Departman (opsiyonel)")}</label>
             <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: "100%" }}>
               <option value="">{t("Genel")}</option>
               {departments.map((d) => (
@@ -152,7 +152,7 @@ export default function AddModuleRecordModal({
             fontWeight: 500,
           }}
         >
-          {saving ? "Kaydediliyor…" : kaydetLabel}
+          {saving ? t("Kaydediliyor…") : kaydetLabel}
         </button>
       </div>
     </Modal>

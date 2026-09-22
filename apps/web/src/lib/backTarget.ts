@@ -92,20 +92,20 @@ export function nextBackMemo(prev: BackMemo | null, pathname: string, from: unkn
  * sayfa kendi sabit ebeveynine düşer (zaten doğru olan davranış).
  */
 const SAYFA_ADLARI: Record<string, string> = {
-  "/": "Ana Sayfa",
-  "/tasks": "Yapılacaklar",
-  "/calendar": "Takvim",
-  "/organizations": "Şirketler",
-  "/groups": "Gruplar",
-  "/archive": "Arşiv",
-  "/settings": "Ayarlar",
+  "/": "Ana Sayfa", // dil:anahtar
+  "/tasks": "Yapılacaklar", // dil:anahtar
+  "/calendar": "Takvim", // dil:anahtar
+  "/organizations": "Şirketler", // dil:anahtar
+  "/groups": "Gruplar", // dil:anahtar
+  "/archive": "Arşiv", // dil:anahtar
+  "/settings": "Ayarlar", // dil:anahtar
 };
 
 /** Anasayfanın sekmeleri ayrı birer sayfa gibi geziliyor (bkz. Dashboard ?tab=). */
 const ANASAYFA_SEKMELERI: Record<string, string> = {
-  budget: "Kasa",
-  files: "Dosyalar",
-  modules: "Modüller",
+  budget: "Kasa", // dil:anahtar
+  files: "Dosyalar", // dil:anahtar
+  modules: "Modüller", // dil:anahtar
 };
 
 /**

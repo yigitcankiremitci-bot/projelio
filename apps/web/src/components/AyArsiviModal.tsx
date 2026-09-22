@@ -1,3 +1,4 @@
+import { bicimDili } from "../lib/i18n/depo";
 import { useEffect, useState } from "react";
 import { faturalarApi, type FaturaKapsami } from "../api/faturalar";
 import { useT } from "../lib/i18n";
@@ -23,8 +24,10 @@ function sonAylar(bugun = new Date()): string[] {
 
 function ayEtiketi(ay: string): string {
   const [yil, no] = ay.split("-");
-  const adlar = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
-  return `${adlar[Number(no) - 1]} ${yil}`;
+  // Ay adı arayüz diliyle (bkz. lib/i18n/depo bicimDili).
+  return new Intl.DateTimeFormat(bicimDili(), { month: "long", year: "numeric", timeZone: "UTC" }).format(
+    new Date(Date.UTC(Number(yil), Number(no) - 1, 1))
+  );
 }
 
 /**

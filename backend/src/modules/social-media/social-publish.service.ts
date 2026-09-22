@@ -4,6 +4,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { InstagramPublishService, PublishError } from "./instagram-publish.service";
 import { buildCaption, instagramCollaborators, MAX_INSTAGRAM_COLLABORATORS, mediaFileIds } from "./publish-format";
 import { isMissingRelation, SocialMediaService, type SocialScope } from "./social-media.service";
+import type { Metin } from "../../common/i18n";
 
 /**
  * Yayının orkestrasyonu: kim, neyi, hangi hesaba, ne zaman.
@@ -176,7 +177,7 @@ export class SocialPublishService {
           post,
           "social_post_published",
           "Instagram gönderisi yayımlandı",
-          `"${post.title}" @${account.handle} hesabında yayımlandı.`,
+          { metin: '"{baslik}" @{hesap} hesabında yayımlandı.', params: { baslik: post.title, hesap: account.handle } },
           result.externalUrl
         );
       }
@@ -214,7 +215,10 @@ export class SocialPublishService {
         post,
         "social_post_failed",
         "Instagram gönderisi yayımlanamadı",
-        `"${post.title}" @${account.handle} hesabında yayımlanamadı: ${message}`
+        {
+          metin: '"{baslik}" @{hesap} hesabında yayımlanamadı: {hata}',
+          params: { baslik: post.title, hesap: account.handle, hata: message },
+        }
       );
     }
   }
@@ -254,8 +258,8 @@ export class SocialPublishService {
   private async notify(
     post: any,
     type: "social_post_published" | "social_post_failed",
-    title: string,
-    body: string,
+    title: Metin,
+    body: Metin,
     link?: string
   ): Promise<void> {
     // Sorumlu yoksa içeriği açan kişi haberdar edilir; ikisi aynıysa tek bildirim.

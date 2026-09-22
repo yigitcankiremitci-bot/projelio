@@ -16,6 +16,7 @@ import {
   moneyStats,
   opts,
   userField,
+  etiketCevir,
   type ModuleRecordConfig,
 } from "./shared";
 
@@ -111,7 +112,7 @@ export const performanceConfig: ModuleRecordConfig = {
   detail: (d) =>
     joinDetail(
       labelOf(RATING, d.rating),
-      d.goalAchievement !== undefined && d.goalAchievement !== null ? `Gerçekleşme %${d.goalAchievement}` : undefined,
+      d.goalAchievement !== undefined && d.goalAchievement !== null ? etiketCevir("Gerçekleşme %{oran}", { oran: d.goalAchievement as number }) : undefined,
       d.reviewer as string
     ),
   computeStats: (records) => [

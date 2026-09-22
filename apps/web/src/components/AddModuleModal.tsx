@@ -75,7 +75,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded }: Pro
       onAdded();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Modül eklenemedi");
+      setError(err instanceof Error ? err.message : t("Modül eklenemedi"));
       setSaving(false);
     }
   };
@@ -151,7 +151,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded }: Pro
             opacity: !departmentId || selectedKeys.length === 0 ? 0.6 : 1,
           }}
         >
-          {saving ? "Ekleniyor…" : "Modülleri ekle"}
+          {saving ? t("Ekleniyor…") : t("Modülleri ekle")}
         </button>
       </div>
     </Modal>

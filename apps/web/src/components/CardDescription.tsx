@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 interface Props {
   text: string;
@@ -26,6 +27,7 @@ interface Props {
  * sığıyor.
  */
 export default function CardDescription({ text, lines = 2, style }: Props) {
+  const t = useT();
   const c = useThemeColors();
   const [expanded, setExpanded] = useState(false);
   const [clamped, setClamped] = useState(false);
@@ -57,7 +59,7 @@ export default function CardDescription({ text, lines = 2, style }: Props) {
             }
           : undefined
       }
-      title={clamped && !expanded ? "Tamamını görmek için çift tıkla" : undefined}
+      title={clamped && !expanded ? t("Tamamını görmek için çift tıkla") : undefined}
       style={{
         color: c.textSecondary,
         fontSize: 15,

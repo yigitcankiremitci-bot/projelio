@@ -1,4 +1,5 @@
 import type { PasskeyAuthOptions, PasskeyRegistrationOptions } from "@projelio/shared";
+import { cevirmenSuAn } from "./i18n";
 
 /**
  * Tarayıcı tarafındaki geçiş anahtarı (WebAuthn) işleri.
@@ -133,10 +134,11 @@ export async function anahtarlaImzala(secenekler: PasskeyAuthOptions): Promise<{
  * bıraktığı ve sonra iki anahtarı ayırt edemediği bir alan oluyordu.
  */
 export function cihazAdiOner(): string {
+  const t = cevirmenSuAn();
   const ua = navigator.userAgent;
   if (/iPhone|iPad/.test(ua)) return "iPhone / iPad";
   if (/Macintosh/.test(ua)) return "Mac";
   if (/Android/.test(ua)) return "Android";
   if (/Windows/.test(ua)) return "Windows";
-  return "Bu cihaz";
+  return t("Bu cihaz");
 }

@@ -122,7 +122,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
   // yüzden bu sayfalarda "+" düğmesi devreye girmez.
   const fabAvailable = useFabAvailable();
   useProjectFabAction(
-    departmentKey && fabAvailable ? { label: "Modül ekle", onClick: () => setAdding((v) => !v) } : null,
+    departmentKey && fabAvailable ? { label: t("Modül ekle"), onClick: () => setAdding((v) => !v) } : null,
     [organizationId, departmentKey, fabAvailable],
     // Panel önceliği: aynı sekmedeki Ürün/Hizmet paneliyle tek menüde birleşsin
     // (bkz. lib/projectFab.tsx mergeActions).
@@ -140,7 +140,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
       // Modülü kapatmak kayıtları silmez, sadece etkinliği kaldırır — geri alma
       // basitçe aynı modülü yeniden etkinleştirir.
       pushUndo({
-        label: "Modül kaldırma",
+        label: t("Modül kaldırma"),
         run: async () => {
           await api.post(`/organizations/${organizationId}/modules`, { moduleKeys: [moduleKey] });
           load();
@@ -193,7 +193,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
           <span style={{ flex: 1 }}>{notice}</span>
           <button
             onClick={() => setNotice("")}
-            aria-label="Kapat"
+            aria-label={t("Kapat")}
             style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
           >
             <IconX size={13} color={c.textSecondary} />
@@ -306,7 +306,7 @@ function AddModulesForm({
       await api.post(`/organizations/${organizationId}/modules`, { moduleKeys: selectedKeys });
       onAdded();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Modül eklenemedi");
+      setError(err instanceof Error ? err.message : t("Modül eklenemedi"));
       setSaving(false);
     }
   };
@@ -315,7 +315,7 @@ function AddModulesForm({
     <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{t("Bu departmana modül ekle")}</span>
-        <button onClick={onClose} aria-label="Kapat" style={{ background: "transparent", border: "none" }}>
+        <button onClick={onClose} aria-label={t("Kapat")} style={{ background: "transparent", border: "none" }}>
           <IconX size={16} color={c.textSecondary} />
         </button>
       </div>
@@ -355,7 +355,7 @@ function AddModulesForm({
           disabled={saving}
           style={{ padding: "9px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
         >
-          {saving ? "Ekleniyor…" : "Modülleri ekle"}
+          {saving ? t("Ekleniyor…") : t("Modülleri ekle")}
         </button>
       )}
     </div>

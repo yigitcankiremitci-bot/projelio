@@ -71,7 +71,7 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
 
     const secilen = Array.from(files).slice(0, MAX_IMAGES - total);
     if (secilen.length === 0) {
-      setError(`Bir ürüne en fazla ${MAX_IMAGES} fotoğraf eklenebilir.`);
+      setError(t("Bir ürüne en fazla {MAX_IMAGES} fotoğraf eklenebilir.", { MAX_IMAGES }));
       return;
     }
     setCropQueue(secilen);
@@ -98,7 +98,7 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
       }
       if (sonuncu) onChanged(sonuncu);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fotoğraf yüklenemedi. Tekrar dene.");
+      setError(err instanceof Error ? err.message : t("Fotoğraf yüklenemedi. Tekrar dene."));
     } finally {
       setBusy(false);
     }
@@ -115,7 +115,7 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
     try {
       onChanged(await api.delete<Product>(`/products/${productId}/images/${image.id}`));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fotoğraf silinemedi.");
+      setError(err instanceof Error ? err.message : t("Fotoğraf silinemedi."));
     } finally {
       setBusy(false);
     }
@@ -147,7 +147,7 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
     try {
       onChanged(await api.patch<Product>(`/products/${productId}/images/order`, { imageIds: sira }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sıra değiştirilemedi.");
+      setError(err instanceof Error ? err.message : t("Sıra değiştirilemedi."));
     } finally {
       setBusy(false);
     }
@@ -161,7 +161,7 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <label style={{ fontSize: 15, color: c.textSecondary }}>
-        Fotoğraflar{total > 0 ? ` (${total}/${MAX_IMAGES})` : ""}
+        {t("Fotoğraflar")}{total > 0 ? ` (${total}/${MAX_IMAGES})` : ""}
       </label>
 
       <div ref={seritRef} style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
@@ -235,7 +235,7 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
                 onClick={() => void move(index, index - 1)}
                 disabled={busy || index === 0}
                 aria-label={t("Sola taşı")}
-                title={index === 1 ? "Vitrine al" : "Sola taşı"}
+                title={index === 1 ? "Vitrine al" : t("Sola taşı")}
                 style={okStili(index === 0)}
               >
                 <IconChevronLeft size={13} color="#fff" />
@@ -277,15 +277,15 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
             }}
           >
             <IconPlus size={16} color={c.textSecondary} />
-            {busy ? "Yükleniyor…" : "Fotoğraf ekle"}
+            {busy ? t("Yükleniyor…") : t("Fotoğraf ekle")}
           </button>
         )}
       </div>
 
       <p style={{ margin: 0, fontSize: 12.5, color: c.textSecondary }}>
         {total === 0
-          ? "İlk fotoğraf ürün kartında görünür. JPEG, PNG, GIF veya WebP; en fazla 8 MB."
-          : "Soldaki fotoğraf ürün kartında görünür — oklarla sırayı değiştirebilirsin."}
+          ? t("İlk fotoğraf ürün kartında görünür. JPEG, PNG, GIF veya WebP; en fazla 8 MB.")
+          : t("Soldaki fotoğraf ürün kartında görünür — oklarla sırayı değiştirebilirsin.")}
       </p>
 
       {error && <p style={{ margin: 0, color: c.danger, fontSize: 14 }}>{error}</p>}

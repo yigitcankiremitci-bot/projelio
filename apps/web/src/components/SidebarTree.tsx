@@ -29,10 +29,10 @@ type IconComp = typeof IconBuilding;
 // (rota/JobDetail) hâlâ "program" (operation), yalnızca kullanıcıya görünen
 // etiket "Rutinler" — "Program" adı kafa karıştırıyordu.
 const JOB_LEAF_TABS: { tab: string; label: string; icon: IconComp }[] = [
-  { tab: "projects", label: "Projeler", icon: IconFolder },
-  { tab: "programs", label: "Rutinler", icon: IconActivity },
-  { tab: "team", label: "Ekip", icon: IconUser },
-  { tab: "files", label: "Dosyalar", icon: IconFile },
+  { tab: "projects", label: "Projeler", icon: IconFolder }, // dil:anahtar
+  { tab: "programs", label: "Rutinler", icon: IconActivity }, // dil:anahtar
+  { tab: "team", label: "Ekip", icon: IconUser }, // dil:anahtar
+  { tab: "files", label: "Dosyalar", icon: IconFile }, // dil:anahtar
 ];
 
 const INACTIVE_ICON = "#9AA6B4";
@@ -217,27 +217,27 @@ export default function SidebarTree() {
           onToggle={() => toggle(key)}
         />
         {isExpanded &&
-          JOB_LEAF_TABS.map((t) => {
+          JOB_LEAF_TABS.map((sekme) => {
             // Adreste sekme yoksa sayfa işin açılış sekmesindedir (bkz. Job.defaultTab).
-            const tabActive = jobActive && (searchTab === t.tab || (!searchTab && t.tab === (job.defaultTab || "projects")));
+            const tabActive = jobActive && (searchTab === sekme.tab || (!searchTab && sekme.tab === (job.defaultTab || "projects")));
 
             // "Projeler"/"Rutinler": kendi kapak resmiyle tek tek listelenen açık
             // öğeleri olduğu için (bkz. useSidebarHierarchy openProjectsByJobId/
             // openOperationsByJobId) diğer sabit sekmeler gibi düz bir link değil,
             // iş/organizasyon düğümleriyle aynı açılır-kapanır Row kullanılır.
-            if (t.tab === "projects" || t.tab === "programs") {
-              const isProjects = t.tab === "projects";
+            if (sekme.tab === "projects" || sekme.tab === "programs") {
+              const isProjects = sekme.tab === "projects";
               const items = isProjects ? openProjects : openOperations;
-              const subKey = `jobtab:${job.id}:${t.tab}`;
+              const subKey = `jobtab:${job.id}:${sekme.tab}`;
               const subExpanded = expanded.has(subKey);
               return (
-                <div key={t.tab}>
+                <div key={sekme.tab}>
                   <Row
                     // Projeler de sekmesiyle birlikte: işin açılış sekmesi başka
                     // olabilir, çıplak adres oraya düşerdi (bkz. Job.defaultTab).
-                    to={`/jobs/${job.id}?tab=${t.tab}`}
-                    icon={t.icon}
-                    label={t.label}
+                    to={`/jobs/${job.id}?tab=${sekme.tab}`}
+                    icon={sekme.icon}
+                    label={t(sekme.label)}
                     depth={depth + 1}
                     active={tabActive}
                     expandable={items.length > 0}
@@ -281,10 +281,10 @@ export default function SidebarTree() {
 
             return (
               <LeafRow
-                key={t.tab}
-                to={`/jobs/${job.id}?tab=${t.tab}`}
-                icon={t.icon}
-                label={t.label}
+                key={sekme.tab}
+                to={`/jobs/${job.id}?tab=${sekme.tab}`}
+                icon={sekme.icon}
+                label={t(sekme.label)}
                 depth={depth + 1}
                 active={tabActive}
               />

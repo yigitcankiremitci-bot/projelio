@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getModuleRecordConfig } from "../lib/moduleRecordConfigs";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 import MailboxPanel from "./MailboxPanel";
 import ModuleRecordsPanel from "./ModuleRecordsPanel";
 
@@ -41,6 +42,7 @@ export default function EmailModulePanel({
   canWrite = true,
 }: Props) {
   const c = useThemeColors();
+  const t = useT();
   const [tab, setTab] = useState<Tab>("inbox");
 
   const tabButton = (value: Tab, label: string) => (
@@ -63,8 +65,8 @@ export default function EmailModulePanel({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {tabButton("inbox", "Gelen kutusu")}
-        {tabButton("campaigns", "Kampanyalar")}
+        {tabButton("inbox", t("Gelen kutusu"))}
+        {tabButton("campaigns", t("Kampanyalar"))}
       </div>
 
       {tab === "inbox" ? (

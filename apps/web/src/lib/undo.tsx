@@ -3,6 +3,7 @@ import { Z } from "./layout";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
 import { onRoomChanged } from "./liveRoom";
+import { useT } from "./i18n";
 
 /**
  * Uygulama geneli "geri al" (Cmd+Z / Ctrl+Z) ve "ileri al" (Shift+Cmd+Z / Ctrl+Y)
@@ -161,11 +162,12 @@ export function useLatestRef<T>(value: T) {
  */
 export function useReorderUndo() {
   const { pushUndo } = useUndo();
+  const t = useT();
   return useCallback(
     (endpoint: string, previousIds: string[], nextIds: string[], reload: () => void) => {
       if (previousIds.length === 0) return;
       pushUndo({
-        label: "Sıralama",
+        label: t("Sıralama"),
         run: async () => {
           await api.patch(endpoint, { ids: previousIds });
           reload();
@@ -210,6 +212,7 @@ function isEditingText(target: EventTarget | null): boolean {
 }
 
 export function UndoProvider({ children }: { children: ReactNode }) {
+  const t = useT();
   // Yığınlar ref'te: her push'ta yeniden render etmeye gerek yok, yalnızca
   // "geri/ileri alınacak bir şey var mı" bilgisi state olarak dışarı veriliyor.
   const undoStack = useRef<Entry[]>([]);
@@ -297,7 +300,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     (label: string, totalSeconds: number) => {
       clearToastTimers();
       let remaining = totalSeconds;
-      const render = () => `${label} — ${remaining} sn içinde Cmd/Ctrl+Z ile geri alabilirsin`;
+      const render = () => t("{label} — {remaining} sn içinde Cmd/Ctrl+Z ile geri alabilirsin", { label, remaining });
       setToast(render());
       toastInterval.current = setInterval(() => {
         remaining -= 1;
@@ -329,7 +332,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
           // sonsuza dek "bekliyor" gibi gizli kalır — bkz. bug raporu).
           void Promise.resolve(dropped.commit())
             .catch(() => {
-              showToast(`${dropped.label} silinemedi, ağ bağlantını kontrol et`);
+              showToast(t("{label} silinemedi, ağ bağlantını kontrol et", { label: dropped.label }));
             })
             .finally(() => {
               if (ids.length) setPendingDeleteIds((prev) => prev.filter((x) => !ids.includes(x)));
@@ -363,7 +366,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
             // İstek başarısız oldu: sessizce yutmak yerine haber ver ve
             // listeleri tazele — aksi halde kayıt sunucuda hâlâ dururken
             // arayüzde "silinmiş" gibi görünmeye devam eder.
-            showToast(`${label} silinemedi, ağ bağlantını kontrol et`);
+            showToast(t("{label} silinemedi, ağ bağlantını kontrol et", { label }));
           })
           .finally(() => {
             forget();
@@ -426,7 +429,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     const entry = undoStack.current.pop();
     if (!entry) {
       sync();
-      showToast("Geri alınacak bir işlem yok");
+      showToast(t("Geri alınacak bir işlem yok"));
       return;
     }
     // Yığından çıkarıldığını hemen yansıt (buton/durum geri bildirimi); işlem
@@ -453,13 +456,13 @@ export function UndoProvider({ children }: { children: ReactNode }) {
             },
           });
           sync();
-          showToast(`${entry.label} geri alındı`);
+          showToast(t("{label} geri alındı", { label: entry.label }));
         })
         .catch(() => {
           // Geri alma isteği başarısız oldu: adımı yığına geri koy, sessizce kaybolmasın.
           undoStack.current.push(entry);
           sync();
-          showToast(`${entry.label} geri alınamadı, tekrar dene`);
+          showToast(t("{label} geri alınamadı, tekrar dene", { label: entry.label }));
         });
     } else {
       Promise.resolve(entry.run())
@@ -480,12 +483,12 @@ export function UndoProvider({ children }: { children: ReactNode }) {
             redoStack.current = [];
           }
           sync();
-          showToast(`${entry.label} geri alındı`);
+          showToast(t("{label} geri alındı", { label: entry.label }));
         })
         .catch(() => {
           undoStack.current.push(entry);
           sync();
-          showToast(`${entry.label} geri alınamadı, tekrar dene`);
+          showToast(t("{label} geri alınamadı, tekrar dene", { label: entry.label }));
         });
     }
   }, [bumpRefresh, registerDestructive, registerUndoable, showToast, sync]);
@@ -494,20 +497,20 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     const item = redoStack.current.pop();
     if (!item) {
       sync();
-      showToast("İleri alınacak bir işlem yok");
+      showToast(t("İleri alınacak bir işlem yok"));
       return;
     }
     sync();
     Promise.resolve(item.apply())
       .then(() => {
         sync();
-        showToast(`${item.label} ileri alındı`);
+        showToast(t("{label} ileri alındı", { label: item.label }));
       })
       .catch(() => {
         // İleri alma başarısız oldu: adımı yığına geri koy, tekrar denenebilsin.
         redoStack.current.push(item);
         sync();
-        showToast(`${item.label} ileri alınamadı, tekrar dene`);
+        showToast(t("{label} ileri alınamadı, tekrar dene", { label: item.label }));
       });
   }, [showToast, sync]);
 

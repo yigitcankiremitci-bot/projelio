@@ -8,6 +8,7 @@ import VadeRozeti from "../VadeRozeti";
 import HizmetAnlasmalari from "../butce/HizmetAnlasmalari";
 import { useUndo, useWithoutPendingDeletes } from "../../lib/undo";
 import { useT } from "../../lib/i18n";
+import { bicimDili } from "../../lib/i18n/depo";
 
 // Metinler t() ile kullanıldıkları yerde çevriliyor: modül düzeyinde kanca
 // çağrılamaz, Türkçe metin anahtar olarak kalır (bkz. BudgetPanel.tsx).
@@ -36,7 +37,7 @@ function SummaryCard({ label, amount, color }: { label: string; amount: number; 
   return (
     <div style={{ flex: 1, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "12px 14px" }}>
       <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{label}</p>
-      <p style={{ fontSize: 20, fontWeight: 600, color, margin: 0 }}>{amount.toLocaleString("tr-TR")} ₺</p>
+      <p style={{ fontSize: 20, fontWeight: 600, color, margin: 0 }}>{amount.toLocaleString(bicimDili())} ₺</p>
     </div>
   );
 }
@@ -88,7 +89,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
   const handleCreated = (tx: BudgetTransaction) => {
     setTransactions((prev) => [tx, ...prev]);
     pushUndo({
-      label: tx.type === "income" ? "Ödeme eklendi" : "Gider eklendi",
+      label: tx.type === "income" ? t("Ödeme eklendi") : t("Gider eklendi"),
       run: async () => {
         await api.delete(`/budget/transactions/${tx.id}`).catch(() => {});
         reloadTransactions();
@@ -117,7 +118,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
       reloadTransactions();
     };
     pushUndo({
-      label: "Bütçe kaydı düzenlendi",
+      label: t("Bütçe kaydı düzenlendi"),
       run: () => apply(previous),
       redo: () => apply(saved),
     });
@@ -125,7 +126,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
 
   const handleDelete = (tx: BudgetTransaction) => {
     pushDestructive({
-      label: "Bütçe kaydı silindi",
+      label: t("Bütçe kaydı silindi"),
       entityId: tx.id,
       commit: async () => {
         await api.delete(`/budget/transactions/${tx.id}`).catch(() => {});
@@ -255,9 +256,9 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", gap: 8 }}>
-        <SummaryCard label="Onaylanan" amount={approvedTotal} color={c.success} />
-        <SummaryCard label="Beklenen" amount={pendingTotal} color={c.warning} />
-        <SummaryCard label="Planlanan" amount={plannedTotal} color={c.primary} />
+        <SummaryCard label={t("Onaylanan")} amount={approvedTotal} color={c.success} />
+        <SummaryCard label={t("Beklenen")} amount={pendingTotal} color={c.warning} />
+        <SummaryCard label={t("Planlanan")} amount={plannedTotal} color={c.primary} />
         <SummaryCard label={t("Ödenen")} amount={paidTotal} color={c.accentDark} />
       </div>
 
@@ -267,7 +268,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
           <div>
             <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{t("Anlaşılan ücret")}</p>
             <p style={{ fontSize: 19, fontWeight: 600, color: c.textPrimary, margin: 0 }}>
-              {agreedFee.toLocaleString("tr-TR")} ₺
+              {agreedFee.toLocaleString(bicimDili())} ₺
             </p>
           </div>
           {fullyCollected && (
@@ -281,8 +282,8 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                 borderRadius: 20,
               }}
             >
-              Tahsilat tamam
-              {overpaid > 0 && ` · +${overpaid.toLocaleString("tr-TR")} ₺ fazla`}
+              {t("Tahsilat tamam")}
+              {overpaid > 0 && " · " + t("+{tutar} ₺ fazla", { tutar: overpaid.toLocaleString(bicimDili()) })}
             </span>
           )}
         </div>
@@ -301,7 +302,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
           <div style={{ flex: 1, minWidth: 110 }}>
             <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{t("Gelen ödeme")}</p>
             <p style={{ fontSize: 19, fontWeight: 600, color: c.success, margin: 0 }}>
-              {received.toLocaleString("tr-TR")} ₺
+              {received.toLocaleString(bicimDili())} ₺
             </p>
           </div>
           <div style={{ flex: 1, minWidth: 110 }}>
@@ -314,19 +315,19 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                 margin: 0,
               }}
             >
-              {expectedPayment.toLocaleString("tr-TR")} ₺
+              {expectedPayment.toLocaleString(bicimDili())} ₺
             </p>
           </div>
           <div style={{ flex: 1, minWidth: 110 }}>
             <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{t("Yapılan harcamalar")}</p>
             <p style={{ fontSize: 19, fontWeight: 600, color: c.danger, margin: 0 }}>
-              {totalSpent.toLocaleString("tr-TR")} ₺
+              {totalSpent.toLocaleString(bicimDili())} ₺
             </p>
           </div>
           <div style={{ flex: 1, minWidth: 110 }}>
             <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 4px" }}>{t("Net kazanç")}</p>
             <p style={{ fontSize: 19, fontWeight: 600, color: netEarned < 0 ? c.danger : c.success, margin: 0 }}>
-              {netEarned.toLocaleString("tr-TR")} ₺
+              {netEarned.toLocaleString(bicimDili())} ₺
             </p>
             <p style={{ fontSize: 12, color: c.textSecondary, margin: "2px 0 0" }}>{t("Gelen ödeme − harcama")}</p>
           </div>
@@ -371,7 +372,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
 
                   <span style={{ fontSize: 15, fontWeight: 500, color: gelir ? c.success : c.danger, flexShrink: 0 }}>
                     {gelir ? "+" : "−"}
-                    {r.amount.toLocaleString("tr-TR")} ₺
+                    {r.amount.toLocaleString(bicimDili())} ₺
                   </span>
 
                   {/* İşleme yetkisi ödemenin SAHİBİNDE: kayıt onun kasasında
@@ -404,8 +405,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
         <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>{t("Ödeme hareketleri")}</h4>
         {visibleTransactions.length === 0 ? (
           <p style={{ fontSize: 15, color: c.textSecondary }}>
-            Müşteriden tahsil ettiğin ödemeleri "gelen ödeme" olarak ekle; beklenen ödemeden otomatik düşülür. Eklemek
-            için alttaki + butonunu kullan.
+            {t("Müşteriden tahsil ettiğin ödemeleri \"gelen ödeme\" olarak ekle; beklenen ödemeden otomatik düşülür. Eklemek için alttaki + butonunu kullan.")}
           </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -435,17 +435,17 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                       background: `${color}1a`,
                     }}
                   >
-                    {isIncome ? "Gelen ödeme" : kayit.type === "payout" ? "Hakediş" : "Gider"}
+                    {isIncome ? t("Gelen ödeme") : kayit.type === "payout" ? t("Hakediş") : t("Gider")}
                   </span>
                   <span style={{ fontSize: 15, color: c.textPrimary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {kayit.description || (isIncome ? "Gelen ödeme" : "Gider")}
+                    {kayit.description || (isIncome ? t("Gelen ödeme") : t("Gider"))}
                   </span>
                   <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
-                    {new Date(kayit.createdAt).toLocaleDateString("tr-TR")}
+                    {new Date(kayit.createdAt).toLocaleDateString(bicimDili())}
                   </span>
                   <span style={{ fontSize: 15, fontWeight: 500, color, flexShrink: 0 }}>
                     {isIncome ? "+" : "-"}
-                    {kayit.amount.toLocaleString("tr-TR")} ₺
+                    {kayit.amount.toLocaleString(bicimDili())} ₺
                   </span>
 
                   {/* Düğmeler `isOwner`a BAĞLANMAZ: proje kaydında owner_id boş
@@ -503,7 +503,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                   {taskLabel(kayit)}
                 </span>
                 <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, flexShrink: 0 }}>
-                  {(kayit.budget ?? 0).toLocaleString("tr-TR")} ₺
+                  {(kayit.budget ?? 0).toLocaleString(bicimDili())} ₺
                 </span>
                 <span
                   style={{
@@ -618,7 +618,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                 <option value="">{t("Üye seç…")}</option>
                 {nonViewers.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.fullName ?? "Bilinmeyen kullanıcı"}
+                    {m.fullName ?? t("Bilinmeyen kullanıcı")}
                   </option>
                 ))}
               </select>
@@ -649,7 +649,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                     padding: "8px 12px",
                   }}
                 >
-                  <span style={{ fontSize: 15, color: c.textPrimary }}>{m.fullName ?? "Bilinmeyen kullanıcı"}</span>
+                  <span style={{ fontSize: 15, color: c.textPrimary }}>{m.fullName ?? t("Bilinmeyen kullanıcı")}</span>
                   <button
                     onClick={() => setVisibility(m, false)}
                     aria-label={t("Görüntüleme yetkisini kaldır")}

@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { hataMetni } from "./i18n/index";
 
 /**
  * Adres güvenlik kuralının SUNUCU tarafındaki kopyası.
@@ -78,7 +79,7 @@ export function safeExternalUrl(raw: string | null | undefined): string | null {
 export function requireSafeUrl(raw: string | null | undefined, field: string): string {
   const safe = safeExternalUrl(raw);
   if (!safe) {
-    throw new BadRequestException(`${field} geçersiz. http:// veya https:// ile başlayan bir adres girin.`);
+    throw new BadRequestException(hataMetni("{field} geçersiz. http:// veya https:// ile başlayan bir adres girin.", { field }));
   }
   return safe;
 }

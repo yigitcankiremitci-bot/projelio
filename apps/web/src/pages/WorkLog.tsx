@@ -12,6 +12,7 @@ import WorkLogTargetModal, { type HedefNiyeti } from "../components/WorkLogTarge
 import WorkLogEditModal from "../components/WorkLogEditModal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { IconPlay, IconPause, IconStop, IconLink, IconTrash, IconCheck, IconEdit } from "../components/icons";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * YAPTIM — kullanıcının kişisel iş günlüğü.
@@ -90,7 +91,7 @@ export default function WorkLog() {
         })
         .catch((err) => {
           if (signal?.aborted) return;
-          setHata(err instanceof Error ? err.message : "Kayıtlar yüklenemedi");
+          setHata(err instanceof Error ? err.message : t("Kayıtlar yüklenemedi"));
         })
         .finally(() => {
           if (!signal?.aborted && !sessiz) setLoading(false);
@@ -147,7 +148,7 @@ export default function WorkLog() {
   // Mobildeki "+" düğmesi bu sayfada giriş kutusuna odaklanır: yeni bir modal
   // açmak, tek satırlık bir kaydı iki tıklık bir işe dönüştürürdü.
   useProjectFabAction(
-    useMemo(() => ({ label: "Kayıt ekle", onClick: () => odaklanRef.current?.() }), []),
+    useMemo(() => ({ label: t("Kayıt ekle"), onClick: () => odaklanRef.current?.() }), []),
     []
   );
 
@@ -203,7 +204,7 @@ export default function WorkLog() {
       setEntries((prev) => [kayit, ...prev]);
       setHata("");
     } catch (err) {
-      setHata(err instanceof Error ? err.message : "Kayıt eklenemedi");
+      setHata(err instanceof Error ? err.message : t("Kayıt eklenemedi"));
     } finally {
       setKaydediliyor(false);
     }
@@ -230,7 +231,7 @@ export default function WorkLog() {
       setHata("");
     } catch (err) {
       setEntries(onceki);
-      setHata(err instanceof Error ? err.message : "Kayıt güncellenemedi");
+      setHata(err instanceof Error ? err.message : t("Kayıt güncellenemedi"));
     }
   };
 
@@ -243,7 +244,7 @@ export default function WorkLog() {
       await worklog.update(entry.id, { duration: dakika });
     } catch (err) {
       setEntries(onceki);
-      setHata(err instanceof Error ? err.message : "Süre kaydedilemedi");
+      setHata(err instanceof Error ? err.message : t("Süre kaydedilemedi"));
     }
   };
 
@@ -259,7 +260,7 @@ export default function WorkLog() {
       // durdurmuyor (bkz. migration 101).
       setEntries((prev) => prev.map((e) => (e.id === guncel.id ? guncel : e)));
     } catch (err) {
-      setHata(err instanceof Error ? err.message : "Kronometre değiştirilemedi");
+      setHata(err instanceof Error ? err.message : t("Kronometre değiştirilemedi"));
     }
   };
 
@@ -271,7 +272,7 @@ export default function WorkLog() {
       await worklog.archive(entry.id);
     } catch (err) {
       setEntries(onceki);
-      setHata(err instanceof Error ? err.message : "Kayıt silinemedi");
+      setHata(err instanceof Error ? err.message : t("Kayıt silinemedi"));
     }
   };
 
@@ -784,7 +785,7 @@ function gunBasligi(gun: string, t: (metin: string) => string): string {
   const dun = new Date();
   dun.setDate(dun.getDate() - 1);
   if (gun === yerelGun(dun)) return t("Dün");
-  return new Date(`${gun}T12:00:00`).toLocaleDateString("tr-TR", {
+  return new Date(`${gun}T12:00:00`).toLocaleDateString(bicimDili(), {
     day: "numeric",
     month: "long",
     weekday: "long",

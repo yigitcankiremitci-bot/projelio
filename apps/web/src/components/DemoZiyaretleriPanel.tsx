@@ -8,6 +8,8 @@ import {
 } from "@projelio/shared";
 import { demoZiyaretleri, type DemoZiyaretAnalitigi } from "../api/demoZiyaretleri";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 /**
  * Admin > Demo ziyaretleri — demoya girenler önce neyi merak ediyor?
@@ -20,19 +22,19 @@ import { useThemeColors } from "../theme/useThemeColors";
 const OZELLIK_ADLARI: Record<string, string> = {
   pano: "Ana pano",
   lio: "Lio (asistan)",
-  is: "İşler",
-  proje: "Projeler",
+  is: "İşler", // dil:anahtar
+  proje: "Projeler", // dil:anahtar
   rutin: "Rutinler",
   organizasyon: "Organizasyonlar",
   departman: "Departmanlar",
   holding: "Holdingler",
-  takvim: "Takvim",
-  gorevler: "Görevler",
-  yaptim: "Yaptım",
-  ayarlar: "Ayarlar",
+  takvim: "Takvim", // dil:anahtar
+  gorevler: "Görevler", // dil:anahtar
+  yaptim: "Yaptım", // dil:anahtar
+  ayarlar: "Ayarlar", // dil:anahtar
   "lio-bakiyesi": "Lio Bakiyesi",
   abonelik: "Abonelik",
-  arsiv: "Arşiv",
+  arsiv: "Arşiv", // dil:anahtar
 };
 
 function ozellikAdi(anahtar: string): string {
@@ -42,18 +44,18 @@ function ozellikAdi(anahtar: string): string {
 
 const SAYFA_ADLARI: Record<string, string> = {
   "/": "Ana pano",
-  "/jobs/:id": "İş kapağı",
-  "/projects/:id": "Proje",
+  "/jobs/:id": "İş kapağı", // dil:anahtar
+  "/projects/:id": "Proje", // dil:anahtar
   "/operations/:id": "Rutin",
   "/organizations": "Organizasyon listesi",
   "/organizations/:id": "Organizasyon",
   "/departments/:id": "Departman",
   "/groups": "Holding listesi",
   "/groups/:id": "Holding",
-  "/calendar": "Takvim",
-  "/tasks": "Görevler",
-  "/worklog": "Yaptım",
-  "/settings": "Ayarlar",
+  "/calendar": "Takvim", // dil:anahtar
+  "/tasks": "Görevler", // dil:anahtar
+  "/worklog": "Yaptım", // dil:anahtar
+  "/settings": "Ayarlar", // dil:anahtar
 };
 
 function sayfaAdi(sayfa: string): string {
@@ -64,17 +66,18 @@ function sayfaAdi(sayfa: string): string {
 
 const yuzde = (oran: number) => `%${Math.round(oran * 100)}`;
 const tarih = (iso: string) =>
-  new Date(/[zZ]$/.test(iso) ? iso : `${iso}Z`).toLocaleString("tr-TR", {
+  new Date(/[zZ]$/.test(iso) ? iso : `${iso}Z`).toLocaleString(bicimDili(), {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
   });
 
-const CIHAZ_ADI = { mobil: "Telefon", tablet: "Tablet", masaustu: "Masaüstü" } as const;
+const CIHAZ_ADI = { mobil: "Telefon", tablet: "Tablet", masaustu: "Masaüstü" } as const; // dil:anahtar
 const DONEMLER = [7, 30, 90] as const;
 
 export default function DemoZiyaretleriPanel() {
+  const t = useT();
   const c = useThemeColors();
   const [gun, setGun] = useState<number>(30);
   const [veri, setVeri] = useState<DemoZiyaretAnalitigi | null>(null);
@@ -87,7 +90,7 @@ export default function DemoZiyaretleriPanel() {
     demoZiyaretleri
       .ozet(gun)
       .then((v) => !iptal && setVeri(v))
-      .catch((e) => !iptal && setHata(e instanceof Error ? e.message : "Demo ziyaretleri okunamadı."));
+      .catch((e) => !iptal && setHata(e instanceof Error ? e.message : t("Demo ziyaretleri okunamadı.")));
     return () => {
       iptal = true;
     };
@@ -128,7 +131,7 @@ export default function DemoZiyaretleriPanel() {
   return (
     <section style={{ width: "100%" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", margin: "0 0 6px" }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, margin: 0 }}>Demo ziyaretleri</h2>
+        <h2 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, margin: 0 }}>{t("Demo ziyaretleri")}</h2>
         <div role="tablist" style={{ display: "flex", gap: 4 }}>
           {DONEMLER.map((d) => (
             <button
@@ -151,11 +154,11 @@ export default function DemoZiyaretleriPanel() {
         </div>
       </div>
       <p style={{ margin: "0 0 14px", fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
-        Demo hesabına girenlerin anonim gezinmesi: kişi değil ziyaret sayılır, kimlik ve yazılan içerik tutulmaz. Kayıtlar 90 gün saklanır (gizlilik politikası §14).
+        {t("Demo hesabına girenlerin anonim gezinmesi: kişi değil ziyaret sayılır, kimlik ve yazılan içerik tutulmaz. Kayıtlar 90 gün saklanır (gizlilik politikası §14).")}
       </p>
 
       {hata && <p style={{ color: c.danger, fontSize: 14 }}>{hata}</p>}
-      {!veri && !hata && <p style={{ color: c.textSecondary, fontSize: 14 }}>Yükleniyor…</p>}
+      {!veri && !hata && <p style={{ color: c.textSecondary, fontSize: 14 }}>{t("Yükleniyor…")}</p>}
 
       {veri && (
         <div style={{ display: "grid", gap: 14 }}>
@@ -168,11 +171,11 @@ export default function DemoZiyaretleriPanel() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
             {[
               ["Ziyaret", String(veri.ziyaret)],
-              ["Ortanca süre", etkinlikSuresiYaz(veri.medyanSureSn)],
-              ["Ortalama süre", etkinlikSuresiYaz(veri.ortSureSn)],
-              ["Ziyaret başına sayfa", veri.ortSayfa.toLocaleString("tr-TR")],
-              ["Panodan öteye geçmeyen", veri.ziyaret ? yuzde(veri.hemenCikma) : "—"],
-              ["Tanıtım sitesinden", veri.ziyaret ? yuzde(veri.kaynak.tanitim / veri.ziyaret) : "—"],
+              [t("Ortanca süre"), etkinlikSuresiYaz(veri.medyanSureSn)],
+              [t("Ortalama süre"), etkinlikSuresiYaz(veri.ortSureSn)],
+              [t("Ziyaret başına sayfa"), veri.ortSayfa.toLocaleString(bicimDili())],
+              [t("Panodan öteye geçmeyen"), veri.ziyaret ? yuzde(veri.hemenCikma) : "—"],
+              [t("Tanıtım sitesinden"), veri.ziyaret ? yuzde(veri.kaynak.tanitim / veri.ziyaret) : "—"],
               ["Telefondan", veri.ziyaret ? yuzde(veri.cihaz.mobil / veri.ziyaret) : "—"],
             ].map(([ad, deger]) => (
               <div key={ad} style={{ ...kart, padding: "12px 14px" }}>
@@ -185,41 +188,41 @@ export default function DemoZiyaretleriPanel() {
           </div>
 
           <div style={kart}>
-            <h3 style={baslik}>Günlük ziyaret</h3>
+            <h3 style={baslik}>{t("Günlük ziyaret")}</h3>
             <GunlukCubuk seri={veri.gunluk} renk={c.accent} zemin={c.background} yazi={c.textSecondary} />
           </div>
 
           {veri.ziyaret === 0 ? (
             <p style={{ margin: 0, fontSize: 14, color: c.textSecondary }}>
-              Bu dönemde demo ziyareti yok. Ölçüm, migration 116 uygulandıktan sonraki ilk demo girişiyle başlar.
+              {t("Bu dönemde demo ziyareti yok. Ölçüm, migration 116 uygulandıktan sonraki ilk demo girişiyle başlar.")}
             </p>
           ) : (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
                 <div style={kart}>
                   <h3 style={baslik}>İlk neyi merak ettiler?</h3>
-                  {cubuklar(veri.ilkIlgi, "Hiçbir ziyaret panodan öteye geçmedi.")}
+                  {cubuklar(veri.ilkIlgi, t("Hiçbir ziyaret panodan öteye geçmedi."))}
                 </div>
                 <div style={kart}>
                   <h3 style={baslik}>Neye baktılar? (ziyaretlerin yüzdesi)</h3>
-                  {cubuklar(veri.ozellikler, "Kayıt yok.")}
+                  {cubuklar(veri.ozellikler, t("Kayıt yok."))}
                 </div>
                 <div style={kart}>
                   <h3 style={baslik}>Nerede bıraktılar?</h3>
-                  {cubuklar(veri.sonSayfa, "Kayıt yok.", sayfaAdi)}
+                  {cubuklar(veri.sonSayfa, t("Kayıt yok."), sayfaAdi)}
                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 14 }}>
                 <div style={{ ...kart, overflowX: "auto" }}>
-                  <h3 style={baslik}>Sayfalar ve kalma süresi</h3>
+                  <h3 style={baslik}>{t("Sayfalar ve kalma süresi")}</h3>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr>
-                        <th style={baslikHucre}>Sayfa</th>
-                        <th style={{ ...baslikHucre, textAlign: "right" }}>Ziyaret</th>
-                        <th style={{ ...baslikHucre, textAlign: "right" }}>Ort. süre</th>
-                        <th style={{ ...baslikHucre, textAlign: "right" }}>Toplam</th>
+                        <th style={baslikHucre}>{t("Sayfa")}</th>
+                        <th style={{ ...baslikHucre, textAlign: "right" }}>{t("Ziyaret")}</th>
+                        <th style={{ ...baslikHucre, textAlign: "right" }}>{t("Ort. süre")}</th>
+                        <th style={{ ...baslikHucre, textAlign: "right" }}>{t("Toplam")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -238,15 +241,15 @@ export default function DemoZiyaretleriPanel() {
                 <div style={{ ...kart, overflowX: "auto" }}>
                   <h3 style={baslik}>Ne tıkladılar?</h3>
                   {veri.tiklamalar.length === 0 ? (
-                    <p style={{ margin: 0, fontSize: 14, color: c.textSecondary }}>Kayıt yok.</p>
+                    <p style={{ margin: 0, fontSize: 14, color: c.textSecondary }}>{t("Kayıt yok.")}</p>
                   ) : (
                     <table style={{ width: "100%", borderCollapse: "collapse" }}>
                       <thead>
                         <tr>
-                          <th style={baslikHucre}>Düğme</th>
-                          <th style={baslikHucre}>Sayfa</th>
-                          <th style={{ ...baslikHucre, textAlign: "right" }}>Ziyaret</th>
-                          <th style={{ ...baslikHucre, textAlign: "right" }}>Tıklama</th>
+                          <th style={baslikHucre}>{t("Düğme")}</th>
+                          <th style={baslikHucre}>{t("Sayfa")}</th>
+                          <th style={{ ...baslikHucre, textAlign: "right" }}>{t("Ziyaret")}</th>
+                          <th style={{ ...baslikHucre, textAlign: "right" }}>{t("Tıklama")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -265,7 +268,7 @@ export default function DemoZiyaretleriPanel() {
               </div>
 
               <div style={kart}>
-                <h3 style={baslik}>Son ziyaretler</h3>
+                <h3 style={baslik}>{t("Son ziyaretler")}</h3>
                 <div style={{ display: "grid" }}>
                   {veri.sonZiyaretler.map((z) => (
                     <ZiyaretSatiri
@@ -296,6 +299,7 @@ function GunlukCubuk({
   zemin: string;
   yazi: string;
 }) {
+  const t = useT();
   const enYuksek = Math.max(1, ...seri.map((g) => g.ziyaret));
   return (
     <div>
@@ -303,7 +307,7 @@ function GunlukCubuk({
         {seri.map((g) => (
           <div
             key={g.gun}
-            title={`${new Date(`${g.gun}T12:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}: ${g.ziyaret} ziyaret`}
+            title={`${new Date(`${g.gun}T12:00:00Z`).toLocaleDateString(bicimDili(), { day: "numeric", month: "short" })}: ${g.ziyaret} ziyaret`}
             style={{ flex: 1, height: "100%", display: "flex", alignItems: "flex-end", background: zemin, borderRadius: 2 }}
           >
             <div style={{ width: "100%", height: `${(g.ziyaret / enYuksek) * 100}%`, background: renk, borderRadius: 2 }} />
@@ -311,9 +315,9 @@ function GunlukCubuk({
         ))}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: yazi, marginTop: 4 }}>
-        <span>{seri[0] && new Date(`${seri[0].gun}T12:00:00Z`).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}</span>
+        <span>{seri[0] && new Date(`${seri[0].gun}T12:00:00Z`).toLocaleDateString(bicimDili(), { day: "numeric", month: "short" })}</span>
         <span>en yüksek: {enYuksek}</span>
-        <span>bugün</span>
+        <span>{t("bugün")}</span>
       </div>
     </div>
   );
@@ -326,6 +330,7 @@ function adimMetni(a: DemoAdim): string {
 }
 
 function ZiyaretSatiri({ z, acik, degistir }: { z: DemoZiyaretOzeti; acik: boolean; degistir: () => void }) {
+  const t = useT();
   const c = useThemeColors();
   return (
     <div style={{ borderBottom: `1px solid ${c.border}` }}>
@@ -349,10 +354,10 @@ function ZiyaretSatiri({ z, acik, degistir }: { z: DemoZiyaretOzeti; acik: boole
       >
         <span style={{ minWidth: 110, fontVariantNumeric: "tabular-nums" }}>{tarih(z.basladiAt)}</span>
         <span style={{ color: c.textSecondary }}>{CIHAZ_ADI[z.cihaz]}</span>
-        <span style={{ color: c.textSecondary }}>{z.kaynak === "tanitim" ? "tanıtım sitesi" : z.kaynak === "giris" ? "giriş ekranı" : "—"}</span>
+        <span style={{ color: c.textSecondary }}>{z.kaynak === "tanitim" ? t("tanıtım sitesi") : z.kaynak === "giris" ? t("giriş ekranı") : "—"}</span>
         <span style={{ fontVariantNumeric: "tabular-nums" }}>{etkinlikSuresiYaz(z.sureSn)}</span>
         <span>
-          İlk ilgi: <strong style={{ fontWeight: 500 }}>{z.ilkIlgi ? ozellikAdi(z.ilkIlgi) : "panoda kaldı"}</strong>
+          {t("İlk ilgi:")} <strong style={{ fontWeight: 500 }}>{z.ilkIlgi ? ozellikAdi(z.ilkIlgi) : t("panoda kaldı")}</strong>
         </span>
         <span style={{ marginLeft: "auto", color: c.textSecondary }}>
           {z.adimSayisi} adım {acik ? "▴" : "▾"}
@@ -363,7 +368,7 @@ function ZiyaretSatiri({ z, acik, degistir }: { z: DemoZiyaretOzeti; acik: boole
           {z.adimlar.map((a, i) => (
             <li key={i} style={{ fontSize: 13, color: a.tur === "sayfa" ? c.textPrimary : c.textSecondary }}>
               <span style={{ fontVariantNumeric: "tabular-nums", color: c.textSecondary, marginRight: 8 }}>
-                {new Date(/[zZ]$/.test(a.at) ? a.at : `${a.at}Z`).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                {new Date(/[zZ]$/.test(a.at) ? a.at : `${a.at}Z`).toLocaleTimeString(bicimDili(), { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </span>
               {adimMetni(a)}
               {a.tur === "sayfa" && a.sureSn != null && (

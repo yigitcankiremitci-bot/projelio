@@ -304,7 +304,7 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
             setEditing(true);
           }
         }}
-        aria-label={collapsed && !tapped ? "Profil kartını aç" : "Profil fotoğrafı"}
+        aria-label={collapsed && !tapped ? t("Profil kartını aç") : t("Profil fotoğrafı")}
         aria-expanded={collapsed ? tapped : undefined}
         style={{
           position: "relative",

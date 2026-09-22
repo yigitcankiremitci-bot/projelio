@@ -3,6 +3,7 @@ import type { KasaHareketi } from "../lib/butceOzeti";
 import { aylikOzet } from "../lib/butceOzeti";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   transactions: KasaHareketi[];
@@ -21,14 +22,14 @@ interface Props {
 /** Eksen etiketi için kısa tutar: "12,5 B ₺". Uzun rakam çubukların arasına sığmıyor. */
 function kisaTutar(amount: number): string {
   try {
-    return `${new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 }).format(amount)} ₺`;
+    return `${new Intl.NumberFormat(bicimDili(), { notation: "compact", maximumFractionDigits: 1 }).format(amount)} ₺`;
   } catch {
     return `${Math.round(amount)} ₺`;
   }
 }
 
 function varsayilanTutar(amount: number): string {
-  return `${amount.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ₺`;
+  return `${amount.toLocaleString(bicimDili(), { maximumFractionDigits: 2 })} ₺`;
 }
 
 const ALAN_YUKSEKLIGI = 128;

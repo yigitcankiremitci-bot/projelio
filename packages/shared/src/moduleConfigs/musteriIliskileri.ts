@@ -14,6 +14,7 @@ import {
   opts,
   partyField,
   userField,
+  etiketCevir,
   type ModuleRecordConfig,
 } from "./shared";
 
@@ -41,7 +42,7 @@ export const complaintConfig: ModuleRecordConfig = {
     { key: "status", label: "Durum", type: "select", defaultValue: "open", options: opts(COMPLAINT_STATUS) },
     { key: "date", label: "Tarih", type: "date" },
   ],
-  summary: (d) => `${labelOf(COMPLAINT_TYPE, d.type) ?? "Şikayet"}${d.customerName ? ` · ${d.customerName}` : ""}`,
+  summary: (d) => `${labelOf(COMPLAINT_TYPE, d.type) ?? etiketCevir("Şikayet")}${d.customerName ? ` · ${d.customerName}` : ""}`,
   detail: (d) => labelOf(COMPLAINT_STATUS, d.status) ?? "Açık",
   computeStats: (records) => [
     {
@@ -87,7 +88,7 @@ export const supportTicketConfig: ModuleRecordConfig = {
   detail: (d) =>
     joinDetail(
       labelOf(TICKET_STATUS, d.status),
-      d.priority && d.priority !== "normal" ? `Öncelik: ${labelOf(TICKET_PRIORITY, d.priority)}` : undefined,
+      d.priority && d.priority !== "normal" ? etiketCevir("Öncelik: {deger}", { deger: labelOf(TICKET_PRIORITY, d.priority) }) : undefined,
       d.assignee as string,
       d.openedDate as string
     ),

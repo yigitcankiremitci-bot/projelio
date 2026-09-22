@@ -4,8 +4,8 @@ import { IconDashboard, IconCalendar, IconShield, IconLogout, IconCheck } from "
 import { useT } from "../lib/i18n";
 
 const navItems = [
-  { to: "/", label: "Ana sayfa", icon: IconDashboard },
-  { to: "/calendar", label: "Takvim", icon: IconCalendar },
+  { to: "/", label: "Ana sayfa", icon: IconDashboard }, // dil:anahtar
+  { to: "/calendar", label: "Takvim", icon: IconCalendar }, // dil:anahtar
   { to: "/admin", label: "Admin", icon: IconShield },
 ];
 
@@ -69,7 +69,7 @@ export default function Navbar() {
               }}
             >
               <Icon size={15} color={active ? c.accent : "#9AA6B4"} />
-              <span style={{ fontSize: 16, color: active ? "#fff" : "#C7CCD6" }}>{item.label}</span>
+              <span style={{ fontSize: 16, color: active ? "#fff" : "#C7CCD6" }}>{t(item.label)}</span>
             </Link>
           );
         })}

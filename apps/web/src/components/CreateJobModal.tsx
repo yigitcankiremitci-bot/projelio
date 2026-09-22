@@ -55,8 +55,7 @@ export default function CreateJobModal({ onClose, onCreated }: Props) {
       <Modal title={t("Onaya gönderildi")} onClose={onClose}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <p style={{ fontSize: 16, color: c.textPrimary, margin: 0, lineHeight: 1.5 }}>
-            <strong>{title}</strong> talebiniz yetkiliye iletildi. Onaylandığında bildirim alacak
-            ve iş listenizde göreceksiniz.
+            <strong>{title}</strong> {t("talebiniz yetkiliye iletildi. Onaylandığında bildirim alacak ve iş listenizde göreceksiniz.")}
           </p>
           <button
             type="button"
@@ -90,7 +89,7 @@ export default function CreateJobModal({ onClose, onCreated }: Props) {
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Oluşturuluyor…" : "İş oluştur"}
+          {loading ? t("Oluşturuluyor…") : t("İş oluştur")}
         </button>
       </form>
     </Modal>

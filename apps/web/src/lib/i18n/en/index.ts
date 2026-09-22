@@ -18,6 +18,9 @@ import { butce } from "./butce";
 import { hesaplar } from "./hesaplar";
 import { epostaYonetimi } from "./epostaYonetimi";
 import { demoRandevu } from "./demoRandevu";
+import { baslangic } from "./baslangic";
+import { ilkAdimlar } from "./ilkAdimlar";
+import { uygulama } from "./uygulama";
 
 /**
  * Türkçe → İngilizce sözlük.
@@ -52,6 +55,9 @@ export const en: TranslationDict = {
   ...ortak,
   ...gezinme,
   ...kimlik,
+  ...baslangic,
+  ...ilkAdimlar,
+  ...uygulama,
   ...ayarlar,
   ...gorevler,
   ...projeler,

@@ -14,6 +14,7 @@ import { useModuleReferences } from "../lib/moduleReferences";
 import ModuleFieldInput from "./ModuleFieldInput";
 import ModuleFormAttachments from "./ModuleFormAttachments";
 import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
 
 // A1 — Form / Doküman görünümü.
 //
@@ -261,7 +262,7 @@ export default function ModuleFormPanel({
       setRecords((rs) => rs.map((r) => (r.id === saved.id ? saved : r)));
       return saved;
     } catch (e: any) {
-      setError(e?.message ?? "Kaydedilemedi");
+      setError(e?.message ?? t("Kaydedilemedi"));
       return null;
     } finally {
       setBusy(false);
@@ -283,7 +284,7 @@ export default function ModuleFormPanel({
       setRecords((rs) => rs.map((r) => (r.id === approved.id ? approved : r)));
       setMode("read");
     } catch (e: any) {
-      setError(e?.message ?? "Onaylanamadı");
+      setError(e?.message ?? t("Onaylanamadı"));
     } finally {
       setBusy(false);
     }
@@ -385,7 +386,7 @@ export default function ModuleFormPanel({
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
-                  {records.some((r) => r.scopeRef === p.id) ? "" : " — strateji yok"}
+                  {records.some((r) => r.scopeRef === p.id) ? "" : t(" — strateji yok")}
                 </option>
               ))}
             </select>
@@ -645,7 +646,7 @@ export default function ModuleFormPanel({
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, color: c.textPrimary }}>
                     {t("{tarih} tarihine kadar yürürlükteydi", {
-                      tarih: new Date(v.approvedAt).toLocaleDateString("tr-TR"),
+                      tarih: new Date(v.approvedAt).toLocaleDateString(bicimDili()),
                     })}
                   </div>
                   {v.note && <div style={{ fontSize: 12, color: c.textSecondary }}>{v.note}</div>}

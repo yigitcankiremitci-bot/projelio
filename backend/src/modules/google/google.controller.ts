@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Logger, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import type { Response } from "express";
+import { tarayiciDili } from "../../common/i18n";
 import { MicrosoftAccountsService } from "../microsoft/microsoft-accounts.service";
 import { GoogleAccountsService } from "./google-accounts.service";
 import { GoogleAuthService } from "./google-auth.service";
@@ -88,7 +89,8 @@ export class GoogleController {
     @Query("code") code: string,
     @Query("state") state: string,
     @Query("error") error: string,
-    @Res() res: Response
+    @Res() res: Response,
+    @Req() req: { headers: Record<string, string | string[] | undefined> }
   ) {
     const web = this.oauth.webAppUrl;
 
@@ -131,10 +133,11 @@ export class GoogleController {
         return res.redirect(`${web}/google/return?${params.toString()}`);
       }
 
-      const { token, isNewUser } = await this.googleAuth.loginWithGoogle(identity, {
-        refreshToken: tokens.refresh_token,
-        scopes,
-      });
+      const { token, isNewUser } = await this.googleAuth.loginWithGoogle(
+        identity,
+        { refreshToken: tokens.refresh_token, scopes },
+        tarayiciDili(req)
+      );
       if (scopes.includes(DRIVE_SCOPE)) {
         await this.ensureRootFolderByToken(token).catch(() => undefined);
       }

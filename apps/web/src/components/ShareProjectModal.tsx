@@ -7,6 +7,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
 import { IconCopy, IconTrash } from "./icons";
+import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
   projectId: string;
@@ -325,14 +326,14 @@ export default function ShareProjectModal({ projectId, projectTitle, onClose }: 
                         {t("{n} kez açıldı", { n: link.viewCount })}
                         {link.lastViewedAt &&
                           ` · ${t("son: {tarih}", {
-                            tarih: parseServerDate(link.lastViewedAt).toLocaleDateString("tr-TR"),
+                            tarih: parseServerDate(link.lastViewedAt).toLocaleDateString(bicimDili()),
                           })}`}
                       </>
                     )}
                   </span>
                   {link.expiresAt && link.active && (
                     <span>
-                      {t("Bitiş: {tarih}", { tarih: parseServerDate(link.expiresAt).toLocaleDateString("tr-TR") })}
+                      {t("Bitiş: {tarih}", { tarih: parseServerDate(link.expiresAt).toLocaleDateString(bicimDili()) })}
                     </span>
                   )}
                 </div>

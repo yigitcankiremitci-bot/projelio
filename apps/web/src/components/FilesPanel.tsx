@@ -879,7 +879,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     try {
       window.location.href = await filesApi.contentUrl(file.id, { download: true });
     } catch (e: any) {
-      setError(e?.message ?? "Dosya indirilemedi");
+      setError(e?.message ?? t("Dosya indirilemedi"));
     }
   };
 
@@ -1600,7 +1600,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                 <IconFolder size={40} color={c.accent} />
               </div>
               <InlineRenameText
-                  name={folder.name}
+                  name={folder.kind === "general" ? t(folder.name) : folder.name}
                   editing={adDuzenlenen === folderKey(folder.id)}
                   onCommit={(ad) => void handleRenameFolder(folder, ad)}
                   onClose={() => setAdDuzenlenen(null)}
@@ -1687,7 +1687,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               <IconFolder size={18} color={c.accent} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <InlineRenameText
-                  name={folder.name}
+                  name={folder.kind === "general" ? t(folder.name) : folder.name}
                   editing={adDuzenlenen === folderKey(folder.id)}
                   onCommit={(ad) => void handleRenameFolder(folder, ad)}
                   onClose={() => setAdDuzenlenen(null)}

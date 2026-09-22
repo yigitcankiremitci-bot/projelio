@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import GirisDilSecici from "../components/GirisDilSecici";
 
 type Status = "checking" | "success" | "error";
 
@@ -51,6 +52,7 @@ export default function VerifyEmail() {
         padding: 24,
       }}
     >
+      <GirisDilSecici />
       <div
         style={{
           width: "100%",

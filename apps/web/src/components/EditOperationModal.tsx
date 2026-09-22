@@ -22,9 +22,9 @@ interface Props {
 }
 
 const periods: { value: OperationBudgetPeriod; label: string }[] = [
-  { value: "weekly", label: "Haftalık" },
-  { value: "monthly", label: "Aylık" },
-  { value: "yearly", label: "Yıllık" },
+  { value: "weekly", label: "Haftalık" }, // dil:anahtar
+  { value: "monthly", label: "Aylık" }, // dil:anahtar
+  { value: "yearly", label: "Yıllık" }, // dil:anahtar
 ];
 
 /**
@@ -122,7 +122,7 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
 
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 2 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>Dönemsel ücret (₺)</label>
+            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Dönemsel ücret (₺)")}</label>
             <input
               type="number"
               min={0}
@@ -140,7 +140,7 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
             >
               {periods.map((p) => (
                 <option key={p.value} value={p.value}>
-                  {p.label}
+                  {t(p.label)}
                 </option>
               ))}
             </select>
@@ -182,18 +182,18 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
             fontWeight: 500,
           }}
         >
-          {loading ? "Kaydediliyor…" : "Kaydet"}
+          {loading ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       </form>
 
       <EntityDangerZone
-        entityLabel="Rutini"
+        entityLabel={t("Rutini", { ctx: "nesne" })}
         resourcePath={`/operations/${operation.id}`}
         affectsSidebar
         onArchive={handleArchive}
         onDelete={handleDelete}
-        archiveMessage={`"${operation.title}" rutinini arşive eklemek istediğine emin misin? Rutine bağlı tekrar kuralları ve açılmış görevler de arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.`}
-        deleteMessage={`"${operation.title}" rutinini silmek istediğine emin misin? Rutine bağlı tüm tekrar kuralları ve açılmış görevler de silinecek. Bu işlem geri alınamaz.`}
+        archiveMessage={t("\"{title}\" rutinini arşive eklemek istediğine emin misin? Rutine bağlı tekrar kuralları ve açılmış görevler de arşive taşınır. İstediğin zaman Ayarlar > Arşiv üzerinden geri getirebilirsin.", { title: operation.title })}
+        deleteMessage={t("\"{title}\" rutinini silmek istediğine emin misin? Rutine bağlı tüm tekrar kuralları ve açılmış görevler de silinecek. Bu işlem geri alınamaz.", { title: operation.title })}
       />
     </Modal>
   );

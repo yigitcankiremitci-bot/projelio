@@ -28,7 +28,7 @@ export default function WhatsappLioWritesToggle({ enabled, onChanged }: { enable
       await whatsappApi.setLioWrites(!enabled);
       onChanged();
     } catch (e: any) {
-      setError(e?.message ?? "Ayar kaydedilemedi.");
+      setError(e?.message ?? t("Ayar kaydedilemedi."));
     } finally {
       setBusy(false);
     }
@@ -47,8 +47,7 @@ export default function WhatsappLioWritesToggle({ enabled, onChanged }: { enable
         <span>
           <span style={{ fontSize: 15, color: c.textPrimary }}>{t("WhatsApp'tan değişiklik yapılabilsin")}</span>
           <span style={{ display: "block", fontSize: 14, color: c.textSecondary, marginTop: 4, lineHeight: 1.5 }}>
-            Lio, WhatsApp'tan yazdığınız isteklerle görev açabilir, kayıt güncelleyebilir. Kapalıyken yalnızca
-            sorularınızı yanıtlar. Silme ve bütçe işlemleri WhatsApp'tan hiçbir zaman yapılamaz.
+            {t("Lio, WhatsApp'tan yazdığınız isteklerle görev açabilir, kayıt güncelleyebilir. Kapalıyken yalnızca sorularınızı yanıtlar. Silme ve bütçe işlemleri WhatsApp'tan hiçbir zaman yapılamaz.")}
           </span>
         </span>
       </label>

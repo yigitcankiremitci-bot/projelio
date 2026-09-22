@@ -10,6 +10,7 @@ import {
   type LegalLang,
 } from "../lib/legal";
 import { useThemeColors } from "../theme/useThemeColors";
+import { useT } from "../lib/i18n";
 
 /**
  * Yasal metinlerin ortak sayfası — gizlilik politikası ve kullanıcı sözleşmesi
@@ -29,11 +30,12 @@ import { useThemeColors } from "../theme/useThemeColors";
  * olmayan giriş ekranına döner.
  */
 export default function LegalDocPage({ kind }: { kind: LegalDocKind }) {
+  const t = useT();
   const c = useThemeColors();
   const [lang, setLang] = useState<LegalLang>(initialLegalLang);
   const hasToken = !!localStorage.getItem("projelio_token");
   const back = useBackTarget(
-    hasToken ? { to: "/", label: "Anasayfa" } : { to: "/login", label: "Giriş sayfası" }
+    hasToken ? { to: "/", label: t("Anasayfa") } : { to: "/login", label: t("Giriş sayfası") }
   );
 
   useEffect(() => {

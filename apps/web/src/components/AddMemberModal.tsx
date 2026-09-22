@@ -60,7 +60,7 @@ export default function AddMemberModal({ projectId, existingUserIds, onClose, on
       });
       onAdded(created);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Üye eklenemedi. Tekrar dene.");
+      setError(err instanceof Error ? err.message : t("Üye eklenemedi. Tekrar dene."));
       setSaving(false);
     }
   };
@@ -164,7 +164,7 @@ export default function AddMemberModal({ projectId, existingUserIds, onClose, on
 
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, color: c.textPrimary }}>
           <input type="checkbox" checked={isSubcontractor} onChange={(e) => setIsSubcontractor(e.target.checked)} />
-          Taşeron olarak ekle (projede sadece kendisine atanan görev/alt görevleri görür)
+          {t("Taşeron olarak ekle (projede sadece kendisine atanan görev/alt görevleri görür)")}
         </label>
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}
@@ -174,7 +174,7 @@ export default function AddMemberModal({ projectId, existingUserIds, onClose, on
           disabled={saving || !selectedUser}
           style={{ background: c.primary, color: c.onPrimary, padding: "10px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {saving ? "Ekleniyor…" : "Ekle"}
+          {saving ? t("Ekleniyor…") : t("Ekle")}
         </button>
       </form>
     </Modal>

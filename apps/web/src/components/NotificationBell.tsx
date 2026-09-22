@@ -57,7 +57,7 @@ export default function NotificationBell() {
     try {
       const note = approve
         ? undefined
-        : window.prompt("Ret gerekçesi (isteğe bağlı) — talep sahibi görecek:") ?? undefined;
+        : window.prompt(t("Ret gerekçesi (isteğe bağlı) — talep sahibi görecek:")) ?? undefined;
       await respondToCreationRequest(request.id, approve, note);
       setApprovals((prev) => prev.filter((r) => r.id !== request.id));
     } finally {
@@ -209,7 +209,7 @@ export default function NotificationBell() {
     <div ref={ref} {...tourAnchor("notification-bell")} style={{ position: "fixed", top: safeTop(TOP_CHROME.top), right: TOP_CHROME.gutter, zIndex: Z.topChrome }}>
       <button
         onClick={() => setOpen((v) => !v)}
-        aria-label="Bildirimler"
+        aria-label={t("Bildirimler")}
         style={{
           position: "relative",
           width: 44,
@@ -318,9 +318,18 @@ export default function NotificationBell() {
                   }}
                 >
                   <span style={{ fontSize: 15, color: c.textPrimary }}>
-                    <strong>{invite.invitedByName ?? "Bir kullanıcı"}</strong> seni{" "}
-                    <strong>“{invite.jobTitle ?? "bir iş"}”</strong> işine ekledi
-                    {invite.title ? ` (${invite.title})` : ""}. Kabul ediyor musun?
+                    {/* Cümle tek parça çevriliyor: Türkçede özne-nesne-yüklem, İngilizcede
+                        özne-yüklem-nesne; parçalar ayrı çevrilince sıra bozuluyordu. */}
+                    {invite.title
+                      ? t('{kisi} seni "{is}" işine ekledi ({unvan}). Kabul ediyor musun?', {
+                          kisi: invite.invitedByName ?? t("Bir kullanıcı"),
+                          is: invite.jobTitle ?? t("bir iş"),
+                          unvan: invite.title,
+                        })
+                      : t('{kisi} seni "{is}" işine ekledi. Kabul ediyor musun?', {
+                          kisi: invite.invitedByName ?? t("Bir kullanıcı"),
+                          is: invite.jobTitle ?? t("bir iş"),
+                        })}
                   </span>
                   <span style={{ fontSize: 12, color: c.textSecondary }}>{timeAgo(invite.joinedAt)}</span>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -390,11 +399,21 @@ export default function NotificationBell() {
                   }}
                 >
                   <span style={{ fontSize: 15, color: c.textPrimary }}>
-                    <strong>{request.requesterName ?? "Bir taşeron"}</strong>,{" "}
-                    <strong>“{String(request.payload?.title ?? "başlıksız")}”</strong> adlı{" "}
-                    {request.kind === "job" ? "işi" : "projeyi"} açmak için izin istiyor
-                    {request.kind === "project" && request.jobTitle ? ` (${request.jobTitle})` : ""}
-                    {request.kind === "job" && request.organizationName ? ` (${request.organizationName})` : ""}.
+                    {(() => {
+                      const p = {
+                        kisi: request.requesterName ?? t("Bir taşeron"),
+                        ad: String(request.payload?.title ?? t("başlıksız")),
+                        yer:
+                          request.kind === "project" && request.jobTitle
+                            ? ` (${request.jobTitle})`
+                            : request.kind === "job" && request.organizationName
+                              ? ` (${request.organizationName})`
+                              : "",
+                      };
+                      return request.kind === "job"
+                        ? t('{kisi}, "{ad}" adlı işi açmak için izin istiyor{yer}.', p)
+                        : t('{kisi}, "{ad}" adlı projeyi açmak için izin istiyor{yer}.', p);
+                    })()}
                   </span>
                   <span style={{ fontSize: 12, color: c.textSecondary }}>{timeAgo(request.createdAt)}</span>
                   <div style={{ display: "flex", gap: 8 }}>

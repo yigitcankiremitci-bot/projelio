@@ -14,9 +14,9 @@ interface Props {
 }
 
 const typeOptions: { value: BudgetTransactionType; label: string }[] = [
-  { value: "income", label: "Gelen ödeme (müşteriden tahsilat)" },
-  { value: "expense", label: "Gider (malzeme, abonelik…)" },
-  { value: "payout", label: "Hakediş ödemesi (taşeron/ekip)" },
+  { value: "income", label: "Gelen ödeme (müşteriden tahsilat)" }, // dil:anahtar
+  { value: "expense", label: "Gider (malzeme, abonelik…)" }, // dil:anahtar
+  { value: "payout", label: "Hakediş ödemesi (taşeron/ekip)" }, // dil:anahtar
 ];
 
 function todayString() {
@@ -61,27 +61,27 @@ export default function AddBudgetEntryModal({ transaction, onClose, onSaved }: P
       onSaved(saved);
       onClose();
     } catch {
-      setError(editing ? "Kayıt güncellenemedi. Tekrar dene." : "Kayıt eklenemedi. Tekrar dene.");
+      setError(editing ? t("Kayıt güncellenemedi. Tekrar dene.") : t("Kayıt eklenemedi. Tekrar dene."));
       setLoading(false);
     }
   };
 
   return (
-    <Modal title={editing ? "Kaydı düzenle" : "Gelir / gider ekle"} onClose={onClose}>
+    <Modal title={editing ? t("Kaydı düzenle") : t("Gelir / gider ekle")} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tür")}</label>
           <select value={type} onChange={(e) => setType(e.target.value as BudgetTransactionType)} style={{ width: "100%" }}>
             {typeOptions.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {t(o.label)}
               </option>
             ))}
           </select>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Tutar (₺)</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Tutar (₺)")}</label>
           <input
             type="number"
             min={0}
@@ -104,7 +104,7 @@ export default function AddBudgetEntryModal({ transaction, onClose, onSaved }: P
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 15, color: c.textSecondary }}>Proje (opsiyonel)</label>
+          <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Proje (opsiyonel)")}</label>
           <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={{ width: "100%" }}>
             <option value="">{t("Projesiz — genel kayıt")}</option>
             {projects.map((p) => (
@@ -132,7 +132,7 @@ export default function AddBudgetEntryModal({ transaction, onClose, onSaved }: P
           disabled={loading}
           style={{ marginTop: 4, background: c.primary, color: c.onPrimary, padding: "11px 0", borderRadius: 8, border: "none", fontSize: 17, fontWeight: 500 }}
         >
-          {loading ? "Kaydediliyor…" : "Kaydet"}
+          {loading ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       </form>
     </Modal>

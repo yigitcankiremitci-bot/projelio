@@ -103,27 +103,27 @@ export default function DepartmentDetail() {
     !department
       ? null
       : activeTab === "flow"
-      ? { label: "Yeni paylaşım", onClick: () => feedRef.current?.openCreate() }
+      ? { label: t("Yeni paylaşım"), onClick: () => feedRef.current?.openCreate() }
       : // Kadroya davet ve bütçeye kayıt: yalnızca yönetebilenler (org sahibi /
       // departman yöneticisi). Diğerlerinde "+" butonu hiç çıkmaz.
       activeTab === "team"
       ? access?.canManage === false
         ? null
-        : { label: "Kişi davet et", onClick: () => teamRef.current?.openCreate() }
+        : { label: t("Kişi davet et"), onClick: () => teamRef.current?.openCreate() }
       : activeTab === "tasks"
       ? {
           // Sekme artık hem görev hem çıktı barındırıyor; "+" hangisini
           // eklediğini sormalı (bkz. ProjectDetail'deki aynı menü).
-          label: "Görev veya çıktı ekle",
+          label: t("Görev veya çıktı ekle"),
           options: [
-            { label: "Yeni görev", onClick: () => tasksRef.current?.openCreate() },
-            { label: "Yeni çıktı", onClick: () => tasksRef.current?.openCreateOutput() },
+            { label: t("Yeni görev"), onClick: () => tasksRef.current?.openCreate() },
+            { label: t("Yeni çıktı"), onClick: () => tasksRef.current?.openCreateOutput() },
           ],
         }
       : activeTab === "budget"
       ? access?.canManage === false
         ? null
-        : { label: "Kayıt ekle", onClick: () => budgetRef.current?.openCreate() }
+        : { label: t("Kayıt ekle"), onClick: () => budgetRef.current?.openCreate() }
       : // Dosyalar sekmesinin "+" eylemi panelin kendisinde (bkz. FilesPanel).
         null,
     [activeTab, department?.id, access?.canManage]
@@ -136,7 +136,7 @@ export default function DepartmentDetail() {
   // bkz. ProjectDetail — görev kartından gelindiyse geri, gelinen yere döner.
   const back = useBackTarget({
     to: department ? `/organizations/${department.organizationId}?tab=departments` : "/organizations",
-    label: "Departmanlar",
+    label: t("Departmanlar"),
   });
 
   usePageHeader(department?.name, coverRef, [department?.name, department?.organizationId, back.to, back.label, back.geriGit], {
@@ -232,8 +232,8 @@ export default function DepartmentDetail() {
           <button
             type="button"
             onClick={() => setBilgiKarti(true)}
-            aria-label="Şirket bilgi kartı"
-            title="Şirket bilgi kartı"
+            aria-label={t("Şirket bilgi kartı")}
+            title={t("Şirket bilgi kartı")}
             style={{
               position: "absolute",
               bottom: 14,

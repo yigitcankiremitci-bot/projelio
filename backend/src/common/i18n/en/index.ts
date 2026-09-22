@@ -7,6 +7,8 @@ import { ipuclari } from "./ipuclari";
 import { ornekIs } from "./ornek-is";
 import { epostaYonetimi } from "./eposta-yonetimi";
 import { demoRandevu } from "./demo-randevu";
+import { katalog } from "./katalog";
+import { genel } from "./genel";
 
 /**
  * Sunucu metinlerinin Türkçe → İngilizce sözlüğü.
@@ -33,4 +35,6 @@ export const en: TranslationDict = {
   ...ornekIs,
   ...epostaYonetimi,
   ...demoRandevu,
+  ...katalog,
+  ...genel,
 };

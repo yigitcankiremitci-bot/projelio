@@ -111,14 +111,14 @@ export class AppErrorBoundary extends Component<Props, State> {
           {guncellemeVar ? "🔄" : "⚠️"}
         </div>
         <h1 style={{ fontSize: 19, margin: 0, fontWeight: 600 }}>
-          {guncellemeVar ? "Yeni sürüm yayımlandı" : "Beklenmeyen bir hata oluştu"}
+          {guncellemeVar ? t("Yeni sürüm yayımlandı") : t("Beklenmeyen bir hata oluştu")}
         </h1>
         <p style={{ margin: 0, fontSize: 14, color: "#6B7280", maxWidth: 380, lineHeight: 1.6 }}>
           {guncellemeVar
-            ? "Uygulamanın yeni bir sürümü var. Sayfayı yenileyerek devam edebilirsiniz."
+            ? t("Uygulamanın yeni bir sürümü var. Sayfayı yenileyerek devam edebilirsiniz.")
             : rota
-              ? "Bu bölüm açılamadı. Verileriniz güvende — başka bir sayfaya geçebilir veya yeniden deneyebilirsiniz."
-              : "Verileriniz güvende. Sayfayı yenileyerek devam edebilirsiniz."}
+              ? t("Bu bölüm açılamadı. Verileriniz güvende — başka bir sayfaya geçebilir veya yeniden deneyebilirsiniz.")
+              : t("Verileriniz güvende. Sayfayı yenileyerek devam edebilirsiniz.")}
         </p>
         <button
           type="button"

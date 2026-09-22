@@ -5,6 +5,7 @@ import {
   MODULE_RECORD_CONFIGS,
   type ModuleFieldConfig,
 } from "@projelio/shared";
+import { hataMetni } from "../../common/i18n/index";
 
 // Lio'nun modül kayıtlarıyla çalışabilmesi için alan tanımlarının backend'de de
 // okunabilmesi gerekiyor. Tanımlar packages/shared/src/moduleConfigs/ altında —
@@ -80,14 +81,14 @@ function coerceValue(field: ModuleFieldConfig, raw: unknown): unknown {
     case "currency": {
       const n = Number(raw);
       if (Number.isNaN(n)) {
-        throw new BadRequestException(`"${field.label}" alanı sayı olmalı, gelen: ${JSON.stringify(raw)}`);
+        throw new BadRequestException(hataMetni("\"{label}\" alanı sayı olmalı, gelen: {p2}", { label: field.label, p2: JSON.stringify(raw) }));
       }
       return n;
     }
     case "date": {
       const s = String(raw).slice(0, 10);
       if (!DATE_RE.test(s)) {
-        throw new BadRequestException(`"${field.label}" alanı YYYY-MM-DD biçiminde olmalı, gelen: ${JSON.stringify(raw)}`);
+        throw new BadRequestException(hataMetni("\"{label}\" alanı YYYY-MM-DD biçiminde olmalı, gelen: {p2}", { label: field.label, p2: JSON.stringify(raw) }));
       }
       return s;
     }
@@ -96,7 +97,7 @@ function coerceValue(field: ModuleFieldConfig, raw: unknown): unknown {
       const allowed = field.options ?? [];
       if (allowed.length && !allowed.some((o) => o.value === s)) {
         throw new BadRequestException(
-          `"${field.label}" için geçersiz değer: ${s}. Geçerli seçenekler: ${allowed.map((o) => o.value).join(", ")}`
+          hataMetni("\"{label}\" için geçersiz değer: {s}. Geçerli seçenekler: {p3}", { label: field.label, s, p3: allowed.map((o) => o.value).join(", ") })
         );
       }
       return s;
@@ -162,7 +163,7 @@ export function normalizeModuleData(
       const code = String(raw).toUpperCase();
       if (!CURRENCY_OPTIONS.some((o) => o.value === code)) {
         throw new BadRequestException(
-          `Geçersiz para birimi: ${raw}. Geçerli: ${CURRENCY_OPTIONS.map((o) => o.value).join(", ")}`
+          hataMetni("Geçersiz para birimi: {raw}. Geçerli: {p2}", { raw: String(raw), p2: CURRENCY_OPTIONS.map((o) => o.value).join(", ") })
         );
       }
       data[key] = code;
@@ -176,7 +177,7 @@ export function normalizeModuleData(
       .filter((f) => f.required && data[f.key] === undefined && f.defaultValue === undefined)
       .map((f) => `${f.key} (${f.label})`);
     if (missing.length) {
-      throw new BadRequestException(`Zorunlu alan(lar) eksik: ${missing.join(", ")}`);
+      throw new BadRequestException(hataMetni("Zorunlu alan(lar) eksik: {p1}", { p1: missing.join(", ") }));
     }
     // Varsayılanı olan zorunlu alanlar boş bırakılabilir; panelin davranışıyla aynı.
     for (const f of config.fields) {

@@ -101,7 +101,7 @@ export default function DepartmentSettingsModal({
       const updated = await api.patch<Department>(`/departments/${department.id}`, { defaultTab: gecerliDefaultTab, hiddenTabs });
       onSaved(updated);
     } catch {
-      setError("Kaydedilemedi. Tekrar dene.");
+      setError(t("Kaydedilemedi. Tekrar dene."));
       setLoading(false);
     }
   };
@@ -135,7 +135,7 @@ export default function DepartmentSettingsModal({
             opacity: coverBusy ? 0.6 : 1,
           }}
         >
-          {!coverUrl && "Kapak yok"}
+          {!coverUrl && t("Kapak yok")}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
@@ -152,7 +152,7 @@ export default function DepartmentSettingsModal({
               fontSize: 15,
             }}
           >
-            {coverBusy ? "Yükleniyor…" : "Fotoğraf yükle"}
+            {coverBusy ? t("Yükleniyor…") : t("Fotoğraf yükle")}
           </button>
           {/* Yalnızca kullanıcının yüklediği bir kapak varsa: katalog departmanları
               kaldırıldığında kendi varsayılan fotoğrafına döner. */}
@@ -187,7 +187,7 @@ export default function DepartmentSettingsModal({
         />
         {coverError && <p style={{ color: c.danger, fontSize: 15, margin: 0 }}>{coverError}</p>}
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-          Kapak seçtiğin anda kaydedilir; "Kaydet"i beklemez.
+          {t('Kapak seçtiğin anda kaydedilir; "Kaydet"i beklemez.')}
         </p>
       </div>
 
@@ -236,18 +236,18 @@ export default function DepartmentSettingsModal({
             fontWeight: 500,
           }}
         >
-          {loading ? "Kaydediliyor…" : "Kaydet"}
+          {loading ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
       </form>
 
       <EntityDangerZone
-        entityLabel="Departmanı"
+        entityLabel={t("Departmanı", { ctx: "nesne" })}
         resourcePath={`/departments/${department.id}`}
         affectsSidebar
         onArchive={onArchived ? handleArchive : undefined}
         onDelete={onDeleted ? handleDelete : undefined}
-        archiveMessage={`"${department.name}" departmanını arşive eklemek istediğine emin misin? Departman, organizasyonun departman listesinden kaldırılır; ekip, görevler ve dosyalar korunur.`}
-        deleteMessage={`"${department.name}" departmanını silmek istediğine emin misin? Departmana ait ekip, görevler, dosyalar ve akış paylaşımları da birlikte silinir. Bu işlem geri alınamaz.`}
+        archiveMessage={t("\"{name}\" departmanını arşive eklemek istediğine emin misin? Departman, organizasyonun departman listesinden kaldırılır; ekip, görevler ve dosyalar korunur.", { name: department.name })}
+        deleteMessage={t("\"{name}\" departmanını silmek istediğine emin misin? Departmana ait ekip, görevler, dosyalar ve akış paylaşımları da birlikte silinir. Bu işlem geri alınamaz.", { name: department.name })}
       />
     </Modal>
   );

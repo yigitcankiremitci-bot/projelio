@@ -73,8 +73,8 @@ export default function BottomNav({ sidebarOpen }: Props) {
   // "Ana sayfa" düğmesinin hedefi Ayarlar > Gezinme'den değiştirilebilir
   // (bkz. lib/homeTarget.ts); etiket sabit kalır, değişen sadece gittiği yer.
   const leftItems = [
-    { to: homeTarget.path, label: "Ana sayfa", icon: IconDashboard },
-    { to: "/calendar", label: "Takvim", icon: IconCalendar },
+    { to: homeTarget.path, label: t("Ana sayfa"), icon: IconDashboard },
+    { to: "/calendar", label: t("Takvim"), icon: IconCalendar },
   ];
 
   const isActive = (to: string) =>
@@ -113,14 +113,14 @@ export default function BottomNav({ sidebarOpen }: Props) {
     fabLabel = t("Proje, rutin veya görev ekle");
   } else if (location.pathname === "/organizations") {
     createAction = "organization";
-    fabLabel = "Yeni organizasyon";
+    fabLabel = t("Yeni organizasyon");
   } else if (location.pathname === "/groups") {
     createAction = "group";
-    fabLabel = "Yeni grup";
+    fabLabel = t("Yeni grup");
   } else if (groupDetailMatch) {
     createAction = "organization-in-group";
     groupIdForOrg = groupDetailMatch[1];
-    fabLabel = "Bu gruba organizasyon ekle";
+    fabLabel = t("Bu gruba organizasyon ekle");
   } else if (orgDetailMatch) {
     // Bir organizasyonun içindeyken varsayılan "Yeni iş" eylemi uygulanmaz — şirket/işletme
     // bağlamında iş (job) kavramı yok, "+" o an sayfanın kayıtlı ettiği eyleme (departman
@@ -206,9 +206,9 @@ export default function BottomNav({ sidebarOpen }: Props) {
       ]
     : jobId
     ? [
-        { label: "Yeni proje", icon: IconFolder, onClick: () => setModal("project") },
+        { label: t("Yeni proje"), icon: IconFolder, onClick: () => setModal("project") },
         // Rutin: süresi olmayan, tekrarlayan işlerden oluşan çalışma (kodda "operation").
-        { label: "Yeni rutin", icon: IconActivity, onClick: () => setModal("operation") },
+        { label: t("Yeni rutin"), icon: IconActivity, onClick: () => setModal("operation") },
         { label: t("Yeni görev"), icon: IconListCheck, onClick: () => setModal("task") },
       ]
     : hasCustomOptions

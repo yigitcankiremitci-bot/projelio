@@ -5,7 +5,7 @@ import { WahaHttpClient } from "./waha.client";
 import { WhatsappLioService } from "./whatsapp-lio.service";
 import { isLioCommandEnabled } from "./lio-komut-sinir";
 import { AUTO_REPLIES, confirmPrompt, parseInboundCommand } from "./whatsapp-optin";
-import { isGroupJid, isLidJid, jidToE164, maskPhone } from "./whatsapp-phone";
+import { isGroupJid, isLidJid, isLidKey, jidToE164, lidContactKey, maskPhone } from "./whatsapp-phone";
 import { WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
 
 /** WAHA webhook zarfı — yalnızca kullandığımız alanlar. */
@@ -171,14 +171,19 @@ export class WhatsappWebhookService {
       }
       if (!phone) phone = jidToE164(await this.waha.resolveLid(conn.session_name, from));
     }
+    // Numara hiçbir yerden çıkmadıysa (SenderAlt boş, WAHA'nın LID tablosunda
+    // da yok) kişi LID'iyle kaydedilir ve cevap LID adresine gider. Eskiden
+    // mesaj burada atılıyordu: gizli numaralı kullanıcının eşleştirme kodu
+    // hiç işlenmiyor, Lio cevap vermiyordu. Eşleştirme için numara gerekmez,
+    // kodun kendisi kullanıcıyı tanımlar.
+    let waJid: string | undefined;
+    if (!phone && isLidJid(from)) {
+      phone = lidContactKey(from);
+      waJid = from;
+      this.logger.log(`Gönderenin numarası gizli, LID ile devam: ${from}`);
+    }
     if (!phone) {
-      // Hangi alanların geldiğini yaz: bir sonraki biçim değişikliğinde
-      // mesajın neden atıldığı log'dan anlaşılsın (numara yazılmaz, yalnız biçim).
-      const info = payload?._data?.Info ?? {};
-      const bicim = (v: unknown) => (typeof v === "string" ? v.replace(/\d/g, "9") : String(v));
-      this.logger.warn(
-        `Gönderen numarası çözülemedi: ${from} (SenderAlt=${bicim(info.SenderAlt)} Sender=${bicim(info.Sender)} Chat=${bicim(info.Chat)})`
-      );
+      this.logger.warn(`Gönderen numarası çözülemedi: ${from}`);
       return;
     }
 
@@ -193,7 +198,7 @@ export class WhatsappWebhookService {
       kind: command.kind === "link" ? "user" : "customer",
       display_name: displayName,
       last_inbound_at: now,
-    });
+    }, waJid);
     // Bekleyen aday varken gelen EVET, kullanıcı akışına girer (bkz. 082).
     const isConfirmingPending = command.kind === "confirm" && Boolean(contact.pending_user_id);
     const isUserPhone = contact.kind === "user" || Boolean(contact.user_id) || command.kind === "link" || isConfirmingPending;
@@ -225,7 +230,7 @@ export class WhatsappWebhookService {
     // Kodsuz eşleşme: tanımadığımız bir telefon, tam bir kullanıcının profil
     // telefonuyla eşleşiyorsa önce "EVET yazın" denir; müşteri akışı bu
     // mesajda çalışmaz (kullanıcı kendi bildirim numarasını bağlıyor olabilir).
-    if (!contact.user_id && !contact.pending_user_id) {
+    if (!contact.user_id && !contact.pending_user_id && !isLidKey(contact.phone_e164)) {
       const owner = await this.whatsapp.findProfilePhoneOwner(contact.phone_e164);
       if (owner) {
         await this.updateContact(contact.id, { pending_user_id: owner.id, pending_since: now });

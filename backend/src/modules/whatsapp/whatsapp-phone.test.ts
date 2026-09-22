@@ -2,7 +2,7 @@
 // gereği), bu yüzden namespace import kullanılıyor.
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { e164ToJid, isGroupJid, isLidJid, jidToE164, maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
+import { e164ToJid, isGroupJid, isLidJid, isLidKey, jidToE164, lidContactKey, maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
 
 describe("telefon normalizasyonu", () => {
   const cases: [string, string | null][] = [
@@ -42,6 +42,14 @@ describe("JID dönüşümü", () => {
     assert.equal(jidToE164("120363012345678901@g.us"), null);
     assert.equal(jidToE164("123456789012345@lid"), null);
     assert.equal(jidToE164(undefined), null);
+  });
+
+  test("numarası gizli LID'in kayıt anahtarı", () => {
+    assert.equal(lidContactKey("237679279137013@lid"), "lid:237679279137013");
+    assert.equal(lidContactKey("237679279137013:4@lid"), "lid:237679279137013");
+    assert.equal(isLidKey("lid:237679279137013"), true);
+    assert.equal(isLidKey("+905321234567"), false);
+    assert.equal(maskPhone("lid:237679279137013"), "gizli numara");
   });
 
   test("LID ve grup ayrımı", () => {

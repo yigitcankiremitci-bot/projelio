@@ -56,6 +56,19 @@ export function jidToE164(jid: string | null | undefined): string | null {
   return match ? "+" + match[1] : null;
 }
 
+/**
+ * Numarası öğrenilemeyen LID'li kişinin kayıt anahtarı ("lid:237679279137013").
+ * whatsapp_contacts.phone_e164 NOT NULL ve bağlantı başına tekil; gerçek bir
+ * numara olmadığı "lid:" önekinden anlaşılır, E.164 ile asla çakışmaz.
+ */
+export function lidContactKey(jid: string): string {
+  return "lid:" + jid.replace(/[:@].*$/, "");
+}
+
+export function isLidKey(phone: string | null | undefined): boolean {
+  return typeof phone === "string" && phone.startsWith("lid:");
+}
+
 export function isLidJid(jid: string | null | undefined): boolean {
   return typeof jid === "string" && jid.endsWith("@lid");
 }
@@ -70,6 +83,7 @@ export function isGroupJid(jid: string | null | undefined): boolean {
  */
 export function maskPhone(phoneE164: string | null | undefined): string {
   if (!phoneE164) return "";
+  if (isLidKey(phoneE164)) return "gizli numara";
   const digits = phoneE164.replace(/^\+/, "");
   if (digits.length < 6) return "+" + digits;
   const country = digits.slice(0, digits.length - 10) || digits.slice(0, 2);

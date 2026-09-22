@@ -635,7 +635,9 @@ export class WhatsappService {
   async upsertContact(
     connectionId: string,
     phone: string,
-    patch: { kind?: "user" | "customer"; party_id?: string | null; display_name?: string | null; last_inbound_at?: string }
+    patch: { kind?: "user" | "customer"; party_id?: string | null; display_name?: string | null; last_inbound_at?: string },
+    // Numarası bilinmeyen LID'li kişide gönderim adresi LID'in kendisi.
+    waJid?: string
   ): Promise<ContactRow> {
     const now = new Date().toISOString();
     const { data: existing } = await this.supabase.client
@@ -659,7 +661,7 @@ export class WhatsappService {
       .insert({
         connection_id: connectionId,
         phone_e164: phone,
-        wa_jid: e164ToJid(phone),
+        wa_jid: waJid ?? e164ToJid(phone),
         kind: patch.kind ?? "customer",
         party_id: patch.party_id ?? null,
         display_name: patch.display_name ?? null,
@@ -668,7 +670,7 @@ export class WhatsappService {
       .select()
       .single();
     if (error) {
-      if (error.code === "23505") return this.upsertContact(connectionId, phone, patch);
+      if (error.code === "23505") return this.upsertContact(connectionId, phone, patch, waJid);
       throw error;
     }
     return data as ContactRow;

@@ -18,6 +18,8 @@ const KAPSAM_KAYNAKLARI: Record<KapsamAdi, string> = {
   cariler: "party",
   modulKayitlari: "module_records",
   gorevler: "tasks",
+  planDonemleri: "plan_periods",
+  sosyalGonderiler: "social_posts",
 };
 
 /**

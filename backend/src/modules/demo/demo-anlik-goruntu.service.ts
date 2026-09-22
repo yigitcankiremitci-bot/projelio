@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SupabaseService } from "../../database/supabase.service";
 import {
-  DEMO_EPOSTA_SONU,
+  DEMO_EPOSTA_SONLARI,
   DEMO_ID_ALT,
   DEMO_ID_UST,
   KapsamIdleri,
@@ -133,7 +133,7 @@ export class DemoAnlikGoruntuService {
         const { data, error } = await this.supabase.client
           .from(kural.tablo)
           .select("*")
-          .like("email", `%${DEMO_EPOSTA_SONU}`);
+          .or(DEMO_EPOSTA_SONLARI.map((son) => `email.like.%${son}`).join(","));
         if (error) throw new Error(`${kural.tablo}: ${error.message}`);
         satirlar = data ?? [];
       } else if (kural.tip === "aralik") {

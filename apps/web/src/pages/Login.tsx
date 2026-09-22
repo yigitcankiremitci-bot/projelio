@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { backState } from "../lib/backTarget";
 import SocialSignInButtons from "../components/SocialSignInButtons";
-import { demoHesap } from "../lib/demoHesap";
+import { demoEpostasiMi, demoHesap, serbestDemoHesap } from "../lib/demoHesap";
 import { demoZiyaretiBaslat } from "../lib/demoZiyaret";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
@@ -20,9 +20,12 @@ export default function Login() {
   // Tanıtım sitesindeki "Demo hesabıyla gez" bağlantısı buraya ?demo=1 ile
   // geliyor; alanları hazır dolduruyoruz ki ziyaretçi kopyala-yapıştırla
   // uğraşmasın. Şifre zaten sitede de yazıyor, gizlenecek bir şey yok.
-  const demoIstendi = new URLSearchParams(window.location.search).get("demo") === "1";
-  const [email, setEmail] = useState(demoIstendi ? demoHesap.email : "");
-  const [password, setPassword] = useState(demoIstendi ? demoHesap.password : "");
+  // ?demo=1 şirket demosu, ?demo=freelancer serbest çalışan demosu.
+  const demoParam = new URLSearchParams(window.location.search).get("demo");
+  const demoIstendi = demoParam === "1" || demoParam === "freelancer";
+  const istenenDemo = demoParam === "freelancer" ? serbestDemoHesap : demoHesap;
+  const [email, setEmail] = useState(demoIstendi ? istenenDemo.email : "");
+  const [password, setPassword] = useState(demoIstendi ? istenenDemo.password : "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   // Şifre doğru ama e-posta doğrulanmamışsa backend 403 döner; bu durumda
@@ -68,7 +71,7 @@ export default function Login() {
       });
       localStorage.setItem("projelio_token", token);
       // Her demo girişi yeni bir ziyaret (bkz. lib/demoZiyaret.ts).
-      if (girisEmail.trim().toLowerCase() === demoHesap.email) demoZiyaretiBaslat(demoIstendi ? "tanitim" : "giris");
+      if (demoEpostasiMi(girisEmail)) demoZiyaretiBaslat(demoIstendi ? "tanitim" : "giris");
       window.location.href = guvenliHedef();
     } catch (err) {
       // Backend bazı durumlarda (ör. Google ile kaydolmuş bir hesaba şifreyle
@@ -253,39 +256,61 @@ export default function Login() {
             {t("Üye olmadan gezmek ister misin?")}
           </p>
           <p style={{ margin: "6px 0 0", fontSize: 14, lineHeight: 1.5, color: c.textSecondary }}>
-            {t(
-              "Hazır bir demo hesabı var: örnek bir şirketin projeleri, görevleri, bütçesi ve raporlarıyla birlikte her yeri dolaşabilirsin."
-            )}
+            {t("Hazır iki demo hesabı var; hangisi sana daha yakınsa onunla gez.")}
           </p>
-          <p
-            style={{
-              margin: "10px 0 0",
-              fontSize: 13,
-              color: c.textSecondary,
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-              wordBreak: "break-all",
-            }}
-          >
-            {demoHesap.email} · {demoHesap.password}
-          </p>
-          <button
-            type="button"
-            onClick={() => girisYap(demoHesap.email, demoHesap.password)}
-            disabled={loading}
-            style={{
-              marginTop: 12,
-              width: "100%",
-              background: c.accent,
-              color: "#fff",
-              padding: "10px 0",
-              borderRadius: 8,
-              border: "none",
-              fontSize: 16,
-              fontWeight: 500,
-            }}
-          >
-            {loading ? t("Giriş yapılıyor…") : t("Demo hesabıyla gir")}
-          </button>
+          {/* İki demo: şirket (kadro, departmanlar, modüller) ve serbest çalışan
+              (kendi işleri, projeleri, rutinleri, Kasa'sı). Ayrı kartlar, çünkü
+              ziyaretçinin hangisini açacağına kendi durumuna bakarak karar vermesi
+              gerekiyor — tek düğme şirket demosuna gidiyordu ve serbest çalışanlar
+              kendilerine uymayan bir ekranla karşılaşıyordu. */}
+          {[
+            {
+              hesap: demoHesap,
+              baslik: t("Şirket"),
+              aciklama: t("Departmanları, kadrosu, bütçesi ve raporlarıyla örnek bir şirket."),
+              dugme: t("Şirket demosuyla gir"),
+            },
+            {
+              hesap: serbestDemoHesap,
+              baslik: t("Serbest çalışan"),
+              aciklama: t("Müzik prodüktörü ve video editörü: kendi işleri, projeleri, rutinleri ve kasası."),
+              dugme: t("Serbest çalışan demosuyla gir"),
+            },
+          ].map((demo) => (
+            <div key={demo.hesap.email} style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${c.border}` }}>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: c.textPrimary }}>{demo.baslik}</p>
+              <p style={{ margin: "4px 0 0", fontSize: 13, lineHeight: 1.5, color: c.textSecondary }}>{demo.aciklama}</p>
+              <p
+                style={{
+                  margin: "8px 0 0",
+                  fontSize: 13,
+                  color: c.textSecondary,
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                  wordBreak: "break-all",
+                }}
+              >
+                {demo.hesap.email} · {demo.hesap.password}
+              </p>
+              <button
+                type="button"
+                onClick={() => girisYap(demo.hesap.email, demo.hesap.password)}
+                disabled={loading}
+                style={{
+                  marginTop: 10,
+                  width: "100%",
+                  background: c.accent,
+                  color: c.onPrimary,
+                  padding: "10px 0",
+                  borderRadius: 8,
+                  border: "none",
+                  fontSize: 16,
+                  fontWeight: 500,
+                }}
+              >
+                {loading ? t("Giriş yapılıyor…") : demo.dugme}
+              </button>
+            </div>
+          ))}
           <p style={{ margin: "10px 0 0", fontSize: 13, lineHeight: 1.5, color: c.textSecondary }}>
             {t(
               "Her şeyi deneyebilirsin: eklediğin, değiştirdiğin, sildiğin ne varsa bir sonraki girişte ilk haline döner. Hesap herkese açık olduğu için aynı anda başkaları da içeride olabilir — gerçek veri ya da kişisel bilgi girme."

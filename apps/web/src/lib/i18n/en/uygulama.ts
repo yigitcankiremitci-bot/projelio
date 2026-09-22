@@ -532,4 +532,11 @@ export const uygulama: TranslationDict = {
   "grup": "group",
   "ürün": "product",
   "{sure} tamamlandı": "{sure} done",
+  // Giriş ekranı: iki demo hesabı
+  "Departmanları, kadrosu, bütçesi ve raporlarıyla örnek bir şirket.": "A sample company with its departments, staff, budget and reports.",
+  "Hazır iki demo hesabı var; hangisi sana daha yakınsa onunla gez.": "There are two demo accounts ready; look around with whichever fits you best.",
+  "Müzik prodüktörü ve video editörü: kendi işleri, projeleri, rutinleri ve kasası.": "A music producer and video editor: their own jobs, projects, routines and cash book.",
+  "Serbest çalışan": "Freelancer",
+  "Serbest çalışan demosuyla gir": "Sign in with the freelancer demo",
+  "Şirket demosuyla gir": "Sign in with the company demo",
 };

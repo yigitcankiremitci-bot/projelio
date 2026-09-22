@@ -6,7 +6,7 @@ import type { AiCredits as AiCreditsData, AiCreditTransaction } from "../api/aiC
 import { IconSparkle } from "../components/icons";
 import AiCreditTopUp from "../components/AiCreditTopUp";
 import { useCurrentUser } from "../lib/useCurrentUser";
-import { demoHesap } from "../lib/demoHesap";
+import { demoEpostasiMi } from "../lib/demoHesap";
 import { satinAlmaGosterilir } from "../lib/mobilKabuk";
 import { bicimDili } from "../lib/i18n/depo";
 
@@ -32,7 +32,7 @@ export default function AiCreditsPage() {
   // deneme tavanından kalan kısım (bkz. backend demo-ai-kotasi.ts). Kredi
   // yükleme arka uçta da kapalı, düğmeyi göstermek boşuna hataya çıkarırdı.
   const { user: me } = useCurrentUser();
-  const demoHesabi = me?.email?.toLowerCase() === demoHesap.email;
+  const demoHesabi = demoEpostasiMi(me?.email);
 
   // Sipariş oluşturulunca da çağrılır: ödeme entegrasyonu bağlandığında kredi
   // anında yükleneceği için bakiyenin tazelenmesi gerekir.

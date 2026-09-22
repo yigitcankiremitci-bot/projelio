@@ -21,7 +21,7 @@ import { getSidebarDefaultOpen, useAppPrefs } from "./lib/appPrefs";
 import { refreshSession } from "./lib/session";
 import { useEtkinlikSayaci } from "./lib/etkinlikSayaci";
 import { useDemoZiyaret } from "./lib/demoZiyaret";
-import { demoHesap } from "./lib/demoHesap";
+import { demoEpostasiMi } from "./lib/demoHesap";
 import { SIDEBAR_WIDTH, pageGutter, Z, TOP_CHROME, SAFE_TOP, safeTop } from "./lib/layout";
 import { kabukDonusunuDinle } from "./lib/mobilKabuk";
 import UploadTray, { UPLOAD_TRAY_HEIGHT } from "./components/UploadTray";
@@ -631,7 +631,7 @@ export default function App() {
   // Demo ziyaretçisi neye bakıyor (Admin > Demo ziyaretleri). Yalnızca herkese
   // açık demo hesabında; gerçek kullanıcıların gezinmesi ölçülmüyor.
   useDemoZiyaret(
-    !isAuthScreen && me?.email?.toLowerCase() === demoHesap.email,
+    !isAuthScreen && demoEpostasiMi(me?.email),
     location.pathname
   );
 

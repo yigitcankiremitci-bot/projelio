@@ -13,7 +13,7 @@ import DeleteAccountModal from "../components/DeleteAccountModal";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { backState } from "../lib/backTarget";
-import { demoHesap } from "../lib/demoHesap";
+import { demoEpostasiMi } from "../lib/demoHesap";
 import { useLocale, useT } from "../lib/i18n";
 import TabBar from "../components/TabBar";
 // Tek kart: Drive ve OneDrive hesaplarının hepsi burada listeleniyor. Ayrı
@@ -423,7 +423,7 @@ export default function Settings() {
   // Herkese açık demo hesabında şifre değiştirme ve hesap silme kapalı: arka uç
   // zaten reddediyor (bkz. backend/src/common/demo-hesap.ts), burada da formu
   // hiç göstermiyoruz ki ziyaretçi doldurup hataya çarpmasın.
-  const demoHesabi = me?.email?.toLowerCase() === demoHesap.email;
+  const demoHesabi = demoEpostasiMi(me?.email);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

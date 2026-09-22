@@ -6,7 +6,7 @@ import { kabuktaMi } from "../lib/mobilKabuk";
 import { ApiError } from "../api/client";
 import { IconSparkle, IconStar } from "../components/icons";
 import Anahtar from "../components/Anahtar";
-import { demoHesap } from "../lib/demoHesap";
+import { demoEpostasiMi } from "../lib/demoHesap";
 import { useLocale, useT } from "../lib/i18n";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -45,7 +45,7 @@ export default function BillingPage() {
   const tlYaz = (tutar: number) => `${tutar.toLocaleString(bicimDili())} ₺`;
   const [params, setParams] = useSearchParams();
   const { user: me } = useCurrentUser();
-  const demoHesabi = me?.email?.toLowerCase() === demoHesap.email;
+  const demoHesabi = demoEpostasiMi(me?.email);
 
   const [veri, setVeri] = useState<BillingOverview | null>(null);
   /**

@@ -18,6 +18,7 @@ import { hataMetni } from "./i18n/index";
  *     Yani içerideki her değişiklik geçici; hesabın kendisi ise hiç değişmez.
  */
 export const DEMO_HESAP = {
+  /** Şirket demosu (Çelikhan Endüstri). Geriye uyum için tek e-posta alanı duruyor. */
   email: "ceo@celikhan.test",
   /**
    * Demo veri kümesindeki bütün satırların id'si bu ön ekle başlar
@@ -28,9 +29,17 @@ export const DEMO_HESAP = {
   idOnEki: "ce11",
 } as const;
 
-/** Verilen e-posta demo hesabına mı ait? (büyük/küçük harf duyarsız) */
+/**
+ * Herkese açık bütün demo hesapları: şirket demosu ve serbest çalışan demosu
+ * (Oliver Hayes, migration 124). İkisi de aynı veri kümesinde, aynı `ce11`
+ * kimlik aralığında duruyor ve aynı sıfırlamadan geçiyor; yeni bir demo
+ * hesabı eklemek = bu listeye bir satır + veri (bkz. demo/demo-kapsam.ts).
+ */
+export const DEMO_EPOSTALARI: readonly string[] = [DEMO_HESAP.email, "oliver@hayes.test"];
+
+/** Verilen e-posta bir demo hesabına mı ait? (büyük/küçük harf duyarsız) */
 export function demoEpostasiMi(email: string | null | undefined): boolean {
-  return typeof email === "string" && email.trim().toLowerCase() === DEMO_HESAP.email;
+  return typeof email === "string" && DEMO_EPOSTALARI.includes(email.trim().toLowerCase());
 }
 
 /** Verilen kullanıcı id'si demo veri kümesine mi ait? */

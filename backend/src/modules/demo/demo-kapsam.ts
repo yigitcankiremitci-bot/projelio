@@ -22,8 +22,15 @@ export const DEMO_ID_UST = "ce11ffff-ffff-ffff-ffff-ffffffffffff";
 /** PostgREST `or=` filtresi: demo aralığının dışındaki satırlar. */
 export const ZIYARETCI_SATIRI = `id.lt.${DEMO_ID_ALT},id.gt.${DEMO_ID_UST}`;
 
-/** Demo kullanıcılarının e-posta alan adı. */
-export const DEMO_EPOSTA_SONU = "@celikhan.test";
+/**
+ * Demo kullanıcılarının e-posta alan adları.
+ *
+ * `@celikhan.test` şirket demosunun kadrosu, `@hayes.test` serbest çalışan
+ * demosu (Oliver Hayes, migration 124). İkisi aynı anlık görüntüde durur;
+ * hangi demoya girilirse girilsin ikisi birden sıfırlanır — ayrı tutmak iki
+ * kopya kural listesi demekti.
+ */
+export const DEMO_EPOSTA_SONLARI: readonly string[] = ["@celikhan.test", "@hayes.test"];
 
 export type KapsamAdi =
   | "kullanicilar"
@@ -35,7 +42,9 @@ export type KapsamAdi =
   | "rutinler"
   | "cariler"
   | "modulKayitlari"
-  | "gorevler";
+  | "gorevler"
+  | "planDonemleri"
+  | "sosyalGonderiler";
 
 export type KapsamIdleri = Record<KapsamAdi, string[]>;
 
@@ -82,17 +91,31 @@ export const YAKALAMA_KURALLARI: YakalamaKurali[] = [
   { tablo: "department_members", tip: "kapsam", sutun: "department_id", kaynak: "departmanlar" },
   { tablo: "organization_modules", tip: "kapsam", sutun: "organization_id", kaynak: "organizasyon" },
   { tablo: "module_members", tip: "kapsam", sutun: "organization_id", kaynak: "organizasyon" },
+  { tablo: "products", tip: "kapsam", sutun: "organization_id", kaynak: "organizasyon" },
+  // Şirket işleri şirkete, serbest çalışanın işleri KİŞİYE bağlı (organization_id
+  // boş). İkisi birden: yalnızca şirket ölçütü serbest çalışan demosunu kaçırırdı.
+  {
+    tablo: "jobs",
+    tip: "coklu",
+    coklu: [
+      { sutun: "organization_id", kaynak: "organizasyon" },
+      { sutun: "owner_id", kaynak: "kullanicilar" },
+    ],
+    kapsamAdi: "isler",
+  },
+  { tablo: "job_modules", tip: "kapsam", sutun: "job_id", kaynak: "isler" },
+  // Cariler şirkete ya da (serbest çalışanda) işe bağlı.
   {
     tablo: "party",
-    tip: "kapsam",
-    sutun: "organization_id",
-    kaynak: "organizasyon",
+    tip: "coklu",
+    coklu: [
+      { sutun: "organization_id", kaynak: "organizasyon" },
+      { sutun: "job_id", kaynak: "isler" },
+    ],
     kendine: "parent_party_id",
     kapsamAdi: "cariler",
   },
   { tablo: "party_contact", tip: "kapsam", sutun: "party_id", kaynak: "cariler" },
-  { tablo: "products", tip: "kapsam", sutun: "organization_id", kaynak: "organizasyon" },
-  { tablo: "jobs", tip: "kapsam", sutun: "organization_id", kaynak: "organizasyon", kapsamAdi: "isler" },
   { tablo: "job_members", tip: "kapsam", sutun: "job_id", kaynak: "isler" },
   { tablo: "projects", tip: "kapsam", sutun: "job_id", kaynak: "isler", kapsamAdi: "projeler" },
   { tablo: "project_members", tip: "kapsam", sutun: "project_id", kaynak: "projeler" },
@@ -110,6 +133,11 @@ export const YAKALAMA_KURALLARI: YakalamaKurali[] = [
     kendine: "parent_task_id",
     kapsamAdi: "gorevler",
   },
+  // Çoklu atama (migration 055). Yapılacaklar ve "bana atananlar" buradan okuyor;
+  // alınmazsa sıfırlamadan sonra görevler kimseye atanmamış görünürdü.
+  { tablo: "task_assignees", tip: "kapsam", sutun: "task_id", kaynak: "gorevler" },
+  // Düzenli ödemeler hareketlerden ÖNCE: hareket recurring_payment_id ile ona bakıyor.
+  { tablo: "recurring_payments", tip: "kapsam", sutun: "owner_id", kaynak: "kullanicilar" },
   {
     tablo: "budget_transactions",
     tip: "coklu",
@@ -117,13 +145,18 @@ export const YAKALAMA_KURALLARI: YakalamaKurali[] = [
       { sutun: "project_id", kaynak: "projeler" },
       { sutun: "operation_id", kaynak: "operasyonlar" },
       { sutun: "department_id", kaynak: "departmanlar" },
+      // Kasa kişinin defteri (owner_id); iş kademesindeki ve bağımsız
+      // kayıtlar yalnızca bu ölçütle yakalanıyor.
+      { sutun: "owner_id", kaynak: "kullanicilar" },
     ],
   },
   {
     tablo: "module_records",
-    tip: "kapsam",
-    sutun: "organization_id",
-    kaynak: "organizasyon",
+    tip: "coklu",
+    coklu: [
+      { sutun: "organization_id", kaynak: "organizasyon" },
+      { sutun: "job_id", kaynak: "isler" },
+    ],
     kapsamAdi: "modulKayitlari",
   },
   { tablo: "module_record_versions", tip: "kapsam", sutun: "record_id", kaynak: "modulKayitlari" },
@@ -132,6 +165,34 @@ export const YAKALAMA_KURALLARI: YakalamaKurali[] = [
   { tablo: "task_comments", tip: "kapsam", sutun: "user_id", kaynak: "kullanicilar" },
   { tablo: "notifications", tip: "kapsam", sutun: "user_id", kaynak: "kullanicilar", yalnizcaDemoAraligi: true },
   { tablo: "personal_todos", tip: "kapsam", sutun: "user_id", kaynak: "kullanicilar" },
+  // Takvim/planlama. Bloklar görevlere ve kişisel yapılacaklara baktığı için
+  // onlardan SONRA; Yaptım kayıtları bloklara baktığı için en sonda.
+  // plan_preferences bilerek yok: birincil anahtarı user_id, geri yükleme ise
+  // id üzerinden upsert ediyor — varsayılan tercihler demoya yetiyor.
+  { tablo: "plan_focus_areas", tip: "kapsam", sutun: "user_id", kaynak: "kullanicilar" },
+  { tablo: "plan_periods", tip: "kapsam", sutun: "user_id", kaynak: "kullanicilar", kapsamAdi: "planDonemleri" },
+  { tablo: "plan_targets", tip: "kapsam", sutun: "period_id", kaynak: "planDonemleri" },
+  { tablo: "plan_time_blocks", tip: "kapsam", sutun: "user_id", kaynak: "kullanicilar" },
+  { tablo: "work_log_entries", tip: "kapsam", sutun: "user_id", kaynak: "kullanicilar" },
+  // Sosyal medya modülü (şirkete ya da işe bağlı).
+  {
+    tablo: "social_accounts",
+    tip: "coklu",
+    coklu: [
+      { sutun: "organization_id", kaynak: "organizasyon" },
+      { sutun: "job_id", kaynak: "isler" },
+    ],
+  },
+  {
+    tablo: "social_posts",
+    tip: "coklu",
+    coklu: [
+      { sutun: "organization_id", kaynak: "organizasyon" },
+      { sutun: "job_id", kaynak: "isler" },
+    ],
+    kapsamAdi: "sosyalGonderiler",
+  },
+  { tablo: "social_post_targets", tip: "kapsam", sutun: "post_id", kaynak: "sosyalGonderiler" },
 ];
 
 /** Tek bir silme kuralı: "şu tabloda, şu sütunu şu id'lere bakan satırlar". */
@@ -144,6 +205,18 @@ export type SilmeKurali = { tablo: string; sutun: string; kapsam: KapsamAdi };
  */
 export const SILME_DALGALARI: SilmeKurali[][] = [
   [
+    // Yaptım kayıtları takvim bloklarına bakıyor; bloklar görevlere. En önce onlar.
+    { tablo: "work_log_entries", sutun: "user_id", kapsam: "kullanicilar" },
+    { tablo: "social_post_targets", sutun: "post_id", kapsam: "sosyalGonderiler" },
+  ],
+  [
+    { tablo: "plan_time_blocks", sutun: "user_id", kapsam: "kullanicilar" },
+    { tablo: "plan_targets", sutun: "period_id", kapsam: "planDonemleri" },
+    { tablo: "task_assignees", sutun: "task_id", kapsam: "gorevler" },
+    { tablo: "social_posts", sutun: "job_id", kapsam: "isler" },
+    { tablo: "social_posts", sutun: "organization_id", kapsam: "organizasyon" },
+  ],
+  [
     // Ziyaretçi her şeyi demo kullanıcısı olarak yazar; yorum/bildirim gibi
     // "kime ait" bilgisi net olan tablolarda kapsam doğrudan kullanıcıdır.
     { tablo: "task_comments", sutun: "user_id", kapsam: "kullanicilar" },
@@ -151,6 +224,9 @@ export const SILME_DALGALARI: SilmeKurali[][] = [
     { tablo: "module_record_versions", sutun: "approved_by", kapsam: "kullanicilar" },
     { tablo: "notifications", sutun: "user_id", kapsam: "kullanicilar" },
     { tablo: "personal_todos", sutun: "user_id", kapsam: "kullanicilar" },
+    { tablo: "plan_periods", sutun: "user_id", kapsam: "kullanicilar" },
+    { tablo: "plan_focus_areas", sutun: "user_id", kapsam: "kullanicilar" },
+    { tablo: "plan_rituals", sutun: "user_id", kapsam: "kullanicilar" },
   ],
   [
     { tablo: "tasks", sutun: "project_id", kapsam: "projeler" },
@@ -168,6 +244,9 @@ export const SILME_DALGALARI: SilmeKurali[][] = [
     { tablo: "budget_transactions", sutun: "project_id", kapsam: "projeler" },
     { tablo: "budget_transactions", sutun: "operation_id", kapsam: "operasyonlar" },
     { tablo: "budget_transactions", sutun: "department_id", kapsam: "departmanlar" },
+    // Kasa'ya doğrudan (iş kademesine ya da bağımsız) girilen ziyaretçi kayıtları.
+    { tablo: "budget_transactions", sutun: "owner_id", kapsam: "kullanicilar" },
+    { tablo: "recurring_payments", sutun: "owner_id", kapsam: "kullanicilar" },
     { tablo: "operation_routines", sutun: "operation_id", kapsam: "operasyonlar" },
     { tablo: "party_contact", sutun: "party_id", kapsam: "cariler" },
     { tablo: "department_members", sutun: "department_id", kapsam: "departmanlar" },
@@ -176,6 +255,16 @@ export const SILME_DALGALARI: SilmeKurali[][] = [
     { tablo: "projects", sutun: "job_id", kapsam: "isler" },
     { tablo: "operations", sutun: "job_id", kapsam: "isler" },
     { tablo: "job_members", sutun: "job_id", kapsam: "isler" },
+    // Ziyaretçinin kendi açtığı işin içindekiler (iş kimliği anlık görüntüde
+    // yok): sahiplikten yakalanıyor. operations.job_id'de cascade olmadığı
+    // için iş silinmeden önce gitmeleri şart.
+    { tablo: "projects", sutun: "owner_id", kapsam: "kullanicilar" },
+    { tablo: "operations", sutun: "owner_id", kapsam: "kullanicilar" },
+    { tablo: "job_modules", sutun: "job_id", kapsam: "isler" },
+    { tablo: "module_records", sutun: "job_id", kapsam: "isler" },
+    { tablo: "party", sutun: "job_id", kapsam: "isler" },
+    { tablo: "social_accounts", sutun: "job_id", kapsam: "isler" },
+    { tablo: "social_accounts", sutun: "organization_id", kapsam: "organizasyon" },
   ],
   [
     { tablo: "jobs", sutun: "organization_id", kapsam: "organizasyon" },
@@ -187,8 +276,9 @@ export const SILME_DALGALARI: SilmeKurali[][] = [
     { tablo: "departments", sutun: "organization_id", kapsam: "organizasyon" },
   ],
   [
-    // Ziyaretçi kendine yeni bir şirket açtıysa o da gitsin.
+    // Ziyaretçi kendine yeni bir şirket ya da (serbest çalışan demosunda) iş açtıysa o da gitsin.
     { tablo: "organizations", sutun: "owner_id", kapsam: "kullanicilar" },
+    { tablo: "jobs", sutun: "owner_id", kapsam: "kullanicilar" },
   ],
 ];
 

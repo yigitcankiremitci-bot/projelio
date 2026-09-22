@@ -23,6 +23,15 @@ export const site = {
     password: "Celikhan2026!",
   },
   /**
+   * Serbest çalışan demosu: müzik prodüktörü + video editörü Oliver Hayes
+   * (panel migration 124). Panel tarafındaki karşılığı aynı dosyada
+   * (apps/web/src/lib/demoHesap.ts `serbestDemoHesap`).
+   */
+  demoFreelancer: {
+    email: "oliver@hayes.test",
+    password: "Freelance2026!",
+  },
+  /**
    * Uluslararası formatta, sadece rakam. Örn: 905551112233
    * Aynı numara iletişim sayfasında telefon ve WhatsApp bağlantısı olarak da
    * yazılı (src/i18n/{tr,en}.ts > contact.channels) — biri değişirse diğeri de
@@ -72,6 +81,8 @@ export const appLinks = {
    * içeren bir adres yazılırsa sorgu parametresi yanlış yere iliştirilirdi.
    */
   demo: process.env.NEXT_PUBLIC_DEMO_URL || `${site.appUrl}/login?demo=1`,
+  /** Serbest çalışan demosu: giriş ekranı `?demo=freelancer` ile onun bilgilerini doldurur. */
+  demoFreelancer: `${site.appUrl}/login?demo=freelancer`,
 };
 
 /**

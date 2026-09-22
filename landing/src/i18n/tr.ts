@@ -151,10 +151,15 @@ export const tr = {
   demoAccount: {
     eyebrow: "Kayıt yok, form yok",
     title: "Üye olmadan içeriyi gezin",
-    lede: "Hazır bir demo hesabı açtık. Örnek bir üretim şirketinin projeleri, görevleri, bütçesi ve raporlarıyla dolu — tek tıkla girip her yeri dolaşabilirsiniz.",
+    lede: "İki hazır demo hesabı açtık: biri örnek bir üretim şirketi, diğeri serbest çalışan bir müzik prodüktörü ve video editörü. Size yakın olanı seçin, tek tıkla girip her yeri dolaşın.",
+    companyTitle: "Şirket demosu",
+    companyText: "Departmanları, kadrosu, projeleri, bütçesi ve raporlarıyla bir üretim şirketi.",
+    freelancerTitle: "Serbest çalışan demosu",
+    freelancerText: "Oliver Hayes: kendi işleri, müşteri projeleri, YouTube rutini, kasası ve takvimiyle bir müzik prodüktörü ve video editörü. İçerik İngilizce.",
+    freelancerCta: "Serbest çalışan demosuyla gir",
     emailLabel: "E-posta",
     passwordLabel: "Şifre",
-    cta: "Demo hesabıyla gir",
+    cta: "Şirket demosuyla gir",
     ctaNote: "Bağlantı sizi giriş ekranına götürür; bilgiler hazır dolu gelir.",
     points: [
       "Kart bilgisi ya da kayıt istemiyoruz.",

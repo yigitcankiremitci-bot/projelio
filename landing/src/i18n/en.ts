@@ -152,10 +152,15 @@ export const en: Dict = {
   demoAccount: {
     eyebrow: "No sign-up, no form",
     title: "Look around without an account",
-    lede: "We keep a demo account open for you. It is filled with a sample manufacturing company's projects, tasks, budget and reports — one click and you are inside.",
+    lede: "We keep two demo accounts open for you: a sample manufacturing company, and a freelance music producer and video editor. Pick the one closer to you — one click and you are inside.",
+    companyTitle: "Company demo",
+    companyText: "A manufacturing company with its departments, staff, projects, budget and reports.",
+    freelancerTitle: "Freelancer demo",
+    freelancerText: "Oliver Hayes: a music producer and video editor with his own jobs, client projects, YouTube routine, cash book and calendar.",
+    freelancerCta: "Enter the freelancer demo",
     emailLabel: "Email",
     passwordLabel: "Password",
-    cta: "Enter the demo account",
+    cta: "Enter the company demo",
     ctaNote: "The link opens the sign-in screen with the fields already filled in.",
     points: [
       "No card details, no registration.",

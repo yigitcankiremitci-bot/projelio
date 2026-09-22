@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getDict, type Locale } from "@/i18n";
-import { appLinks, path, site } from "@/lib/site";
+import { appLinks, path, site, dilliAdres } from "@/lib/site";
 import LioDemo from "@/components/LioDemo";
 import Reveal from "@/components/Reveal";
 import Faq from "@/components/Faq";
@@ -206,6 +206,10 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
 
             <Reveal>
               <div className="demo-account-card">
+                {/* İki demo: şirket ve serbest çalışan. Ziyaretçi kendine uyanı seçsin. */}
+                <p className="small" style={{ margin: 0 }}>
+                  <b>{dict.demoAccount.companyTitle}</b> — {dict.demoAccount.companyText}
+                </p>
                 <div className="demo-account-cred">
                   <span>{dict.demoAccount.emailLabel}</span>
                   <b>{site.demo.email}</b>
@@ -217,9 +221,28 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
                 <a
                   className="btn btn-primary btn-lg btn-block"
                   style={{ marginTop: 18 }}
-                  href={appLinks.demo}
+                  href={dilliAdres(appLinks.demo, locale)}
                 >
                   {dict.demoAccount.cta} <ArrowRight />
+                </a>
+
+                <p className="small" style={{ margin: "24px 0 0" }}>
+                  <b>{dict.demoAccount.freelancerTitle}</b> — {dict.demoAccount.freelancerText}
+                </p>
+                <div className="demo-account-cred">
+                  <span>{dict.demoAccount.emailLabel}</span>
+                  <b>{site.demoFreelancer.email}</b>
+                </div>
+                <div className="demo-account-cred">
+                  <span>{dict.demoAccount.passwordLabel}</span>
+                  <b>{site.demoFreelancer.password}</b>
+                </div>
+                <a
+                  className="btn btn-primary btn-lg btn-block"
+                  style={{ marginTop: 18 }}
+                  href={dilliAdres(appLinks.demoFreelancer, locale)}
+                >
+                  {dict.demoAccount.freelancerCta} <ArrowRight />
                 </a>
                 <p className="xsmall demo-account-note">{dict.demoAccount.ctaNote}</p>
                 <p className="small demo-account-reset">{dict.demoAccount.resetNote}</p>

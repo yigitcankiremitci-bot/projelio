@@ -8,6 +8,9 @@ import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/proje
 import { IconTrash, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
+import { partyApi } from "../api/party";
+import { askLioDraft } from "../lib/askLio";
+import { onLioActivity } from "../lib/liveRoom";
 
 interface Props {
   organizationId?: string;
@@ -81,6 +84,20 @@ export default function CustomersPanel({
   };
 
   useEffect(() => load(true), [scopePath]);
+
+  // Excel şablonu Lio'ya verilince kartlar Lio'nun tarafında açılıyor; kullanıcı
+  // bu ekrandaysa listeyi kendisi tazelemek zorunda kalmasın.
+  useEffect(() => onLioActivity(() => load()), [scopePath]);
+
+  const [sablonHatasi, setSablonHatasi] = useState("");
+  const sablonuIndir = () => {
+    setSablonHatasi("");
+    partyApi.sablonuIndir(t("Projelio müşteri şablonu") + ".xlsx").catch(() => setSablonHatasi(t("Şablon indirilemedi.")));
+  };
+  // Mesaj yalnızca YAZILIR, gönderilmez: dosyayı kullanıcı ekleyecek, dosyasız
+  // giden mesaj Lio'ya "hangi dosya?" diye sordurmaktan başka işe yaramaz.
+  const lioyaYukle = () =>
+    askLioDraft(t("Doldurduğum müşteri şablonunu ekliyorum, içindeki müşterileri yükle."));
 
   // Departman değişince o departmanın varsayılan rol filtresi uygulanır.
   useEffect(() => setRoleFilter(profile.defaultRole ?? ""), [profile.defaultRole]);
@@ -242,6 +259,39 @@ export default function CustomersPanel({
           )
         )}
       </div>
+
+      {canWrite && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 10px",
+            borderRadius: 8,
+            border: `1px dashed ${c.border}`,
+            fontSize: 12,
+            color: c.textSecondary,
+          }}
+        >
+          <span style={{ flex: "1 1 220px" }}>
+            {t("Çok sayıda müşteriniz mi var? Excel şablonunu doldurup Lio'ya verin, kartları o açsın.")}
+          </span>
+          <button
+            onClick={sablonuIndir}
+            style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+          >
+            {t("Şablonu indir")}
+          </button>
+          <button
+            onClick={lioyaYukle}
+            style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+          >
+            {t("Lio'ya yükle")}
+          </button>
+          {sablonHatasi && <span style={{ width: "100%", color: c.danger }}>{sablonHatasi}</span>}
+        </div>
+      )}
 
       {!loading && parties.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

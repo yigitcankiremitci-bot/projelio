@@ -234,6 +234,9 @@ export const bildirimler: TranslationDict = {
   "modül kaydı güncellendi": "module record updated",
   "modül kaydı arşivlendi": "module record archived",
   "dosyadan toplu modül kaydı eklendi": "module records added in bulk from a file",
+  "müşteri kartı açıldı": "customer card created",
+  "müşteri kartı güncellendi": "customer card updated",
+  "dosyadan toplu müşteri kartı açıldı": "customer cards created in bulk from a file",
   "rutin oluşturuldu": "routine created",
   "rutin güncellendi": "routine updated",
   "ürün eklendi": "product added",
@@ -295,6 +298,10 @@ export const bildirimler: TranslationDict = {
   "Dosyadan {n} modül kaydı eklendi": {
     one: "{n} module record added from a file",
     other: "{n} module records added from a file",
+  },
+  "Dosyadan {n} müşteri kartı açıldı": {
+    one: "{n} customer card created from a file",
+    other: "{n} customer cards created from a file",
   },
 
   // ─────────────────────────────────────────────── Lio: duraklatma ve kredi

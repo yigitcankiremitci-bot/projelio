@@ -52,6 +52,7 @@ import { OperationsService } from "../operations/operations.service";
 import { ProductsService, type ProductWriteInput } from "../products/products.service";
 import { SupportService } from "../support/support.service";
 import { PartyService } from "../party/party.service";
+import { mevcutlariAyikla, planMusteriImport, SABLON_SAYFA_ADI } from "../party/musteri-sablonu";
 import { ORG_RECEIVABLE_MODULE_KEY } from "../budget/sirket-defteri";
 import { addRole } from "../party/party-dedup";
 import { AccessService } from "../../common/access/access.service";
@@ -623,6 +624,9 @@ const ACTION_LABELS: Record<string, string> = {
   export_report: "rapor dosyası üretildi",
   import_tasks_from_sheet: "dosyadan toplu görev eklendi",
   import_module_records_from_sheet: "dosyadan toplu modül kaydı eklendi",
+  create_customer: "müşteri kartı açıldı",
+  update_customer: "müşteri kartı güncellendi",
+  import_customers_from_sheet: "dosyadan toplu müşteri kartı açıldı",
 };
 // dil:anahtar-bitis
 
@@ -1232,6 +1236,9 @@ export class AiAssistantService {
         "(varsayılan hedef vermek ya da o satırları elde bırakmak).",
       "- Sonucu MUTLAKA raporla: kaç kayıt açıldı, kaç satır atlandı ve neden, hangi hedefe kaç tane gitti. " +
         "Satır tavanına gelinirse (kalanIlkSatir dönerse) kalanlar için aynı çağrıyı o satırdan devam ettir.",
+      "- MÜŞTERİ LİSTESİ (Projelio müşteri şablonu ya da herhangi bir müşteri/tedarikçi listesi) için " +
+        "import_customers_from_sheet: şablonda eşleme gerekmez. Önizlemede eşleşmeyen sütun varsa söyle; " +
+        "zaten kayıtlı oldukları için atlananları sayı olarak bildir, kullanıcı isterse adlarını ver.",
       "- Modül kayıtları da aynı şekilde: describe_module ile alan anahtarlarını al, " +
         "import_module_records_from_sheet'e anahtar -> sütun eşlemesi ver.",
       "",
@@ -2919,6 +2926,11 @@ export class AiAssistantService {
         return make(label);
       }
 
+      case "import_customers_from_sheet": {
+        const count = Number(result?.acilan ?? 0);
+        return count ? make(t("Dosyadan {n} müşteri kartı açıldı", { n: count })) : null;
+      }
+
       case "import_module_records_from_sheet": {
         const count = Number(result?.olusturulan ?? 0);
         if (!count) return null;
@@ -4505,6 +4517,9 @@ export class AiAssistantService {
       case "import_module_records_from_sheet":
         return this.importModuleRecordsFromSheet(userId, input);
 
+      case "import_customers_from_sheet":
+        return this.importCustomersFromSheet(userId, input);
+
       // --- Gruplar / organizasyonlar / departmanlar -------------------------
       //
       // Kapsayıcı sırası: grup > organizasyon > departman. Yetki her serviste
@@ -5168,6 +5183,72 @@ export class AiAssistantService {
       not: kalanIlkSatir
         ? `Satır tavanına gelindi. Kalanlar için ilkSatir:${kalanIlkSatir} ile tekrarla.`
         : "Bitti. Kaç kayıt yazıldığını ve atlananları kullanıcıya SÖYLE.",
+    });
+  }
+
+  /**
+   * Tablodan toplu müşteri kartı (bkz. musteri-sablonu.ts).
+   *
+   * import_module_records_from_sheet'in eşi ama module_records'a değil party
+   * tablosuna yazar. Yinelenen ayıklaması arşivdeki kartları da görür: vergi
+   * no tekilliği arşivi kapsıyor, ayrıca arşivlenmiş bir müşteriyi sessizce
+   * yeniden açmak kullanıcının vazgeçtiği bir kaydı geri getirmek olurdu.
+   */
+  private async importCustomersFromSheet(userId: string, input: Record<string, any>): Promise<unknown> {
+    const scope = await this.customerScope(userId, input);
+    const sheets = this.attachmentsService.getSheets(userId, String(input.dosyaKimligi ?? ""));
+    // Şablonda veri sayfası adıyla bulunur; kullanıcı rehber sayfasını öne
+    // almış olsa bile "Nasıl doldurulur" satırları müşteri sanılmasın.
+    const sayfa =
+      input.sayfa ?? sheets?.find((sh) => normalizeKey(sh.name) === normalizeKey(SABLON_SAYFA_ADI))?.name;
+    const sheet = this.requireSheet(userId, { ...input, sayfa });
+
+    const plan = planMusteriImport(sheet, {
+      esleme: input.esleme ?? {},
+      basliksatiri: input.basliksatiri,
+      ilkSatir: input.ilkSatir,
+      sonSatir: input.sonSatir,
+    });
+    const mevcut = await this.partyService.findAll(scope, { includeArchived: true });
+    const { yeni, zatenVar } = mevcutlariAyikla(plan.planlanan, mevcut);
+    const islenecek = yeni.slice(0, MAX_IMPORT_ROWS);
+    const kalanIlkSatir = yeni[MAX_IMPORT_ROWS]?.satir;
+
+    const ortak = {
+      okunanSatir: plan.toplamSatir,
+      eslesenSutunlar: plan.eslesenSutunlar,
+      kullanilmayanSutunlar: plan.kullanilmayanSutunlar.length ? plan.kullanilmayanSutunlar : undefined,
+      zatenKayitli: zatenVar.length || undefined,
+      zatenKayitliOrnek: zatenVar.slice(0, 8),
+      atlanan: plan.atlanan.slice(0, 8),
+      atlananToplam: plan.atlanan.length || undefined,
+      uyarilar: plan.uyarilar.slice(0, 5),
+      kalanIlkSatir,
+    };
+
+    if (input.onizleme !== false) {
+      return pruneEmpty({
+        onizleme: true,
+        acilacak: islenecek.length,
+        ...ortak,
+        ornek: islenecek.slice(0, 2).map((p) => pruneEmpty({ ...p.party, yetkili: p.kisi?.name })),
+        not: "Hiçbir şey YAZILMADI. Özeti kullanıcıya göster; onay alınca aynı çağrıyı onizleme:false ile tekrarla.",
+      });
+    }
+
+    const { olusan, hatalar } = await this.partyService.createMany(
+      { ...scope, departmentId: input.departmentId },
+      islenecek,
+      userId,
+      "excel"
+    );
+    return pruneEmpty({
+      acilan: olusan.length,
+      ...ortak,
+      hatalar: hatalar.length ? hatalar.slice(0, 8) : undefined,
+      not: kalanIlkSatir
+        ? `Satır tavanına gelindi. Kalanlar için ilkSatir:${kalanIlkSatir} ile tekrarla.`
+        : "Bitti. Kaç kart açıldığını, kaçının zaten kayıtlı olduğu için atlandığını kullanıcıya SÖYLE.",
     });
   }
 

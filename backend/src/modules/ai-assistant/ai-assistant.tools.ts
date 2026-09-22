@@ -95,6 +95,8 @@ export const WRITE_TOOLS = new Set<string>([
   // olarak yok: müşteri kartını ekrandan kaldırmak arayüzden yapılsın.
   "create_customer",
   "update_customer",
+  // Toplu kart açma; önizleme varsayılan (bkz. import_tasks_from_sheet).
+  "import_customers_from_sheet",
   // Bilgi kartı: künye düzenlemek geri alınabilir bir değişiklik (silme değil),
   // o yüzden kritik değil — ama yazmadır, "hiçbir şeyi değiştirme" denmişse kapanır.
   "update_info_card",
@@ -1513,6 +1515,38 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         notes: { type: "string" },
       },
       required: ["partyId"],
+    },
+  },
+  {
+    name: "import_customers_from_sheet",
+    description:
+      "Tablodaki satırlardan toplu müşteri/tedarikçi kartı açar. Projelio müşteri şablonu (Müşteriler ekranından " +
+      "indirilen Excel) ESLEME GEREKTİRMEZ: başlıklar otomatik tanınır. Kullanıcının kendi listesi de olur; " +
+      "başlıklar tanınmazsa esleme ile alan -> sütun başlığı ver. Aynı ad, vergi no ya da e-postayla zaten " +
+      "kayıtlı olanlar ve dosyadaki tekrarlar ATLANIR. Önce onizleme:true (varsayılan), özeti kullanıcıya " +
+      "göster, onay alınca aynı çağrıyı onizleme:false ile tekrarla.",
+    input_schema: {
+      type: "object",
+      properties: {
+        dosyaKimligi: { type: "string" },
+        sayfa: { type: "string", description: "Şablonda veri sayfası \"Müşteriler\"; verilmezse ilk sayfa." },
+        basliksatiri: { type: "number" },
+        ilkSatir: { type: "number" },
+        sonSatir: { type: "number" },
+        organizationId: { type: "string", description: "Şirket tarafı: organizasyon kimliği." },
+        jobId: { type: "string", description: "Serbest çalışan tarafı: iş kimliği." },
+        departmentId: { type: "string", description: "Kullanıcı departman belirttiyse (opsiyonel)." },
+        esleme: {
+          type: "object",
+          description:
+            "İsteğe bağlı: alan -> sütun başlığı. Alanlar: displayName (zorunlu), partyType, roles, legalName, " +
+            "taxNumber, taxOffice, email, phone, website, city, district, address, contactName, contactPhone, " +
+            "contactEmail, notes.",
+          additionalProperties: { type: "string" },
+        },
+        onizleme: { type: "boolean", description: "Varsayılan true." },
+      },
+      required: ["dosyaKimligi"],
     },
   },
   // --- Gruplar, organizasyonlar ve departmanlar --------------------------

@@ -1,7 +1,9 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import type { Response } from "express";
 import { AuthGuard } from "@nestjs/passport";
 import type { Party, PartyActivity, PartyContact, PartyRole } from "@projelio/shared";
 import { PartyService } from "./party.service";
+import { musteriSablonuOlustur, SABLON_DOSYA_ADI } from "./musteri-sablonu";
 import { AccessService } from "../../common/access/access.service";
 
 @Controller()
@@ -11,6 +13,23 @@ export class PartyController {
     private partyService: PartyService,
     private access: AccessService
   ) {}
+
+  // ============================================================ Excel şablonu
+
+  /**
+   * Boş müşteri şablonu. Veri içermez, o yüzden kapsam ve yetki istemiyor —
+   * yalnızca oturum. Yol "party/..." altında DEĞİL: aşağıdaki "party/:id"
+   * yolu onu kimlik sanıp yakalardı.
+   */
+  @Get("party-template")
+  async sablon(@Res() res: Response) {
+    const icerik = await musteriSablonuOlustur();
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Length", String(icerik.length));
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(SABLON_DOSYA_ADI)}`);
+    res.end(icerik);
+  }
 
   // ============================================================ Organizasyon
 

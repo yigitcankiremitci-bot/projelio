@@ -256,6 +256,108 @@ export class PartyService {
     return party;
   }
 
+  /**
+   * Toplu kart açma (Excel şablonu, bkz. musteri-sablonu.ts).
+   *
+   * create()'i satır satır çağırmak her satırda yetkiyi ve kapsamın TÜM
+   * kartlarını yeniden okuyordu: 300 satırlık dosya binlerce sorgu ederdi.
+   * Burada yetki bir kez bakılıyor, satırlar 100'lük parçalarla yazılıyor.
+   * Yinelenen ayıklaması ÇAĞIRANIN işi (mevcutlariAyikla) — bu metot
+   * kopya kontrolü yapmaz.
+   *
+   * Bir parçada vergi no çakışırsa (ayıklamadan sonra başka biri aynı anda
+   * eklemiş olabilir) o parça tek tek yeniden denenir: tek satırın çakışması
+   * 99 masum satırı düşürmesin. Başarısız satırlar `hatalar`da döner.
+   */
+  async createMany(
+    scope: PartyScope,
+    rows: { satir: number; party: Partial<Party> & { displayName: string }; kisi?: Partial<PartyContact> }[],
+    userId: string,
+    source: string
+  ): Promise<{ olusan: { satir: number; party: Party }[]; hatalar: { satir: number; sebep: string }[] }> {
+    await this.assertCanWrite(scope, userId);
+
+    const kayit = (p: Partial<Party> & { displayName: string }) => ({
+      organization_id: scope.organizationId ?? null,
+      job_id: scope.jobId ?? null,
+      party_type: p.partyType ?? "company",
+      display_name: p.displayName.trim(),
+      legal_name: p.legalName ?? null,
+      tax_number: p.taxNumber ?? null,
+      tax_office: p.taxOffice ?? null,
+      email: p.email ?? null,
+      phone: p.phone ?? null,
+      website: p.website ?? null,
+      address: p.address ?? null,
+      roles: p.roles?.length ? p.roles : ["lead"],
+      status: "active",
+      source,
+      // Bkz. create(): sahipsiz müşteri kimsenin takip etmediği müşteridir.
+      owner_user_id: userId,
+      data: {},
+      notes: p.notes ?? null,
+      created_by: userId,
+    });
+
+    const olusan: { satir: number; party: Party }[] = [];
+    const hatalar: { satir: number; sebep: string }[] = [];
+
+    for (let i = 0; i < rows.length; i += 100) {
+      const parca = rows.slice(i, i + 100);
+      const { data, error } = await this.supabase.client
+        .from("party")
+        .insert(parca.map((r) => kayit(r.party)))
+        .select(this.OWNER_JOIN);
+      if (!error) {
+        // PostgREST toplu eklemede satırları gönderilen sırayla döndürür.
+        (data ?? []).forEach((row: any, j: number) => olusan.push({ satir: parca[j].satir, party: mapParty(row) }));
+        continue;
+      }
+      if ((error as any).code !== "23505") throw error;
+      for (const r of parca) {
+        const tek = await this.supabase.client.from("party").insert(kayit(r.party)).select(this.OWNER_JOIN).single();
+        if (tek.error) {
+          hatalar.push({
+            satir: r.satir,
+            sebep: (tek.error as any).code === "23505" ? "bu vergi numarası zaten kayıtlı" : "kaydedilemedi",
+          });
+        } else {
+          olusan.push({ satir: r.satir, party: mapParty(tek.data) });
+        }
+      }
+    }
+
+    // Geçmiş ve yetkili kişi de toplu: satır başına iki sorgu daha olmasın.
+    if (olusan.length) {
+      await this.supabase.client.from("party_activity").insert(
+        olusan.map((o) => ({
+          party_id: o.party.id,
+          type: "sistem",
+          summary: "Excel'den içe aktarıldı",
+          user_id: userId,
+          occurred_at: new Date().toISOString(),
+        }))
+      );
+      const kisiler = olusan
+        .map((o) => ({ o, kisi: rows.find((r) => r.satir === o.satir)?.kisi }))
+        .filter((x) => x.kisi?.name?.trim())
+        .map(({ o, kisi }) => ({
+          party_id: o.party.id,
+          name: kisi!.name!.trim(),
+          email: kisi!.email ?? null,
+          phone: kisi!.phone ?? null,
+          is_primary: true,
+        }));
+      if (kisiler.length) {
+        const { error } = await this.supabase.client.from("party_contact").insert(kisiler);
+        // Kartlar açıldı; kişi eklenemediyse kartları geri almak daha büyük kayıp.
+        if (error) hatalar.push({ satir: 0, sebep: "yetkili kişiler eklenemedi" });
+      }
+    }
+
+    return { olusan, hatalar };
+  }
+
   async update(id: string, payload: Partial<Party>, userId?: string): Promise<Party> {
     const existing = await this.findOne(id);
     await this.assertCanWrite(this.scopeOf(existing), userId);

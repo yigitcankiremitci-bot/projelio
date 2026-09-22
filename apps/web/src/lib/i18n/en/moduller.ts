@@ -1034,4 +1034,12 @@ export const moduller: TranslationDict = {
     "Read: {ozet} — the record and the cash entry were created.",
   "Okundu: {ozet} — kayıt açıldı ama kasaya yazılamadı ({hata})":
     "Read: {ozet} — the record was created but it couldn't be written to the cash book ({hata})",
+  "Çok sayıda müşteriniz mi var? Excel şablonunu doldurup Lio'ya verin, kartları o açsın.":
+    "Have a lot of customers? Fill in the Excel template and give it to Lio — it will create the cards.",
+  "Şablonu indir": "Download template",
+  "Lio'ya yükle": "Upload to Lio",
+  "Şablon indirilemedi.": "Couldn't download the template.",
+  "Projelio müşteri şablonu": "Projelio customer template",
+  "Doldurduğum müşteri şablonunu ekliyorum, içindeki müşterileri yükle.":
+    "I'm attaching my filled-in customer template — please import the customers in it.",
 };

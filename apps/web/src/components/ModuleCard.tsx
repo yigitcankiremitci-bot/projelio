@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import type { ModuleCatalogEntry } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconSparkle, IconX } from "./icons";
+import { IconX } from "./icons";
+import ModuleEmblem from "./ModuleEmblem";
 import { useT } from "../lib/i18n";
 
 interface Props {
@@ -28,21 +29,8 @@ export default function ModuleCard({ entry, departmentId, to, onClick, onRemove,
   const t = useT();
   const content = (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <span
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 26,
-            height: 26,
-            borderRadius: 8,
-            background: c.background,
-            flexShrink: 0,
-          }}
-        >
-          <IconSparkle size={13} color={c.textSecondary} />
-        </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <ModuleEmblem moduleKey={entry.key} />
         <h3
           style={{
             margin: 0,
@@ -65,7 +53,7 @@ export default function ModuleCard({ entry, departmentId, to, onClick, onRemove,
             color: c.textSecondary,
             lineHeight: 1.4,
             display: "-webkit-box",
-            WebkitLineClamp: 3,
+            WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical" as const,
             overflow: "hidden",
           }}

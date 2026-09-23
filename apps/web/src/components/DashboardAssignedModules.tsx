@@ -7,7 +7,7 @@ import { moduleModalWidth } from "../lib/moduleSurfaces";
 import ModuleSurface from "./ModuleSurface";
 import ModuleTeamPanel from "./ModuleTeamPanel";
 import Modal from "./Modal";
-import { IconSparkle } from "./icons";
+import ModuleEmblem from "./ModuleEmblem";
 import { useT } from "../lib/i18n";
 
 // ModuleCard.tsx ile aynı sabit kart yüksekliği — anasayfadaki modül kartları
@@ -131,21 +131,8 @@ export default function DashboardAssignedModules({ jobs }: Props) {
                 overflow: "hidden",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 26,
-                    height: 26,
-                    borderRadius: 8,
-                    background: c.background,
-                    flexShrink: 0,
-                  }}
-                >
-                  <IconSparkle size={13} color={c.textSecondary} />
-                </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <ModuleEmblem moduleKey={item.moduleKey} />
                 <h3
                   style={{
                     margin: 0,

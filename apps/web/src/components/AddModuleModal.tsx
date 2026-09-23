@@ -3,6 +3,7 @@ import type { Department, ModuleCatalogEntry, OrganizationModule } from "@projel
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import ModuleEmblem from "./ModuleEmblem";
 import { useT } from "../lib/i18n";
 
 interface Props {
@@ -118,8 +119,11 @@ export default function AddModuleModal({ organizationId, onClose, onAdded }: Pro
                     type="button"
                     onClick={() => toggleKey(entry.key)}
                     style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
                       textAlign: "left",
-                      padding: "8px 10px",
+                      padding: "6px 10px 6px 6px",
                       borderRadius: 8,
                       border: `1.5px solid ${active ? c.primary : c.border}`,
                       background: active ? c.background : "transparent",
@@ -127,6 +131,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded }: Pro
                       color: c.textPrimary,
                     }}
                   >
+                    <ModuleEmblem moduleKey={entry.key} size={28} />
                     {entry.name}
                   </button>
                 );

@@ -623,3 +623,19 @@ button:focus-visible {
     animation: none;
   }
 }
+
+/* Modül simgesi (ModuleEmblem): kartın üstüne gelince çizim hafifçe kalkar —
+   kartın tıklanabilir olduğunu söyleyen ikinci, sessiz bir işaret. */
+.module-emblem svg {
+  transition: transform 0.18s ease;
+}
+
+.entity-card:hover .module-emblem svg {
+  transform: translateY(-1px) scale(1.07);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module-emblem svg {
+    transition: none;
+  }
+}

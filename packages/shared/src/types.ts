@@ -624,6 +624,32 @@ export type PartyRole = "lead" | "customer" | "supplier" | "candidate" | "distri
 export type PartyType = "person" | "company";
 export type PartyStatus = "active" | "passive" | "blocked";
 
+/**
+ * Müşteri Excel şablonunun içe aktarma sonucu (POST .../party/import ve Lio).
+ * `onizleme: true` iken hiçbir şey yazılmamıştır; `acilacak` ne olacağını söyler.
+ */
+export interface MusteriIceAktarmaSonucu {
+  onizleme: boolean;
+  /** Dolu (boş olmayan) veri satırı sayısı. */
+  okunanSatir: number;
+  /** Önizlemede: açılacak kart sayısı. Uygulamada: açılması denenen. */
+  acilacak: number;
+  /** Yalnızca uygulamada: gerçekten açılan kart sayısı. */
+  acilan?: number;
+  /** Alan -> dosyadaki sütun başlığı. */
+  eslesenSutunlar: Record<string, string>;
+  /** Hiçbir alana gitmeyen başlıklar (veri kaybı burada görünür). */
+  kullanilmayanSutunlar: string[];
+  zatenKayitli: { satir: number; ad: string; mevcutKart: string; neden: string }[];
+  atlanan: { satir: number; sebep: string }[];
+  uyarilar: { satir: number; sebep: string }[];
+  hatalar: { satir: number; sebep: string }[];
+  /** Önizlemede açılacak kartların ilk birkaçı. */
+  ornek: { satir: number; ad: string; rol?: string; telefon?: string; eposta?: string }[];
+  /** Satır tavanına gelindiyse kalanların başladığı satır. */
+  kalanIlkSatir?: number;
+}
+
 export interface PartyAddress {
   country?: string;
   city?: string;

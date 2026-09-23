@@ -5,9 +5,11 @@ import {
   MUSTERI_SUTUNLARI,
   mevcutlariAyikla,
   musteriSablonuOlustur,
+  musteriSayfasiniSec,
   musteriSutunlariniBul,
   planMusteriImport,
   SABLON_SAYFA_ADI,
+  tabloyuOku,
   Workbook,
 } from "./musteri-sablonu";
 
@@ -137,5 +139,46 @@ describe("mevcutlariAyikla", () => {
   test("arşivdeki kart da eşleşir ve bunu söyler", () => {
     const { zatenVar } = mevcutlariAyikla([plan(2, "Mavi")], [{ id: "1", displayName: "Mavi", archivedAt: "2026-01-01" }]);
     assert.match(zatenVar[0].mevcutKart, /arşivde/);
+  });
+});
+
+describe("tabloyuOku — yüklenen dosya", () => {
+  test("doldurulan şablon: boş hücre sütunları KAYDIRMAZ, rehber sayfası müşteri sanılmaz", async () => {
+    const wb = new Workbook();
+    await wb.xlsx.load((await musteriSablonuOlustur()) as any);
+    const veri = wb.getWorksheet(SABLON_SAYFA_ADI)!;
+    // Ad dolu, Tür ve Rol BOŞ, Resmî unvan dolu: ExcelJS'in seyrek dizisi
+    // burada delik bırakır.
+    veri.getRow(2).getCell(1).value = "Deniz Lojistik";
+    veri.getRow(2).getCell(4).value = "Deniz Lojistik Ltd. Şti.";
+    veri.getRow(2).getCell(8).value = "0216 555 12 34";
+    veri.getRow(2).commit();
+    const buf = Buffer.from(await wb.xlsx.writeBuffer());
+
+    const sayfalar = await tabloyuOku(buf, "müşteriler.xlsx");
+    const sayfa = musteriSayfasiniSec(sayfalar);
+    assert.equal(sayfa.name, SABLON_SAYFA_ADI);
+    const plan = planMusteriImport(sayfa);
+    assert.equal(plan.planlanan.length, 1);
+    assert.equal(plan.planlanan[0].party.displayName, "Deniz Lojistik");
+    assert.equal(plan.planlanan[0].party.legalName, "Deniz Lojistik Ltd. Şti.");
+    assert.equal(plan.planlanan[0].party.phone, "0216 555 12 34");
+  });
+
+  test("CSV de okunur (noktalı virgül ayraçlı, BOM'lu)", async () => {
+    const sayfalar = await tabloyuOku(Buffer.from("\uFEFFAd;Telefon\nMavi Ajans;0212\n", "utf8"), "liste.csv");
+    const plan = planMusteriImport(musteriSayfasiniSec(sayfalar));
+    assert.equal(plan.planlanan[0].party.displayName, "Mavi Ajans");
+    assert.equal(plan.planlanan[0].party.phone, "0212");
+  });
+
+  test("eski .xls ve bozuk dosya anlaşılır hatayla reddedilir", async () => {
+    await assert.rejects(tabloyuOku(Buffer.from("x"), "eski.xls"), /\.xls/);
+    await assert.rejects(tabloyuOku(Buffer.from("bozuk"), "bozuk.xlsx"), /açılamadı/);
+  });
+
+  test("şablon sayfası yoksa ilk sayfa seçilir, boş dosya reddedilir", () => {
+    assert.equal(musteriSayfasiniSec([{ name: "Sayfa1", rows: [["Ad"]] }]).name, "Sayfa1");
+    assert.throws(() => musteriSayfasiniSec([]));
   });
 });

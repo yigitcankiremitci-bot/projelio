@@ -1,7 +1,9 @@
 // MÜŞTERİ EXCEL ŞABLONU: üretimi ve geri okunması.
 //
-// Akış: kullanıcı Müşteriler ekranından şablonu indirir, doldurur, Lio'ya
-// verir; Lio import_customers_from_sheet ile önce önizler, onay alınca yazar.
+// Akış: kullanıcı Müşteriler ekranından şablonu indirir, doldurur ve AYNI
+// pencereden geri yükler (POST .../party/import); önce önizleme, onayla yazma.
+// Lio da aynı yoldan geçer (import_customers_from_sheet) — iki kapı, tek kod:
+// PartyService.sablondanIceAktar.
 //
 // Şablonu üreten ve okuyan kod BİLEREK aynı dosyada: sütun tanımı tek yerde.
 // Başlığı burada değiştirip okuyucuyu unutmak, indirilen şablonların sessizce
@@ -13,7 +15,15 @@
 
 import * as ExcelJS from "exceljs";
 import type { Party, PartyRole, PartyType } from "@projelio/shared";
-import { normalizeKey, resolveColumn, type SheetData } from "../ai-assistant/ai-sheet-import";
+import { BadRequestException } from "@nestjs/common";
+import {
+  cellText,
+  MAX_RETAINED_ROWS,
+  normalizeKey,
+  parseCsv,
+  resolveColumn,
+  type SheetData,
+} from "../ai-assistant/ai-sheet-import";
 import { normalizeEmail, normalizeName, normalizeTaxNumber } from "./party-dedup";
 
 // Derlenmiş sunucu (CommonJS) paketi doğrudan veriyor; Node'un test koşucusu
@@ -250,8 +260,9 @@ export async function musteriSablonuOlustur(): Promise<Buffer> {
   rehber.addRow({
     sutun: "Yükleme",
     aciklama:
-      `"${SABLON_SAYFA_ADI}" sayfasını doldurup dosyayı Lio'ya gönderin ve "bu müşterileri yükle" deyin. ` +
-      "Lio önce kaç kart açılacağını gösterir, onayınızdan sonra yazar. Aynı adla ya da vergi numarasıyla " +
+      `"${SABLON_SAYFA_ADI}" sayfasını doldurup dosyayı Müşteriler ekranındaki "Excel ile toplu ekle" ` +
+      "penceresinden yükleyin (ya da Lio'ya verin). Önce kaç kart açılacağı gösterilir, onayınızdan sonra " +
+      "yazılır. Aynı adla, vergi numarasıyla ya da e-postayla " +
       "zaten kayıtlı olanlar atlanır. Sütunların sırası ve bu sayfa önemli değil; başlıkları değiştirmeyin.",
   });
 
@@ -259,6 +270,62 @@ export async function musteriSablonuOlustur(): Promise<Buffer> {
 }
 
 // ============================================================ Okuma
+
+/**
+ * Yüklenen dosyanın sayfaları (.xlsx ya da .csv).
+ *
+ * Eski .xls bilerek reddediliyor: ExcelJS okuyamıyor ve sessizce boş dönmesi,
+ * "dosyada müşteri yok" diye yanlış bir sonuç verirdi.
+ */
+export async function tabloyuOku(buffer: Buffer, dosyaAdi: string): Promise<SheetData[]> {
+  const ad = dosyaAdi.toLocaleLowerCase("tr");
+  if (ad.endsWith(".csv")) {
+    const rows = parseCsv(buffer.toString("utf8"));
+    return rows.length ? [{ name: SABLON_SAYFA_ADI, rows: rows.slice(0, MAX_RETAINED_ROWS) }] : [];
+  }
+  if (ad.endsWith(".xls")) {
+    throw new BadRequestException("Eski Excel biçimi (.xls) okunamıyor. Dosyayı .xlsx olarak kaydedip tekrar yükleyin.");
+  }
+  const wb = new Workbook();
+  try {
+    await wb.xlsx.load(buffer as any);
+  } catch {
+    // ExcelJS bozuk dosyada anlamsız bir TypeError atıyor (bkz. ai-attachments).
+    throw new BadRequestException("Dosya Excel (.xlsx) olarak açılamadı. Excel'de açıp yeniden kaydedip deneyin.");
+  }
+  const sayfalar: SheetData[] = [];
+  wb.eachSheet((sheet) => {
+    const rows: string[][] = [];
+    sheet.eachRow({ includeEmpty: false }, (row) => {
+      if (rows.length >= MAX_RETAINED_ROWS) return;
+      // row.values seyrek dizi: boş hücreler DELİK. Array.from delikleri
+      // doldurur; yoksa sütun sırası kayar ve telefon adın yerine yazılırdı.
+      const values = Array.isArray(row.values) ? Array.from(row.values.slice(1)) : [];
+      const cells = values.map(cellText);
+      if (cells.every((c) => c.trim() === "")) return;
+      rows.push(cells);
+    });
+    if (rows.length) sayfalar.push({ name: sheet.name, rows });
+  });
+  return sayfalar;
+}
+
+/**
+ * Müşterilerin okunacağı sayfa: şablonun veri sayfası varsa o, yoksa ilk sayfa.
+ * Rehber sayfası öne alınmış olsa bile "Nasıl doldurulur" satırları müşteri
+ * sanılmasın diye ada göre aranıyor.
+ */
+export function musteriSayfasiniSec(sayfalar: SheetData[], istenen?: string): SheetData {
+  if (!sayfalar.length) throw new BadRequestException("Dosyada dolu bir satır bulunamadı.");
+  if (istenen) {
+    const bulunan = sayfalar.find((s) => normalizeKey(s.name) === normalizeKey(istenen));
+    if (!bulunan) {
+      throw new BadRequestException(`"${istenen}" adlı sayfa yok. Sayfalar: ${sayfalar.map((s) => s.name).join(", ")}`);
+    }
+    return bulunan;
+  }
+  return sayfalar.find((s) => normalizeKey(s.name) === normalizeKey(SABLON_SAYFA_ADI)) ?? sayfalar[0];
+}
 
 export interface PlanlananMusteri {
   satir: number;

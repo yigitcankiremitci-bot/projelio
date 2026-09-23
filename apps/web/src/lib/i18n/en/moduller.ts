@@ -1034,12 +1034,37 @@ export const moduller: TranslationDict = {
     "Read: {ozet} — the record and the cash entry were created.",
   "Okundu: {ozet} — kayıt açıldı ama kasaya yazılamadı ({hata})":
     "Read: {ozet} — the record was created but it couldn't be written to the cash book ({hata})",
-  "Çok sayıda müşteriniz mi var? Excel şablonunu doldurup Lio'ya verin, kartları o açsın.":
-    "Have a lot of customers? Fill in the Excel template and give it to Lio — it will create the cards.",
-  "Şablonu indir": "Download template",
-  "Lio'ya yükle": "Upload to Lio",
   "Şablon indirilemedi.": "Couldn't download the template.",
   "Projelio müşteri şablonu": "Projelio customer template",
-  "Doldurduğum müşteri şablonunu ekliyorum, içindeki müşterileri yükle.":
-    "I'm attaching my filled-in customer template — please import the customers in it.",
+  "Excel ile toplu ekle": "Bulk add from Excel",
+  "Excel ile toplu müşteri ekle": "Bulk add customers from Excel",
+  "Şablonu indirin, doldurun, aynı yerden yükleyin — her satır bir müşteri kartı olur.":
+    "Download the template, fill it in and upload it here — each row becomes a customer card.",
+  "Şablonu indirip doldurun": "Download and fill in the template",
+  "Her satır bir müşteri. Yalnızca Ad zorunlu; sütunların açıklaması dosyanın ikinci sayfasında.":
+    "One customer per row. Only Name is required; the columns are explained on the file's second sheet.",
+  "Şablonu indir (.xlsx)": "Download template (.xlsx)",
+  "Doldurduğunuz dosyayı yükleyin": "Upload your filled-in file",
+  "Dosyayı buraya bırakın ya da seçmek için tıklayın": "Drop the file here or click to choose",
+  "Kendi müşteri listeniz de olur (.xlsx ya da .csv); tanınan sütunlar aktarılır.":
+    "Your own customer list works too (.xlsx or .csv); recognised columns are imported.",
+  "Dosya okunuyor…": "Reading the file…",
+  "{n} müşteri kartı açıldı.": { one: "{n} customer card created.", other: "{n} customer cards created." },
+  "{n} satır okundu, {m} müşteri eklenecek.": "{n} rows read, {m} customers will be added.",
+  "{n} satır okundu, eklenecek yeni müşteri yok.": "{n} rows read, no new customers to add.",
+  "ve {n} tane daha": "and {n} more",
+  "{n} tanesi zaten kayıtlı, atlanacak": "{n} already exist and will be skipped",
+  "{n} satır atlanacak:": { one: "{n} row will be skipped:", other: "{n} rows will be skipped:" },
+  "Uyarılar:": "Warnings:",
+  "Tanınmayan sütunlar aktarılmayacak: {liste}": "Unrecognised columns won't be imported: {liste}",
+  "Eklenemeyenler:": "Couldn't be added:",
+  "Tek seferde en fazla 300 satır eklenir. Kalanlar için dosyayı {n}. satırdan başlatıp yeniden yükleyin.":
+    "At most 300 rows are added at once. For the rest, start the file from row {n} and upload it again.",
+  "{n} müşteriyi ekle": { one: "Add {n} customer", other: "Add {n} customers" },
+  "Müşterileri ekle": "Add customers",
+  "{n}. satır: {sebep}": "Row {n}: {sebep}",
+  "… ve {n} satır daha": "… and {n} more rows",
+  "aynı ad": "same name",
+  "aynı vergi no": "same tax number",
+  "aynı e-posta": "same email",
 };

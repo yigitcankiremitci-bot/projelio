@@ -14,6 +14,7 @@ import {
   buildSheetSummary,
   INLINE_SHEET_CHARS,
   MAX_RETAINED_ROWS,
+  cellText,
   parseCsv,
   type SheetData,
 } from "./ai-sheet-import";
@@ -163,20 +164,6 @@ function humanDuration(seconds: number): string {
   return minutes > 0 ? `${minutes} dk ${rest} sn` : `${rest} sn`;
 }
 
-/** Excel hücresi zengin metin, formül, tarih veya köprü olabilir; hepsi düz metne iner. */
-function cellText(value: any): string {
-  if (value === null || value === undefined) return "";
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  if (typeof value === "object") {
-    if (Array.isArray(value.richText)) return value.richText.map((part: any) => part?.text ?? "").join("");
-    // Formül hücresinde modeli ilgilendiren formül değil SONUÇtur.
-    if ("result" in value) return cellText(value.result);
-    if ("text" in value) return String(value.text);
-    if ("hyperlink" in value) return String(value.hyperlink);
-    return "";
-  }
-  return String(value);
-}
 
 @Injectable()
 export class AiAttachmentsService {

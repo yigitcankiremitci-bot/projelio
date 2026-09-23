@@ -5,12 +5,11 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { ALL_ROLES, ROLE_COLORS, ROLE_LABELS, STATUS_LABELS, profileFor } from "../lib/partyProfiles";
 import { useUndo } from "../lib/undo";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
-import { IconTrash, IconX } from "./icons";
+import { IconTrash, IconUpload, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
-import { partyApi } from "../api/party";
-import { askLioDraft } from "../lib/askLio";
 import { onLioActivity } from "../lib/liveRoom";
+import MusteriExcelModal from "./MusteriExcelModal";
 
 interface Props {
   organizationId?: string;
@@ -89,15 +88,8 @@ export default function CustomersPanel({
   // bu ekrandaysa listeyi kendisi tazelemek zorunda kalmasın.
   useEffect(() => onLioActivity(() => load()), [scopePath]);
 
-  const [sablonHatasi, setSablonHatasi] = useState("");
-  const sablonuIndir = () => {
-    setSablonHatasi("");
-    partyApi.sablonuIndir(t("Projelio müşteri şablonu") + ".xlsx").catch(() => setSablonHatasi(t("Şablon indirilemedi.")));
-  };
-  // Mesaj yalnızca YAZILIR, gönderilmez: dosyayı kullanıcı ekleyecek, dosyasız
-  // giden mesaj Lio'ya "hangi dosya?" diye sordurmaktan başka işe yaramaz.
-  const lioyaYukle = () =>
-    askLioDraft(t("Doldurduğum müşteri şablonunu ekliyorum, içindeki müşterileri yükle."));
+  // Şablon indirme ve doldurulmuş dosyayı yükleme aynı pencerede (bkz. MusteriExcelModal).
+  const [excelAcik, setExcelAcik] = useState(false);
 
   // Departman değişince o departmanın varsayılan rol filtresi uygulanır.
   useEffect(() => setRoleFilter(profile.defaultRole ?? ""), [profile.defaultRole]);
@@ -261,36 +253,38 @@ export default function CustomersPanel({
       </div>
 
       {canWrite && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 10px",
-            borderRadius: 8,
-            border: `1px dashed ${c.border}`,
-            fontSize: 12,
-            color: c.textSecondary,
-          }}
-        >
-          <span style={{ flex: "1 1 220px" }}>
-            {t("Çok sayıda müşteriniz mi var? Excel şablonunu doldurup Lio'ya verin, kartları o açsın.")}
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => setExcelAcik(true)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "9px 16px",
+              borderRadius: 8,
+              border: `1px solid ${c.primary}`,
+              background: "transparent",
+              color: c.primary,
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            <IconUpload size={16} /> {t("Excel ile toplu ekle")}
+          </button>
+          <span style={{ flex: "1 1 200px", fontSize: 12, color: c.textSecondary }}>
+            {t("Şablonu indirin, doldurun, aynı yerden yükleyin — her satır bir müşteri kartı olur.")}
           </span>
-          <button
-            onClick={sablonuIndir}
-            style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-          >
-            {t("Şablonu indir")}
-          </button>
-          <button
-            onClick={lioyaYukle}
-            style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-          >
-            {t("Lio'ya yükle")}
-          </button>
-          {sablonHatasi && <span style={{ width: "100%", color: c.danger }}>{sablonHatasi}</span>}
         </div>
+      )}
+
+      {excelAcik && (
+        <MusteriExcelModal
+          scopePath={scopePath}
+          departmentId={departmentId}
+          onClose={() => setExcelAcik(false)}
+          onDone={() => load()}
+        />
       )}
 
       {!loading && parties.length > 0 && (

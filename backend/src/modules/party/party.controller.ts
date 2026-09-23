@@ -1,9 +1,31 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { memoryStorage } from "multer";
+import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guard";
 import type { Response } from "express";
 import { AuthGuard } from "@nestjs/passport";
 import type { Party, PartyActivity, PartyContact, PartyRole } from "@projelio/shared";
 import { PartyService } from "./party.service";
-import { musteriSablonuOlustur, SABLON_DOSYA_ADI } from "./musteri-sablonu";
+import { musteriSablonuOlustur, musteriSayfasiniSec, SABLON_DOSYA_ADI, tabloyuOku } from "./musteri-sablonu";
+import type { PartyScope } from "./party.service";
+
+/** Şablon dosyası: 1000 satırlık dolu bir xlsx bile 1 MB'ı bulmuyor, 5 MB bol. */
+const SABLON_YUKLEME = FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 import { AccessService } from "../../common/access/access.service";
 
 @Controller()
@@ -29,6 +51,50 @@ export class PartyController {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(SABLON_DOSYA_ADI)}`);
     res.end(icerik);
+  }
+
+  /**
+   * Doldurulmuş şablonu yükler. `onizleme=0` gelmedikçe HİÇBİR ŞEY YAZILMAZ —
+   * arayüz önce önizler, kullanıcı "N müşteriyi ekle"ye basınca aynı dosyayı
+   * onizleme=0 ile yeniden gönderir. Dosya sunucuda saklanmıyor: iki istek
+   * arasında durum tutmamak, yarım kalan bir önizlemenin bellekte asılı
+   * kalmaması demek; dosya küçük, iki kez göndermek ucuz.
+   */
+  @Post("organizations/:organizationId/party/import")
+  @UseGuards(UploadRateLimitGuard)
+  @UseInterceptors(SABLON_YUKLEME)
+  async importOrg(
+    @Param("organizationId") organizationId: string,
+    @Query("onizleme") onizleme: string | undefined,
+    @Query("departmentId") departmentId: string | undefined,
+    @Req() req: any,
+    @UploadedFile() file?: Express.Multer.File
+  ) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.iceAktar({ organizationId, departmentId }, onizleme, req.user.userId, file);
+  }
+
+  @Post("jobs/:jobId/party/import")
+  @UseGuards(UploadRateLimitGuard)
+  @UseInterceptors(SABLON_YUKLEME)
+  async importJob(
+    @Param("jobId") jobId: string,
+    @Query("onizleme") onizleme: string | undefined,
+    @Req() req: any,
+    @UploadedFile() file?: Express.Multer.File
+  ) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.iceAktar({ jobId }, onizleme, req.user.userId, file);
+  }
+
+  private async iceAktar(scope: PartyScope, onizleme: string | undefined, userId: string, file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException("Dosya bulunamadı");
+    // multer dosya adını latin1 okuyor; "Müşteriler.xlsx" bozuk gelmesin.
+    const ad = Buffer.from(file.originalname, "latin1").toString("utf8");
+    const sayfa = musteriSayfasiniSec(await tabloyuOku(file.buffer, ad));
+    return this.partyService.sablondanIceAktar(scope, sayfa, userId, { onizleme: onizleme !== "0" });
   }
 
   // ============================================================ Organizasyon

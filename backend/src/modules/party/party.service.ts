@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  MusteriIceAktarmaSonucu,
   Party,
   PartyActivity,
   PartyActivityType,
@@ -11,6 +12,8 @@ import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { addRole, findDuplicates } from "./party-dedup";
 import { hataMetni } from "../../common/i18n/index";
+import { MAX_IMPORT_ROWS, type SheetData } from "../ai-assistant/ai-sheet-import";
+import { mevcutlariAyikla, planMusteriImport, type MusteriAlani } from "./musteri-sablonu";
 
 // Müşteri modülü bu varlığa bakar; yetki de o modülün üzerinden çözülür.
 const MODULE_KEY = "crm_musteri";
@@ -254,6 +257,64 @@ export class PartyService {
     const party = mapParty(row);
     await this.logActivity(party.id, "sistem", "Kayıt oluşturuldu", userId);
     return party;
+  }
+
+  /**
+   * Excel şablonundan (ya da herhangi bir müşteri listesinden) toplu kart.
+   *
+   * İki kapının TEK gövdesi: Müşteriler ekranındaki yükleme ucu ve Lio'nun
+   * import_customers_from_sheet aracı. Önizleme varsayılan: yanlış sütun
+   * eşlemesi ancak kartlar açıldıktan sonra fark edilirdi.
+   *
+   * Yazma yetkisi ÖNİZLEMEDE de bakılıyor: yazamayacak birine "120 kart
+   * açılacak" deyip onayda reddetmek boşa emek.
+   *
+   * Yinelenen ayıklaması arşivdeki kartları da görür: vergi no tekilliği
+   * arşivi kapsıyor, ayrıca arşivlenmiş bir müşteriyi sessizce yeniden açmak
+   * kullanıcının vazgeçtiği bir kaydı geri getirmek olurdu.
+   */
+  async sablondanIceAktar(
+    scope: PartyScope,
+    sheet: SheetData,
+    userId: string,
+    opts: {
+      onizleme?: boolean;
+      esleme?: Partial<Record<MusteriAlani, string>>;
+      basliksatiri?: number;
+      ilkSatir?: number;
+      sonSatir?: number;
+      kaynak?: string;
+    } = {}
+  ): Promise<MusteriIceAktarmaSonucu> {
+    await this.assertCanWrite(scope, userId);
+    const plan = planMusteriImport(sheet, opts);
+    const mevcut = await this.findAll(scope, { includeArchived: true });
+    const { yeni, zatenVar } = mevcutlariAyikla(plan.planlanan, mevcut);
+    const islenecek = yeni.slice(0, MAX_IMPORT_ROWS);
+
+    const sonuc: MusteriIceAktarmaSonucu = {
+      onizleme: opts.onizleme !== false,
+      okunanSatir: plan.toplamSatir,
+      acilacak: islenecek.length,
+      eslesenSutunlar: plan.eslesenSutunlar,
+      kullanilmayanSutunlar: plan.kullanilmayanSutunlar,
+      zatenKayitli: zatenVar,
+      atlanan: plan.atlanan,
+      uyarilar: plan.uyarilar,
+      hatalar: [],
+      ornek: islenecek.slice(0, 5).map((p) => ({
+        satir: p.satir,
+        ad: p.party.displayName,
+        rol: p.party.roles?.join(", "),
+        telefon: p.party.phone,
+        eposta: p.party.email,
+      })),
+      kalanIlkSatir: yeni[MAX_IMPORT_ROWS]?.satir,
+    };
+    if (sonuc.onizleme || !islenecek.length) return sonuc;
+
+    const { olusan, hatalar } = await this.createMany(scope, islenecek, userId, opts.kaynak ?? "excel");
+    return { ...sonuc, acilan: olusan.length, hatalar };
   }
 
   /**

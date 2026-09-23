@@ -52,7 +52,7 @@ import { OperationsService } from "../operations/operations.service";
 import { ProductsService, type ProductWriteInput } from "../products/products.service";
 import { SupportService } from "../support/support.service";
 import { PartyService } from "../party/party.service";
-import { mevcutlariAyikla, planMusteriImport, SABLON_SAYFA_ADI } from "../party/musteri-sablonu";
+import { musteriSayfasiniSec } from "../party/musteri-sablonu";
 import { ORG_RECEIVABLE_MODULE_KEY } from "../budget/sirket-defteri";
 import { addRole } from "../party/party-dedup";
 import { AccessService } from "../../common/access/access.service";
@@ -5187,68 +5187,45 @@ export class AiAssistantService {
   }
 
   /**
-   * Tablodan toplu müşteri kartı (bkz. musteri-sablonu.ts).
-   *
-   * import_module_records_from_sheet'in eşi ama module_records'a değil party
-   * tablosuna yazar. Yinelenen ayıklaması arşivdeki kartları da görür: vergi
-   * no tekilliği arşivi kapsıyor, ayrıca arşivlenmiş bir müşteriyi sessizce
-   * yeniden açmak kullanıcının vazgeçtiği bir kaydı geri getirmek olurdu.
+   * Tablodan toplu müşteri kartı. Gövde PartyService.sablondanIceAktar'da —
+   * Müşteriler ekranındaki yükleme ucu da oradan geçiyor. Burada yalnızca
+   * sonuç modele göre KISALTILIYOR: yüzlerce "zaten kayıtlı" satırı her turda
+   * token olarak ödenirdi.
    */
   private async importCustomersFromSheet(userId: string, input: Record<string, any>): Promise<unknown> {
     const scope = await this.customerScope(userId, input);
     const sheets = this.attachmentsService.getSheets(userId, String(input.dosyaKimligi ?? ""));
-    // Şablonda veri sayfası adıyla bulunur; kullanıcı rehber sayfasını öne
-    // almış olsa bile "Nasıl doldurulur" satırları müşteri sanılmasın.
-    const sayfa =
-      input.sayfa ?? sheets?.find((sh) => normalizeKey(sh.name) === normalizeKey(SABLON_SAYFA_ADI))?.name;
-    const sheet = this.requireSheet(userId, { ...input, sayfa });
+    if (!sheets?.length) this.requireSheet(userId, input); // "dosya yok" hatasının tek yeri orası
+    const sheet = musteriSayfasiniSec(sheets!, input.sayfa);
 
-    const plan = planMusteriImport(sheet, {
+    const r = await this.partyService.sablondanIceAktar({ ...scope, departmentId: input.departmentId }, sheet, userId, {
+      onizleme: input.onizleme !== false,
       esleme: input.esleme ?? {},
       basliksatiri: input.basliksatiri,
       ilkSatir: input.ilkSatir,
       sonSatir: input.sonSatir,
+      kaynak: "lio",
     });
-    const mevcut = await this.partyService.findAll(scope, { includeArchived: true });
-    const { yeni, zatenVar } = mevcutlariAyikla(plan.planlanan, mevcut);
-    const islenecek = yeni.slice(0, MAX_IMPORT_ROWS);
-    const kalanIlkSatir = yeni[MAX_IMPORT_ROWS]?.satir;
-
-    const ortak = {
-      okunanSatir: plan.toplamSatir,
-      eslesenSutunlar: plan.eslesenSutunlar,
-      kullanilmayanSutunlar: plan.kullanilmayanSutunlar.length ? plan.kullanilmayanSutunlar : undefined,
-      zatenKayitli: zatenVar.length || undefined,
-      zatenKayitliOrnek: zatenVar.slice(0, 8),
-      atlanan: plan.atlanan.slice(0, 8),
-      atlananToplam: plan.atlanan.length || undefined,
-      uyarilar: plan.uyarilar.slice(0, 5),
-      kalanIlkSatir,
-    };
-
-    if (input.onizleme !== false) {
-      return pruneEmpty({
-        onizleme: true,
-        acilacak: islenecek.length,
-        ...ortak,
-        ornek: islenecek.slice(0, 2).map((p) => pruneEmpty({ ...p.party, yetkili: p.kisi?.name })),
-        not: "Hiçbir şey YAZILMADI. Özeti kullanıcıya göster; onay alınca aynı çağrıyı onizleme:false ile tekrarla.",
-      });
-    }
-
-    const { olusan, hatalar } = await this.partyService.createMany(
-      { ...scope, departmentId: input.departmentId },
-      islenecek,
-      userId,
-      "excel"
-    );
     return pruneEmpty({
-      acilan: olusan.length,
-      ...ortak,
-      hatalar: hatalar.length ? hatalar.slice(0, 8) : undefined,
-      not: kalanIlkSatir
-        ? `Satır tavanına gelindi. Kalanlar için ilkSatir:${kalanIlkSatir} ile tekrarla.`
-        : "Bitti. Kaç kart açıldığını, kaçının zaten kayıtlı olduğu için atlandığını kullanıcıya SÖYLE.",
+      onizleme: r.onizleme || undefined,
+      acilacak: r.onizleme ? r.acilacak : undefined,
+      acilan: r.acilan,
+      okunanSatir: r.okunanSatir,
+      eslesenSutunlar: r.eslesenSutunlar,
+      kullanilmayanSutunlar: r.kullanilmayanSutunlar.length ? r.kullanilmayanSutunlar : undefined,
+      zatenKayitli: r.zatenKayitli.length || undefined,
+      zatenKayitliOrnek: r.zatenKayitli.slice(0, 8),
+      atlanan: r.atlanan.slice(0, 8),
+      atlananToplam: r.atlanan.length || undefined,
+      uyarilar: r.uyarilar.slice(0, 5),
+      hatalar: r.hatalar.length ? r.hatalar.slice(0, 8) : undefined,
+      ornek: r.onizleme ? r.ornek.slice(0, 2) : undefined,
+      kalanIlkSatir: r.kalanIlkSatir,
+      not: r.onizleme
+        ? "Hiçbir şey YAZILMADI. Özeti kullanıcıya göster; onay alınca aynı çağrıyı onizleme:false ile tekrarla."
+        : r.kalanIlkSatir
+          ? `Satır tavanına gelindi. Kalanlar için ilkSatir:${r.kalanIlkSatir} ile tekrarla.`
+          : "Bitti. Kaç kart açıldığını, kaçının zaten kayıtlı olduğu için atlandığını kullanıcıya SÖYLE.",
     });
   }
 

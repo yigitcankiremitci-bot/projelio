@@ -150,6 +150,27 @@ export function parseCsv(raw: string): string[][] {
   return rows;
 }
 
+/**
+ * Excel hücresi zengin metin, formül, tarih veya köprü olabilir; hepsi düz metne iner.
+ *
+ * Burada duruyor çünkü iki okuyucusu var: Lio'nun ekleri (ai-attachments) ve
+ * müşteri şablonunun doğrudan yüklenmesi (party/musteri-sablonu). Eklerin
+ * dosyası dekoratörlü, test koşucusu onu içe aktaramıyor.
+ */
+export function cellText(value: any): string {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === "object") {
+    if (Array.isArray(value.richText)) return value.richText.map((part: any) => part?.text ?? "").join("");
+    // Formül hücresinde modeli ilgilendiren formül değil SONUÇtur.
+    if ("result" in value) return cellText(value.result);
+    if ("text" in value) return String(value.text);
+    if ("hyperlink" in value) return String(value.hyperlink);
+    return "";
+  }
+  return String(value);
+}
+
 /** Karşılaştırma için sadeleştirme: Türkçe küçük harf, kırpma, tek boşluk. */
 export function normalizeKey(value: unknown): string {
   return String(value ?? "")

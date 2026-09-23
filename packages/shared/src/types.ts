@@ -157,6 +157,10 @@ export interface User {
   // migration 093). Eskiden yalnızca localStorage'daydı ve her yeni tarayıcıda
   // eğitim baştan açılıyordu. Yalnızca /auth/me'de dolu gelir.
   toursSeen?: string[];
+  // Hesabı ekip yöneticisi açtı ve şifreyi o belirledi (bkz. migration 130).
+  // true ise uygulama kişiden önce kendi şifresini belirlemesini ister.
+  // Yalnızca /auth/me'de dolu gelir.
+  mustChangePassword?: boolean;
 }
 
 // ============================================================ Sekme görünürlüğü
@@ -3961,4 +3965,27 @@ export interface TahsilatRaporSatiri {
   kalan: number;
   /** Kalanın vadesi geçmiş kısmı. */
   geciken: number;
+}
+
+// ============================================================ Shopify (bkz. 129_shopify.sql)
+
+/** Şirket ayarlarındaki Shopify kartının bir satırı. Jeton ASLA istemciye çıkmaz. */
+export interface ShopifyMagazaOzeti {
+  id: string;
+  /** "magaza.myshopify.com" — mağazanın değişmeyen adı. */
+  shopDomain: string;
+  magazaAdi: string | null;
+  paraBirimi: string | null;
+  durum: "aktif" | "kaldirildi";
+  /** Shopify'dan yeni açılan müşteri kartının sorumlusu; boşsa bağlayan kişi. */
+  varsayilanSorumluId: string | null;
+  baglandiAt: string;
+  sonOlayAt: string | null;
+  sonHata: string | null;
+}
+
+export interface ShopifyOzeti {
+  /** Sunucuda anahtarlar tanımlı mı; değilse arayüz "Bağla" düğmesini göstermez. */
+  yapilandirildi: boolean;
+  magazalar: ShopifyMagazaOzeti[];
 }

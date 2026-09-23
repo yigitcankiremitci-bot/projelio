@@ -509,4 +509,30 @@ export const kurumsal: TranslationDict = {
   "Hesabı askıya alma": "Suspend account",
   "Hesap askıda: kişi giriş yapamıyor. Askıyı kaldırınca yeniden giriş yapabilir.": "The account is suspended: they can't sign in. Lifting the suspension lets them sign in again.",
   "Kişi hemen tüm cihazlardan çıkarılır ve askı kaldırılana kadar giriş yapamaz. Verisi silinmez.": "They're signed out on all devices right away and can't sign in until the suspension is lifted. No data is deleted.",
+
+  // ─────────────────────────────────────────────── Shopify mağazası (şirket ayarları)
+  "Shopify mağazası": "Shopify store",
+  "Mağazanızdaki siparişler Müşteriler ekranına, ödenen tutarlar kasaya gelir olarak kendiliğinden düşer. Müşteri e-postası zaten kayıtlıysa yeni kart açılmaz, siparişi mevcut karta eklenir.":
+    "Orders from your store appear on the Customers screen automatically, and paid amounts are recorded as income in the cash book. If the customer's email is already on file, no new card is created — the order is added to the existing one.",
+  "Mağaza bağla": "Connect store",
+  "Başka mağaza bağla": "Connect another store",
+  "Mağaza bağlanamadı.": "Couldn't connect the store.",
+  "Mağaza bağlandı. Yeni siparişler birkaç dakika içinde Müşteriler ekranına düşmeye başlar.":
+    "Store connected. New orders will start appearing on the Customers screen within a few minutes.",
+  "Mağazayı bağlayan kişi": "The person who connected the store",
+  "Yeni müşterilerin sorumlusu": "Owner of new customers",
+  "Son sipariş olayı": "Last order event",
+  "Henüz sipariş gelmedi.": "No orders received yet.",
+  "Son hata": "Last error",
+  "Shopify bağlantısı tamamlanamadı.": "The Shopify connection couldn't be completed.",
+  "Shopify bağlantısını kaldır": "Remove Shopify connection",
+  "Uygulama mağazanızdan da kaldırılır ve yeni siparişler gelmez. Şimdiye kadar gelen siparişler, müşteri kartları ve kasadaki tahsilatlar yerinde kalır.":
+    "The app is also removed from your store and no new orders will arrive. Orders received so far, customer cards and collections in the cash book stay as they are.",
+  // Sunucunun Shopify dönüş adresine yazdığı hatalar (yönlendirme olduğu için
+  // sunucu sözlüğünden geçmiyor, burada çevriliyor).
+  "Shopify entegrasyonu bu sunucuda henüz açılmadı": "The Shopify integration isn't enabled on this server yet",
+  "Shopify mağazasını yalnızca şirketin kurucusu bağlayabilir": "Only the company's founder can connect a Shopify store",
+  "Bu mağaza başka bir şirkete bağlı. Önce oradaki bağlantıyı kaldırın.": "This store is connected to another company. Remove that connection first.",
+  "Shopify gerekli izinleri vermedi; bağlantıyı yeniden deneyin": "Shopify didn't grant the required permissions; try connecting again",
+  "Shopify bağlantı isteği geçersiz veya süresi dolmuş": "The Shopify connection request is invalid or has expired",
 };

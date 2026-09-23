@@ -11,6 +11,7 @@ import { SiparisService } from "./siparis.service";
   controllers: [PartyController],
   providers: [PartyService, SiparisService],
   // Diğer modüller (fatura, destek talebi) party_activity'ye yazacak.
-  exports: [PartyService],
+  // SiparisService: Shopify webhook'ları siparişi ve tahsilatı aynı kapıdan yazar.
+  exports: [PartyService, SiparisService],
 })
 export class PartyModule {}

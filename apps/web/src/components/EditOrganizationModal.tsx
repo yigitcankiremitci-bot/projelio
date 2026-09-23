@@ -8,6 +8,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import OrganizationStorageSection from "./OrganizationStorageSection";
+import ShopifySection from "./ShopifySection";
 import EntityDangerZone from "./EntityDangerZone";
 import TabVisibilitySection from "./TabVisibilitySection";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
@@ -201,6 +202,8 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
       </form>
 
       <OrganizationStorageSection organizationId={organization.id} />
+
+      <ShopifySection organizationId={organization.id} />
 
       {/* Şirketten ayrılma. Sahibinin yerinde (tehlikeli bölge) duruyor çünkü
           ikisi aynı sorunun iki cevabı: "bu şirketle işim bitti". Üye

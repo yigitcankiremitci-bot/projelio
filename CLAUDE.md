@@ -44,6 +44,7 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | "?" menüsü: başlangıç rehberi + sesli turlar | `apps/web/src/components/tour/TourLauncher.tsx`, içerik ve kendiliğinden açılma kuralı `apps/web/src/lib/baslangicRehberi.ts` |
 | Müşteri siparişleri + tahsilat takibi (çalışana atanan müşteri, ay ay vade, yönetici raporu) | `backend/src/modules/party/siparis.service.ts`, yetki `siparis-erisim.ts`; arayüz `apps/web/src/components/musteri/`; durum/rapor hesabı `packages/shared/src/tahsilat.ts` — her tahsilat kasaya `source='tahsilat'` gelir satırı yazar (migration 128) |
 | Canlı demo randevuları (herkese açık takvim, Ayarlar kartı, admin atama, .ics + hatırlatma) | `backend/src/modules/demo-randevu/`, `apps/web/src/pages/DemoRandevu.tsx`, `apps/web/src/components/demoRandevu/`; slot/.ics hesabı `packages/shared/src/demoRandevu.ts` — moderatör bir ROL değil, `demo_sunuculari` satırı; otomatik Meet `demo-meet.service.ts` + `google-takvim.ts` (ortak Google callback'inde `demo_takvim` modu) |
+| Shopify entegrasyonu (sipariş → Müşteriler > Tahsilat, ödeme → kasa; tek yön) | `backend/src/modules/shopify/` — saf eşleme `shopify-esleme.ts`, webhook kuyruğu `shopify_olaylari` + `shopify.processor.ts`; arayüz `apps/web/src/components/ShopifySection.tsx`; kurulum `docs/shopify-kurulumu.md` (migration 129) |
 
 Backend'de 48 modül, 500'den fazla HTTP ucu var (`node scripts/uc-listesi.mjs` ile
 listelenir — elle yazılmış liste bayatlıyor). Lio =
@@ -155,6 +156,7 @@ Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 | Dosya paylaşımlarının göndereni (isteğe bağlı) | `EMAIL_FROM_LINK` | `backend/.env` — tanımsızsa EMAIL_FROM alan adında `link@` |
 | Tek tık "aboneliği bırak" | `API_PUBLIC_URL` | `backend/.env` |
 | Mağaza abonelikleri | `APPSTORE_*` / `PLAY_*` | `backend/.env` |
+| Shopify entegrasyonu | `SHOPIFY_API_KEY` + `SHOPIFY_API_SECRET` + `SHOPIFY_TOKEN_ENC_KEY` | `backend/.env` — eksikse kart arayüzde görünmez |
 
 `AI_PROVIDERS` sağlayıcıları hem **açar** hem **sıralar** — virgülle ayrılmış,
 soldan sağa öncelikli:

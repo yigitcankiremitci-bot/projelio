@@ -317,6 +317,128 @@ export class SiparisService {
     return this.tekil(siparis.id);
   }
 
+  // ============================================================ Entegrasyon kapısı
+
+  /**
+   * Dış sistemden (Shopify) gelen siparişi yazar ya da günceller.
+   *
+   * YETKİ SORULMAZ: çağıran bir kullanıcı değil, imzası doğrulanmış bir
+   * webhook. Kapsam müşteri kartından gelir, kart da mağazanın bağlı olduğu
+   * şirketten — yani yazılabilecek yer zaten bağlantı kurulurken belirlendi.
+   * `aktorId` yalnızca "kim yazdı" izi (mağazayı bağlayan kişi).
+   *
+   * Aynı dış kimlik ikinci kez gelirse mevcut satır güncellenir
+   * (musteri_siparisleri_dis_kimlik_uniq). Tahsilatı olan siparişin tutarı
+   * tahsil edilenin altına ÇEKİLMEZ — elle düzenlemedeki kuralın aynısı.
+   */
+  async entegrasyonSiparisiYaz(p: {
+    party: Party;
+    kaynak: "shopify";
+    disKimlik: string;
+    shopifyMagazaId: string;
+    alanlar: Record<string, unknown>;
+    aktorId: string | null;
+  }): Promise<{ siparis: MusteriSiparisi; yeni: boolean }> {
+    const mevcutId = await this.disKimliktenBul(p.kaynak, p.disKimlik);
+    if (mevcutId) {
+      const mevcut = await this.tekil(mevcutId);
+      const alanlar = { ...p.alanlar };
+      const odenen = tahsilEdilen(mevcut);
+      if (odenen > 0) {
+        delete alanlar.para_birimi;
+        if (Number(alanlar.tutar) < odenen) delete alanlar.tutar;
+      }
+      const { error } = await this.supabase.client
+        .from("musteri_siparisleri")
+        .update({ ...alanlar, updated_at: new Date().toISOString() })
+        .eq("id", mevcutId);
+      if (error) throw error;
+      return { siparis: await this.tekil(mevcutId), yeni: false };
+    }
+
+    const { data: row, error } = await this.supabase.client
+      .from("musteri_siparisleri")
+      .insert({
+        ...p.alanlar,
+        party_id: p.party.id,
+        organization_id: p.party.organizationId ?? null,
+        job_id: p.party.jobId ?? null,
+        kaynak: p.kaynak,
+        dis_kimlik: p.disKimlik,
+        shopify_magaza_id: p.shopifyMagazaId,
+        created_by: p.aktorId,
+      })
+      .select("id")
+      .single();
+    if (error) {
+      // İki olay aynı anda işlendiyse ikincisi tekil indekse takılır; o
+      // zaman kaydı açan diğeri, biz yalnızca onu okuruz.
+      if ((error as any).code === "23505") {
+        const id = await this.disKimliktenBul(p.kaynak, p.disKimlik);
+        if (id) return { siparis: await this.tekil(id), yeni: false };
+      }
+      throw error;
+    }
+
+    if (!p.party.roles.includes("customer")) {
+      await this.partyService.addRoleTo(p.party.id, "customer").catch(() => undefined);
+    }
+    await this.partyService
+      .logActivity(p.party.id, "sistem", `Shopify siparişi: ${p.alanlar.siparis_no ?? p.disKimlik}`, p.aktorId ?? undefined)
+      .catch(() => undefined);
+    return { siparis: await this.tekil(row.id), yeni: true };
+  }
+
+  /**
+   * Dış sistemin bildirdiği ödemeyi tahsilat olarak yazar; kasa satırı
+   * elle tahsilattaki aynı yoldan (deftereIsle) ve aynı geri alma
+   * güvencesiyle açılır. Tutarın kalan alacağı aşmaması burada da şart.
+   */
+  async entegrasyonTahsilatiYaz(p: {
+    siparis: MusteriSiparisi;
+    tutar: number;
+    tarih: string;
+    odemeYontemi: OdemeYontemi;
+    notlar: string;
+    aktorId: string | null;
+  }): Promise<MusteriSiparisi> {
+    const hata = tahsilatTutariHatasi(p.siparis, p.tutar);
+    if (hata) throw new BadRequestException(hata);
+
+    const { data: t, error } = await this.supabase.client
+      .from("musteri_tahsilatlari")
+      .insert({
+        siparis_id: p.siparis.id,
+        tutar: p.tutar,
+        tarih: p.tarih,
+        odeme_yontemi: p.odemeYontemi,
+        notlar: p.notlar,
+        created_by: p.aktorId,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+
+    try {
+      await this.deftereIsle(p.siparis, t.id, p.tutar, p.tarih, p.aktorId);
+    } catch (err) {
+      await this.supabase.client.from("musteri_tahsilatlari").delete().eq("id", t.id);
+      throw err;
+    }
+    return this.tekil(p.siparis.id);
+  }
+
+  private async disKimliktenBul(kaynak: string, disKimlik: string): Promise<string | null> {
+    const { data, error } = await this.supabase.client
+      .from("musteri_siparisleri")
+      .select("id")
+      .eq("kaynak", kaynak)
+      .eq("dis_kimlik", disKimlik)
+      .maybeSingle();
+    if (error) throw error;
+    return data?.id ?? null;
+  }
+
   // ============================================================ Yardımcılar
 
   private async yetkiIste(party: Party, userId: string, ne: "okur" | "yazar"): Promise<void> {
@@ -418,7 +540,7 @@ export class SiparisService {
     tahsilatId: string,
     tutar: number,
     tarih: string,
-    userId: string
+    userId: string | null
   ): Promise<void> {
     const kademe = siparis.jobId
       ? { sutun: "job_id", tablo: "jobs", id: siparis.jobId }

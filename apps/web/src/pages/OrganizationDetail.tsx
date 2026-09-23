@@ -73,6 +73,11 @@ export default function OrganizationDetail() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
+  // Shopify bağlantısından dönüş: sonuç şirket ayarlarındaki Shopify kartında
+  // gösteriliyor, o yüzden ayarlar penceresi kendiliğinden açılır.
+  useEffect(() => {
+    if (searchParams.get("shopify")) setEditing(true);
+  }, []);
   // Terfi etmiş modüller de sekme olabilir: geçerli sekme listesi çekirdek
   // sekmeler + o anki modül sekmeleridir (bkz. lib/moduleLayout.ts).
   const moduleTabs = useModuleTabs(id);

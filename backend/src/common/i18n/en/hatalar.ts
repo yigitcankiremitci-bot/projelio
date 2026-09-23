@@ -883,4 +883,12 @@ export const hatalar: TranslationDict = {
   "Bu kayıt bir müşteri tahsilatından oluştu; Müşteriler ekranında siparişin tahsilatından düzenleyin": "This entry was created by a customer collection; edit it from the order's collection on the Customers screen",
   "Ödeme yöntemi": "Payment method",
   "Miktar": "Quantity",
+  // Shopify
+  "Shopify entegrasyonu bu sunucuda henüz açılmadı": "The Shopify integration isn't enabled on this server yet",
+  "Mağaza adresi geçersiz. Örnek: magazam.myshopify.com": "Invalid store address. Example: mystore.myshopify.com",
+  "Shopify mağazasını yalnızca şirketin kurucusu bağlayabilir": "Only the company's founder can connect a Shopify store",
+  "Bu mağaza başka bir şirkete bağlı. Önce oradaki bağlantıyı kaldırın.": "This store is connected to another company. Remove that connection first.",
+  "Shopify gerekli izinleri vermedi; bağlantıyı yeniden deneyin": "Shopify didn't grant the required permissions; try connecting again",
+  "Shopify bağlantı isteği geçersiz veya süresi dolmuş": "The Shopify connection request is invalid or has expired",
+  "Mağaza bulunamadı": "Store not found",
 };

@@ -1,6 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
+  ModuleAccess,
   MusteriIceAktarmaSonucu,
+  MusteriListesi,
   Party,
   PartyActivity,
   PartyActivityType,
@@ -10,6 +12,8 @@ import type {
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
+import { AccessService } from "../../common/access/access.service";
+import { kartDuzenlemeHatasi, musteriYetkisi } from "./siparis-erisim";
 import { addRole, findDuplicates } from "./party-dedup";
 import { hataMetni } from "../../common/i18n/index";
 import { MAX_IMPORT_ROWS, type SheetData } from "../ai-assistant/ai-sheet-import";
@@ -96,14 +100,16 @@ export interface PartyScope {
 export class PartyService {
   constructor(
     private supabase: SupabaseService,
-    private moduleMembers: ModuleMembersService
+    private moduleMembers: ModuleMembersService,
+    private accessService: AccessService
   ) {}
 
   private readonly OWNER_JOIN = "*, owner:users!party_owner_user_id_fkey(full_name)";
 
   // ============================================================ Yetki
 
-  private async access(scope: PartyScope, userId?: string) {
+  /** crm_musteri modülündeki yetki; sipariş servisi de aynı kapıdan geçer. */
+  async access(scope: PartyScope, userId?: string): Promise<ModuleAccess> {
     return scope.jobId
       ? this.moduleMembers.resolveJobAccess(scope.jobId, MODULE_KEY, userId)
       : this.moduleMembers.resolveOrganizationAccess(
@@ -139,8 +145,23 @@ export class PartyService {
     }
   }
 
+  /**
+   * Müşteriye atanacak kişi bu kapsamı görebiliyor mu.
+   *
+   * Görmeyen birine atanan müşteri kimsenin listesinde çıkmaz: çalışan onu
+   * göremez, yönetici de "atandı" sanır. Kimliği istemci gönderdiği için
+   * herhangi bir kullanıcı kimliği yazılıp başka şirketin çalışanına
+   * müşteri atanabilirdi.
+   */
+  private async assertAtanabilir(scope: PartyScope, sorumluId: string): Promise<void> {
+    const gorur = scope.jobId
+      ? await this.accessService.canViewJob(scope.jobId, sorumluId)
+      : await this.accessService.canViewOrganization(scope.organizationId!, sorumluId);
+    if (!gorur) throw new BadRequestException("Seçilen kişi bu şirketin ekibinde değil");
+  }
+
   /** Kaydın sahibinden (organizasyon/iş) kapsamı türetir. */
-  private scopeOf(party: Party): PartyScope {
+  scopeOf(party: Party): PartyScope {
     return { organizationId: party.organizationId, jobId: party.jobId };
   }
 
@@ -161,6 +182,27 @@ export class PartyService {
     const { data, error } = await query;
     if (error) throw error;
     return (data ?? []).map(mapParty);
+  }
+
+  /**
+   * Müşteriler ekranının listesi: yönetici hepsini, çalışan KENDİSİNE
+   * atananları görür (bkz. siparis-erisim.ts).
+   *
+   * Genel `findAll` bilerek süzülmüyor: diğer modüllerin müşteri seçicileri
+   * (fatura, alacak-borç, satış fırsatı) ve kayıtlardaki kimliklerin ada
+   * çevrilmesi o listeye dayanıyor. Orada süzülseydi muhasebe, satışçının
+   * müşterisine fatura kesemez; eski kayıtlarda ad yerine kimlik görünürdü.
+   */
+  async musterilerim(scope: PartyScope, userId: string): Promise<MusteriListesi> {
+    const a = await this.access(scope, userId);
+    if (!a.canRead) throw new ForbiddenException("Bu kaydı görme yetkin yok");
+    const hepsi = await this.findAll(scope);
+    const yonetici = a.canManageTeam;
+    return {
+      yonetici,
+      kartYazar: a.canWrite,
+      musteriler: yonetici ? hepsi : hepsi.filter((p) => musteriYetkisi(a, p.ownerUserId, userId).okur),
+    };
   }
 
   /** GET /party/:id için: yükler VE okuma yetkisini doğrular. */
@@ -209,6 +251,19 @@ export class PartyService {
     if (!payload.displayName?.trim()) throw new BadRequestException("Ad gerekli");
     await this.assertCanWrite(scope, userId);
 
+    // Çalışan açtığı müşteriyi kendisi üstlenir; başkasına atamak yöneticinin
+    // kararı (bkz. kartDuzenlemeHatasi). Yönetici birini seçtiyse o kişi
+    // şirketin ekibinde olmalı.
+    let sorumlu = userId ?? null;
+    if (payload.ownerUserId && userId && payload.ownerUserId !== userId) {
+      const a = await this.access(scope, userId);
+      if (!a.canManageTeam) throw new ForbiddenException("Müşteriyi başka bir çalışana yalnızca yönetici atayabilir");
+      await this.assertAtanabilir(scope, payload.ownerUserId);
+      sorumlu = payload.ownerUserId;
+    } else if (payload.ownerUserId && !userId) {
+      sorumlu = payload.ownerUserId;
+    }
+
     const duplicates = await this.checkDuplicates(scope, {
       displayName: payload.displayName,
       taxNumber: payload.taxNumber,
@@ -240,7 +295,7 @@ export class PartyService {
         source: payload.source ?? null,
         // Sorumlu belirtilmediyse kaydı açan kişi üstlenir; sahipsiz müşteri
         // kimsenin takip etmediği müşteridir.
-        owner_user_id: payload.ownerUserId ?? userId ?? null,
+        owner_user_id: sorumlu,
         parent_party_id: payload.parentPartyId ?? null,
         data: payload.data ?? {},
         notes: payload.notes ?? null,
@@ -421,7 +476,14 @@ export class PartyService {
 
   async update(id: string, payload: Partial<Party>, userId?: string): Promise<Party> {
     const existing = await this.findOne(id);
-    await this.assertCanWrite(this.scopeOf(existing), userId);
+    if (userId) {
+      const a = await this.access(this.scopeOf(existing), userId);
+      // Boş dize "sorumluyu kaldır" demek; yalnızca yönetici yapabilir.
+      const yeni = payload.ownerUserId === undefined ? undefined : payload.ownerUserId || null;
+      const hata = kartDuzenlemeHatasi(a, existing.ownerUserId, yeni, userId);
+      if (hata) throw new ForbiddenException(hata);
+      if (yeni && yeni !== existing.ownerUserId) await this.assertAtanabilir(this.scopeOf(existing), yeni);
+    }
 
     if (payload.taxNumber && payload.taxNumber !== existing.taxNumber) {
       const duplicates = await this.checkDuplicates(this.scopeOf(existing), {
@@ -449,7 +511,7 @@ export class PartyService {
     assign("roles", payload.roles);
     assign("status", payload.status);
     assign("source", payload.source);
-    assign("owner_user_id", payload.ownerUserId);
+    assign("owner_user_id", payload.ownerUserId === undefined ? undefined : payload.ownerUserId || null);
     assign("parent_party_id", payload.parentPartyId);
     assign("data", payload.data);
     assign("notes", payload.notes);

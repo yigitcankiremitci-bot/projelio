@@ -14,7 +14,7 @@
 // (bkz. ai-assistant/ai-sheet-import.ts ile aynı ayrım).
 
 import * as ExcelJS from "exceljs";
-import type { Party, PartyRole, PartyType } from "@projelio/shared";
+import type { Locale, Party, PartyRole, PartyType } from "@projelio/shared";
 import { BadRequestException } from "@nestjs/common";
 import {
   cellText,
@@ -63,17 +63,19 @@ interface Sutun {
   metin?: boolean;
 }
 
-const ROLLER: { etiket: string; rol: PartyRole; esAdlar: string[] }[] = [
-  { etiket: "Müşteri", rol: "customer", esAdlar: ["müşteri", "musteri", "customer", "client"] },
-  { etiket: "Aday müşteri", rol: "lead", esAdlar: ["aday müşteri", "aday", "potansiyel", "lead"] },
-  { etiket: "Tedarikçi", rol: "supplier", esAdlar: ["tedarikçi", "tedarikci", "supplier", "vendor"] },
-  { etiket: "Distribütör", rol: "distributor", esAdlar: ["distribütör", "distributor", "bayi", "dealer"] },
-  { etiket: "Diğer", rol: "other", esAdlar: ["diğer", "diger", "other"] },
+// `en`: İngilizce şablondaki etiket. Okuyucu İKİ dili de her zaman tanır —
+// Türkçe arayüzdeki biri İngilizce şablonu (ya da tersini) yükleyebilir.
+const ROLLER: { etiket: string; en: string; rol: PartyRole; esAdlar: string[] }[] = [
+  { etiket: "Müşteri", en: "Customer", rol: "customer", esAdlar: ["müşteri", "musteri", "customer", "client"] },
+  { etiket: "Aday müşteri", en: "Lead", rol: "lead", esAdlar: ["aday müşteri", "aday", "potansiyel", "lead", "prospect"] },
+  { etiket: "Tedarikçi", en: "Supplier", rol: "supplier", esAdlar: ["tedarikçi", "tedarikci", "supplier", "vendor"] },
+  { etiket: "Distribütör", en: "Distributor", rol: "distributor", esAdlar: ["distribütör", "distributor", "bayi", "dealer"] },
+  { etiket: "Diğer", en: "Other", rol: "other", esAdlar: ["diğer", "diger", "other"] },
 ];
 
-const TURLER: { etiket: string; tur: PartyType; esAdlar: string[] }[] = [
-  { etiket: "Firma", tur: "company", esAdlar: ["firma", "şirket", "sirket", "kurum", "tüzel", "company"] },
-  { etiket: "Kişi", tur: "person", esAdlar: ["kişi", "kisi", "şahıs", "sahis", "bireysel", "gerçek", "person", "individual"] },
+const TURLER: { etiket: string; en: string; tur: PartyType; esAdlar: string[] }[] = [
+  { etiket: "Firma", en: "Company", tur: "company", esAdlar: ["firma", "şirket", "sirket", "kurum", "tüzel", "company", "business"] },
+  { etiket: "Kişi", en: "Person", tur: "person", esAdlar: ["kişi", "kisi", "şahıs", "sahis", "bireysel", "gerçek", "person", "individual"] },
 ];
 
 export const MUSTERI_SUTUNLARI: Sutun[] = [
@@ -199,8 +201,83 @@ export const MUSTERI_SUTUNLARI: Sutun[] = [
   },
 ];
 
-export const SABLON_SAYFA_ADI = "Müşteriler";
-export const SABLON_DOSYA_ADI = "Projelio müşteri şablonu.xlsx";
+/**
+ * İngilizce şablonun metinleri. Ayrı bir tablo, çünkü bunlar arayüz metni
+ * değil DOSYA İÇERİĞİ: çeviri sözlüğünden geçselerdi okuyucu İngilizce
+ * başlığı tanımak için sözlüğü tersinden aramak zorunda kalırdı. Burada
+ * başlık hem yazılıyor hem okunuyor (bkz. musteriSutunlariniBul).
+ */
+const EN: Record<MusteriAlani, { baslik: string; aciklama: string; ornek: string }> = {
+  displayName: { baslik: "Name", aciklama: "Required. The name shown in the list: company name or the person's full name.", ornek: "Harbor Logistics" },
+  partyType: { baslik: "Type", aciklama: "Company or Person. Empty means Company.", ornek: "Company" },
+  roles: {
+    baslik: "Role",
+    aciklama: "Customer, Lead, Supplier, Distributor or Other. Separate several with commas. Empty means Lead.",
+    ornek: "Customer",
+  },
+  legalName: { baslik: "Legal name", aciklama: "The full legal name as it appears on invoices.", ornek: "Harbor Logistics Ltd." },
+  taxNumber: { baslik: "Tax ID", aciklama: "Tax or national ID number. The same number can't be entered twice.", ornek: "1234567890" },
+  taxOffice: { baslik: "Tax office", aciklama: "", ornek: "Central" },
+  email: { baslik: "Email", aciklama: "", ornek: "hello@harborlogistics.com" },
+  phone: { baslik: "Phone", aciklama: "", ornek: "+44 20 7946 0000" },
+  website: { baslik: "Website", aciklama: "", ornek: "harborlogistics.com" },
+  city: { baslik: "City", aciklama: "", ornek: "London" },
+  district: { baslik: "District", aciklama: "", ornek: "Camden" },
+  address: { baslik: "Address", aciklama: "", ornek: "1 Dock Street" },
+  contactName: {
+    baslik: "Contact person",
+    aciklama: "Your contact at the company. Added to the card's Contacts tab as the primary contact.",
+    ornek: "Emma Clarke",
+  },
+  contactPhone: { baslik: "Contact phone", aciklama: "", ornek: "+44 7700 900000" },
+  contactEmail: { baslik: "Contact email", aciklama: "", ornek: "emma@harborlogistics.com" },
+  notes: { baslik: "Notes", aciklama: "Free-form note.", ornek: "Monthly shipping agreement." },
+};
+
+const METIN = {
+  tr: {
+    veriSayfasi: "Müşteriler",
+    rehberSayfasi: "Nasıl doldurulur",
+    dosya: "Projelio müşteri şablonu.xlsx",
+    baslik: "Projelio müşteri şablonu",
+    sutun: "Sütun",
+    aciklama: "Açıklama",
+    ornek: "Örnek",
+    istegeBagli: "İsteğe bağlı.",
+    yukleme: "Yükleme",
+    yuklemeMetni:
+      `"Müşteriler" sayfasını doldurup dosyayı Müşteriler ekranındaki "Excel ile toplu ekle" ` +
+      "penceresinden yükleyin (ya da Lio'ya verin). Önce kaç kart açılacağı gösterilir, onayınızdan sonra " +
+      "yazılır. Aynı adla, vergi numarasıyla ya da e-postayla zaten kayıtlı olanlar atlanır. " +
+      "Sütunların sırası ve bu sayfa önemli değil; başlıkları değiştirmeyin.",
+  },
+  en: {
+    veriSayfasi: "Customers",
+    rehberSayfasi: "How to fill in",
+    dosya: "Projelio customer template.xlsx",
+    baslik: "Projelio customer template",
+    sutun: "Column",
+    aciklama: "Description",
+    ornek: "Example",
+    istegeBagli: "Optional.",
+    yukleme: "Uploading",
+    yuklemeMetni:
+      `Fill in the "Customers" sheet and upload the file from "Bulk add from Excel" on the Customers ` +
+      "screen (or give it to Lio). You'll first see how many cards will be created; they're written only " +
+      "after you confirm. Customers already registered with the same name, tax ID or email are skipped. " +
+      "Column order and this sheet don't matter; don't change the headings.",
+  },
+} satisfies Record<Locale, Record<string, string>>;
+
+/** Türkçe veri sayfasının adı (geriye uyumluluk: Lio ve CSV okuması bunu kullanıyor). */
+export const SABLON_SAYFA_ADI = METIN.tr.veriSayfasi;
+export const SABLON_DOSYA_ADI = METIN.tr.dosya;
+/** İndirilecek dosyanın adı, şablonun dilinde. */
+export function sablonDosyaAdi(dil: Locale): string {
+  return METIN[dil].dosya;
+}
+/** Veri sayfası sayılan adlar — iki dilin şablonu da tanınır. */
+const VERI_SAYFALARI = [METIN.tr.veriSayfasi, METIN.en.veriSayfasi];
 /** Şablonun kaç satırına açılır liste ve metin biçimi uygulanacağı. */
 const SABLON_SATIR = 1000;
 
@@ -213,13 +290,20 @@ const SABLON_SATIR = 1000;
  * kullanıcı silmeyi unutursa "Deniz Lojistik" adında sahte bir müşteri açılırdı.
  * Veri sayfası İLK sayfa — Lio sayfa adı verilmezse ilk sayfayı okur.
  */
-export async function musteriSablonuOlustur(): Promise<Buffer> {
+export async function musteriSablonuOlustur(dil: Locale = "tr"): Promise<Buffer> {
+  const m = METIN[dil];
+  // Sütunun o dildeki metinleri; Türkçe tanım MUSTERI_SUTUNLARI'nda.
+  const yerel = (s: Sutun) =>
+    dil === "en"
+      ? { ...EN[s.alan], secenekler: s.alan === "roles" ? ROLLER.map((r) => r.en) : s.alan === "partyType" ? TURLER.map((t) => t.en) : undefined }
+      : { baslik: s.baslik, aciklama: s.aciklama, ornek: s.ornek, secenekler: s.secenekler };
+
   const wb = new Workbook();
   wb.creator = "Projelio";
-  wb.title = "Projelio müşteri şablonu";
+  wb.title = m.baslik;
 
-  const veri = wb.addWorksheet(SABLON_SAYFA_ADI, { views: [{ state: "frozen", ySplit: 1 }] });
-  veri.columns = MUSTERI_SUTUNLARI.map((s) => ({ header: s.baslik, key: s.alan, width: s.genislik }));
+  const veri = wb.addWorksheet(m.veriSayfasi, { views: [{ state: "frozen", ySplit: 1 }] });
+  veri.columns = MUSTERI_SUTUNLARI.map((s) => ({ header: yerel(s).baslik, key: s.alan, width: s.genislik }));
   const baslik = veri.getRow(1);
   baslik.font = { bold: true, color: { argb: "FFFFFFFF" } };
   baslik.height = 20;
@@ -227,12 +311,14 @@ export async function musteriSablonuOlustur(): Promise<Buffer> {
     const hucre = baslik.getCell(i + 1);
     // Paletin ana ve vurgu renkleri (packages/shared/src/theme.ts): zorunlu sütun vurgu renginde.
     hucre.fill = { type: "pattern", pattern: "solid", fgColor: { argb: s.zorunlu ? "FFC0813F" : "FF3E4858" } };
-    if (s.aciklama) hucre.note = s.aciklama;
+    const y = yerel(s);
+    if (y.aciklama) hucre.note = y.aciklama;
     const harf = veri.getColumn(i + 1).letter;
     if (s.metin) {
       for (let r = 2; r <= SABLON_SATIR; r++) veri.getCell(`${harf}${r}`).numFmt = "@";
     }
-    if (s.secenekler) {
+    if (y.secenekler) {
+      const secenekler = y.secenekler;
       for (let r = 2; r <= SABLON_SATIR; r++) {
         veri.getCell(`${harf}${r}`).dataValidation = {
           type: "list",
@@ -240,31 +326,25 @@ export async function musteriSablonuOlustur(): Promise<Buffer> {
           // öneri, başka değer yazılınca Excel engellemesin.
           allowBlank: true,
           showErrorMessage: false,
-          formulae: [`"${s.secenekler.join(",")}"`],
+          formulae: [`"${secenekler.join(",")}"`],
         };
       }
     }
   });
 
-  const rehber = wb.addWorksheet("Nasıl doldurulur");
+  const rehber = wb.addWorksheet(m.rehberSayfasi);
   rehber.columns = [
-    { header: "Sütun", key: "sutun", width: 18 },
-    { header: "Açıklama", key: "aciklama", width: 70 },
-    { header: "Örnek", key: "ornek", width: 34 },
+    { header: m.sutun, key: "sutun", width: 18 },
+    { header: m.aciklama, key: "aciklama", width: 70 },
+    { header: m.ornek, key: "ornek", width: 34 },
   ];
   rehber.getRow(1).font = { bold: true };
   for (const s of MUSTERI_SUTUNLARI) {
-    rehber.addRow({ sutun: s.baslik, aciklama: s.aciklama || "İsteğe bağlı.", ornek: s.ornek });
+    const y = yerel(s);
+    rehber.addRow({ sutun: y.baslik, aciklama: y.aciklama || m.istegeBagli, ornek: y.ornek });
   }
   rehber.addRow({});
-  rehber.addRow({
-    sutun: "Yükleme",
-    aciklama:
-      `"${SABLON_SAYFA_ADI}" sayfasını doldurup dosyayı Müşteriler ekranındaki "Excel ile toplu ekle" ` +
-      "penceresinden yükleyin (ya da Lio'ya verin). Önce kaç kart açılacağı gösterilir, onayınızdan sonra " +
-      "yazılır. Aynı adla, vergi numarasıyla ya da e-postayla " +
-      "zaten kayıtlı olanlar atlanır. Sütunların sırası ve bu sayfa önemli değil; başlıkları değiştirmeyin.",
-  });
+  rehber.addRow({ sutun: m.yukleme, aciklama: m.yuklemeMetni });
 
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
@@ -324,7 +404,8 @@ export function musteriSayfasiniSec(sayfalar: SheetData[], istenen?: string): Sh
     }
     return bulunan;
   }
-  return sayfalar.find((s) => normalizeKey(s.name) === normalizeKey(SABLON_SAYFA_ADI)) ?? sayfalar[0];
+  const veriAdlari = VERI_SAYFALARI.map(normalizeKey);
+  return sayfalar.find((s) => veriAdlari.includes(normalizeKey(s.name))) ?? sayfalar[0];
 }
 
 export interface PlanlananMusteri {
@@ -374,7 +455,7 @@ export function musteriSutunlariniBul(
   }
   for (const s of MUSTERI_SUTUNLARI) {
     if (sonuc.has(s.alan)) continue;
-    const adaylar = [s.baslik, ...s.esAdlar].map(baslikAnahtari);
+    const adaylar = [s.baslik, EN[s.alan].baslik, ...s.esAdlar].map(baslikAnahtari);
     const i = anahtarlar.findIndex((a, idx) => !kullanilan.has(idx) && adaylar.includes(a));
     if (i >= 0) {
       sonuc.set(s.alan, i);
@@ -388,7 +469,9 @@ function rolleriCoz(deger: string): { roller: PartyRole[]; taninmayan: string[] 
   const roller: PartyRole[] = [];
   const taninmayan: string[] = [];
   for (const parca of deger.split(/[,;/]/).map((p) => normalizeKey(p)).filter(Boolean)) {
-    const bulunan = ROLLER.find((r) => normalizeKey(r.etiket) === parca || r.esAdlar.includes(parca));
+    const bulunan = ROLLER.find(
+      (r) => normalizeKey(r.etiket) === parca || normalizeKey(r.en) === parca || r.esAdlar.includes(parca)
+    );
     if (!bulunan) taninmayan.push(parca);
     else if (!roller.includes(bulunan.rol)) roller.push(bulunan.rol);
   }
@@ -397,7 +480,7 @@ function rolleriCoz(deger: string): { roller: PartyRole[]; taninmayan: string[] 
 
 function turuCoz(deger: string): PartyType | undefined {
   const d = normalizeKey(deger);
-  return TURLER.find((t) => normalizeKey(t.etiket) === d || t.esAdlar.includes(d))?.tur;
+  return TURLER.find((t) => normalizeKey(t.etiket) === d || normalizeKey(t.en) === d || t.esAdlar.includes(d))?.tur;
 }
 
 /**

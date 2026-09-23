@@ -1,3 +1,4 @@
+import { ForbiddenException } from "@nestjs/common";
 import type { BudgetScopeType, BudgetTransaction, RecurringPayment } from "@projelio/shared";
 
 /**
@@ -111,4 +112,21 @@ export function mapRecurringPayment(row: any): RecurringPayment {
     lastRunAt: row.last_run_at ?? undefined,
     createdAt: row.created_at,
   };
+}
+
+/**
+ * Müşteri tahsilatından doğan defter satırı (source='tahsilat', bkz. migration 128).
+ *
+ * Defterden düzenlenemez, silinemez, düzenliye çevrilemez: kaynağı siparişin
+ * tahsilatı. Burada değiştirilebilseydi kasa "4.000 geldi", tahsilat raporu
+ * "10.000 geldi" derdi ve hangisinin doğru olduğu anlaşılmazdı. Geri almak
+ * için Müşteriler > sipariş > tahsilatı geri al; satır cascade ile gider.
+ */
+// dil:anahtar-baslangic
+export const TAHSILAT_SATIRI =
+  "Bu kayıt bir müşteri tahsilatından oluştu; Müşteriler ekranında siparişin tahsilatından düzenleyin";
+// dil:anahtar-bitis
+
+export function tahsilatSatiriDegilse(row: { source?: string | null } | null | undefined): void {
+  if (row?.source === "tahsilat") throw new ForbiddenException(TAHSILAT_SATIRI);
 }

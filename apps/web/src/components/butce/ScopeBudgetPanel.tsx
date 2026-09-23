@@ -641,6 +641,7 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
                       kayit.taskTitle ? `↳ ${kayit.taskTitle}` : undefined,
                       kayit.type === "payout" ? t(TUR_ETIKET.payout) : undefined,
                       kayit.source === "recurring" ? t("düzenli") : undefined,
+                      kayit.source === "tahsilat" ? t("müşteri tahsilatı") : undefined,
                       isDesktop && kayit.createdByName ? kayit.createdByName : undefined,
                     ]
                       .filter(Boolean)
@@ -704,7 +705,9 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
                     {t("Fatura")}
                   </button>
                 )}
-                {yetki.canManage && (
+                {/* Tahsilat satırı siparişten yönetilir (sunucu da reddediyor);
+                    düğme görünseydi basınca yalnızca hata alınırdı. */}
+                {yetki.canManage && kayit.source !== "tahsilat" && (
                   <>
                     <button
                       onClick={() => duzenlemeyeBasla(kayit)}

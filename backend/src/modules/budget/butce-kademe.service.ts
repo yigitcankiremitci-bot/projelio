@@ -5,7 +5,7 @@ import { requireAmount, requireOneOf, optionalOneOf, paraBirimiDogrula } from ".
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { ButceErisimService } from "./butce-erisim.service";
 import type { ViewerKapsami } from "./butce-erisim";
-import { mapRecurringPayment, mapTransaction, SECIM, DUZENLI_SECIM } from "./butce-eslestirme";
+import { mapRecurringPayment, mapTransaction, SECIM, DUZENLI_SECIM, TAHSILAT_SATIRI } from "./butce-eslestirme";
 import { ButceHiyerarsiService } from "./butce-hiyerarsi.service";
 import { advanceDueDate } from "./vade";
 import { RECURRENCE_INTERVALS } from "@projelio/shared";
@@ -383,6 +383,11 @@ export class ButceKademeService {
     }
     if (kayit.recurring_payment_id) {
       throw new BadRequestException("Bu kayıt zaten bir düzenli ödemeden üretilmiş");
+    }
+    // Tahsilat bir siparişe gelen tek seferlik paradır; her ay kendini
+    // tekrarlaması gerçekte gelmemiş gelir yazmak olurdu.
+    if (kayit.source === "tahsilat") {
+      throw new BadRequestException(TAHSILAT_SATIRI);
     }
 
     const interval = requireOneOf(data.interval ?? "monthly", RECURRENCE_INTERVALS, "Tekrar aralığı");

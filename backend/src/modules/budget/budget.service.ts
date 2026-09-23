@@ -5,7 +5,7 @@ import { requireAmount, requireOneOf, optionalOneOf, paraBirimiDogrula } from ".
 import { NotificationsService } from "../notifications/notifications.service";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { ORG_RECEIVABLE_MODULE_KEY, sirketAlacakBorcu } from "./sirket-defteri";
-import { mapTransaction, SECIM } from "./butce-eslestirme";
+import { mapTransaction, SECIM, tahsilatSatiriDegilse } from "./butce-eslestirme";
 import { ButceErisimService } from "./butce-erisim.service";
 import { ButceKademeService } from "./butce-kademe.service";
 import { aynaKayit, hizmetOzeti, musteriKendiOdemesiniYonetebilir, uyeKendiOdemesiniYonetebilir } from "./hizmet-anlasmasi";
@@ -597,6 +597,7 @@ export class BudgetService {
     userId?: string
   ): Promise<BudgetTransaction> {
     const mevcut = await this.assertCanManageTransaction(id, userId);
+    tahsilatSatiriDegilse(mevcut);
 
     // Üye kendi girdiği hizmet ödemesinde yalnızca tutarı, tarihi ve açıklamayı
     // değiştirir. Türü ya da projeyi değiştirebilseydi sahibin defterine
@@ -652,7 +653,7 @@ export class BudgetService {
   }
 
   async removeTransaction(id: string, userId?: string): Promise<{ success: true }> {
-    await this.assertCanManageTransaction(id, userId);
+    tahsilatSatiriDegilse(await this.assertCanManageTransaction(id, userId));
     const { error } = await this.supabase.client.from("budget_transactions").delete().eq("id", id);
     if (error) throw error;
     return { success: true };
@@ -661,11 +662,12 @@ export class BudgetService {
   async removeForUser(id: string, userId: string): Promise<{ success: true }> {
     const { data: row } = await this.supabase.client
       .from("budget_transactions")
-      .select("owner_id")
+      .select("owner_id, source")
       .eq("id", id)
       .maybeSingle();
     if (!row) throw new NotFoundException("Kayıt bulunamadı");
     if (row.owner_id !== userId) throw new ForbiddenException("Bu kaydı silme yetkin yok");
+    tahsilatSatiriDegilse(row);
 
     const { error } = await this.supabase.client.from("budget_transactions").delete().eq("id", id);
     if (error) throw error;

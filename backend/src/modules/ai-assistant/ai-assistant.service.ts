@@ -4890,8 +4890,11 @@ export class AiAssistantService {
       case "list_customers": {
         const scope = await this.customerScope(userId, input);
         const q = String(input.query ?? "").trim().toLocaleLowerCase("tr");
-        const parties = await this.partyService.findAll(scope, { role: input.role as PartyRole | undefined });
-        return parties
+        // Ekrandaki kuralla aynı: çalışan yalnızca kendisine atanan müşterileri
+        // görür. findAll'a gidilseydi Lio'ya sormak listeyi açmanın yolu olurdu.
+        const { musteriler } = await this.partyService.musterilerim(scope, userId);
+        const rol = input.role as PartyRole | undefined;
+        return (rol ? musteriler.filter((p) => p.roles.includes(rol)) : musteriler)
           .filter(
             (p) =>
               !q ||

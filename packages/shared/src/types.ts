@@ -736,6 +736,18 @@ export interface PartyActivity {
 }
 
 /** Kayıt eklenirken/güncellenirken tespit edilen olası yinelenen kayıt. */
+/**
+ * Müşteriler ekranının listesi. Yönetici hepsini, çalışan yalnızca kendisine
+ * atananları görür (bkz. backend party/siparis-erisim.ts).
+ */
+export interface MusteriListesi {
+  /** Şirket sahibi / departman ya da modül yöneticisi: atama yapar, raporu görür. */
+  yonetici: boolean;
+  /** Kart bilgisini (ad, iletişim) değiştirebilir mi. */
+  kartYazar: boolean;
+  musteriler: Party[];
+}
+
 export interface PartyDuplicate {
   party: Party;
   /** block: kayıt açılmaz (vergi no). warn: kullanıcıya sorulur. */
@@ -1585,7 +1597,7 @@ export const RECURRENCE_INTERVALS: RecurrenceInterval[] = ["weekly", "monthly", 
  * diye. `manual` kayıtlar elle bir göreve bağlanabilir ve aynı göreve birden
  * fazlası yazılabilir; oradaki soru "bu görev için ne harcandı".
  */
-export type BudgetTransactionSource = "manual" | "task_budget" | "recurring";
+export type BudgetTransactionSource = "manual" | "task_budget" | "recurring" | "tahsilat";
 
 // Kira, abonelik, düzenli hakediş gibi tekrar eden ödemeler. Vadesi geldiğinde
 // sunucudaki günlük görev otomatik olarak bir BudgetTransaction üretir, sonraki
@@ -3864,4 +3876,89 @@ export interface BilgiKartiSayfasi {
   belgeler: BilgiKartiBelgesi[];
   ozet: BilgiKartiOzeti;
   yetki: BilgiKartiYetkisi;
+}
+
+// ============================================================ Müşteri siparişi ve tahsilat
+//
+// Müşteri kartı (Party) bir satış çalışanına atanır (ownerUserId); çalışan o
+// müşterinin siparişlerini girer ve vadesi gelen parayı tahsil eder. Her
+// tahsilat şirketin defterine `source = 'tahsilat'` gelir satırı yazar.
+// Durum ve rapor hesabı: packages/shared/src/tahsilat.ts
+// Bkz. database/migrations/128_musteri_siparis_tahsilat.sql
+
+export type OdemeYontemi = "nakit" | "havale" | "kredi_karti" | "cek" | "senet" | "diger";
+
+/** Saklanmaz, tahsilatlardan hesaplanır (bkz. siparisDurumu). */
+export type SiparisDurumu = "bekliyor" | "kismi" | "tahsil_edildi" | "gecikti";
+
+export interface MusteriTahsilati {
+  id: string;
+  siparisId: string;
+  tutar: number;
+  /** Paranın geldiği gün (YYYY-MM-DD) — defter satırının tarihi de bu. */
+  tarih: string;
+  odemeYontemi: OdemeYontemi;
+  evrakNo?: string;
+  evrakVadesi?: string;
+  notlar?: string;
+  createdBy?: string;
+  createdByName?: string;
+  createdAt: string;
+}
+
+export interface MusteriSiparisi {
+  id: string;
+  partyId: string;
+  partyName?: string;
+  organizationId?: string;
+  jobId?: string;
+  siparisNo?: string;
+  aciklama?: string;
+  miktar?: number;
+  birim?: string;
+  tutar: number;
+  paraBirimi: string;
+  siparisTarihi: string;
+  vadeGun: number;
+  /** Sipariş tarihi + vade günü; veritabanında hesaplanan sütun. */
+  vadeTarihi: string;
+  odemeYontemi: OdemeYontemi;
+  evrakNo?: string;
+  evrakVadesi?: string;
+  notlar?: string;
+  /**
+   * Müşterinin ŞU ANKİ sorumlusu. Sipariş kendi sorumlusunu tutmaz: müşteri
+   * başka çalışana devredilince açık alacak da onunla gider.
+   */
+  sorumluId?: string;
+  sorumluAdi?: string;
+  tahsilatlar: MusteriTahsilati[];
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface MusteriSiparisListesi {
+  /**
+   * İsteyen herkesin siparişini görüyor mu (şirket sahibi, departman ya da
+   * modül yöneticisi). false ise liste yalnızca kendi müşterilerini içerir.
+   */
+  yonetici: boolean;
+  siparisler: MusteriSiparisi[];
+}
+
+/** Yönetici raporunun bir satırı: sorumlu × vade ayı × para birimi. */
+export interface TahsilatRaporSatiri {
+  sorumluId: string | null;
+  sorumluAdi?: string;
+  /** Vadenin düştüğü ay, YYYY-MM. */
+  ay: string;
+  paraBirimi: string;
+  siparisSayisi: number;
+  /** O ay vadesi gelen toplam. */
+  beklenen: number;
+  /** Bu siparişlere bugüne kadar gelen. */
+  tahsilEdilen: number;
+  kalan: number;
+  /** Kalanın vadesi geçmiş kısmı. */
+  geciken: number;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Party, PartyActivity, PartyContact, PartyDuplicate, PartyRole } from "@projelio/shared";
+import type { DepartmentMember, JobMember, Party, PartyActivity, PartyContact, PartyDuplicate, PartyRole } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { ALL_ROLES, ROLE_COLORS, ROLE_LABELS, STATUS_LABELS, profileFor } from "../lib/partyProfiles";
@@ -10,6 +10,10 @@ import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 import { onLioActivity } from "../lib/liveRoom";
 import MusteriExcelModal from "./MusteriExcelModal";
+import { partyApi } from "../api/party";
+import { useCurrentUser } from "../lib/useCurrentUser";
+import MusteriSiparisleri from "./musteri/MusteriSiparisleri";
+import TahsilatTakibi from "./musteri/TahsilatTakibi";
 
 interface Props {
   organizationId?: string;
@@ -33,6 +37,8 @@ function emptyForm() {
     phone: "",
     taxNumber: "",
     notes: "",
+    // Boş = kaydı açan üstlenir (sunucu varsayılanı).
+    ownerUserId: "",
   };
 }
 
@@ -67,22 +73,64 @@ export default function CustomersPanel({
   const [roleFilter, setRoleFilter] = useState<PartyRole | "">(profile.defaultRole ?? "");
   const [openPartyId, setOpenPartyId] = useState<string | null>(null);
   const { pushUndo } = useUndo();
+  const { user } = useCurrentUser();
+
+  // Yönetici hepsini görür, müşteriyi çalışana atar ve raporu görür; çalışan
+  // yalnızca kendisine atananları görür. Karar sunucunun (musterilerim ucu).
+  const [yonetici, setYonetici] = useState(false);
+  const [gorunum, setGorunum] = useState<"musteriler" | "tahsilat">("musteriler");
+  const [sorumluFiltre, setSorumluFiltre] = useState("");
+  const [ekip, setEkip] = useState<{ id: string; ad: string }[]>([]);
 
   const scopePath = jobId ? `/jobs/${jobId}/party` : `/organizations/${organizationId}/party`;
+  const kapsamYolu = jobId ? `/jobs/${jobId}` : `/organizations/${organizationId}`;
 
   // Yalnızca İLK yüklemede "Yükleniyor…" gösterilir. Kaydetme/arşivleme
   // sonrası tazelemede de gösterilince liste bir an yok olup geri geliyor,
   // kaydırma başa dönüyordu — sayfa kendi kendine yenileniyor gibi görünüyordu.
   const load = (ilk = false) => {
     if (ilk === true) setLoading(true);
-    api
-      .get<Party[]>(scopePath)
-      .then(setParties)
+    partyApi
+      .musterilerim(scopePath, jobId ? undefined : departmentId)
+      .then((r) => {
+        setParties(r.musteriler);
+        setYonetici(r.yonetici);
+      })
       .catch(() => setParties([]))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => load(true), [scopePath]);
+  useEffect(() => load(true), [scopePath, departmentId]);
+
+  // Atanabilecek kişiler: departmanın ya da işin ekibi. Şirket düzeyinde
+  // (departmansız) açılan panelde ekip listesi yok; orada yönetici yalnızca
+  // kendini ya da kartın mevcut sorumlusunu seçebilir.
+  useEffect(() => {
+    if (!yonetici) return;
+    const yol = jobId ? `/jobs/${jobId}/members` : departmentId ? `/departments/${departmentId}/members` : null;
+    if (!yol) return;
+    api
+      .get<(DepartmentMember | JobMember)[]>(yol)
+      .then((m) =>
+        setEkip(
+          m
+            .filter((x: any) => x.userId && (x.status ?? "approved") === "approved")
+            .map((x: any) => ({ id: x.userId as string, ad: x.fullName ?? x.username ?? x.email ?? t("İsimsiz") }))
+        )
+      )
+      .catch(() => setEkip([]));
+  }, [yonetici, jobId, departmentId]);
+
+  /** Sorumlu seçicisinin seçenekleri: ekip + ben + listede sorumlusu görünenler. */
+  const sorumluSecenekleri = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const k of ekip) m.set(k.id, k.ad);
+    if (user) m.set(user.id, m.get(user.id) ?? t("Ben"));
+    for (const p of parties) if (p.ownerUserId && !m.has(p.ownerUserId)) m.set(p.ownerUserId, p.ownerName ?? t("İsimsiz"));
+    return Array.from(m.entries())
+      .map(([id, ad]) => ({ id, ad }))
+      .sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
+  }, [ekip, parties, user?.id]);
 
   // Excel şablonu Lio'ya verilince kartlar Lio'nun tarafında açılıyor; kullanıcı
   // bu ekrandaysa listeyi kendisi tazelemek zorunda kalmasın.
@@ -98,6 +146,7 @@ export default function CustomersPanel({
     const q = search.trim().toLocaleLowerCase("tr");
     return parties.filter((p) => {
       if (roleFilter && !p.roles.includes(roleFilter)) return false;
+      if (sorumluFiltre && (sorumluFiltre === "-" ? !!p.ownerUserId : p.ownerUserId !== sorumluFiltre)) return false;
       if (!q) return true;
       return [p.displayName, p.legalName, p.email, p.phone, p.taxNumber]
         .filter(Boolean)
@@ -105,9 +154,9 @@ export default function CustomersPanel({
         .toLocaleLowerCase("tr")
         .includes(q);
     });
-  }, [parties, search, roleFilter]);
+  }, [parties, search, roleFilter, sorumluFiltre]);
 
-  const hasActiveFilter = search.trim() !== "" || roleFilter !== (profile.defaultRole ?? "");
+  const hasActiveFilter = search.trim() !== "" || roleFilter !== (profile.defaultRole ?? "") || sorumluFiltre !== "";
   const showToolbar = parties.length > TOOLBAR_THRESHOLD || hasActiveFilter;
 
   const stats = useMemo(
@@ -137,6 +186,7 @@ export default function CustomersPanel({
       phone: p.phone ?? "",
       taxNumber: p.taxNumber ?? "",
       notes: p.notes ?? "",
+      ownerUserId: p.ownerUserId ?? "",
     });
     setDuplicates([]);
     setError("");
@@ -193,6 +243,9 @@ export default function CustomersPanel({
         phone: form.phone || undefined,
         taxNumber: form.taxNumber || undefined,
         notes: form.notes || undefined,
+        // Yalnızca yönetici gönderir: çalışanın alanı yok, sunucu da başkasına
+        // atamayı reddediyor. Boş = oluştururken "ben", düzenlerken dokunma.
+        ...(yonetici && form.ownerUserId ? { ownerUserId: form.ownerUserId } : {}),
         ...(departmentId && !jobId ? { departmentId } : {}),
       };
       if (formMode?.kind === "edit") {
@@ -251,6 +304,35 @@ export default function CustomersPanel({
           )
         )}
       </div>
+
+      {/* Tahsilat takibi: ay ay vadesi gelen siparişler + yöneticiye rapor. */}
+      <div style={{ display: "flex", gap: 6 }}>
+        {(["musteriler", "tahsilat"] as const).map((g) => (
+          <button
+            key={g}
+            onClick={() => setGorunum(g)}
+            style={{
+              fontSize: 13,
+              padding: "5px 12px",
+              borderRadius: 8,
+              border: `1px solid ${gorunum === g ? c.primary : c.border}`,
+              background: gorunum === g ? c.primary : "transparent",
+              color: gorunum === g ? c.onPrimary : c.textSecondary,
+              cursor: "pointer",
+            }}
+          >
+            {g === "musteriler" ? t("Müşteriler") : t("Tahsilat takibi")}
+          </button>
+        ))}
+      </div>
+
+      {gorunum === "tahsilat" ? (
+        <TahsilatTakibi kapsamYolu={kapsamYolu} departmentId={jobId ? undefined : departmentId} />
+      ) : (
+      <>
+      {!loading && !yonetici && parties.length > 0 && (
+        <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Sana atanmış müşteriler listeleniyor.")}</span>
+      )}
 
       {canWrite && (
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
@@ -330,11 +412,28 @@ export default function CustomersPanel({
               </option>
             ))}
           </select>
+          {yonetici && (
+            <select
+              value={sorumluFiltre}
+              onChange={(e) => setSorumluFiltre(e.target.value)}
+              style={{ fontSize: 13, padding: "5px 6px" }}
+              aria-label={t("Sorumlu")}
+            >
+              <option value="">{t("Sorumlu: tümü")}</option>
+              <option value="-">{t("Sorumlusu olmayanlar")}</option>
+              {sorumluSecenekleri.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.ad}
+                </option>
+              ))}
+            </select>
+          )}
           {hasActiveFilter && (
             <button
               onClick={() => {
                 setSearch("");
                 setRoleFilter(profile.defaultRole ?? "");
+                setSorumluFiltre("");
               }}
               style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
             >
@@ -413,6 +512,25 @@ export default function CustomersPanel({
               style={{ width: "100%" }}
             />
           </Field>
+
+          {yonetici && (
+            <Field label={t("Sorumlu çalışan")}>
+              <select
+                value={form.ownerUserId}
+                onChange={(e) => setForm((f) => ({ ...f, ownerUserId: e.target.value }))}
+                style={{ width: "100%" }}
+              >
+                {formMode.kind === "create" && <option value="">{t("Ben")}</option>}
+                {formMode.kind === "edit" && !form.ownerUserId && <option value="">{t("Seçilmedi")}</option>}
+                {/* Oluştururken "Ben" en üstte zaten var; kendi adı ikinci kez çıkmasın. */}
+                {sorumluSecenekleri.filter((k) => formMode.kind === "edit" || k.id !== user?.id).map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.ad}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
 
           <Field label={t("Not")}>
             <textarea
@@ -526,8 +644,10 @@ export default function CustomersPanel({
                       </span>
                     ))}
                   </div>
-                  {profile.detail(p) && (
-                    <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>{profile.detail(p)}</div>
+                  {(profile.detail(p) || yonetici) && (
+                    <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
+                      {[profile.detail(p), yonetici ? p.ownerName ?? t("Sorumlu yok") : undefined].filter(Boolean).join(" · ")}
+                    </div>
                   )}
                 </button>
                 {canWrite && (
@@ -553,12 +673,18 @@ export default function CustomersPanel({
               {openPartyId === p.id && <PartyDetail
                   party={p}
                   canWrite={canWrite}
+                  // Sipariş/tahsilat yazma hakkı sorumluluktan gelir (bkz.
+                  // backend siparis-erisim.ts): modülde salt okur olan satışçı
+                  // da kendisine atanan müşterinin tahsilatını girer.
+                  siparisYazar={yonetici || (!!user && p.ownerUserId === user.id)}
                   profile={profile.primaryActionLabel}
                   organizationId={organizationId}
                 />}
             </div>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );
@@ -591,17 +717,20 @@ function Field({
 function PartyDetail({
   party,
   canWrite,
+  siparisYazar,
   profile,
   organizationId,
 }: {
   party: Party;
   canWrite: boolean;
+  siparisYazar: boolean;
   profile: string;
   organizationId?: string;
 }) {
   const c = useThemeColors();
   const t = useT();
-  const [tab, setTab] = useState<"activity" | "contacts" | "alacakBorc">("activity");
+  const [tab, setTab] = useState<"activity" | "contacts" | "alacakBorc" | "siparisler">("siparisler");
+  const [siparisSayisi, setSiparisSayisi] = useState(0);
   // null = şirket kartı değil ya da kullanıcının alacak/borç defterini görme
   // yetkisi yok; sekme o zaman hiç çıkmaz (bkz. useMusteriAlacakBorcu).
   const alacakBorc = useMusteriAlacakBorcu(party, organizationId);
@@ -662,7 +791,10 @@ function PartyDetail({
         gap: 8,
       }}
     >
-      <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <button onClick={() => setTab("siparisler")} style={tabStyle(tab === "siparisler")}>
+          {t("Siparişler")} {siparisSayisi > 0 && `(${siparisSayisi})`}
+        </button>
         <button onClick={() => setTab("activity")} style={tabStyle(tab === "activity")}>
           {t("Geçmiş")} {activities.length > 0 && `(${activities.length})`}
         </button>
@@ -676,7 +808,7 @@ function PartyDetail({
         )}
       </div>
 
-      {canWrite && tab !== "alacakBorc" && (
+      {canWrite && (tab === "activity" || tab === "contacts") && (
         <div style={{ display: "flex", gap: 6 }}>
           <input
             value={draft}
@@ -703,7 +835,9 @@ function PartyDetail({
         </div>
       )}
 
-      {tab === "alacakBorc" && alacakBorc.kayitlar && organizationId ? (
+      {tab === "siparisler" ? (
+        <MusteriSiparisleri party={party} yazabilir={siparisYazar} onSayi={setSiparisSayisi} />
+      ) : tab === "alacakBorc" && alacakBorc.kayitlar && organizationId ? (
         <MusteriAlacakBorcu
           party={party}
           organizationId={organizationId}

@@ -800,7 +800,7 @@ function HareketSutunu({
                 yansıyan kayıtlar için de geçerli (readOnly): kimlikleri
                 budget_transactions'a ait değil, /budget/transactions uçları
                 onları bulamaz — düğme koymak 404 veren bir düğme olurdu. */}
-            {!hareket.recurringPaymentId && !hareket.readOnly && (
+            {!hareket.recurringPaymentId && !hareket.readOnly && hareket.source !== "tahsilat" && (
               <button
                 type="button"
                 onClick={() => onEdit(hareket)}
@@ -810,7 +810,8 @@ function HareketSutunu({
                 <IconEdit size={14} color={c.textSecondary} />
               </button>
             )}
-            {!hareket.readOnly && (
+            {/* Müşteri tahsilatı siparişten geri alınır (bkz. migration 128). */}
+            {!hareket.readOnly && hareket.source !== "tahsilat" && (
               <button
                 type="button"
                 onClick={() => onDelete(hareket.id)}

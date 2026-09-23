@@ -182,3 +182,51 @@ describe("tabloyuOku — yüklenen dosya", () => {
     assert.throws(() => musteriSayfasiniSec([]));
   });
 });
+
+describe("İngilizce şablon", () => {
+  test("başlıklar, sayfa adları ve açılır listeler İngilizce; okuyucu hepsini tanır", async () => {
+    const wb = new Workbook();
+    await wb.xlsx.load((await musteriSablonuOlustur("en")) as any);
+    assert.deepEqual(wb.worksheets.map((w) => w.name), ["Customers", "How to fill in"]);
+
+    const veri = wb.worksheets[0];
+    const basliklar = (veri.getRow(1).values as unknown[]).slice(1).map(String);
+    assert.equal(basliklar[0], "Name");
+    assert.ok(!basliklar.some((b) => /[çğıöşüÇĞİÖŞÜ]/.test(b)), `Türkçe başlık kaldı: ${basliklar.join(", ")}`);
+    assert.equal(musteriSutunlariniBul(basliklar).size, MUSTERI_SUTUNLARI.length);
+
+    const rol = veri.getCell("C2").dataValidation;
+    assert.match(String(rol?.formulae?.[0]), /Customer,Lead,Supplier/);
+
+    // Rehber sayfasında da Türkçe metin kalmamalı.
+    const rehber: string[] = [];
+    wb.worksheets[1].eachRow((row) => rehber.push((row.values as unknown[]).slice(1).map(String).join(" ")));
+    assert.ok(!rehber.some((r) => /[çğıöşüÇĞİÖŞÜ]/.test(r)), rehber.find((r) => /[çğıöşü]/i.test(r)));
+  });
+
+  test("doldurulan İngilizce şablon: rol/tür İngilizce değerlerle çözülür", async () => {
+    const wb = new Workbook();
+    await wb.xlsx.load((await musteriSablonuOlustur("en")) as any);
+    const veri = wb.getWorksheet("Customers")!;
+    veri.getRow(2).getCell(1).value = "Harbor Logistics";
+    veri.getRow(2).getCell(2).value = "Person";
+    veri.getRow(2).getCell(3).value = "Customer, Supplier";
+    veri.getRow(2).commit();
+    const sayfalar = await tabloyuOku(Buffer.from(await wb.xlsx.writeBuffer()), "customers.xlsx");
+
+    // Rehber sayfası öne alınmış olsa bile veri sayfası adıyla bulunur.
+    const sayfa = musteriSayfasiniSec([...sayfalar].reverse());
+    assert.equal(sayfa.name, "Customers");
+    const p = planMusteriImport(sayfa).planlanan[0];
+    assert.equal(p.party.displayName, "Harbor Logistics");
+    assert.equal(p.party.partyType, "person");
+    assert.deepEqual(p.party.roles, ["customer", "supplier"]);
+  });
+
+  test("Türkçe şablon değişmedi", async () => {
+    const wb = new Workbook();
+    await wb.xlsx.load((await musteriSablonuOlustur()) as any);
+    assert.deepEqual(wb.worksheets.map((w) => w.name), ["Müşteriler", "Nasıl doldurulur"]);
+    assert.equal(String(wb.worksheets[0].getCell("A1").value), "Ad");
+  });
+});

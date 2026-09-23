@@ -9,6 +9,7 @@ import { epostaYonetimi } from "./eposta-yonetimi";
 import { demoRandevu } from "./demo-randevu";
 import { katalog } from "./katalog";
 import { genel } from "./genel";
+import { ekipHesaplari } from "./ekip-hesaplari";
 
 /**
  * Sunucu metinlerinin Türkçe → İngilizce sözlüğü.
@@ -28,6 +29,7 @@ import { genel } from "./genel";
  */
 export const en: TranslationDict = {
   ...epostalar,
+  ...ekipHesaplari,
   ...bildirimler,
   ...hatalar,
   ...whatsapp,

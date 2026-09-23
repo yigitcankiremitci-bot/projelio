@@ -42,6 +42,7 @@ import { CatalogService } from "../catalog/catalog.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { BilgiKartiService } from "../bilgi-karti/bilgi-karti.service";
 import { HesaplarService } from "../hesaplar/hesaplar.service";
+import { EkipHesaplariService } from "../ekip-hesaplari/ekip-hesaplari.service";
 import { DepartmentsService } from "../departments/departments.service";
 import { DepartmentMembersService } from "../department-members/department-members.service";
 import { OrganizationModulesService } from "../organization-modules/organization-modules.service";
@@ -760,6 +761,9 @@ export class AiAssistantService {
     // enjekte ediliyor; sırrı okuyan HesapKimlikService bilerek dışarıda
     // (bkz. hesaplar.module.ts exports).
     private hesaplarService: HesaplarService,
+    // Ekip Hesapları: yöneticinin ekibine hesap açması. Yetki (sahip ya da
+    // departman yöneticisi) ve doğrulama servisin içinde; Lio aynı kapıdan geçer.
+    private ekipHesaplariService: EkipHesaplariService,
     // Departman araçları: görev bir projeye ya da bir departmana açılabiliyor
     // (bkz. Task.departmentId). Yetki kontrolleri yine bu servislerin içinde.
     private departmentsService: DepartmentsService,
@@ -2853,6 +2857,12 @@ export class AiAssistantService {
         return make(label, `/organizations/${id}`, `organization:${id}`, id);
       }
 
+      case "create_team_account": {
+        const id = input.organizationId;
+        const label = t("Ekip hesabı açıldı") + (result?.ad ? `: ${result.ad}` : "");
+        return id ? make(label, `/organizations/${id}`, `organization:${id}`, id) : null;
+      }
+
       case "create_department":
       case "update_department":
       case "archive_department": {
@@ -3428,6 +3438,21 @@ export class AiAssistantService {
         return name === "delete_product"
           ? t("\"{ad}\" ürününü KALICI olarak silmek üzeresin. Fotoğrafları da gider.", { ad: label })
           : t("\"{ad}\" ürününü arşivlemek üzeresin. (Geri alınabilir.)", { ad: label });
+      }
+
+      case "create_team_account": {
+        // Onay penceresinde ADRES görünmeli: bağlantı kime giderse hesap onun.
+        // Departman adları seçeneklerden; okunamazsa kimlik yerine sayı yazılır.
+        const secimler: { departmentId: string; role: string }[] = Array.isArray(input.departmanlar) ? input.departmanlar : [];
+        const adlar = await this.ekipHesaplariService
+          .secenekler(String(input.organizationId ?? ""), userId)
+          .then((s) => new Map(s.departmanlar.map((d) => [d.id, d.name])))
+          .catch(() => new Map<string, string>());
+        const departmanlar = secimler.map((d) => adlar.get(d.departmentId) ?? "?").join(", ");
+        return t(
+          "{ad} için Projelio hesabı açılacak ve {eposta} adresine giriş bağlantısı gönderilecek.\nDepartman: {departmanlar}\nŞifreyi kişi ilk girişte kendisi belirler.",
+          { ad: String(input.fullName ?? ""), eposta: String(input.email ?? ""), departmanlar: departmanlar || "-" }
+        );
       }
 
       case "create_support_request": {
@@ -4809,6 +4834,68 @@ export class AiAssistantService {
             tarih: shortDate(r.createdAt),
           })
         );
+      }
+
+      // --- Ekip Hesapları ---------------------------------------------------
+      //
+      // Şifre yanıtta YOK ve hiç yok: lioIleOlustur onu rastgele üretip kimseye
+      // göstermiyor (bkz. EkipHesaplariService.lioIleOlustur).
+      case "get_team_account_options": {
+        const s = await this.ekipHesaplariService.secenekler(String(input.organizationId ?? ""), userId);
+        return {
+          sirketSahibi: s.sahipMi,
+          departmanlar: s.departmanlar.map((d) => ({
+            departmentId: d.id,
+            ad: d.name,
+            moduller: d.moduller.map((m) => ({ moduleKey: m.key, ad: m.name })),
+          })),
+        };
+      }
+
+      case "list_team_accounts": {
+        const liste = await this.ekipHesaplariService.liste(String(input.organizationId ?? ""), userId);
+        return liste.map((h) =>
+          pruneEmpty({
+            ad: h.fullName,
+            kullaniciAdi: h.username,
+            eposta: h.email,
+            gorev: h.title,
+            departmanlar: h.departmanlar.map((d) => `${d.name} (${d.role})`),
+            acan: h.createdByName,
+            acilis: shortDate(h.createdAt),
+            baglantiGonderildi: h.davetGonderildiAt ? shortDate(h.davetGonderildiAt) : "hayır",
+            girisYapti: h.ilkGirisAt ? shortDate(h.ilkGirisAt) : "henüz değil",
+          })
+        );
+      }
+
+      case "create_team_account": {
+        const { hesap, epostaGonderildi } = await this.ekipHesaplariService.lioIleOlustur(
+          String(input.organizationId ?? ""),
+          {
+            fullName: String(input.fullName ?? ""),
+            email: String(input.email ?? ""),
+            username: input.username,
+            title: input.title,
+            phone: input.phone,
+            departmanlar: Array.isArray(input.departmanlar) ? input.departmanlar : [],
+            moduller: Array.isArray(input.moduller) ? input.moduller : [],
+            karsilamaNotu: input.karsilamaNotu,
+            locale: input.locale === "en" ? "en" : "tr",
+          },
+          userId
+        );
+        return pruneEmpty({
+          organizationId: input.organizationId,
+          ad: hesap.fullName,
+          kullaniciAdi: hesap.username,
+          eposta: hesap.email,
+          departmanlar: hesap.departmanlar.map((d) => `${d.name} (${d.role})`),
+          epostaGonderildi: epostaGonderildi ? "evet" : "hayır",
+          not: epostaGonderildi
+            ? "Kişi e-postasındaki bağlantıyla doğrudan girer ve ilk girişte kendi şifresini belirler. Şifre kimseyle paylaşılmadı."
+            : "Hesap açıldı ama e-posta gönderilemedi. Ekip Hesapları modülünden \"Bağlantıyı yeniden gönder\" denebilir.",
+        });
       }
 
       case "create_support_request": {

@@ -67,7 +67,9 @@ const A3_INVENTORY_KEYS = new Set(["oud_depo"]);
  * süzgeç, toplu link ve abonelik toplamı var, yani ekranın kendisi bir çalışma
  * alanı.
  */
-const OZEL_MOTOR_KEYS = new Set(["hesaplar"]);
+// Ekip Hesapları da aynı durumda: hesap listesi + oluşturma formu, kayıt
+// module_records'ta değil kendi tablosunda ve kullanıcılar tablosunda.
+const OZEL_MOTOR_KEYS = new Set(["hesaplar", "ekip_hesaplari"]);
 
 /**
  * Modülün arketipi.

@@ -55,6 +55,7 @@ import { PlanningModule } from "./modules/planning/planning.module";
 import { CreationRequestsModule } from "./modules/creation-requests/creation-requests.module";
 import { SocialMediaModule } from "./modules/social-media/social-media.module";
 import { HesaplarModule } from "./modules/hesaplar/hesaplar.module";
+import { EkipHesaplariModule } from "./modules/ekip-hesaplari/ekip-hesaplari.module";
 import { PasskeysModule } from "./modules/passkeys/passkeys.module";
 import { BilgiKartiModule } from "./modules/bilgi-karti/bilgi-karti.module";
 import { MailboxModule } from "./modules/mailbox/mailbox.module";
@@ -128,6 +129,9 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     // Hesaplar: üye olunan hesaplar + şifreli giriş bilgileri + abonelik gideri
     // (bkz. 106_hesaplar_modulu.sql).
     HesaplarModule,
+    // Ekip Hesapları: yöneticinin ekibi için hesap açması + e-postadaki
+    // tek kullanımlık giriş bağlantısı (bkz. 130_ekip_hesaplari.sql).
+    EkipHesaplariModule,
     // Geçiş anahtarları (WebAuthn). Hesaplar modülünün kilidini açıyor ama
     // kayıt KULLANICIYA ait, o yüzden ayrı modül.
     PasskeysModule,

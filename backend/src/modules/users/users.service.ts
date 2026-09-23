@@ -47,6 +47,8 @@ export interface UserRecord {
   locale?: Locale;
   // Kullanıcıya bir kez gösterilmiş eğitim turları; bkz. migration 093.
   toursSeen?: string[];
+  // Hesabı ekip yöneticisi açtı, şifre kişinin kendisinin değil (migration 130).
+  sifreDegistirmeli?: boolean;
 }
 
 // Dışarıya (frontend'e) dönülen güvenli kullanıcı görünümü - şifre hash'i içermez.
@@ -109,6 +111,8 @@ function mapUser(row: any): UserRecord {
     onboardingModules: row.onboarding_modules ?? undefined,
     locale: row.locale ?? undefined,
     toursSeen: row.tours_seen ?? undefined,
+    // Migration 130 uygulanmadan sütun yok: undefined → "değiştirmesi gerekmiyor".
+    sifreDegistirmeli: row.sifre_degistirmeli === true,
   };
 }
 
@@ -129,6 +133,8 @@ function toPublicUser(user: UserRecord): PublicUser {
     toursSeen: _toursSeen,
     // Askı durumu yalnızca yöneticiyi ilgilendirir (bkz. modules/admin).
     bannedAt: _bannedAt,
+    // Kişinin kendi hesabının durumu; başkasına dönmesinin anlamı yok.
+    sifreDegistirmeli: _sifreDegistirmeli,
     ...publicUser
   } = user;
   return publicUser;
@@ -623,7 +629,52 @@ export class UsersService {
     }
 
     await this.updatePasswordHash(userId, await hashPassword(newPassword));
+    await this.sifreDegistirmeBayraginiKaldir(userId);
     return { ok: true, hasPassword: true };
+  }
+
+  /**
+   * Ekip yöneticisinin açtığı hesapta kişinin KENDİ şifresini belirlemesi.
+   *
+   * Mevcut şifre SORULMAZ — sorulsaydı kişi yöneticinin koyduğu şifreyi
+   * bilmek zorunda kalırdı, oysa e-postadaki bağlantıyla şifresiz girdi.
+   * Bu yüzden kapı dar: yalnızca bayrak açıkken çalışır ve ilk kullanımda
+   * bayrak kapanır. Sonrasında şifre değiştirmek normal yoldan (mevcut şifre
+   * ile) geçer.
+   */
+  async ilkSifreyiBelirle(userId: string, newPassword: string): Promise<{ ok: true }> {
+    demoHesabindaYasak(userId, "şifre değiştirme");
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      throw new BadRequestException("Yeni şifre en az 8 karakter olmalı.");
+    }
+    const user = await this.findById(userId);
+    if (!user?.sifreDegistirmeli) {
+      throw new BadRequestException("Şifreni Ayarlar > Hesap bölümünden değiştirebilirsin.");
+    }
+    if (user.passwordHash && (await verifyPassword(newPassword, user.passwordHash))) {
+      throw new BadRequestException("Yeni şifre, yöneticinin belirlediği şifreyle aynı olamaz.");
+    }
+    await this.updatePasswordHash(userId, await hashPassword(newPassword));
+    await this.sifreDegistirmeBayraginiKaldir(userId);
+    return { ok: true };
+  }
+
+  /**
+   * Kişi kendi şifresini belirledi: "ilk girişte şifreni değiştir" isteği düşer
+   * (bkz. migration 130).
+   *
+   * Ayrı bir güncelleme ve HATAYI YUTUYOR: migration uygulanmadan sütun yok ve
+   * şifre değiştirmek bu yüzden bozulmamalı. updatePasswordHash'e katılmadı
+   * çünkü o, girişteki sessiz hash tazelemesinde de çağrılıyor — orada kişi
+   * şifresini kendisi belirlemiş olmuyor.
+   */
+  async sifreDegistirmeBayraginiKaldir(userId: string): Promise<void> {
+    const { error } = await this.supabase.client
+      .from("users")
+      .update({ sifre_degistirmeli: false })
+      .eq("id", userId)
+      .eq("sifre_degistirmeli", true);
+    if (error) this.logger.warn(`sifre_degistirmeli kaldırılamadı (${userId}): ${error.message}`);
   }
 
   /**

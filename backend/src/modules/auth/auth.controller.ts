@@ -12,6 +12,8 @@ import {
 } from "./dto/auth.dto";
 import { PasswordResetService } from "./password-reset.service";
 import { EmailVerificationService } from "./email-verification.service";
+import { GirisBaglantisiService } from "./giris-baglantisi.service";
+import { UsersService } from "../users/users.service";
 import { absoluteSessionExpired } from "./session-payload";
 import { cevirmen, istekDili, tarayiciDili } from "../../common/i18n";
 
@@ -36,7 +38,9 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private passwordResetService: PasswordResetService,
-    private emailVerificationService: EmailVerificationService
+    private emailVerificationService: EmailVerificationService,
+    private girisBaglantisiService: GirisBaglantisiService,
+    private usersService: UsersService
   ) {}
 
   @Post("register")
@@ -117,6 +121,24 @@ export class AuthController {
         ? t("Bu hesap zaten doğrulanmış. Giriş yapabilirsiniz.")
         : t("E-posta adresiniz doğrulandı. Şimdi giriş yapabilirsiniz."),
     };
+  }
+
+  /**
+   * E-postadaki tek kullanımlık giriş bağlantısı (Ekip Hesapları, migration 130).
+   * Token URL'de gelir ama POST ile takas edilir: GET olsaydı e-posta
+   * istemcilerinin bağlantı önizleyicisi onu tıklamadan yakıp geçerdi.
+   */
+  @Post("giris-baglantisi")
+  @UseGuards(AuthRateLimitGuard)
+  girisBaglantisi(@Body("token") token: string) {
+    return this.girisBaglantisiService.kullan(token);
+  }
+
+  /** Yöneticinin açtığı hesapta kişinin kendi şifresini ilk kez belirlemesi. */
+  @Post("ilk-sifre")
+  @UseGuards(AuthGuard("jwt"))
+  ilkSifre(@Body("newPassword") newPassword: string, @Req() req: any) {
+    return this.usersService.ilkSifreyiBelirle(req.user.userId, newPassword);
   }
 
   // Şifre sıfırlamadaki gibi: hesabın var olup olmadığını sızdırmamak için

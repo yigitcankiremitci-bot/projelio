@@ -226,4 +226,7 @@ export const katalog: TranslationDict = {
   "Kimlik ve Yön": "Identity & Direction",
   "Marka Kimliği": "Brand Identity",
   "Hesaplar": "Accounts",
+  "Ekip Hesapları": "Team Accounts",
+  "Ekibin için Projelio hesabı aç: ad, kullanıcı adı, e-posta, şifre, görev, departman ve görebileceği modüller tek formda. Çalışana giden e-postadaki bağlantı onu doğrudan hesabına sokar.":
+    "Create Projelio accounts for your team: name, username, email, password, job title, department and the modules they can see in one form. The link in their email signs them straight in.",
 };

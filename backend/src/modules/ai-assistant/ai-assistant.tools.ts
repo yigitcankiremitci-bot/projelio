@@ -39,6 +39,11 @@ export const CRITICAL_TOOLS = new Set<string>([
   "delete_operation",
   "archive_product",
   "delete_product",
+  // Ekip hesabı: gerçek bir kişi için GİRİŞ YAPILABİLEN hesap açar ve o
+  // kişiye e-posta gönderir — dışarı çıkan, geri alınması zahmetli bir işlem.
+  // Yanlış adrese giden bağlantı hesabı başkasına teslim eder; kullanıcı
+  // adresi onay penceresinde görmeli.
+  "create_team_account",
   // Destek talebi Projelio ekibine giden bir MESAJDIR: gönderildikten sonra
   // geri alınamaz ve karşı tarafta bir insan okur. Kullanıcı ne yazdığını
   // görmeden gitmemeli.
@@ -2055,6 +2060,95 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: [],
+    },
+  },
+  // --- Ekip Hesapları -----------------------------------------------------
+  //
+  // Yönetici ekibine hesap açar (bkz. modules/ekip-hesaplari). ŞİFRE BU
+  // ARAÇLARDA YOK: Lio ile açılan hesabın şifresini sunucu rastgele üretir,
+  // kimse görmez; kişi e-postadaki tek kullanımlık bağlantıyla girer ve ilk
+  // girişte kendi şifresini belirler.
+  {
+    name: "get_team_account_options",
+    description:
+      "Ekip hesabı açarken seçilebilecek departmanları ve her departmanda açık modülleri döndürür " +
+      "(departmentId + moduleKey). create_team_account'tan ÖNCE çağır: departman ve modül kimliklerini " +
+      "buradan al, tahmin etme. Şirket sahibi tüm departmanları, departman yöneticisi yalnızca " +
+      "yönettiklerini görür; ikisi de değilse hata döner — o zaman kullanıcıya hesap açma yetkisi olmadığını söyle.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string", description: "list_organizations'tan gelen kimlik." },
+      },
+      required: ["organizationId"],
+    },
+  },
+  {
+    name: "list_team_accounts",
+    description:
+      "Ekip Hesapları'ndan açılmış hesapları listeler: ad, kullanıcı adı, e-posta, görev, departmanlar, " +
+      "e-posta gitti mi, kişi giriş yaptı mı. \"Kimi eklemiştik\", \"X hesabına girdi mi\" gibi sorularda.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string" },
+      },
+      required: ["organizationId"],
+    },
+  },
+  {
+    name: "create_team_account",
+    description:
+      "Ekipten biri için Projelio hesabı açar: kişi seçilen departman(lar)ın kadrosuna eklenir, işaretlenen " +
+      "modüllerde kayıt girebilir ve e-posta adresine hesabına doğrudan girebileceği tek kullanımlık bir " +
+      "bağlantı gider. \"Ayşe'ye hesap aç\", \"yeni satış temsilcisini sisteme ekle\" gibi isteklerde kullan.\n" +
+      "AKIŞ: (1) get_team_account_options ile departman/modül kimliklerini al; (2) ad soyad, e-posta ve en az " +
+      "bir departman yoksa kullanıcıya SOR — e-postayı tahmin etme, yanlış adrese giden bağlantı hesabı " +
+      "başkasına teslim eder; (3) çağır (onay penceresi çıkar).\n" +
+      "ŞİFRE İSTEME VE YAZMA: şifreyi sunucu üretir, kimse görmez; kişi bağlantıyla girip kendi şifresini " +
+      "belirler. Kullanıcı bir şifre söylerse bunun Lio ile ayarlanamayacağını, isterse Ekip Hesapları " +
+      "modülündeki formdan şifreyle açabileceğini söyle.\n" +
+      "Rol: employee (üretici çalışan, varsayılan), manager (departman yöneticisi), subcontractor (taşeron). " +
+      "Kullanıcı adı verilmezse addan önerilir. Adres zaten kayıtlıysa hata döner: o kişi kadro davetiyle eklenir.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string" },
+        fullName: { type: "string", description: "Ad soyad." },
+        email: { type: "string", description: "Kişinin e-posta adresi — kullanıcıdan AL, uydurma." },
+        username: { type: "string", description: "Kullanıcı adı (opsiyonel; boşsa addan üretilir)." },
+        title: { type: "string", description: "Görevi / unvanı (opsiyonel), örn. \"Satış temsilcisi\"." },
+        phone: { type: "string", description: "Telefon (opsiyonel)." },
+        departmanlar: {
+          type: "array",
+          description: "En az bir departman. Kimlikler get_team_account_options'tan.",
+          items: {
+            type: "object",
+            properties: {
+              departmentId: { type: "string" },
+              role: { type: "string", enum: ["employee", "manager", "subcontractor"] },
+            },
+            required: ["departmentId", "role"],
+          },
+        },
+        moduller: {
+          type: "array",
+          description:
+            "Kayıt girebileceği modüller (opsiyonel). Departman kadrosunda olmak o departmanın modüllerini " +
+            "GÖRMEYE zaten yeter; bu liste yazma yetkisi verir. departmentId seçilen departmanlardan biri olmalı.",
+          items: {
+            type: "object",
+            properties: {
+              departmentId: { type: "string" },
+              moduleKey: { type: "string" },
+            },
+            required: ["departmentId", "moduleKey"],
+          },
+        },
+        karsilamaNotu: { type: "string", description: "E-postaya eklenecek kısa not (opsiyonel)." },
+        locale: { type: "string", enum: ["tr", "en"], description: "E-postanın dili; varsayılan tr." },
+      },
+      required: ["organizationId", "fullName", "email", "departmanlar"],
     },
   },
   // --- Dışa aktarma -------------------------------------------------------

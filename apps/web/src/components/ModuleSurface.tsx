@@ -7,6 +7,7 @@ import { PANEL_CONFIGS } from "../lib/panelConfigs";
 import { isMailModule } from "../lib/mailbox";
 import { isSocialMediaModule } from "../lib/socialMedia";
 import { isHesaplarModule } from "../lib/hesaplar";
+import { isEkipHesaplariModule } from "../lib/ekipHesaplari";
 import CustomersPanel from "./CustomersPanel";
 import EmailModulePanel from "./EmailModulePanel";
 import ModuleFormPanel from "./ModuleFormPanel";
@@ -14,6 +15,7 @@ import ModulePanelView from "./ModulePanelView";
 import ModuleRecordsPanel from "./ModuleRecordsPanel";
 import SocialMediaPanel from "./SocialMediaPanel";
 import HesaplarPanel from "./hesaplar/HesaplarPanel";
+import EkipHesaplariPanel from "./ekipHesaplari/EkipHesaplariPanel";
 import AskLioButton from "./AskLioButton";
 
 /**
@@ -120,6 +122,13 @@ function ModuleSurfaceContent({
         canWrite={canWrite}
       />
     );
+  }
+
+  if (isEkipHesaplariModule(moduleKey)) {
+    // Kendi tablosuna ve users'a yazan modül (bkz. 130_ekip_hesaplari.sql).
+    // Yetki modül erişiminden değil sunucudaki kuraldan gelir: şirket sahibi
+    // ya da departman yöneticisi — modülü okuyabilen her çalışan hesap açamaz.
+    return <EkipHesaplariPanel organizationId={organizationId} jobId={jobId} />;
   }
 
   if (isMailModule(moduleKey)) {

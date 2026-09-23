@@ -234,6 +234,9 @@ export class AuthService {
       // Görülen eğitim turları. Boş dizi "hiç görülmedi" demek; istemci buna
       // bakarak kendiliğinden başlayan turu bir kez gösteriyor (bkz. migration 093).
       toursSeen: user.toursSeen ?? [],
+      // Ekip yöneticisinin açtığı hesap: istemci önce kendi şifresini
+      // belirlemesini ister (bkz. migration 130, GirisBaglantisiService).
+      mustChangePassword: user.sifreDegistirmeli === true,
     };
   }
 }

@@ -15,6 +15,7 @@ import { isFormModule } from "./moduleForms";
 import { isPanelModule } from "./panelConfigs";
 import { isSocialMediaModule } from "./socialMedia";
 import { isHesaplarModule } from "./hesaplar";
+import { isEkipHesaplariModule } from "./ekipHesaplari";
 
 export const ENTITY_MODULE_KEYS = ["crm_musteri"] as const;
 
@@ -38,6 +39,7 @@ export function isOpenableModule(moduleKey: string, hasRecordConfig: boolean): b
     isFormModule(moduleKey) ||
     isSocialMediaModule(moduleKey) ||
     isHesaplarModule(moduleKey) ||
+    isEkipHesaplariModule(moduleKey) ||
     hasRecordConfig
   );
 }

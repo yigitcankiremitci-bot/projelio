@@ -47,6 +47,7 @@ import { useT } from "./lib/i18n";
 //   · TourOverlay/TourLauncher — yalnızca tur başlatılınca
 // Bunlar statik import'ken giriş ekranını görmek için bile indiriliyorlardı.
 const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
+const IlkSifreModal = lazy(() => import("./components/IlkSifreModal"));
 const AiLauncher = lazy(() => import("./components/AiLauncher"));
 const TourOverlay = lazy(() => import("./components/tour/TourOverlay"));
 const TourLauncher = lazy(() => import("./components/tour/TourLauncher"));
@@ -60,6 +61,7 @@ const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const HesapGiris = lazy(() => import("./pages/HesapGiris"));
 const GoogleReturn = lazy(() => import("./pages/GoogleReturn"));
 const HabieConnect = lazy(() => import("./pages/HabieConnect"));
 const MicrosoftReturn = lazy(() => import("./pages/MicrosoftReturn"));
@@ -563,6 +565,9 @@ export default function App() {
     location.pathname === "/forgot-password" ||
     location.pathname === "/reset-password" ||
     location.pathname === "/verify-email" ||
+    // E-postadaki tek kullanımlık giriş bağlantısı (Ekip Hesapları): token
+    // burada oturuma çevriliyor, henüz yerel depoda yok.
+    location.pathname === "/hesap-giris" ||
     location.pathname === "/google/return" ||
     location.pathname === "/microsoft/return" ||
     // Habie devir sayfası: token'ı okuyup Habie'ye yönlendiriyor, uygulama
@@ -656,6 +661,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/hesap-giris" element={<HesapGiris />} />
           <Route path="/google/return" element={<GoogleReturn />} />
           <Route path="/habie" element={<HabieConnect />} />
           <Route path="/microsoft/return" element={<MicrosoftReturn />} />
@@ -719,6 +725,14 @@ export default function App() {
       {me && !me.onboardingCompletedAt && (
         <Suspense fallback={null}>
           <OnboardingWizard onCompleted={reloadMe} />
+        </Suspense>
+      )}
+      {/* Ekip yöneticisinin açtığı hesap: kişi önce kendi şifresini belirler
+          (bkz. migration 130). Sihirbazla çakışmaz — bu hesaplar sihirbazı
+          atlayarak açılıyor. */}
+      {me?.mustChangePassword && (
+        <Suspense fallback={null}>
+          <IlkSifreModal fullName={me.fullName} onTamam={reloadMe} />
         </Suspense>
       )}
 

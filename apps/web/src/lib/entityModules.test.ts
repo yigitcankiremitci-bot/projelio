@@ -12,3 +12,8 @@ test("tanımsız modül kapalı, kayıt tanımlı modül açık kalır", () => {
   assert.equal(isOpenableModule("tanimlanmamis_modul", false), false);
   assert.equal(isOpenableModule("tanimlanmamis_modul", true), true);
 });
+
+test("Ekip Hesapları kayıt tanımı olmadan sayfa olarak açılır", () => {
+  assert.equal(isOpenableModule("ekip_hesaplari", false), true);
+  assert.equal(moduleSurface("ekip_hesaplari"), "page");
+});

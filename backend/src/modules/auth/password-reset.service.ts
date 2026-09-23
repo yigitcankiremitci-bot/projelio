@@ -105,6 +105,8 @@ export class PasswordResetService {
       .update({ password_hash: passwordHash })
       .eq("id", row.user_id);
     if (updateError) throw updateError;
+    // Sıfırlanan şifreyi kişi kendisi seçti; yöneticinin verdiği şifre artık yok.
+    await this.usersService.sifreDegistirmeBayraginiKaldir(row.user_id);
 
     // Bu kullanıcının bekleyen tüm token'larını iptal et — art arda birden fazla
     // "bağlantıyı tekrar gönder" denemesinden kalan eski linkler artık işe yaramasın.

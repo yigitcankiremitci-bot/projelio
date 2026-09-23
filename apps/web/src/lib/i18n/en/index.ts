@@ -16,6 +16,7 @@ import { abonelik } from "./abonelik";
 import { yaptim } from "./yaptim";
 import { butce } from "./butce";
 import { hesaplar } from "./hesaplar";
+import { ekipHesaplari } from "./ekipHesaplari";
 import { epostaYonetimi } from "./epostaYonetimi";
 import { demoRandevu } from "./demoRandevu";
 import { baslangic } from "./baslangic";
@@ -71,6 +72,7 @@ export const en: TranslationDict = {
   ...yaptim,
   ...butce,
   ...hesaplar,
+  ...ekipHesaplari,
   ...hatalar,
   ...epostaYonetimi,
   ...demoRandevu,

@@ -31,6 +31,7 @@ import { CatalogModule } from "../catalog/catalog.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { BilgiKartiModule } from "../bilgi-karti/bilgi-karti.module";
 import { HesaplarModule } from "../hesaplar/hesaplar.module";
+import { EkipHesaplariModule } from "../ekip-hesaplari/ekip-hesaplari.module";
 import { DepartmentsModule } from "../departments/departments.module";
 import { DepartmentMembersModule } from "../department-members/department-members.module";
 import { OrganizationModulesModule } from "../organization-modules/organization-modules.module";
@@ -85,6 +86,8 @@ import { WhatsappModule } from "../whatsapp/whatsapp.module";
     // Hesaplar: Lio üyelik listesini ve abonelik giderlerini okuyor; sır
     // okuyan servis bu modülden dışa aktarılmıyor.
     HesaplarModule,
+    // Ekip Hesapları: Lio yöneticinin ekibine hesap açabiliyor (create_team_account).
+    EkipHesaplariModule,
     // Departman araçları: görev bir projeye ya da bir departmana açılabiliyor.
     // Departmanı listelemek, kadrosunu görmek ve görevlerini yönetmek için.
     DepartmentsModule,

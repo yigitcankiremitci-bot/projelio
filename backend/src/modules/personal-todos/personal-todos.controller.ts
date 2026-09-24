@@ -70,6 +70,16 @@ export class PersonalTodosController {
     return this.personalTodosService.create(req.user.userId, body);
   }
 
+  /**
+   * Kartın tam kaydı. Pano satırı (v_personal_board) hatırlatma ön süresini
+   * taşımıyor; düzenleyici onu buradan okur, yoksa açılışta "Hatırlatma yok"
+   * görünür ve kaydet dendiğinde kurulu hatırlatma sessizce silinirdi.
+   */
+  @Get(":id")
+  findOne(@Req() req: any, @Param("id") id: string) {
+    return this.personalTodosService.findOne(req.user.userId, id);
+  }
+
   @Patch(":id")
   update(@Req() req: any, @Param("id") id: string, @Body() body: any) {
     return this.personalTodosService.update(req.user.userId, id, body);

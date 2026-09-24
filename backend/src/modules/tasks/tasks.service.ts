@@ -861,16 +861,22 @@ export class TasksService {
     if (data.description !== undefined) patch.description = data.description || null;
     if (data.startDate !== undefined) patch.start_date = data.startDate || null;
     if (data.deadline !== undefined) patch.deadline = data.deadline;
-    // Saat ya da ön süre değiştiyse hatırlatma yeniden kurulmalı: gönderildi
-    // damgası temizlenmezse zamanlanmış iş bu görevi bir daha hiç ele almaz.
+    // Gün, saat ya da ön süre değiştiyse hatırlatma yeniden kurulmalı:
+    // gönderildi damgası temizlenmezse zamanlanmış iş bu görevi bir daha hiç
+    // ele almaz. Yalnızca GERÇEKTEN değiştiyse ama — düzenleyici her kayıtta tüm
+    // alanları gönderiyor ve koşulsuz temizlemek, başlığı düzeltilen görevin
+    // hatırlatmasını bir kez daha gönderiyordu.
     if (data.deadlineTime !== undefined) {
       patch.deadline_time = data.deadlineTime || null;
-      patch.reminder_sent_at = null;
+      if ((data.deadlineTime || "").slice(0, 5) !== (previous?.deadlineTime ?? "").slice(0, 5)) patch.reminder_sent_at = null;
       // Saat kaldırıldıysa hatırlatma da düşer (DB'deki CHECK ile aynı kural).
       if (!data.deadlineTime) patch.reminder_lead_minutes = null;
     }
     if (data.reminderLeadMinutes !== undefined) {
       patch.reminder_lead_minutes = data.reminderLeadMinutes ?? null;
+      if ((data.reminderLeadMinutes ?? null) !== (previous?.reminderLeadMinutes ?? null)) patch.reminder_sent_at = null;
+    }
+    if (data.deadline !== undefined && String(data.deadline ?? "").slice(0, 10) !== String(previous?.deadline ?? "").slice(0, 10)) {
       patch.reminder_sent_at = null;
     }
     // Atama artık ayrı tabloda (bkz. 053): assigned_to'yu burada elle set etmiyoruz,

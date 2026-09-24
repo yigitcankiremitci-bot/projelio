@@ -9,6 +9,7 @@ import type {
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { TasksService } from "../tasks/tasks.service";
+import { yerelBugun } from "../notifications/hatirlatma-ani";
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "completed"];
 
@@ -138,7 +139,11 @@ export class PersonalTodosService {
         status,
         priority,
         color: body.color || null,
-        due_date: body.dueDate || null,
+        // Saat var ama gün yoksa gün = bugün. Tarihsiz bir saat hatırlatma
+        // işleyicisinin gözünde hiçbir ana karşılık gelmiyor; kullanıcı saat
+        // ve hatırlatma kurup tarihi boş bıraktığında bildirim HİÇ gitmiyordu
+        // (2026-09-24). "16:35'te hatırlat" diyen kişi bugünü kastediyor.
+        due_date: body.dueDate || (body.dueTime ? yerelBugun() : null),
         due_time: body.dueTime || null,
         // Hatırlatma yalnızca saat varsa (DB'de de CHECK var).
         reminder_lead_minutes: body.dueTime ? (body.reminderLeadMinutes ?? null) : null,
@@ -169,16 +174,28 @@ export class PersonalTodosService {
     if (body.priority !== undefined) patch.priority = clampPriority(body.priority);
     if (body.color !== undefined) patch.color = body.color || null;
     if (body.dueDate !== undefined) patch.due_date = body.dueDate || null;
-    // Saat ya da ön süre değiştiyse hatırlatma yeniden kurulmalı: damga
-    // temizlenmezse zamanlanmış iş bu kaydı bir daha hiç ele almaz.
     if (body.dueTime !== undefined) {
       patch.due_time = body.dueTime || null;
-      patch.reminder_sent_at = null;
       if (!body.dueTime) patch.reminder_lead_minutes = null;
     }
-    if (body.reminderLeadMinutes !== undefined) {
-      patch.reminder_lead_minutes = body.reminderLeadMinutes ?? null;
-      patch.reminder_sent_at = null;
+    if (body.reminderLeadMinutes !== undefined) patch.reminder_lead_minutes = body.reminderLeadMinutes ?? null;
+
+    if (body.dueDate !== undefined || body.dueTime !== undefined || body.reminderLeadMinutes !== undefined) {
+      const mevcut = await this.findOne(userId, id);
+      const gun = body.dueDate !== undefined ? body.dueDate || null : mevcut.dueDate ?? null;
+      const saat = body.dueTime !== undefined ? body.dueTime || null : mevcut.dueTime ?? null;
+      // Oluştururken olduğu gibi: saat var, gün yoksa gün = bugün.
+      if (saat && !gun) patch.due_date = yerelBugun();
+      // Hatırlatma yalnızca an ya da ön süre GERÇEKTEN değiştiyse yeniden
+      // kurulur: damga temizlenmezse zamanlanmış iş bu kaydı bir daha hiç ele
+      // almaz. Ama düzenleyici her kayıtta tüm alanları gönderiyor; koşulsuz
+      // temizlemek, yalnızca başlığı düzeltilen görevin hatırlatmasını bir kez
+      // daha gönderiyordu.
+      const gunDegisti = String(patch.due_date ?? gun ?? "").slice(0, 10) !== String(mevcut.dueDate ?? "").slice(0, 10);
+      const saatDegisti = (saat ?? "").slice(0, 5) !== (mevcut.dueTime ?? "").slice(0, 5);
+      const onSureDegisti =
+        body.reminderLeadMinutes !== undefined && (body.reminderLeadMinutes ?? null) !== (mevcut.reminderLeadMinutes ?? null);
+      if (gunDegisti || saatDegisti || onSureDegisti) patch.reminder_sent_at = null;
     }
     if (body.status !== undefined) {
       const status = this.assertStatus(body.status);

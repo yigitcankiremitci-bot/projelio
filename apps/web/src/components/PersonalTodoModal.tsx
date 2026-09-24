@@ -1,5 +1,5 @@
-import { useId, useRef, useState } from "react";
-import type { PersonalBoardItem, Task, TaskPriority } from "@projelio/shared";
+import { useEffect, useId, useRef, useState } from "react";
+import type { PersonalBoardItem, PersonalTodo, Task, TaskPriority } from "@projelio/shared";
 import { MAX_TASK_PRIORITY } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -16,6 +16,12 @@ import { useT } from "../lib/i18n";
 
 function toDateInputValue(iso?: string) {
   return iso ? new Date(iso).toISOString().slice(0, 10) : "";
+}
+
+/** Tarayıcının yerel günü, <input type="date"> biçiminde. */
+function bugunInputDegeri() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 interface Props {
@@ -51,11 +57,29 @@ export default function PersonalTodoModal({ item, onClose, onChanged, onPromoted
   const [dueDate, setDueDate] = useState(toDateInputValue(item.effectiveDueDate));
   // Bitiş saati + hatırlatma (bkz. 059): iş görevlerindeki alanların birebir aynısı.
   const [dueTime, setDueTime] = useState(item.deadlineTime ?? "");
-  const [reminderLead, setReminderLead] = useState("");
+  // null = henüz yüklenmedi. Pano satırı ön süreyi taşımıyor; kayıt ayrıca
+  // okunuyor. Eskiden burası hep "" (Hatırlatma yok) ile açılıyordu ve başlığı
+  // düzeltip kaydetmek bile kurulu hatırlatmayı siliyordu.
+  const [reminderLead, setReminderLead] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const formId = useId();
+
+  useEffect(() => {
+    let iptal = false;
+    api
+      .get<PersonalTodo>(`/todos/${item.itemId}`)
+      .then((todo) => {
+        if (!iptal) setReminderLead(todo.reminderLeadMinutes != null ? String(todo.reminderLeadMinutes) : "");
+      })
+      // Okunamazsa null kalır ve alan kayıtta hiç gönderilmez: bilinmeyen
+      // değeri "yok" diye ezmektense olduğu gibi bırakmak doğru.
+      .catch(() => {});
+    return () => {
+      iptal = true;
+    };
+  }, [item.itemId]);
 
   const formPayload = () => ({
     title,
@@ -64,7 +88,8 @@ export default function PersonalTodoModal({ item, onClose, onChanged, onPromoted
     dueDate: dueDate ? new Date(dueDate).toISOString() : null,
     dueTime: dueTime || null,
     // Saat yoksa hatırlatma da yok — sunucu ve veritabanı aynı kuralda.
-    reminderLeadMinutes: dueTime && reminderLead !== "" ? Number(reminderLead) : null,
+    // Yüklenmemişse (null) gönderilmez, sunucudaki değer korunur.
+    reminderLeadMinutes: !dueTime ? null : reminderLead === null ? undefined : reminderLead === "" ? null : Number(reminderLead),
   });
 
   const handleSave = async (e: React.FormEvent) => {
@@ -216,6 +241,9 @@ export default function PersonalTodoModal({ item, onClose, onChanged, onPromoted
               onChange={(e) => {
                 setDueTime(e.target.value);
                 if (!e.target.value) setReminderLead("");
+                // Tarihsiz saatin hatırlatması hiçbir ana denk gelmez; gün boşsa
+                // bugün yazılır (sunucu da aynı kuralı uyguluyor) ve kullanıcı görür.
+                else if (!dueDate) setDueDate(bugunInputDegeri());
               }}
               style={{ width: "100%" }}
             />
@@ -223,7 +251,7 @@ export default function PersonalTodoModal({ item, onClose, onChanged, onPromoted
           <div style={halfField}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Hatırlat")}</label>
             <select
-              value={reminderLead}
+              value={reminderLead ?? ""}
               onChange={(e) => setReminderLead(e.target.value)}
               disabled={!dueTime}
               style={{ width: "100%" }}

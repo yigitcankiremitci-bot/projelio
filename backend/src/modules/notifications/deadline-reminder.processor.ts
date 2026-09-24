@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "./notifications.service";
+import { duvarSaatiAni } from "./hatirlatma-ani";
 
 /** Hatırlatma ne kadar geç kalırsa kalsın gönderilsin; ama bu kadar eskiyse artık gönderme. */
 const MAX_LATE_MS = 6 * 60 * 60 * 1000;
@@ -20,8 +21,10 @@ const MAX_LATE_MS = 6 * 60 * 60 * 1000;
  * diliyle okunaksız oluyor. Aday kümesi tarihe göre dar tutulup (birkaç gün)
  * kesin karşılaştırma JS'te yapılıyor.
  *
- * NOT: hesap sunucu yerel saatine göre. Kullanıcı bazlı saat dilimi henüz yok;
- * eklendiğinde tek değişecek yer `dueMoment`.
+ * Saat dilimi: bitiş saati İstanbul duvar saati olarak yorumlanır
+ * (`duvarSaatiAni`). Eskiden sürecin yerel saati kullanılıyordu; konteyner UTC
+ * olduğu için her hatırlatma 3 saat geç gidiyordu. Kullanıcı bazlı saat dilimi
+ * eklendiğinde tek değişecek yer o fonksiyonun üçüncü parametresi.
  */
 @Injectable()
 export class DeadlineReminderProcessor {
@@ -88,7 +91,7 @@ export class DeadlineReminderProcessor {
     const damgalanacak: string[] = [];
 
     for (const task of data as any[]) {
-      const dueMoment = combine(task.deadline, task.deadline_time);
+      const dueMoment = duvarSaatiAni(task.deadline, task.deadline_time);
       if (!dueMoment) continue;
 
       const fireAt = new Date(dueMoment.getTime() - (task.reminder_lead_minutes ?? 0) * 60_000);
@@ -169,7 +172,7 @@ export class DeadlineReminderProcessor {
     const damgalanacak: string[] = [];
 
     for (const todo of data as any[]) {
-      const dueMoment = combine(todo.due_date, todo.due_time);
+      const dueMoment = duvarSaatiAni(todo.due_date, todo.due_time);
       if (!dueMoment) continue;
 
       const fireAt = new Date(dueMoment.getTime() - (todo.reminder_lead_minutes ?? 0) * 60_000);
@@ -199,14 +202,4 @@ export class DeadlineReminderProcessor {
       if (damgaHatasi) this.logger.error(`Kişisel hatırlatma damgası yazılamadı: ${damgaHatasi.message}`);
     }
   }
-}
-
-/** `deadline` gününü `deadline_time` saatiyle birleştirip tam anı verir. */
-function combine(deadline?: string, time?: string): Date | null {
-  if (!deadline || !time) return null;
-  const day = new Date(deadline);
-  if (Number.isNaN(day.getTime())) return null;
-  const [h, m] = String(time).split(":").map(Number);
-  if (Number.isNaN(h) || Number.isNaN(m)) return null;
-  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m, 0, 0);
 }

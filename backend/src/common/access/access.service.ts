@@ -441,14 +441,20 @@ export class AccessService {
     if (!userId) return;
     const { data: post } = await this.supabase.client
       .from("project_posts")
-      .select("project_id, department_id, organization_id, wall_user_id")
+      // "*": görünürlük sütunu (136) uygulanmadan da çalışsın.
+      .select("*")
       .eq("id", postId)
       .maybeSingle();
     if (!post) throw new NotFoundException("Paylaşım bulunamadı");
     if (post.project_id) return this.assertCanViewProject(post.project_id, userId);
     if (post.department_id) return this.assertCanViewDepartment(post.department_id, userId);
     if (post.organization_id) return this.assertCanViewOrganization(post.organization_id, userId);
-    if (post.wall_user_id) return this.assertCanViewWall(post.wall_user_id, userId);
+    if (post.wall_user_id) {
+      // Herkese açık duvar paylaşımını oturum açmış herkes görür, beğenir,
+      // yorumlar (bkz. migration 136); diğeri arkadaşlığa bağlı.
+      if (post.gorunurluk === "herkes") return;
+      return this.assertCanViewWall(post.wall_user_id, userId);
+    }
     throw new ForbiddenException("Bu paylaşımı görüntüleme yetkiniz yok");
   }
 

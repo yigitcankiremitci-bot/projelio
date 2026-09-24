@@ -7,8 +7,8 @@ export const arkadaslar: TranslationDict = {
   Arkadaşlar: "Friends",
   İstekler: "Requests",
   "Kişi bul": "Find people",
-  "Aynı işte olmasanız da arkadaş ekleyebilir, birbirinizin duvarına yazabilirsiniz. Paylaşımları yalnızca arkadaşlar görür.":
-    "Add friends even if you don't work together, and post on each other's walls. Only friends can see the posts.",
+  "Aynı işte olmasanız da arkadaş ekleyebilir, birbirinizin duvarına yazabilirsiniz. Her paylaşımda kimlerin göreceğini sen seçersin.":
+    "Add friends even if you don't work together, and post on each other's walls. You choose who sees each post.",
   'Henüz arkadaşın yok. "Kişi bul" sekmesinden adıyla arayabilir ya da önerilere bakabilirsin.':
     'You have no friends yet. Search by name in the "Find people" tab or check the suggestions.',
   "Arkadaşlıktan çık": "Unfriend",
@@ -30,8 +30,13 @@ export const arkadaslar: TranslationDict = {
   "Kimse bulunamadı.": "No one found.",
   "Bu kullanıcı bulunamadı.": "This user could not be found.",
   "{n} arkadaş": { one: "{n} friend", other: "{n} friends" },
-  "{ad} ile arkadaş olunca paylaşımlarını görebilir, duvarına yazabilirsin.":
-    "Once you and {ad} are friends, you can see their posts and write on their wall.",
+  "Yalnızca herkese açık paylaşımlar görünüyor. {ad} ile arkadaş olunca tümünü görebilir, duvarına yazabilirsin.":
+    "Only public posts are shown. Once you and {ad} are friends, you can see everything and write on their wall.",
+  "Akışta göster:": "Show in feed:",
+  "Sadece arkadaşlar": "Friends only",
+  Herkes: "Everyone",
+  "Herkes görebilir": "Anyone can see this",
+  "Kimler görsün:": "Who can see:",
   Arkadaşsınız: "Friends",
   "İstek gönderildi": "Request sent",
   "İsteği kabul et": "Accept request",

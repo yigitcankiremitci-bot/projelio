@@ -103,7 +103,7 @@ export class PostCommentsService {
           .maybeSingle();
         if (post) {
           const { members, link } = await this.projectPostsService.resolveScopeMembers(postScopeOf(post));
-          const actorName = members.find((m) => m.userId === userId)?.fullName ?? "Bir ekip üyesi";
+          const actorName = await this.projectPostsService.aktorAdi(members, userId);
           await this.notificationsService.notifyUser(comment.user_id, "comment_like", "Yorumun beğenildi", { metin: "{kisi} yorumunu beğendi.", params: { kisi: actorName } }, link);
         }
       }
@@ -129,7 +129,7 @@ export class PostCommentsService {
     if (!post) return;
 
     const { members, link } = await this.projectPostsService.resolveScopeMembers(postScopeOf(post));
-    const actorName = members.find((m) => m.userId === actingUserId)?.fullName ?? "Bir ekip üyesi";
+    const actorName = await this.projectPostsService.aktorAdi(members, actingUserId);
 
     if (post.user_id !== actingUserId) {
       await this.notificationsService.notifyUser(

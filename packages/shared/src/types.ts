@@ -1436,6 +1436,9 @@ export interface ProjectPost {
   // duvarına yazılmışsa kartta "Yazan → Duvar sahibi" gösterilir.
   wallUserId?: string;
   wallOwnerName?: string;
+  // Duvar paylaşımında kimler görebilir (bkz. migration 136): 'herkes' ise
+  // arkadaş olmayanların Sosyal akışında da çıkar.
+  gorunurluk?: "arkadaslar" | "herkes";
   // Sosyal akışta paylaşımı yazan ya da duvar sahibi silebilir (duvar sahibi
   // kendi duvarının moderatörüdür). Diğer akışlarda paylaşım silinemez.
   canDelete?: boolean;

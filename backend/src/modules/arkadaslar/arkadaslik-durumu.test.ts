@@ -6,9 +6,11 @@ import {
   duvarErisimi,
   duvarPaylasiminiSilebilir,
   durumHesapla,
+  gorunurlukCoz,
   istekKarari,
   likeKacir,
   oneriSirala,
+  paylasimiGorebilir,
   type ArkadaslikSatiri,
 } from "./arkadaslik-durumu";
 
@@ -151,5 +153,27 @@ describe("oneriSirala", () => {
   test("tavan uygulanır", () => {
     const cok = new Map(Array.from({ length: 30 }, (_, i) => [`u${i}`, 1] as [string, number]));
     assert.equal(oneriSirala(cok, new Map(), new Set(), 20).length, 20);
+  });
+});
+
+describe("görünürlük", () => {
+  test("herkese açık paylaşımı yabancı da görür, arkadaşlara özeli göremez", () => {
+    assert.equal(paylasimiGorebilir("c", "a", false, "herkes"), true);
+    assert.equal(paylasimiGorebilir("c", "a", false, "arkadaslar"), false);
+    assert.equal(paylasimiGorebilir("b", "a", true, "arkadaslar"), true);
+  });
+
+  test("görünürlüğü bilinmeyen eski paylaşım arkadaşlara özeldir", () => {
+    assert.equal(paylasimiGorebilir("c", "a", false, null), false);
+  });
+
+  test("kendi duvarında seçim geçerli, varsayılan herkes", () => {
+    assert.equal(gorunurlukCoz("arkadaslar", "a", "a"), "arkadaslar");
+    assert.equal(gorunurlukCoz("herkes", "a", "a"), "herkes");
+    assert.equal(gorunurlukCoz(undefined, "a", "a"), "herkes");
+  });
+
+  test("başkasının duvarına yazılan paylaşım herkese açılamaz", () => {
+    assert.equal(gorunurlukCoz("herkes", "b", "a"), "arkadaslar");
   });
 });

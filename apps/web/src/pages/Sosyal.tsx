@@ -9,6 +9,18 @@ import { useCurrentUser } from "../lib/useCurrentUser";
 import FeedPanel from "../components/panels/FeedPanel";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { IconUser } from "../components/icons";
+import IkiliSecim from "../components/IkiliSecim";
+
+type AkisKapsami = "arkadaslar" | "herkes";
+const KAPSAM_ANAHTARI = "projelio_sosyal_akis_kapsami";
+
+function sonKapsam(): AkisKapsami {
+  try {
+    return localStorage.getItem(KAPSAM_ANAHTARI) === "arkadaslar" ? "arkadaslar" : "herkes";
+  } catch {
+    return "herkes";
+  }
+}
 
 /**
  * Sosyal: arkadaşlar ve kişisel duvarlar (bkz. migration 134).
@@ -60,6 +72,17 @@ function SosyalAnasayfa({ benimId }: { benimId: string }) {
     ? (params.get("sekme") as Sekme)
     : "akis";
   const [ozet, setOzet] = useState<ArkadasOzeti | null>(null);
+  // Akışta kimlerin paylaşımları: yalnızca arkadaşlar ya da herkes
+  // (herkese açık paylaşımlar, bkz. migration 136). Seçim hatırlanır.
+  const [kapsam, setKapsam] = useState<AkisKapsami>(sonKapsam);
+  const kapsamSec = (k: AkisKapsami) => {
+    setKapsam(k);
+    try {
+      localStorage.setItem(KAPSAM_ANAHTARI, k);
+    } catch {
+      // Depolama kapalıysa seçim yalnızca bu oturumda geçerli.
+    }
+  };
 
   const yukle = useCallback(() => {
     api
@@ -81,7 +104,7 @@ function SosyalAnasayfa({ benimId }: { benimId: string }) {
       <div>
         <h1 style={{ margin: 0, fontSize: 26, color: c.textPrimary }}>{t("Sosyal")}</h1>
         <p style={{ margin: "6px 0 0", fontSize: 14, color: c.textSecondary, lineHeight: 1.5 }}>
-          {t("Aynı işte olmasanız da arkadaş ekleyebilir, birbirinizin duvarına yazabilirsiniz. Paylaşımları yalnızca arkadaşlar görür.")}
+          {t("Aynı işte olmasanız da arkadaş ekleyebilir, birbirinizin duvarına yazabilirsiniz. Her paylaşımda kimlerin göreceğini sen seçersin.")}
         </p>
       </div>
 
@@ -134,7 +157,16 @@ function SosyalAnasayfa({ benimId }: { benimId: string }) {
           {ozet && ozet.arkadaslar.length < 5 && (
             <OneriListesi tavan={3} onDegisti={yukle} onTumu={() => setParams({ sekme: "bul" }, { replace: true })} />
           )}
-          <FeedPanel socialFeed wallUserId={benimId} tasks={[]} />
+          <IkiliSecim
+            etiket={t("Akışta göster:")}
+            deger={kapsam}
+            onChange={kapsamSec}
+            secenekler={[
+              { deger: "arkadaslar", etiket: t("Sadece arkadaşlar") },
+              { deger: "herkes", etiket: t("Herkes") },
+            ]}
+          />
+          <FeedPanel socialFeed wallUserId={benimId} akisKapsami={kapsam} gorunurlukSecimi tasks={[]} />
         </>
       )}
       {sekme === "arkadaslar" && <ArkadasListesi ozet={ozet} onDegisti={yukle} />}
@@ -459,11 +491,15 @@ function KisiSayfasi({ userId, kendim }: { userId: string; kendim?: boolean }) {
         )}
       </div>
 
-      {profil.duvariGorebilir ? (
-        <FeedPanel wallUserId={profil.userId} tasks={[]} />
-      ) : (
-        <BosDurum metin={t("{ad} ile arkadaş olunca paylaşımlarını görebilir, duvarına yazabilirsin.", { ad: profil.fullName })} />
+      {/* Arkadaş olmayan da duvarı görür ama yalnızca herkese açık paylaşımları
+          (süzme sunucuda) ve yazamaz. Kendi duvarımda görünürlüğü seçerim;
+          arkadaşımın duvarına yazdığım her zaman arkadaşlara özel. */}
+      {!profil.duvariGorebilir && (
+        <p style={{ margin: 0, fontSize: 14, color: c.textSecondary }}>
+          {t("Yalnızca herkese açık paylaşımlar görünüyor. {ad} ile arkadaş olunca tümünü görebilir, duvarına yazabilirsin.", { ad: profil.fullName })}
+        </p>
       )}
+      <FeedPanel wallUserId={profil.userId} gorunurlukSecimi={kendim} yazmaKapali={!profil.duvariGorebilir} tasks={[]} />
 
       {cikiyor && (
         <ConfirmDialog

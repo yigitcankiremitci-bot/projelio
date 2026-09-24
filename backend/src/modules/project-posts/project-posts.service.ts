@@ -8,13 +8,19 @@ import { extractMentionHandles } from "../../common/mentions.util";
 import { requireUuid } from "../../common/validation/input";
 import { AKIS_TAVANI } from "../../common/liste-tavani";
 import { ArkadaslarService } from "../arkadaslar/arkadaslar.service";
-import { duvarPaylasiminiSilebilir } from "../arkadaslar/arkadaslik-durumu";
+import { duvarPaylasiminiSilebilir, gorunurlukCoz, type Gorunurluk } from "../arkadaslar/arkadaslik-durumu";
 
 // Yazarın adı. project_posts'un users'a İKİ bağı var (user_id ve 134'ten beri
 // wall_user_id); ipucu vermeden "users(...)" yazmak PostgREST'te belirsizlik
 // hatası verir ve TÜM akışları düşürür. Bağ, sütun adıyla işaretleniyor.
 const POST_SECIMI = "*, users!user_id(full_name)";
-const DUVAR_SECIMI = "*, users!user_id(full_name), wall_owner:users!wall_user_id(full_name)";
+// Duvarda yazarın hesap durumu da çekiliyor: herkese açık akışta silinmiş ya
+// da askıya alınmış birinin paylaşımı yabancılara gösterilmez.
+const DUVAR_SECIMI =
+  "*, users!user_id(full_name, deleted_at, banned_at), wall_owner:users!wall_user_id(full_name)";
+
+/** Sosyal akışın kapsamı: yalnızca arkadaşlarımın duvarları ya da herkes. */
+export type AkisKapsami = "arkadaslar" | "herkes";
 
 function mapPost(
   row: any,
@@ -39,6 +45,7 @@ function mapPost(
     likedByMe,
     wallUserId: row.wall_user_id ?? undefined,
     wallOwnerName: row.wall_user_id ? row.wall_owner?.full_name ?? undefined : undefined,
+    gorunurluk: row.gorunurluk ?? undefined,
     canDelete:
       !!row.wall_user_id && !!requestingUserId && duvarPaylasiminiSilebilir(requestingUserId, row.user_id, row.wall_user_id),
   };
@@ -58,6 +65,8 @@ interface PostScope {
   organizationId?: string;
   // Kişisel duvar (bkz. migration 134): paylaşım bu kullanıcının duvarında.
   wallUserId?: string;
+  // Yalnızca duvar paylaşımı OLUŞTURULURKEN (bkz. migration 136).
+  gorunurluk?: Gorunurluk;
 }
 
 /**
@@ -199,37 +208,73 @@ export class ProjectPostsService {
   // ------------------------------------------------------------ Kişisel duvar
 
   /**
-   * Bir kullanıcının duvarı. Yetki (sahibi ya da arkadaşı) controller'da
-   * AccessService.assertCanViewWall ile sorulmuş olmalı.
+   * Bir kullanıcının duvarı. Sahibi ve arkadaşları hepsini görür; arkadaş
+   * olmayan yalnızca herkese açık paylaşımları (bkz. migration 136).
    */
   async findWall(wallUserId: string, requestingUserId: string): Promise<ProjectPost[]> {
-    return this.findWalls([wallUserId], requestingUserId);
-  }
-
-  /**
-   * Sosyal sayfanın akışı: benim ve arkadaşlarımın duvarları, tek zaman
-   * çizelgesinde. Arkadaşımın, benim arkadaşım OLMAYAN birinin duvarına
-   * yazdığı paylaşım burada yok — o duvarı göremiyorum.
-   */
-  async findSocialFeed(requestingUserId: string): Promise<ProjectPost[]> {
-    const arkadaslar = await this.arkadaslar.arkadasIdleri(requestingUserId);
-    return this.findWalls([requestingUserId, ...arkadaslar], requestingUserId);
-  }
-
-  private async findWalls(wallUserIds: string[], requestingUserId: string): Promise<ProjectPost[]> {
-    const { data, error } = await this.supabase.client
+    const tamErisim = wallUserId === requestingUserId || (await this.arkadaslar.arkadasMi(requestingUserId, wallUserId));
+    let query = this.supabase.client
       .from("project_posts")
       .select(DUVAR_SECIMI)
-      .in("wall_user_id", wallUserIds)
+      .eq("wall_user_id", wallUserId)
       .order("created_at", { ascending: false })
       .limit(AKIS_TAVANI);
+    if (!tamErisim) query = query.eq("gorunurluk", "herkes");
+    const { data, error } = await query;
     if (error) throw error;
     return this.attachEngagement(data ?? [], requestingUserId);
   }
 
-  /** Arkadaşının duvarına yazınca duvar sahibi haberdar edilir; kendi duvarına yazınca kimse. */
-  async createOnWall(wallUserId: string, userId: string, body: string): Promise<ProjectPost> {
-    const post = await this.createForScope({ wallUserId }, userId, body);
+  /**
+   * Sosyal sayfanın akışı.
+   *
+   * 'arkadaslar': benim ve arkadaşlarımın duvarları. Arkadaşımın, benim
+   * arkadaşım OLMAYAN birinin duvarına yazdığı paylaşım burada yok.
+   * 'herkes': buna ek olarak platformdaki herkese açık paylaşımlar — yazanın
+   * arkadaşım olup olmadığına bakılmaz.
+   */
+  async findSocialFeed(requestingUserId: string, kapsam: AkisKapsami = "herkes"): Promise<ProjectPost[]> {
+    const duvarlar = [requestingUserId, ...(await this.arkadaslar.arkadasIdleri(requestingUserId))];
+
+    const benimkiler = this.supabase.client
+      .from("project_posts")
+      .select(DUVAR_SECIMI)
+      .in("wall_user_id", duvarlar)
+      .order("created_at", { ascending: false })
+      .limit(AKIS_TAVANI);
+    const herkeseAcik =
+      kapsam === "herkes"
+        ? this.supabase.client
+            .from("project_posts")
+            .select(DUVAR_SECIMI)
+            .eq("gorunurluk", "herkes")
+            .order("created_at", { ascending: false })
+            .limit(AKIS_TAVANI)
+        : null;
+
+    const [a, b] = await Promise.all([benimkiler, herkeseAcik ?? Promise.resolve({ data: [], error: null })]);
+    if (a.error) throw a.error;
+    // Herkese açık sorgu düşerse (ör. 136 uygulanmadan) akış tamamen gitmesin;
+    // arkadaşların paylaşımları yine gösterilir.
+    const satirlar = new Map<string, any>();
+    for (const r of [...(a.data ?? []), ...(b.error ? [] : b.data ?? [])]) {
+      if (r.users?.deleted_at || r.users?.banned_at) continue;
+      satirlar.set(r.id, r);
+    }
+    const sirali = Array.from(satirlar.values())
+      .sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime())
+      .slice(0, AKIS_TAVANI);
+    return this.attachEngagement(sirali, requestingUserId);
+  }
+
+  /**
+   * Duvara yazma. Arkadaşının duvarına yazınca duvar sahibi haberdar edilir;
+   * kendi duvarına yazınca kimse. Görünürlük gorunurlukCoz'da: başkasının
+   * duvarına yazılan her zaman arkadaşlara özel.
+   */
+  async createOnWall(wallUserId: string, userId: string, body: string, gorunurlukHam?: unknown): Promise<ProjectPost> {
+    const gorunurluk = gorunurlukCoz(gorunurlukHam, userId, wallUserId);
+    const post = await this.createForScope({ wallUserId, gorunurluk }, userId, body);
     if (wallUserId !== userId) {
       this.notificationsService.notifyUserSafe(
         wallUserId,
@@ -273,7 +318,7 @@ export class ProjectPostsService {
         // Anahtar yalnızca duvar paylaşımında yazılıyor: her zaman
         // `wall_user_id: null` göndermek, migration 134 uygulanmamış bir
         // veritabanında proje/departman paylaşımlarını da düşürürdü.
-        ...(scope.wallUserId ? { wall_user_id: scope.wallUserId } : {}),
+        ...(scope.wallUserId ? { wall_user_id: scope.wallUserId, gorunurluk: scope.gorunurluk ?? "arkadaslar" } : {}),
         user_id: userId,
         body: trimmed,
       })
@@ -312,7 +357,7 @@ export class ProjectPostsService {
 
       if (post && post.user_id !== userId) {
         const { members, link } = await this.resolveScopeMembers(postScopeOf(post));
-        const actorName = members.find((m) => m.userId === userId)?.fullName ?? "Bir ekip üyesi";
+        const actorName = await this.aktorAdi(members, userId);
         await this.notificationsService.notifyUser(post.user_id, "post_like", "Paylaşımın beğenildi", { metin: "{kisi} paylaşımını beğendi.", params: { kisi: actorName } }, link);
       }
     }
@@ -332,7 +377,7 @@ export class ProjectPostsService {
     if (handles.length === 0) return;
 
     const { members, link } = await this.resolveScopeMembers(scope);
-    const actorName = members.find((m) => m.userId === actingUserId)?.fullName ?? "Bir ekip üyesi";
+    const actorName = await this.aktorAdi(members, actingUserId);
     const mentioned = members.filter(
       (m) => m.username && handles.includes(m.username.toLowerCase()) && m.userId !== actingUserId
     );
@@ -368,6 +413,18 @@ export class ProjectPostsService {
       return this.resolveWallMembers(scope.wallUserId);
     }
     return { members: [] };
+  }
+
+  /**
+   * Bildirimdeki "kim yaptı" adı. Önce kapsamın üye listesine bakılır; orada
+   * yoksa (herkese açık bir duvar paylaşımını arkadaş olmayan biri beğendi ya
+   * da yorumladı — bkz. migration 136) kullanıcının kendi kaydına.
+   */
+  async aktorAdi(members: ScopeActor[], userId: string): Promise<string> {
+    const bulunan = members.find((m) => m.userId === userId)?.fullName;
+    if (bulunan) return bulunan;
+    const { data } = await this.supabase.client.from("users").select("full_name").eq("id", userId).maybeSingle();
+    return data?.full_name ?? "Bir ekip üyesi";
   }
 
   // Duvar için etiket/bildirim alıcıları: duvar sahibi + arkadaşları — yani tam

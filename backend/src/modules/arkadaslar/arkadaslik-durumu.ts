@@ -65,6 +65,33 @@ export function duvarErisimi(bakanId: string, duvarSahibiId: string, arkadasMi: 
   return bakanId === duvarSahibiId || arkadasMi;
 }
 
+export type Gorunurluk = "arkadaslar" | "herkes";
+
+/**
+ * Tek bir duvar paylaşımını görebilir miyim (bkz. migration 136).
+ * 'herkes' paylaşımı oturum açmış herkes görür; diğerini duvar sahibi ve
+ * arkadaşları. Görünürlüğü bilinmeyen (136 öncesi) paylaşım arkadaşlara özel sayılır.
+ */
+export function paylasimiGorebilir(
+  bakanId: string,
+  duvarSahibiId: string,
+  arkadasMi: boolean,
+  gorunurluk: Gorunurluk | null | undefined
+): boolean {
+  return gorunurluk === "herkes" || duvarErisimi(bakanId, duvarSahibiId, arkadasMi);
+}
+
+/**
+ * Yeni paylaşımın görünürlüğü. Varsayılan 'herkes' — Sosyal sayfasının
+ * amacı arkadaş olmayanlara da görünmek. Ama BAŞKASININ duvarına yazılan
+ * paylaşım her zaman 'arkadaslar': duvar sahibi, duvarının herkese
+ * açılmasına onay vermedi.
+ */
+export function gorunurlukCoz(ham: unknown, yazarId: string, duvarSahibiId: string): Gorunurluk {
+  if (yazarId !== duvarSahibiId) return "arkadaslar";
+  return ham === "arkadaslar" ? "arkadaslar" : "herkes";
+}
+
 /** Duvar paylaşımını yazan ya da duvarın sahibi silebilir. */
 export function duvarPaylasiminiSilebilir(bakanId: string, yazarId: string, duvarSahibiId: string): boolean {
   return bakanId === yazarId || bakanId === duvarSahibiId;

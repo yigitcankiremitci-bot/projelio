@@ -8,6 +8,21 @@ import { useRefreshOnUndo } from "../../lib/undo";
 import { IconCheck, IconHeart, IconMessageCircle, IconTrash } from "../icons";
 import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
+import IkiliSecim from "../IkiliSecim";
+
+type Gorunurluk = "arkadaslar" | "herkes";
+const GORUNURLUK_ANAHTARI = "projelio_sosyal_gorunurluk";
+
+// Son seçilen görünürlük hatırlanır: her paylaşımda yeniden seçtirmek, çoğu
+// kişinin hep aynı seçimi yaptığı bir yerde gereksiz tıklama. Depolama
+// kapalıysa (gizli pencere) varsayılana düşer.
+function sonGorunurluk(): Gorunurluk {
+  try {
+    return localStorage.getItem(GORUNURLUK_ANAHTARI) === "arkadaslar" ? "arkadaslar" : "herkes";
+  } catch {
+    return "herkes";
+  }
+}
 
 export interface FeedPanelHandle {
   openCreate: () => void;
@@ -27,6 +42,12 @@ interface Props {
   // kendi) duvarıma.
   wallUserId?: string;
   socialFeed?: boolean;
+  // Sosyal akışın kapsamı (bkz. migration 136): yalnızca arkadaşlar ya da herkes.
+  akisKapsami?: Gorunurluk;
+  // Paylaşım kutusunda "Arkadaşlar / Herkes" seçimi — yalnızca kendi duvarında.
+  gorunurlukSecimi?: boolean;
+  // Paylaşım kutusu hiç gösterilmez (arkadaş olmayanın duvarı: okunur, yazılmaz).
+  yazmaKapali?: boolean;
   tasks: Task[];
 }
 
@@ -83,7 +104,7 @@ function getMentionQuery(text: string, cursor: number): { start: number; query: 
   return { start: at, query };
 }
 
-const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projectId, departmentId, organizationId, wallUserId, socialFeed, tasks }, ref) {
+const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projectId, departmentId, organizationId, wallUserId, socialFeed, akisKapsami, gorunurlukSecimi, yazmaKapali, tasks }, ref) {
   const c = useThemeColors();
   const t = useT();
   const [comments, setComments] = useState<FeedComment[]>([]);
@@ -93,6 +114,15 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
   const [posting, setPosting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mentionQuery, setMentionQuery] = useState<{ start: number; query: string } | null>(null);
+  const [gorunurluk, setGorunurluk] = useState<Gorunurluk>(sonGorunurluk);
+  const gorunurlukSec = (g: Gorunurluk) => {
+    setGorunurluk(g);
+    try {
+      localStorage.setItem(GORUNURLUK_ANAHTARI, g);
+    } catch {
+      // bkz. sonGorunurluk
+    }
+  };
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const postsPath = wallUserId
@@ -171,14 +201,14 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
       // Görev yorumlarını akışa karıştırma özelliği şimdilik yalnızca projelerde var
       // (departman/organizasyon akışları için henüz toplu bir yorum uç noktası yok).
       projectId ? api.get<FeedComment[]>(`/projects/${projectId}/comments`).catch(() => []) : Promise.resolve([]),
-      api.get<ProjectPost[]>(socialFeed ? "/sosyal/akis" : postsPath).catch(() => []),
+      api.get<ProjectPost[]>(socialFeed ? `/sosyal/akis?kapsam=${akisKapsami ?? "herkes"}` : postsPath).catch(() => []),
       loadMembers(),
     ]);
     setComments(cm);
     setPosts(p);
     setMembers(m);
     setLoading(false);
-  }, [projectId, departmentId, organizationId, wallUserId, socialFeed, postsPath, membersPath]);
+  }, [projectId, departmentId, organizationId, wallUserId, socialFeed, akisKapsami, postsPath, membersPath]);
 
   useEffect(() => {
     void load();
@@ -230,7 +260,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
     if (!trimmed) return;
     setPosting(true);
     try {
-      const created = await api.post<ProjectPost>(postsPath, { body: trimmed });
+      const created = await api.post<ProjectPost>(postsPath, gorunurlukSecimi ? { body: trimmed, gorunurluk } : { body: trimmed });
       setPosts((prev) => [created, ...prev]);
       setPostBody("");
       setMentionQuery(null);
@@ -277,6 +307,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {!yazmaKapali && (
       <form
         onSubmit={handlePost}
         style={{ position: "relative", background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12 }}
@@ -300,7 +331,21 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
           style={{ width: "100%", resize: "none", fontSize: 16, border: "none", outline: "none", background: "transparent", color: c.textPrimary }}
         />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
-          <span style={{ fontSize: 13, color: remaining < 20 ? c.danger : c.textSecondary }}>{remaining}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, color: remaining < 20 ? c.danger : c.textSecondary }}>{remaining}</span>
+            {gorunurlukSecimi && (
+              <IkiliSecim
+                kucuk
+                etiket={t("Kimler görsün:")}
+                deger={gorunurluk}
+                onChange={gorunurlukSec}
+                secenekler={[
+                  { deger: "arkadaslar", etiket: t("Arkadaşlar") },
+                  { deger: "herkes", etiket: t("Herkes") },
+                ]}
+              />
+            )}
+          </span>
           <button
             type="submit"
             disabled={posting || !postBody.trim()}
@@ -353,6 +398,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
           </div>
         )}
       </form>
+      )}
 
       {/* Tamamlanan görevler artık aşağıdaki akışta, tamamlanma saat/tarihiyle birlikte gösteriliyor. */}
 
@@ -564,7 +610,10 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged, onDeleted }: Pos
             </span>
           )}
         </div>
-        <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>{new Date(post.createdAt).toLocaleDateString(bicimDili())}</span>
+        <span style={{ fontSize: 13, color: c.textSecondary, flexShrink: 0 }}>
+          {post.gorunurluk === "herkes" && <span title={t("Herkes görebilir")}>{t("Herkes")} · </span>}
+          {new Date(post.createdAt).toLocaleDateString(bicimDili())}
+        </span>
       </div>
       <p style={{ fontSize: 16, color: c.textPrimary, margin: "0 0 8px", lineHeight: 1.45 }}>{renderMentions(post.body, c.primary)}</p>
 

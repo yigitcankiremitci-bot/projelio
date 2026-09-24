@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { ProjectPostsService } from "./project-posts.service";
 import { AccessService } from "../../common/access/access.service";
@@ -56,20 +56,26 @@ export class ProjectPostsController {
   // Kişisel duvar ve sosyal sayfa akışı (migration 134). Duvarı sahibi ve
   // arkadaşları görür ve yazar; iş/şirket ilişkisi burada hiçbir şey açmaz.
   @Get("sosyal/akis")
-  socialFeed(@Req() req: any) {
-    return this.projectPostsService.findSocialFeed(req.user.userId);
+  socialFeed(@Req() req: any, @Query("kapsam") kapsam?: string) {
+    return this.projectPostsService.findSocialFeed(req.user.userId, kapsam === "arkadaslar" ? "arkadaslar" : "herkes");
   }
 
+  // Okuma herkese açık: arkadaş olmayan yalnızca herkese açık paylaşımları
+  // görür (süzme serviste). Yazma hâlâ arkadaşlık ister.
   @Get("sosyal/duvar/:userId")
-  async findWall(@Param("userId") userId: string, @Req() req: any) {
-    await this.access.assertCanViewWall(requireUuid(userId, "Kullanıcı"), req.user.userId);
-    return this.projectPostsService.findWall(userId, req.user.userId);
+  findWall(@Param("userId") userId: string, @Req() req: any) {
+    return this.projectPostsService.findWall(requireUuid(userId, "Kullanıcı"), req.user.userId);
   }
 
   @Post("sosyal/duvar/:userId")
-  async createOnWall(@Param("userId") userId: string, @Req() req: any, @Body("body") body: string) {
+  async createOnWall(
+    @Param("userId") userId: string,
+    @Req() req: any,
+    @Body("body") body: string,
+    @Body("gorunurluk") gorunurluk?: unknown
+  ) {
     await this.access.assertCanViewWall(requireUuid(userId, "Kullanıcı"), req.user.userId);
-    return this.projectPostsService.createOnWall(userId, req.user.userId, body);
+    return this.projectPostsService.createOnWall(userId, req.user.userId, body, gorunurluk);
   }
 
   @Delete("sosyal/paylasim/:postId")

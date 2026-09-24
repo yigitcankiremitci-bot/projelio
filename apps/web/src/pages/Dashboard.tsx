@@ -10,7 +10,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { useNavVisibility } from "../lib/useNavVisibility";
 import { onJobInvitesChanged } from "../lib/jobInvites";
 import { IconBuilding, IconLayers, IconChevronRight, IconFolder, IconActivity, IconFile, IconSparkle } from "../components/icons";
-import ProfileCard from "../components/ProfileCard";
+import ProfileCard, { PROFILE_CARD_MOBILE_WIDTH } from "../components/ProfileCard";
 import AiCreditsChip from "../components/AiCreditsChip";
 import { useAppPrefs } from "../lib/appPrefs";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
@@ -309,10 +309,28 @@ export default function Dashboard() {
           marginBottom: isDesktop ? 20 : 12,
         }}
       >
-        <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{pageTitle}</h1>
+        {/* Telefonda kapaklı sayfalarla aynı model (bkz. EntityCover
+            MobileCollapsibleCover): başlık ile yalnızca fotoğraf tek satırda,
+            fotoğrafa dokununca kapsül sola doğru açılır. Bakiye başlığın altında. */}
+        {!isDesktop ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{pageTitle}</h1>
+              {prefs.showLio && <AiCreditsChip compact />}
+            </div>
+            <div style={{ position: "relative", flexShrink: 0, width: PROFILE_CARD_MOBILE_WIDTH, height: PROFILE_CARD_MOBILE_WIDTH, zIndex: 2 }}>
+              <div style={{ position: "absolute", right: 0, top: 0, pointerEvents: "none" }}>
+                <ProfileCard compact collapsible />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{pageTitle}</h1>
+        )}
         {/* Hem masaüstünde hem mobilde sağa dayalı: kartın kendi kompozisyonu
             (sağa hizalı metin, sağdaki avatar, transformOrigin: right) sağ kenara
             yaslandığında doğru duruyor. */}
+        {isDesktop && (
         <div
           style={{
             display: "flex",
@@ -338,6 +356,7 @@ export default function Dashboard() {
               kullanmadığı bir aracın bakiyesi anasayfada yer kaplamasın. */}
           {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
         </div>
+        )}
       </div>
 
       {/* İşler / Kasa sekmeleri.

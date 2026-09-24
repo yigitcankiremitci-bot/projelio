@@ -5,6 +5,8 @@ import { api } from "../api/client";
 import { useLiveRoom } from "../lib/liveRoom";
 import DepartmentMembersList, { DepartmentMembersListHandle } from "../components/DepartmentMembersList";
 import DepartmentModulesPanel from "../components/DepartmentModulesPanel";
+import PageModulesBar from "../components/PageModulesBar";
+import AddModuleModal from "../components/AddModuleModal";
 import DepartmentTasksPanel, { DepartmentTasksPanelHandle } from "../components/DepartmentTasksPanel";
 import ScopeBudgetPanel, { type ScopeBudgetPanelHandle } from "../components/butce/ScopeBudgetPanel";
 import BilgiKartiModal from "../components/bilgiKarti/BilgiKartiModal";
@@ -14,13 +16,13 @@ import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import FilesPanel from "../components/FilesPanel";
 import DepartmentSettingsModal from "../components/DepartmentSettingsModal";
 import ProfileCard from "../components/ProfileCard";
-import { CoverBackLink } from "../components/EntityCover";
+import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton } from "../components/EntityCover";
 import AskLioButton from "../components/AskLioButton";
 import { useBackTarget } from "../lib/backTarget";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
 import { presetForSeed } from "../lib/covers";
 import { TOP_CHROME_BOTTOM, safeTop } from "../lib/layout";
-import { useProjectFabAction } from "../lib/projectFab";
+import { useProjectFabAction, type ProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
 import { colors } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -72,6 +74,10 @@ export default function DepartmentDetail() {
   // Finans departmanları ve onların çalışma yeri burası — şirket sayfasına
   // çıkıp geri dönmek, bilgiye ulaşmanın önündeki asıl engeldi.
   const [bilgiKarti, setBilgiKarti] = useState(false);
+  // "+" menüsündeki "Modül ekle" penceresi ve eklenince tepedeki modül
+  // listesinin (PageModulesBar) tazelenmesi.
+  const [addingModule, setAddingModule] = useState(false);
+  const [modulYenile, setModulYenile] = useState(0);
   const feedRef = useRef<FeedPanelHandle>(null);
   const teamRef = useRef<DepartmentMembersListHandle>(null);
   const tasksRef = useRef<DepartmentTasksPanelHandle>(null);
@@ -99,7 +105,9 @@ export default function DepartmentDetail() {
   // departman detayında hangi sekmedeysek ona uygun eylemi tetikler. Modüller ve
   // Dosyalar sekmelerinin eylemini panellerin kendisi kaydeder (bkz.
   // DepartmentModulesPanel / ProductsPanel / FilesPanel), o yüzden burada yoklar.
-  useProjectFabAction(
+  // Sekmenin kendi eylemi; aşağıda her sekmede "Modül ekle" seçeneğiyle
+  // birleştiriliyor.
+  const sekmeEylemi: ProjectFabAction | null =
     !department
       ? null
       : activeTab === "flow"
@@ -125,8 +133,28 @@ export default function DepartmentDetail() {
         ? null
         : { label: t("Kayıt ekle"), onClick: () => budgetRef.current?.openCreate() }
       : // Dosyalar sekmesinin "+" eylemi panelin kendisinde (bkz. FilesPanel).
-        null,
-    [activeTab, department?.id, access?.canManage]
+        null;
+
+  // "Modül ekle" HER sekmede "+" menüsünde: modüller artık sayfanın tepesinde
+  // listeleniyor (bkz. PageModulesBar), eklemek için Modüller sekmesine gitmek
+  // gerekmesin. Modüller sekmesinde panelin kendi kaydı (FAB_PRIORITY.panel)
+  // bunu ezer. Özel (kataloğa dayanmayan) departmanın modülü olmadığı için
+  // orada seçenek yok; yönetemeyen kadroya da gösterilmiyor.
+  const modulEklenebilir = Boolean(department?.catalogKey) && access?.canManage !== false;
+  const modulSecenegi = { label: t("Modül ekle"), onClick: () => setAddingModule(true) };
+  useProjectFabAction(
+    !modulEklenebilir
+      ? sekmeEylemi
+      : !sekmeEylemi
+      ? modulSecenegi
+      : {
+          label: t("Ekle"),
+          options: [
+            ...(sekmeEylemi.options ?? (sekmeEylemi.onClick ? [{ label: sekmeEylemi.label, onClick: sekmeEylemi.onClick }] : [])),
+            modulSecenegi,
+          ],
+        },
+    [activeTab, department?.id, department?.catalogKey, access?.canManage]
   );
 
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
@@ -135,7 +163,7 @@ export default function DepartmentDetail() {
   const backRef = useRef<HTMLDivElement>(null);
   // bkz. ProjectDetail — görev kartından gelindiyse geri, gelinen yere döner.
   const back = useBackTarget({
-    to: department ? `/organizations/${department.organizationId}?tab=departments` : "/organizations",
+    to: department ? `/organizations/${department.organizationId}` : "/organizations",
     label: t("Departmanlar"),
   });
 
@@ -174,6 +202,34 @@ export default function DepartmentDetail() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
+      {/* Telefonda bu sayfanın kendi kapağı yerine ortak katlanır kapak
+          (bkz. EntityCover): diğer sayfalarla aynı bant, aynı kişi fotoğrafı.
+          Buradaki elle yazılmış kapak telefonda tam boy kişi kartını
+          fotoğrafın üstüne bindiriyordu. */}
+      {!isDesktop ? (
+        <EntityCover
+          coverRef={coverRef}
+          coverImageUrl={coverUrl}
+          seed={department?.id}
+          title={department?.name ?? "…"}
+          description={department?.description}
+          lioSubject={department ? { kind: "departman", title: department.name, id: department.id } : undefined}
+          action={
+            department && (
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setBilgiKarti(true)} aria-label={t("Şirket bilgi kartı")} style={coverActionButton(c)}>
+                  <IconIdCard size={18} color={c.textSecondary} />
+                </button>
+                {access?.canManage !== false && (
+                  <button onClick={() => setSettingsOpen(true)} aria-label={t("Departman ayarları")} style={coverActionButton(c)}>
+                    <IconSettings size={18} color={c.textSecondary} />
+                  </button>
+                )}
+              </div>
+            )
+          }
+        />
+      ) : (
       <div
         ref={coverRef}
         style={{
@@ -279,6 +335,16 @@ export default function DepartmentDetail() {
           </button>
         )}
       </div>
+      )}
+
+      {addingModule && department && (
+        <AddModuleModal
+          organizationId={department.organizationId}
+          fixedDepartmentId={department.id}
+          onClose={() => setAddingModule(false)}
+          onAdded={() => setModulYenile((n) => n + 1)}
+        />
+      )}
 
       {bilgiKarti && department && (
         <BilgiKartiModal
@@ -294,6 +360,19 @@ export default function DepartmentDetail() {
             <div ref={tabsRef}>
               <DepartmentTabs active={activeTab} onChange={setActiveTab} access={access} hiddenTabs={hiddenTabs} />
             </div>
+            {/* Telefonda geri bağlantısı kapakta değil, sekmelerin altında (bkz. EntityCover). */}
+            <MobileBackRow backRef={backRef} to={back.to} label={back.label} geriGit={back.geriGit} />
+            {/* Modüller her sekmede üstte, kolay erişim için (bkz. PageModulesBar).
+                Modüller sekmesinde liste zaten sayfanın kendisi. */}
+            {activeTab !== "modules" && (
+              <PageModulesBar
+                kind="department"
+                departmentId={department.id}
+                organizationId={department.organizationId}
+                departmentKey={department.catalogKey}
+                yenile={modulYenile}
+              />
+            )}
 
             {activeTab === "flow" && <FeedPanel ref={feedRef} departmentId={department.id} tasks={tasks} />}
 
@@ -347,8 +426,8 @@ export default function DepartmentDetail() {
           // Kapak değişimi anında kaydedilir: modal açık kalır, arkadaki başlık
           // yeni kapağı hemen gösterir.
           onCoverChanged={setDepartment}
-          onDeleted={() => navigate(`/organizations/${department.organizationId}?tab=departments`)}
-          onArchived={() => navigate(`/organizations/${department.organizationId}?tab=departments`)}
+          onDeleted={() => navigate(`/organizations/${department.organizationId}`)}
+          onArchived={() => navigate(`/organizations/${department.organizationId}`)}
         />
       )}
     </div>

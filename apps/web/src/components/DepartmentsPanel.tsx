@@ -7,10 +7,17 @@ import { onEnter } from "../lib/enterAction";
 import { useSortableList } from "../lib/useSortableList";
 import { useLatestRef, useRefreshOnUndo, useReorderUndo } from "../lib/undo";
 import DepartmentCard from "./DepartmentCard";
-import { IconX } from "./icons";
+import { IconBuilding, IconListCheck } from "./icons";
+import Modal from "./Modal";
 import { useDragScroll } from "../lib/useDragScroll";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { useT } from "../lib/i18n";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import ListRowLink, { ListRowStack } from "./ListRowLink";
+import SectionToggle from "./SectionToggle";
+import { useKatlanirBolum } from "../lib/useKatlanirBolum";
+import { getDepartmentCoverUrl } from "../lib/departmentCovers";
+import { coverBackground } from "../lib/covers";
 
 export interface DepartmentsPanelHandle {
   openAdd: () => void;
@@ -19,7 +26,7 @@ export interface DepartmentsPanelHandle {
 interface Props {
   organizationId: string;
   // Şirket anasayfasında "+" beş kısayolu birden taşıyan tek bir menü açıyor
-  // (bkz. OrganizationDetail HomeAddFabRegistrar) ve "Departman kur" orada zaten
+  // (bkz. OrganizationDetail HomeAddFabRegistrar) ve "Departman ekle" orada zaten
   // var; ikinci kez kaydedilmesin diye orada useFab=false verilir ve ekleme
   // DepartmentsPanelHandle.openAdd ile tetiklenir (ProductsPanel'deki desenin aynısı).
   useFab?: boolean;
@@ -41,6 +48,10 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
 ) {
   const c = useThemeColors();
   const t = useT();
+  const isDesktop = useIsDesktop();
+  // Anasayfada ürün/hizmet şeridi gibi başlıktan kapatılabilir; ayrı
+  // Departmanlar sekmesinde (grid) hep açık.
+  const [collapsed, toggleCollapsed] = useKatlanirBolum("projelio.anasayfa-departmanlar-kapali", layout === "scroll");
   const [departments, setDepartments] = useState<Department[]>([]);
   const [catalog, setCatalog] = useState<DepartmentCatalogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,10 +117,29 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Departmanlar")}</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {/* Başlığa çift dokunmak da "Departman ekle" penceresini açar — "+"
+            menüsündeki eylemin kısayolu, görünür bir düğme eklemeden. */}
+        <h2
+          onDoubleClick={() => setAdding(true)}
+          title={t("Eklemek için çift tıkla")}
+          style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0, userSelect: "none", cursor: "default", touchAction: "manipulation" }}
+        >
+          {t("Departmanlar")}
+        </h2>
+        {layout === "scroll" && (
+          <SectionToggle
+            collapsed={collapsed}
+            onToggle={toggleCollapsed}
+            count={loading ? undefined : departments.length}
+            showLabel={t("Departmanları göster")}
+            hideLabel={t("Departmanları gizle")}
+          />
+        )}
+      </div>
 
       {adding && (
-        <AddDepartmentForm
+        <AddDepartmentModal
           organizationId={organizationId}
           availableCatalog={availableCatalog}
           onClose={() => setAdding(false)}
@@ -120,7 +150,8 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
         />
       )}
 
-      {loading ? (
+      {/* Ekleme formu kapalı bölümde de açılır: "+" menüsünden gelinmiş olabilir. */}
+      {collapsed ? null : loading ? (
         <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
       ) : departments.length === 0 ? (
         <div
@@ -135,6 +166,36 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
         >
           {t("Henüz departman yok. ISO 9001 uyumlu standart departman listesinden seçebilir ya da özel bir departman açabilirsin.")}
         </div>
+      ) : layout === "scroll" && !isDesktop ? (
+        // Telefonda anasayfa özeti: kapaklı kartlar yerine alt alta tek
+        // satırlık düğmeler (bkz. ListRowLink). Zemin departman kartının
+        // kapağıyla aynı — kart ile satır aynı departman olarak tanınsın.
+        <ListRowStack>
+          {departments.map((dept) => (
+            <ListRowLink
+              key={dept.id}
+              to={`/departments/${dept.id}`}
+              background={coverBackground(getDepartmentCoverUrl(dept), dept.id)}
+              icon={<IconBuilding size={18} color="rgba(255,255,255,0.85)" />}
+              label={dept.name}
+              // Kişi sayısı yerine iş durumu: satır bir bakışta "bu departman
+              // ne kadar ilerledi?" sorusunu cevaplasın.
+              trailing={
+                <span
+                  title={t("Biten / toplam görev")}
+                  aria-label={t("{biten} / {toplam} görev bitti", {
+                    biten: dept.completedTaskCount ?? 0,
+                    toplam: dept.taskCount ?? 0,
+                  })}
+                  style={{ display: "flex", alignItems: "center", gap: 4 }}
+                >
+                  <IconListCheck size={13} color="rgba(255,255,255,0.8)" />
+                  {dept.completedTaskCount ?? 0}/{dept.taskCount ?? 0}
+                </span>
+              }
+            />
+          ))}
+        </ListRowStack>
       ) : (
         <div
           ref={layout === "grid" ? listRef : scrollRef}
@@ -173,7 +234,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
 
 export default DepartmentsPanel;
 
-function AddDepartmentForm({
+function AddDepartmentModal({
   organizationId,
   availableCatalog,
   onClose,
@@ -218,61 +279,58 @@ function AddDepartmentForm({
   };
 
   return (
-    <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <Modal title={t("Departman ekle")} onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{t("Standart departmanlardan seç")}</span>
-        <button onClick={onClose} aria-label={t("Kapat")} style={{ background: "transparent", border: "none" }}>
-          <IconX size={16} color={c.textSecondary} />
+
+        {availableCatalog.length === 0 ? (
+          <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Standart departmanların hepsi zaten eklenmiş.")}</p>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 6 }}>
+            {availableCatalog.map((entry) => {
+              const active = selectedKeys.includes(entry.key);
+              return (
+                <button
+                  key={entry.key}
+                  onClick={() => toggleKey(entry.key)}
+                  style={{
+                    textAlign: "left",
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: `1.5px solid ${active ? c.primary : c.border}`,
+                    background: active ? c.background : "transparent",
+                    fontSize: 13,
+                    color: c.textPrimary,
+                  }}
+                >
+                  {entry.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div>
+          <label style={{ fontSize: 13, color: c.textSecondary }}>{t("Ya da özel departman adı")}</label>
+          <input
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            onKeyDown={onEnter(() => void handleSave())}
+            placeholder={t("Örn. Ar-Ge")}
+            style={{ width: "100%", marginTop: 4 }}
+          />
+        </div>
+
+        {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          style={{ padding: "9px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
+        >
+          {saving ? t("Ekleniyor…") : t("Departmanları ekle")}
         </button>
       </div>
-
-      {availableCatalog.length === 0 ? (
-        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Standart departmanların hepsi zaten eklenmiş.")}</p>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 6 }}>
-          {availableCatalog.map((entry) => {
-            const active = selectedKeys.includes(entry.key);
-            return (
-              <button
-                key={entry.key}
-                onClick={() => toggleKey(entry.key)}
-                style={{
-                  textAlign: "left",
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: `1.5px solid ${active ? c.primary : c.border}`,
-                  background: active ? c.background : "transparent",
-                  fontSize: 13,
-                  color: c.textPrimary,
-                }}
-              >
-                {entry.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <div>
-        <label style={{ fontSize: 13, color: c.textSecondary }}>{t("Ya da özel departman adı")}</label>
-        <input
-          value={customName}
-          onChange={(e) => setCustomName(e.target.value)}
-          onKeyDown={onEnter(() => void handleSave())}
-          placeholder={t("Örn. Ar-Ge")}
-          style={{ width: "100%", marginTop: 4 }}
-        />
-      </div>
-
-      {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
-
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        style={{ padding: "9px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
-      >
-        {saving ? t("Ekleniyor…") : t("Departmanları ekle")}
-      </button>
-    </div>
+    </Modal>
   );
 }

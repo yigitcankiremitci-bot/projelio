@@ -642,9 +642,15 @@ interface Props {
   moduleKey: string;
   /** Karonun kenar uzunluğu (px). Çizim bunun ~%64'ü. */
   size?: number;
+  /**
+   * Köşe yuvarlaklığı. Verilmezse boyuttan türetilir. Satırın soluna tam boy
+   * yaslanan simgede (bkz. ListRowLink iconBleed) yalnızca sol köşeler
+   * yuvarlanır ve çerçeve kalkar — satırın kendi çerçevesi zaten var.
+   */
+  radius?: string;
 }
 
-export default function ModuleEmblem({ moduleKey, size = 40 }: Props) {
+export default function ModuleEmblem({ moduleKey, size = 40, radius }: Props) {
   const c = useThemeColors();
   const stroke = {
     fill: "none",
@@ -673,11 +679,11 @@ export default function ModuleEmblem({ moduleKey, size = 40 }: Props) {
         width: size,
         height: size,
         flexShrink: 0,
-        borderRadius: Math.round(size * 0.28),
+        borderRadius: radius ?? Math.round(size * 0.28),
         // Zemin iki rengin çok açık bir karışımı: kartın beyazından ayrışacak
         // kadar, başlığın önüne geçmeyecek kadar.
         background: `linear-gradient(140deg, color-mix(in srgb, ${c.accent} 16%, ${c.surface}), color-mix(in srgb, ${c.primary} 7%, ${c.surface}))`,
-        border: `1px solid color-mix(in srgb, ${c.accent} 20%, ${c.border})`,
+        border: radius ? "none" : `1px solid color-mix(in srgb, ${c.accent} 20%, ${c.border})`,
       }}
     >
       <svg width={glyph} height={glyph} viewBox="0 0 32 32">

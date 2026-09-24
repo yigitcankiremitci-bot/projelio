@@ -1,10 +1,22 @@
-import { useEffect, useState } from "react";
-import type { Department, ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import type { Department, ModuleCatalogEntry, ModuleStatsResponse, OrganizationModule } from "@projelio/shared";
+import { sonAcilislar, sonKullanimaGoreSirala } from "../lib/sonKullanilanModul";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import ModuleCard from "./ModuleCard";
 import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import ListRowLink, { ListRowStack, ROW_INNER_HEIGHT } from "./ListRowLink";
+import SectionToggle from "./SectionToggle";
+import { useKatlanirBolum } from "../lib/useKatlanirBolum";
+import ModuleEmblem from "./ModuleEmblem";
+import AddModuleModal from "./AddModuleModal";
+
+export interface ModulesPanelHandle {
+  /** Anasayfadaki "+" menüsünden "Modül ekle" (bkz. OrganizationDetail HomeAddFabRegistrar). */
+  openAdd: () => void;
+}
 
 interface Props {
   organizationId: string;
@@ -18,14 +30,21 @@ interface Props {
 // Bu sayıya kadar tek satır; üstünde iki satıra bölünüp yana kaydırılır.
 const SINGLE_ROW_LIMIT = 4;
 
-export default function ModulesPanel({ organizationId }: Props) {
+const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel({ organizationId }, ref) {
   const c = useThemeColors();
   const t = useT();
+  const isDesktop = useIsDesktop();
   const scrollRef = useDragScroll<HTMLDivElement>();
+  // Anasayfadaki diğer bölümler gibi başlıktan kapatılabilir (bkz. useKatlanirBolum).
+  const [collapsed, toggleCollapsed] = useKatlanirBolum("projelio.anasayfa-moduller-kapali");
   const [enabled, setEnabled] = useState<OrganizationModule[]>([]);
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  // Modül başına sunucudaki son kayıt hareketi — sıralama için (bkz. lib/sonKullanilanModul).
+  const [hareket, setHareket] = useState<Record<string, string | undefined>>({});
   const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  useImperativeHandle(ref, () => ({ openAdd: () => setAdding(true) }));
 
   const load = () => {
     setLoading(true);
@@ -33,11 +52,14 @@ export default function ModulesPanel({ organizationId }: Props) {
       api.get<OrganizationModule[]>(`/organizations/${organizationId}/modules`).catch(() => []),
       api.get<ModuleCatalogEntry[]>("/module-catalog").catch(() => []),
       api.get<Department[]>(`/organizations/${organizationId}/departments`).catch(() => []),
+      // Okunamazsa sıra yalnızca bu cihazdaki açılışlara göre kurulur.
+      api.get<ModuleStatsResponse>(`/organizations/${organizationId}/module-stats`).catch(() => null),
     ])
-      .then(([e, cat, d]) => {
+      .then(([e, cat, d, stats]) => {
         setEnabled(e);
         setCatalog(cat);
         setDepartments(d);
+        setHareket(Object.fromEntries((stats?.modules ?? []).map((m) => [m.moduleKey, m.lastActivityAt])));
       })
       .finally(() => setLoading(false));
   };
@@ -46,7 +68,14 @@ export default function ModulesPanel({ organizationId }: Props) {
 
   const deptIdByCatalogKey = new Map(departments.filter((d) => d.catalogKey).map((d) => [d.catalogKey as string, d.id]));
   const enabledKeys = new Set(enabled.map((m) => m.moduleKey));
-  const activeEntries = catalog.filter((e) => enabledKeys.has(e.key));
+  // Son kullanılan en üstte: ekranda hem liste (telefon) hem şerit (masaüstü)
+  // bu sırayı izliyor.
+  const activeEntries = sonKullanimaGoreSirala(
+    catalog.filter((e) => enabledKeys.has(e.key)),
+    (e) => e.key,
+    sonAcilislar(),
+    hareket
+  );
 
   /**
    * Kart tıklanınca hangi departmanın sayfasına gidilecek.
@@ -69,9 +98,25 @@ export default function ModulesPanel({ organizationId }: Props) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Modüller")}</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {/* Çift dokunuş "Modül ekle" penceresini açar (bkz. DepartmentsPanel başlığı). */}
+        <h2
+          onDoubleClick={() => setAdding(true)}
+          title={t("Eklemek için çift tıkla")}
+          style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0, userSelect: "none", cursor: "default", touchAction: "manipulation" }}
+        >
+          {t("Modüller")}
+        </h2>
+        <SectionToggle
+          collapsed={collapsed}
+          onToggle={toggleCollapsed}
+          count={loading ? undefined : activeEntries.length}
+          showLabel={t("Modülleri göster")}
+          hideLabel={t("Modülleri gizle")}
+        />
+      </div>
 
-      {loading ? (
+      {collapsed ? null : loading ? (
         <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
       ) : activeEntries.length === 0 ? (
         <div
@@ -86,6 +131,23 @@ export default function ModulesPanel({ organizationId }: Props) {
         >
           {t("Henüz etkinleştirilmiş modül yok. Bir departmanın sayfasından \"+\" ile modül ekleyebilirsin.")}
         </div>
+      ) : !isDesktop ? (
+        // Telefonda iki satırlık yatay şerit yerine alt alta tek satırlık
+        // düğmeler (bkz. ListRowLink). Hedef, kartınkiyle aynı.
+        <ListRowStack>
+          {activeEntries.map((entry) => {
+            const departmentId = departmentIdFor(entry);
+            return (
+              <ListRowLink
+                key={entry.key}
+                to={departmentId ? `/departments/${departmentId}?tab=modules&module=${encodeURIComponent(entry.key)}` : undefined}
+                icon={<ModuleEmblem moduleKey={entry.key} size={ROW_INNER_HEIGHT} radius="11px 0 0 11px" />}
+                iconBleed
+                label={entry.name}
+              />
+            );
+          })}
+        </ListRowStack>
       ) : (
         // Anasayfada modüller departman kartlarıyla aynı mantıkta: yana
         // kaydırmalı, EN FAZLA İKİ SATIR. Tam liste 20+ modülde sayfanın
@@ -112,6 +174,19 @@ export default function ModulesPanel({ organizationId }: Props) {
           ))}
         </div>
       )}
+
+      {adding && (
+        <AddModuleModal
+          organizationId={organizationId}
+          onClose={() => setAdding(false)}
+          onAdded={() => {
+            setAdding(false);
+            load();
+          }}
+        />
+      )}
     </div>
   );
-}
+});
+
+export default ModulesPanel;

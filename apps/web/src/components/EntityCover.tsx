@@ -4,12 +4,15 @@ import { COVER_VEIL_HEIGHT, COVER_VEIL_HEIGHT_MOBILE, coverBackground } from "..
 import type { LioSubject } from "../lib/askLio";
 import AskLioButton from "./AskLioButton";
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { COVER_TOP_CLEARANCE, pageGutter, SAFE_TOP, TOP_CHROME_BOTTOM, safeTop } from "../lib/layout";
+import { COVER_TOP_CLEARANCE, pageGutter, SAFE_TOP, TOP_CHROME_BOTTOM, safeTop, TOP_CHROME } from "../lib/layout";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import { useCoverTheme } from "../theme/useCoverTheme";
-import { IconChevronLeft } from "./icons";
-import { PROFILE_CARD_MOBILE_WIDTH } from "./ProfileCard";
+import { IconChevronDown, IconChevronLeft } from "./icons";
+import { useKatlanirBolum } from "../lib/useKatlanirBolum";
+import ProfileCard, { PROFILE_CARD_MOBILE_WIDTH } from "./ProfileCard";
+import AiCreditsChip from "./AiCreditsChip";
+import { useAppPrefs } from "../lib/appPrefs";
 
 /**
  * Kapağın sağ alt köşesindeki düzenleme düğmesinin ortak stili — beş sayfada
@@ -20,8 +23,10 @@ export function coverActionButton(c: { border: string; surface: string }): CSSPr
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    width: 48,
-    height: 48,
+    // Ölçü kapaktan gelir (bkz. EntityCover --cover-action-size): telefonda
+    // 48 px'lik iki düğme kapağın dibinde ayrı bir bant açıp kapağı uzatıyordu.
+    width: "var(--cover-action-size, 48px)",
+    height: "var(--cover-action-size, 48px)",
     borderRadius: 10,
     border: `1px solid ${c.border}`,
     background: c.surface,
@@ -43,6 +48,9 @@ export function coverActionButton(c: { border: string; surface: string }): CSSPr
 const BELL_BAND_BOTTOM = TOP_CHROME_BOTTOM;
 const COVER_PADDING = 20;
 const ACTION_BAND = 48 + 8;
+/** Telefonda düzenleme düğmeleri küçülür (bkz. coverActionButton). */
+const ACTION_SIZE_MOBILE = 38;
+const ACTION_BAND_MOBILE = ACTION_SIZE_MOBILE + 8;
 /** Masaüstünde kart akıştaki sütunda: dolgu zaten 20 px, kalanı burada eklenir. */
 const ASIDE_TOP_CLEARANCE = BELL_BAND_BOTTOM - COVER_PADDING;
 /**
@@ -59,7 +67,7 @@ const MOBILE_ASIDE_RESERVE = PROFILE_CARD_MOBILE_WIDTH;
  * yükseklik. Kapak bundan kısa kalırsa kart bandına sığmıyor ve ortalanırken
  * iki uçtan da taşıyor: üstte çanın, altta düzenleme düğmesinin üstüne biner.
  */
-const MOBILE_ASIDE_BAND = PROFILE_CARD_MOBILE_WIDTH + 56;
+const MOBILE_ASIDE_BAND = PROFILE_CARD_MOBILE_WIDTH + 34;
 /**
  * Dar ekranda kapağın tavanı.
  *
@@ -69,7 +77,11 @@ const MOBILE_ASIDE_BAND = PROFILE_CARD_MOBILE_WIDTH + 56;
  * için yüksekliği kısmak yalnızca fotoğrafın üst kısmını kırpar, hiçbir metni
  * kaybetmez.
  */
-const MOBILE_MAX_HEIGHT = 220;
+//
+// 220'den 190'a indirildi: telefonda anasayfa (şirket kapağı) hâlâ ekranın
+// dörtte birini kaplıyordu. Açıklama tek satıra, künye tek satıra indiği için
+// yazı bloğu artık bu tavana sığıyor.
+const MOBILE_MAX_HEIGHT = 190;
 
 /**
  * "← İşler" bağlantısının kapak içindeki hâli.
@@ -246,6 +258,13 @@ interface Props {
    * konuyu bildirir.
    */
   lioSubject?: LioSubject;
+  /**
+   * Telefonda başlık ve kişi fotoğrafı EN ÜST satırda, kenar çubuğu oku ile
+   * yardım/bildirim düğmelerinin arasında durur; kapak yalnızca o satır
+   * kadardır. Proje sayfası için: orada kanban panosu ekranın asıl içeriği ve
+   * kapağın her pikseli panodan çalınıyordu.
+   */
+  titleInTopRow?: boolean;
 }
 
 /**
@@ -275,6 +294,306 @@ export default function EntityCover({
   stats,
   action,
   lioSubject,
+  titleInTopRow = false,
+}: Props) {
+  const isDesktop = useIsDesktop();
+  // Telefonda HER kapak aynı modelde: katlanır bant (bkz. MobileCollapsibleCover).
+  // Sayfaların kendi `aside`ı, `back`i ve `stats`ı burada kullanılmaz — kişi
+  // kartını ve bakiyeyi kapak kendisi çizer, geri bağlantısını sayfa
+  // sekmelerin altına koyar (bkz. MobileBackRow).
+  if (!isDesktop) {
+    return (
+      <MobileCollapsibleCover
+        coverRef={coverRef}
+        coverImageUrl={coverImageUrl}
+        seed={seed}
+        title={title}
+        description={description}
+        meta={meta}
+        action={action}
+        lioSubject={lioSubject}
+        titleInTopRow={titleInTopRow}
+      />
+    );
+  }
+  return (
+    <DefaultCover
+      coverRef={coverRef}
+      coverImageUrl={coverImageUrl}
+      seed={seed}
+      height={height}
+      back={back}
+      title={title}
+      description={description}
+      meta={meta}
+      aside={aside}
+      asideOnMobile={asideOnMobile}
+      stats={stats}
+      action={action}
+      lioSubject={lioSubject}
+    />
+  );
+}
+
+/**
+ * Telefonda kapağın geri bağlantısı: sekmelerin ALTINDA, kendi satırında.
+ *
+ * Katlanır kapakta yer yok (bant yalnızca başlık + fotoğraf) ve kapağın
+ * üstünde sabit düğmelerle yarışıyordu. `backRef` sayfanın usePageHeader'a
+ * verdiği ref: kaydırınca beliren geri hapı bu öğe görünürlükten çıkınca
+ * devralıyor. Masaüstünde hiçbir şey çizmez — orada bağlantı kapağın içinde.
+ */
+export function MobileBackRow({
+  backRef,
+  to,
+  label,
+  geriGit,
+}: {
+  backRef: RefObject<HTMLDivElement>;
+  to: string;
+  label: string;
+  geriGit?: boolean;
+}) {
+  const isDesktop = useIsDesktop();
+  if (isDesktop) return null;
+  return (
+    <div ref={backRef} style={{ marginBottom: 14 }}>
+      <CoverBackLink to={to} label={label} geriGit={geriGit} floating />
+    </div>
+  );
+}
+
+/** Kapak açık mı — bütün sayfalarda TEK tercih: telefonda her kapak aynı davranır. */
+const KAPAK_ACIK_ANAHTARI = "projelio.kapak-acik";
+
+/** Kapalı bandın üstünde bırakılan boşluk: sabit düğmelerin (ok, çan) altı. */
+const COLLAPSED_TOP = TOP_CHROME_BOTTOM + 2;
+/** Açılınca başlığın üstünde görünen kapak fotoğrafı şeridi. */
+const EXPANDED_PHOTO = 84;
+
+/**
+ * titleInTopRow ölçüleri: başlık satırı sabit düğmelerin (ok solda, yardım +
+ * çan sağda) arasına oturur. Kenar boşlukları o düğmelerin kapladığı yerden
+ * türetiliyor (bkz. lib/layout TOP_CHROME, App.tsx): ok 14–54, yardım ve
+ * çan sağdan 14–106.
+ */
+const TOP_ROW_AVATAR = 40;
+const TOP_ROW_HEIGHT = TOP_ROW_AVATAR + 8;
+const TOP_ROW_LEFT = TOP_CHROME.gutter + 40 + 8;
+const TOP_ROW_RIGHT = TOP_CHROME.gutter + TOP_CHROME.size * 2 + 4 + 8;
+/** Satır, 44 px'lik düğmelerle aynı dikey merkezde. */
+const TOP_ROW_TOP = TOP_CHROME.top + TOP_CHROME.size / 2 - TOP_ROW_HEIGHT / 2;
+
+/**
+ * Telefonda katlanır kapak (bkz. Props.mobileCollapsible).
+ *
+ * Neden: telefonda şirket anasayfasının ilk ekranının yarısı kapaktı —
+ * geri bağlantısı, iki satırlık başlık, açıklama, künye, kişi kartı, bakiye
+ * ve iki düğme. Hepsi talep üzerine bakılan bilgi; kapalı hâlde yalnızca
+ * sayfanın kimliği (başlık) ve kullanıcının kendisi (fotoğraf) kalıyor.
+ *
+ * Açılma animasyonu ölçüm yapmadan: fotoğraf şeridi sabit iki yükseklik
+ * arasında, künye bloğu `grid-template-rows: 0fr ↔ 1fr` ile geçiyor —
+ * `height: auto`ya geçiş canlandırılamadığı için bilinen yol bu.
+ */
+function MobileCollapsibleCover({
+  coverRef,
+  coverImageUrl,
+  seed,
+  title,
+  description,
+  meta,
+  action,
+  lioSubject,
+  titleInTopRow = false,
+}: Pick<
+  Props,
+  "coverRef" | "coverImageUrl" | "seed" | "title" | "description" | "meta" | "action" | "lioSubject" | "titleInTopRow"
+>) {
+  const t = useT();
+  const prefs = useAppPrefs();
+  const cover = useCoverTheme();
+  const gutter = pageGutter(false);
+  // Varsayılan KAPALI. useKatlanirBolum "1" yazılı değilse false döner;
+  // burada anahtar "açık mı?" anlamında kullanılıyor (adı "-acik" ile
+  // bitiyor), yani hiç dokunulmamış kapak kapalı başlıyor.
+  const [acik, degistir] = useKatlanirBolum(KAPAK_ACIK_ANAHTARI);
+  const easing = "360ms cubic-bezier(0.22, 1, 0.36, 1)";
+  const kartGenisligi = titleInTopRow ? TOP_ROW_HEIGHT : PROFILE_CARD_MOBILE_WIDTH;
+  // Açılınca görünen fotoğraf şeridi: normalde başlığın üstünde, üst satır
+  // kipinde başlığın ALTINDA (başlık yerinden oynamasın).
+  const fotoSeridi = <div aria-hidden style={{ height: acik ? EXPANDED_PHOTO : 0, transition: `height ${easing}` }} />;
+
+  return (
+    <div
+      ref={coverRef}
+      style={{
+        position: "relative",
+        background: coverBackground(coverImageUrl, seed),
+        padding: titleInTopRow
+          ? `${safeTop(TOP_ROW_TOP)} ${gutter}px 8px`
+          : `${safeTop(COLLAPSED_TOP)} ${gutter}px 12px`,
+        // "hidden" DEĞİL "clip": katlı kişi kartının kapsülü sağa kaydırılmış
+        // (transform) bekliyor ve taşan kısmı kapağı kaydırılabilir bir kutuya
+        // çeviriyordu. Açma düğmesine dokununca tarayıcı odaklanan öğeyi
+        // görünür kılmak için kapağı ~50 px sola kaydırıyor, başlık kesiliyordu.
+        // clip kaydırma kutusu oluşturmaz; eski tarayıcılar hidden'a düşer.
+        overflow: "hidden",
+        overflowX: "clip" as CSSProperties["overflowX"],
+        overflowY: "clip" as CSSProperties["overflowY"],
+        ["--cover-action-size" as string]: `${ACTION_SIZE_MOBILE}px`,
+      }}
+    >
+      {/* Kapalıyken perde tam: bant kısa, fotoğrafın tamamı yazının arkasında
+          kalıyor. Açılınca üst kısım kapağın kendisi olarak görünür. */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: acik ? "72%" : "100%",
+          background: cover.veil,
+          pointerEvents: "none",
+          transition: `height ${easing}`,
+        }}
+      />
+
+      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column" }}>
+        {!titleInTopRow && fotoSeridi}
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            minHeight: kartGenisligi,
+            ...(titleInTopRow ? { marginLeft: TOP_ROW_LEFT - gutter, marginRight: TOP_ROW_RIGHT - gutter } : {}),
+          }}
+        >
+          <h1
+            style={{
+              flex: "0 1 auto",
+              minWidth: 0,
+              fontSize: titleInTopRow ? 17 : 19,
+              fontWeight: 500,
+              lineHeight: 1.25,
+              color: cover.primary,
+              margin: 0,
+              // Kapalı bantta başlık tek satır; açılınca tamamı görünür.
+              ...(acik
+                ? {}
+                : { whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }),
+            }}
+          >
+            {title}
+          </h1>
+          <button
+            type="button"
+            onClick={degistir}
+            aria-expanded={acik}
+            aria-label={acik ? t("Kapağı kapat") : t("Kapağı aç")}
+            title={acik ? t("Kapağı kapat") : t("Kapağı aç")}
+            style={{
+              flexShrink: 0,
+              width: 30,
+              height: 30,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: `1px solid ${cover.dark ? "rgba(255,255,255,0.22)" : "rgba(26,31,41,0.10)"}`,
+              background: cover.dark ? "rgba(255,255,255,0.14)" : "rgba(26,31,41,0.06)",
+              cursor: "pointer",
+            }}
+          >
+            <span
+              style={{
+                display: "flex",
+                transform: acik ? "rotate(180deg)" : "rotate(0deg)",
+                transition: `transform ${easing}`,
+              }}
+            >
+              <IconChevronDown size={16} color={cover.primary} />
+            </span>
+          </button>
+          <div style={{ flex: 1 }} />
+          {/* Kişi kartı akışta yalnızca fotoğraf kadar yer tutar; dokununca
+              açılan kapsül sola doğru, başlığın ÜSTÜNE taşar (katlı kart,
+              bkz. ProfileCard collapsible). */}
+          <div style={{ position: "relative", flexShrink: 0, width: kartGenisligi, height: kartGenisligi, zIndex: 2 }}>
+            {/* Sarmalayıcı dokunuşa kapalı: katlı kartın kutusu sola, açma
+                düğmesinin üstüne uzanıyor. Fotoğraf ve açık kapsül kendi
+                pointerEvents: auto değerleriyle dokunuş almaya devam eder. */}
+            <div style={{ position: "absolute", right: 0, top: 0, pointerEvents: "none" }}>
+              <ProfileCard compact collapsible avatarSize={titleInTopRow ? TOP_ROW_AVATAR : undefined} />
+            </div>
+          </div>
+        </div>
+
+        {titleInTopRow && fotoSeridi}
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateRows: acik ? "1fr" : "0fr",
+            opacity: acik ? 1 : 0,
+            transition: `grid-template-rows ${easing}, opacity 260ms ease`,
+          }}
+          // Kapalıyken içindeki düğmelere klavyeyle de ulaşılmasın. `inert`
+          // React 18 tiplerinde yok; öznitelik elle yazılıyor (satır içi ref
+          // her çizimde yeniden çağrıldığı için durum değişince güncellenir).
+          ref={(el) => {
+            if (!el) return;
+            if (acik) el.removeAttribute("inert");
+            else el.setAttribute("inert", "");
+          }}
+        >
+          <div style={{ minHeight: 0, overflow: "hidden" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 6, color: cover.secondary }}>
+              {lioSubject && (
+                <div>
+                  <AskLioButton subject={lioSubject} size={28} withBackground />
+                </div>
+              )}
+              {description && (
+                <p style={{ fontSize: 14, color: cover.secondary, margin: 0, lineHeight: 1.45 }}>{description}</p>
+              )}
+              {meta && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 13, color: cover.secondary }}>
+                  {meta}
+                </div>
+              )}
+              {(prefs.showLio || action) && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, paddingTop: 2 }}>
+                  {/* Lio gizlenmişse (Ayarlar > Yardımcılar) bakiye de görünmez. */}
+                  <div>{prefs.showLio && <AiCreditsChip compact />}</div>
+                  {action}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DefaultCover({
+  coverRef,
+  coverImageUrl,
+  seed,
+  height = 290,
+  back,
+  title,
+  description,
+  meta,
+  aside,
+  asideOnMobile = false,
+  stats,
+  action,
+  lioSubject,
 }: Props) {
   const isDesktop = useIsDesktop();
   const gutter = pageGutter(isDesktop);
@@ -288,7 +607,7 @@ export default function EntityCover({
    * Dar ekranda kapağın alt sınırı: yazı bloğu kadar (minHeight ile kendiliğinden
    * uzar) ama bindirilen kart varsa onun bandını da karşılamalı.
    */
-  const mobileAsideBandBottom = COVER_PADDING + (action ? ACTION_BAND : 0);
+  const mobileAsideBandBottom = COVER_PADDING + (action ? ACTION_BAND_MOBILE : 0);
   /**
    * SAFE_TOP burada da var: kart, çanın ALTINDAN başlayan bir banda oturuyor
    * ve çan mobil kabukta durum çubuğu kadar aşağı itiliyor (bkz. layout.ts).
@@ -321,6 +640,7 @@ export default function EntityCover({
           : `${safeTop(COVER_TOP_CLEARANCE)} ${gutter}px 16px`,
         display: "flex",
         overflow: "hidden",
+        ...(isDesktop ? {} : { ["--cover-action-size" as string]: `${ACTION_SIZE_MOBILE}px` }),
       }}
     >
       {/* Yazı perdesi: kapağın alt kısmını beyaza doğru açar. Üst kısım kapağın
@@ -386,9 +706,10 @@ export default function EntityCover({
                 fontSize: isDesktop ? 16 : 14,
                 color: cover.secondary,
                 margin: "0 0 8px",
-                // Uzun açıklama kapağı taşırmasın: iki satırda kırpılır.
+                // Uzun açıklama kapağı taşırmasın: iki satırda (telefonda tek
+                // satırda) kırpılır.
                 display: "-webkit-box",
-                WebkitLineClamp: 2,
+                WebkitLineClamp: isDesktop ? 2 : 1,
                 WebkitBoxOrient: "vertical",
                 overflow: "hidden",
               }}
@@ -398,7 +719,18 @@ export default function EntityCover({
             </p>
           )}
           {meta && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: isDesktop ? 14 : 10, fontSize: isDesktop ? 15 : 13, color: cover.secondary }}>
+            // Telefonda künye tek satır: alt satıra kırılınca kapağı iki
+            // satır uzatıyordu. Sığmayan uç kırpılır — künye özet bilgi.
+            <div
+              style={{
+                display: "flex",
+                flexWrap: isDesktop ? "wrap" : "nowrap",
+                gap: isDesktop ? 14 : 10,
+                fontSize: isDesktop ? 15 : 12.5,
+                color: cover.secondary,
+                ...(isDesktop ? {} : { whiteSpace: "nowrap", overflow: "hidden" }),
+              }}
+            >
               {meta}
             </div>
           )}

@@ -8,7 +8,7 @@ import RoutineModal from "../components/RoutineModal";
 import EditOperationModal from "../components/EditOperationModal";
 import TaskEditModal from "../components/TaskEditModal";
 import OperationHealthBadge, { AdherenceDots } from "../components/OperationHealthBadge";
-import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
+import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton } from "../components/EntityCover";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import TaskAttachmentBadges from "../components/TaskAttachmentBadges";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -247,6 +247,8 @@ export default function OperationDetail() {
       />
 
       <div style={{ padding: `12px ${gutter}px 28px` }}>
+        {/* Telefonda geri bağlantısı kapakta değil burada (bkz. EntityCover). */}
+        <MobileBackRow backRef={backRef} to={back.to} label={back.label} geriGit={back.geriGit} />
         {/* Rutinde ilerleme yüzdesi yerine düzen ölçülür. */}
         <StatSummary items={stats} />
 

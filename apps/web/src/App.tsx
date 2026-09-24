@@ -273,7 +273,12 @@ function CoverStickyHeader({
     const check = () => {
       const el = coverRef.current;
       if (!el) return;
-      const title = el.getBoundingClientRect().bottom <= STICKY_REVEAL;
+      // Sayfa hiç kaydırılmadıysa şerit açılmaz. Telefondaki kısa kapaklar
+      // (proje sayfasında yalnızca üst satır, ~68 px) daha açılışta eşiğin
+      // üstünde kalıyordu: şerit hemen belirip kapağın açma simgesini
+      // örtüyordu. Uzun kapaklarda fark yok — onlar zaten ancak kaydırılınca
+      // eşiğe geliyor.
+      const title = window.scrollY > 4 && el.getBoundingClientRect().bottom <= STICKY_REVEAL;
       const backEl = backSourceRef?.current;
       const next = {
         title,
@@ -386,7 +391,7 @@ function CoverStickyHeader({
           - masaüstünde sayfanın sekme çubuğu yukarı kayınca (2. aşama) sekmeler,
           - mobilde ise sayfa adı + kişi göstergesi buraya yerleşir; böylece dar
             ekranda ayrı bir başlık satırı açıp şeridi bir kat daha uzatmıyoruz. */}
-      {/* ÜST SATIR — sayfanın kimliği. Solda sidebar oku (14–54) + logo (62–110),
+      {/* ÜST SATIR — sayfanın kimliği. Solda sidebar oku (14–54),
           sağda bildirim çanı (14–58) + tur düğmesi (62–106) position:fixed
           duruyor; bu satırın dolgusu tam o boşluğu bırakıyor ve kişi göstergesi
           sağ uçta, çanın hemen yanına düşüyor. */}
@@ -396,7 +401,7 @@ function CoverStickyHeader({
           display: "flex",
           alignItems: "center",
           gap: 12,
-          paddingLeft: sidebarOpen ? 28 : 118,
+          paddingLeft: sidebarOpen ? 28 : 62,
           paddingRight: 112,
         }}
       >
@@ -772,11 +777,10 @@ export default function App() {
           user={me}
         />
 
-        {/* Sidebar kapalıyken (masaüstünde veya mobilde) sol üstte küçük bir ok
-            butonu ve onun yanında Projelio logosu gösterilir; oka basınca sidebar
-            açılır, logoya basınca ana sayfaya gidilir. Sidebar açıkken zaten kendi
-            logosunu ve kapatma okunu içeriyor, burada ayrıca bir şey göstermeye
-            gerek yok. */}
+        {/* Sidebar kapalıyken (masaüstünde veya mobilde) sol üstte yalnızca küçük
+            bir ok butonu durur; basınca sidebar açılır. Yanındaki yüzen Projelio
+            logosu 2026-09'da kaldırıldı: logo sidebar'ın içinde zaten var, kapağın
+            üstünde de başlığa ve kapak fotoğrafına binip kalabalık yaratıyordu. */}
         {!sidebarOpen && (
           <>
             <button
@@ -801,20 +805,6 @@ export default function App() {
             >
               <IconChevronRight size={18} color={c.textSecondary} />
             </button>
-            <Link
-              to="/"
-              aria-label={t("Projelio - Ana sayfa")}
-              style={{
-                position: "fixed",
-                top: safeTop(10),
-                left: 62,
-                zIndex: Z.topChrome,
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <img src="/logo.png" alt="Projelio" style={{ width: 48, height: 48 }} />
-            </Link>
           </>
         )}
         <NotificationBell />

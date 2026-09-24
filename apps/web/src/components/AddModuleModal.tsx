@@ -10,6 +10,11 @@ interface Props {
   organizationId: string;
   onClose: () => void;
   onAdded: () => void;
+  /**
+   * Departman sayfasından açıldığında o departman: seçim adımı atlanır,
+   * doğrudan o departmanın eklenebilir modülleri listelenir.
+   */
+  fixedDepartmentId?: string;
 }
 
 // Şirket anasayfasındaki birleşik "+" menüsünden ("Modül ekle") açılır. Modül
@@ -17,13 +22,13 @@ interface Props {
 // önce hangi departmana ekleneceği seçilir, sonra o departmanın henüz etkin
 // olmayan modülleri listelenir — DepartmentModulesPanel.AddModulesForm ile aynı
 // ekleme mantığı, tek farkla: departman seçimi burada ek bir adım.
-export default function AddModuleModal({ organizationId, onClose, onAdded }: Props) {
+export default function AddModuleModal({ organizationId, onClose, onAdded, fixedDepartmentId }: Props) {
   const c = useThemeColors();
   const t = useT();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [enabledKeys, setEnabledKeys] = useState<Set<string>>(new Set());
   const [loadingDepts, setLoadingDepts] = useState(true);
-  const [departmentId, setDepartmentId] = useState("");
+  const [departmentId, setDepartmentId] = useState(fixedDepartmentId ?? "");
   const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
@@ -84,6 +89,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded }: Pro
   return (
     <Modal title={t("Modül ekle")} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {!fixedDepartmentId && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Departman")}</label>
           {loadingDepts ? (
@@ -103,6 +109,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded }: Pro
             </select>
           )}
         </div>
+        )}
 
         {departmentId &&
           (loadingCatalog ? (

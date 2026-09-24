@@ -12,7 +12,6 @@ import type { TranslationDict } from "@projelio/shared";
 export const ilkAdimlar: TranslationDict = {
   // ─────────────────────────────────────────────── Genel
   "Ana sayfa": "Home",
-  "Projelio - Ana sayfa": "Projelio - Home",
   "Ara…": "Search…",
   "Ekleniyor…": "Adding…",
   "Siliniyor…": "Deleting…",

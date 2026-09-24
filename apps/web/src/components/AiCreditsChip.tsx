@@ -85,7 +85,10 @@ export default function AiCreditsChip({ compact = false }: Props) {
     >
       <IconSparkle size={compact ? 13 : 15} color={isLow ? c.accentDark : c.accent} />
       <span style={{ fontWeight: 500 }}>{balance}</span>
-      <span style={{ color: c.textSecondary, fontSize: compact ? 11.5 : 13 }}>{t("Lio Bakiyesi")}</span>
+      {/* Küçük rozette yalnızca simge + sayı: telefonda rozet kapağın
+          üstünde, fotoğrafın altında duruyor ve etiketle birlikte başlığın
+          sütununa taşıyordu. Anlamı title/aria-label taşıyor. */}
+      {!compact && <span style={{ color: c.textSecondary, fontSize: 13 }}>{t("Lio Bakiyesi")}</span>}
     </button>
   );
 }

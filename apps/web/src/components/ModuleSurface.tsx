@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import type { ModuleAccess } from "@projelio/shared";
+import { modulKullanildi } from "../lib/sonKullanilanModul";
 import { isEntityModule, isOpenableModule } from "../lib/entityModules";
 import { MODULE_FORM_CONFIGS } from "../lib/moduleForms";
 import { getModuleRecordConfig } from "../lib/moduleRecordConfigs";
@@ -50,6 +52,9 @@ export interface ModuleSurfaceProps {
  * bir kural demekti.
  */
 export default function ModuleSurface(props: ModuleSurfaceProps) {
+  // Anasayfadaki Modüller listesi son kullanılanı en üste koyuyor; beş yüzeyin
+  // hepsi buradan geçtiği için işaret tek yerde (bkz. lib/sonKullanilanModul).
+  useEffect(() => modulKullanildi(props.moduleKey), [props.moduleKey]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>

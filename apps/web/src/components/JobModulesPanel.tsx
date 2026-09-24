@@ -22,6 +22,14 @@ interface Props {
    * görünür — kullanıcı ne eklediğini görmeli.
    */
   hideWhenEmpty?: boolean;
+  /**
+   * Modüller artık sayfanın tepesinde listeleniyor (bkz. PageModulesBar);
+   * bu panel yalnızca "+" ile ekleme açıldığında görünür — ekleme listesi ve
+   * kaldırma düğmeli kartlar orada. Yoksa aynı liste sayfada iki kez dururdu.
+   */
+  onlyWhileAdding?: boolean;
+  /** Atama değişince (ekleme/kaldırma) — tepedeki listenin tazelenmesi için. */
+  onChanged?: () => void;
 }
 
 /**
@@ -44,7 +52,7 @@ export interface JobModulesPanelHandle {
   openAdd: () => void;
 }
 
-const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobModulesPanel({ jobId, hideWhenEmpty }, ref) {
+const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobModulesPanel({ jobId, hideWhenEmpty, onlyWhileAdding, onChanged }, ref) {
   const c = useThemeColors();
   const t = useT();
   const navigate = useNavigate();
@@ -66,6 +74,7 @@ const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobMod
       .then(([cat, mods]) => {
         setCatalog(cat);
         setAssigned(mods);
+        onChanged?.();
       })
       .finally(() => setLoading(false));
   };
@@ -127,6 +136,7 @@ const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobMod
 
   const activeEntries = catalog.filter((e) => isAssigned(e.key));
   if (hideWhenEmpty && activeEntries.length === 0 && !adding) return null;
+  if (onlyWhileAdding && !adding) return null;
   const availableEntries = catalog.filter((e) => !isAssigned(e.key));
   const modalEntry = modalKey ? catalog.find((e) => e.key === modalKey) ?? null : null;
 

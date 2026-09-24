@@ -19,8 +19,12 @@ const AVATAR_SIZE_DESKTOP = 116;
  * ve "Çelikhan Endüstri A.Ş." gibi üç kelimelik bir şirket adı üç satıra
  * yayılıyordu. Fotoğrafın kendisi de o boyutta kapağın yarısını kaplayıp
  * kalabalık kapak görsellerinde karmaşa yaratıyordu.
+ *
+ * 76'dan 56'ya indirildi (2026-09): telefonda anasayfa hâlâ kalabalık
+ * bulunuyordu. Kart orada bir kimlik işareti, bilgi kaynağı değil — fotoğraf
+ * küçük durmalı, kapak ve liste öne çıkmalı.
  */
-const AVATAR_SIZE_MOBILE = 76;
+const AVATAR_SIZE_MOBILE = 56;
 const RING_PADDING = 4;
 /**
  * Dar ekranda kartın kapladığı GENİŞLİK (avatar + iki yandaki halka).
@@ -84,9 +88,15 @@ interface Props {
    * Masaüstünde etkisiz: orada kapsül zaten hover ile büyüyor ve yer sorunu yok.
    */
   collapsible?: boolean;
+  /**
+   * Küçük kartta fotoğrafın çapı (halka hariç). Proje kapağının en üst
+   * satırında kart, sabit düğmelerle (44 px) aynı satırda duruyor; 56 px'lik
+   * fotoğraf o satırı uzatıyordu.
+   */
+  avatarSize?: number;
 }
 
-export default function ProfileCard({ bleedRight = 0, compact = false, collapsible = false }: Props) {
+export default function ProfileCard({ bleedRight = 0, compact = false, collapsible = false, avatarSize }: Props) {
   const c = useThemeColors();
   const t = useT();
   const isDesktop = useIsDesktop();
@@ -142,10 +152,13 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
 
   // Taban ölçü ile kapsülün gerektirdiği ölçünün büyüğü — ama kapağa sığacak
   // kadar. Kapsül ölçülene kadar (ilk render) taban ölçü kullanılır.
-  const AVATAR_SIZE = Math.min(
-    AVATAR_SIZE_MAX,
-    Math.max(compact ? AVATAR_SIZE_MOBILE : AVATAR_SIZE_DESKTOP, capsuleHeight + AVATAR_OVERHANG)
-  );
+  //
+  // Küçük kartta avatar SABİT: kapsül açıklamayı göstermediği için hep aynı
+  // boyda, onunla büyümesine gerek yok. Büyüseydi katlı kartta bile (kapsül
+  // görünmezken ölçülmeye devam ediyor) fotoğraf 110 px'e çıkıyordu.
+  const AVATAR_SIZE = compact
+    ? avatarSize ?? AVATAR_SIZE_MOBILE
+    : Math.min(AVATAR_SIZE_MAX, Math.max(AVATAR_SIZE_DESKTOP, capsuleHeight + AVATAR_OVERHANG));
   // Kapsülün sağ ucu HER ZAMAN avatarın merkezinde biter: daire kapsülden taşar,
   // tasarımın tamamı bu binişme üzerine kurulu. Sağa taşma (bleedRight) kapsüle
   // değil KARTIN TAMAMINA uygulanır (aşağıdaki dış sarmalayıcı) — kapsülü
@@ -174,6 +187,12 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
         // tam kenarda durur, kapsül de "sayfanın dışından geliyormuş" gibi
         // görünür. Avatarın kırpılmaması için taşma payı YOK — tam dolgu kadar.
         marginRight: -bleedRight,
+        // Katlıyken kapsül görünmez ama yerleşimde yer kaplamaya devam ediyor
+        // (transform yeri değiştirmez): kartın kök kutusu fotoğrafın SOLUNA
+        // uzanıp altındaki düğmelere gelen dokunuşları yutuyordu — şirket
+        // kapağındaki "Kapağı aç" simgesi bu yüzden çalışmıyordu. Katlıyken
+        // yalnızca fotoğraf dokunuş alır (aşağıda pointerEvents: "auto").
+        pointerEvents: collapsed && !tapped ? "none" : undefined,
       }}
     >
       {/* Sağa dayalı bilgi kapsülü — sağ tarafı avatarın altına girecek şekilde kısaltılmış. */}
@@ -184,7 +203,7 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
           flexDirection: "column",
           alignItems: "flex-end",
           textAlign: "right",
-          gap: compact ? 4 : 3,
+          gap: 3,
           // Kapsüldeki ad her zaman sabit beyaz (aşağıda "#fff"), o yüzden zemin de
           // sabit koyu kalmalı — dinamik c.primary karanlık modda açık bir tona
           // döndüğü için (bkz. ThemeProvider) beyaz yazıyla kontrastı bozar.
@@ -197,14 +216,14 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
           // taşacakmış gibi duruyordu. Dikeyde 9 -> 13, solda 14 -> 18,
           // metin ile avatar arasında 18 -> 22.
           padding: compact
-            ? `10px ${capsuleRightInset + 22}px 10px 18px`
+            ? `7px ${capsuleRightInset + 16}px 7px 14px`
             : `14px ${capsuleRightInset + 26}px 14px 24px`,
           marginRight: -(capsuleRightInset + RING_PADDING),
           // maxWidth kutunun TAMAMINI sınırlar (border-box). Sağ dolgu büyüdükçe
           // metne kalan yer daralıyor ve yazılar eziliyordu; sınırı içerik
           // genişliği + dolgu olarak kuruyoruz. Kapsül sağa sabitli olduğu için
           // fazla genişlik sola doğru açılır.
-          maxWidth: (compact ? 190 : 260) + capsuleRightInset,
+          maxWidth: (compact ? 170 : 260) + capsuleRightInset,
           boxShadow: active ? "0 12px 28px rgba(28,34,44,0.26)" : "0 6px 18px rgba(28,34,44,0.18)",
           // Katlıyken kapsül kendi genişliği kadar sağa kayar: sol ucu avatarın
           // merkezine denk gelir, yani tamamen fotoğrafın ARKASINA (avatar
@@ -220,7 +239,7 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
       >
         <div
           style={{
-            fontSize: compact ? 14 : 17,
+            fontSize: compact ? 13.5 : 17,
             fontWeight: 600,
             color: "#fff",
             whiteSpace: "nowrap",
@@ -234,11 +253,11 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
         {/* Unvan her zaman görünür: kullanıcı kendi metnini yazmadıysa hesap tipinden türetilir. */}
         <div
           style={{
-            fontSize: compact ? 11 : 12,
+            fontSize: compact ? 10.5 : 12,
             fontWeight: 500,
             color: c.primaryDark,
             background: c.accent,
-            padding: "2px 10px",
+            padding: compact ? "1px 8px" : "2px 10px",
             borderRadius: 999,
             whiteSpace: "nowrap",
             overflow: "hidden",
@@ -252,7 +271,9 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
             görünür, taşarsa "…" ile kesilir ve ÇİFT tıklayınca tamamı açılır.
             Kapsül büyüyünce avatar da onunla birlikte büyür (bkz. capsuleHeight),
             yani daire hiçbir zaman kapsülün içine gömülmez. */}
-        {user.bio && (
+        {/* Küçük kartta açıklama yok: telefonda kapsül tek bakışta okunacak
+            kadar kısa kalmalı; açıklama profil düzenleme penceresinde. */}
+        {user.bio && !compact && (
           <CardDescription
             text={user.bio}
             lines={BIO_LINES}
@@ -307,6 +328,7 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
         aria-label={collapsed && !tapped ? t("Profil kartını aç") : t("Profil fotoğrafı")}
         aria-expanded={collapsed ? tapped : undefined}
         style={{
+          pointerEvents: "auto",
           position: "relative",
           zIndex: 2,
           flexShrink: 0,
@@ -347,7 +369,7 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
           ) : (
-            <IconUser size={compact ? 30 : 44} color={c.textSecondary} />
+            <IconUser size={compact ? 24 : 44} color={c.textSecondary} />
           )}
         </div>
 
@@ -376,8 +398,8 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
         >
           <span
             style={{
-              width: 40,
-              height: 40,
+              width: compact ? 30 : 40,
+              height: compact ? 30 : 40,
               borderRadius: "50%",
               background: "rgba(255,255,255,0.16)",
               border: "1.5px solid rgba(255,255,255,0.75)",
@@ -388,7 +410,7 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
               transition: "transform 240ms cubic-bezier(0.34, 1.4, 0.64, 1)",
             }}
           >
-            <IconSettings size={20} color="#fff" />
+            <IconSettings size={compact ? 16 : 20} color="#fff" />
           </span>
         </div>
       </div>

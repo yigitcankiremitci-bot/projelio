@@ -9,7 +9,7 @@ import FilesPanel from "../components/FilesPanel";
 import DepartmentsPanel, { DepartmentsPanelHandle } from "../components/DepartmentsPanel";
 import OrgTasksPanel from "../components/OrgTasksPanel";
 import ProductsPanel, { ProductsPanelHandle } from "../components/ProductsPanel";
-import ModulesPanel from "../components/ModulesPanel";
+import ModulesPanel, { ModulesPanelHandle } from "../components/ModulesPanel";
 import OrgBudgetPanel, { OrgBudgetPanelHandle } from "../components/OrgBudgetPanel";
 import AddModuleRecordModal from "../components/AddModuleRecordModal";
 import QuickFileUploadModal from "../components/QuickFileUploadModal";
@@ -20,7 +20,7 @@ import { useModuleTabs } from "../lib/useModuleTabs";
 import ProfileCard from "../components/ProfileCard";
 import AiCreditsChip from "../components/AiCreditsChip";
 import { useAppPrefs } from "../lib/appPrefs";
-import EntityCover, { CoverBackLink, coverActionButton, coverBadgeStyle } from "../components/EntityCover";
+import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton, coverBadgeStyle } from "../components/EntityCover";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
@@ -100,6 +100,7 @@ export default function OrganizationDetail() {
   };
   const feedRef = useRef<FeedPanelHandle>(null);
   const departmentsRef = useRef<DepartmentsPanelHandle>(null);
+  const modulesRef = useRef<ModulesPanelHandle>(null);
   const productsRef = useRef<ProductsPanelHandle>(null);
   const budgetRef = useRef<OrgBudgetPanelHandle>(null);
   // "İşe al" ve "Gelir/gider ekle" aynı modalı (bkz. AddModuleRecordModal),
@@ -263,6 +264,7 @@ export default function OrganizationDetail() {
             hiddenTabs={hiddenTabs}
           />
         </div>
+        <MobileBackRow backRef={backRef} to={back.to} label={back.label} geriGit={back.geriGit} />
 
         {/* Terfi etmiş modül: sekmenin içeriği modülün kendisi. Departman
             bağlamı yok — organizasyon geneli açılır. */}
@@ -282,6 +284,7 @@ export default function OrganizationDetail() {
             <HomeAddFabRegistrar
               productsRef={productsRef}
               departmentsRef={departmentsRef}
+              modulesRef={modulesRef}
               setAddingRecordModule={setAddingRecordModule}
               setAddingFile={setAddingFile}
               onGelirGider={() => setActiveTab("budget")}
@@ -291,11 +294,10 @@ export default function OrganizationDetail() {
               <DepartmentsPanel ref={departmentsRef} organizationId={id} useFab={false} />
             </div>
             <div style={{ marginTop: 28 }}>
-              <ModulesPanel organizationId={id} />
+              <ModulesPanel ref={modulesRef} organizationId={id} />
             </div>
           </>
         )}
-        {activeTab === "departments" && <DepartmentsPanel organizationId={id} layout="grid" />}
         {activeTab === "tasks" && <OrgTasksPanel organizationId={id} organizationName={organization?.name} />}
         {/* Sekme zaten gizli; ?tab= ile zorlansa da panel açılmasın (sunucu 403 döner). */}
         {activeTab === "products" && access?.canViewCommercial !== false && (
@@ -383,18 +385,21 @@ function BudgetFabRegistrar({ budgetRef }: { budgetRef: React.RefObject<OrgBudge
 // Anasayfa sekmesindeki tek "+" düğmesi, sık kullanılan beş ekleme eylemini
 // birden temsil eder — tıklanınca job-choice ile aynı küçük seçim menüsü
 // (butonun üstüne doğru açılan liste) çıkar (bkz. BottomNav/ProjectFabAction.options).
-// Modül ekleme burada YOK: o, her departmanın kendi sayfasından yapılır (bkz.
-// ModulesPanel'deki not) — bu menü yalnızca en sık tekrarlanan günlük eylemler
-// için bir kısayoldur.
+// Departman ve modül ekleme de burada (2026-09): ayrı Departmanlar sekmesi
+// kaldırıldı ve anasayfa başlıklarına düğme koymak kalabalık buldu; ekleme
+// eylemlerinin tek adresi bu menü. Modül önce departman seçtirir
+// (bkz. AddModuleModal).
 function HomeAddFabRegistrar({
   productsRef,
   departmentsRef,
+  modulesRef,
   setAddingRecordModule,
   setAddingFile,
   onGelirGider,
 }: {
   productsRef: React.RefObject<ProductsPanelHandle | null>;
   departmentsRef: React.RefObject<DepartmentsPanelHandle | null>;
+  modulesRef: React.RefObject<ModulesPanelHandle | null>;
   setAddingRecordModule: (value: string | null) => void;
   setAddingFile: (value: boolean) => void;
   onGelirGider: () => void;
@@ -409,11 +414,12 @@ function HomeAddFabRegistrar({
         // Gelir/gider artık bir modül kaydı değil, defterin kendisi: kısayol
         // Bütçe sekmesine götürüyor (bkz. migration 104, tek defter kararı).
         { label: t("Gelir/gider ekle"), onClick: onGelirGider },
-        { label: t("Departman kur"), onClick: () => departmentsRef.current?.openAdd() },
+        { label: t("Departman ekle"), onClick: () => departmentsRef.current?.openAdd() },
+        { label: t("Modül ekle"), onClick: () => modulesRef.current?.openAdd() },
         { label: t("Dosya ekle"), onClick: () => setAddingFile(true) },
       ],
     },
-    [productsRef, departmentsRef, setAddingRecordModule, setAddingFile, onGelirGider]
+    [productsRef, departmentsRef, modulesRef, setAddingRecordModule, setAddingFile, onGelirGider]
   );
   return null;
 }

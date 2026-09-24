@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { COVER_VEIL_HEIGHT, coverBackground } from "../lib/covers";
 import { useLiveRoom } from "../lib/liveRoom";
-import { CoverBackLink } from "../components/EntityCover";
+import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton } from "../components/EntityCover";
 import AskLioButton from "../components/AskLioButton";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import { useBackTarget } from "../lib/backTarget";
@@ -495,6 +495,47 @@ export default function ProjectDetail() {
         // kimliğinden türetilmiş hazır kapak çizilir (bkz. lib/covers). Bu yüzden
         // eski "kapaksız" düzen dalı — tepeden 76px boşluk, perdesiz zemin, koyu
         // yazı — tamamen kalktı; okunurluk perdeyle sağlanıyor.
+        //
+        // Telefonda bu elle yazılmış kapak yerine ortak katlanır kapak
+        // (bkz. EntityCover): diğer sayfalarla aynı bant ve kişi fotoğrafı.
+        // Durum, ücret ve tarihler açılan künyede; düğmeler de orada.
+        const sahibi = Boolean(currentUserId && currentUserId === project.ownerId);
+        if (!isDesktop) {
+          return (
+            <EntityCover
+              coverRef={coverRef}
+              coverImageUrl={project.coverImageUrl}
+              seed={project.id}
+              title={project.title}
+              // Kanban panosu ekranın asıl içeriği: kapak yalnızca en üst satır.
+              titleInTopRow
+              description={project.description}
+              lioSubject={{ kind: "proje", title: project.title, id: project.id }}
+              meta={
+                <>
+                  <StatusBadge status={project.status} onChange={sahibi ? handleStatusChange : undefined} />
+                  <span style={{ whiteSpace: "nowrap" }}>
+                    {t("Ücret:")} <span style={{ color: c.accentDark, fontWeight: 500 }}>{project.totalBudget.toLocaleString(bicimDili())} ₺</span>
+                  </span>
+                  <span style={{ whiteSpace: "nowrap" }}>{t("Başlangıç: {tarih}", { tarih: new Date(project.startDate).toLocaleDateString(bicimDili()) })}</span>
+                  <span style={{ whiteSpace: "nowrap" }}>{t("Bitiş: {tarih}", { tarih: new Date(project.deadline).toLocaleDateString(bicimDili()) })}</span>
+                </>
+              }
+              action={
+                sahibi ? (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setSharing(true)} aria-label={t("Takip linki oluştur")} style={coverActionButton(c)}>
+                      <IconExternalLink size={17} color={c.textSecondary} />
+                    </button>
+                    <button onClick={() => setEditing(true)} aria-label={t("Projeyi düzenle")} style={coverActionButton(c)}>
+                      <IconSettings size={17} color={c.textSecondary} />
+                    </button>
+                  </div>
+                ) : undefined
+              }
+            />
+          );
+        }
         return (
           <div
             ref={coverRef}
@@ -669,6 +710,8 @@ export default function ProjectDetail() {
               />
             </div>
           </div>
+          {/* Telefonda geri bağlantısı kapakta değil, sekmelerin altında (bkz. EntityCover). */}
+          <MobileBackRow backRef={backRef} to={back.to} label={back.label} geriGit={back.geriGit} />
 
           {activeTab === "feed" && <FeedPanel ref={feedRef} projectId={id} tasks={tasks} />}
           {activeTab === "team" && (

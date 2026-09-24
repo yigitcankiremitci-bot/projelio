@@ -13,8 +13,9 @@ import JobTabs, { JobTab, visibleJobTabs } from "../components/JobTabs";
 import ScopeBudgetPanel, { type ScopeBudgetPanelHandle } from "../components/butce/ScopeBudgetPanel";
 import { useCurrentUser, useIsSubcontractor } from "../lib/useCurrentUser";
 import JobModulesPanel, { JobModulesPanelHandle } from "../components/JobModulesPanel";
+import PageModulesBar from "../components/PageModulesBar";
 import JobTeamPanel, { JobTeamPanelHandle } from "../components/JobTeamPanel";
-import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
+import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton } from "../components/EntityCover";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import JobInviteBanner from "../components/JobInviteBanner";
 import OrnekIsSeridi from "../components/OrnekIsSeridi";
@@ -112,6 +113,8 @@ export default function JobDetail() {
   const tasksPanelRef = useRef<JobTasksPanelHandle>(null);
   const teamRef = useRef<JobTeamPanelHandle>(null);
   const modulesRef = useRef<JobModulesPanelHandle>(null);
+  // Modül eklenip kaldırılınca tepedeki liste (PageModulesBar) tazelensin.
+  const [modulYenile, setModulYenile] = useState(0);
   const budgetRef = useRef<ScopeBudgetPanelHandle>(null);
 
   // Sekmeye göre alt navigasyondaki "+" butonunun ne yapacağı.
@@ -496,6 +499,12 @@ export default function JobDetail() {
             />
           </div>
         </div>
+        {/* Telefonda geri bağlantısı kapakta değil, sekmelerin altında (bkz. EntityCover). */}
+        <MobileBackRow backRef={backRef} to={back.to} label={back.label} geriGit={back.geriGit} />
+        {/* Modüller her sekmede üstte, kolay erişim için (bkz. PageModulesBar).
+            İşte ayrı bir Modüller sekmesi yok; ekleme/kaldırma Projeler
+            sekmesindeki panelde, "+" ile açılınca. */}
+        {id && <PageModulesBar kind="job" jobId={id} yenile={modulYenile} />}
 
         <div>
           <StatSummary items={stats} />
@@ -541,7 +550,13 @@ export default function JobDetail() {
               seçeneği listeyi açıp paneli görünür kılıyor. */}
           {activeTab === "projects" && id && !isSubcontractor && (
             <div style={{ marginTop: 28 }}>
-              <JobModulesPanel ref={modulesRef} jobId={id} hideWhenEmpty />
+              <JobModulesPanel
+                ref={modulesRef}
+                jobId={id}
+                hideWhenEmpty
+                onlyWhileAdding
+                onChanged={() => setModulYenile((n) => n + 1)}
+              />
             </div>
           )}
 

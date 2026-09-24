@@ -54,13 +54,18 @@ export default function TabBar({ tabs, active, onChange, style, scrollable }: Pr
   // normal.
   const minTab = isDesktop ? 118 : 92;
 
-  // Mobilde her zaman tek satır + yana kaydırma: 6 sekme dar ekranda iki-üç
-  // satıra sarıyor ve ekranın üçte birini yiyordu. Masaüstünde sarma sorunu yok,
-  // orada sekmeler genişliği paylaşan ızgara olarak daha okunaklı — tek istisna,
-  // sabit şeritteki kopya (`scrollable`), çünkü o bandın yüksekliği sabit.
-  // Mobilde her zaman tek satır + yana kaydırma.
+  // Mobilde sayfadaki çubuk alt alta, ekrana tam oturan bir ızgara
+  // (bkz. MobileGridTabBar). Yana kaydırmalı hâl kullanıcı tarafından
+  // beğenilmedi (2026-09): sekmelerin yarısı ekran dışında kalıyor, hangi
+  // sekmelerin olduğu ancak kaydırınca anlaşılıyordu. Tepede beliren sabit
+  // şeritteki kopya (`scrollable`) ise kaydırmalı kalır — o bandın yüksekliği
+  // sabit, iki-üç satırlık ızgara ekranın yarısını kapatırdı.
   if (!isDesktop) {
-    return <ScrollableTabBar tabs={tabs} active={active} onChange={onChange} style={style} />;
+    return scrollable ? (
+      <ScrollableTabBar tabs={tabs} active={active} onChange={onChange} style={style} />
+    ) : (
+      <MobileGridTabBar tabs={tabs} active={active} onChange={onChange} style={style} />
+    );
   }
 
   // Masaüstünde sabit şeritteki kopya (`scrollable`): satır yüksekliği sabit
@@ -129,6 +134,88 @@ export default function TabBar({ tabs, active, onChange, style, scrollable }: Pr
           )}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Telefondaki ızgarada satır başına sekme sayısı. */
+const MOBILE_COLUMNS = 3;
+
+/**
+ * Telefonda sayfanın içindeki sekme çubuğu: 3 sütunlu, ekrana tam oturan
+ * ızgara; hücreler arasında ince çizgi.
+ *
+ * Çizgiler kenarlıkla değil, zemin rengini 1 px'lik aralıktan göstererek
+ * çiziliyor: kenarlıkla dış kenarda çift çizgi oluşuyor, hangi hücrenin hangi
+ * kenarının çizileceğini ayrıca hesaplamak gerekiyordu. Son satır eksik
+ * kalırsa son sekme kalan hücreleri kaplar — yoksa boş hücreler aralık
+ * rengiyle dolu, bozuk görünen kutular olarak kalırdı.
+ */
+function MobileGridTabBar({ tabs, active, onChange, style }: Props) {
+  const c = useThemeColors();
+  const t = useT();
+  const lastSpan = MOBILE_COLUMNS - ((tabs.length - 1) % MOBILE_COLUMNS);
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${MOBILE_COLUMNS}, minmax(0, 1fr))`,
+        gap: 1,
+        background: c.border,
+        border: `1px solid ${c.border}`,
+        borderRadius: 10,
+        overflow: "hidden",
+        marginBottom: 16,
+        ...style,
+      }}
+    >
+      {tabs.map((sekme, i) => {
+        const on = active === sekme.key;
+        return (
+          <button
+            key={sekme.key}
+            onClick={() => onChange(sekme.key)}
+            aria-pressed={on}
+            style={{
+              gridColumn: i === tabs.length - 1 && lastSpan > 1 ? `span ${lastSpan}` : undefined,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+              minHeight: 42,
+              padding: "8px 4px",
+              lineHeight: 1.25,
+              // Hücreye sığmayan uzun etiket (ör. büyütülmüş yazı ölçeğinde)
+              // taşmak yerine iki satıra bölünsün.
+              overflowWrap: "anywhere",
+              textAlign: "center",
+              border: "none",
+              borderRadius: 0,
+              background: on ? c.primary : c.surface,
+              color: on ? "#fff" : c.textSecondary,
+              fontSize: 12.5,
+              fontWeight: 500,
+              textTransform: "uppercase",
+              cursor: "pointer",
+              transition: "background 0.12s ease, color 0.12s ease",
+            }}
+          >
+            {t(sekme.label, sekme.ctx ? { ctx: sekme.ctx } : undefined)}
+            {sekme.isNew && (
+              <span
+                title={t("Sık kullandığın için üste alındı")}
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  flexShrink: 0,
+                  background: on ? "#fff" : c.accent,
+                }}
+              />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -5,6 +5,10 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { useDragScroll } from "../lib/useDragScroll";
 import ProductCard from "./ProductCard";
+import ProductStack from "./ProductStack";
+import SectionToggle from "./SectionToggle";
+import { useKatlanirBolum } from "../lib/useKatlanirBolum";
+import { useIsDesktop } from "../lib/useIsDesktop";
 import AddEditProductModal from "./AddEditProductModal";
 import ProductDetailModal from "./ProductDetailModal";
 import { useT } from "../lib/i18n";
@@ -42,6 +46,14 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
   const c = useThemeColors();
   const t = useT();
   const scrollRef = useDragScroll<HTMLDivElement>(layout === "scroll");
+  const isDesktop = useIsDesktop();
+  const compactCards = layout === "scroll" && !isDesktop;
+  const cardWidth = 260;
+  // Küçültme yalnızca anasayfa şeridinde: ayrı Ürün/Hizmet sekmesinde
+  // listeyi gizlemek sekmenin kendisini anlamsızlaştırırdı.
+  const collapsible = layout === "scroll";
+  const [collapsed, toggleCollapsed] = useKatlanirBolum("projelio.anasayfa-urunler-kapali", collapsible);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -71,9 +83,27 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Ürün/Hizmet")}</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {/* Çift dokunuş "Ürün/Hizmet ekle" penceresini açar (bkz. DepartmentsPanel başlığı). */}
+        <h2
+          onDoubleClick={() => setAdding(true)}
+          title={t("Eklemek için çift tıkla")}
+          style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0, userSelect: "none", cursor: "default", touchAction: "manipulation" }}
+        >
+          {t("Ürün/Hizmet")}
+        </h2>
+        {collapsible && (
+          <SectionToggle
+            collapsed={collapsed}
+            onToggle={toggleCollapsed}
+            count={loading ? undefined : products.length}
+            showLabel={t("Ürün/hizmetleri göster")}
+            hideLabel={t("Ürün/hizmetleri gizle")}
+          />
+        )}
+      </div>
 
-      {loading ? (
+      {collapsed ? null : loading ? (
         <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
       ) : products.length === 0 ? (
         <div
@@ -88,6 +118,8 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
         >
           {t('Henüz ürün/hizmet yok. Sayfadaki "+" ile Ürün Yönetimi departmanına ürün/hizmet ekleyebilirsin.')}
         </div>
+      ) : compactCards ? (
+        <ProductStack products={products} onOpen={setOpen} onCoverUpdated={load} />
       ) : (
         <div
           ref={scrollRef}
@@ -108,7 +140,10 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
             // Kaydırmalı satırda kart genişliği SABİT: flex öğeleri varsayılan
             // olarak büzülüyor ve otuz ürün eklendiğinde hepsi satıra sıkışıp
             // okunamaz hale geliyordu (bkz. DepartmentsPanel'deki aynı ölçü).
-            <div key={p.id} style={layout === "grid" ? undefined : { flex: "0 0 260px", width: 260 }}>
+            <div
+              key={p.id}
+              style={layout === "grid" ? undefined : { flex: `0 0 ${cardWidth}px`, width: cardWidth }}
+            >
               <ProductCard product={p} onOpen={() => setOpen(p)} onCoverUpdated={() => load()} />
             </div>
           ))}

@@ -5,6 +5,7 @@ import { defaultLocale, ENTITY_TAB_KEYS, sanitizeHiddenTabs } from "@projelio/sh
 import { cevirmen } from "../../common/i18n";
 import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 import { applyOrder } from "../../common/reorder.util";
+import { tumSayfalar } from "../../common/liste-tavani";
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { decideDepartmentAccess } from "./department-access";
@@ -211,14 +212,38 @@ export class DepartmentsService {
 
     const deptIds = departments.map((d) => d.id);
     if (deptIds.length > 0) {
-      const { data: memberRows } = await this.supabase.client
-        .from("department_members")
-        .select("department_id")
-        .in("department_id", deptIds)
-        .neq("status", "removed");
+      const [{ data: memberRows }, taskRows] = await Promise.all([
+        this.supabase.client
+          .from("department_members")
+          .select("department_id")
+          .in("department_id", deptIds)
+          .neq("status", "removed"),
+        // Anasayfadaki departman satırı "bitmiş/toplam görev" gösteriyor.
+        // Yalnızca iki sütun çekiliyor; departmanın Görevler sekmesiyle aynı
+        // küme (arşivlenmemiş, departmana doğrudan bağlı görevler). Okunamazsa
+        // liste yine döner, sayılar 0 görünür.
+        tumSayfalar<{ department_id: string; status: string }>((bas, bit) =>
+          this.supabase.client
+            .from("tasks")
+            .select("department_id, status")
+            .in("department_id", deptIds)
+            .is("archived_at", null)
+            .range(bas, bit)
+        ).catch(() => []),
+      ]);
       const counts = new Map<string, number>();
       for (const m of memberRows ?? []) counts.set(m.department_id, (counts.get(m.department_id) ?? 0) + 1);
-      for (const d of departments) d.memberCount = counts.get(d.id) ?? 0;
+      const toplam = new Map<string, number>();
+      const biten = new Map<string, number>();
+      for (const t of taskRows) {
+        toplam.set(t.department_id, (toplam.get(t.department_id) ?? 0) + 1);
+        if (t.status === "completed") biten.set(t.department_id, (biten.get(t.department_id) ?? 0) + 1);
+      }
+      for (const d of departments) {
+        d.memberCount = counts.get(d.id) ?? 0;
+        d.taskCount = toplam.get(d.id) ?? 0;
+        d.completedTaskCount = biten.get(d.id) ?? 0;
+      }
     }
 
     return departments;

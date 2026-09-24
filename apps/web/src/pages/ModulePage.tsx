@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import type { Department, Job, ModuleAccess, ModuleCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
 import { useBackTarget } from "../lib/backTarget";
@@ -8,7 +8,7 @@ import { useLiveRoom } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
 import ModuleSurface from "../components/ModuleSurface";
 import ModuleTeamPanel from "../components/ModuleTeamPanel";
-import { IconChevronLeft } from "../components/icons";
+import { CoverBackLink } from "../components/EntityCover";
 import { useT } from "../lib/i18n";
 
 /**
@@ -89,7 +89,6 @@ export default function ModulePage() {
   // sekmesine gidiyordu — kullanıcı hiç görmediği bir sayfaya düşüyordu.
   // Önceki sayfa bilinmiyorsa (doğrudan bağlantı) sabit ebeveyn sürüyor.
   const back = useBackTarget(parent);
-  const navigate = useNavigate();
   const { key } = useLocation();
   // Modülün adı geçmişe yazılır: buradan açılan sayfanın geri bağlantısı
   // "← Faturalar" diyebilsin.
@@ -108,19 +107,12 @@ export default function ModulePage() {
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <Link
-          to={back.to}
-          onClick={(e) => {
-            // Yeni sekmede açma (Cmd/Ctrl/orta tık) bağlantının kendi işi.
-            if (!back.geriGit || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-            e.preventDefault();
-            navigate(-1);
-          }}
-          style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: c.textSecondary }}
-        >
-          <IconChevronLeft size={14} color={c.textSecondary} />
-          {back.label}
-        </Link>
+        {/* Uygulamanın her yerindeki geri hapı (bkz. EntityCover CoverBackLink).
+            Burada kapak olmadığı için sayfa zeminine uygun "floating" hâli.
+            Önceden düz bir yazı bağlantısıydı; tek bu sayfa farklı duruyordu. */}
+        <div style={{ alignSelf: "flex-start" }}>
+          <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} floating />
+        </div>
         {/* Lio simgesi burada DEĞİL: modülün kendi yüzeyi (ModuleSurface) onu
             zaten çiziyor, buraya da koyarsak sayfada iki tane olurdu. */}
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: c.textPrimary }}>{title}</h1>

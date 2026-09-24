@@ -5,7 +5,7 @@ import TabBar from "./TabBar";
 // Terfi etmiş modüller de bu çubuğa girdiği için tip string'e açıldı: sabit
 // sekme anahtarları + modül katalog anahtarları.
 // Bkz. docs/moduller/24-yerlesim-modul-yuzeyleri.md §3
-export type OrgTab = "home" | "flow" | "departments" | "tasks" | "products" | "budget" | "files" | (string & {});
+export type OrgTab = "home" | "flow" | "tasks" | "products" | "budget" | "files" | (string & {});
 
 // Çekirdek sekme anahtarları ortak listeden gelir (bkz. shared ENTITY_TAB_KEYS):
 // ayarlar ekranındaki "kapatılabilir sekmeler" ile buradaki çubuk aynı kümeden
@@ -13,14 +13,13 @@ export type OrgTab = "home" | "flow" | "departments" | "tasks" | "products" | "b
 export const CORE_ORG_TABS = ENTITY_TAB_KEYS.organization;
 
 // Anasayfa, organizasyonun özeti (Ürün/Hizmet + Departmanlar + Modüller) —
-// varsayılan sekme budur. Departmanlar sekmesi yalnızca departman yönetimi
-// (ekleme/listeleme) içindir (bkz. OrganizationDetail.tsx). Sosyal, organizasyona
+// varsayılan sekme budur. Ayrı bir Departmanlar sekmesi YOK: liste Anasayfa'da,
+// ekleme oradaki "Departmanlar" başlığından açılan pencerede. Sosyal, organizasyona
 // bağlı TÜM departmanların akışlarını (+ organizasyona doğrudan yapılan
 // paylaşımları) tek zaman çizelgesinde toplar (bkz. FeedPanel).
 export const ORG_TABS = [
   { key: "home", label: "Anasayfa" }, // dil:anahtar
   { key: "flow", label: "Sosyal" }, // dil:anahtar
-  { key: "departments", label: "Departmanlar" }, // dil:anahtar
   // Departmanlarda dağınık duran görevlerin tek panosu (bkz. OrgTasksPanel).
   { key: "tasks", label: "Görevler" }, // dil:anahtar
   { key: "products", label: "Ürün/Hizmet" }, // dil:anahtar

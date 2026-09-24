@@ -185,7 +185,10 @@ export type TabScope = "organization" | "job" | "department" | "project";
  * onlar sabit değil, modülün kendi yetkisiyle gelip gidiyor.
  */
 export const ENTITY_TAB_KEYS: Record<TabScope, string[]> = {
-  organization: ["home", "flow", "departments", "tasks", "products", "budget", "files"],
+  // "departments" sekmesi 2026-09'da kaldırıldı: departmanlar Anasayfa'da
+  // listeleniyor, ekleme anasayfanın "+" menüsünden ya da başlığa çift dokunarak.
+  // Kayıtlı hiddenTabs'teki eski anahtarı sanitizeHiddenTabs sessizce atar.
+  organization: ["home", "flow", "tasks", "products", "budget", "files"],
   job: ["projects", "programs", "team", "tasks", "budget", "files", "modules"],
   department: ["flow", "team", "tasks", "budget", "modules", "files"],
   project: ["feed", "team", "tasks", "files", "budget", "process"],
@@ -350,6 +353,10 @@ export interface Department {
   archivedAt?: string;
   // Sunucu tarafında eklenir: bu departmandaki (removed hariç) kadro sayısı.
   memberCount?: number;
+  // Sunucu tarafında eklenir: arşivlenmemiş görev sayısı ve bunların kaçının
+  // tamamlandığı (anasayfadaki departman satırı "bitmiş/toplam" gösterir).
+  taskCount?: number;
+  completedTaskCount?: number;
   // Sunucu tarafında eklenir: İSTEYEN kullanıcının bu departmandaki görünürlüğü.
   // Arayüz sekmeleri buna göre gizler (bkz. DepartmentTabs) — asıl kısıt yine
   // sunucudadır, bu alan yalnızca kullanıcıya boş/hatalı ekran göstermemek için.

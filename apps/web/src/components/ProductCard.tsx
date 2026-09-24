@@ -16,6 +16,13 @@ interface Props {
   /** Ürün kartını (ProductDetailModal) açar. */
   onOpen: () => void;
   onCoverUpdated: (coverImageUrl?: string) => void;
+  /**
+   * Telefondaki anasayfa şeridi için küçük kart: fotoğraf, ad ve fiyat.
+   * Tam boy kart (368 px) telefonda ekranın yarısını kaplıyordu ve anasayfa
+   * tek bir ürünü gösteren bir vitrine dönüşüyordu. Açıklama, kod ve rozetler
+   * ürün penceresinde zaten var.
+   */
+  compact?: boolean;
 }
 
 // JobCard ile aynı görsel dil (kart yüksekliği HER ZAMAN sabit, hiç
@@ -30,6 +37,9 @@ interface Props {
 // resizeProductImage) tamamını kırpmadan gösterecek kadar yer bırakıyor.
 const COVER_HEIGHT = 176;
 const CARD_HEIGHT = 368;
+/** Küçük kartta fotoğraf yine 4:3'e yakın kalsın diye genişlikle (150) birlikte seçildi. */
+const COVER_HEIGHT_COMPACT = 110;
+const CARD_HEIGHT_COMPACT = 178;
 
 function formatPrice(price?: number, currency?: string): string | null {
   if (price === undefined || price === null) return null;
@@ -46,7 +56,7 @@ function formatStock(product: Product): string | null {
   return product.unit ? `${miktar} ${PRODUCT_UNIT_LABEL[product.unit].toLocaleLowerCase("tr-TR")}` : miktar;
 }
 
-export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) {
+export default function ProductCard({ product, onOpen, onCoverUpdated, compact = false }: Props) {
   const c = useThemeColors();
   const t = useT();
   const [coverUrl, setCoverUrl] = useState(product.coverImageUrl);
@@ -125,13 +135,13 @@ export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) 
         borderRadius: 12,
         overflow: "hidden",
         background: c.surface,
-        height: CARD_HEIGHT,
+        height: compact ? CARD_HEIGHT_COMPACT : CARD_HEIGHT,
       }}
     >
       <div
         style={{
           position: "relative",
-          height: COVER_HEIGHT,
+          height: compact ? COVER_HEIGHT_COMPACT : COVER_HEIGHT,
           flexShrink: 0,
           // Fotoğraf kutuyu tamamen kapladığı için zemin yalnızca yükleme anında
           // görünür; kart yüzeyiyle aynı kalsın ki karanlık modda beyaz bir
@@ -165,10 +175,10 @@ export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) 
           className="entity-card-cover-add"
           style={{
             position: "absolute",
-            top: 8,
-            right: 8,
-            width: 30,
-            height: 30,
+            top: 6,
+            right: 6,
+            width: compact ? 26 : 30,
+            height: compact ? 26 : 30,
             borderRadius: "50%",
             border: "none",
             background: "rgba(26,31,41,0.6)",
@@ -180,7 +190,7 @@ export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) 
           <IconPlus size={16} color="#fff" />
         </button>
 
-        {imageCount > 1 && (
+        {imageCount > 1 && !compact && (
           <span
             style={{
               position: "absolute",
@@ -262,11 +272,11 @@ export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) 
         />
       </div>
 
-      <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{ padding: compact ? "8px 10px" : 16, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         <h3
           style={{
             margin: "0 0 2px",
-            fontSize: 17,
+            fontSize: compact ? 14 : 17,
             fontWeight: 500,
             color: c.textPrimary,
             overflow: "hidden",
@@ -279,7 +289,7 @@ export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) 
 
         {/* Marka · Kategori: ürünü listede ayırt etmenin en hızlı yolu, ikisi de
             boşsa satır hiç çizilmiyor ki kart boş bir aralıkla başlamasın. */}
-        {(product.brand || product.category) && (
+        {!compact && (product.brand || product.category) && (
           <p
             style={{
               margin: "0 0 6px",
@@ -294,10 +304,10 @@ export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) 
           </p>
         )}
 
-        {product.description && <CardDescription text={product.description} />}
+        {!compact && product.description && <CardDescription text={product.description} />}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 15, color: c.textSecondary, marginBottom: 10 }}>
-          {product.sku && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 15, color: c.textSecondary, marginBottom: compact ? 0 : 10 }}>
+          {!compact && product.sku && (
             <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("Kod: {kod}", { kod: product.sku })}</div>
           )}
         </div>
@@ -309,9 +319,9 @@ export default function ProductCard({ product, onOpen, onCoverUpdated }: Props) 
             alignItems: "center",
             justifyContent: "space-between",
             gap: 8,
-            fontSize: 15,
-            paddingTop: 10,
-            borderTop: `1px solid ${c.border}`,
+            fontSize: compact ? 13 : 15,
+            paddingTop: compact ? 0 : 10,
+            borderTop: compact ? "none" : `1px solid ${c.border}`,
           }}
         >
           <span style={{ color: priceLabel ? c.textPrimary : c.textSecondary, fontWeight: priceLabel ? 500 : 400 }}>

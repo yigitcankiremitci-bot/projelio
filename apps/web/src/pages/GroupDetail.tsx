@@ -10,7 +10,7 @@ import ScopeBudgetPanel from "../components/butce/ScopeBudgetPanel";
 import ProfileCard from "../components/ProfileCard";
 import AiCreditsChip from "../components/AiCreditsChip";
 import { useAppPrefs } from "../lib/appPrefs";
-import EntityCover, { CoverBackLink, coverActionButton } from "../components/EntityCover";
+import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton } from "../components/EntityCover";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -109,6 +109,8 @@ export default function GroupDetail() {
       />
 
       <div style={{ padding: `14px ${gutter}px 28px` }}>
+        {/* Telefonda geri bağlantısı kapakta değil burada (bkz. EntityCover). */}
+        <MobileBackRow backRef={backRef} to={back.to} label={back.label} geriGit={back.geriGit} />
         <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 14px" }}>{t("Organizasyonlar")}</h2>
 
         {organizations.length === 0 ? (

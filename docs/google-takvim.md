@@ -66,3 +66,48 @@ Doğrulama için gerekenler:
 
 KVKK notu: Lio Anthropic dışı bir sağlayıcıya düşerse (bkz. `AI_PROVIDERS`)
 takvim içerikleri de oraya gider.
+
+## Doğrulama başvurusu malzemeleri
+
+### İzin gerekçesi
+
+Google Auth Platform > Data Access > "How will the scopes be used?" kutusuna
+(İngilizce, en fazla 1000 karakter):
+
+```
+Projelio is a project and task management app. Users can optionally connect their own Google Calendar in Settings > Connected accounts. We use calendar.events to (1) read events from the calendars the user selects and show them inside Projelio's planning calendar next to their tasks and time blocks, and (2) write events the user explicitly creates in Projelio (a time block or an event) to their own calendar, and update or delete only those Projelio-created events when the user moves or deletes them. Events created elsewhere are shown read-only. No guests are added and no invitations are sent (sendUpdates=none). The read-only calendar.readonly / calendar.events.readonly scopes are not sufficient because the user asks us to write events to their calendar. We do not use the broader calendar scope and never create, delete or share calendars. Data is used only for these user-facing features, never for advertising or AI model training.
+```
+
+### Demo videosu (YouTube, "liste dışı" yüklenebilir)
+
+Google videonun şunları göstermesini istiyor: OAuth onay ekranı (uygulama adı
+ve istenen izinler okunur hâlde), her iznin uygulamada nerede kullanıldığı.
+Tarayıcı adres çubuğu görünür olmalı; OAuth adresindeki `client_id`
+okunabilmeli. Yaklaşık 2 dakika, seslendirme gerekmez (İngilizce altyazı
+yeterli).
+
+1. `https://app.projelio.app` açık, giriş yapılmış. Ayarlar > Bağlı hesaplar >
+   Google Takvim kartı > "Google Takvim'i bağla".
+2. Google hesap seçimi → onay ekranı. Ekranda dur: "Projelio", istenen iki izin
+   ("View and edit events…", "See the list of Google calendars…"). Adres
+   çubuğundaki `client_id` görünsün. Onayla.
+3. Projelio'ya dönüş → kartta bağlı hesap, takvim listesi (calendarlist izni),
+   hedef takvim seçimi.
+4. Takvim sayfası → Google etkinlikleri ızgarada (okuma). Bir etkinliğe tıkla:
+   salt okunur ayrıntı.
+5. "+ Etkinlik" ile bir etkinlik ekle → Google Takvim'i yan sekmede aç, etkinlik
+   orada (yazma).
+6. Bir zaman bloğu aç → "Google Takvim'e de ekle" → Google'da görün. Bloğu
+   Projelio'da taşı → Google'da da taşındığını göster; bloğu sil → Google'dan da
+   silindiğini göster (güncelleme/silme yalnızca Projelio'nun açtıklarında).
+7. Ayarlar > "Bağlantıyı kes" → takvim Projelio'dan kalkar.
+
+Google Cloud tarafı 2026-09-24'te tamamlandı: Branding'de ana sayfa, gizlilik ve
+şartlar bağlantıları; yetkili alan adı yalnızca `projelio.app` (eski Netlify ve
+Render adresleri OAuth istemcisinden ve listeden çıkarıldı); Data Access'te
+yukarıdaki gerekçe kayıtlı.
+
+Uygulama doğrulamasında ayrıca: projelio.app alan adının Search Console'da
+doğrulanmış olması, gizlilik politikası bağlantısının onay ekranında
+(Branding) çalışan bir adres olması — `https://projelio.app/en/legal/privacy` (`/privacy` 404 veriyor) ve politikanın Limited Use
+paragrafını içermesi (§7, 2026-09-24).

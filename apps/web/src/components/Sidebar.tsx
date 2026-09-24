@@ -60,6 +60,9 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
     // Yaptım, Yapılacaklar'ın hemen altında: ikisi aynı kişisel çalışma
     // alanının iki yüzü — biri "yapacağım", diğeri "yaptım".
     { to: "/worklog", label: t("Yaptım"), active: location.pathname.startsWith("/worklog") },
+    // Sosyal: arkadaşlar ve duvarlar. Mobilde alt çubukta yer yok; oraya
+    // buradan (üstteki okla açılan kenar çubuğu) ulaşılıyor.
+    { to: "/sosyal", label: t("Sosyal"), active: location.pathname.startsWith("/sosyal") },
     // Ayarlar diğer sayfalarla aynı listede, Yapılacaklar'ın hemen altında.
     // Önceden en altta, gezinme ağacından sonra, "Çıkış yap" ile birlikte ayrı
     // bir öbekteydi; orada bir sayfa değil bir "kapanış" gibi duruyordu.

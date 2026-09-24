@@ -2,6 +2,8 @@ import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/commo
 import type { AccountType, DepartmentMemberRole, OrganizationAccess } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { decideDepartmentAccess } from "../../modules/departments/department-access";
+import { requireUuid } from "../validation/input";
+import { duvarErisimi } from "../../modules/arkadaslar/arkadaslik-durumu";
 import { SURFACE_MESSAGE, isSubcontractorAccount, seesAllProjectsOfJob, type RestrictedSurface } from "./subcontractor";
 
 /**
@@ -439,14 +441,43 @@ export class AccessService {
     if (!userId) return;
     const { data: post } = await this.supabase.client
       .from("project_posts")
-      .select("project_id, department_id, organization_id")
+      .select("project_id, department_id, organization_id, wall_user_id")
       .eq("id", postId)
       .maybeSingle();
     if (!post) throw new NotFoundException("Paylaşım bulunamadı");
     if (post.project_id) return this.assertCanViewProject(post.project_id, userId);
     if (post.department_id) return this.assertCanViewDepartment(post.department_id, userId);
     if (post.organization_id) return this.assertCanViewOrganization(post.organization_id, userId);
+    if (post.wall_user_id) return this.assertCanViewWall(post.wall_user_id, userId);
     throw new ForbiddenException("Bu paylaşımı görüntüleme yetkiniz yok");
+  }
+
+  // ------------------------------------------------------------ Arkadaşlık
+
+  /**
+   * İki kullanıcı kabul edilmiş arkadaş mı (bkz. migration 134).
+   * Satır sırasız çifti tutuyor; yön bilinmediği için iki yöne de bakılır.
+   */
+  async arkadasMi(a: string, b: string): Promise<boolean> {
+    if (a === b) return false;
+    const { data } = await this.supabase.client
+      .from("arkadasliklar")
+      .select("id")
+      .eq("durum", "kabul")
+      .or(`and(isteyen_id.eq.${requireUuid(a, "Kullanıcı kimliği")},alan_id.eq.${requireUuid(b, "Kullanıcı kimliği")}),and(isteyen_id.eq.${b},alan_id.eq.${a})`)
+      .limit(1);
+    return (data ?? []).length > 0;
+  }
+
+  /**
+   * Kişisel duvar: sahibi ve ARKADAŞLARI görür, yazar, yorum yapar. İş/şirket
+   * ilişkisi burada hiçbir şey ifade etmez — aynı şirkette olmak birinin
+   * duvarını açmaz, arkadaş olmak açar.
+   */
+  async assertCanViewWall(wallUserId: string, userId?: string): Promise<void> {
+    if (!userId) return;
+    if (duvarErisimi(userId, wallUserId, await this.arkadasMi(userId, wallUserId))) return;
+    throw new ForbiddenException("Bu duvarı yalnızca arkadaşları görebilir");
   }
 
   /** Paylaşım yorumu, bağlı olduğu paylaşımın görünürlüğünü devralır. */

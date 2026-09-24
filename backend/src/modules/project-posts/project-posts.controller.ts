@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { ProjectPostsService } from "./project-posts.service";
 import { AccessService } from "../../common/access/access.service";
+import { requireUuid } from "../../common/validation/input";
 
 // Sosyal akış, yazıldığı kapsamın (proje / departman / organizasyon) görünürlüğünü
 // devralır. Okuma ve yazma aynı kapıdan geçer: paylaşım oluşturmak kapsamdaki HERKESE
@@ -50,6 +51,31 @@ export class ProjectPostsController {
   async createForOrganization(@Param("organizationId") organizationId: string, @Req() req: any, @Body("body") body: string) {
     await this.access.assertCanViewOrganization(organizationId, req.user.userId);
     return this.projectPostsService.createForOrganization(organizationId, req.user.userId, body);
+  }
+
+  // Kişisel duvar ve sosyal sayfa akışı (migration 134). Duvarı sahibi ve
+  // arkadaşları görür ve yazar; iş/şirket ilişkisi burada hiçbir şey açmaz.
+  @Get("sosyal/akis")
+  socialFeed(@Req() req: any) {
+    return this.projectPostsService.findSocialFeed(req.user.userId);
+  }
+
+  @Get("sosyal/duvar/:userId")
+  async findWall(@Param("userId") userId: string, @Req() req: any) {
+    await this.access.assertCanViewWall(requireUuid(userId, "Kullanıcı"), req.user.userId);
+    return this.projectPostsService.findWall(userId, req.user.userId);
+  }
+
+  @Post("sosyal/duvar/:userId")
+  async createOnWall(@Param("userId") userId: string, @Req() req: any, @Body("body") body: string) {
+    await this.access.assertCanViewWall(requireUuid(userId, "Kullanıcı"), req.user.userId);
+    return this.projectPostsService.createOnWall(userId, req.user.userId, body);
+  }
+
+  @Delete("sosyal/paylasim/:postId")
+  async deleteWallPost(@Param("postId") postId: string, @Req() req: any) {
+    await this.projectPostsService.deleteWallPost(postId, req.user.userId);
+    return { ok: true };
   }
 
   @Post("posts/:postId/like")

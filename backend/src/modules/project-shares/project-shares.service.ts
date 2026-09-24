@@ -365,7 +365,8 @@ export class ProjectSharesService {
   private async fetchFeed(projectId: string) {
     const { data, error } = await this.supabase.client
       .from("project_posts")
-      .select("id, body, created_at, users(full_name)")
+      // users'a iki bağ var (user_id, wall_user_id — migration 134); ipucu şart.
+      .select("id, body, created_at, users!user_id(full_name)")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false })
       .limit(50);

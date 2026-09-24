@@ -18,6 +18,7 @@ import { OutputsModule } from "./modules/outputs/outputs.module";
 import { TaskCommentsModule } from "./modules/task-comments/task-comments.module";
 import { ProjectPostsModule } from "./modules/project-posts/project-posts.module";
 import { PostCommentsModule } from "./modules/post-comments/post-comments.module";
+import { ArkadaslarModule } from "./modules/arkadaslar/arkadaslar.module";
 import { MembersModule } from "./modules/members/members.module";
 import { JobMembersModule } from "./modules/job-members/job-members.module";
 import { BudgetModule } from "./modules/budget/budget.module";
@@ -87,6 +88,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     TaskCommentsModule,
     ProjectPostsModule,
     PostCommentsModule,
+    ArkadaslarModule,
     MembersModule,
     JobMembersModule,
     BudgetModule,

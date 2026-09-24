@@ -891,4 +891,11 @@ export const hatalar: TranslationDict = {
   "Shopify gerekli izinleri vermedi; bağlantıyı yeniden deneyin": "Shopify didn't grant the required permissions; try connecting again",
   "Shopify bağlantı isteği geçersiz veya süresi dolmuş": "The Shopify connection request is invalid or has expired",
   "Mağaza bulunamadı": "Store not found",
+  // Arkadaşlık ve duvar
+  "Bu duvarı yalnızca arkadaşları görebilir": "Only friends can see this wall",
+  "Kendine arkadaşlık isteği gönderemezsin": "You can't send a friend request to yourself",
+  "Arkadaşlık isteği bulunamadı": "Friend request not found",
+  "Bu isteği yalnızca alıcısı yanıtlayabilir": "Only the recipient can respond to this request",
+  "Bu paylaşımı yalnızca yazan ya da duvar sahibi silebilir": "Only the author or the wall's owner can delete this post",
+  "Paylaşım boş olamaz": "A post can't be empty",
 };

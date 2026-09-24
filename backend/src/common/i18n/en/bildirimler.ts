@@ -120,6 +120,14 @@ export const bildirimler: TranslationDict = {
   "{kisi} seni bir paylaşımda etiketledi.": "{kisi} mentioned you in a post.",
   "{kisi} seni bir yorumda etiketledi.": "{kisi} mentioned you in a comment.",
 
+  // ─────────────────────────────────────────────── Arkadaşlık ve duvar
+  "Yeni arkadaşlık isteği": "New friend request",
+  "{kisi} seni arkadaş olarak eklemek istiyor.": "{kisi} wants to add you as a friend.",
+  "Arkadaşlık isteğin kabul edildi": "Your friend request was accepted",
+  "{kisi} arkadaşlık isteğini kabul etti.": "{kisi} accepted your friend request.",
+  "Duvarına bir paylaşım yazıldı": "Someone posted on your wall",
+  '{kisi} duvarına yazdı: "{alinti}"': '{kisi} posted on your wall: "{alinti}"',
+
   // ─────────────────────────────────────────────── Bütçe ve düzenli ödemeler
   "Bütçe Güncellendi": "Budget updated",
   "Gelir: {tutar} ₺": "Income: {tutar} ₺",

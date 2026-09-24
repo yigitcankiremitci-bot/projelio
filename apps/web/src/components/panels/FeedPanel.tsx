@@ -1,10 +1,11 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { Task, TaskComment, ProjectPost, ProjectMember, DepartmentMember, PostComment, Department } from "@projelio/shared";
+import { Link } from "react-router-dom";
+import type { Task, TaskComment, ProjectPost, ProjectMember, DepartmentMember, PostComment, Department, ArkadasOzeti } from "@projelio/shared";
 import { api } from "../../api/client";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { formatDateTime } from "../../lib/dates";
 import { useRefreshOnUndo } from "../../lib/undo";
-import { IconCheck, IconHeart, IconMessageCircle } from "../icons";
+import { IconCheck, IconHeart, IconMessageCircle, IconTrash } from "../icons";
 import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
 
@@ -20,6 +21,12 @@ interface Props {
   projectId?: string;
   departmentId?: string;
   organizationId?: string;
+  // Kişisel duvar (bkz. migration 134): wallUserId tek başına o kişinin
+  // duvarıdır; socialFeed ile birlikte verilirse Sosyal sayfasının akışı olur —
+  // okuma benim + arkadaşlarımın duvarlarından, yazma wallUserId'nin (yani
+  // kendi) duvarıma.
+  wallUserId?: string;
+  socialFeed?: boolean;
   tasks: Task[];
 }
 
@@ -76,7 +83,7 @@ function getMentionQuery(text: string, cursor: number): { start: number; query: 
   return { start: at, query };
 }
 
-const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projectId, departmentId, organizationId, tasks }, ref) {
+const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projectId, departmentId, organizationId, wallUserId, socialFeed, tasks }, ref) {
   const c = useThemeColors();
   const t = useT();
   const [comments, setComments] = useState<FeedComment[]>([]);
@@ -88,7 +95,9 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
   const [mentionQuery, setMentionQuery] = useState<{ start: number; query: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const postsPath = organizationId
+  const postsPath = wallUserId
+    ? `/sosyal/duvar/${wallUserId}`
+    : organizationId
     ? `/organizations/${organizationId}/posts`
     : departmentId
     ? `/departments/${departmentId}/posts`
@@ -116,6 +125,14 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
     // departmanların kadrosu birleştirilir (N+1 ama departman sayısı küçük);
     // proje/departman akışında zaten tek bir üye listesi var.
     const loadMembers = (): Promise<FeedMember[]> => {
+      // Duvarda etiketlenebilecekler arkadaşlar. Sunucu yine de yalnızca duvarı
+      // görebilen birine bildirim gönderir (bkz. resolveWallMembers).
+      if (wallUserId) {
+        return api
+          .get<ArkadasOzeti>("/arkadaslar")
+          .then((o) => o.arkadaslar.map((k): FeedMember => ({ userId: k.userId, fullName: k.fullName, username: k.username })))
+          .catch(() => []);
+      }
       if (organizationId) {
         return api
           .get<Department[]>(`/organizations/${organizationId}/departments`)
@@ -154,14 +171,14 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
       // Görev yorumlarını akışa karıştırma özelliği şimdilik yalnızca projelerde var
       // (departman/organizasyon akışları için henüz toplu bir yorum uç noktası yok).
       projectId ? api.get<FeedComment[]>(`/projects/${projectId}/comments`).catch(() => []) : Promise.resolve([]),
-      api.get<ProjectPost[]>(postsPath).catch(() => []),
+      api.get<ProjectPost[]>(socialFeed ? "/sosyal/akis" : postsPath).catch(() => []),
       loadMembers(),
     ]);
     setComments(cm);
     setPosts(p);
     setMembers(m);
     setLoading(false);
-  }, [projectId, departmentId, organizationId, postsPath, membersPath]);
+  }, [projectId, departmentId, organizationId, wallUserId, socialFeed, postsPath, membersPath]);
 
   useEffect(() => {
     void load();
@@ -228,6 +245,10 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likedByMe: liked, likeCount } : p)));
   };
 
+  const handleDeleted = (postId: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  };
+
   const handleCommentCountChanged = (postId: string, delta: number) => {
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, commentCount: p.commentCount + delta } : p)));
   };
@@ -265,7 +286,11 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
           value={postBody}
           onChange={handleBodyChange}
           placeholder={
-            organizationId
+            socialFeed
+              ? t("Arkadaşlarınla bir şey paylaş… (140 karakter)")
+              : wallUserId
+              ? t("Duvara bir şey yaz… @ ile bir arkadaşını etiketleyebilirsin (140 karakter)")
+              : organizationId
               ? t("Şirketle bir şey paylaş… @ ile herhangi bir departman kadrosundan birini etiketleyebilirsin (140 karakter)")
               : departmentId
               ? t("Departmanla bir şey paylaş… @ ile kadrodan birini etiketleyebilirsin (140 karakter)")
@@ -335,7 +360,11 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
         {loading ? (
           <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
         ) : items.length === 0 ? (
-          <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Henüz bir paylaşım veya yorum yok.")}</p>
+          <p style={{ fontSize: 15, color: c.textSecondary }}>
+            {socialFeed
+              ? t("Henüz paylaşım yok. Arkadaş ekle ya da ilk paylaşımı sen yap.")
+              : t("Henüz bir paylaşım veya yorum yok.")}
+          </p>
         ) : (
           items.map((item) =>
             item.kind === "post" ? (
@@ -344,6 +373,7 @@ const FeedPanel = forwardRef<FeedPanelHandle, Props>(function FeedPanel({ projec
                 post={item.post}
                 onLikeToggled={handleLikeToggled}
                 onCommentCountChanged={handleCommentCountChanged}
+                onDeleted={handleDeleted}
               />
             ) : item.kind === "taskDone" ? (
               <div
@@ -397,9 +427,10 @@ interface PostCardProps {
   post: ProjectPost;
   onLikeToggled: (postId: string, liked: boolean, likeCount: number) => void;
   onCommentCountChanged: (postId: string, delta: number) => void;
+  onDeleted: (postId: string) => void;
 }
 
-function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps) {
+function PostCard({ post, onLikeToggled, onCommentCountChanged, onDeleted }: PostCardProps) {
   const c = useThemeColors();
   const t = useT();
   const [expanded, setExpanded] = useState(false);
@@ -408,6 +439,26 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
   const [commentDraft, setCommentDraft] = useState("");
   const [commentPosting, setCommentPosting] = useState(false);
   const [liking, setLiking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Silme yalnızca duvar paylaşımında var (sunucu canDelete'i yalnızca orada
+  // doldurur). Onay penceresi yerine confirm: 140 karakterlik bir paylaşım
+  // için modal ağır kaçıyordu.
+  const handleDelete = async () => {
+    if (deleting || !window.confirm(t("Bu paylaşım silinsin mi?"))) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/sosyal/paylasim/${post.id}`);
+      onDeleted(post.id);
+    } catch {
+      setDeleting(false);
+    }
+  };
+
+  // Duvar paylaşımında yazarın adı kişinin sosyal sayfasına gider; başkasının
+  // duvarına yazılmışsa "Yazan → Duvar sahibi" gösterilir.
+  const duvarda = !!post.wallUserId;
+  const baskasininDuvari = duvarda && post.wallUserId !== post.userId;
 
   // Açık duran yorum başlığı da canlı kalmalı: aynı sayfadaki başka biri bu
   // paylaşıma yorum yazdığında liste tazelenir. Akışın kendi tazelemesi yalnızca
@@ -475,9 +526,25 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
     <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "10px 12px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {post.authorName}
-          </span>
+          {duvarda ? (
+            <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <Link to={`/sosyal/${post.userId}`} style={{ color: c.textPrimary }}>
+                {post.authorName}
+              </Link>
+              {baskasininDuvari && post.wallOwnerName && (
+                <>
+                  <span style={{ color: c.textSecondary, fontWeight: 400 }}> → </span>
+                  <Link to={`/sosyal/${post.wallUserId}`} style={{ color: c.textPrimary }}>
+                    {post.wallOwnerName}
+                  </Link>
+                </>
+              )}
+            </span>
+          ) : (
+            <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {post.authorName}
+            </span>
+          )}
           {/* Şirket akışında (organizasyon aggregate görünümü) hangi departmandan
               geldiğini gösteren rozet — organizasyona doğrudan yapılmış bir
               paylaşımda bu alan boş olduğu için rozet gösterilmez. */}
@@ -520,6 +587,17 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged }: PostCardProps)
           <IconMessageCircle size={16} color={c.textSecondary} />
           <span style={{ fontSize: 13, color: c.textSecondary }}>{post.commentCount > 0 ? post.commentCount : t("Yorum yap")}</span>
         </button>
+        {post.canDelete && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            aria-label={t("Paylaşımı sil")}
+            title={t("Paylaşımı sil")}
+            style={{ display: "flex", alignItems: "center", background: "transparent", border: "none", padding: 0, marginLeft: "auto" }}
+          >
+            <IconTrash size={15} color={c.textSecondary} />
+          </button>
+        )}
       </div>
 
       {expanded && (

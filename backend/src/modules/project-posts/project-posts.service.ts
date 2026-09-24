@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { ProjectPost } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { MembersService } from "../members/members.service";
@@ -7,13 +7,22 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { extractMentionHandles } from "../../common/mentions.util";
 import { requireUuid } from "../../common/validation/input";
 import { AKIS_TAVANI } from "../../common/liste-tavani";
+import { ArkadaslarService } from "../arkadaslar/arkadaslar.service";
+import { duvarPaylasiminiSilebilir } from "../arkadaslar/arkadaslik-durumu";
+
+// Yazarın adı. project_posts'un users'a İKİ bağı var (user_id ve 134'ten beri
+// wall_user_id); ipucu vermeden "users(...)" yazmak PostgREST'te belirsizlik
+// hatası verir ve TÜM akışları düşürür. Bağ, sütun adıyla işaretleniyor.
+const POST_SECIMI = "*, users!user_id(full_name)";
+const DUVAR_SECIMI = "*, users!user_id(full_name), wall_owner:users!wall_user_id(full_name)";
 
 function mapPost(
   row: any,
   likeCount: number,
   commentCount: number,
   likedByMe: boolean,
-  sourceDepartmentName?: string
+  sourceDepartmentName?: string,
+  requestingUserId?: string
 ): ProjectPost {
   return {
     id: row.id,
@@ -28,6 +37,10 @@ function mapPost(
     likeCount,
     commentCount,
     likedByMe,
+    wallUserId: row.wall_user_id ?? undefined,
+    wallOwnerName: row.wall_user_id ? row.wall_owner?.full_name ?? undefined : undefined,
+    canDelete:
+      !!row.wall_user_id && !!requestingUserId && duvarPaylasiminiSilebilir(requestingUserId, row.user_id, row.wall_user_id),
   };
 }
 
@@ -43,6 +56,22 @@ interface PostScope {
   projectId?: string;
   departmentId?: string;
   organizationId?: string;
+  // Kişisel duvar (bkz. migration 134): paylaşım bu kullanıcının duvarında.
+  wallUserId?: string;
+}
+
+/**
+ * Bir paylaşım satırının kapsamı. Yorum/beğeni bildirimleri kapsamı buradan
+ * çıkarıyor; yeni bir kapsam eklendiğinde üç ayrı yerde elle kurulan nesneler
+ * birini unutuyordu.
+ */
+export function postScopeOf(row: any): PostScope {
+  return {
+    projectId: row.project_id ?? undefined,
+    departmentId: row.department_id ?? undefined,
+    organizationId: row.organization_id ?? undefined,
+    wallUserId: row.wall_user_id ?? undefined,
+  };
 }
 
 @Injectable()
@@ -51,7 +80,8 @@ export class ProjectPostsService {
     private supabase: SupabaseService,
     private membersService: MembersService,
     private departmentMembersService: DepartmentMembersService,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
+    private arkadaslar: ArkadaslarService
   ) {}
 
   async findByProject(projectId: string, requestingUserId?: string): Promise<ProjectPost[]> {
@@ -67,7 +97,7 @@ export class ProjectPostsService {
     // eski gönderiler pratikte hiç görülmüyor (bkz. common/liste-tavani.ts).
     let query = this.supabase.client
       .from("project_posts")
-      .select("*, users(full_name)")
+      .select(POST_SECIMI)
       .order("created_at", { ascending: false })
       .limit(AKIS_TAVANI);
     query = scope.departmentId ? query.eq("department_id", scope.departmentId) : query.eq("project_id", scope.projectId!);
@@ -92,7 +122,7 @@ export class ProjectPostsService {
 
     let query = this.supabase.client
       .from("project_posts")
-      .select("*, users(full_name)")
+      .select(POST_SECIMI)
       .order("created_at", { ascending: false })
       .limit(AKIS_TAVANI);
     query =
@@ -146,7 +176,8 @@ export class ProjectPostsService {
         likeCounts.get(row.id) ?? 0,
         commentCounts.get(row.id) ?? 0,
         likedPostIds.has(row.id),
-        getSourceDepartmentName?.(row)
+        getSourceDepartmentName?.(row),
+        requestingUserId
       )
     );
   }
@@ -165,30 +196,102 @@ export class ProjectPostsService {
     return this.createForScope({ organizationId }, userId, body);
   }
 
+  // ------------------------------------------------------------ Kişisel duvar
+
+  /**
+   * Bir kullanıcının duvarı. Yetki (sahibi ya da arkadaşı) controller'da
+   * AccessService.assertCanViewWall ile sorulmuş olmalı.
+   */
+  async findWall(wallUserId: string, requestingUserId: string): Promise<ProjectPost[]> {
+    return this.findWalls([wallUserId], requestingUserId);
+  }
+
+  /**
+   * Sosyal sayfanın akışı: benim ve arkadaşlarımın duvarları, tek zaman
+   * çizelgesinde. Arkadaşımın, benim arkadaşım OLMAYAN birinin duvarına
+   * yazdığı paylaşım burada yok — o duvarı göremiyorum.
+   */
+  async findSocialFeed(requestingUserId: string): Promise<ProjectPost[]> {
+    const arkadaslar = await this.arkadaslar.arkadasIdleri(requestingUserId);
+    return this.findWalls([requestingUserId, ...arkadaslar], requestingUserId);
+  }
+
+  private async findWalls(wallUserIds: string[], requestingUserId: string): Promise<ProjectPost[]> {
+    const { data, error } = await this.supabase.client
+      .from("project_posts")
+      .select(DUVAR_SECIMI)
+      .in("wall_user_id", wallUserIds)
+      .order("created_at", { ascending: false })
+      .limit(AKIS_TAVANI);
+    if (error) throw error;
+    return this.attachEngagement(data ?? [], requestingUserId);
+  }
+
+  /** Arkadaşının duvarına yazınca duvar sahibi haberdar edilir; kendi duvarına yazınca kimse. */
+  async createOnWall(wallUserId: string, userId: string, body: string): Promise<ProjectPost> {
+    const post = await this.createForScope({ wallUserId }, userId, body);
+    if (wallUserId !== userId) {
+      this.notificationsService.notifyUserSafe(
+        wallUserId,
+        "wall_post",
+        "Duvarına bir paylaşım yazıldı",
+        { metin: '{kisi} duvarına yazdı: "{alinti}"', params: { kisi: post.authorName, alinti: post.body.slice(0, 80) } },
+        `/sosyal/${wallUserId}`
+      );
+    }
+    return post;
+  }
+
+  /**
+   * Yalnızca duvar paylaşımları silinebilir: yazan ya da duvarın sahibi.
+   * Proje/departman/şirket akışlarında silme hiç olmadı; bu değişiklik onlara
+   * dokunmuyor. Beğeni ve yorumlar ON DELETE CASCADE ile birlikte gider.
+   */
+  async deleteWallPost(postId: string, userId: string): Promise<void> {
+    const { data: post } = await this.supabase.client
+      .from("project_posts")
+      .select("*")
+      .eq("id", requireUuid(postId, "Paylaşım"))
+      .maybeSingle();
+    if (!post || !post.wall_user_id) throw new NotFoundException("Paylaşım bulunamadı");
+    if (!duvarPaylasiminiSilebilir(userId, post.user_id, post.wall_user_id)) {
+      throw new ForbiddenException("Bu paylaşımı yalnızca yazan ya da duvar sahibi silebilir");
+    }
+    const { error } = await this.supabase.client.from("project_posts").delete().eq("id", post.id);
+    if (error) throw error;
+  }
+
   private async createForScope(scope: PostScope, userId: string, body: string): Promise<ProjectPost> {
-    const trimmed = body.trim().slice(0, 140);
+    const trimmed = (typeof body === "string" ? body : "").trim().slice(0, 140);
+    if (!trimmed) throw new BadRequestException("Paylaşım boş olamaz");
     const { data: row, error } = await this.supabase.client
       .from("project_posts")
       .insert({
         project_id: scope.projectId ?? null,
         department_id: scope.departmentId ?? null,
         organization_id: scope.organizationId ?? null,
+        // Anahtar yalnızca duvar paylaşımında yazılıyor: her zaman
+        // `wall_user_id: null` göndermek, migration 134 uygulanmamış bir
+        // veritabanında proje/departman paylaşımlarını da düşürürdü.
+        ...(scope.wallUserId ? { wall_user_id: scope.wallUserId } : {}),
         user_id: userId,
         body: trimmed,
       })
-      .select("*, users(full_name)")
+      .select(scope.wallUserId ? DUVAR_SECIMI : POST_SECIMI)
       .single();
     if (error) throw error;
 
     await this.notifyMentions(scope, userId, trimmed);
 
-    return mapPost(row, 0, 0, false);
+    return mapPost(row, 0, 0, false, undefined, userId);
   }
 
   async toggleLike(postId: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+    // "*": sütun listesi yazılsaydı migration 134 uygulanmadan (wall_user_id
+    // yokken) beğeni tamamen çalışmazdı.
     const { data: post } = await this.supabase.client
       .from("project_posts")
-      .select("user_id, project_id, department_id, organization_id")
+      .select("*")
       .eq("id", postId)
       .maybeSingle();
 
@@ -208,11 +311,7 @@ export class ProjectPostsService {
       liked = true;
 
       if (post && post.user_id !== userId) {
-        const { members, link } = await this.resolveScopeMembers({
-          projectId: post.project_id ?? undefined,
-          departmentId: post.department_id ?? undefined,
-          organizationId: post.organization_id ?? undefined,
-        });
+        const { members, link } = await this.resolveScopeMembers(postScopeOf(post));
         const actorName = members.find((m) => m.userId === userId)?.fullName ?? "Bir ekip üyesi";
         await this.notificationsService.notifyUser(post.user_id, "post_like", "Paylaşımın beğenildi", { metin: "{kisi} paylaşımını beğendi.", params: { kisi: actorName } }, link);
       }
@@ -265,7 +364,21 @@ export class ProjectPostsService {
     if (scope.organizationId) {
       return this.resolveOrganizationMembers(scope.organizationId);
     }
+    if (scope.wallUserId) {
+      return this.resolveWallMembers(scope.wallUserId);
+    }
     return { members: [] };
+  }
+
+  // Duvar için etiket/bildirim alıcıları: duvar sahibi + arkadaşları — yani tam
+  // olarak o duvarı görebilenler. Duvarı göremeyen biri etiketlenemez.
+  private async resolveWallMembers(wallUserId: string): Promise<{ members: ScopeActor[]; link?: string }> {
+    const ids = [wallUserId, ...(await this.arkadaslar.arkadasIdleri(wallUserId))];
+    const { data } = await this.supabase.client.from("users").select("id, full_name, username").in("id", ids);
+    return {
+      members: (data ?? []).map((u: any) => ({ userId: u.id, fullName: u.full_name, username: u.username })),
+      link: `/sosyal/${wallUserId}`,
+    };
   }
 
   // Organizasyon akışı için etiket/bildirim alıcı listesi: organizasyona bağlı TÜM

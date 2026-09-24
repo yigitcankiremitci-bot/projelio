@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { PostComment } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
-import { ProjectPostsService } from "../project-posts/project-posts.service";
+import { ProjectPostsService, postScopeOf } from "../project-posts/project-posts.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { extractMentionHandles } from "../../common/mentions.util";
 
@@ -98,15 +98,11 @@ export class PostCommentsService {
       if (comment && comment.user_id && comment.user_id !== userId) {
         const { data: post } = await this.supabase.client
           .from("project_posts")
-          .select("project_id, department_id, organization_id")
+          .select("*")
           .eq("id", comment.post_id)
           .maybeSingle();
         if (post) {
-          const { members, link } = await this.projectPostsService.resolveScopeMembers({
-            projectId: post.project_id ?? undefined,
-            departmentId: post.department_id ?? undefined,
-            organizationId: post.organization_id ?? undefined,
-          });
+          const { members, link } = await this.projectPostsService.resolveScopeMembers(postScopeOf(post));
           const actorName = members.find((m) => m.userId === userId)?.fullName ?? "Bir ekip üyesi";
           await this.notificationsService.notifyUser(comment.user_id, "comment_like", "Yorumun beğenildi", { metin: "{kisi} yorumunu beğendi.", params: { kisi: actorName } }, link);
         }
@@ -126,16 +122,13 @@ export class PostCommentsService {
   private async notifyPostAuthorAndMentions(postId: string, actingUserId: string, body: string): Promise<void> {
     const { data: post } = await this.supabase.client
       .from("project_posts")
-      .select("user_id, project_id, department_id, organization_id")
+      // "*": kapsam sütunları postScopeOf'ta; liste burada tekrar yazılmasın.
+      .select("*")
       .eq("id", postId)
       .maybeSingle();
     if (!post) return;
 
-    const { members, link } = await this.projectPostsService.resolveScopeMembers({
-      projectId: post.project_id ?? undefined,
-      departmentId: post.department_id ?? undefined,
-      organizationId: post.organization_id ?? undefined,
-    });
+    const { members, link } = await this.projectPostsService.resolveScopeMembers(postScopeOf(post));
     const actorName = members.find((m) => m.userId === actingUserId)?.fullName ?? "Bir ekip üyesi";
 
     if (post.user_id !== actingUserId) {

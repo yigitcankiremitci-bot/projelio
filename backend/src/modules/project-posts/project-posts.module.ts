@@ -4,9 +4,10 @@ import { ProjectPostsService } from "./project-posts.service";
 import { MembersModule } from "../members/members.module";
 import { DepartmentMembersModule } from "../department-members/department-members.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { ArkadaslarModule } from "../arkadaslar/arkadaslar.module";
 
 @Module({
-  imports: [MembersModule, DepartmentMembersModule, NotificationsModule],
+  imports: [MembersModule, DepartmentMembersModule, NotificationsModule, ArkadaslarModule],
   controllers: [ProjectPostsController],
   providers: [ProjectPostsService],
   exports: [ProjectPostsService],

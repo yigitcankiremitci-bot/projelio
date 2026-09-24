@@ -22,6 +22,7 @@ import { demoRandevu } from "./demoRandevu";
 import { baslangic } from "./baslangic";
 import { ilkAdimlar } from "./ilkAdimlar";
 import { uygulama } from "./uygulama";
+import { arkadaslar } from "./arkadaslar";
 
 /**
  * Türkçe → İngilizce sözlük.
@@ -76,4 +77,5 @@ export const en: TranslationDict = {
   ...hatalar,
   ...epostaYonetimi,
   ...demoRandevu,
+  ...arkadaslar,
 };

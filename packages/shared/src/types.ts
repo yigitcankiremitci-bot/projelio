@@ -1424,6 +1424,55 @@ export interface ProjectPost {
   likeCount: number;
   likedByMe: boolean;
   commentCount: number;
+  // Kişisel duvar paylaşımı (bkz. migration 134): paylaşım kimin duvarına
+  // yazıldı. Kendi duvarına yazılmışsa wallUserId === userId; arkadaşının
+  // duvarına yazılmışsa kartta "Yazan → Duvar sahibi" gösterilir.
+  wallUserId?: string;
+  wallOwnerName?: string;
+  // Sosyal akışta paylaşımı yazan ya da duvar sahibi silebilir (duvar sahibi
+  // kendi duvarının moderatörüdür). Diğer akışlarda paylaşım silinemez.
+  canDelete?: boolean;
+}
+
+// ─────────────────────────────────────────────── Arkadaşlık (migration 134)
+
+/**
+ * Bakan kişinin gözünden iki kullanıcı arasındaki ilişki.
+ *
+ * "giden_istek", karşı tarafın REDDETTİĞİ isteği de kapsar: isteyene
+ * reddedildiği söylenmez (bkz. 134_arkadaslik.sql başlığı).
+ */
+export type ArkadaslikDurumu = "kendisi" | "yok" | "arkadas" | "gelen_istek" | "giden_istek";
+
+export interface ArkadasKisi {
+  userId: string;
+  fullName: string;
+  username?: string;
+  avatarUrl?: string;
+  title?: string;
+}
+
+export interface ArkadasIstegi extends ArkadasKisi {
+  istekId: string;
+  createdAt: string;
+}
+
+export interface ArkadasOzeti {
+  arkadaslar: ArkadasKisi[];
+  gelenIstekler: ArkadasIstegi[];
+  gidenIstekler: ArkadasIstegi[];
+}
+
+export interface ArkadasAramaSonucu extends ArkadasKisi {
+  durum: ArkadaslikDurumu;
+}
+
+/** Bir kullanıcının sosyal sayfasının başlığı. Duvarı görmek arkadaşlık ister. */
+export interface SosyalProfil extends ArkadasKisi {
+  bio?: string;
+  durum: ArkadaslikDurumu;
+  arkadasSayisi: number;
+  duvariGorebilir: boolean;
 }
 
 export interface PostComment {
@@ -1993,6 +2042,11 @@ export interface NotificationPayload {
     | "post_comment"
     | "post_like"
     | "comment_like"
+    // Arkadaşlık isteği geldi / kabul edildi (bkz. modules/arkadaslar).
+    // Arkadaşının duvarına yazdığında duvar sahibine wall_post gider.
+    | "friend_request"
+    | "friend_accepted"
+    | "wall_post"
     // Zamanlanmış sosyal medya yayınının sonucu. Yalnızca OTOMATİK yayında
     // gönderilir: kullanıcı "Şimdi paylaş" dediyse sonucu zaten ekranda görür.
     | "social_post_published"

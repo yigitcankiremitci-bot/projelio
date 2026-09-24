@@ -14,8 +14,9 @@ import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 /**
  * `calendar.events`: tüm takvimlerdeki etkinlikleri okuma + yazma.
  * `calendar.calendarlist.readonly`: hangi takvimler var (iş, aile, tatiller).
- * İkisi de Google'ın "hassas" sınıfında — herkese açmadan önce uygulama
- * doğrulaması şart (bkz. docs/google-takvim.md). Geniş `calendar` izni
+ * `calendar.events` Google'ın "hassas" sınıfında — herkese açmadan önce
+ * uygulama doğrulaması şart (bkz. docs/google-takvim.md); liste izni hassas
+ * DEĞİL. Geniş `calendar` izni
  * (takvim oluşturma/silme, paylaşım ayarları) bilerek İSTENMİYOR.
  */
 export const TAKVIM_ETKINLIK_IZNI = "https://www.googleapis.com/auth/calendar.events";

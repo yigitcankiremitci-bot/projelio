@@ -44,13 +44,13 @@ Yeni ortam değişkeni yok: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
 
 1. Migration 133'ü uygula (`./deploy/migrate.sh uygula`).
 2. Google Cloud Console → Calendar API açık olmalı (demo Meet için zaten açıldı).
-3. OAuth onay ekranına şu izinleri ekle:
-   - `https://www.googleapis.com/auth/calendar.events` (demo için zaten var)
-   - `https://www.googleapis.com/auth/calendar.calendarlist.readonly` (YENİ)
+3. OAuth onay ekranı (Google Auth Platform > Data Access) — ikisi de 2026-09-24'te eklendi:
+   - `https://www.googleapis.com/auth/calendar.events` — hassas
+   - `https://www.googleapis.com/auth/calendar.calendarlist.readonly` — hassas değil
 
 ## ⚠️ Herkese açmadan önce: Google doğrulaması
 
-İki izin de Google'ın **hassas** sınıfında. Uygulama doğrulanmadan:
+`calendar.events` Google'ın **hassas** sınıfında. Uygulama doğrulanmadan:
 - en fazla 100 kullanıcı bağlanabilir,
 - her kullanıcı "Google bu uygulamayı doğrulamadı" uyarısı görür.
 
@@ -60,7 +60,8 @@ Doğrulama için gerekenler:
   (`apps/web/src/lib/legal/privacyPolicy.ts`, iki dil) — takvim verisinin
   Projelio sunucusunda önbelleğe alındığı ve Lio'ya (AI sağlayıcısına)
   gönderildiği açıkça yazılmalı,
-- her izin için gerekçe metni,
+- `calendar.events` için gerekçe metni (Data Access sayfasındaki "How will the
+  scopes be used?" kutusu, şu an boş),
 - OAuth akışını ve izinlerin kullanıldığı ekranları gösteren bir YouTube videosu.
 
 KVKK notu: Lio Anthropic dışı bir sağlayıcıya düşerse (bkz. `AI_PROVIDERS`)

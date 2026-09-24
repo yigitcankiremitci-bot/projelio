@@ -412,6 +412,8 @@ export class AccountDeletionService {
   private async deletePersonalData(userId: string): Promise<void> {
     const tablolar = [
       "push_subscriptions",
+      // Mobil uygulama bildirim cihazları (migration 131).
+      "push_cihazlari",
       "personal_todos",
       "personal_task_prefs",
       "notifications",

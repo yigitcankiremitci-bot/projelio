@@ -5,4 +5,9 @@
       ile aynı değer (#1C222C). Bkz. styles.xml AppTheme.NoActionBar.
     -->
     <color name="projelioWindowBackground">#1C222C</color>
+    <!--
+      Bildirim ikonunun ve başlığının vurgu rengi. packages/shared/src/theme.ts
+      -> accent ile aynı değer.
+    -->
+    <color name="projelioAccent">#C0813F</color>
 </resources>

@@ -53,6 +53,7 @@ import { useTour } from "../lib/tour/TourContext";
 import WorkRhythmSettings from "../components/plan/WorkRhythmSettings";
 import SupportPanel from "../components/SupportPanel";
 import { bicimDili } from "../lib/i18n/depo";
+import { bildirimCihaziniBirak } from "../push";
 
 /**
  * AYARLAR — iki yerleşim, tek içerik.
@@ -388,6 +389,7 @@ export default function Settings() {
   }, []);
 
   const handleLogout = () => {
+    bildirimCihaziniBirak();
     localStorage.removeItem("projelio_token");
     navigate("/login");
   };

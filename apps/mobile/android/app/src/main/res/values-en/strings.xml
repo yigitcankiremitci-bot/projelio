@@ -1,0 +1,5 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="bildirim_kanali_adi">Notifications</string>
+    <string name="bildirim_kanali_aciklamasi">Task assignments, comments, deadline reminders</string>
+</resources>

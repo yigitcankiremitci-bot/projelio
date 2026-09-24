@@ -50,6 +50,13 @@ const config: CapacitorConfig = {
       launchFadeOutDuration: 250,
       androidScaleType: "CENTER_CROP",
     },
+    PushNotifications: {
+      // Uygulama AÇIKKEN gelen bildirim de sistem bildirimi olarak görünsün.
+      // Eklentinin varsayılanı göstermemek; o zaman bildirim yalnızca çanın
+      // sayacına düşüyor ve telefonda kimse fark etmiyor. Kapalıyken zaten
+      // Android gösteriyor (bkz. backend notifications/fcm.ts).
+      presentationOptions: ["alert", "sound", "badge"],
+    },
   },
 };
 

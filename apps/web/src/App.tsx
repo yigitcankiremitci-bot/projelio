@@ -23,7 +23,7 @@ import { useEtkinlikSayaci } from "./lib/etkinlikSayaci";
 import { useDemoZiyaret } from "./lib/demoZiyaret";
 import { demoEpostasiMi } from "./lib/demoHesap";
 import { SIDEBAR_WIDTH, pageGutter, Z, TOP_CHROME, SAFE_TOP, safeTop } from "./lib/layout";
-import { kabukDonusunuDinle } from "./lib/mobilKabuk";
+import { kabukBildirimDokunusunuDinle, kabukDonusunuDinle } from "./lib/mobilKabuk";
 import UploadTray, { UPLOAD_TRAY_HEIGHT } from "./components/UploadTray";
 import { useUploads } from "./lib/uploadQueue";
 import { CoverBackLink } from "./components/EntityCover";
@@ -560,6 +560,10 @@ export default function App() {
   // uygulamaya teslim ediyor; buradan router'a aktarılıyor, gerisi her zamanki
   // dönüş ekranı (bkz. lib/mobilKabuk.ts). Tarayıcıda hiçbir şey yapmaz.
   useEffect(() => kabukDonusunuDinle((yol) => navigate(yol, { replace: true })), [navigate]);
+  // Kabukta bildirime dokunulunca ilgili sayfa açılsın (uygulama kapalıyken
+  // dokunulduysa da — eklenti olayı bu dinleyici bağlanana kadar saklıyor).
+  // Oturum yoksa korumalı bölge zaten /login'e çevirir.
+  useEffect(() => kabukBildirimDokunusunuDinle((yol) => navigate(yol)), [navigate]);
   // Google dönüş ekranı da kimlik doğrulaması gerektirmeyen bir ekrandır: token
   // henüz yerel depoda yok, tam da burada oluşturuluyor. Korumalı bölgeye
   // koyarsak /login'e yönlenir ve akış hiç tamamlanamaz.

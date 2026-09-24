@@ -7,8 +7,8 @@ android {
         applicationId "app.projelio.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.1.0"
+        versionCode 4
+        versionName "1.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -85,11 +85,30 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
+/**
+ * FIREBASE (bildirimler).
+ *
+ * google-services.json Firebase konsolundan indirilir (bkz. docs/mobil-bildirimler.md).
+ * Sır DEĞİL — içindeki anahtar yalnızca paket adı + imza parmak iziyle
+ * kullanılabilir — bu yüzden repoda duruyor.
+ *
+ * Dosya yoksa eklenti uygulanmaz ve bu DEBUG derlemede kabul edilebilir
+ * (bildirim denenmeyecekse). YAYIN derlemesinde ise derleme DURUR: dosyasız
+ * çıkan bir paket FirebaseApp'i başlatamaz, bildirim izni istenir ama hiçbir
+ * bildirim gelmez — 1.1.0 kullanıcılarının yaşadığı tam olarak buydu ve
+ * hata hiçbir yerde görünmüyordu.
+ */
+def servicesJSON = file('google-services.json')
+if (servicesJSON.exists() && servicesJSON.text) {
+    apply plugin: 'com.google.gms.google-services'
+} else {
+    logger.warn("google-services.json yok: bildirimler bu derlemede ÇALIŞMAZ.")
+    gradle.taskGraph.whenReady { graph ->
+        if (graph.allTasks.any { it.name.toLowerCase().contains('release') }) {
+            throw new GradleException(
+                "google-services.json yok — yayın paketi bildirimsiz çıkardı. " +
+                "Firebase konsolundan indirip apps/mobile/android/app/ altına koy (docs/mobil-bildirimler.md)."
+            )
+        }
     }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }

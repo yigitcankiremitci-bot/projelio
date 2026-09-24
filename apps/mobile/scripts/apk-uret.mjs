@@ -87,6 +87,16 @@ if (aab && !existsSync(join(androidKok, "keystore.properties"))) {
   );
 }
 
+// Bildirimler Firebase'e bağlı; dosyasız paket izin ister ama hiçbir bildirim
+// almaz — ve bunu hiçbir yerde söylemez. Gradle da durduruyor (app/build.gradle),
+// burada ise derleme dakikalarca sürmeden önce yakalansın diye.
+if (surum === "Release" && !existsSync(join(androidKok, "app/google-services.json"))) {
+  throw new Error(
+    "apps/mobile/android/app/google-services.json yok — yayın paketi bildirimsiz çıkardı.\n" +
+      "Firebase konsolundan indir: docs/mobil-bildirimler.md"
+  );
+}
+
 const gorev = aab ? "bundleRelease" : `assemble${surum}`;
 console.log(`\n▸ Gradle: ${gorev}`);
 calistir("./gradlew", [gorev], androidKok);

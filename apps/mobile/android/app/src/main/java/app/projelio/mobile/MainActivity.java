@@ -1,5 +1,8 @@
 package app.projelio.mobile;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.activity.EdgeToEdge;
@@ -33,5 +36,36 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
+        bildirimKanaliniOlustur();
+    }
+
+    /**
+     * Bildirim kanalı — Android 8+ kanalsız bildirimi göstermez ya da
+     * "Diğer" adlı düşük öncelikli bir kanala atar: ses yok, ekranın üstünde
+     * açılan uyarı (heads-up) yok. Kullanıcıların "bildirim geliyor ama fark
+     * etmiyorum" şikâyetinin kaynağı bu.
+     *
+     * NEDEN BURADA, web'de değil: kanal ilk bildirim GELMEDEN var olmalı.
+     * Uygulama kapalıyken gelen bildirimi Android kendisi çizer ve o anda
+     * hiçbir JavaScript çalışmaz; kanal yoksa manifestteki varsayılan kimlik
+     * boşa düşer.
+     *
+     * IMPORTANCE_HIGH yalnızca İLK oluşturmada geçerli: kanal bir kez
+     * yaratıldıktan sonra önemini yalnızca kullanıcı değiştirebilir ve tekrar
+     * çağırmak onun ayarını ezmez. Yani bunu her açılışta çağırmak güvenli.
+     */
+    private void bildirimKanaliniOlustur() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        NotificationManager yonetici = getSystemService(NotificationManager.class);
+        if (yonetici == null) return;
+        NotificationChannel kanal = new NotificationChannel(
+            getString(R.string.bildirim_kanali_kimligi),
+            getString(R.string.bildirim_kanali_adi),
+            NotificationManager.IMPORTANCE_HIGH
+        );
+        kanal.setDescription(getString(R.string.bildirim_kanali_aciklamasi));
+        kanal.enableVibration(true);
+        kanal.setShowBadge(true);
+        yonetici.createNotificationChannel(kanal);
     }
 }

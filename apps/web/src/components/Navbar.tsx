@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconDashboard, IconCalendar, IconShield, IconLogout, IconCheck } from "./icons";
 import { useT } from "../lib/i18n";
+import { bildirimCihaziniBirak } from "../push";
 
 const navItems = [
   { to: "/", label: "Ana sayfa", icon: IconDashboard }, // dil:anahtar
@@ -16,6 +17,7 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
+    bildirimCihaziniBirak();
     localStorage.removeItem("projelio_token");
     navigate("/login");
   };

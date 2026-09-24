@@ -37,6 +37,12 @@ interface CapacitorBridge {
     App?: {
       addListener?: (event: "appUrlOpen", handler: (data: { url?: string }) => void) => unknown;
     };
+    PushNotifications?: {
+      checkPermissions?: () => unknown;
+      requestPermissions?: () => unknown;
+      register?: () => unknown;
+      addListener?: (event: string, handler: (data: any) => void) => unknown;
+    };
   };
 }
 
@@ -167,6 +173,130 @@ export function kabukDonusunuDinle(handler: (yol: string) => void): () => void {
   }
 
   return () => guvenliCagir(handle?.remove && (() => handle!.remove!()));
+}
+
+/* ------------------------------------------------------------------ *
+ * BİLDİRİMLER (FCM)                                                  *
+ * ------------------------------------------------------------------ */
+
+/**
+ * NEDEN AYRI BİR YOL. Web'in push'u (service worker + VAPID, bkz. push.ts)
+ * Android WebView'de ÇALIŞMAZ: WebView'de PushManager yok. 1.1.0'da kabuk bu
+ * yüzden hiç sistem bildirimi alamıyordu; bildirimler yalnızca uygulama
+ * açıkken çanın sayacına düşüyordu. Kabukta bildirim Firebase Cloud
+ * Messaging'den gelir; cihazın FCM anahtarı sunucuya kaydedilir
+ * (POST /notifications/devices) ve backend oraya gönderir (fcm.ts).
+ */
+const FCM_ANAHTARI = "projelio_fcm_token";
+
+/** Sonucu Promise olsun olmasın bekler; köprü hatasında null döner. */
+async function bekle<T>(fn: (() => unknown) | undefined): Promise<T | null> {
+  if (!fn) return null;
+  try {
+    return (await Promise.resolve(fn())) as T;
+  } catch {
+    return null;
+  }
+}
+
+let bildirimDinleyicileriKuruldu = false;
+
+/**
+ * Bildirim iznini ister ve cihazı FCM'ye kaydeder. Anahtar geldiğinde
+ * `kaydet` çağrılır — anahtar Firebase tarafından ara ara yenilenir, o
+ * zaman da yeniden çağrılır.
+ *
+ * Kabuk yoksa false döner; çağıran o zaman web push'u dener.
+ *
+ * İzin reddedilmişse bir daha SORULMAZ (Android zaten ikinci retten sonra
+ * pencereyi göstermiyor); kullanıcı telefonun ayarlarından açabilir.
+ */
+export function kabukBildirimleriniBaslat(kaydet: (token: string) => Promise<void>): boolean {
+  const push = kopru()?.Plugins?.PushNotifications;
+  if (!push) return false;
+
+  void (async () => {
+    if (!bildirimDinleyicileriKuruldu && push.addListener) {
+      bildirimDinleyicileriKuruldu = true;
+      try {
+        push.addListener("registration", (data: { value?: string }) => {
+          const token = data?.value;
+          if (!token) return;
+          try {
+            localStorage.setItem(FCM_ANAHTARI, token);
+          } catch {
+            // Depo kapalıysa çıkışta anahtar silinemez; kayıt yine yapılır.
+          }
+          void kaydet(token).catch(() => {});
+        });
+      } catch {
+        bildirimDinleyicileriKuruldu = false;
+        return;
+      }
+    }
+
+    const durum = await bekle<{ receive?: string }>(push.checkPermissions);
+    let izin = durum?.receive;
+    if (izin === "prompt" || izin === "prompt-with-rationale") {
+      izin = (await bekle<{ receive?: string }>(push.requestPermissions))?.receive;
+    }
+    if (izin !== "granted") return;
+    await bekle(push.register);
+  })();
+
+  return true;
+}
+
+/** Bu cihazın en son kaydedilen FCM anahtarı (çıkışta sunucudan silmek için). */
+export function kabukBildirimAnahtari(): string | null {
+  if (!kabuktaMi()) return null;
+  try {
+    return localStorage.getItem(FCM_ANAHTARI);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Bildirime dokunulduğunda ilgili sayfayı açar.
+ *
+ * Uygulama kapalıyken dokunulursa da çalışır: eklenti olayı dinleyici
+ * bağlanana kadar saklıyor, dinleyici bağlanınca teslim ediyor.
+ *
+ * YALNIZCA uygulama içi yol kabul edilir: bağlantı sunucudan geliyor ama
+ * "//baska-site" gibi bir değer router'a verilirse WebView dışarı gider.
+ */
+export function kabukBildirimDokunusunuDinle(handler: (yol: string) => void): () => void {
+  const addListener = kopru()?.Plugins?.PushNotifications?.addListener;
+  if (!addListener) return () => {};
+
+  let handle: { remove?: () => unknown } | undefined;
+  try {
+    const sonuc = addListener("pushNotificationActionPerformed", (olay: any) => {
+      const yol = uygulamaIciYol(olay?.notification?.data?.link);
+      if (yol) handler(yol);
+    });
+    void Promise.resolve(sonuc)
+      .then((h) => {
+        handle = h as { remove?: () => unknown };
+      })
+      .catch(() => {});
+  } catch {
+    return () => {};
+  }
+  return () => guvenliCagir(handle?.remove && (() => handle!.remove!()));
+}
+
+/** Sunucunun verdiği bağlantıyı güvenli bir uygulama içi yola çevirir. */
+export function uygulamaIciYol(link: unknown): string | null {
+  if (typeof link !== "string" || !link) return null;
+  try {
+    const u = new URL(link, window.location.origin);
+    if (u.origin !== window.location.origin) return null;
+    return `${u.pathname}${u.search}${u.hash}`;
+  } catch {
+    return null;
+  }
 }
 
 /* ------------------------------------------------------------------ *

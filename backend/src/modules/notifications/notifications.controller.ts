@@ -44,8 +44,19 @@ export class NotificationsController {
   }
 
   @Post("unsubscribe")
-  unsubscribe(@Body("endpoint") endpoint: string) {
-    return this.notificationsService.removeSubscription(endpoint);
+  unsubscribe(@Body("endpoint") endpoint: string, @Req() req: AuthedRequest) {
+    return this.notificationsService.removeSubscription(endpoint, req.user.userId);
+  }
+
+  // Mobil uygulama (FCM) cihaz kaydı — web push'un karşılığı (migration 131).
+  @Post("devices")
+  saveDevice(@Body() body: { token: string; platform?: string }, @Req() req: AuthedRequest) {
+    return this.notificationsService.saveDevice(req.user.userId, body?.token, body?.platform);
+  }
+
+  @Post("devices/remove")
+  removeDevice(@Body("token") token: string, @Req() req: AuthedRequest) {
+    return this.notificationsService.removeDevice(token, req.user.userId);
   }
 
   // ──────────────────────────────────────────── Bildirim e-postaları (102)

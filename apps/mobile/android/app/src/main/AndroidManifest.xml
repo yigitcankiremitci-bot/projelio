@@ -48,6 +48,27 @@
             </intent-filter>
         </activity>
 
+        <!--
+          BİLDİRİMLER (FCM). Uygulama arka plandayken ya da kapalıyken bildirimi
+          Android'in kendisi çizer ve bu üç değeri buradan okur; kodla
+          ayarlanamazlar.
+
+          İkon: yalnızca alfa kanalı kullanılır; uygulama ikonu verilirse
+          bildirimde düz beyaz bir kare görünür (bkz. scripts/bildirim-ikonu-uret.py).
+          Kanal: Android 8+ kanalsız bildirimi "Diğer" adlı sessiz bir kanala
+          düşürür. Kanal MainActivity'de oluşturuluyor; sunucu da aynı kimliği
+          gönderiyor (backend fcm.ts BILDIRIM_KANALI).
+        -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_projelio" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/projelioAccent" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="@string/bildirim_kanali_kimligi" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -60,4 +81,10 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!--
+      Android 13+ bildirim izni. Beyan edilmezse izin penceresi HİÇ çıkmaz ve
+      bildirimler sessizce engellenir — 1.1.0'da tam olarak bu oldu. İzin
+      giriş yapıldıktan sonra web tarafından istenir (lib/mobilKabuk.ts).
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

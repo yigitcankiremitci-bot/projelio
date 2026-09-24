@@ -7,6 +7,7 @@ import { WhatsappService } from "../whatsapp/whatsapp.service";
 import { cevir } from "../../common/i18n";
 import type { Metin } from "../../common/i18n";
 import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
+import { FcmGonderici } from "./fcm";
 
 function mapNotification(row: any): NotificationPayload {
   return {
@@ -25,6 +26,9 @@ function mapNotification(row: any): NotificationPayload {
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly vapidConfigured: boolean;
+  // Mobil uygulama (FCM). Nest sağlayıcısı değil, düz sınıf: tek kullanıcısı
+  // bu servis ve durumu (önbellekteki erişim jetonu) burada yaşamalı.
+  private readonly fcm = new FcmGonderici();
 
   constructor(
     private supabase: SupabaseService,
@@ -43,6 +47,9 @@ export class NotificationsService {
       webpush.setVapidDetails(subject, publicKey!, privateKey!);
     } else {
       this.logger.warn("VAPID anahtarları tanımlı değil, push bildirimleri gönderilemeyecek.");
+    }
+    if (!this.fcm.isConfigured()) {
+      this.logger.warn("FCM_* tanımlı değil: mobil uygulamaya bildirim GİTMEYECEK (bkz. docs/mobil-bildirimler.md).");
     }
   }
 
@@ -83,7 +90,8 @@ export class NotificationsService {
 
     const notification = mapNotification(row);
     this.gateway.sendToUser(userId, notification);
-    void this.sendPush(userId, notification);
+    void this.sendPush(userId, notification).catch(() => {});
+    void this.sendMobilePush(userId, notification).catch(() => {});
     // Dördüncü kanal: kullanıcı WhatsApp'a bağlıysa kuyruğa girer, değilse
     // sessizce döner. Gönderim burada değil, dakikalık işleyicide (hız sınırı).
     void this.whatsapp.notifyUser(userId, notification);
@@ -168,9 +176,60 @@ export class NotificationsService {
     if (error) throw error;
   }
 
-  async removeSubscription(endpoint: string): Promise<void> {
-    const { error } = await this.supabase.client.from("push_subscriptions").delete().eq("endpoint", endpoint);
+  /**
+   * userId verilirse yalnızca o kullanıcının aboneliği silinir. Uç (unsubscribe)
+   * eskiden kimin aboneliği olduğuna bakmadan siliyordu: endpoint'i bilen herkes
+   * başkasının bildirimlerini kesebilirdi. İç temizlik (410 Gone) userId vermez.
+   */
+  async removeSubscription(endpoint: string, userId?: string): Promise<void> {
+    let sorgu = this.supabase.client.from("push_subscriptions").delete().eq("endpoint", endpoint);
+    if (userId) sorgu = sorgu.eq("user_id", userId);
+    const { error } = await sorgu;
     if (error) throw error;
+  }
+
+  /**
+   * Mobil cihazın FCM anahtarını kaydeder. Anahtar TEKİL: aynı telefonda başka
+   * bir hesapla giriş yapılırsa satır yeni kullanıcıya taşınır (migration 131).
+   */
+  async saveDevice(userId: string, token: string, platform = "android"): Promise<void> {
+    const temiz = typeof token === "string" ? token.trim() : "";
+    // FCM anahtarları ~150-200 karakter; sınır, uca çöp yazılmasını engelliyor.
+    if (!temiz || temiz.length > 4096) return;
+    const { error } = await this.supabase.client.from("push_cihazlari").upsert(
+      {
+        user_id: userId,
+        token: temiz,
+        platform: platform === "ios" ? "ios" : "android",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "token" }
+    );
+    if (error) throw error;
+  }
+
+  /** Çıkışta çağrılır; yalnızca isteyenin kendi kaydı silinir. */
+  async removeDevice(token: string, userId?: string): Promise<void> {
+    if (!token) return;
+    let sorgu = this.supabase.client.from("push_cihazlari").delete().eq("token", token);
+    if (userId) sorgu = sorgu.eq("user_id", userId);
+    const { error } = await sorgu;
+    if (error) throw error;
+  }
+
+  private async sendMobilePush(userId: string, notification: NotificationPayload): Promise<void> {
+    if (!this.fcm.isConfigured()) return;
+    const { data, error } = await this.supabase.client.from("push_cihazlari").select("token").eq("user_id", userId);
+    // Tablo yoksa (migration 131 uygulanmadan) sessizce geç: bildirimin kendisi
+    // zaten yazıldı, yalnızca telefona gitmedi.
+    if (error || !data || data.length === 0) return;
+
+    await Promise.all(
+      data.map(async ({ token }) => {
+        const sonuc = await this.fcm.gonder(token, notification);
+        if (sonuc === "gecersiz") await this.removeDevice(token).catch(() => {});
+      })
+    );
   }
 
   private async sendPush(userId: string, notification: NotificationPayload): Promise<void> {

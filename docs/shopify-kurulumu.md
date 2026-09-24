@@ -8,25 +8,55 @@ Faz 1: Shopify → Projelio, tek yön. Siparişler Müşteriler > Tahsilat'a,
 
 ## 1. Shopify tarafı (bir kez)
 
-1. **Shopify Partners hesabı** aç → Dev Dashboard'da yeni uygulama.
-2. **Dağıtım:** **public app**, App Store'da listelenmeden. *Custom distribution*
-   tek mağazaya (ya da tek Plus organizasyonuna) kurulur; müşterilerimize sunacağımız
-   için public gerekli.
-3. **App URL:** `https://app.projelio.app` (mağaza sahibi Shopify'dan uygulamayı açarsa buraya gelir).
-4. **Redirect URL:** `https://api.projelio.app/shopify/callback` — BİREBİR.
-5. **İzinler (scopes):** `read_orders`, `read_products` (koddaki `SHOPIFY_SCOPES` ile aynı olmalı).
-6. **Zorunlu gizlilik webhook'ları** — üçü de `https://api.projelio.app/shopify/webhook`:
-   `customers/data_request`, `customers/redact`, `shop/redact`.
-   Sipariş webhook'larını (orders/create, orders/updated, orders/paid, app/uninstalled)
-   elle kurmaya gerek yok: mağaza bağlanınca kod API ile açıyor.
-7. **Korumalı müşteri verisi (Protected customer data) başvurusu** — API access
+Uygulamalar artık Partner Dashboard'da değil **Dev Dashboard**'da yönetiliyor
+(dev.shopify.com). Partners hesabı yine gerekli: Dev Dashboard'a oradan girilir.
+
+1. **Uygulama oluştur:** Dev Dashboard > Apps > *Create app* > *Start from Dev Dashboard*
+   > ad: `Projelio`.
+2. **Sürüm (Versions) oluştur** — uygulamanın yapılandırması sürümle yayımlanır:
+   - **App URL:** `https://app.projelio.app`
+   - **Embed app in Shopify admin:** KAPALI (Projelio kendi sitesinde çalışıyor)
+   - **Webhooks API version:** `2026-07` (koddaki `SHOPIFY_API_VERSION` ile aynı)
+   - **Scopes:** `read_orders,read_products` (koddaki `SHOPIFY_SCOPES` ile aynı)
+   - **Redirect URLs:** `https://api.projelio.app/shopify/callback` — BİREBİR
+   - **Compliance webhooks** (üçü de): `https://api.projelio.app/shopify/webhook`
+     — `customers/data_request`, `customers/redact`, `shop/redact`
+   - Sipariş webhook'larını (orders/create, orders/updated, orders/paid,
+     app/uninstalled) BURAYA GİRME: mağaza bağlanınca kod API ile açıyor.
+     İkisi birden olursa her olay iki kez gelir.
+   - *Release*.
+3. **Settings:** Client ID → `SHOPIFY_API_KEY`, Client secret → `SHOPIFY_API_SECRET`.
+4. **Geliştirme mağazası (dev store) aç** ve orada dene. Dağıtım seçilmeden de
+   kendi organizasyonundaki dev store'a kurulabiliyor; gerçek müşteriye açmadan
+   önce bütün akış burada denenir.
+5. **Korumalı müşteri verisi (Protected customer data) başvurusu** — API access
    bölümünden. Onay yoksa siparişte müşterinin adı/e-postası/telefonu BOŞ gelir ve
-   bütün siparişler mağazanın "Shopify misafir" kartına düşer. Başvuruda KVKK /
-   gizlilik politikası bağlantısı ve verinin ne için kullanıldığı soruluyor
-   ("siparişi müşterinin CRM kartına bağlamak, tahsilatı izlemek"). Ad, e-posta,
-   telefon ve adres alanlarını iste.
-8. App Store listelemesi Faz 1'de YOK; listelenmemiş uygulama yükleme bağlantısıyla
-   ya da Projelio'daki "Mağaza bağla" düğmesiyle kurulur.
+   bütün siparişler mağazanın "Shopify misafir" kartına düşer. Ad, e-posta,
+   telefon ve adres alanlarını iste; gerekçe: "siparişi müşterinin CRM kartına
+   bağlamak ve tahsilatı izlemek". Gizlilik politikası bağlantısı isteniyor.
+6. **Dağıtım (Distribution) — GERİ ALINAMAZ, en son seç:**
+   - *Public*: Shopify App Store'da listelenir, App Review'dan geçer. Birden çok
+     müşteriye sunmanın tek yolu bu.
+   - *Custom*: tek mağaza ya da tek Plus organizasyonu. Müşterilere sunmak için UYGUN DEĞİL.
+
+### Jetonlar (bkz. migration 132)
+
+Yeni public uygulamalar **süresi dolan** çevrimdışı jeton kullanmak zorunda:
+erişim jetonu 1 saat, yenileme jetonu 90 gün ve her yenilemede değişiyor. Kod
+bunu `expiring=1` ile istiyor, gerektiğinde yeniliyor ve her gece 04:50'de
+süresi yaklaşanları tazeliyor. Siparişler webhook'la geldiği için jetona bağlı
+değil; jeton düşerse yalnızca bağlantıyı kaldırma ve (Faz 2) geçmiş aktarımı etkilenir.
+
+### App Review'dan önce kapanması gerekenler
+
+- **Shopify'dan başlayan kurulum:** Mağaza sahibi uygulamayı App Store'dan
+  kurduğunda Shopify, App URL'ye `?shop=&hmac=` ile gelir ve uygulamanın hemen
+  yetkilendirmeyi başlatmasını bekler. Bugün kurulum yalnızca Projelio'daki
+  "Mağaza bağla" düğmesinden başlıyor; App URL'de bu karşılama sayfası YOK.
+- **Ücretlendirme:** App Store'daki uygulamalar mağazadan aldıkları ücreti
+  Shopify Billing API ile almak zorunda. Entegrasyon Projelio aboneliğinin
+  parçası olarak sunulacaksa bu kuralın nasıl uygulandığı başvurudan önce
+  netleştirilmeli.
 
 ## 2. Sunucu (backend/.env)
 
@@ -41,9 +71,7 @@ API_PUBLIC_URL=https://api.projelio.app   # geri dönüş ve webhook adresi bund
 
 ## 3. Migration
 
-```bash
-./deploy/migrate.sh uygula   # 129_shopify.sql
-```
+`129_shopify.sql` ve `132_shopify_jeton_yenileme.sql`.
 
 ## Davranış özeti
 

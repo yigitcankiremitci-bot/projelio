@@ -167,7 +167,7 @@ export default function ShopifySection({ organizationId }: { organizationId: str
 
           {m.sonHata && (
             <p style={{ fontSize: 13, color: c.warning, margin: 0, lineHeight: 1.5, overflowWrap: "anywhere" }}>
-              {t("Son hata")}: {m.sonHata}
+              {t("Son hata")}: {t(m.sonHata)}
             </p>
           )}
         </div>

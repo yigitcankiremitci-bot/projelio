@@ -51,6 +51,35 @@ const TUR_BASINA_OLAY = 50;
 const EN_FAZLA_DENEME = 5;
 /** İşlenmiş olay gövdeleri müşteri kişisel verisi taşır; bu kadar gün sonra silinir. */
 const OLAY_SAKLAMA_GUN = 30;
+/** Erişim jetonu bitmeden bu kadar önce yenilenir: istek yoldayken ölmesin. */
+const JETON_PAYI_MS = 5 * 60_000;
+/** Yenileme jetonu bitmesine bu kadar gün kalınca gece işi yeniler (bkz. 132). */
+const YENILEME_ESIGI_GUN = 30;
+
+/** Shopify'ın jeton yanıtı (kod takası ve yenileme aynı biçimde döner). */
+interface JetonYaniti {
+  access_token?: string;
+  scope?: string;
+  expires_in?: number;
+  refresh_token?: string;
+  refresh_token_expires_in?: number;
+}
+
+/**
+ * Jeton yanıtını sütunlara çevirir. `expires_in` yoksa jeton süresiz sayılır
+ * (eski tip uygulama); o zaman yenileme hiç denenmez — yenileme jetonu
+ * olmayan bir jetonu yenilemeye kalkmak kalıcı 401 demekti.
+ */
+function jetonSutunlari(j: JetonYaniti): Record<string, string | null> {
+  const simdi = Date.now();
+  const saniye = (n: unknown) => (Number(n) > 0 ? new Date(simdi + Number(n) * 1000).toISOString() : null);
+  return {
+    access_token_enc: tokenCrypto.encrypt(j.access_token!),
+    refresh_token_enc: j.refresh_token ? tokenCrypto.encrypt(j.refresh_token) : null,
+    access_token_expires_at: saniye(j.expires_in),
+    refresh_token_expires_at: saniye(j.refresh_token_expires_in),
+  };
+}
 
 const SAAT_DILIMI = process.env.TZ?.trim() || "Europe/Istanbul";
 function bugun(): string {
@@ -66,6 +95,7 @@ const HATA_IZIN = "Shopify gerekli izinleri vermedi; bağlantıyı yeniden deney
 const HATA_GECERSIZ_ISTEK = "Shopify bağlantı isteği geçersiz veya süresi dolmuş";
 const HATA_SORUMLU = "Seçilen kişi bu şirketin ekibinde değil";
 const HATA_MAGAZA_YOK = "Mağaza bulunamadı";
+const HATA_ERISIM_BITTI = "Shopify erişimi sona erdi; mağazayı yeniden bağlayın";
 // dil:anahtar-bitis
 
 interface ShopifyState {
@@ -81,6 +111,9 @@ interface MagazaSatiri {
   shop_domain: string;
   magaza_adi: string | null;
   access_token_enc: string | null;
+  refresh_token_enc: string | null;
+  access_token_expires_at: string | null;
+  refresh_token_expires_at: string | null;
   durum: string;
   varsayilan_sorumlu_id: string | null;
   baglayan_id: string | null;
@@ -236,16 +269,18 @@ export class ShopifyService {
     await this.sahipOlmali(state.organizationId, state.userId);
     await this.baskaSirketeBagliMi(shop, state.organizationId);
 
+    // expiring=1: Shopify yeni public uygulamalarda süresiz jetonu kabul
+    // etmiyor. Erişim jetonu 1 saat, yenileme jetonu 90 gün (bkz. 132).
     const res = await fetchWithTimeout(`https://${shop}/admin/oauth/access_token`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ client_id: this.istemciKimligi, client_secret: this.sir, code }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams({ client_id: this.istemciKimligi!, client_secret: this.sir!, code, expiring: "1" }),
     });
     if (!res.ok) {
       this.logger.error(`Shopify kod takası başarısız (${shop}, ${res.status}): ${await res.text()}`);
       throw new UnauthorizedException(HATA_GECERSIZ_ISTEK);
     }
-    const json = (await res.json()) as { access_token?: string; scope?: string };
+    const json = (await res.json()) as JetonYaniti;
     const verilen = new Set((json.scope ?? "").split(",").map((s) => s.trim()));
     if (!json.access_token || !SHOPIFY_SCOPES.every((s) => verilen.has(s))) {
       throw new UnauthorizedException(HATA_IZIN);
@@ -271,7 +306,7 @@ export class ShopifyService {
       shop_domain: shop,
       magaza_adi: bilgi?.shop.name ?? null,
       para_birimi: bilgi?.shop.currencyCode ?? null,
-      access_token_enc: tokenCrypto.encrypt(json.access_token),
+      ...jetonSutunlari(json),
       scopes: json.scope ?? null,
       durum: "aktif",
       baglayan_id: state.userId,
@@ -353,7 +388,7 @@ export class ShopifyService {
       try {
         const res = await fetchWithTimeout(`https://${m.shop_domain}/admin/api_permissions/current.json`, {
           method: "DELETE",
-          headers: { "X-Shopify-Access-Token": tokenCrypto.decrypt(m.access_token_enc) },
+          headers: { "X-Shopify-Access-Token": await this.gecerliJeton(m) },
         });
         if (!res.ok && res.status !== 401) this.logger.warn(`Shopify jeton iptali ${res.status} döndü (${m.shop_domain})`);
       } catch (err) {
@@ -367,7 +402,14 @@ export class ShopifyService {
   private async pasiflestir(magazaId: string): Promise<void> {
     const { error } = await this.supabase.client
       .from("shopify_magazalari")
-      .update({ durum: "kaldirildi", access_token_enc: null, kaldirildi_at: new Date().toISOString() })
+      .update({
+        durum: "kaldirildi",
+        access_token_enc: null,
+        refresh_token_enc: null,
+        access_token_expires_at: null,
+        refresh_token_expires_at: null,
+        kaldirildi_at: new Date().toISOString(),
+      })
       .eq("id", magazaId);
     if (error) throw error;
   }
@@ -376,6 +418,89 @@ export class ShopifyService {
     const { data } = await this.supabase.client.from("shopify_magazalari").select("*").eq("id", id).maybeSingle();
     if (!data || data.durum !== "aktif") throw new NotFoundException(HATA_MAGAZA_YOK);
     return data as MagazaSatiri;
+  }
+
+  // ============================================================ Jeton yenileme
+
+  /**
+   * Kullanılabilir erişim jetonu. Süresi bitmek üzereyse önce yenilenir.
+   * API çağıran her yer bundan geçmeli; şifreli sütunu doğrudan çözmek
+   * bir saat sonra 401 almak demek.
+   */
+  private async gecerliJeton(m: MagazaSatiri): Promise<string> {
+    if (!m.access_token_enc) throw new Error(HATA_ERISIM_BITTI);
+    const bitis = m.access_token_expires_at ? Date.parse(m.access_token_expires_at) : null;
+    if (bitis === null || bitis - JETON_PAYI_MS > Date.now()) return tokenCrypto.decrypt(m.access_token_enc);
+    return this.jetonuYenile(m);
+  }
+
+  /**
+   * Yenileme jetonuyla yeni çift alır ve İKİSİNİ de saklar. Shopify her
+   * yenilemede yeni bir yenileme jetonu verir ve eskisini emekliye ayırır;
+   * yenisini yazmamak bir sonraki yenilemede kalıcı 401 demek.
+   *
+   * Geçici hata (zaman aşımı, 5xx) güvenli: sunduğumuz jeton, Shopify'ın
+   * verdiği yenisi kullanılana kadar geçerli kalır — aynı jetonla yeniden
+   * denenebilir. 401 ise gerçekten bitmiş demek: kartta "yeniden bağlayın"
+   * görünür; siparişler (webhook) jetona bağlı olmadığı için gelmeye devam eder.
+   */
+  private async jetonuYenile(m: MagazaSatiri): Promise<string> {
+    if (!m.refresh_token_enc) throw new Error(HATA_ERISIM_BITTI);
+    const res = await fetchWithTimeout(`https://${m.shop_domain}/admin/oauth/access_token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams({
+        client_id: this.istemciKimligi!,
+        client_secret: this.sir!,
+        grant_type: "refresh_token",
+        refresh_token: tokenCrypto.decrypt(m.refresh_token_enc),
+      }),
+    });
+    if (res.status === 401 || res.status === 400) {
+      await this.supabase.client.from("shopify_magazalari").update({ son_hata: HATA_ERISIM_BITTI }).eq("id", m.id);
+      throw new Error(HATA_ERISIM_BITTI);
+    }
+    if (!res.ok) throw new Error(`Shopify jeton yenileme ${res.status}`);
+    const json = (await res.json()) as JetonYaniti;
+    if (!json.access_token) throw new Error("Shopify jeton yenileme yanıtı boş");
+
+    const sutunlar = jetonSutunlari(json);
+    // Yanıtta yeni yenileme jetonu yoksa eldekini koru — silmek bağlantıyı öldürürdü.
+    if (!sutunlar.refresh_token_enc) {
+      delete sutunlar.refresh_token_enc;
+      delete sutunlar.refresh_token_expires_at;
+    }
+    const { error } = await this.supabase.client.from("shopify_magazalari").update(sutunlar).eq("id", m.id);
+    if (error) throw error;
+    Object.assign(m, sutunlar);
+    return json.access_token;
+  }
+
+  /**
+   * Gece işi: yenileme jetonu 90 gün KULLANILMAZSA ölür. Faz 1'de API'ye
+   * neredeyse hiç gidilmediği (siparişler webhook'la geliyor) için, bu iş
+   * olmasa her mağaza üç ayda bir sessizce "yeniden bağlayın" durumuna düşerdi.
+   */
+  async suresiYaklasanJetonlariYenile(): Promise<{ yenilendi: number; dustu: number }> {
+    const sinir = new Date(Date.now() + YENILEME_ESIGI_GUN * 86_400_000).toISOString();
+    const { data, error } = await this.supabase.client
+      .from("shopify_magazalari")
+      .select("*")
+      .eq("durum", "aktif")
+      .not("refresh_token_enc", "is", null)
+      .lt("refresh_token_expires_at", sinir);
+    if (error) throw error;
+    const sonuc = { yenilendi: 0, dustu: 0 };
+    for (const m of (data ?? []) as MagazaSatiri[]) {
+      try {
+        await this.jetonuYenile(m);
+        sonuc.yenilendi++;
+      } catch (err) {
+        this.logger.warn(`Shopify jetonu yenilenemedi (${m.shop_domain}): ${(err as Error).message}`);
+        sonuc.dustu++;
+      }
+    }
+    return sonuc;
   }
 
   private async graphql<T>(shop: string, jeton: string, sorgu: string, degiskenler?: Record<string, unknown>): Promise<T> {

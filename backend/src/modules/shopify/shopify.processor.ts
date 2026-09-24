@@ -8,6 +8,7 @@ import { ShopifyService } from "./shopify.service";
  *   webhook geldiğinde   hemen bir tur (ShopifyWebhookController tetikler)
  *   her dakika           yedek tur — tetik kaçtıysa ya da olay yeniden denenecekse
  *   her gün 04:40        30 günü geçmiş işlenmiş olayların silinmesi (kişisel veri)
+ *   her gün 04:50        süresi yaklaşan yenileme jetonlarının yenilenmesi (bkz. 132)
  *
  * `running` bayrağı: webhook tetiği ile dakikalık tur çakışırsa aynı olay iki
  * kez işlenmesin. Sipariş yazımı tekil indeksle zaten korunuyor ama tahsilat
@@ -50,6 +51,17 @@ export class ShopifyProcessor {
       if (n > 0) this.logger.log(`Eski Shopify olayları silindi: ${n}`);
     } catch (err) {
       this.logger.error(`Shopify olay süpürme düştü: ${(err as Error).message}`);
+    }
+  }
+
+  /** Yenileme jetonu 90 gün kullanılmazsa ölür; bu iş onu canlı tutar. */
+  @Cron("50 4 * * *")
+  async jetonlariYenile(): Promise<void> {
+    try {
+      const { yenilendi, dustu } = await this.shopify.suresiYaklasanJetonlariYenile();
+      if (yenilendi || dustu) this.logger.log(`Shopify jetonları: ${yenilendi} yenilendi, ${dustu} düştü`);
+    } catch (err) {
+      this.logger.error(`Shopify jeton yenileme turu düştü: ${(err as Error).message}`);
     }
   }
 }

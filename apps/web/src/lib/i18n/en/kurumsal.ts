@@ -535,4 +535,5 @@ export const kurumsal: TranslationDict = {
   "Bu mağaza başka bir şirkete bağlı. Önce oradaki bağlantıyı kaldırın.": "This store is connected to another company. Remove that connection first.",
   "Shopify gerekli izinleri vermedi; bağlantıyı yeniden deneyin": "Shopify didn't grant the required permissions; try connecting again",
   "Shopify bağlantı isteği geçersiz veya süresi dolmuş": "The Shopify connection request is invalid or has expired",
+  "Shopify erişimi sona erdi; mağazayı yeniden bağlayın": "Shopify access has expired; reconnect the store",
 };

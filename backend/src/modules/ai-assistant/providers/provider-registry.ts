@@ -5,6 +5,18 @@ import { OpenAiCompatProvider } from "./openai-compat.provider";
 import { PROVIDER_CATALOG, defaultModelForTier, findModel, modelOverride, readProviderOrder } from "./providers.config";
 import type { ModelDefinition, ProviderDefinition } from "./providers.config";
 
+/**
+ * İstek yalnızca belirli sağlayıcılara gidebilecekken (bkz.
+ * ai-assistant/google-veri-siniri.ts) o sağlayıcılardan hiçbiri etkin değil.
+ * Yedeğe DÜŞÜLMEZ; çağıran kullanıcıya açık bir mesaj gösterir.
+ */
+export class IzinliSaglayiciYokHatasi extends Error {
+  constructor() {
+    super("İzinli sağlayıcı yok");
+    this.name = "IzinliSaglayiciYokHatasi";
+  }
+}
+
 /** Bir kademe için seçilmiş sağlayıcı + o sağlayıcıdaki model adı. */
 export interface ProviderChoice {
   provider: LlmProvider;
@@ -130,10 +142,22 @@ export class LlmProviderRegistry {
   async send(
     tier: "fast" | "smart" | "max",
     build: (choice: ProviderChoice) => LlmRequest,
-    options: { preferred?: string | null; onSwitch?: (choice: ProviderChoice) => void } = {}
+    options: {
+      preferred?: string | null;
+      onSwitch?: (choice: ProviderChoice) => void;
+      /**
+       * Verilirse yalnızca bu sağlayıcılar denenir (kimlikler: providers.config.ts).
+       * Google verisi taşıyan istekler için — bkz. ai-assistant/google-veri-siniri.ts.
+       */
+      izinliSaglayicilar?: readonly string[];
+    } = {}
   ): Promise<{ response: LlmResponse; choice: ProviderChoice }> {
-    const { preferred, onSwitch } = options;
-    const candidates = this.candidatesForTier(tier, preferred);
+    const { preferred, onSwitch, izinliSaglayicilar } = options;
+    let candidates = this.candidatesForTier(tier, preferred);
+    if (izinliSaglayicilar) {
+      candidates = candidates.filter((c) => izinliSaglayicilar.includes(c.definition.id));
+      if (candidates.length === 0) throw new IzinliSaglayiciYokHatasi();
+    }
     if (candidates.length === 0) {
       throw new Error(`"${tier}" kademesi için yapılandırılmış sağlayıcı yok.`);
     }

@@ -6,6 +6,8 @@ import type { TranslationDict } from "@projelio/shared";
  */
 export const googleTakvim: TranslationDict = {
   "Google Takvim'e eklendi": "Added to Google Calendar",
+  "Google Takvim verisi içeren istekler yalnızca Anthropic ile işleniyor ve şu an kullanılamıyor. Biraz sonra tekrar dene.":
+    "Requests containing Google Calendar data are processed only by Anthropic, which is unavailable right now. Try again shortly.",
   "Takvim izni verilmedi. Bağlarken takvim kutularını işaretli bırak.":
     "Calendar permission wasn't granted. Leave the calendar boxes checked when connecting.",
   "Google Takvim bağlı değil. Ayarlar > Bağlı hesaplar'dan bağlayabilirsin.":

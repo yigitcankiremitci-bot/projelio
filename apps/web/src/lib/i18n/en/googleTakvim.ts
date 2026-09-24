@@ -31,6 +31,8 @@ export const googleTakvim: TranslationDict = {
   "Google Takvim bağlantısı kesilsin mi? Projelio'dan eklediğin etkinlikler Google Takvim'de kalır.":
     "Disconnect Google Calendar? Events you added from Projelio will stay in Google Calendar.",
   "Google Takvim bağlantısı kopmuş. Yeniden bağlan.": "The Google Calendar connection was lost. Reconnect it.",
+  "Lio'ya takviminle ilgili bir şey sorduğunda, yalnızca yanıt için gereken etkinlikler yapay zekâ sağlayıcımız Anthropic'e iletilir ve model eğitiminde kullanılmaz. Takvim verin başka bir yapay zekâ sağlayıcısına gönderilmez.":
+    "When you ask Lio about your calendar, only the events needed for the answer are sent to our AI provider, Anthropic, and are not used for model training. Your calendar data is not sent to any other AI provider.",
 
   // ─────────────────────────────────────────────── Takvim sayfası
   "+ Etkinlik": "+ Event",

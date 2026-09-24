@@ -92,7 +92,7 @@ import {
   resolveTier,
   type ModelTier,
 } from "./ai-credits.config";
-import { LlmProviderRegistry, type ProviderChoice } from "./providers/provider-registry";
+import { IzinliSaglayiciYokHatasi, LlmProviderRegistry, type ProviderChoice } from "./providers/provider-registry";
 import { AiModelSettingsService } from "./ai-model-settings.service";
 import type { LlmRequest, LlmResponse } from "./providers/llm-provider";
 import type { Locale } from "@projelio/shared";
@@ -100,6 +100,7 @@ import { DIL_KURALLARI } from "./lio-dil-kurallari";
 import { cevir, cevirmen, hataMetni } from "../../common/i18n";
 import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 import { GoogleTakvimService } from "../google-takvim/google-takvim.service";
+import { GOOGLE_VERISI_SAGLAYICILARI, takvimVerisiIceriyor } from "./google-veri-siniri";
 import { tumGunGunleri, takvimGunEkle, type GoogleTakvimEtkinligi } from "@projelio/shared";
 
 const DEFAULT_MODEL = MODEL_TIERS.fast.model;
@@ -324,6 +325,10 @@ interface PendingRun {
   tier: ModelTier;
   /** Kullanıcının açıkça seçtiği model ("saglayici:model"); yoksa kademe kararı geçerli. */
   preferredModel?: string | null;
+  /** İstekler Google verisi taşıyor: yalnızca izinli sağlayıcıya gider (bkz. googleVerisiSiniri). */
+  googleVerisi?: boolean;
+  /** Kullanıcının Google Takvim'i bağlı mı — koşu başına bir kez sorulur. */
+  takvimBagli?: boolean;
   messages: Anthropic.MessageParam[];
   /**
    * Bağlamın dosyadan BAĞIMSIZ kısmı (tarih, rol, iş/proje özeti).
@@ -859,14 +864,39 @@ export class AiAssistantService {
   private async callModel(
     tier: ModelTier,
     build: (choice: ProviderChoice) => LlmRequest,
-    preferred?: string | null
+    preferred?: string | null,
+    izinliSaglayicilar?: readonly string[]
   ): Promise<{ response: LlmResponse; model: string; providerLabel: string }> {
     try {
-      const { response, choice } = await this.providers.send(tier, build, { preferred });
+      const { response, choice } = await this.providers.send(tier, build, { preferred, izinliSaglayicilar });
       return { response, model: choice.model, providerLabel: choice.definition.label };
     } catch (err: any) {
+      if (err instanceof IzinliSaglayiciYokHatasi) {
+        this.logger.error("Google verisi taşıyan istek için izinli sağlayıcı (Anthropic) etkin değil.");
+        throw new ServiceUnavailableException(
+          "Google Takvim verisi içeren istekler yalnızca Anthropic ile işleniyor ve şu an kullanılamıyor. Biraz sonra tekrar dene."
+        );
+      }
       throw this.toUserFacingError(err);
     }
+  }
+
+  /**
+   * Bu koşunun istekleri Google verisi taşıyor mu? Taşıyorsa yalnızca
+   * GOOGLE_VERISI_SAGLAYICILARI'na gider, yedeğe düşmez (bkz. google-veri-siniri.ts).
+   *
+   * İki kaynak: konuşmada bir takvim aracı çağrılmış olması (geçmiş dahil) ya da
+   * kullanıcının Google Takvim'inin bağlı olması. İkincisi şart çünkü
+   * takvim ekranındaki "Lio ile göreve çevir" etkinliğin başlığını doğrudan
+   * kullanıcı mesajına yazıyor — araç çağrılmadan da takvim verisi gidebiliyor.
+   * Bir kez true olunca koşu boyunca true kalır.
+   */
+  private async googleVerisiSiniri(run: PendingRun): Promise<readonly string[] | undefined> {
+    if (!run.googleVerisi) {
+      run.takvimBagli ??= await this.googleTakvim.bagliMi(run.userId).catch(() => false);
+      run.googleVerisi = run.takvimBagli || takvimVerisiIceriyor(run.messages);
+    }
+    return run.googleVerisi ? GOOGLE_VERISI_SAGLAYICILARI : undefined;
   }
 
   /** Sağlayıcı hatasını kullanıcıya gösterilebilir bir istisnaya çevirir. */
@@ -2202,7 +2232,7 @@ export class AiAssistantService {
         ] as any,
         tools: toolsForChannel(run.channel, { allowWrites: run.allowWrites }),
         messages: run.messages,
-      }), run.preferredModel);
+      }), run.preferredModel, await this.googleVerisiSiniri(run));
       // Yedeğe geçilmiş olabilir; sonraki kredi hesapları gerçek modeli kullansın.
       model = usedModel;
       run.iterationsUsed += 1;

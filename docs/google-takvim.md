@@ -36,6 +36,14 @@ okuyup göreve çevirir.
   önceliğini Lio tahmin eder, önce önerir, onayla görevi açar ve etkinliği
   `mark_calendar_event` ile işaretler (`isleme`: yeni · gorev · yoksay).
 - Hiçbir Google isteğinde davet gönderilmez (`sendUpdates=none`).
+- **Takvim verisi yalnızca Anthropic'e gider.** Lio konuşmasında bir takvim
+  aracı çağrıldıysa ya da kullanıcının Google Takvim'i bağlıysa, sağlayıcı
+  yönlendiricisi yedeğe (MiniMax, z.ai) GEÇMEZ; Anthropic yoksa istek hata
+  verir (`ai-assistant/google-veri-siniri.ts`). Gizlilik politikası §6, §7 ve
+  §11 ile Ayarlar'daki takvim kartındaki cümle bu kurala dayanıyor — Google'ın
+  Limited Use koşulu verinin aktarıldığı tarafın da model eğitmemesini istiyor
+  ve yedek sağlayıcılar için bu doğrulanmadı. Kuralı gevşetmeden önce üç metni
+  de değiştir.
 
 ## Kurulum
 

@@ -99,6 +99,15 @@ export class GoogleTakvimService {
     };
   }
 
+  /**
+   * Bağlantı satırı var mı (kopuk olsa bile — önbellekte veri durur). Lio,
+   * bağlı kullanıcının isteklerini yalnızca Anthropic'e gönderiyor (bkz.
+   * ai-assistant/google-veri-siniri.ts).
+   */
+  async bagliMi(userId: string): Promise<boolean> {
+    return Boolean(await this.baglanti(userId));
+  }
+
   /** Google onay ekranının adresi. Dönüş google.controller'daki ortak callback'e düşer. */
   baglantiAdresi(userId: string, next = "/calendar"): string {
     if (!this.yapilandirildi()) {

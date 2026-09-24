@@ -206,6 +206,18 @@ export default function GoogleTakvimKarti() {
           </div>
         </>
       ) : null}
+
+      {/* Yapay zekâ bilgilendirmesi — Google'ın Sınırlı Kullanım koşulları
+          verinin bir yapay zekâ sağlayıcısına gittiğinin özelliği kullanırken
+          de söylenmesini istiyor, yalnızca gizlilik politikasında değil.
+          Cümle kodla bağlı: takvim verisi taşıyan istekler yedeğe düşmez
+          (bkz. backend ai-assistant/google-veri-siniri.ts). Politika §7 ile
+          aynı taahhüt; birini değiştiren ötekini de değiştirmeli. */}
+      {durum?.yapilandirildi && (
+        <p style={{ fontSize: 12, color: c.textSecondary, margin: "14px 0 0", lineHeight: 1.5 }}>
+          {t("Lio'ya takviminle ilgili bir şey sorduğunda, yalnızca yanıt için gereken etkinlikler yapay zekâ sağlayıcımız Anthropic'e iletilir ve model eğitiminde kullanılmaz. Takvim verin başka bir yapay zekâ sağlayıcısına gönderilmez.")}
+        </p>
+      )}
     </div>
   );
 }

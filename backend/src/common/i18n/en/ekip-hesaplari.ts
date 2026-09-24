@@ -10,6 +10,7 @@ export const ekipHesaplari: TranslationDict = {
   "{yonetici}, seni Projelio'da {sirket} ekibine ekledi ve senin için bir hesap açtı.":
     "{yonetici} added you to the {sirket} team on Projelio and created an account for you.",
   "Hesabına gir": "Sign in to your account",
+  "E-posta": "Email",
   "Bu bağlantı 7 gün geçerli ve tek kullanımlık. Sonrasında e-posta adresin ve şifrenle giriş yapabilirsin.":
     "This link is valid for 7 days and works once. After that, sign in with your email and password.",
   "İlk girişte kendi şifreni belirlemen istenecek.": "You'll be asked to set your own password when you first sign in.",

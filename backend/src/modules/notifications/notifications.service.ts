@@ -1,6 +1,6 @@
 import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import * as webpush from "web-push";
-import type { NotificationPayload, PushSubscriptionPayload } from "@projelio/shared";
+import { bildirimKanaliAcikMi, type NotificationPayload, type PushSubscriptionPayload } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsGateway } from "./notifications.gateway";
 import { WhatsappService } from "../whatsapp/whatsapp.service";
@@ -8,6 +8,7 @@ import { cevir } from "../../common/i18n";
 import type { Metin } from "../../common/i18n";
 import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 import { FcmGonderici } from "./fcm";
+import { BildirimTercihleriService } from "./bildirim-tercihleri.service";
 
 function mapNotification(row: any): NotificationPayload {
   return {
@@ -37,7 +38,8 @@ export class NotificationsService {
     // modülün gateway'ini kullanıyor; biz de bildirimi WhatsApp'a vermek için
     // onu — iki yönlü bağımlılık Nest'te ancak böyle çözülüyor.
     @Inject(forwardRef(() => WhatsappService)) private whatsapp: WhatsappService,
-    private readonly diller: KullaniciDiliService
+    private readonly diller: KullaniciDiliService,
+    private readonly tercihler: BildirimTercihleriService
   ) {
     const publicKey = process.env.VAPID_PUBLIC_KEY;
     const privateKey = process.env.VAPID_PRIVATE_KEY;
@@ -73,7 +75,11 @@ export class NotificationsService {
     title: Metin,
     body: Metin,
     link?: string
-  ): Promise<NotificationPayload> {
+  ): Promise<NotificationPayload | null> {
+    // Kullanıcı bu tipi Ayarlar > Bildirimler'de kapattıysa hiç yazılmaz
+    // (bkz. migration 135). null dönüşü "gönderilmedi, hata değil" demek.
+    const tercih = await this.tercihler.getir(userId);
+    if (!bildirimKanaliAcikMi(tercih, type, "uygulama")) return null;
     const locale = await this.diller.diliniBul(userId);
     const { data: row, error } = await this.supabase.client
       .from("notifications")
@@ -90,11 +96,14 @@ export class NotificationsService {
 
     const notification = mapNotification(row);
     this.gateway.sendToUser(userId, notification);
-    void this.sendPush(userId, notification).catch(() => {});
-    void this.sendMobilePush(userId, notification).catch(() => {});
+    if (bildirimKanaliAcikMi(tercih, type, "anlik")) {
+      void this.sendPush(userId, notification).catch(() => {});
+      void this.sendMobilePush(userId, notification).catch(() => {});
+    }
     // Dördüncü kanal: kullanıcı WhatsApp'a bağlıysa kuyruğa girer, değilse
     // sessizce döner. Gönderim burada değil, dakikalık işleyicide (hız sınırı).
-    void this.whatsapp.notifyUser(userId, notification);
+    if (bildirimKanaliAcikMi(tercih, type, "whatsapp")) void this.whatsapp.notifyUser(userId, notification);
+    // E-posta kanalı burada değil: işleyici tabloyu tarıyor ve tipi orada süzüyor.
     return notification;
   }
 

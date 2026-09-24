@@ -3,6 +3,7 @@ import { AuthGuard } from "@nestjs/passport";
 import type { NotificationEmailPrefs, PushSubscriptionPayload } from "@projelio/shared";
 import { NotificationsService } from "./notifications.service";
 import { NotificationEmailPrefsService } from "./notification-email-prefs.service";
+import { BildirimTercihleriService } from "./bildirim-tercihleri.service";
 import { NotificationEmailProcessor } from "./notification-email.processor";
 
 interface AuthedRequest {
@@ -15,7 +16,8 @@ export class NotificationsController {
   constructor(
     private notificationsService: NotificationsService,
     private emailPrefs: NotificationEmailPrefsService,
-    private emailProcessor: NotificationEmailProcessor
+    private emailProcessor: NotificationEmailProcessor,
+    private tercihler: BildirimTercihleriService
   ) {}
 
   @Get()
@@ -57,6 +59,19 @@ export class NotificationsController {
   @Post("devices/remove")
   removeDevice(@Body("token") token: string, @Req() req: AuthedRequest) {
     return this.notificationsService.removeDevice(token, req.user.userId);
+  }
+
+  // ──────────────────────────────────── Bildirim tipi × kanal tercihi (135)
+
+  @Get("preferences")
+  getPreferences(@Req() req: AuthedRequest) {
+    return this.tercihler.getir(req.user.userId);
+  }
+
+  /** Tam tercih gönderilir; bilinmeyen tip/kanal sunucuda düşer. */
+  @Patch("preferences")
+  savePreferences(@Body() body: unknown, @Req() req: AuthedRequest) {
+    return this.tercihler.kaydet(req.user.userId, body);
   }
 
   // ──────────────────────────────────────────── Bildirim e-postaları (102)

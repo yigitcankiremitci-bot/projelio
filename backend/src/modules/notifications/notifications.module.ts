@@ -6,6 +6,7 @@ import { NotificationsController } from "./notifications.controller";
 import { DeadlineReminderProcessor } from "./deadline-reminder.processor";
 import { DigestProcessor } from "./digest.processor";
 import { NotificationEmailPrefsService } from "./notification-email-prefs.service";
+import { BildirimTercihleriService } from "./bildirim-tercihleri.service";
 import { NotificationEmailProcessor } from "./notification-email.processor";
 import { NotificationEmailUnsubscribeController } from "./notification-email-unsubscribe.controller";
 import { getJwtSecret } from "../../common/config/env";
@@ -37,6 +38,7 @@ import { EmailModule } from "../auth/email.module";
     DigestProcessor,
     NotificationEmailPrefsService,
     NotificationEmailProcessor,
+    BildirimTercihleriService,
   ],
   // Gateway de dışarı açık: WhatsApp modülü bağlantı durumunu aynı odaya basıyor.
   // Tercih servisi dışarı açık: ipucu ve toplu e-postalar (eposta-yonetimi)

@@ -23,6 +23,7 @@ import CloudAccountsCard from "../components/CloudAccountsCard";
 import WhatsappCard from "../components/WhatsappCard";
 import GoogleTakvimKarti from "../components/googleTakvim/GoogleTakvimKarti";
 import NotificationEmailCard from "../components/NotificationEmailCard";
+import BildirimTercihleriKarti from "../components/BildirimTercihleriKarti";
 import OrnekIsAyari from "../components/OrnekIsAyari";
 import DemoRandevuKarti from "../components/demoRandevu/DemoRandevuKarti";
 import PasskeysCard from "../components/PasskeysCard";
@@ -85,7 +86,7 @@ const CARD_MIN_WIDTH = 440;
 /** Çok geniş ekranda kartlar üçüncü sütuna yayılıp dağılmasın diye üst sınır. */
 const CONTENT_MAX_WIDTH = 1400;
 
-type SettingsTab = "hesap" | "gorunum" | "gezinme" | "yardimcilar" | "ritim" | "baglantilar" | "destek";
+type SettingsTab = "hesap" | "gorunum" | "gezinme" | "bildirimler" | "yardimcilar" | "ritim" | "baglantilar" | "destek";
 
 /**
  * Sekme etiketleri modül düzeyinde, yani t() burada çağrılamaz (kanca yok).
@@ -96,6 +97,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "hesap", label: "Hesap" }, // dil:anahtar
   { key: "gorunum", label: "Görünüm" }, // dil:anahtar
   { key: "gezinme", label: "Gezinme" }, // dil:anahtar
+  { key: "bildirimler", label: "Bildirimler" }, // dil:anahtar
   { key: "yardimcilar", label: "Yardımcılar" }, // dil:anahtar
   { key: "ritim", label: "Çalışma ritmi" }, // dil:anahtar
   { key: "baglantilar", label: "Bağlı hesaplar" }, // dil:anahtar
@@ -1050,11 +1052,6 @@ export default function Settings() {
         <Toggle checked={prefs.showPresence} onChange={prefs.setShowPresence} />
       </SettingCard>
 
-      {/* Bildirim e-postaları en altta ve KATLANMIŞ: varsayılanı (günde bir
-          özet, 09:00) çoğu kullanıcı için doğru, ayarı arayan ise burada
-          bulur. Bkz. NotificationEmailCard başlığı. */}
-      <NotificationEmailCard />
-
       <SettingCard
         title={t("Kullanım turu")}
         description={t("Uygulamayı tanıtan sesli turu baştan izle. Tur, bulunduğun sayfadaki öğeleri işaret ederek ilerler.")}
@@ -1098,6 +1095,15 @@ export default function Settings() {
     hesap: hesapTab,
     gorunum: gorunumTab,
     gezinme: gezinmeTab,
+    // Hangi bildirim hangi kanaldan + e-postanın sıklığı tek sekmede. E-posta
+    // kartı eskiden Yardımcılar'ın dibindeydi; bildirim ayarını arayan kişi
+    // orayı bulamıyordu. Kart hâlâ KATLANMIŞ açılıyor (bkz. başlığı).
+    bildirimler: (
+      <>
+        <BildirimTercihleriKarti />
+        <NotificationEmailCard />
+      </>
+    ),
     yardimcilar: yardimcilarTab,
     ritim: <WorkRhythmSettings />, baglantilar: (
       <>

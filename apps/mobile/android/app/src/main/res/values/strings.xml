@@ -5,7 +5,7 @@
     <string name="package_name">app.projelio.mobile</string>
     <string name="custom_url_scheme">app.projelio.mobile</string>
     <!-- Bildirim kanalı: kimlik KALICIDIR, değişirse kullanıcının kanal ayarları (ses, sessize alma) kaybolur. -->
-    <string name="bildirim_kanali_kimligi" translatable="false">projelio_bildirimler</string>
+    <string name="bildirim_kanali_kimligi" translatable="false">projelio_bildirimler_v2</string>
     <string name="bildirim_kanali_adi">Bildirimler</string>
     <string name="bildirim_kanali_aciklamasi">Görev atamaları, yorumlar, son tarih hatırlatmaları</string>
 </resources>

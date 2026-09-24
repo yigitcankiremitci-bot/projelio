@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import type { Socket } from "socket.io-client";
 import { safeExternalUrl, type CreationRequest, type JobMember, type NotificationPayload } from "@projelio/shared";
 import { api } from "../api/client";
+import { bildirimSesiCal, bildirimSesiniAyarla } from "../lib/bildirimSesi";
 import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { timeAgo } from "../lib/dates";
@@ -104,6 +105,14 @@ export default function NotificationBell() {
       })
       .catch(() => {});
 
+    // Ses tercihi (Ayarlar > Bildirimler). Okunamazsa ses açık kalır.
+    api
+      .get<{ ses: boolean }>("/notifications/preferences")
+      .then((tercih) => {
+        if (!cancelled) bildirimSesiniAyarla(tercih.ses !== false);
+      })
+      .catch(() => {});
+
     api
       .get<{ id: string } | null>("/auth/me")
       .then((me) => {
@@ -121,6 +130,7 @@ export default function NotificationBell() {
         socket.on("notification", (notification: NotificationPayload) => {
           setNotifications((prev) => [notification, ...prev].slice(0, 50));
           setUnreadCount((n) => n + 1);
+          bildirimSesiCal();
           // Yeni bir iş daveti geldiyse kabul/ret satırı da anında belirsin.
           if (notification.type === "job_invite") loadInvites();
           if (notification.type === "creation_request") loadApprovals();

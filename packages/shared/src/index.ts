@@ -19,3 +19,4 @@ export * from "./epostaYonetimi";
 export * from "./demoRandevu";
 export * from "./ekipHesaplari";
 export * from "./googleTakvim";
+export * from "./bildirimTercihleri";

@@ -5,7 +5,8 @@ import { SupabaseService } from "../../database/supabase.service";
 import { EmailService } from "../auth/email.service";
 import { getWebAppUrl } from "../../common/config/env";
 import { demoEpostasiMi } from "../../common/demo-hesap";
-import { isLocale } from "@projelio/shared";
+import { bildirimKanaliAcikMi, isLocale } from "@projelio/shared";
+import { BildirimTercihleriService } from "./bildirim-tercihleri.service";
 import {
   NotificationEmailPrefsService,
   BOS_DAMGALAR,
@@ -96,7 +97,8 @@ export class NotificationEmailProcessor {
   constructor(
     private supabase: SupabaseService,
     private email: EmailService,
-    private tercihler: NotificationEmailPrefsService
+    private tercihler: NotificationEmailPrefsService,
+    private tipTercihleri: BildirimTercihleriService
   ) {}
 
   // ────────────────────────────────────────────────────────── Anlık tur
@@ -383,7 +385,7 @@ export class NotificationEmailProcessor {
 
     const { data, error } = await this.supabase.client
       .from("notifications")
-      .select("title, body, link, created_at")
+      .select("type, title, body, link, created_at")
       .eq("user_id", alici.userId)
       .eq("read", false)
       .gt("created_at", baslangic.toISOString())
@@ -396,7 +398,12 @@ export class NotificationEmailProcessor {
     // görüp kapattığı şeyi bir de gelen kutusunda görmek istemiyor. Anlık
     // kipte bunun ikinci bir faydası var — uygulamayı açık tutan kişiye
     // neredeyse hiç e-posta gitmiyor.
-    return (data ?? []).map((row: any) => ({
+    // Ayarlar > Bildirimler'de e-postası kapatılan tipler düşer (bkz. 135).
+    // Önbellekli okuma: aynı kullanıcı için dakikada en fazla bir sorgu.
+    const tipTercihi = await this.tipTercihleri.getir(alici.userId);
+    return (data ?? [])
+      .filter((row: any) => bildirimKanaliAcikMi(tipTercihi, row.type, "eposta"))
+      .map((row: any) => ({
       baslik: row.title,
       govde: row.body,
       link: row.link ?? undefined,

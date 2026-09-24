@@ -2,6 +2,9 @@ package app.projelio.mobile;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.ContentResolver;
+import android.media.AudioAttributes;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 
@@ -53,6 +56,13 @@ public class MainActivity extends BridgeActivity {
      * IMPORTANCE_HIGH yalnızca İLK oluşturmada geçerli: kanal bir kez
      * yaratıldıktan sonra önemini yalnızca kullanıcı değiştirebilir ve tekrar
      * çağırmak onun ayarını ezmez. Yani bunu her açılışta çağırmak güvenli.
+     *
+     * SES: kanalın sesi de önemi gibi yalnızca İLK oluşturmada yazılır. Projelio
+     * sesi (res/raw/projelio_bildirim) eklendiğinde eski kanal varsayılan sesle
+     * zaten yaratılmıştı; üstüne setSound demek hiçbir şeyi değiştirmezdi. Bu
+     * yüzden kimlik değişti (strings.xml, sonuna _v2) ve eski kanal silinir ki
+     * ayarlarda iki "Bildirimler" görünmesin. Sesi bir daha değiştirmek = yine
+     * yeni kimlik; sunucudaki BILDIRIM_KANALI de birlikte değişmeli.
      */
     private void bildirimKanaliniOlustur() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
@@ -64,8 +74,20 @@ public class MainActivity extends BridgeActivity {
             NotificationManager.IMPORTANCE_HIGH
         );
         kanal.setDescription(getString(R.string.bildirim_kanali_aciklamasi));
+        Uri ses = Uri.parse(
+            ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + getPackageName() + "/" + R.raw.projelio_bildirim
+        );
+        kanal.setSound(
+            ses,
+            new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        );
         kanal.enableVibration(true);
         kanal.setShowBadge(true);
         yonetici.createNotificationChannel(kanal);
+        // 1.2.0 ve öncesinin kanalı (varsayılan sesli).
+        yonetici.deleteNotificationChannel("projelio_bildirimler");
     }
 }

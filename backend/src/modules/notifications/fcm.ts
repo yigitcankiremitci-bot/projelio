@@ -27,8 +27,15 @@ const KAPSAM = "https://www.googleapis.com/auth/firebase.messaging";
  * Android bildirim kanalı. Uygulamadaki kimlikle BİREBİR aynı olmalı
  * (apps/mobile/android/.../strings.xml bildirim_kanali_kimligi); farklı olursa
  * Android bildirimi "Diğer" adlı sessiz bir kanala düşürür.
+ *
+ * _v2: kanal Projelio'nun kendi sesiyle yeniden açıldı (bkz. MainActivity
+ * bildirimKanaliniOlustur — ses kanal açılırken sabitleniyor). Kanalı henüz
+ * olmayan eski sürümlerde FCM SDK bilinmeyen kimliği görünce manifestteki
+ * varsayılan kanala (o sürümde eski kimlik) düşüyor, yani bildirim kaybolmuyor.
  */
-export const BILDIRIM_KANALI = "projelio_bildirimler";
+export const BILDIRIM_KANALI = "projelio_bildirimler_v2";
+/** res/raw/projelio_bildirim.mp3 — Android 8 öncesi (kanalsız) cihazlar için. */
+const BILDIRIM_SESI = "projelio_bildirim";
 
 /** Bildirim ikonu (res/drawable-*), yalnızca alfa kanalı kullanılan beyaz logo. */
 const BILDIRIM_IKONU = "ic_stat_projelio";
@@ -68,7 +75,8 @@ export function fcmMesaji(token: string, bildirim: Pick<NotificationPayload, "id
           channel_id: BILDIRIM_KANALI,
           icon: BILDIRIM_IKONU,
           color: VURGU_RENGI,
-          default_sound: true,
+          // Android 8+ sesi kanaldan alır; bu alan yalnızca daha eskileri için.
+          sound: BILDIRIM_SESI,
           default_vibrate_timings: true,
           notification_priority: "PRIORITY_HIGH",
         },

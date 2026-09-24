@@ -24,6 +24,7 @@ import { baslangic } from "./baslangic";
 import { ilkAdimlar } from "./ilkAdimlar";
 import { uygulama } from "./uygulama";
 import { arkadaslar } from "./arkadaslar";
+import { bildirimTercihleri } from "./bildirimTercihleri";
 
 /**
  * Türkçe → İngilizce sözlük.
@@ -62,6 +63,7 @@ export const en: TranslationDict = {
   ...ilkAdimlar,
   ...uygulama,
   ...ayarlar,
+  ...bildirimTercihleri,
   ...gorevler,
   ...projeler,
   ...kurumsal,

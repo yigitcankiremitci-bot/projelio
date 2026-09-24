@@ -1,4 +1,4 @@
-import type { NotificationPayload } from "@projelio/shared";
+import { WHATSAPP_GIDEN_TIPLER, type NotificationPayload } from "@projelio/shared";
 
 /**
  * Hangi bildirim tipleri WhatsApp'a da gider.
@@ -8,21 +8,9 @@ import type { NotificationPayload } from "@projelio/shared";
  * değeri düşük olanlar (beğeni, günlük özet, yöneticiye maliyet uyarısı)
  * uygulama içi bildirimde kalır.
  */
-const WHATSAPP_NOTIFICATION_TYPES: ReadonlySet<NotificationPayload["type"]> = new Set<NotificationPayload["type"]>([
-  "task_due_24h",
-  "task_due_1h",
-  "task_reminder",
-  "project_deadline_24h",
-  "task_assigned",
-  "team_invite",
-  "job_invite",
-  "job_invite_answered",
-  "creation_request",
-  "creation_request_answered",
-  "post_mention",
-  "post_comment",
-  "support_reply",
-]);
+// Liste ortak pakette: Ayarlar'daki bildirim tercihleri kartı da aynı kümeye
+// bakıp WhatsApp'a gitmeyen tip için anahtar göstermiyor.
+const WHATSAPP_NOTIFICATION_TYPES = WHATSAPP_GIDEN_TIPLER;
 
 export function shouldSendOverWhatsapp(type: NotificationPayload["type"]): boolean {
   return WHATSAPP_NOTIFICATION_TYPES.has(type);

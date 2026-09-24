@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PlanCalendarView, PlanPeriodKind, PlanTimeBlock } from "@projelio/shared";
+import type {
+  GoogleTakvimDurumu,
+  GoogleTakvimEtkinligi,
+  PlanCalendarView,
+  PlanPeriodKind,
+  PlanTimeBlock,
+} from "@projelio/shared";
+import { useNavigate } from "react-router-dom";
+import { googleTakvimApi } from "../api/googleTakvim";
+import GoogleEtkinlikModal from "../components/googleTakvim/GoogleEtkinlikModal";
 import { useThemeColors } from "../theme/useThemeColors";
 import { planning, type PlanSuggestionResult } from "../api/planning";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -71,6 +80,15 @@ export default function CalendarView() {
   // "atlandı" kaydı yalnızca kullanıcı "Şimdi değil" derse yazılır; "kendim
   // yaparım" diyen biri sayfayı yenilediğinde kartı yeniden görebilmeli.
   const [ritualDismissed, setRitualDismissed] = useState(false);
+  const navigate = useNavigate();
+
+  // Google Takvim. Durum bir kez okunur; etkinlikler takvim verisiyle birlikte
+  // tazelenir (bkz. aşağıdaki efekt).
+  const [gDurum, setGDurum] = useState<GoogleTakvimDurumu | null>(null);
+  const [etkinlikler, setEtkinlikler] = useState<GoogleTakvimEtkinligi[]>([]);
+  const [acikEtkinlik, setAcikEtkinlik] = useState<GoogleTakvimEtkinligi | null>(null);
+  const [yeniEtkinlikTarihi, setYeniEtkinlikTarihi] = useState<string | null>(null);
+  const googleCalisiyor = Boolean(gDurum?.bagli && !gDurum.kopuk);
 
   const load = useCallback(() => {
     setError(null);
@@ -82,6 +100,49 @@ export default function CalendarView() {
   }, [view, anchor]);
 
   useEffect(load, [load]);
+
+  useEffect(() => {
+    // Google hatası takvimi durdurmasın: durum okunamazsa sayfa eskisi gibi çalışır.
+    googleTakvimApi.durum().then(setGDurum).catch(() => setGDurum(null));
+  }, []);
+
+  // Etkinlikler iki adımda gelir: önce sunucudaki önbellek (anında), sonra
+  // görünen aralık Google'dan tazelenir ve liste yeniden okunur. Sayfa
+  // Google'ın hızını beklemesin diye. Ay görünümü tam haftalarla çizildiği
+  // için aralık bir hafta taşırılıyor.
+  const gFrom = data ? addDays(data.from, -7) : null;
+  const gTo = data ? addDays(data.to, 7) : null;
+  const etkinlikleriYukle = useCallback(() => {
+    if (!gFrom || !gTo) return Promise.resolve();
+    return googleTakvimApi
+      .etkinlikler(gFrom, gTo)
+      .then(setEtkinlikler)
+      .catch(() => undefined);
+  }, [gFrom, gTo]);
+
+  useEffect(() => {
+    if (!googleCalisiyor || !gFrom || !gTo) {
+      setEtkinlikler([]);
+      return;
+    }
+    let iptal = false;
+    void etkinlikleriYukle().then(() =>
+      googleTakvimApi
+        .esitle(gFrom, gTo)
+        .then(() => (iptal ? undefined : etkinlikleriYukle()))
+        .catch(() => undefined)
+    );
+    return () => {
+      iptal = true;
+    };
+    // `data` her yüklemede yenilendiği için odaklanmada da tazelenir; sunucu
+    // aynı aralığı bir dakikadan sık Google'a sormuyor.
+  }, [googleCalisiyor, data, etkinlikleriYukle]);
+
+  const googleBloklari = useMemo(
+    () => new Set(etkinlikler.filter((e) => e.planBlokId).map((e) => e.planBlokId!)),
+    [etkinlikler]
+  );
 
   // Görevler bu sayfanın dışında da değişiyor (biri görevi tamamlar, atama
   // kalkar). Sekmeye dönüldüğünde tazeliyoruz ki eskimiş bir takvime bakılmasın.
@@ -231,7 +292,62 @@ export default function CalendarView() {
             ızgaraya yakın olması, sayfanın en üstündeki başlık satırına
             karışmasından daha okunur. */}
 
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {gDurum?.yapilandirildi && !googleCalisiyor && (
+            <button
+              onClick={() => navigate("/settings?sekme=baglantilar")}
+              title={gDurum.kopuk ? t("Google Takvim bağlantısı kopmuş. Yeniden bağlan.") : undefined}
+              style={{
+                padding: "6px 13px",
+                borderRadius: 8,
+                fontSize: 14,
+                border: `1px solid ${gDurum.kopuk ? c.danger : c.border}`,
+                background: c.surface,
+                color: gDurum.kopuk ? c.danger : c.textPrimary,
+                cursor: "pointer",
+              }}
+            >
+              {gDurum.kopuk ? t("Google Takvim'i yeniden bağla") : t("Google Takvim'i bağla")}
+            </button>
+          )}
+          {googleCalisiyor && data && (
+            <>
+              <button
+                onClick={() => setYeniEtkinlikTarihi(view === "day" ? anchor : todayStr())}
+                style={{
+                  padding: "6px 13px",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  border: `1px solid ${c.border}`,
+                  background: c.surface,
+                  color: c.textPrimary,
+                  cursor: "pointer",
+                }}
+              >
+                {t("+ Etkinlik")}
+              </button>
+              <button
+                onClick={() =>
+                  askLio(
+                    `${periodLabel} (${data.from} – ${data.to}) dönemindeki Google Takvim etkinliklerimden henüz işlenmemiş olanlara bak. ` +
+                      "Hangilerinin Projelio'da görev olması gerektiğini, her birinin hangi iş/projeye ait olduğunu, tahmini süresini, " +
+                      "önceliğini ve son tarihini tahmin et; görev olmayacakları da ayır. Önce liste olarak öner, onaylarsam uygula."
+                  )
+                }
+                style={{
+                  padding: "6px 13px",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  border: `1px solid ${c.border}`,
+                  background: c.surface,
+                  color: c.textPrimary,
+                  cursor: "pointer",
+                }}
+              >
+                {t("Etkinlikleri Lio ile işle")}
+              </button>
+            </>
+          )}
           <button
             onClick={() => askLio(`${periodLabel} dönemim için planımı gözden geçir ve nerede sapma var söyle.`)}
             style={{
@@ -430,6 +546,8 @@ export default function CalendarView() {
                 setView("day");
               }}
               onDropItem={dropItem}
+              etkinlikler={etkinlikler}
+              onOpenEtkinlik={setAcikEtkinlik}
             />
           )}
 
@@ -447,6 +565,9 @@ export default function CalendarView() {
               onCreateAt={(blockDate, startsAt, endsAt) => setDraftBlock({ blockDate, startsAt, endsAt })}
               onMoveBlock={moveBlock}
               onDropItem={dropItem}
+              etkinlikler={etkinlikler}
+              onOpenEtkinlik={setAcikEtkinlik}
+              googleBloklari={googleBloklari}
             />
           )}
             </div>
@@ -486,6 +607,20 @@ export default function CalendarView() {
             setDraftBlock(null);
           }}
           onSaved={load}
+          googleBagli={googleCalisiyor}
+          googleda={editingBlock ? googleBloklari.has(editingBlock.id) : false}
+        />
+      )}
+
+      {(acikEtkinlik || yeniEtkinlikTarihi) && (
+        <GoogleEtkinlikModal
+          etkinlik={acikEtkinlik ?? undefined}
+          tarih={yeniEtkinlikTarihi ?? undefined}
+          onClose={() => {
+            setAcikEtkinlik(null);
+            setYeniEtkinlikTarihi(null);
+          }}
+          onSaved={() => void etkinlikleriYukle()}
         />
       )}
     </div>

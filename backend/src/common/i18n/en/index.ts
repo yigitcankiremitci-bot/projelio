@@ -10,6 +10,7 @@ import { demoRandevu } from "./demo-randevu";
 import { katalog } from "./katalog";
 import { genel } from "./genel";
 import { ekipHesaplari } from "./ekip-hesaplari";
+import { googleTakvim } from "./google-takvim";
 
 /**
  * Sunucu metinlerinin Türkçe → İngilizce sözlüğü.
@@ -39,4 +40,5 @@ export const en: TranslationDict = {
   ...demoRandevu,
   ...katalog,
   ...genel,
+  ...googleTakvim,
 };

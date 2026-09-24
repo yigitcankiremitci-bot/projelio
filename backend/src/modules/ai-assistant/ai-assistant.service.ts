@@ -99,6 +99,8 @@ import type { Locale } from "@projelio/shared";
 import { DIL_KURALLARI } from "./lio-dil-kurallari";
 import { cevir, cevirmen, hataMetni } from "../../common/i18n";
 import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
+import { GoogleTakvimService } from "../google-takvim/google-takvim.service";
+import { tumGunGunleri, takvimGunEkle, type GoogleTakvimEtkinligi } from "@projelio/shared";
 
 const DEFAULT_MODEL = MODEL_TIERS.fast.model;
 const PENDING_ACTION_TTL_MS = 10 * 60 * 1000; // 10 dakika
@@ -455,6 +457,35 @@ function customerAddress(current: PartyAddress | undefined, input: Record<string
  * Modele "5.25 saat" demek yeterli; "5.2483333" hem token yakar hem cümleye
  * o hassasiyetle geçtiğinde kullanıcıya saçma görünür.
  */
+/**
+ * Takvim etkinliğinin zamanı, kullanıcının saat diliminde tek satır:
+ * "2026-09-24 10:00-11:30". Modele ISO/UTC vermek, İstanbul'daki kullanıcıya
+ * toplantısını üç saat erken söyletirdi.
+ */
+function takvimZamani(e: GoogleTakvimEtkinligi, saatDilimi: string): string {
+  if (e.tumGun) {
+    const gunler = tumGunGunleri(e.baslangic, e.bitis);
+    return gunler.length > 1 ? `${gunler[0]} – ${gunler[gunler.length - 1]} (tüm gün)` : `${gunler[0]} (tüm gün)`;
+  }
+  let bicim: Intl.DateTimeFormat;
+  const secenek: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  };
+  try {
+    bicim = new Intl.DateTimeFormat("sv-SE", { ...secenek, timeZone: saatDilimi });
+  } catch {
+    bicim = new Intl.DateTimeFormat("sv-SE", { ...secenek, timeZone: "Europe/Istanbul" });
+  }
+  const bas = bicim.format(new Date(e.baslangic));
+  const bit = bicim.format(new Date(e.bitis));
+  return bas.slice(0, 10) === bit.slice(0, 10) ? `${bas}-${bit.slice(11)}` : `${bas} → ${bit}`;
+}
+
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
@@ -789,7 +820,10 @@ export class AiAssistantService {
     private exportsService: AiExportsService,
     private realtime: RealtimeGateway,
     private providers: LlmProviderRegistry,
-    private modelSettings: AiModelSettingsService
+    private modelSettings: AiModelSettingsService,
+    // Kullanıcının kendi Google Takvim'i: etkinlikleri okumak, etkinlik eklemek,
+    // etkinliği göreve çevirince kararı işaretlemek.
+    private googleTakvim: GoogleTakvimService
   ) {}
 
   /** Kademe belirtilmeyen yerler (ör. draftText) için varsayılan model. */
@@ -1401,6 +1435,18 @@ export class AiAssistantService {
         "aynı hedefi küçültmeden tekrar yazmak işe yaramıyor.",
       "- Gün planında kısa konuş. Sabah 09:00'da uzun bir oturum kimsenin işine yaramaz: tek bir \"bugünün ana işi\" " +
         "çıkar, günü bloklara böl, bitir.",
+      "",
+      "## Google Takvim",
+      "Kullanıcı Google Takvim'ini bağladıysa toplantıları ve randevuları list_calendar_events ile görürsün. " +
+        "Zaman bloklarından (list_time_blocks) ayrıdır: bloklar Projelio'daki plan, etkinlikler dış dünyadaki sözler.",
+      "- Gün/hafta planlarken önce etkinliklere bak: toplantı olan saate odak bloğu koyma.",
+      "- Etkinlikleri göreve çevirmek istendiğinde: list_calendar_events(onlyUnprocessed=true) ile oku, her etkinlik için " +
+        "TAHMİNİNİ söyle — görev mi (hazırlık, teslim, takip gerektiren) yoksa yok sayılmalı mı (kişisel, sosyal, " +
+        "bilgilendirme), hangi iş/projeye ait (başlık, katılımcı ve açıklamayı list_projects/search_tasks ile eşleştir), " +
+        "tahmini süre, öncelik ve son tarih (genelde etkinlik günü; hazırlık görevi için bir gün öncesi). " +
+        "Tahminini liste olarak ÖNER, kullanıcı onaylayınca create_task/create_tasks ile oluştur ve her etkinliği " +
+        "mark_calendar_event ile işaretle (görev olmayanları yoksay). Emin olmadığın projeyi uydurma, sor.",
+      "- Kullanıcı açıkça \"hepsini işle\" demedikçe onay almadan toplu görev açma.",
       "",
       "Aşağıda sana kullanıcının bugünkü bağlamı verilecek. Oradaki id'leri doğrudan kullanabilirsin;",
       "listede olmayan bir şey için list_* araçlarına başvur.",
@@ -3039,6 +3085,10 @@ export class AiAssistantService {
         return make(label, "/calendar");
       }
 
+      case "create_calendar_event":
+      case "send_time_blocks_to_calendar":
+        return make(t("Google Takvim'e eklendi"), "/calendar");
+
       default:
         return null;
     }
@@ -4300,6 +4350,89 @@ export class AiAssistantService {
           input.actualMinutes
         );
         return { id: block.id, durum: block.status };
+      }
+
+      case "list_calendar_events": {
+        const from = String(input.from ?? "");
+        let to = String(input.to ?? "");
+        // Tavan: iki aylık bir aralık yoğun bir takvimde yüzlerce etkinlik
+        // eder; daha genişi bağlamı doldurur, işe yarar bir cevap üretmez.
+        if (/^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && to > takvimGunEkle(from, 62)) {
+          to = takvimGunEkle(from, 62);
+        }
+        const durum = await this.googleTakvim.durum(userId);
+        if (!durum.bagli) {
+          return { hata: "Google Takvim bağlı değil. Kullanıcı Ayarlar > Bağlı hesaplar'dan bağlayabilir." };
+        }
+        if (durum.kopuk) return { hata: "Google Takvim bağlantısı kopmuş; kullanıcı Ayarlar'dan yeniden bağlanmalı." };
+        // Okumadan önce tazele: Lio'ya bayat takvimle cevap verdirmek, "o
+        // toplantı iptal oldu" diyen kullanıcıyla tartışmak demek. Google'a
+        // ulaşılamazsa önbellekle devam edilir.
+        const esitleme = await this.googleTakvim.esitle(userId, from, to).catch(() => null);
+        const [etkinlikler, tercih] = await Promise.all([
+          this.googleTakvim.etkinlikler(userId, from, to),
+          this.planningService.getPreferences(userId),
+        ]);
+        const saatDilimi = tercih.timezone || "Europe/Istanbul";
+        const liste = etkinlikler.filter((e) =>
+          input.onlyUnprocessed ? e.kaynak === "google" && e.isleme === "yeni" : !e.planBlokId
+        );
+        return pruneEmpty({
+          etkinlikler: liste.slice(0, 150).map((e) =>
+            pruneEmpty({
+              id: e.id,
+              baslik: e.baslik,
+              zaman: takvimZamani(e, saatDilimi),
+              takvim: e.takvimAdi,
+              aciklama: e.aciklama ? e.aciklama.slice(0, 400) : undefined,
+              konum: e.konum,
+              katilimci: e.katilimciSayisi,
+              duzenleyen: e.duzenleyen,
+              kaynak: e.kaynak === "projelio" ? "Projelio'dan eklendi" : undefined,
+              isleme: e.isleme,
+              gorev: e.gorevBasligi,
+            })
+          ),
+          kesildi: liste.length > 150 ? `${liste.length} etkinlikten ilk 150'si` : undefined,
+          uyari: esitleme?.hata ? `Google'dan tazelenemedi, son eşitleme: ${durum.sonEsitleme ?? "yok"}` : undefined,
+        });
+      }
+
+      case "create_calendar_event": {
+        const e = await this.googleTakvim.etkinlikEkle(
+          userId,
+          {
+            baslik: String(input.title ?? ""),
+            tarih: String(input.date ?? ""),
+            baslangicSaati: input.startsAt,
+            bitisSaati: input.endsAt,
+            tumGun: Boolean(input.allDay),
+            bitisTarihi: input.endDate,
+            aciklama: input.description,
+            konum: input.location,
+          },
+          { gorevId: input.taskId || undefined }
+        );
+        return { id: e.id, baslik: e.baslik, takvim: e.takvimAdi, link: e.htmlLink };
+      }
+
+      case "send_time_blocks_to_calendar": {
+        const ids: string[] = Array.isArray(input.blockIds) ? input.blockIds.map(String).slice(0, 30) : [];
+        const sonuc = { gonderilen: 0, hatalar: [] as string[] };
+        for (const id of ids) {
+          try {
+            await this.googleTakvim.blokuGonder(userId, id);
+            sonuc.gonderilen++;
+          } catch (err) {
+            sonuc.hatalar.push(`${id}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+        return pruneEmpty(sonuc);
+      }
+
+      case "mark_calendar_event": {
+        const e = await this.googleTakvim.islemeAyarla(userId, String(input.eventId ?? ""), input.status, input.taskId);
+        return pruneEmpty({ id: e.id, baslik: e.baslik, isleme: e.isleme, gorev: e.gorevBasligi });
       }
 
       case "get_due_ritual": {

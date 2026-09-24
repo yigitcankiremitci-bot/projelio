@@ -6,6 +6,7 @@ import { GoogleAuthService } from "./google-auth.service";
 import { GoogleController } from "./google.controller";
 import { GoogleCoreModule } from "./google-core.module";
 import { DemoMeetModule } from "../demo-randevu/demo-meet.module";
+import { GoogleTakvimModule } from "../google-takvim/google-takvim.module";
 
 /**
  * "Google ile giriş" akışı ve Ayarlar'daki Drive bağlantı ekranı.
@@ -20,7 +21,7 @@ import { DemoMeetModule } from "../demo-randevu/demo-meet.module";
  * MicrosoftModule değil: o UsersModule'ü çeker ve döngü doğar.
  */
 @Module({
-  imports: [GoogleCoreModule, MicrosoftCoreModule, UsersModule, PassportModule, DemoMeetModule],
+  imports: [GoogleCoreModule, MicrosoftCoreModule, UsersModule, PassportModule, DemoMeetModule, GoogleTakvimModule],
   controllers: [GoogleController],
   providers: [GoogleAuthService],
   exports: [GoogleCoreModule],

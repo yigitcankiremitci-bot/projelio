@@ -19,6 +19,7 @@ import { hesaplar } from "./hesaplar";
 import { ekipHesaplari } from "./ekipHesaplari";
 import { epostaYonetimi } from "./epostaYonetimi";
 import { demoRandevu } from "./demoRandevu";
+import { googleTakvim } from "./googleTakvim";
 import { baslangic } from "./baslangic";
 import { ilkAdimlar } from "./ilkAdimlar";
 import { uygulama } from "./uygulama";
@@ -77,5 +78,6 @@ export const en: TranslationDict = {
   ...hatalar,
   ...epostaYonetimi,
   ...demoRandevu,
+  ...googleTakvim,
   ...arkadaslar,
 };

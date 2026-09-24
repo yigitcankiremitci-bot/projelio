@@ -3,6 +3,7 @@ import { PlanningController } from "./planning.controller";
 import { PlanningService } from "./planning.service";
 import { PersonalTodosModule } from "../personal-todos/personal-todos.module";
 import { DepartmentsModule } from "../departments/departments.module";
+import { GoogleTakvimModule } from "../google-takvim/google-takvim.module";
 
 /**
  * Takvim / kişisel planlama.
@@ -12,7 +13,7 @@ import { DepartmentsModule } from "../departments/departments.module";
  * Aynı sorguyu burada tekrar yazmak, iki listenin zamanla ayrışması demekti.
  */
 @Module({
-  imports: [PersonalTodosModule, DepartmentsModule],
+  imports: [PersonalTodosModule, DepartmentsModule, GoogleTakvimModule],
   controllers: [PlanningController],
   providers: [PlanningService],
   exports: [PlanningService],

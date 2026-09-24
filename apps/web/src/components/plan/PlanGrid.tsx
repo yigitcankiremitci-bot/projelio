@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import type { PlanTimeBlock } from "@projelio/shared";
+import type { GoogleTakvimEtkinligi, PlanTimeBlock } from "@projelio/shared";
 import { useThemeColors } from "../../theme/useThemeColors";
 import {
   DRAG_BLOCK,
@@ -20,6 +20,7 @@ import {
   type DraggedItem,
 } from "../../lib/planGrid";
 import { useT } from "../../lib/i18n";
+import { etkinlikleriGunlereDagit, type EtkinlikParcasi } from "../../lib/googleTakvimGorunum";
 
 interface Props {
   from: string;
@@ -35,7 +36,16 @@ interface Props {
   onCreateAt: (blockDate: string, startsAt: string, endsAt: string) => void;
   onMoveBlock: (blockId: string, blockDate: string, startsAt: string) => void;
   onDropItem: (item: DraggedItem, blockDate: string, startsAt: string, endsAt: string) => void;
+  /** Google Takvim etkinlikleri (bağlıysa). Salt okunur: sürüklenmez, tıklanınca açılır. */
+  etkinlikler?: GoogleTakvimEtkinligi[];
+  onOpenEtkinlik?: (e: GoogleTakvimEtkinligi) => void;
+  /** Google Takvim'e de gönderilmiş blokların id'leri — kutuda küçük bir işaret çıkar. */
+  googleBloklari?: Set<string>;
 }
+
+/** Tüm gün şeridinde gün başına en fazla kaç satır; fazlası "+n" olur. */
+const TUM_GUN_SATIRI = 3;
+const TUM_GUN_SATIR_YUKSEKLIGI = 20;
 
 /**
  * Gün ve hafta görünümünün saat gridi.
@@ -57,10 +67,30 @@ export default function PlanGrid({
   onCreateAt,
   onMoveBlock,
   onDropItem,
+  etkinlikler,
+  onOpenEtkinlik,
+  googleBloklari,
 }: Props) {
   const c = useThemeColors();
   const days = useMemo(() => eachDay(from, to), [from, to]);
-  const { startHour, endHour } = useMemo(() => gridRange(blocks, dayStart, dayEnd), [blocks, dayStart, dayEnd]);
+  const gunluk = useMemo(() => etkinlikleriGunlereDagit(etkinlikler ?? []), [etkinlikler]);
+  // Izgaranın saat aralığı toplantıları da kapsar: 08:00'deki toplantı,
+  // mesai 09:00'da başlıyor diye görünmez kalmasın.
+  const gorunenParcalar = useMemo(
+    () => days.flatMap((d) => gunluk.get(d)?.saatli ?? []),
+    [days, gunluk]
+  );
+  const { startHour, endHour } = useMemo(
+    () => gridRange([...blocks, ...gorunenParcalar], dayStart, dayEnd),
+    [blocks, gorunenParcalar, dayStart, dayEnd]
+  );
+  // Tüm gün şeridi yalnızca görünen günlerde tüm gün etkinlik varsa açılır;
+  // her sütunda aynı yükseklikte, yoksa saat çizgileri kayardı.
+  const tumGunSatiri = Math.min(
+    TUM_GUN_SATIRI,
+    Math.max(0, ...days.map((d) => gunluk.get(d)?.tumGun.length ?? 0))
+  );
+  const tumGunYuksekligi = tumGunSatiri ? tumGunSatiri * TUM_GUN_SATIR_YUKSEKLIGI + 6 : 0;
   const hours = useMemo(
     () => Array.from({ length: endHour - startHour }, (_, i) => startHour + i),
     [startHour, endHour]
@@ -87,7 +117,7 @@ export default function PlanGrid({
   return (
     <div style={{ display: "flex", background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, overflow: "hidden" }}>
       {/* Saat cetveli */}
-      <div style={{ width: 52, flexShrink: 0, borderRight: `1px solid ${c.border}`, paddingTop: HEADER_HEIGHT }}>
+      <div style={{ width: 52, flexShrink: 0, borderRight: `1px solid ${c.border}`, paddingTop: HEADER_HEIGHT + tumGunYuksekligi }}>
         {hours.map((h) => (
           <div
             key={h}
@@ -127,6 +157,11 @@ export default function PlanGrid({
             onCreateAt={onCreateAt}
             onMoveBlock={onMoveBlock}
             onDropItem={onDropItem}
+            parcalar={gunluk.get(day)?.saatli ?? []}
+            tumGunler={gunluk.get(day)?.tumGun ?? []}
+            tumGunYuksekligi={tumGunYuksekligi}
+            onOpenEtkinlik={onOpenEtkinlik}
+            googleBloklari={googleBloklari}
           />
         ))}
       </div>
@@ -153,6 +188,11 @@ interface ColumnProps {
   onCreateAt: (blockDate: string, startsAt: string, endsAt: string) => void;
   onMoveBlock: (blockId: string, blockDate: string, startsAt: string) => void;
   onDropItem: (item: DraggedItem, blockDate: string, startsAt: string, endsAt: string) => void;
+  parcalar: EtkinlikParcasi[];
+  tumGunler: GoogleTakvimEtkinligi[];
+  tumGunYuksekligi: number;
+  onOpenEtkinlik?: (e: GoogleTakvimEtkinligi) => void;
+  googleBloklari?: Set<string>;
 }
 
 function DayColumn({
@@ -172,11 +212,16 @@ function DayColumn({
   onCreateAt,
   onMoveBlock,
   onDropItem,
+  parcalar,
+  tumGunler,
+  tumGunYuksekligi,
+  onOpenEtkinlik,
+  googleBloklari,
 }: ColumnProps) {
   const t = useT();
   const c = useThemeColors();
   const bodyRef = useRef<HTMLDivElement>(null);
-  const layout = useMemo(() => layoutColumns(blocks), [blocks]);
+  const layout = useMemo(() => layoutColumns([...blocks, ...parcalar]), [blocks, parcalar]);
 
   /** İmlecin sütun içindeki dikey konumundan saati çıkarır. */
   const timeAt = (clientY: number): string => {
@@ -250,6 +295,52 @@ function DayColumn({
         )}
       </div>
 
+      {tumGunYuksekligi > 0 && (
+        <div
+          style={{
+            height: tumGunYuksekligi,
+            borderBottom: `1px solid ${c.border}`,
+            padding: "3px 3px 0",
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            overflow: "hidden",
+          }}
+        >
+          {tumGunler.slice(0, tumGunler.length > TUM_GUN_SATIRI ? TUM_GUN_SATIRI - 1 : TUM_GUN_SATIRI).map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              onClick={() => onOpenEtkinlik?.(e)}
+              title={e.baslik}
+              style={{
+                height: TUM_GUN_SATIR_YUKSEKLIGI - 2,
+                flexShrink: 0,
+                borderRadius: 5,
+                border: `1px solid ${c.border}`,
+                borderLeft: `3px solid ${e.takvimRengi ?? c.accent}`,
+                background: c.background,
+                color: c.textPrimary,
+                fontSize: 11,
+                textAlign: "left",
+                padding: "0 5px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                cursor: "pointer",
+              }}
+            >
+              {e.baslik}
+            </button>
+          ))}
+          {tumGunler.length > TUM_GUN_SATIRI && (
+            <span style={{ fontSize: 11, color: c.textSecondary, paddingLeft: 5 }}>
+              {t("+{n} etkinlik", { n: tumGunler.length - (TUM_GUN_SATIRI - 1) })}
+            </span>
+          )}
+        </div>
+      )}
+
       <div
         ref={bodyRef}
         onDragOver={handleDragOver}
@@ -312,6 +403,17 @@ function DayColumn({
             layout={layout.get(block.id) ?? { column: 0, columns: 1 }}
             onOpen={() => onOpenBlock(block)}
             onToggleDone={() => onToggleDone(block)}
+            googleda={googleBloklari?.has(block.id) ?? false}
+          />
+        ))}
+
+        {parcalar.map((p) => (
+          <EtkinlikKutusu
+            key={p.id}
+            parca={p}
+            startHour={startHour}
+            layout={layout.get(p.id) ?? { column: 0, columns: 1 }}
+            onOpen={() => onOpenEtkinlik?.(p.etkinlik)}
           />
         ))}
       </div>
@@ -351,12 +453,14 @@ function BlockCard({
   layout,
   onOpen,
   onToggleDone,
+  googleda,
 }: {
   block: PlanTimeBlock;
   startHour: number;
   layout: { column: number; columns: number };
   onOpen: () => void;
   onToggleDone: () => void;
+  googleda: boolean;
 }) {
   const t = useT();
   const c = useThemeColors();
@@ -440,10 +544,83 @@ function BlockCard({
             <div style={{ fontSize: 10, color: c.textSecondary, marginTop: 1 }}>
               {block.startsAt}–{block.endsAt} · {formatDuration(block.plannedMinutes)}
               {block.source === "lio" && block.status === "planned" ? " · Lio" : ""}
+              {googleda ? ` · ${t("Google")}` : ""}
             </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Google Takvim etkinliği. Plan bloğundan bilerek FARKLI görünür (soluk zemin,
+ * takvim renginde şerit, onay kutusu yok): blok kullanıcının kendine ayırdığı
+ * zamandır, etkinlik dışarıya verilmiş bir söz. İkisi karışırsa "bunu ben mi
+ * planladım, toplantı mı" sorusu doğuyor.
+ */
+function EtkinlikKutusu({
+  parca,
+  startHour,
+  layout,
+  onOpen,
+}: {
+  parca: EtkinlikParcasi;
+  startHour: number;
+  layout: { column: number; columns: number };
+  onOpen: () => void;
+}) {
+  const t = useT();
+  const c = useThemeColors();
+  const { top, height } = blockGeometry(parca, startHour);
+  const e = parca.etkinlik;
+  const width = `calc(${100 / layout.columns}% - 6px)`;
+  const left = `calc(${(100 / layout.columns) * layout.column}% + 3px)`;
+  const islendi = e.isleme === "gorev";
+
+  return (
+    <div
+      onClick={(ev) => {
+        ev.stopPropagation();
+        onOpen();
+      }}
+      onDoubleClick={(ev) => ev.stopPropagation()}
+      title={`${parca.startsAt}–${parca.endsAt} · ${e.baslik}`}
+      style={{
+        position: "absolute",
+        top,
+        left,
+        width,
+        height,
+        borderRadius: 7,
+        border: `1px dashed ${c.border}`,
+        borderLeft: `3px solid ${e.takvimRengi ?? c.accent}`,
+        background: c.background,
+        padding: "3px 6px",
+        overflow: "hidden",
+        cursor: "pointer",
+        opacity: e.isleme === "yoksay" ? 0.6 : 1,
+        zIndex: 2,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 12,
+          lineHeight: "15px",
+          color: c.textPrimary,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {e.baslik}
+      </div>
+      {height > 40 && (
+        <div style={{ fontSize: 10, color: c.textSecondary, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {parca.startsAt}–{parca.endsAt}
+          {islendi ? ` · ${t("görev")}` : ""}
+        </div>
+      )}
     </div>
   );
 }

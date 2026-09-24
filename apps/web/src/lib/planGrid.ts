@@ -1,4 +1,3 @@
-import type { PlanTimeBlock } from "@projelio/shared";
 import { etkinDil } from "./i18n/depo";
 import { cevirmenSuAn } from "./i18n/anlik";
 
@@ -152,7 +151,7 @@ export function formatDuration(minutes: number): string {
  * kapsayacak kadar genişler. Aksi halde kullanıcının 20:00'de koyduğu blok
  * takvimde hiç görünmezdi — "kaybolan blok" en can sıkıcı takvim hatasıdır.
  */
-export function gridRange(blocks: PlanTimeBlock[], dayStart: string, dayEnd: string): { startHour: number; endHour: number } {
+export function gridRange(blocks: SaatAraligi[], dayStart: string, dayEnd: string): { startHour: number; endHour: number } {
   let min = Math.floor(timeToMinutes(dayStart) / 60);
   let max = Math.ceil(timeToMinutes(dayEnd) / 60);
   for (const b of blocks) {
@@ -169,7 +168,7 @@ export function offsetToTime(offsetY: number, startHour: number): string {
 }
 
 /** Bloğun grid içindeki üst konumu ve yüksekliği. */
-export function blockGeometry(block: PlanTimeBlock, startHour: number): { top: number; height: number } {
+export function blockGeometry(block: SaatAraligi, startHour: number): { top: number; height: number } {
   const start = timeToMinutes(block.startsAt) - startHour * 60;
   const length = timeToMinutes(block.endsAt) - timeToMinutes(block.startsAt);
   return {
@@ -179,17 +178,28 @@ export function blockGeometry(block: PlanTimeBlock, startHour: number): { top: n
 }
 
 /**
+ * Izgaraya yerleşen her şeyin ortak şekli. Plan blokları ve Google Takvim
+ * etkinliklerinin parçaları aynı sütun yerleşimine girer — ayrı yerleşseler
+ * aynı saatteki toplantı ile blok üst üste binerdi.
+ */
+export interface SaatAraligi {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+}
+
+/**
  * Aynı anda başlayan/çakışan blokları yan yana dizmek için sütun ataması.
  *
  * Çakışan bloklar üst üste basılsaydı alttaki tıklanamaz olurdu. Basit bir
  * kümeleme yeterli: zaman sırasına dizilir, biten grup kapanınca yeni gruba
  * geçilir; grup içindeki her blok boşta olan ilk sütuna yerleşir.
  */
-export function layoutColumns(blocks: PlanTimeBlock[]): Map<string, { column: number; columns: number }> {
+export function layoutColumns(blocks: SaatAraligi[]): Map<string, { column: number; columns: number }> {
   const result = new Map<string, { column: number; columns: number }>();
   const sorted = [...blocks].sort((a, b) => timeToMinutes(a.startsAt) - timeToMinutes(b.startsAt));
 
-  let group: PlanTimeBlock[] = [];
+  let group: SaatAraligi[] = [];
   let groupEnd = -1;
 
   const flush = () => {

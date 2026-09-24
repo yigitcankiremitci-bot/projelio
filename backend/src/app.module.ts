@@ -52,6 +52,7 @@ import { WorklogModule } from "./modules/worklog/worklog.module";
 import { OrnekIsModule } from "./modules/ornek-is/ornek-is.module";
 import { EpostaYonetimiModule } from "./modules/eposta-yonetimi/eposta-yonetimi.module";
 import { DemoRandevuModule } from "./modules/demo-randevu/demo-randevu.module";
+import { GoogleTakvimModule } from "./modules/google-takvim/google-takvim.module";
 import { PlanningModule } from "./modules/planning/planning.module";
 import { CreationRequestsModule } from "./modules/creation-requests/creation-requests.module";
 import { SocialMediaModule } from "./modules/social-media/social-media.module";
@@ -125,6 +126,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     EpostaYonetimiModule,
     // Canlı demo randevuları: herkese açık takvim + Admin > Demo randevuları.
     DemoRandevuModule,
+    GoogleTakvimModule,
     PlanningModule,
     // Sosyal medya: kendi tablolarını kullanan ilk modül (bkz. 054_social_media.sql).
     SocialMediaModule,

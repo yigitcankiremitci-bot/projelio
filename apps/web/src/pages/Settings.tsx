@@ -21,6 +21,7 @@ import TabBar from "../components/TabBar";
 // varsayımının kalıntısıydı (bkz. CloudAccountsCard).
 import CloudAccountsCard from "../components/CloudAccountsCard";
 import WhatsappCard from "../components/WhatsappCard";
+import GoogleTakvimKarti from "../components/googleTakvim/GoogleTakvimKarti";
 import NotificationEmailCard from "../components/NotificationEmailCard";
 import OrnekIsAyari from "../components/OrnekIsAyari";
 import DemoRandevuKarti from "../components/demoRandevu/DemoRandevuKarti";
@@ -1099,6 +1100,7 @@ export default function Settings() {
     ritim: <WorkRhythmSettings />, baglantilar: (
       <>
         <CloudAccountsCard />
+        <GoogleTakvimKarti />
         <WhatsappCard />
       </>
     ),

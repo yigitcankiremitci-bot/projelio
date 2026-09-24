@@ -92,6 +92,10 @@ export const WRITE_TOOLS = new Set<string>([
   "create_time_blocks",
   "update_time_block_status",
   "complete_ritual",
+  // Google Takvim: kullanıcının kendi takvimine yazar, davetli yok (sendUpdates=none).
+  "create_calendar_event",
+  "send_time_blocks_to_calendar",
+  "mark_calendar_event",
   // Modül defteri
   "create_module_record",
   "update_module_record",
@@ -1289,6 +1293,83 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         status: { type: "string", enum: ["done", "skipped"], description: "Kullanıcı planlamak istemediyse skipped." },
       },
       required: ["kind"],
+    },
+  },
+
+  // --- Google Takvim ---------------------------------------------------
+  //
+  // Kullanıcının KENDİ Google Takvim'i (Ayarlar > Bağlı hesaplar). Etkinlikler
+  // önbellekten okunur; list_calendar_events aralığı okumadan önce Google'dan
+  // tazeler. Bağlı değilse araçlar bunu söyleyen bir hata döner.
+  {
+    name: "list_calendar_events",
+    description:
+      "Kullanıcının Google Takvim etkinliklerini listeler (toplantılar, randevular, tüm gün etkinlikler). " +
+      "\"Yarın toplantım var mı\", \"bu hafta takvimimde ne var\" gibi sorular için ve takvim etkinliklerini " +
+      "göreve çevirmeden önce kullan. Her etkinliğin `isleme` alanı var: yeni (henüz bakılmadı) · gorev (Projelio'ya " +
+      "işlendi) · yoksay (görev olmayacak). Projelio'nun kendi zaman blokları için list_time_blocks kullan.",
+    input_schema: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "Başlangıç tarihi (YYYY-MM-DD)." },
+        to: { type: "string", description: "Bitiş tarihi (YYYY-MM-DD). En fazla 62 gün sonrası." },
+        onlyUnprocessed: {
+          type: "boolean",
+          description: "true: yalnızca Google'dan gelip henüz işlenmemiş (isleme=yeni) etkinlikler. Göreve çevirirken kullan.",
+        },
+      },
+      required: ["from", "to"],
+    },
+  },
+  {
+    name: "create_calendar_event",
+    description:
+      "Kullanıcının Google Takvim'ine etkinlik ekler (davetli yok, kimseye e-posta gitmez). Kullanıcı \"takvimime ekle\", " +
+      "\"Google takvimime koy\" dediğinde kullan. Projelio'nun kendi planı için create_time_blocks kullan; bir bloğu " +
+      "Google'a da göndermek için send_time_blocks_to_calendar. Bir göreve ait etkinlikse taskId ver.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        date: { type: "string", description: "YYYY-MM-DD" },
+        startsAt: { type: "string", description: "HH:MM (allDay değilse zorunlu)." },
+        endsAt: { type: "string", description: "HH:MM (allDay değilse zorunlu)." },
+        allDay: { type: "boolean" },
+        endDate: { type: "string", description: "Çok günlü tüm gün etkinlikte son gün (dahil), YYYY-MM-DD." },
+        description: { type: "string" },
+        location: { type: "string" },
+        taskId: { type: "string", description: "Etkinliğin ait olduğu Projelio görevi (opsiyonel)." },
+      },
+      required: ["title", "date"],
+    },
+  },
+  {
+    name: "send_time_blocks_to_calendar",
+    description:
+      "Projelio takvimindeki zaman bloklarını kullanıcının Google Takvim'ine de yazar. Sonradan blok taşınırsa ya da " +
+      "silinirse Google'daki kopyası da güncellenir. Blok id'lerini list_time_blocks ile bul.",
+    input_schema: {
+      type: "object",
+      properties: {
+        blockIds: { type: "array", items: { type: "string" }, description: "En fazla 30 blok." },
+      },
+      required: ["blockIds"],
+    },
+  },
+  {
+    name: "mark_calendar_event",
+    description:
+      "Bir Google Takvim etkinliği hakkındaki kararı kaydeder: göreve çevrildiyse durum=gorev ve taskId; görev " +
+      "olmayacaksa (kişisel randevu, sosyal etkinlik, bilgi amaçlı) durum=yoksay; kararı geri almak için durum=yeni. " +
+      "Bir etkinlikten görev oluşturduktan sonra MUTLAKA çağır — yoksa aynı etkinlik bir dahaki sefere yine önerilir.",
+    input_schema: {
+      type: "object",
+      properties: {
+        eventId: { type: "string", description: "list_calendar_events'ten gelen id." },
+        status: { type: "string", enum: ["gorev", "yoksay", "yeni"] },
+        taskId: { type: "string", description: "durum=gorev ise oluşturulan/bağlanan görevin id'si." },
+      },
+      required: ["eventId", "status"],
     },
   },
 

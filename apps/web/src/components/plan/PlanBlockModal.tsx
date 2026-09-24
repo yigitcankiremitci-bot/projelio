@@ -6,6 +6,7 @@ import { planning, type PlanBlockInput } from "../../api/planning";
 import { formatDuration, timeToMinutes } from "../../lib/planGrid";
 import { inputStyle, labelStyle, primaryButton, secondaryButton } from "./PlanTargetsModal";
 import { useT } from "../../lib/i18n";
+import { googleTakvimApi } from "../../api/googleTakvim";
 
 interface Props {
   /** Var olan blok düzenleniyorsa dolu; yeni blokta boş. */
@@ -15,6 +16,10 @@ interface Props {
   focusAreas: PlanFocusArea[];
   onClose: () => void;
   onSaved: () => void;
+  /** Google Takvim bağlı ve çalışıyor mu. false → "Google'a da ekle" seçeneği hiç görünmez. */
+  googleBagli?: boolean;
+  /** Bu blok zaten Google Takvim'e gönderilmiş mi. */
+  googleda?: boolean;
 }
 
 /**
@@ -24,7 +29,7 @@ interface Props {
  * ona ayrılan zamandır. Modal bunu kullanıcıya açıkça söylüyor: takvimden bir
  * kutuyu kaldırırken "işim de gitti mi?" diye tereddüt etmemeli.
  */
-export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSaved }: Props) {
+export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSaved, googleBagli, googleda }: Props) {
   const c = useThemeColors();
   const t = useT();
   const editing = Boolean(block);
@@ -35,6 +40,7 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
   const [title, setTitle] = useState(block?.title ?? "");
   const [note, setNote] = useState(block?.note ?? "");
   const [focusAreaId, setFocusAreaId] = useState(block?.focusAreaId ?? "");
+  const [googleaEkle, setGoogleaEkle] = useState(Boolean(googleda));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,12 +62,26 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
         note: note.trim() || undefined,
         focusAreaId: focusAreaId || null,
       };
+      let blockId = block?.id;
       if (block) {
         await planning.updateBlock(block.id, payload);
       } else {
         // Elle açılan blok "manual": Lio'nun önerileriyle karışmasın, "önerileri
         // temizle" dendiğinde kullanıcının kendi koyduğu bloklar silinmesin.
-        await planning.createBlock({ ...payload, source: "manual" });
+        blockId = (await planning.createBlock({ ...payload, source: "manual" })).id;
+      }
+      // Google'a gönderme ayrı bir adım: Google'a ulaşılamazsa blok yine
+      // kaydedilmiş olur, hata yalnızca bu seçenek için gösterilir. Zaten
+      // gönderilmiş bloğun güncellemesini sunucu kendisi taşıyor.
+      if (googleBagli && blockId && googleaEkle !== Boolean(googleda)) {
+        try {
+          if (googleaEkle) await googleTakvimApi.blokuGonder(blockId);
+          else await googleTakvimApi.blokBaginiKaldir(blockId);
+        } catch (err: any) {
+          onSaved();
+          setError(`${t("Blok kaydedildi ama Google Takvim'e aktarılamadı:")} ${String(err?.message ?? "")}`);
+          return;
+        }
       }
       onSaved();
       onClose();
@@ -150,6 +170,13 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
         style={{ ...inputStyle(c), resize: "vertical" }}
       />
 
+      {googleBagli && (
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: c.textPrimary, marginTop: 14 }}>
+          <input type="checkbox" checked={googleaEkle} onChange={(e) => setGoogleaEkle(e.target.checked)} />
+          {t("Google Takvim'e de ekle")}
+        </label>
+      )}
+
       {error && <p style={{ color: c.danger, fontSize: 13, margin: "12px 0 0" }}>{error}</p>}
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 18 }}>
@@ -162,8 +189,7 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
           <button onClick={onClose} style={secondaryButton(c)}>
             {t("Vazgeç")}
           </button>
-          <button onClick={save} disabled={saving} style={primaryButton(c, saving)}>
-            data-primary
+          <button data-primary onClick={save} disabled={saving} style={primaryButton(c, saving)}>
             {saving ? t("Kaydediliyor…") : t("Kaydet")}
           </button>
         </div>

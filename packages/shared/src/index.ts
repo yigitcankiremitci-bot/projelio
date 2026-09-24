@@ -18,3 +18,4 @@ export * from "./tlFiyat";
 export * from "./epostaYonetimi";
 export * from "./demoRandevu";
 export * from "./ekipHesaplari";
+export * from "./googleTakvim";

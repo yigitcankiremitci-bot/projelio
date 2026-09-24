@@ -21,6 +21,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { parcalara } from "../../common/parcali-liste";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
 import { DepartmentsService } from "../departments/departments.service";
+import { GoogleTakvimService } from "../google-takvim/google-takvim.service";
 import {
   assertTime,
   daysBetween,
@@ -88,7 +89,10 @@ export class PlanningService {
     // departmanın görevini takvime koyamamak (ve Yaptım'da bulamamak) bir
     // kapsam eksiğiydi. Kim hangi departmanı görüyor sorusunun cevabı
     // DepartmentsService'in kendisinde; buraya KOPYALANMIYOR.
-    private departments: DepartmentsService
+    private departments: DepartmentsService,
+    // Google Takvim'e gönderilmiş bir blok taşınınca/silinince Google'daki
+    // kopyası da güncellensin. Gönderilmemiş blokta tek bir sorgudan ibaret.
+    private googleTakvim: GoogleTakvimService
   ) {}
 
   // ====================================================================== Tercihler
@@ -554,6 +558,9 @@ export class PlanningService {
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException("Blok bulunamadı.");
+    // Beklenmiyor: Google'ın yavaşlığı sürükle-bırakı bekletmesin. Servis
+    // hata fırlatmıyor (bkz. GoogleTakvimService.blokDegisti).
+    void this.googleTakvim.blokDegisti(userId, id);
     return mapBlock(data);
   }
 
@@ -625,6 +632,9 @@ export class PlanningService {
   }
 
   async deleteBlock(userId: string, id: string): Promise<{ ok: true }> {
+    // Silmeden ÖNCE: satır gidince Google'daki kopyayı bulduran bağ da
+    // (plan_blok_id, on delete set null) kopar.
+    await this.googleTakvim.blokSilinecek(userId, id);
     const { data, error } = await this.supabase.client
       .from("plan_time_blocks")
       .delete()

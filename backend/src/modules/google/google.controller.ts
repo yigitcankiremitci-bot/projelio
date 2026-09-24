@@ -8,6 +8,7 @@ import { GoogleAuthService } from "./google-auth.service";
 import { DRIVE_SCOPE, GoogleOAuthService, LOGIN_SCOPES } from "./google-oauth.service";
 import { DriveService } from "./drive.service";
 import { DemoMeetService } from "../demo-randevu/demo-meet.service";
+import { GoogleTakvimService } from "../google-takvim/google-takvim.service";
 
 @Controller()
 export class GoogleController {
@@ -20,7 +21,8 @@ export class GoogleController {
     private drive: DriveService,
     // Depolama sağlayıcısı yalnızca biri olabilir (bkz. google.module.ts).
     private msAccounts: MicrosoftAccountsService,
-    private demoMeet: DemoMeetService
+    private demoMeet: DemoMeetService,
+    private takvim: GoogleTakvimService
   ) {}
 
   // ------------------------------------------------------------------- giriş
@@ -113,6 +115,14 @@ export class GoogleController {
       if (parsed.mode === "demo_takvim" && parsed.userId) {
         await this.demoMeet.baglantiyiKaydet(parsed.userId, identity.email, tokens.refresh_token, scopes);
         const params = new URLSearchParams({ connected: "1", next: next ?? "/settings" });
+        return res.redirect(`${web}/google/return?${params.toString()}`);
+      }
+
+      // Kullanıcının Google Takvim'i: o da kendi tablosuna yazılır, giriş ve
+      // Drive hesaplarına dokunmaz (bkz. migration 133).
+      if (parsed.mode === "takvim" && parsed.userId) {
+        await this.takvim.baglantiyiKaydet(parsed.userId, identity.email, tokens.refresh_token, scopes);
+        const params = new URLSearchParams({ connected: "1", next: next ?? "/calendar" });
         return res.redirect(`${web}/google/return?${params.toString()}`);
       }
 

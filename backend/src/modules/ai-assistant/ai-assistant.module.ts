@@ -43,6 +43,7 @@ import { ProductsModule } from "../products/products.module";
 import { SupportModule } from "../support/support.module";
 import { PartyModule } from "../party/party.module";
 import { WhatsappModule } from "../whatsapp/whatsapp.module";
+import { GoogleTakvimModule } from "../google-takvim/google-takvim.module";
 
 @Module({
   imports: [PayTRModule, 
@@ -108,6 +109,8 @@ import { WhatsappModule } from "../whatsapp/whatsapp.module";
     // WhatsApp araçları (müşteriye yaz, konuşmayı oku). İki yönlü bağımlılık:
     // WhatsApp modülü otomatik yanıt için draftText()'i çağırıyor.
     forwardRef(() => WhatsappModule),
+    // Kullanıcının Google Takvim'i: etkinlikleri okuma, ekleme, göreve çevirme.
+    GoogleTakvimModule,
   ],
   controllers: [AiAssistantController],
   providers: [

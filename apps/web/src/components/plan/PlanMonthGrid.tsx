@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { PlanTimeBlock } from "@projelio/shared";
+import type { GoogleTakvimEtkinligi, PlanTimeBlock } from "@projelio/shared";
 import { useThemeColors } from "../../theme/useThemeColors";
 import {
   DRAG_ITEM,
@@ -14,6 +14,7 @@ import {
   type DraggedItem,
 } from "../../lib/planGrid";
 import { useT } from "../../lib/i18n";
+import { etkinlikleriGunlereDagit } from "../../lib/googleTakvimGorunum";
 
 interface Props {
   from: string;
@@ -24,6 +25,9 @@ interface Props {
   dayStart: string;
   onSelectDay: (day: string) => void;
   onDropItem: (item: DraggedItem, blockDate: string, startsAt: string, endsAt: string) => void;
+  /** Google Takvim etkinlikleri: gün hücresinde ilk ikisinin başlığı, fazlası "+n". */
+  etkinlikler?: GoogleTakvimEtkinligi[];
+  onOpenEtkinlik?: (e: GoogleTakvimEtkinligi) => void;
 }
 
 /**
@@ -44,9 +48,12 @@ export default function PlanMonthGrid({
   dayStart,
   onSelectDay,
   onDropItem,
+  etkinlikler,
+  onOpenEtkinlik,
 }: Props) {
   const t = useT();
   const c = useThemeColors();
+  const gunluk = useMemo(() => etkinlikleriGunlereDagit(etkinlikler ?? []), [etkinlikler]);
   const today = todayStr();
 
   // Ay, tam haftalar hâlinde çizilir: ilk satır ayın 1'inden önceki
@@ -157,6 +164,50 @@ export default function PlanMonthGrid({
                     </span>
                   )}
                 </div>
+
+                {(() => {
+                  const g = gunluk.get(day);
+                  // Tüm gün etkinlikler önce, saatliler saat sırasıyla.
+                  const liste = g ? [...g.tumGun, ...g.saatli.map((p) => p.etkinlik)] : [];
+                  if (!liste.length) return null;
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 5 }}>
+                      {liste.slice(0, 2).map((e) => (
+                        <button
+                          key={e.id}
+                          type="button"
+                          title={e.baslik}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            onOpenEtkinlik?.(e);
+                          }}
+                          style={{
+                            fontSize: 11,
+                            lineHeight: "16px",
+                            textAlign: "left",
+                            padding: "0 4px",
+                            borderRadius: 4,
+                            border: "none",
+                            borderLeft: `3px solid ${e.takvimRengi ?? c.accent}`,
+                            background: c.background,
+                            color: c.textPrimary,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {e.baslik}
+                        </button>
+                      ))}
+                      {liste.length > 2 && (
+                        <span style={{ fontSize: 11, color: c.textSecondary, paddingLeft: 4 }}>
+                          {t("+{n} etkinlik", { n: liste.length - 2 })}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {entry && (
                   <>

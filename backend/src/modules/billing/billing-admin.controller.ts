@@ -7,6 +7,7 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { BillingService } from "./billing.service";
 import { BillingSettingsService, type OdemeSaglayici } from "./billing-settings.service";
+import { PayTRKartService } from "./paytr-kart.service";
 import { isBillingPeriod, isPlanKey, PLANS } from "./billing.plans";
 import { kurSapmasi } from "./tcmb-kuru";
 import { TcmbKuruService } from "./tcmb-kuru.service";
@@ -30,7 +31,8 @@ export class BillingAdminController {
   constructor(
     private billing: BillingService,
     private settings: BillingSettingsService,
-    private tcmb: TcmbKuruService
+    private tcmb: TcmbKuruService,
+    private kart: PayTRKartService
   ) {}
 
   /** Katalog + sağlayıcıdaki karşılıkları yan yana: eksik olan hemen görünsün. */
@@ -168,5 +170,33 @@ export class BillingAdminController {
   @Post("run-renewals")
   runRenewals() {
     return this.billing.donemleriIlerlet();
+  }
+
+  /*
+   * PayTR kart saklama DENEMESİ — yöneticinin kendi kartıyla. Aboneliği
+   * yazmadan önce utoken'ın bildirimde nasıl geldiğini ve require_cvv'yi
+   * görmek için (bkz. PayTRKartService başlığı). Abonelik yazılınca kalkar.
+   * Kart verisi bu uçlara HİÇ GELMEZ: form tarayıcıdan doğrudan PayTR'ye gider.
+   */
+
+  @Get("paytr-kart")
+  kartDurumu(@Req() req: any) {
+    return this.kart.durum(req.user.userId);
+  }
+
+  @Post("paytr-kart/form")
+  kartFormu(@Body() body: { tutar?: number }, @Req() req: any) {
+    return this.kart.kartSaklamaFormu(req.user.userId, req.ip ?? "", Number(body?.tutar));
+  }
+
+  @Post("paytr-kart/tekrarlayan")
+  tekrarlayan(@Body() body: { ctoken?: string; tutar?: number }, @Req() req: any) {
+    return this.kart.tekrarlayanCekim(req.user.userId, req.ip ?? "", String(body?.ctoken ?? ""), Number(body?.tutar));
+  }
+
+  @Post("paytr-kart/sil")
+  async kartSil(@Body() body: { ctoken?: string }, @Req() req: any) {
+    await this.kart.kartSil(req.user.userId, String(body?.ctoken ?? ""));
+    return { ok: true };
   }
 }

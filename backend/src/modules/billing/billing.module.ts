@@ -10,6 +10,7 @@ import { BillingController } from "./billing.controller";
 import { BillingService } from "./billing.service";
 import { GooglePlayClient } from "./google-play.client";
 import { IyzicoClient } from "./iyzico.client";
+import { PayTRKartService } from "./paytr-kart.service";
 import { PayTROdemeService } from "./paytr-odeme.service";
 import { PayTRModule } from "./paytr.module";
 import { StorePurchasesService } from "./store-purchases.service";
@@ -33,6 +34,7 @@ import { TcmbKuruService } from "./tcmb-kuru.service";
     BillingSettingsService,
     IyzicoClient,
     PayTROdemeService,
+    PayTRKartService,
     AppleStoreClient,
     GooglePlayClient,
     StorePurchasesService,

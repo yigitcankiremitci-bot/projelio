@@ -5,6 +5,7 @@ import { ApiError } from "../api/client";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import { bicimDili } from "../lib/i18n/depo";
+import PayTRKartDenemesi from "./PayTRKartDenemesi";
 
 /**
  * Yönetici: sağlayıcıdaki paket karşılıkları.
@@ -284,6 +285,8 @@ export default function BillingAdminPanel() {
           </div>
         )}
       </div>
+
+      <PayTRKartDenemesi />
     </div>
   );
 }

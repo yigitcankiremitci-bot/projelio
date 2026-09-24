@@ -1,10 +1,12 @@
-import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { AiCreditOrdersService } from "../ai-assistant/ai-credit-orders.service";
 import { getWebAppUrl } from "../../common/config/env";
 import { describeError } from "../../common/network-errors";
 import { PayTRClient } from "./paytr.client";
-import { kurusaCevir, siparisNumarasiCoz, siparisNumarasiUret, telefonAlani } from "./paytr-imza";
+import { PayTRKartService } from "./paytr-kart.service";
+import { paytrKullaniciBilgisi } from "./paytr-kullanici";
+import { kurusaCevir, siparisNumarasiCoz, siparisNumarasiUret, siparisOneki, telefonAlani } from "./paytr-imza";
 
 /** Bildirim ucunun PayTR'ye vereceği yanıt. Gövde SADECE "OK" olmalı. */
 export const BILDIRIM_YANITI = "OK";
@@ -31,7 +33,8 @@ export class PayTROdemeService {
   constructor(
     private supabase: SupabaseService,
     private orders: AiCreditOrdersService,
-    private paytr: PayTRClient
+    private paytr: PayTRClient,
+    private kart: PayTRKartService
   ) {}
 
   /** Arayüzün ödeme formunu açabilmesi için iframe token'ı üretir. */
@@ -49,7 +52,7 @@ export class PayTROdemeService {
       throw new ConflictException("Bu siparişin ödemesi zaten sonuçlanmış.");
     }
 
-    const kullanici = await this.kullaniciBilgisi(userId);
+    const kullanici = await paytrKullaniciBilgisi(this.supabase, userId);
     const merchantOid = siparisNumarasiUret(siparis.id);
     // Rota adı /settings/lio-units — "credits" DEĞİL. Yanlış yazılınca müşteri
     // ödemeyi tamamladıktan sonra var olmayan bir sayfada kalıyor (canlıda
@@ -92,6 +95,12 @@ export class PayTROdemeService {
     }
 
     const merchantOid = String(govde.merchant_oid ?? "");
+    // Tek Bildirim URL, birden çok akış: önek hangisine ait olduğunu söyler.
+    const onek = siparisOneki(merchantOid);
+    if (onek === "KRT" || onek === "KRY") {
+      await this.kart.bildirimIsle(govde, onek);
+      return;
+    }
     const orderId = siparisNumarasiCoz(merchantOid);
     if (!orderId) {
       // Bizim üretmediğimiz bir sipariş numarası. İmza geçtiyse mağaza doğru
@@ -174,21 +183,5 @@ export class PayTROdemeService {
       .eq("id", orderId)
       .maybeSingle();
     return data?.status ?? null;
-  }
-
-  private async kullaniciBilgisi(userId: string): Promise<{ ad: string; email: string; telefon?: string }> {
-    const { data, error } = await this.supabase.client
-      .from("users")
-      .select("full_name, email, phone")
-      .eq("id", userId)
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) throw new ForbiddenException("Kullanıcı bulunamadı.");
-    return {
-      // PayTR ad alanını zorunlu tutuyor ve boş bırakılırsa token reddediliyor.
-      ad: String(data.full_name ?? "").trim() || "Projelio kullanıcısı",
-      email: String(data.email ?? ""),
-      telefon: data.phone ?? undefined,
-    };
   }
 }

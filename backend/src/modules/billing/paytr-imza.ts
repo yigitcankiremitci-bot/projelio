@@ -72,7 +72,7 @@ export interface OdemeTokenAlanlari {
   userIp: string;
   merchantOid: string;
   email: string;
-  /** PayTR'ye gönderilecek biçimin BİREBİR aynısı olmalı (iFrame'de kuruş cinsinden tam sayı). */
+  /** PayTR'ye gönderilecek biçimin BİREBİR aynısı olmalı — Direkt API'de noktalı ondalık TL ("34.56"), bkz. ondalikTutar. */
   paymentAmount: string;
   /** Şimdilik her zaman "card". */
   paymentType: string;
@@ -165,6 +165,26 @@ export function durumSorguTokeni(
 }
 
 /**
+ * Kart Saklama (CAPI) servislerinin token'ları — ödeme token'ından FARKLI:
+ *   LIST   : utoken + merchant_salt
+ *   DELETE : ctoken + utoken + merchant_salt   (ctoken ÖNCE)
+ * Sıralar PayTR'nin CAPI dokümanlarından alındı (dev.paytr.com, kart-saklama-api).
+ */
+export function kartListesiTokeni(utoken: string, merchantKey: string, merchantSalt: string): string {
+  return createHmac("sha256", merchantKey).update(utoken + merchantSalt, "utf8").digest("base64");
+}
+
+export function kartSilmeTokeni(
+  params: { utoken: string; ctoken: string },
+  merchantKey: string,
+  merchantSalt: string
+): string {
+  return createHmac("sha256", merchantKey)
+    .update(params.ctoken + params.utoken + merchantSalt, "utf8")
+    .digest("base64");
+}
+
+/**
  * Sipariş numarası (merchant_oid) üretimi ve çözümü.
  *
  * PayTR sipariş numarasının ALFANUMERİK ve en fazla 64 karakter olmasını
@@ -180,14 +200,30 @@ export function durumSorguTokeni(
 const OID_ONEK = "LIO";
 const UUID_UZUNLUK = 32;
 
-export function siparisNumarasiUret(orderId: string, simdi = Date.now()): string {
-  return OID_ONEK + orderId.replace(/-/g, "") + simdi.toString(36);
+/**
+ * Önek, bildirimin HANGİ AKIŞA ait olduğunu söyler — hepsi aynı Bildirim
+ * URL'ye geliyor. Önekler 3 harf ve birbirinin başı değil; yeni akış eklerken
+ * bu listeye ekle, çakışan önek bir akışın bildirimini ötekine yönlendirir.
+ *   LIO: Lio Bakiyesi siparişi (uuid = ai_credit_orders.id)
+ *   KRT: kart saklama ödemesi (uuid = kullanıcı)
+ *   KRY: saklı karttan tekrarlayan çekim (uuid = kullanıcı)
+ */
+export type SiparisOneki = "LIO" | "KRT" | "KRY";
+
+export function siparisNumarasiUret(orderId: string, simdi = Date.now(), onek: SiparisOneki = OID_ONEK): string {
+  return onek + orderId.replace(/-/g, "") + simdi.toString(36);
+}
+
+/** Sipariş numarasının öneki; tanınmazsa null. */
+export function siparisOneki(merchantOid: string): SiparisOneki | null {
+  const onek = merchantOid?.slice(0, 3);
+  return onek === "LIO" || onek === "KRT" || onek === "KRY" ? onek : null;
 }
 
 /** Bildirimden gelen sipariş numarasını tireli UUID'ye geri çevirir; tanınmazsa null. */
-export function siparisNumarasiCoz(merchantOid: string): string | null {
-  if (!merchantOid?.startsWith(OID_ONEK)) return null;
-  const ham = merchantOid.slice(OID_ONEK.length, OID_ONEK.length + UUID_UZUNLUK);
+export function siparisNumarasiCoz(merchantOid: string, onek: SiparisOneki = OID_ONEK): string | null {
+  if (!merchantOid?.startsWith(onek)) return null;
+  const ham = merchantOid.slice(onek.length, onek.length + UUID_UZUNLUK);
   if (!/^[0-9a-f]{32}$/i.test(ham)) return null;
   return [ham.slice(0, 8), ham.slice(8, 12), ham.slice(12, 16), ham.slice(16, 20), ham.slice(20)]
     .join("-")
@@ -220,4 +256,16 @@ export function telefonAlani(telefon?: string | null): string {
  */
 export function kurusaCevir(tutar: number): string {
   return String(Math.round(tutar * 100));
+}
+
+/**
+ * Tutarı Direkt API'nin beklediği biçime çevirir: NOKTALI ondalık, TL.
+ * 34.56 TL -> "34.56".
+ *
+ * iFRAME İLE KARIŞTIRMA: iFrame kuruş ister ("3456"), Direkt API ondalık TL
+ * ister ("34.56"). kurusaCevir'in çıktısını buraya vermek 100 katı tutar
+ * çekmek demek. Bildirimdeki total_amount ise İKİSİNDE DE kuruş.
+ */
+export function ondalikTutar(tutar: number): string {
+  return (Math.round(tutar * 100) / 100).toFixed(2);
 }

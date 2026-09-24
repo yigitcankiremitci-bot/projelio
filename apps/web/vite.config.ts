@@ -91,7 +91,8 @@ function cspPlugin(apiUrl: string | undefined) {
         `frame-src 'self' ${api} https://docs.google.com https://drive.google.com`.trim(),
         "frame-ancestors 'none'",
         "base-uri 'self'",
-        "form-action 'self'",
+        // PayTR Direkt API: kart formu tarayıcıdan doğrudan PayTR'ye POST edilir.
+        "form-action 'self' https://www.paytr.com",
         "object-src 'none'",
       ].join("; ");
 

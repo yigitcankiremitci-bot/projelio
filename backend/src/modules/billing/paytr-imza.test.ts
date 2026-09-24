@@ -7,9 +7,13 @@ import {
   direktOdemeTokeni,
   durumSorguTokeni,
   iframeTokeni,
+  kartListesiTokeni,
+  kartSilmeTokeni,
   kurusaCevir,
+  ondalikTutar,
   siparisNumarasiCoz,
   siparisNumarasiUret,
+  siparisOneki,
   telefonAlani,
 } from "./paytr-imza";
 
@@ -199,4 +203,36 @@ test("tutar kuruşa çevrilir", () => {
   assert.equal(kurusaCevir(249), "24900");
   // 19.99 * 100 kayan noktada 1998.9999... — Math.round olmadan 1998 yazardı.
   assert.equal(kurusaCevir(19.99), "1999");
+});
+
+test("Direkt API tutarı noktalı ondalık TL'dir, kuruş DEĞİL", () => {
+  // Kuruş biçimini ("3456") buraya vermek 100 katı tutar çekmek olurdu.
+  assert.equal(ondalikTutar(34.56), "34.56");
+  assert.equal(ondalikTutar(249), "249.00");
+  assert.equal(ondalikTutar(1), "1.00");
+  assert.equal(ondalikTutar(19.99), "19.99");
+  assert.equal(ondalikTutar(0.1 + 0.2), "0.30");
+});
+
+test("kart listesi tokeni utoken + salt sırasıyla üretilir", () => {
+  const beklenen = createHmac("sha256", KEY).update("UTOK" + SALT, "utf8").digest("base64");
+  assert.equal(kartListesiTokeni("UTOK", KEY, SALT), beklenen);
+});
+
+test("kart silme tokeninde ctoken utoken'dan ÖNCE gelir", () => {
+  const beklenen = createHmac("sha256", KEY).update("CTOK" + "UTOK" + SALT, "utf8").digest("base64");
+  assert.equal(kartSilmeTokeni({ utoken: "UTOK", ctoken: "CTOK" }, KEY, SALT), beklenen);
+  const ters = createHmac("sha256", KEY).update("UTOK" + "CTOK" + SALT, "utf8").digest("base64");
+  assert.notEqual(kartSilmeTokeni({ utoken: "UTOK", ctoken: "CTOK" }, KEY, SALT), ters);
+});
+
+test("önekli sipariş numarası kendi önekiyle çözülür, başkasınınkiyle çözülmez", () => {
+  const userId = "3f1a9c2e-7b4d-4a51-9c33-0d2e8f6a1b47";
+  const oid = siparisNumarasiUret(userId, 1758184800000, "KRT");
+  assert.equal(siparisOneki(oid), "KRT");
+  assert.equal(siparisNumarasiCoz(oid, "KRT"), userId);
+  // Kart saklama bildirimi Lio Bakiyesi siparişi sanılmamalı.
+  assert.equal(siparisNumarasiCoz(oid), null);
+  assert.equal(siparisOneki(siparisNumarasiUret(userId)), "LIO");
+  assert.equal(siparisOneki("XYZ123"), null);
 });

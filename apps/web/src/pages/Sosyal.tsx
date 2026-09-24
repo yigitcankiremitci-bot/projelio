@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { ArkadasAramaSonucu, ArkadasKisi, ArkadaslikDurumu, ArkadasOzeti, SosyalProfil } from "@projelio/shared";
+import type { ArkadasAramaSonucu, ArkadasKisi, ArkadaslikDurumu, ArkadasOnerisi, ArkadasOzeti, SosyalProfil } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
@@ -127,7 +127,16 @@ function SosyalAnasayfa({ benimId }: { benimId: string }) {
         })}
       </div>
 
-      {sekme === "akis" && <FeedPanel socialFeed wallUserId={benimId} tasks={[]} />}
+      {sekme === "akis" && (
+        <>
+          {/* Arkadaşı az olana akışın üstünde birkaç öneri: boş bir akış, kişiyi
+              "Kişi bul" sekmesini keşfetmeden sayfayı terk ettiriyordu. */}
+          {ozet && ozet.arkadaslar.length < 5 && (
+            <OneriListesi tavan={3} onDegisti={yukle} onTumu={() => setParams({ sekme: "bul" }, { replace: true })} />
+          )}
+          <FeedPanel socialFeed wallUserId={benimId} tasks={[]} />
+        </>
+      )}
       {sekme === "arkadaslar" && <ArkadasListesi ozet={ozet} onDegisti={yukle} />}
       {sekme === "istekler" && <IstekListesi ozet={ozet} onDegisti={yukle} />}
       {sekme === "bul" && <KisiBul onDegisti={yukle} />}
@@ -142,7 +151,7 @@ function ArkadasListesi({ ozet, onDegisti }: { ozet: ArkadasOzeti | null; onDegi
 
   if (!ozet) return <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
   if (ozet.arkadaslar.length === 0) {
-    return <BosDurum metin={t("Henüz arkadaşın yok. \"Kişi bul\" sekmesinden e-posta ya da kullanıcı adıyla arayabilirsin.")} />;
+    return <BosDurum metin={t("Henüz arkadaşın yok. \"Kişi bul\" sekmesinden adıyla arayabilir ya da önerilere bakabilirsin.")} />;
   }
   return (
     <Liste>
@@ -254,27 +263,38 @@ function KisiBul({ onDegisti }: { onDegisti: () => void }) {
   const t = useT();
   const [sorgu, setSorgu] = useState("");
   const [sonuclar, setSonuclar] = useState<ArkadasAramaSonucu[] | null>(null);
+  const [araniyor, setAraniyor] = useState(false);
 
-  // Yazarken arar; kısa bir bekleme her tuşta istek gitmesini önlüyor.
+  // Sorgu yeterli uzunlukta mı — sunucudaki aramaSorgusuCoz ile aynı eşik (2).
+  const aktifSorgu = sorgu.trim().replace(/^@+/, "");
+  const aramaVar = aktifSorgu.length >= 2;
+
+  // Yazar yazmaz arar. Kısa bekleme her tuşta istek gitmesini önlüyor ama
+  // hissedilmeyecek kadar kısa. Önceki sonuçlar yeni yanıt gelene kadar
+  // ekranda kalır: her tuşta listenin boşalıp dolması göz yoruyordu.
   // AbortController: geç dönen eski yanıt yenisini ezmesin.
   useEffect(() => {
-    const q = sorgu.trim();
-    if (q.replace(/^@/, "").length < 3) {
+    if (!aramaVar) {
       setSonuclar(null);
+      setAraniyor(false);
       return;
     }
     const ac = new AbortController();
+    setAraniyor(true);
     const zamanlayici = window.setTimeout(() => {
       api
-        .get<ArkadasAramaSonucu[]>(`/arkadaslar/ara?q=${encodeURIComponent(q)}`, ac.signal)
-        .then(setSonuclar)
+        .get<ArkadasAramaSonucu[]>(`/arkadaslar/ara?q=${encodeURIComponent(sorgu.trim())}`, ac.signal)
+        .then((r) => {
+          setSonuclar(r);
+          setAraniyor(false);
+        })
         .catch(() => {});
-    }, 300);
+    }, 150);
     return () => {
       window.clearTimeout(zamanlayici);
       ac.abort();
     };
-  }, [sorgu]);
+  }, [sorgu, aramaVar]);
 
   const durumDegisti = (userId: string, durum: ArkadaslikDurumu) => {
     setSonuclar((onceki) => (onceki ?? []).map((k) => (k.userId === userId ? { ...k, durum } : k)));
@@ -286,17 +306,23 @@ function KisiBul({ onDegisti }: { onDegisti: () => void }) {
       <input
         value={sorgu}
         onChange={(e) => setSorgu(e.target.value)}
-        placeholder={t("E-posta adresi ya da @kullanıcıadı")}
+        placeholder={t("Ad, kullanıcı adı ya da e-posta")}
         autoFocus
+        type="search"
         style={{ fontSize: 16, padding: "10px 12px", borderRadius: 8 }}
       />
-      <p style={{ margin: 0, fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
-        {t("Gizlilik için ad-soyadla arama yapılmaz: kişinin e-postasını tam olarak ya da kullanıcı adını yaz.")}
-      </p>
-      {sonuclar !== null &&
-        (sonuclar.length === 0 ? (
-          <BosDurum metin={t("Kimse bulunamadı.")} />
+      {!aramaVar ? (
+        <OneriListesi onDegisti={onDegisti} />
+      ) : sonuclar === null ? (
+        <p style={{ margin: 0, fontSize: 14, color: c.textSecondary }}>{t("Aranıyor…")}</p>
+      ) : sonuclar.length === 0 ? (
+        araniyor ? (
+          <p style={{ margin: 0, fontSize: 14, color: c.textSecondary }}>{t("Aranıyor…")}</p>
         ) : (
+          <BosDurum metin={t("Kimse bulunamadı.")} />
+        )
+      ) : (
+        <div style={{ opacity: araniyor ? 0.6 : 1, transition: "opacity 120ms" }}>
           <Liste>
             {sonuclar.map((k) => (
               <KisiSatiri
@@ -306,9 +332,72 @@ function KisiBul({ onDegisti }: { onDegisti: () => void }) {
               />
             ))}
           </Liste>
-        ))}
+        </div>
+      )}
     </div>
   );
+}
+
+/**
+ * "Tanıyor olabileceğin kişiler": ortak arkadaşlar ve birlikte çalışılanlar
+ * (bkz. ArkadaslarService.oneriler). Hiç öneri yoksa hiçbir şey çizmez —
+ * boş bir "öneri yok" kutusu Akış'ın üstünde yalnızca gürültü olurdu.
+ */
+function OneriListesi({ tavan, onDegisti, onTumu }: { tavan?: number; onDegisti: () => void; onTumu?: () => void }) {
+  const t = useT();
+  const [oneriler, setOneriler] = useState<ArkadasOnerisi[] | null>(null);
+  // İstek gönderilen öneri listeden düşmez, düğmesi "İstek gönderildi" olur:
+  // satırın aniden kaybolması neye tıklandığını belirsizleştiriyordu.
+  const [durumlar, setDurumlar] = useState<Record<string, ArkadaslikDurumu>>({});
+
+  useEffect(() => {
+    const ac = new AbortController();
+    api
+      .get<ArkadasOnerisi[]>("/arkadaslar/oneriler", ac.signal)
+      .then(setOneriler)
+      .catch(() => {});
+    return () => ac.abort();
+  }, []);
+
+  if (!oneriler || oneriler.length === 0) return null;
+  const gosterilen = tavan ? oneriler.slice(0, tavan) : oneriler;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <AltBaslik>{t("Tanıyor olabileceğin kişiler")}</AltBaslik>
+        {onTumu && oneriler.length > gosterilen.length && (
+          <button onClick={onTumu} style={{ background: "transparent", border: "none", padding: 0, fontSize: 14, color: "inherit", textDecoration: "underline" }}>
+            {t("Tümünü gör")}
+          </button>
+        )}
+      </div>
+      <Liste>
+        {gosterilen.map((k) => (
+          <KisiSatiri
+            key={k.userId}
+            kisi={k}
+            alt={oneriSebebi(k, t)}
+            sag={
+              <ArkadaslikDugmesi
+                userId={k.userId}
+                durum={durumlar[k.userId] ?? "yok"}
+                onDegisti={(d) => {
+                  setDurumlar((onceki) => ({ ...onceki, [k.userId]: d }));
+                  onDegisti();
+                }}
+              />
+            }
+          />
+        ))}
+      </Liste>
+    </div>
+  );
+}
+
+function oneriSebebi(k: ArkadasOnerisi, t: ReturnType<typeof useT>): string {
+  if (k.ortakArkadasSayisi > 0) return t("{n} ortak arkadaş", { n: k.ortakArkadasSayisi });
+  return t("Birlikte çalışıyorsunuz");
 }
 
 function KisiSayfasi({ userId, kendim }: { userId: string; kendim?: boolean }) {
@@ -435,7 +524,7 @@ function ArkadaslikDugmesi({
 
 // ------------------------------------------------------------ Küçük parçalar
 
-function KisiSatiri({ kisi, sag }: { kisi: ArkadasKisi; sag?: ReactNode }) {
+function KisiSatiri({ kisi, sag, alt }: { kisi: ArkadasKisi; sag?: ReactNode; alt?: string }) {
   const c = useThemeColors();
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderBottom: `1px solid ${c.border}` }}>
@@ -448,6 +537,7 @@ function KisiSatiri({ kisi, sag }: { kisi: ArkadasKisi; sag?: ReactNode }) {
           <div style={{ fontSize: 13, color: c.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {[kisi.username && `@${kisi.username}`, kisi.title].filter(Boolean).join(" · ")}
           </div>
+          {alt && <div style={{ fontSize: 12, color: c.accentDark, marginTop: 1 }}>{alt}</div>}
         </div>
       </Link>
       {sag}

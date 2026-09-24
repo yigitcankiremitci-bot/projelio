@@ -22,6 +22,11 @@ export class ArkadaslarController {
     return this.arkadaslar.ara(req.user.userId, q);
   }
 
+  @Get("arkadaslar/oneriler")
+  oneriler(@Req() req: any) {
+    return this.arkadaslar.oneriler(req.user.userId);
+  }
+
   @Post("arkadaslar/istek")
   istekGonder(@Req() req: any, @Body("userId") userId: unknown) {
     return this.arkadaslar.istekGonder(req.user.userId, userId);

@@ -1474,6 +1474,16 @@ export interface ArkadasAramaSonucu extends ArkadasKisi {
   durum: ArkadaslikDurumu;
 }
 
+/**
+ * "Tanıyor olabileceğin kişiler". Sebep kişiye gösterilir: neden önerildiğini
+ * bilmeyen biri öneriyi rastgele sanar ve güvenmez.
+ */
+export interface ArkadasOnerisi extends ArkadasKisi {
+  ortakArkadasSayisi: number;
+  // Aynı iş/proje/departman/şirkette kaç ortak alan (0 = birlikte çalışmıyor).
+  ortakAlanSayisi: number;
+}
+
 /** Bir kullanıcının sosyal sayfasının başlığı. Duvarı görmek arkadaşlık ister. */
 export interface SosyalProfil extends ArkadasKisi {
   bio?: string;

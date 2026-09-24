@@ -9,8 +9,8 @@ export const arkadaslar: TranslationDict = {
   "Kişi bul": "Find people",
   "Aynı işte olmasanız da arkadaş ekleyebilir, birbirinizin duvarına yazabilirsiniz. Paylaşımları yalnızca arkadaşlar görür.":
     "Add friends even if you don't work together, and post on each other's walls. Only friends can see the posts.",
-  'Henüz arkadaşın yok. "Kişi bul" sekmesinden e-posta ya da kullanıcı adıyla arayabilirsin.':
-    'You have no friends yet. Search by email or username in the "Find people" tab.',
+  'Henüz arkadaşın yok. "Kişi bul" sekmesinden adıyla arayabilir ya da önerilere bakabilirsin.':
+    'You have no friends yet. Search by name in the "Find people" tab or check the suggestions.',
   "Arkadaşlıktan çık": "Unfriend",
   "Arkadaşlıktan çıkılsın mı?": "Unfriend this person?",
   "{ad} ile artık birbirinizin duvarını göremezsiniz. Eski paylaşımlar silinmez.":
@@ -21,9 +21,12 @@ export const arkadaslar: TranslationDict = {
   Reddet: "Decline",
   "Gönderdiğin istekler": "Requests you sent",
   "Geri çek": "Withdraw",
-  "E-posta adresi ya da @kullanıcıadı": "Email address or @username",
-  "Gizlilik için ad-soyadla arama yapılmaz: kişinin e-postasını tam olarak ya da kullanıcı adını yaz.":
-    "For privacy, you can't search by name: enter the person's exact email or their username.",
+  "Ad, kullanıcı adı ya da e-posta": "Name, username or email",
+  "Aranıyor…": "Searching…",
+  "Tanıyor olabileceğin kişiler": "People you may know",
+  "Tümünü gör": "See all",
+  "{n} ortak arkadaş": { one: "{n} mutual friend", other: "{n} mutual friends" },
+  "Birlikte çalışıyorsunuz": "You work together",
   "Kimse bulunamadı.": "No one found.",
   "Bu kullanıcı bulunamadı.": "This user could not be found.",
   "{n} arkadaş": { one: "{n} friend", other: "{n} friends" },

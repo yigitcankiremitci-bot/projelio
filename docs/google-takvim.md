@@ -55,7 +55,7 @@ Yeni ortam değişkeni yok: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
 - her kullanıcı "Google bu uygulamayı doğrulamadı" uyarısı görür.
 
 Doğrulama için gerekenler:
-- projelio.app'in Search Console'da doğrulanması,
+- projelio.app'in Search Console'da doğrulanması (✓ 2026-09-24),
 - gizlilik politikasına Google API **Limited Use** paragrafı
   (`apps/web/src/lib/legal/privacyPolicy.ts`, iki dil) — takvim verisinin
   Projelio sunucusunda önbelleğe alındığı ve Lio'ya (AI sağlayıcısına)
@@ -107,7 +107,10 @@ Google Cloud tarafı 2026-09-24'te tamamlandı: Branding'de ana sayfa, gizlilik 
 Render adresleri OAuth istemcisinden ve listeden çıkarıldı); Data Access'te
 yukarıdaki gerekçe kayıtlı.
 
-Uygulama doğrulamasında ayrıca: projelio.app alan adının Search Console'da
-doğrulanmış olması, gizlilik politikası bağlantısının onay ekranında
+Search Console: `projelio.app` alan adı mülkü 2026-09-24'te doğrulandı
+(yigitcankiremitci@gmail.com; DNS GoDaddy'de, mevcut google-site-verification
+TXT kaydıyla — o kayıtları SİLME).
+
+Uygulama doğrulamasında ayrıca: gizlilik politikası bağlantısının onay ekranında
 (Branding) çalışan bir adres olması — `https://projelio.app/en/legal/privacy` (`/privacy` 404 veriyor) ve politikanın Limited Use
 paragrafını içermesi (§7, 2026-09-24).

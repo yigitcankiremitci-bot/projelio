@@ -26,12 +26,12 @@ export const privacyDoc: LegalDoc = {
     tr: {
       title: "Gizlilik Politikası",
       lede: "Hangi veriyi neden topladığımızı, kimlerle paylaştığımızı ve haklarınızı nasıl kullanacağınızı anlatır.",
-      effective: "17 Eylül 2026",
+      effective: "24 Eylül 2026",
     },
     en: {
       title: "Privacy Policy",
       lede: "What data we collect and why, who we share it with, and how you can exercise your rights.",
-      effective: "17 September 2026",
+      effective: "24 September 2026",
     },
   },
   sections: {
@@ -115,6 +115,8 @@ export const privacyDoc: LegalDoc = {
         p: [
           "Projelio, siz istediğinizde başka hizmetlere bağlanabilir. Bağlantı kurmadıkça bu hizmetlerle hiçbir veri paylaşılmaz; bağlantıyı istediğiniz an ayarlardan kaldırabilirsiniz.",
           "Google Drive ve Microsoft OneDrive: dosyalarınızı Projelio kayıtlarına iliştirmek için kullanılır. Yalnızca izin verdiğiniz kapsamdaki dosya ve klasörlere erişilir; bir işe ya da projeye erişim izni verdiğinizde ilgili klasör paylaşımı yalnızca daveti kabul etmiş üyeler için açılır.",
+          "Google Takvim: takviminizi bağlarsanız, seçtiğiniz takvimlerdeki etkinlikler (başlık, zaman, konum, açıklama, katılımcı sayısı ve düzenleyenin adı ya da e-posta adresi) Projelio takviminde gösterilmek üzere sunucumuzda saklanır ve düzenli olarak Google'dan güncellenir. Projelio'dan eklemeyi seçtiğiniz etkinlikler ve zaman blokları Google Takvim'inize yazılır; davetli eklenmez ve kimseye davet gönderilmez. Lio'dan takviminizle ilgili bir şey istediğinizde, yalnızca isteğinizi yanıtlamak için gereken etkinlikler 6. maddede anlatılan yapay zekâ tedarikçisine iletilir. Bağlantıyı kestiğinizde takvim verileri sunucumuzdan silinir; Projelio'dan eklediğiniz etkinlikler Google Takvim'inizde kalır.",
+          "Google API'lerinden alınan verilerin Projelio tarafından kullanımı ve başka uygulamalara aktarımı, Sınırlı Kullanım (Limited Use) koşulları dahil Google API Hizmetleri Kullanıcı Verileri Politikası'na (Google API Services User Data Policy) uygundur. Google'dan aldığımız verileri yalnızca size sunduğumuz özellikleri çalıştırmak için kullanırız: reklam için kullanmaz, satmaz, yapay zekâ modellerinin eğitiminde kullanmaz ve açık izniniz olmadıkça insanlara okutmayız — güvenlik amaçları ve yasal yükümlülükler saklıdır.",
           "Microsoft Outlook posta kutusu: posta modülünü kullanırsanız, verdiğiniz izin kapsamında ileti başlıkları ve içerikleri arayüzde gösterilir.",
           "Instagram ve Meta hizmetleri: sosyal medya paylaşım modülünü kullanırsanız, paylaşmayı seçtiğiniz görsel/video ve metin ilgili platforma iletilir.",
           "WhatsApp: Lio'yu WhatsApp üzerinden kullanmayı seçerseniz telefon numaranız, uygulama içinde ürettiğiniz tek kullanımlık doğrulama koduyla hesabınıza bağlanır. Mesajlar Meta Platforms, Inc. altyapısı üzerinden iletilir ve bu iletim Meta'nın kendi koşullarına tabidir; köprüyü işleten sunucu bizimdir ve Türkiye'dedir.",
@@ -239,7 +241,7 @@ export const privacyDoc: LegalDoc = {
           "VERBİS: Veri Sorumluları Sicili'ne kayıt yükümlülüğü, yıllık çalışan sayısı 50'den az ve yıllık mali bilanço toplamı 25 milyon TL'nin altında olan, ana faaliyet konusu özel nitelikli kişisel veri işlemek olmayan veri sorumluları bakımından aranmamaktadır; işletmemiz bu kapsamdadır.",
           "Gizlilikle ilgili tüm sorularınız, talepleriniz ve şikâyetleriniz için: info@projelio.app",
           "Avrupa Ekonomik Alanı ve Birleşik Krallık'taki ilgili kişiler: Hizmet Türkiye'ye yöneliktir ve AB/BK'de atanmış bir temsilcimiz bulunmamaktadır; taleplerinizi doğrudan info@projelio.app adresine iletebilirsiniz.",
-          "Yürürlük tarihi: 17 Eylül 2026.",
+          "Yürürlük tarihi: 24 Eylül 2026.",
         ],
       },
     ],
@@ -323,6 +325,8 @@ export const privacyDoc: LegalDoc = {
         p: [
           "Projelio can connect to other services when you ask it to. Until you set up a connection, no data is shared with those services, and you can remove a connection at any time in settings.",
           "Google Drive and Microsoft OneDrive: used to attach your files to Projelio records. Only the files and folders within the scope you grant are accessed; when you give access to a job or project, the related folder is shared only with members who have accepted their invitation.",
+          "Google Calendar: if you connect your calendar, events from the calendars you select (title, time, location, description, number of guests and the organiser's name or email address) are stored on our server so they can be shown in Projelio's calendar, and are refreshed from Google regularly. Events and time blocks you choose to add from Projelio are written to your Google Calendar; no guests are added and no invitations are sent. When you ask Lio about your calendar, only the events needed to answer your request are sent to the AI supplier described in section 6. When you disconnect, the calendar data is deleted from our server; events you added from Projelio stay in your Google Calendar.",
+          "Projelio's use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements. We use data received from Google only to provide the features we offer you: we do not use it for advertising, do not sell it, do not use it to train AI models, and do not let humans read it without your explicit permission, except for security purposes and legal obligations.",
           "Microsoft Outlook mailbox: if you use the mail module, message headers and bodies are displayed in the interface within the scope you grant.",
           "Instagram and Meta services: if you use the social publishing module, the image, video and text you choose to publish are sent to that platform.",
           "WhatsApp: if you choose to use Lio over WhatsApp, your phone number is linked to your account with a single-use verification code generated inside the app. Messages travel over Meta Platforms, Inc.'s infrastructure and that transport is subject to Meta's own terms; the server running the bridge is ours and is located in Türkiye.",
@@ -447,7 +451,7 @@ export const privacyDoc: LegalDoc = {
           "VERBIS: data controllers with fewer than 50 employees and an annual balance sheet total below TRY 25 million, whose principal activity is not the processing of special categories of personal data, are not required to register with the Data Controllers' Registry; our business falls within that exemption.",
           "For any privacy question, request or complaint: info@projelio.app",
           "Individuals in the European Economic Area and the United Kingdom: the Service is directed at Türkiye and we have not appointed a representative in the EEA or the UK; you can send your requests directly to info@projelio.app.",
-          "Effective date: 17 September 2026.",
+          "Effective date: 24 September 2026.",
         ],
       },
     ],

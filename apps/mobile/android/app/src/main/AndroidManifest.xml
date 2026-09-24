@@ -13,7 +13,18 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
+            <!--
+              KLAVYE: adjustResize ŞART. Belirtilmediğinde Android pencereyi
+              klavyenin boyu kadar YUKARI İTİYORDU (pan): üstteki sabit şerit
+              dahil bütün sayfa ekrandan çıkıyor, yazılan kutu da çoğu zaman
+              görünmüyordu. Edge-to-edge modda adjustResize pencereyi kendisi
+              küçültmez; yalnızca kaydırmayı durdurup klavye payını (IME
+              inset) uygulamaya bırakır. O payı safe-area eklentisi WebView'e
+              alt dolgu olarak veriyor → görünür alan klavyenin üstünde biter,
+              position:fixed öğeler yerinde kalır.
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

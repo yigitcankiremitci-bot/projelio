@@ -36,6 +36,13 @@ const config: CapacitorConfig = {
     backgroundColor: "#1C222C",
   },
   plugins: {
+    // Güvenli alan ve klavye payını @capacitor-community/safe-area yönetiyor.
+    // Capacitor 8'in yerleşik SystemBars'ı da AYNI pencereye kendi dinleyicisini
+    // takıyor; ikisinden hangisinin son takıldığı belirsiz kalıyordu ve eklenti
+    // her açılışta bunun için hata yazıyor. Tek sahip kalsın diye kapalı.
+    SystemBars: {
+      insetsHandling: "disable",
+    },
     SplashScreen: {
       backgroundColor: "#1C222C",
       // AutoHide KAPATILAMAZ: kapatıldığında açılış ekranını yalnızca

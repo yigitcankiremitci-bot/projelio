@@ -1,4 +1,12 @@
-import type { AdminKullaniciDetayi, AdminKullaniciSatiri, AdminMesajGirdisi, AdminMesajSonucu, UserRole } from "@projelio/shared";
+import type {
+  AdminKullaniciDetayi,
+  AdminKullaniciSatiri,
+  AdminMesajGirdisi,
+  AdminMesajSonucu,
+  AdminYeniKullaniciGirdisi,
+  AdminYeniKullaniciSonucu,
+  UserRole,
+} from "@projelio/shared";
 import { api } from "./client";
 
 type KrediBakiyesi = { balance: number; lifetimePurchased: number; lifetimeSpent: number };
@@ -7,6 +15,10 @@ type KrediBakiyesi = { balance: number; lifetimePurchased: number; lifetimeSpent
 export const adminKullanicilar = {
   liste: () => api.get<{ kullanicilar: AdminKullaniciSatiri[]; migrationEksik: boolean }>("/admin/kullanicilar"),
   detay: (id: string, signal?: AbortSignal) => api.get<AdminKullaniciDetayi>(`/admin/kullanicilar/${id}`, signal),
+
+  hesapAc: (girdi: AdminYeniKullaniciGirdisi) => api.post<AdminYeniKullaniciSonucu>("/admin/kullanicilar", girdi),
+  girisBaglantisiGonder: (id: string) =>
+    api.post<{ epostaGonderildi: boolean }>(`/admin/kullanicilar/${id}/giris-baglantisi`, {}),
 
   askiyaAl: (id: string, sebep?: string) => api.post<{ ok: true }>(`/admin/kullanicilar/${id}/askiya-al`, { sebep }),
   askiyiKaldir: (id: string) => api.post<{ ok: true }>(`/admin/kullanicilar/${id}/askiyi-kaldir`, {}),

@@ -732,14 +732,16 @@ export default function App() {
     <div style={{ minHeight: "100vh" }}>
       {/* fallback={null}: bu üç parça arka planda inerken ekranda bir şey
           göstermeye gerek yok — kabuk zaten çizilmiş durumda. */}
-      {me && !me.onboardingCompletedAt && (
+      {/* Şifre ekranı açıkken sihirbaz beklemede: admin panelinden açılan
+          hesaplar sihirbazı ATLAMIYOR (hesap tipini kişi seçer), ikisi üst
+          üste binmesin — önce şifre, sonra kurulum. */}
+      {me && !me.onboardingCompletedAt && !me.mustChangePassword && (
         <Suspense fallback={null}>
           <OnboardingWizard onCompleted={reloadMe} />
         </Suspense>
       )}
-      {/* Ekip yöneticisinin açtığı hesap: kişi önce kendi şifresini belirler
-          (bkz. migration 130). Sihirbazla çakışmaz — bu hesaplar sihirbazı
-          atlayarak açılıyor. */}
+      {/* Başkasının (ekip yöneticisi ya da admin) açtığı hesap: kişi önce
+          kendi şifresini belirler (bkz. migration 130). */}
       {me?.mustChangePassword && (
         <Suspense fallback={null}>
           <IlkSifreModal fullName={me.fullName} onTamam={reloadMe} />

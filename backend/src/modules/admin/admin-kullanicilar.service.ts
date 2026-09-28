@@ -1,11 +1,15 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { randomBytes } from "crypto";
+import { BadRequestException, ConflictException, Injectable, Logger } from "@nestjs/common";
 import {
   adminKullaniciDurumu,
+  adminYeniKullaniciDogrula,
   gunlukEtkinligiDoldur,
   type AdminKrediHareketi,
   type AdminKullaniciDetayi,
   type AdminKullaniciIslemi,
   type AdminKullaniciSatiri,
+  type AdminYeniKullaniciGirdisi,
+  type AdminYeniKullaniciSonucu,
   type UserRole,
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
@@ -14,7 +18,13 @@ import { AiCreditsService } from "../ai-assistant/ai-credits.service";
 import { HesapDurumuService } from "../../common/hesap-durumu/hesap-durumu.service";
 import { utcMs } from "../../common/hesap-durumu/oturum-engeli";
 import { demoKullanicisiMi } from "../../common/demo-hesap";
-import { hataMetni } from "../../common/i18n/index";
+import { hataMetni, istekDili } from "../../common/i18n/index";
+import { hashPassword } from "../../common/password.util";
+import { isProduction } from "../../common/config/env";
+import { UsersService } from "../users/users.service";
+import { EmailService } from "../auth/email.service";
+import { GirisBaglantisiService } from "../auth/giris-baglantisi.service";
+import { adminHesapEpostasi } from "./admin-hesap-eposta";
 
 /**
  * Admin paneli kullanıcı yönetimi: liste, detay, askı, oturum iptali, rol,
@@ -33,10 +43,12 @@ import { hataMetni } from "../../common/i18n/index";
 const KULLANICI_TAVANI = 2000;
 
 const TEMEL_SUTUNLAR =
-  "id, full_name, email, username, avatar_url, role, account_type, created_at, email_verified_at, deleted_at, password_hash";
+  "id, full_name, email, username, avatar_url, role, account_type, created_at, email_verified_at, deleted_at, password_hash, sifre_degistirmeli";
 const ASKI_SUTUNLARI = ", banned_at, ban_reason";
 
 type IslemTuru =
+  | "hesap_ac"
+  | "giris_baglantisi_gonder"
   | "askiya_al"
   | "askiyi_kaldir"
   | "oturumlari_kapat"
@@ -57,7 +69,10 @@ export class AdminKullanicilarService {
     private supabase: SupabaseService,
     private accountDeletion: AccountDeletionService,
     private credits: AiCreditsService,
-    private hesapDurumu: HesapDurumuService
+    private hesapDurumu: HesapDurumuService,
+    private usersService: UsersService,
+    private emailService: EmailService,
+    private girisBaglantisi: GirisBaglantisiService
   ) {}
 
   // ============================================================ Okuma
@@ -155,6 +170,108 @@ export class AdminKullanicilarService {
       gunlukEtkinlik: gunlukEtkinligiDoldur(etkinlik.gunler, istanbulGunu()),
       migrationEksik,
     };
+  }
+
+  // ============================================================ Hesap açma
+
+  /**
+   * Admin birini sisteme kaydeder. Kişi ilk girişte kendi şifresini belirlemek
+   * ZORUNDA (sifre_degistirmeli, migration 130) — ekranı uygulama kabuğu
+   * gösterir (IlkSifreModal), ardından olağan kurulum sihirbazı gelir: hesap
+   * tipini ve şirketini kişi kendisi seçer, admin onun yerine karar vermez.
+   *
+   * E-posta DOĞRULANMIŞ açılır: adresi admin yazdı, yani kayıt ekranındaki
+   * "bu adres gerçekten senin mi" sorusunun muhatabı yok. Doğrulanmamış
+   * açılsaydı geçici şifreyle giriş, doğrulama e-postası bekleyip dururdu.
+   *
+   * Şifre boşsa rastgele üretilir ve kimseye gösterilmez; kişi e-postadaki
+   * tek kullanımlık bağlantıyla girer (Ekip Hesapları'ndaki Lio yolu gibi).
+   */
+  async hesapAc(adminId: string, girdi: Partial<AdminYeniKullaniciGirdisi>): Promise<AdminYeniKullaniciSonucu> {
+    const sonuc = adminYeniKullaniciDogrula(girdi ?? {});
+    if ("hata" in sonuc) throw new BadRequestException(sonuc.hata);
+    const g = sonuc.temiz;
+
+    // Admin'e adresin kayıtlı olduğunu söylemek sızıntı değil: zaten tüm
+    // kullanıcı listesini görüyor.
+    if (await this.usersService.findByEmail(g.email)) {
+      throw new ConflictException("Bu e-posta adresiyle zaten bir Projelio hesabı var.");
+    }
+    if (await this.usersService.isUsernameTaken(g.username)) {
+      throw new ConflictException("Bu kullanıcı adı zaten alınmış, başka bir tane dene.");
+    }
+
+    const yeni = await this.usersService.create({
+      fullName: g.fullName,
+      email: g.email,
+      passwordHash: await hashPassword(g.password ?? randomBytes(24).toString("base64url")),
+      username: g.username,
+      locale: g.locale,
+    });
+
+    // Bayrak yazılamazsa hesap GERİ ALINIR: şifre değiştirme zorunluluğu
+    // olmadan açılmış bir hesap, adminin bildiği şifreyle sonsuza dek açık
+    // kalırdı.
+    const { error } = await this.supabase.client
+      .from("users")
+      .update({ sifre_degistirmeli: true, email_verified_at: new Date().toISOString() })
+      .eq("id", yeni.id);
+    if (error) {
+      this.logger.error(`Admin hesabı yarım kaldı, geri alınıyor (${yeni.id}): ${error.message}`);
+      await this.supabase.client.from("users").delete().eq("id", yeni.id);
+      throw error;
+    }
+
+    await this.kaydet(adminId, yeni.id, "hesap_ac", {
+      geciciSifre: Boolean(g.password),
+      girisBaglantisi: g.girisBaglantisiGonder,
+    });
+
+    const epostaGonderildi = g.girisBaglantisiGonder ? await this.baglantiGonder(adminId, yeni.id) : false;
+    return { userId: yeni.id, epostaGonderildi };
+  }
+
+  /**
+   * Giriş bağlantısını (yeniden) gönderir — e-posta ulaşmadı, süresi doldu.
+   *
+   * Yalnızca kişi henüz kendi şifresini belirlememişken: sonrasında hesap
+   * kişinin kendisinin ve adminin onun adına şifresiz giriş bağlantısı
+   * üretebilmesi hesaba bir arka kapı olurdu (Ekip Hesapları'ndaki kural).
+   */
+  async girisBaglantisiGonder(adminId: string, userId: string): Promise<{ epostaGonderildi: boolean }> {
+    await this.hedefiDogrula(adminId, userId, "giriş bağlantısı gönderme");
+    const kisi = await this.usersService.findById(userId);
+    if (!kisi || kisi.deletedAt) throw new BadRequestException("Kullanıcı bulunamadı.");
+    if (!kisi.sifreDegistirmeli) {
+      throw new BadRequestException(
+        "Bu kişi kendi şifresini zaten belirledi. Şifresini unuttuysa giriş ekranındaki “Şifremi unuttum”u kullanabilir."
+      );
+    }
+    const epostaGonderildi = await this.baglantiGonder(adminId, userId);
+    await this.kaydet(adminId, userId, "giris_baglantisi_gonder", { epostaGonderildi });
+    return { epostaGonderildi };
+  }
+
+  /** HATA FIRLATMAZ: hesap açıldıysa e-postanın gitmemesi onu geri almaz. */
+  private async baglantiGonder(adminId: string, userId: string): Promise<boolean> {
+    try {
+      const kisi = await this.usersService.findById(userId);
+      if (!kisi) return false;
+      const girisUrl = await this.girisBaglantisi.olustur(userId, adminId);
+      const mail = adminHesapEpostasi({
+        alici: { ad: kisi.fullName, kullaniciAdi: kisi.username, eposta: kisi.email },
+        girisUrl,
+        dil: istekDili(kisi.locale),
+      });
+      const gitti = await this.emailService.sendPrepared(kisi.email, mail);
+      // Gerekçe: EkipHesaplariService.baglantiGonder — üretimde bu bağlantı
+      // hesabı açan anahtar, loga yazılmaz.
+      if (!gitti && !isProduction()) this.logger.warn(`Giriş bağlantısı (yalnızca geliştirme): ${girisUrl}`);
+      return gitti;
+    } catch (err) {
+      this.logger.warn(`Admin hesabı e-postası gönderilemedi (${userId}): ${(err as any)?.message ?? err}`);
+      return false;
+    }
   }
 
   // ============================================================ Hesap işlemleri
@@ -360,6 +477,7 @@ export class AdminKullanicilarService {
       banReason: row.ban_reason ?? undefined,
       // Hash'in kendisi asla dışarı çıkmıyor, yalnızca var olup olmadığı.
       sifreliGiris: Boolean(row.password_hash),
+      ilkSifreBekliyor: row.sifre_degistirmeli === true,
       durum: adminKullaniciDurumu(alanlar),
       kredi: {
         balance: Number(bakiye?.balance ?? 0),

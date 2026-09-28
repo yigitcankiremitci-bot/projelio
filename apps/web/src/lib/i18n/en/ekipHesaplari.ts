@@ -92,10 +92,44 @@ export const ekipHesaplari: TranslationDict = {
   "Giriş yapılamadı": "Couldn't sign in",
   "Giriş yapılamadı.": "Couldn't sign in.",
   "Hoş geldin, {ad}": "Welcome, {ad}",
-  "Hesabını yöneticin açtı. Devam etmeden önce yalnızca senin bildiğin bir şifre belirle; bundan sonra e-posta adresin ve bu şifreyle giriş yaparsın.":
-    "Your manager created this account. Before you continue, set a password only you know; from now on you'll sign in with your email and this password.",
+  "Bu hesap senin için açıldı. Devam etmeden önce yalnızca senin bildiğin bir şifre belirle; bundan sonra e-posta adresin ve bu şifreyle giriş yaparsın.":
+    "This account was created for you. Before you continue, set a password only you know; from now on you'll sign in with your email and this password.",
   "Yeni şifre (en az 8 karakter)": "New password (at least 8 characters)",
   "Şifre en az 8 karakter olmalı.": "Password must be at least 8 characters.",
   "Şifre kaydedilemedi.": "Couldn't save the password.",
   "Şifremi belirle ve devam et": "Set my password and continue",
+
+  // ─────────────────────────────────────────────── Admin > Kullanıcılar > Kullanıcı ekle
+  "Kullanıcı ekle": "Add user",
+  "Hesap açılamadı.": "Couldn't create the account.",
+  "Hesap açıldı.": "Account created.",
+  "{eposta} adresine giriş bağlantısı gönderildi. Kişi bağlantıya tıklayınca kendi şifresini belirleyecek.":
+    "A sign-in link was sent to {eposta}. They'll set their own password after clicking it.",
+  "Giriş bağlantısı e-postası gönderilemedi. Kullanıcının detayından yeniden gönderebilirsin; sunucuda RESEND_API_KEY ve EMAIL_FROM ayarlarını da kontrol et.":
+    "The sign-in link email couldn't be sent. You can resend it from the user's details; also check RESEND_API_KEY and EMAIL_FROM on the server.",
+  "Geçici şifreyi kişiye kendin ilet. İlk girişte kendi şifresini belirlemesi istenecek.":
+    "Share the temporary password with them yourself. They'll be asked to set their own password on first sign-in.",
+  "Kullanıcıyı aç": "Open user",
+  "Kişi ilk girişte kendi şifresini belirler, ardından hesap tipini seçip kurulumu kendisi tamamlar.":
+    "They'll set their own password on first sign-in, then choose an account type and finish setup themselves.",
+  "Geçici şifre (isteğe bağlı)": "Temporary password (optional)",
+  "Boş bırakırsan kişi yalnızca e-postadaki bağlantıyla girer": "Leave empty and they can only sign in with the emailed link",
+  "E-posta dili": "Email language",
+  "İngilizce": "English",
+  "Giriş bağlantısını e-postayla gönder": "Email a sign-in link",
+  "7 gün geçerli, tek kullanımlık. Şifre e-postaya yazılmaz.": "Valid for 7 days, single use. The password is never put in the email.",
+  "Açılıyor…": "Creating…",
+  "Hesabı aç": "Create account",
+  "Geçici bir şifre belirle ya da giriş bağlantısını e-postayla gönder.": "Set a temporary password or send the sign-in link by email.",
+  "Bu hesabı başkası açtı ve kişi henüz kendi şifresini belirlemedi. İlk girişte şifre belirleme ekranı açılacak.":
+    "Someone else created this account and they haven't set their own password yet. They'll see the set-password screen on first sign-in.",
+  "Giriş bağlantısı e-postası gönderilemedi. Sunucuda RESEND_API_KEY ve EMAIL_FROM ayarlarını kontrol et.":
+    "The sign-in link email couldn't be sent. Check RESEND_API_KEY and EMAIL_FROM on the server.",
+  "Giriş bağlantısı gönderildi; önceki bağlantılar geçersiz oldu.": "Sign-in link sent; earlier links no longer work.",
+  "Giriş bağlantısı gönder": "Send sign-in link",
+  "Hesabı açtı": "Created the account",
+  "Ad soyad 2-120 karakter olmalı.": "Full name must be 2-120 characters.",
+  "Geçerli bir e-posta adresi gir.": "Enter a valid email address.",
+  "Şifre 8-72 karakter olmalı.": "Password must be 8-72 characters.",
+  "Giriş bağlantısı gönderdi": "Sent a sign-in link",
 };

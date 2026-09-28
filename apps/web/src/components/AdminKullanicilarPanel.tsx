@@ -18,12 +18,13 @@ import { useT } from "../lib/i18n";
 import Modal from "./Modal";
 import ConfirmDialog from "./ConfirmDialog";
 import AdminMesajModal from "./AdminMesajModal";
+import AdminYeniKullaniciModal from "./AdminYeniKullaniciModal";
 import { IconUser } from "./icons";
 import { bicimDili } from "../lib/i18n/depo";
 
 /**
- * Admin paneli > Kullanıcılar: tüm hesapların tek listesi ve hesap başına
- * işlemler (askı, oturum kapatma, rol, kredi, silme).
+ * Admin paneli > Kullanıcılar: tüm hesapların tek listesi, hesap açma ve
+ * hesap başına işlemler (askı, oturum kapatma, rol, kredi, silme).
  *
  * Kurallar sunucuda (modules/admin/admin-kullanicilar.service.ts). Buradaki
  * gizle/göster kararları yalnızca kolaylık: sunucu yine de reddeder.
@@ -137,6 +138,7 @@ export default function AdminKullanicilarPanel({ yenile = 0 }: { yenile?: number
   // önce "Askıda"yı sonra "Doğrulanmamış"ı süzüp ikisinden kişi toplayabilmeli.
   const [secilenler, setSecilenler] = useState<Set<string>>(new Set());
   const [mesajAlicilari, setMesajAlicilari] = useState<AdminKullaniciSatiri[] | null>(null);
+  const [yeniAc, setYeniAc] = useState(false);
 
   const yukle = () => {
     adminKullanicilar
@@ -272,6 +274,9 @@ export default function AdminKullanicilarPanel({ yenile = 0 }: { yenile?: number
         <button type="button" onClick={yukle} style={ikincilButon(c)}>
           {t("Yenile")}
         </button>
+        <button type="button" onClick={() => setYeniAc(true)} style={birincilButon(c)}>
+          {t("Kullanıcı ekle")}
+        </button>
       </div>
 
       {secilenler.size > 0 && (
@@ -390,6 +395,20 @@ export default function AdminKullanicilarPanel({ yenile = 0 }: { yenile?: number
           userId={seciliId}
           onClose={() => setSeciliId(null)}
           onDegisti={yukle}
+        />
+      )}
+
+      {yeniAc && (
+        <AdminYeniKullaniciModal
+          onClose={() => {
+            setYeniAc(false);
+            yukle();
+          }}
+          onAcildi={(id) => {
+            setYeniAc(false);
+            yukle();
+            setSeciliId(id);
+          }}
         />
       )}
 
@@ -586,6 +605,11 @@ function KullaniciDetayModal({ userId, onClose, onDegisti }: { userId: string; o
             </Uyari>
           )}
           {u.anonimlestirildi && <Uyari c={c}>{t("Bu hesap kalıcı olarak silinmiş; üzerinde işlem yapılamaz.")}</Uyari>}
+          {u.ilkSifreBekliyor && !u.deletedAt && (
+            <Uyari c={c}>
+              {t("Bu hesabı başkası açtı ve kişi henüz kendi şifresini belirlemedi. İlk girişte şifre belirleme ekranı açılacak.")}
+            </Uyari>
+          )}
 
           {/* ---------------------------------------------------- Etkinlik */}
           <Bolum c={c} baslik={t("Uygulama kullanımı")}>
@@ -621,6 +645,24 @@ function KullaniciDetayModal({ userId, onClose, onDegisti }: { userId: string; o
               >
                 {u.role === "admin" ? t("Yöneticiliği kaldır") : t("Yönetici yap")}
               </button>
+              {u.ilkSifreBekliyor && !u.deletedAt && (
+                <button
+                  type="button"
+                  disabled={kilitli}
+                  style={ikincilButon(c)}
+                  onClick={() =>
+                    calistir(async () => {
+                      const r = await adminKullanicilar.girisBaglantisiGonder(u.id);
+                      // Gönderilemediyse başarı gibi görünmesin.
+                      if (!r.epostaGonderildi) {
+                        throw new Error(t("Giriş bağlantısı e-postası gönderilemedi. Sunucuda RESEND_API_KEY ve EMAIL_FROM ayarlarını kontrol et."));
+                      }
+                    }, t("Giriş bağlantısı gönderildi; önceki bağlantılar geçersiz oldu."))
+                  }
+                >
+                  {t("Giriş bağlantısı gönder")}
+                </button>
+              )}
               {!u.emailVerifiedAt && (
                 <button
                   type="button"
@@ -978,6 +1020,8 @@ const HAREKET_ETIKETI: Record<string, string> = {
 };
 
 const ISLEM_ETIKETI: Record<string, string> = {
+  hesap_ac: "Hesabı açtı", // dil:anahtar
+  giris_baglantisi_gonder: "Giriş bağlantısı gönderdi", // dil:anahtar
   askiya_al: "Askıya aldı", // dil:anahtar
   askiyi_kaldir: "Askıyı kaldırdı", // dil:anahtar
   oturumlari_kapat: "Oturumları kapattı", // dil:anahtar

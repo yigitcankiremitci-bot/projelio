@@ -5,6 +5,7 @@ import {
   adminKullaniciDurumu,
   adminMesajiniDogrula,
   adminMesajLinkiGecerliMi,
+  adminYeniKullaniciDogrula,
   etkinlikSuresiYaz,
   gercekEpostaMi,
   gunlukEtkinligiDoldur,
@@ -107,4 +108,42 @@ test("gerçek e-posta: demo ve silinmiş alan adları elenir", () => {
   assert.equal(gercekEpostaMi("silinmis+ab12cd34@projelio.invalid"), false);
   assert.equal(gercekEpostaMi("a@example.com"), false);
   assert.equal(gercekEpostaMi(""), false);
+});
+
+test("yeni kullanıcı: temizler ve dili varsayılan tr yapar", () => {
+  const r = adminYeniKullaniciDogrula({
+    fullName: "  Ayşe Yılmaz ",
+    email: " Ayse@Ornek.com ",
+    username: "@Ayse.Yilmaz",
+    password: "",
+    girisBaglantisiGonder: true,
+  });
+  assert.ok("temiz" in r);
+  assert.deepEqual(r.temiz, {
+    fullName: "Ayşe Yılmaz",
+    email: "ayse@ornek.com",
+    username: "ayse.yilmaz",
+    password: undefined,
+    girisBaglantisiGonder: true,
+    locale: "tr",
+  });
+});
+
+test("yeni kullanıcı: ne şifre ne bağlantı varsa içeri girilemez, reddedilir", () => {
+  const r = adminYeniKullaniciDogrula({ fullName: "Ali Can", email: "a@b.co", username: "ali", girisBaglantisiGonder: false });
+  assert.ok("hata" in r);
+});
+
+test("yeni kullanıcı: geçici şifre 8-72 karakter", () => {
+  const temel = { fullName: "Ali Can", email: "a@b.co", username: "ali", girisBaglantisiGonder: false };
+  assert.ok("hata" in adminYeniKullaniciDogrula({ ...temel, password: "kisa" }));
+  assert.ok("hata" in adminYeniKullaniciDogrula({ ...temel, password: "x".repeat(73) }));
+  assert.ok("temiz" in adminYeniKullaniciDogrula({ ...temel, password: "yeterince-uzun" }));
+});
+
+test("yeni kullanıcı: geçersiz kullanıcı adı ve e-posta", () => {
+  const temel = { fullName: "Ali Can", email: "a@b.co", username: "ali", girisBaglantisiGonder: true };
+  assert.ok("hata" in adminYeniKullaniciDogrula({ ...temel, username: "Ali Can" }));
+  assert.ok("hata" in adminYeniKullaniciDogrula({ ...temel, email: "ali" }));
+  assert.ok("hata" in adminYeniKullaniciDogrula({ ...temel, fullName: "A" }));
 });

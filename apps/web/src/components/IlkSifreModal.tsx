@@ -86,7 +86,7 @@ export default function IlkSifreModal({ fullName, onTamam }: Props) {
           {fullName ? t("Hoş geldin, {ad}", { ad: fullName.split(" ")[0] }) : t("Hoş geldin")}
         </h2>
         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: c.textSecondary }}>
-          {t("Hesabını yöneticin açtı. Devam etmeden önce yalnızca senin bildiğin bir şifre belirle; bundan sonra e-posta adresin ve bu şifreyle giriş yaparsın.")}
+          {t("Bu hesap senin için açıldı. Devam etmeden önce yalnızca senin bildiğin bir şifre belirle; bundan sonra e-posta adresin ve bu şifreyle giriş yaparsın.")}
         </p>
         <input
           type="password"

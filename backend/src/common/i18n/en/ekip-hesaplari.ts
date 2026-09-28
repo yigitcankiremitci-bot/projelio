@@ -19,6 +19,17 @@ export const ekipHesaplari: TranslationDict = {
   "Bu kişiyi tanımıyorsan ya da bu e-postayı beklemiyorsan bağlantıya tıklama.":
     "If you don't know this person or weren't expecting this email, don't click the link.",
 
+  // ─────────────────────────────────────────────── Admin panelinden açılan hesap
+  "Projelio hesabın hazır": "Your Projelio account is ready",
+  "Senin için bir Projelio hesabı açıldı. Aşağıdaki düğmeyle içeri gir, kendi şifreni belirle ve kaldığın yerden devam et.":
+    "A Projelio account has been created for you. Use the button below to sign in, set your own password and pick up where you left off.",
+  "Bu e-postayı beklemiyorsan bağlantıya tıklama.": "If you weren't expecting this email, don't click the link.",
+  "Bu e-posta adresiyle zaten bir Projelio hesabı var.": "There's already a Projelio account with this email.",
+  "Bu kişi kendi şifresini zaten belirledi. Şifresini unuttuysa giriş ekranındaki “Şifremi unuttum”u kullanabilir.":
+    "This person has already set their own password. If they forgot it, they can use “Forgot password” on the sign-in screen.",
+  "Geçici bir şifre belirle ya da giriş bağlantısını e-postayla gönder.":
+    "Set a temporary password or send the sign-in link by email.",
+
   // ─────────────────────────────────────────────── Lio
   "{ad} için Projelio hesabı açılacak ve {eposta} adresine giriş bağlantısı gönderilecek.\nDepartman: {departmanlar}\nŞifreyi kişi ilk girişte kendisi belirler.":
     "A Projelio account will be created for {ad} and a sign-in link sent to {eposta}.\nDepartment: {departmanlar}\nThey'll set their own password on first sign-in.",

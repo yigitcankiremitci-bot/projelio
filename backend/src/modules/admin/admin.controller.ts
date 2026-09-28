@@ -9,7 +9,7 @@ import { DemoSifirlamaService } from "../demo/demo-sifirlama.service";
 import { DemoZiyaretService } from "../demo/demo-ziyaret.service";
 import { AdminKullanicilarService } from "./admin-kullanicilar.service";
 import { AdminMesajService } from "./admin-mesaj.service";
-import type { AdminMesajGirdisi } from "@projelio/shared";
+import type { AdminMesajGirdisi, AdminYeniKullaniciGirdisi } from "@projelio/shared";
 
 @Controller("admin")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
@@ -48,6 +48,12 @@ export class AdminController {
     return this.kullanicilar.liste();
   }
 
+  /** Birini sisteme kaydeder; kişi ilk girişte kendi şifresini belirler. */
+  @Post("kullanicilar")
+  hesapAc(@Body() body: Partial<AdminYeniKullaniciGirdisi>, @Req() req: any) {
+    return this.kullanicilar.hesapAc(req.user.userId, body);
+  }
+
   /** Bir ya da birden çok kullanıcıya (en fazla 200) bildirim ve/veya e-posta. */
   @Post("kullanicilar/mesaj")
   mesajGonder(@Body() body: Partial<AdminMesajGirdisi> & { userIds?: string[] }, @Req() req: any) {
@@ -58,6 +64,11 @@ export class AdminController {
   @Get("kullanicilar/:id")
   kullaniciDetayi(@Param("id", ParseUUIDPipe) id: string) {
     return this.kullanicilar.detay(id);
+  }
+
+  @Post("kullanicilar/:id/giris-baglantisi")
+  girisBaglantisiGonder(@Param("id", ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.kullanicilar.girisBaglantisiGonder(req.user.userId, id);
   }
 
   @Post("kullanicilar/:id/askiya-al")

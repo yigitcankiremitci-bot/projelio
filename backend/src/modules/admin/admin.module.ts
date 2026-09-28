@@ -9,9 +9,10 @@ import { AdminKullanicilarService } from "./admin-kullanicilar.service";
 import { AdminMesajService } from "./admin-mesaj.service";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { EmailModule } from "../auth/email.module";
+import { AuthModule } from "../auth/auth.module";
 
 @Module({
-  imports: [UsersModule, ProjectsModule, DemoModule, AiAssistantModule, NotificationsModule, EmailModule],
+  imports: [UsersModule, ProjectsModule, DemoModule, AiAssistantModule, NotificationsModule, EmailModule, AuthModule],
   controllers: [AdminController],
   providers: [AdminService, AdminKullanicilarService, AdminMesajService],
 })

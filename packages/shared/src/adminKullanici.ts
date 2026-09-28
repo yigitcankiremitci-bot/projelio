@@ -1,4 +1,6 @@
 import type { AccountType, UserRole } from "./types";
+import type { Locale } from "./i18n";
+import { KULLANICI_ADI_DESENI } from "./ekipHesaplari";
 
 /**
  * Admin paneli kullanıcı yönetimi — ortak tipler ve saf kararlar.
@@ -61,6 +63,11 @@ export interface AdminKullaniciSatiri {
   anonimlestirildi: boolean;
   /** Şifresi yok = yalnızca Google/Microsoft ile giriyor. */
   sifreliGiris: boolean;
+  /**
+   * Hesabı başkası (admin ya da ekip yöneticisi) açtı ve kişi henüz kendi
+   * şifresini belirlemedi (users.sifre_degistirmeli, migration 130).
+   */
+  ilkSifreBekliyor: boolean;
   durum: AdminKullaniciDurumu;
   kredi: { balance: number; lifetimePurchased: number; lifetimeSpent: number };
   /**
@@ -253,4 +260,68 @@ export function gercekEpostaMi(email: string | null | undefined): boolean {
   if (!email || !email.includes("@")) return false;
   const alan = email.toLowerCase().split("@").pop() ?? "";
   return !/\.(test|invalid|example|localhost)$/.test(alan) && !["example.com", "example.org", "example.net"].includes(alan);
+}
+
+// ============================================================ Hesap açma
+
+/**
+ * Admin panelinden hesap açma girdisi.
+ *
+ * Kişi ilk girişte HER ZAMAN kendi şifresini belirler: adminin koyduğu şifre
+ * yalnızca kapıyı açan geçici bir anahtar. Şifre boş bırakılırsa sunucu
+ * rastgele üretir ve kimse bilmez — kişi e-postadaki tek kullanımlık
+ * bağlantıyla girer.
+ */
+export interface AdminYeniKullaniciGirdisi {
+  fullName: string;
+  email: string;
+  username: string;
+  /** Geçici şifre; boşsa sunucu üretir. */
+  password?: string;
+  /** E-postayla tek kullanımlık giriş bağlantısı gönderilsin mi. */
+  girisBaglantisiGonder: boolean;
+  locale?: Locale;
+}
+
+export interface AdminYeniKullaniciSonucu {
+  userId: string;
+  epostaGonderildi: boolean;
+}
+
+const EPOSTA_DESENI = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Girdiyi doğrular ve temizler (sunucu ve form aynı koddan geçer). Hata
+ * mesajları sözlük anahtarı.
+ */
+export function adminYeniKullaniciDogrula(
+  girdi: Partial<AdminYeniKullaniciGirdisi>
+): { hata: string } | { temiz: AdminYeniKullaniciGirdisi } {
+  const fullName = typeof girdi.fullName === "string" ? girdi.fullName.trim() : "";
+  if (fullName.length < 2 || fullName.length > 120) return { hata: "Ad soyad 2-120 karakter olmalı." }; // dil:anahtar
+
+  const email = typeof girdi.email === "string" ? girdi.email.trim().toLowerCase() : "";
+  if (!EPOSTA_DESENI.test(email) || email.length > 254) return { hata: "Geçerli bir e-posta adresi gir." }; // dil:anahtar
+
+  const username = typeof girdi.username === "string" ? girdi.username.trim().replace(/^@/, "").toLowerCase() : "";
+  if (!KULLANICI_ADI_DESENI.test(username)) {
+    return { hata: "Kullanıcı adı 3-30 karakter olmalı; sadece küçük harf, rakam, nokta ve alt çizgi içerebilir." }; // dil:anahtar
+  }
+
+  const password = typeof girdi.password === "string" && girdi.password.length ? girdi.password : undefined;
+  // bcrypt 72 baytta keser (bkz. backend common/password.util.ts).
+  if (password !== undefined && (password.length < 8 || password.length > 72)) {
+    return { hata: "Şifre 8-72 karakter olmalı." }; // dil:anahtar
+  }
+
+  const girisBaglantisiGonder = girdi.girisBaglantisiGonder === true;
+  // İkisi de yoksa kişinin içeri girmesinin hiçbir yolu kalmaz: şifreyi kimse
+  // bilmiyor, bağlantı da gitmedi.
+  if (!password && !girisBaglantisiGonder) {
+    return { hata: "Geçici bir şifre belirle ya da giriş bağlantısını e-postayla gönder." }; // dil:anahtar
+  }
+
+  return {
+    temiz: { fullName, email, username, password, girisBaglantisiGonder, locale: girdi.locale === "en" ? "en" : "tr" },
+  };
 }

@@ -4,7 +4,7 @@ import { AiCreditOrdersService } from "../ai-assistant/ai-credit-orders.service"
 import { getWebAppUrl } from "../../common/config/env";
 import { describeError } from "../../common/network-errors";
 import { PayTRClient } from "./paytr.client";
-import { PayTRKartService } from "./paytr-kart.service";
+import { PayTRAbonelikService } from "./paytr-abonelik.service";
 import { paytrKullaniciBilgisi } from "./paytr-kullanici";
 import { kurusaCevir, siparisNumarasiCoz, siparisNumarasiUret, siparisOneki, telefonAlani } from "./paytr-imza";
 
@@ -34,7 +34,7 @@ export class PayTROdemeService {
     private supabase: SupabaseService,
     private orders: AiCreditOrdersService,
     private paytr: PayTRClient,
-    private kart: PayTRKartService
+    private abonelik: PayTRAbonelikService
   ) {}
 
   /** Arayüzün ödeme formunu açabilmesi için iframe token'ı üretir. */
@@ -97,8 +97,8 @@ export class PayTROdemeService {
     const merchantOid = String(govde.merchant_oid ?? "");
     // Tek Bildirim URL, birden çok akış: önek hangisine ait olduğunu söyler.
     const onek = siparisOneki(merchantOid);
-    if (onek === "KRT" || onek === "KRY") {
-      await this.kart.bildirimIsle(govde, onek);
+    if (onek === "ABN") {
+      await this.abonelik.bildirimIsle(govde);
       return;
     }
     const orderId = siparisNumarasiCoz(merchantOid);

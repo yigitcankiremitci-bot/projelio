@@ -37,25 +37,22 @@ export const billingApi = {
     subscriptions: (status?: string) =>
       api.get<Subscription[]>(`/billing/admin/subscriptions${status ? `?status=${status}` : ""}`),
     runRenewals: () => api.post<{ krediYuklenen: number; suresiDolan: number }>("/billing/admin/run-renewals", {}),
-    /**
-     * PayTR kart saklama denemesi (bkz. backend PayTRKartService). Kart verisi
-     * bu uçlara GİTMEZ: form alanları alınır, kart tarayıcıda girilir ve form
-     * doğrudan PayTR'ye POST edilir.
-     */
-    paytrKart: {
-      durum: () => api.get<PayTRKartDurumu>("/billing/admin/paytr-kart"),
-      form: (tutar: number) =>
-        api.post<{ action: string; alanlar: Record<string, string>; testMode: boolean }>("/billing/admin/paytr-kart/form", { tutar }),
-      tekrarlayan: (ctoken: string, tutar: number) =>
-        api.post<{ status: string; msg?: string; tryAgain?: boolean }>("/billing/admin/paytr-kart/tekrarlayan", { ctoken, tutar }),
-      sil: (ctoken: string) => api.post<{ ok: boolean }>("/billing/admin/paytr-kart/sil", { ctoken }),
-    },
   },
   /**
    * Lio Bakiyesi siparişi için PayTR ödeme formunu açar.
    * Tutar gönderilmez — sunucu siparişin kendi tutarını kullanır.
    */
   paytr: {
+    /**
+     * Abonelik formları: yalnızca gizli alanlar döner, kart tarayıcıda girilir
+     * ve form doğrudan PayTR'ye gider (bkz. components/PayTRKartFormu).
+     */
+    abonelik: (body: { planKey: string; period: string; scope?: string; organizationId?: string; onay: boolean }) =>
+      api.post<PayTRForm>("/billing/paytr/abonelik", body),
+    gecikmisOdeme: (subscriptionId: string, onay: boolean) =>
+      api.post<PayTRForm>(`/billing/paytr/abonelik/${subscriptionId}/odeme`, { onay }),
+    kartDegisim: (subscriptionId: string, onay: boolean) =>
+      api.post<PayTRForm>(`/billing/paytr/abonelik/${subscriptionId}/kart`, { onay }),
     bakiyeOdemesiBaslat: (orderId: string) =>
       api.post<{ token: string; iframeUrl: string; testMode: boolean }>(
         `/billing/paytr/lio-bakiyesi/${orderId}`,
@@ -64,32 +61,10 @@ export const billingApi = {
   },
 };
 
-export interface PayTRSakliKart {
-  ctoken: string;
-  last4: string;
-  requireCvv: boolean;
-  ay: string;
-  yil: string;
-  banka: string;
-  tur: string;
-  sema: string;
-}
-
-export interface PayTRKartDurumu {
-  testMode: boolean;
-  utokenVar: boolean;
-  sonBildirim: {
-    onek: string;
-    merchantOid: string;
-    status: string;
-    totalAmount: string;
-    failedReason: string | null;
-    alanlar: string[];
-    utokenGeldi: boolean;
-    zaman: string;
-  } | null;
-  kartlar: PayTRSakliKart[];
-  kartHatasi?: string;
+/** PayTR Direkt API formu: action + gizli alanlar (kart alanları YOK). */
+export interface PayTRForm {
+  action: string;
+  alanlar: Record<string, string>;
 }
 
 export interface BillingAdminPlanRef {

@@ -6,6 +6,7 @@ import { kabuktaMi } from "../lib/mobilKabuk";
 import { ApiError } from "../api/client";
 import { IconSparkle, IconStar } from "../components/icons";
 import Anahtar from "../components/Anahtar";
+import PayTRKartFormu from "../components/PayTRKartFormu";
 import { demoEpostasiMi } from "../lib/demoHesap";
 import { useLocale, useT } from "../lib/i18n";
 import { useCurrentUser } from "../lib/useCurrentUser";
@@ -23,6 +24,23 @@ import { bicimDili } from "../lib/i18n/depo";
 
 /** Ödeme dönüşünde çağırmak üzere jetonu saklarız (bkz. odemeDonusu). */
 const JETON_ANAHTARI = "projelio.billing.token";
+
+/**
+ * PayTR 3D'den dönünce aboneliğin DEĞİŞTİĞİNİ anlamak için forma gitmeden
+ * önceki hâli. Abonelik tarayıcının dönmesiyle değil PayTR'nin bildirimiyle
+ * işleniyor (birkaç saniye sürebilir); dönüşte ekran bu hâlden farklı bir
+ * abonelik görene kadar yeniler.
+ */
+const ONCEKI_DURUM_ANAHTARI = "projelio.billing.paytrOncesi";
+
+type KartFormuIstegi =
+  | { tur: "ilk"; plan: BillingPlanView; tutar: number }
+  | { tur: "elle"; abonelik: Subscription }
+  | { tur: "kart"; abonelik: Subscription };
+
+function abonelikIzi(a: Subscription | null): string {
+  return a ? [a.id, a.status, a.currentPeriodEnd ?? "", a.kartSon4 ?? ""].join("|") : "-";
+}
 
 const DURUM_METINLERI: Record<Subscription["status"], string> = {
   pending: "Ödeme bekleniyor", // dil:anahtar
@@ -63,6 +81,7 @@ export default function BillingPage() {
   const [islemde, setIslemde] = useState<string | null>(null);
   const [mesaj, setMesaj] = useState<{ tur: "iyi" | "kotu"; metin: string } | null>(null);
   const formKabi = useRef<HTMLDivElement | null>(null);
+  const [kartFormu, setKartFormu] = useState<KartFormuIstegi | null>(null);
 
   const yenile = useCallback((signal?: AbortSignal) => {
     return billingApi
@@ -117,6 +136,77 @@ export default function BillingPage() {
   }, [params, setParams, t, yenile]);
 
   /**
+   * PayTR 3D dönüşü (?odeme=bekleniyor | basarisiz). Dönüş ödemenin kanıtı
+   * DEĞİL: abonelik bildirimle işlenir. Ekran, forma gitmeden önceki hâlden
+   * farklı bir abonelik görene kadar birkaç saniyede bir yeniler.
+   */
+  useEffect(() => {
+    const odeme = params.get("odeme");
+    if (!odeme) return;
+    params.delete("odeme");
+    setParams(params, { replace: true });
+
+    let onceki: { iz: string; tur: string } | null = null;
+    try {
+      onceki = JSON.parse(sessionStorage.getItem(ONCEKI_DURUM_ANAHTARI) ?? "null");
+      sessionStorage.removeItem(ONCEKI_DURUM_ANAHTARI);
+    } catch {
+      /* depolama kapalı: yine de yenileyerek bekleriz */
+    }
+
+    if (odeme !== "bekleniyor") {
+      setMesaj({ tur: "kotu", metin: t("Ödeme tamamlanmadı. Kartından para çekilmedi; tekrar deneyebilirsin.") });
+      return;
+    }
+
+    setMesaj({ tur: "iyi", metin: t("Ödemen PayTR'den onay bekliyor…") });
+    let kalan = 15;
+    let iptal = false;
+    const bak = async () => {
+      if (iptal) return;
+      const guncel = await billingApi.overview().catch(() => null);
+      if (guncel) setVeri(guncel);
+      const iz = abonelikIzi(guncel?.subscription ?? null);
+      // Kart değişimi aboneliğin durumunu değiştirmez (past_due'da da yapılabilir);
+      // orada kartın son 4 hanesinin değişmesi yeterli.
+      const tamam = guncel?.subscription?.status === "active" || onceki?.tur === "kart";
+      if (guncel && iz !== (onceki?.iz ?? "-") && tamam) {
+        setMesaj({
+          tur: "iyi",
+          metin:
+            onceki?.tur === "kart"
+              ? t("Kartın güncellendi. Doğrulama için çekilen 1 ₺ iade ediliyor.")
+              : t("Ödemen alındı, paketin etkin. Makbuz e-posta adresine gönderildi."),
+        });
+        return;
+      }
+      kalan -= 1;
+      if (kalan <= 0) {
+        setMesaj({ tur: "kotu", metin: t("Ödeme onayı gecikiyor. Birkaç dakika sonra sayfayı yenile; sorun sürerse destekle iletişime geç.") });
+        return;
+      }
+      setTimeout(bak, 3000);
+    };
+    void bak();
+    return () => {
+      iptal = true;
+    };
+  }, [params, setParams, t]);
+
+  const kartFormunuAc = (istek: KartFormuIstegi) => {
+    try {
+      sessionStorage.setItem(
+        ONCEKI_DURUM_ANAHTARI,
+        JSON.stringify({ iz: abonelikIzi(veri?.subscription ?? null), tur: istek.tur })
+      );
+    } catch {
+      /* depolama kapalı: dönüşte yine yenilenir */
+    }
+    setMesaj(null);
+    setKartFormu(istek);
+  };
+
+  /**
    * iyzico'nun ödeme formunu sayfaya basar.
    *
    * innerHTML ile eklenen <script> etiketleri TARAYICI TARAFINDAN ÇALIŞTIRILMAZ
@@ -135,19 +225,9 @@ export default function BillingPage() {
     });
   };
 
-  const satinAl = async (plan: BillingPlanView) => {
-    setMesaj(null);
-    setIslemde(plan.key);
-    try {
-      const sonuc = await billingApi.checkout({ planKey: plan.key, period: donem });
-      sessionStorage.setItem(JETON_ANAHTARI, sonuc.token);
-      odemeFormunuAc(sonuc.checkoutFormContent);
-    } catch (hata) {
-      setMesaj({ tur: "kotu", metin: hata instanceof ApiError ? hata.message : t("Ödeme başlatılamadı.") });
-    } finally {
-      setIslemde(null);
-    }
-  };
+  // Web'de abonelik PayTR ile alınıyor (2026-09). iyzico akışı (checkout,
+  // odemeFormunuAc, kartGuncelle) eski iyzico abonelikleri için duruyor.
+  const satinAl = (plan: BillingPlanView, tutar: number) => kartFormunuAc({ tur: "ilk", plan, tutar });
 
   const iptalEt = async (abonelik: Subscription) => {
     if (!window.confirm(t("Paketin dönem sonuna kadar açık kalacak, sonra ücretsiz plana düşeceksin. İptal edilsin mi?"))) {
@@ -244,6 +324,7 @@ export default function BillingPage() {
           </div>
           <div style={{ fontSize: 13, opacity: 0.8 }}>
             {t(DURUM_METINLERI[abonelik.status])}
+            {abonelik.kartSon4 && ` · •••• ${abonelik.kartSon4}`}
             {abonelik.currentPeriodEnd &&
               ` · ${new Date(abonelik.currentPeriodEnd).toLocaleDateString(bicimDili())} ${
                 abonelik.cancelAtPeriodEnd ? t("tarihinde sona erecek") : t("tarihinde yenilenecek")
@@ -252,7 +333,9 @@ export default function BillingPage() {
 
           {abonelik.status === "past_due" && (
             <div style={{ fontSize: 13, marginTop: 12, opacity: 0.9, lineHeight: 1.5 }}>
-              {t("Son ödeme alınamadı. Erişimin dönem sonuna kadar sürüyor; kartını güncellersen kesinti olmaz.")}
+              {abonelik.source === "paytr"
+                ? t("Son ödeme alınamadı. Paketin açık; ödemeyi birkaç gün boyunca yeniden deneyeceğiz. Hemen ödemek ya da başka bir kart kullanmak için aşağıdaki düğmeye bas.")
+                : t("Son ödeme alınamadı. Erişimin dönem sonuna kadar sürüyor; kartını güncellersen kesinti olmaz.")}
             </div>
           )}
 
@@ -278,7 +361,30 @@ export default function BillingPage() {
                 </button>
               </>
             )}
-            {abonelik.source !== "iyzico" && (
+            {/* PayTR: ödeme/kart düğmeleri kabukta YOK (mağaza kuralı, iyzico'daki
+                gerekçenin aynısı); iptal kabukta da duruyor. */}
+            {abonelik.source === "paytr" && !abonelik.cancelAtPeriodEnd && (
+              <>
+                {!kabukta && abonelik.status === "past_due" && (
+                  <button onClick={() => kartFormunuAc({ tur: "elle", abonelik })} disabled={islemde !== null} style={koyuDugme(c)}>
+                    {t("Ödemeyi şimdi yap")}
+                  </button>
+                )}
+                {!kabukta && (
+                  <button
+                    onClick={() => kartFormunuAc({ tur: "kart", abonelik })}
+                    disabled={islemde !== null}
+                    style={koyuDugme(c, abonelik.status === "past_due")}
+                  >
+                    {t("Kartı değiştir")}
+                  </button>
+                )}
+                <button onClick={() => iptalEt(abonelik)} disabled={islemde !== null} style={koyuDugme(c, true)}>
+                  {islemde === "iptal" ? t("İptal ediliyor…") : t("Paketi iptal et")}
+                </button>
+              </>
+            )}
+            {abonelik.source !== "iyzico" && abonelik.source !== "paytr" && (
               <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.5 }}>
                 {abonelik.source === "app_store"
                   ? t("Bu paket App Store üzerinden alınmış; değişiklikler Ayarlar > Abonelikler'den yapılır.")
@@ -419,7 +525,7 @@ export default function BillingPage() {
                   </ul>
 
                   <button
-                    onClick={() => satinAl(plan)}
+                    onClick={() => tahsilat && satinAl(plan, tahsilat.amount)}
                     disabled={!satinAlinabilir || islemde !== null}
                     style={{
                       marginTop: "auto",
@@ -461,6 +567,39 @@ export default function BillingPage() {
 
       {/* iyzico ödeme formu buraya basılır (kendi açılır penceresini kurar). */}
       <div ref={formKabi} />
+
+      {kartFormu && (
+        <PayTRKartFormu
+          baslik={
+            kartFormu.tur === "ilk"
+              ? t("{plan} paketine geç", { plan: t(kartFormu.plan.name) })
+              : kartFormu.tur === "elle"
+                ? t("Ödemeyi şimdi yap")
+                : t("Ödeme kartını değiştir")
+          }
+          ozet={
+            kartFormu.tur === "ilk"
+              ? t("{donem} ödeme: {tutar}. Bir sonraki dönem aynı karttan otomatik yenilenir; istediğin zaman iptal edebilirsin.", {
+                  donem: donem === "yearly" ? t("Yıllık") : t("Aylık"),
+                  tutar: tlYaz(kartFormu.tutar),
+                })
+              : kartFormu.tur === "elle"
+                ? t("Bekleyen dönem ödemesi: {tutar}. Bu kart sonraki yenilemelerde de kullanılır.", {
+                    tutar: kartFormu.abonelik.priceAmount ? tlYaz(kartFormu.abonelik.priceAmount) : "—",
+                  })
+                : t("Kartını doğrulamak için 1 ₺ çekilir ve hemen iade edilir. Sonraki yenilemeler bu karttan yapılır.")
+          }
+          dugmeMetni={kartFormu.tur === "kart" ? t("Kartı doğrula") : t("Öde")}
+          formuAl={(onay) =>
+            kartFormu.tur === "ilk"
+              ? billingApi.paytr.abonelik({ planKey: kartFormu.plan.key, period: donem, onay })
+              : kartFormu.tur === "elle"
+                ? billingApi.paytr.gecikmisOdeme(kartFormu.abonelik.id, onay)
+                : billingApi.paytr.kartDegisim(kartFormu.abonelik.id, onay)
+          }
+          onKapat={() => setKartFormu(null)}
+        />
+      )}
     </div>
   );
 }

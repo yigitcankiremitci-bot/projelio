@@ -3372,7 +3372,7 @@ export interface WhatsappStatusEvent {
 export type BillingPlanKey = "free" | "starter" | "pro" | "business";
 export type BillingPeriod = "monthly" | "yearly";
 export type SubscriptionStatus = "pending" | "trialing" | "active" | "past_due" | "canceled" | "expired";
-export type SubscriptionSource = "iyzico" | "app_store" | "play_store" | "manual";
+export type SubscriptionSource = "iyzico" | "app_store" | "play_store" | "manual" | "paytr";
 
 export interface Subscription {
   id: string;
@@ -3392,6 +3392,8 @@ export interface Subscription {
   currency: string;
   /** Vitrin fiyatı (USD) — ilanla karşılaştırmak için. */
   priceUsd?: number;
+  /** PayTR aboneliğinde çekimin yapılacağı saklı kartın son 4 hanesi. */
+  kartSon4?: string;
   createdAt: string;
 }
 

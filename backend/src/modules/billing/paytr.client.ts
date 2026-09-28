@@ -4,6 +4,7 @@ import {
   bildirimGecerliMi,
   direktOdemeTokeni,
   durumSorguTokeni,
+  iadeTokeni,
   iframeTokeni,
   kartListesiTokeni,
   kartSilmeTokeni,
@@ -34,6 +35,7 @@ const IFRAME_TABANI = "https://www.paytr.com/odeme/guvenli";
 export const DIREKT_ODEME_UCU = "https://www.paytr.com/odeme";
 const KART_LISTESI_UCU = "https://www.paytr.com/odeme/capi/list";
 const KART_SILME_UCU = "https://www.paytr.com/odeme/capi/delete";
+const IADE_UCU = "https://www.paytr.com/odeme/iade";
 
 export interface OdemeBaslatParametreleri {
   merchantOid: string;
@@ -499,6 +501,40 @@ export class PayTRClient {
     if (sonuc?.status !== "success") {
       this.logger.error(`PayTR kart silme reddedildi: ${sonuc?.err_msg ?? "sebep bildirilmedi"}`);
       throw new PayTRHatasi("Kart silinemedi."); // dil:anahtar
+    }
+  }
+
+  /**
+   * Başarılı bir ödemeyi (kısmen ya da tamamen) iade eder. Bugün tek kullanıcısı
+   * kart değişimindeki 1 TL'lik doğrulama çekimi.
+   *
+   * Hata FIRLATIR; çağıran yakalayıp log'a yazmalı — iade edilemeyen tutar
+   * yöneticinin PayTR panelinden elle iade etmesi gereken bir borçtur.
+   */
+  async iade(merchantOid: string, tutar: number): Promise<void> {
+    if (!this.isConfigured()) {
+      throw new ServiceUnavailableException("Ödeme sağlayıcısı yapılandırılmamış.");
+    }
+    const returnAmount = ondalikTutar(tutar);
+    const govde = new URLSearchParams({
+      merchant_id: this.merchantId,
+      merchant_oid: merchantOid,
+      return_amount: returnAmount,
+      paytr_token: iadeTokeni(
+        { merchantId: this.merchantId, merchantOid, returnAmount },
+        this.merchantKey,
+        this.merchantSalt
+      ),
+    });
+    const yanit = await fetchWithTimeout(
+      IADE_UCU,
+      { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: govde.toString() },
+      15_000
+    );
+    if (!yanit.ok) throw new PayTRHatasi(`PayTR iade isteği başarısız: HTTP ${yanit.status}`);
+    const sonuc = (await yanit.json()) as { status?: string; err_no?: string; err_msg?: string };
+    if (sonuc?.status !== "success") {
+      throw new PayTRHatasi(`PayTR iadeyi reddetti: ${sonuc?.err_no ?? ""} ${sonuc?.err_msg ?? "sebep bildirilmedi"}`);
     }
   }
 }

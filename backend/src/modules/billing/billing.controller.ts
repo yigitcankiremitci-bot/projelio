@@ -3,6 +3,7 @@ import { AuthGuard } from "@nestjs/passport";
 import { BillingService } from "./billing.service";
 import { StorePurchasesService } from "./store-purchases.service";
 import { PayTROdemeService } from "./paytr-odeme.service";
+import { PayTRAbonelikService } from "./paytr-abonelik.service";
 
 /**
  * Abonelik ekranının uçları.
@@ -17,8 +18,34 @@ export class BillingController {
   constructor(
     private billing: BillingService,
     private store: StorePurchasesService,
-    private paytrOdeme: PayTROdemeService
+    private paytrOdeme: PayTROdemeService,
+    private paytrAbonelik: PayTRAbonelikService
   ) {}
+
+  /*
+   * PayTR abonelik formları. Üçü de yalnızca GİZLİ ALANLARI döner; kart
+   * bilgisini müşteri tarayıcıda girer ve form doğrudan PayTR'ye gider.
+   * Tutar gövdeden ALINMAZ, sunucu hesaplar. `onay` = "her dönem kayıtlı
+   * kartımdan otomatik yenilensin" kutusu; sunucuda da zorunlu.
+   */
+
+  @Post("paytr/abonelik")
+  paytrAbonelikFormu(
+    @Body() body: { planKey: string; period: string; scope?: string; organizationId?: string; onay?: boolean },
+    @Req() req: any
+  ) {
+    return this.paytrAbonelik.abonelikFormu(req.user.userId, body ?? ({} as any), req.ip ?? "");
+  }
+
+  @Post("paytr/abonelik/:id/odeme")
+  paytrGecikmisOdeme(@Param("id") id: string, @Body() body: { onay?: boolean }, @Req() req: any) {
+    return this.paytrAbonelik.gecikmisOdemeFormu(req.user.userId, id, req.ip ?? "", body?.onay);
+  }
+
+  @Post("paytr/abonelik/:id/kart")
+  paytrKartDegisim(@Param("id") id: string, @Body() body: { onay?: boolean }, @Req() req: any) {
+    return this.paytrAbonelik.kartDegisimFormu(req.user.userId, id, req.ip ?? "", body?.onay);
+  }
 
   /**
    * Lio Bakiyesi siparişi için PayTR ödeme formunu açar.

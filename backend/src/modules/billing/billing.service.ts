@@ -14,10 +14,11 @@ import { demoHesabindaYasak } from "../../common/demo-hesap";
 import { getWebAppUrl } from "../../common/config/env";
 import { BillingSettingsService, type OdemeSaglayici } from "./billing-settings.service";
 import { IyzicoClient, IyzicoHatasi } from "./iyzico.client";
+import { PayTRClient } from "./paytr.client";
+import { toleransSonu } from "./paytr-abonelik-takvim";
 import { abonelikTutari, aylikKarsilikTl } from "./abonelik-tutari";
 import {
   ayEkle,
-  krediAyiBasi,
   findPlan,
   FREE_PLAN,
   isBillingPeriod,
@@ -29,12 +30,13 @@ import {
   type BillingPeriod,
   type Plan,
   type PlanKey,
+  yillikAylikYukleme,
 } from "./billing.plans";
 import { hataMetni } from "../../common/i18n/index";
 
 export type AbonelikDurumu = "pending" | "trialing" | "active" | "past_due" | "canceled" | "expired";
 export type AbonelikKapsami = "user" | "organization";
-export type AbonelikKaynagi = OdemeSaglayici | "manual";
+export type AbonelikKaynagi = OdemeSaglayici | "manual" | "paytr";
 
 export interface Abonelik {
   id: string;
@@ -54,6 +56,8 @@ export interface Abonelik {
   priceAmount?: number;
   currency: string;
   priceUsd?: number;
+  /** PayTR: çekimin yapılacağı saklı kartın son 4 hanesi. */
+  kartSon4?: string;
   createdAt: string;
 }
 
@@ -91,6 +95,7 @@ function mapAbonelik(row: any): Abonelik {
     priceAmount: row.price_amount === null || row.price_amount === undefined ? undefined : Number(row.price_amount),
     currency: row.currency ?? "TRY",
     priceUsd: row.price_usd === null || row.price_usd === undefined ? undefined : Number(row.price_usd),
+    kartSon4: row.kart_son4 ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -118,17 +123,20 @@ export class BillingService {
   private readonly credits: AiCreditsService;
   private readonly settings: BillingSettingsService;
   private readonly iyzico: IyzicoClient;
+  private readonly paytr: PayTRClient;
 
   constructor(
     @Inject(SupabaseService) supabase: SupabaseService,
     @Inject(AiCreditsService) credits: AiCreditsService,
     @Inject(BillingSettingsService) settings: BillingSettingsService,
-    @Inject(IyzicoClient) iyzico: IyzicoClient
+    @Inject(IyzicoClient) iyzico: IyzicoClient,
+    @Inject(PayTRClient) paytr: PayTRClient
   ) {
     this.supabase = supabase;
     this.credits = credits;
     this.settings = settings;
     this.iyzico = iyzico;
+    this.paytr = paytr;
   }
 
   // ==================================================================== Vitrin
@@ -195,8 +203,10 @@ export class BillingService {
         features: plan.features,
       })),
       subscription: abonelik,
-      paymentConfigured: this.iyzico.isConfigured(),
-      testMode: this.iyzico.isConfigured() && !this.iyzico.isLive(),
+      // Web'de abonelik PayTR'den alınıyor (2026-09); iyzico kodu duruyor ama
+      // satın alma düğmeleri ona bağlı değil.
+      paymentConfigured: this.paytr.isConfigured(),
+      testMode: this.paytr.isConfigured() && this.paytr.isTestMode(),
       usdTryRate: kur,
     };
   }
@@ -283,7 +293,15 @@ export class BillingService {
    */
   private donemGecerli(abonelik: Abonelik): boolean {
     if (!abonelik.currentPeriodEnd) return abonelik.status === "active" || abonelik.status === "trialing";
-    return new Date(abonelik.currentPeriodEnd).getTime() > Date.now();
+    const bitis = new Date(abonelik.currentPeriodEnd);
+    // PayTR'de yenilemeyi biz deniyoruz ve vade geçtikten sonra 14 gün daha
+    // deniyoruz; bu sürede erişim açık kalmalı (kullanıcı kararı, 2026-09-28).
+    // Aktif ama vadesi geçmiş satır da aynı durumda: saat başı iş henüz
+    // çekmemiş olabilir, bir saatlik gecikme erişimi kesmemeli.
+    if (abonelik.source === "paytr" && (abonelik.status === "past_due" || abonelik.status === "active")) {
+      return toleransSonu(bitis).getTime() > Date.now();
+    }
+    return bitis.getTime() > Date.now();
   }
 
   // ================================================================== Satın alma
@@ -300,25 +318,10 @@ export class BillingService {
     userId: string,
     istek: { planKey: string; period: string; scope?: string; organizationId?: string }
   ): Promise<{ token: string; checkoutFormContent: string }> {
-    demoHesabindaYasak(userId, "abonelik satın alma");
-
-    const { planKey, period, scope, organizationId } = this.istegiDogrula(istek);
     if (!this.iyzico.isConfigured()) {
       throw new ServiceUnavailableException("Ödeme sağlayıcısı henüz yapılandırılmamış.");
     }
-
-    if (scope === "organization") await this.organizasyonSahibiMi(userId, organizationId!);
-
-    // Yürürlükte bir abonelik varsa ikincisini SATTIRMIYORUZ: iki abonelik iki
-    // kez tahsilat demek ve hangisinin geçerli olduğu belirsizleşir. İPTAL
-    // EDİLMİŞ abonelik engel değil — fikrini değiştiren kişi dönem sonunu
-    // beklemeden geri dönebilmeli (bkz. YURURLUKTE).
-    const mevcut = scope === "user" ? await this.aktifAbonelik(userId) : await this.organizasyonAboneligi(organizationId!);
-    if (mevcut && YURURLUKTE.includes(mevcut.status)) {
-      throw new ConflictException(
-        "Zaten bir paketin var. Değiştirmek için önce mevcut aboneliği iptal et ya da destekten yardım iste."
-      );
-    }
+    const { planKey, period, scope, organizationId } = await this.satinAlmaOnKontrol(userId, istek);
 
     const ref = await this.settings.planRef("iyzico", planKey, period);
     if (!ref?.referenceCode) {
@@ -361,6 +364,33 @@ export class BillingService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Satın almadan önceki ortak kontroller (iyzico ve PayTR aynı kuraldan geçer):
+   * demo hesabı, istek geçerliliği, şirket sahipliği, yürürlükteki abonelik.
+   */
+  async satinAlmaOnKontrol(
+    userId: string,
+    istek: { planKey: string; period: string; scope?: string; organizationId?: string }
+  ): Promise<{ planKey: PlanKey; period: BillingPeriod; scope: AbonelikKapsami; organizationId?: string }> {
+    demoHesabindaYasak(userId, "abonelik satın alma");
+    const dogrulanmis = this.istegiDogrula(istek);
+    const { scope, organizationId } = dogrulanmis;
+
+    if (scope === "organization") await this.organizasyonSahibiMi(userId, organizationId!);
+
+    // Yürürlükte bir abonelik varsa ikincisini SATTIRMIYORUZ: iki abonelik iki
+    // kez tahsilat demek ve hangisinin geçerli olduğu belirsizleşir. İPTAL
+    // EDİLMİŞ abonelik engel değil — fikrini değiştiren kişi dönem sonunu
+    // beklemeden geri dönebilmeli (bkz. YURURLUKTE).
+    const mevcut = scope === "user" ? await this.aktifAbonelik(userId) : await this.organizasyonAboneligi(organizationId!);
+    if (mevcut && YURURLUKTE.includes(mevcut.status)) {
+      throw new ConflictException(
+        "Zaten bir paketin var. Değiştirmek için önce mevcut aboneliği iptal et ya da destekten yardım iste."
+      );
+    }
+    return dogrulanmis;
   }
 
   /**
@@ -425,6 +455,13 @@ export class BillingService {
     baslangic: Date;
     /** Mağazanın doğruladığı gerçek dönem sonu; yoksa katalog döneminden hesaplanır. */
     bitis?: Date;
+    /**
+     * Gerçekten tahsil edilen tutar (PayTR). Verilmezse plan tablosundaki
+     * tutar yazılır — iyzico'da tutar planda sabit olduğu için ikisi aynı.
+     */
+    fiyat?: { amount: number; currency: string };
+    /** PayTR: çekimin yapılacağı saklı kart. */
+    kart?: { ctoken: string; son4: string };
   }): Promise<Abonelik> {
     const mevcut = await this.abonelikSaglayiciReferansiyla(params.source, params.providerRef);
     if (mevcut && mevcut.userId !== params.userId) {
@@ -435,7 +472,11 @@ export class BillingService {
     }
 
     const plan = findPlan(params.planKey) ?? FREE_PLAN;
-    const ref = await this.settings.planRef(params.source === "manual" ? "iyzico" : params.source, params.planKey, params.period);
+    // PayTR ve elle açılan abonelikler web'in TL tutar satırlarını kullanıyor;
+    // o satırların sağlayıcı adı tabloda hâlâ "iyzico" (bkz. billing-admin TL_SAGLAYICI).
+    const refSaglayici: OdemeSaglayici =
+      params.source === "manual" || params.source === "paytr" ? "iyzico" : params.source;
+    const ref = await this.settings.planRef(refSaglayici, params.planKey, params.period);
     const bitis = params.bitis ?? ayEkle(params.baslangic, periodMonths(params.period));
 
     const { data, error } = await this.supabase.client
@@ -455,9 +496,10 @@ export class BillingService {
           current_period_end: bitis.toISOString(),
           cancel_at_period_end: false,
           canceled_at: null,
-          price_amount: ref?.priceAmount ?? null,
-          currency: ref?.currency ?? "TRY",
+          price_amount: params.fiyat?.amount ?? ref?.priceAmount ?? null,
+          currency: params.fiyat?.currency ?? ref?.currency ?? "TRY",
           price_usd: planPriceUsd(plan, params.period),
+          ...(params.kart ? { paytr_ctoken: params.kart.ctoken, kart_son4: params.kart.son4 } : {}),
           updated_at: new Date().toISOString(),
         },
         { onConflict: "source,provider_ref" }
@@ -596,7 +638,7 @@ export class BillingService {
       throw new ConflictException("Bu abonelik zaten iptal edilmiş.");
     }
 
-    if (abonelik.source !== "iyzico") {
+    if (abonelik.source !== "iyzico" && abonelik.source !== "paytr") {
       // Mağaza aboneliği bizden iptal EDİLEMEZ; Apple/Google kendi kurallarını
       // uygular ve iptali yalnızca kendi arayüzünden kabul eder.
       throw new BadRequestException(
@@ -608,7 +650,10 @@ export class BillingService {
       );
     }
 
-    if (abonelik.providerRef) {
+    // PayTR'de iptal edilecek bir sağlayıcı aboneliği YOK: yenilemeyi biz
+    // başlatıyoruz, iptal edilmiş satır saat başı işte hiç seçilmez. Saklı kart
+    // PayTR'de kalır; müşteri isterse Paketler ekranından siler.
+    if (abonelik.source === "iyzico" && abonelik.providerRef) {
       try {
         await this.iyzico.iptalEt(abonelik.providerRef);
       } catch (error) {
@@ -801,26 +846,43 @@ export class BillingService {
       this.logger.error(`Paket birimleri sona erdirilemedi: ${(error as Error).message}`);
     }
 
+    // PayTR'nin past_due satırları BURADA KAPATILMAZ: vadeden sonra 14 gün
+    // yeniden deneniyor ve beşinci deneme düşünce PayTRAbonelikService kapatıyor.
+    // Burada kapatmak, vade gecesi ilk başarısız çekimde aboneliği bitirirdi.
     const { data: suresiDolanlar, error: dolanHata } = await this.supabase.client
       .from("subscriptions")
       .update({ status: "expired", updated_at: simdi.toISOString() })
-      .in("status", ["canceled", "past_due"])
+      .or("status.eq.canceled,and(status.eq.past_due,source.neq.paytr)")
       .lt("current_period_end", simdi.toISOString())
       .select("id");
     if (dolanHata) throw dolanHata;
 
-    const { data: aktifler, error: aktifHata } = await this.supabase.client
+    // İptal edilmiş yıllık abonelik de dönem sonuna kadar aylık bakiye alır
+    // (bkz. yillikAylikYukleme). Yürürlükteki satırlar, iptalden sonra yeni
+    // paket alınıp alınmadığını anlamak için aynı sorguda.
+    const { data: yilliklar, error: aktifHata } = await this.supabase.client
       .from("subscriptions")
       .select("*")
-      .in("status", ["active", "trialing"])
-      .eq("period", "yearly");
+      .in("status", ["active", "trialing", "canceled"])
+      .eq("period", "yearly")
+      .gt("current_period_end", simdi.toISOString());
     if (aktifHata) throw aktifHata;
+    const { data: yururluktekiler, error: yururlukHata } = await this.supabase.client
+      .from("subscriptions")
+      .select("id, scope, user_id, organization_id, created_at")
+      .in("status", YURURLUKTE);
+    if (yururlukHata) throw yururlukHata;
 
     let krediYuklenen = 0;
-    for (const row of aktifler ?? []) {
+    for (const row of yilliklar ?? []) {
       const abonelik = mapAbonelik(row);
-      if (!abonelik.currentPeriodStart) continue;
-      const donemBasi = krediAyiBasi(new Date(abonelik.currentPeriodStart), simdi);
+      const yenisiYururlukte = (yururluktekiler ?? []).some(
+        (y: any) =>
+          y.id !== row.id &&
+          y.created_at > row.created_at &&
+          (row.scope === "organization" ? y.organization_id === row.organization_id : y.user_id === row.user_id && y.scope === "user")
+      );
+      const donemBasi = yillikAylikYukleme({ ...abonelik, yenisiYururlukte }, simdi);
       if (!donemBasi) continue;
       try {
         if (await this.krediYukle(abonelik, donemBasi)) krediYuklenen += 1;
@@ -849,7 +911,7 @@ export class BillingService {
 
   // ================================================================ Yardımcılar
 
-  private istegiDogrula(istek: { planKey: string; period: string; scope?: string; organizationId?: string }): {
+  istegiDogrula(istek: { planKey: string; period: string; scope?: string; organizationId?: string }): {
     planKey: PlanKey;
     period: BillingPeriod;
     scope: AbonelikKapsami;
@@ -868,7 +930,7 @@ export class BillingService {
   }
 
   /** Şirket aboneliğini yalnızca şirket sahibi alabilir — fatura sahibi o olacak. */
-  private async organizasyonSahibiMi(userId: string, organizationId: string): Promise<void> {
+  async organizasyonSahibiMi(userId: string, organizationId: string): Promise<void> {
     const { data, error } = await this.supabase.client
       .from("organizations")
       .select("owner_id")
@@ -881,7 +943,7 @@ export class BillingService {
     }
   }
 
-  private async abonelikBul(id: string): Promise<Abonelik> {
+  async abonelikBul(id: string): Promise<Abonelik> {
     const { data, error } = await this.supabase.client.from("subscriptions").select("*").eq("id", id).maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException("Abonelik bulunamadı.");

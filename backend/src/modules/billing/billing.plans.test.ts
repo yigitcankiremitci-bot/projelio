@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { ayEkle, findPlan, krediAyiBasi, PLANS, planPriceUsd, SATIN_ALINABILIR, YEARLY_MONTHS } from "./billing.plans";
+import { ayEkle, findPlan, krediAyiBasi, PLANS, planPriceUsd, SATIN_ALINABILIR, YEARLY_MONTHS, yillikAylikYukleme } from "./billing.plans";
 
 test("vitrin fiyatları duyurulan liste ile birebir aynı", () => {
   // Bu sayılar tanıtım sitesinde ve mağaza listelerinde yazılı. Değiştirmek
@@ -99,4 +99,32 @@ test("ayın 31'inde başlayan yıllık abonelik şubatta kaymaz", () => {
   assert.equal(krediAyiBasi(baslangic, new Date("2026-03-01T00:00:00Z"))!.toISOString(), "2026-02-28T09:00:00.000Z");
   // Mart'ta yeniden 31'ine döner: ay sonuna sabitleme kalıcı kayma yaratmamalı.
   assert.equal(krediAyiBasi(baslangic, new Date("2026-04-01T00:00:00Z"))!.toISOString(), "2026-03-31T09:00:00.000Z");
+});
+
+test("iptal edilmiş yıllık abone dönem sonuna kadar aylık bakiyesini alır", () => {
+  const a = {
+    status: "canceled",
+    currentPeriodStart: "2026-01-07T09:00:00.000Z",
+    currentPeriodEnd: "2027-01-07T09:00:00.000Z",
+    yenisiYururlukte: false,
+  };
+  assert.equal(yillikAylikYukleme(a, new Date("2026-05-10T00:00:00Z"))!.toISOString(), "2026-05-07T09:00:00.000Z");
+  // Dönem bittikten sonra yükleme yok.
+  assert.equal(yillikAylikYukleme(a, new Date("2027-01-08T00:00:00Z")), null);
+});
+
+test("iptalden sonra yeni paket alındıysa eski yıllık abonelik yüklemez", () => {
+  const a = {
+    status: "canceled",
+    currentPeriodStart: "2026-01-07T09:00:00.000Z",
+    currentPeriodEnd: "2027-01-07T09:00:00.000Z",
+    yenisiYururlukte: true,
+  };
+  assert.equal(yillikAylikYukleme(a, new Date("2026-05-10T00:00:00Z")), null);
+});
+
+test("etkin yıllık abone yükler, ödemesi düşmüş yıllık abone yüklemez", () => {
+  const temel = { currentPeriodStart: "2026-01-07T09:00:00.000Z", currentPeriodEnd: "2027-01-07T09:00:00.000Z", yenisiYururlukte: false };
+  assert.ok(yillikAylikYukleme({ ...temel, status: "active" }, new Date("2026-03-10T00:00:00Z")));
+  assert.equal(yillikAylikYukleme({ ...temel, status: "past_due" }, new Date("2026-03-10T00:00:00Z")), null);
 });

@@ -6,6 +6,7 @@ import {
   bildirimHash,
   direktOdemeTokeni,
   durumSorguTokeni,
+  iadeTokeni,
   iframeTokeni,
   kartListesiTokeni,
   kartSilmeTokeni,
@@ -228,11 +229,24 @@ test("kart silme tokeninde ctoken utoken'dan ÖNCE gelir", () => {
 
 test("önekli sipariş numarası kendi önekiyle çözülür, başkasınınkiyle çözülmez", () => {
   const userId = "3f1a9c2e-7b4d-4a51-9c33-0d2e8f6a1b47";
-  const oid = siparisNumarasiUret(userId, 1758184800000, "KRT");
-  assert.equal(siparisOneki(oid), "KRT");
-  assert.equal(siparisNumarasiCoz(oid, "KRT"), userId);
-  // Kart saklama bildirimi Lio Bakiyesi siparişi sanılmamalı.
+  const oid = siparisNumarasiUret(userId, 1758184800000, "ABN");
+  assert.equal(siparisOneki(oid), "ABN");
+  assert.equal(siparisNumarasiCoz(oid, "ABN"), userId);
+  // Abonelik bildirimi Lio Bakiyesi siparişi sanılmamalı.
   assert.equal(siparisNumarasiCoz(oid), null);
   assert.equal(siparisOneki(siparisNumarasiUret(userId)), "LIO");
   assert.equal(siparisOneki("XYZ123"), null);
+});
+
+test("iade tokeni merchant_id + oid + tutar + salt sırasıyla üretilir", () => {
+  const beklenen = createHmac("sha256", KEY).update("750172" + "ABN1" + "1.00" + SALT, "utf8").digest("base64");
+  assert.equal(iadeTokeni({ merchantId: "750172", merchantOid: "ABN1", returnAmount: "1.00" }, KEY, SALT), beklenen);
+});
+
+test("abonelik ödemesinin öneki ABN, satır kimliğine geri çözülür", () => {
+  const odemeId = "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d";
+  const oid = siparisNumarasiUret(odemeId, 1758184800000, "ABN");
+  assert.equal(siparisOneki(oid), "ABN");
+  assert.equal(siparisNumarasiCoz(oid, "ABN"), odemeId);
+  assert.ok(oid.length <= 64);
 });

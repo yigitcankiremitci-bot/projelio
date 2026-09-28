@@ -185,6 +185,21 @@ export function kartSilmeTokeni(
 }
 
 /**
+ * İade API token'ı: merchant_id + merchant_oid + return_amount + merchant_salt.
+ * return_amount NOKTALI ondalık TL ("10.25") — kuruş değil (bkz. ondalikTutar).
+ * Sıra PayTR İade API dokümanından (dev.paytr.com/iade-api).
+ */
+export function iadeTokeni(
+  params: { merchantId: string; merchantOid: string; returnAmount: string },
+  merchantKey: string,
+  merchantSalt: string
+): string {
+  return createHmac("sha256", merchantKey)
+    .update(params.merchantId + params.merchantOid + params.returnAmount + merchantSalt, "utf8")
+    .digest("base64");
+}
+
+/**
  * Sipariş numarası (merchant_oid) üretimi ve çözümü.
  *
  * PayTR sipariş numarasının ALFANUMERİK ve en fazla 64 karakter olmasını
@@ -205,10 +220,10 @@ const UUID_UZUNLUK = 32;
  * URL'ye geliyor. Önekler 3 harf ve birbirinin başı değil; yeni akış eklerken
  * bu listeye ekle, çakışan önek bir akışın bildirimini ötekine yönlendirir.
  *   LIO: Lio Bakiyesi siparişi (uuid = ai_credit_orders.id)
- *   KRT: kart saklama ödemesi (uuid = kullanıcı)
- *   KRY: saklı karttan tekrarlayan çekim (uuid = kullanıcı)
+ *   ABN: abonelik ödemesi (uuid = paytr_abonelik_odemeleri.id)
+ * (KRT/KRY 2026-09-28'deki kart saklama denemesinde kullanıldı, deneme kaldırıldı.)
  */
-export type SiparisOneki = "LIO" | "KRT" | "KRY";
+export type SiparisOneki = "LIO" | "ABN";
 
 export function siparisNumarasiUret(orderId: string, simdi = Date.now(), onek: SiparisOneki = OID_ONEK): string {
   return onek + orderId.replace(/-/g, "") + simdi.toString(36);
@@ -217,7 +232,7 @@ export function siparisNumarasiUret(orderId: string, simdi = Date.now(), onek: S
 /** Sipariş numarasının öneki; tanınmazsa null. */
 export function siparisOneki(merchantOid: string): SiparisOneki | null {
   const onek = merchantOid?.slice(0, 3);
-  return onek === "LIO" || onek === "KRT" || onek === "KRY" ? onek : null;
+  return onek === "LIO" || onek === "ABN" ? onek : null;
 }
 
 /** Bildirimden gelen sipariş numarasını tireli UUID'ye geri çevirir; tanınmazsa null. */

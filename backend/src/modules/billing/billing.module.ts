@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AiAssistantModule } from "../ai-assistant/ai-assistant.module";
+import { EmailModule } from "../auth/email.module";
 import { AppleStoreClient } from "./apple-store.client";
 import { BillingAdminController } from "./billing-admin.controller";
 import { BillingPublicController } from "./billing-public.controller";
@@ -10,6 +11,7 @@ import { BillingController } from "./billing.controller";
 import { BillingService } from "./billing.service";
 import { GooglePlayClient } from "./google-play.client";
 import { IyzicoClient } from "./iyzico.client";
+import { PayTRAbonelikService } from "./paytr-abonelik.service";
 import { PayTRKartService } from "./paytr-kart.service";
 import { PayTROdemeService } from "./paytr-odeme.service";
 import { PayTRModule } from "./paytr.module";
@@ -27,7 +29,7 @@ import { TcmbKuruService } from "./tcmb-kuru.service";
  * SupabaseService global modülden geliyor.
  */
 @Module({
-  imports: [AiAssistantModule, PayTRModule],
+  imports: [AiAssistantModule, PayTRModule, EmailModule],
   controllers: [BillingController, BillingPublicController, BillingWebhookController, BillingAdminController],
   providers: [
     BillingService,
@@ -35,6 +37,7 @@ import { TcmbKuruService } from "./tcmb-kuru.service";
     IyzicoClient,
     PayTROdemeService,
     PayTRKartService,
+    PayTRAbonelikService,
     AppleStoreClient,
     GooglePlayClient,
     StorePurchasesService,

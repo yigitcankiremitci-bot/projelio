@@ -199,3 +199,32 @@ export function krediAyiBasi(donemBasi: Date, simdi: Date): Date | null {
   }
   return null;
 }
+
+/**
+ * Yıllık aboneliğin bu ayki bakiye yüklemesinin dönem başı; yükleme gerekmiyorsa null.
+ *
+ * İPTAL EDİLMİŞ YILLIK ABONE DE ALIR, dönem sonuna kadar: parayı bir yıl için
+ * peşin ödedi ve erişimi dönem sonuna kadar sürüyor (iptal = "yenileme",
+ * "şimdi kes" değil). Eskiden yalnızca active/trialing yükleniyordu; iptal
+ * edenin ödenmiş aylarının bakiyesi kesiliyordu.
+ *
+ * AMA iptal ettikten sonra yeni bir paket aldıysa eski abonelik YÜKLEMEZ: her
+ * yükleme kullanıcının paket payını sıfırlayıp kendi miktarını yazıyor
+ * (ai_grant_plan_credits); iki abonelik birbirinin payını ezerdi.
+ *
+ * past_due yıllık abone yüklemez: yıllık çekim düşmüş demektir, yeni yılın
+ * bakiyesi ödeme gelince yenileme yolundan yüklenir.
+ */
+export function yillikAylikYukleme(
+  a: { status: string; currentPeriodStart?: string; currentPeriodEnd?: string; yenisiYururlukte: boolean },
+  simdi: Date
+): Date | null {
+  if (!a.currentPeriodStart) return null;
+  const baslangic = new Date(a.currentPeriodStart);
+  if (a.status === "active" || a.status === "trialing") return krediAyiBasi(baslangic, simdi);
+  if (a.status !== "canceled" || a.yenisiYururlukte || !a.currentPeriodEnd) return null;
+  const bitis = new Date(a.currentPeriodEnd);
+  if (bitis <= simdi) return null;
+  const ay = krediAyiBasi(baslangic, simdi);
+  return ay && ay < bitis ? ay : null;
+}

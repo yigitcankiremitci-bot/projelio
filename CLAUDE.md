@@ -25,7 +25,7 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | API referansı | `docs/api-endpoints.md` (seçilmiş uçlar) + `node scripts/uc-listesi.mjs` (tam liste) |
 | Modül sistemi tasarımı | `docs/moduller/` — 20 belge; README'de faz tablosu |
 | Tanıtım sitesi (Next.js) | `landing/` |
-| Abonelik / ödeme (iyzico + mağazalar) | `backend/src/modules/billing/` — kurulum `docs/odeme-kurulumu.md` |
+| Abonelik / ödeme (PayTR web + mağazalar; iyzico kodu duruyor) | `backend/src/modules/billing/` — PayTR aboneliği `paytr-abonelik.service.ts`, kararlar `paytr-abonelik-takvim.ts`, kart formu `apps/web/src/components/PayTRKartFormu.tsx`; kurulum `docs/odeme-kurulumu.md` |
 | Bildirim e-postaları | `backend/src/modules/notifications/notification-email.*` — tercih, şablon, iki turlu işleyici |
 | Yaptım (kişisel iş günlüğü) | `backend/src/modules/worklog/`, `apps/web/src/pages/WorkLog.tsx` — Yapılacaklar'ın tersi |
 | Ürün kartı (ürün/hizmet + strateji + modüllerdeki izi) | `apps/web/src/components/ProductDetailModal.tsx`, `ProductForm.tsx`; özet ucu `GET /products/:id/overview`; modül eşleştirmesi `packages/shared/src/urunIliskileri.ts` |
@@ -298,6 +298,29 @@ Değişmez kurallar:
 
 Kredi *paketleri* (tek seferlik yükleme, `ai_credit_orders`) ayrı ve duruyor:
 abonelik onun yerine değil, yanına geldi.
+
+### PayTR aboneliği (2026-09'dan beri web'de geçerli olan)
+
+iyzico başvurusu düştü; web aboneliği **PayTR Direkt API + Kart Saklama + Non3D
++ recurring** ile alınıyor (migration 137 + 138). PayTR'de hazır abonelik YOK:
+kart 3D'li ilk ödemede PayTR'de saklanır, her vadede saklı karttan Non3D
+çekimi **biz** başlatırız (`BillingRenewalProcessor.paytrSaatlik`, saat başı).
+
+- **Kart verisi sunucuya gelmez**: sunucu yalnızca imzalı gizli alanları döner,
+  form tarayıcıdan doğrudan PayTR'ye POST edilir (`PayTRKartFormu`).
+- **Abonelik açılışı ve dönem ilerlemesi yalnızca imzalı bildirimle** — tarayıcı
+  dönüşü ve eşzamanlı "success" yanıtı kanıt değil.
+- Her çekim denemesi `paytr_abonelik_odemeleri`'nde bir satır; bir dönem için
+  aynı anda tek yenileme kısmi tekil indeksle zorlanır (çift çekim koruması).
+- Kararlar (kullanıcı, 2026-09-28): başarısız çekimde 14 gün tolerans ve 1/3/7/14.
+  günlerde yeniden deneme (erişim açık), yenilemede güncel fiyat ama değiştiyse
+  7 gün önce e-posta (duyurulmamış tutar ÇEKİLMEZ), yıllık aboneye 7 gün önce
+  hatırlatma, kart değişimi 1 TL çekip İade API ile iade.
+- PayTR'ye verilen söz: ilk ödeme 3D, Non3D yalnızca 3D ile saklanmış karttan
+  yenilemede, açık onay kutusu (sunucuda da zorunlu), her çekimden sonra e-posta,
+  panelden iptal. Bunları gevşetmek PayTR yetkisini riske atar.
+- Direkt API tutarı **ondalık TL** ("34.56"), iFrame **kuruş** ("3456"); bildirimdeki
+  `total_amount` ikisinde de kuruş.
 
 ## Bütçe: tek defter, beş kademe
 

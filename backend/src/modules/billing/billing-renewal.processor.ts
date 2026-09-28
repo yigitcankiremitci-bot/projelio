@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { BillingService } from "./billing.service";
+import { PayTRAbonelikService } from "./paytr-abonelik.service";
 
 /**
  * Gecelik abonelik bakımı.
@@ -21,9 +22,34 @@ import { BillingService } from "./billing.service";
 export class BillingRenewalProcessor {
   private readonly logger = new Logger(BillingRenewalProcessor.name);
   private readonly billing: BillingService;
+  private readonly paytr: PayTRAbonelikService;
 
-  constructor(@Inject(BillingService) billing: BillingService) {
+  constructor(
+    @Inject(BillingService) billing: BillingService,
+    @Inject(PayTRAbonelikService) paytr: PayTRAbonelikService
+  ) {
     this.billing = billing;
+    this.paytr = paytr;
+  }
+
+  /**
+   * PayTR yenilemeleri SAAT BAŞI: iyzico'da yenilemeyi sağlayıcı yapıyordu,
+   * PayTR'de biz yapıyoruz. Günde bir kez koşsaydı vadesi öğlen dolan abone
+   * ertesi sabaha kadar yenilenmemiş görünür, yeniden denemeler de bir güne
+   * kadar kayardı. Tekrar koşması güvenli (bkz. PayTRAbonelikService kural 3).
+   */
+  @Cron("7 * * * *")
+  async paytrSaatlik(): Promise<void> {
+    try {
+      const sonuc = await this.paytr.saatlikIs();
+      if (sonuc.denenen || sonuc.hatirlatma || sonuc.biten) {
+        this.logger.log(
+          `PayTR abonelik işi: ${sonuc.denenen} yenileme denendi, ${sonuc.hatirlatma} hatırlatma gönderildi, ${sonuc.biten} abonelik sona erdi.`
+        );
+      }
+    } catch (error) {
+      this.logger.error(`PayTR abonelik işi başarısız: ${(error as Error).message}`);
+    }
   }
 
   @Cron("20 3 * * *")

@@ -79,3 +79,6 @@ apps/mobile/ios/App/Pods/
 apps/mobile/android/keystore.properties
 *.jks
 *.keystore
+
+# Tanıtım videosu altyazısı — yerel çalışma dosyası
+docs/google-takvim-demo.srt

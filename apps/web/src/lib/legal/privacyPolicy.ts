@@ -26,12 +26,12 @@ export const privacyDoc: LegalDoc = {
     tr: {
       title: "Gizlilik Politikası",
       lede: "Hangi veriyi neden topladığımızı, kimlerle paylaştığımızı ve haklarınızı nasıl kullanacağınızı anlatır.",
-      effective: "24 Eylül 2026",
+      effective: "28 Eylül 2026",
     },
     en: {
       title: "Privacy Policy",
       lede: "What data we collect and why, who we share it with, and how you can exercise your rights.",
-      effective: "24 September 2026",
+      effective: "28 September 2026",
     },
   },
   sections: {
@@ -63,7 +63,7 @@ export const privacyDoc: LegalDoc = {
           "Sosyal medya hesap bilgileri: sosyal medya modülünde bir hesabın kullanıcı adı ve parolasını saklamayı seçerseniz, parola veritabanına şifrelenmiş olarak yazılır. Varsayılan kapalıdır: modülü görebilen biri parolanın varlığını görür, değerini görmez. Parolayı yalnızca kaydı giren kişi, ilgili yönetici ve yöneticinin açıkça izin verdiği kişiler görüntüleyebilir; her görüntüleme kim, ne zaman ve hangi hakla sorularının cevabıyla birlikte kaydedilir.",
           "İletişim ve destek bilgileri: bize gönderdiğiniz e-postalar, destek talepleri, hata bildirimleri, ekran görüntüleri, anket ve geri bildirim yanıtları.",
           "Lio'ya yazdıklarınız: asistana gönderdiğiniz mesajların içeriği, varsa ilettiğiniz dosya ve görseller ve asistanın verdiği yanıtlar.",
-          "Faturalandırma bilgileri: fatura unvanı, adres, vergi dairesi ve vergi numarası ile satın alma ve abonelik kayıtlarınız. Kart bilgilerini hiç toplamıyoruz ve sunucularımızda saklamıyoruz: ödeme, lisanslı ödeme kuruluşu iyzico'nun kendi ödeme formu üzerinden alınır ve kart bilgisi doğrudan onların altyapısında işlenir. Bize yalnızca ödemenin sonucu ve aboneliğin referans numarası döner. Aboneliğinizin yenilenmesi ve kartınızın saklanması da iyzico tarafında yürür; kartınızı değiştirmek istediğinizde yine onların formu açılır.",
+          "Faturalandırma bilgileri: fatura unvanı, adres, vergi dairesi ve vergi numarası ile satın alma ve abonelik kayıtlarınız. Kart bilgilerini hiç toplamıyoruz ve sunucularımızda saklamıyoruz: ödeme, lisanslı ödeme kuruluşu PayTR'nin altyapısı üzerinden 3D Secure ile alınır ve kart bilgisi doğrudan PayTR'ye iletilir. Aboneliğinizin otomatik yenilenebilmesi için kartınız, onayınızla PayTR'de saklanır; bize yalnızca kartın son dört hanesi ve PayTR'nin verdiği kart kimliği döner. Yenileme ödemelerini bu kimlikle PayTR üzerinden başlatırız. Kayıtlı kartınızı, kart değiştirerek ya da aboneliğinizi iptal ederek kullanımdan kaldırabilirsiniz.",
         ],
       },
       {
@@ -241,7 +241,7 @@ export const privacyDoc: LegalDoc = {
           "VERBİS: Veri Sorumluları Sicili'ne kayıt yükümlülüğü, yıllık çalışan sayısı 50'den az ve yıllık mali bilanço toplamı 25 milyon TL'nin altında olan, ana faaliyet konusu özel nitelikli kişisel veri işlemek olmayan veri sorumluları bakımından aranmamaktadır; işletmemiz bu kapsamdadır.",
           "Gizlilikle ilgili tüm sorularınız, talepleriniz ve şikâyetleriniz için: info@projelio.app",
           "Avrupa Ekonomik Alanı ve Birleşik Krallık'taki ilgili kişiler: Hizmet Türkiye'ye yöneliktir ve AB/BK'de atanmış bir temsilcimiz bulunmamaktadır; taleplerinizi doğrudan info@projelio.app adresine iletebilirsiniz.",
-          "Yürürlük tarihi: 24 Eylül 2026.",
+          "Yürürlük tarihi: 28 Eylül 2026.",
         ],
       },
     ],
@@ -273,7 +273,7 @@ export const privacyDoc: LegalDoc = {
           "Social media account credentials: if you choose to store an account's username and password in the social media module, the password is written to the database encrypted. It is closed by default: someone who can see the module sees that a password exists, not its value. Only the person who entered it, the relevant administrator and people the administrator has explicitly authorised can reveal it, and every reveal is logged with who, when and under which right.",
           "Communication and support information: emails you send us, support requests, bug reports, screenshots, survey and feedback responses.",
           "What you write to Lio: the content of the messages you send the assistant, any files or images you attach, and the answers it returns.",
-          "Billing information: billing name, address, tax office and tax number, and your purchase and subscription records. We do not collect or store card details at all: payment is taken through the payment form of iyzico, a licensed payment institution, and card details are processed directly on their infrastructure. Only the payment result and the subscription reference number come back to us. Renewals and card storage also run on iyzico's side; when you want to change your card, their form opens again.",
+          "Billing information: billing name, address, tax office and tax number, and your purchase and subscription records. We do not collect or store card details at all: payment is taken with 3D Secure through the infrastructure of PayTR, a licensed payment institution, and card details are sent directly to PayTR. So that your subscription can renew automatically, your card is stored at PayTR with your consent; only the last four digits of the card and a card identifier issued by PayTR come back to us. We initiate renewal payments through PayTR using that identifier. You can stop your saved card from being used by changing your card or cancelling your subscription.",
         ],
       },
       {
@@ -451,7 +451,7 @@ export const privacyDoc: LegalDoc = {
           "VERBIS: data controllers with fewer than 50 employees and an annual balance sheet total below TRY 25 million, whose principal activity is not the processing of special categories of personal data, are not required to register with the Data Controllers' Registry; our business falls within that exemption.",
           "For any privacy question, request or complaint: info@projelio.app",
           "Individuals in the European Economic Area and the United Kingdom: the Service is directed at Türkiye and we have not appointed a representative in the EEA or the UK; you can send your requests directly to info@projelio.app.",
-          "Effective date: 24 September 2026.",
+          "Effective date: 28 September 2026.",
         ],
       },
     ],

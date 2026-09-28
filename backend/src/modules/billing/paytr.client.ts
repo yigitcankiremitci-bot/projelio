@@ -454,10 +454,22 @@ export class PayTRClient {
     // gösterelim ki sebep log'da görünsün.
     const metin = await yanit.text();
     try {
-      const sonuc = JSON.parse(metin) as { status?: string; msg?: string; try_again?: unknown };
+      const sonuc = JSON.parse(metin) as Record<string, unknown>;
+      const status = String(sonuc.status ?? "bilinmiyor");
+      // Sebep her zaman `msg`de gelmiyor: ilk canlı denemede "failed" döndü,
+      // msg boştu ve bildirim hiç gelmedi — yani istek işleme dönüşmeden
+      // reddedildi. PayTR doğrulama hatalarını get-token'daki gibi `reason`
+      // alanında veriyor olabilir; bilinen adların hepsine bakılıyor ve
+      // başarısız yanıtın TAMAMI log'a yazılıyor (yanıtta sır yok).
+      const sebep = [sonuc.msg, sonuc.reason, sonuc.err_msg, sonuc.failed_reason_msg].find(
+        (d) => typeof d === "string" && d.length > 0
+      ) as string | undefined;
+      if (status !== "success") {
+        this.logger.warn(`PayTR tekrarlayan çekim yanıtı (${params.merchantOid}): ${metin.slice(0, 500)}`);
+      }
       return {
-        status: String(sonuc.status ?? "bilinmiyor"),
-        msg: sonuc.msg,
+        status,
+        msg: sebep,
         tryAgain: sonuc.try_again === true || String(sonuc.try_again) === "1",
       };
     } catch {

@@ -186,4 +186,7 @@ export const abonelik: TranslationDict = {
   "İndirim kodu kontrol edilemedi.": "Couldn't check the discount code.",
   "İndirim kodu oluşturuldu.": "Discount code created.",
   "İndirim kodun var mı?": "Have a discount code?",
+  "Dönem bakımını çalıştır": "Run period maintenance",
+  "Dönem bakımı çalıştı: {denenen} yenileme denendi, {kredi} aylık bakiye yüklendi, {biten} abonelik kapandı.": "Period maintenance ran: {denenen} renewals attempted, {kredi} monthly balances loaded, {biten} subscriptions closed.",
+  "Dönem bakımı çalıştırılamadı.": "Couldn't run period maintenance.",
 };

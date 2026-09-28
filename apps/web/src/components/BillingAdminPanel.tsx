@@ -80,6 +80,32 @@ export default function BillingAdminPanel() {
     }
   };
 
+  /**
+   * Dönem bakımını elle tetikler (normalde saat başı + gecelik iş): vadesi
+   * gelen PayTR aboneliklerini çeker, yıllık abonelerin aylık bakiyesini
+   * yükler, süresi dolanları kapatır. Tekrar basmak güvenli — çift çekimi
+   * veritabanındaki tekil indeks engelliyor.
+   */
+  const bakimCalistir = async () => {
+    setKaydediliyor("bakim");
+    setMesaj(null);
+    try {
+      const s = await billingApi.admin.runRenewals();
+      setMesaj(
+        t("Dönem bakımı çalıştı: {denenen} yenileme denendi, {kredi} aylık bakiye yüklendi, {biten} abonelik kapandı.", {
+          denenen: s.paytr?.denenen ?? 0,
+          kredi: s.krediYuklenen,
+          biten: (s.paytr?.biten ?? 0) + s.suresiDolan,
+        })
+      );
+      yenile();
+    } catch (hata) {
+      setMesaj(hata instanceof ApiError ? hata.message : t("Dönem bakımı çalıştırılamadı."));
+    } finally {
+      setKaydediliyor(null);
+    }
+  };
+
   const kurKaydet = async () => {
     setKaydediliyor("kur");
     try {
@@ -266,9 +292,18 @@ export default function BillingAdminPanel() {
       )}
 
       <div style={{ marginTop: 24 }}>
-        <h3 style={{ color: c.textPrimary, fontSize: 15, fontWeight: 500, margin: "0 0 8px" }}>
-          {t("Abonelikler")} ({abonelikler.length})
-        </h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 8px", flexWrap: "wrap" }}>
+          <h3 style={{ color: c.textPrimary, fontSize: 15, fontWeight: 500, margin: 0 }}>
+            {t("Abonelikler")} ({abonelikler.length})
+          </h3>
+          <button
+            onClick={bakimCalistir}
+            disabled={kaydediliyor !== null}
+            style={{ border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, borderRadius: 8, padding: "5px 12px", fontSize: 12.5, cursor: "pointer" }}
+          >
+            {kaydediliyor === "bakim" ? "…" : t("Dönem bakımını çalıştır")}
+          </button>
+        </div>
         {abonelikler.length === 0 ? (
           <div style={{ ...etiket }}>{t("Henüz abonelik yok.")}</div>
         ) : (

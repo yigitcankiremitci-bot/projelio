@@ -427,7 +427,14 @@ export class PayTRAbonelikService {
       .eq("id", satir.subscription_id)
       // Koşullu: dönem zaten ilerlemişse (aynı dönem hem otomatik hem elle
       // ödendiyse) ikinci kez ilerletilmez.
-      .eq("current_period_end", vade.toISOString())
+      //
+      // BİREBİR EŞİTLİK DEĞİL, ±1 sn: donem_basi JS'ten milisaniye hassasiyetle
+      // yazılıyor, current_period_end ise veritabanından elle düzeltilirse
+      // mikrosaniye taşıyor (now()). 2026-09-28'de vade elle öne çekilince
+      // eşitlik tutmadı, ödeme alındı ama dönem ilerlemedi. Bir sonraki dönem
+      // bir ay sonra olduğu için ±1 sn iki dönemi karıştıramaz.
+      .gte("current_period_end", new Date(vade.getTime() - 1000).toISOString())
+      .lte("current_period_end", new Date(vade.getTime() + 1000).toISOString())
       .select("*")
       .maybeSingle();
     if (error) throw error;

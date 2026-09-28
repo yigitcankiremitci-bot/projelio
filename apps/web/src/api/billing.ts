@@ -40,7 +40,11 @@ export const billingApi = {
     saveUsdTry: (rate: number | null) => api.patch<{ ok: boolean; error?: string }>("/billing/admin/settings/usd-try", { rate }),
     subscriptions: (status?: string) =>
       api.get<Subscription[]>(`/billing/admin/subscriptions${status ? `?status=${status}` : ""}`),
-    runRenewals: () => api.post<{ krediYuklenen: number; suresiDolan: number }>("/billing/admin/run-renewals", {}),
+    runRenewals: () =>
+      api.post<{ krediYuklenen: number; suresiDolan: number; paytr?: { denenen: number; hatirlatma: number; biten: number } }>(
+        "/billing/admin/run-renewals",
+        {}
+      ),
     indirimKodlari: () => api.get<AdminIndirimKodu[]>("/billing/admin/indirim-kodlari"),
     indirimKoduOlustur: (body: YeniIndirimKodu) => api.post<AdminIndirimKodu>("/billing/admin/indirim-kodlari", body),
     indirimKoduAktiflik: (id: string, aktif: boolean) =>

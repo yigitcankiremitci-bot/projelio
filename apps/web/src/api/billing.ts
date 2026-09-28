@@ -21,10 +21,6 @@ export const billingApi = {
 
   cancel: (id: string) => api.post<Subscription>(`/billing/subscription/${id}/cancel`, {}),
 
-  /** İndirim kodu önizlemesi; kullanımı YAZMAZ, tutar ödemede sunucuda yeniden hesaplanır. */
-  indirimOnizle: (body: { kod: string; kapsam: "abonelik" | "lio"; planKey?: string; period?: string; packageKey?: string }) =>
-    api.post<IndirimOzeti>("/billing/indirim-kodu/onizle", body),
-
   cardUpdate: (id: string) => api.post<{ checkoutFormContent: string }>(`/billing/subscription/${id}/card-update`, {}),
 
   admin: {
@@ -41,10 +37,6 @@ export const billingApi = {
     subscriptions: (status?: string) =>
       api.get<Subscription[]>(`/billing/admin/subscriptions${status ? `?status=${status}` : ""}`),
     runRenewals: () => api.post<{ krediYuklenen: number; suresiDolan: number }>("/billing/admin/run-renewals", {}),
-    indirimKodlari: () => api.get<AdminIndirimKodu[]>("/billing/admin/indirim-kodlari"),
-    indirimKoduOlustur: (body: YeniIndirimKodu) => api.post<AdminIndirimKodu>("/billing/admin/indirim-kodlari", body),
-    indirimKoduAktiflik: (id: string, aktif: boolean) =>
-      api.patch<{ ok: boolean }>(`/billing/admin/indirim-kodlari/${id}`, { aktif }),
   },
   /**
    * Lio Bakiyesi siparişi için PayTR ödeme formunu açar.
@@ -55,14 +47,7 @@ export const billingApi = {
      * Abonelik formları: yalnızca gizli alanlar döner, kart tarayıcıda girilir
      * ve form doğrudan PayTR'ye gider (bkz. components/PayTRKartFormu).
      */
-    abonelik: (body: {
-      planKey: string;
-      period: string;
-      scope?: string;
-      organizationId?: string;
-      onay: boolean;
-      indirimKodu?: string;
-    }) =>
+    abonelik: (body: { planKey: string; period: string; scope?: string; organizationId?: string; onay: boolean }) =>
       api.post<PayTRForm>("/billing/paytr/abonelik", body),
     gecikmisOdeme: (subscriptionId: string, onay: boolean) =>
       api.post<PayTRForm>(`/billing/paytr/abonelik/${subscriptionId}/odeme`, { onay }),
@@ -75,39 +60,6 @@ export const billingApi = {
       ),
   },
 };
-
-export type IndirimSuresi = "ilk" | "donem" | "surekli";
-
-export interface IndirimOzeti {
-  kod: string;
-  tur: "yuzde" | "tutar";
-  deger: number;
-  sure: IndirimSuresi;
-  donemSayisi: number | null;
-  listeTutari: number;
-  tutar: number;
-}
-
-export interface YeniIndirimKodu {
-  kod: string;
-  aciklama?: string;
-  tur: "yuzde" | "tutar";
-  deger: number;
-  kapsam: "abonelik" | "lio" | "hepsi";
-  planKeys?: string[] | null;
-  periods?: string[] | null;
-  sure: IndirimSuresi;
-  donemSayisi?: number | null;
-  sonTarih?: string | null;
-  kullanimSiniri?: number | null;
-}
-
-export interface AdminIndirimKodu extends YeniIndirimKodu {
-  id: string;
-  aktif: boolean;
-  kullanimSayisi: number;
-  createdAt: string;
-}
 
 /** PayTR Direkt API formu: action + gizli alanlar (kart alanları YOK). */
 export interface PayTRForm {

@@ -590,9 +590,14 @@ export default function BillingPage() {
                 : t("Kartını doğrulamak için 1 ₺ çekilir ve hemen iade edilir. Sonraki yenilemeler bu karttan yapılır.")
           }
           dugmeMetni={kartFormu.tur === "kart" ? t("Kartı doğrula") : t("Öde")}
-          formuAl={(onay) =>
+          indirimOnizle={
             kartFormu.tur === "ilk"
-              ? billingApi.paytr.abonelik({ planKey: kartFormu.plan.key, period: donem, onay })
+              ? (kod) => billingApi.indirimOnizle({ kod, kapsam: "abonelik", planKey: kartFormu.plan.key, period: donem })
+              : undefined
+          }
+          formuAl={(onay, indirimKodu) =>
+            kartFormu.tur === "ilk"
+              ? billingApi.paytr.abonelik({ planKey: kartFormu.plan.key, period: donem, onay, indirimKodu })
               : kartFormu.tur === "elle"
                 ? billingApi.paytr.gecikmisOdeme(kartFormu.abonelik.id, onay)
                 : billingApi.paytr.kartDegisim(kartFormu.abonelik.id, onay)

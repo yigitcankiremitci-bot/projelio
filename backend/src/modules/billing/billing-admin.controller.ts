@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { abonelikTutari } from "./abonelik-tutari";
 import { USD_TRY_AYAR_ANAHTARI } from "../../common/usd-try-kuru";
 import { AuthGuard } from "@nestjs/passport";
@@ -8,6 +8,7 @@ import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { BillingService } from "./billing.service";
 import { BillingSettingsService, type OdemeSaglayici } from "./billing-settings.service";
 import { PayTRAbonelikService } from "./paytr-abonelik.service";
+import { IndirimService } from "./indirim.service";
 import { isBillingPeriod, isPlanKey, PLANS } from "./billing.plans";
 import { kurSapmasi } from "./tcmb-kuru";
 import { TcmbKuruService } from "./tcmb-kuru.service";
@@ -32,8 +33,30 @@ export class BillingAdminController {
     private billing: BillingService,
     private settings: BillingSettingsService,
     private tcmb: TcmbKuruService,
-    private paytrAbonelik: PayTRAbonelikService
+    private paytrAbonelik: PayTRAbonelikService,
+    private indirimler: IndirimService
   ) {}
+
+  /*
+   * İndirim kodları. Oluşturulan kodun değeri DEĞİŞTİRİLEMEZ, yalnızca
+   * kapatılır/açılır (bkz. migration 140).
+   */
+
+  @Get("indirim-kodlari")
+  indirimKodlari() {
+    return this.indirimler.listele();
+  }
+
+  @Post("indirim-kodlari")
+  indirimKoduOlustur(@Body() body: any, @Req() req: any) {
+    return this.indirimler.olustur(body ?? {}, req.user.userId);
+  }
+
+  @Patch("indirim-kodlari/:id")
+  async indirimKoduAktiflik(@Param("id") id: string, @Body() body: { aktif?: boolean }) {
+    await this.indirimler.aktiflikDegistir(id, body?.aktif === true);
+    return { ok: true };
+  }
 
   /** Katalog + sağlayıcıdaki karşılıkları yan yana: eksik olan hemen görünsün. */
   @Get("settings")

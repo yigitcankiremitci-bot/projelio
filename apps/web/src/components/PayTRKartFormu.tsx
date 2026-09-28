@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../api/client";
+import type { IndirimOzeti } from "../api/billing";
+import IndirimKoduAlani from "./IndirimKoduAlani";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 
@@ -23,13 +25,16 @@ export default function PayTRKartFormu({
   ozet,
   dugmeMetni,
   formuAl,
+  indirimOnizle,
   onKapat,
 }: {
   baslik: string;
   /** Ne ödendiği ve ne kadar — kullanıcı neye onay verdiğini görsün. */
   ozet: string;
   dugmeMetni: string;
-  formuAl: (onay: boolean) => Promise<{ action: string; alanlar: Record<string, string> }>;
+  formuAl: (onay: boolean, indirimKodu?: string) => Promise<{ action: string; alanlar: Record<string, string> }>;
+  /** Verilirse "İndirim kodun var mı?" alanı görünür (yalnızca paket satın almada). */
+  indirimOnizle?: (kod: string) => Promise<IndirimOzeti>;
   onKapat: () => void;
 }) {
   const c = useThemeColors();
@@ -39,6 +44,7 @@ export default function PayTRKartFormu({
   const [form, setForm] = useState<{ action: string; alanlar: Record<string, string> } | null>(null);
   const [mesgul, setMesgul] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
+  const [indirim, setIndirim] = useState<IndirimOzeti | null>(null);
 
   // Gizli alanlar DOM'a yazıldıktan SONRA gönder; aynı turda göndermek
   // alanların boş gitmesine yol açardı.
@@ -52,7 +58,7 @@ export default function PayTRKartFormu({
     setMesgul(true);
     setHata(null);
     try {
-      setForm(await formuAl(true));
+      setForm(await formuAl(true, indirim?.kod));
     } catch (h) {
       setHata(h instanceof ApiError ? h.message : t("Ödeme başlatılamadı."));
       setMesgul(false);
@@ -105,6 +111,7 @@ export default function PayTRKartFormu({
       >
         <div style={{ fontSize: 17, fontWeight: 600, color: c.textPrimary }}>{baslik}</div>
         <div style={{ fontSize: 13.5, color: c.textSecondary, lineHeight: 1.55, marginBottom: 4 }}>{ozet}</div>
+        {indirimOnizle && <IndirimKoduAlani onizle={indirimOnizle} onDegis={setIndirim} />}
 
         {form && Object.entries(form.alanlar).map(([ad, deger]) => <input key={ad} type="hidden" name={ad} value={deger} />)}
 

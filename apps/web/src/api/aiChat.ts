@@ -387,8 +387,8 @@ export const aiChat = {
   getCreditPackages: () =>
     api.get<{ packages: AiCreditPackage[]; paymentConfigured: boolean }>("/ai/credit-packages"),
   getCreditOrders: () => api.get<AiCreditOrder[]>("/ai/credit-orders"),
-  createCreditOrder: (packageKey: string) =>
-    api.post<{ order: AiCreditOrder; checkoutUrl: string | null }>("/ai/credit-orders", { packageKey }),
+  createCreditOrder: (packageKey: string, indirimKodu?: string) =>
+    api.post<{ order: AiCreditOrder; checkoutUrl: string | null }>("/ai/credit-orders", { packageKey, indirimKodu }),
   cancelCreditOrder: (id: string) => api.post<AiCreditOrder>(`/ai/credit-orders/${id}/cancel`, {}),
 
   // Yönetim

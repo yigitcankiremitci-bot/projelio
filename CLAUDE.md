@@ -322,6 +322,12 @@ kart 3D'li ilk ödemede PayTR'de saklanır, her vadede saklı karttan Non3D
   panelden iptal. Bunları gevşetmek PayTR yetkisini riske atar.
 - Direkt API tutarı **ondalık TL** ("34.56"), iFrame **kuruş** ("3456"); bildirimdeki
   `total_amount` ikisinde de kuruş.
+- **İndirim kodları** (migration 140, `billing/indirim*.ts`, Admin > Paketler ve
+  ödeme): yüzde ya da sabit TL, abonelik ve/veya Lio Bakiyesi, süre ilk ödeme /
+  ilk N ödeme / süresiz. Tutar 1 ₺'nin altına inmez (PayTR 0 ₺ almıyor, kart
+  saklanamaz). Kullanım ÖDEME ALININCA yazılır; kodun değeri sonradan
+  değiştirilemez, yalnızca kapatılır. Aboneliğin `liste_tutari` indirimsiz tutarı
+  tutar — indirim bitince yenileme ona döner ve bu artış da 7 gün önce duyurulur.
 
 ## Bütçe: tek defter, beş kademe
 

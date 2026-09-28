@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { BillingService } from "./billing.service";
 import { StorePurchasesService } from "./store-purchases.service";
 import { PayTROdemeService } from "./paytr-odeme.service";
 import { PayTRAbonelikService } from "./paytr-abonelik.service";
+import { IndirimService, indirimOzeti } from "./indirim.service";
+import { AiCreditOrdersService } from "../ai-assistant/ai-credit-orders.service";
 
 /**
  * Abonelik ekranının uçları.
@@ -19,8 +21,32 @@ export class BillingController {
     private billing: BillingService,
     private store: StorePurchasesService,
     private paytrOdeme: PayTROdemeService,
-    private paytrAbonelik: PayTRAbonelikService
+    private paytrAbonelik: PayTRAbonelikService,
+    private indirimler: IndirimService,
+    private creditOrders: AiCreditOrdersService
   ) {}
+
+  /**
+   * İndirim kodu önizlemesi (ödeme formundaki "Uygula"). Kullanım YAZMAZ;
+   * asıl tutar ödeme formu açılırken sunucuda yeniden hesaplanır.
+   */
+  @Post("indirim-kodu/onizle")
+  async indirimOnizle(
+    @Body() body: { kod?: string; kapsam?: string; planKey?: string; period?: string; packageKey?: string },
+    @Req() req: any
+  ) {
+    const kod = String(body?.kod ?? "");
+    if (body?.kapsam === "lio") {
+      const paket = (await this.creditOrders.listPackages()).find((p) => p.key === body.packageKey);
+      if (!paket) throw new BadRequestException("Geçersiz bakiye paketi.");
+      return indirimOzeti(await this.indirimler.uygula(req.user.userId, kod, { kapsam: "lio" }, paket.priceTry));
+    }
+    return this.paytrAbonelik.indirimOnizle(req.user.userId, {
+      kod,
+      planKey: String(body?.planKey ?? ""),
+      period: String(body?.period ?? ""),
+    });
+  }
 
   /*
    * PayTR abonelik formları. Üçü de yalnızca GİZLİ ALANLARI döner; kart
@@ -31,7 +57,7 @@ export class BillingController {
 
   @Post("paytr/abonelik")
   paytrAbonelikFormu(
-    @Body() body: { planKey: string; period: string; scope?: string; organizationId?: string; onay?: boolean },
+    @Body() body: { planKey: string; period: string; scope?: string; organizationId?: string; onay?: boolean; indirimKodu?: string },
     @Req() req: any
   ) {
     return this.paytrAbonelik.abonelikFormu(req.user.userId, body ?? ({} as any), req.ip ?? "");

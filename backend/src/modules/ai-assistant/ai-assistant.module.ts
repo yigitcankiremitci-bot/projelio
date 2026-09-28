@@ -13,6 +13,7 @@ import { AiSpeechService } from "./ai-speech.service";
 import { AiSpendAlertProcessor } from "./ai-spend-alert.processor";
 import { AiExportsService } from "./ai-exports.service";
 import { PayTRModule } from "../billing/paytr.module";
+import { IndirimModule } from "../billing/indirim.module";
 import { TasksModule } from "../tasks/tasks.module";
 import { ProjectsModule } from "../projects/projects.module";
 import { JobsModule } from "../jobs/jobs.module";
@@ -46,7 +47,7 @@ import { WhatsappModule } from "../whatsapp/whatsapp.module";
 import { GoogleTakvimModule } from "../google-takvim/google-takvim.module";
 
 @Module({
-  imports: [PayTRModule, 
+  imports: [PayTRModule, IndirimModule, 
     TasksModule,
     ProjectsModule,
     JobsModule,

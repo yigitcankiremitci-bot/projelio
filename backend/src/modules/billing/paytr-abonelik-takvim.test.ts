@@ -43,12 +43,14 @@ const TEMEL = {
   vade: VADE,
   gonderilenVade: null,
   sonTutar: 490,
-  guncelTutar: 490,
+  sonListe: 490,
+  guncelListe: 490,
+  sonrakiIndirim: null,
 };
 
 test("yıllık aboneye 7 gün kala hatırlatma gider, daha erken gitmez", () => {
   assert.equal(hatirlatmaKarari({ ...TEMEL, period: "yearly", simdi: sonra(-8) }), null);
-  assert.deepEqual(hatirlatmaKarari({ ...TEMEL, period: "yearly", simdi: sonra(-7) }), { tur: "yillik", tutar: 490 });
+  assert.deepEqual(hatirlatmaKarari({ ...TEMEL, period: "yearly", simdi: sonra(-7) }), { tur: "yillik", tutar: 490, liste: 490 });
 });
 
 test("aylık aboneye fiyat değişmediyse hatırlatma gitmez", () => {
@@ -56,20 +58,35 @@ test("aylık aboneye fiyat değişmediyse hatırlatma gitmez", () => {
 });
 
 test("aylık aboneye fiyat değiştiyse 7 gün önce yeni tutar duyurulur", () => {
-  assert.deepEqual(hatirlatmaKarari({ ...TEMEL, guncelTutar: 590, period: "monthly", simdi: sonra(-7) }), {
+  assert.deepEqual(hatirlatmaKarari({ ...TEMEL, guncelListe: 590, period: "monthly", simdi: sonra(-7) }), {
     tur: "fiyat",
     tutar: 590,
+    liste: 590,
   });
 });
 
 test("fiyat pencere açıldıktan sonra değiştiyse o dönem duyurulmaz", () => {
   // 3 gün kala fark edilen değişiklik: 7 günlük süre tanınamaz.
-  assert.equal(hatirlatmaKarari({ ...TEMEL, guncelTutar: 590, period: "monthly", simdi: sonra(-3) }), null);
+  assert.equal(hatirlatmaKarari({ ...TEMEL, guncelListe: 590, period: "monthly", simdi: sonra(-3) }), null);
   // Yıllıkta hatırlatma yine gider ama ESKİ tutarla.
-  assert.deepEqual(hatirlatmaKarari({ ...TEMEL, guncelTutar: 590, period: "yearly", simdi: sonra(-3) }), {
+  assert.deepEqual(hatirlatmaKarari({ ...TEMEL, guncelListe: 590, period: "yearly", simdi: sonra(-3) }), {
     tur: "yillik",
     tutar: 490,
+    liste: 490,
   });
+});
+
+test("indirim bitiyorsa artış 7 gün önce duyurulur", () => {
+  // Son ödeme %50 indirimliydi (245), sonraki ödemede indirim yok.
+  const d = { ...TEMEL, sonTutar: 245, period: "monthly" as const };
+  assert.deepEqual(hatirlatmaKarari({ ...d, simdi: sonra(-7) }), { tur: "fiyat", tutar: 490, liste: 490 });
+  // Pencere kaçtıysa artış duyurulmaz.
+  assert.equal(hatirlatmaKarari({ ...d, simdi: sonra(-3) }), null);
+});
+
+test("indirim sürüyorsa ve fiyat değişmediyse aylık hatırlatma gitmez", () => {
+  const d = { ...TEMEL, sonTutar: 245, sonrakiIndirim: { tur: "yuzde" as const, deger: 50 }, period: "monthly" as const };
+  assert.equal(hatirlatmaKarari({ ...d, simdi: sonra(-7) }), null);
 });
 
 test("aynı vade için hatırlatma iki kez gitmez", () => {
@@ -80,11 +97,21 @@ test("vadesi geçmiş abonelik için hatırlatma gitmez", () => {
   assert.equal(hatirlatmaKarari({ ...TEMEL, period: "yearly", simdi: sonra(0.1) }), null);
 });
 
+const YENILEME = { vade: VADE, sonTutar: 490, sonListe: 490, hatirlatmaVadesi: null, hatirlatmaTutari: null, hatirlatmaListe: null, indirim: null };
+
 test("yenilemede duyurulan tutar çekilir, duyurulmamış güncel fiyat çekilmez", () => {
-  assert.equal(yenilemeTutari({ vade: VADE, sonTutar: 490, hatirlatmaVadesi: VADE, hatirlatmaTutari: 590 }), 590);
-  assert.equal(yenilemeTutari({ vade: VADE, sonTutar: 490, hatirlatmaVadesi: null, hatirlatmaTutari: null }), 490);
+  assert.deepEqual(yenilemeTutari({ ...YENILEME, hatirlatmaVadesi: VADE, hatirlatmaTutari: 590, hatirlatmaListe: 590 }), { tutar: 590, liste: 590 });
+  assert.deepEqual(yenilemeTutari(YENILEME), { tutar: 490, liste: 490 });
   // Başka bir vadenin duyurusu bu vadeyi etkilemez.
-  assert.equal(yenilemeTutari({ vade: VADE, sonTutar: 490, hatirlatmaVadesi: sonra(-30), hatirlatmaTutari: 590 }), 490);
+  assert.deepEqual(yenilemeTutari({ ...YENILEME, hatirlatmaVadesi: sonra(-30), hatirlatmaTutari: 590 }), { tutar: 490, liste: 490 });
+});
+
+test("süren indirim yenilemede uygulanır", () => {
+  assert.deepEqual(yenilemeTutari({ ...YENILEME, sonTutar: 245, indirim: { tur: "yuzde", deger: 50 } }), { tutar: 245, liste: 490 });
+});
+
+test("indirim bitti ama duyurulmadıysa son çekilen tutar aşılmaz", () => {
+  assert.deepEqual(yenilemeTutari({ ...YENILEME, sonTutar: 245 }), { tutar: 245, liste: 490 });
 });
 
 test("saklanan kart önceki listede olmayan karttır", () => {

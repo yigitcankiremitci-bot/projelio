@@ -15,6 +15,7 @@ import { PayTRAbonelikService } from "./paytr-abonelik.service";
 import { PayTRKartService } from "./paytr-kart.service";
 import { PayTROdemeService } from "./paytr-odeme.service";
 import { PayTRModule } from "./paytr.module";
+import { IndirimModule } from "./indirim.module";
 import { StorePurchasesService } from "./store-purchases.service";
 import { TcmbKuruService } from "./tcmb-kuru.service";
 
@@ -29,7 +30,7 @@ import { TcmbKuruService } from "./tcmb-kuru.service";
  * SupabaseService global modülden geliyor.
  */
 @Module({
-  imports: [AiAssistantModule, PayTRModule, EmailModule],
+  imports: [AiAssistantModule, PayTRModule, EmailModule, IndirimModule],
   controllers: [BillingController, BillingPublicController, BillingWebhookController, BillingAdminController],
   providers: [
     BillingService,

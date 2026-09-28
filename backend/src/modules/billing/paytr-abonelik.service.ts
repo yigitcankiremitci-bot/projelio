@@ -10,6 +10,8 @@ import { BillingSettingsService } from "./billing-settings.service";
 import { ayEkle, findPlan, periodMonths, type BillingPeriod, type PlanKey } from "./billing.plans";
 import { PayTRClient, type DirektFormu } from "./paytr.client";
 import { PayTRKartService } from "./paytr-kart.service";
+import { IndirimService, indirimOzeti } from "./indirim.service";
+import { ilkOdemedenSonraKalan, kalaniAzalt, sonrakiOdemedeIndirim, type Indirim } from "./indirim";
 import { paytrKullaniciBilgisi } from "./paytr-kullanici";
 import { kurusaCevir, siparisNumarasiCoz, siparisNumarasiUret, telefonAlani } from "./paytr-imza";
 import {
@@ -47,6 +49,8 @@ interface OdemeSatiri {
   merchant_oid: string;
   user_ip: string | null;
   onceki_kartlar: string[] | null;
+  indirim_kodu_id: string | null;
+  liste_tutari: number | string | null;
   created_at: string;
 }
 
@@ -90,7 +94,8 @@ export class PayTRAbonelikService {
     private settings: BillingSettingsService,
     private paytr: PayTRClient,
     private kart: PayTRKartService,
-    private email: EmailService
+    private email: EmailService,
+    private indirimler: IndirimService
   ) {}
 
   // ============================================================ Form başlatma
@@ -98,16 +103,22 @@ export class PayTRAbonelikService {
   /** Paket satın alma: 3D'li ilk ödemenin form alanları. */
   async abonelikFormu(
     userId: string,
-    istek: { planKey: string; period: string; scope?: string; organizationId?: string; onay?: boolean },
+    istek: { planKey: string; period: string; scope?: string; organizationId?: string; onay?: boolean; indirimKodu?: string },
     userIp: string
   ): Promise<DirektFormu> {
     this.yapilandirilmis();
     const { planKey, period, scope, organizationId } = await this.billing.satinAlmaOnKontrol(userId, istek);
-    const tutar = await this.guncelTutar(planKey, period);
-    if (tutar === null) {
+    const liste = await this.guncelTutar(planKey, period);
+    if (liste === null) {
       throw new ServiceUnavailableException("Bu paket şu an satın alınamıyor. Lütfen bizimle iletişime geç.");
     }
+    // İndirim SUNUCUDA hesaplanır; kodun kullanımı ödeme alınınca yazılır.
+    const indirim = istek.indirimKodu?.trim()
+      ? await this.indirimler.uygula(userId, istek.indirimKodu, { kapsam: "abonelik", planKey, period }, liste)
+      : null;
     return this.formHazirla({
+      indirimKoduId: indirim?.kod.id ?? null,
+      listeTutari: liste,
       tur: "ilk",
       userId,
       scope,
@@ -116,10 +127,19 @@ export class PayTRAbonelikService {
       period,
       subscriptionId: null,
       donemBasi: null,
-      tutar,
+      tutar: indirim?.tutar ?? liste,
       userIp,
       onay: istek.onay,
     });
+  }
+
+  /** Ödeme formundaki "Uygula": kodu doğrular, indirimli tutarı gösterir. Kullanım YAZMAZ. */
+  async indirimOnizle(userId: string, istek: { kod: string; planKey: string; period: string }) {
+    const { planKey, period } = this.billing.istegiDogrula(istek);
+    const liste = await this.guncelTutar(planKey, period);
+    if (liste === null) throw new ServiceUnavailableException("Bu paket şu an satın alınamıyor. Lütfen bizimle iletişime geç.");
+    const sonuc = await this.indirimler.uygula(userId, istek.kod, { kapsam: "abonelik", planKey, period }, liste);
+    return indirimOzeti(sonuc);
   }
 
   /**
@@ -137,9 +157,11 @@ export class PayTRAbonelikService {
     if (bekleyen) {
       throw new ConflictException("Bu dönemin ödemesi şu an işleniyor. Birkaç dakika sonra tekrar bak.");
     }
-    const tutar = this.yenilemeTutariniHesapla(ham, vade);
-    if (tutar === null) throw new ServiceUnavailableException("Ödeme tutarı belirlenemedi. Lütfen bizimle iletişime geç.");
+    const hesap = await this.yenilemeTutariniHesapla(ham, vade);
+    if (hesap === null) throw new ServiceUnavailableException("Ödeme tutarı belirlenemedi. Lütfen bizimle iletişime geç.");
     return this.formHazirla({
+      indirimKoduId: hesap.indirimli ? ham.indirim_kodu_id : null,
+      listeTutari: hesap.liste,
       tur: "elle",
       userId,
       scope: abonelik.scope,
@@ -148,7 +170,7 @@ export class PayTRAbonelikService {
       period: abonelik.period,
       subscriptionId: abonelik.id,
       donemBasi: vade.toISOString(),
-      tutar,
+      tutar: hesap.tutar,
       userIp,
       onay,
     });
@@ -170,6 +192,8 @@ export class PayTRAbonelikService {
       period: abonelik.period,
       subscriptionId: abonelik.id,
       donemBasi: null,
+      indirimKoduId: null,
+      listeTutari: null,
       tutar: KART_DOGRULAMA_TUTARI,
       userIp,
       onay,
@@ -186,6 +210,9 @@ export class PayTRAbonelikService {
     subscriptionId: string | null;
     donemBasi: string | null;
     tutar: number;
+    /** İndirimsiz tutar ve uygulanan kod (yoksa null). */
+    listeTutari: number | null;
+    indirimKoduId: string | null;
     userIp: string;
     onay?: boolean;
   }): Promise<DirektFormu> {
@@ -225,6 +252,8 @@ export class PayTRAbonelikService {
       user_ip: p.userIp,
       onceki_kartlar: oncekiKartlar,
       yenileme_onayi_at: new Date().toISOString(),
+      indirim_kodu_id: p.indirimKoduId,
+      liste_tutari: p.listeTutari,
     });
     if (error) throw error;
 
@@ -346,6 +375,19 @@ export class PayTRAbonelikService {
       kart: kart ?? undefined,
     });
     await this.supabase.client.from("paytr_abonelik_odemeleri").update({ subscription_id: abonelik.id }).eq("id", satir.id);
+
+    // Liste tutarı + indirim aboneliğe yazılır: yenileme indirimin sürüp
+    // sürmediğine ve bitince hangi tutara dönüleceğine buradan bakıyor.
+    const kod = satir.indirim_kodu_id ? await this.indirimler.kod(satir.indirim_kodu_id) : null;
+    await this.supabase.client
+      .from("subscriptions")
+      .update({
+        liste_tutari: Number(satir.liste_tutari ?? satir.tutar),
+        indirim_kodu_id: kod?.id ?? null,
+        indirim_kalan_donem: kod ? ilkOdemedenSonraKalan(kod) : null,
+      })
+      .eq("id", abonelik.id);
+    if (kod) await this.indirimler.kullanimYaz(kod.id, satir.user_id, { subscriptionId: abonelik.id });
     this.logger.log(`PayTR aboneliği açıldı: ${abonelik.id} (${satir.plan_key}/${satir.period}).`);
     await this.makbuzGonder(satir, abonelik, true);
   }
@@ -362,6 +404,13 @@ export class PayTRAbonelikService {
     // bedava yapar ve bakiye ayını kaydırırdı.
     const yeniBitis = ayEkle(vade, periodMonths(satir.period));
     const kart = satir.tur === "elle" ? await this.yeniKart(satir) : null;
+    // İndirimli bir ödemeyse kalan indirimli ödeme sayısı bir azalır.
+    const { data: onceki, error: oncekiHata } = await this.supabase.client
+      .from("subscriptions")
+      .select("indirim_kalan_donem")
+      .eq("id", satir.subscription_id)
+      .maybeSingle();
+    if (oncekiHata) throw oncekiHata;
 
     const { data, error } = await this.supabase.client
       .from("subscriptions")
@@ -370,6 +419,8 @@ export class PayTRAbonelikService {
         current_period_start: vade.toISOString(),
         current_period_end: yeniBitis.toISOString(),
         price_amount: Number(satir.tutar),
+        liste_tutari: Number(satir.liste_tutari ?? satir.tutar),
+        ...(satir.indirim_kodu_id ? { indirim_kalan_donem: kalaniAzalt(onceki?.indirim_kalan_donem ?? null) } : {}),
         ...(kart ? { paytr_ctoken: kart.ctoken, kart_son4: kart.son4 } : {}),
         updated_at: new Date().toISOString(),
       })
@@ -497,11 +548,12 @@ export class PayTRAbonelikService {
       return "bitti";
     }
 
-    const tutar = this.yenilemeTutariniHesapla(ham, vade);
-    if (tutar === null) {
+    const hesap = await this.yenilemeTutariniHesapla(ham, vade);
+    if (hesap === null) {
       this.logger.error(`PayTR yenileme tutarı belirlenemedi (abonelik ${ham.id}); denenmedi.`);
       return "bekliyor";
     }
+    const tutar = hesap.tutar;
 
     const id = randomUUID();
     const merchantOid = siparisNumarasiUret(id, simdi.getTime(), "ABN");
@@ -517,6 +569,8 @@ export class PayTRAbonelikService {
       period: ham.period,
       donem_basi: vade.toISOString(),
       tutar,
+      liste_tutari: hesap.liste,
+      indirim_kodu_id: hesap.indirimli ? ham.indirim_kodu_id : null,
       deneme: karar.deneme,
       merchant_oid: merchantOid,
       user_ip: userIp,
@@ -620,7 +674,9 @@ export class PayTRAbonelikService {
       simdi,
       gonderilenVade: ham.hatirlatma_vadesi ? new Date(ham.hatirlatma_vadesi) : null,
       sonTutar: ham.price_amount === null ? null : Number(ham.price_amount),
-      guncelTutar: await this.guncelTutar(ham.plan_key, ham.period),
+      sonListe: ham.liste_tutari === null ? null : Number(ham.liste_tutari),
+      guncelListe: await this.guncelTutar(ham.plan_key, ham.period),
+      sonrakiIndirim: await this.sonrakiIndirim(ham),
     });
     if (!karar) return false;
 
@@ -629,7 +685,7 @@ export class PayTRAbonelikService {
     // şartı değil (tutar yine duyurulan tutar, bkz. yenilemeTutari).
     const { data, error } = await this.supabase.client
       .from("subscriptions")
-      .update({ hatirlatma_vadesi: vade.toISOString(), hatirlatma_tutari: karar.tutar })
+      .update({ hatirlatma_vadesi: vade.toISOString(), hatirlatma_tutari: karar.tutar, hatirlatma_liste_tutari: karar.liste })
       .eq("id", ham.id)
       // Tarih PostgREST filtresinde tırnak içinde: ":" ve "." ayraç sanılmasın.
       .or(`hatirlatma_vadesi.is.null,hatirlatma_vadesi.neq."${vade.toISOString()}"`)
@@ -707,13 +763,28 @@ export class PayTRAbonelikService {
     return abonelikTutari(plan, period, kur, ref)?.amount ?? null;
   }
 
-  private yenilemeTutariniHesapla(ham: any, vade: Date): number | null {
-    return yenilemeTutari({
+  /** Bu vadede çekilecek tutar, indirimsiz hâli ve indirimin uygulanıp uygulanmadığı. */
+  private async yenilemeTutariniHesapla(
+    ham: any,
+    vade: Date
+  ): Promise<{ tutar: number; liste: number; indirimli: boolean } | null> {
+    const indirim = await this.sonrakiIndirim(ham);
+    const sonuc = yenilemeTutari({
       vade,
       sonTutar: ham.price_amount === null ? null : Number(ham.price_amount),
+      sonListe: ham.liste_tutari === null || ham.liste_tutari === undefined ? null : Number(ham.liste_tutari),
       hatirlatmaVadesi: ham.hatirlatma_vadesi ? new Date(ham.hatirlatma_vadesi) : null,
       hatirlatmaTutari: ham.hatirlatma_tutari === null ? null : Number(ham.hatirlatma_tutari),
+      hatirlatmaListe: ham.hatirlatma_liste_tutari === null || ham.hatirlatma_liste_tutari === undefined ? null : Number(ham.hatirlatma_liste_tutari),
+      indirim,
     });
+    return sonuc ? { ...sonuc, indirimli: indirim !== null } : null;
+  }
+
+  /** Aboneliğin bir sonraki ödemesinde uygulanacak indirim; yoksa null. */
+  private async sonrakiIndirim(ham: any): Promise<Indirim | null> {
+    if (!sonrakiOdemedeIndirim(ham.indirim_kalan_donem ?? null, Boolean(ham.indirim_kodu_id))) return null;
+    return this.indirimler.indirim(ham.indirim_kodu_id);
   }
 
   /** Satırı 'bekliyor'dan çıkarır; başka biri önce çıkardıysa false. */

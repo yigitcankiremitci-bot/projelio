@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { billingApi } from "../api/billing";
+import { billingApi, type IndirimOzeti } from "../api/billing";
+import IndirimKoduAlani from "./IndirimKoduAlani";
 import { aiChat } from "../api/aiChat";
 import type { AiCreditOrder, AiCreditPackage } from "../api/aiChat";
 import { useT } from "../lib/i18n";
@@ -51,6 +52,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [indirim, setIndirim] = useState<IndirimOzeti | null>(null);
 
   const reloadOrders = () => aiChat.getCreditOrders().then(setOrders).catch(() => {});
 
@@ -74,7 +76,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
     setBusy(true);
     setError("");
     try {
-      const { order, checkoutUrl } = await aiChat.createCreditOrder(selected);
+      const { order, checkoutUrl } = await aiChat.createCreditOrder(selected, indirim?.kod);
 
       // Ödeme sayfasının adresi iki yoldan gelebilir:
       //   · checkoutUrl — sipariş ucunun kendi döndürdüğü adres (şu an kullanılmıyor),
@@ -135,7 +137,10 @@ export default function AiCreditTopUp({ onChanged }: Props) {
               return (
                 <button
                   key={p.key}
-                  onClick={() => setSelected(active ? null : p.key)}
+                  onClick={() => {
+                    setSelected(active ? null : p.key);
+                    setIndirim(null);
+                  }}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -161,6 +166,18 @@ export default function AiCreditTopUp({ onChanged }: Props) {
               );
             })}
           </div>
+
+          {/* Paket değişince alan sıfırlanır (key): önizleme o paketin tutarıyla yapıldı. */}
+          {selected && (
+            <div style={{ marginBottom: 12 }}>
+              <IndirimKoduAlani
+                key={selected}
+                sureyiGoster={false}
+                onizle={(kod) => billingApi.indirimOnizle({ kod, kapsam: "lio", packageKey: selected })}
+                onDegis={setIndirim}
+              />
+            </div>
+          )}
 
           {/* Ödeme entegrasyonu gelene kadar kullanıcı ne olacağını ÖNCEDEN bilsin. */}
           {!paymentConfigured && (

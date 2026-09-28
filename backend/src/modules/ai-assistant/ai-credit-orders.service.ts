@@ -5,6 +5,7 @@ import { creditPackagesAt, findCreditPackage } from "./ai-credits.config";
 import { usdTryKuruOku } from "../../common/usd-try-kuru";
 import { demoHesabindaYasak } from "../../common/demo-hesap";
 import type { CreditPackage } from "./ai-credits.config";
+import { IndirimService } from "../billing/indirim.service";
 
 export type CreditOrderStatus = "pending_payment" | "paid" | "cancelled" | "failed";
 
@@ -14,6 +15,8 @@ export interface CreditOrder {
   packageKey: string;
   credits: number;
   priceAmount: number;
+  /** İndirim kodu uygulandıysa indirimsiz tutar. */
+  listPriceAmount?: number;
   currency: string;
   status: CreditOrderStatus;
   paidAt?: string;
@@ -40,6 +43,7 @@ function mapOrder(row: any): CreditOrder {
     packageKey: row.package_key,
     credits: Number(row.credits),
     priceAmount: Number(row.price_amount),
+    listPriceAmount: row.liste_tutari === null || row.liste_tutari === undefined ? undefined : Number(row.liste_tutari),
     currency: row.currency,
     status: row.status,
     paidAt: row.paid_at ?? undefined,
@@ -71,7 +75,8 @@ export class AiCreditOrdersService {
 
   constructor(
     private supabase: SupabaseService,
-    private credits: AiCreditsService
+    private credits: AiCreditsService,
+    private indirimler: IndirimService
   ) {}
 
   /** Satıştaki paketler, admin panelindeki kurla fiyatlanmış (bkz. creditPackagesAt). */
@@ -84,7 +89,7 @@ export class AiCreditOrdersService {
    * anahtarı alınır ve değerler sunucudaki katalogdan yazılır. Aksi halde istemci
    * "500.000 kredi, 1 ₺" diye bir sipariş uydurabilirdi.
    */
-  async create(userId: string, packageKey: string): Promise<CreditOrder> {
+  async create(userId: string, packageKey: string, indirimKodu?: string): Promise<CreditOrder> {
     // Demo hesabında kredi satın alınmaz: Lio zaten ücretsiz ve saatlik tavanla
     // sınırlı (bkz. demo-ai-kotasi.ts). Ziyaretçinin açtığı sipariş kayıtları
     // demo sıfırlamasının kapsamı dışında kalır, yani kalıcı çöp bırakırdı.
@@ -107,13 +112,21 @@ export class AiCreditOrdersService {
       );
     }
 
+    // İndirim de siparişe dondurulur; kodun kullanımı ödeme doğrulanınca
+    // yazılır (markPaid), vazgeçilen sipariş kodu harcamasın.
+    const indirim = indirimKodu?.trim()
+      ? await this.indirimler.uygula(userId, indirimKodu, { kapsam: "lio" }, pkg.priceTry)
+      : null;
+
     const { data, error } = await this.supabase.client
       .from("ai_credit_orders")
       .insert({
         user_id: userId,
         package_key: pkg.key,
         credits: pkg.credits,
-        price_amount: pkg.priceTry,
+        price_amount: indirim?.tutar ?? pkg.priceTry,
+        liste_tutari: indirim ? pkg.priceTry : null,
+        indirim_kodu_id: indirim?.kod.id ?? null,
         currency: "TRY",
         status: "pending_payment",
       })
@@ -225,6 +238,15 @@ export class AiCreditOrdersService {
           ? "Bu siparişin ödemesi zaten onaylanmış."
           : "Yalnızca ödeme bekleyen siparişler onaylanabilir."
       );
+    }
+
+    if (data.indirim_kodu_id) {
+      try {
+        await this.indirimler.kullanimYaz(data.indirim_kodu_id, data.user_id, { orderId: data.id });
+      } catch (hata) {
+        // Kullanım kaydı bakiyeyi ENGELLEMEZ: para alındı, bakiye yüklenmeli.
+        this.logger.error(`İndirim kullanımı yazılamadı (sipariş ${data.id}): ${(hata as Error).message}`);
+      }
     }
 
     return this.creditOrder(mapOrder(data), approvedBy);

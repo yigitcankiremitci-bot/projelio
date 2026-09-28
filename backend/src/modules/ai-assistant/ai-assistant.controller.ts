@@ -328,8 +328,8 @@ export class AiAssistantController {
    * kayıt oluşturur. Kredi ancak ödeme doğrulandıktan sonra yüklenir.
    */
   @Post("credit-orders")
-  async createCreditOrder(@Req() req: any, @Body() body: { packageKey: string }) {
-    const order = await this.creditOrders.create(req.user.userId, body?.packageKey);
+  async createCreditOrder(@Req() req: any, @Body() body: { packageKey: string; indirimKodu?: string }) {
+    const order = await this.creditOrders.create(req.user.userId, body?.packageKey, body?.indirimKodu);
     // Ödeme sağlayıcısı bağlıysa kullanıcı oraya yönlendirilir; değilse null döner
     // ve arayüz elle ödeme yönergesini gösterir (bkz. AiPaymentProvider).
     const checkout = await this.payment.createCheckout(order);

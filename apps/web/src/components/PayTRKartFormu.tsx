@@ -20,6 +20,30 @@ import { useThemeColors } from "../theme/useThemeColors";
  * ONAY KUTUSU ZORUNLU: PayTR'ye "müşteri tekrarlayan çekime açık onay verecek"
  * dendi. Sunucu da onaysız isteği reddediyor; kutu yalnızca arayüz tarafı.
  */
+/**
+ * Kart alanlarını PayTR'nin beklediği biçime getirir. Alanlar kontrolsüz
+ * (state yok), bu yüzden değer DOM'da düzeltiliyor.
+ *
+ * NEDEN: tarayıcının kart otomatik doldurması yılı "2029", kart numarasını
+ * "4242 4242 …" diye yazıyor. PayTR yılı İKİ hane istiyor; maxLength=2 çözüm
+ * değil, tarayıcı "2029"u "20"ye keser ve yanlış yıl gider. 4 hane gelirse
+ * son iki hane alınır.
+ */
+export function yilIkiHane(deger: string): string {
+  const rakam = deger.replace(/\D/g, "");
+  return rakam.length >= 4 ? rakam.slice(2, 4) : rakam.slice(0, 2);
+}
+
+function rakamlar(deger: string, enFazla: number): string {
+  return deger.replace(/\D/g, "").slice(0, enFazla);
+}
+
+function duzelt(e: React.FormEvent<HTMLInputElement>, cevir: (d: string) => string) {
+  const girdi = e.currentTarget;
+  const yeni = cevir(girdi.value);
+  if (yeni !== girdi.value) girdi.value = yeni;
+}
+
 export default function PayTRKartFormu({
   baslik,
   ozet,
@@ -55,6 +79,11 @@ export default function PayTRKartFormu({
   const gonder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!onay || mesgul) return;
+    // Son güvence: otomatik doldurma hiçbir olay göndermeden yazmış olabilir.
+    const yil = formRef.current?.elements.namedItem("expiry_year") as HTMLInputElement | null;
+    if (yil) yil.value = yilIkiHane(yil.value);
+    const numara = formRef.current?.elements.namedItem("card_number") as HTMLInputElement | null;
+    if (numara) numara.value = rakamlar(numara.value, 16);
     setMesgul(true);
     setHata(null);
     try {
@@ -122,14 +151,44 @@ export default function PayTRKartFormu({
           autoComplete="cc-number"
           inputMode="numeric"
           pattern="\d{15,16}"
+          onInput={(e) => duzelt(e, (d) => rakamlar(d, 16))}
           title={t("Kart numarası, boşluksuz 15–16 rakam")}
           placeholder={t("Kart numarası")}
           style={girdi}
         />
         <div style={{ display: "flex", gap: 8 }}>
-          <input name="expiry_month" required autoComplete="cc-exp-month" inputMode="numeric" pattern="\d{1,2}" placeholder={t("Ay")} style={girdi} />
-          <input name="expiry_year" required autoComplete="cc-exp-year" inputMode="numeric" pattern="\d{2}" placeholder={t("Yıl (2 hane)")} style={girdi} />
-          <input name="cvv" required autoComplete="cc-csc" inputMode="numeric" pattern="\d{3,4}" placeholder="CVV" style={girdi} />
+          <input
+            name="expiry_month"
+            required
+            autoComplete="cc-exp-month"
+            inputMode="numeric"
+            pattern="\d{1,2}"
+            onInput={(e) => duzelt(e, (d) => rakamlar(d, 2))}
+            placeholder={t("Ay")}
+            style={girdi}
+          />
+          <input
+            name="expiry_year"
+            required
+            autoComplete="cc-exp-year"
+            inputMode="numeric"
+            pattern="\d{2}"
+            onInput={(e) => duzelt(e, yilIkiHane)}
+            // Otomatik doldurma bazen input olayı göndermiyor; alandan çıkınca da düzelt.
+            onBlur={(e) => duzelt(e, yilIkiHane)}
+            placeholder={t("Yıl (2 hane)")}
+            style={girdi}
+          />
+          <input
+            name="cvv"
+            required
+            autoComplete="cc-csc"
+            inputMode="numeric"
+            pattern="\d{3,4}"
+            onInput={(e) => duzelt(e, (d) => rakamlar(d, 4))}
+            placeholder="CVV"
+            style={girdi}
+          />
         </div>
 
         <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, color: c.textPrimary, lineHeight: 1.5, marginTop: 4 }}>

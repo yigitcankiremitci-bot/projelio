@@ -3,6 +3,8 @@ import { JwtModule } from "@nestjs/jwt";
 import { FilesModule } from "../files/files.module";
 import { ModuleMembersModule } from "../module-members/module-members.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { AiAssistantModule } from "../ai-assistant/ai-assistant.module";
+import { LioOneriService } from "./lio-oneri.service";
 import { InstagramController } from "./instagram.controller";
 import { InstagramOAuthService } from "./instagram-oauth.service";
 import { InstagramPublishService } from "./instagram-publish.service";
@@ -26,6 +28,9 @@ import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
     FilesModule,
     // Zamanlanmış yayının sonucu sorumluya bildirilir.
     NotificationsModule,
+    // Lio'nun açıklama/etiket önerisi: kredi defteri, sağlayıcı yönlendirici ve
+    // ses çözümleme tek yerden (bkz. LioOneriService).
+    AiAssistantModule,
     // OAuth `state` imzası için — Google akışıyla aynı desen.
     JwtModule.register({
       secret: getJwtSecret(),
@@ -42,6 +47,7 @@ import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
     InstagramPublishService,
     SocialPublishService,
     SocialPublishProcessor,
+    LioOneriService,
   ],
   exports: [SocialMediaService],
 })

@@ -100,3 +100,35 @@ export function extractMetaError(body: string): string {
     return "Instagram isteği reddedildi.";
   }
 }
+
+/**
+ * Deneme reels'in Meta'daki adı.
+ *
+ * Kendi değerlerimiz (manual/performance) veritabanında duruyor; Meta'nın
+ * adlandırması yalnızca burada. `trial_params` JSON bir nesne olarak gider:
+ * {"graduation_strategy":"MANUAL"}.
+ */
+export function trialParam(trialReel: string | null | undefined): Record<string, string> {
+  if (trialReel === "manual") return { trial_params: JSON.stringify({ graduation_strategy: "MANUAL" }) };
+  if (trialReel === "performance") return { trial_params: JSON.stringify({ graduation_strategy: "SS_PERFORMANCE" }) };
+  return {};
+}
+
+/**
+ * Deneme reels bu medyayla yayımlanabilir mi — değilse kullanıcıya gösterilecek
+ * sebep.
+ *
+ * Meta deneme reels'i yalnızca TEK videolu reels konteynerinde kabul ediyor.
+ * Kontrol burada, çünkü sessizce normal gönderi olarak yayımlamak en kötü
+ * sonuç olurdu: kullanıcı "önce yabancılara deneyeyim" dediği videoyu bütün
+ * takipçilerine göstermiş olur ve bu geri alınamaz.
+ */
+export function denemeReelsHatasi(media: { mimeType: string }[]): string | null {
+  if (media.length !== 1) {
+    return "Deneme reels yalnızca tek bir videoyla yayımlanabilir; karusel ya da çoklu medya olmaz.";
+  }
+  if (!media[0].mimeType.startsWith("video/")) {
+    return "Deneme reels bir video ister; görsel deneme olarak yayımlanamaz.";
+  }
+  return null;
+}

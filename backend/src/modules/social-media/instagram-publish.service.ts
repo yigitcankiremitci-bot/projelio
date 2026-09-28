@@ -3,7 +3,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { FilesService } from "../files/files.service";
 import { IG_API_VERSION, IG_GRAPH_HOST } from "./instagram-oauth.service";
-import { extractMetaError } from "./publish-format";
+import { denemeReelsHatasi, extractMetaError, trialParam } from "./publish-format";
 import { SocialTokensService } from "./social-tokens.service";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
@@ -101,6 +101,8 @@ export class InstagramPublishService {
     mediaFileIds: string[];
     /** Katkıda bulunan kullanıcı adları ("@" öneksiz). Boşsa parametre gitmez. */
     collaborators?: string[];
+    /** Deneme reels (migration 139): "manual" | "performance". Boşsa normal gönderi. */
+    trialReel?: string | null;
     actingUserId: string;
     /** Yarım kalmış denemeden gelen konteyner — medya yeniden yüklenmesin. */
     existingContainerId?: string | null;
@@ -133,9 +135,23 @@ export class InstagramPublishService {
           staged.push(await this.stageMedia(fileId, params.actingUserId));
         }
 
+        if (params.trialReel) {
+          // Medya biçimi ancak dosya açılınca kesinleşiyor; kontrol bu yüzden
+          // kopyalamadan sonra. Kopyalar finally'de siliniyor.
+          const sebep = denemeReelsHatasi(staged);
+          if (sebep) throw new PublishError(sebep, true);
+        }
+
         containerId =
           staged.length === 1
-            ? await this.createContainer(params.externalAccountId, token.accessToken, staged[0], caption, params.collaborators)
+            ? await this.createContainer(
+                params.externalAccountId,
+                token.accessToken,
+                staged[0],
+                caption,
+                params.collaborators,
+                params.trialReel
+              )
             : await this.createCarousel(params.externalAccountId, token.accessToken, staged, caption, params.collaborators);
 
         await params.onContainer?.(containerId);
@@ -220,7 +236,8 @@ export class InstagramPublishService {
     accessToken: string,
     media: StagedMedia,
     caption: string,
-    collaborators?: string[]
+    collaborators?: string[],
+    trialReel?: string | null
   ): Promise<string> {
     const body: Record<string, string> = { caption, access_token: accessToken, ...collaboratorParam(collaborators) };
     if (media.isVideo) {
@@ -228,6 +245,8 @@ export class InstagramPublishService {
       // REELS: Meta 2024'ten beri tekil videoları reel olarak yayımlıyor;
       // media_type=VIDEO artık yalnızca carousel öğesi için geçerli.
       body.media_type = "REELS";
+      // Deneme reels: önce yalnızca takipçi olmayanlara gösterilir.
+      Object.assign(body, trialParam(trialReel));
     } else {
       body.image_url = media.publicUrl;
     }

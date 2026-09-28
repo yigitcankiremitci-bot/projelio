@@ -102,15 +102,18 @@ function toNetworkError(error: unknown): ApiError {
  * Çağıranın kendi signal'ini zaman aşımıyla birleştirir.
  * Çağıranın iptali ezilmemeli: bileşenler sayfa değişiminde isteği iptal ediyor.
  */
-function signalWithTimeout(caller: AbortSignal | null | undefined): { signal: AbortSignal; done: () => void } {
+function signalWithTimeout(
+  caller: AbortSignal | null | undefined,
+  timeoutMs = REQUEST_TIMEOUT_MS
+): { signal: AbortSignal; done: () => void } {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const signal =
     caller && typeof AbortSignal.any === "function" ? AbortSignal.any([caller, controller.signal]) : controller.signal;
   return { signal, done: () => clearTimeout(timer) };
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, options: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
   const token = localStorage.getItem("projelio_token");
   // Açık soketin kimliği: sunucu bundan isteğin HANGİ SAYFADAN geldiğini bulup
   // değişikliği o sayfadaki diğer kullanıcılara duyuruyor (bkz. lib/liveRoom.ts
@@ -123,7 +126,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // dili gösterdiğini zaten biliyor, o yüzden burada yazılıyor.
   // Bkz. backend common/filters/all-exceptions.filter.ts.
   const locale = etkinDil();
-  const timeout = signalWithTimeout(options.signal);
+  const timeout = signalWithTimeout(options.signal, options.timeoutMs);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
@@ -230,8 +233,10 @@ export const api = {
   //     api.get(path, ac.signal).then(setX).catch(ignoreAbort);
   //     return () => ac.abort(); }, [path]);
   get: <T>(path: string, signal?: AbortSignal) => request<T>(path, { signal }),
-  post: <T>(path: string, body: unknown, signal?: AbortSignal) =>
-    request<T>(path, { method: "POST", body: JSON.stringify(body), signal }),
+  // timeoutMs: bilerek uzun süren işler için (ör. Lio'nun video izlemesi —
+  // indirme + kare + ses çözümleme 30 sn'yi rahatça aşıyor). Varsayılan 30 sn.
+  post: <T>(path: string, body: unknown, signal?: AbortSignal, timeoutMs?: number) =>
+    request<T>(path, { method: "POST", body: JSON.stringify(body), signal, timeoutMs }),
   patch: <T>(path: string, body: unknown, signal?: AbortSignal) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body), signal }),
   // keepalive: true — sekme/pencere kapatılırken de isteğin tamamlanmasına izin

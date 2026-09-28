@@ -70,6 +70,8 @@ export interface SocialPostInput {
   /** "projelio" | "external" — bkz. isQueueable. */
   publishVia?: string;
   externalTool?: string | null;
+  /** Instagram deneme reels: "manual" | "performance" | null (normal gönderi). Bkz. migration 139. */
+  trialReel?: string | null;
   /** Katkıda bulunanlar. Verilirse liste bununla değiştirilir. */
   collaborators?: SocialPostCollaboratorInput[];
 }
@@ -100,6 +102,8 @@ const CONTENT_TYPES = new Set([
 ]);
 
 const PUBLISH_VIA = new Set(["projelio", "external"]);
+
+const TRIAL_REEL = new Set(["manual", "performance"]);
 
 const COLLABORATOR_STATUSES = new Set(["invited", "accepted", "declined"]);
 
@@ -236,6 +240,7 @@ function mapPost(row: any, assigneeName?: string): SocialPost {
     // Migration 115 uygulanmadan önce kolon yok: eski davranış "projelio".
     publishVia: row.publish_via ?? "projelio",
     externalTool: row.external_tool ?? undefined,
+    trialReel: row.trial_reel ?? undefined,
     targets: (row.social_post_targets ?? []).map(mapTarget),
     media: (row.social_post_media ?? []).map(mapMedia).sort((a, b) => a.sortOrder - b.sortOrder),
     collaborators: (row.social_post_collaborators ?? [])
@@ -580,6 +585,9 @@ export class SocialMediaService {
         ...("publish_via" in existing
           ? { publish_via: existing.publish_via, external_tool: existing.external_tool ?? null }
           : {}),
+        // Deneme reels de taşınır: bir seriyi önce denemeyle çıkaran ekip
+        // kopyada da aynısını bekler. Migration 139 öncesi kolon yok.
+        ...("trial_reel" in existing ? { trial_reel: existing.trial_reel ?? null } : {}),
       })
       .select("id")
       .single();
@@ -770,6 +778,9 @@ export class SocialMediaService {
     if (input.publishVia && !PUBLISH_VIA.has(input.publishVia)) {
       throw new BadRequestException("Geçersiz yayın yolu");
     }
+    if (input.trialReel && !TRIAL_REEL.has(input.trialReel)) {
+      throw new BadRequestException("Geçersiz deneme reels seçeneği");
+    }
   }
 
   /**
@@ -785,6 +796,9 @@ export class SocialMediaService {
     if (input.externalTool !== undefined && input.publishVia !== "projelio") {
       cols.external_tool = nullable(input.externalTool);
     }
+    // Yalnızca istemci alanı gönderdiyse yazılır: migration 139 uygulanmadan
+    // önce kolon yok ve alanı hiç bilmeyen eski istemcinin kaydı düşmemeli.
+    if (input.trialReel !== undefined) cols.trial_reel = input.trialReel || null;
     return cols;
   }
 

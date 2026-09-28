@@ -4,11 +4,13 @@ import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   buildCaption,
+  denemeReelsHatasi,
   extractMetaError,
   instagramCollaborators,
   isQueueable,
   mediaFileIds,
   normalizeHandle,
+  trialParam,
 } from "./publish-format";
 
 // Yayına giden metnin ve medya sırasının kuralları. Bu iki fonksiyon yanlış
@@ -126,5 +128,27 @@ describe("katkıda bulunanlar", () => {
   test("platformu yazılmamış kayıt Instagram sayılır, boş ad atlanır", () => {
     assert.deepEqual(instagramCollaborators([{ handle: "a" }, { handle: " @ " }]), ["a"]);
     assert.deepEqual(instagramCollaborators(null), []);
+  });
+});
+
+describe("deneme reels", () => {
+  test("kendi değerlerimiz Meta'nın mezuniyet adına çevrilir", () => {
+    assert.deepEqual(trialParam("manual"), { trial_params: '{"graduation_strategy":"MANUAL"}' });
+    assert.deepEqual(trialParam("performance"), { trial_params: '{"graduation_strategy":"SS_PERFORMANCE"}' });
+  });
+
+  test("deneme değilse parametre hiç gitmez", () => {
+    assert.deepEqual(trialParam(null), {});
+    assert.deepEqual(trialParam(undefined), {});
+    assert.deepEqual(trialParam("bilinmeyen"), {});
+  });
+
+  test("yalnızca tek video kabul edilir", () => {
+    // Sessizce normal gönderi olarak yayımlamak geri alınamaz: video bütün
+    // takipçilere gitmiş olur.
+    assert.equal(denemeReelsHatasi([{ mimeType: "video/mp4" }]), null);
+    assert.ok(denemeReelsHatasi([{ mimeType: "image/jpeg" }]));
+    assert.ok(denemeReelsHatasi([{ mimeType: "video/mp4" }, { mimeType: "video/mp4" }]));
+    assert.ok(denemeReelsHatasi([]));
   });
 });

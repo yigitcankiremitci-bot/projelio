@@ -151,6 +151,8 @@ export class SocialPublishService {
         externalAccountId: account.external_account_id,
         caption: buildCaption(post, target),
         collaborators,
+        // Migration 139 öncesi kolon yok: undefined = normal gönderi.
+        trialReel: post.trial_reel,
         mediaFileIds: mediaFileIds(post),
         // Dosyalar kullanıcı yetkisiyle okunur; sistem adına arka kapı yok.
         // Zamanlanmış yayında içeriği oluşturan kişi adına hareket edilir.

@@ -899,4 +899,17 @@ export const hatalar: TranslationDict = {
   "Bu isteği yalnızca alıcısı yanıtlayabilir": "Only the recipient can respond to this request",
   "Bu paylaşımı yalnızca yazan ya da duvar sahibi silebilir": "Only the author or the wall's owner can delete this post",
   "Paylaşım boş olamaz": "A post can't be empty",
+  // Sosyal medya: Lio önerisi + deneme reels
+  "Geçersiz deneme reels seçeneği": "Invalid trial reel option",
+  "Lio bir öneri üretemedi, tekrar dene.": "Lio couldn't come up with a suggestion, try again.",
+  "Lio'nun bakabilmesi için önce bir görsel ya da video ekle.": "Add an image or video first so Lio has something to look at.",
+  "Sunucuda görsel okuyabilen bir AI sağlayıcısı tanımlı değil.": "No AI provider that can read images is configured on the server.",
+  "Bu sunucuda video işleme (ffmpeg) kurulu değil; Lio videoyu izleyemiyor. Görsel içeriklerde öneri çalışır.":
+    "Video processing (ffmpeg) isn't installed on this server, so Lio can't watch videos. Suggestions still work for images.",
+  "Lio bu gönderinin medyasını okuyamadı. JPEG/PNG görsel ya da video ekleyin.":
+    "Lio couldn't read this post's media. Add a JPEG/PNG image or a video.",
+  "Video çok büyük (en fazla 1 GB).": "The video is too large (1 GB max).",
+  "Video dosyası okunamadı.": "Couldn't read the video file.",
+  "Videodan kare alınamadı; dosya bozuk ya da desteklenmeyen biçimde olabilir.":
+    "Couldn't take frames from the video; the file may be damaged or in an unsupported format.",
 };

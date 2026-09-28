@@ -25,6 +25,12 @@ COPY backend/package.json backend/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN npm ci --omit=dev && npm cache clean --force
+# ffmpeg: Lio'nun sosyal medya videolarından kare ve ses çıkarması için
+# (backend/src/modules/social-media/video-kareleri.ts). npm paketi değil,
+# sistem paketi — yoksa özellik kapanır, uygulamanın geri kalanı etkilenmez.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/backend/dist backend/dist
 COPY --from=build /app/packages/shared packages/shared
 RUN node -e "const fs=require('fs'); const path='packages/shared/package.json'; const pkg=JSON.parse(fs.readFileSync(path)); pkg.main='dist/index.js'; fs.writeFileSync(path, JSON.stringify(pkg, null, 2)+'\n')"

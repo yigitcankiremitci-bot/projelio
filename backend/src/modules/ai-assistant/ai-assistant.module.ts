@@ -136,6 +136,8 @@ import { GoogleTakvimModule } from "../google-takvim/google-takvim.module";
   // AiCreditOrdersService dışa açık: PayTR bildirimi ödemeyi onayladığında
   // bakiyeyi yükleyen tek yol bu servis (BillingModule kullanıyor). Kredi
   // defteri mantığı orada KOPYALANMIYOR.
-  exports: [AiCreditsService, AiCreditOrdersService, AiAssistantService, LlmProviderRegistry],
+  // AiTranscriptionService dışa açık: Sosyal Medya'nın Lio önerisi videonun
+  // sesini aynı çözümleme yolundan (ve aynı ücretlendirmeyle) yazıya döküyor.
+  exports: [AiCreditsService, AiCreditOrdersService, AiAssistantService, LlmProviderRegistry, AiTranscriptionService],
 })
 export class AiAssistantModule {}

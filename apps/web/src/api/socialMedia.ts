@@ -1,5 +1,6 @@
 import type {
   SocialAccount,
+  SocialCaptionSuggestion,
   SocialContentType,
   SocialMediaOverview,
   SocialPlatform,
@@ -7,6 +8,7 @@ import type {
   SocialPostCollaboratorInput,
   SocialPostStatus,
   SocialPublishVia,
+  SocialTrialReel,
 } from "@projelio/shared";
 import { api } from "./client";
 
@@ -55,6 +57,8 @@ export interface SocialPostInput {
   captionOverrides?: Record<string, string>;
   publishVia?: SocialPublishVia;
   externalTool?: string | null;
+  /** Deneme reels; null = normal gönderi. Gönderilmezse sunucu dokunmaz (migration 139 öncesi uyum). */
+  trialReel?: SocialTrialReel | null;
   /** Verilirse katkıda bulunan listesi bununla değiştirilir. */
   collaborators?: SocialPostCollaboratorInput[];
 }
@@ -74,6 +78,9 @@ function overviewPath(scope: SocialScope): string {
 function withScope<T extends object>(scope: SocialScope, body: T): T & { departmentId?: string } {
   return "jobId" in scope ? body : { ...body, departmentId: scope.departmentId };
 }
+
+/** Tek yayın isteğinin tavanı: sunucunun video bekleme süresi (2 dk) + pay. */
+const YAYIN_SURESI_MS = 3 * 60_000;
 
 export const socialMediaApi = {
   /** Modül açılışının tek isteği: hesaplar + gönderiler. */
@@ -140,9 +147,20 @@ export const socialMediaApi = {
   disconnectInstagram: (accountId: string) => api.post<{ ok: true }>(`/social-accounts/${accountId}/disconnect`, {}),
 
   /** "Şimdi paylaş" — yayımlanmamış bütün kanallar denenir. */
+  // Video yayınında sunucu Meta'nın kodlamasını 2 dakikaya kadar bekliyor
+  // (instagram-publish.service > POLL_TIMEOUT_MS); 30 sn'lik varsayılanla
+  // istemci "yanıt vermedi" deyip yayın arkada sürerken kullanıcıyı yanıltıyordu.
   publishPost: (postId: string) =>
-    api.post<{ published: number; failed: number }>(`/social-posts/${postId}/publish`, {}),
+    api.post<{ published: number; failed: number }>(`/social-posts/${postId}/publish`, {}, undefined, YAYIN_SURESI_MS),
 
   /** Tek kanalı yeniden dener. */
-  publishTarget: (targetId: string) => api.post<{ ok: boolean }>(`/social-post-targets/${targetId}/publish`, {}),
+  publishTarget: (targetId: string) =>
+    api.post<{ ok: boolean }>(`/social-post-targets/${targetId}/publish`, {}, undefined, YAYIN_SURESI_MS),
+
+  /**
+   * Lio'nun açıklama + etiket önerisi. Video indirilip karelere bölünüyor ve
+   * sesi yazıya dökülüyor — dakikalar sürebilir. Öneri kaydedilmez, döner.
+   */
+  lioOnerisi: (postId: string, istek?: string) =>
+    api.post<SocialCaptionSuggestion>(`/social-posts/${postId}/lio-oneri`, { istek }, undefined, 5 * 60_000),
 };

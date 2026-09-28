@@ -5,6 +5,8 @@ import { InstagramService } from "./instagram.service";
 import { SocialMediaService } from "./social-media.service";
 import type { SocialAccountInput, SocialPostInput, SocialScope } from "./social-media.service";
 import { SocialPublishService } from "./social-publish.service";
+import { LioOneriService } from "./lio-oneri.service";
+import { istemciDili } from "../../common/i18n";
 
 /**
  * Sosyal Medya modülünün uçları.
@@ -20,6 +22,7 @@ export class SocialMediaController {
     private social: SocialMediaService,
     private instagram: InstagramService,
     private publish: SocialPublishService,
+    private lioOneri: LioOneriService,
     private access: AccessService
   ) {}
 
@@ -175,6 +178,19 @@ export class SocialMediaController {
   @Post("social-posts/:id/publish")
   publishPost(@Param("id") id: string, @Req() req: any) {
     return this.publish.publishPostNow(id, req.user.userId);
+  }
+
+  /**
+   * "Lio'ya yazdır": gönderinin görsel/videosuna bakıp açıklama ve etiket
+   * önerir. Öneri kaydedilmez, döner — forma almak kullanıcının kararı.
+   * Uzun sürebilir (video indirme + kare + ses çözümleme).
+   */
+  @Post("social-posts/:id/lio-oneri")
+  lioOnerisi(@Param("id") id: string, @Body("istek") istek: string | undefined, @Req() req: any) {
+    return this.lioOneri.oner(id, req.user.userId, {
+      istek: typeof istek === "string" ? istek : undefined,
+      dil: istemciDili(req) === "en" ? "en" : "tr",
+    });
   }
 
   /** Tek kanalı yeniden dener (hata sonrası). */

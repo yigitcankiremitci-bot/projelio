@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   SocialAccount,
+  SocialCaptionSuggestion,
   SocialCollaboratorStatus,
   SocialContentType,
   SocialPlatform,
   SocialPost,
   SocialPostStatus,
   SocialPublishVia,
+  SocialTrialReel,
 } from "@projelio/shared";
 import { normalizeSocialHandle } from "@projelio/shared";
 import type { ProjectFile } from "@projelio/shared";
@@ -39,6 +41,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
 import { IconExternalLink, IconTrash, IconUpload } from "./icons";
+import { LioMascotIcon } from "./AskLioButton";
 
 interface Props {
   scope: SocialScope;
@@ -67,6 +70,8 @@ interface FormState {
   assigneeId: string;
   publishVia: SocialPublishVia;
   externalTool: string;
+  /** Boş = normal gönderi. */
+  trialReel: SocialTrialReel | "";
 }
 
 /** Formdaki katkıda bulunan: kayıtlı hesap ya da yalnızca kullanıcı adı. */
@@ -92,6 +97,7 @@ function initialForm(post: SocialPost | null | undefined, defaultDate?: string):
     assigneeId: post?.assigneeId ?? "",
     publishVia: post?.publishVia ?? "projelio",
     externalTool: post?.externalTool ?? "",
+    trialReel: post?.trialReel ?? "",
   };
 }
 
@@ -161,6 +167,12 @@ export default function SocialPostComposer({
   const [silinecek, setSilinecek] = useState(false);
   // "Tekrar paylaş": yayımlanmış içeriği yeni bir taslak olarak çoğaltır.
   const [cogaltiliyor, setCogaltiliyor] = useState(false);
+  // Lio önerisi: panel açık mı, kullanıcının isteği, sonuç.
+  const [lioAcik, setLioAcik] = useState(false);
+  const [lioIstek, setLioIstek] = useState("");
+  const [lioCalisiyor, setLioCalisiyor] = useState(false);
+  const [lioOneri, setLioOneri] = useState<SocialCaptionSuggestion | null>(null);
+  const [lioHata, setLioHata] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
@@ -262,6 +274,9 @@ export default function SocialPostComposer({
     captionOverrides: Object.fromEntries(Object.entries(overrides).filter(([id, v]) => selected.includes(id) && v.trim())),
     publishVia: form.publishVia,
     externalTool: form.publishVia === "external" ? form.externalTool : null,
+    // Alan yalnızca kullanılıyorsa gider: migration 139 uygulanmamış bir
+    // sunucuda kolon yok ve alanı hiç kullanmayan kaydın düşmesi gerekmez.
+    ...(form.trialReel || saved?.trialReel ? { trialReel: form.trialReel || null } : {}),
     collaborators: collabs.map((k) => ({
       accountId: k.accountId,
       platform: k.platform,
@@ -438,6 +453,37 @@ export default function SocialPostComposer({
     }
   };
 
+  /**
+   * "Lio'ya yazdır".
+   *
+   * Önce kaydeder: sunucu gönderiyi veritabanından okuyor (medya, hesapların
+   * ton notu, kullanıcının taslağı) — ekrandaki taslak kaydedilmeden gitseydi
+   * Lio eski metnin üstüne yazardı. Öneri forma KENDİLİĞİNDEN yazılmaz;
+   * kullanıcı "al" diyene kadar kendi metni yerinde durur.
+   */
+  const lioyaYazdir = async () => {
+    setLioCalisiyor(true);
+    setLioHata("");
+    setLioOneri(null);
+    try {
+      const current = await persist();
+      setLioOneri(await socialMediaApi.lioOnerisi(current.id, lioIstek.trim() || undefined));
+    } catch (err) {
+      setLioHata(err instanceof Error ? err.message : t("Lio bir öneri üretemedi, tekrar dene."));
+    } finally {
+      setLioCalisiyor(false);
+    }
+  };
+
+  const oneriyiAl = (ne: "caption" | "hashtags" | "ikisi") => {
+    if (!lioOneri) return;
+    setForm((f) => ({
+      ...f,
+      caption: ne === "hashtags" ? f.caption : lioOneri.caption,
+      hashtags: ne === "caption" ? f.hashtags : lioOneri.hashtags,
+    }));
+  };
+
   /** Hesap → yayın hedefi. Bağlı kanalların durumu chip'lerde gösteriliyor. */
   const targetByAccount = useMemo(
     () => new Map((saved?.targets ?? []).map((hedef) => [hedef.accountId, hedef])),
@@ -487,6 +533,28 @@ export default function SocialPostComposer({
    */
   const cokSatirli = { ...field, height: "auto", resize: "vertical", lineHeight: 1.5 } as const;
   const media = saved?.media ?? [];
+  const videoVar = media.some((m) => (m.mimeType ?? "").startsWith("video/"));
+  // Deneme reels yalnızca Instagram'a ve Projelio'nun yaptığı yayında anlamlı.
+  const instagramSecili = accounts.some((a) => selected.includes(a.id) && a.platform === "instagram");
+  const denemeGoster = form.publishVia === "projelio" && (instagramSecili || !!form.trialReel);
+  // Sunucu yayın anında aynı kuralı uygular (publish-format.ts > denemeReelsHatasi);
+  // burada erken uyarı.
+  const denemeUyarisi =
+    form.trialReel && media.length > 0 && (media.length !== 1 || !videoVar)
+      ? t("Deneme reels tek bir video ister; bu içerikte {n} medya var.", { n: media.length })
+      : "";
+  const ikincilDugme = {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 12,
+    padding: "4px 10px",
+    borderRadius: 8,
+    border: `1px solid ${c.border}`,
+    background: "transparent",
+    cursor: "pointer",
+    color: c.textPrimary,
+  } as const;
 
   return (
     <Modal
@@ -761,7 +829,18 @@ export default function SocialPostComposer({
         {/* ---------------------------------------------- Metin */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-            {label(t("Açıklama metni"))}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {label(t("Açıklama metni"))}
+              <button
+                type="button"
+                onClick={() => setLioAcik((a) => !a)}
+                title={t("Lio görsellere ya da videoya bakıp açıklama ve etiket önersin")}
+                style={{ ...ikincilDugme, padding: "2px 8px", fontSize: 11 }}
+              >
+                <LioMascotIcon size={14} />
+                {t("Lio'ya yazdır")}
+              </button>
+            </div>
             <span style={{ fontSize: 11, color: overLimit ? c.danger : c.textSecondary }}>
               {limit !== undefined
                 ? t("{n} / {sinir} karakter", { n: length, sinir: limit })
@@ -780,6 +859,115 @@ export default function SocialPostComposer({
             style={{ ...cokSatirli, borderColor: overLimit ? c.danger : undefined }}
           />
         </div>
+
+        {lioAcik && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              border: `1px solid ${c.border}`,
+              borderRadius: 8,
+              padding: 10,
+              background: c.surface,
+            }}
+          >
+            <span style={{ fontSize: 12, color: c.textSecondary }}>
+              {videoVar
+                ? t(
+                    "Lio videoyu izler: eşit aralıklarla kareler alır, konuşma varsa yazıya döker ve buna göre açıklama ile etiket önerir. Hesabın ton notu ve kutudaki taslağın dikkate alınır."
+                  )
+                : t(
+                    "Lio görsellere bakıp açıklama ve etiket önerir. Hesabın ton notu ve kutudaki taslağın dikkate alınır."
+                  )}
+            </span>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <input
+                value={lioIstek}
+                onChange={(e) => setLioIstek(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !lioCalisiyor && media.length > 0) void lioyaYazdir();
+                }}
+                placeholder={t("Ne vurgulansın? (isteğe bağlı — ör. indirimi öne çıkar, kısa tut)")}
+                style={{ ...field, flex: "1 1 240px", width: "auto" }}
+              />
+              <button
+                type="button"
+                onClick={() => void lioyaYazdir()}
+                disabled={lioCalisiyor || media.length === 0}
+                style={{
+                  ...ikincilDugme,
+                  fontSize: 13,
+                  padding: "6px 12px",
+                  border: "none",
+                  background: c.primary,
+                  color: c.onPrimary,
+                  opacity: lioCalisiyor || media.length === 0 ? 0.6 : 1,
+                  cursor: lioCalisiyor || media.length === 0 ? "default" : "pointer",
+                }}
+              >
+                {lioCalisiyor ? (videoVar ? t("Lio videoyu izliyor…") : t("Lio bakıyor…")) : t("Öner")}
+              </button>
+            </div>
+            {media.length === 0 && (
+              <span style={{ fontSize: 11, color: c.textSecondary }}>
+                {t("Önce aşağıdan bir görsel ya da video ekle; Lio ona bakarak yazar.")}
+              </span>
+            )}
+            {lioCalisiyor && videoVar && (
+              <span style={{ fontSize: 11, color: c.textSecondary }}>
+                {t("Uzun videolarda bir iki dakika sürebilir.")}
+              </span>
+            )}
+            {lioHata && <span style={{ fontSize: 12, color: c.danger }}>{lioHata}</span>}
+            {lioOneri && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {lioOneri.gorulen && (
+                  <span style={{ fontSize: 12, color: c.textSecondary, fontStyle: "italic" }}>
+                    {t("Lio'nun gördüğü:")} {lioOneri.gorulen}
+                  </span>
+                )}
+                <div
+                  style={{
+                    fontSize: 13,
+                    whiteSpace: "pre-wrap",
+                    lineHeight: 1.5,
+                    padding: 8,
+                    borderRadius: 6,
+                    background: c.background,
+                    color: c.textPrimary,
+                  }}
+                >
+                  {lioOneri.caption}
+                </div>
+                {lioOneri.hashtags && (
+                  <div style={{ fontSize: 12, color: c.primary, lineHeight: 1.5 }}>{lioOneri.hashtags}</div>
+                )}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <button type="button" onClick={() => oneriyiAl("ikisi")} style={ikincilDugme}>
+                    {t("İkisini de al")}
+                  </button>
+                  <button type="button" onClick={() => oneriyiAl("caption")} style={ikincilDugme}>
+                    {t("Yalnızca açıklamayı al")}
+                  </button>
+                  {lioOneri.hashtags && (
+                    <button type="button" onClick={() => oneriyiAl("hashtags")} style={ikincilDugme}>
+                      {t("Yalnızca etiketleri al")}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => void lioyaYazdir()} disabled={lioCalisiyor} style={ikincilDugme}>
+                    {t("Yeniden öner")}
+                  </button>
+                  <span style={{ fontSize: 11, color: c.textSecondary, marginLeft: "auto" }}>
+                    {lioOneri.sesVar
+                      ? t("{n} kare + ses · {birim} birim", { n: lioOneri.kareSayisi, birim: lioOneri.kredi })
+                      : t("{n} kare · {birim} birim", { n: lioOneri.kareSayisi, birim: lioOneri.kredi })}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <div style={{ flex: "2 1 240px", display: "flex", flexDirection: "column", gap: 4 }}>
@@ -1093,6 +1281,57 @@ export default function SocialPostComposer({
             />
           </div>
         </div>
+
+        {/* ---------------------------------------------- Deneme reels */}
+        {denemeGoster && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              border: `1px solid ${form.trialReel ? c.accent : c.border}`,
+              borderRadius: 8,
+              padding: "8px 10px",
+            }}
+          >
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={!!form.trialReel}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    trialReel: e.target.checked ? "manual" : "",
+                    // Deneme yalnızca reels olabilir; tür başka bir şeyse takvimde
+                    // yanlış görünmesin.
+                    contentType: e.target.checked ? "reel" : f.contentType,
+                  }))
+                }
+                style={{ width: "auto", height: "auto" }}
+              />
+              {t("Instagram'da deneme reels olarak yayımla")}
+            </label>
+            <span style={{ fontSize: 11, color: c.textSecondary }}>
+              {t(
+                "Deneme reels önce yalnızca seni takip etmeyenlere gösterilir; takipçilerin görmez. Tutarsa takipçilerine açılır. Yalnızca tek videolu gönderide çalışır."
+              )}
+            </span>
+            {form.trialReel && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {label(t("Takipçilere ne zaman açılsın"))}
+                <select
+                  value={form.trialReel}
+                  onChange={(e) => set("trialReel", e.target.value as SocialTrialReel)}
+                  style={{ ...field, maxWidth: 380 }}
+                >
+                  <option value="manual">{t("Ben Instagram'dan açarım")}</option>
+                  <option value="performance">{t("İyi performans gösterirse Instagram kendisi açsın")}</option>
+                </select>
+              </div>
+            )}
+            {denemeUyarisi && <span style={{ fontSize: 12, color: c.danger }}>{denemeUyarisi}</span>}
+          </div>
+        )}
 
         {error && <span style={{ fontSize: 12, color: c.danger }}>{error}</span>}
         {notice && <span style={{ fontSize: 12, color: c.success }}>{notice}</span>}

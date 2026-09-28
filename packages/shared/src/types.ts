@@ -2941,6 +2941,27 @@ export interface SocialPostTarget {
  */
 export type SocialPublishVia = "projelio" | "external";
 
+/**
+ * Instagram deneme reels'in mezuniyet yolu (migration 139). Deneme reels önce
+ * yalnızca takipçi olmayanlara gösterilir; "manual"da kullanıcı Instagram'dan
+ * elle açar, "performance"ta Meta ilk performansa bakıp kendisi açar.
+ */
+export type SocialTrialReel = "manual" | "performance";
+
+/** Lio'nun gönderi için yazdığı açıklama önerisi (bkz. POST /social-posts/:id/lio-oneri). */
+export interface SocialCaptionSuggestion {
+  caption: string;
+  /** "#etiket #etiket" biçiminde, boşlukla ayrılmış. */
+  hashtags: string;
+  /** Lio'nun videoda/görselde ne gördüğüne dair kısa not — kullanıcı öneriyi tartabilsin. */
+  gorulen?: string;
+  /** Kaç kare incelendi; videoda ses yazıya çevrildiyse `sesVar` true. */
+  kareSayisi: number;
+  sesVar: boolean;
+  /** Harcanan Lio Bakiyesi (birim). */
+  kredi: number;
+}
+
 export type SocialCollaboratorStatus = "invited" | "accepted" | "declined";
 
 /** Gönderinin ortak yazarı (Instagram "katkıda bulunanlar"). */
@@ -2998,6 +3019,8 @@ export interface SocialPost {
   publishVia: SocialPublishVia;
   /** publishVia "external" ise aracın adı (ör. "Meta Business Suite"). */
   externalTool?: string;
+  /** Doluysa Instagram'a deneme reels olarak gider (yalnızca tek videolu gönderi). */
+  trialReel?: SocialTrialReel;
   /** Hangi hesaplarda yayımlanacak. */
   targets: SocialPostTarget[];
   media: SocialPostMedia[];

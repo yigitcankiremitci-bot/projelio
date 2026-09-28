@@ -355,4 +355,37 @@ export const sosyal: TranslationDict = {
   "İçerik çoğaltılamadı": "Couldn't duplicate the post",
   "İçeriği yeni bir taslak olarak çoğaltır; metin, görseller ve hesaplar taşınır.":
     "Copies the post into a new draft; text, images and accounts come along.",
+
+  // ─────────────────────────────────────────────── Lio önerisi + deneme reels
+  "Lio'ya yazdır": "Let Lio write",
+  "Lio görsellere ya da videoya bakıp açıklama ve etiket önersin":
+    "Lio looks at the images or video and suggests a caption and tags",
+  "Lio videoyu izler: eşit aralıklarla kareler alır, konuşma varsa yazıya döker ve buna göre açıklama ile etiket önerir. Hesabın ton notu ve kutudaki taslağın dikkate alınır.":
+    "Lio watches the video: it takes frames at even intervals, transcribes any speech and suggests a caption and tags from that. The account's tone note and your draft are taken into account.",
+  "Lio görsellere bakıp açıklama ve etiket önerir. Hesabın ton notu ve kutudaki taslağın dikkate alınır.":
+    "Lio looks at the images and suggests a caption and tags. The account's tone note and your draft are taken into account.",
+  "Ne vurgulansın? (isteğe bağlı — ör. indirimi öne çıkar, kısa tut)":
+    "What should it highlight? (optional — e.g. feature the discount, keep it short)",
+  "Öner": "Suggest",
+  "Lio videoyu izliyor…": "Lio is watching the video…",
+  "Lio bakıyor…": "Lio is looking…",
+  "Önce aşağıdan bir görsel ya da video ekle; Lio ona bakarak yazar.":
+    "Add an image or video below first; Lio writes from it.",
+  "Uzun videolarda bir iki dakika sürebilir.": "Long videos can take a minute or two.",
+  "Lio bir öneri üretemedi, tekrar dene.": "Lio couldn't come up with a suggestion, try again.",
+  "Lio'nun gördüğü:": "What Lio saw:",
+  "İkisini de al": "Use both",
+  "Yalnızca açıklamayı al": "Use caption only",
+  "Yalnızca etiketleri al": "Use tags only",
+  "Yeniden öner": "Suggest again",
+  "{n} kare + ses · {birim} birim": "{n} frames + audio · {birim} units",
+  "{n} kare · {birim} birim": "{n} frames · {birim} units",
+  "Instagram'da deneme reels olarak yayımla": "Publish as an Instagram trial reel",
+  "Deneme reels önce yalnızca seni takip etmeyenlere gösterilir; takipçilerin görmez. Tutarsa takipçilerine açılır. Yalnızca tek videolu gönderide çalışır.":
+    "A trial reel is shown only to people who don't follow you at first; your followers won't see it. If it does well, it's shared with your followers. Works only for single-video posts.",
+  "Takipçilere ne zaman açılsın": "When to share with followers",
+  "Ben Instagram'dan açarım": "I'll share it from Instagram",
+  "İyi performans gösterirse Instagram kendisi açsın": "Let Instagram share it if it performs well",
+  "Deneme reels tek bir video ister; bu içerikte {n} medya var.":
+    "A trial reel needs exactly one video; this post has {n} media items.",
 };

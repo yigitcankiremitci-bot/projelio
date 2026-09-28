@@ -198,12 +198,14 @@ export const lio: TranslationDict = {
   // Mobil uygulamada yükleme çağrısı gösterilmiyor (mağaza kuralı).
   "Lio Bakiyeniz azaldı.": "You're running low on Lio Units.",
   "Sesli komut ver (ses çözümleme Lio Bakiyesi harcar)": "Give a voice command (transcription uses Lio Units)",
-  "Sesli anlatım": "Narration",
+  // Tur İngilizcede SESSİZ (bkz. narrator.sesliAnlatimVar): tur başlıkları
+  // "narration/voice" dememeli, kullanıcı ses bekleyip bulamıyordu.
+  "Sesli anlatım": "Guided tours",
   "Sesli kullanım anlatımı": "Narrated walkthrough",
   "Anlatımı sesli dinle": "Listen to the narration",
   "Anlatım hızı": "Narration speed",
   "Anlatım bitince kendiliğinden ilerle": "Advance automatically when the narration ends",
-  "Diğer anlatımlar": "Other narrations",
+  "Diğer anlatımlar": "Other tours",
   "Okuma sesi": "Reading voice",
   "Ses kaynağı": "Voice source",
   "Doğal ses": "Natural voice",

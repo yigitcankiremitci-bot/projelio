@@ -8,6 +8,7 @@ import { demoZiyaretiBaslat } from "../lib/demoZiyaret";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import GirisDilSecici from "../components/GirisDilSecici";
+import SifreGirdisi from "../components/SifreGirdisi";
 
 /** 905 -> "15:05". Geri sayım dakika:saniye okunması en kolay biçim. */
 function formatSure(saniye: number): string {
@@ -165,13 +166,12 @@ export default function Login() {
                 {t("Şifremi unuttum")}
               </Link>
             </div>
-            <input
-              type="password"
+            <SifreGirdisi
               placeholder="••••••••"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
+              autoComplete="current-password"
               required
-              style={{ width: "100%" }}
             />
           </div>
 

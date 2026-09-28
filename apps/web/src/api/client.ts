@@ -224,6 +224,39 @@ export function ignoreAbort(error: unknown): void {
   if (!isAbortError(error)) throw error;
 }
 
+/**
+ * Başarıyla tamamlanan yazma isteklerini izleyenler.
+ *
+ * NEDEN: bazı yan davranışlar "kullanıcı şunu yaptı" anına bağlı ama o iş
+ * onlarca bileşende ayrı ayrı yapılıyor — ör. görev tamamlama 10 dosyada
+ * kendi PATCH'iyle. Değerlendirme isteği (lib/degerlendirmeIstegi.ts) buradan
+ * dinliyor ki her bileşene bir satır eklemek gerekmesin.
+ *
+ * Yalnızca BAŞARILI istekten SONRA çağrılır; oturum ve hata akışına hiçbir
+ * etkisi yoktur. Dinleyicinin hatası yutulur — isteği yapanın sonucu
+ * bir yan davranış yüzünden bozulmamalı.
+ */
+type YazmaDinleyicisi = (method: string, path: string, body: unknown) => void;
+const yazmaDinleyicileri = new Set<YazmaDinleyicisi>();
+
+export function basariliYazmayiDinle(fn: YazmaDinleyicisi): () => void {
+  yazmaDinleyicileri.add(fn);
+  return () => {
+    yazmaDinleyicileri.delete(fn);
+  };
+}
+
+function yazmaBitti<T>(sonuc: T, method: string, path: string, body: unknown): T {
+  for (const fn of yazmaDinleyicileri) {
+    try {
+      fn(method, path, body);
+    } catch {
+      /* yan davranış; isteğin sonucunu etkilemez */
+    }
+  }
+  return sonuc;
+}
+
 export const api = {
   // signal isteğe bağlı ama GET'te önemli: kullanıcı kenar çubuğundan hızlıca
   // proje A → B → C gezdiğinde, geç dönen A yanıtı C'nin ekranını eziyordu
@@ -238,7 +271,9 @@ export const api = {
   post: <T>(path: string, body: unknown, signal?: AbortSignal, timeoutMs?: number) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body), signal, timeoutMs }),
   patch: <T>(path: string, body: unknown, signal?: AbortSignal) =>
-    request<T>(path, { method: "PATCH", body: JSON.stringify(body), signal }),
+    request<T>(path, { method: "PATCH", body: JSON.stringify(body), signal }).then((sonuc) =>
+      yazmaBitti(sonuc, "PATCH", path, body)
+    ),
   // keepalive: true — sekme/pencere kapatılırken de isteğin tamamlanmasına izin
   // verir. Özellikle geciktirilmiş silme akışının (bkz. lib/undo.tsx pushDestructive)
   // beforeunload sırasında attığı "flush" isteği için kritik: keepalive olmadan

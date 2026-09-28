@@ -111,6 +111,7 @@ export default function TourOverlay() {
     stepCount,
     speaking,
     source,
+    sesDestekleniyor,
     voiceEnabled,
     rate,
     autoAdvance,
@@ -311,15 +312,19 @@ export default function TourOverlay() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={() => setVoiceEnabled(!voiceEnabled)}
-            style={{ ...controlBtn, width: 38, padding: 0 }}
-            aria-label={voiceEnabled ? t("Sesi kapat") : t("Sesi aç")}
-            title={voiceEnabled ? t("Sesi kapat") : t("Sesi aç")}
-          >
-            <span aria-hidden style={{ fontSize: 15 }}>{voiceEnabled ? "🔊" : "🔇"}</span>
-          </button>
+          {/* Ses yalnızca Türkçe arayüzde var (bkz. narrator.sesliAnlatimVar);
+              diğer dillerde tur yazılı ilerler ve ses düğmeleri hiç çıkmaz. */}
+          {sesDestekleniyor && (
+            <button
+              type="button"
+              onClick={() => setVoiceEnabled(!voiceEnabled)}
+              style={{ ...controlBtn, width: 38, padding: 0 }}
+              aria-label={voiceEnabled ? t("Sesi kapat") : t("Sesi aç")}
+              title={voiceEnabled ? t("Sesi kapat") : t("Sesi aç")}
+            >
+              <span aria-hidden style={{ fontSize: 15 }}>{voiceEnabled ? "🔊" : "🔇"}</span>
+            </button>
+          )}
 
           {voiceEnabled && (
             <button
@@ -367,6 +372,9 @@ export default function TourOverlay() {
           </button>
         </div>
 
+        {/* "Anlatım bitince ilerle" yalnızca ses varken anlamlı: sessiz turda
+            anlatımın bittiği an yok. */}
+        {voiceEnabled && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
           <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: c.textSecondary, cursor: "pointer" }}>
             <input
@@ -383,6 +391,7 @@ export default function TourOverlay() {
             </span>
           )}
         </div>
+        )}
       </div>
     </>
   );

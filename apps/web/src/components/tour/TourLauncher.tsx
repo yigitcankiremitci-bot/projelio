@@ -37,7 +37,18 @@ function oturumdaAcildiMi(): boolean {
 export default function TourLauncher() {
   const c = useThemeColors();
   const t = useT();
-  const { toursHere, allTours, seen, markSeen, start, tour, voiceEnabled, setVoiceEnabled } = useTour();
+  const {
+    toursHere,
+    allTours,
+    seen,
+    markSeen,
+    start,
+    tour,
+    voiceEnabled,
+    setVoiceEnabled,
+    sesDestekleniyor,
+    paylasilanHesap,
+  } = useTour();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const [toplamSaniye, setToplamSaniye] = useState<number | null>(null);
@@ -45,13 +56,21 @@ export default function TourLauncher() {
   const rehberKapali = seen.includes(REHBER_KAPALI_KIMLIGI);
 
   useEffect(() => {
+    // Demo hesabının toplam süresi herkesin süresinin toplamı: eşiği çoktan
+    // aşmış olduğu için rehber hiçbir ziyaretçiye açılmıyordu. Ortak hesapta
+    // her ziyaretçi yeni sayılır; "bir daha açma" tercihi de cihazda tutuluyor
+    // (bkz. TourProvider paylasilanHesap).
+    if (paylasilanHesap) {
+      setToplamSaniye(0);
+      return;
+    }
     api
       .get<{ toplamSaniye: number }>("/users/me/yardim-durumu")
       .then((r) => setToplamSaniye(r.toplamSaniye))
       // Sunucu cevap vermezse kendiliğinden açılmıyor: emin olmadığımız bir
       // durumda her girişte açılan bir liste, açılmamasından daha kötü.
       .catch(() => setToplamSaniye(null));
-  }, []);
+  }, [paylasilanHesap]);
 
   useEffect(() => {
     const ac = rehberKendiligindenAcilsinMi({
@@ -166,7 +185,11 @@ export default function TourLauncher() {
           style={{
             position: "absolute",
             top: 48,
-            right: 0,
+            // Düğme ekranın sağ kenarından 62 px içeride. Liste düğmenin sağ
+            // kenarına hizalıyken telefonda sola taşıyor ve başı kesiliyordu
+            // ("Yardım" başlığı "ım" olarak görünüyordu). -50 ile liste ekranın
+            // sağ kenarından 12 px içeride biter; maxWidth de soldan 12 px bırakır.
+            right: -50,
             width: 360,
             maxWidth: "calc(100vw - 24px)",
             maxHeight: "75vh",
@@ -221,28 +244,31 @@ export default function TourLauncher() {
           <div style={{ fontSize: 11.5, letterSpacing: 0.3, textTransform: "uppercase", color: c.textSecondary, padding: "2px 10px 6px" }}>
             {t("Sesli anlatım")}
           </div>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 10px",
-              margin: "0 2px 6px",
-              borderRadius: 10,
-              background: c.background,
-              fontSize: 13,
-              color: c.textSecondary,
-              cursor: "pointer",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={voiceEnabled}
-              onChange={(e) => setVoiceEnabled(e.target.checked)}
-              style={{ width: 15, height: 15, margin: 0 }}
-            />
-            {t("Anlatımı sesli dinle")}
-          </label>
+          {/* Ses yalnızca Türkçe arayüzde var (bkz. narrator.sesliAnlatimVar). */}
+          {sesDestekleniyor && (
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 10px",
+                margin: "0 2px 6px",
+                borderRadius: 10,
+                background: c.background,
+                fontSize: 13,
+                color: c.textSecondary,
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={voiceEnabled}
+                onChange={(e) => setVoiceEnabled(e.target.checked)}
+                style={{ width: 15, height: 15, margin: 0 }}
+              />
+              {t("Anlatımı sesli dinle")}
+            </label>
+          )}
 
           {toursHere.length > 0 && (
             <>

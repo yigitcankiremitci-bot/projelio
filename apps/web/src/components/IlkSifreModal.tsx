@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import { useT } from "../lib/i18n";
 import { Z } from "../lib/layout";
 import { useThemeColors } from "../theme/useThemeColors";
+import SifreGirdisi from "./SifreGirdisi";
 
 interface Props {
   fullName?: string;
@@ -88,19 +89,17 @@ export default function IlkSifreModal({ fullName, onTamam }: Props) {
         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: c.textSecondary }}>
           {t("Bu hesap senin için açıldı. Devam etmeden önce yalnızca senin bildiğin bir şifre belirle; bundan sonra e-posta adresin ve bu şifreyle giriş yaparsın.")}
         </p>
-        <input
-          type="password"
+        <SifreGirdisi
           value={sifre}
-          onChange={(e) => setSifre(e.target.value)}
+          onChange={setSifre}
           placeholder={t("Yeni şifre (en az 8 karakter)")}
           autoComplete="new-password"
           autoFocus
           style={alan}
         />
-        <input
-          type="password"
+        <SifreGirdisi
           value={tekrar}
-          onChange={(e) => setTekrar(e.target.value)}
+          onChange={setTekrar}
           placeholder={t("Yeni şifre (tekrar)")}
           autoComplete="new-password"
           style={alan}

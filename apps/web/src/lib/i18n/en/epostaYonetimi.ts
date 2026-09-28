@@ -63,9 +63,9 @@ export const epostaYonetimi: TranslationDict = {
   "E-posta önizlemesi":
     "Email preview",
   "Ekranı sesli gez":
-    "Take the voice tour",
+    "Take the tour",
   "Ekranın hangi parçası ne işe yarıyor? İki dakikalık sesli tanıtımı istediğin zaman yeniden izleyebilirsin.":
-    "Which part of the screen does what? You can replay the two-minute voice tour any time.",
+    "Which part of the screen does what? You can replay the two-minute tour any time.",
   "Elle en fazla 500 kişi seçilebilir; daha geniş kitle için kitle seçeneklerini kullan.":
     "You can pick at most 500 people by hand; use the audience options for a wider group.",
   "En az iki harf yaz…":

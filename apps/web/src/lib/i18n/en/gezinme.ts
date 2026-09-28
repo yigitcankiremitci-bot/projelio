@@ -56,8 +56,9 @@ export const gezinme: TranslationDict = {
   // ══════════════════════════════════════════════ Kullanım turu
   //
   // Her adımın iki metni var: kısa YAZILI metin ve daha akıcı SESLİ anlatım.
-  // İkisi de burada. Ses kaydı ayrı bir iş: /tour-audio/<dil>/… altında aranır,
-  // İngilizce kayıt yüklenene kadar cihazın kendi sesi okur (narrator.ts).
+  // İngilizcede tur SESSİZ ilerler (bkz. narrator.sesliAnlatimVar): yalnızca
+  // yazılı metin görünür, sesli anlatımların çevirisi şimdilik kullanılmıyor.
+  // Yazılı metinler bu yüzden "sesli/dinle" dememeli.
 
   // ─────────────────────────────────────────────── İlk bakış turu
   "Projelio'ya ilk bakış": "A first look at Projelio",
@@ -65,7 +66,7 @@ export const gezinme: TranslationDict = {
     "What does each part of the screen do? A 2-minute overview.",
   "Hoş geldin": "Welcome",
   "Projelio'yu birlikte gezelim. Anlatım hem sesli hem yazılı ilerler; istediğin an duraklatabilir, geri alabilir ya da turu kapatabilirsin.":
-    "Let's walk through Projelio together. The narration runs as both audio and text; you can pause, step back or close the tour whenever you like.",
+    "Let's walk through Projelio together. Go at your own pace with Next and Back, and close the tour whenever you like.",
   "Projelio'ya hoş geldin. Şimdi ekranı birlikte gezeceğiz. Anlatım hem sesli hem yazılı ilerliyor. İstediğin an duraklatabilir, bir adım geri alabilir ya da turu tamamen kapatabilirsin.":
     "Welcome to Projelio. We'll walk through the screen together. The narration runs as both audio and text. You can pause at any point, step back, or close the tour entirely.",
 
@@ -106,7 +107,7 @@ export const gezinme: TranslationDict = {
 
   "Turu istediğin an tekrar başlat": "Restart the tour whenever you like",
   "Bu soru işareti her sayfada duruyor. Tıkladığında o sayfayla ilgili anlatımları listeler; dilediğini baştan dinleyebilirsin.":
-    "This question mark is on every page. Click it to list the walkthroughs for that page and replay any of them.",
+    "This question mark is on every page. Click it to list the walkthroughs for that page and start any of them again.",
   "Son olarak şunu bilmeni isterim: bu soru işareti her sayfada duruyor. Tıkladığında bulunduğun sayfayla ilgili anlatımları listeler. Bir şeyi unuttuğunda ya da yeni bir alana geçtiğinde buradan istediğin turu baştan dinleyebilirsin. Hazırsan başlayalım.":
     "One last thing: this question mark is on every page. Click it and it lists the walkthroughs for the page you're on. Whenever you forget something or move into a new area, you can replay any tour from here. Let's begin.",
 
@@ -181,5 +182,5 @@ export const gezinme: TranslationDict = {
   "Sesi kapat": "Turn sound off",
   "Duraklat": "Pause",
   "{tur} — adım {n} / {toplam}": "{tur} — step {n} of {toplam}",
-  "{tur} — sesli anlat": "{tur} — narrated",
+  "{tur} — sesli anlat": "{tur} — show me",
 };

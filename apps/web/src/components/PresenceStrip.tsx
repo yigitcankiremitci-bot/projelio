@@ -44,6 +44,8 @@ export default function PresenceStrip({
 
   return (
     <div
+      // Klavye açıkken gizlenir (bkz. lib/klavye.ts).
+      data-klavyede-gizle
       // Kenar çubuğu açıkken içeriğin sol kenarına hizalanır (left=SIDEBAR_WIDTH);
       // telefonda alt menünün (68 px + safe-area) üstünde durur.
       style={{

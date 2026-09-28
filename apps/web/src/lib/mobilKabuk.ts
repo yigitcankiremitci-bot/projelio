@@ -37,6 +37,12 @@ interface CapacitorBridge {
     App?: {
       addListener?: (event: "appUrlOpen", handler: (data: { url?: string }) => void) => unknown;
     };
+    Keyboard?: {
+      addListener?: (event: string, handler: () => void) => unknown;
+    };
+    InAppReview?: {
+      requestReview?: () => unknown;
+    };
     PushNotifications?: {
       checkPermissions?: () => unknown;
       requestPermissions?: () => unknown;
@@ -297,6 +303,88 @@ export function uygulamaIciYol(link: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * KLAVYE                                                             *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Yazılım klavyesinin açılıp kapandığını bildirir (bkz. lib/klavye.ts).
+ *
+ * Tarayıcıda bunu görsel görünür alandan (visualViewport) tahmin etmek
+ * mümkün ama kabukta güvenilmez: klavye payı WebView'e alt dolgu olarak
+ * veriliyor (bkz. AndroidManifest adjustResize yorumu) ve sayfanın gördüğü
+ * ölçüler sürümden sürüme farklı davranıyor. Eklentinin olayı kesin bilgi.
+ *
+ * "willShow" beklenir ki alt menü klavye yükselirken kaybolsun, klavyenin
+ * üstünde bir an görünüp sonra kaybolmasın. Kabuk yoksa null döner; çağıran
+ * o zaman tarayıcı yoluna düşer.
+ */
+export function kabukKlavyesiniDinle(degisti: (acik: boolean) => void): (() => void) | null {
+  const addListener = kopru()?.Plugins?.Keyboard?.addListener;
+  if (!addListener) return null;
+
+  const tutamaclar: { remove?: () => unknown }[] = [];
+  const bagla = (olay: string, acik: boolean) => {
+    try {
+      void Promise.resolve(addListener(olay, () => degisti(acik)))
+        .then((h) => tutamaclar.push(h as { remove?: () => unknown }))
+        .catch(() => {});
+    } catch {
+      /* köprü hatası: klavye izlenemez, sayfa eskisi gibi çalışır */
+    }
+  };
+  bagla("keyboardWillShow", true);
+  bagla("keyboardWillHide", false);
+  // Bazı klavyeler "will" olayını atlıyor; "did" ikinci güvence.
+  bagla("keyboardDidShow", true);
+  bagla("keyboardDidHide", false);
+
+  return () => {
+    for (const h of tutamaclar) guvenliCagir(h?.remove && (() => h.remove!()));
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * MAĞAZADA DEĞERLENDİRME                                             *
+ * ------------------------------------------------------------------ */
+
+/** Play Store'daki uygulama sayfası. */
+export const MAGAZA_ADRESI = "https://play.google.com/store/apps/details?id=app.projelio.mobile";
+
+/**
+ * Google'ın uygulama içi değerlendirme penceresini ister (uygulamadan
+ * çıkmadan yıldız verilen alt pencere).
+ *
+ * PENCERENİN AÇILACAĞI GARANTİ DEĞİL: Google kota uyguluyor ve ne zaman
+ * gösterdiğini söylemiyor; çağrı "başarılı" dönüp hiçbir şey göstermeyebilir.
+ * Bu yüzden yalnızca kendiliğinden sorulan an için kullanılır (bkz.
+ * lib/degerlendirmeIstegi.ts). Kullanıcının bastığı bir düğmenin arkasına
+ * KONMAZ — düğme bazen hiçbir şey yapmıyor gibi görünürdü; düğme
+ * magazaSayfasiniAc'ı çağırır.
+ *
+ * Kabuk yoksa ya da eklenti yoksa (eski APK) false döner.
+ */
+export function uygulamaIciDegerlendirmeIste(): boolean {
+  const iste = kopru()?.Plugins?.InAppReview?.requestReview;
+  return guvenliCagir(iste);
+}
+
+/**
+ * Play Store'daki uygulama sayfasını açar (Ayarlar > Destek düğmesi).
+ *
+ * Kabukta adrese gitmek yeterli: Capacitor kendi alan adı dışındaki adresleri
+ * WebView'de açmıyor, sisteme bırakıyor; Android de play.google.com
+ * bağlantısını Play Store uygulamasına veriyor. Tarayıcıda yeni sekme açılır —
+ * uygulamanın kendisi terk edilmesin.
+ */
+export function magazaSayfasiniAc(): void {
+  if (kabuktaMi()) {
+    window.location.href = MAGAZA_ADRESI;
+    return;
+  }
+  window.open(MAGAZA_ADRESI, "_blank", "noopener");
 }
 
 /* ------------------------------------------------------------------ *

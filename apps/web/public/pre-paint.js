@@ -26,11 +26,19 @@
     }
   } catch (e) {}
 
-  // Karanlık mod varsayılan: yalnızca açıkça "light" seçilmişse atlanır.
+  // Karanlık mod varsayılan: yalnızca açıkça "light" seçilmişse ya da "system"
+  // seçilip cihaz aydınlık moddaysa atlanır.
   // Değerler packages/shared/src/theme.ts (colors.dark) ile senkron tutulmalı;
-  // anahtar adı src/theme/preferences.ts (THEME_MODE_KEY) ile.
+  // anahtar adı ve mantık src/theme/preferences.ts (THEME_MODE_KEY) ile.
   try {
-    if (localStorage.getItem("projelio_theme_mode") !== "light") {
+    var tema = localStorage.getItem("projelio_theme_mode");
+    var koyu =
+      tema === "light"
+        ? false
+        : tema === "system"
+          ? !(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches)
+          : true;
+    if (koyu) {
       var root = document.documentElement.style;
       root.setProperty("--color-primary", "#8593A8");
       root.setProperty("--color-primary-dark", "#3E4858");

@@ -1,56 +1,53 @@
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type InputHTMLAttributes } from "react";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconEye, IconEyeOff } from "./icons";
 
-interface Props {
+type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & {
   value: string;
   onChange: (value: string) => void;
-  placeholder?: string;
   /**
-   * Tarayıcının şifre kasası davranışı. "new-password": kendi kasasına
-   * kaydetmeye kalkmasın (hesap şifresi Projelio'da duruyor);
-   * "current-password": kullanıcının kendi Projelio şifresi.
+   * Tarayıcının şifre kasası davranışı. "new-password": yeni şifre (ya da
+   * kasaya kaydedilmemesi gereken bir hesap şifresi); "current-password":
+   * kullanıcının kendi Projelio şifresi.
    */
   autoComplete: "new-password" | "current-password";
-  /** Alanın kutusuna uygulanır; düğme kutunun İÇİNDE durur. */
+  /** Alanın KENDİSİNE uygulanır — sayfadaki diğer alanlarla aynı görünsün diye. */
   style?: CSSProperties;
-}
+  /** Alanı ve düğmeyi saran kutuya: yerleşim için (flex, genişlik). */
+  kutuStili?: CSSProperties;
+};
 
 /**
- * Göz düğmeli şifre alanı: yazılanı isteyince gösterir.
+ * Göz düğmeli şifre alanı: yazılanı isteyince gösterir. Uygulamadaki BÜTÜN
+ * şifre alanları bundan geçer — giriş, kayıt, sıfırlama, Ayarlar, Hesaplar.
  *
- * NEDEN: uzun, rastgele bir hesap şifresini yapıştırırken ya da elle
- * yazarken ne girildiğini görmeden kaydetmek, yanlış şifrenin kasaya
- * girmesi demekti — hata ancak biri o hesaba girmeye çalışınca çıkıyordu.
+ * NEDEN: şifreyi görmeden yazmak, özellikle telefonda, yanlış yazılmış
+ * şifreyle giriş denemesi ya da yanlış şifrenin kaydedilmesi demekti. Göz
+ * düğmesi önce yalnızca Hesaplar'da vardı; Play kapalı testinin raporu giriş
+ * ekranında olmamasını ayrıca yazdı.
  *
  * Görünürlük BİLEREK kalıcı değil: bileşen her açılışta gizli başlar,
  * açık bırakılmış bir ekran şifreyi sergilemesin.
  */
-export default function SifreGirdisi({ value, onChange, placeholder, autoComplete, style }: Props) {
+export default function SifreGirdisi({ value, onChange, style, kutuStili, ...girdi }: Props) {
   const c = useThemeColors();
   const t = useT();
   const [gorunur, setGorunur] = useState(false);
   const etiket = gorunur ? t("Şifreyi gizle") : t("Şifreyi göster");
 
   return (
-    <div style={{ position: "relative", display: "flex", alignItems: "center", ...style, padding: 0 }}>
+    <div style={{ position: "relative", display: "flex", alignItems: "center", width: "100%", ...kutuStili }}>
       <input
+        {...girdi}
         type={gorunur ? "text" : "password"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
         // Görünür hâlde yazım denetimi/otomatik düzeltme şifreyi bozmasın.
         spellCheck={false}
         autoCapitalize="off"
         autoCorrect="off"
-        style={{
-          fontSize: style?.fontSize ?? 13,
-          padding: (style?.padding as string | number | undefined) ?? "6px 8px",
-          paddingRight: 34,
-          width: "100%",
-        }}
+        style={{ width: "100%", ...style, paddingRight: 40 }}
       />
       <button
         type="button"
@@ -58,14 +55,17 @@ export default function SifreGirdisi({ value, onChange, placeholder, autoComplet
         aria-label={etiket}
         aria-pressed={gorunur}
         title={etiket}
+        // Alan devre dışıyken düğme de: gösterilecek bir şey yok.
+        disabled={girdi.disabled}
         style={{
           position: "absolute",
           right: 4,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 26,
-          height: 26,
+          // Parmakla dokunulabilecek büyüklükte (telefon).
+          width: 34,
+          height: 34,
           padding: 0,
           background: "transparent",
           border: "none",
@@ -73,7 +73,7 @@ export default function SifreGirdisi({ value, onChange, placeholder, autoComplet
           cursor: "pointer",
         }}
       >
-        {gorunur ? <IconEyeOff size={16} color={c.textSecondary} /> : <IconEye size={16} color={c.textSecondary} />}
+        {gorunur ? <IconEyeOff size={18} color={c.textSecondary} /> : <IconEye size={18} color={c.textSecondary} />}
       </button>
     </div>
   );

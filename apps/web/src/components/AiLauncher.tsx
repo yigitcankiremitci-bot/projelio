@@ -186,6 +186,8 @@ export default function AiLauncher() {
       {!open && (
         <button
           {...tourAnchor("lio-launcher")}
+          // Klavye açıkken gizlenir (bkz. lib/klavye.ts).
+          data-klavyede-gizle
           onClick={() => {
             if (suppressClick.current) {
               suppressClick.current = false;

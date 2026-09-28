@@ -65,10 +65,16 @@ export const ayarlar: TranslationDict = {
     "If you have trouble reading the screen, you can enlarge the text and the interface.",
   "Geçiş ve animasyonları neredeyse tamamen kapatır. Baş dönmesi/odaklanma sorunu yaşıyorsan ya da arayüzün daha hızlı hissettirmesini istiyorsan aç.":
     "Turns off almost all transitions and animations. Switch it on if motion makes you dizzy or breaks your focus, or if you just want the interface to feel faster.",
-  "Aydınlık veya karanlık görünümü seç. Tercih bu cihazda saklanır.":
-    "Choose a light or dark look. The preference is stored on this device.",
+  "Aydınlık, karanlık ya da cihazının ayarını izleyen sistem görünümünü seç. Tercih bu cihazda saklanır.":
+    "Choose light, dark, or system to follow your device's setting. The preference is stored on this device.",
   Aydınlık: "Light",
   Karanlık: "Dark",
+  Sistem: "System",
+  // Ayarlar > Destek, yalnızca telefon uygulamasında (bkz. lib/degerlendirmeIstegi.ts).
+  "Projelio'yu değerlendir": "Rate Projelio",
+  "Projelio işine yarıyorsa Google Play'de birkaç kelime yazman, başkalarının bizi bulmasına çok yardımcı olur.":
+    "If Projelio is useful to you, a few words on Google Play go a long way in helping others find us.",
+  "Google Play'de değerlendir": "Rate on Google Play",
   "Düğmelerde ve seçili öğelerde kullanılan rengi Projelio paletinden değiştir.":
     "Change the colour used on buttons and selected items, from the Projelio palette.",
   "Kenar çubuğu rengi": "Sidebar colour",
@@ -95,7 +101,7 @@ export const ayarlar: TranslationDict = {
     "A thin strip in the bottom left showing teammates working on the same page.",
   "Kullanım turu": "Guided tour",
   "Uygulamayı tanıtan sesli turu baştan izle. Tur, bulunduğun sayfadaki öğeleri işaret ederek ilerler.":
-    "Watch the narrated tour of the app from the start. It walks you through by pointing at things on the page you're on.",
+    "Take the guided tour of the app from the start. It walks you through by pointing at things on the page you're on.",
   "Turu yeniden başlat": "Restart the tour",
 
   // Yasal

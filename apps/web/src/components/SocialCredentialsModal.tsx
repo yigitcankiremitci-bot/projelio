@@ -16,6 +16,7 @@ import { SOCIAL_PLATFORMS } from "../lib/socialMedia";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { bicimDili } from "../lib/i18n/depo";
+import SifreGirdisi from "./SifreGirdisi";
 
 interface Props {
   scope: SocialScope;
@@ -291,10 +292,9 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
               {label(form.id ? t("Yeni şifre (boş bırakılırsa değişmez)") : t("Şifre *"))}
               {/* type=password + autoComplete=new-password: tarayıcı bunu kendi
                   şifre kasasına kaydetmeye çalışmasın, sır tek yerde dursun. */}
-              <input
-                type="password"
+              <SifreGirdisi
                 value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                onChange={(password) => setForm({ ...form, password })}
                 autoComplete="new-password"
                 style={field}
               />

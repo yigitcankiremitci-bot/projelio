@@ -143,7 +143,8 @@ export default function HesapKilidi({ onAcildi }: { onAcildi: (sonuc: ServiceUnl
           onChange={setSifre}
           placeholder={t("Projelio şifreniz")}
           autoComplete="current-password"
-          style={{ flex: "1 1 180px", fontSize: 13, padding: "6px 8px" }}
+          kutuStili={{ flex: "1 1 180px", width: "auto" }}
+          style={{ fontSize: 13, padding: "6px 8px" }}
         />
         <button
           type="submit"

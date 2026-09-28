@@ -25,7 +25,12 @@ export const TOURS: Tour[] = [
     title: "Projelio'ya ilk bakış",
     description: "Ekranın hangi parçası ne işe yarıyor? 2 dakikalık genel tanıtım.",
     area: "genel",
-    match: /^\/$/,
+    // Şirket ve holding sahiplerinin açılış sayfası ana sayfa DEĞİL: ana sayfa
+    // onları kendi şirketinin/grubunun sayfasına yönlendiriyor (bkz.
+    // Dashboard.tsx). Tur yalnızca "/"yi tanıdığı sürece yönlendirme 700 ms'lik
+    // bekleme dolmadan gerçekleşiyor ve bu kullanıcılara tur HİÇ açılmıyordu —
+    // Play kapalı testinde "yeni kullanıcıya tanıtım yok" denmesinin bir sebebi.
+    match: /^\/$|^\/(organizations|groups)\/[^/]+$/,
     autoStart: true,
     steps: [
       {
@@ -64,6 +69,8 @@ export const TOURS: Tour[] = [
           "Ana sayfan dört sekmeden oluşuyor: İşler, Kasa, Dosyalar ve Modüller. Dördü de aynı sayfada duruyor, aralarında sekme değiştirerek geçiyorsun. Birazdan her birini ayrı ayrı anlatan turları da görebileceksin.",
         anchor: "dashboard-tabs",
         placement: "bottom",
+        // Şirket/grup sayfasında bu sekmeler yok; orada adım atlanır.
+        optional: true,
       },
       {
         id: "ekle",

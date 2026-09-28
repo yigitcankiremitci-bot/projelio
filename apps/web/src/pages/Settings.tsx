@@ -55,6 +55,8 @@ import WorkRhythmSettings from "../components/plan/WorkRhythmSettings";
 import SupportPanel from "../components/SupportPanel";
 import { bicimDili } from "../lib/i18n/depo";
 import { bildirimCihaziniBirak } from "../push";
+import SifreGirdisi from "../components/SifreGirdisi";
+import { kabuktaMi, magazaSayfasiniAc } from "../lib/mobilKabuk";
 
 /**
  * AYARLAR — iki yerleşim, tek içerik.
@@ -610,43 +612,37 @@ export default function Settings() {
       >
         <form onSubmit={handlePasswordSubmit} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {hasPassword && (
-            <input
-              type="password"
+            <SifreGirdisi
               value={currentPassword}
-              onChange={(e) => {
-                setCurrentPassword(e.target.value);
+              onChange={(v) => {
+                setCurrentPassword(v);
                 setPasswordSaved(false);
               }}
               placeholder={t("Mevcut şifren")}
               autoComplete="current-password"
-              style={{ width: "100%" }}
               disabled={!me}
             />
           )}
-          <input
-            type="password"
+          <SifreGirdisi
             value={newPassword}
-            onChange={(e) => {
-              setNewPassword(e.target.value);
+            onChange={(v) => {
+              setNewPassword(v);
               setPasswordSaved(false);
             }}
             placeholder={t("Yeni şifre")}
             autoComplete="new-password"
             minLength={8}
-            style={{ width: "100%" }}
             disabled={!me}
           />
-          <input
-            type="password"
+          <SifreGirdisi
             value={newPasswordAgain}
-            onChange={(e) => {
-              setNewPasswordAgain(e.target.value);
+            onChange={(v) => {
+              setNewPasswordAgain(v);
               setPasswordSaved(false);
             }}
             placeholder={t("Yeni şifre (tekrar)")}
             autoComplete="new-password"
             minLength={8}
-            style={{ width: "100%" }}
             disabled={!me}
           />
           <button
@@ -906,19 +902,29 @@ export default function Settings() {
       </CardGroup>
 
       <CardGroup label={t("Tema ve renkler")}>
-        <SettingCard title={t("Tema")} description={t("Aydınlık veya karanlık görünümü seç. Tercih bu cihazda saklanır.")}>
+        <SettingCard
+          title={t("Tema")}
+          description={t("Aydınlık, karanlık ya da cihazının ayarını izleyen sistem görünümünü seç. Tercih bu cihazda saklanır.")}
+        >
           <SwatchRow>
             <SwatchButton
-              active={theme.mode === "light"}
-              onClick={() => theme.setMode("light")}
+              active={theme.preference === "light"}
+              onClick={() => theme.setPreference("light")}
               label={t("Aydınlık")}
               swatch={{ background: "#F7F8FA", border: "1px solid #E3E6EB" }}
             />
             <SwatchButton
-              active={theme.mode === "dark"}
-              onClick={() => theme.setMode("dark")}
+              active={theme.preference === "dark"}
+              onClick={() => theme.setPreference("dark")}
               label={t("Karanlık")}
               swatch={{ background: "#12151B", border: "1px solid #2A3140" }}
+            />
+            {/* Yarısı aydınlık, yarısı karanlık: "cihaza göre değişir". */}
+            <SwatchButton
+              active={theme.preference === "system"}
+              onClick={() => theme.setPreference("system")}
+              label={t("Sistem")}
+              swatch={{ background: "linear-gradient(135deg, #F7F8FA 50%, #12151B 50%)", border: "1px solid #2A3140" }}
             />
           </SwatchRow>
         </SettingCard>
@@ -1112,7 +1118,37 @@ export default function Settings() {
         <WhatsappCard />
       </>
     ),
-    destek: <SupportPanel me={me} />,
+    destek: (
+      <>
+        <SupportPanel me={me} />
+        {/* Yalnızca telefon uygulamasında: tarayıcıdaki kullanıcıya mağaza
+            sayfası önermenin anlamı yok. Düğme Play Store'u AÇAR; Google'ın
+            uygulama içi penceresi kota yüzünden bazen hiç çıkmadığı için
+            düğmenin arkasına konmadı (bkz. lib/mobilKabuk.ts). */}
+        {kabuktaMi() && (
+          <SettingCard
+            title={t("Projelio'yu değerlendir")}
+            description={t("Projelio işine yarıyorsa Google Play'de birkaç kelime yazman, başkalarının bizi bulmasına çok yardımcı olur.")}
+          >
+            <button
+              type="button"
+              onClick={magazaSayfasiniAc}
+              style={{
+                background: c.primary,
+                color: c.onPrimary,
+                padding: "9px 16px",
+                borderRadius: 8,
+                border: "none",
+                fontSize: 15,
+                fontWeight: 500,
+              }}
+            >
+              {t("Google Play'de değerlendir")}
+            </button>
+          </SettingCard>
+        )}
+      </>
+    ),
   };
 
   // Etiketler TABS içinde Türkçe duruyor ve orada t() çağrılamıyor (modül

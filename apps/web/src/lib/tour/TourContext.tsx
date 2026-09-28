@@ -44,6 +44,9 @@ interface TourApi {
   speaking: boolean;
   /** Ses gerçekten hangi kaynaktan geliyor: kayıt mı, tarayıcı sesi mi? */
   source: narrator.NarrationSource;
+  /** Arayüz dilinde sesli anlatım var mı? Yoksa ses denetimleri hiç gösterilmez. */
+  sesDestekleniyor: boolean;
+  /** Ses gerçekten açık mı: kullanıcının tercihi VE dilin desteği. */
   voiceEnabled: boolean;
   rate: number;
   autoAdvance: boolean;
@@ -66,6 +69,8 @@ interface TourApi {
   setAutoAdvance: (on: boolean) => void;
   /** Overlay, hedef öğeyi bulamadığında çağırır (bkz. TourStep.optional). */
   reportAnchorMissing: (index: number) => void;
+  /** Ortak (demo) hesap mı? "Görüldü" o zaman hesaba değil cihaza ait. */
+  paylasilanHesap: boolean;
 
   /** Bu rotayla ilgili turlar. */
   toursHere: Tour[];
@@ -84,6 +89,7 @@ export function TourProvider({
   children,
   autoStartEnabled = false,
   serverSeen,
+  paylasilanHesap = false,
 }: {
   children: ReactNode;
   /**
@@ -100,6 +106,17 @@ export function TourProvider({
    * demek (hata değil): o hâlde yalnızca yereldeki liste kullanılır.
    */
   serverSeen?: string[];
+  /**
+   * Herkesin aynı hesapla girdiği demo hesabı (bkz. lib/demoHesap.ts).
+   *
+   * NEDEN GEREKLİ: "görüldü" listesi sunucuda HESABA yazılıyor. Demo hesabında
+   * ilk ziyaretçi turu kapattığı an tur o hesap için kalıcı olarak "görüldü"
+   * oluyordu ve sonradan gelen hiçbir ziyaretçiye açılmıyordu — Play kapalı
+   * testinin raporunda "yeni kullanıcıya tanıtım yok" yazılmasının sebebi
+   * buydu. Ortak hesapta liste cihaza aittir: sunucudan okunmaz, sunucuya
+   * yazılmaz.
+   */
+  paylasilanHesap?: boolean;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -108,7 +125,11 @@ export function TourProvider({
   const [stepIndex, setStepIndex] = useState(0);
   const [speaking, setSpeaking] = useState(false);
   const [source, setSource] = useState<narrator.NarrationSource>("none");
-  const [voiceEnabled, setVoiceEnabledState] = useState(() => readBool(STORAGE_VOICE, true));
+  const [voiceTercihi, setVoiceEnabledState] = useState(() => readBool(STORAGE_VOICE, true));
+  // Tercih silinmez, yalnızca etkisiz kalır: kullanıcı Türkçeye dönünce
+  // eski tercihi geri gelir.
+  const sesDestekleniyor = narrator.sesliAnlatimVar();
+  const voiceEnabled = voiceTercihi && sesDestekleniyor;
   const [autoAdvance, setAutoAdvanceState] = useState(() => readBool(STORAGE_AUTO, true));
   const [rate, setRateState] = useState(() => {
     const raw = Number(localStorage.getItem(STORAGE_RATE));
@@ -120,7 +141,7 @@ export function TourProvider({
   // kullanıcı bu tarayıcıda turu bitirip henüz sunucuya yazılmadan sayfayı
   // yenilemiş olabilir; o durumda eski liste geri gelip eğitimi tekrar açardı.
   useEffect(() => {
-    if (!serverSeen) return;
+    if (!serverSeen || paylasilanHesap) return;
     setSeen((prev) => {
       const birlesik = Array.from(new Set([...prev, ...serverSeen]));
       if (birlesik.length === prev.length) return prev;
@@ -131,12 +152,15 @@ export function TourProvider({
       }
       return birlesik;
     });
-  }, [serverSeen]);
+  }, [serverSeen, paylasilanHesap]);
   /** Son yön: eksik (optional) adım atlanırken hangi tarafa gidileceğini belirler. */
   const directionRef = useRef<1 | -1>(1);
 
   const tour = tourId ? getTour(tourId) ?? null : null;
   const step = tour ? tour.steps[stepIndex] ?? null : null;
+
+  const paylasilanRef = useRef(paylasilanHesap);
+  paylasilanRef.current = paylasilanHesap;
 
   const markSeen = useCallback((id: string) => {
     setSeen((prev) => {
@@ -151,7 +175,9 @@ export function TourProvider({
       // etkili olsun diye duruyor. Hata yutuluyor — turu bitirmiş bir kullanıcıya
       // "kaydedilemedi" demenin bir karşılığı yok, en kötü ihtimalle başka bir
       // tarayıcıda bir kez daha görür.
-      void api.patch("/users/me/tours-seen", { toursSeen: next }).catch(() => {});
+      if (!paylasilanRef.current) {
+        void api.patch("/users/me/tours-seen", { toursSeen: next }).catch(() => {});
+      }
       return next;
     });
   }, []);
@@ -351,6 +377,7 @@ export function TourProvider({
     stepCount: tour?.steps.length ?? 0,
     speaking,
     source,
+    sesDestekleniyor,
     voiceEnabled,
     rate,
     autoAdvance,
@@ -366,6 +393,7 @@ export function TourProvider({
     setRate,
     setAutoAdvance,
     reportAnchorMissing,
+    paylasilanHesap,
     toursHere,
     allTours: TOURS,
   };

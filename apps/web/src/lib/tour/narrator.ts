@@ -30,6 +30,19 @@ export function narrationLang(): string {
   return getLocale() ?? (navigator.language?.toLowerCase().startsWith("tr") ? "tr" : "en");
 }
 
+/**
+ * Tur sesli anlatılabilir mi? YALNIZCA Türkçe arayüzde.
+ *
+ * Turun konuşma metinleri (`speech`) Türkçe yazılı ve çevrilmiyor; ekrandaki
+ * metin İngilizceye çevrilirken sese Türkçe cümleler gidiyordu ve yabancı
+ * kullanıcı Türkçe metni İngilizce sesle okunmuş hâlde duyuyordu. Kayıtlar
+ * da yalnızca Türkçe. Diğer dillerde tur yazılı ilerler: ses denetimleri
+ * gizlenir, kullanıcı İleri/Geri ile gezer.
+ */
+export function sesliAnlatimVar(): boolean {
+  return narrationLang() === "tr";
+}
+
 /** Bu adımın kaydedilmiş ses dosyasının beklendiği yol. */
 export function stepAudioUrl(tourId: string, stepId: string): string {
   return `${AUDIO_BASE}/${narrationLang()}/${tourId}/${stepId}.mp3`;

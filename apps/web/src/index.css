@@ -639,3 +639,13 @@ button:focus-visible {
     transition: none;
   }
 }
+
+/* Yazılım klavyesi açıkken alta sabit öğeler (alt menü, + düğmesi, Lio balonu,
+   kişi şeridi) klavyenin üstüne binip yazı alanını daraltıyordu. İşareti
+   lib/klavye.ts koyar; gizlenecek öğe `data-klavyede-gizle` taşır. */
+html[data-klavye="acik"] [data-klavyede-gizle] {
+  display: none !important;
+}
+html[data-klavye="acik"] [data-klavyede-alt-bosluk] {
+  padding-bottom: 16px !important;
+}

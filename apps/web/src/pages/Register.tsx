@@ -6,6 +6,7 @@ import SocialSignInButtons from "../components/SocialSignInButtons";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useLocale, useT } from "../lib/i18n";
 import GirisDilSecici from "../components/GirisDilSecici";
+import SifreGirdisi from "../components/SifreGirdisi";
 
 export default function Register() {
   const [fullName, setFullName] = useState("");
@@ -229,14 +230,13 @@ export default function Register() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Şifre")}</label>
-            <input
-              type="password"
+            <SifreGirdisi
               placeholder={t("En az 8 karakter")}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
+              autoComplete="new-password"
               required
               minLength={8}
-              style={{ width: "100%" }}
             />
           </div>
 

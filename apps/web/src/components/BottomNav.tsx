@@ -319,6 +319,8 @@ export default function BottomNav({ sidebarOpen }: Props) {
   return (
     <>
       <nav
+        // Klavye açıkken gizlenir; + düğmesi de bunun içinde (bkz. lib/klavye.ts).
+        data-klavyede-gizle
         style={{
           position: "fixed",
           bottom: 0,

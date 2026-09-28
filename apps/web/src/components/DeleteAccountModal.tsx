@@ -3,6 +3,7 @@ import { API_URL, api, ApiError } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { useT } from "../lib/i18n";
+import SifreGirdisi from "./SifreGirdisi";
 
 interface DeletionPreview {
   /** Doluysa silme yapılamaz; metin ne yapılması gerektiğini anlatır. */
@@ -225,10 +226,9 @@ export default function DeleteAccountModal({ hasPassword, onClose }: Props) {
           {hasPassword && (
             <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 14, color: c.textSecondary }}>
               {t("Şifren")}
-              <input
-                type="password"
+              <SifreGirdisi
                 value={sifre}
-                onChange={(e) => setSifre(e.target.value)}
+                onChange={setSifre}
                 autoComplete="current-password"
                 style={girdi(c)}
               />

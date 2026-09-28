@@ -6,21 +6,25 @@ import {
   getAccentKey,
   getSidebarColorKey,
   getSidebarPatternKey,
-  getThemeMode,
+  getThemePreference,
   setAccentKey as persistAccentKey,
   setSidebarColorKey as persistSidebarColorKey,
   setSidebarPatternKey as persistSidebarPatternKey,
-  setThemeMode as persistThemeMode,
+  setThemePreference as persistThemePreference,
 } from "./preferences";
+import type { ThemePreference } from "./preferences";
 import { sistemCubuklariniTemayaUydur } from "../lib/mobilKabuk";
 
 interface ThemeContextValue {
+  /** Ekrana UYGULANAN mod — "Sistem" seçiliyse cihaza bakılarak çözülmüş hâli. */
   mode: ThemeMode;
+  /** Kullanıcının seçimi (Ayarlar > Tema): aydınlık, karanlık ya da sistem. */
+  preference: ThemePreference;
   accentKey: AccentKey;
   colors: ThemeColors;
   sidebarColorKey: SidebarColorKey;
   sidebarPatternKey: SidebarPatternKey;
-  setMode: (mode: ThemeMode) => void;
+  setPreference: (pref: ThemePreference) => void;
   setAccentKey: (key: AccentKey) => void;
   setSidebarColorKey: (key: SidebarColorKey) => void;
   setSidebarPatternKey: (key: SidebarPatternKey) => void;
@@ -48,8 +52,38 @@ function syncCssVariables(c: ThemeColors) {
   root.setProperty("--color-danger", c.danger);
 }
 
+const KOYU_SORGU = "(prefers-color-scheme: dark)";
+
+function cihazKoyuMu(): boolean {
+  try {
+    return window.matchMedia(KOYU_SORGU).matches;
+  } catch {
+    return true;
+  }
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>(getThemeMode);
+  const [preference, setPreferenceState] = useState<ThemePreference>(getThemePreference);
+  const [cihazKoyu, setCihazKoyu] = useState<boolean>(cihazKoyuMu);
+  const mode: ThemeMode = preference === "system" ? (cihazKoyu ? "dark" : "light") : preference;
+
+  // "Sistem" seçiliyken cihazın ayarı değişince (telefonun gece modu akşam
+  // kendiliğinden açılır) uygulama da o an değişsin; yeniden açılmayı beklemesin.
+  // Mobil kabukta da çalışır: uygulamanın Android teması DayNight, WebView
+  // cihazın ayarını sayfaya iletiyor (bkz. apps/mobile styles.xml).
+  useEffect(() => {
+    if (preference !== "system") return;
+    let sorgu: MediaQueryList;
+    try {
+      sorgu = window.matchMedia(KOYU_SORGU);
+    } catch {
+      return;
+    }
+    const degisti = () => setCihazKoyu(sorgu.matches);
+    degisti();
+    sorgu.addEventListener?.("change", degisti);
+    return () => sorgu.removeEventListener?.("change", degisti);
+  }, [preference]);
   const [accentKey, setAccentKeyState] = useState<AccentKey>(getAccentKey);
   const [sidebarColorKey, setSidebarColorKeyState] = useState<SidebarColorKey>(getSidebarColorKey);
   const [sidebarPatternKey, setSidebarPatternKeyState] = useState<SidebarPatternKey>(getSidebarPatternKey);
@@ -72,9 +106,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     sistemCubuklariniTemayaUydur(mode);
   }, [mode]);
 
-  const setMode = (next: ThemeMode) => {
-    setModeState(next);
-    persistThemeMode(next);
+  const setPreference = (next: ThemePreference) => {
+    setPreferenceState(next);
+    persistThemePreference(next);
   };
 
   const setAccentKeyFn = (key: AccentKey) => {
@@ -94,11 +128,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const value: ThemeContextValue = {
     mode,
+    preference,
     accentKey,
     colors: themeColors,
     sidebarColorKey,
     sidebarPatternKey,
-    setMode,
+    setPreference,
     setAccentKey: setAccentKeyFn,
     setSidebarColorKey: setSidebarColorKeyFn,
     setSidebarPatternKey: setSidebarPatternKeyFn,

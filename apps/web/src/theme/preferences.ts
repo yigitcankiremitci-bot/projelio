@@ -10,16 +10,27 @@ export const ACCENT_KEY = "projelio_accent";
 export const SIDEBAR_COLOR_KEY = "projelio_sidebar_color";
 export const SIDEBAR_PATTERN_KEY = "projelio_sidebar_pattern";
 
+/**
+ * Kullanıcının SEÇTİĞİ görünüm. "system" = cihazın açık/koyu ayarını izle;
+ * ekrana uygulanan mod (ThemeMode) o an cihaza bakılarak çözülür (bkz.
+ * ThemeProvider). Yalnızca bu cihazda saklanır, sunucuya yazılmaz.
+ */
+export type ThemePreference = ThemeMode | "system";
+
 // Varsayılan görünüm: karanlık mod + gece sidebar + çizgili desen. Yalnızca
 // hiç seçim yapmamış kullanıcıyı etkiler — açıkça "light"/"default"/"none"
 // seçmiş olanın tercihi localStorage'da yazılı olduğu için korunur.
-// pre-paint.js aynı varsayılanı boyamadan önce uygular; ikisi senkron kalmalı.
-export function getThemeMode(): ThemeMode {
-  return localStorage.getItem(THEME_MODE_KEY) === "light" ? "light" : "dark";
+// Varsayılan BİLEREK "system" değil: hiç seçim yapmamış mevcut kullanıcıyla
+// yeni kullanıcı ayırt edilemiyor, varsayılanı değiştirmek aydınlık moddaki
+// telefonlarda herkesin uygulamasını bir sabah beyaza çevirirdi.
+// pre-paint.js aynı mantığı boyamadan önce uygular; ikisi senkron kalmalı.
+export function getThemePreference(): ThemePreference {
+  const stored = localStorage.getItem(THEME_MODE_KEY);
+  return stored === "light" || stored === "system" ? stored : "dark";
 }
 
-export function setThemeMode(mode: ThemeMode) {
-  localStorage.setItem(THEME_MODE_KEY, mode);
+export function setThemePreference(pref: ThemePreference) {
+  localStorage.setItem(THEME_MODE_KEY, pref);
 }
 
 export function getAccentKey(): AccentKey {

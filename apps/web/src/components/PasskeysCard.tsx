@@ -5,6 +5,7 @@ import { anahtarOlustur, cihazAdiOner, desteklenirMi } from "../lib/gecisAnahtar
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import { bicimDili } from "../lib/i18n/depo";
+import SifreGirdisi from "./SifreGirdisi";
 
 /**
  * GEÇİŞ ANAHTARLARI — kullanıcının cihazları.
@@ -145,11 +146,10 @@ export default function PasskeysCard({ hasPassword = true }: { hasPassword?: boo
       ))}
 
       {desteklenirMi() && hasPassword && (
-        <input
-          type="password"
+        <SifreGirdisi
           autoComplete="current-password"
           value={password}
-          onChange={(event) => setPassword(event.target.value)}
+          onChange={setPassword}
           placeholder={t("Mevcut şifren")}
           aria-label={t("Mevcut şifren")}
           disabled={busy}

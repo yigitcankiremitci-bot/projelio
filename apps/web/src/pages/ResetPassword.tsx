@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import GirisDilSecici from "../components/GirisDilSecici";
+import SifreGirdisi from "../components/SifreGirdisi";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -83,26 +84,24 @@ export default function ResetPassword() {
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Yeni şifre")}</label>
-              <input
-                type="password"
+              <SifreGirdisi
                 placeholder={t("En az 8 karakter")}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={setPassword}
+                autoComplete="new-password"
                 required
                 minLength={8}
-                style={{ width: "100%" }}
               />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Yeni şifre (tekrar)")}</label>
-              <input
-                type="password"
+              <SifreGirdisi
                 placeholder={t("En az 8 karakter")}
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={setConfirmPassword}
+                autoComplete="new-password"
                 required
                 minLength={8}
-                style={{ width: "100%" }}
               />
             </div>
 

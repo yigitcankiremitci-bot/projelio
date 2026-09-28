@@ -2,7 +2,9 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "re
 import type { RefObject } from "react";
 import { Routes, Route, Link, useLocation, useNavigate, useParams, Navigate } from "react-router-dom";
 import type { User } from "@projelio/shared";
-import { api } from "./api/client";
+import { api, basariliYazmayiDinle } from "./api/client";
+import { yazmaIsteginiIsle } from "./lib/degerlendirmeIstegi";
+import { klavyeyiIzle } from "./lib/klavye";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
 import NotificationBell from "./components/NotificationBell";
@@ -564,6 +566,11 @@ export default function App() {
   // dokunulduysa da — eklenti olayı bu dinleyici bağlanana kadar saklıyor).
   // Oturum yoksa korumalı bölge zaten /login'e çevirir.
   useEffect(() => kabukBildirimDokunusunuDinle((yol) => navigate(yol)), [navigate]);
+  // Görev tamamlandıkça sayar; vakti gelince Play'in değerlendirme penceresini
+  // ister. Yalnızca kabukta bir şey yapar (bkz. lib/degerlendirmeIstegi.ts).
+  useEffect(() => basariliYazmayiDinle(yazmaIsteginiIsle), []);
+  // Klavye açıkken alt menü ve balonlar gizlensin (bkz. lib/klavye.ts).
+  useEffect(() => klavyeyiIzle(), []);
   // Google dönüş ekranı da kimlik doğrulaması gerektirmeyen bir ekrandır: token
   // henüz yerel depoda yok, tam da burada oluşturuluyor. Korumalı bölgeye
   // koyarsak /login'e yönlenir ve akış hiç tamamlanamaz.
@@ -728,7 +735,11 @@ export default function App() {
     {/* Sesli + yazılı kullanım turu. Kurulum sihirbazı hâlâ açıkken kendiliğinden
         başlamaz (autoStartEnabled); kullanıcı isterse sağ üstteki "?" düğmesinden
         her an başlatabilir. */}
-    <TourProvider autoStartEnabled={Boolean(me?.onboardingCompletedAt)} serverSeen={me?.toursSeen}>
+    <TourProvider
+      autoStartEnabled={Boolean(me?.onboardingCompletedAt)}
+      serverSeen={me?.toursSeen}
+      paylasilanHesap={demoEpostasiMi(me?.email)}
+    >
     <div style={{ minHeight: "100vh" }}>
       {/* fallback={null}: bu üç parça arka planda inerken ekranda bir şey
           göstermeye gerek yok — kabuk zaten çizilmiş durumda. */}
@@ -842,6 +853,9 @@ export default function App() {
         )}
         <ProjectFabProvider>
           <div
+            // Alttaki boşluk alt menü ve balonlar için; klavye açıkken onlar
+            // gizlendiği için boşluk da daralır (bkz. index.css, lib/klavye.ts).
+            data-klavyede-alt-bosluk
             style={{
               paddingTop: isCoverPage ? 0 : safeTop(HEADER_HEIGHT),
               // Mobilde sayfanın altında üç şey üst üste duruyor: alt menü

@@ -200,7 +200,12 @@ services:
       # Global ceiling. Per-bucket limits are tighter (8 MB, set by migration
       # 063 in stage D); this only has to be above the largest of them. The
       # backend streams anything over 8 MB to Drive/OneDrive, not here.
-      FILE_SIZE_LIMIT: 52428800
+      # EXCEPTION: social-publish (Instagram staging) holds whole videos for a
+      # few seconds while Meta fetches them. Reels go up to 300 MB; at 50 MB
+      # every normal reel failed with "object exceeded the maximum allowed
+      # size". The bucket carries its own 300 MB cap (migration 141), so the
+      # 8 MB image buckets are not loosened by this.
+      FILE_SIZE_LIMIT: 314572800
       TENANT_ID: projelio
       REGION: local
 

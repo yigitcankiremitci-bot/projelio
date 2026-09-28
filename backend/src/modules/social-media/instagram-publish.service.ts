@@ -29,6 +29,13 @@ import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 /** Geçici public kova (bkz. 058_social_publishing.sql). */
 const PUBLISH_BUCKET = "social-publish";
 
+/**
+ * Instagram'ın reels video sınırı (300 MB). Geçici kovanın sınırı da bu
+ * (migration 141 + depolama servisinin FILE_SIZE_LIMIT'i). Daha büyüğünü
+ * kopyalamaya çalışmak hem belleği şişirir hem de Meta'da yine reddedilir.
+ */
+const MAX_VIDEO_BYTES = 300 * 1024 * 1024;
+
 /** Instagram tek gönderide en fazla 10 medya kabul ediyor. */
 const MAX_CAROUSEL_ITEMS = 10;
 
@@ -192,6 +199,12 @@ export class InstagramPublishService {
       );
     }
 
+    const uzunluk = Number(response.headers.get("content-length") ?? 0);
+    if (uzunluk > MAX_VIDEO_BYTES) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new PublishError(`"${fileName}" çok büyük: Instagram en fazla 300 MB kabul ediyor.`, true);
+    }
+
     const buffer = Buffer.from(await response.arrayBuffer());
     const extension = isVideo ? (mimeType.split("/")[1] || "mp4") : "jpg";
     const storagePath = `${randomUUID()}.${extension}`;
@@ -200,6 +213,15 @@ export class InstagramPublishService {
       .from(PUBLISH_BUCKET)
       .upload(storagePath, buffer, { contentType: mimeType, upsert: false });
     if (error) {
+      // Boyut reddi geçici değil: aynı dosya her denemede aynı sınıra takılır.
+      // Eskiden geçici sayılıyordu ve kuyruk 59 MB'lık bir reels'i saatlerce
+      // yeniden deniyordu (depolamanın genel sınırı 50 MB'tı).
+      if (/exceeded the maximum allowed size|payload too large|entity too large/i.test(error.message)) {
+        throw new PublishError(
+          `"${fileName}" yayın için geçici depoya sığmadı (sunucu sınırı). Yöneticiye bildirin.`,
+          true
+        );
+      }
       throw new PublishError(`Medya yayına hazırlanamadı: ${error.message}`, false, 60_000);
     }
 

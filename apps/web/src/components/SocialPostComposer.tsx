@@ -164,6 +164,10 @@ export default function SocialPostComposer({
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Medya hatası ayrı: genel hata satırı modalın en altında ve yükleme
+  // düğmesinden ekranlarca uzakta — "yükleme bitti ama dosya yok" diye
+  // bildirilen durumda hata oradaydı, görülmedi.
+  const [medyaHata, setMedyaHata] = useState("");
   const [silinecek, setSilinecek] = useState(false);
   // "Tekrar paylaş": yayımlanmış içeriği yeni bir taslak olarak çoğaltır.
   const [cogaltiliyor, setCogaltiliyor] = useState(false);
@@ -295,20 +299,52 @@ export default function SocialPostComposer({
     return next;
   };
 
+  /**
+   * Tek dosyayı yükler; yarıda kalmış görünen yüklemeyi kurtarır.
+   *
+   * Büyük dosya Drive'a parça parça gidiyor ve SON parçanın yanıtı tarayıcıda
+   * "Failed to fetch" ile düşebiliyor — dosya Drive'da oluşmuş, Projelio'ya
+   * kaydedilmemiş olarak kalıyor. Dosyalar sayfası bunu sunucuya sorarak
+   * çözüyor (lib/uploadQueue.ts > closeSession); burada o adım yoktu ve
+   * 60 MB'lık reels videoları "yüklendi ama kayboldu". Aynı mutabakat burada.
+   */
+  const yukle = async (target: NonNullable<typeof uploadTarget>, file: File): Promise<ProjectFile> => {
+    let sessionId: string | undefined;
+    try {
+      return await uploadFile(target, file, {}, (ratio) => setUploadPct(Math.round(ratio * 100)), undefined, (id) => {
+        sessionId = id;
+      });
+    } catch (err) {
+      if (sessionId) {
+        const sonuc = await filesApi.reconcileSession(sessionId, false).catch(() => null);
+        if (sonuc?.status === "completed") return sonuc.file;
+      }
+      throw err;
+    }
+  };
+
   const handleUpload = async (files: FileList | null) => {
     if (!files?.length || !uploadTarget) return;
     setUploading(true);
     setError("");
+    setMedyaHata("");
     try {
       const target = saved ?? (await persist());
       let current = target;
       for (const file of Array.from(files)) {
-        const uploaded = await uploadFile(uploadTarget, file, {}, (ratio) => setUploadPct(Math.round(ratio * 100)));
+        const uploaded = await yukle(uploadTarget, file);
         current = await socialMediaApi.attachMedia(current.id, uploaded.id);
+        // Her dosyadan sonra ekrana yansıt: çoklu yüklemede sonraki dosya
+        // düşerse öncekiler kaybolmuş gibi görünmesin.
+        setSaved(current);
       }
-      setSaved(current);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("Dosya yüklenemedi"));
+      const mesaj = err instanceof Error ? err.message : t("Dosya yüklenemedi");
+      setMedyaHata(
+        /failed to fetch|networkerror|load failed/i.test(mesaj)
+          ? t("Bağlantı koptu, dosya yüklenemedi. İnternetini kontrol edip tekrar dene.")
+          : mesaj
+      );
     } finally {
       setUploading(false);
       setUploadPct(0);
@@ -348,7 +384,7 @@ export default function SocialPostComposer({
       const target = saved ?? (await persist());
       setSaved(await socialMediaApi.attachMedia(target.id, file.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("Dosya eklenemedi"));
+      setMedyaHata(err instanceof Error ? err.message : t("Dosya eklenemedi"));
     } finally {
       setUploading(false);
     }
@@ -366,7 +402,7 @@ export default function SocialPostComposer({
           const imported = await filesApi.importFromDrive(uploadTarget, { sourceFileId: id, name });
           await attachExisting(imported);
         } catch (err) {
-          setError(err instanceof Error ? err.message : t("Dosya içe aktarılamadı"));
+          setMedyaHata(err instanceof Error ? err.message : t("Dosya içe aktarılamadı"));
         }
       },
       // Seçici HEDEFİN depo hesabıyla açılmalı; şirketler ayrı hesap
@@ -1198,6 +1234,7 @@ export default function SocialPostComposer({
               )}
             </span>
           )}
+          {medyaHata && <span style={{ fontSize: 12, color: c.danger }}>{medyaHata}</span>}
         </div>
 
         {/* ---------------------------------------------- Plan */}

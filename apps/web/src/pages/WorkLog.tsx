@@ -34,10 +34,20 @@ import { bicimDili } from "../lib/i18n/depo";
 /** Hızlı süre düğmeleri. Gerçek hayatta en sık girilen değerler. */
 const HIZLI_SURELER = [15, 30, 60, 120];
 
-type Aralik = "today" | "week" | "month" | "all";
+/**
+ * "day" = tek gün (seçili gün, varsayılan bugün). Diğerleri yalnızca bakmak
+ * için: kayıt EKLEMEK tek bir güne yapılır, o yüzden gün seçimi ayrı bir şerit.
+ */
+type Aralik = "day" | "week" | "month" | "all";
+
+/**
+ * Gün şeridinde kaç gün geriye gidilebiliyor. Unutulan işi geriye dönük
+ * yazmak en çok geçen haftayla ilgili; daha eskisi için kayıt eklenip
+ * düzenleme penceresinden tarihi değiştirilebilir.
+ */
+const GUN_SERIDI = 7;
 
 const ARALIKLAR: { value: Aralik; label: string }[] = [
-  { value: "today", label: "Bugün" }, // dil:anahtar
   { value: "week", label: "Son 7 gün" }, // dil:anahtar
   { value: "month", label: "Son 30 gün" }, // dil:anahtar
   { value: "all", label: "Tümü" }, // dil:anahtar
@@ -51,7 +61,11 @@ export default function WorkLog() {
 
   const [entries, setEntries] = useState<WorkLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [aralik, setAralik] = useState<Aralik>("today");
+  const [aralik, setAralik] = useState<Aralik>("day");
+  // Tek gün kipinde hangi gün. Yeni kayıtlar da BU GÜNE yazılıyor: birkaç gün
+  // önce yapılan işi girmek için önce kaydı açıp sonra tarihini düzeltmek
+  // gerekiyordu ve günde birkaç iş için bu, hiç girmemeye yol açıyordu.
+  const [secilenGun, setSecilenGun] = useState(() => yerelGun(new Date()));
   const [hata, setHata] = useState("");
 
   const [kaydediliyor, setKaydediliyor] = useState(false);
@@ -70,12 +84,12 @@ export default function WorkLog() {
     if (aralik === "all") return {};
     const bugun = new Date();
     const gun = (d: Date) => yerelGun(d);
-    if (aralik === "today") return { from: gun(bugun), to: gun(bugun) };
+    if (aralik === "day") return { from: secilenGun, to: secilenGun };
     const geriye = aralik === "week" ? 6 : 29;
     const baslangic = new Date(bugun);
     baslangic.setDate(baslangic.getDate() - geriye);
     return { from: gun(baslangic), to: gun(bugun) };
-  }, [aralik]);
+  }, [aralik, secilenGun]);
 
   const yukle = useCallback(
     // `sessiz`: canlı sinyalle gelen tazelemede yükleme göstergesi AÇILMAZ.
@@ -170,6 +184,10 @@ export default function WorkLog() {
   }) => {
     if (kaydediliyor) return;
     setKaydediliyor(true);
+    // Geçmiş bir gün açıksa kayıt o güne düşer; aksi hâlde (bugün ya da çok
+    // günlü görünüm) bugüne.
+    const bugun = yerelGun(new Date());
+    const hedefGun = aralik === "day" ? secilenGun : bugun;
     try {
       const yeni = await worklog.create({
         title: veri.title,
@@ -177,9 +195,11 @@ export default function WorkLog() {
         duration: veri.duration,
         // Saat aralığı yerel duvar saatiyle gidiyor: sunucu gün defterini de
         // takvim bloğunu da buna göre kuruyor (bkz. api/worklog.ts).
-        startedAt: veri.startedAt ? `${yerelGun(new Date())}T${veri.startedAt}:00` : null,
-        endedAt: veri.endedAt ? `${yerelGun(new Date())}T${veri.endedAt}:00` : null,
-        doneAt: veri.startedAt ? undefined : simdiYerel(),
+        startedAt: veri.startedAt ? `${hedefGun}T${veri.startedAt}:00` : null,
+        endedAt: veri.endedAt ? `${hedefGun}T${veri.endedAt}:00` : null,
+        // Geçmiş güne saatin kendisi yazılıyor: gün içindeki sıra, girildiği
+        // sırayla aynı kalsın diye.
+        doneAt: veri.startedAt ? undefined : `${hedefGun}${simdiYerel().slice(10)}`,
         markTaskDone: veri.markTaskDone,
         addToCalendar: veri.addToCalendar,
         // "Yeni oluştur" ile BAĞLAMA seçildiyse kayıt zaten bağlı doğuyor.
@@ -320,6 +340,97 @@ export default function WorkLog() {
           zaman sistemde zaten açık duran bir görev ve onu yüzlerce kart
           arasında aramak, kaydı hiç girmemeye yol açıyordu
           (bkz. WorkLogComposer). */}
+      {/* --- Gün şeridi ---------------------------------------------------
+          Süreç sekmesindeki gün gezinmesiyle aynı kalıp: ‹ › birer gün kaydırır,
+          ortadaki baloncuklar tek tıkla o güne atlar. Açık gün hem listelenen
+          hem de yeni kaydın YAZILACAĞI gün. Geleceğe gidilmiyor: "yaptım"
+          olmamış iş için yazılmaz. */}
+      {(() => {
+        const bugun = yerelGun(new Date());
+        const gunler = gunPenceresi(secilenGun, GUN_SERIDI);
+        const ileriGidilir = aralik !== "day" || secilenGun < bugun;
+        const gunuSec = (gun: string) => {
+          setSecilenGun(gun > bugun ? bugun : gun);
+          setAralik("day");
+        };
+        // Çok günlü görünümdeyken ok, bugünden başlayarak gezinmeye döner.
+        const kaydir = (n: number) => gunuSec(aralik === "day" ? gunEkle(secilenGun, n) : n < 0 ? gunEkle(bugun, -1) : bugun);
+        const okStili = (etkin: boolean) =>
+          ({
+            width: 30,
+            height: 30,
+            borderRadius: "50%",
+            border: `1px solid ${c.border}`,
+            background: c.background,
+            color: etkin ? c.textPrimary : c.textSecondary,
+            opacity: etkin ? 1 : 0.4,
+            fontSize: 17,
+            flexShrink: 0,
+          }) as const;
+        return (
+          <div style={{ display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 6 }}>
+            <button type="button" onClick={() => kaydir(-1)} aria-label={t("Önceki gün")} style={okStili(true)}>
+              ‹
+            </button>
+            <div style={{ flex: 1, display: "flex", flexWrap: "nowrap", gap: 6, minWidth: 0 }}>
+              {gunler.map((gun) => {
+                const secili = aralik === "day" && gun === secilenGun;
+                return (
+                  <button
+                    key={gun}
+                    type="button"
+                    onClick={() => gunuSec(gun)}
+                    aria-pressed={secili}
+                    style={{
+                      flex: "1 1 0",
+                      minWidth: 0,
+                      maxWidth: 96,
+                      padding: "5px 2px",
+                      borderRadius: 10,
+                      border: `1px solid ${secili ? c.accent : c.border}`,
+                      background: secili ? "rgba(192,129,63,0.10)" : "transparent",
+                      color: secili ? c.accentDark : c.textSecondary,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      lineHeight: 1.25,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <span style={{ fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
+                      {kisaGunAdi(gun, t)}
+                    </span>
+                    <span style={{ fontSize: 15, fontWeight: 600 }}>{Number(gun.slice(8, 10))}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => ileriGidilir && kaydir(1)}
+              disabled={!ileriGidilir}
+              aria-label={t("Sonraki gün")}
+              style={okStili(ileriGidilir)}
+            >
+              ›
+            </button>
+          </div>
+        );
+      })()}
+
+      {aralik === "day" && secilenGun !== yerelGun(new Date()) && (
+        <p style={{ margin: "-8px 0 0", fontSize: 13.5, color: c.accentDark }}>
+          {t("Kayıtlar {gun} gününe eklenecek.", { gun: gunBasligi(secilenGun, t) })}{" "}
+          <button
+            type="button"
+            onClick={() => setSecilenGun(yerelGun(new Date()))}
+            style={{ border: "none", background: "none", padding: 0, color: c.accentDark, textDecoration: "underline", fontSize: 13.5 }}
+          >
+            {t("Bugüne dön")}
+          </button>
+        </p>
+      )}
+
       <WorkLogComposer kaydediliyor={kaydediliyor} onSubmit={(veri) => void ekle(veri)} odakRef={odaklanRef} />
 
       {hata && (
@@ -776,6 +887,32 @@ function yerelGun(d: Date): string {
   const ay = String(d.getMonth() + 1).padStart(2, "0");
   const gun = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${ay}-${gun}`;
+}
+
+/** "YYYY-MM-DD" gününe `n` gün ekler (eksi olabilir). Öğlen çapası yaz saati kaymasına karşı. */
+function gunEkle(gun: string, n: number): string {
+  const d = new Date(`${gun}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return yerelGun(d);
+}
+
+/**
+ * Şeritte görünen `adet` gün, ESKİDEN YENİYE (soldan sağa, oklarla aynı yön).
+ * Seçili gün son bir haftadaysa pencere bugünde biter ve kıpırdamaz; daha
+ * geriye gidildikçe seçili gün ortada kalacak biçimde kayar, ama bugünü aşmaz.
+ */
+function gunPenceresi(secilen: string, adet: number): string[] {
+  const bugun = yerelGun(new Date());
+  const ortadanSonra = gunEkle(secilen, Math.floor(adet / 2));
+  const son = ortadanSonra > bugun ? bugun : ortadanSonra;
+  return Array.from({ length: adet }, (_, i) => gunEkle(son, i - adet + 1));
+}
+
+/** Gün şeridindeki üst satır: "Bugün" / "Dün" / "Cum". */
+function kisaGunAdi(gun: string, t: (metin: string) => string): string {
+  const baslik = gunBasligi(gun, t);
+  if (baslik === t("Bugün") || baslik === t("Dün")) return baslik;
+  return new Date(`${gun}T12:00:00`).toLocaleDateString(bicimDili(), { weekday: "short" });
 }
 
 /** "Bugün" / "Dün" / "10 Eylül Perşembe". */

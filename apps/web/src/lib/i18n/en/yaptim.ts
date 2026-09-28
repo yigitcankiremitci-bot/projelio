@@ -46,6 +46,8 @@ export const yaptim: TranslationDict = {
   bağlanmamış: "unlinked",
   "{n} kronometre çalışıyor": { one: "{n} timer running", other: "{n} timers running" },
   "Son 7 gün": "Last 7 days",
+  "Kayıtlar {gun} gününe eklenecek.": "New entries will be added to {gun}.",
+  "Bugüne dön": "Back to today",
   "Son 30 gün": "Last 30 days",
   Dün: "Yesterday",
 

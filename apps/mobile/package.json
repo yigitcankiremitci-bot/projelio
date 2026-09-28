@@ -12,6 +12,7 @@
     "android:aab": "npm run android:hazirla && node scripts/apk-uret.mjs --aab"
   },
   "dependencies": {
+    "@capacitor-community/in-app-review": "^8.0.0",
     "@capacitor-community/safe-area": "^8.0.1",
     "@capacitor/android": "^8.5.2",
     "@capacitor/app": "^8.1.1",

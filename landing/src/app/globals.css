@@ -3662,9 +3662,11 @@ input[type="range"] {
   box-shadow: var(--shadow), 0 0 0 3px rgba(224, 176, 119, 0.14);
 }
 
+/* Görseller 4:3; eskiden 16:9 kutuya cover ile basılıp alt-üstten kırpılıyor,
+   ortadaki çizim küçük ve yanlar boş kalıyordu. Oranı koruyunca tamamı görünür. */
 .dept-card figure {
   margin: 0;
-  height: 146px;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
   background: var(--surface-2);
 }
@@ -3750,15 +3752,35 @@ input[type="range"] {
   animation: bubble-in 0.35s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
 
-.dept-module i {
+/* Modül simgesi: uygulamadaki ModuleEmblem (koyu tema paleti). */
+.module-emblem {
+  --em-primary: #8593a8;
+  --em-accent: #d9a868;
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
-  background: rgba(192, 129, 63, 0.14);
-  color: var(--bronze-400);
+  border-radius: 10px;
+  background: linear-gradient(140deg, color-mix(in srgb, var(--em-accent) 16%, var(--surface)), color-mix(in srgb, var(--em-primary) 7%, var(--surface)));
+  border: 1px solid color-mix(in srgb, var(--em-accent) 20%, var(--line));
+}
+
+.module-emblem svg {
+  width: 23px;
+  height: 23px;
+}
+
+.marquee-track .module-emblem {
+  width: clamp(38px, 4vw, 50px);
+  height: clamp(38px, 4vw, 50px);
+  margin-right: 14px;
+  vertical-align: middle;
+}
+
+.marquee-track .module-emblem svg {
+  width: 62%;
+  height: 62%;
 }
 
 /* --- Lio bölümü: nabız atan hale + büyük filigran ----------------------- */
@@ -3845,6 +3867,8 @@ input[type="range"] {
 }
 
 .marquee-track span {
+  display: inline-flex;
+  align-items: center;
   white-space: nowrap;
   font-size: clamp(1.4rem, 2.6vw, 2.2rem);
   font-weight: 600;

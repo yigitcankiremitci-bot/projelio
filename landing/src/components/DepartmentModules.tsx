@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import type { Dict } from "@/i18n";
-import { ArrowRight, Sparkle } from "./Icons";
+import { ArrowRight } from "./Icons";
+import ModuleEmblem, { DEPARTMENT_MODULE_KEYS } from "./ModuleEmblem";
 
 /**
  * Departmanlar tek sıra, yana kaydırmalı (uygulamadaki DepartmentsPanel'in
@@ -103,8 +104,8 @@ export default function DepartmentModules({ dict }: { dict: Dict }) {
               <Image
                 src={`/modules/${m.slug}.webp`}
                 alt=""
-                width={520}
-                height={320}
+                width={800}
+                height={600}
                 sizes="260px"
                 loading="lazy"
                 draggable={false}
@@ -132,9 +133,7 @@ export default function DepartmentModules({ dict }: { dict: Dict }) {
         <div className="dept-module-grid" key={dept.slug}>
           {dept.modules.map((name, i) => (
             <span className="dept-module" key={name} style={{ animationDelay: `${i * 35}ms` }}>
-              <i>
-                <Sparkle size={14} />
-              </i>
+              <ModuleEmblem moduleKey={DEPARTMENT_MODULE_KEYS[dept.slug]?.[i] ?? ""} />
               {name}
             </span>
           ))}

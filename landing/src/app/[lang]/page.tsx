@@ -11,6 +11,7 @@ import LiveProduct from "@/components/LiveProduct";
 import FeatureFilm from "@/components/FeatureFilm";
 import JourneyFilm from "@/components/JourneyFilm";
 import DepartmentModules from "@/components/DepartmentModules";
+import ModuleEmblem, { DEPARTMENT_MODULE_KEYS } from "@/components/ModuleEmblem";
 import { ArrowRight, CheckSmall, WhatsApp, lioIcons, securityIcons } from "@/components/Icons";
 
 export default async function HomePage({ params }: { params: Promise<{ lang: string }> }) {
@@ -20,7 +21,14 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
 
   const faqPreview = dict.faq.categories[0].items.slice(0, 5);
   // Aynı modül birden çok departmanda olabiliyor (ör. Hesaplar); şeritte bir kez.
-  const allModules = [...new Set(dict.modules.items.flatMap((m) => m.modules))];
+  // Tekilleştirme adla değil simge anahtarıyla: TR/EN aynı modülü aynı anahtarla bulur.
+  const allModules = [
+    ...new Map(
+      dict.modules.items.flatMap((d) =>
+        d.modules.map((name, i) => [DEPARTMENT_MODULE_KEYS[d.slug]?.[i] ?? name, name] as const),
+      ),
+    ),
+  ];
   const faqJsonLd = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -340,9 +348,9 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
         <div className="module-marquee" style={{ marginTop: 56, marginBottom: 0 }}>
           <div className="marquee-track">
             {[0, 1].map((copy) =>
-              allModules.map((name, i) => (
-                <span key={`${copy}-${name}`} aria-hidden={copy === 1 ? true : undefined}>
-                  <i>{String(i + 1).padStart(2, "0")}</i>
+              allModules.map(([key, name]) => (
+                <span key={`${copy}-${key}`} aria-hidden={copy === 1 ? true : undefined}>
+                  <ModuleEmblem moduleKey={key} />
                   {name}
                 </span>
               )),

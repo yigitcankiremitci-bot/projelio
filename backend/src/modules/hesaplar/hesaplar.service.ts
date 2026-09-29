@@ -175,7 +175,11 @@ export class HesaplarService {
       // Departman süzgeci: modül departman altında açıldığında yalnızca o
       // departmanın hesapları görünür. Departmansız açılışta (kurulum
       // sihirbazından gelen eski kayıtlar) şirketin tamamı görünür.
-      if (kapsam.departmentId) sorgu = sorgu.eq("department_id", kapsam.departmentId);
+      // Departmansız yazılmış eski kayıtlar (organizasyon sekmesinden girilenler)
+      // da departmanda görünür: anasayfa ile departman aynı hesapları göstermeli.
+      if (kapsam.departmentId) {
+        sorgu = sorgu.or(`department_id.eq.${kapsam.departmentId},department_id.is.null`);
+      }
     }
 
     const { data, error } = await sorgu.order("name", { ascending: true }).limit(LISTE_TAVANI);

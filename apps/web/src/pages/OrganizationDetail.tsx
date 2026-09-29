@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { Department, Organization, Task } from "@projelio/shared";
+import type { Department, ModuleCatalogEntry, Organization, Task } from "@projelio/shared";
 import { ORG_TYPE_LABEL } from "@projelio/shared";
 import { api } from "../api/client";
 import { useLiveRoom } from "../lib/liveRoom";
@@ -82,6 +82,22 @@ export default function OrganizationDetail() {
   // sekmeler + o anki modül sekmeleridir (bkz. lib/moduleLayout.ts).
   const moduleTabs = useModuleTabs(id);
   const openModuleTab = moduleTabs.find((m) => m.key === tabParam);
+  // Modül bir departmana aittir: sekmede de o departmanın kapsamıyla açılmalı,
+  // yoksa buraya girilen kayıtlar departman sayfasında görünmez (ve tersi).
+  const [moduleCatalog, setModuleCatalog] = useState<ModuleCatalogEntry[]>([]);
+  useEffect(() => {
+    api.get<ModuleCatalogEntry[]>("/module-catalog").then(setModuleCatalog).catch(() => setModuleCatalog([]));
+  }, []);
+  const openModuleDepartmentId = (() => {
+    const entry = moduleCatalog.find((e) => e.key === openModuleTab?.key);
+    if (!entry) return undefined;
+    const keys = entry.departmentKeys?.length ? entry.departmentKeys : entry.departmentKey ? [entry.departmentKey] : [];
+    for (const key of keys) {
+      const dept = departments.find((d) => d.catalogKey === key);
+      if (dept) return dept.id;
+    }
+    return undefined;
+  })();
   // Bütçe sekmesi yalnızca finansal görünürlüğü olanlara açık (bkz. canViewOrgBudget);
   // yetkisi olmayan ?tab=budget ile gelse bile Anasayfa'ya düşer.
   // Sekme yetkileri sunucudan gelir (bkz. OrganizationAccess); istemci çıkarım yapmaz.
@@ -266,10 +282,15 @@ export default function OrganizationDetail() {
         </div>
         <MobileBackRow backRef={backRef} to={back.to} label={back.label} geriGit={back.geriGit} />
 
-        {/* Terfi etmiş modül: sekmenin içeriği modülün kendisi. Departman
-            bağlamı yok — organizasyon geneli açılır. */}
+        {/* Terfi etmiş modül: sekmenin içeriği modülün kendisi; modülün ait
+            olduğu departmanın kapsamıyla açılır (departman sayfasıyla aynı veri). */}
         {openModuleTab && id && (
-          <ModuleSurface moduleKey={openModuleTab.key} moduleName={openModuleTab.name} organizationId={id} />
+          <ModuleSurface
+            moduleKey={openModuleTab.key}
+            moduleName={openModuleTab.name}
+            organizationId={id}
+            departmentId={openModuleDepartmentId}
+          />
         )}
 
         {activeTab === "flow" && (

@@ -37,7 +37,10 @@ export const site = {
    * yazılı (src/i18n/{tr,en}.ts > contact.channels) — biri değişirse diğeri de
    * değişmeli.
    */
-  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP ?? "905418636753",
+  // `||`, `??` değil: dağıtım bu değişkeni boş metinle geçiriyor (docker-compose
+  // `${NEXT_PUBLIC_WHATSAPP:-}`) ve `??` boşu geçerli sayıp numarayı siliyordu —
+  // düğmeler href="#" ile canlıya çıktı.
+  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP || "905418636753",
   /** İletişim sayfasında ve yasal metinlerde görünen telefon. */
   phone: "+90 541 863 67 53",
   social: {

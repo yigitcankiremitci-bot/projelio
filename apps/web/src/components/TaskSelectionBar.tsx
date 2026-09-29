@@ -198,6 +198,21 @@ export default function TaskSelectionBar({
         () => (hepsiSecili ? onDeselectAll?.() : onSelectAll?.()),
         { alwaysEnabled: true, alwaysLabel: true }
       ),
+    // Kısmi seçimde de "Temizle" görünsün: eskiden yalnızca HEPSİ seçiliyken
+    // çıkıyordu, birkaç kart seçip vazgeçen kullanıcı seçimi boşaltacak düğmeyi
+    // bulamıyordu ("Tümü" çıkıyor, "Temizle" hiç yoktu).
+    selectableCount > 0 &&
+      !hepsiSecili &&
+      selectedCount > 0 &&
+      onDeselectAll &&
+      actionButton(
+        "clear",
+        t("Temizle"),
+        t("Seçimi kaldır"),
+        <IconX size={iconSize} color={c.textSecondary} />,
+        () => onDeselectAll(),
+        { alwaysEnabled: true, alwaysLabel: true }
+      ),
     // Lio ilk sırada: tek "okuma" eylemi, geri kalanların hepsi veriyi değiştiriyor.
     // Lio gizliyken çizilmez (bkz. AskLioButton — dinleyen panel mount edilmiyor).
     showLio &&
@@ -236,6 +251,8 @@ export default function TaskSelectionBar({
     actionButton("cancel", t("Vazgeç"), t("Seçimi iptal et"), <IconX size={iconSize} color={c.textSecondary} />, onCancel, {
       borderless: true,
       alwaysEnabled: true,
+      // Yazılı: yalnızca "X" ikonu seçim kipinden ÇIKIŞ olarak anlaşılmıyordu.
+      alwaysLabel: true,
     }),
   ].filter(Boolean);
 

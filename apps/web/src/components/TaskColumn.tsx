@@ -731,7 +731,12 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     selection.forEach((id) => {
       if (id === draggedId) return;
       const node = document.querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`);
-      if (node) node.style.opacity = "0.4";
+      // Gizleniyor (soluklaştırma değil): yerinde soluk kalan kart "taşınmıyor"
+      // gibi görünüyordu. Bırakınca liste zaten yeni sıraya göre çiziliyor.
+      if (node) {
+        node.setAttribute("data-multi-hidden", "");
+        node.style.display = "none";
+      }
     });
     requestAnimationFrame(() => {
       const ghost = document.querySelector<HTMLElement>(".sortable-fallback");
@@ -749,9 +754,10 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   };
 
   const clearMultiDrag = () => {
-    for (const node of document.querySelectorAll<HTMLElement>("[data-id]")) {
-      if (node.style.opacity === "0.4") node.style.opacity = "";
-    }
+    document.querySelectorAll<HTMLElement>("[data-multi-hidden]").forEach((node) => {
+      node.removeAttribute("data-multi-hidden");
+      node.style.display = "";
+    });
   };
 
   const startSubtaskDrag = (evt: SortableEvent) => {

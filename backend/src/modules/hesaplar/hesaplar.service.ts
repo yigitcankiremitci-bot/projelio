@@ -172,14 +172,11 @@ export class HesaplarService {
     if ("jobId" in kapsam) sorgu = sorgu.eq("job_id", kapsam.jobId);
     else {
       sorgu = sorgu.eq("organization_id", kapsam.organizationId);
-      // Departman süzgeci: modül departman altında açıldığında yalnızca o
-      // departmanın hesapları görünür. Departmansız açılışta (kurulum
-      // sihirbazından gelen eski kayıtlar) şirketin tamamı görünür.
-      // Departmansız yazılmış eski kayıtlar (organizasyon sekmesinden girilenler)
-      // da departmanda görünür: anasayfa ile departman aynı hesapları göstermeli.
-      if (kapsam.departmentId) {
-        sorgu = sorgu.or(`department_id.eq.${kapsam.departmentId},department_id.is.null`);
-      }
+      // Departman süzgeci YOK: Hesaplar birden fazla departmanda (Yönetim, BT)
+      // açık olabiliyor ve anasayfa ile her departman AYNI listeyi göstermek
+      // zorunda — süzgeç, aynı modülü departman başına ayrı bir liste yapmıştı.
+      // Başka departmanın kaydında yönetici/kapsam izni SAYILMAZ (aşağıda), yani
+      // liste ortak ama yetki kaydın kendi departmanından gelir.
     }
 
     const { data, error } = await sorgu.order("name", { ascending: true }).limit(LISTE_TAVANI);
@@ -193,13 +190,16 @@ export class HesaplarService {
       this.kasaBilgisi(kapsam, userId),
     ]);
 
+    const kendiKapsaminda = (row: any) =>
+      "jobId" in kapsam || !kapsam.departmentId || (row.department_id ?? null) === kapsam.departmentId;
+
     const accounts = satirlar.map((row: any) => {
       const karar = hesapErisimKarari({
         canReadModule: access.canRead,
-        isAdmin: access.canManageTeam,
+        isAdmin: access.canManageTeam && kendiKapsaminda(row),
         isCreator: row.created_by === userId,
         hasAccountGrant: paylasimlar.kendiHesaplari.has(row.id),
-        hasScopeGrant: paylasimlar.kendiKapsami,
+        hasScopeGrant: paylasimlar.kendiKapsami && kendiKapsaminda(row),
       });
       return this.map(row, {
         ownerName: row.owner_user_id ? isimler.get(row.owner_user_id) : undefined,

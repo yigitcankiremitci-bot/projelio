@@ -20,6 +20,9 @@ export default function WhatsappLeadsPanel() {
   const [error, setError] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const [messages, setMessages] = useState<WhatsappMessage[] | null>(null);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
 
   const reload = useCallback(() => {
     return whatsappApi.admin
@@ -41,11 +44,36 @@ export default function WhatsappLeadsPanel() {
       return;
     }
     setOpen(threadId);
+    setDraft("");
+    setSendError("");
+    loadMessages(threadId);
+  };
+
+  const loadMessages = (threadId: string) => {
     setMessages(null);
     whatsappApi
       .messages(threadId, 100)
       .then((m) => setMessages([...m].reverse()))
       .catch(() => setMessages([]));
+  };
+
+  // Cevap Lio'nun numarasından, kuyruk ve hız sınırıyla gider (birkaç dakika
+  // sürebilir). Elle yazılan mesajdan sonra Lio bu kişiye şablon göndermez.
+  const send = async (threadId: string) => {
+    const text = draft.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setSendError("");
+    try {
+      await whatsappApi.send(threadId, text);
+      setDraft("");
+      loadMessages(threadId);
+      void reload();
+    } catch (e: any) {
+      setSendError(e?.message ?? t("Mesaj gönderilemedi."));
+    } finally {
+      setSending(false);
+    }
   };
 
   const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleString(bicimDili(), { dateStyle: "short", timeStyle: "short" }) : "—");
@@ -116,6 +144,26 @@ export default function WhatsappLeadsPanel() {
                     {m.body}
                   </div>
                 ))}
+                <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                  <input
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && void send(l.threadId)}
+                    placeholder={t("Lio numarasından cevap yazın…")}
+                    style={{ flex: 1, minWidth: 0, padding: "8px 10px", borderRadius: 9, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary, fontSize: 14 }}
+                  />
+                  <button
+                    onClick={() => void send(l.threadId)}
+                    disabled={sending || !draft.trim()}
+                    style={{ padding: "8px 14px", borderRadius: 9, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500, cursor: sending ? "wait" : "pointer", opacity: !draft.trim() ? 0.6 : 1 }}
+                  >
+                    {t("Gönder")}
+                  </button>
+                </div>
+                {sendError && <span style={{ fontSize: 13, color: c.danger }}>{sendError}</span>}
+                <span style={{ fontSize: 12, color: c.textSecondary }}>
+                  {t("Mesaj birkaç dakika içinde gider. Elle cevap yazınca Lio bu kişiye otomatik şablon göndermeyi bırakır.")}
+                </span>
                 {!l.phone.startsWith("gizli") && (
                   <a
                     href={`https://wa.me/${l.phone.replace(/\D/g, "")}`}

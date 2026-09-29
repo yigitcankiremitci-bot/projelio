@@ -404,14 +404,18 @@ export class WhatsappWebhookService {
   private async pazarla(conn: ConnectionRow, contact: ContactRow, thread: ThreadRow, body: string): Promise<void> {
     if (!isPazarlamaEnabled()) return;
     if (contact.opt_in_state === "opted_out") return;
-    const { count } = await this.supabase.client
+    const { data: giden } = await this.supabase.client
       .from("whatsapp_messages")
-      .select("id", { count: "exact", head: true })
+      .select("sent_by")
       .eq("thread_id", thread.id)
-      .eq("direction", "outbound");
+      .eq("direction", "outbound")
+      .limit(200);
+    const gidenler = (giden ?? []) as { sent_by: string | null }[];
+    // Yönetici panelden elle yazdıysa konuşma artık insanda: şablon araya girmez.
+    if (gidenler.some((m) => m.sent_by === "user")) return;
     const karar = decidePazarlama(pazarlamaConfigFromEnv(), {
       gelen: body,
-      gidenSayisi: count ?? 0,
+      gidenSayisi: gidenler.length,
       kayitUrl: `${getWebAppUrl()}/register`,
     });
     if (karar.reply === null) return;

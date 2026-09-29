@@ -41,6 +41,14 @@ export const site = {
   // `${NEXT_PUBLIC_WHATSAPP:-}`) ve `??` boşu geçerli sayıp numarayı siliyordu —
   // düğmeler href="#" ile canlıya çıktı.
   whatsapp: process.env.NEXT_PUBLIC_WHATSAPP || "905418636753",
+  /**
+   * Lio'nun WhatsApp hattı (WAHA'ya bağlı numara), sadece rakam. Yukarıdaki
+   * `whatsapp` şirketin kendi iletişim numarası — ikisi FARKLI: sitedeki
+   * "Lio ile WhatsApp'tan konuş" düğmeleri buraya gider, yoksa Lio'ya değil
+   * bir insana yazılmış olur. Ayrı değişken adı bilerek: NEXT_PUBLIC_WHATSAPP
+   * dağıtımda iletişim numarası için kullanılıyor olabilir.
+   */
+  lioWhatsapp: process.env.NEXT_PUBLIC_LIO_WHATSAPP || "905534169500",
   /** İletişim sayfasında ve yasal metinlerde görünen telefon. */
   phone: "+90 541 863 67 53",
   social: {
@@ -149,10 +157,11 @@ export function path(locale: Locale | string, sub = ""): string {
   return clean ? `/${locale}/${clean}` : `/${locale}`;
 }
 
+/** Lio'ya WhatsApp bağlantısı (iletişim numarasına DEĞİL, bkz. site.lioWhatsapp). */
 export function waLink(text = ""): string {
-  if (!site.whatsapp) return "#";
+  if (!site.lioWhatsapp) return "#";
   const q = text ? `?text=${encodeURIComponent(text)}` : "";
-  return `https://wa.me/${site.whatsapp}${q}`;
+  return `https://wa.me/${site.lioWhatsapp}${q}`;
 }
 
 export function formatTRY(value: number, locale: Locale | string = "tr"): string {

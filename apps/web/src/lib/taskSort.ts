@@ -47,7 +47,11 @@ export function compareTasksBy(mode: TaskSortMode) {
       case "due":
         return compareDue(a, b);
       case "created":
-        return a.createdAt.localeCompare(b.createdAt);
+        // EN YENİ ÜSTTE. Eskiden en eski üstteydi ve "Kendi sıram" da yeni kartı
+        // zaten en alta koyuyor; yani bu ölçüt hiçbir şeyi değiştirmiyor, son
+        // eklenenleri yukarı almak isteyen kullanıcı bunu hiçbir yerde
+        // yapamıyordu.
+        return b.createdAt.localeCompare(a.createdAt);
       case "title":
         return a.title.localeCompare(b.title, "tr");
       default:

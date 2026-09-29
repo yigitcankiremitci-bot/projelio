@@ -405,15 +405,21 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
       // bir görevin altına taşımak isteniyordu. Tıklama hâlâ seçim yapıyor —
       // sürükleme 180 ms basılı tutmak istiyor, ikisi çakışmıyor.
       group: { name: group, pull: true, put: true },
-      sort: Boolean(onReorderTasks) && !selectionMode,
+      // Seçim kipinde de sıralama AÇIK: kullanıcı seçtiği kartları toplu olarak
+      // üste/alta sürükleyebilmeli.
+      sort: Boolean(onReorderTasks),
       handle: ".task-drag-handle",
       // Alt görev sürüklemesiyle AYNI yardımcılar: boş alt görev listeleri
       // bırakılabilir hale gelir ve kartın üzerinde beklenince liste açılır
       // (bkz. handleSubtaskDragMove). Ok işlevleri TDZ içindir — bu satırlar
       // render sırasında değerlendiriliyor, yardımcılar aşağıda tanımlı.
-      onStart: (evt) => startSubtaskDrag(evt),
+      onStart: (evt) => {
+        startSubtaskDrag(evt);
+        markMultiDrag(evt.item.dataset.id);
+      },
       onEnd: (evt) => {
         finishSubtaskDrag();
+        clearMultiDrag();
         const toEl = evt.to;
         const fromEl = evt.from;
         const taskId = evt.item.dataset.id;
@@ -445,6 +451,31 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
         const ids = Array.from(toEl.children)
           .map((node) => (node as HTMLElement).dataset.id)
           .filter((v): v is string => Boolean(v));
+        const { onMove: move, onReorderTasks: reorder, selectedIds: selection, allTasks: tasksNow } = latest.current;
+        const toStatus = toEl.dataset.status as TaskStatus | undefined;
+
+        // Çoklu sürükleme: Sortable tek düğüm taşır; sürüklenen kart seçiliyse
+        // seçilenlerin geri kalanı onun hemen ardına yerleşir. Aynı sütunda
+        // bırakılırsa yalnızca o sütundaki seçilenler, başka sütuna bırakılırsa
+        // seçimin tamamı gelir.
+        const partners: string[] =
+          selection?.has(taskId) && selection.size > 1
+            ? tasksNow
+                .filter(
+                  (t) =>
+                    selection.has(t.id) &&
+                    t.id !== taskId &&
+                    !t.parentTaskId &&
+                    (toEl !== fromEl || t.status === toStatus)
+                )
+                .map((t) => t.id)
+            : [];
+        if (partners.length > 0) {
+          const rest = ids.filter((id) => !partners.includes(id));
+          const at = rest.indexOf(taskId);
+          rest.splice(at < 0 ? rest.length : at + 1, 0, ...partners);
+          ids.splice(0, ids.length, ...rest);
+        }
         if (toEl !== fromEl) {
           // Sortable kartın DOM düğümünü diğer sütuna fiziksel olarak taşır; React ise
           // bir sonraki render'da aynı düğümü eski sütundan kaldırmaya çalışıp
@@ -458,23 +489,14 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
           } catch {
             // DOM zaten React tarafından güncellendiyse sorun yok
           }
-          const toStatus = toEl.dataset.status as TaskStatus | undefined;
+          // Sürüklenen kart seçiliyse seçimin tamamı taşınır (partners) — alt
+          // göreve dönüştürmedeki davranışın aynısı.
           if (toStatus) {
-            // Sürüklenen kart seçiliyse seçimin tamamı taşınır — alt göreve
-            // dönüştürmedeki davranışın aynısı, aksi halde seçim kipinde
-            // sürüklemek yalnızca bir kartı taşıyıp kafa karıştırırdı.
-            const selection = latest.current.selectedIds;
-            const movingIds =
-              selection?.has(taskId) && selection.size > 1
-                ? latest.current.allTasks
-                    .filter((t) => selection.has(t.id) && !t.parentTaskId)
-                    .map((t) => t.id)
-                : [taskId];
-            for (const id of movingIds) onMove(id, toStatus);
+            for (const id of [taskId, ...partners]) move(id, toStatus);
           }
         }
-        if (!onReorderTasks) return;
-        onReorderTasks(ids);
+        if (!reorder) return;
+        reorder(ids);
       },
     },
     [group, Boolean(onReorderTasks), selectionMode]
@@ -501,9 +523,16 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
 
   // Sortable seçenekleri bir kez kuruluyor; içeriden okunan prop'lar bu yüzden
   // ref üzerinden alınır, yoksa ilk render'ın değerlerine saplanırdı.
-  const latest = useRef({ onReorderTasks, onTaskRenamed, pushUndo, onTasksReload, selectedIds, allTasks });
+  //
+  // `onMove` ve `onReorderTasks` da BURADAN okunmalı (üst görev listesinin
+  // onEnd'i). Sortable örneği yalnızca `deps` değişince yeniden kuruluyor; onEnd
+  // doğrudan prop'u yakalarsa bileşenin İLK çiziminin kopyasına saplanıyor. Üst
+  // bileşenler bu iki işlevi güncel listeden türetiyor (Yapılacaklar'da
+  // kart→kaynak sözlüğü): sonradan eklenen ya da filtre değişince gelen kartlar
+  // eski kopyada yoktu, taşıma ve sıralama SESSİZCE hiçbir şey yapmıyordu.
+  const latest = useRef({ onMove, onReorderTasks, onTaskRenamed, pushUndo, onTasksReload, selectedIds, allTasks });
   useEffect(() => {
-    latest.current = { onReorderTasks, onTaskRenamed, pushUndo, onTasksReload, selectedIds, allTasks };
+    latest.current = { onMove, onReorderTasks, onTaskRenamed, pushUndo, onTasksReload, selectedIds, allTasks };
   });
 
   /**
@@ -690,6 +719,38 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
       // Sunucu kuralı reddedebilir (ör. kaydın kendi alt görevleri var).
       window.alert(err?.message ?? t("Alt göreve dönüştürülemedi."));
       reload?.();
+    }
+  };
+
+  // Çoklu sürükleme görseli: sürüklenen kart seçiliyse seçilen diğer kartlar
+  // (her sütunda) soluklaşır ve imlecin altındaki kopyaya "N görev" rozeti
+  // takılır — kullanıcı tek kartı mı, hepsini mi taşıdığını görsün.
+  const markMultiDrag = (draggedId?: string) => {
+    const selection = latest.current.selectedIds;
+    if (!draggedId || !selection?.has(draggedId) || selection.size < 2) return;
+    selection.forEach((id) => {
+      if (id === draggedId) return;
+      const node = document.querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`);
+      if (node) node.style.opacity = "0.4";
+    });
+    requestAnimationFrame(() => {
+      const ghost = document.querySelector<HTMLElement>(".sortable-fallback");
+      if (!ghost || ghost.querySelector("[data-multi-badge]")) return;
+      const badge = document.createElement("span");
+      badge.setAttribute("data-multi-badge", "");
+      // Yalnızca sayı: çevrilecek yeni bir metin gerektirmiyor.
+      badge.textContent = String(selection.size);
+      badge.style.cssText =
+        "position:absolute;top:-8px;right:-8px;padding:2px 8px;border-radius:999px;font-size:12px;" +
+        `background:${c.primary};color:#fff;pointer-events:none;z-index:1;`;
+      ghost.style.position = ghost.style.position || "fixed";
+      ghost.appendChild(badge);
+    });
+  };
+
+  const clearMultiDrag = () => {
+    for (const node of document.querySelectorAll<HTMLElement>("[data-id]")) {
+      if (node.style.opacity === "0.4") node.style.opacity = "";
     }
   };
 
@@ -1272,7 +1333,16 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                 // geri alınması gereken iki tık vardı, üçüncü çağrı listeyi açık
                 // bırakıp gözle görülür bir açılıp-kapanmaya yol açıyordu.
                 // Artık tek tıklama kısa bir süre bekletiliyor (bkz. clickIntent).
-                onClick={() => (onOpenSource ? click.single(() => toggleExpand(gorev.id)) : toggleExpand(gorev.id))}
+                onClick={() => {
+                  // Seçim kipinde kartın her yeri seçer: yalnızca küçük kutucuğa
+                  // nişan almak toplu seçimi yavaşlatıyordu.
+                  if (selectionMode && onToggleSelect) {
+                    onToggleSelect(gorev.id);
+                    return;
+                  }
+                  if (onOpenSource) click.single(() => toggleExpand(gorev.id));
+                  else toggleExpand(gorev.id);
+                }}
                 onDoubleClick={
                   onOpenSource
                     ? (e) => {

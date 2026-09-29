@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow, noarchive" />
+<meta name="theme-color" content="#3E4858" />
+<title>Projelio Marka Rehberi</title>
+<link rel="icon" href="/favicon.ico" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* Değerler packages/shared/src/theme.ts ve landing/src/app/globals.css'ten alındı.
+   Paleti orada değiştirirsen bu sayfayı da güncelle. */
+:root {
+  --bg: #F7F8FA; --surface: #FFFFFF; --text: #1A1F29; --soft: #66707F; --line: #E3E6EB;
+  --primary: #3E4858; --accent: #C0813F; --accent-dark: #8C5A28;
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151B; --surface: #1B2028; --text: #F1F3F5; --soft: #9AA2B0; --line: #2A3140;
+    --primary: #8593A8; --accent: #D9A868; --accent-dark: #C0813F;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151B; --surface: #1B2028; --text: #F1F3F5; --soft: #9AA2B0; --line: #2A3140;
+  --primary: #8593A8; --accent: #D9A868; --accent-dark: #C0813F;
+}
+* { box-sizing: border-box; margin: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font: 16px/1.6 "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { font-family: "Bricolage Grotesque", "Inter", sans-serif; line-height: 1.15; letter-spacing: -0.01em; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+header.top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; align-items: center; gap: 16px; height: 58px; }
+header.top img { width: 30px; height: 30px; }
+header.top b { font-family: "Bricolage Grotesque"; font-size: 18px; }
+header.top nav { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; }
+header.top nav a { color: var(--soft); text-decoration: none; font-size: 14px; padding: 6px 10px; border-radius: 8px; white-space: nowrap; }
+header.top nav a:hover { color: var(--text); background: var(--line); }
+#tema { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 14px; cursor: pointer; }
+.hero { padding: 72px 0 40px; }
+.hero h1 { font-size: clamp(38px, 7vw, 64px); font-weight: 600; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero p { color: var(--soft); max-width: 560px; margin-top: 16px; font-size: 18px; }
+section { padding: 48px 0; border-top: 1px solid var(--line); }
+section > .wrap > h2 { font-size: 30px; font-weight: 600; margin-bottom: 8px; }
+.lead { color: var(--soft); max-width: 640px; margin-bottom: 28px; }
+h3 { font-size: 17px; font-weight: 600; margin: 28px 0 12px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.card .pad { padding: 16px; }
+.card small { color: var(--soft); }
+.logo-stage { display: grid; place-items: center; height: 200px; }
+.logo-stage img { height: 130px; width: auto; }
+.on-light { background: #F7F8FA; } .on-dark { background: #12151B; } .on-navy { background: #3E4858; } .on-bronze { background: #C0813F; }
+.dl { display: inline-block; margin-top: 8px; font-size: 13px; color: var(--accent-dark); text-decoration: none; font-weight: 600; margin-right: 12px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dl { color: var(--accent); } }
+:root[data-theme="dark"] .dl { color: var(--accent); }
+.dl:hover { text-decoration: underline; }
+.sw { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); cursor: pointer; text-align: left; padding: 0; font: inherit; color: inherit; width: 100%; }
+.sw:hover { border-color: var(--accent); }
+.sw .chip { height: 84px; border-bottom: 1px solid var(--line); }
+.sw .meta { padding: 10px 12px; }
+.sw .meta b { display: block; font-size: 14px; }
+.sw .meta code { color: var(--soft); font-size: 13px; }
+.sw .meta span { display: block; color: var(--soft); font-size: 12px; margin-top: 2px; }
+.pair { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+@media (max-width: 720px) { .pair { grid-template-columns: 1fr; } }
+.pair > div > h3 { margin-top: 0; }
+.pal { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.pal .sw .chip { height: 58px; } .pal .sw .meta { padding: 8px 10px; }
+.type-sample { padding: 22px; }
+.type-sample .big { font-size: 44px; line-height: 1.1; }
+.type-sample p { color: var(--soft); margin-top: 8px; font-size: 14px; }
+.scale { display: grid; gap: 6px; margin-top: 14px; }
+.scale div { display: flex; align-items: baseline; gap: 14px; }
+.scale small { color: var(--soft); width: 92px; flex: none; font-size: 12px; }
+.rules { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.rules .card .pad h4 { font-size: 15px; margin-bottom: 4px; }
+.rules .card .pad p { color: var(--soft); font-size: 14px; }
+.yes { border-left: 4px solid #2E9E5B; } .no { border-left: 4px solid #C13434; }
+.demo-btn { display: inline-block; padding: 10px 18px; border-radius: 8px; font: 600 15px "Bricolage Grotesque"; background: var(--primary); color: #fff; }
+:root[data-theme="dark"] .demo-btn { color: #12151B; }
+.demo-btn.acc { background: var(--accent); color: #fff; }
+.radius-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.radius-row div { width: 110px; height: 78px; background: var(--surface); border: 1px solid var(--line); display: grid; place-items: center; font-size: 13px; color: var(--soft); }
+.sidebar-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.sidebar-row div { width: 120px; height: 90px; border-radius: 12px; color: #fff; font-size: 13px; padding: 10px; display: flex; align-items: flex-end; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="2" cy="2" r="1" fill="rgba(255,255,255,0.16)"/></svg>'); }
+footer { padding: 40px 0 64px; color: var(--soft); font-size: 13px; border-top: 1px solid var(--line); }
+#toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 8px 16px; border-radius: 999px; font-size: 14px; opacity: 0; transition: .2s; pointer-events: none; }
+#toast.on { opacity: 1; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <img src="assets/projelio-logo.png" alt="" /><b>Projelio</b>
+    <nav>
+      <a href="#logo">Logo</a><a href="#renk">Renk</a><a href="#yazi">Yazı tipi</a><a href="#bilesen">Biçim</a><a href="#ses">Ses ve dil</a><a href="#indir">İndir</a>
+    </nav>
+    <button id="tema" type="button" aria-label="Temayı değiştir">Tema</button>
+  </div>
+</header>
+
+<div class="wrap hero">
+  <h1>Projelio <em>marka rehberi</em></h1>
+  <p>Logo, renk, yazı tipi ve dil kuralları tek yerde. Renk kutularına tıklayınca kod panoya kopyalanır.</p>
+</div>
+
+<section id="logo"><div class="wrap">
+  <h2>Logo</h2>
+  <p class="lead">Koyu gri-lacivert “P” harfi ve içinde bronz-kehribar bir onay işareti: güven ve tamamlanma. Logo renkleri markanın iki ana rengini belirler.</p>
+  <div class="grid">
+    <div class="card"><div class="logo-stage on-light"><img src="assets/projelio-logo.png" alt="Projelio logosu açık zeminde" /></div><div class="pad"><b>Açık zemin</b><br /><small>Varsayılan kullanım</small><br /><a class="dl" href="assets/projelio-logo.png" download>PNG 512×512</a></div></div>
+    <div class="card"><div class="logo-stage on-dark"><img src="assets/projelio-logo.png" alt="Projelio logosu koyu zeminde" /></div><div class="pad"><b>Koyu zemin</b><br /><small>#12151B üzerinde okunur</small></div></div>
+    <div class="card"><div class="logo-stage on-bronze"><img src="assets/projelio-logo.png" alt="Projelio logosu bronz zeminde" style="filter: brightness(0) invert(1)" /></div><div class="pad"><b>Tek renk (beyaz)</b><br /><small>Renkli zeminlerde</small></div></div>
+    <div class="card"><div class="logo-stage on-light"><img src="assets/projelio-icon-512.png" alt="Uygulama ikonu" style="height:110px;border-radius:24px" /></div><div class="pad"><b>Uygulama ikonu</b><br /><small>Mağaza, favicon, ana ekran</small><br /><a class="dl" href="assets/projelio-icon-512.png" download>512</a><a class="dl" href="assets/projelio-icon-192.png" download>192</a></div></div>
+  </div>
+  <h3>Lio — asistan simgesi</h3>
+  <div class="grid">
+    <div class="card"><div class="logo-stage on-light"><img src="assets/lio-mascot.png" alt="Lio" style="height:110px" /></div><div class="pad"><b>Lio yüzü</b><br /><small>Bronz çember, gülen gözler</small><br /><a class="dl" href="assets/lio-mascot.png" download>PNG</a><a class="dl" href="assets/lio-face.svg" download>SVG</a></div></div>
+  </div>
+  <h3>Kullanım kuralları</h3>
+  <div class="rules">
+    <div class="card yes"><div class="pad"><h4>Yap</h4><p>Logonun etrafında en az P harfinin kalınlığı kadar boş alan bırak. Küçük boyutta 24 px altına inme.</p></div></div>
+    <div class="card no"><div class="pad"><h4>Yapma</h4><p>Logoyu esnetme, döndürme, renklerini değiştirme, gölge ya da çerçeve ekleme.</p></div></div>
+    <div class="card no"><div class="pad"><h4>Yapma</h4><p>Düşük kontrastlı zemine (ör. lacivert üzerinde lacivert) koyma; tek renk beyaz sürümünü kullan.</p></div></div>
+  </div>
+</div></section>
+
+<section id="renk"><div class="wrap">
+  <h2>Renk</h2>
+  <p class="lead">Ana renk <b>Gri-Lacivert</b> güven ve istikrar, ikincil renk <b>Bronz Kehribar</b> bütçe, tamamlanma ve premium his anlatır. Uygulamada renkler tek dosyadan gelir: <code>packages/shared/src/theme.ts</code>. Yeni renk uydurulmaz, paletten alınır.</p>
+
+  <h3>Marka renkleri</h3>
+  <div class="grid" id="marka"></div>
+
+  <div class="pair">
+    <div><h3>Açık tema</h3><div class="pal" id="acik"></div></div>
+    <div><h3>Koyu tema</h3><div class="pal" id="koyu"></div></div>
+  </div>
+
+  <h3>Vurgu (accent) seçenekleri</h3>
+  <p class="lead" style="margin-bottom:14px">Kullanıcı Ayarlar’dan seçer. Bronz varsayılandır. Tamamlanma yeşili accent’ten bağımsızdır, bordo temada “bitti” ile “hata” karışmasın diye.</p>
+  <div class="pal" id="vurgu"></div>
+
+  <h3>Kenar çubuğu renkleri</h3>
+  <div class="sidebar-row" id="sidebar"></div>
+
+  <h3>Tanıtım sitesi ölçeği</h3>
+  <div class="pal" id="olcek"></div>
+</div></section>
+
+<section id="yazi"><div class="wrap">
+  <h2>Yazı tipi</h2>
+  <p class="lead">Uygulama <b>Bricolage Grotesque</b> kullanır (Google Fonts, 400–600). Tanıtım sitesi <b>Inter</b> kullanır. İkisi de ücretsizdir ve açık lisanslıdır. Yedek: sistem yazı tipi.</p>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+    <div class="card type-sample"><div class="big" style="font-family:'Bricolage Grotesque'">Aa Bb Cc Çç</div><b style="font-family:'Bricolage Grotesque'">Bricolage Grotesque</b><p>Uygulama arayüzü, başlıklar. Ağırlıklar: 400 · 500 · 600</p>
+      <div class="scale" style="font-family:'Bricolage Grotesque'"><div><small>Başlık 30</small><span style="font-size:30px;font-weight:600">Projelerin yolunda</span></div><div><small>Alt başlık 20</small><span style="font-size:20px;font-weight:500">Bugünün görevleri</span></div><div><small>Gövde 16</small><span style="font-size:16px">Görevleri tek yerden yönet.</span></div></div></div>
+    <div class="card type-sample"><div class="big" style="font-family:'Inter'">Aa Bb Cc Çç</div><b>Inter</b><p>Tanıtım sitesi. Ağırlıklar: 400 · 500 · 600 · 700</p>
+      <div class="scale"><div><small>Başlık 30</small><span style="font-size:30px;font-weight:700">Projelerin yolunda</span></div><div><small>Alt başlık 20</small><span style="font-size:20px;font-weight:600">Bugünün görevleri</span></div><div><small>Gövde 16</small><span style="font-size:16px">Görevleri tek yerden yönet.</span></div></div></div>
+  </div>
+  <h3>Yedek yığın</h3>
+  <div class="card"><div class="pad"><code>"Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif</code></div></div>
+</div></section>
+
+<section id="bilesen"><div class="wrap">
+  <h2>Biçim</h2>
+  <p class="lead">Yumuşak köşeler, ince kenarlıklar, hafif gölge. Koyu temada gölge derinleşir, kenarlık aynı kalır.</p>
+  <h3>Düğmeler</h3>
+  <p><span class="demo-btn">Ana eylem</span> &nbsp; <span class="demo-btn acc">Vurgulu eylem</span></p>
+  <h3>Köşe yarıçapı</h3>
+  <div class="radius-row"><div style="border-radius:8px">8 · düğme</div><div style="border-radius:14px">14 · kart</div><div style="border-radius:22px">22 · büyük kart</div><div style="border-radius:30px">30 · vitrin</div></div>
+  <h3>Gölge</h3>
+  <div class="radius-row">
+    <div style="border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.3)">küçük</div>
+    <div style="border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.2),0 1px 3px rgba(0,0,0,.15)">orta</div>
+    <div style="border-radius:14px;box-shadow:0 20px 70px rgba(192,129,63,.25)">bronz parıltı</div>
+  </div>
+</div></section>
+
+<section id="ses"><div class="wrap">
+  <h2>Ses ve dil</h2>
+  <div class="rules">
+    <div class="card"><div class="pad"><h4>Türkçe, sade, samimi</h4><p>Arayüzdeki tüm metinler Türkçe. İngilizce sürümde aynı ton korunur.</p></div></div>
+    <div class="card no"><div class="pad"><h4>“Kredi” deme</h4><p>Ödeme kuruluşu bu terimi kabul etmedi. Doğrusu: <b>Lio Bakiyesi</b> (İngilizce <b>Lio Units</b>), miktar “birim”.</p></div></div>
+    <div class="card"><div class="pad"><h4>Lio</h4><p>Yapay zekâ asistanının adı Lio. “Asistan” yerine adıyla anılır; sesi yardımsever ve kısa.</p></div></div>
+    <div class="card"><div class="pad"><h4>Yazımı</h4><p>Marka adı <b>Projelio</b>: tek kelime, baş harf büyük. “ProjeLio” ya da “PROJELIO” yazılmaz.</p></div></div>
+  </div>
+</div></section>
+
+<section id="indir"><div class="wrap">
+  <h2>İndir</h2>
+  <div class="grid">
+    <div class="card"><div class="pad"><b>Logo</b><br /><a class="dl" href="assets/projelio-logo.png" download>PNG</a></div></div>
+    <div class="card"><div class="pad"><b>Uygulama ikonu</b><br /><a class="dl" href="assets/projelio-icon-512.png" download>512</a><a class="dl" href="assets/projelio-icon-192.png" download>192</a></div></div>
+    <div class="card"><div class="pad"><b>Lio</b><br /><a class="dl" href="assets/lio-mascot.png" download>PNG</a><a class="dl" href="assets/lio-face.svg" download>SVG</a></div></div>
+    <div class="card"><div class="pad"><b>Paylaşım görseli</b><br /><small>1200×630</small><br /><a class="dl" href="assets/og-gorseli.png" download>PNG</a></div></div>
+  </div>
+</div></section>
+
+<footer><div class="wrap">Projelio · Dahili marka rehberi. Bu sayfa arama motorlarına kapalıdır; yalnızca bağlantıyı bilenler açabilir.</div></footer>
+<div id="toast" role="status"></div>
+
+<script>
+const marka = [
+  ["Gri-Lacivert", "#3E4858", "Ana renk, P harfi"],
+  ["Gri-Lacivert koyu", "#1C222C", "primaryDark"],
+  ["Bronz Kehribar", "#C0813F", "Vurgu, onay işareti"],
+  ["Bronz koyu", "#8C5A28", "accentDark"],
+];
+const acik = [
+  ["background", "#F7F8FA"], ["surface", "#FFFFFF"], ["textPrimary", "#1A1F29"], ["textSecondary", "#66707F"],
+  ["border", "#E3E6EB"], ["success", "#2E9E5B"], ["completed", "#2F7A5B"], ["danger", "#C13434"], ["warning", "#C0813F"],
+];
+const koyu = [
+  ["background", "#12151B"], ["surface", "#1B2028"], ["textPrimary", "#F1F3F5"], ["textSecondary", "#9AA2B0"],
+  ["border", "#2A3140"], ["success", "#3FBE73"], ["completed", "#5FBE94"], ["danger", "#E5605F"], ["warning", "#D9A868"],
+  ["primary", "#8593A8"], ["accent", "#D9A868"],
+];
+const vurgu = [
+  ["Bronz (varsayılan)", "#C0813F", "koyu: #D9A868"], ["Lacivert Mavi", "#4A5FC1", "koyu: #8C9BE8"],
+  ["Çam Yeşili", "#2F7A5B", "koyu: #5FBE94"], ["Bordo", "#9C3F52", "koyu: #D97690"],
+];
+const sidebar = [["Varsayılan", "#3E4858"], ["Gece", "#14181F"], ["Zeytin", "#2E3527"], ["Bordo", "#34202A"], ["Orman", "#17301F"]];
+const olcek = [
+  ["navy-900", "#171C23"], ["navy-800", "#232A34"], ["navy-700", "#2B333F"], ["navy-600", "#3E4858"], ["navy-500", "#556174"],
+  ["navy-400", "#7A8598"], ["navy-300", "#A8B1C0"], ["navy-200", "#D3D9E2"], ["navy-100", "#E9EDF3"],
+  ["bronze-700", "#96632E"], ["bronze-600", "#C0813F"], ["bronze-500", "#D29A58"], ["bronze-400", "#E0B077"], ["bronze-100", "#F7ECDD"],
+];
+function sw(ad, hex, not) {
+  return `<button class="sw" type="button" data-hex="${hex}"><div class="chip" style="background:${hex}"></div><div class="meta"><b>${ad}</b><code>${hex}</code>${not ? `<span>${not}</span>` : ""}</div></button>`;
+}
+const doldur = (id, liste) => document.getElementById(id).innerHTML = liste.map(([a, h, n]) => sw(a, h, n)).join("");
+doldur("marka", marka); doldur("acik", acik); doldur("koyu", koyu); doldur("vurgu", vurgu); doldur("olcek", olcek);
+document.getElementById("sidebar").innerHTML = sidebar.map(([a, h]) => `<div style="background-color:${h}">${a}<br>${h}</div>`).join("");
+
+const toast = document.getElementById("toast");
+document.addEventListener("click", e => {
+  const b = e.target.closest(".sw"); if (!b) return;
+  const hex = b.dataset.hex;
+  const bitti = () => { toast.textContent = hex + " kopyalandı"; toast.classList.add("on"); setTimeout(() => toast.classList.remove("on"), 1400); };
+  try { navigator.clipboard.writeText(hex).then(bitti, bitti); } catch { bitti(); }
+});
+
+const kok = document.documentElement;
+try { const t = localStorage.getItem("tema"); if (t) kok.dataset.theme = t; } catch {}
+document.getElementById("tema").addEventListener("click", () => {
+  const koyuMu = kok.dataset.theme ? kok.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  kok.dataset.theme = koyuMu ? "light" : "dark";
+  try { localStorage.setItem("tema", kok.dataset.theme); } catch {}
+});
+</script>
+</body>
+</html>

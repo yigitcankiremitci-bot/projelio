@@ -77,6 +77,10 @@ export const dosyalar: TranslationDict = {
   "Liste alınamadı.": "Could not load the list.",
   ilgilenmiyor: "not interested",
   "WhatsApp'ta aç": "Open in WhatsApp",
+  "Mesaj gönderilemedi.": "Could not send the message.",
+  "Lio numarasından cevap yazın…": "Reply from the Lio number…",
+  "Mesaj birkaç dakika içinde gider. Elle cevap yazınca Lio bu kişiye otomatik şablon göndermeyi bırakır.":
+    "The message goes out within a few minutes. Once you reply by hand, Lio stops sending automatic templates to this person.",
   "WhatsApp'ta gönder": "Send on WhatsApp",
   "WhatsApp numarasını hesaptan ayır": "Unlink the WhatsApp number from the account",
   "WhatsApp'tan değişiklik yapılabilsin": "Allow changes from WhatsApp",
@@ -144,6 +148,9 @@ export const dosyalar: TranslationDict = {
   "Dosya indirilemedi": "The file couldn't be downloaded",
   // Çoklu seçim: sağ tık menüsü ve onay penceresi.
   "{sayi} öğe": "{sayi} items",
+  "{sayi} seçili": "{sayi} selected",
+  "Seçileni basılı tutup bir klasöre sürükle": "Press and hold a selected item, then drag it onto a folder",
+  "Menü": "Menu",
   "{sayi} öğeyi çoğalt": "Duplicate {sayi} items",
   "{sayi} öğeyi üst klasöre taşı": "Move {sayi} items to the parent folder",
   "{sayi} öğeyi köke taşı": "Move {sayi} items to the top level",

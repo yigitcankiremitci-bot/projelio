@@ -251,6 +251,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
    * (telefonda Drive da böyle davranıyor).
    */
   const secim = useFileSelection();
+  /** Son uzun basma / sürükleme bırakma anı — peşinden gelen sahte tıkı yutmak için. */
+  const uzunBasmaAni = useRef(0);
   /** Adı yerinde düzenlenen öğe (fileKey/folderKey); aynı anda yalnızca bir tane. */
   const [adDuzenlenen, setAdDuzenlenen] = useState<string | null>(null);
 
@@ -641,7 +643,12 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
   const rowClick = (e: React.MouseEvent, key: string, ac: () => void) => {
     e.stopPropagation();
     setMenu(null);
+    // Basılı tutmanın ardından parmak kalkınca tarayıcı bir de "tık" üretiyor;
+    // o tık seçimi hemen geri alır ya da öğeyi açardı.
+    if (Date.now() - uzunBasmaAni.current < 600) return;
     if (isDesktop) secim.click(e, key, sirali);
+    // Dokunmatikte seçim modu açıkken dokunma açmaz, seçimi değiştirir.
+    else if (secim.count > 0) secim.click({ metaKey: true, ctrlKey: true, shiftKey: false }, key, sirali);
     else ac();
   };
 
@@ -650,6 +657,9 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     e.preventDefault();
     // Panelin boşluk menüsü satırların üstünde açılmasın.
     e.stopPropagation();
+    // Dokunmatikte basılı tutmak MENÜ değil SEÇİM demek (bkz. dokunmatik
+    // seçim efekti); menüye seçim çubuğundaki "Menü" düğmesinden ulaşılır.
+    if (!isDesktop) return;
     const key = hedef.folder ? folderKey(hedef.folder.id) : fileKey(hedef.file!.id);
     const aktif = secim.contextSelect(key);
     setMenu({ x: e.clientX, y: e.clientY, ...hedef, toplu: aktif.length > 1 ? aktif : undefined });
@@ -726,6 +736,110 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       load();
     }
   };
+
+  /**
+   * DOKUNMATİK SEÇİM VE SÜRÜKLEME (telefon/tablet).
+   *
+   * Tarayıcının sürükle-bırakı dokunmatikte güvenilmez ve basılı tutmak zaten
+   * "sağ tık menüsü" açıyordu; bu yüzden kendi hareketimizi kuruyoruz:
+   *   * bir öğeye basılı tut     → o öğe seçilir (menü açılmaz)
+   *   * seçim varken dokun        → öğeyi seçime ekler / çıkarır
+   *   * seçili bir öğeyi sürükle  → seçimin tamamı bir klasörün üstüne bırakılır
+   * Basılı tutup PARMAĞI KALDIRMADAN sürüklemek de aynı yola giriyor.
+   *
+   * touchmove dinleyicisi passive OLAMAZ: sürükleme başlayınca sayfanın
+   * kaymaması için preventDefault gerekiyor.
+   */
+  const [dokunSurukle, setDokunSurukle] = useState<{ x: number; y: number; sayi: number } | null>(null);
+  const kokRef = useRef<HTMLDivElement>(null);
+  const dokunGuncel = useRef({ secim, tasi });
+  dokunGuncel.current = { secim, tasi };
+  useEffect(() => {
+    const kok = kokRef.current;
+    if (isDesktop || !kok || compact || !canBrowse || readOnly) return;
+    let zamanlayici: number | undefined;
+    let g: { key: string; x: number; y: number; mod: "bekle" | "basili" | "surukle" | "kaydir" } | null = null;
+
+    const satir = (hedef: EventTarget | null) =>
+      (hedef as HTMLElement | null)?.closest?.("[data-secim-key]") as HTMLElement | null;
+    const klasorAlti = (x: number, y: number): string | null => {
+      const el = document.elementFromPoint(x, y)?.closest?.("[data-klasor-id]") as HTMLElement | null;
+      return el?.dataset.klasorId ?? null;
+    };
+    const temizle = () => {
+      window.clearTimeout(zamanlayici);
+      g = null;
+      setDokunSurukle(null);
+      setDropOver(null);
+    };
+
+    const basla = (e: TouchEvent) => {
+      const el = satir(e.target);
+      if (!el || e.touches.length !== 1) return;
+      const t0 = e.touches[0];
+      g = { key: el.dataset.secimKey!, x: t0.clientX, y: t0.clientY, mod: "bekle" };
+      window.clearTimeout(zamanlayici);
+      zamanlayici = window.setTimeout(() => {
+        if (!g) return;
+        const { secim: s } = dokunGuncel.current;
+        // Zaten seçiliyse basılı tutmak seçimi bozmaz; değilse ekler.
+        if (!s.keys.includes(g.key)) s.replace([...s.keys, g.key]);
+        g.mod = "basili";
+        uzunBasmaAni.current = Date.now();
+        navigator.vibrate?.(15);
+      }, 450);
+    };
+
+    const hareket = (e: TouchEvent) => {
+      if (!g) return;
+      const t0 = e.touches[0];
+      const uzak = Math.hypot(t0.clientX - g.x, t0.clientY - g.y) > 10;
+      if (g.mod === "bekle" && uzak) {
+        // Seçim modunda SEÇİLİ bir öğeyi sürüklemek taşımadır; öbür parmak
+        // hareketleri normal kaydırma.
+        if (dokunGuncel.current.secim.keys.includes(g.key)) g.mod = "surukle";
+        else {
+          window.clearTimeout(zamanlayici);
+          g.mod = "kaydir";
+        }
+      } else if (g.mod === "basili" && uzak) {
+        g.mod = "surukle";
+      }
+      if (g.mod === "surukle") {
+        if (e.cancelable) e.preventDefault();
+        setDokunSurukle({ x: t0.clientX, y: t0.clientY, sayi: dokunGuncel.current.secim.keys.length });
+        const k = klasorAlti(t0.clientX, t0.clientY);
+        setDropOver(k ? `folder:${k}` : null);
+      }
+    };
+
+    const bitis = (e: TouchEvent) => {
+      if (g?.mod === "surukle") {
+        const t0 = e.changedTouches[0];
+        const hedef = klasorAlti(t0.clientX, t0.clientY);
+        const { secim: s, tasi: tasiSon } = dokunGuncel.current;
+        uzunBasmaAni.current = Date.now();
+        if (hedef) {
+          // Klasörü kendi üstüne bırakmak işlemsiz; kalanlar taşınır.
+          const items = s.keys.map(parseKey).filter((i) => !(i.kind === "folder" && i.id === hedef));
+          void tasiSon(items, hedef);
+        }
+      }
+      temizle();
+    };
+
+    kok.addEventListener("touchstart", basla, { passive: true });
+    kok.addEventListener("touchmove", hareket, { passive: false });
+    kok.addEventListener("touchend", bitis);
+    kok.addEventListener("touchcancel", temizle);
+    return () => {
+      kok.removeEventListener("touchstart", basla);
+      kok.removeEventListener("touchmove", hareket);
+      kok.removeEventListener("touchend", bitis);
+      kok.removeEventListener("touchcancel", temizle);
+      window.clearTimeout(zamanlayici);
+    };
+  }, [isDesktop, compact, canBrowse, readOnly]);
 
   /** `hedef` verilmezse kapsamın kökü. */
   const handleInternalDrop = async (hedef?: FileFolder) => {
@@ -1052,6 +1166,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
   return (
     <div
+      ref={kokRef}
+      style={!isDesktop ? { WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" } : undefined}
       onContextMenu={backgroundContextMenu}
       // Boşluğa sol tık seçimi bırakır — seçili satır sonsuza kadar vurgulu
       // kalmasın.
@@ -1575,6 +1691,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             <div
               key={folder.id}
               ref={marquee.item(folderKey(folder.id))}
+              data-secim-key={folderKey(folder.id)}
+              data-klasor-id={folder.id}
               draggable={canBrowse && !readOnly && !folder.managed}
               onDragStart={(e) => beginDrag(e, folderKey(folder.id))}
               onDragEnd={() => setDragKeys(null)}
@@ -1613,6 +1731,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             <div
               key={file.id}
               ref={marquee.item(fileKey(file.id))}
+              data-secim-key={fileKey(file.id)}
               draggable={canMoveFile(file)}
               onDragStart={(e) => beginDrag(e, fileKey(file.id))}
               onDragEnd={() => setDragKeys(null)}
@@ -1661,6 +1780,8 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             <div
               key={folder.id}
               ref={marquee.item(folderKey(folder.id))}
+              data-secim-key={folderKey(folder.id)}
+              data-klasor-id={folder.id}
               draggable={canBrowse && !readOnly && !folder.managed}
               onDragStart={(e) => beginDrag(e, folderKey(folder.id))}
               onDragEnd={() => setDragKeys(null)}
@@ -1704,6 +1825,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             <div
               key={file.id}
               ref={marquee.item(fileKey(file.id))}
+              data-secim-key={fileKey(file.id)}
               draggable={canMoveFile(file)}
               onDragStart={(e) => beginDrag(e, fileKey(file.id))}
               onDragEnd={() => setDragKeys(null)}
@@ -1818,6 +1940,72 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
           >
             {t("Bırakın, yükleyelim")}
           </div>
+        </div>
+      )}
+
+      {/* Dokunmatik seçim çubuğu ve sürükleme etiketi (bkz. dokunmatik seçim efekti). */}
+      {!isDesktop && secim.count > 0 && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            left: 12,
+            right: 12,
+            bottom: "calc(12px + env(safe-area-inset-bottom))",
+            zIndex: 60,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "10px 14px",
+            borderRadius: 12,
+            background: c.surface,
+            border: `1px solid ${c.accent}`,
+            boxShadow: "0 6px 24px rgba(0,0,0,0.25)",
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary }}>
+              {t("{sayi} seçili", { sayi: secim.count })}
+            </div>
+            <div style={{ fontSize: 12, color: c.textSecondary }}>{t("Seçileni basılı tutup bir klasöre sürükle")}</div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              setMenu({ x: r.left, y: Math.max(8, r.top - 8), toplu: secim.keys });
+            }}
+            style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 14 }}
+          >
+            {t("Menü")}
+          </button>
+          <button
+            type="button"
+            onClick={() => secim.clear()}
+            style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: c.accent, color: "#fff", fontSize: 14 }}
+          >
+            {t("Vazgeç")}
+          </button>
+        </div>
+      )}
+      {dokunSurukle && (
+        <div
+          style={{
+            position: "fixed",
+            left: dokunSurukle.x - 24,
+            top: dokunSurukle.y - 56,
+            zIndex: 70,
+            pointerEvents: "none",
+            padding: "6px 12px",
+            borderRadius: 999,
+            background: c.accent,
+            color: "#fff",
+            fontSize: 14,
+            fontWeight: 600,
+            boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+          }}
+        >
+          {t("{sayi} öğe", { sayi: dokunSurukle.sayi })}
         </div>
       )}
 

@@ -19,18 +19,16 @@ www.projelio.app {
 }
 
 # ------------------------------------------------------------ Marka rehberi
-# brand.projelio.app: logo, renk, yazı tipi. Sitede hiçbir yerden bağlantı YOK;
-# yalnızca adresi bilen açar. Arama motorlarına üç yerden kapalı (bu başlık,
-# robots.txt ve sayfadaki meta) — biri unutulsa da diğerleri tutar.
+# brand.projelio.app: logo, renk, yazı tipi. Sitede bağlantı yok ama arama
+# motorlarına AÇIK (2026-09-29 kararı): robots.txt izin veriyor, noindex yok.
 # Statik dosyalar /srv/brand'den gelir (bkz. Dockerfile.web, brand/ klasörü).
 brand.projelio.app {
 	root * /srv/brand
 	encode zstd gzip
 	file_server
 	header {
-		X-Robots-Tag "noindex, nofollow, noarchive"
 		X-Content-Type-Options "nosniff"
-		Referrer-Policy "no-referrer"
+		Referrer-Policy "strict-origin-when-cross-origin"
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		Cache-Control "no-cache"
 	}

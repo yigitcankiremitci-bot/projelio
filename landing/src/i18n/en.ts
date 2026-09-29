@@ -46,6 +46,9 @@ export const en: Dict = {
   },
 
   common: {
+    whatsappLio: "Chat with Lio on WhatsApp",
+    whatsappLioAria: "Start chatting with Lio on WhatsApp",
+    whatsappLioText: "Hi Lio, I'd like to learn about Projelio.",
     tryLio: "Try Lio",
     seePricing: "See pricing",
     startFree: "Start free",

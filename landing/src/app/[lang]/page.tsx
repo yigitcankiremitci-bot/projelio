@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getDict, type Locale } from "@/i18n";
-import { appLinks, path, site, dilliAdres } from "@/lib/site";
+import { appLinks, path, site, dilliAdres, waLink } from "@/lib/site";
 import LioDemo from "@/components/LioDemo";
 import Reveal from "@/components/Reveal";
 import Faq from "@/components/Faq";
@@ -11,7 +11,7 @@ import LiveProduct from "@/components/LiveProduct";
 import FeatureFilm from "@/components/FeatureFilm";
 import JourneyFilm from "@/components/JourneyFilm";
 import DepartmentModules from "@/components/DepartmentModules";
-import { ArrowRight, CheckSmall, lioIcons, securityIcons } from "@/components/Icons";
+import { ArrowRight, CheckSmall, WhatsApp, lioIcons, securityIcons } from "@/components/Icons";
 
 export default async function HomePage({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = await params;
@@ -95,6 +95,15 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
               <Link className="btn btn-ghost btn-lg" href={path(locale, "pricing")}>
                 {dict.hero.ctaSecondary}
               </Link>
+              <a
+                className="btn btn-ghost btn-lg"
+                href={waLink(dict.common.whatsappLioText)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <WhatsApp size={18} />
+                {dict.common.whatsappLio}
+              </a>
             </div>
             <div className="hero-proof">
               {dict.hero.proof.map((p) => (

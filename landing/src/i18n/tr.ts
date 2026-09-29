@@ -45,6 +45,9 @@ export const tr = {
   },
 
   common: {
+    whatsappLio: "Lio ile WhatsApp'tan konuş",
+    whatsappLioAria: "Lio ile WhatsApp'tan konuşmaya başla",
+    whatsappLioText: "Merhaba Lio, Projelio'yu tanımak istiyorum.",
     tryLio: "Lio'yu dene",
     seePricing: "Fiyatları gör",
     startFree: "Ücretsiz başla",

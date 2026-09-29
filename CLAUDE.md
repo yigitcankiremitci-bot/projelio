@@ -151,6 +151,7 @@ Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 | Arıza bildirimi | `PROJELIO_NTFY_KONU` ya da `PROJELIO_TELEGRAM_TOKEN`+`_CHAT` | `/etc/projelio/uyari.env` ya da `~/uyari.env` |
 | Yedek yaşam sinyali | `PROJELIO_YEDEK_PING` | aynı dosya |
 | WhatsApp'tan Lio'ya komut | `WHATSAPP_LIO_KOMUT=1` | `backend/.env` |
+| Yabancı numaraya Lio'nun şablonlu pazarlaması (tanıt → 2 soru → kayıt linki, en çok 10 mesaj) | `WHATSAPP_PAZARLAMA=1` (`_MAKS` isteğe bağlı) | `backend/.env` — kod `whatsapp-pazarlama.ts`, MODEL YOK (bakiye harcamaz); adım = konuşmadaki giden mesaj sayısı |
 | Lio'nun AI sağlayıcı sırası | `AI_PROVIDERS` | `backend/.env` (ya da Admin paneli) |
 | Abonelik tahsilatı | `IYZICO_API_KEY` + `IYZICO_SECRET_KEY` | `backend/.env` (plan kodları Admin panelinde) |
 | Lio Bakiyesi tahsilatı (PayTR) | `PAYTR_MERCHANT_ID` + `PAYTR_MERCHANT_KEY` + `PAYTR_MERCHANT_SALT` | `backend/.env` — eksikse eski akış (elle onay) sürer |

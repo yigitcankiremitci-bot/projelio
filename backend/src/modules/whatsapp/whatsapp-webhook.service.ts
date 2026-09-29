@@ -4,6 +4,8 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { WahaHttpClient } from "./waha.client";
 import { WhatsappLioService } from "./whatsapp-lio.service";
 import { isLioCommandEnabled } from "./lio-komut-sinir";
+import { decidePazarlama, isPazarlamaEnabled, pazarlamaConfigFromEnv } from "./whatsapp-pazarlama";
+import { getWebAppUrl } from "../../common/config/env";
 import { AUTO_REPLIES, confirmPrompt, parseInboundCommand } from "./whatsapp-optin";
 import { isGroupJid, isLidJid, isLidKey, jidToE164, lidContactKey, maskPhone } from "./whatsapp-phone";
 import { WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
@@ -381,11 +383,39 @@ export class WhatsappWebhookService {
         "/settings?tab=baglantilar"
       );
     }
+    // Yabancı: ne konuşmanın sahibi var ne de bir kullanıcıya bağlı. Lio şablonla
+    // tanıtır ve kayda yönlendirir (bkz. whatsapp-pazarlama.ts).
+    if (!thread.owner_user_id && !contact.user_id && !contact.pending_user_id) {
+      await this.pazarla(conn, contact, thread, body).catch((e) => {
+        this.logger.warn(`Yabancıya pazarlama yanıtı başarısız (${thread.id}): ${e instanceof Error ? e.message : e}`);
+      });
+      return;
+    }
     if (thread.lio_auto_reply && thread.owner_user_id) {
       await this.lio.replyToInbound(thread, contact, conn, body).catch((e) => {
         this.logger.warn(`Lio otomatik yanıt başarısız (${thread.id}): ${e instanceof Error ? e.message : e}`);
       });
     }
+  }
+
+  /** Yabancıya şablonlu pazarlama yanıtı; tavan dolduysa ya da kişi reddettiyse susar. */
+  private async pazarla(conn: ConnectionRow, contact: ContactRow, thread: ThreadRow, body: string): Promise<void> {
+    if (!isPazarlamaEnabled()) return;
+    if (contact.opt_in_state === "opted_out") return;
+    const { count } = await this.supabase.client
+      .from("whatsapp_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("thread_id", thread.id)
+      .eq("direction", "outbound");
+    const karar = decidePazarlama(pazarlamaConfigFromEnv(), {
+      gelen: body,
+      gidenSayisi: count ?? 0,
+      kayitUrl: `${getWebAppUrl()}/register`,
+    });
+    if (karar.reply === null) return;
+    if (karar.red) await this.updateContact(contact.id, { opt_in_state: "opted_out", opt_out_at: new Date().toISOString() });
+    await this.waha.sendSeen(conn.session_name, contact.wa_jid).catch(() => {});
+    await this.sendImmediate(conn, thread.id, contact.wa_jid, karar.reply);
   }
 
   /**

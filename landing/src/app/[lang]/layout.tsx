@@ -4,6 +4,7 @@ import { getDict, isLocale, locales, defaultLocale, type Locale } from "@/i18n";
 import { site } from "@/lib/site";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import WhatsappLio from "@/components/WhatsappLio";
 
 // Tarayıcı çubuğu da sitenin koyu zeminine uysun (bkz. globals.css --paper).
 export const viewport: Viewport = {
@@ -121,6 +122,7 @@ export default async function LangLayout({
         <Header dict={dict} locale={locale} />
         <main id="main">{children}</main>
         <Footer dict={dict} locale={locale} />
+        <WhatsappLio dict={dict} />
       </body>
     </html>
   );

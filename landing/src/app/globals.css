@@ -4236,53 +4236,35 @@ input[type="range"] {
   font-size: 0.92rem;
 }
 
-/* Lio ile WhatsApp'tan konuş — sabit düğme. Yeşil değil, sitenin bronz paleti; yalnızca "çevrimiçi" noktası yeşil. */
+/* Lio ile WhatsApp'tan konuş — sağ altta sabit, yalnız logo. Yeşil değil, sitenin bronz paleti; yalnızca "çevrimiçi" noktası yeşil. */
 .wa-lio {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
   bottom: max(16px, env(safe-area-inset-bottom));
   z-index: 60;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 18px 8px 8px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  border: 1px solid var(--bronze-600);
-  color: var(--text);
-  font-weight: 600;
-  font-size: 0.92rem;
-  box-shadow: var(--shadow), var(--shadow-glow);
-  transition: transform 0.16s ease, background 0.2s ease, border-color 0.2s ease;
-}
-.wa-lio:hover {
-  transform: translateY(-2px);
-  background: var(--surface);
-  border-color: var(--bronze-500);
-}
-.wa-lio-ikon {
-  position: relative;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   background: var(--bronze-600);
+  border: 1px solid var(--bronze-400);
   color: var(--ink);
+  box-shadow: var(--shadow), var(--shadow-glow);
+  transition: transform 0.16s ease, background 0.2s ease;
 }
-.wa-lio-ikon::after {
+.wa-lio:hover {
+  transform: translateY(-2px) scale(1.04);
+  background: var(--bronze-500);
+}
+.wa-lio::after {
   content: "";
   position: absolute;
-  top: 1px;
-  right: 1px;
-  width: 10px;
-  height: 10px;
+  top: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--ok);
-  border: 2px solid var(--surface-2);
-}
-@media (max-width: 560px) {
-  /* Dar ekranda yalnızca ikon: yazı içeriğin üstüne binmesin. */
-  .wa-lio { padding: 6px; }
-  .wa-lio-yazi { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  border: 2px solid var(--paper);
 }

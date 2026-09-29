@@ -70,6 +70,13 @@ export const dosyalar: TranslationDict = {
   // WhatsApp
   WhatsApp: "WhatsApp",
   "WhatsApp numaraları": "WhatsApp numbers",
+  "Lio'ya yazanlar": "People who wrote to Lio",
+  "WhatsApp'tan Lio'ya yazan, henüz üye olmamış kişiler. Üye olup kodu gönderenler bu listeden düşer.":
+    "People who messaged Lio on WhatsApp and have not signed up yet. Anyone who signs up and sends their code drops off this list.",
+  "Henüz Lio'ya yazan yabancı yok.": "Nobody outside the app has written to Lio yet.",
+  "Liste alınamadı.": "Could not load the list.",
+  ilgilenmiyor: "not interested",
+  "WhatsApp'ta aç": "Open in WhatsApp",
   "WhatsApp'ta gönder": "Send on WhatsApp",
   "WhatsApp numarasını hesaptan ayır": "Unlink the WhatsApp number from the account",
   "WhatsApp'tan değişiklik yapılabilsin": "Allow changes from WhatsApp",

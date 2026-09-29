@@ -14,6 +14,7 @@ import DemoAdminPanel from "../components/DemoAdminPanel";
 import DemoZiyaretleriPanel from "../components/DemoZiyaretleriPanel";
 import DemoRandevuAdminPanel from "../components/demoRandevu/DemoRandevuAdminPanel";
 import WhatsappNumbersPanel from "../components/WhatsappNumbersPanel";
+import WhatsappLeadsPanel from "../components/WhatsappLeadsPanel";
 import AdminEpostaPanel from "../components/adminEposta/AdminEpostaPanel";
 import AdminEpostaMaliyetPanel from "../components/adminEposta/AdminEpostaMaliyetPanel";
 import TabBar from "../components/TabBar";
@@ -179,7 +180,12 @@ export default function AdminPanel() {
     demoRandevu: () => <DemoRandevuAdminPanel />,
     demo: () => <DemoAdminPanel />,
     ziyaretler: () => <DemoZiyaretleriPanel />,
-    whatsapp: () => <WhatsappNumbersPanel />,
+    whatsapp: () => (
+      <>
+        <WhatsappLeadsPanel />
+        <WhatsappNumbersPanel />
+      </>
+    ),
   };
 
   const tabs = TABS.map((s) => ({ ...s, label: t(s.label) }));

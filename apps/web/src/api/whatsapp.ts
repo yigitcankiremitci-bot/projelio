@@ -1,5 +1,6 @@
 import type {
   WhatsappConnectionSummary,
+  WhatsappLead,
   WhatsappLinkCode,
   WhatsappLinkedUser,
   WhatsappMessage,
@@ -32,6 +33,7 @@ export const whatsappApi = {
   // --- Yönetici: numara havuzu ---
   admin: {
     list: () => api.get<WhatsappConnectionSummary[]>("/admin/whatsapp/numbers"),
+    leads: () => api.get<WhatsappLead[]>("/admin/whatsapp/leads"),
     linkedUsers: () => api.get<WhatsappLinkedUser[]>("/admin/whatsapp/linked-users"),
     add: (label: string) => api.post<WhatsappConnectionSummary>("/admin/whatsapp/numbers", { label }),
     start: (id: string) => api.post<WhatsappConnectionSummary>(`/admin/whatsapp/numbers/${id}/start`, {}),

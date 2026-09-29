@@ -380,7 +380,9 @@ export class WhatsappWebhookService {
           // Hattın adı yoksa AYRI metin: yedek sözcük parametreye konsa
           // İngilizce cümlenin ortasında Türkçe kalırdı (params çevrilmez).
           : { metin: "Sahipsiz konuşma (havuz): {mesaj}", params: { mesaj: preview } },
-        "/settings?tab=baglantilar"
+        // Sahipsiz konuşma yöneticilere gider ve yalnız Admin > WhatsApp'ta görünür;
+        // sahipli olan sahibinin Ayarlar sayfasına.
+        thread.owner_user_id ? "/settings?tab=baglantilar" : "/admin?sekme=whatsapp"
       );
     }
     // Yabancı: ne konuşmanın sahibi var ne de bir kullanıcıya bağlı. Lio şablonla

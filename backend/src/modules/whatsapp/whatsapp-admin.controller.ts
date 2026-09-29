@@ -28,6 +28,12 @@ export class WhatsappAdminController {
     return this.whatsapp.listLinkedUsers();
   }
 
+  /** Lio'ya yazan, henüz üye olmamış yabancılar (sahipsiz konuşmalar). */
+  @Get("leads")
+  leads() {
+    return this.whatsapp.listLeads();
+  }
+
   /** Havuza numara ekler ve QR bekleyen oturumu açar. Gövde: { label } */
   @Post("numbers")
   add(@Body() body: { label: string }, @Req() req: any) {

@@ -3364,6 +3364,25 @@ export interface WhatsappThread {
   lastInboundAt?: string;
 }
 
+/**
+ * Lio'ya yazan yabancı (sahipsiz müşteri konuşması) — yalnız yönetici görür.
+ * `phone` tam numara (yönetici ulaşabilsin diye); numarası gizli (LID) kişide
+ * maskeli "gizli numara" gelir.
+ */
+export interface WhatsappLead {
+  threadId: string;
+  phone: string;
+  displayName?: string;
+  firstAt: string;
+  lastInboundAt?: string;
+  inboundCount: number;
+  outboundCount: number;
+  /** Kişi "dur/ilgilenmiyorum" dedi; Lio artık yazmıyor. */
+  optedOut: boolean;
+  /** Son gelen mesajın başı (önizleme). */
+  lastInbound?: string;
+}
+
 export interface WhatsappMessage {
   id: string;
   threadId: string;

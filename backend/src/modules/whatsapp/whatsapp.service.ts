@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import { randomInt } from "node:crypto";
 import type {
+  WhatsappLead,
   NotificationPayload,
   WhatsappConnectionSummary,
   WhatsappContact,
@@ -27,7 +28,7 @@ import { NotificationsGateway } from "../notifications/notifications.gateway";
 import { WahaHttpClient, type WahaSessionStatus } from "./waha.client";
 import { formatNotificationText, shouldSendOverWhatsapp } from "./whatsapp-notification-types";
 import { buildLinkUrl, generateLinkCode } from "./whatsapp-optin";
-import { e164ToJid, maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
+import { e164ToJid, isLidKey, maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
 import { getWebAppUrl } from "../../common/config/env";
 
 /** Eşleştirme kodu geçerlilik süresi. */
@@ -558,6 +559,59 @@ export class WhatsappService {
       .limit(limit);
     if (error) throw error;
     return (data ?? []).map(mapThread);
+  }
+
+  /**
+   * Lio'ya yazan yabancılar: sahibi olmayan müşteri konuşmaları (kimse onlara
+   * yazmamış, kendileri yazmış). Kullanıcıya bağlanan kişi kind=notification
+   * ve sahipli konuşmaya geçtiği için buradan düşer — yani liste "henüz üye
+   * olmamış" ilgililerdir. Yönetici ucundan çağrılır.
+   */
+  async listLeads(limit = 100): Promise<WhatsappLead[]> {
+    const { data, error } = await this.supabase.client
+      .from("whatsapp_threads")
+      .select("id, created_at, last_inbound_at, whatsapp_contacts!inner(phone_e164, display_name, opt_in_state, user_id)")
+      .eq("kind", "customer")
+      .is("owner_user_id", null)
+      .is("whatsapp_contacts.user_id", null)
+      .order("last_message_at", { ascending: false, nullsFirst: false })
+      .limit(limit);
+    if (error) throw error;
+    const rows = (data ?? []) as any[];
+    if (rows.length === 0) return [];
+
+    const { data: msgs } = await this.supabase.client
+      .from("whatsapp_messages")
+      .select("thread_id, direction, body, created_at")
+      .in("thread_id", rows.map((r) => r.id))
+      .order("created_at", { ascending: false })
+      .limit(5000);
+    const stats = new Map<string, { inbound: number; outbound: number; last?: string }>();
+    for (const m of (msgs ?? []) as any[]) {
+      const st = stats.get(m.thread_id) ?? { inbound: 0, outbound: 0 };
+      if (m.direction === "inbound") {
+        st.inbound++;
+        // Sıra yeniden eskiye: ilk görülen gelen mesaj sonuncusudur.
+        if (st.last === undefined && m.body) st.last = String(m.body).slice(0, 140);
+      } else st.outbound++;
+      stats.set(m.thread_id, st);
+    }
+
+    return rows.map((r) => {
+      const c = r.whatsapp_contacts;
+      const st = stats.get(r.id);
+      return {
+        threadId: r.id,
+        phone: isLidKey(c.phone_e164) ? maskPhone(c.phone_e164) : c.phone_e164,
+        displayName: c.display_name ?? undefined,
+        firstAt: r.created_at,
+        lastInboundAt: r.last_inbound_at ?? undefined,
+        inboundCount: st?.inbound ?? 0,
+        outboundCount: st?.outbound ?? 0,
+        optedOut: c.opt_in_state === "opted_out",
+        lastInbound: st?.last,
+      };
+    });
   }
 
   /** Konuşmayı görebilir mi: sahibi, ya da konuşmanın organizasyonunu görebilen. */

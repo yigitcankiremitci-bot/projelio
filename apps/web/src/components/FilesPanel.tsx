@@ -19,6 +19,7 @@ import { fileKey, folderKey, parseKey, useFileSelection } from "../lib/fileSelec
 import { useFileThumbnails } from "../lib/fileThumbnails";
 import { useFileViewMode } from "../lib/fileViewMode";
 import { matchesSearch, sortFiles, sortFolders, useFileSort } from "../lib/fileSort";
+import { benzersizYollar, zipYaz, type ZipGirdisi } from "../lib/zipYaz";
 import { useMarqueeSelection } from "../lib/useMarqueeSelection";
 import { usePageFileDrop } from "../lib/usePageFileDrop";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -994,6 +995,88 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       window.location.href = await filesApi.contentUrl(file.id, { download: true });
     } catch (e: any) {
       setError(e?.message ?? t("Dosya indirilemedi"));
+    }
+  };
+
+  const [zipDurumu, setZipDurumu] = useState<string | null>(null);
+
+  /** Bir klasörün doğrudan dosyaları — kapsamın türüne göre doğru uçtan. */
+  const klasorDosyalari = (klasorId: string): Promise<ProjectFile[]> => {
+    if (!folderOwner) return Promise.resolve([]);
+    if (folderOwner.kind === "job") return filesApi.listByJob(folderOwner.id, { scope: "all", folderId: klasorId });
+    if (folderOwner.kind === "department") return filesApi.listByDepartment(folderOwner.id, klasorId);
+    return filesApi.listByOrganization(folderOwner.id, klasorId);
+  };
+
+  /**
+   * Seçimi indirir. Tek dosya doğrudan iner; birden çok öğe ya da bir klasör
+   * KLASÖR YAPISI KORUNARAK tek zip olur (bkz. lib/zipYaz.ts).
+   *
+   * Sınırlar bellek içindir: zip tarayıcıda kuruluyor, dev bir klasör sekmeyi
+   * çökertmesin diye toplam boyut ve dosya sayısı baştan sınırlı.
+   */
+  const handleDownloadMany = async (items: { kind: "file" | "folder"; id: string }[]) => {
+    if (items.length === 1 && items[0].kind === "file") {
+      const f = gorunenDosyalar.find((x) => x.id === items[0].id);
+      if (f) return handleDownload(f);
+    }
+    const ENFAZLA_DOSYA = 300;
+    const ENFAZLA_BOYUT = 800 * 1024 * 1024;
+    try {
+      setError("");
+      setZipDurumu(t("Dosyalar hazırlanıyor…"));
+      const toplanan: { yol: string; file: ProjectFile }[] = [];
+      const gez = async (klasor: { id: string; name: string }, onek: string, derinlik: number) => {
+        if (derinlik > 12) return;
+        const yol = `${onek}${klasor.name}/`;
+        const [dosyalar, altlar] = await Promise.all([
+          klasorDosyalari(klasor.id),
+          folderOwner ? filesApi.folders(folderOwner, klasor.id) : Promise.resolve([] as FileFolder[]),
+        ]);
+        dosyalar.forEach((file) => toplanan.push({ yol: yol + file.name, file }));
+        for (const alt of altlar) await gez(alt, yol, derinlik + 1);
+      };
+      for (const item of items) {
+        if (item.kind === "file") {
+          const f = gorunenDosyalar.find((x) => x.id === item.id);
+          if (f) toplanan.push({ yol: f.name, file: f });
+        } else {
+          const k = gorunenKlasorler.find((x) => x.id === item.id);
+          if (k) await gez({ id: k.id, name: k.kind === "general" ? t(k.name) : k.name }, "", 0);
+        }
+      }
+      if (!toplanan.length) {
+        setError(t("İndirilecek dosya bulunamadı"));
+        return;
+      }
+      const toplam = toplanan.reduce((a, x) => a + (x.file.sizeBytes ?? 0), 0);
+      if (toplanan.length > ENFAZLA_DOSYA || toplam > ENFAZLA_BOYUT) {
+        setError(
+          t("Bir seferde en fazla {sayi} dosya / 800 MB indirilebilir. Seçimi küçültüp tekrar dene.", { sayi: ENFAZLA_DOSYA })
+        );
+        return;
+      }
+      const yollar = benzersizYollar(toplanan.map((x) => x.yol));
+      const girdiler: ZipGirdisi[] = [];
+      for (let i = 0; i < toplanan.length; i++) {
+        setZipDurumu(t("İndiriliyor… {i}/{n}", { i: i + 1, n: toplanan.length }));
+        const url = await filesApi.contentUrl(toplanan[i].file.id, { download: true });
+        const yanit = await fetch(url);
+        if (!yanit.ok) throw new Error(t("“{ad}” indirilemedi", { ad: toplanan[i].file.name }));
+        girdiler.push({ yol: yollar[i], veri: new Uint8Array(await yanit.arrayBuffer()) });
+      }
+      const blob = zipYaz(girdiler);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${items.length === 1 ? (gorunenKlasorler.find((k) => k.id === items[0].id)?.name ?? "dosyalar") : "dosyalar"}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+    } catch (e: any) {
+      setError(e?.message ?? t("Dosya indirilemedi"));
+    } finally {
+      setZipDurumu(null);
     }
   };
 
@@ -2009,6 +2092,27 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
         </div>
       )}
 
+      {zipDurumu && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "calc(16px + env(safe-area-inset-bottom))",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 80,
+            padding: "10px 16px",
+            borderRadius: 10,
+            background: c.surface,
+            border: `1px solid ${c.accent}`,
+            color: c.textPrimary,
+            fontSize: 14,
+            boxShadow: "0 6px 24px rgba(0,0,0,0.25)",
+          }}
+        >
+          {zipDurumu}
+        </div>
+      )}
+
       {menu && (
         <FileContextMenu
           x={menu.x}
@@ -2023,6 +2127,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
             // saymak olurdu.
             menu.toplu
               ? [
+                  {
+                    label: t("{sayi} öğeyi indir", { sayi: menu.toplu.length }),
+                    onClick: () => void handleDownloadMany(menuHedefleri(menu)),
+                  },
                   {
                     label: t("{sayi} öğeyi çoğalt", { sayi: menu.toplu.length }),
                     disabled: readOnly,
@@ -2075,6 +2183,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               : menu.folder
               ? [
                   { label: t("Aç"), onClick: () => setFolderId(menu.folder!.id) },
+                  {
+                    label: t("İndir (zip)"),
+                    onClick: () => void handleDownloadMany([{ kind: "folder", id: menu.folder!.id }]),
+                  },
                   {
                     label: t("Yeniden adlandır"),
                     // Projelio üretimi klasörün adı projeden/görevden geliyor;

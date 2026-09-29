@@ -149,6 +149,14 @@ export const dosyalar: TranslationDict = {
   // Çoklu seçim: sağ tık menüsü ve onay penceresi.
   "{sayi} öğe": "{sayi} items",
   "{sayi} seçili": "{sayi} selected",
+  "{sayi} öğeyi indir": "Download {sayi} items",
+  "İndir (zip)": "Download (zip)",
+  "Dosyalar hazırlanıyor…": "Preparing files…",
+  "İndiriliyor… {i}/{n}": "Downloading… {i}/{n}",
+  "İndirilecek dosya bulunamadı": "No files to download",
+  "Bir seferde en fazla {sayi} dosya / 800 MB indirilebilir. Seçimi küçültüp tekrar dene.":
+    "You can download up to {sayi} files / 800 MB at once. Narrow the selection and try again.",
+  "“{ad}” indirilemedi": "Couldn't download “{ad}”",
   "Seçileni basılı tutup bir klasöre sürükle": "Press and hold a selected item, then drag it onto a folder",
   "Menü": "Menu",
   "{sayi} öğeyi çoğalt": "Duplicate {sayi} items",

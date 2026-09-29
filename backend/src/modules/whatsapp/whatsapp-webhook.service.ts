@@ -226,6 +226,7 @@ export class WhatsappWebhookService {
       .from("whatsapp_threads")
       .update({ last_inbound_at: now, last_message_at: now, updated_at: now })
       .eq("id", thread.id);
+    this.whatsapp.pushLeadsChanged(thread.id);
 
     if (isUserPhone) return this.onUserMessage(conn, contact, thread, payload, command);
 
@@ -509,6 +510,7 @@ export class WhatsappWebhookService {
         sent_at: now,
       });
       await this.supabase.client.from("whatsapp_threads").update({ last_outbound_at: now, last_message_at: now, updated_at: now }).eq("id", threadId);
+      this.whatsapp.pushLeadsChanged(threadId);
     } catch (e) {
       this.logger.warn(`Otomatik yanıt gönderilemedi: ${e instanceof Error ? e.message : e}`);
     }

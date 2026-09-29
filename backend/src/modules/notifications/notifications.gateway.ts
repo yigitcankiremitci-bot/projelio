@@ -53,6 +53,12 @@ export class NotificationsGateway {
     this.server.to(`user:${userId}`).emit("whatsapp-status", event);
   }
 
+  // Lio'ya yazan yabancıların listesi/konuşması değişti (mesaj geldi, gitti):
+  // Admin > WhatsApp sayfası sayfa yenilemeden tazelensin.
+  sendWhatsappLeads(userId: string, event: { threadId: string }) {
+    this.server.to(`user:${userId}`).emit("whatsapp-leads", event);
+  }
+
   /**
    * "Üzerinde çalışıyorum" durumu değişti — iş ekibi panelini açık tutanlara bildirir.
    *

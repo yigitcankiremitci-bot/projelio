@@ -205,6 +205,7 @@ export class WhatsappSendProcessor {
           .from("whatsapp_threads")
           .update({ last_outbound_at: sentAt, last_message_at: sentAt, updated_at: sentAt })
           .eq("id", row.thread_id);
+        this.whatsapp.pushLeadsChanged(row.thread_id);
         sentThisRun++;
         counters.perContact.set(thread.contact_id, (counters.perContact.get(thread.contact_id) ?? 0) + 1);
       } catch (e) {

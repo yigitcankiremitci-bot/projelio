@@ -439,6 +439,25 @@ export class WhatsappService {
     }
   }
 
+  /**
+   * Sahipsiz (yabancı) bir konuşmada mesaj geldi/gitti: tüm yöneticilerin
+   * "Lio'ya yazanlar" listesi canlı tazelensin. Sahipli konuşmada sessiz kalır
+   * (o konuşma yönetici listesinde değil). Hata fırlatmaz: canlı güncelleme
+   * yalnızca kolaylık, mesaj akışını asla bozmamalı.
+   */
+  pushLeadsChanged(threadId: string): void {
+    void (async () => {
+      try {
+        const { data: thread } = await this.supabase.client.from("whatsapp_threads").select("owner_user_id").eq("id", threadId).maybeSingle();
+        if (!thread || (thread as any).owner_user_id) return;
+        const { data: admins } = await this.supabase.client.from("users").select("id").eq("role", "admin");
+        for (const a of (admins ?? []) as { id: string }[]) this.gateway.sendWhatsappLeads(a.id, { threadId });
+      } catch {
+        // Canlı güncelleme başarısızsa sayfa yenilenince zaten görünür.
+      }
+    })();
+  }
+
   /** Numara durumunu bağlayan yöneticiye (+ isteğe bağlı bir kullanıcıya) iletir. */
   pushStatus(row: ConnectionRow, extraUserId?: string): void {
     const event: WhatsappStatusEvent = {
@@ -810,6 +829,7 @@ export class WhatsappService {
       }
       throw error;
     }
+    this.pushLeadsChanged(threadId);
     return mapMessage(data);
   }
 

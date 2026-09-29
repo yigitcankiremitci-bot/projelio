@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WhatsappLead, WhatsappMessage } from "@projelio/shared";
 import { whatsappApi } from "../api/whatsapp";
+import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
@@ -36,6 +37,29 @@ export default function WhatsappLeadsPanel() {
 
   useEffect(() => {
     void reload();
+  }, [reload]);
+
+  // Canlı güncelleme: sunucu bir yabancı konuşmasında mesaj olunca haber verir.
+  // Açık konuşmayı "yükleniyor"a çevirmeden sessizce tazeliyoruz; yoksa yazarken
+  // gelen her mesaj kutuyu yanıp söndürürdü.
+  const openRef = useRef<string | null>(null);
+  openRef.current = open;
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const handler = (e: { threadId: string }) => {
+      void reload();
+      if (openRef.current === e.threadId) {
+        whatsappApi
+          .messages(e.threadId, 100)
+          .then((m) => setMessages([...m].reverse()))
+          .catch(() => {});
+      }
+    };
+    socket.on("whatsapp-leads", handler);
+    return () => {
+      socket.off("whatsapp-leads", handler);
+    };
   }, [reload]);
 
   const toggle = (threadId: string) => {

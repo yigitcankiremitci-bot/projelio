@@ -10,7 +10,7 @@ import { MAX_ATTACHMENT_UPLOAD_BYTES } from "../ai-assistant/ai-attachments.serv
 import type { WahaClient } from "./waha.client";
 import { decideLioKomut, lioKomutConfigFromEnv } from "./lio-komut-sinir";
 import { gelenMedya, medyaTuru, MEDYA_INDIRME_ZAMAN_ASIMI_MS, MEDYA_TEK_DOSYA_TAVANI, type GelenMedya } from "../social-media/gelen-medya";
-import { yedekle, yedekSil } from "../social-media/medya-yedegi";
+import { yedekle, yedekSil, yedektenYukle } from "../social-media/medya-yedegi";
 import { formatForWhatsapp } from "./whatsapp-lio-format";
 import { maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
 import { mapMessage, mapThread, WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
@@ -282,9 +282,27 @@ export class WhatsappLioService {
     }
 
     // Bu mesajla gelen ve daha önce SESSİZCE gelen medya, kimlikleriyle Lio'ya.
+    // Önce yedekten geri yükle: dağıtımdan sonra bellek boştur.
+    await yedektenYukle(this.supabase, userId).catch(() => undefined);
+    const yeni = new Set<string>();
     for (const m of gelenMedya.bildirilmemisleriAl(userId)) {
       const tur = medyaTuru(m.mimeType);
-      if (tur) karar.text += "\n\n" + medyaNotu(m, tur);
+      if (!tur) continue;
+      yeni.add(m.id);
+      karar.text += "\n\n" + medyaNotu(m, tur);
+    }
+    // Daha önce bildirilmiş ama hâlâ taslağa bağlanmamış medya da HER turda
+    // hatırlatılır. Modelin social_list_accounts'u çağırıp bakmasına güvenilmiyor:
+    // 2026-09-30'da Lio hiç araç çağırmadan sohbet geçmişindeki eski bağlamı
+    // ("elimde yalnızca ses kayıtları var") tekrarladı, video depoda dururken.
+    const bekleyen = gelenMedya.liste(userId).filter((m) => !yeni.has(m.id));
+    if (bekleyen.length) {
+      karar.text +=
+        "\n\n[Sistem notu: Kullanıcının WhatsApp'tan gönderdiği, henüz taslağa bağlanmamış medya ŞU AN SENDE: " +
+        bekleyen
+          .map((m) => `mediaId=${m.id} · ${m.ad} · ${medyaTuru(m.mimeType) === "video" ? "video" : "fotoğraf"} · ${(m.boyut / 1048576).toFixed(1)} MB · ${m.orijinal ? "orijinal kalite" : "sıkıştırılmış"}`)
+          .join("; ") +
+        ". Sohbet geçmişinde aksi yazıyorsa o bilgi ESKİDİR; sosyal medya isteğinde bu mediaId'leri kullan.]";
     }
 
     const result = await (await this.ai()).chat(

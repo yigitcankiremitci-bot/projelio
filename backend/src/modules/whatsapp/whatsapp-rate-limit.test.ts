@@ -79,6 +79,12 @@ describe("gönderim kararı", () => {
     assert.deepEqual(decideSend(DEFAULT_RATE_LIMIT, facts({ sentLastHour: 200 })), { allowed: false, reason: "per_hour" });
     assert.deepEqual(decideSend(DEFAULT_RATE_LIMIT, facts({ sentToday: 1500 })), { allowed: false, reason: "per_day" });
     assert.deepEqual(decideSend(DEFAULT_RATE_LIMIT, facts({ sentToContactToday: 20 })), { allowed: false, reason: "per_contact" });
+    // Kullanıcının kendi isteğine cevabın kişi başı tavanı ayrı ve daha yüksek.
+    assert.deepEqual(decideSend(DEFAULT_RATE_LIMIT, facts({ sentToContactToday: 20, bypassQuietHours: true })), { allowed: true });
+    assert.deepEqual(
+      decideSend(DEFAULT_RATE_LIMIT, facts({ sentToContactToday: DEFAULT_RATE_LIMIT.perContactReplyPerDay, bypassQuietHours: true })),
+      { allowed: false, reason: "per_contact" }
+    );
   });
 
   test("ısınma günündeki tavan günlük limitin önüne geçer", () => {

@@ -219,6 +219,11 @@ export const bildirimler: TranslationDict = {
   // ("Şimdiye kadar: iş oluşturuldu, görev eklendi"). Bu yüzden hepsi küçük
   // harfle ve edilgen: cümlenin ortasında duruyorlar, başında değil.
   "iş oluşturuldu": "job created",
+  "sosyal medya taslağı açıldı": "social media draft opened",
+  "açıklama ve etiketler yazıldı": "caption and hashtags written",
+  "sosyal medya taslağı güncellendi": "social media draft updated",
+  "gönderi planlandı": "post scheduled",
+  "sosyal medya taslağı iptal edildi": "social media draft cancelled",
   "iş güncellendi": "job updated",
   "proje oluşturuldu": "project created",
   "proje güncellendi": "project updated",

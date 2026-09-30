@@ -619,6 +619,11 @@ const WHATSAPP_CHANNEL_PROMPT = [
 // dil:anahtar-baslangic — duraklatma mesajındaki "şimdiye kadar ne yapıldı"
 // özeti kullanıcıya gösteriliyor; çeviri kullanım yerinde yapılıyor.
 const ACTION_LABELS: Record<string, string> = {
+  social_create_draft: "sosyal medya taslağı açıldı",
+  social_suggest_caption: "açıklama ve etiketler yazıldı",
+  social_update_draft: "sosyal medya taslağı güncellendi",
+  social_schedule_post: "gönderi planlandı",
+  social_cancel_draft: "sosyal medya taslağı iptal edildi",
   create_job: "iş oluşturuldu",
   update_job: "iş güncellendi",
   create_project: "proje oluşturuldu",

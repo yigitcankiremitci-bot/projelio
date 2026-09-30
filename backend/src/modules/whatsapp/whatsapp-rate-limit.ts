@@ -21,6 +21,8 @@ export interface RateLimitConfig {
   warmupDays: number;
   /** Aynı kişiye günde en fazla. */
   perContactPerDay: number;
+  /** Aynı kişiye, KENDİ isteğine cevap olarak (Lio komutu) günde en fazla. */
+  perContactReplyPerDay: number;
   /** Sessiz saat aralığı [başlangıç, bitiş) — yerel saat, saat cinsinden. */
   quietHoursStart: number;
   quietHoursEnd: number;
@@ -37,6 +39,7 @@ export const DEFAULT_RATE_LIMIT: RateLimitConfig = {
   warmupGrowth: 1.8,
   warmupDays: 7,
   perContactPerDay: 20,
+  perContactReplyPerDay: 150,
   quietHoursStart: 22,
   quietHoursEnd: 8,
   jitterMinMs: 2_000,
@@ -58,6 +61,7 @@ export function rateLimitFromEnv(env: NodeJS.ProcessEnv = process.env): RateLimi
     warmupGrowth: DEFAULT_RATE_LIMIT.warmupGrowth,
     warmupDays: num("WHATSAPP_WARMUP_DAYS", DEFAULT_RATE_LIMIT.warmupDays),
     perContactPerDay: num("WHATSAPP_RATE_PER_CONTACT_PER_DAY", DEFAULT_RATE_LIMIT.perContactPerDay),
+    perContactReplyPerDay: num("WHATSAPP_RATE_REPLY_PER_CONTACT_PER_DAY", DEFAULT_RATE_LIMIT.perContactReplyPerDay),
     quietHoursStart: num("WHATSAPP_QUIET_START", DEFAULT_RATE_LIMIT.quietHoursStart),
     quietHoursEnd: num("WHATSAPP_QUIET_END", DEFAULT_RATE_LIMIT.quietHoursEnd),
     jitterMinMs: DEFAULT_RATE_LIMIT.jitterMinMs,
@@ -101,8 +105,9 @@ export interface SendWindowFacts {
    * Sessiz saat kuralı ban riskini düşürmek için var ve tetikleyici gece
    * yarısı BİLDİRİM atmak. Kullanıcı 02:00'de Lio'ya kendisi yazdıysa cevabı
    * sabaha ertelemek istenmeyen mesaj korkusuyla istenen mesajı geciktirmek
-   * olurdu. Yalnızca sessiz saati atlar — hacim tavanları (dakika/saat/gün/
-   * kişi) ban riskinin asıl kaynağı olduğu için bu bayrakla delinmez.
+   * olurdu. Sessiz saati atlar; hacim tavanları (dakika/saat/gün) ban riskinin
+   * asıl kaynağı olduğu için delinmez. Kişi başı tavanda ayrı, daha yüksek
+   * değer kullanılır (perContactReplyPerDay).
    */
   bypassQuietHours?: boolean;
 }
@@ -124,7 +129,13 @@ export function decideSend(config: RateLimitConfig, facts: SendWindowFacts): Sen
   if (facts.sentToday >= dailyCapForWarmup(config, facts.warmupStartedAt, facts.now)) {
     return { allowed: false, reason: "per_day" };
   }
-  if (facts.sentToContactToday >= config.perContactPerDay) return { allowed: false, reason: "per_contact" };
+  // Kişi başı günlük tavan. Kullanıcının KENDİ isteğine verilen cevapların
+  // (bypassQuietHours ile işaretli) tavanı ayrı ve daha yüksek: 2026-09-30'da
+  // Lio ile bir akşam yazışan kullanıcı 20. mesajdan sonra hiç cevap alamadı,
+  // cevaplar kuyrukta sessizce bekledi. Tavan yine var — hacim ban riskinin
+  // kaynağı; kaldırmak yerine istenen yazışmaya göre ölçeklendi.
+  const kisiTavani = facts.bypassQuietHours ? config.perContactReplyPerDay : config.perContactPerDay;
+  if (facts.sentToContactToday >= kisiTavani) return { allowed: false, reason: "per_contact" };
   return { allowed: true };
 }
 

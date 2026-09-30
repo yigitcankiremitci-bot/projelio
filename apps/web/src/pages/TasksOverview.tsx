@@ -21,6 +21,7 @@ import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { backState } from "../lib/backTarget";
 import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 
 // Sıra, uygulamadaki diğer tüm kanbanlarla aynı: önce üzerinde çalışılan işler.
 // (bkz. DepartmentTasksPanel, JobTasksPanel, OutputsPanel, ProcessPanel)
@@ -240,9 +241,9 @@ export default function TasksOverview() {
     (task: Task) => {
       const item = items.find((i) => i.itemId === task.id);
       if (!item || item.source === "personal") return undefined;
-      return item.projectTitle ?? item.operationTitle ?? item.departmentName;
+      return item.projectTitle ?? item.operationTitle ?? departmanAdi(item.departmentName, t);
     },
-    [items]
+    [items, t]
   );
 
   /**
@@ -259,7 +260,7 @@ export default function TasksOverview() {
       }
       return {
         url: item.coverImageUrl,
-        label: item.projectTitle ?? item.operationTitle ?? item.departmentName ?? t("Atanan görev"),
+        label: item.projectTitle ?? item.operationTitle ?? departmanAdi(item.departmentName, t) ?? t("Atanan görev"),
       };
     },
     [items, me]

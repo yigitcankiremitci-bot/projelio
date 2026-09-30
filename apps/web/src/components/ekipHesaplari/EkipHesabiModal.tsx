@@ -3,6 +3,7 @@ import type { DepartmentMemberRole, EkipHesabi, EkipHesabiGirdisi, EkipHesabiSec
 import { KULLANICI_ADI_DESENI, kullaniciAdiOner } from "@projelio/shared";
 import { ekipHesaplariApi } from "../../api/ekipHesaplari";
 import { useT } from "../../lib/i18n";
+import { departmanAdi } from "../../lib/departmanAdi";
 import { sifreUret } from "../../lib/ekipHesaplari";
 import { useThemeColors } from "../../theme/useThemeColors";
 import Modal from "../Modal";
@@ -365,7 +366,7 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
                 >
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: c.textPrimary, flex: "1 1 160px" }}>
                     <input type="checkbox" checked={Boolean(rol)} onChange={(e) => departmanDegistir(d.id, e.target.checked)} />
-                    {d.name}
+                    {departmanAdi(d.name, t)}
                   </label>
                   {rol && (
                     <select

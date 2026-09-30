@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import ModuleEmblem from "./ModuleEmblem";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 
 interface Props {
   organizationId: string;
@@ -103,7 +104,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
               <option value="">{t("Departman seç…")}</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.name}
+                  {departmanAdi(d.name, t)}
                 </option>
               ))}
             </select>

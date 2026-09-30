@@ -4,6 +4,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { planning } from "../../api/planning";
 import { DRAG_ITEM, shortDayLabel, type DraggedItem } from "../../lib/planGrid";
 import { useT } from "../../lib/i18n";
+import { departmanAdi } from "../../lib/departmanAdi";
 
 interface Props {
   /** Kişisel pano: kullanıcının kendi görevleri + kendisine atananlar. */
@@ -148,7 +149,7 @@ function MineList({ items }: { items: PersonalBoardItem[] }) {
           meta={[
             item.source === "personal"
               ? t("Kişisel")
-              : (item.projectTitle ?? item.operationTitle ?? item.departmentName ?? t("Atanan")),
+              : (item.projectTitle ?? item.operationTitle ?? departmanAdi(item.departmentName, t) ?? t("Atanan")),
             item.effectiveDueDate ? shortDayLabel(item.effectiveDueDate.slice(0, 10)) : undefined,
           ]}
         />

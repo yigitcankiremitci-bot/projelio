@@ -3,6 +3,7 @@ import type { DepartmentMemberRole, EkipHesabi, EkipHesabiSecenekleri } from "@p
 import { ApiError } from "../../api/client";
 import { ekipHesaplariApi } from "../../api/ekipHesaplari";
 import { useT } from "../../lib/i18n";
+import { departmanAdi } from "../../lib/departmanAdi";
 import { useThemeColors } from "../../theme/useThemeColors";
 import EkipHesabiModal from "./EkipHesabiModal";
 
@@ -224,7 +225,7 @@ export default function EkipHesaplariPanel({ organizationId, jobId }: Props) {
                       key={d.id}
                       style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, border: `1px solid ${c.border}`, color: c.textPrimary }}
                     >
-                      {d.name} · {t(ROL_KISA[d.role])}
+                      {departmanAdi(d.name, t)} · {t(ROL_KISA[d.role])}
                     </span>
                   ))
                 )}

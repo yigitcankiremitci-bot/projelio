@@ -4,6 +4,7 @@ import Modal from "./Modal";
 import { useSidebarHierarchy } from "../lib/useSidebarHierarchy";
 import { DEFAULT_HOME_TARGET, setHomeTarget, useHomeTarget, type HomeTarget } from "../lib/homeTarget";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 import {
   IconBuilding,
   IconLayers,
@@ -75,7 +76,7 @@ export default function HomeTargetModal({ onClose }: Props) {
       {
         title: t("Departmanlar"),
         options: orgNodes.flatMap((o) =>
-          o.departments.map((d) => ({ path: `/departments/${d.id}`, label: d.name, icon: IconListCheck }))
+          o.departments.map((d) => ({ path: `/departments/${d.id}`, label: departmanAdi(d.name, t), icon: IconListCheck }))
         ),
       },
       {

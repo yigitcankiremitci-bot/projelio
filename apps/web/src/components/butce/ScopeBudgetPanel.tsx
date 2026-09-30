@@ -4,6 +4,7 @@ import type { BudgetScopeType, BudgetTransaction, BudgetTransactionType, ButceSa
 import { api } from "../../api/client";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
+import { departmanAdi } from "../../lib/departmanAdi";
 import { useRefreshOnUndo, useUndo } from "../../lib/undo";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { IconEdit, IconTrash } from "../icons";
@@ -212,7 +213,7 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
         const olusan = await api.post<BudgetTransaction>(`/budget/scope/${scopeType}/${scopeId}/transactions`, govde);
         // Kayıt bu kademeye değil, seçilen hedefe yazıldıysa nereye gittiğini
         // söyle: aksi hâlde aşağıdaki listede görünmediği için kaybolmuş sanılıyor.
-        const yazildigiYer = olusan.projectTitle || olusan.departmentName || olusan.jobTitle || olusan.organizationName;
+        const yazildigiYer = olusan.projectTitle || departmanAdi(olusan.departmentName, t) || olusan.jobTitle || olusan.organizationName;
         setBilgi(
           olusan.scopeType !== scopeType && yazildigiYer
             ? t("Kayıt {yer} defterine yazıldı; buradaki toplamlara dahil.", { yer: yazildigiYer })
@@ -637,7 +638,7 @@ const ScopeBudgetPanel = forwardRef<ScopeBudgetPanelHandle, Props>(function Scop
                       kayit.category,
                       // Neyle ilgili olduğu: kaydın kendi kademesinden BAŞKA
                       // bir yere aitse orası, ayrıca bağlıysa görev.
-                      kayit.projectTitle || kayit.departmentName || kayit.jobTitle,
+                      kayit.projectTitle || departmanAdi(kayit.departmentName, t) || kayit.jobTitle,
                       kayit.taskTitle ? `↳ ${kayit.taskTitle}` : undefined,
                       kayit.type === "payout" ? t(TUR_ETIKET.payout) : undefined,
                       kayit.source === "recurring" ? t("düzenli") : undefined,

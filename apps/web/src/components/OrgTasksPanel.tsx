@@ -13,6 +13,7 @@ import { sortTasks, type TaskSortMode } from "../lib/taskSort";
 import { backState } from "../lib/backTarget";
 import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 import { gorevDurumHatasiniBildir, altGorevHatasiniBildir } from "../lib/taskBlockNotice";
 
 // Sıra, uygulamadaki diğer tüm kanbanlarla aynı: önce üzerinde çalışılan işler.
@@ -222,11 +223,11 @@ export default function OrgTasksPanel({ organizationId, organizationName }: Prop
 
   // Kart altındaki küçük satır: bu görev hangi departmandan geldi.
   const getTaskMeta = (task: Task): string | undefined => {
-    if (task.departmentName) return task.departmentName;
+    if (task.departmentName) return departmanAdi(task.departmentName, t);
     // Alt görevler sunucudan üst görevle aynı departmanla geliyor; yine de
     // eksikse üstünden okunuyor — kartın kaynağı hiç boş kalmasın.
     if (!task.parentTaskId) return undefined;
-    return tasks.find((item) => item.id === task.parentTaskId)?.departmentName;
+    return departmanAdi(tasks.find((item) => item.id === task.parentTaskId)?.departmentName, t);
   };
 
   if (loading) return <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;

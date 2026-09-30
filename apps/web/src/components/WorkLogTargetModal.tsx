@@ -12,10 +12,12 @@ import type {
   WorkLogTargetKind,
 } from "@projelio/shared";
 import { getModuleRecordConfig } from "@projelio/shared";
+import type { Translate } from "@projelio/shared";
 import { api } from "../api/client";
 import { worklog, type WorkLogPushInput } from "../api/worklog";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 import Modal from "./Modal";
 
 /**
@@ -53,11 +55,12 @@ export interface Secenek {
  * istisna değil kural ve şirket adı olmadan liste iki özdeş satır gösteriyor —
  * kullanıcı hangisini seçtiğini bilmeden seçiyor.
  */
-export function departmanlariEtiketle(departments: Department[], organizations: Organization[]): Secenek[] {
+export function departmanlariEtiketle(departments: Department[], organizations: Organization[], t: Translate): Secenek[] {
   const sirketAdlari = new Map(organizations.map((o) => [o.id, o.name]));
   return departments.map((d) => {
     const sirket = sirketAdlari.get(d.organizationId);
-    return { id: d.id, label: sirket ? `${d.name} · ${sirket}` : d.name };
+    const ad = departmanAdi(d.name, t);
+    return { id: d.id, label: sirket ? `${ad} · ${sirket}` : ad };
   });
 }
 
@@ -102,7 +105,7 @@ export default function WorkLogTargetModal({ entry, baslik, onClose, onDone, onS
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   // Departman etiketleri şirket adını da taşımalı: iki şirkette aynı adlı
   // departman ("Muhasebe") olduğunda liste ayırt edilemez hâle geliyordu.
-  const departmanSecenekleri = useMemo(() => departmanlariEtiketle(departments, organizations), [departments, organizations]);
+  const departmanSecenekleri = useMemo(() => departmanlariEtiketle(departments, organizations, t), [departments, organizations, t]);
   const [yukleniyor, setYukleniyor] = useState(true);
 
   useEffect(() => {

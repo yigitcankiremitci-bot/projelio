@@ -30,6 +30,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { IconIdCard, IconLayers, IconSettings } from "../components/icons";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 
 // Bir departmanın kendi sayfası: iç dinamikler üstteki sekmelerle ayrılır —
 // Sosyal (Twitter mantığında paylaşım/yorum/beğeni akışı), Görevler (projedeki
@@ -47,6 +48,7 @@ export default function DepartmentDetail() {
   const isDesktop = useIsDesktop();
   const gutter = pageGutter(isDesktop);
   const [department, setDepartment] = useState<Department | null>(null);
+  const gorunenAd = departmanAdi(department?.name, t);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -95,11 +97,11 @@ export default function DepartmentDetail() {
   useEffect(reload, [id]);
 
   useEffect(() => {
-    if (department?.name) document.title = `${department.name} · Projelio`;
+    if (gorunenAd) document.title = `${gorunenAd} · Projelio`;
     return () => {
       document.title = "Projelio";
     };
-  }, [department?.name]);
+  }, [gorunenAd]);
 
   // Alt navigasyondaki "+" butonu, proje detayındaki (ProjectDetail) ile aynı desende:
   // departman detayında hangi sekmedeysek ona uygun eylemi tetikler. Modüller ve
@@ -167,7 +169,7 @@ export default function DepartmentDetail() {
     label: t("Departmanlar"),
   });
 
-  usePageHeader(department?.name, coverRef, [department?.name, department?.organizationId, back.to, back.label, back.geriGit], {
+  usePageHeader(gorunenAd, coverRef, [gorunenAd, department?.organizationId, back.to, back.label, back.geriGit], {
     to: back.to,
     label: back.label,
     geriGit: back.geriGit,
@@ -211,7 +213,7 @@ export default function DepartmentDetail() {
           coverRef={coverRef}
           coverImageUrl={coverUrl}
           seed={department?.id}
-          title={department?.name ?? "…"}
+          title={gorunenAd ?? "…"}
           description={department?.description}
           lioSubject={department ? { kind: "departman", title: department.name, id: department.id } : undefined}
           action={
@@ -269,7 +271,7 @@ export default function DepartmentDetail() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <IconLayers size={16} color="#fff" />
-            <h1 style={{ fontSize: 20, fontWeight: 500, color: "#fff", margin: 0 }}>{department?.name ?? "…"}</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 500, color: "#fff", margin: 0 }}>{gorunenAd ?? "…"}</h1>
             {department && (
               <AskLioButton
                 subject={{ kind: "departman", title: department.name, id: department.id }}

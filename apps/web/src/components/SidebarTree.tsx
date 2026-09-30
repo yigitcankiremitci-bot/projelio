@@ -5,6 +5,7 @@ import type { Department, Job } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useSidebarHierarchy, SidebarGroupNode, SidebarOrgNode } from "../lib/useSidebarHierarchy";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 import { backState, useHereAsBack } from "../lib/backTarget";
 import {
   IconBuilding,
@@ -306,7 +307,7 @@ export default function SidebarTree() {
         // bir sayfaya düşüyordu; bulunduğu yeri de yanına koyuyoruz.
         linkState={hereBack ? backState(hereBack) : undefined}
         icon={IconListCheck}
-        label={dept.name}
+        label={departmanAdi(dept.name, t)}
         depth={depth}
         active={active}
         expandable={false}

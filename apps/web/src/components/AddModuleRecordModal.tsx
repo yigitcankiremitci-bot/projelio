@@ -8,6 +8,7 @@ import { hasDynamicFields, useModuleReferences } from "../lib/moduleReferences";
 import ModuleFieldInput from "./ModuleFieldInput";
 import Modal from "./Modal";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 
 interface Props {
   organizationId: string;
@@ -112,7 +113,7 @@ export default function AddModuleRecordModal({
               <option value="">{t("Genel")}</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.name}
+                  {departmanAdi(d.name, t)}
                 </option>
               ))}
             </select>

@@ -10,6 +10,7 @@ import { coverBackground } from "../lib/covers";
 import { IconUser, IconEdit } from "./icons";
 import AskLioButton from "./AskLioButton";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 
 interface Props {
   department: Department;
@@ -161,7 +162,7 @@ export default function DepartmentCard({ department, onCoverUpdated }: Props) {
               minWidth: 0,
             }}
           >
-            {department.name}
+            {departmanAdi(department.name, t)}
           </h3>
           <AskLioButton subject={{ kind: "departman", title: department.name, id: department.id }} size={24} />
         </div>

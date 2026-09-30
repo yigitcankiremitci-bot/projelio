@@ -15,6 +15,7 @@ import AddRecurringPaymentModal from "./AddRecurringPaymentModal";
 import { useUndo } from "../lib/undo";
 import { IconTrash, IconEdit, IconCalendar, IconFolder } from "./icons";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 import { bicimDili } from "../lib/i18n/depo";
 
 function formatMoney(amount: number): string {
@@ -775,7 +776,7 @@ function HareketSutunu({
                 {hareket.projectTitle
                   ? ` · ${hareket.projectTitle}`
                   : hareket.departmentName
-                    ? ` · ${hareket.departmentName}`
+                    ? ` · ${departmanAdi(hareket.departmentName, t)}`
                     : hareket.organizationName
                       ? ` · ${hareket.organizationName}`
                       : hareket.jobTitle

@@ -12,6 +12,7 @@ import Modal from "./Modal";
 import { useDragScroll } from "../lib/useDragScroll";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import ListRowLink, { ListRowStack } from "./ListRowLink";
 import SectionToggle from "./SectionToggle";
@@ -177,7 +178,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
               to={`/departments/${dept.id}`}
               background={coverBackground(getDepartmentCoverUrl(dept), dept.id)}
               icon={<IconBuilding size={18} color="rgba(255,255,255,0.85)" />}
-              label={dept.name}
+              label={departmanAdi(dept.name, t)}
               // Kişi sayısı yerine iş durumu: satır bir bakışta "bu departman
               // ne kadar ilerledi?" sorusunu cevaplasın.
               trailing={

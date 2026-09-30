@@ -3,6 +3,7 @@ import type { GorevButceTalebi } from "@projelio/shared";
 import { api } from "../../api/client";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
+import { departmanAdi } from "../../lib/departmanAdi";
 import { fmtPara, fmtTarih } from "./butceBicim";
 
 interface Props {
@@ -85,7 +86,7 @@ export default function OnayKuyrugu({ talepler, onDegisti }: Props) {
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {talepler.map((talep) => {
           const mesgul = islenen === talep.taskId;
-          const nereden = talep.projectTitle || talep.departmentName;
+          const nereden = talep.projectTitle || departmanAdi(talep.departmentName, t);
           return (
             <div
               key={talep.taskId}

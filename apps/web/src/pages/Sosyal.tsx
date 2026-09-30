@@ -49,7 +49,7 @@ export default function Sosyal() {
         gap: 18,
       }}
     >
-      <div style={{ width: "100%", maxWidth: 720, display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 18 }}>
         {!user ? null : userId && userId !== user.id ? (
           <KisiSayfasi key={userId} userId={userId} />
         ) : userId ? (

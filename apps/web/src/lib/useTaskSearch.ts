@@ -3,6 +3,7 @@ import type { SchedulableTask } from "@projelio/shared";
 import { gorevleriAra } from "@projelio/shared";
 import { api, isAbortError } from "../api/client";
 import { useT } from "./i18n";
+import { departmanAdi } from "./departmanAdi";
 import { cevirmenSuAn } from "./i18n/anlik";
 
 /** Öneri listesinde gösterilecek en fazla satır. */
@@ -162,7 +163,7 @@ function oneriyeCevir(g: SchedulableTask): Oneri {
     altBaslik: [
       g.parentTaskId ? t("alt görev") : null,
       g.status === "completed" ? t("tamamlandı") : null,
-      g.projectTitle ?? departmanEtiketi(g.departmentName, g.departmentOrganizationName) ?? g.operationTitle,
+      g.projectTitle ?? departmanEtiketi(departmanAdi(g.departmentName, t), g.departmentOrganizationName) ?? g.operationTitle,
       g.jobTitle,
     ]
       .filter(Boolean)

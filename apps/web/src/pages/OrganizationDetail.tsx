@@ -31,6 +31,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings, IconLayers, IconIdCard } from "../components/icons";
 import { useT } from "../lib/i18n";
+import { departmanAdi } from "../lib/departmanAdi";
 import { bicimDili } from "../lib/i18n/depo";
 
 // Şirket AKIŞINDA görev/tamamlanan-görev karışımı yok: paylaşımlar ile görevler
@@ -357,7 +358,7 @@ export default function OrganizationDetail() {
 
       {addingFile && (
         <QuickFileUploadModal
-          targets={departments.map((d) => ({ id: d.id, label: d.name, target: { departmentId: d.id } }))}
+          targets={departments.map((d) => ({ id: d.id, label: departmanAdi(d.name, t), target: { departmentId: d.id } }))}
           pickerLabel={t("Departman")}
           emptyMessage={t("Dosya yükleyebilmek için önce en az bir departman kurman gerekiyor.")}
           onClose={() => setAddingFile(false)}

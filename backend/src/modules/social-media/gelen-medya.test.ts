@@ -128,3 +128,12 @@ test("yedekten dönen medya yeniden bildirilmez", () => {
   assert.equal(d.bildirilmemisleriAl("u1").length, 0);
   assert.equal(d.liste("u1").length, 1);
 });
+
+test("bu turda taslak açıldı mı", () => {
+  const d = new GelenMedyaDeposu();
+  assert.equal(d.buTurTaslakVar("u1"), false);
+  d.taslakDokunuldu("u1", "p1");
+  assert.equal(d.buTurTaslakVar("u1"), true);
+  d.yeniTur("u1");
+  assert.equal(d.buTurTaslakVar("u1"), false);
+});

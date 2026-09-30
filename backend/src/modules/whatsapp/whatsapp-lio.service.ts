@@ -29,6 +29,8 @@ const KOMUT_SOHBET_PENCERESI_MS = 6 * 60 * 60 * 1000;
  * fotoğrafları birkaç saniye arayla gelir; hepsi gelince tek tur çalışsın.
  */
 const MEDYA_TURU_BEKLEME_MS = 20_000;
+/** Taslak gösterilen turda cevap sınırı: Instagram açıklaması 2200 karakter + hesap/zaman/soru. */
+const TASLAK_CEVAP_SINIRI = 3500;
 /** Otomatik yanıtın üst uzunluğu (WhatsApp'ta kısa mesaj doğal). */
 const AUTO_REPLY_MAX_TOKENS = 400;
 
@@ -305,6 +307,8 @@ export class WhatsappLioService {
         ". Sohbet geçmişinde aksi yazıyorsa o bilgi ESKİDİR; sosyal medya isteğinde bu mediaId'leri kullan.]";
     }
 
+    karar.text += await this.acikTaslakNotu(userId);
+
     const result = await (await this.ai()).chat(
       userId,
       role,
@@ -319,9 +323,45 @@ export class WhatsappLioService {
     // hangi sohbete bağlandığını bilmeden sürekliliği kuramayız.
     await this.komutSohbetiKaydet(thread.id, result.conversationId);
 
-    const reply = this.komutCevabi(result);
+    // Taslak gösterilen turda cevap KESİLMEZ: kullanıcı onaylayacağı açıklamanın
+    // tamamını görmeli. 800'de kesilince "…Tamamı için" eki açıklamanın parçası
+    // sanıldı ve kullanıcı olmayan cümleleri sildirmeye çalıştı (2026-09-30).
+    const reply = this.komutCevabi(result, gelenMedya.buTurTaslakVar(userId) ? TASLAK_CEVAP_SINIRI : undefined);
     if (reply) await this.gonder(thread.id, userId, reply);
     this.logger.log(`Lio komutu yanıtlandı (${conn.session_name}, ${maskPhone(contact.phone_e164)})`);
+  }
+
+  /**
+   * Kullanıcının açık (taslak/planlanmış) sosyal medya gönderileri, kimliği ve
+   * GÜNCEL metniyle. Sohbet geçmişinde araç sonuçları kalmadığı için Lio bir
+   * sonraki turda postId'yi ve mevcut açıklamayı bilmiyordu: düzeltme isteğinde
+   * mediaId'yi postId diye verip taslağı baştan açmaya kalktı (2026-09-30).
+   */
+  private async acikTaslakNotu(userId: string): Promise<string> {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await this.supabase.client
+      .from("social_posts")
+      .select("id, title, status, scheduled_at, caption, hashtags, trial_reel")
+      .eq("created_by", userId)
+      .is("archived_at", null)
+      .in("status", ["draft", "scheduled"])
+      .gte("updated_at", since)
+      .order("updated_at", { ascending: false })
+      .limit(3);
+    const satirlar = (data ?? []) as any[];
+    if (!satirlar.length) return "";
+    return (
+      "\n\n[Sistem notu: Açık sosyal medya gönderilerin (düzeltme/planlama/iptal için BU postId'leri kullan, taslağı yeniden açma):\n" +
+      satirlar
+        .map(
+          (p) =>
+            `- postId=${p.id} · durum=${p.status}${p.trial_reel ? " · deneme reels" : ""}` +
+            `${p.scheduled_at ? ` · yayın=${new Date(p.scheduled_at).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}` : ""}\n` +
+            `  güncel açıklama: ${p.caption ?? "(boş)"}\n  güncel etiketler: ${p.hashtags ?? "(boş)"}`
+        )
+        .join("\n") +
+      "]"
+    );
   }
 
   // ------------------------------------------------ medya turu zamanlaması
@@ -452,11 +492,11 @@ export class WhatsappLioService {
   }
 
   /** Cevap metni — ChatResult'ın her hâli WhatsApp'ta bir karşılık bulmalı. */
-  private komutCevabi(result: ChatResult): string | null {
+  private komutCevabi(result: ChatResult, limit?: number): string | null {
     const url = getWebAppUrl();
     switch (result?.type) {
       case "message":
-        return formatForWhatsapp(result.text ?? "", url) || null;
+        return formatForWhatsapp(result.text ?? "", url, limit) || null;
       case "out_of_credits":
         return `Lio Bakiyeniz bu isteği tamamlamaya yetmedi.${result.doneSummary ? " " + result.doneSummary : ""}
 

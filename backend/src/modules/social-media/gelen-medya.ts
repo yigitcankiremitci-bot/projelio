@@ -216,6 +216,11 @@ export class GelenMedyaDeposu {
     this.buTur.delete(userId);
   }
 
+  /** Bu turda bir taslak açıldı/değişti mi (cevap kesilmesin diye; bkz. whatsapp-lio). */
+  buTurTaslakVar(userId: string): boolean {
+    return (this.buTur.get(userId)?.size ?? 0) > 0;
+  }
+
   planlanabilir(userId: string, postId: string): boolean {
     return this.sunulan.get(userId)?.has(postId) === true;
   }

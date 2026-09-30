@@ -25,6 +25,21 @@ import { icerikTuruSec, KARUSEL_TAVANI, planlamaEksikleri, zamaniCoz, zamaniGost
  * bu geri alınamaz; modelin "onayladı" saymasına güvenilmiyor.
  */
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Model postId yerine mediaId ("med_…") verebiliyor; veritabanı "invalid input
+ * syntax for type uuid" diye patlıyor ve model sebebi anlamayıp taslağı baştan
+ * açmaya kalkıyordu (2026-09-30). Hata ne yapacağını söylesin.
+ */
+function postIdDogrula(postId: string): void {
+  if (!UUID.test(postId)) {
+    throw new BadRequestException(
+      "postId bir gönderi kimliği olmalı (mediaId değil). Açık taslakların kimlikleri mesajdaki sistem notunda; taslağı yeniden AÇMA."
+    );
+  }
+}
+
 /** Şimdilik yalnızca Instagram için otomatik yayın var (bkz. SocialPublishService.runTarget). */
 const OTOMATIK_YAYIN = new Set(["instagram"]);
 
@@ -153,6 +168,23 @@ export class SosyalLioService {
           `dosya olarak gönderirse yeni mediaId ile devam et.`
       );
     }
+    // Medya HEMEN ayrılır: model aynı turda aracı iki kez paralel çağırınca ikisi
+    // de medyayı bulup iki ayrı taslak açıyordu (2026-09-30). Taslak açılamazsa
+    // medya depoya geri konur.
+    gelenMedya.birak(userId, girdi.mediaIds);
+    try {
+      return await this.taslakOlusturAyrilmis(userId, girdi, medya);
+    } catch (e) {
+      for (const m of medya) gelenMedya.geriYukle(userId, m);
+      throw e;
+    }
+  }
+
+  private async taslakOlusturAyrilmis(
+    userId: string,
+    girdi: Parameters<SosyalLioService["taslakOlustur"]>[1],
+    medya: GelenMedya[]
+  ): Promise<{ taslaklar: TaslakOzeti[]; uyari?: string }> {
     const tur = medya.map((m) => medyaTuru(m.mimeType));
     if (tur.includes(null)) throw new BadRequestException("Yalnızca JPEG/PNG/WebP görsel ve video paylaşılabilir.");
     if (tur.includes("video") && medya.length > 1) {
@@ -227,8 +259,7 @@ export class SosyalLioService {
       taslaklar.push(await this.ozet(post.id, userId));
     }
 
-    // Dosyalar artık Drive'da; bellekteki kopya gereksiz yer tutmasın.
-    gelenMedya.birak(userId, girdi.mediaIds);
+    // Dosyalar artık Drive'da; yedek gereksiz yer tutmasın (bellekten zaten ayrıldı).
     await yedekSil(this.supabase, userId, girdi.mediaIds).catch(() => undefined);
     return { taslaklar };
   }
@@ -237,6 +268,7 @@ export class SosyalLioService {
 
   /** Medyaya bakıp açıklama + etiket yazar ve TASLAĞA işler (yayın kararı vermez). */
   async aciklamaOner(userId: string, postId: string, istek?: string) {
+    postIdDogrula(postId);
     const oneri = await this.oneri.oner(postId, userId, { istek, dil: "tr" });
     await this.social.updatePost(postId, { caption: oneri.caption, hashtags: oneri.hashtags }, userId);
     gelenMedya.taslakDokunuldu(userId, postId);
@@ -254,6 +286,7 @@ export class SosyalLioService {
     postId: string,
     d: { aciklama?: string; etiketler?: string; baslik?: string; yayinZamani?: string; denemeReels?: string | null }
   ) {
+    postIdDogrula(postId);
     const post = await this.social.findPost(postId, userId);
     if (["published", "cancelled"].includes(post.status)) {
       throw new BadRequestException("Yayımlanmış ya da iptal edilmiş gönderi düzenlenemez.");
@@ -286,6 +319,7 @@ export class SosyalLioService {
   // ================================================================ planlama
 
   async planla(userId: string, postId: string, yayinZamani?: string) {
+    postIdDogrula(postId);
     const post = await this.social.findPost(postId, userId);
     if (post.status === "scheduled") throw new BadRequestException("Bu gönderi zaten planlanmış.");
     if (post.status !== "draft") throw new BadRequestException(`Bu gönderi planlanamaz (durum: ${post.status}).`);
@@ -322,6 +356,7 @@ export class SosyalLioService {
 
   /** "Vazgeç / iptal": taslağı ya da planlanmış gönderiyi iptal eder (yayımlanmışa dokunulmaz). */
   async iptalEt(userId: string, postId: string) {
+    postIdDogrula(postId);
     const post = await this.social.findPost(postId, userId);
     if (post.status === "published") throw new BadRequestException("Yayımlanmış gönderi iptal edilemez.");
     if (post.status === "cancelled") throw new BadRequestException("Bu gönderi zaten iptal edilmiş.");

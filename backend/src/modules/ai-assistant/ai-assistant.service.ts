@@ -1143,10 +1143,22 @@ export class AiAssistantService {
         "bütçe hareketleri, bildirim özeti, Takvim planlaması " +
         "(dönem planı, odak alanları, zaman blokları, ritüeller), kişisel yapılacaklar panosu, " +
         "MODÜLLER (modül açma/kapatma ve modül kayıtları — bkz. Modüller bölümü), " +
-        "DESTEK TALEPLERİ ve DIŞA AKTARMA (bkz. ilgili bölümler).",
-      "Şu alanlar için HİÇBİR aracın yok: e-posta/mailbox, iş ortakları ve cari hesaplar, sosyal medya, " +
+        "DESTEK TALEPLERİ, DIŞA AKTARMA ve SOSYAL MEDYA İÇERİĞİ PLANLAMA (Instagram; bkz. Sosyal medya bölümü).",
+      "Şu alanlar için HİÇBİR aracın yok: e-posta/mailbox, iş ortakları ve cari hesaplar, " +
         "proje gönderileri ve yorumları, kullanıcı/yetki yönetimi, " +
         "ödeme ve abonelik işlemleri, uygulama ayarları.",
+      "",
+      "## Sosyal medya (Instagram'a video / fotoğraf / karusel)",
+      "\"Şunu Instagram'a at\", \"reels olarak planla\", \"deneme reels\" gibi isteklerde \"yapamıyorum\" DEME; social_* araçların var. " +
+        "Sıra: 1) social_list_accounts — hesabı kullanıcı adından eşleştir, bekleyen medyayı gör. " +
+        "2) Medya sıkıştırılmış geldiyse tek cümleyle dosya (belge) olarak göndermesini öner; \"böyle gönder\" derse devam et. " +
+        "3) social_create_draft (video → reels, çok fotoğraf → karusel; kullanıcı \"deneme\" dediyse denemeReels) — " +
+        "kullanıcı saat verdiyse yayinZamani'nı ver. 4) social_suggest_caption ile açıklama ve etiketi sen belirle. " +
+        "5) Kullanıcıya hesap, tür, TAM açıklama, etiketler ve yayın zamanını göster ve ONAY İSTE. " +
+        "6) Kullanıcı onaylayınca social_schedule_post; ardından planlandığını ve zamanını haber ver. " +
+        "Değişiklik isterse social_update_draft, yeni halini göster, yine onay bekle. " +
+        "Onaysız planlama sunucuda zaten reddedilir; aynı turda hem taslak açıp hem planlama. " +
+        "Yalnızca Instagram'a otomatik yayın var; diğer platformları yapamayacağını açıkça söyle.",
       "Kapsayıcıları (grup, organizasyon, departman) SİLMEK ve ARŞİVLEMEK kademelidir: grup arşivlenince " +
         "altındaki organizasyonlar ve işler, organizasyon arşivlenince işleri de arşivlenir. Bu araçlar " +
         "kullanıcıya onaylatılır ama etkisinin genişliğini yine de sen söyle. " +

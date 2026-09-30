@@ -9,6 +9,8 @@ import {
   forwardRef,
   Inject,
 } from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
+import { gelenMedya } from "../social-media/gelen-medya";
 import Anthropic from "@anthropic-ai/sdk";
 import { SupabaseService } from "../../database/supabase.service";
 import { TasksService } from "../tasks/tasks.service";
@@ -597,6 +599,8 @@ const WHATSAPP_CHANNEL_PROMPT = [
   "- Düz metin üret: başlık, kalın yazı, tablo ve markdown kullanma. Kısa madde listesi olur.",
   "- Kısa tut: en fazla 800 karakter. Sığmayacaksa en önemlisini yaz ve ayrıntı için uygulamaya yönlendir.",
   "- Dosya bağlantısı verme; WhatsApp'ta açılmaz.",
+  "- İSTİSNA: sosyal medya taslağında açıklamayı ve etiketleri EKSİKSİZ yaz (800 karakter sınırı bunlar için geçerli değil);",
+  "  kullanıcı onaylayacağı metni tam görmeli.",
   "",
   "İŞ YAPMA (en önemli kural):",
   "- Bir şey eklemen/değiştirmen isteniyorsa İLGİLİ ARACI ÇAĞIR. Aracı çağırmadan",
@@ -828,8 +832,17 @@ export class AiAssistantService {
     private modelSettings: AiModelSettingsService,
     // Kullanıcının kendi Google Takvim'i: etkinlikleri okumak, etkinlik eklemek,
     // etkinliği göreve çevirince kararı işaretlemek.
-    private googleTakvim: GoogleTakvimService
+    private googleTakvim: GoogleTakvimService,
+    // Sosyal medya araçları çağrı anında çözülür: SocialMediaModule zaten
+    // AiAssistantModule'ü içe aktarıyor (öneri için kredi defteri), statik
+    // bağımlılık modül döngüsü kurardı — WhatsappLioService ile aynı desen.
+    private moduleRef: ModuleRef
   ) {}
+
+  private async sosyalLio(): Promise<import("../social-media/sosyal-lio.service").SosyalLioService> {
+    const { SosyalLioService } = await import("../social-media/sosyal-lio.service");
+    return this.moduleRef.get(SosyalLioService, { strict: false });
+  }
 
   /** Kademe belirtilmeyen yerler (ör. draftText) için varsayılan model. */
   private get model(): string {
@@ -1659,6 +1672,11 @@ export class AiAssistantService {
     // varsayılan bir istek konur, aksi halde model ne yapacağını bilemez.
     const trimmed = userMessage?.trim() || (attachments.length ? EMPTY_MESSAGE_WITH_FILE : "");
     if (!trimmed) throw new BadRequestException("Mesaj boş olamaz.");
+
+    // Kullanıcı yeni bir mesaj yazdı: önceki turda Lio'nun açtığı sosyal medya
+    // taslakları artık "gösterilmiş" sayılır ve onay verilirse planlanabilir
+    // (bkz. social-media/gelen-medya.ts — onaysız planlama koruması).
+    gelenMedya.yeniTur(userId);
 
     // Kademe ve model kararı ADMİNE aittir, kullanıcıya değil.
     //
@@ -5217,6 +5235,40 @@ export class AiAssistantService {
           phone: input.phone,
           enabled: Boolean(input.enabled),
         });
+
+      // ============================================================ Sosyal medya
+      case "social_list_accounts": {
+        const sosyal = await this.sosyalLio();
+        return { hesaplar: await sosyal.hesaplar(userId), bekleyenMedya: sosyal.bekleyenMedya(userId) };
+      }
+
+      case "social_create_draft":
+        return (await this.sosyalLio()).taslakOlustur(userId, {
+          accountIds: Array.isArray(input.accountIds) ? input.accountIds.map(String) : [],
+          mediaIds: Array.isArray(input.mediaIds) ? input.mediaIds.map(String) : [],
+          baslik: input.baslik,
+          aciklama: input.aciklama,
+          etiketler: input.etiketler,
+          icerikTuru: input.icerikTuru,
+          denemeReels: input.denemeReels,
+          yayinZamani: input.yayinZamani,
+          sikistirilmisKabul: input.sikistirilmisKabul === true,
+        });
+
+      case "social_suggest_caption":
+        return (await this.sosyalLio()).aciklamaOner(userId, String(input.postId ?? ""), input.istek);
+
+      case "social_update_draft":
+        return (await this.sosyalLio()).taslakDuzenle(userId, String(input.postId ?? ""), {
+          aciklama: input.aciklama,
+          etiketler: input.etiketler,
+          baslik: input.baslik,
+          yayinZamani: input.yayinZamani,
+          denemeReels: input.denemeReels,
+        });
+
+      case "social_schedule_post":
+        return (await this.sosyalLio()).planla(userId, String(input.postId ?? ""), input.yayinZamani);
 
       default:
         throw new BadRequestException(hataMetni("Bilinmeyen araç: {ad}", { ad: name }));

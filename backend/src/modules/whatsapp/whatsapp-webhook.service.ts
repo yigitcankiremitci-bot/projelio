@@ -1,3 +1,4 @@
+import { belgeOlarakMi } from "../social-media/gelen-medya";
 import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -266,7 +267,7 @@ export class WhatsappWebhookService {
       // media.error dolu gelir; o durumda da en azından metin işlenir.
       const media =
         payload.hasMedia && typeof payload.media?.url === "string" && !payload.media?.error
-          ? { waha: this.waha, url: payload.media.url, mimetype: payload.media.mimetype, filename: payload.media.filename }
+          ? { waha: this.waha, url: payload.media.url, mimetype: payload.media.mimetype, filename: payload.media.filename, belge: belgeOlarakMi(payload, payload.media.filename) }
           : undefined;
       if (!body.trim() && !media) return;
       await this.waha.sendSeen(conn.session_name, contact.wa_jid, payload.id ? [payload.id] : undefined).catch(() => {});

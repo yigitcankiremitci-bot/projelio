@@ -110,6 +110,14 @@ export const WRITE_TOOLS = new Set<string>([
   // o yüzden kritik değil — ama yazmadır, "hiçbir şeyi değiştirme" denmişse kapanır.
   "update_info_card",
   "add_info_card_field",
+  // Sosyal medya: taslak açar/düzenler/planlar. Planlama kritik SAYILMIYOR
+  // çünkü onay diyaloğu web'e bağlı; onayın yerini sunucu kuralı tutuyor:
+  // kullanıcı taslağı görüp bir mesaj yazmadan planlama reddedilir
+  // (bkz. social-media/gelen-medya.ts).
+  "social_create_draft",
+  "social_suggest_caption",
+  "social_update_draft",
+  "social_schedule_post",
 ]);
 
 /**
@@ -2341,6 +2349,105 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         enabled: { type: "boolean" },
       },
       required: ["enabled"],
+    },
+  },
+  // ============================================================ Sosyal medya (Instagram)
+  {
+    name: "social_list_accounts",
+    description:
+      "Kullanıcının içerik ekleyebildiği sosyal medya hesaplarını listeler (accountId, platform, kullanıcı adı, " +
+      "hangi şirket/işe ait, otomatik yayına hazır mı) ve WhatsApp'tan gelip henüz bir gönderiye bağlanmamış " +
+      "medyayı (mediaId, tür, boyut) döndürür. Kullanıcı \"şu videoyu X hesabında paylaş\" dediğinde ilk bunu çağır; " +
+      "hesabı kullanıcı adından eşleştir. Eşleşme belirsizse (aynı ada iki hesap) kullanıcıya sor.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "social_create_draft",
+    description:
+      "Gelen video/fotoğraflardan bir Instagram gönderisi TASLAĞI açar; medya şirketin dosya deposuna yazılır. " +
+      "Taslak YAYINA GİRMEZ. Video → reels, birden çok fotoğraf → karusel, tek fotoğraf → görsel gönderi " +
+      "(icerikTuru ile değiştirilebilir). Deneme reels için denemeReels ver: \"manual\" (elle terfi) ya da " +
+      "\"performance\" (performansa göre otomatik); yalnızca TEK videoyla olur. Kullanıcı hangisini istediğini " +
+      "söylemediyse \"manual\" kullan. Aynı içerik birden çok hesapta paylaşılacaksa hepsini accountIds'e koy. " +
+      "Açıklamayı kendin yazmayacaksan aciklama/etiketler'i boş bırak ve hemen ardından social_suggest_caption'ı çağır. " +
+      "yayinZamani: kullanıcının saatiyle duvar saati, \"2026-10-01T19:00\" biçiminde (ofset ekleme); " +
+      "\"yarın 19:00\" gibi ifadeleri bugünün tarihine göre çöz. Videolu gönderide karusel yapılamaz. " +
+      "KALİTE: WhatsApp video/fotoğrafı sıkıştırır. bekleyenMedya'da kalite \"sıkıştırılmış\" ise taslak açmadan ÖNCE " +
+      "kullanıcıya tek cümleyle öner: dosyayı ataç > Belge olarak göndersin, kalite korunur. Kullanıcı \"böyle gönder\" " +
+      "derse sikistirilmisKabul=true ile devam et; dosya olarak yeniden gönderirse (kalite \"orijinal\") onu kullan, " +
+      "sıkıştırılmış kopya zaten düşer. Önerdikten sonra tekrar tekrar sorma.",
+    input_schema: {
+      type: "object",
+      properties: {
+        accountIds: { type: "array", items: { type: "string" }, description: "social_list_accounts'tan accountId'ler." },
+        mediaIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "Gönderi sırasıyla medya kimlikleri (mesajdaki [Ekli medya] notundan ya da social_list_accounts'tan).",
+        },
+        baslik: { type: "string", description: "İç kullanım başlığı (opsiyonel)." },
+        aciklama: { type: "string" },
+        etiketler: { type: "string", description: "\"#etiket #etiket\" biçiminde." },
+        icerikTuru: { type: "string", enum: ["image", "video", "carousel", "reel", "story"] },
+        denemeReels: { type: "string", enum: ["manual", "performance"] },
+        yayinZamani: { type: "string", description: "\"YYYY-MM-DDTHH:mm\" yerel saat." },
+        sikistirilmisKabul: {
+          type: "boolean",
+          description: "Yalnızca kullanıcı sıkıştırılmış medyayla devam etmeyi açıkça söylediyse true.",
+        },
+      },
+      required: ["accountIds", "mediaIds"],
+    },
+  },
+  {
+    name: "social_suggest_caption",
+    description:
+      "Taslağın videosunu/fotoğraflarını inceleyip (video için kareler + varsa konuşma) hesabın tonuna uygun " +
+      "açıklama ve etiket yazar ve TASLAĞA işler. Lio Bakiyesinden harcar. istek ile yönlendirilebilir " +
+      "(\"daha kısa\", \"satış odaklı\"). Sonuçta dönen açıklama ve etiketleri kullanıcıya AYNEN göster.",
+    input_schema: {
+      type: "object",
+      properties: {
+        postId: { type: "string" },
+        istek: { type: "string", description: "Kullanıcının üslup/içerik isteği (opsiyonel)." },
+      },
+      required: ["postId"],
+    },
+  },
+  {
+    name: "social_update_draft",
+    description:
+      "Taslağın açıklama, etiket, başlık, yayın zamanı ya da deneme reels ayarını değiştirir (kullanıcı " +
+      "\"etiketleri azalt\", \"saati 20'ye al\" dediğinde). Planlanmış bir gönderiyi değiştirirsen taslağa döner " +
+      "ve yeniden onay gerekir. denemeReels için boş metin \"\" ile deneme kapatılır.",
+    input_schema: {
+      type: "object",
+      properties: {
+        postId: { type: "string" },
+        aciklama: { type: "string" },
+        etiketler: { type: "string" },
+        baslik: { type: "string" },
+        yayinZamani: { type: "string", description: "\"YYYY-MM-DDTHH:mm\" yerel saat." },
+        denemeReels: { type: "string", enum: ["manual", "performance", ""] },
+      },
+      required: ["postId"],
+    },
+  },
+  {
+    name: "social_schedule_post",
+    description:
+      "Taslağı yayın için PLANLAR. Zamanı gelince Instagram'a otomatik çıkar ve GERİ ALINAMAZ. " +
+      "ÖNCE kullanıcıya şunları yaz ve ONAY BEKLE: hangi hesap(lar), içerik türü (deneme reels mi), tam açıklama, " +
+      "etiketler, yayın zamanı. Kullanıcı açıkça onaylayınca (\"tamam\", \"onaylıyorum\", \"planla\") bu aracı çağır. " +
+      "Aynı turda taslağı açıp planlama: sunucu bunu reddeder. Değişiklik istediyse önce social_update_draft, " +
+      "yeni halini göster, yine onay bekle. Başarılı olunca kullanıcıya planlandığını ve yayın zamanını haber ver.",
+    input_schema: {
+      type: "object",
+      properties: {
+        postId: { type: "string" },
+        yayinZamani: { type: "string", description: "Taslaktaki zamanı değiştirmek için (opsiyonel)." },
+      },
+      required: ["postId"],
     },
   },
 ];

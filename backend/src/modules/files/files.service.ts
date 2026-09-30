@@ -2712,10 +2712,14 @@ export class FilesService {
     userId: string,
     file: Express.Multer.File,
     context: FileContext,
-    placement?: { folderId?: string; relativePath?: string }
+    placement?: { folderId?: string; relativePath?: string },
+    // Tarayıcıdan gelen istekte 8 MB (parçalı akış var); sunucunun kendi
+    // içinden (Lio'nun WhatsApp videosu) parçalı akış olmadığı için çağıran
+    // daha yüksek bir tavan verebilir.
+    sizeLimit = INLINE_UPLOAD_LIMIT
   ): Promise<ProjectFile> {
     if (!file) throw new BadRequestException("Dosya gönderilmedi");
-    if (file.size > INLINE_UPLOAD_LIMIT) {
+    if (file.size > sizeLimit) {
       throw new BadRequestException(
         "Bu dosya doğrudan yükleme için çok büyük; parçalı yükleme akışını kullanın."
       );
@@ -2802,10 +2806,11 @@ export class FilesService {
     scope: FlatScope,
     userId: string,
     file: Express.Multer.File,
-    placement?: { folderId?: string; relativePath?: string }
+    placement?: { folderId?: string; relativePath?: string },
+    sizeLimit = INLINE_UPLOAD_LIMIT
   ): Promise<ProjectFile> {
     if (!file) throw new BadRequestException("Dosya gönderilmedi");
-    if (file.size > INLINE_UPLOAD_LIMIT) {
+    if (file.size > sizeLimit) {
       throw new BadRequestException(
         "Bu dosya doğrudan yükleme için çok büyük; parçalı yükleme akışını kullanın."
       );

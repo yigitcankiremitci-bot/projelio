@@ -5,6 +5,9 @@ import { ModuleMembersModule } from "../module-members/module-members.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { AiAssistantModule } from "../ai-assistant/ai-assistant.module";
 import { LioOneriService } from "./lio-oneri.service";
+import { SosyalLioService } from "./sosyal-lio.service";
+import { JobsModule } from "../jobs/jobs.module";
+import { OrganizationsModule } from "../organizations/organizations.module";
 import { InstagramController } from "./instagram.controller";
 import { InstagramOAuthService } from "./instagram-oauth.service";
 import { InstagramPublishService } from "./instagram-publish.service";
@@ -31,6 +34,9 @@ import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
     // Lio'nun açıklama/etiket önerisi: kredi defteri, sağlayıcı yönlendirici ve
     // ses çözümleme tek yerden (bkz. LioOneriService).
     AiAssistantModule,
+    // Lio'nun sosyal medya araçları: kullanıcının hesaplarını bulmak için.
+    OrganizationsModule,
+    JobsModule,
     // OAuth `state` imzası için — Google akışıyla aynı desen.
     JwtModule.register({
       secret: getJwtSecret(),
@@ -48,7 +54,8 @@ import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
     SocialPublishService,
     SocialPublishProcessor,
     LioOneriService,
+    SosyalLioService,
   ],
-  exports: [SocialMediaService],
+  exports: [SocialMediaService, SosyalLioService],
 })
 export class SocialMediaModule {}

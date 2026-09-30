@@ -9,6 +9,7 @@ import type { AiAttachmentsService } from "../ai-assistant/ai-attachments.servic
 import { MAX_ATTACHMENT_UPLOAD_BYTES } from "../ai-assistant/ai-attachments.service";
 import type { WahaClient } from "./waha.client";
 import { decideLioKomut, lioKomutConfigFromEnv } from "./lio-komut-sinir";
+import { gelenMedya, medyaTuru, MEDYA_TEK_DOSYA_TAVANI, type GelenMedya } from "../social-media/gelen-medya";
 import { formatForWhatsapp } from "./whatsapp-lio-format";
 import { maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
 import { mapMessage, mapThread, WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
@@ -180,9 +181,22 @@ export class WhatsappLioService {
     // WhatsApp'tan gelen dosya (Excel, PDF, görsel, sesli not). Eskiden hiç
     // iletilmiyordu: açıklamasız dosya "boş mesaj" sayılıp atlanıyor,
     // açıklamalısında Lio yalnızca metni görüyordu.
-    media?: { waha: WahaClient; url: string; mimetype?: string | null; filename?: string | null }
+    media?: { waha: WahaClient; url: string; mimetype?: string | null; filename?: string | null; belge?: boolean }
   ): Promise<void> {
     const config = lioKomutConfigFromEnv();
+    // Açıklamasız video/fotoğraf: SESSİZCE depolanır, Lio cevap vermez. Karusel
+    // için 5 fotoğraf art arda gelir; her birine "aldım" demek 5 bildirim ve
+    // 5 model turu olurdu. Kullanıcı ne yapılacağını yazınca Lio hepsini görür
+    // (bkz. social_list_accounts → bekleyenMedya).
+    if (media && !text.trim() && medyaTuru(media.mimetype ?? "")) {
+      try {
+        await this.sosyalMedyaAl(userId, media);
+      } catch (e) {
+        this.logger.warn(`WhatsApp medyası depolanamadı (${thread.id}): ${e instanceof Error ? e.message : e}`);
+        await this.gonder(thread.id, userId, "Dosyayı alamadım. Birazdan yeniden göndermeyi deneyin.", false);
+      }
+      return;
+    }
     // Açıklamasız dosya: modele ne yapacağını söyleyen kısa bir istek.
     if (media && !text.trim()) text = "Gönderdiğim dosyaya bak.";
     const karar = decideLioKomut(config, text, {
@@ -201,15 +215,27 @@ export class WhatsappLioService {
     let attachmentIds: string[] | undefined;
     if (media) {
       try {
-        const buffer = await media.waha.downloadMedia(media.url, MAX_ATTACHMENT_UPLOAD_BYTES);
-        const ek = await (await this.attachments()).prepareFromBuffer(
-          userId,
-          buffer,
-          media.filename || dosyaAdi(media.url),
-          media.mimetype ?? "application/octet-stream",
-          convId
+        const turu = medyaTuru(media.mimetype ?? "");
+        // Paylaşılabilir medya (video/fotoğraf) sosyal medya araçları için
+        // bellekte tutulur ve modele KİMLİĞİYLE bildirilir; içerik Drive'a ancak
+        // Lio bir taslak açınca yazılır (bkz. social-media/gelen-medya.ts).
+        const ad = media.filename || dosyaAdi(media.url);
+        const mime = media.mimetype ?? "application/octet-stream";
+        const buffer = await media.waha.downloadMedia(
+          media.url,
+          turu ? MEDYA_TEK_DOSYA_TAVANI : MAX_ATTACHMENT_UPLOAD_BYTES
         );
-        attachmentIds = [ek.id];
+        if (turu) {
+          const kayit = gelenMedya.ekle(userId, { ad, mimeType: mime, buffer, orijinal: media.belge === true });
+          karar.text += "\n\n" + medyaNotu(kayit, turu);
+        }
+        // Video ses çözümlemesine girerdi (ücretli) ve modele bir şey katmazdı:
+        // Lio videoyu social_suggest_caption ile kendisi izler. Fotoğrafı ise
+        // model doğrudan görebilsin diye normal ek olarak da veriyoruz.
+        if (turu !== "video") {
+          const ek = await (await this.attachments()).prepareFromBuffer(userId, buffer, ad, mime, convId);
+          attachmentIds = [ek.id];
+        }
       } catch (e) {
         // Desteklenmeyen tür / çok büyük dosya: sebebi kullanıcıya söylenir,
         // yoksa yine cevapsız kalırdı. Ek hazırlama hataları zaten Türkçe
@@ -244,6 +270,20 @@ export class WhatsappLioService {
     const reply = this.komutCevabi(result);
     if (reply) await this.gonder(thread.id, userId, reply);
     this.logger.log(`Lio komutu yanıtlandı (${conn.session_name}, ${maskPhone(contact.phone_e164)})`);
+  }
+
+  /** Medyayı indirir ve bellekteki gelen-medya deposuna koyar (modele bildirmeden). */
+  private async sosyalMedyaAl(
+    userId: string,
+    media: { waha: WahaClient; url: string; mimetype?: string | null; filename?: string | null; belge?: boolean }
+  ): Promise<GelenMedya> {
+    const buffer = await media.waha.downloadMedia(media.url, MEDYA_TEK_DOSYA_TAVANI);
+    return gelenMedya.ekle(userId, {
+      ad: media.filename || dosyaAdi(media.url),
+      mimeType: media.mimetype ?? "application/octet-stream",
+      buffer,
+      orijinal: media.belge === true,
+    });
   }
 
   /** Cevap metni — ChatResult'ın her hâli WhatsApp'ta bir karşılık bulmalı. */
@@ -397,6 +437,19 @@ Bakiye yüklemek için: ${url}`;
 }
 
 export { mapMessage };
+
+/** Modele giden tek satırlık medya notu: kimlik, kalite ve (varsa) neyin yerine geçtiği. */
+function medyaNotu(kayit: GelenMedya, turu: "video" | "gorsel"): string {
+  const kalite = kayit.orijinal ? "dosya olarak geldi (orijinal kalite)" : "WhatsApp'ın sıkıştırdığı hâliyle geldi";
+  const yerine = kayit.yerineGectigi
+    ? ` Bu dosya daha önce gelen sıkıştırılmış "${kayit.yerineGectigi.ad}" (${kayit.yerineGectigi.id}) kopyasının YERİNE GEÇTİ; ` +
+      `artık yalnızca bunu kullan. O kimlikle taslak açtıysan kullanıcıya söyle ve yenisini açmayı öner.`
+    : "";
+  return (
+    `[Ekli medya: mediaId=${kayit.id} · ${turu === "video" ? "video" : "fotoğraf"} · ${kayit.ad} · ` +
+    `${(kayit.boyut / 1048576).toFixed(1)} MB · ${kalite}.${yerine} Sosyal medya için social_create_draft'ta bu mediaId'yi kullan.]`
+  );
+}
 
 /** WAHA dosyayı "<mesaj-id>.<uzantı>" adıyla saklıyor; adı gelmemişse uzantı buradan. */
 function dosyaAdi(url: string): string {

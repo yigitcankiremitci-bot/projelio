@@ -301,7 +301,9 @@ export class SosyalLioService {
       vakit,
       simdi: new Date(),
     });
-    if (eksik.length) throw new BadRequestException(eksik.join(" "));
+    // Birleştirilmiş metin çeviri sözlüğünde anahtar olamaz; her eksik kendi
+    // cümlesiyle gider, Lio düzeltip yeniden çağırınca sıradaki görünür.
+    if (eksik.length) throw new BadRequestException(eksik[0]);
 
     await this.social.updatePost(
       postId,

@@ -901,6 +901,29 @@ export const hatalar: TranslationDict = {
   "Paylaşım boş olamaz": "A post can't be empty",
   // Sosyal medya: Lio önerisi + deneme reels
   "Geçersiz deneme reels seçeneği": "Invalid trial reel option",
+  // Sosyal medya: Lio araçları (WhatsApp / sohbetten gönderi taslağı ve planlama)
+  "Bu gönderi zaten planlanmış.": "This post is already scheduled.",
+  "Gönderide görsel/video yok.": "The post has no image/video.",
+  "Gönderinin yayımlanacağı hesap yok.": "The post has no account to publish to.",
+  "Açıklama boş.": "The caption is empty.",
+  "Yayın zamanı belirtilmemiş.": "No publish time was given.",
+  "Yayın zamanı geçmişte ya da çok yakın; en az birkaç dakika sonrası olmalı.":
+    "The publish time is in the past or too soon; it must be at least a few minutes from now.",
+  "Bu medya artık bende yok (süre doldu ya da sunucu yenilendi). Kullanıcıdan dosyayı WhatsApp'tan yeniden göndermesini iste.":
+    "I no longer have this media (it expired or the server restarted). Ask the user to send the file again on WhatsApp.",
+  "Bu taslağı kullanıcıya henüz göstermedin ya da gösterdikten sonra değiştirdin. Açıklama, etiketler, hesap ve yayın zamanını kullanıcıya yaz ve onayını bekle; kullanıcı onay mesajını yazınca yeniden dene.":
+    "You haven't shown this draft to the user yet, or you changed it after showing it. Write the caption, tags, account and publish time to the user and wait for their approval; retry once they reply with approval.",
+  "Dosya çok büyük (en çok 64 MB).": "The file is too large (64 MB at most).",
+  "En az bir görsel ya da video gerekli.": "At least one image or video is required.",
+  "En az bir hesap seçilmeli (social_list_accounts).": "Pick at least one account (social_list_accounts).",
+  "Hesaplardan biri bulunamadı; social_list_accounts'taki accountId'leri kullan.":
+    "One of the accounts was not found; use the accountIds from social_list_accounts.",
+  "Videolu gönderi tek videoyla yayımlanır; karuselde video olmaz. Ayrı gönderiler açalım mı?":
+    "A video post goes out with a single video; carousels can't contain video. Shall we open separate posts?",
+  "Yalnızca JPEG/PNG/WebP görsel ve video paylaşılabilir.": "Only JPEG/PNG/WebP images and videos can be shared.",
+  "Yayımlanmış ya da iptal edilmiş gönderi düzenlenemez.": "A published or cancelled post can't be edited.",
+  'denemeReels "manual" ya da "performance" olmalı.': 'denemeReels must be "manual" or "performance".',
+  'yayinZamani "2026-10-01T19:00" biçiminde olmalı.': 'yayinZamani must be in the format "2026-10-01T19:00".',
   "Lio bir öneri üretemedi, tekrar dene.": "Lio couldn't come up with a suggestion, try again.",
   "Lio'nun bakabilmesi için önce bir görsel ya da video ekle.": "Add an image or video first so Lio has something to look at.",
   "Sunucuda görsel okuyabilen bir AI sağlayıcısı tanımlı değil.": "No AI provider that can read images is configured on the server.",

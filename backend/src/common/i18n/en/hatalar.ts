@@ -903,6 +903,8 @@ export const hatalar: TranslationDict = {
   "Geçersiz deneme reels seçeneği": "Invalid trial reel option",
   // Sosyal medya: Lio araçları (WhatsApp / sohbetten gönderi taslağı ve planlama)
   "Bu gönderi zaten planlanmış.": "This post is already scheduled.",
+  "Yayımlanmış gönderi iptal edilemez.": "A published post can't be cancelled.",
+  "Bu gönderi zaten iptal edilmiş.": "This post is already cancelled.",
   "Boş dosya yüklenemez.": "An empty file can't be uploaded.",
   "Bulut depoya yüklenen dosyanın kimliği alınamadı.": "Couldn't get the ID of the file uploaded to cloud storage.",
   "Gönderide görsel/video yok.": "The post has no image/video.",

@@ -23,6 +23,8 @@ const LINK_CODE_PATTERN = new RegExp(`${LINK_CODE_PREFIX}([${LINK_CODE_ALPHABET}
 
 const OPT_OUT_WORDS = new Set(["dur", "durdur", "iptal", "stop", "cikis", "çıkış", "çık", "cik"]);
 const OPT_IN_WORDS = new Set(["başlat", "baslat", "start", "devam", "aç", "ac"]);
+/** Çıkış sayılan ama günlük dilde başka anlamı da olan kelimeler. */
+const BELIRSIZ_CIKIS = new Set(["dur", "iptal"]);
 const CONFIRM_WORDS = new Set(["evet", "onaylıyorum", "onayliyorum", "onayla", "tamam", "ok", "yes"]);
 
 /** Türkçe büyük/küçük harf tuzakları için (İ→i, I→ı) yerel ayarlı küçültme. */
@@ -59,10 +61,23 @@ export function parseInboundCommand(text: string | null | undefined): InboundCom
  */
 export function komutuSohbeteCevir(
   komut: InboundCommand,
-  kisi: { user_id?: string | null; opt_in_state?: string | null; pending_user_id?: string | null }
+  kisi: {
+    user_id?: string | null;
+    opt_in_state?: string | null;
+    pending_user_id?: string | null;
+    /** Lio ile süren (yakın zamanda konuşulmuş) bir sohbet var mı. */
+    sohbet_aktif?: boolean;
+  },
+  metin?: string | null
 ): InboundCommand {
   const baglı = Boolean(kisi.user_id) && kisi.opt_in_state === "opted_in";
   if (!baglı) return komut;
+  // "iptal" / "dur" hem çıkış hem sohbet olabilir: Lio ile süren bir konuşma
+  // varken bunlar o konuşmaya cevaptır ("taslağı iptal et"). Kesin çıkış
+  // kelimeleri (stop, durdur, çıkış…) her zaman çıkıştır, sohbet sürse de.
+  if (komut.kind === "opt_out" && kisi.sohbet_aktif && metin && BELIRSIZ_CIKIS.has(fold(metin).replace(/[.!]+$/, ""))) {
+    return { kind: "none" };
+  }
   if (komut.kind === "confirm" && !kisi.pending_user_id) return { kind: "none" };
   if (komut.kind === "opt_in") return { kind: "none" }; // zaten açık: "devam" sohbettir
   return komut;

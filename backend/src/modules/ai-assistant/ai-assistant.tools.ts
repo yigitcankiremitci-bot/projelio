@@ -118,6 +118,7 @@ export const WRITE_TOOLS = new Set<string>([
   "social_suggest_caption",
   "social_update_draft",
   "social_schedule_post",
+  "social_cancel_draft",
 ]);
 
 /**
@@ -2449,5 +2450,14 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       },
       required: ["postId"],
     },
+  },
+  {
+    name: "social_cancel_draft",
+    description:
+      "Bir sosyal medya taslağını ya da planlanmış (henüz yayımlanmamış) gönderiyi İPTAL eder. Kullanıcı taslak " +
+      "ortadayken \"iptal\", \"vazgeç\", \"yapma\" derse bunu çağır; önce ne iptal edeceğini (hangi gönderi) kısaca " +
+      "teyit ettirmen gerekmez, son konuşulan taslaktır. Yayımlanmış gönderiye dokunamaz. Aracı çağırmadan " +
+      "\"iptal ettim\" deme.",
+    input_schema: { type: "object", properties: { postId: { type: "string" } }, required: ["postId"] },
   },
 ];

@@ -78,3 +78,22 @@ describe("komutuSohbeteCevir", () => {
     assert.equal(komutuSohbeteCevir(parseInboundCommand("başlat"), kapali).kind, "opt_in");
   });
 });
+
+describe("çıkış kelimeleri sohbet bağlamında", () => {
+  const bagli = { user_id: "u1", opt_in_state: "opted_in", pending_user_id: null, sohbet_aktif: true };
+
+  test("Lio ile süren sohbette 'iptal' ve 'dur' sohbettir", () => {
+    assert.equal(komutuSohbeteCevir(parseInboundCommand("iptal"), bagli, "iptal").kind, "none");
+    assert.equal(komutuSohbeteCevir(parseInboundCommand("Dur!"), bagli, "Dur!").kind, "none");
+  });
+
+  test("sohbet sürerken bile kesin çıkış kelimeleri çıkıştır", () => {
+    for (const w of ["stop", "durdur", "çıkış"]) {
+      assert.equal(komutuSohbeteCevir(parseInboundCommand(w), bagli, w).kind, "opt_out", w);
+    }
+  });
+
+  test("sohbet yokken 'iptal' çıkıştır", () => {
+    assert.equal(komutuSohbeteCevir(parseInboundCommand("iptal"), { ...bagli, sohbet_aktif: false }, "iptal").kind, "opt_out");
+  });
+});

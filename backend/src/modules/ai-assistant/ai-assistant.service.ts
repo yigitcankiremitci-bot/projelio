@@ -1159,6 +1159,7 @@ export class AiAssistantService {
         "(\"Onayla mı, yoksa başka değişiklik istiyorsun?\" gibi devrik/bozuk cümle KURMA). " +
         "6) Kullanıcı onaylayınca social_schedule_post; ardından planlandığını ve zamanını haber ver. " +
         "Değişiklik isterse social_update_draft, yeni halini göster, yine onay bekle. " +
+        "Taslak ortadayken kullanıcı \"iptal/vazgeç\" derse bu, taslağa yöneliktir: social_cancel_draft'ı çağır (bildirim çıkışı DEĞİL). " +
         "Onaysız planlama sunucuda zaten reddedilir; aynı turda hem taslak açıp hem planlama. " +
         "Yalnızca Instagram'a otomatik yayın var; diğer platformları yapamayacağını açıkça söyle.",
       "Kapsayıcıları (grup, organizasyon, departman) SİLMEK ve ARŞİVLEMEK kademelidir: grup arşivlenince " +
@@ -5280,6 +5281,9 @@ export class AiAssistantService {
           yayinZamani: input.yayinZamani,
           denemeReels: input.denemeReels,
         });
+
+      case "social_cancel_draft":
+        return (await this.sosyalLio()).iptalEt(userId, String(input.postId ?? ""));
 
       case "social_schedule_post":
         return (await this.sosyalLio()).planla(userId, String(input.postId ?? ""), input.yayinZamani);

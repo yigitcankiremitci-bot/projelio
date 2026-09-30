@@ -320,6 +320,17 @@ export class SosyalLioService {
     return { planlandi: true, yayinZamani: zamaniGoster(vakit!), taslak: await this.ozet(postId, userId) };
   }
 
+  /** "Vazgeç / iptal": taslağı ya da planlanmış gönderiyi iptal eder (yayımlanmışa dokunulmaz). */
+  async iptalEt(userId: string, postId: string) {
+    const post = await this.social.findPost(postId, userId);
+    if (post.status === "published") throw new BadRequestException("Yayımlanmış gönderi iptal edilemez.");
+    if (post.status === "cancelled") throw new BadRequestException("Bu gönderi zaten iptal edilmiş.");
+    // Durum "cancelled" olunca kuyruk hedefin saatini kaldırır (isQueueable).
+    await this.social.updatePost(postId, { status: "cancelled" }, userId);
+    gelenMedya.planlandi(userId, postId);
+    return { iptalEdildi: true, taslak: await this.ozet(postId, userId) };
+  }
+
   // ================================================================ yardımcılar
 
   private async hesapSatirlari(ids: string[]): Promise<any[]> {

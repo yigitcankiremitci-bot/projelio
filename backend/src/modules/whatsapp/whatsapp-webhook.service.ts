@@ -203,7 +203,11 @@ export class WhatsappWebhookService {
       last_inbound_at: now,
     }, waJid);
     // Bağlı kullanıcının "onaylıyorum/tamam/devam" cevabı Lio'ya gider, komut sayılmaz.
-    const command = komutuSohbeteCevir(parsedCommand, contact);
+    const command = komutuSohbeteCevir(
+      parsedCommand,
+      { ...contact, sohbet_aktif: await this.lioSohbetiAktifMi(contact.id) },
+      body
+    );
     // Bekleyen aday varken gelen EVET, kullanıcı akışına girer (bkz. 082).
     const isConfirmingPending = command.kind === "confirm" && Boolean(contact.pending_user_id);
     const isUserPhone = contact.kind === "user" || Boolean(contact.user_id) || command.kind === "link" || isConfirmingPending;
@@ -498,6 +502,24 @@ export class WhatsappWebhookService {
   }
 
   /** Otomatik yanıt: doğrudan gönderilir ve giden mesaj olarak kaydedilir. */
+  /**
+   * Bu kişiyle Lio'nun süren bir sohbeti var mı (komut penceresiyle aynı 6 saat).
+   * "iptal" yazan kullanıcının çıkış mı istediği yoksa Lio'ya mı cevap verdiği
+   * buradan anlaşılır.
+   */
+  private async lioSohbetiAktifMi(contactId: string): Promise<boolean> {
+    const { data } = await this.supabase.client
+      .from("whatsapp_threads")
+      .select("ai_conversation_at")
+      .eq("contact_id", contactId)
+      .not("ai_conversation_at", "is", null)
+      .order("ai_conversation_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const an = (data as any)?.ai_conversation_at;
+    return Boolean(an) && Date.now() - new Date(an).getTime() < 6 * 60 * 60 * 1000;
+  }
+
   private async sendImmediate(conn: ConnectionRow, threadId: string, chatId: string, text: string): Promise<void> {
     const now = new Date().toISOString();
     try {

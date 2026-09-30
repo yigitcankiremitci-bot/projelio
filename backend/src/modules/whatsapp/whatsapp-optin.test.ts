@@ -2,7 +2,7 @@
 // gereği), bu yüzden namespace import kullanılıyor.
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { buildLinkUrl, generateLinkCode, parseInboundCommand } from "./whatsapp-optin";
+import { buildLinkUrl, generateLinkCode, komutuSohbeteCevir, parseInboundCommand } from "./whatsapp-optin";
 
 describe("gelen komut çözümleme", () => {
   test("eşleştirme kodu, küçük harf ve etrafında metinle bile", () => {
@@ -52,5 +52,29 @@ describe("eşleştirme kodu üretimi", () => {
 
   test("wa.me bağlantısı", () => {
     assert.equal(buildLinkUrl("+905321234567", "PROJELIO-AB2C"), "https://wa.me/905321234567?text=PROJELIO-AB2C");
+  });
+});
+
+describe("komutuSohbeteCevir", () => {
+  const bagli = { user_id: "u1", opt_in_state: "opted_in", pending_user_id: null };
+
+  test("bağlı kullanıcının 'onaylıyorum' cevabı sohbettir (Lio'ya gider)", () => {
+    assert.deepEqual(komutuSohbeteCevir(parseInboundCommand("onaylıyorum"), bagli), { kind: "none" });
+    assert.deepEqual(komutuSohbeteCevir(parseInboundCommand("Tamam"), bagli), { kind: "none" });
+    assert.deepEqual(komutuSohbeteCevir(parseInboundCommand("devam"), bagli), { kind: "none" });
+  });
+
+  test("bekleyen aday varken EVET hâlâ eşleştirme onayıdır", () => {
+    const aday = { user_id: null, opt_in_state: null, pending_user_id: "u2" };
+    assert.equal(komutuSohbeteCevir(parseInboundCommand("evet"), aday).kind, "confirm");
+  });
+
+  test("çıkış komutu bağlı kullanıcıda da çalışır", () => {
+    assert.equal(komutuSohbeteCevir(parseInboundCommand("dur"), bagli).kind, "opt_out");
+  });
+
+  test("bildirimi kapatmış kullanıcının BAŞLAT'ı yeniden açar", () => {
+    const kapali = { user_id: "u1", opt_in_state: "opted_out", pending_user_id: null };
+    assert.equal(komutuSohbeteCevir(parseInboundCommand("başlat"), kapali).kind, "opt_in");
   });
 });

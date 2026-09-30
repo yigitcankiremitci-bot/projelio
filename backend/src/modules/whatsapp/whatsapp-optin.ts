@@ -48,6 +48,27 @@ export function parseInboundCommand(text: string | null | undefined): InboundCom
 }
 
 /**
+ * Bağlı ve bildirime açık bir kullanıcı için "evet", "tamam", "onaylıyorum",
+ * "devam" gibi tek kelimeler KOMUT DEĞİL, Lio'ya yazılmış cevaptır.
+ *
+ * NEDEN: bu kelimeler hesap eşleştirme/opt-in içindi. Bekleyen aday yokken
+ * gelen "onaylıyorum" sessizce yutuluyordu; Lio bir Instagram taslağı için
+ * onay bekliyor, kullanıcı "onaylıyorum" yazıyor ve hiçbir şey olmuyordu
+ * (2026-09-30). `opt_out` (dur/stop…) bilerek DOKUNULMADI: çıkış her zaman
+ * çalışmalı.
+ */
+export function komutuSohbeteCevir(
+  komut: InboundCommand,
+  kisi: { user_id?: string | null; opt_in_state?: string | null; pending_user_id?: string | null }
+): InboundCommand {
+  const baglı = Boolean(kisi.user_id) && kisi.opt_in_state === "opted_in";
+  if (!baglı) return komut;
+  if (komut.kind === "confirm" && !kisi.pending_user_id) return { kind: "none" };
+  if (komut.kind === "opt_in") return { kind: "none" }; // zaten açık: "devam" sohbettir
+  return komut;
+}
+
+/**
  * Rastgele eşleştirme kodu. Rastgelelik dışarıdan verilir ki test
  * belirlenimci olsun; üretimde crypto.randomInt kullanılır.
  */

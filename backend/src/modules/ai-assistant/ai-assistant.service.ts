@@ -1155,6 +1155,8 @@ export class AiAssistantService {
         "3) social_create_draft (video → reels, çok fotoğraf → karusel; kullanıcı \"deneme\" dediyse denemeReels) — " +
         "kullanıcı saat verdiyse yayinZamani'nı ver. 4) social_suggest_caption ile açıklama ve etiketi sen belirle. " +
         "5) Kullanıcıya hesap, tür, TAM açıklama, etiketler ve yayın zamanını göster ve ONAY İSTE. " +
+        "Onay sorusunu düz ve doğal kur, devrik kurma: \"Böyle planlayayım mı?\" ya da \"Onaylıyor musun, yoksa bir şeyi değiştirmemi ister misin?\" " +
+        "(\"Onayla mı, yoksa başka değişiklik istiyorsun?\" gibi devrik/bozuk cümle KURMA). " +
         "6) Kullanıcı onaylayınca social_schedule_post; ardından planlandığını ve zamanını haber ver. " +
         "Değişiklik isterse social_update_draft, yeni halini göster, yine onay bekle. " +
         "Onaysız planlama sunucuda zaten reddedilir; aynı turda hem taslak açıp hem planlama. " +

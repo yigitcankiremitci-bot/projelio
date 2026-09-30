@@ -7,7 +7,7 @@ import { WhatsappLioService } from "./whatsapp-lio.service";
 import { isLioCommandEnabled } from "./lio-komut-sinir";
 import { decidePazarlama, isPazarlamaEnabled, pazarlamaConfigFromEnv } from "./whatsapp-pazarlama";
 import { getWebAppUrl } from "../../common/config/env";
-import { AUTO_REPLIES, confirmPrompt, parseInboundCommand } from "./whatsapp-optin";
+import { AUTO_REPLIES, confirmPrompt, komutuSohbeteCevir, parseInboundCommand } from "./whatsapp-optin";
 import { isGroupJid, isLidJid, isLidKey, jidToE164, lidContactKey, maskPhone } from "./whatsapp-phone";
 import { WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
 
@@ -193,15 +193,17 @@ export class WhatsappWebhookService {
     const now = new Date().toISOString();
     const displayName: string | null = payload?._data?.pushName ?? payload?._data?.notifyName ?? payload?.notifyName ?? null;
     const body: string = typeof payload.body === "string" ? payload.body : "";
-    const command = parseInboundCommand(body);
+    const parsedCommand = parseInboundCommand(body);
 
     // Kişi: kayıtlıysa türü korunur; ilk kez yazan biri eşleştirme kodu
     // gönderiyorsa kullanıcıdır, yoksa müşteri.
     const contact = await this.whatsapp.upsertContact(conn.id, phone, {
-      kind: command.kind === "link" ? "user" : "customer",
+      kind: parsedCommand.kind === "link" ? "user" : "customer",
       display_name: displayName,
       last_inbound_at: now,
     }, waJid);
+    // Bağlı kullanıcının "onaylıyorum/tamam/devam" cevabı Lio'ya gider, komut sayılmaz.
+    const command = komutuSohbeteCevir(parsedCommand, contact);
     // Bekleyen aday varken gelen EVET, kullanıcı akışına girer (bkz. 082).
     const isConfirmingPending = command.kind === "confirm" && Boolean(contact.pending_user_id);
     const isUserPhone = contact.kind === "user" || Boolean(contact.user_id) || command.kind === "link" || isConfirmingPending;

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * Lio'ya WhatsApp'tan gelen medya (video, fotoğraf) + "onaysız planlama olmaz"
  * koruması.
@@ -33,9 +35,15 @@ export const MEDYA_OMRU_MS = 3 * 60 * 60 * 1000;
 /** Kullanıcı başına en çok kaç medya (karusel 10 görsel). */
 export const MEDYA_ADET_TAVANI = 12;
 /** Kullanıcı başına toplam bayt tavanı; aşılırsa en eskiler düşer. */
-export const MEDYA_BAYT_TAVANI = 150 * 1024 * 1024;
-/** Tek dosya tavanı. WhatsApp video olarak ~16 MB; belge olarak gelirse daha büyük olabilir. */
-export const MEDYA_TEK_DOSYA_TAVANI = 64 * 1024 * 1024;
+export const MEDYA_BAYT_TAVANI = 400 * 1024 * 1024;
+/**
+ * Tek dosya tavanı = Instagram'ın reels için kabul ettiği en büyük dosya
+ * (InstagramPublishService MAX_VIDEO_BYTES ile aynı, 300 MB). Bunun üstü zaten
+ * yayımlanamaz; kullanıcıya baştan söylemek, indirip sonra reddetmekten iyi.
+ */
+export const MEDYA_TEK_DOSYA_TAVANI = 300 * 1024 * 1024;
+/** Büyük dosyanın WAHA'dan inme süresi (varsayılan 60 sn 300 MB için yetmiyor). */
+export const MEDYA_INDIRME_ZAMAN_ASIMI_MS = 5 * 60 * 1000;
 
 export function medyaTuru(mimeType: string): "video" | "gorsel" | null {
   if (mimeType.startsWith("video/")) return "video";
@@ -71,7 +79,8 @@ export class GelenMedyaDeposu {
   private now: () => number;
   private id: () => string;
 
-  constructor(now: () => number = Date.now, id: () => string = () => Math.random().toString(36).slice(2, 10)) {
+  // Kimlik tahmin edilemez olmalı: yedek yolunun parçası (bkz. medya-yedegi.ts).
+  constructor(now: () => number = Date.now, id: () => string = () => randomUUID().replace(/-/g, "")) {
     this.now = now;
     this.id = id;
   }
@@ -108,6 +117,15 @@ export class GelenMedyaDeposu {
     }
     this.medya.set(userId, liste);
     return kayit;
+  }
+
+  /** Yedekten dönen kaydı, kimliği ve geliş zamanıyla, olduğu gibi koyar. */
+  geriYukle(userId: string, m: Omit<GelenMedya, "boyut"> & { boyut?: number }): void {
+    const liste = this.temiz(userId);
+    if (liste.some((x) => x.id === m.id)) return;
+    liste.push({ ...m, boyut: m.buffer.length });
+    liste.sort((a, b) => a.gelis - b.gelis);
+    this.medya.set(userId, liste);
   }
 
   liste(userId: string): GelenMedya[] {

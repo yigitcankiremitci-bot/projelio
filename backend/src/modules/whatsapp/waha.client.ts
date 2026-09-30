@@ -75,7 +75,7 @@ export interface WahaClient {
   /** LID (@lid) adresini telefon JID'ine (@c.us) çevirir; bilinmiyorsa null. */
   resolveLid(name: string, lid: string): Promise<string | null>;
   /** Gelen mesajın WAHA'nın indirdiği medya dosyası (payload.media.url). */
-  downloadMedia(url: string, maxBytes: number): Promise<Buffer>;
+  downloadMedia(url: string, maxBytes: number, timeoutMs?: number): Promise<Buffer>;
 }
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -196,7 +196,7 @@ export class WahaHttpClient implements WahaClient {
     }
   }
 
-  async downloadMedia(url: string, maxBytes: number): Promise<Buffer> {
+  async downloadMedia(url: string, maxBytes: number, timeoutMs = MEDIA_TIMEOUT_MS): Promise<Buffer> {
     // WAHA adresi kendi gözünden yazıyor (çoğu zaman http://localhost:3000/...);
     // backend'den oraya ulaşılamaz. Yalnızca yol alınır, bizim WAHA_URL'imize
     // eklenir — yolun dışına (başka bir sunucuya) istek atılmasın diye de.
@@ -206,7 +206,7 @@ export class WahaHttpClient implements WahaClient {
     // Gövde de zaman aşımının içinde okunur: raw() zamanlayıcıyı başlıklar
     // gelince kapatıyor, büyük dosyada gövde asılı kalabilirdi.
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), MEDIA_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await fetch(this.baseUrl + path, {
         headers: { "X-Api-Key": this.apiKey, Accept: "*/*" },

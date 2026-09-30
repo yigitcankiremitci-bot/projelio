@@ -4,6 +4,7 @@ import { FilesService } from "../files/files.service";
 import { JobsService } from "../jobs/jobs.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { gelenMedya, medyaTuru, MEDYA_TEK_DOSYA_TAVANI, type GelenMedya } from "./gelen-medya";
+import { yedektenYukle, yedekSil } from "./medya-yedegi";
 import { LioOneriService } from "./lio-oneri.service";
 import { denemeReelsHatasi } from "./publish-format";
 import { SocialMediaService, type SocialScope } from "./social-media.service";
@@ -57,6 +58,8 @@ export class SosyalLioService {
 
   /** Kullanıcının içerik ekleyebildiği hesaplar. Yazma yetkisi olmayan listeye girmez. */
   async hesaplar(userId: string) {
+    // Dağıtımdan sonra bellek boşalır; bekleyen medya yedekten geri gelir.
+    await yedektenYukle(this.supabase, userId).catch(() => undefined);
     const [orgs, jobs] = await Promise.all([this.organizations.findAllForUser(userId), this.jobs.findAllForUser(userId)]);
     const orgAd = new Map(orgs.map((o) => [o.id, o.name]));
     const jobAd = new Map(jobs.map((j) => [j.id, j.title]));
@@ -132,10 +135,11 @@ export class SosyalLioService {
       throw new BadRequestException(`Bir gönderiye en çok ${KARUSEL_TAVANI} medya eklenebilir.`);
     }
 
+    await yedektenYukle(this.supabase, userId).catch(() => undefined);
     const { medya, eksik } = gelenMedya.coz(userId, girdi.mediaIds);
     if (eksik.length) {
       throw new BadRequestException(
-        "Bu medya artık bende yok (süre doldu ya da sunucu yenilendi). Kullanıcıdan dosyayı WhatsApp'tan yeniden göndermesini iste."
+        "Bu medya artık bende yok (süre doldu). Aynı çağrıyı TEKRARLAMA; kullanıcıdan dosyayı WhatsApp'tan yeniden göndermesini iste."
       );
     }
     // WhatsApp video/fotoğrafı sıkıştırıyor; Instagram'a bu hâliyle çıkarsa
@@ -225,6 +229,7 @@ export class SosyalLioService {
 
     // Dosyalar artık Drive'da; bellekteki kopya gereksiz yer tutmasın.
     gelenMedya.birak(userId, girdi.mediaIds);
+    await yedekSil(this.supabase, userId, girdi.mediaIds).catch(() => undefined);
     return { taslaklar };
   }
 
@@ -328,7 +333,7 @@ export class SosyalLioService {
 
   /** Medyayı gönderinin kapsamının Drive/OneDrive deposuna yazar; dosya kimliğini döner. */
   private async depoyaYaz(kapsam: SocialScope, userId: string, m: GelenMedya): Promise<string> {
-    if (m.boyut > MEDYA_TEK_DOSYA_TAVANI) throw new BadRequestException("Dosya çok büyük (en çok 64 MB).");
+    if (m.boyut > MEDYA_TEK_DOSYA_TAVANI) throw new BadRequestException("Dosya çok büyük (en çok 300 MB).");
     const dosya = { originalname: m.ad, mimetype: m.mimeType, size: m.boyut, buffer: m.buffer } as Express.Multer.File;
     const yuklenen =
       "jobId" in kapsam

@@ -2735,7 +2735,7 @@ export class FilesService {
     const target = await this.jobUploadTarget(jobId, userId, provider, accountId, rootFolderId, context, resolvedProjectId, placement);
 
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
-    const uploaded = await this.cloudStorage.uploadMultipart(
+    const uploaded = await this.cloudStorage.uploadBuffer(
       provider,
       accessToken,
       {
@@ -2821,7 +2821,7 @@ export class FilesService {
     const target = await this.resolvePlacement({ kind: scope.kind, id: scope.id }, userId, folderId, placement);
 
     const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
-    const uploaded = await this.cloudStorage.uploadMultipart(
+    const uploaded = await this.cloudStorage.uploadBuffer(
       provider,
       accessToken,
       {

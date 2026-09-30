@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 import { DriveService, GOOGLE_DOC_EXPORT_MIME, GOOGLE_NATIVE_MIME, isGoogleDocMime } from "../google/drive.service";
 import { GoogleAccountsService } from "../google/google-accounts.service";
 import { MicrosoftAccountsService } from "../microsoft/microsoft-accounts.service";
@@ -20,6 +21,12 @@ export type NativeFileKind = "gdoc" | "gsheet" | "gslide" | "docx" | "xlsx" | "p
  * Microsoft) yönlendirir. FilesService'in geri kalanı iki sağlayıcı
  * arasındaki farkla hiç uğraşmaz.
  */
+/** Bunun altı tek istekle gider. OneDrive'ın basit yükleme sınırı 4 MB. */
+const SIMPLE_UPLOAD_LIMIT = 4 * 1024 * 1024;
+/** 5 MiB: hem Google'ın (256 KiB) hem Graph'ın (320 KiB) parça katı. */
+const UPLOAD_CHUNK = 5 * 1024 * 1024;
+const UPLOAD_CHUNK_TIMEOUT_MS = 2 * 60 * 1000;
+
 @Injectable()
 export class CloudStorageService {
   constructor(
@@ -158,6 +165,64 @@ export class CloudStorageService {
     return provider === "google"
       ? this.googleDrive.uploadMultipart(accessToken, meta, content)
       : this.oneDrive.uploadMultipart(accessToken, meta, content);
+  }
+
+  /**
+   * Sunucudaki bir belleği (Buffer) sağlayıcıya yükler; büyüklüğe göre yol seçer.
+   *
+   * NEDEN: uploadMultipart büyük dosyada bozuk. Google'da gövde bellekte bir kez
+   * daha kopyalanıyor (300 MB dosya = ~600 MB, konteyner 1200 MB), OneDrive'da
+   * tek istekli PUT 4 MB'ın üstünü kabul etmiyor. Tarayıcı bu yüzden büyük
+   * dosyayı resumable oturumla kendisi parça parça yüklüyor; sunucunun kendi
+   * içinden yükleyen yerler (Lio'nun WhatsApp videosu) için aynı akış burada.
+   */
+  async uploadBuffer(
+    provider: StorageProvider,
+    accessToken: string,
+    meta: { name: string; mimeType: string; parentId?: string },
+    content: Buffer
+  ): Promise<CloudFile> {
+    if (content.length <= SIMPLE_UPLOAD_LIMIT) return this.uploadMultipart(provider, accessToken, meta, content);
+
+    const uploadUrl = await this.createResumableSession(provider, accessToken, { ...meta, sizeBytes: content.length });
+    const total = content.length;
+    for (let start = 0; start < total; start += UPLOAD_CHUNK) {
+      const end = Math.min(start + UPLOAD_CHUNK, total);
+      const chunk = content.subarray(start, end);
+      // Oturum adresi önceden yetkilidir: Authorization başlığı GÖNDERİLMEZ
+      // (Graph gönderilirse reddeder).
+      const res = await fetchWithTimeout(
+        uploadUrl,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Length": String(chunk.length),
+            "Content-Range": `bytes ${start}-${end - 1}/${total}`,
+          },
+          body: chunk as unknown as BodyInit,
+          redirect: "manual",
+        },
+        UPLOAD_CHUNK_TIMEOUT_MS
+      );
+      const last = end >= total;
+      // Ara parçalar: Google 308, OneDrive 202. Son parça: 200/201 + dosya gövdesi.
+      if (!last) {
+        await res.arrayBuffer().catch(() => undefined);
+        if (res.status !== 308 && res.status !== 202 && !res.ok) {
+          await this.cancelResumable(provider, uploadUrl).catch(() => undefined);
+          throw new BadRequestException(`Bulut depoya yükleme sırasında hata (${res.status}).`);
+        }
+        continue;
+      }
+      if (!res.ok) {
+        await this.cancelResumable(provider, uploadUrl).catch(() => undefined);
+        throw new BadRequestException(`Bulut depoya yükleme tamamlanamadı (${res.status}).`);
+      }
+      const json = (await res.json().catch(() => null)) as { id?: string } | null;
+      if (!json?.id) throw new BadRequestException("Bulut depoya yüklenen dosyanın kimliği alınamadı.");
+      return this.getFile(provider, accessToken, json.id);
+    }
+    throw new BadRequestException("Boş dosya yüklenemez.");
   }
 
   async createResumableSession(

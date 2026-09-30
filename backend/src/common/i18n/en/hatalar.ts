@@ -903,17 +903,19 @@ export const hatalar: TranslationDict = {
   "Geçersiz deneme reels seçeneği": "Invalid trial reel option",
   // Sosyal medya: Lio araçları (WhatsApp / sohbetten gönderi taslağı ve planlama)
   "Bu gönderi zaten planlanmış.": "This post is already scheduled.",
+  "Boş dosya yüklenemez.": "An empty file can't be uploaded.",
+  "Bulut depoya yüklenen dosyanın kimliği alınamadı.": "Couldn't get the ID of the file uploaded to cloud storage.",
   "Gönderide görsel/video yok.": "The post has no image/video.",
   "Gönderinin yayımlanacağı hesap yok.": "The post has no account to publish to.",
   "Açıklama boş.": "The caption is empty.",
   "Yayın zamanı belirtilmemiş.": "No publish time was given.",
   "Yayın zamanı geçmişte ya da çok yakın; en az birkaç dakika sonrası olmalı.":
     "The publish time is in the past or too soon; it must be at least a few minutes from now.",
-  "Bu medya artık bende yok (süre doldu ya da sunucu yenilendi). Kullanıcıdan dosyayı WhatsApp'tan yeniden göndermesini iste.":
-    "I no longer have this media (it expired or the server restarted). Ask the user to send the file again on WhatsApp.",
+  "Bu medya artık bende yok (süre doldu). Aynı çağrıyı TEKRARLAMA; kullanıcıdan dosyayı WhatsApp'tan yeniden göndermesini iste.":
+    "I no longer have this media (it expired). Do NOT repeat the same call; ask the user to send the file again on WhatsApp.",
   "Bu taslağı kullanıcıya henüz göstermedin ya da gösterdikten sonra değiştirdin. Açıklama, etiketler, hesap ve yayın zamanını kullanıcıya yaz ve onayını bekle; kullanıcı onay mesajını yazınca yeniden dene.":
     "You haven't shown this draft to the user yet, or you changed it after showing it. Write the caption, tags, account and publish time to the user and wait for their approval; retry once they reply with approval.",
-  "Dosya çok büyük (en çok 64 MB).": "The file is too large (64 MB at most).",
+  "Dosya çok büyük (en çok 300 MB).": "The file is too large (300 MB at most).",
   "En az bir görsel ya da video gerekli.": "At least one image or video is required.",
   "En az bir hesap seçilmeli (social_list_accounts).": "Pick at least one account (social_list_accounts).",
   "Hesaplardan biri bulunamadı; social_list_accounts'taki accountId'leri kullan.":

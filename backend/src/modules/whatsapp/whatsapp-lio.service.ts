@@ -9,7 +9,8 @@ import type { AiAttachmentsService } from "../ai-assistant/ai-attachments.servic
 import { MAX_ATTACHMENT_UPLOAD_BYTES } from "../ai-assistant/ai-attachments.service";
 import type { WahaClient } from "./waha.client";
 import { decideLioKomut, lioKomutConfigFromEnv } from "./lio-komut-sinir";
-import { gelenMedya, medyaTuru, MEDYA_TEK_DOSYA_TAVANI, type GelenMedya } from "../social-media/gelen-medya";
+import { gelenMedya, medyaTuru, MEDYA_INDIRME_ZAMAN_ASIMI_MS, MEDYA_TEK_DOSYA_TAVANI, type GelenMedya } from "../social-media/gelen-medya";
+import { yedekle, yedekSil } from "../social-media/medya-yedegi";
 import { formatForWhatsapp } from "./whatsapp-lio-format";
 import { maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
 import { mapMessage, mapThread, WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
@@ -193,7 +194,7 @@ export class WhatsappLioService {
         await this.sosyalMedyaAl(userId, media);
       } catch (e) {
         this.logger.warn(`WhatsApp medyası depolanamadı (${thread.id}): ${e instanceof Error ? e.message : e}`);
-        await this.gonder(thread.id, userId, "Dosyayı alamadım. Birazdan yeniden göndermeyi deneyin.", false);
+        await this.gonder(thread.id, userId, this.medyaHatasi(e, userId), false);
       }
       return;
     }
@@ -221,13 +222,13 @@ export class WhatsappLioService {
         // Lio bir taslak açınca yazılır (bkz. social-media/gelen-medya.ts).
         const ad = media.filename || dosyaAdi(media.url);
         const mime = media.mimetype ?? "application/octet-stream";
-        const buffer = await media.waha.downloadMedia(
-          media.url,
-          turu ? MEDYA_TEK_DOSYA_TAVANI : MAX_ATTACHMENT_UPLOAD_BYTES
-        );
+        let buffer: Buffer;
         if (turu) {
-          const kayit = gelenMedya.ekle(userId, { ad, mimeType: mime, buffer, orijinal: media.belge === true });
+          const kayit = await this.sosyalMedyaAl(userId, media);
           karar.text += "\n\n" + medyaNotu(kayit, turu);
+          buffer = kayit.buffer;
+        } else {
+          buffer = await media.waha.downloadMedia(media.url, MAX_ATTACHMENT_UPLOAD_BYTES);
         }
         // Video ses çözümlemesine girerdi (ücretli) ve modele bir şey katmazdı:
         // Lio videoyu social_suggest_caption ile kendisi izler. Fotoğrafı ise
@@ -243,7 +244,9 @@ export class WhatsappLioService {
         const status = (e as any)?.status ?? (e as any)?.getStatus?.();
         this.logger.warn(`WhatsApp dosyası Lio'ya verilemedi (${thread.id}): ${e instanceof Error ? e.message : e}`);
         const mesaj =
-          status === 400 && e instanceof Error
+          medyaTuru(media.mimetype ?? "") && status !== 400
+            ? this.medyaHatasi(e, userId)
+            : status === 400 && e instanceof Error
             ? e.message
             : status === 413
               ? "Dosya çok büyük, Lio okuyamadı. Uygulamadaki Lio'ya yüklemeyi deneyin."
@@ -272,18 +275,51 @@ export class WhatsappLioService {
     this.logger.log(`Lio komutu yanıtlandı (${conn.session_name}, ${maskPhone(contact.phone_e164)})`);
   }
 
-  /** Medyayı indirir ve bellekteki gelen-medya deposuna koyar (modele bildirmeden). */
+  /**
+   * Medyayı indirir, bellekteki gelen-medya deposuna koyar ve kalıcı yedeğini
+   * yazar (dağıtımda bellek silinir; bkz. social-media/medya-yedegi.ts).
+   * Yedek yazılamazsa medya yine bellekte kullanılabilir, yalnızca uyarı düşer.
+   */
   private async sosyalMedyaAl(
     userId: string,
     media: { waha: WahaClient; url: string; mimetype?: string | null; filename?: string | null; belge?: boolean }
   ): Promise<GelenMedya> {
-    const buffer = await media.waha.downloadMedia(media.url, MEDYA_TEK_DOSYA_TAVANI);
-    return gelenMedya.ekle(userId, {
+    const buffer = await media.waha.downloadMedia(media.url, MEDYA_TEK_DOSYA_TAVANI, MEDYA_INDIRME_ZAMAN_ASIMI_MS);
+    const kayit = gelenMedya.ekle(userId, {
       ad: media.filename || dosyaAdi(media.url),
       mimeType: media.mimetype ?? "application/octet-stream",
       buffer,
       orijinal: media.belge === true,
     });
+    await yedekle(this.supabase, userId, kayit).catch((e) =>
+      this.logger.warn(`Medya yedeği yazılamadı (${kayit.id}): ${e instanceof Error ? e.message : e}`)
+    );
+    // Sıkıştırılmış kopyanın yerine geçtiyse eski yedek de gider.
+    if (kayit.yerineGectigi) await yedekSil(this.supabase, userId, [kayit.yerineGectigi.id]).catch(() => undefined);
+    return kayit;
+  }
+
+  /**
+   * Medya alınamadığında kullanıcıya gidecek SEBEPLİ mesaj. "Dosyayı alamadım"
+   * demek kullanıcıyı çıkmaza sokuyordu: 330 MB'lık dosya Instagram'ın 300 MB
+   * sınırını aşıyordu ama kullanıcı bunu öğrenmedi ve aynı dosyayı yeniden denedi.
+   */
+  private medyaHatasi(e: unknown, userId: string): string {
+    const status = (e as any)?.status;
+    const sikisik = gelenMedya.liste(userId).some((m) => !m.orijinal);
+    const devam = sikisik
+      ? " Daha önce gönderdiğin sıkıştırılmış hâliyle devam etmek istersen \"devam et\" yaz."
+      : "";
+    if (status === 413) {
+      return (
+        `Dosya çok büyük: Instagram reels için en fazla ${MEDYA_TEK_DOSYA_TAVANI / 1048576} MB kabul ediyor. ` +
+        `Videoyu daha düşük bit hızıyla dışa aktarıp (ya da kısaltıp) yeniden gönder.${devam}`
+      );
+    }
+    if ((e as any)?.name === "AbortError") {
+      return `Dosya zamanında inmedi (bağlantı yavaş ya da dosya çok büyük). Bir kez daha göndermeyi dene.${devam}`;
+    }
+    return `Dosyayı alamadım. Birazdan yeniden göndermeyi deneyin.${devam}`;
   }
 
   /** Cevap metni — ChatResult'ın her hâli WhatsApp'ta bir karşılık bulmalı. */

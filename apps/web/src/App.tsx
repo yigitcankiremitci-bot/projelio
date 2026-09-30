@@ -5,6 +5,7 @@ import type { User } from "@projelio/shared";
 import { api, basariliYazmayiDinle } from "./api/client";
 import { yazmaIsteginiIsle } from "./lib/degerlendirmeIstegi";
 import { klavyeyiIzle } from "./lib/klavye";
+import { yaziyiGorunurTut } from "./lib/yaziGorunur";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
 import NotificationBell from "./components/NotificationBell";
@@ -571,6 +572,8 @@ export default function App() {
   useEffect(() => basariliYazmayiDinle(yazmaIsteginiIsle), []);
   // Klavye açıkken alt menü ve balonlar gizlensin (bkz. lib/klavye.ts).
   useEffect(() => klavyeyiIzle(), []);
+  // Yazılan yer klavyenin hemen üstünde, son kelimeler görünür kalsın.
+  useEffect(() => yaziyiGorunurTut(), []);
   // Google dönüş ekranı da kimlik doğrulaması gerektirmeyen bir ekrandır: token
   // henüz yerel depoda yok, tam da burada oluşturuluyor. Korumalı bölgeye
   // koyarsak /login'e yönlenir ve akış hiç tamamlanamaz.

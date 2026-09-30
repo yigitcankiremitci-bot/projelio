@@ -214,9 +214,10 @@ export class WahaHttpClient implements WahaClient {
       });
       if (!res.ok) throw new WahaError(`WAHA medya ${res.status}`, res.status, await res.text());
       const length = Number(res.headers.get("content-length") ?? 0);
-      if (length > maxBytes) throw new WahaError("Medya çok büyük", 413, "");
+      // Gövde alanında gerçek boyut: kullanıcıya "329,9 MB" diyebilmek için.
+      if (length > maxBytes) throw new WahaError("Medya çok büyük", 413, String(length));
       const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.length > maxBytes) throw new WahaError("Medya çok büyük", 413, "");
+      if (buf.length > maxBytes) throw new WahaError("Medya çok büyük", 413, String(buf.length));
       return buf;
     } finally {
       clearTimeout(timer);

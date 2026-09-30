@@ -213,6 +213,18 @@ export class WhatsappLioService {
     const convId = await this.komutSohbeti(thread);
     const role = await this.kullaniciRolu(userId);
 
+    // Az önce alınamayan dosya varsa Lio'ya söylenir; yoksa kullanıcı ardından
+    // "bunu planla" yazınca Lio medya bulamayıp "yeniden gönder" diyordu.
+    for (const r of gelenMedya.reddedilenleriAl(userId)) {
+      const mb = r.boyut ? `${(r.boyut / 1048576).toFixed(1)} MB, ` : "";
+      karar.text +=
+        r.sebep === "cok-buyuk"
+          ? `\n\n[Sistem notu: kullanıcının gönderdiği "${r.ad}" (${mb}) Instagram'ın ${MEDYA_TEK_DOSYA_TAVANI / 1048576} MB sınırını aştığı için ALINMADI ` +
+            `ve kullanıcıya bildirildi. Aynı dosyayı yeniden göndermesini İSTEME; videoyu küçültüp (daha düşük bit hızı / kısaltma) göndermesini söyle. ` +
+            `social_list_accounts'ta sıkıştırılmış bir kopya bekliyorsa onunla devam etmeyi öner.]`
+          : `\n\n[Sistem notu: kullanıcının gönderdiği "${r.ad}" indirilemedi (zaman aşımı/bağlantı) ve kullanıcıya bildirildi; bir kez daha göndermesini söyle.]`;
+    }
+
     let attachmentIds: string[] | undefined;
     if (media) {
       try {
@@ -284,9 +296,21 @@ export class WhatsappLioService {
     userId: string,
     media: { waha: WahaClient; url: string; mimetype?: string | null; filename?: string | null; belge?: boolean }
   ): Promise<GelenMedya> {
-    const buffer = await media.waha.downloadMedia(media.url, MEDYA_TEK_DOSYA_TAVANI, MEDYA_INDIRME_ZAMAN_ASIMI_MS);
+    const ad = media.filename || dosyaAdi(media.url);
+    let buffer: Buffer;
+    try {
+      buffer = await media.waha.downloadMedia(media.url, MEDYA_TEK_DOSYA_TAVANI, MEDYA_INDIRME_ZAMAN_ASIMI_MS);
+    } catch (e) {
+      const boyut = Number((e as any)?.body);
+      gelenMedya.reddet(userId, {
+        ad,
+        boyut: boyut > 0 ? boyut : undefined,
+        sebep: (e as any)?.status === 413 ? "cok-buyuk" : "inmedi",
+      });
+      throw e;
+    }
     const kayit = gelenMedya.ekle(userId, {
-      ad: media.filename || dosyaAdi(media.url),
+      ad,
       mimeType: media.mimetype ?? "application/octet-stream",
       buffer,
       orijinal: media.belge === true,
@@ -311,8 +335,10 @@ export class WhatsappLioService {
       ? " Daha önce gönderdiğin sıkıştırılmış hâliyle devam etmek istersen \"devam et\" yaz."
       : "";
     if (status === 413) {
+      const boyut = Number((e as any)?.body);
+      const mb = boyut > 0 ? ` (${(boyut / 1048576).toFixed(1).replace(".", ",")} MB)` : "";
       return (
-        `Dosya çok büyük: Instagram reels için en fazla ${MEDYA_TEK_DOSYA_TAVANI / 1048576} MB kabul ediyor. ` +
+        `Dosya çok büyük${mb}: Instagram reels için en fazla ${MEDYA_TEK_DOSYA_TAVANI / 1048576} MB kabul ediyor. ` +
         `Videoyu daha düşük bit hızıyla dışa aktarıp (ya da kısaltıp) yeniden gönder.${devam}`
       );
     }

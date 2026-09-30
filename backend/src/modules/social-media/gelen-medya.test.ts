@@ -100,3 +100,14 @@ test("belge tespiti", () => {
   assert.equal(belgeOlarakMi({}, "klip.mp4"), true);
   assert.equal(belgeOlarakMi({}, null), false);
 });
+
+test("reddedilen dosya bir kez bildirilir, süresi dolunca düşer", () => {
+  let t = 1000;
+  const d = new GelenMedyaDeposu(() => t);
+  d.reddet("u1", { ad: "büyük.mp4", boyut: 345_000_000, sebep: "cok-buyuk" });
+  assert.equal(d.reddedilenleriAl("u1").length, 1);
+  assert.equal(d.reddedilenleriAl("u1").length, 0);
+  d.reddet("u1", { ad: "eski.mp4", sebep: "inmedi" });
+  t += 31 * 60 * 1000;
+  assert.equal(d.reddedilenleriAl("u1").length, 0);
+});

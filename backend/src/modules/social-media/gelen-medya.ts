@@ -45,6 +45,9 @@ export const MEDYA_TEK_DOSYA_TAVANI = 300 * 1024 * 1024;
 /** Büyük dosyanın WAHA'dan inme süresi (varsayılan 60 sn 300 MB için yetmiyor). */
 export const MEDYA_INDIRME_ZAMAN_ASIMI_MS = 5 * 60 * 1000;
 
+/** Red notu bu kadar süre Lio'ya bildirilmeyi bekler. */
+export const REDDEDILEN_OMRU_MS = 30 * 60 * 1000;
+
 export function medyaTuru(mimeType: string): "video" | "gorsel" | null {
   if (mimeType.startsWith("video/")) return "video";
   if (["image/jpeg", "image/png", "image/webp"].includes(mimeType)) return "gorsel";
@@ -71,6 +74,7 @@ export class GelenMedyaDeposu {
   private medya = new Map<string, GelenMedya[]>();
   /** Bu kullanıcı mesajında (turda) oluşturulan ya da değiştirilen taslaklar. */
   private buTur = new Map<string, Set<string>>();
+  private reddedilen = new Map<string, { ad: string; boyut?: number; sebep: "cok-buyuk" | "inmedi"; zaman: number }[]>();
   /** Kullanıcıya gösterilmiş ve bir mesajla karşılık almış taslaklar. */
   private sunulan = new Map<string, Set<string>>();
 
@@ -157,6 +161,27 @@ export class GelenMedyaDeposu {
     if (canli.length) this.medya.set(userId, canli);
     else this.medya.delete(userId);
     return canli;
+  }
+
+  // ------------------------------------------------------- reddedilen medya
+  //
+  // Alınamayan dosya (ör. 300 MB'ı aşan) kullanıcıya hemen bildirilir, ama
+  // Lio'nun da bilmesi gerekir: kullanıcı ardından "bunu planla" yazınca Lio
+  // depoda medya bulamayıp "videoyu yeniden gönder" diyordu — aynı büyük dosyayı
+  // yeniden göndermesine yol açan yanlış yönlendirme (2026-09-30).
+
+  reddet(userId: string, r: { ad: string; boyut?: number; sebep: "cok-buyuk" | "inmedi" }): void {
+    const liste = (this.reddedilen.get(userId) ?? []).filter((x) => x.zaman >= this.now() - REDDEDILEN_OMRU_MS);
+    liste.push({ ...r, zaman: this.now() });
+    this.reddedilen.set(userId, liste);
+  }
+
+  /** Bekleyen red notlarını verir ve temizler (bir kez bildirilir). */
+  reddedilenleriAl(userId: string): { ad: string; boyut?: number; sebep: "cok-buyuk" | "inmedi" }[] {
+    const sinir = this.now() - REDDEDILEN_OMRU_MS;
+    const liste = (this.reddedilen.get(userId) ?? []).filter((x) => x.zaman >= sinir);
+    this.reddedilen.delete(userId);
+    return liste;
   }
 
   // ------------------------------------------------------------ onay koruması

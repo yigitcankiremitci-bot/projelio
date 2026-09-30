@@ -2366,7 +2366,8 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     name: "social_create_draft",
     description:
       "Gelen video/fotoğraflardan bir Instagram gönderisi TASLAĞI açar; medya şirketin dosya deposuna yazılır. " +
-      "Taslak YAYINA GİRMEZ. Video → reels, birden çok fotoğraf → karusel, tek fotoğraf → görsel gönderi " +
+      "Taslak YAYINA GİRMEZ; açmak için kullanıcıdan onay İSTEME, medya ve istek belli olunca hemen çağır " +
+      "(bellekteki medya zamanla düşer, taslak onu kalıcı yapar). Video → reels, birden çok fotoğraf → karusel, tek fotoğraf → görsel gönderi " +
       "(icerikTuru ile değiştirilebilir). Deneme reels için denemeReels ver: \"manual\" (elle terfi) ya da " +
       "\"performance\" (performansa göre otomatik); yalnızca TEK videoyla olur. Kullanıcı hangisini istediğini " +
       "söylemediyse \"manual\" kullan. Aynı içerik birden çok hesapta paylaşılacaksa hepsini accountIds'e koy. " +

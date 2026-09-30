@@ -111,3 +111,20 @@ test("reddedilen dosya bir kez bildirilir, süresi dolunca düşer", () => {
   t += 31 * 60 * 1000;
   assert.equal(d.reddedilenleriAl("u1").length, 0);
 });
+
+test("sessiz gelen medya bir kez bildirilir", () => {
+  const d = new GelenMedyaDeposu();
+  d.ekle("u1", { ad: "1.jpg", mimeType: "image/jpeg", buffer: buf(1) });
+  d.ekle("u1", { ad: "2.jpg", mimeType: "image/jpeg", buffer: buf(1) });
+  assert.deepEqual(d.bildirilmemisleriAl("u1").map((m) => m.ad), ["1.jpg", "2.jpg"]);
+  assert.equal(d.bildirilmemisleriAl("u1").length, 0);
+  d.ekle("u1", { ad: "3.jpg", mimeType: "image/jpeg", buffer: buf(1) });
+  assert.deepEqual(d.bildirilmemisleriAl("u1").map((m) => m.ad), ["3.jpg"]);
+});
+
+test("yedekten dönen medya yeniden bildirilmez", () => {
+  const d = new GelenMedyaDeposu();
+  d.geriYukle("u1", { id: "med_x", ad: "v.mp4", mimeType: "video/mp4", buffer: buf(1), gelis: Date.now(), orijinal: true });
+  assert.equal(d.bildirilmemisleriAl("u1").length, 0);
+  assert.equal(d.liste("u1").length, 1);
+});

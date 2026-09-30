@@ -26,6 +26,8 @@ export interface GelenMedya {
    * gönderince yeniden sıkıştırıyor; belge olarak gönderilen orijinal kalır.
    */
   orijinal: boolean;
+  /** Lio'ya [Ekli medya] notuyla bildirildi mi (sessiz gelen medya bir sonraki turda bildirilir). */
+  bildirildi?: boolean;
   /** Bu dosya, daha önce gelen sıkıştırılmış bir kopyanın yerine geçti (o kopya depodan düştü). */
   yerineGectigi?: { id: string; ad: string };
 }
@@ -127,13 +129,21 @@ export class GelenMedyaDeposu {
   geriYukle(userId: string, m: Omit<GelenMedya, "boyut"> & { boyut?: number }): void {
     const liste = this.temiz(userId);
     if (liste.some((x) => x.id === m.id)) return;
-    liste.push({ ...m, boyut: m.buffer.length });
+    // Yedekten dönen medya daha önce bildirildi ya da Lio onu bekleyenMedya'dan görür.
+    liste.push({ ...m, boyut: m.buffer.length, bildirildi: true });
     liste.sort((a, b) => a.gelis - b.gelis);
     this.medya.set(userId, liste);
   }
 
   liste(userId: string): GelenMedya[] {
     return [...this.temiz(userId)];
+  }
+
+  /** Lio'ya henüz bildirilmemiş medyayı verir ve bildirildi olarak işaretler. */
+  bildirilmemisleriAl(userId: string): GelenMedya[] {
+    const yeni = this.temiz(userId).filter((m) => !m.bildirildi);
+    for (const m of yeni) m.bildirildi = true;
+    return yeni;
   }
 
   /** Verilen sırayla döner; bulunamayan kimlik varsa `eksik`e girer. */

@@ -24,6 +24,11 @@ const AUTO_REPLY_CONTEXT = 20;
  * Kuyruktaki MAX_QUEUE_AGE_MS ile aynı değer.
  */
 const KOMUT_SOHBET_PENCERESI_MS = 6 * 60 * 60 * 1000;
+/**
+ * Açıklamasız dosyadan sonra Lio turunu başlatmadan önceki bekleme. Karuselin
+ * fotoğrafları birkaç saniye arayla gelir; hepsi gelince tek tur çalışsın.
+ */
+const MEDYA_TURU_BEKLEME_MS = 20_000;
 /** Otomatik yanıtın üst uzunluğu (WhatsApp'ta kısa mesaj doğal). */
 const AUTO_REPLY_MAX_TOKENS = 400;
 
@@ -185,17 +190,20 @@ export class WhatsappLioService {
     media?: { waha: WahaClient; url: string; mimetype?: string | null; filename?: string | null; belge?: boolean }
   ): Promise<void> {
     const config = lioKomutConfigFromEnv();
-    // Açıklamasız video/fotoğraf: SESSİZCE depolanır, Lio cevap vermez. Karusel
+    // Açıklamasız video/fotoğraf: depolanır, HER BİRİNE cevap verilmez. Karusel
     // için 5 fotoğraf art arda gelir; her birine "aldım" demek 5 bildirim ve
-    // 5 model turu olurdu. Kullanıcı ne yapılacağını yazınca Lio hepsini görür
-    // (bkz. social_list_accounts → bekleyenMedya).
+    // 5 model turu olurdu. Lio ile süren bir konuşma varsa (ör. Lio "dosyayı
+    // gönder" dedi) son dosyadan kısa süre sonra TEK bir tur çalışır; yoksa
+    // kullanıcı ne yapılacağını yazınca Lio hepsini görür.
     if (media && !text.trim() && medyaTuru(media.mimetype ?? "")) {
       try {
-        await this.sosyalMedyaAl(userId, media);
+        await this.indirmeyiIzle(userId, this.sosyalMedyaAl(userId, media));
       } catch (e) {
         this.logger.warn(`WhatsApp medyası depolanamadı (${thread.id}): ${e instanceof Error ? e.message : e}`);
         await this.gonder(thread.id, userId, this.medyaHatasi(e, userId), false);
+        return;
       }
+      if (this.komutSohbeti(thread)) this.medyaTuruPlanla(thread.id, contact, conn, userId);
       return;
     }
     // Açıklamasız dosya: modele ne yapacağını söyleyen kısa bir istek.
@@ -210,7 +218,13 @@ export class WhatsappLioService {
       return;
     }
 
-    const convId = await this.komutSohbeti(thread);
+    // Bu tur, bekleyen "dosya geldi" turunun yerini tutar.
+    this.medyaTuruIptal(userId);
+    // Dosya hâlâ iniyorsa (büyük video dakikalar sürebilir) metin onu bekler:
+    // yoksa "gönderdim" yazan kullanıcıya Lio "videoyu göremiyorum" diyordu.
+    await this.indirmeleriBekle(userId);
+
+    const convId = this.komutSohbeti(thread);
     const role = await this.kullaniciRolu(userId);
 
     // Az önce alınamayan dosya varsa Lio'ya söylenir; yoksa kullanıcı ardından
@@ -236,9 +250,8 @@ export class WhatsappLioService {
         const mime = media.mimetype ?? "application/octet-stream";
         let buffer: Buffer;
         if (turu) {
-          const kayit = await this.sosyalMedyaAl(userId, media);
-          karar.text += "\n\n" + medyaNotu(kayit, turu);
-          buffer = kayit.buffer;
+          // Not aşağıda, bildirilmemiş medyayla birlikte eklenir.
+          buffer = (await this.indirmeyiIzle(userId, this.sosyalMedyaAl(userId, media))).buffer;
         } else {
           buffer = await media.waha.downloadMedia(media.url, MAX_ATTACHMENT_UPLOAD_BYTES);
         }
@@ -268,6 +281,12 @@ export class WhatsappLioService {
       }
     }
 
+    // Bu mesajla gelen ve daha önce SESSİZCE gelen medya, kimlikleriyle Lio'ya.
+    for (const m of gelenMedya.bildirilmemisleriAl(userId)) {
+      const tur = medyaTuru(m.mimeType);
+      if (tur) karar.text += "\n\n" + medyaNotu(m, tur);
+    }
+
     const result = await (await this.ai()).chat(
       userId,
       role,
@@ -285,6 +304,55 @@ export class WhatsappLioService {
     const reply = this.komutCevabi(result);
     if (reply) await this.gonder(thread.id, userId, reply);
     this.logger.log(`Lio komutu yanıtlandı (${conn.session_name}, ${maskPhone(contact.phone_e164)})`);
+  }
+
+  // ------------------------------------------------ medya turu zamanlaması
+
+  /** Kullanıcı başına sürmekte olan medya indirmeleri. */
+  private readonly indirmeler = new Map<string, Set<Promise<unknown>>>();
+  /** Kullanıcı başına bekleyen "dosya geldi" turu. */
+  private readonly medyaTurlari = new Map<string, NodeJS.Timeout>();
+
+  private async indirmeyiIzle<T>(userId: string, is: Promise<T>): Promise<T> {
+    const set = this.indirmeler.get(userId) ?? new Set();
+    set.add(is);
+    this.indirmeler.set(userId, set);
+    try {
+      return await is;
+    } finally {
+      set.delete(is);
+      if (!set.size) this.indirmeler.delete(userId);
+    }
+  }
+
+  private async indirmeleriBekle(userId: string): Promise<void> {
+    const set = this.indirmeler.get(userId);
+    if (!set?.size) return;
+    const bitis = new Promise((r) => setTimeout(r, MEDYA_INDIRME_ZAMAN_ASIMI_MS));
+    await Promise.race([Promise.allSettled([...set]), bitis]);
+  }
+
+  /**
+   * Son dosyadan MEDYA_TURU_BEKLEME sonra tek bir Lio turu. Yeni dosya gelirse
+   * süre baştan başlar (karusel tek turda); kullanıcı arada yazarsa iptal olur.
+   */
+  private medyaTuruPlanla(threadId: string, contact: ContactRow, conn: ConnectionRow, userId: string): void {
+    this.medyaTuruIptal(userId);
+    const t = setTimeout(() => {
+      this.medyaTurlari.delete(userId);
+      void (async () => {
+        const { data } = await this.supabase.client.from("whatsapp_threads").select("*").eq("id", threadId).maybeSingle();
+        if (!data) return;
+        await this.handleUserCommand(data as ThreadRow, contact, conn, userId, "Dosyayı gönderdim.");
+      })().catch((e) => this.logger.warn(`Medya turu çalışmadı (${threadId}): ${e instanceof Error ? e.message : e}`));
+    }, MEDYA_TURU_BEKLEME_MS);
+    this.medyaTurlari.set(userId, t);
+  }
+
+  private medyaTuruIptal(userId: string): void {
+    const t = this.medyaTurlari.get(userId);
+    if (t) clearTimeout(t);
+    this.medyaTurlari.delete(userId);
   }
 
   /**
@@ -315,8 +383,9 @@ export class WhatsappLioService {
       buffer,
       orijinal: media.belge === true,
     });
-    await yedekle(this.supabase, userId, kayit).catch((e) =>
-      this.logger.warn(`Medya yedeği yazılamadı (${kayit.id}): ${e instanceof Error ? e.message : e}`)
+    await yedekle(this.supabase, userId, kayit).then(
+      () => this.logger.log(`Medya alındı ve yedeklendi (${kayit.id}, ${(kayit.boyut / 1048576).toFixed(1)} MB)`),
+      (e) => this.logger.warn(`Medya yedeği yazılamadı (${kayit.id}): ${e instanceof Error ? e.message : e}`)
     );
     // Sıkıştırılmış kopyanın yerine geçtiyse eski yedek de gider.
     if (kayit.yerineGectigi) await yedekSil(this.supabase, userId, [kayit.yerineGectigi.id]).catch(() => undefined);
@@ -346,6 +415,22 @@ export class WhatsappLioService {
       return `Dosya zamanında inmedi (bağlantı yavaş ya da dosya çok büyük). Bir kez daha göndermeyi dene.${devam}`;
     }
     return `Dosyayı alamadım. Birazdan yeniden göndermeyi deneyin.${devam}`;
+  }
+
+  /**
+   * WAHA mesajda medya olduğunu söyledi ama dosyayı veremedi (media.error ya da
+   * adres yok). Eskiden bu yol SESSİZDİ: açıklamasız dosyada hiçbir şey olmuyor,
+   * kullanıcı gönderdiği videonun kaybolduğunu ancak Lio'ya sorunca anlıyordu.
+   */
+  async medyaAlinamadi(threadId: string, userId: string, ad: string | null | undefined, hata: unknown): Promise<void> {
+    this.logger.warn(`WAHA medyayı vermedi (${threadId}): ${typeof hata === "string" ? hata : JSON.stringify(hata ?? null)}`);
+    gelenMedya.reddet(userId, { ad: ad || "dosya", sebep: "inmedi" });
+    await this.gonder(
+      threadId,
+      userId,
+      "Dosyayı WhatsApp'tan alamadım. Çok büyük dosyalarda (yüzlerce MB) bu olabiliyor; bir kez daha göndermeyi dene, olmazsa videoyu küçültüp gönder.",
+      false
+    );
   }
 
   /** Cevap metni — ChatResult'ın her hâli WhatsApp'ta bir karşılık bulmalı. */
@@ -432,7 +517,7 @@ Bakiye yüklemek için: ${url}`;
   }
 
   /** Süren sohbet varsa onu, yoksa null (chat() yenisini açar). */
-  private async komutSohbeti(thread: ThreadRow): Promise<string | undefined> {
+  private komutSohbeti(thread: ThreadRow): string | undefined {
     if (!thread.ai_conversation_id || !thread.ai_conversation_at) return undefined;
     const age = Date.now() - new Date(thread.ai_conversation_at).getTime();
     return age < KOMUT_SOHBET_PENCERESI_MS ? thread.ai_conversation_id : undefined;

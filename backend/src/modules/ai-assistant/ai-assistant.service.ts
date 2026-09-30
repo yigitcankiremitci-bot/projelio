@@ -1150,17 +1150,24 @@ export class AiAssistantService {
       "",
       "## Sosyal medya (Instagram'a video / fotoğraf / karusel)",
       "\"Şunu Instagram'a at\", \"reels olarak planla\", \"deneme reels\" gibi isteklerde \"yapamıyorum\" DEME; social_* araçların var. " +
-        "Sıra: 1) social_list_accounts — hesabı kullanıcı adından eşleştir, bekleyen medyayı gör. " +
-        "2) Medya sıkıştırılmış geldiyse tek cümleyle dosya (belge) olarak göndermesini öner; \"böyle gönder\" derse devam et. " +
-        "3) social_create_draft (video → reels, çok fotoğraf → karusel; kullanıcı \"deneme\" dediyse denemeReels) — " +
-        "kullanıcı saat verdiyse yayinZamani'nı ver. 4) social_suggest_caption ile açıklama ve etiketi sen belirle. " +
-        "5) Kullanıcıya hesap, tür, TAM açıklama, etiketler ve yayın zamanını göster ve ONAY İSTE. " +
-        "Onay sorusunu düz ve doğal kur, devrik kurma: \"Böyle planlayayım mı?\" ya da \"Onaylıyor musun, yoksa bir şeyi değiştirmemi ister misin?\" " +
-        "(\"Onayla mı, yoksa başka değişiklik istiyorsun?\" gibi devrik/bozuk cümle KURMA). " +
-        "6) Kullanıcı onaylayınca social_schedule_post; ardından planlandığını ve zamanını haber ver. " +
-        "Değişiklik isterse social_update_draft, yeni halini göster, yine onay bekle. " +
-        "Taslak ortadayken kullanıcı \"iptal/vazgeç\" derse bu, taslağa yöneliktir: social_cancel_draft'ı çağır (bildirim çıkışı DEĞİL). " +
-        "Onaysız planlama sunucuda zaten reddedilir; aynı turda hem taslak açıp hem planlama. " +
+        "TEK ONAY KURALI: onay YALNIZCA planlama içindir. Taslak açmak, açıklama yazmak ve düzeltmek yayına hiçbir şey " +
+        "göndermez — bunlar için kullanıcıya \"açayım mı?\", \"yazayım mı?\" diye SORMA, doğrudan yap. " +
+        "Sıra: 1) Medya ve ne yapılacağı belli olunca social_list_accounts ile hesabı kullanıcı adından eşleştir. " +
+        "2) Medya sıkıştırılmış geldiyse ve kullanıcı henüz \"böyle gönder\" demediyse, tek cümleyle dosya (belge) olarak " +
+        "göndermesini öner ve dur; bunu bir konuşmada yalnızca BİR KEZ öner. " +
+        "3) Aynı turda HEMEN social_create_draft (video → reels, çok fotoğraf → karusel; \"deneme\" dediyse denemeReels; " +
+        "saat verdiyse yayinZamani) ve ardından social_suggest_caption çağır. Taslak medyayı hemen kalıcı depoya yazar; " +
+        "beklemek medyanın kaybolmasına yol açar. " +
+        "4) Kullanıcıya hesabı, türü, TAM açıklamayı, etiketleri ve yayın zamanını göster ve tek bir onay sorusu sor: " +
+        "\"Böyle planlayayım mı?\" (devrik ya da bozuk cümle kurma). " +
+        "5) Kullanıcı olumlu cevap verince (onaylıyorum, tamam, evet, olur, planla…) BAŞKA SORU SORMADAN social_schedule_post'u " +
+        "çağır ve planlandığını, zamanıyla birlikte haber ver. " +
+        "Değişiklik isterse social_update_draft ile uygula, yeni hâlini göster ve yine tek onay sorusu sor. " +
+        "Taslak ortadayken \"iptal/vazgeç\" taslağa yöneliktir: social_cancel_draft (bildirim çıkışı DEĞİL). " +
+        "Kullanıcıya ARAÇ ADI YAZMA (social_create_draft vb.); ne yaptığını düz Türkçeyle söyle. " +
+        "WhatsApp'tan gelen video/fotoğrafı dosyalarda ARAMA (search_files değil): elindeki tek kaynak mesajlardaki " +
+        "[Ekli medya] notları ve social_list_accounts'un bekleyenMedya listesi. İkisinde de yoksa medya sende yoktur; " +
+        "bunu açıkça söyle ve [Sistem notu] varsa sebebini aktar. " +
         "Yalnızca Instagram'a otomatik yayın var; diğer platformları yapamayacağını açıkça söyle.",
       "Kapsayıcıları (grup, organizasyon, departman) SİLMEK ve ARŞİVLEMEK kademelidir: grup arşivlenince " +
         "altındaki organizasyonlar ve işler, organizasyon arşivlenince işleri de arşivlenir. Bu araçlar " +

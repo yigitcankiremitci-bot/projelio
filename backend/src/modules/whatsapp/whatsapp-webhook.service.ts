@@ -275,6 +275,14 @@ export class WhatsappWebhookService {
         payload.hasMedia && typeof payload.media?.url === "string" && !payload.media?.error
           ? { waha: this.waha, url: payload.media.url, mimetype: payload.media.mimetype, filename: payload.media.filename, belge: belgeOlarakMi(payload, payload.media.filename) }
           : undefined;
+      // Medya var ama WAHA dosyayı vermedi: sessiz kalmak kullanıcıyı gönderdiği
+      // videonun kaybolduğundan habersiz bırakıyordu. Sebep söylenir; metin de
+      // varsa Lio yine çalışır (red notu o tura eklenir).
+      if (payload.hasMedia && !media) {
+        await this.lio
+          .medyaAlinamadi(thread.id, contact.user_id, payload.media?.filename, payload.media?.error ?? "adres yok")
+          .catch(() => undefined);
+      }
       if (!body.trim() && !media) return;
       await this.waha.sendSeen(conn.session_name, contact.wa_jid, payload.id ? [payload.id] : undefined).catch(() => {});
       // "Yazıyor…" göstergesi: araçlı tur 15 saniye sürebiliyor ve o süre

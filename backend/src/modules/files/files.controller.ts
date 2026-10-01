@@ -801,6 +801,13 @@ export class FilesController {
     return this.filesService.rename(id, req.user.userId, name);
   }
 
+  /** Künyeyi buluttan tazeler: Drive/OneDrive editöründe değiştirilen ad Projelio'ya geçer. */
+  @Post("files/:id/sync")
+  @UseGuards(AuthGuard("jwt"))
+  syncFromCloud(@Param("id") id: string, @Req() req: any) {
+    return this.filesService.syncFromCloud(id, req.user.userId);
+  }
+
   /** Dosyayı bulunduğu klasöre kopyalar ("Çoğalt"). */
   @Post("files/:id/duplicate")
   @UseGuards(AuthGuard("jwt"))

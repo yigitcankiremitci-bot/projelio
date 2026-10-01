@@ -88,8 +88,14 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
     setError("");
   };
 
+  // Aynı tıklama/Enter iki kez gelirse Drive'da AYNI ADLA iki dosya açılıyordu
+  // (biri boş kalıyor, kullanıcı ötekini düzenliyordu). `saving` durumu bir
+  // sonraki çizime kadar güncellenmediği için bekçi olarak yetmez; ref anlık.
+  const creatingRef = useRef(false);
+
   const handleCreate = async () => {
-    if (!pendingKind || !name.trim()) return;
+    if (!pendingKind || !name.trim() || creatingRef.current) return;
+    creatingRef.current = true;
     setSaving(true);
     setError("");
     try {
@@ -99,6 +105,7 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
     } catch (e: any) {
       setError(e?.message ?? t("Dosya oluşturulamadı"));
     } finally {
+      creatingRef.current = false;
       setSaving(false);
     }
   };
@@ -115,7 +122,8 @@ const CreateNativeFileMenu = forwardRef<CreateNativeFileMenuHandle, Props>(funct
             placeholder={t("Örn. Toplantı Notları")}
             autoFocus
             disabled={saving}
-            onKeyDown={(e) => e.key === "Enter" && void handleCreate()}
+            // Enter'ı burada ayrıca yakalamıyoruz: Modal onu zaten "Oluştur"
+            // düğmesine (data-primary) basıyor; ikisi birden dosyayı iki kez açıyordu.
             style={{ width: "100%" }}
           />
         </div>

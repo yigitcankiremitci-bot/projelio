@@ -116,6 +116,9 @@ export const filesApi = {
 
   rename: (fileId: string, name: string) => api.patch<ProjectFile>(`/files/${fileId}`, { name }),
 
+  /** Künyeyi buluttan tazeler (Drive/OneDrive'da değiştirilen ad). */
+  syncFromCloud: (fileId: string) => api.post<ProjectFile>(`/files/${fileId}/sync`, {}),
+
   /** Dosyayı bulunduğu klasöre kopyalar. */
   duplicate: (fileId: string) => api.post<ProjectFile>(`/files/${fileId}/duplicate`, {}),
 

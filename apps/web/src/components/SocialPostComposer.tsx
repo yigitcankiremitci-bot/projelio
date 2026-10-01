@@ -922,7 +922,10 @@ export default function SocialPostComposer({
                 value={lioIstek}
                 onChange={(e) => setLioIstek(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !lioCalisiyor && media.length > 0) void lioyaYazdir();
+                  if (e.key !== "Enter") return;
+                  // Enter burada "Lio'ya yazdır"; Modal'ın onu "Kaydet" saymaması için.
+                  e.preventDefault();
+                  if (!lioCalisiyor && media.length > 0) void lioyaYazdir();
                 }}
                 placeholder={t("Ne vurgulansın? (isteğe bağlı — ör. indirimi öne çıkar, kısa tut)")}
                 style={{ ...field, flex: "1 1 240px", width: "auto" }}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Job, Project, ProjectFile } from "@projelio/shared";
 import { filesApi, type LinkSource } from "../api/files";
-import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
+import { driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
 import { useFileThumbnails } from "../lib/fileThumbnails";
 import { fileKey, parseKey, useFileSelection } from "../lib/fileSelection";
 import { useFileViewMode } from "../lib/fileViewMode";
@@ -20,6 +20,7 @@ import FileDeleteOptions from "./FileDeleteOptions";
 import FileListControls from "./FileListControls";
 import InlineRenameText from "./InlineRenameText";
 import FilePreviewModal from "./FilePreviewModal";
+import { useDriveDuzenlemeSenkronu } from "../lib/driveDuzenlemeSenkronu";
 import FileThumb from "./FileThumb";
 import LinkFileModal from "./LinkFileModal";
 import QuickFileUploadModal, { type UploadTargetOption } from "./QuickFileUploadModal";
@@ -168,6 +169,13 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
   };
 
   const reload = () => setReloadKey((k) => k + 1);
+
+  // Drive'da düzenlenip dönülen dosyanın adı orada değişmiş olabilir (bkz. lib/driveDuzenlemeSenkronu).
+  const handleFileSynced = (guncel: ProjectFile) => {
+    setFiles((prev) => prev.map((f) => (f.id === guncel.id ? { ...guncel, jobTitle: f.jobTitle } : f)));
+    setPreview((p) => (p?.id === guncel.id ? guncel : p));
+  };
+  const driveDaDuzenle = useDriveDuzenlemeSenkronu(handleFileSynced);
   // Geri/ileri alma sunucuyu değiştiriyor; liste kendini tazelemeli.
   useRefreshOnUndo(reload);
 
@@ -422,7 +430,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
           </IconButton>
           <IconButton
             title={t("{saglayici}'da düzenle", { saglayici: driveProviderLabel(file) })}
-            onClick={() => window.open(driveEditUrl(file), "_blank", "noopener,noreferrer")}
+            onClick={() => driveDaDuzenle(file)}
           >
             <IconExternalLink size={16} color={c.textSecondary} />
           </IconButton>
@@ -519,7 +527,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
                   },
                   {
                     label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file!) }),
-                    onClick: () => window.open(driveEditUrl(menu.file!), "_blank", "noopener,noreferrer"),
+                    onClick: () => driveDaDuzenle(menu.file!),
                   },
                   { label: t("Yeniden adlandır"), onClick: () => setAdDuzenlenen(menu.file!.id) },
                   { label: t("Çoğalt"), onClick: () => void handleDuplicate([menu.file!]) },
@@ -536,7 +544,7 @@ export default function AllFilesPanel({ jobs, projects, myUserId }: Props) {
 
       {linking && <LinkFileModal sources={linking} onClose={() => setLinking(null)} />}
 
-      {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} />}
+      {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} onMaybeChanged={handleFileSynced} />}
 
       {sharing && <FileDownloadLinkModal files={sharing} onClose={() => setSharing(null)} />}
 

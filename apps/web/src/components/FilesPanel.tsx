@@ -4,7 +4,7 @@ import type { GoogleDriveStatus, ProjectFile } from "@projelio/shared";
 import { driveApi, filesApi, oneDriveApi, type LinkSource } from "../api/files";
 import { useRefreshOnUndo, useUndo, useWithoutPendingDeletes } from "../lib/undo";
 import type { FileFolder, FileFolderOwner, FileScope } from "../api/files";
-import { driveEditUrl, driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
+import { driveProviderLabel, fileKindLabel, formatFileSize } from "../lib/driveLinks";
 import {
   cancelUpload,
   dismissUpload,
@@ -34,6 +34,7 @@ import type { CreateNativeFileMenuHandle } from "./CreateNativeFileMenu";
 import FileContextMenu from "./FileContextMenu";
 import FileDownloadLinkModal from "./FileDownloadLinkModal";
 import FilePreviewModal from "./FilePreviewModal";
+import { useDriveDuzenlemeSenkronu } from "../lib/driveDuzenlemeSenkronu";
 import FileDeleteOptions from "./FileDeleteOptions";
 import FileListControls from "./FileListControls";
 import InlineRenameText from "./InlineRenameText";
@@ -1138,6 +1139,14 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     setPreview(file);
   };
 
+  // "Drive'da düzenle" ile açılan dosyanın adı orada değişebilir; sekmeye
+  // dönüldüğünde buluttan tazelenen künye satırın ve açık önizlemenin yerine geçer.
+  const handleFileSynced = (guncel: ProjectFile) => {
+    setFiles((prev) => prev.map((f) => (f.id === guncel.id ? guncel : f)));
+    setPreview((p) => (p?.id === guncel.id ? guncel : p));
+  };
+  const driveDaDuzenle = useDriveDuzenlemeSenkronu(handleFileSynced);
+
   const handleBrowseDriveClick = () => {
     setPickerError("");
     if (connectedProvider === "google") {
@@ -1960,7 +1969,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
               </IconButton>
               <IconButton
                 title={t("{saglayici}'da düzenle", { saglayici: driveProviderLabel(file) })}
-                onClick={() => window.open(driveEditUrl(file), "_blank", "noopener,noreferrer")}
+                onClick={() => driveDaDuzenle(file)}
               >
                 <IconExternalLink size={16} color={c.textSecondary} />
               </IconButton>
@@ -2229,7 +2238,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                   },
                   {
                     label: t("{saglayici}'da aç", { saglayici: driveProviderLabel(menu.file!) }),
-                    onClick: () => window.open(driveEditUrl(menu.file!), "_blank", "noopener,noreferrer"),
+                    onClick: () => driveDaDuzenle(menu.file!),
                   },
                   {
                     label: t("Yeniden adlandır"),
@@ -2279,7 +2288,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       )}
 
       {preview && (
-        <FilePreviewModal file={preview} onClose={() => setPreview(null)} onMaybeChanged={load} />
+        <FilePreviewModal file={preview} onClose={() => setPreview(null)} onMaybeChanged={handleFileSynced} />
       )}
 
       {sharing && <FileDownloadLinkModal files={sharing} onClose={() => setSharing(null)} />}

@@ -3582,6 +3582,46 @@ export class FilesService {
   }
 
   /**
+   * Dosyanın künyesini (ad, boyut, önizleme) buluttan tazeler.
+   *
+   * Kullanıcı "Drive'da düzenle" ile dosyayı sağlayıcının kendi editöründe
+   * açıp ADINI orada değiştirebiliyor; Projelio'nun kaydı bundan habersiz
+   * kalıyor ve listede ilk verilen ad duruyordu. Arayüz düzenleme sekmesinden
+   * dönüldüğünde bu ucu çağırır. Değişen bir şey yoksa yazılmaz.
+   */
+  async syncFromCloud(fileId: string, userId: string): Promise<ProjectFile> {
+    const { row, file } = await this.findById(fileId, userId);
+    const { provider, accountId } = storageOwner(row);
+
+    const accessToken = await this.cloudStorage.getAccessToken(provider, accountId);
+    let fresh;
+    try {
+      fresh = await this.cloudStorage.getFile(provider, accessToken, row.drive_file_id);
+    } catch (error) {
+      if (error instanceof DriveFileMissingError || error instanceof OneDriveFileMissingError) {
+        await this.markMissing(row.id);
+      }
+      throw error;
+    }
+
+    const degisen: Record<string, unknown> = {};
+    if (fresh.name && fresh.name !== row.name) degisen.name = fresh.name;
+    if (fresh.size != null && fresh.size !== row.size_bytes) degisen.size_bytes = fresh.size;
+    if (fresh.thumbnailLink && fresh.thumbnailLink !== row.thumbnail_link) degisen.thumbnail_link = fresh.thumbnailLink;
+    if (Object.keys(degisen).length === 0) return file;
+
+    const { data: updated, error } = await this.supabase.client
+      .from("files")
+      .update(degisen)
+      .eq("id", fileId)
+      .select()
+      .single();
+    if (error) throw error;
+
+    return mapFile(updated, file.canEditInDrive);
+  }
+
+  /**
    * Dosyayı Projelio'dan kaldırır.
    *
    * Varsayılan olarak bulut deposundaki dosyaya dokunulmaz — kullanıcının kendi

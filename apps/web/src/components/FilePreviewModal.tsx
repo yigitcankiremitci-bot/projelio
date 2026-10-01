@@ -5,7 +5,6 @@ import type { ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
 import {
   canRenderLocally,
-  driveEditUrl,
   drivePreviewUrl,
   driveProviderLabel,
   fileKindLabel,
@@ -14,12 +13,16 @@ import {
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconDownload, IconExternalLink, IconX } from "./icons";
 import { useT } from "../lib/i18n";
+import { useDriveDuzenlemeSenkronu } from "../lib/driveDuzenlemeSenkronu";
 
 interface Props {
   file: ProjectFile;
   onClose: () => void;
-  /** Kullanıcı Drive'da düzenleyip döndüğünde listeyi tazelemek için. */
-  onMaybeChanged?: () => void;
+  /**
+   * Kullanıcı Drive'da düzenleyip döndüğünde buluttan tazelenen künye
+   * (orada değiştirilen ad dahil); liste kendi satırını bununla günceller.
+   */
+  onMaybeChanged?: (file: ProjectFile) => void;
 }
 
 export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Props) {
@@ -27,7 +30,6 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
   const t = useT();
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [openedEditor, setOpenedEditor] = useState(false);
 
   const renderLocally = canRenderLocally(file);
 
@@ -55,14 +57,9 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Kullanıcı düzenleme sekmesinden geri döndüğünde listeyi tazele: dosyanın adı
-  // veya içeriği değişmiş olabilir.
-  useEffect(() => {
-    if (!openedEditor) return;
-    const onFocus = () => onMaybeChanged?.();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [openedEditor, onMaybeChanged]);
+  // Kullanıcı düzenleme sekmesinden geri döndüğünde künye buluttan tazelenir:
+  // dosyanın adı orada değişmiş olabilir.
+  const handleEdit = useDriveDuzenlemeSenkronu((guncel) => onMaybeChanged?.(guncel));
 
   const handleDownload = async () => {
     try {
@@ -73,10 +70,6 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
     }
   };
 
-  const handleEdit = () => {
-    setOpenedEditor(true);
-    window.open(driveEditUrl(file), "_blank", "noopener,noreferrer");
-  };
 
   return createPortal(
     <div
@@ -156,7 +149,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
           </button>
 
           <button
-            onClick={handleEdit}
+            onClick={() => handleEdit(file)}
             style={{
               display: "flex",
               alignItems: "center",

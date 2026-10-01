@@ -124,6 +124,9 @@ export default function Modal({
    */
   const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "Enter") return;
+    // Alan Enter'ı kendisi işlediyse (öneri listesinden seçim, "ekle" vb.)
+    // olumlu düğmeye bir kez daha basılmaz — aynı eylem iki kez çalışıyordu.
+    if (e.defaultPrevented) return;
     const target = e.target as HTMLElement | null;
     if (!target || !boxRef.current?.contains(target)) return;
     // İç içe modal: iç modal portal ile ayrı bir düğüme çizilir ama React

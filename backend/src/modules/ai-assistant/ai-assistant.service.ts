@@ -24,6 +24,7 @@ import { PlanningService } from "../planning/planning.service";
 import { OutputsService } from "../outputs/outputs.service";
 import { AI_TOOLS, CRITICAL_TOOLS, toolsForChannel, WRITE_TOOLS } from "./ai-assistant.tools";
 import { ARACSIZ_IDDIA_UYARISI, aracsizIddiaMi } from "./yapildi-iddiasi";
+import { takvimSeridi } from "./takvim-seridi";
 
 import {
   describeModuleFields,
@@ -1568,6 +1569,10 @@ export class AiAssistantService {
       "## Bağlam",
       `- Bugünün tarihi: ${today} (${tarihSaat})`,
       `- Saat dilimi: ${AI_TIMEZONE}. Göreli zaman ifadelerini (bugün, yarın, akşam, 2 saat sonra) bu saate göre çöz.`,
+      // Gün adı ↔ tarih eşleşmesini model hesaplamasın (bkz. takvim-seridi.ts).
+      "- Takvim (tarih ↔ gün adı). \"Cuma\", \"haftaya salı\", \"3 Ekim\" gibi ifadeleri ve bir tarihin hangi güne " +
+        "denk geldiğini KENDİN HESAPLAMA, yalnızca bu tablodan oku; kullanıcıya tarih yazarken gün adını da buradan al:",
+      ...takvimSeridi(now, AI_TIMEZONE).map((satir) => `  ${satir}`),
       `- Kullanıcının rolü: ${userRole === "admin" ? "admin (yönetici)" : "freelancer"}`,
       context,
     ].join("\n");

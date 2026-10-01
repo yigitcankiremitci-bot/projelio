@@ -22,7 +22,9 @@ import { TaskCommentsService } from "../task-comments/task-comments.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PlanningService } from "../planning/planning.service";
 import { OutputsService } from "../outputs/outputs.service";
-import { AI_TOOLS, CRITICAL_TOOLS, toolsForChannel } from "./ai-assistant.tools";
+import { AI_TOOLS, CRITICAL_TOOLS, toolsForChannel, WRITE_TOOLS } from "./ai-assistant.tools";
+import { ARACSIZ_IDDIA_UYARISI, aracsizIddiaMi } from "./yapildi-iddiasi";
+
 import {
   describeModuleFields,
   hasRecordConfig,
@@ -587,6 +589,9 @@ const EMPTY_MESSAGE_WITH_FILE = "Bu dosyayı incele ve ne olduğunu özetle."; /
  * sonra bir gün geriye kayıyordu (bkz. buildDynamicSystemPrompt).
  */
 const AI_TIMEZONE = process.env.TZ?.trim() || "Europe/Istanbul";
+
+/** Veriyi değiştiren her araç: kritik (onaylı) + kritik olmayan yazma araçları. */
+const YAZAN_ARACLAR = new Set<string>([...WRITE_TOOLS, ...CRITICAL_TOOLS]);
 
 // dil:atla-baslangic — modele giden kanal talimatı, kullanıcıya görünmüyor.
 const WHATSAPP_CHANNEL_PROMPT = [
@@ -2025,6 +2030,7 @@ export class AiAssistantService {
      * kez olduysa artık toparlanmıyor demektir; ısrar etmek katlanan bir zarar.
      */
     let truncatedRetries = 0;
+    let iddiaGeriCevrildi = false;
     /** Son tur önbelleği yazdı mı? Sonraki turun tahmini buna göre değişiyor. */
     let lastTurnWroteCache = false;
 
@@ -2310,6 +2316,15 @@ export class AiAssistantService {
       const truncated = response.stop_reason === "max_tokens";
 
       if (toolUses.length === 0) {
+        // "Yaptım" diyor ama bu koşuda hiçbir yazma aracı çalışmadı: cevap
+        // kullanıcıya gitmez, model bir kez geri çevrilir (bkz. yapildi-iddiasi.ts).
+        if (text && !iddiaGeriCevrildi && aracsizIddiaMi(text, run.executed, YAZAN_ARACLAR)) {
+          iddiaGeriCevrildi = true;
+          this.logger.warn(`Araçsız "yaptım" iddiası geri çevrildi · sohbet=${run.conversationId} tur=${run.iterationsUsed}`);
+          run.messages.push({ role: "assistant", content: response.content });
+          run.messages.push({ role: "user", content: ARACSIZ_IDDIA_UYARISI });
+          continue;
+        }
         if (text) return finish({ type: "message", text }, text);
 
         this.logger.warn(

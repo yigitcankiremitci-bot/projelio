@@ -11,6 +11,7 @@ import type { WahaClient } from "./waha.client";
 import { decideLioKomut, lioKomutConfigFromEnv } from "./lio-komut-sinir";
 import { gelenMedya, medyaTuru, MEDYA_INDIRME_ZAMAN_ASIMI_MS, MEDYA_TEK_DOSYA_TAVANI, type GelenMedya } from "../social-media/gelen-medya";
 import { yedekle, yedekSil, yedektenYukle } from "../social-media/medya-yedegi";
+import { medyaEtiketi, utcAn, WHATSAPP_ADSIZ_DOSYA_ONEKI } from "../social-media/sosyal-lio";
 import { formatForWhatsapp } from "./whatsapp-lio-format";
 import { maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
 import { mapMessage, mapThread, WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
@@ -341,7 +342,7 @@ export class WhatsappLioService {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data } = await this.supabase.client
       .from("social_posts")
-      .select("id, title, status, scheduled_at, caption, hashtags, trial_reel")
+      .select("id, title, status, scheduled_at, caption, hashtags, trial_reel, social_post_media(sort_order, files(name, mime_type, size_bytes))")
       .eq("created_by", userId)
       .is("archived_at", null)
       .in("status", ["draft", "scheduled"])
@@ -351,12 +352,19 @@ export class WhatsappLioService {
     const satirlar = (data ?? []) as any[];
     if (!satirlar.length) return "";
     return (
-      "\n\n[Sistem notu: Açık sosyal medya gönderilerin (düzeltme/planlama/iptal için BU postId'leri kullan, taslağı yeniden açma):\n" +
+      "\n\n[Sistem notu: Açık sosyal medya gönderilerin (düzeltme/planlama/iptal için BU postId'leri kullan, taslağı yeniden açma). " +
+      "Birden fazlası varsa kullanıcıya hangisinin HANGİ VİDEOYU taşıdığını (orijinal / sıkıştırılmış) söyle:\n" +
       satirlar
         .map(
           (p) =>
             `- postId=${p.id} · durum=${p.status}${p.trial_reel ? " · deneme reels" : ""}` +
-            `${p.scheduled_at ? ` · yayın=${new Date(p.scheduled_at).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}` : ""}\n` +
+            `${p.scheduled_at ? ` · yayın=${utcAn(p.scheduled_at).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}` : ""}\n` +
+            `  medya: ${
+              [...(p.social_post_media ?? [])]
+                .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+                .map((m: any) => medyaEtiketi(m.files ?? {}))
+                .join("; ") || "(yok)"
+            }\n` +
             `  güncel açıklama: ${p.caption ?? "(boş)"}\n  güncel etiketler: ${p.hashtags ?? "(boş)"}`
         )
         .join("\n") +
@@ -660,5 +668,5 @@ function medyaNotu(kayit: GelenMedya, turu: "video" | "gorsel"): string {
 function dosyaAdi(url: string): string {
   const son = new URL(url, "http://waha").pathname.split("/").pop() ?? "";
   const ext = son.includes(".") ? son.slice(son.lastIndexOf(".")) : "";
-  return `whatsapp-dosyasi${ext}`;
+  return `${WHATSAPP_ADSIZ_DOSYA_ONEKI}${ext}`;
 }

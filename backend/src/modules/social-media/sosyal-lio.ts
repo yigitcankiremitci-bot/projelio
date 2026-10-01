@@ -81,3 +81,38 @@ export function planlamaEksikleri(p: {
   }
   return e;
 }
+
+/**
+ * WhatsApp'ın kendi sıkıştırdığı video/fotoğraf dosya adı taşımaz; köprü ona bu
+ * önekle ad verir (bkz. whatsapp-lio.service dosyaAdi). Belge olarak gönderilen
+ * orijinal dosya kendi adıyla gelir. Kalite bilgisi dosya kaydında ayrıca
+ * tutulmadığı için ayrım bu addan yapılır.
+ */
+export const WHATSAPP_ADSIZ_DOSYA_ONEKI = "whatsapp-dosyasi";
+
+/**
+ * Taslağa bağlı medyanın tek satırlık tanımı: ad · tür · boyut · kalite.
+ *
+ * NEDEN: 2026-09-30'da aynı içerik için üç taslak vardı; ikisinde orijinal
+ * (211 MB), birinde WhatsApp'ın sıkıştırdığı (22 MB) video. Notta video
+ * yazmadığı için kullanıcı sıkıştırılmış olanı tutup orijinalleri iptal
+ * ettirdi ve yanlış video planlandı.
+ */
+export function medyaEtiketi(f: { name?: string | null; mime_type?: string | null; size_bytes?: number | string | null }): string {
+  const ad = f.name || "medya";
+  const tur = (f.mime_type ?? "").startsWith("video/") ? "video" : "görsel";
+  const bayt = Number(f.size_bytes ?? 0);
+  const boyut = bayt > 0 ? ` · ${(bayt / 1048576).toFixed(0)} MB` : "";
+  const kalite = ad.startsWith(WHATSAPP_ADSIZ_DOSYA_ONEKI) ? "WhatsApp'ın sıkıştırdığı kopya" : "orijinal dosya";
+  return `${ad} · ${tur}${boyut} · ${kalite}`;
+}
+
+/**
+ * Veritabanından gelen saat dilimsiz zaman damgası ("2026-10-01T16:00:00") UTC'dir
+ * (bkz. migration 127). `new Date()` ofsetsiz metni SÜRECİN saat dilimiyle okur;
+ * backend bugün UTC'de çalıştığı için doğru çıkıyor, ama konteynere bir gün
+ * TZ=Europe/Istanbul verilirse planlanan saat 3 saat kayardı.
+ */
+export function utcAn(damga: string): Date {
+  return new Date(/([zZ]|[+-]\d{2}:?\d{2})$/.test(damga) ? damga : `${damga}Z`);
+}

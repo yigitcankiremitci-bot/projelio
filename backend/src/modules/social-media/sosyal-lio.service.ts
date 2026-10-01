@@ -8,7 +8,7 @@ import { yedektenYukle, yedekSil } from "./medya-yedegi";
 import { LioOneriService } from "./lio-oneri.service";
 import { denemeReelsHatasi } from "./publish-format";
 import { SocialMediaService, type SocialScope } from "./social-media.service";
-import { icerikTuruSec, KARUSEL_TAVANI, planlamaEksikleri, zamaniCoz, zamaniGoster } from "./sosyal-lio";
+import { icerikTuruSec, KARUSEL_TAVANI, medyaEtiketi, utcAn, planlamaEksikleri, zamaniCoz, zamaniGoster } from "./sosyal-lio";
 
 /**
  * Lio'nun sosyal medya araçlarının arkasındaki servis: WhatsApp'tan (ya da
@@ -49,7 +49,8 @@ interface TaslakOzeti {
   hesaplar: string[];
   icerikTuru: string;
   denemeReels: string | null;
-  medya: { ad: string; tur: string }[];
+  /** "ad · tür · boyut · kalite" — taslaklar birbirinden ayırt edilebilsin. */
+  medya: string[];
   aciklama: string | null;
   etiketler: string | null;
   yayinZamani: string | null;
@@ -331,7 +332,7 @@ export class SosyalLioService {
       );
     }
 
-    const vakit = yayinZamani ? zamaniCoz(yayinZamani) : post.scheduledAt ? new Date(post.scheduledAt) : null;
+    const vakit = yayinZamani ? zamaniCoz(yayinZamani) : post.scheduledAt ? utcAn(post.scheduledAt) : null;
     if (yayinZamani && !vakit) throw new BadRequestException('yayinZamani "2026-10-01T19:00" biçiminde olmalı.');
     const eksik = planlamaEksikleri({
       medyaSayisi: post.media.length,
@@ -396,6 +397,13 @@ export class SosyalLioService {
     return yuklenen.id;
   }
 
+  private async medyaEtiketleri(fileIds: string[]): Promise<string[]> {
+    if (!fileIds.length) return [];
+    const { data } = await this.supabase.client.from("files").select("id, name, mime_type, size_bytes").in("id", fileIds);
+    const byId = new Map((data ?? []).map((f: any) => [f.id, f]));
+    return fileIds.map((id) => medyaEtiketi(byId.get(id) ?? {}));
+  }
+
   private async ozet(postId: string, userId: string): Promise<TaslakOzeti> {
     const post = await this.social.findPost(postId, userId);
     const hesapIdleri = post.targets.map((t) => t.accountId);
@@ -408,10 +416,10 @@ export class SosyalLioService {
       hesaplar: hesapIdleri.map((id) => `@${ad.get(id) ?? "?"}`),
       icerikTuru: post.contentType,
       denemeReels: post.trialReel ?? null,
-      medya: post.media.map((m) => ({ ad: m.name ?? "medya", tur: (m.mimeType ?? "").startsWith("video/") ? "video" : "görsel" })),
+      medya: await this.medyaEtiketleri(post.media.map((m) => m.fileId)),
       aciklama: post.caption ?? null,
       etiketler: post.hashtags ?? null,
-      yayinZamani: post.scheduledAt ? zamaniGoster(new Date(post.scheduledAt)) : null,
+      yayinZamani: post.scheduledAt ? zamaniGoster(utcAn(post.scheduledAt)) : null,
       durum: post.status,
     };
   }

@@ -235,7 +235,7 @@ export class EkipHesaplariService {
     // açılamadığını anlayamaz.
     if (await this.usersService.findByEmail(email)) {
       throw new ConflictException(
-        "Bu e-posta adresiyle zaten bir Projelio hesabı var. Kişiyi departmanın Ekip sekmesinden kadroya davet edebilirsin."
+        "Bu e-posta adresiyle zaten bir Projelio hesabı var. Kişiyi şirket sayfasındaki “İşe al” ile davet edebilirsin."
       );
     }
     if (await this.usersService.isUsernameTaken(username)) {

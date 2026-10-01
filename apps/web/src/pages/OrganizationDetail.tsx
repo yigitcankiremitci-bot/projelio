@@ -10,8 +10,8 @@ import DepartmentsPanel, { DepartmentsPanelHandle } from "../components/Departme
 import OrgTasksPanel from "../components/OrgTasksPanel";
 import ProductsPanel, { ProductsPanelHandle } from "../components/ProductsPanel";
 import ModulesPanel, { ModulesPanelHandle } from "../components/ModulesPanel";
+import SirketEkibiPanel, { SirketEkibiPanelHandle } from "../components/iseAlim/SirketEkibiPanel";
 import OrgBudgetPanel, { OrgBudgetPanelHandle } from "../components/OrgBudgetPanel";
-import AddModuleRecordModal from "../components/AddModuleRecordModal";
 import QuickFileUploadModal from "../components/QuickFileUploadModal";
 import BilgiKartiModal from "../components/bilgiKarti/BilgiKartiModal";
 import OrgTabs, { CORE_ORG_TABS, OrgTab, visibleOrgTabs } from "../components/OrgTabs";
@@ -69,8 +69,8 @@ export default function OrganizationDetail() {
   // yetkisi çalışsın diye Ürün Yönetimi departmanının id'si burada tutulur
   // (bkz. ProductsPanel/ProductsService.assertCanManage).
   const [productDepartmentId, setProductDepartmentId] = useState<string | undefined>(undefined);
-  // Anasayfadaki birleşik "+" menüsünün departman seçicileri (İşe al/Gelir-Gider
-  // kayıtları, Dosya ekle) için tüm departman listesi burada tutulur.
+  // Anasayfadaki birleşik "+" menüsünün departman seçicisi (Dosya ekle) ve
+  // modül sekmelerinin departman kapsamı için tüm departman listesi burada tutulur.
   const [departments, setDepartments] = useState<Department[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -120,9 +120,7 @@ export default function OrganizationDetail() {
   const modulesRef = useRef<ModulesPanelHandle>(null);
   const productsRef = useRef<ProductsPanelHandle>(null);
   const budgetRef = useRef<OrgBudgetPanelHandle>(null);
-  // "İşe al" ve "Gelir/gider ekle" aynı modalı (bkz. AddModuleRecordModal),
-  // yalnızca moduleKey'i değiştirerek kullanır.
-  const [addingRecordModule, setAddingRecordModule] = useState<string | null>(null);
+  const ekipRef = useRef<SirketEkibiPanelHandle>(null);
   const [addingFile, setAddingFile] = useState(false);
 
   const reload = () => {
@@ -307,13 +305,16 @@ export default function OrganizationDetail() {
               productsRef={productsRef}
               departmentsRef={departmentsRef}
               modulesRef={modulesRef}
-              setAddingRecordModule={setAddingRecordModule}
+              ekipRef={ekipRef}
               setAddingFile={setAddingFile}
               onGelirGider={() => setActiveTab("budget")}
             />
             <ProductsPanel ref={productsRef} organizationId={id} departmentId={productDepartmentId} useFab={false} />
             <div style={{ marginTop: 28 }}>
               <DepartmentsPanel ref={departmentsRef} organizationId={id} useFab={false} />
+            </div>
+            <div style={{ marginTop: 28 }}>
+              <SirketEkibiPanel ref={ekipRef} organizationId={id} />
             </div>
             <div style={{ marginTop: 28 }}>
               <ModulesPanel ref={modulesRef} organizationId={id} />
@@ -343,16 +344,6 @@ export default function OrganizationDetail() {
           onSaved={reload}
           onDeleted={() => navigate("/organizations")}
           onArchived={() => navigate("/organizations")}
-        />
-      )}
-
-      {addingRecordModule && (
-        <AddModuleRecordModal
-          organizationId={id}
-          moduleKey={addingRecordModule}
-          departments={departments}
-          onClose={() => setAddingRecordModule(null)}
-          onSaved={() => setAddingRecordModule(null)}
         />
       )}
 
@@ -415,14 +406,14 @@ function HomeAddFabRegistrar({
   productsRef,
   departmentsRef,
   modulesRef,
-  setAddingRecordModule,
+  ekipRef,
   setAddingFile,
   onGelirGider,
 }: {
   productsRef: React.RefObject<ProductsPanelHandle | null>;
   departmentsRef: React.RefObject<DepartmentsPanelHandle | null>;
   modulesRef: React.RefObject<ModulesPanelHandle | null>;
-  setAddingRecordModule: (value: string | null) => void;
+  ekipRef: React.RefObject<SirketEkibiPanelHandle | null>;
   setAddingFile: (value: boolean) => void;
   onGelirGider: () => void;
 }) {
@@ -432,7 +423,9 @@ function HomeAddFabRegistrar({
       label: t("Ekle"),
       options: [
         { label: t("Ürün ekle"), onClick: () => productsRef.current?.openAdd() },
-        { label: t("İşe al"), onClick: () => setAddingRecordModule("ik_ise_alim_oryantasyon") },
+        // Kişiyi gerçekten şirkete alır: davet + departman/modül seçimi
+        // (bkz. SirketEkibiPanel). Eskiden yalnızca İK modülüne kayıt açıyordu.
+        { label: t("İşe al"), onClick: () => ekipRef.current?.openHire() },
         // Gelir/gider artık bir modül kaydı değil, defterin kendisi: kısayol
         // Bütçe sekmesine götürüyor (bkz. migration 104, tek defter kararı).
         { label: t("Gelir/gider ekle"), onClick: onGelirGider },
@@ -441,7 +434,7 @@ function HomeAddFabRegistrar({
         { label: t("Dosya ekle"), onClick: () => setAddingFile(true) },
       ],
     },
-    [productsRef, departmentsRef, modulesRef, setAddingRecordModule, setAddingFile, onGelirGider]
+    [productsRef, departmentsRef, modulesRef, ekipRef, setAddingFile, onGelirGider]
   );
   return null;
 }

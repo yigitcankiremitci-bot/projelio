@@ -10,6 +10,7 @@ import { demoRandevu } from "./demo-randevu";
 import { katalog } from "./katalog";
 import { genel } from "./genel";
 import { ekipHesaplari } from "./ekip-hesaplari";
+import { iseAlim } from "./ise-alim";
 import { googleTakvim } from "./google-takvim";
 
 /**
@@ -31,6 +32,7 @@ import { googleTakvim } from "./google-takvim";
 export const en: TranslationDict = {
   ...epostalar,
   ...ekipHesaplari,
+  ...iseAlim,
   ...bildirimler,
   ...hatalar,
   ...whatsapp,

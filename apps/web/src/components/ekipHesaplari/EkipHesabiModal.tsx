@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { DepartmentMemberRole, EkipHesabi, EkipHesabiGirdisi, EkipHesabiSecenekleri } from "@projelio/shared";
+import { useEffect, useRef, useState } from "react";
+import type { EkipHesabi, EkipHesabiGirdisi, EkipHesabiSecenekleri } from "@projelio/shared";
 import { KULLANICI_ADI_DESENI, kullaniciAdiOner } from "@projelio/shared";
 import { ekipHesaplariApi } from "../../api/ekipHesaplari";
 import { useT } from "../../lib/i18n";
-import { departmanAdi } from "../../lib/departmanAdi";
 import { sifreUret } from "../../lib/ekipHesaplari";
 import { useThemeColors } from "../../theme/useThemeColors";
 import Modal from "../Modal";
+import KadroSecimi, { DepartmanRolleri, GOREV_ONERILERI, baslangicDepartmanlari, kadroSeciminiTopla } from "./KadroSecimi";
 
 interface Props {
   organizationId: string;
@@ -15,30 +15,6 @@ interface Props {
   /** Açılan hesap + şifre (bir kez gösterilsin diye) + e-posta gitti mi. */
   onAcildi: (sonuc: { hesap: EkipHesabi; sifre: string; epostaGonderildi: boolean }) => void;
 }
-
-const ROL_ETIKETI: Record<DepartmentMemberRole, string> = {
-  employee: "Üretici Çalışan", // dil:anahtar
-  manager: "Departman Yöneticisi", // dil:anahtar
-  subcontractor: "Taşeron", // dil:anahtar
-};
-
-const ROL_ACIKLAMASI: Record<DepartmentMemberRole, string> = {
-  employee: "Departmanın modüllerini görür; işaretlediğin modüllerde kayıt girer.", // dil:anahtar
-  manager: "Departmanı yönetir: kadroya kişi ekler, tüm modüllerde kayıt girer, bütçeyi görür.", // dil:anahtar
-  subcontractor: "Dış kaynak: yalnızca işaretlediğin modüllerde çalışır, kadroyu ve bütçeyi göremez.", // dil:anahtar
-};
-
-// Görev alanı serbest metin; bunlar yalnızca yazmaya başlarken çıkan öneriler.
-const GOREV_ONERILERI = [
-  "Satış temsilcisi", // dil:anahtar
-  "Muhasebe uzmanı", // dil:anahtar
-  "Proje yöneticisi", // dil:anahtar
-  "İnsan kaynakları uzmanı", // dil:anahtar
-  "Grafik tasarımcı", // dil:anahtar
-  "Sosyal medya uzmanı", // dil:anahtar
-  "Yazılım geliştirici", // dil:anahtar
-  "Stajyer", // dil:anahtar
-];
 
 /**
  * Ekip hesabı açma formu.
@@ -50,9 +26,7 @@ const GOREV_ONERILERI = [
  * ŞİFRE VARSAYILAN OLARAK ÜRETİLİR: yöneticinin aklına gelen ilk şifre
  * genelde "12345678" ya da şirket adı oluyor. Değiştirilebilir.
  *
- * Departman seçimi kaldırıldığında o departmandan işaretlenmiş modüller de
- * düşer — görünmeyen bir seçim sunucuya gidip "modül seçilen departmana ait
- * olmalı" hatası verirdi.
+ * Departman/rol ve modül seçimi İşe al formuyla ortak (bkz. KadroSecimi).
  */
 export default function EkipHesabiModal({ organizationId, secenekler, onClose, onAcildi }: Props) {
   const c = useThemeColors();
@@ -71,9 +45,7 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
   const [locale, setLocale] = useState<"tr" | "en">("tr");
   const [karsilamaNotu, setKarsilamaNotu] = useState("");
   // Departman → rol. Tek departmanlı şirkette baştan seçili gelir.
-  const [departmanlar, setDepartmanlar] = useState<Record<string, DepartmentMemberRole>>(() =>
-    secenekler.departmanlar.length === 1 ? { [secenekler.departmanlar[0].id]: "employee" } : {}
-  );
+  const [departmanlar, setDepartmanlar] = useState<DepartmanRolleri>(() => baslangicDepartmanlari(secenekler));
   // "departmentId:moduleKey"
   const [moduller, setModuller] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -101,43 +73,6 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
     return () => clearTimeout(zamanlayici);
   }, [username, organizationId]);
 
-  const seciliDepartmanlar = useMemo(
-    () => secenekler.departmanlar.filter((d) => departmanlar[d.id]),
-    [secenekler, departmanlar]
-  );
-
-  const departmanDegistir = (id: string, secili: boolean) => {
-    setDepartmanlar((onceki) => {
-      const yeni = { ...onceki };
-      if (secili) yeni[id] = yeni[id] ?? "employee";
-      else delete yeni[id];
-      return yeni;
-    });
-    if (!secili) {
-      setModuller((onceki) => new Set([...onceki].filter((anahtar) => !anahtar.startsWith(`${id}:`))));
-    }
-  };
-
-  const modulDegistir = (anahtar: string, secili: boolean) => {
-    setModuller((onceki) => {
-      const yeni = new Set(onceki);
-      if (secili) yeni.add(anahtar);
-      else yeni.delete(anahtar);
-      return yeni;
-    });
-  };
-
-  const tumunuSec = (departmentId: string, keys: string[], secili: boolean) => {
-    setModuller((onceki) => {
-      const yeni = new Set(onceki);
-      for (const k of keys) {
-        if (secili) yeni.add(`${departmentId}:${k}`);
-        else yeni.delete(`${departmentId}:${k}`);
-      }
-      return yeni;
-    });
-  };
-
   const kaydet = async () => {
     setError("");
     if (!fullName.trim()) return setError(t("Ad soyad gerekli"));
@@ -146,7 +81,8 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
     }
     if (!email.trim()) return setError(t("E-posta gerekli"));
     if (password.length < 8) return setError(t("Şifre en az 8 karakter olmalı."));
-    if (seciliDepartmanlar.length === 0) return setError(t("En az bir departman seç."));
+    const kadro = kadroSeciminiTopla(secenekler, departmanlar, moduller);
+    if (kadro.departmanlar.length === 0) return setError(t("En az bir departman seç."));
 
     const govde: EkipHesabiGirdisi = {
       fullName: fullName.trim(),
@@ -155,11 +91,7 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
       password,
       title: title.trim() || undefined,
       phone: phone.trim() || undefined,
-      departmanlar: seciliDepartmanlar.map((d) => ({ departmentId: d.id, role: departmanlar[d.id] })),
-      moduller: [...moduller].map((anahtar) => {
-        const [departmentId, moduleKey] = anahtar.split(":");
-        return { departmentId, moduleKey };
-      }),
+      ...kadro,
       sifreDegistirmeli,
       karsilamaNotu: karsilamaNotu.trim() || undefined,
       locale,
@@ -339,95 +271,14 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
           {t("İlk girişte kendi şifresini belirlesin (önerilir)")}
         </label>
 
-        {/* ------------------------------------------------------------ Departman */}
-        {bolum(t("Departman ve rol"))}
-        {secenekler.departmanlar.length === 0 ? (
-          <span style={{ fontSize: 13, color: c.textSecondary }}>
-            {t("Bu şirkette henüz departman yok. Önce bir departman aç; hesap bir departmanın kadrosuna eklenir.")}
-          </span>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {!secenekler.sahipMi &&
-              ipucu(t("Yalnızca yöneticisi olduğun departmanlar listeleniyor."))}
-            {secenekler.departmanlar.map((d) => {
-              const rol = departmanlar[d.id];
-              return (
-                <div
-                  key={d.id}
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "6px 10px",
-                    border: `1px solid ${rol ? c.accent : c.border}`,
-                    borderRadius: 8,
-                  }}
-                >
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: c.textPrimary, flex: "1 1 160px" }}>
-                    <input type="checkbox" checked={Boolean(rol)} onChange={(e) => departmanDegistir(d.id, e.target.checked)} />
-                    {departmanAdi(d.name, t)}
-                  </label>
-                  {rol && (
-                    <select
-                      value={rol}
-                      onChange={(e) => setDepartmanlar((o) => ({ ...o, [d.id]: e.target.value as DepartmentMemberRole }))}
-                      style={{ fontSize: 12, padding: "4px 6px" }}
-                    >
-                      {(Object.keys(ROL_ETIKETI) as DepartmentMemberRole[]).map((r) => (
-                        <option key={r} value={r}>
-                          {t(ROL_ETIKETI[r])}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {rol && <div style={{ flexBasis: "100%", fontSize: 11, color: c.textSecondary }}>{t(ROL_ACIKLAMASI[rol])}</div>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ------------------------------------------------------------ Görebilecekleri */}
-        {seciliDepartmanlar.length > 0 && (
-          <>
-            {bolum(t("Görebilecekleri ve çalışacağı modüller"))}
-            {ipucu(
-              t("Departmanın kadrosunda olmak o departmanın modüllerini görmeye yeter. İşaretlediğin modüllerde kayıt da girebilir.")
-            )}
-            {seciliDepartmanlar.map((d) => {
-              const anahtarlar = d.moduller.map((m) => m.key);
-              const hepsi = anahtarlar.length > 0 && anahtarlar.every((k) => moduller.has(`${d.id}:${k}`));
-              return (
-                <div key={d.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>{d.name}</span>
-                    {anahtarlar.length > 1 && (
-                      <button type="button" onClick={() => tumunuSec(d.id, anahtarlar, !hepsi)} style={{ ...kucukDugme, padding: "2px 8px", fontSize: 11 }}>
-                        {hepsi ? t("Hiçbiri") : t("Tümü")}
-                      </button>
-                    )}
-                  </div>
-                  {d.moduller.length === 0 ? (
-                    ipucu(t("Bu departmanda açık modül yok."))
-                  ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 4 }}>
-                      {d.moduller.map((m) => {
-                        const anahtar = `${d.id}:${m.key}`;
-                        return (
-                          <label key={anahtar} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: c.textPrimary }}>
-                            <input type="checkbox" checked={moduller.has(anahtar)} onChange={(e) => modulDegistir(anahtar, e.target.checked)} />
-                            {m.name}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </>
-        )}
+        <KadroSecimi
+          secenekler={secenekler}
+          departmanlar={departmanlar}
+          setDepartmanlar={setDepartmanlar}
+          moduller={moduller}
+          setModuller={setModuller}
+          bolum={bolum}
+        />
 
         {/* ------------------------------------------------------------ Not */}
         {bolum(t("Karşılama notu"))}

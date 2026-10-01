@@ -87,6 +87,7 @@ const Archive = lazy(() => import("./pages/Archive"));
 const TasksOverview = lazy(() => import("./pages/TasksOverview"));
 const WorkLog = lazy(() => import("./pages/WorkLog"));
 const Sosyal = lazy(() => import("./pages/Sosyal"));
+const IseAlimDaveti = lazy(() => import("./pages/IseAlimDaveti"));
 const AiCreditsPage = lazy(() => import("./pages/AiCredits"));
 const BillingPage = lazy(() => import("./pages/Billing"));
 const DistanceSales = lazy(() => import("./pages/DistanceSales"));
@@ -895,6 +896,8 @@ export default function App() {
                 {/* Sosyal: arkadaşlar ve kişisel duvarlar — iş/şirket ilişkisinden bağımsız (migration 134). */}
                 <Route path="/sosyal" element={<Sosyal />} />
                 <Route path="/sosyal/:userId" element={<Sosyal />} />
+                {/* İşe alım daveti: bildirimdeki bağlantı buraya açılır (migration 143). */}
+                <Route path="/ise-alim/:id" element={<IseAlimDaveti />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/settings/archive" element={<Archive />} />
                 <Route path="/settings/lio-units" element={<AiCreditsPage />} />

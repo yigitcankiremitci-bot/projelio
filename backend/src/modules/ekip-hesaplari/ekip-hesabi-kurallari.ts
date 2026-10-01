@@ -65,20 +65,34 @@ export function girdiyiDogrula(girdi: EkipHesabiGirdisi, secenekler: EkipHesabiS
     return "Not en fazla 1000 karakter olabilir.";
   }
 
-  if (!Array.isArray(girdi.departmanlar) || girdi.departmanlar.length === 0) {
+  return kadroSeciminiDogrula(girdi.departmanlar, girdi.moduller, secenekler, "Bu departmana hesap açma yetkin yok.");
+}
+
+/**
+ * Departman (rolüyle) + modül seçiminin doğrulaması. İşe alım daveti de
+ * (modules/ise-alim) aynı kuraldan geçiyor: "kim hangi departmana kişi
+ * sokabilir" sorusunun iki ayrı cevabı olmamalı.
+ */
+export function kadroSeciminiDogrula(
+  departmanSecimi: EkipHesabiGirdisi["departmanlar"],
+  modulSecimi: EkipHesabiGirdisi["moduller"],
+  secenekler: EkipHesabiSecenekleri,
+  yetkisizMesaji: string
+): string | null {
+  if (!Array.isArray(departmanSecimi) || departmanSecimi.length === 0) {
     return "En az bir departman seç.";
   }
   const departmanlar = new Map(secenekler.departmanlar.map((d) => [d.id, d]));
   const secilen = new Set<string>();
-  for (const secim of girdi.departmanlar) {
-    if (!secim || !departmanlar.has(secim.departmentId)) return "Bu departmana hesap açma yetkin yok.";
+  for (const secim of departmanSecimi) {
+    if (!secim || !departmanlar.has(secim.departmentId)) return yetkisizMesaji;
     if (!(ROLLER as readonly string[]).includes(secim.role)) return "Geçersiz kadro rolü.";
     if (secilen.has(secim.departmentId)) return "Aynı departman iki kez seçilmiş.";
     secilen.add(secim.departmentId);
   }
 
-  if (!Array.isArray(girdi.moduller)) return "Modül seçimi geçersiz.";
-  for (const m of girdi.moduller) {
+  if (!Array.isArray(modulSecimi)) return "Modül seçimi geçersiz.";
+  for (const m of modulSecimi) {
     if (!m || !secilen.has(m.departmentId)) return "Modül, seçilen departmanlardan birine ait olmalı.";
     const departman = departmanlar.get(m.departmentId)!;
     if (!departman.moduller.some((dm) => dm.key === m.moduleKey)) {

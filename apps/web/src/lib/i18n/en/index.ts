@@ -17,6 +17,7 @@ import { yaptim } from "./yaptim";
 import { butce } from "./butce";
 import { hesaplar } from "./hesaplar";
 import { ekipHesaplari } from "./ekipHesaplari";
+import { iseAlim } from "./iseAlim";
 import { epostaYonetimi } from "./epostaYonetimi";
 import { demoRandevu } from "./demoRandevu";
 import { googleTakvim } from "./googleTakvim";
@@ -77,6 +78,7 @@ export const en: TranslationDict = {
   ...butce,
   ...hesaplar,
   ...ekipHesaplari,
+  ...iseAlim,
   ...hatalar,
   ...epostaYonetimi,
   ...demoRandevu,

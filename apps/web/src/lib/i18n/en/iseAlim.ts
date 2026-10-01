@@ -9,7 +9,6 @@ import type { TranslationDict } from "@projelio/shared";
  */
 export const iseAlim: TranslationDict = {
   // ─────────────────────────────────────────────── Ekip bölümü
-  "+ İşe al": "+ Hire",
   "Ekibi göster": "Show team",
   "Ekibi gizle": "Hide team",
   "Ekip yüklenemedi": "Couldn't load the team",
@@ -21,8 +20,8 @@ export const iseAlim: TranslationDict = {
   "Geri çekiliyor…": "Withdrawing…",
   "Davet geri çekilemedi": "Couldn't withdraw the invitation",
   "Henüz ekipte kimse yok.": "No one on the team yet.",
-  "Henüz ekipte kimse yok. “İşe al” ile Projelio'daki birini davet et ya da hesabı yoksa onun için hesap aç.":
-    "No one on the team yet. Use “Hire” to invite someone on Projelio, or create an account for them if they don't have one.",
+  "Henüz ekipte kimse yok. “+” menüsündeki “İşe al” ile Projelio'daki birini davet et ya da hesabı yoksa onun için hesap aç.":
+    "No one on the team yet. Use “Hire” in the “+” menu to invite someone on Projelio, or create an account for them if they don't have one.",
   "{ad} kişisine işe alım daveti gönderildi. Kabul edince ekipte görünecek.":
     "Invitation sent to {ad}. They'll appear on the team once they accept.",
   "Hesap açıldı ama e-posta gönderilemedi. Ekip Hesapları modülünden bağlantıyı yeniden gönderebilirsin.":

@@ -6,6 +6,7 @@ import { ekipHesaplariApi } from "../../api/ekipHesaplari";
 import { useT } from "../../lib/i18n";
 import { departmanAdi } from "../../lib/departmanAdi";
 import { useKatlanirBolum } from "../../lib/useKatlanirBolum";
+import { useRefreshOnUndo } from "../../lib/undo";
 import { useThemeColors } from "../../theme/useThemeColors";
 import SectionToggle from "../SectionToggle";
 import Modal from "../Modal";
@@ -63,6 +64,9 @@ const SirketEkibiPanel = forwardRef<SirketEkibiPanelHandle, { organizationId: st
       });
   };
   useEffect(yukle, [organizationId]);
+  // Davet kabul edilince sunucu şirket odasına sinyal gönderiyor (bkz.
+  // IseAlimService.odalariTazele): yeni kişi yenilemeden listeye düşer.
+  useRefreshOnUndo(yukle);
 
   const formuAc = async () => {
     setBilgi("");
@@ -182,12 +186,8 @@ const SirketEkibiPanel = forwardRef<SirketEkibiPanelHandle, { organizationId: st
           showLabel={t("Ekibi göster")}
           hideLabel={t("Ekibi gizle")}
         />
-        <div style={{ flex: 1 }} />
-        {ekip?.iseAlabilir && (
-          <button onClick={() => void formuAc()} style={hayalet}>
-            {t("+ İşe al")}
-          </button>
-        )}
+        {/* Görünür bir "İşe al" düğmesi yok: anasayfanın ekleme eylemlerinin tek
+            adresi "+" menüsü (bkz. OrganizationDetail.HomeAddFabRegistrar). */}
       </div>
 
       {bilgi && <span style={{ fontSize: 12, color: c.success }}>{bilgi}</span>}
@@ -218,7 +218,7 @@ const SirketEkibiPanel = forwardRef<SirketEkibiPanelHandle, { organizationId: st
           {ekip.uyeler.length === 0 ? (
             <div style={{ border: `1px dashed ${c.border}`, borderRadius: 12, padding: 24, textAlign: "center", color: c.textSecondary, fontSize: 14 }}>
               {ekip.iseAlabilir
-                ? t("Henüz ekipte kimse yok. “İşe al” ile Projelio'daki birini davet et ya da hesabı yoksa onun için hesap aç.")
+                ? t("Henüz ekipte kimse yok. “+” menüsündeki “İşe al” ile Projelio'daki birini davet et ya da hesabı yoksa onun için hesap aç.")
                 : t("Henüz ekipte kimse yok.")}
             </div>
           ) : (

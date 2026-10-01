@@ -12,6 +12,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { NotificationsService } from "../notifications/notifications.service";
 import { UsersService } from "../users/users.service";
+import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { EkipHesaplariService } from "../ekip-hesaplari/ekip-hesaplari.service";
 import { davetGirdisiniDogrula, gecerliSecim, kabulPlani } from "./ise-alim-kurallari";
 
@@ -47,8 +48,24 @@ export class IseAlimService {
     private supabase: SupabaseService,
     private usersService: UsersService,
     private notifications: NotificationsService,
-    private ekipHesaplari: EkipHesaplariService
+    private ekipHesaplari: EkipHesaplariService,
+    private realtime: RealtimeGateway
   ) {}
+
+  /**
+   * Şirket ve davetteki departman sayfalarına "değişti" sinyali.
+   *
+   * Genel interceptor (RealtimeChangeInterceptor) sinyali isteği atanın
+   * BULUNDUĞU odaya gönderir — kabulü davet edilen kişi kendi davet
+   * sayfasından yapıyor, o odalarda değil. Bu yüzden şirket sayfası açık olan
+   * yönetici Ekip'i ve departman kartlarındaki kişi sayısını ancak sayfayı
+   * yenileyince görüyordu.
+   */
+  private odalariTazele(satir: DavetSatiri, actorId: string, path: string): void {
+    const meta = { method: "POST", path, actorId };
+    this.realtime.notifyRoom(`organization:${satir.organization_id}`, meta);
+    for (const d of satir.departmanlar) this.realtime.notifyRoom(`department:${d.departmentId}`, meta);
+  }
 
   /** İşe alım yetkisi yoksa null — "Ekip" listesi yine görünsün diye fırlatmaz. */
   private async secenekleriBul(organizationId: string, userId: string): Promise<EkipHesabiSecenekleri | null> {
@@ -209,6 +226,8 @@ export class IseAlimService {
       `/ise-alim/${satir.id}`
     );
 
+    // Aynı şirket sayfasında duran diğer yöneticiler de bekleyen daveti görsün.
+    this.odalariTazele(satir as DavetSatiri, userId, `/organizations/${organizationId}/ise-alim`);
     const [davet] = await this.coz([satir as DavetSatiri]);
     return davet;
   }
@@ -262,6 +281,7 @@ export class IseAlimService {
     if (error) throw error;
     if (!guncel) throw new BadRequestException("Bu davet artık geçerli değil.");
 
+    this.odalariTazele(satir, userId, `/ise-alim/${id}/yanit`);
     const [davet] = await this.coz([guncel as DavetSatiri]);
     if (satir.invited_by) {
       this.notifications.notifyUserSafe(
@@ -294,6 +314,7 @@ export class IseAlimService {
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new BadRequestException("Bu davet artık beklemede değil.");
+    this.odalariTazele(satir, userId, `/ise-alim/${id}/iptal`);
     return { success: true };
   }
 

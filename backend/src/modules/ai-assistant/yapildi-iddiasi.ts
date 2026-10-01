@@ -37,7 +37,20 @@ const IDDIA_KOKLERI = [
   "değiştirdim",
   "iptal ettim",
   "gönderdim",
+  // Edilgen bildirimler: 2026-09-24'te "Eklendi. 19:00-19:15 … bloğu bugüne
+  // eklendi" tek turda, araçsız yazıldı. "tamamlandı" bilerek YOK: bir kartın
+  // durumunu anlatırken de geçer ("görev tamamlandı durumda").
+  "eklendi",
+  "kuruldu",
+  "oluşturuldu",
+  "kaydedildi",
+  "güncellendi",
 ];
+
+// "Kontrol ettim / baktım": okuma iddiası. Hiçbir araç (okuma dahil) çalışmadan
+// söylenirse uydurmadır — 2026-09-24'te Lio takvime hiç bakmadan "kontrol
+// ettim, 8 blok takvimde var" dedi.
+const KONTROL_IDDIASI = /(?<![\p{L}])(kontrol ettim|baktım|kontrol edildi|doğruladım)(?![\p{L}])/u;
 
 const IDDIA = new RegExp(`(?<![\\p{L}])(${IDDIA_KOKLERI.join("|")})(?![\\p{L}])`, "iu");
 // İngilizce arayüz dili için de aynı denetim (Lio kullanıcının dilinde cevap verir).
@@ -55,13 +68,15 @@ export function yapildiIddiasiVar(metin: string): boolean {
  * "taşıdım" demek tam olarak yakalanmak istenen durum.
  */
 export function aracsizIddiaMi(metin: string, calisanAraclar: string[], yazmaAraclari: Set<string>): boolean {
-  if (!yapildiIddiasiVar(metin)) return false;
-  return !calisanAraclar.some((ad) => yazmaAraclari.has(ad));
+  if (yapildiIddiasiVar(metin) && !calisanAraclar.some((ad) => yazmaAraclari.has(ad))) return true;
+  // Okuma iddiası: herhangi bir araç çalıştıysa bakmış sayılır.
+  return calisanAraclar.length === 0 && KONTROL_IDDIASI.test(metin.toLocaleLowerCase("tr-TR"));
 }
 
 // dil:atla-baslangic — modele giden yönlendirme, kullanıcıya görünmüyor.
 export const ARACSIZ_IDDIA_UYARISI =
-  "Az önceki cevabında bir işi YAPTIĞINI söyledin ama bu istekte hiçbir araç çağırmadın; yani hiçbir şey " +
-  "değişmedi. Şimdi gerçekten yap: gerekiyorsa önce ilgili veriyi oku (ör. get_todo_board), sonra değişikliği " +
+  "Az önceki cevabında bir işi YAPTIĞINI ya da bir şeyi KONTROL ETTİĞİNİ söyledin ama bu istekte gerekli aracı " +
+  "çağırmadın; yani hiçbir şey değişmedi ve hiçbir şeye bakılmadı. (Bu istekte yapılmamış, geçmişte olmuş bir şeyi " +
+  "anlatıyorsan bunu açıkça geçmiş olarak söyle.) Şimdi gerçekten yap: gerekiyorsa önce ilgili veriyi oku (ör. get_todo_board), sonra değişikliği " +
   "yapan aracı çağır. Yapamıyorsan bunu açıkça söyle. Araç sonucu gelmeden \"yaptım\" deme.";
 // dil:atla-bitis

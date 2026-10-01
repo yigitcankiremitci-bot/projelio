@@ -31,3 +31,14 @@ test("İngilizce iddia", () => {
   assert.equal(yapildiIddiasiVar("Done — I've moved 6 cards to completed."), true);
   assert.equal(yapildiIddiasiVar("Which cards should I move?"), false);
 });
+
+test("canlıdaki takvim vakaları (2026-09-24)", () => {
+  // Edilgen iddia, araç yok.
+  assert.equal(aracsizIddiaMi("Eklendi. 19:00-19:15 bloğu bugüne eklendi, 19:00'de hatırlatıcı kuruldu.", [], YAZMA), true);
+  // Takvime hiç bakmadan "kontrol ettim".
+  assert.equal(aracsizIddiaMi("Kontrol ettim — bugünün 8 bloğu takvimde var ve kaydedildi.", [], YAZMA), true);
+  // Gerçekten okuduysa kontrol iddiası meşru (yazma iddiası yoksa).
+  assert.equal(aracsizIddiaMi("Kontrol ettim, bugün takvimde 8 blok var.", ["list_time_blocks"], YAZMA), false);
+  // Blok yazıldıysa "eklendi" meşru.
+  assert.equal(aracsizIddiaMi("Eklendi.", ["create_time_blocks"], new Set(["create_time_blocks"])), false);
+});

@@ -279,19 +279,24 @@ function DayColumn({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: 6,
           fontSize: 13,
           fontWeight: isToday ? 600 : 500,
           color: isToday ? c.accent : c.textPrimary,
+          overflow: "hidden",
         }}
       >
         {single ? (
           <span>{shortDayLabel(day)}</span>
         ) : (
-          <>
-            <span style={{ color: c.textSecondary, fontWeight: 400 }}>{t(WEEKDAY_LABELS[weekdayOf(day)])}</span>
-            <span>{shortDayLabel(day)}</span>
-          </>
+          // Gün adı ÜSTTE, yalnızca gün numarası ALTTA. Yan yana "Pzt 28 Eyl"
+          // telefonda (sütun ~45 px) sığmıyor, metinler komşu sütuna taşıp
+          // birbirinin üstüne biniyordu. Ay zaten üstteki aralık başlığında yazılı.
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.1, minWidth: 0 }}>
+            <span style={{ fontSize: 11, color: isToday ? c.accent : c.textSecondary, fontWeight: 400, whiteSpace: "nowrap" }}>
+              {t(WEEKDAY_LABELS[weekdayOf(day)])}
+            </span>
+            <span style={{ fontSize: 15, fontVariantNumeric: "tabular-nums" }}>{Number(day.slice(8, 10))}</span>
+          </div>
         )}
       </div>
 

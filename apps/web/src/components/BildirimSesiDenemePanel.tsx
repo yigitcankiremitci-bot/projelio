@@ -38,6 +38,7 @@ const SESLER = [
   { key: "noti13", ad: "Ses 13", dosya: "/sounds/bildirim-noti13.wav" }, // dil:anahtar
   { key: "noti14", ad: "Ses 14", dosya: "/sounds/bildirim-noti14.wav" }, // dil:anahtar
   { key: "noti15", ad: "Ses 15", dosya: "/sounds/bildirim-noti15.wav" }, // dil:anahtar
+  { key: "noti16", ad: "Ses 16", dosya: "/sounds/bildirim-noti16.wav" }, // dil:anahtar
 ] as const;
 
 type SesAnahtari = (typeof SESLER)[number]["key"];

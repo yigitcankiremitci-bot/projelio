@@ -102,6 +102,7 @@ export const bildirimTercihleri: TranslationDict = {
   "Ses 13": "Sound 13",
   "Ses 14": "Sound 14",
   "Ses 15": "Sound 15",
+  "Ses 16": "Sound 16",
   "Aday ses": "Candidate sound",
   Gecikme: "Delay",
   Hemen: "Now",

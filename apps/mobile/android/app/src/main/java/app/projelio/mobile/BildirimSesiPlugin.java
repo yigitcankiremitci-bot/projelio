@@ -62,7 +62,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "BildirimSesi")
 public class BildirimSesiPlugin extends Plugin {
     private static final String KANAL_ONEKI = "projelio_ses_deneme_";
-    private static final String[] SESLER = { "mevcut", "ses2", "ses3", "ses4", "ses5", "noti10", "noti11", "noti12", "noti13", "noti14", "noti15" };
+    private static final String[] SESLER = { "mevcut", "ses2", "ses3", "ses4", "ses5", "noti10", "noti11", "noti12", "noti13", "noti14", "noti15", "noti16" };
 
     private MediaPlayer oynatici;
 
@@ -80,6 +80,7 @@ public class BildirimSesiPlugin extends Plugin {
         if ("noti13".equals(ses)) return R.raw.projelio_bildirim_noti13;
         if ("noti14".equals(ses)) return R.raw.projelio_bildirim_noti14;
         if ("noti15".equals(ses)) return R.raw.projelio_bildirim_noti15;
+        if ("noti16".equals(ses)) return R.raw.projelio_bildirim_noti16;
         return 0;
     }
 

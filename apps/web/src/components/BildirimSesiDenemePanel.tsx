@@ -26,6 +26,18 @@ const SESLER = [
   { key: "mevcut", ad: "Mevcut ses (1.2.0)", dosya: "/sounds/bildirim.mp3" }, // dil:anahtar
   { key: "ses2", ad: "Ses 2", dosya: "/sounds/bildirim-ses2.mp3" }, // dil:anahtar
   { key: "ses3", ad: "Ses 3", dosya: "/sounds/bildirim-ses3.mp3" }, // dil:anahtar
+  // 4 ve 5: aynı melodi bir/iki oktav yukarıda, telefon hoparlörüne uygun
+  // (1–3 kHz, tek kanal, -3 dBFS). 1–3 telefonda bu yüzden cızırdıyordu —
+  // bkz. BildirimSesiPlugin.java.
+  { key: "ses4", ad: "Ses 4 (1 oktav tiz)", dosya: "/sounds/bildirim-ses4.wav" }, // dil:anahtar
+  { key: "ses5", ad: "Ses 5 (2 oktav tiz)", dosya: "/sounds/bildirim-ses5.wav" }, // dil:anahtar
+  // 10–15: telefon ölçüsüne göre (1–4 kHz, mono, -3 dBFS) elle hazırlanan adaylar.
+  { key: "noti10", ad: "Ses 10", dosya: "/sounds/bildirim-noti10.wav" }, // dil:anahtar
+  { key: "noti11", ad: "Ses 11", dosya: "/sounds/bildirim-noti11.wav" }, // dil:anahtar
+  { key: "noti12", ad: "Ses 12", dosya: "/sounds/bildirim-noti12.wav" }, // dil:anahtar
+  { key: "noti13", ad: "Ses 13", dosya: "/sounds/bildirim-noti13.wav" }, // dil:anahtar
+  { key: "noti14", ad: "Ses 14", dosya: "/sounds/bildirim-noti14.wav" }, // dil:anahtar
+  { key: "noti15", ad: "Ses 15", dosya: "/sounds/bildirim-noti15.wav" }, // dil:anahtar
 ] as const;
 
 type SesAnahtari = (typeof SESLER)[number]["key"];

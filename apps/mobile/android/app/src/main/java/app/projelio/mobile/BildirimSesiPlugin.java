@@ -46,6 +46,15 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * (kanal → sistem bildirim sesi) iki durumda da aynı, ama yerel bildirim
  * internete, FCM anahtarına ve sunucu değişikliğine bağımlı değil.
  *
+ * NEDEN PATLIYORDU (2026-10-01 ölçümü): mevcut ses, ses2 ve ses3'ün TÜM
+ * enerjisi 230–620 Hz arasında, 1 kHz üstünde neredeyse hiçbir şey yok.
+ * Telefon hoparlörü bu frekansları çalamıyor; akıllı amfi zorlayınca
+ * duyulan şey cızırtı oluyor — ses kısılsa da. Üstüne tepeler 0 dBFS'te
+ * (pay yok) ve ses3 stereo ters fazlı (tek hoparlörde birbirini siliyor).
+ * ses4/ses5 aynı melodinin bir/iki oktav yukarısı, tek kanal, -3 dBFS
+ * tepe, kayıpsız WAV (çözücü taşması olmasın) — scratchpad'de numpy ile
+ * üretildi.
+ *
  * Karar verilince: kazanan dosya res/raw/projelio_bildirim.mp3'ün yerine konur,
  * ana kanal kimliği bir artırılır (_v3) ve sunucudaki BILDIRIM_KANALI de
  * birlikte değişir. Bu eklenti ve deneme dosyaları o zaman kaldırılabilir.
@@ -53,7 +62,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "BildirimSesi")
 public class BildirimSesiPlugin extends Plugin {
     private static final String KANAL_ONEKI = "projelio_ses_deneme_";
-    private static final String[] SESLER = { "mevcut", "ses2", "ses3" };
+    private static final String[] SESLER = { "mevcut", "ses2", "ses3", "ses4", "ses5", "noti10", "noti11", "noti12", "noti13", "noti14", "noti15" };
 
     private MediaPlayer oynatici;
 
@@ -62,6 +71,15 @@ public class BildirimSesiPlugin extends Plugin {
         if ("mevcut".equals(ses)) return R.raw.projelio_bildirim;
         if ("ses2".equals(ses)) return R.raw.projelio_bildirim_ses2;
         if ("ses3".equals(ses)) return R.raw.projelio_bildirim_ses3;
+        if ("ses4".equals(ses)) return R.raw.projelio_bildirim_ses4;
+        if ("ses5".equals(ses)) return R.raw.projelio_bildirim_ses5;
+        // noti10–15: kullanıcının yukarıdaki ölçüye göre hazırladığı adaylar.
+        if ("noti10".equals(ses)) return R.raw.projelio_bildirim_noti10;
+        if ("noti11".equals(ses)) return R.raw.projelio_bildirim_noti11;
+        if ("noti12".equals(ses)) return R.raw.projelio_bildirim_noti12;
+        if ("noti13".equals(ses)) return R.raw.projelio_bildirim_noti13;
+        if ("noti14".equals(ses)) return R.raw.projelio_bildirim_noti14;
+        if ("noti15".equals(ses)) return R.raw.projelio_bildirim_noti15;
         return 0;
     }
 

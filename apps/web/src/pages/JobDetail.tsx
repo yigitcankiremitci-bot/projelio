@@ -283,10 +283,11 @@ export default function JobDetail() {
     const previousStatus = tasksRef.current.find((t) => t.id === taskId)?.status;
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
     api
-      .patch(`/tasks/${taskId}/status`, { status })
+      .patchKuyruklu(`/tasks/${taskId}/status`, { status })
       // Tamamlanma zamanı/kişisi sunucuda hesaplanıyor ("Bugün yapılanlar" için);
-      // gerçek değeri almak üzere görevleri yeniden çekiyoruz.
-      .then(() => reloadTasks())
+      // gerçek değeri almak üzere görevleri yeniden çekiyoruz. Bağlantı yokken
+      // değişiklik kuyrukta bekliyor, çekecek taze veri de yok.
+      .then((gonderildi) => gonderildi && reloadTasks())
       .catch((err) => {
         gorevDurumHatasiniBildir(err);
         reloadTasks();

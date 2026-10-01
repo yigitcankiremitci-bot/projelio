@@ -6,6 +6,7 @@ import { ThemeProvider } from "./theme/ThemeProvider";
 import { AppPrefsProvider } from "./lib/appPrefs";
 import { I18nProvider } from "./lib/i18n";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
+import BaglantiSeridi from "./components/BaglantiSeridi";
 import "./index.css";
 
 // Hata sınırı EN DIŞTA: ThemeProvider ya da AppPrefsProvider'ın kendisi patlasa
@@ -18,6 +19,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <I18nProvider>
             <BrowserRouter>
               <App />
+              {/* App'in dışında: giriş ekranı dahil her yüzeyde görünsün. */}
+              <BaglantiSeridi />
             </BrowserRouter>
           </I18nProvider>
         </AppPrefsProvider>

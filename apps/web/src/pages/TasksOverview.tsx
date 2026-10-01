@@ -307,7 +307,7 @@ export default function TasksOverview() {
       const previousStatus = itemsRef.current.find((i) => i.itemId === itemId)?.status;
 
       setItems((prev) => prev.map((i) => (i.itemId === itemId ? { ...i, status } : i)));
-      api.patch("/todos/status", { source, itemId, status }).catch(() => load());
+      api.patchKuyruklu("/todos/status", { source, itemId, status }).catch(() => load());
 
       // registerUndo=false: bu çağrı zaten bir geri alma işleminin kendisi.
       if (registerUndo && previousStatus && previousStatus !== status) {

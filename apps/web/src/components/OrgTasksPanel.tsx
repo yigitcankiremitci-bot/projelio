@@ -145,7 +145,7 @@ export default function OrgTasksPanel({ organizationId, organizationName }: Prop
   const handleMoveTask = (taskId: string, status: TaskStatus, registerUndo = true) => {
     const previousStatus = tasksRef.current.find((task) => task.id === taskId)?.status;
     setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status } : task)));
-    api.patch(`/tasks/${taskId}/status`, { status }).catch((err) => {
+    api.patchKuyruklu(`/tasks/${taskId}/status`, { status }).catch((err) => {
       gorevDurumHatasiniBildir(err);
       load();
     });

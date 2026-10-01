@@ -2,6 +2,29 @@ import { getSocketId } from "../lib/socketId";
 import { etkinDil } from "../lib/i18n/depo";
 import { sendWithProgress } from "../lib/xhrUpload";
 import { sunucuZamanlariniIsaretle } from "../lib/sunucuZamani";
+import {
+  KISMI_BAGLANTI_BEKLEME_MS,
+  bekleyenleriUygula,
+  onbellegeAlinirMi,
+  onbellekAnahtari,
+  oturumSahibi,
+  sunucuyaUlasilamadiMi,
+} from "../lib/cevrimdisi";
+import {
+  agYok,
+  bekleyenYazmalar,
+  cevrimdisiEtkin,
+  cevrimdisiKur,
+  eskiVeriGosterildiIsaretle,
+  kuyrugaAl,
+  kuyrukBosMu,
+  kuyruguGonder,
+  oturumsuzTemizle,
+  sakliYanitiOku,
+  ulasildi,
+  ulasilamadi,
+  yanitiSakla,
+} from "../lib/cevrimdisiDepo";
 
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -56,8 +79,13 @@ function handleExpiredSession(): void {
   }
 }
 
-async function parseResponse<T>(res: Response): Promise<T> {
+async function parseResponse<T>(res: Response, hamGovde?: (text: string) => void): Promise<T> {
   const text = await res.text();
+  hamGovde?.(text);
+  return metniCoz<T>(text);
+}
+
+function metniCoz<T>(text: string): T {
   if (!text) return undefined as T;
   try {
     // Eksiz zaman damgaları burada bir kez UTC diye işaretleniyor; yoksa her
@@ -113,7 +141,9 @@ function signalWithTimeout(
   return { signal, done: () => clearTimeout(timer) };
 }
 
-async function request<T>(path: string, options: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
+type IstekSecenekleri = RequestInit & { timeoutMs?: number };
+
+async function agaGit<T>(path: string, options: IstekSecenekleri, hamGovde?: (text: string) => void): Promise<T> {
   const token = localStorage.getItem("projelio_token");
   // Açık soketin kimliği: sunucu bundan isteğin HANGİ SAYFADAN geldiğini bulup
   // değişikliği o sayfadaki diğer kullanıcılara duyuruyor (bkz. lib/liveRoom.ts
@@ -164,7 +194,124 @@ async function request<T>(path: string, options: RequestInit & { timeoutMs?: num
     if (res.status === 401 && token) handleExpiredSession();
     throw new ApiError(message, res.status, retryAfterSeconds);
   }
-  return parseResponse<T>(res);
+  return parseResponse<T>(res, hamGovde);
+}
+
+const CEVRIMDISI_MESAJI = "İnternet bağlantısı yok. Bağlantı gelince tekrar dene.";
+
+/**
+ * Her isteğin girdiği kapı: tarayıcıda doğrudan ağa gider; mobil kabukta
+ * çevrimdışı katmanından geçer (bkz. lib/cevrimdisi.ts başı).
+ *
+ * Kabukta:
+ * - GET başarılıysa yanıt cihazda saklanır; sunucuya ulaşılamazsa saklı olan
+ *   döner. Saklı yanıt varken "kısmen kopuk" bağlantıda 30 sn beklenmez.
+ * - Yazma, cihaz ağsızken hiç denenmez — 30 sn dönen düğme yerine anında hata.
+ * - 401 akışı aynen agaGit içinde; burada oturum hakkında hiçbir karar yok.
+ */
+async function request<T>(path: string, options: IstekSecenekleri = {}): Promise<T> {
+  if (!cevrimdisiEtkin()) return agaGit<T>(path, options);
+  const token = localStorage.getItem("projelio_token");
+  if (!token) oturumsuzTemizle();
+  const method = (options.method ?? "GET").toUpperCase();
+  const sahip = oturumSahibi(token);
+  const anahtar = method === "GET" && sahip && onbellegeAlinirMi(path) ? onbellekAnahtari(sahip, path) : null;
+
+  // Bekleyen yazmalar gönderilene dek GET yanıtına (saklı ya da taze) işlenir.
+  const bekleyenleIsle = (veri: T): T => bekleyenleriUygula(veri, bekleyenYazmalar());
+
+  if (agYok()) {
+    const sakli = anahtar ? await sakliYanitiOku(anahtar) : undefined;
+    if (sakli !== undefined) {
+      eskiVeriGosterildiIsaretle();
+      return bekleyenleIsle(metniCoz<T>(sakli));
+    }
+    ulasilamadi();
+    throw new ApiError(CEVRIMDISI_MESAJI, 0);
+  }
+
+  const ag = agaGit<T>(path, options, anahtar ? (text) => void yanitiSakla(anahtar, text) : undefined).then(
+    (sonuc) => {
+      ulasildi();
+      return method === "GET" ? bekleyenleIsle(sonuc) : sonuc;
+    },
+    (error: unknown) => {
+      if (error instanceof ApiError) {
+        if (sunucuyaUlasilamadiMi(error.status)) ulasilamadi();
+        else ulasildi();
+      }
+      throw error;
+    }
+  );
+  if (!anahtar) return ag;
+
+  const sakliyiVer = async (error?: unknown): Promise<T> => {
+    const sakli = await sakliYanitiOku(anahtar);
+    if (sakli === undefined) {
+      if (error !== undefined) throw error;
+      return ag; // saklı yok: ağı sonuna dek bekle
+    }
+    eskiVeriGosterildiIsaretle();
+    return bekleyenleIsle(metniCoz<T>(sakli));
+  };
+
+  let bekleme: ReturnType<typeof setTimeout> | undefined;
+  const yavas = new Promise<T>((resolve, reject) => {
+    bekleme = setTimeout(() => sakliyiVer().then(resolve, reject), KISMI_BAGLANTI_BEKLEME_MS);
+  });
+  try {
+    return await Promise.race([ag, yavas]);
+  } catch (error) {
+    // Çağıranın iptali ve sunucunun gerçek cevabı (403, 404…) olduğu gibi gider;
+    // yalnızca "ulaşılamadı" saklı veriyle karşılanır.
+    if (options.signal?.aborted) throw error;
+    if (error instanceof ApiError && sunucuyaUlasilamadiMi(error.status)) return sakliyiVer(error);
+    throw error;
+  } finally {
+    clearTimeout(bekleme);
+    // Yarışı saklı veri kazandıysa ağ isteği arkada sürer; reddi sahipsiz kalmasın.
+    ag.catch(() => {});
+  }
+}
+
+/**
+ * Sonucu kullanılmayan, değeri SET eden bir yazma: bağlantı yoksa kuyruğa
+ * alınır ve bağlantı gelince gönderilir; çağırana başarılı gibi döner.
+ *
+ * Yalnızca şu koşulları sağlayan yerde kullan: (1) dönen gövdeye ihtiyaç yok,
+ * ekran zaten iyimser güncellendi; (2) aynı isteği iki kez göndermek zararsız
+ * (zaman aşımına uğrayan istek sunucuya ulaşmış olabilir, kuyruk onu yeniden
+ * gönderir); (3) gövdedeki itemId/id hedefi tanımlar (bkz. kuyrugaEkle).
+ * Kayıt OLUŞTURAN ya da para hareketi yazan uçlar bu koşulları sağlamaz.
+ *
+ * Dönüş: true = şimdi gönderildi, false = kuyrukta bekliyor. Gönderimden sonra
+ * listeyi yeniden çeken yer bunu bilmeli — kuyruktayken yeniden çekmek saklı
+ * veriyi getirir, iyimser güncellemeyi ezmese de boşuna istek olur.
+ */
+async function kuyrukluPatch(path: string, body: unknown): Promise<boolean> {
+  const yaz = () => request<unknown>(path, { method: "PATCH", body: JSON.stringify(body) });
+  if (!cevrimdisiEtkin()) {
+    yazmaBitti(await yaz(), "PATCH", path, body);
+    return true;
+  }
+  const yazma = { method: "PATCH" as const, path, body, zaman: Date.now() };
+  // Önde bekleyen varsa sıranın arkasına geç: "tamamlandı" kuyrukta dururken
+  // "geri al" doğrudan giderse sunucuda ters sırayla uygulanır.
+  if (agYok() || !kuyrukBosMu()) {
+    kuyrugaAl(yazma);
+    void kuyruguGonder();
+    return false;
+  }
+  try {
+    yazmaBitti(await yaz(), "PATCH", path, body);
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError && sunucuyaUlasilamadiMi(error.status)) {
+      kuyrugaAl(yazma);
+      return false;
+    }
+    throw error;
+  }
 }
 
 async function uploadFile<T>(
@@ -288,4 +435,25 @@ export const api = {
     }),
   uploadFile: <T>(path: string, formData: FormData, signal?: AbortSignal, onProgress?: (loadedBytes: number) => void) =>
     uploadFile<T>(path, formData, signal, onProgress),
+  // Bağlantı yokken kuyruğa alınan PATCH — koşulları kuyrukluPatch başında.
+  patchKuyruklu: (path: string, body: unknown) => kuyrukluPatch(path, body),
 };
+
+// Mobil kabukta kuyruğun gönderilmesi ve sunucunun yoklanması (tarayıcıda no-op).
+cevrimdisiKur({
+  sahip: () => oturumSahibi(localStorage.getItem("projelio_token")),
+  gonder: (y) =>
+    request<unknown>(y.path, { method: y.method, body: JSON.stringify(y.body) }).then((sonuc) =>
+      yazmaBitti(sonuc, y.method, y.path, y.body)
+    ),
+  yokla: async () => {
+    const t = signalWithTimeout(undefined, 5_000);
+    try {
+      return (await fetch(`${API_URL}/health`, { signal: t.signal })).ok;
+    } catch {
+      return false;
+    } finally {
+      t.done();
+    }
+  },
+});

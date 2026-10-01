@@ -88,6 +88,11 @@ export const Z = {
   filePreview: 110,
   /** "Geri al" bildirimi ve ilk kurulum sihirbazı: her şeyin üstünde. */
   undoToast: 120,
+  /**
+   * Bağlantı şeridi (çevrimdışı / geri geldi). Pencerelerin de üstünde: açık bir
+   * pencerede "kaydet"e basan kişi bağlantının olmadığını görebilmeli.
+   */
+  baglantiSeridi: 121,
   onboarding: 200,
 } as const;
 

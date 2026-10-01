@@ -563,4 +563,10 @@ export const uygulama: TranslationDict = {
   "{sa}s": "{sa}h",
   "{sa}s {dk}dk": "{sa}h {dk}m",
   "{n} kayıt": { one: "{n} entry", other: "{n} entries" },
+  // Bağlantı şeridi (mobil kabukta çevrimdışı çalışma, bkz. components/BaglantiSeridi.tsx)
+  "{n} değişiklik sunucuda kabul edilmedi": { one: "{n} change was rejected by the server", other: "{n} changes were rejected by the server" },
+  "Çevrimdışı · {n} değişiklik bekliyor": { one: "Offline · {n} change waiting", other: "Offline · {n} changes waiting" },
+  "Çevrimdışı · kayıtlı veriler gösteriliyor": "Offline · showing saved data",
+  "{n} değişiklik gönderiliyor…": { one: "Sending {n} change…", other: "Sending {n} changes…" },
+  "Bağlantı geri geldi": "Back online",
 };

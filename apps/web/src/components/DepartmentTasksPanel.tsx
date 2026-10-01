@@ -188,7 +188,7 @@ const DepartmentTasksPanel = forwardRef<DepartmentTasksPanelHandle, Props>(funct
   const handleMoveTask = (taskId: string, status: TaskStatus, registerUndo = true) => {
     const previousStatus = tasksRef.current.find((t) => t.id === taskId)?.status;
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
-    api.patch(`/tasks/${taskId}/status`, { status }).catch((err) => {
+    api.patchKuyruklu(`/tasks/${taskId}/status`, { status }).catch((err) => {
       gorevDurumHatasiniBildir(err);
       load();
     });

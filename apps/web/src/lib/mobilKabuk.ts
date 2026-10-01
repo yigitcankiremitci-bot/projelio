@@ -49,6 +49,11 @@ interface CapacitorBridge {
       register?: () => unknown;
       addListener?: (event: string, handler: (data: any) => void) => unknown;
     };
+    BildirimSesi?: {
+      cal?: (options: { ses: string }) => unknown;
+      bildirimGonder?: (options: { ses: string; gecikme: number }) => unknown;
+      temizle?: () => unknown;
+    };
   };
 }
 
@@ -303,6 +308,52 @@ export function uygulamaIciYol(link: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * BİLDİRİM SESİ DENEMESİ (Admin > Bildirim sesi)                     *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Kabuğun ses deneme eklentisi var mı? 1.4.0'dan eski APK'larda yok — panel
+ * o zaman "yeni sürümü kurun" der ve yalnızca tarayıcıdan dinletir.
+ * Eklentinin kendisi: apps/mobile/android/.../BildirimSesiPlugin.java.
+ */
+export function kabukSesDenemesiVarMi(): boolean {
+  return Boolean(kopru()?.Plugins?.BildirimSesi?.bildirimGonder);
+}
+
+/**
+ * Köprü hatası metin olarak döner (izin kapalı vb. — kullanıcıya gösterilir);
+ * başarıda null. Diğer kabuk çağrılarından farklı olarak sonuç BEKLENİYOR:
+ * denemenin tek amacı duyulmak, sessizce başarısız olursa yanlış karar verilir.
+ */
+async function sesKoprusu(fn: (() => unknown) | undefined): Promise<string | null> {
+  if (!fn) return "Bu uygulama sürümünde ses denemesi yok.";
+  try {
+    await Promise.resolve(fn());
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+/** Sesi telefonun bildirim ses akışında hemen çalar (bildirim göstermeden). */
+export function kabukSesiCal(ses: string): Promise<string | null> {
+  const eklenti = kopru()?.Plugins?.BildirimSesi;
+  return sesKoprusu(eklenti?.cal && (() => eklenti.cal!({ ses })));
+}
+
+/** Seçilen sesin kendi kanalından gerçek bir sistem bildirimi atar. */
+export function kabukSesBildirimiGonder(ses: string, gecikme: number): Promise<string | null> {
+  const eklenti = kopru()?.Plugins?.BildirimSesi;
+  return sesKoprusu(eklenti?.bildirimGonder && (() => eklenti.bildirimGonder!({ ses, gecikme })));
+}
+
+/** Deneme kanallarını telefon ayarlarından kaldırır. */
+export function kabukSesDenemesiniTemizle(): Promise<string | null> {
+  const eklenti = kopru()?.Plugins?.BildirimSesi;
+  return sesKoprusu(eklenti?.temizle && (() => eklenti.temizle!()));
 }
 
 /* ------------------------------------------------------------------ *

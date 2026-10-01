@@ -37,6 +37,9 @@ public class MainActivity extends BridgeActivity {
      */
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Uygulamanın kendi eklentileri super.onCreate'ten ÖNCE kaydedilmeli:
+        // köprü orada kuruluyor, sonra eklenen eklentiyi web tarafı görmez.
+        registerPlugin(BildirimSesiPlugin.class);
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         bildirimKanaliniOlustur();

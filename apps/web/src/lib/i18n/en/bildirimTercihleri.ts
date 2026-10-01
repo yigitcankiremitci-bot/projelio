@@ -88,4 +88,28 @@ export const bildirimTercihleri: TranslationDict = {
     "Support replies and messages from the Projelio team. Always shown in the app.",
   "Destek talebim yanıtlandığında": "When my support request is answered",
   "Projelio ekibinden mesaj": "Message from the Projelio team",
+
+  // Admin > Bildirim sesi (ses denemesi)
+  "Bildirim sesi denemesi": "Notification sound test",
+  "Mevcut ses (1.2.0)": "Current sound (1.2.0)",
+  "Ses 2": "Sound 2",
+  "Ses 3": "Sound 3",
+  "Aday ses": "Candidate sound",
+  Gecikme: "Delay",
+  Hemen: "Now",
+  "{n} sn": "{n}s",
+  "Bildirim olarak gönder": "Send as notification",
+  "Hemen dinle": "Play now",
+  "Ses çalınamadı.": "Couldn't play the sound.",
+  "Bildirim gönderildi.": "Notification sent.",
+  "Bildirim {n} saniye sonra gelecek — ekranı kilitleyebilirsin.": "The notification will arrive in {n} seconds — you can lock the screen.",
+  "Deneme kanalları silindi.": "Test channels removed.",
+  "Deneme kanallarını sil": "Remove test channels",
+  "Aday sesleri telefonda gerçek bildirim olarak dinleyip karşılaştır. Seçim kimsenin bildirim sesini değiştirmez; kazanan ses bir sonraki uygulama sürümüne konacak.":
+    "Compare the candidate sounds as real notifications on a phone. Choosing one doesn't change anyone's notification sound; the winner will ship in the next app version.",
+  "Tarayıcıdasın: sesler yalnızca bilgisayarda dinlenebilir. Patlama sorunu telefonda olduğu için asıl denemeyi Android uygulamasından (1.4.0 ve üstü) yap.":
+    "You're in a browser: sounds can only be played on this computer. The distortion happens on phones, so do the real test in the Android app (1.4.0 or later).",
+  "Bu uygulama sürümünde ses denemesi yok. 1.4.0 ve üstünü kur.": "This app version has no sound test. Install 1.4.0 or later.",
+  "Her ses telefonda kendi bildirim kanalında çalar (Android kanal sesini sonradan değiştirmiyor). Karar verince deneme kanallarını telefon ayarlarından kaldırabilirsin.":
+    "Each sound plays on its own notification channel (Android can't change a channel's sound later). Once you decide, you can remove the test channels from the phone's settings.",
 };

@@ -23,7 +23,11 @@ export interface LioKomutConfig {
 
 export const DEFAULT_LIO_KOMUT: LioKomutConfig = {
   perHour: 10,
-  maxLength: 1000,
+  // 1000'di; gerçek kullanımda dar kaldı (2026-10-02: kullanıcının uzun mesajı
+  // reddedildi — bir Instagram açıklaması tek başına 2200 karakter olabiliyor).
+  // Maliyet kaygısı küçük: her istekte zaten ~54 bin tokenlık sistem istemi
+  // gidiyor, 8000 karakter ~2.500 token ekler.
+  maxLength: 8000,
 };
 
 export function lioKomutConfigFromEnv(env: NodeJS.ProcessEnv = process.env): LioKomutConfig {
@@ -71,7 +75,9 @@ export function decideLioKomut(
     return {
       allowed: false,
       reason: "too_long",
-      reply: "Bu istek WhatsApp için çok uzun. Uzun metinlerle çalışmak için uygulamadaki Lio'yu kullanın.",
+      reply:
+        `Mesajın çok uzun (${trimmed.length.toLocaleString("tr-TR")} karakter; WhatsApp'tan en fazla ` +
+        `${config.maxLength.toLocaleString("tr-TR")}). Kısaltıp gönder ya da uygulamadaki Lio'yu kullan.`,
     };
   }
 

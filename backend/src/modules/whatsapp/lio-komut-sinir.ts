@@ -22,7 +22,9 @@ export interface LioKomutConfig {
 }
 
 export const DEFAULT_LIO_KOMUT: LioKomutConfig = {
-  perHour: 10,
+  // 10'du; bir taslağı birkaç kez düzeltip onaylamak (2026-09-30 akşamı) bir
+  // saatte sınıra dayanıyordu. Kullanıcı kararıyla 30 (2026-10-02).
+  perHour: 30,
   // 1000'di; gerçek kullanımda dar kaldı (2026-10-02: kullanıcının uzun mesajı
   // reddedildi — bir Instagram açıklaması tek başına 2200 karakter olabiliyor).
   // Maliyet kaygısı küçük: her istekte zaten ~54 bin tokenlık sistem istemi

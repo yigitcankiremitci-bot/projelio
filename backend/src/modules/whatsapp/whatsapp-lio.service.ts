@@ -8,7 +8,7 @@ import type { AiAssistantService, ChatResult } from "../ai-assistant/ai-assistan
 import type { AiAttachmentsService } from "../ai-assistant/ai-attachments.service";
 import { MAX_ATTACHMENT_UPLOAD_BYTES } from "../ai-assistant/ai-attachments.service";
 import type { WahaClient } from "./waha.client";
-import { decideLioKomut, lioKomutConfigFromEnv } from "./lio-komut-sinir";
+import { decideLioKomut, devamCevabi, lioKomutConfigFromEnv } from "./lio-komut-sinir";
 import { gelenMedya, medyaTuru, MEDYA_INDIRME_ZAMAN_ASIMI_MS, MEDYA_TEK_DOSYA_TAVANI, type GelenMedya } from "../social-media/gelen-medya";
 import { yedekle, yedekSil, yedektenYukle } from "../social-media/medya-yedegi";
 import { medyaEtiketi, utcAn, WHATSAPP_ADSIZ_DOSYA_ONEKI } from "../social-media/sosyal-lio";
@@ -30,6 +30,8 @@ const KOMUT_SOHBET_PENCERESI_MS = 6 * 60 * 60 * 1000;
  * fotoğrafları birkaç saniye arayla gelir; hepsi gelince tek tur çalışsın.
  */
 const MEDYA_TURU_BEKLEME_MS = 20_000;
+/** Duraklatılan koşunun sürdürülebileceği süre — AiAssistantService PENDING_RUN_TTL_MS ile aynı. */
+const BEKLEYEN_KOSU_OMRU_MS = 15 * 60 * 1000;
 /** Taslak gösterilen turda cevap sınırı: Instagram açıklaması 2200 karakter + hesap/zaman/soru. */
 const TASLAK_CEVAP_SINIRI = 3500;
 /** Otomatik yanıtın üst uzunluğu (WhatsApp'ta kısa mesaj doğal). */
@@ -221,6 +223,11 @@ export class WhatsappLioService {
       return;
     }
 
+    // Duraklatılmış bir iş var ve mesajın tamamı bir onay/ret mi? Öyleyse yeni
+    // istek DEĞİL, o iş sürdürülür/durdurulur (bkz. devamCevabi).
+    const bekleyenKosu = this.bekleyenKosuAl(thread.id);
+    const devamKarari = bekleyenKosu && !media ? devamCevabi(karar.text) : null;
+
     // Bu tur, bekleyen "dosya geldi" turunun yerini tutar.
     this.medyaTuruIptal(userId);
     // Dosya hâlâ iniyorsa (büyük video dakikalar sürebilir) metin onu bekler:
@@ -310,15 +317,40 @@ export class WhatsappLioService {
 
     karar.text += await this.acikTaslakNotu(userId);
 
-    const result = await (await this.ai()).chat(
-      userId,
-      role,
-      karar.text,
-      convId,
-      "fast",
-      attachmentIds,
-      { channel: "whatsapp", allowWrites: contact.lio_allow_writes !== false }
-    );
+    let result: ChatResult;
+    if (bekleyenKosu && devamKarari) {
+      try {
+        // approveAll: kullanıcı WhatsApp'ta "devam" dediyse işi sonuna kadar
+        // götür; her adımda yeniden sormak burada aynı tıkanıklığı doğururdu.
+        // Bakiye korumaları onaya bağlı değil, yine geçerli.
+        result = await (await this.ai()).continueRun(bekleyenKosu.runId, userId, devamKarari === "devam", undefined, true);
+      } catch (e) {
+        if ((e as any)?.status !== 404 && (e as any)?.getStatus?.() !== 404) throw e;
+        // Koşu bellekteydi: süre doldu ya da sunucu yeniden başladı. Baştan
+        // yapmak (aynı görevleri ikinci kez açmak) yanlış olurdu; kullanıcı
+        // karar versin.
+        await this.gonder(
+          thread.id,
+          userId,
+          "Yarım kalan işi sürdüremiyorum: süresi doldu ya da sunucu yenilendi. Yapılmış olanlar duruyor. " +
+            "Kalanı için isteği yeniden yaz ve önceden açılanları tekrar açmamamı belirt.",
+          false
+        );
+        return;
+      }
+    } else {
+      result = await (await this.ai()).chat(
+        userId,
+        role,
+        karar.text,
+        convId,
+        "fast",
+        attachmentIds,
+        { channel: "whatsapp", allowWrites: contact.lio_allow_writes !== false }
+      );
+    }
+    // Yine duraklatıldıysa koşu saklanır: sıradaki "devam" onu sürdürür.
+    if (result.type === "continuation") this.bekleyenKosular.set(thread.id, { runId: result.runId, at: Date.now() });
 
     // chat() sohbeti kendisi açmış olabilir (convId undefined geçtiysek);
     // hangi sohbete bağlandığını bilmeden sürekliliği kuramayız.
@@ -370,6 +402,22 @@ export class WhatsappLioService {
         .join("\n") +
       "]"
     );
+  }
+
+  // ------------------------------------------------ duraklatılan koşular
+
+  /**
+   * Konuşma başına duraklatılmış Lio koşusu. Koşunun kendisi AiAssistantService'te
+   * bellekte (15 dk); burada yalnızca kimliği tutulur. Eskiden hiç tutulmuyordu ve
+   * WhatsApp'ta "devam et" işi baştan başlatıyordu.
+   */
+  private readonly bekleyenKosular = new Map<string, { runId: string; at: number }>();
+
+  /** Taze bekleyen koşuyu verir ve kaydı siler (her mesaj ya sürdürür ya bırakır). */
+  private bekleyenKosuAl(threadId: string): { runId: string; at: number } | null {
+    const k = this.bekleyenKosular.get(threadId);
+    this.bekleyenKosular.delete(threadId);
+    return k && Date.now() - k.at < BEKLEYEN_KOSU_OMRU_MS ? k : null;
   }
 
   // ------------------------------------------------ medya turu zamanlaması
@@ -510,11 +558,11 @@ export class WhatsappLioService {
 
 Bakiye yüklemek için: ${url}`;
       case "continuation":
-        // Web'de "devam edeyim mi?" diye sorulur; WhatsApp'ta o diyalog yok.
+        // Koşu saklandı (bkz. bekleyenKosular): "devam" yazınca kaldığı yerden sürer.
         return formatForWhatsapp(
           `${result.text ?? ""}
 
-İşin kalanı için uygulamadaki Lio'yu kullanın.`,
+Sürdürmem için "devam", durdurmam için "vazgeç" yaz.`,
           url
         );
       case "confirmation":

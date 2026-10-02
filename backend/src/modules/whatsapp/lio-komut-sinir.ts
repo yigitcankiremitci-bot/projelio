@@ -93,3 +93,31 @@ export function decideLioKomut(
 
   return { allowed: true, text: trimmed };
 }
+
+/**
+ * Duraklatılmış bir işe ("devam edeyim mi?") verilen cevap.
+ *
+ * NEDEN: WhatsApp'ta "devam et" eskiden duraklatılan işi SÜRDÜRMÜYORDU; yeni
+ * bir istek oluyor ve model işi baştan yapıyordu. 2026-10-02'de 8 ana görev
+ * üç kez açıldı, alt görevler üst göreve bağlanamadı. Yalnızca mesajın
+ * TAMAMI bir onay/ret ise karar verilir; "devam et ama önce şunu düzelt"
+ * yeni bir istektir.
+ */
+export type DevamKarari = "devam" | "durdur" | null;
+
+const DEVAM = new Set([
+  "devam", "devam et", "devam edin", "devam edebilirsin", "devam etsin", "sürdür", "evet",
+  "evet devam", "evet devam et", "tamam", "tamam devam", "olur", "ok", "okey", "yes", "continue", "go on",
+]);
+const DURDUR = new Set(["vazgeç", "vazgec", "hayır", "hayir", "dur", "iptal", "yeter", "durdur", "no", "stop"]);
+
+export function devamCevabi(metin: string | null | undefined): DevamKarari {
+  const t = (metin ?? "")
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[.!?,;:…]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (DEVAM.has(t)) return "devam";
+  if (DURDUR.has(t)) return "durdur";
+  return null;
+}

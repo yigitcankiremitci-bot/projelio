@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import {
   DEFAULT_LIO_KOMUT,
   decideLioKomut,
+  devamCevabi,
   isLioCommandEnabled,
   lioKomutConfigFromEnv,
 } from "./lio-komut-sinir";
@@ -90,5 +91,21 @@ describe("lioKomutConfigFromEnv", () => {
     // perHour=0 özelliği sessizce kapatırdı; kapatmanın yolu bayrak.
     const c = lioKomutConfigFromEnv({ WHATSAPP_LIO_SAATLIK: "0", WHATSAPP_LIO_MAX_UZUNLUK: "abc" });
     assert.deepEqual(c, DEFAULT_LIO_KOMUT);
+  });
+});
+
+describe("devamCevabi", () => {
+  test("onaylar işi sürdürür", () => {
+    for (const m of ["devam et", "Devam et", "DEVAM", "evet", "tamam.", "olur!", "devam edebilirsin"]) {
+      assert.equal(devamCevabi(m), "devam", m);
+    }
+  });
+  test("retler işi durdurur", () => {
+    for (const m of ["vazgeç", "Hayır", "dur", "iptal"]) assert.equal(devamCevabi(m), "durdur", m);
+  });
+  test("içerik taşıyan mesaj yeni istektir", () => {
+    assert.equal(devamCevabi("devam et ama önce başlıkları düzelt"), null);
+    assert.equal(devamCevabi("Pazarlama'ya 3 görev aç"), null);
+    assert.equal(devamCevabi(""), null);
   });
 });

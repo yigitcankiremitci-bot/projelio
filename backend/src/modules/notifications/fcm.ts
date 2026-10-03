@@ -1,6 +1,6 @@
 import { Logger } from "@nestjs/common";
 import { createSign } from "node:crypto";
-import type { NotificationPayload } from "@projelio/shared";
+import { bildirimSesiKanali, bildirimSesiTemizle, type NotificationPayload } from "@projelio/shared";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 
 /**
@@ -24,18 +24,23 @@ const OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const KAPSAM = "https://www.googleapis.com/auth/firebase.messaging";
 
 /**
- * Android bildirim kanalı. Uygulamadaki kimlikle BİREBİR aynı olmalı
- * (apps/mobile/android/.../strings.xml bildirim_kanali_kimligi); farklı olursa
- * Android bildirimi "Diğer" adlı sessiz bir kanala düşürür.
+ * Android bildirim kanalı = kullanıcının seçtiği ses (Ayarlar > Bildirimler,
+ * shared/bildirimSesleri.ts). Kanalın sesi Android'de kanal açılırken
+ * sabitleniyor; sesi seçmenin tek yolu her ses için ayrı kanal. Kanalı
+ * uygulama açıyor (BildirimSesiPlugin / MainActivity) — kimlik iki tarafta da
+ * bildirimSesiKanali()'ndan türüyor.
  *
- * _v2: kanal Projelio'nun kendi sesiyle yeniden açıldı (bkz. MainActivity
- * bildirimKanaliniOlustur — ses kanal açılırken sabitleniyor). Kanalı henüz
- * olmayan eski sürümlerde FCM SDK bilinmeyen kimliği görünce manifestteki
- * varsayılan kanala (o sürümde eski kimlik) düşüyor, yani bildirim kaybolmuyor.
+ * Telefonda bu kanal YOKSA (1.4.0'dan eski sürüm, ya da ses başka cihazdan
+ * değiştirildi ve uygulama o günden beri açılmadı) FCM SDK bilinmeyen kimliği
+ * görünce manifestteki varsayılan kanala düşüyor — bildirim kaybolmuyor,
+ * yalnızca o sürümün varsayılan sesiyle çalıyor.
+ *
+ * Aynı ad Android 8 öncesi (kanalsız) cihazlar için `sound` alanında da
+ * kullanılıyor: res/raw dosyasının adı kanal kimliğiyle aynı.
  */
-export const BILDIRIM_KANALI = "projelio_bildirimler_v2";
-/** res/raw/projelio_bildirim.mp3 — Android 8 öncesi (kanalsız) cihazlar için. */
-const BILDIRIM_SESI = "projelio_bildirim";
+export function bildirimKanali(ses?: string): string {
+  return bildirimSesiKanali(bildirimSesiTemizle(ses));
+}
 
 /** Bildirim ikonu (res/drawable-*), yalnızca alfa kanalı kullanılan beyaz logo. */
 const BILDIRIM_IKONU = "ic_stat_projelio";
@@ -56,7 +61,12 @@ const VURGU_RENGI = "#C0813F";
  *
  * `data` değerleri STRING olmak zorunda (FCM sayı/null reddeder).
  */
-export function fcmMesaji(token: string, bildirim: Pick<NotificationPayload, "id" | "type" | "title" | "body" | "link">) {
+export function fcmMesaji(
+  token: string,
+  bildirim: Pick<NotificationPayload, "id" | "type" | "title" | "body" | "link">,
+  ses?: string
+) {
+  const kanal = bildirimKanali(ses);
   return {
     message: {
       token,
@@ -72,11 +82,11 @@ export function fcmMesaji(token: string, bildirim: Pick<NotificationPayload, "id
         // yağdırmasın: 24 saatten eski bildirim artık bilgi değil gürültü.
         ttl: "86400s",
         notification: {
-          channel_id: BILDIRIM_KANALI,
+          channel_id: kanal,
           icon: BILDIRIM_IKONU,
           color: VURGU_RENGI,
           // Android 8+ sesi kanaldan alır; bu alan yalnızca daha eskileri için.
-          sound: BILDIRIM_SESI,
+          sound: kanal,
           default_vibrate_timings: true,
           notification_priority: "PRIORITY_HIGH",
         },
@@ -115,14 +125,14 @@ export class FcmGonderici {
     );
   }
 
-  async gonder(token: string, bildirim: NotificationPayload): Promise<FcmSonucu> {
+  async gonder(token: string, bildirim: NotificationPayload, ses?: string): Promise<FcmSonucu> {
     try {
       const erisim = await this.erisimJetonu();
       const proje = process.env.FCM_PROJECT_ID!.trim();
       const response = await fetchWithTimeout(`https://fcm.googleapis.com/v1/projects/${proje}/messages:send`, {
         method: "POST",
         headers: { Authorization: `Bearer ${erisim}`, "Content-Type": "application/json" },
-        body: JSON.stringify(fcmMesaji(token, bildirim)),
+        body: JSON.stringify(fcmMesaji(token, bildirim, ses)),
       }, 10_000);
       if (response.ok) return "gonderildi";
 

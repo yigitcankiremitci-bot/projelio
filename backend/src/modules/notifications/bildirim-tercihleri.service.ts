@@ -26,7 +26,8 @@ export class BildirimTercihleriService {
 
     const { data, error } = await this.supabase.client
       .from("notification_type_prefs")
-      .select("tipler, ses")
+      // "*": ses_secimi (migration 144) uygulanmadan da okuma bozulmasın.
+      .select("*")
       .eq("user_id", userId)
       .maybeSingle();
     if (error) {
@@ -44,7 +45,7 @@ export class BildirimTercihleriService {
     if (!userIds.length) return sonuc;
     const { data, error } = await this.supabase.client
       .from("notification_type_prefs")
-      .select("user_id, tipler, ses")
+      .select("*")
       .in("user_id", userIds);
     if (error) {
       this.logger.warn(`Bildirim tercihleri okunamadı, hepsi açık sayıldı: ${error.message}`);
@@ -57,9 +58,15 @@ export class BildirimTercihleriService {
   /** Tam tercih yazılır (arayüz her kayıtta hepsini gönderiyor); gövde temizlenir. */
   async kaydet(userId: string, govde: unknown): Promise<BildirimTercihleri> {
     const temiz = bildirimTercihleriniTemizle(govde);
-    const { error } = await this.supabase.client
-      .from("notification_type_prefs")
-      .upsert({ user_id: userId, tipler: temiz.tipler, ses: temiz.ses }, { onConflict: "user_id" });
+    const satir = { user_id: userId, tipler: temiz.tipler, ses: temiz.ses, ses_secimi: temiz.sesSecimi };
+    let { error } = await this.supabase.client.from("notification_type_prefs").upsert(satir, { onConflict: "user_id" });
+    // ses_secimi sütunu yoksa (migration 144 uygulanmadan) diğer tercihler yine
+    // kaydedilsin; yalnızca ses seçimi kalıcı olmaz.
+    if (error && /ses_secimi/.test(error.message ?? "")) {
+      this.logger.warn("ses_secimi sütunu yok (migration 144?) — ses seçimi kaydedilmedi.");
+      const eski = { user_id: userId, tipler: temiz.tipler, ses: temiz.ses };
+      ({ error } = await this.supabase.client.from("notification_type_prefs").upsert(eski, { onConflict: "user_id" }));
+    }
     if (error) throw error;
     this.onbellek.set(userId, { deger: temiz, son: Date.now() + ONBELLEK_MS });
     return temiz;

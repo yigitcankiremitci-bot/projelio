@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bildirim sesleri koddan ADIYLA aranıyor (BildirimSesiPlugin, getIdentifier) ve
+     sunucu da adını gönderiyor; R.raw üzerinden hiç başvurulmuyor. Kaynak
+     küçültme (shrinkResources) bir gün açılırsa hepsini "kullanılmıyor" sayıp
+     silerdi — sesler sessizce kaybolurdu. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/projelio_bildirim_*" />

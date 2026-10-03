@@ -50,9 +50,9 @@ interface CapacitorBridge {
       addListener?: (event: string, handler: (data: any) => void) => unknown;
     };
     BildirimSesi?: {
+      sec?: (options: { ses: string; ad: string }) => unknown;
       cal?: (options: { ses: string }) => unknown;
-      bildirimGonder?: (options: { ses: string; gecikme: number }) => unknown;
-      temizle?: () => unknown;
+      denemeBildirimi?: (options: { baslik: string; metin: string }) => unknown;
     };
   };
 }
@@ -311,49 +311,48 @@ export function uygulamaIciYol(link: unknown): string | null {
 }
 
 /* ------------------------------------------------------------------ *
- * BİLDİRİM SESİ DENEMESİ (Admin > Bildirim sesi)                     *
+ * BİLDİRİM SESİ (Ayarlar > Bildirimler)                              *
  * ------------------------------------------------------------------ */
 
 /**
- * Kabuğun ses deneme eklentisi var mı? 1.4.0'dan eski APK'larda yok — panel
- * o zaman "yeni sürümü kurun" der ve yalnızca tarayıcıdan dinletir.
- * Eklentinin kendisi: apps/mobile/android/.../BildirimSesiPlugin.java.
+ * Kabuğun ses eklentisi var mı? 1.4.0'dan eski APK'larda yok — orada telefon
+ * bildirimi o sürümün sabit sesiyle çalar, seçim yalnızca hesaba yazılır.
+ * Eklenti: apps/mobile/android/.../BildirimSesiPlugin.java.
  */
-export function kabukSesDenemesiVarMi(): boolean {
-  return Boolean(kopru()?.Plugins?.BildirimSesi?.bildirimGonder);
+export function kabukSesSecimiVarMi(): boolean {
+  return Boolean(kopru()?.Plugins?.BildirimSesi?.sec);
 }
 
 /**
- * Köprü hatası metin olarak döner (izin kapalı vb. — kullanıcıya gösterilir);
- * başarıda null. Diğer kabuk çağrılarından farklı olarak sonuç BEKLENİYOR:
- * denemenin tek amacı duyulmak, sessizce başarısız olursa yanlış karar verilir.
+ * Seçilen sesin Android kanalını açar ve öncekini siler. Uygulama açılışında
+ * da hesaptaki seçimle çağrılır: ses başka cihazdan değiştirildiyse bu telefon
+ * da eşitlensin. Hata yutulur — kanal açılamazsa bildirim varsayılan kanala
+ * düşer, kaybolmaz.
  */
-async function sesKoprusu(fn: (() => unknown) | undefined): Promise<string | null> {
-  if (!fn) return "Bu uygulama sürümünde ses denemesi yok.";
+export function kabukBildirimSesiniSec(ses: string, ad: string): void {
+  const eklenti = kopru()?.Plugins?.BildirimSesi;
+  guvenliCagir(eklenti?.sec && (() => eklenti.sec!({ ses, ad })));
+}
+
+/** Sesi telefonun BİLDİRİM ses düzeyinde çalar; eklenti yoksa false (çağıran tarayıcıda çalar). */
+export function kabukSesiCal(ses: string): boolean {
+  const eklenti = kopru()?.Plugins?.BildirimSesi;
+  return guvenliCagir(eklenti?.cal && (() => eklenti.cal!({ ses })));
+}
+
+/**
+ * Seçili sesle gerçek bir deneme bildirimi. Hata metin olarak döner (ör. izin
+ * kapalı) — kullanıcı neden duymadığını bilsin; başarıda null.
+ */
+export async function kabukDenemeBildirimi(baslik: string, metin: string): Promise<string | null> {
+  const eklenti = kopru()?.Plugins?.BildirimSesi;
+  if (!eklenti?.denemeBildirimi) return "yok";
   try {
-    await Promise.resolve(fn());
+    await Promise.resolve(eklenti.denemeBildirimi({ baslik, metin }));
     return null;
   } catch (err) {
     return err instanceof Error ? err.message : String(err);
   }
-}
-
-/** Sesi telefonun bildirim ses akışında hemen çalar (bildirim göstermeden). */
-export function kabukSesiCal(ses: string): Promise<string | null> {
-  const eklenti = kopru()?.Plugins?.BildirimSesi;
-  return sesKoprusu(eklenti?.cal && (() => eklenti.cal!({ ses })));
-}
-
-/** Seçilen sesin kendi kanalından gerçek bir sistem bildirimi atar. */
-export function kabukSesBildirimiGonder(ses: string, gecikme: number): Promise<string | null> {
-  const eklenti = kopru()?.Plugins?.BildirimSesi;
-  return sesKoprusu(eklenti?.bildirimGonder && (() => eklenti.bildirimGonder!({ ses, gecikme })));
-}
-
-/** Deneme kanallarını telefon ayarlarından kaldırır. */
-export function kabukSesDenemesiniTemizle(): Promise<string | null> {
-  const eklenti = kopru()?.Plugins?.BildirimSesi;
-  return sesKoprusu(eklenti?.temizle && (() => eklenti.temizle!()));
 }
 
 /* ------------------------------------------------------------------ *

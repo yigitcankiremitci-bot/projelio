@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { TOP_CHROME, Z, safeTop } from "../lib/layout";
 import { useNavigate } from "react-router-dom";
 import type { Socket } from "socket.io-client";
-import { safeExternalUrl, type CreationRequest, type JobMember, type NotificationPayload } from "@projelio/shared";
+import { bildirimSesiTemizle, safeExternalUrl, type CreationRequest, type JobMember, type NotificationPayload } from "@projelio/shared";
 import { api } from "../api/client";
-import { bildirimSesiCal, bildirimSesiniAyarla } from "../lib/bildirimSesi";
+import { bildirimSesiCal, bildirimSesiniAyarla, bildirimSesiSeciminiAyarla } from "../lib/bildirimSesi";
 import { getSocket } from "../lib/liveRoom";
 import { useThemeColors } from "../theme/useThemeColors";
 import { timeAgo } from "../lib/dates";
@@ -105,11 +105,14 @@ export default function NotificationBell() {
       })
       .catch(() => {});
 
-    // Ses tercihi (Ayarlar > Bildirimler). Okunamazsa ses açık kalır.
+    // Ses tercihi ve seçili ses (Ayarlar > Bildirimler). Okunamazsa ses açık,
+    // varsayılan ses. Seçim kabukta telefonun bildirim kanalını da eşitler.
     api
-      .get<{ ses: boolean }>("/notifications/preferences")
+      .get<{ ses: boolean; sesSecimi?: string }>("/notifications/preferences")
       .then((tercih) => {
-        if (!cancelled) bildirimSesiniAyarla(tercih.ses !== false);
+        if (cancelled) return;
+        bildirimSesiniAyarla(tercih.ses !== false);
+        bildirimSesiSeciminiAyarla(bildirimSesiTemizle(tercih.sesSecimi));
       })
       .catch(() => {});
 

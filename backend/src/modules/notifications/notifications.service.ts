@@ -1,6 +1,6 @@
 import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import * as webpush from "web-push";
-import { bildirimKanaliAcikMi, type NotificationPayload, type PushSubscriptionPayload } from "@projelio/shared";
+import { bildirimKanaliAcikMi, type BildirimSesiAnahtari, type NotificationPayload, type PushSubscriptionPayload } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsGateway } from "./notifications.gateway";
 import { WhatsappService } from "../whatsapp/whatsapp.service";
@@ -98,7 +98,7 @@ export class NotificationsService {
     this.gateway.sendToUser(userId, notification);
     if (bildirimKanaliAcikMi(tercih, type, "anlik")) {
       void this.sendPush(userId, notification).catch(() => {});
-      void this.sendMobilePush(userId, notification).catch(() => {});
+      void this.sendMobilePush(userId, notification, tercih.sesSecimi).catch(() => {});
     }
     // Dördüncü kanal: kullanıcı WhatsApp'a bağlıysa kuyruğa girer, değilse
     // sessizce döner. Gönderim burada değil, dakikalık işleyicide (hız sınırı).
@@ -226,7 +226,7 @@ export class NotificationsService {
     if (error) throw error;
   }
 
-  private async sendMobilePush(userId: string, notification: NotificationPayload): Promise<void> {
+  private async sendMobilePush(userId: string, notification: NotificationPayload, ses?: BildirimSesiAnahtari): Promise<void> {
     if (!this.fcm.isConfigured()) return;
     const { data, error } = await this.supabase.client.from("push_cihazlari").select("token").eq("user_id", userId);
     // Tablo yoksa (migration 131 uygulanmadan) sessizce geç: bildirimin kendisi
@@ -235,7 +235,7 @@ export class NotificationsService {
 
     await Promise.all(
       data.map(async ({ token }) => {
-        const sonuc = await this.fcm.gonder(token, notification);
+        const sonuc = await this.fcm.gonder(token, notification, ses);
         if (sonuc === "gecersiz") await this.removeDevice(token).catch(() => {});
       })
     );

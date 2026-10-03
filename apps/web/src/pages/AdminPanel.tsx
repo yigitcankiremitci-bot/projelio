@@ -17,7 +17,6 @@ import WhatsappNumbersPanel from "../components/WhatsappNumbersPanel";
 import WhatsappLeadsPanel from "../components/WhatsappLeadsPanel";
 import AdminEpostaPanel from "../components/adminEposta/AdminEpostaPanel";
 import AdminEpostaMaliyetPanel from "../components/adminEposta/AdminEpostaMaliyetPanel";
-import BildirimSesiDenemePanel from "../components/BildirimSesiDenemePanel";
 import TabBar from "../components/TabBar";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
@@ -36,8 +35,7 @@ type AdminTab =
   | "demoRandevu"
   | "demo"
   | "ziyaretler"
-  | "whatsapp"
-  | "bildirimSesi";
+  | "whatsapp";
 
 /**
  * Sekme etiketleri modül düzeyinde, t() burada çağrılamaz (kanca yok); Türkçe
@@ -60,7 +58,6 @@ const TABS: { key: AdminTab; label: string }[] = [
   { key: "demo", label: "Demo hesabı" }, // dil:anahtar
   { key: "ziyaretler", label: "Demo ziyaretleri" },
   { key: "whatsapp", label: "WhatsApp numaraları" }, // dil:anahtar
-  { key: "bildirimSesi", label: "Bildirim sesi" }, // dil:anahtar
 ];
 
 const NAV_WIDTH = 200;
@@ -189,7 +186,6 @@ export default function AdminPanel() {
         <WhatsappNumbersPanel />
       </>
     ),
-    bildirimSesi: () => <BildirimSesiDenemePanel />,
   };
 
   const tabs = TABS.map((s) => ({ ...s, label: t(s.label) }));

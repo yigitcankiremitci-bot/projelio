@@ -1,4 +1,5 @@
 import type { NotificationPayload } from "./types";
+import { bildirimSesiTemizle, VARSAYILAN_BILDIRIM_SESI, type BildirimSesiAnahtari } from "./bildirimSesleri";
 
 /**
  * BİLDİRİM TERCİHLERİ — hangi bildirim, hangi kanaldan (bkz. migration 135).
@@ -40,9 +41,15 @@ export interface BildirimTercihleri {
   tipler: Partial<Record<BildirimTipi, TipTercihi>>;
   /** Uygulama açıkken bildirim sesi çalsın mı (web). Telefonun sesi Android'in kanal ayarında. */
   ses: boolean;
+  /**
+   * Hangi ses (bkz. bildirimSesleri.ts) — hem telefonun bildirim kanalı hem
+   * uygulama açıkken çalan ses. İsteğe bağlı çünkü eski istemciler alanı
+   * göndermiyor; temizleyici her zaman doldurur. DB: ses_secimi (migration 144).
+   */
+  sesSecimi?: BildirimSesiAnahtari;
 }
 
-export const VARSAYILAN_BILDIRIM_TERCIHLERI: BildirimTercihleri = { tipler: {}, ses: true };
+export const VARSAYILAN_BILDIRIM_TERCIHLERI: BildirimTercihleri = { tipler: {}, ses: true, sesSecimi: VARSAYILAN_BILDIRIM_SESI };
 
 /**
  * Çanda KAPATILAMAYAN tipler. Hepsi ya kullanıcıdan bir yanıt bekliyor (davet,
@@ -203,7 +210,12 @@ export function bildirimKanaliAcikMi(tercihler: BildirimTercihleri | null | unde
  */
 export function bildirimTercihleriniTemizle(ham: unknown): BildirimTercihleri {
   const bilinenTipler = new Set<string>(BILDIRIM_KATEGORILERI.flatMap((k) => k.tipler.map((t) => t.tip)));
-  const nesne = (ham && typeof ham === "object" ? ham : {}) as { tipler?: unknown; ses?: unknown };
+  const nesne = (ham && typeof ham === "object" ? ham : {}) as {
+    tipler?: unknown;
+    ses?: unknown;
+    sesSecimi?: unknown;
+    ses_secimi?: unknown;
+  };
   const tipler: BildirimTercihleri["tipler"] = {};
   if (nesne.tipler && typeof nesne.tipler === "object") {
     for (const [tip, deger] of Object.entries(nesne.tipler as Record<string, unknown>)) {
@@ -217,5 +229,6 @@ export function bildirimTercihleriniTemizle(ham: unknown): BildirimTercihleri {
       if (Object.keys(temiz).length) tipler[tip as BildirimTipi] = temiz;
     }
   }
-  return { tipler, ses: nesne.ses !== false };
+  // Arayüz sesSecimi, veritabanı satırı ses_secimi gönderir.
+  return { tipler, ses: nesne.ses !== false, sesSecimi: bildirimSesiTemizle(nesne.sesSecimi ?? nesne.ses_secimi) };
 }

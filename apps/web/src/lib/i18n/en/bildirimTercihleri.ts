@@ -13,8 +13,8 @@ export const bildirimTercihleri: TranslationDict = {
   "Ayrıntıları gizle": "Hide details",
 
   // Bu cihaz
-  "Telefon bildirimleri açık. Sesi ve titreşimi telefonunun Ayarlar > Uygulamalar > Projelio > Bildirimler bölümünden değiştirebilirsin.":
-    "Phone notifications are on. You can change the sound and vibration in your phone's Settings > Apps > Projelio > Notifications.",
+  "Telefon bildirimleri açık. Sesi aşağıdan seçebilirsin; titreşimi telefonunun Ayarlar > Uygulamalar > Projelio > Bildirimler bölümünden değiştirebilirsin.":
+    "Phone notifications are on. Pick the sound below; you can change vibration in your phone's Settings > Apps > Projelio > Notifications.",
   "Bu tarayıcıya bildirim gönderilebiliyor. Sekme kapalıyken de gelir.":
     "This browser can receive notifications, even when the tab is closed.",
   "Bu tarayıcıda bildirimler engellenmiş. Adres çubuğundaki kilit simgesinden Projelio için bildirimlere izin ver.":
@@ -89,36 +89,18 @@ export const bildirimTercihleri: TranslationDict = {
   "Destek talebim yanıtlandığında": "When my support request is answered",
   "Projelio ekibinden mesaj": "Message from the Projelio team",
 
-  // Admin > Bildirim sesi (ses denemesi)
-  "Bildirim sesi denemesi": "Notification sound test",
-  "Mevcut ses (1.2.0)": "Current sound (1.2.0)",
-  "Ses 2": "Sound 2",
-  "Ses 3": "Sound 3",
-  "Ses 4 (1 oktav tiz)": "Sound 4 (1 octave up)",
-  "Ses 5 (2 oktav tiz)": "Sound 5 (2 octaves up)",
-  "Ses 10": "Sound 10",
-  "Ses 11": "Sound 11",
-  "Ses 12": "Sound 12",
-  "Ses 13": "Sound 13",
-  "Ses 14": "Sound 14",
-  "Ses 15": "Sound 15",
-  "Ses 16": "Sound 16",
-  "Aday ses": "Candidate sound",
-  Gecikme: "Delay",
-  Hemen: "Now",
-  "{n} sn": "{n}s",
-  "Bildirim olarak gönder": "Send as notification",
-  "Hemen dinle": "Play now",
-  "Ses çalınamadı.": "Couldn't play the sound.",
-  "Bildirim gönderildi.": "Notification sent.",
-  "Bildirim {n} saniye sonra gelecek — ekranı kilitleyebilirsin.": "The notification will arrive in {n} seconds — you can lock the screen.",
-  "Deneme kanalları silindi.": "Test channels removed.",
-  "Deneme kanallarını sil": "Remove test channels",
-  "Aday sesleri telefonda gerçek bildirim olarak dinleyip karşılaştır. Seçim kimsenin bildirim sesini değiştirmez; kazanan ses bir sonraki uygulama sürümüne konacak.":
-    "Compare the candidate sounds as real notifications on a phone. Choosing one doesn't change anyone's notification sound; the winner will ship in the next app version.",
-  "Tarayıcıdasın: sesler yalnızca bilgisayarda dinlenebilir. Patlama sorunu telefonda olduğu için asıl denemeyi Android uygulamasından (1.4.0 ve üstü) yap.":
-    "You're in a browser: sounds can only be played on this computer. The distortion happens on phones, so do the real test in the Android app (1.4.0 or later).",
-  "Bu uygulama sürümünde ses denemesi yok. 1.4.0 ve üstünü kur.": "This app version has no sound test. Install 1.4.0 or later.",
-  "Her ses telefonda kendi bildirim kanalında çalar (Android kanal sesini sonradan değiştirmiyor). Karar verince deneme kanallarını telefon ayarlarından kaldırabilirsin.":
-    "Each sound plays on its own notification channel (Android can't change a channel's sound later). Once you decide, you can remove the test channels from the phone's settings.",
+  // Bildirim sesi seçimi (shared/bildirimSesleri.ts)
+  "Uygulama içi ses": "In-app sound",
+  varsayılan: "default",
+  "{ad} sesini dinle": "Play {ad}",
+  "Deneme bildirimi": "Test notification",
+  "Bildirimlerin bu sesle gelecek.": "Your notifications will use this sound.",
+  "Deneme bildirimi gönder": "Send a test notification",
+  "Deneme bildirimi gönderildi.": "Test notification sent.",
+  "Deneme bildirimi gösterilemedi. Telefonun ayarlarından Projelio bildirimlerine izin ver.":
+    "Couldn't show the test notification. Allow Projelio notifications in your phone's settings.",
+  "Telefonda ve uygulama açıkken bildirimler bu sesle gelir. Seçince bir kez çalar.":
+    "Notifications on your phone and in the open app use this sound. It plays once when you pick it.",
+  "Seçtiğin ses telefonda uygulamanın yeni sürümüyle (1.4.0) çalmaya başlar; güncellemeyi Play Store'dan alabilirsin.":
+    "Your phone will use the chosen sound from the new app version (1.4.0) on; you can get the update from the Play Store.",
 };

@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { anahtarGecersizMi, BILDIRIM_KANALI, fcmMesaji } from "./fcm";
+import { anahtarGecersizMi, fcmMesaji } from "./fcm";
 
 describe("fcmMesaji", () => {
   const bildirim = { id: "n1", type: "task_assigned" as any, title: "Yeni görev", body: "Sana bir görev atandı", link: "/tasks/42" };
@@ -14,8 +14,16 @@ describe("fcmMesaji", () => {
   it("Doze'da bekletilmesin diye yüksek öncelikli ve uygulamanın kanalına gider", () => {
     const a = fcmMesaji("tok", bildirim).message.android;
     assert.equal(a.priority, "HIGH");
-    assert.equal(a.notification.channel_id, BILDIRIM_KANALI);
+    assert.equal(a.notification.channel_id, "projelio_bildirim_projelio");
     assert.equal(a.notification.icon, "ic_stat_projelio");
+  });
+
+  it("kullanıcının seçtiği sesin kanalına gider; bilinmeyen ses varsayılana düşer", () => {
+    const a = fcmMesaji("tok", bildirim, "noti13").message.android.notification;
+    assert.equal(a.channel_id, "projelio_bildirim_noti13");
+    // Android 8 öncesi: res/raw dosya adı kanal kimliğiyle aynı.
+    assert.equal(a.sound, "projelio_bildirim_noti13");
+    assert.equal(fcmMesaji("tok", bildirim, "ses2").message.android.notification.channel_id, "projelio_bildirim_projelio");
   });
 
   it("data değerlerinin hepsi string (FCM başka türü reddeder), link yoksa ana sayfa", () => {

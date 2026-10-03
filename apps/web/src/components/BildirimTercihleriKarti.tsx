@@ -3,11 +3,14 @@ import type { CSSProperties } from "react";
 import {
   BILDIRIM_KANALI_ETIKETI,
   BILDIRIM_KATEGORILERI,
+  BILDIRIM_SESLERI,
   KILITLI_BILDIRIM_TIPLERI,
   VARSAYILAN_BILDIRIM_TERCIHLERI,
   WHATSAPP_GIDEN_TIPLER,
   bildirimKanaliAcikMi,
+  bildirimSesiTemizle,
   type BildirimKanali,
+  type BildirimSesiAnahtari,
   type BildirimKategorisi,
   type BildirimTercihleri,
   type BildirimTipi,
@@ -15,8 +18,8 @@ import {
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
-import { kabuktaMi } from "../lib/mobilKabuk";
-import { bildirimSesiniAyarla, bildirimSesiniDene } from "../lib/bildirimSesi";
+import { kabukDenemeBildirimi, kabukSesSecimiVarMi, kabuktaMi } from "../lib/mobilKabuk";
+import { bildirimSesiniAyarla, bildirimSesiniDene, bildirimSesiSeciminiAyarla } from "../lib/bildirimSesi";
 import { initPush } from "../push";
 import { IconChevronDown, IconChevronRight } from "./icons";
 
@@ -61,6 +64,8 @@ export default function BildirimTercihleriKarti() {
   const [hata, setHata] = useState("");
   const [izin, setIzin] = useState(tarayiciIzni());
   const kabukta = kabuktaMi();
+  const sesSecimiVar = kabukSesSecimiVarMi();
+  const [denemeDurumu, setDenemeDurumu] = useState("");
 
   useEffect(() => {
     api
@@ -83,7 +88,10 @@ export default function BildirimTercihleriKarti() {
       setTercih(await api.patch<BildirimTercihleri>("/notifications/preferences", yeni));
     } catch {
       setTercih(onceki);
-      if (onceki) bildirimSesiniAyarla(onceki.ses);
+      if (onceki) {
+        bildirimSesiniAyarla(onceki.ses);
+        bildirimSesiSeciminiAyarla(bildirimSesiTemizle(onceki.sesSecimi));
+      }
       setHata(t("Ayar kaydedilemedi. Tekrar dene."));
     }
   };
@@ -105,6 +113,25 @@ export default function BildirimTercihleriKarti() {
       else delete yeniTipler[tip];
     }
     void kaydet({ ...tercih, tipler: yeniTipler });
+  };
+
+  /** Ses seçilince hemen duyulsun: kullanıcı listede gezerken karşılaştırıyor. */
+  const sesSec = (anahtar: BildirimSesiAnahtari) => {
+    if (!tercih) return;
+    setDenemeDurumu("");
+    bildirimSesiniDene(anahtar);
+    if (bildirimSesiTemizle(tercih.sesSecimi) === anahtar) return;
+    bildirimSesiSeciminiAyarla(anahtar);
+    void kaydet({ ...tercih, sesSecimi: anahtar });
+  };
+
+  const denemeGonder = async () => {
+    const hata = await kabukDenemeBildirimi(t("Deneme bildirimi"), t("Bildirimlerin bu sesle gelecek."));
+    setDenemeDurumu(
+      hata === null
+        ? t("Deneme bildirimi gönderildi.")
+        : t("Deneme bildirimi gösterilemedi. Telefonun ayarlarından Projelio bildirimlerine izin ver.")
+    );
   };
 
   const izinIste = async () => {
@@ -238,7 +265,7 @@ export default function BildirimTercihleriKarti() {
         <h3 style={baslik}>{t("Bu cihaz")}</h3>
         {kabukta ? (
           <p style={aciklama}>
-            {t("Telefon bildirimleri açık. Sesi ve titreşimi telefonunun Ayarlar > Uygulamalar > Projelio > Bildirimler bölümünden değiştirebilirsin.")}
+            {t("Telefon bildirimleri açık. Sesi aşağıdan seçebilirsin; titreşimi telefonunun Ayarlar > Uygulamalar > Projelio > Bildirimler bölümünden değiştirebilirsin.")}
           </p>
         ) : izin === "granted" ? (
           <p style={aciklama}>{t("Bu tarayıcıya bildirim gönderilebiliyor. Sekme kapalıyken de gelir.")}</p>
@@ -274,22 +301,96 @@ export default function BildirimTercihleriKarti() {
             }}
           >
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 14, color: c.textPrimary }}>{t("Bildirim sesi")}</div>
+              <div style={{ fontSize: 14, color: c.textPrimary }}>{t("Uygulama içi ses")}</div>
               <div style={{ fontSize: 13, color: c.textSecondary }}>{t("Uygulama açıkken yeni bildirim geldiğinde çalar.")}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={bildirimSesiniDene}
-                style={{ padding: "6px 10px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 13 }}
-              >
-                {t("Dinle")}
-              </button>
               {anaAnahtar(tercih.ses ? "acik" : "kapali", (on) => void kaydet({ ...tercih, ses: on }))}
             </div>
           </div>
         )}
       </section>
+
+      {tercih && (
+        <section style={kutu}>
+          <h3 style={baslik}>{t("Bildirim sesi")}</h3>
+          <p style={aciklama}>
+            {kabukta && !sesSecimiVar
+              ? t("Seçtiğin ses telefonda uygulamanın yeni sürümüyle (1.4.0) çalmaya başlar; güncellemeyi Play Store'dan alabilirsin.")
+              : t("Telefonda ve uygulama açıkken bildirimler bu sesle gelir. Seçince bir kez çalar.")}
+          </p>
+          <div role="radiogroup" aria-label={t("Bildirim sesi")} style={{ display: "flex", flexDirection: "column", marginTop: 8 }}>
+            {BILDIRIM_SESLERI.map(({ anahtar, ad }) => {
+              const secili = bildirimSesiTemizle(tercih.sesSecimi) === anahtar;
+              return (
+                <div
+                  key={anahtar}
+                  style={{ display: "flex", alignItems: "center", gap: 10, borderTop: `1px solid ${c.border}`, padding: "8px 0" }}
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={secili}
+                    onClick={() => sesSec(anahtar)}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "4px 0",
+                      border: "none",
+                      background: "transparent",
+                      color: c.textPrimary,
+                      fontSize: 14,
+                      fontWeight: secili ? 600 : 400,
+                      textAlign: "left",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 18,
+                        height: 18,
+                        flexShrink: 0,
+                        borderRadius: "50%",
+                        border: `2px solid ${secili ? c.accent : c.border}`,
+                        boxShadow: secili ? `inset 0 0 0 3px ${c.surface}` : "none",
+                        background: secili ? c.accent : "transparent",
+                      }}
+                    />
+                    {ad}
+                    {anahtar === "projelio" && (
+                      <span style={{ fontSize: 12, fontWeight: 400, color: c.textSecondary }}>{t("varsayılan")}</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => bildirimSesiniDene(anahtar)}
+                    aria-label={t("{ad} sesini dinle", { ad })}
+                    style={{ padding: "5px 10px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 13 }}
+                  >
+                    {t("Dinle")}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {sesSecimiVar && (
+            <div style={{ borderTop: `1px solid ${c.border}`, paddingTop: 12, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => void denemeGonder()}
+                style={{ padding: "7px 12px", borderRadius: 8, border: "none", background: c.accent, color: c.surface, fontSize: 13, fontWeight: 500 }}
+              >
+                {t("Deneme bildirimi gönder")}
+              </button>
+              {denemeDurumu && <span style={{ fontSize: 13, color: c.textSecondary }}>{denemeDurumu}</span>}
+            </div>
+          )}
+        </section>
+      )}
 
       {hata && <p style={{ color: c.danger, fontSize: 14, margin: 0 }}>{hata}</p>}
 

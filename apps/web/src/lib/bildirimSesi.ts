@@ -1,33 +1,52 @@
-import { kabuktaMi } from "./mobilKabuk";
+import { BILDIRIM_SESLERI, bildirimSesiDosyasi, VARSAYILAN_BILDIRIM_SESI, type BildirimSesiAnahtari } from "@projelio/shared";
+import { kabukBildirimSesiniSec, kabukSesiCal, kabuktaMi } from "./mobilKabuk";
 
 /**
- * Uygulama açıkken gelen bildirimin sesi (public/sounds/bildirim.mp3).
+ * Uygulama açıkken gelen bildirimin sesi — kullanıcının seçtiği ses
+ * (Ayarlar > Bildirimler, shared/bildirimSesleri.ts).
  *
  * Neden yalnızca sekme GÖRÜNÜRKEN: sekme arka plandaysa bildirim zaten web
  * push olarak işletim sistemine gidiyor ve onun sesi çalıyor; ikisi birden
  * çalmasın. Aynı sebeple birden çok sekme açıksa yalnızca bakılan sekme çalar.
  *
  * Neden mobil kabukta hiç çalmıyor: orada aynı bildirim FCM'den sistem
- * bildirimi olarak da geliyor ve kanalın kendi sesi (aynı dosya, res/raw)
- * çalıyor — burada da çalınsa kullanıcı sesi iki kez duyardı.
+ * bildirimi olarak da geliyor ve seçili sesin kanalı çalıyor — burada da
+ * çalınsa kullanıcı sesi iki kez duyardı.
  *
- * Açık/kapalı tercihi hesapta (Ayarlar > Bildirimler, migration 135); çan
- * açılışta okuyup buraya bildirir. Okunamazsa açık kalır.
+ * Açık/kapalı ve hangi ses hesapta (migration 135 + 144); çan açılışta okuyup
+ * buraya bildirir. Okunamazsa açık ve varsayılan ses.
  */
 let ses: HTMLAudioElement | null = null;
 let sesAcik = true;
+let secili: BildirimSesiAnahtari = VARSAYILAN_BILDIRIM_SESI;
 
 export function bildirimSesiniAyarla(acik: boolean): void {
   sesAcik = acik;
 }
 
-function cal(): void {
+/**
+ * Seçili sesi değiştirir. Kabukta telefonun bildirim kanalını da değiştirir —
+ * uygulama her açıldığında hesaptaki seçimle çağrıldığı için başka cihazda
+ * yapılan değişiklik bu telefona da geçer.
+ */
+export function bildirimSesiSeciminiAyarla(anahtar: BildirimSesiAnahtari): void {
+  if (anahtar !== secili) ses = null;
+  secili = anahtar;
+  const ad = BILDIRIM_SESLERI.find((s) => s.anahtar === anahtar)?.ad ?? "";
+  kabukBildirimSesiniSec(anahtar, ad);
+}
+
+function cal(anahtar: BildirimSesiAnahtari): void {
   try {
-    ses ??= new Audio("/sounds/bildirim.mp3");
-    ses.currentTime = 0;
-    // Tarayıcı, kullanıcı sayfayla hiç etkileşmediyse otomatik çalmayı
-    // reddeder; o durumda sessiz kalmak doğru, hata değil.
-    void ses.play().catch(() => {});
+    if (anahtar === secili) {
+      ses ??= new Audio(bildirimSesiDosyasi(anahtar));
+      ses.currentTime = 0;
+      // Tarayıcı, kullanıcı sayfayla hiç etkileşmediyse otomatik çalmayı
+      // reddeder; o durumda sessiz kalmak doğru, hata değil.
+      void ses.play().catch(() => {});
+    } else {
+      void new Audio(bildirimSesiDosyasi(anahtar)).play().catch(() => {});
+    }
   } catch {
     // Audio desteklenmiyorsa bildirim yine çanda görünür.
   }
@@ -35,10 +54,15 @@ function cal(): void {
 
 export function bildirimSesiCal(): void {
   if (!sesAcik || kabuktaMi() || document.visibilityState !== "visible") return;
-  cal();
+  cal(secili);
 }
 
-/** Ayarlardaki "Sesi dinle" — tercihten ve kabuktan bağımsız, kullanıcı istedi. */
-export function bildirimSesiniDene(): void {
-  cal();
+/**
+ * Ayarlardaki "Dinle" — tercihten bağımsız, kullanıcı istedi. Kabukta telefonun
+ * BİLDİRİM ses düzeyinde çalar (gerçekte duyacağı gibi); eski APK'da ya da
+ * tarayıcıda dosyayı çalar.
+ */
+export function bildirimSesiniDene(anahtar: BildirimSesiAnahtari = secili): void {
+  if (kabukSesiCal(anahtar)) return;
+  cal(anahtar);
 }

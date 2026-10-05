@@ -43,7 +43,12 @@ type ContentBlockParam = Extract<Anthropic.MessageParam["content"], any[]>[numbe
 const ONERI_KREDI_TAHMINI = 80;
 
 /** Yanıt tek bir JSON: açıklama + etiketler. */
-const MAX_YANIT_TOKEN = 1500;
+/**
+ * Yanıt tavanı düşünmeyi de kapsıyor (Sonnet 5'te düşünme varsayılan açık).
+ * 1500, JSON'a sıra gelmeden doluyordu — bkz. icerik-analizi.service.ts'teki
+ * aynı not. Kullanılmayan token kesilmez.
+ */
+const MAX_YANIT_TOKEN = 8000;
 
 /** ffmpeg yokken görsel olduğu gibi gönderilir; Anthropic'in 5 MB sınırının altında kalmalı. */
 const HAM_GORSEL_TAVANI = 4 * 1024 * 1024;

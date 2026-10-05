@@ -59,8 +59,15 @@ const GORSEL_ANALIZ_TAHMINI = 80;
 /** Metin raporu: birkaç bin token girdi + ~2 bin çıktı. */
 const RAPOR_TAHMINI = 40;
 
-const ANALIZ_YANIT_TOKEN = 1500;
-const RAPOR_YANIT_TOKEN = 3500;
+/**
+ * Yanıt tavanları DÜŞÜNMEYİ de kapsıyor: Sonnet 5 düşünmeyi varsayılan açık
+ * çalıştırıyor ve düşünme token'ları max_tokens'tan yiyor. 1500'lük tavan
+ * JSON'a sıra gelmeden doluyordu — canlıda "Lio bir analiz üretemedi"
+ * (2026-10-05). Tavan bir sınır, bedel değil: kullanılmayan token kesilmez.
+ */
+const ANALIZ_YANIT_TOKEN = 8000;
+const ONARIM_YANIT_TOKEN = 3000;
+const RAPOR_YANIT_TOKEN = 12_000;
 
 /** Instagram CDN'inden indirilen medya için üst sınır: büyük reels ~100 MB. */
 const CDN_ZAMAN_ASIMI_MS = 120_000;
@@ -396,7 +403,7 @@ export class IcerikAnaliziService {
       ],
     }));
     const kredi = await this.kullanimiKes(userId, choice, response);
-    const icerik = this.coz(() => fikirRaporunuCoz(metniAl(response)), choice, kredi);
+    const icerik = this.coz(() => fikirRaporunuCoz(metniAl(response)), choice, kredi, response);
 
     const { data, error } = await this.supabase.client
       .from("social_idea_reports")
@@ -470,8 +477,24 @@ export class IcerikAnaliziService {
         })));
       }
 
-      const kredi = (await this.kullanimiKes(userId, choice, response)) + sesKredisi;
-      return { okunan: this.coz(() => oku(metniAl(response)), choice, kredi), kredi };
+      let kredi = (await this.kullanimiKes(userId, choice, response)) + sesKredisi;
+      const metin = metniAl(response);
+      try {
+        return { okunan: oku(metin), kredi };
+      } catch (err) {
+        if (!(err instanceof AnalizOkunamadi) || !metin.trim()) {
+          return { okunan: this.coz(() => oku(metin), choice, kredi, response), kredi };
+        }
+        // Model analizi yazdı ama biçim bozuk (kesik JSON, kaçırılmamış tırnak,
+        // JSON yerine düz metin). Kareleri yeniden göndermeden, yazılan metin
+        // ucuz modelle istenen JSON'a çevrilir — bedel zaten ödendi.
+        this.logger.warn(
+          `Lio analizi okunamadı, onarılıyor (model=${choice.model}, durma=${response.stop_reason}): ${metin.slice(-300)}`
+        );
+        const onarim = await this.jsonOnar(userId, sistem, metin);
+        kredi += onarim.kredi;
+        return { okunan: this.coz(() => oku(onarim.metin), choice, kredi, onarim.response), kredi };
+      }
     } catch (err) {
       if (err instanceof VideoIslenemedi) throw new BadRequestException(err.message);
       throw err;
@@ -564,6 +587,31 @@ export class IcerikAnaliziService {
     }
   }
 
+  /**
+   * Bozuk biçimli yanıtı istenen JSON'a çevirir. Sistem istemindeki biçim
+   * tarifi aynen verilir; model yeni içerik üretmez, yalnızca biçimler.
+   */
+  private async jsonOnar(
+    userId: string,
+    sistem: string,
+    metin: string
+  ): Promise<{ metin: string; kredi: number; response: LlmResponse }> {
+    const bicim = sistem.slice(sistem.indexOf("YALNIZCA"));
+    const { response, choice } = await this.providers.send("fast", (secim) => ({
+      model: secim.model,
+      max_tokens: ONARIM_YANIT_TOKEN,
+      system: [
+        "Aşağıda bir analiz metni var; biçimi bozuk ya da yarım kalmış olabilir.",
+        "İçeriğini DEĞİŞTİRMEDEN ve yeni bilgi eklemeden istenen JSON biçimine dönüştür. Yarım kalan maddeyi çıkar.",
+        "",
+        bicim,
+      ].join("\n"),
+      messages: [{ role: "user", content: metin.slice(0, 20_000) }],
+    }));
+    const kredi = await this.kullanimiKes(userId, choice, response);
+    return { metin: metniAl(response), kredi, response };
+  }
+
   /** Sağlayıcı isteği işledi: yanıt okunamasa da kullanım kesilir (fatura okumadaki kural). */
   private async kullanimiKes(userId: string, choice: ProviderChoice, response: LlmResponse): Promise<number> {
     const { credits } = await this.credits.chargeUsage({
@@ -577,12 +625,14 @@ export class IcerikAnaliziService {
     return credits;
   }
 
-  private coz<T>(oku: () => T, choice: ProviderChoice, kredi: number): T {
+  private coz<T>(oku: () => T, choice: ProviderChoice, kredi: number, response?: LlmResponse): T {
     try {
       return oku();
     } catch (err) {
       if (err instanceof AnalizOkunamadi) {
-        this.logger.warn(`Lio analizi okunamadı (model=${choice.model}, kredi=${kredi})`);
+        this.logger.warn(
+          `Lio analizi okunamadı (model=${choice.model}, durma=${response?.stop_reason}, kredi=${kredi}): ${response ? metniAl(response).slice(-300) : ""}`
+        );
         throw new BadRequestException(err.message);
       }
       throw err;

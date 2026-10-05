@@ -677,12 +677,6 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
       ? [{ kind: "file", id: m.file.id }]
       : [];
 
-  /** Menüdeki seçimin DOSYALARI, ekrandaki sırayla — klasörler atlanır. */
-  const menuDosyalari = (m: MenuState): ProjectFile[] => {
-    const ids = new Set(menuHedefleri(m).filter((i) => i.kind === "file").map((i) => i.id));
-    return gorunenDosyalar.filter((f) => ids.has(f.id));
-  };
-
   /** Menüdeki seçimi bağlantı kaynaklarına çevirir (dosya ve klasör). */
   const menuKaynaklari = (m: MenuState): LinkSource[] =>
     menuHedefleri(m).map((i) => (i.kind === "folder" ? { folderId: i.id } : { fileId: i.id }));
@@ -1016,6 +1010,68 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
    * Sınırlar bellek içindir: zip tarayıcıda kuruluyor, dev bir klasör sekmeyi
    * çökertmesin diye toplam boyut ve dosya sayısı baştan sınırlı.
    */
+  /**
+   * Seçili öğeleri dosya listesine açar; klasörlerin içi alt klasörleriyle
+   * birlikte gezilir. Zip indirme ile klasör bağlantısı aynı koddan geçiyor:
+   * ikisinin "klasörde ne var" sorusuna farklı cevap vermesi, indirilen zip
+   * ile gönderilen bağlantının içeriğinin ayrışması demekti.
+   */
+  const ogeleriTopla = async (
+    items: { kind: "file" | "folder"; id: string }[]
+  ): Promise<{ yol: string; file: ProjectFile }[]> => {
+    const toplanan: { yol: string; file: ProjectFile }[] = [];
+    const gez = async (klasor: { id: string; name: string }, onek: string, derinlik: number) => {
+      if (derinlik > 12) return;
+      const yol = `${onek}${klasor.name}/`;
+      const [dosyalar, altlar] = await Promise.all([
+        klasorDosyalari(klasor.id),
+        folderOwner ? filesApi.folders(folderOwner, klasor.id) : Promise.resolve([] as FileFolder[]),
+      ]);
+      dosyalar.forEach((file) => toplanan.push({ yol: yol + file.name, file }));
+      for (const alt of altlar) await gez(alt, yol, derinlik + 1);
+    };
+    for (const item of items) {
+      if (item.kind === "file") {
+        const f = gorunenDosyalar.find((x) => x.id === item.id);
+        if (f) toplanan.push({ yol: f.name, file: f });
+      } else {
+        const k = gorunenKlasorler.find((x) => x.id === item.id);
+        if (k) await gez({ id: k.id, name: k.kind === "general" ? t(k.name) : k.name }, "", 0);
+      }
+    }
+    return toplanan;
+  };
+
+  /**
+   * Klasör(ler) için bağlantı: klasörün O ANKİ dosyalarıyla bir paket
+   * bağlantısı üretir (bkz. migration 121). Bağlantı klasöre değil dosya
+   * listesine bağlı — sonradan klasöre eklenen dosya alıcıya kendiliğinden
+   * açılmaz. Bilerek: paylaşanın görmediği bir dosyanın, eskiden gönderilmiş
+   * bir bağlantıdan sessizce dışarı çıkması istenmez.
+   */
+  const handleShareMany = async (items: { kind: "file" | "folder"; id: string }[]) => {
+    try {
+      setError("");
+      setZipDurumu(t("Dosyalar hazırlanıyor…"));
+      const dosyalar = [...new Map((await ogeleriTopla(items)).map((x) => [x.file.id, x.file])).values()];
+      if (!dosyalar.length) {
+        setError(t("Paylaşılacak dosya bulunamadı"));
+        return;
+      }
+      // Sunucudaki PAKET_DOSYA_TAVANI ile aynı: sınırı burada söylemek,
+      // pencereyi açıp seçenekleri seçtikten sonra 400 almaktan iyidir.
+      if (dosyalar.length > 50) {
+        setError(t("Bir bağlantıda en fazla 50 dosya olabilir"));
+        return;
+      }
+      setSharing(dosyalar);
+    } catch (e: any) {
+      setError(e?.message ?? t("Bağlantı oluşturulamadı"));
+    } finally {
+      setZipDurumu(null);
+    }
+  };
+
   const handleDownloadMany = async (items: { kind: "file" | "folder"; id: string }[]) => {
     if (items.length === 1 && items[0].kind === "file") {
       const f = gorunenDosyalar.find((x) => x.id === items[0].id);
@@ -1026,26 +1082,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
     try {
       setError("");
       setZipDurumu(t("Dosyalar hazırlanıyor…"));
-      const toplanan: { yol: string; file: ProjectFile }[] = [];
-      const gez = async (klasor: { id: string; name: string }, onek: string, derinlik: number) => {
-        if (derinlik > 12) return;
-        const yol = `${onek}${klasor.name}/`;
-        const [dosyalar, altlar] = await Promise.all([
-          klasorDosyalari(klasor.id),
-          folderOwner ? filesApi.folders(folderOwner, klasor.id) : Promise.resolve([] as FileFolder[]),
-        ]);
-        dosyalar.forEach((file) => toplanan.push({ yol: yol + file.name, file }));
-        for (const alt of altlar) await gez(alt, yol, derinlik + 1);
-      };
-      for (const item of items) {
-        if (item.kind === "file") {
-          const f = gorunenDosyalar.find((x) => x.id === item.id);
-          if (f) toplanan.push({ yol: f.name, file: f });
-        } else {
-          const k = gorunenKlasorler.find((x) => x.id === item.id);
-          if (k) await gez({ id: k.id, name: k.kind === "general" ? t(k.name) : k.name }, "", 0);
-        }
-      }
+      const toplanan = await ogeleriTopla(items);
       if (!toplanan.length) {
         setError(t("İndirilecek dosya bulunamadı"));
         return;
@@ -2160,19 +2197,12 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     onClick: () => setLinking(menuKaynaklari(menu)),
                   },
                   // Tek bağlantıda birden fazla dosya (bkz. migration 121).
-                  // Klasörler pakete girmiyor: bağlantı bir dosya listesi,
-                  // klasörün içeriği ise sonradan değişebilir.
-                  ...(() => {
-                    const secilenler = menuDosyalari(menu);
-                    return secilenler.length
-                      ? [
-                          {
-                            label: t("{sayi} dosya için bağlantı oluştur/gönder…", { sayi: secilenler.length }),
-                            onClick: () => setSharing(secilenler),
-                          },
-                        ]
-                      : [];
-                  })(),
+                  // Klasörler içlerindeki o anki dosyalarla pakete açılır
+                  // (bkz. handleShareMany).
+                  {
+                    label: t("{sayi} öğe için bağlantı oluştur/gönder…", { sayi: menu.toplu.length }),
+                    onClick: () => void handleShareMany(menuHedefleri(menu)),
+                  },
                   {
                     label: t("{sayi} öğeyi kaldır", { sayi: menu.toplu.length }),
                     danger: true,
@@ -2207,6 +2237,10 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
                     label: t("Çoğalt"),
                     disabled: readOnly,
                     onClick: () => void handleDuplicateFolder(menu.folder!),
+                  },
+                  {
+                    label: t("Bağlantı oluştur/gönder…"),
+                    onClick: () => void handleShareMany([{ kind: "folder", id: menu.folder!.id }]),
                   },
                   {
                     label: t("Bağla…"),

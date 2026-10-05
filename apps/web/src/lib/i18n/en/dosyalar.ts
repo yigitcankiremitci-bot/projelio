@@ -225,7 +225,9 @@ export const dosyalar: TranslationDict = {
   "E-posta dili": "Email language",
   "Türkçe": "Turkish",
   "İngilizce": "English",
-  "{sayi} dosya için bağlantı oluştur/gönder…": "Create or send link for {sayi} files…",
+  "{sayi} öğe için bağlantı oluştur/gönder…": "Create or send link for {sayi} items…",
+  "Paylaşılacak dosya bulunamadı": "No files to share",
+  "Bir bağlantıda en fazla 50 dosya olabilir": "A link can contain at most 50 files",
   "{ilk} ve {sayi} dosya daha": "{ilk} and {sayi} more",
   "{sayi} dosya tek bağlantıda paylaşılır. Bağlantıyı açan kişi Projelio hesabı olmadan hepsini önizleyip indirebilir; bağlantıyı istediğiniz an kaldırabilirsiniz.":
     "{sayi} files are shared in a single link. Whoever opens it can preview and download all of them without a Projelio account; you can remove the link at any time.",

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation, useNavigationType } from "react-router-dom";
 import { gezinti } from "./gezintiGecmisi";
 
@@ -145,6 +145,22 @@ export function useGezintiIzleyici(): void {
   gezinti.isle(tur, location.key, `${location.pathname}${location.search}`);
   const sabit = hereAsBack(location.pathname, location.search);
   if (sabit) gezinti.adiKaydet(location.key, sabit.label);
+}
+
+/**
+ * Detay sayfası (şirket, departman, iş, grup) adını gezinti geçmişine yazar.
+ *
+ * NEDEN: `useBackTarget` önceki sayfayı ancak ADI BİLİNİYORSA kullanıyor.
+ * Detay sayfalarının adı veri yüklenince belli olduğu için SAYFA_ADLARI'nda
+ * yoklar; kendini tanıtmayan bir sayfadan modüle girilince geri bağlantısı
+ * sabit ebeveyne (departmanın Modüller sekmesine) düşüyordu — kullanıcı
+ * şirket anasayfasından gelmiş olsa bile.
+ */
+export function useGezintiAdi(label: string | undefined): void {
+  const { key } = useLocation();
+  useEffect(() => {
+    if (label) gezinti.adiKaydet(key, label);
+  }, [key, label]);
 }
 
 export function useBackTarget(fallback: BackTarget): BackTarget {

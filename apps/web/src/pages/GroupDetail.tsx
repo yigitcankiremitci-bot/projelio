@@ -17,7 +17,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings } from "../components/icons";
 import { usePageHeader } from "../lib/pageHeader";
-import { useBackTarget } from "../lib/backTarget";
+import { useBackTarget, useGezintiAdi } from "../lib/backTarget";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
 
@@ -59,6 +59,8 @@ export default function GroupDetail() {
   const backRef = useRef<HTMLDivElement>(null);
   // Geri, holdinge hangi sayfadan girildiyse oraya döner (bkz. lib/backTarget).
   const back = useBackTarget({ to: "/groups", label: t("Gruplar") });
+  // Buradan açılan modülün geri bağlantısı bu sayfaya dönebilsin.
+  useGezintiAdi(group?.name);
   usePageHeader(group?.name, coverRef, [group?.name, back.to, back.label, back.geriGit], { ...back, sourceRef: backRef });
 
   if (!id) return null;

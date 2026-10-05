@@ -33,7 +33,7 @@ import { useLatestRef, useRefreshOnUndo, useReorderUndo, useUndo } from "../lib/
 import { gorevDurumHatasiniBildir, altGorevHatasiniBildir } from "../lib/taskBlockNotice";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
-import { useBackTarget } from "../lib/backTarget";
+import { useBackTarget, useGezintiAdi } from "../lib/backTarget";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
 import { CoverStats, StatSummary, type StatItem } from "../components/StatGrid";
@@ -371,6 +371,8 @@ export default function JobDetail() {
   const backRef = useRef<HTMLDivElement>(null);
   // Geri, işe hangi sayfadan girildiyse oraya döner (bkz. lib/backTarget).
   const back = useBackTarget({ to: "/", label: t("İşler") });
+  // Buradan açılan modülün geri bağlantısı bu sayfaya dönebilsin.
+  useGezintiAdi(job?.title);
   usePageHeader(job?.title, coverRef, [job?.title, back.to, back.label, back.geriGit], { ...back, sourceRef: backRef });
   // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
   // (bkz. ProjectDetail'deki aynı desen).

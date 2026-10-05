@@ -25,7 +25,7 @@ import { useCoverTheme } from "../theme/useCoverTheme";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
-import { useBackTarget } from "../lib/backTarget";
+import { useBackTarget, useGezintiAdi } from "../lib/backTarget";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
@@ -153,6 +153,8 @@ export default function OrganizationDetail() {
   const backRef = useRef<HTMLDivElement>(null);
   // Geri, şirkete hangi sayfadan girildiyse oraya döner (bkz. lib/backTarget).
   const back = useBackTarget({ to: "/organizations", label: t("Organizasyonlar") });
+  // Buradan açılan modülün geri bağlantısı bu sayfaya dönebilsin.
+  useGezintiAdi(organization?.name);
   usePageHeader(organization?.name, coverRef, [organization?.name, back.to, back.label, back.geriGit], {
     ...back,
     sourceRef: backRef,

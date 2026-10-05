@@ -18,7 +18,7 @@ import DepartmentSettingsModal from "../components/DepartmentSettingsModal";
 import ProfileCard from "../components/ProfileCard";
 import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton } from "../components/EntityCover";
 import AskLioButton from "../components/AskLioButton";
-import { useBackTarget } from "../lib/backTarget";
+import { useBackTarget, useGezintiAdi } from "../lib/backTarget";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
 import { presetForSeed } from "../lib/covers";
 import { TOP_CHROME_BOTTOM, safeTop } from "../lib/layout";
@@ -168,6 +168,8 @@ export default function DepartmentDetail() {
     to: department ? `/organizations/${department.organizationId}` : "/organizations",
     label: t("Departmanlar"),
   });
+  // Buradan açılan modülün geri bağlantısı bu sayfaya dönebilsin.
+  useGezintiAdi(gorunenAd);
 
   usePageHeader(gorunenAd, coverRef, [gorunenAd, department?.organizationId, back.to, back.label, back.geriGit], {
     to: back.to,

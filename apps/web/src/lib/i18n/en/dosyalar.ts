@@ -225,6 +225,7 @@ export const dosyalar: TranslationDict = {
   "E-posta dili": "Email language",
   "Türkçe": "Turkish",
   "İngilizce": "English",
+  "{sayi} dosya için bağlantı oluştur/gönder…": "Create or send link for {sayi} files…",
   "{sayi} öğe için bağlantı oluştur/gönder…": "Create or send link for {sayi} items…",
   "Paylaşılacak dosya bulunamadı": "No files to share",
   "Bir bağlantıda en fazla 50 dosya olabilir": "A link can contain at most 50 files",

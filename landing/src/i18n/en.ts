@@ -46,6 +46,8 @@ export const en: Dict = {
   },
 
   common: {
+    googlePlayKicker: "Get it on",
+    googlePlayAria: "Get Projelio on Google Play",
     whatsappLio: "Chat with Lio on WhatsApp",
     whatsappLioAria: "Start chatting with Lio on WhatsApp",
     whatsappLioText: "Hi Lio, I'd like to learn about Projelio.",

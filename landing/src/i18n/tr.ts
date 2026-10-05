@@ -45,6 +45,8 @@ export const tr = {
   },
 
   common: {
+    googlePlayKicker: "Uygulamayı indirin",
+    googlePlayAria: "Projelio'yu Google Play'den indirin",
     whatsappLio: "Lio ile WhatsApp'tan konuş",
     whatsappLioAria: "Lio ile WhatsApp'tan konuşmaya başla",
     whatsappLioText: "Merhaba Lio, Projelio'yu tanımak istiyorum.",

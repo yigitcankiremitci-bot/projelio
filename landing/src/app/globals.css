@@ -4268,3 +4268,65 @@ input[type="range"] {
   background: var(--ok);
   border: 2px solid var(--paper);
 }
+
+/* ------------------------------------------------------- store badge -- */
+/* Mağaza rozeti bilerek her temada siyah: Google'ın rozet kuralı koyu zemin
+   + ince açık kenarlık; sitenin bronz düğmelerine benzemesin, mağaza
+   bağlantısı olduğu ilk bakışta anlaşılsın. */
+
+.store-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px 7px 12px;
+  border-radius: 10px;
+  background: #000;
+  border: 1px solid #a6a6a6;
+  color: #fff;
+  line-height: 1.1;
+  transition: transform 0.16s ease, border-color 0.2s ease;
+}
+
+.store-badge:hover {
+  transform: translateY(-1.5px);
+  border-color: #fff;
+}
+
+.store-badge-icon {
+  width: 24px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.store-badge-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.store-badge-text small {
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.store-badge-text strong {
+  font-size: 1.12rem;
+  font-weight: 600;
+}
+
+.store-badge-sm {
+  padding: 5px 12px 5px 10px;
+}
+
+.store-badge-sm .store-badge-icon {
+  width: 19px;
+  height: 21px;
+}
+
+.store-badge-sm .store-badge-text strong {
+  font-size: 0.95rem;
+}
+
+.hero-store {
+  margin-top: 18px;
+}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Dict, Locale } from "@/i18n";
 import { appLinks, path, site } from "@/lib/site";
+import GooglePlayBadge from "@/components/GooglePlayBadge";
 
 export default function Footer({ dict, locale }: { dict: Dict; locale: Locale }) {
   const year = new Date().getFullYear();
@@ -48,6 +49,9 @@ export default function Footer({ dict, locale }: { dict: Dict; locale: Locale })
             <p style={{ marginTop: 16 }}>
               <a href={`mailto:${site.email}`}>{site.email}</a>
             </p>
+            <div style={{ marginTop: 16 }}>
+              <GooglePlayBadge dict={dict} compact />
+            </div>
           </div>
 
           <div>

@@ -49,6 +49,12 @@ export const site = {
    * dağıtımda iletişim numarası için kullanılıyor olabilir.
    */
   lioWhatsapp: process.env.NEXT_PUBLIC_LIO_WHATSAPP || "905534169500",
+  /**
+   * Android uygulamasının Play Store sayfası (paket kimliği app.projelio.mobile).
+   * Üretim incelemesi onaylanmadan bu adres test kullanıcısı olmayanlara
+   * "bulunamadı" gösterir — rozetler ancak onaydan sonra yayına alınmalı.
+   */
+  googlePlay: "https://play.google.com/store/apps/details?id=app.projelio.mobile",
   /** İletişim sayfasında ve yasal metinlerde görünen telefon. */
   phone: "+90 541 863 67 53",
   social: {

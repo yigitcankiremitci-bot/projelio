@@ -11,6 +11,7 @@ import LiveProduct from "@/components/LiveProduct";
 import FeatureFilm from "@/components/FeatureFilm";
 import JourneyFilm from "@/components/JourneyFilm";
 import DepartmentModules from "@/components/DepartmentModules";
+import GooglePlayBadge from "@/components/GooglePlayBadge";
 import ModuleEmblem, { DEPARTMENT_MODULE_KEYS } from "@/components/ModuleEmblem";
 import { ArrowRight, CheckSmall, WhatsApp, lioIcons, securityIcons } from "@/components/Icons";
 
@@ -112,6 +113,9 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
                 <WhatsApp size={18} />
                 {dict.common.whatsappLio}
               </a>
+            </div>
+            <div className="hero-store">
+              <GooglePlayBadge dict={dict} />
             </div>
             <div className="hero-proof">
               {dict.hero.proof.map((p) => (

@@ -154,7 +154,7 @@ export default function BenzerHesapKesfi({
       )}
       {acik && canWrite && !calisiyor && (
         <span style={{ fontSize: 11, color: c.textSecondary }}>
-          {t("Lio Bakiyesi harcar (model + en fazla 5 web araması). Sonuçlar saklanır.")}
+          {t("Lio Bakiyesi harcar (model + en fazla 3 web araması). Sonuçlar saklanır.")}
         </span>
       )}
       {hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}

@@ -13,6 +13,7 @@ import {
   KesifOkunamadi,
   kesifIstemi,
   kesifSistemi,
+  kurtarmaIstemi,
   MAX_ARAMA,
   sonMetin,
 } from "./benzer-hesap";
@@ -29,7 +30,12 @@ import { SocialMediaService, type SocialScope } from "./social-media.service";
  */
 const TAHMINI_GIRDI_TOKEN = 60_000;
 const TAHMINI_CIKTI_TOKEN = 3_000;
-const YANIT_TOKEN = 4000;
+/**
+ * Yanıt tavanı. 4000 yetmedi: model aramalar arasında düşünüyor ve düşünme
+ * token'ları da bu tavandan yiyor — JSON'a sıra gelmeden kesiliyordu.
+ */
+const YANIT_TOKEN = 12_000;
+const KURTARMA_YANIT_TOKEN = 3_000;
 /** Birkaç arama + okuma 60 sn'yi aşabiliyor; SDK'nın otomatik tekrarı aramaları ikilerdi. */
 const ZAMAN_ASIMI_MS = 180_000;
 /**
@@ -173,15 +179,29 @@ export class BenzerHesapService {
 
     const metin = sonMetin(son?.content ?? []);
 
+    const gorulen = gorulenAdresler(tumBloklar);
     let icerik;
     try {
-      icerik = kesfiCoz(metin, gorulenAdresler(tumBloklar), haric);
+      icerik = kesfiCoz(metin, gorulen, haric);
     } catch (err) {
-      if (err instanceof KesifOkunamadi) {
-        this.logger.warn(`Keşif yanıtı okunamadı (model=${choice.model}, arama=${aramaSayisi}, kredi=${kredi})`);
-        throw new BadRequestException(err.message);
+      if (!(err instanceof KesifOkunamadi)) throw err;
+      this.logger.warn(
+        `Keşif yanıtı okunamadı, kurtarma deneniyor (model=${choice.model}, durma=${son?.stop_reason}, arama=${aramaSayisi}, kredi=${kredi}): ${metin.slice(-300)}`
+      );
+      // Aramalar ödendi; sonuç atılmasın. Notlar + görülen sonuçlar aramasız,
+      // ucuz modelle JSON'a çevrilir. Doğrulama yine ORİJİNAL arama
+      // sonuçlarına göre yapılır — kurtarma modeli yeni kaynak uyduramaz.
+      const kurtarma = await this.kurtar(userId, secenek.dil, tumBloklar);
+      kredi += kurtarma.kredi;
+      try {
+        icerik = kesfiCoz(kurtarma.metin, gorulen, haric);
+      } catch (err2) {
+        if (err2 instanceof KesifOkunamadi) {
+          this.logger.warn(`Keşif kurtarması da okunamadı (kredi=${kredi}): ${kurtarma.metin.slice(-300)}`);
+          throw new BadRequestException(err2.message);
+        }
+        throw err2;
       }
-      throw err;
     }
 
     const { data, error } = await this.supabase.client
@@ -206,5 +226,23 @@ export class BenzerHesapService {
       throw error;
     }
     return kesfeCevir(data);
+  }
+
+  private async kurtar(userId: string, dil: "tr" | "en", bloklar: unknown[]): Promise<{ metin: string; kredi: number }> {
+    const { response, choice } = await this.providers.send("fast", (secim) => ({
+      model: secim.model,
+      max_tokens: KURTARMA_YANIT_TOKEN,
+      system: kesifSistemi(dil).replace(/^2\. web_search.*$/m, "2. Web araması YAPMA; yalnızca aşağıdaki notları ve arama sonuçlarını kullan."),
+      messages: [{ role: "user", content: kurtarmaIstemi(bloklar) }],
+    }));
+    const { credits } = await this.credits.chargeUsage({
+      userId,
+      model: choice.model,
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheWriteTokens: response.usage.cache_creation_input_tokens,
+      cacheReadTokens: response.usage.cache_read_input_tokens,
+    });
+    return { metin: sonMetin(response.content), kredi: credits };
   }
 }

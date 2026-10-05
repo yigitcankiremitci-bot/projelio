@@ -606,8 +606,8 @@ export const sosyal: TranslationDict = {
     "Source couldn't be verified in this search — check the profile before adding.",
   "Kendin ara:":
     "Search yourself:",
-  "Lio Bakiyesi harcar (model + en fazla 5 web araması). Sonuçlar saklanır.":
-    "Uses Lio Units (model + up to 5 web searches). Results are saved.",
+  "Lio Bakiyesi harcar (model + en fazla 3 web araması). Sonuçlar saklanır.":
+    "Uses Lio Units (model + up to 3 web searches). Results are saved.",
   "Lio bir sonuç üretemedi, tekrar dene.":
     "Lio couldn't produce a result, try again.",
   "Lio gönderilerinden nişini çıkarır ve açık web'de (listeler, haberler, bloglar) bu nişteki içerik üreticilerini arar. Instagram taranmaz; adayları profiline bakıp panoya ekleyen sensin.":

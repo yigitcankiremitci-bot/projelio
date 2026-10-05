@@ -68,3 +68,19 @@ describe("keşif yanıt metni", () => {
     assert.equal(metin, '{"nis": "Müzik"}');
   });
 });
+
+import { kesifSistemi, kurtarmaIstemi } from "./benzer-hesap";
+
+describe("keşif kurtarması", () => {
+  test("notlar ve görülen sonuçlar istemde, arama talimatı kaldırılabilir", () => {
+    const istem = kurtarmaIstemi([
+      { type: "text", text: "Şu hesapları buldum: @gercek.hesap" },
+      { type: "web_search_tool_result", content: [{ url: "https://ornek.com/liste", title: "Liste" }] },
+      { type: "web_search_tool_result", content: { type: "web_search_tool_result_error" } },
+    ]);
+    assert.match(istem, /@gercek\.hesap/);
+    assert.match(istem, /Liste — https:\/\/ornek\.com\/liste/);
+    const sistem = kesifSistemi("tr").replace(/^2\. web_search.*$/m, "2. ARAMA YOK");
+    assert.match(sistem, /^2\. ARAMA YOK$/m);
+  });
+});

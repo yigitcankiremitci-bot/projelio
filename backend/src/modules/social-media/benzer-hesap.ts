@@ -12,8 +12,14 @@ import type { SocialDiscoveryCandidate, SocialPlatform } from "@projelio/shared"
 import { normalizeSocialHandle } from "@projelio/shared";
 import { jsonuAyikla } from "./lio-oneri";
 
-/** Bir keşifte en fazla bu kadar web araması (her biri ayrı ücret). */
-export const MAX_ARAMA = 5;
+/**
+ * Bir keşifte en fazla bu kadar web araması (her biri ayrı ücret).
+ *
+ * 3, çünkü maliyetin asıl kalemi arama ücreti değil: her arama sonucu sonraki
+ * her örnekleme adımında modele YENİDEN girdi olarak gidiyor. 5 aramalık ilk
+ * canlı keşif ~100 bin girdi token'ı tuttu (2026-10-05).
+ */
+export const MAX_ARAMA = 3;
 export const MAX_ADAY = 12;
 
 /** Instagram kullanıcı adı kuralı: harf, rakam, nokta, alt çizgi; en çok 30. */
@@ -200,5 +206,27 @@ export function sonMetin(bloklar: unknown[]): string {
   const sonra = liste.slice(bas).filter((b) => b?.type === "text");
   const secilen = sonra.length ? sonra : liste.filter((b) => b?.type === "text");
   return secilen.map((b) => b.text ?? "").join("");
+}
+
+/**
+ * Kurtarma istemi: aramalı yanıt JSON'a okunamadığında (düşünme çıktı
+ * sınırını doldurdu, model JSON yerine düz metin yazdı) toplanan notlar ve
+ * görülen arama sonuçları ARAMASIZ, ucuz bir modelle istenen biçime çevrilir.
+ * Aramalar tekrar yapılmaz — bedelleri zaten ödendi.
+ */
+export function kurtarmaIstemi(bloklar: unknown[]): string {
+  const s: string[] = ["Araştırma sırasında yazılan notlar:"];
+  for (const b of bloklar as any[]) {
+    if (b?.type === "text" && typeof b.text === "string" && b.text.trim()) s.push(b.text.trim().slice(0, 4000));
+  }
+  s.push("", "Görülen arama sonuçları (başlık — adres):");
+  for (const b of bloklar as any[]) {
+    if (b?.type === "web_search_tool_result" && Array.isArray(b.content)) {
+      for (const r of b.content) {
+        if (typeof r?.url === "string") s.push(`- ${typeof r.title === "string" ? r.title : ""} — ${r.url}`);
+      }
+    }
+  }
+  return s.join("\n").slice(0, 40_000);
 }
 

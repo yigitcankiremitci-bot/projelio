@@ -3,6 +3,7 @@ import type {
   SocialAccountMediaItem,
   SocialAnalyticsOverview,
   SocialCaptionSuggestion,
+  SocialDiscovery,
   SocialIdeaReport,
   SocialInspiration,
   SocialInspirationInput,
@@ -205,4 +206,8 @@ export const socialMediaApi = {
   /** Lio fikir raporu — metin modeli, birkaç bin token çıktı. */
   fikirUret: (scope: SocialScope, body: { accountId?: string; istek?: string }) =>
     api.post<SocialIdeaReport>(`${base(scope)}/social-media/fikirler`, withScope(scope, body), undefined, 3 * 60_000),
+
+  /** "Benzer hesap bul" — Lio açık web'de arar; sunucu 3 dakikaya kadar bekliyor. */
+  benzerHesapBul: (scope: SocialScope, body: { accountId?: string; istek?: string }) =>
+    api.post<SocialDiscovery>(`${base(scope)}/social-media/benzer-hesaplar`, withScope(scope, body), undefined, 4 * 60_000),
 };

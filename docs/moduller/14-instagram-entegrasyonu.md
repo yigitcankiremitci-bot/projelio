@@ -200,6 +200,7 @@ arayüz `apps/web/src/components/sosyalAnaliz/`.
 | Performans | Her gönderi **kendi hesabının medyanıyla** kıyaslanır ("normalin 3,2 katı"). İlk 48 saat kıyas dışı ("yeni"). |
 | Lio gönderi analizi | Videoyu Meta'dan taze adresle indirir, kare + ses → "neden böyle gitti, sürdür, geliştir". Sonuç `lio_analiz`'e yazılır (bakiye bir kez harcanır). |
 | İlham panosu | Kullanıcının **elle** eklediği hesap/içerik: bağlantı, not, etiket, isteğe bağlı referans dosyası. Lio "neden işliyor, sana nasıl uyar" der. |
+| Benzer hesap bul | İlham panosunun üstünde. Lio nişi çıkarır, **Anthropic sunucu tarafı web aramasıyla açık web'de** (listeler, haberler, bloglar) aday hesap arar — en fazla 5 arama. Aday ancak kaynağı bu keşifte gerçekten dönen bir arama sonucuysa "doğrulandı"; değilse kaynağı gösterilmez ve kart uyarır. Sonuç `social_discoveries`'e yazılır (migration 146). Kod: `benzer-hesap.ts` (saf), `benzer-hesap.service.ts`. Yalnızca Anthropic sağlayıcısı tanımlıyken açık; arama başına ücret `AI_WEB_SEARCH_USD_PER_SEARCH` (varsayılan 0,01 USD) + model kullanımı — bir keşif ≈ 0,2-0,35 USD. |
 | Fikir raporu | Metin modeli: en iyi/en zayıf gönderiler + analizler + ilhamlar → kalıplar ve fikirler. `social_idea_reports`'a yazılır; her fikir takvime "fikir" durumunda içerik olarak eklenebilir. |
 
 **Başka hesapların verisi otomatik çekilmez.** Resmi yolu (Business Discovery,

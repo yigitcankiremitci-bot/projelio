@@ -20,6 +20,20 @@ export interface LlmRequest {
   /** Düz metin ya da bloklu sistem promptu (bloklu hâlde `cache_control` taşıyabilir). */
   system?: string | Anthropic.TextBlockParam[];
   tools?: Anthropic.Tool[];
+  /**
+   * Sağlayıcının KENDİ sunucusunda çalışan araçlar (ör. Anthropic web araması:
+   * `{type: "web_search_20250305", name: "web_search", max_uses}`). Yalnızca
+   * `capabilities.webSearch` olan sağlayıcıya gönderilir; diğerleri bilinmeyen
+   * araç türünü reddeder.
+   */
+  serverTools?: Record<string, unknown>[];
+  /**
+   * Bu istek için zaman aşımı ve SDK'nın kendi tekrar denemesi. Varsayılanlar
+   * sohbet için ayarlı (60 sn, 3 tekrar); birkaç web araması yapan bir istek
+   * 60 sn'yi aşabiliyor ve otomatik tekrar aramaları — yani bedeli — ikiler.
+   */
+  timeoutMs?: number;
+  maxRetries?: number;
 }
 
 /**
@@ -43,6 +57,8 @@ export interface LlmResponse {
      * kullanıldığı için bu sayı doğrudan "paylaşılan önek yazımı" demek.
      */
     cache_creation_1h_input_tokens?: number;
+    /** Sunucu tarafında yapılan web araması adedi (ayrıca faturalanır). */
+    web_search_requests?: number;
   };
 }
 
@@ -56,6 +72,11 @@ export interface LlmCapabilities {
   tools: boolean;
   /** Görsel girdi kabul ediliyor mu? */
   vision: boolean;
+  /**
+   * Sunucu tarafı web araması var mı. Yalnızca resmî Anthropic ucu: MiniMax'ın
+   * Anthropic uyumlu ucu aynı biçimi konuşsa da bu aracı sunmuyor.
+   */
+  webSearch?: boolean;
 }
 
 export interface LlmProvider {

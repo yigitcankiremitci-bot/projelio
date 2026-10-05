@@ -3,6 +3,7 @@ import { AuthGuard } from "@nestjs/passport";
 import type { SocialInspirationInput } from "@projelio/shared";
 import { AccessService } from "../../common/access/access.service";
 import { istemciDili } from "../../common/i18n";
+import { BenzerHesapService } from "./benzer-hesap.service";
 import { IcerikAnaliziService } from "./icerik-analizi.service";
 
 /**
@@ -17,6 +18,7 @@ import { IcerikAnaliziService } from "./icerik-analizi.service";
 export class IcerikAnaliziController {
   constructor(
     private analiz: IcerikAnaliziService,
+    private benzerHesap: BenzerHesapService,
     private access: AccessService
   ) {}
 
@@ -69,6 +71,32 @@ export class IcerikAnaliziController {
   @Post("jobs/:jobId/social-media/fikirler")
   jobIdeas(@Param("jobId") jobId: string, @Body() body: { accountId?: string; istek?: string }, @Req() req: any) {
     return this.analiz.fikirUret({ jobId }, req.user.userId, {
+      accountId: typeof body?.accountId === "string" ? body.accountId : undefined,
+      istek: typeof body?.istek === "string" ? body.istek : undefined,
+      dil: istemciDili(req) === "en" ? "en" : "tr",
+    });
+  }
+
+  /**
+   * "Benzer hesap bul" — Lio açık web'de arar (Instagram taranmaz). Birkaç
+   * arama + okuma, bir iki dakika sürebilir.
+   */
+  @Post("organizations/:organizationId/social-media/benzer-hesaplar")
+  orgDiscover(
+    @Param("organizationId") organizationId: string,
+    @Body() body: { departmentId?: string; accountId?: string; istek?: string },
+    @Req() req: any
+  ) {
+    return this.benzerHesap.bul({ organizationId, departmentId: body?.departmentId }, req.user.userId, {
+      accountId: typeof body?.accountId === "string" ? body.accountId : undefined,
+      istek: typeof body?.istek === "string" ? body.istek : undefined,
+      dil: istemciDili(req) === "en" ? "en" : "tr",
+    });
+  }
+
+  @Post("jobs/:jobId/social-media/benzer-hesaplar")
+  jobDiscover(@Param("jobId") jobId: string, @Body() body: { accountId?: string; istek?: string }, @Req() req: any) {
+    return this.benzerHesap.bul({ jobId }, req.user.userId, {
       accountId: typeof body?.accountId === "string" ? body.accountId : undefined,
       istek: typeof body?.istek === "string" ? body.istek : undefined,
       dil: istemciDili(req) === "en" ? "en" : "tr",

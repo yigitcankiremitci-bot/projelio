@@ -5,6 +5,7 @@ import {
   calculateSpeechCost,
   calculateTranscriptionCost,
   calculateUsageCost,
+  calculateWebSearchCost,
   COMMISSION_RATE,
   CREDIT_UNIT_USD,
   MIN_BALANCE_TO_START,
@@ -504,6 +505,45 @@ export class AiCreditsService {
     });
 
     return { credits, balanceAfter };
+  }
+
+  /**
+   * Web araması bedelini düşer (arama adedi × liste fiyatı + komisyon).
+   *
+   * Token bedelinden ayrı bir kalem: aynı istekte model kullanımı
+   * chargeUsage'dan, aramalar buradan kesilir. Deftere ayrı model adıyla
+   * yazılır ki marj raporunda arama kalemi görünsün.
+   */
+  async chargeWebSearch(params: {
+    userId: string;
+    searches: number;
+    description: string;
+  }): Promise<{ credits: number; balanceAfter: number }> {
+    const { userId, searches, description } = params;
+    const { costUsd, chargedUsd, credits } = calculateWebSearchCost(searches);
+
+    if (demoKullanicisiMi(userId)) return this.demoHarcamasiniYaz(credits);
+
+    if (credits <= 0) return { credits: 0, balanceAfter: (await this.getBalance(userId)).balance };
+
+    const balanceAfter = await this.chargeAtomic({
+      userId,
+      credits: -credits,
+      type: "usage",
+      description: `${description} (${searches} web araması)`,
+      model: "web_search",
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd,
+      chargedUsd,
+    });
+
+    return { credits, balanceAfter };
+  }
+
+  /** N aramanın bakiye karşılığı — başlamadan önceki kontrol için. */
+  estimateWebSearchCredits(searches: number): number {
+    return calculateWebSearchCost(searches).credits;
   }
 
   async listTransactions(userId: string, limit = 50): Promise<CreditTransaction[]> {

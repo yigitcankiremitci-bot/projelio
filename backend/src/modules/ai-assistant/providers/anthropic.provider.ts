@@ -52,7 +52,14 @@ export class AnthropicProvider implements LlmProvider {
       max_tokens: request.max_tokens,
       messages: request.messages,
       ...(request.system ? { system: request.system as any } : {}),
-      ...(request.tools ? { tools: request.tools } : {}),
+      // Sunucu araçları SDK'nın bu sürümünün tiplerinde yok (0.32); gövde
+      // olduğu gibi gittiği için API yine de kabul ediyor.
+      ...(request.tools || request.serverTools
+        ? { tools: [...(request.tools ?? []), ...(request.serverTools ?? [])] as any }
+        : {}),
+    }, {
+      ...(request.timeoutMs ? { timeout: request.timeoutMs } : {}),
+      ...(request.maxRetries !== undefined ? { maxRetries: request.maxRetries } : {}),
     });
 
     const usage: any = response.usage ?? {};
@@ -65,6 +72,7 @@ export class AnthropicProvider implements LlmProvider {
         cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
         cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
         cache_creation_1h_input_tokens: usage.cache_creation?.ephemeral_1h_input_tokens ?? 0,
+        web_search_requests: usage.server_tool_use?.web_search_requests ?? 0,
       },
     };
   }

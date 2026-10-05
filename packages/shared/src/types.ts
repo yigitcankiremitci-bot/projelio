@@ -3181,6 +3181,43 @@ export interface SocialIdeaReport extends SocialIdeaReportContent {
   createdByName?: string;
 }
 
+/** "Benzer hesap bul"un bulduğu aday. */
+export interface SocialDiscoveryCandidate {
+  /** "@" öneksiz, küçük harf kullanıcı adı. */
+  handle: string;
+  /** Görünen ad / marka adı (biliniyorsa). */
+  ad?: string;
+  platform: SocialPlatform;
+  /** Neden benzer: konu, format, ton. */
+  neden: string;
+  /** Adayın geçtiği web sayfası. */
+  kaynak?: string;
+  kaynakBaslik?: string;
+  /**
+   * Kaynak, Lio'nun bu keşifte GERÇEKTEN açtığı arama sonuçlarından biri mi.
+   * Değilse aday modelin kendi bilgisinden gelmiştir ve yanlış olabilir —
+   * arayüz bunu açıkça işaretler.
+   */
+  dogrulandi: boolean;
+}
+
+export interface SocialDiscovery {
+  id: string;
+  accountId?: string;
+  istek?: string;
+  /** Lio'nun çıkardığı niş tarifi. */
+  nis: string;
+  /** "#" öneksiz; arayüz Instagram etiket sayfasına bağlar. */
+  hashtagler: string[];
+  /** Kullanıcının kendisinin arayabileceği ifadeler. */
+  aramalar: string[];
+  adaylar: SocialDiscoveryCandidate[];
+  aramaSayisi: number;
+  kredi: number;
+  createdAt: string;
+  createdByName?: string;
+}
+
 /** Analiz sekmesinin tek isteği. */
 export interface SocialAnalyticsOverview {
   /** Instagram entegrasyonu bu kurulumda açık mı. */
@@ -3189,6 +3226,10 @@ export interface SocialAnalyticsOverview {
   medya: SocialAccountMediaItem[];
   ilhamlar: SocialInspiration[];
   raporlar: SocialIdeaReport[];
+  /** Son "benzer hesap bul" sonuçları (migration 146 öncesi boş). */
+  kesifler: SocialDiscovery[];
+  /** Bu kurulumda web araması yapabilen bir sağlayıcı var mı. */
+  kesifAcik: boolean;
 }
 
 // ---------------------------------------------------------- Hesap şifreleri

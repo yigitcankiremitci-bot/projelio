@@ -3,6 +3,7 @@ import type {
   SocialAccountMediaItem,
   SocialAnalyticsAccount,
   SocialAnalyticsOverview,
+  SocialDiscovery,
   SocialIdeaReport,
   SocialInspiration,
   SocialInspirationAnalysis,
@@ -92,11 +93,12 @@ export class IcerikAnaliziService {
 
     const hesapSatirlari = await this.bagliHesaplar(scope);
     const ids = hesapSatirlari.map((h) => h.id);
-    const [izinler, medya, ilhamlar, raporlar] = await Promise.all([
+    const [izinler, medya, ilhamlar, raporlar, kesifler] = await Promise.all([
       this.tokens.izinVarMi(ids, IG_INSIGHTS_SCOPE),
       this.medyaListesi(ids),
       this.ilhamListesi(scope),
       this.raporListesi(scope),
+      this.kesifListesi(scope),
     ]);
 
     const hesaplar: SocialAnalyticsAccount[] = hesapSatirlari.map((h) => ({
@@ -112,7 +114,15 @@ export class IcerikAnaliziService {
       yenidenBaglanmali: instagramInsightsAcik() && izinler.get(h.id) === false,
     }));
 
-    return { ayarli: this.oauth.isConfigured(), hesaplar, medya, ilhamlar, raporlar };
+    return {
+      ayarli: this.oauth.isConfigured(),
+      hesaplar,
+      medya,
+      ilhamlar,
+      raporlar,
+      kesifler,
+      kesifAcik: this.providers.webSearchChoice("smart") !== null,
+    };
   }
 
   /** "Şimdi güncelle". Kısa aralıkla tekrarlanırsa Meta'ya gitmeden mevcut durumu döner. */
@@ -467,7 +477,8 @@ export class IcerikAnaliziService {
 
   // ============================================================ Veri
 
-  private async bagliHesaplar(scope: SocialScope): Promise<any[]> {
+  /** Kapsamdaki bağlı Instagram hesapları (ham satır) — keşif servisi de kullanıyor. */
+  async bagliHesaplar(scope: SocialScope): Promise<any[]> {
     const sorgu = this.supabase.client
       .from("social_accounts")
       .select(
@@ -484,7 +495,7 @@ export class IcerikAnaliziService {
     return data ?? [];
   }
 
-  private async medyaListesi(accountIds: string[]): Promise<SocialAccountMediaItem[]> {
+  async medyaListesi(accountIds: string[]): Promise<SocialAccountMediaItem[]> {
     if (accountIds.length === 0) return [];
     const { data, error } = await this.supabase.client
       .from("social_account_media")
@@ -496,7 +507,7 @@ export class IcerikAnaliziService {
     return (data ?? []).map(medyayaCevir);
   }
 
-  private async ilhamListesi(scope: SocialScope): Promise<SocialInspiration[]> {
+  async ilhamListesi(scope: SocialScope): Promise<SocialInspiration[]> {
     const sorgu = this.supabase.client.from("social_inspirations").select(ILHAM_SELECT);
     const { data, error } = await ("jobId" in scope
       ? sorgu.eq("job_id", scope.jobId)
@@ -518,6 +529,25 @@ export class IcerikAnaliziService {
       .limit(RAPOR_SAYISI);
     if (error) throw tabloHatasi(error);
     return (data ?? []).map(raporaCevir);
+  }
+
+  /**
+   * Son keşifler. Migration 146 uygulanmadan tablo yok: sekme düşmesin diye
+   * boş liste döner (keşif düğmesi o durumda anlaşılır bir hata verir).
+   */
+  private async kesifListesi(scope: SocialScope): Promise<SocialDiscovery[]> {
+    const sorgu = this.supabase.client.from("social_discoveries").select("*, users!created_by(full_name)");
+    const { data, error } = await ("jobId" in scope
+      ? sorgu.eq("job_id", scope.jobId)
+      : sorgu.eq("organization_id", scope.organizationId)
+    )
+      .order("created_at", { ascending: false })
+      .limit(RAPOR_SAYISI);
+    if (error) {
+      if (error.code === "42P01" || error.code === "PGRST205") return [];
+      throw error;
+    }
+    return (data ?? []).map(kesfeCevir);
   }
 
   private async hesap(accountId: string): Promise<any> {
@@ -616,7 +646,24 @@ function raporaCevir(r: any): SocialIdeaReport {
   };
 }
 
-function kapsamSutunlari(scope: SocialScope): Record<string, unknown> {
+export function kesfeCevir(r: any): SocialDiscovery {
+  const icerik = r.icerik ?? {};
+  return {
+    id: r.id,
+    accountId: r.account_id ?? undefined,
+    istek: r.istek ?? undefined,
+    nis: icerik.nis ?? "",
+    hashtagler: Array.isArray(icerik.hashtagler) ? icerik.hashtagler : [],
+    aramalar: Array.isArray(icerik.aramalar) ? icerik.aramalar : [],
+    adaylar: Array.isArray(icerik.adaylar) ? icerik.adaylar : [],
+    aramaSayisi: r.arama_sayisi ?? 0,
+    kredi: r.kredi ?? 0,
+    createdAt: r.created_at,
+    createdByName: r.users?.full_name ?? undefined,
+  };
+}
+
+export function kapsamSutunlari(scope: SocialScope): Record<string, unknown> {
   return "jobId" in scope
     ? { job_id: scope.jobId, organization_id: null, department_id: null }
     : { organization_id: scope.organizationId, job_id: null, department_id: scope.departmentId ?? null };

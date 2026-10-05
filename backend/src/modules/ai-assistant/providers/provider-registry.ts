@@ -225,6 +225,16 @@ export class LlmProviderRegistry {
   }
 
   /**
+   * Sunucu tarafı web araması yapabilen sağlayıcı — kademenin modeliyle.
+   *
+   * Yedeğe geçiş yok: web araması yalnızca bir sağlayıcıda var, o düşerse
+   * aramasız bir yanıt (uydurma hesap adları) yerine hata dönmesi doğru.
+   */
+  webSearchChoice(tier: "fast" | "smart" | "max"): ProviderChoice | null {
+    return this.candidatesForTier(tier).find((c) => c.provider.capabilities.webSearch) ?? null;
+  }
+
+  /**
    * Arayüzün model seçicisine giden liste: yalnızca ETKİN sağlayıcıların
    * modelleri. Kapalı bir sağlayıcının modeli seçenek olarak gösterilmez.
    */

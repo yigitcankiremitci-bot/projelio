@@ -8,6 +8,7 @@ import { LioOneriService } from "./lio-oneri.service";
 import { SosyalLioService } from "./sosyal-lio.service";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { BenzerHesapService } from "./benzer-hesap.service";
 import { IcerikAnaliziController } from "./icerik-analizi.controller";
 import { IcerikAnaliziService } from "./icerik-analizi.service";
 import { InstagramController } from "./instagram.controller";
@@ -60,6 +61,7 @@ import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
     SosyalLioService,
     InstagramInsightsService,
     IcerikAnaliziService,
+    BenzerHesapService,
   ],
   exports: [SocialMediaService, SosyalLioService],
 })

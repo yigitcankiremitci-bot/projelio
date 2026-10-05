@@ -1,10 +1,17 @@
 import { useState } from "react";
-import type { ProjectFile, SocialInspiration, SocialInspirationKind } from "@projelio/shared";
+import type {
+  ProjectFile,
+  SocialAnalyticsAccount,
+  SocialDiscovery,
+  SocialInspiration,
+  SocialInspirationKind,
+} from "@projelio/shared";
 import { safeExternalUrl } from "@projelio/shared";
 import { filesApi, uploadFile } from "../../api/files";
 import { socialMediaApi, type SocialScope } from "../../api/socialMedia";
 import { useT } from "../../lib/i18n";
 import Modal from "../Modal";
+import BenzerHesapKesfi from "./BenzerHesapKesfi";
 import { MaddeListesi, useAnalizStilleri } from "./ortak";
 
 interface Props {
@@ -12,6 +19,10 @@ interface Props {
   ilhamlar: SocialInspiration[];
   canWrite: boolean;
   onDegisti: (ilhamlar: SocialInspiration[]) => void;
+  hesaplar: SocialAnalyticsAccount[];
+  kesifler: SocialDiscovery[];
+  kesifAcik: boolean;
+  onYeniKesif: (kesif: SocialDiscovery) => void;
 }
 
 /**
@@ -22,7 +33,16 @@ interface Props {
  * Kullanıcı bağlantıyı, gözlemini ve isterse referans videosunu ekler; Lio
  * bunlara bakarak "neden işliyor, sana nasıl uyar" der.
  */
-export default function IlhamPanosu({ scope, ilhamlar, canWrite, onDegisti }: Props) {
+export default function IlhamPanosu({
+  scope,
+  ilhamlar,
+  canWrite,
+  onDegisti,
+  hesaplar,
+  kesifler,
+  kesifAcik,
+  onYeniKesif,
+}: Props) {
   const t = useT();
   const { c, kart, ikincilDugme } = useAnalizStilleri();
   const [form, setForm] = useState<{ ilham?: SocialInspiration } | null>(null);
@@ -61,6 +81,16 @@ export default function IlhamPanosu({ scope, ilhamlar, canWrite, onDegisti }: Pr
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <BenzerHesapKesfi
+        scope={scope}
+        hesaplar={hesaplar}
+        kesifler={kesifler}
+        acik={kesifAcik}
+        canWrite={canWrite}
+        panodakiler={new Set(ilhamlar.map((i) => i.handle).filter((h): h is string => !!h))}
+        onYeniKesif={onYeniKesif}
+        onIlhamEklendi={degistir}
+      />
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
         <span style={{ flex: "1 1 320px", fontSize: 12, color: c.textSecondary, lineHeight: 1.5 }}>
           {t(

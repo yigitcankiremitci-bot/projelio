@@ -588,4 +588,44 @@ export const sosyal: TranslationDict = {
     "Update now",
   "İzlenme ve erişim verileri bu kurulumda henüz açılmadı; şimdilik beğeni ve yorum sayıları gösteriliyor.":
     "Views and reach data aren't enabled on this server yet; showing like and comment counts for now.",
+
+  // ─────────────────────────────────────────────── Benzer hesap keşfi
+  "Benzer hesap bul":
+    "Find similar accounts",
+  "Birkaç arama yapıyor; bir iki dakika sürebilir.":
+    "Running a few searches; this can take a minute or two.",
+  "Bu aramada kaynağıyla birlikte aday bulunamadı; yukarıdaki etiketlere ve aramalara bakabilirsin.":
+    "No candidates with a source were found this time; try the hashtags and searches above.",
+  "Hesap bul":
+    "Find accounts",
+  "Instagram'da bak:":
+    "Browse on Instagram:",
+  "Kaynak":
+    "Source",
+  "Kaynağı bu aramada doğrulanamadı — profiline bakıp emin ol.":
+    "Source couldn't be verified in this search — check the profile before adding.",
+  "Kendin ara:":
+    "Search yourself:",
+  "Lio Bakiyesi harcar (model + en fazla 5 web araması). Sonuçlar saklanır.":
+    "Uses Lio Units (model + up to 5 web searches). Results are saved.",
+  "Lio bir sonuç üretemedi, tekrar dene.":
+    "Lio couldn't produce a result, try again.",
+  "Lio gönderilerinden nişini çıkarır ve açık web'de (listeler, haberler, bloglar) bu nişteki içerik üreticilerini arar. Instagram taranmaz; adayları profiline bakıp panoya ekleyen sensin.":
+    "Lio works out your niche from your posts and searches the open web (lists, news, blogs) for creators in it. Instagram itself isn't scraped; you check each profile and add it to the board.",
+  "Lio web'de arıyor…":
+    "Lio is searching the web…",
+  "Ne arıyorsun? (isteğe bağlı) — ör. Türkiye'deki küçük müzik prodüktörleri, eğitici reels":
+    "What are you looking for? (optional) — e.g. small music producers in Turkey, educational reels",
+  "Nişin":
+    "Your niche",
+  "Panoda":
+    "On the board",
+  "benzer hesap":
+    "similar account",
+  "{n} aday":
+    "{n} candidates",
+  "{n} web araması · {birim} birim":
+    "{n} web searches · {birim} units",
+  "İlham panosuna ekle":
+    "Add to inspiration board",
 };

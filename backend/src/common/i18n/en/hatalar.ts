@@ -971,4 +971,12 @@ export const hatalar: TranslationDict = {
     "Content analytics isn't enabled on this server yet (database update pending).",
   "İzlenme ve erişim verileri bu kurulumda henüz açılmadı; şimdilik beğeni ve yorum sayıları gösteriliyor.":
     "Views and reach data aren't enabled on this server yet; showing like and comment counts for now.",
+
+  // ─────────────────────────────────────────────── Sosyal medya: benzer hesap keşfi
+  "Benzer hesap araması için web araması yapabilen bir AI sağlayıcısı (Anthropic) gerekiyor; bu sunucuda tanımlı değil.":
+    "Finding similar accounts needs an AI provider that can search the web (Anthropic); none is configured on this server.",
+  "Lio bir sonuç üretemedi, tekrar dene.":
+    "Lio couldn't produce a result, try again.",
+  "Lio'nun nişini anlayabilmesi için önce gönderilerini çek, ilham panosuna birkaç kaynak ekle ya da ne tür hesaplar aradığını yaz.":
+    "So Lio can understand your niche, first pull your posts, add a few inspirations, or describe the kind of accounts you're looking for.",
 };

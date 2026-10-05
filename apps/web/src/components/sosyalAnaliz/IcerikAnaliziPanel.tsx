@@ -324,6 +324,10 @@ export default function IcerikAnaliziPanel({ scope, canWrite, onInstagramBagla, 
           ilhamlar={veri.ilhamlar}
           canWrite={canWrite}
           onDegisti={(ilhamlar) => setVeri((v) => (v ? { ...v, ilhamlar } : v))}
+          hesaplar={hesaplar}
+          kesifler={veri.kesifler ?? []}
+          kesifAcik={veri.kesifAcik ?? false}
+          onYeniKesif={(kesif) => setVeri((v) => (v ? { ...v, kesifler: [kesif, ...(v.kesifler ?? [])].slice(0, 5) } : v))}
         />
       )}
 

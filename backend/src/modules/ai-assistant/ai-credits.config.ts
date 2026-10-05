@@ -307,6 +307,27 @@ export function calculateSpeechCost(chars: number): UsageCost {
   };
 }
 
+/**
+ * Anthropic sunucu tarafı web aramasının arama başına liste fiyatı (USD).
+ *
+ * Token'dan AYRI faturalanıyor: Anthropic her aramayı ayrıca sayıyor
+ * (`usage.server_tool_use.web_search_requests`, 1.000 arama 10 USD). Arama
+ * sonuçlarının modele giren metni ise normal girdi token'ı olarak zaten
+ * chargeUsage'dan geçer — burada yalnızca arama adedi.
+ */
+export const WEB_SEARCH_USD_PER_SEARCH = Number(process.env.AI_WEB_SEARCH_USD_PER_SEARCH ?? 0.01);
+
+export function calculateWebSearchCost(searches: number): UsageCost {
+  const costUsd = Math.max(searches, 0) * WEB_SEARCH_USD_PER_SEARCH;
+  const chargedUsd = costUsd * (1 + COMMISSION_RATE);
+  const credits = Math.ceil((chargedUsd / CREDIT_UNIT_USD) * 100) / 100;
+  return {
+    costUsd: Number(costUsd.toFixed(6)),
+    chargedUsd: Number(chargedUsd.toFixed(6)),
+    credits,
+  };
+}
+
 export function calculateTranscriptionCost(durationSeconds: number): UsageCost {
   const minutes = Math.max(durationSeconds, 0) / 60;
   const costUsd = minutes * TRANSCRIPTION_USD_PER_MINUTE;

@@ -73,9 +73,18 @@ echo "$gidecek" | sed 's/^/  /'
 echo
 
 # 3. CI'ın koşacaklarını yerelde koş -------------------------------------------
-# Buradaki iki komut ci.yml'deki ilk iki kontrolün aynısı. Docker imajları ve
+# Buradaki komutlar ci.yml'deki ilk üç kontrolün aynısı. Docker imajları ve
 # landing derlemesi bilerek koşulmuyor: yerelde dakikalar sürüyor, kırılma
 # oranı ise çok düşük.
+#
+# Çeviri denetimi --hizli'da da koşuyor: bir iki saniye sürüyor ve typecheck
+# ile testlerin göremediği bir hatayı yakalıyor — yeniden adlandırılan bir
+# anahtarın başka bir dosyada kullanılmaya devam etmesi. 2026-10-05'te tam
+# olarak bu yüzden yeşil geçen bir yayın CI'da kırmızıya düştü.
+echo "→ çeviri denetimi"
+node scripts/dil-denetimi.mjs --ci > /tmp/projelio-yayinla-dil.log 2>&1 \
+  || { node scripts/dil-denetimi.mjs --eksik 2>&1 | head -20; vazgec "çeviri denetimi kırmızı. CI de kırmızı olurdu, push edilmedi."; }
+
 if [ "$HIZLI" = "1" ]; then
   echo "⚠ Testler atlandı (--hizli). CI yine de koşacak; kırmızı gelirse yayın olmaz."
 else
@@ -84,7 +93,7 @@ else
   echo "→ npm test"
   npm test --silent > /tmp/projelio-yayinla-test.log 2>&1 \
     || { tail -30 /tmp/projelio-yayinla-test.log; vazgec "testler kırmızı. Push edilmedi."; }
-  echo "✓ typecheck ve testler yeşil"
+  echo "✓ çeviri, typecheck ve testler yeşil"
 fi
 
 # 4. Onay ----------------------------------------------------------------------

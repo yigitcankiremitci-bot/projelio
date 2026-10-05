@@ -42,11 +42,32 @@ export const IG_API_VERSION = "v21.0";
 /**
  * İstenen izinler.
  *
- * `instagram_business_basic` profil ve medya okuma, `..._content_publish` yayın.
- * İkisi de App Review ister; geliştirme modunda yalnızca uygulamada rolü olan
- * hesaplarla çalışır.
+ * `instagram_business_basic` profil ve medya okuma, `..._content_publish` yayın,
+ * `..._manage_insights` içerik analizinin metrikleri (izlenme, erişim, kaydetme,
+ * paylaşım, izlenme süresi). Hepsi App Review ister; geliştirme modunda yalnızca
+ * uygulamada rolü olan hesaplarla çalışır.
+ *
+ * Insights izni migration 145 ile eklendi ve `INSTAGRAM_INSIGHTS=1` ile AÇILIR.
+ * NEDEN BAYRAK: Meta uygulamasında eklenmemiş / App Review'dan geçmemiş bir
+ * izni istemek yetkilendirme ekranını HERKES için düşürür — yani izin panelde
+ * hazır olmadan bu kod yayına çıkarsa kimse Instagram bağlayamazdı, yayın
+ * dahil. Bayrak kapalıyken Analiz sekmesi yine çalışır, yalnızca beğeni/yorum
+ * sayılarıyla (temel izin yetiyor).
+ *
+ * Bayrak açıldıktan sonra, ondan önce bağlanmış hesapların jetonunda izin yok:
+ * onlar yayına devam eder, Analiz sekmesi "yeniden bağlan" der (bkz.
+ * SocialTokensService.izinVarMi).
  */
-export const IG_SCOPES = ["instagram_business_basic", "instagram_business_content_publish"];
+export const IG_INSIGHTS_SCOPE = "instagram_business_manage_insights";
+const IG_TEMEL_SCOPES = ["instagram_business_basic", "instagram_business_content_publish"];
+
+export function instagramInsightsAcik(): boolean {
+  return process.env.INSTAGRAM_INSIGHTS?.trim() === "1";
+}
+
+export function igScopes(): string[] {
+  return instagramInsightsAcik() ? [...IG_TEMEL_SCOPES, IG_INSIGHTS_SCOPE] : IG_TEMEL_SCOPES;
+}
 
 export interface InstagramStatePayload {
   typ: "instagram_oauth";
@@ -149,7 +170,7 @@ export class InstagramOAuthService {
       client_id: this.clientId!,
       redirect_uri: this.redirectUri,
       response_type: "code",
-      scope: IG_SCOPES.join(","),
+      scope: igScopes().join(","),
       state,
       // Kullanıcı ikinci bir hesabı bağlamak istediğinde Instagram, oturumdaki
       // hesabı sormadan onaylıyordu; yanlış hesap bağlanıyordu.

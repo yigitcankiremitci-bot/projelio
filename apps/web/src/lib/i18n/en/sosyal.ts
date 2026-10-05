@@ -388,4 +388,204 @@ export const sosyal: TranslationDict = {
   "İyi performans gösterirse Instagram kendisi açsın": "Let Instagram share it if it performs well",
   "Deneme reels tek bir video ister; bu içerikte {n} medya var.":
     "A trial reel needs exactly one video; this post has {n} media items.",
+
+  // ─────────────────────────────────────────────── Analiz ve fikirler (içerik analizi, ilham panosu, Lio raporları)
+  "Analiz et":
+    "Analyze",
+  "Analiz ve fikirler":
+    "Analytics & ideas",
+  "Analiz yüklenemedi":
+    "Couldn't load analytics",
+  "Açılış (hook)":
+    "Opening (hook)",
+  "Beğendiğin hesapları ve videoları buraya kaydet: bağlantısını, neyin dikkatini çektiğini ve istersen videonun kendisini ekle. Projelio başka hesaplardan otomatik veri toplamaz; Lio senin notlarına ve yüklediğin dosyaya bakar.":
+    "Save accounts and videos you like here: add the link, what caught your eye and, if you want, the video itself. Projelio doesn't collect data from other accounts automatically; Lio works from your notes and the file you upload.",
+  "Beğeni":
+    "Likes",
+  "Bu gönderinin metrikleri okunamadı:":
+    "Couldn't read this post's metrics:",
+  "Bu ilham kaydı silinsin mi? Yüklediğin referans dosyası dosyalarında kalır.":
+    "Delete this inspiration? The reference file you uploaded stays in your files.",
+  "Dosya yüklemek için modülü bir departman içinden aç; organizasyon genelinde yükleme klasörü yok.":
+    "To upload a file, open the module from a department; there's no upload folder at the organization level.",
+  "Ekli dosya":
+    "Attached file",
+  "En iyi giden format":
+    "Best-performing format",
+  "En iyi paylaşım saati":
+    "Best posting hour",
+  "Etiketler (virgülle)":
+    "Tags (comma-separated)",
+  "Fikir üret":
+    "Generate ideas",
+  "Fikirler":
+    "Ideas",
+  "Fikirlere eklendi":
+    "Added to ideas",
+  "Format":
+    "Format",
+  "Geliştir":
+    "Improve",
+  "Gönderi":
+    "Posts",
+  "Gönderi analizi":
+    "Post analysis",
+  "Gönderilerim":
+    "My posts",
+  "Gönderilerinin izlenme, erişim, kaydetme ve paylaşım verilerini görmek için Instagram profesyonel hesabını bağla. İlham panosunu bağlamadan da kullanabilirsin.":
+    "Connect your Instagram professional account to see views, reach, saves and shares for your posts. You can use the inspiration board without connecting.",
+  "Güncellenemedi":
+    "Couldn't update",
+  "Henüz fikir raporu yok.":
+    "No idea reports yet.",
+  "Henüz gönderi verisi yok. \"Şimdi güncelle\" ile Instagram'dan çek; her gece kendiliğinden de güncellenir.":
+    "No post data yet. Pull it from Instagram with \"Update now\"; it also refreshes automatically every night.",
+  "Henüz ilham kaynağı yok. Örneğin: senin tarzında içerik üreten 5-10 hesap ve her birinden en çok izlenen 1-2 video iyi bir başlangıç.":
+    "No inspirations yet. A good start: 5-10 accounts that make content in your style and their 1-2 most-viewed videos each.",
+  "Henüz veri çekilmedi":
+    "No data pulled yet",
+  "Hesabının medyan izlenmesine göre.":
+    "Relative to your account's median views.",
+  "Instagram bağlantısı bulunamadı.":
+    "Instagram connection not found.",
+  "Instagram bağlantısının süresi dolmuş; hesabı yeniden bağlayın.":
+    "The Instagram connection has expired; reconnect the account.",
+  "Instagram entegrasyonu bu kurulumda yapılandırılmamış; ilham panosunu ve fikir raporlarını yine de kullanabilirsin.":
+    "The Instagram integration isn't configured on this server; you can still use the inspiration board and idea reports.",
+  "Instagram verileri okunamadı, daha sonra tekrar denenecek.":
+    "Couldn't read Instagram data; it will be retried later.",
+  "Instagram'da aç":
+    "Open on Instagram",
+  "Instagram'dan okunuyor…":
+    "Reading from Instagram…",
+  "Kaydetme":
+    "Saves",
+  "Kaydetme + paylaşım (medyan)":
+    "Saves + shares (median)",
+  "Kaydetme + paylaşım oranı":
+    "Save + share rate",
+  "Lio Bakiyesi harcar.":
+    "Uses Lio Units.",
+  "Lio Bakiyesi harcar. Raporlar saklanır, tekrar açmak ücretsiz.":
+    "Uses Lio Units. Reports are saved; reopening them is free.",
+  "Lio analizi var":
+    "Lio analysis",
+  "Lio bir analiz üretemedi, tekrar dene.":
+    "Lio couldn't produce an analysis, try again.",
+  "Lio bir rapor üretemedi, tekrar dene.":
+    "Lio couldn't produce a report, try again.",
+  "Lio düşünüyor…":
+    "Lio is thinking…",
+  "Lio en iyi ve en zayıf gönderilerine, önceki analizlerine ve ilham panona bakar; neyin işlediğini çıkarıp yeni içerik fikirleri önerir.":
+    "Lio looks at your best and weakest posts, earlier analyses and your inspiration board, works out what's working and suggests new content ideas.",
+  "Lio gönderiye bakar (videoysa karelerini ve konuşmasını), metrikleri hesabının normaliyle kıyaslar ve sonraki içerikler için ne yapman gerektiğini söyler. Lio Bakiyesi harcar.":
+    "Lio looks at the post (frames and speech if it's a video), compares the metrics with your account's normal and tells you what to do in your next posts. Uses Lio Units.",
+  "Lio incelesin":
+    "Ask Lio",
+  "Lio videonun karelerine ve konuşmasına bakar. Yalnızca incelemek için hakkın olan içerikleri yükle; dosya kendi klasörünüzde saklanır.":
+    "Lio looks at the video's frames and speech. Only upload content you have the right to review; the file is stored in your own folder.",
+  "Lio'nun analizini gizle":
+    "Hide Lio's analysis",
+  "Lio'nun analizini göster":
+    "Show Lio's analysis",
+  "Lio: neden böyle gitti?":
+    "Lio: why did it perform this way?",
+  "Metrikleri okumak için Instagram bağlantısının yenilenmesi gerekiyor (yeni izin: içerik istatistikleri).":
+    "The Instagram connection needs to be renewed to read metrics (new permission: content insights).",
+  "Ne dikkatini çekti? İlk saniyelerde ne oluyor, nasıl bitiyor, kaç izlenme almış, yorumlarda ne konuşuluyor?":
+    "What caught your eye? What happens in the first seconds, how does it end, how many views did it get, what are people saying in the comments?",
+  "Neden":
+    "Why",
+  "Neden böyle gitti":
+    "Why it performed this way",
+  "Neden işliyor":
+    "Why it works",
+  "Normal (medyan) izlenme":
+    "Normal (median) views",
+  "Normalin {kat} katı":
+    "{kat}× your normal",
+  "Notun":
+    "Your note",
+  "Odak (isteğe bağlı) — ör. bu ay eğitici içerik, 30 sn altı reels":
+    "Focus (optional) — e.g. educational content this month, reels under 30 s",
+  "Oran":
+    "Rate",
+  "Ort. izlenme":
+    "Avg. watch",
+  "Ort. izlenme süresi":
+    "Avg. watch time",
+  "Paylaşım":
+    "Shares",
+  "Reels":
+    "Reels",
+  "Referans video ya da görsel (isteğe bağlı)":
+    "Reference video or image (optional)",
+  "Senin hesabına uyarla":
+    "Adapt it to your account",
+  "Son güncelleme: {zaman}":
+    "Last updated: {zaman}",
+  "Sırala: en yeni":
+    "Sort: newest",
+  "Sırala: izlenme":
+    "Sort: views",
+  "Sırala: kaydetme + paylaşım oranı":
+    "Sort: save + share rate",
+  "Sırala: normale göre":
+    "Sort: vs. normal",
+  "Sürdür":
+    "Keep doing",
+  "Takip ettiğim hesap":
+    "An account I follow",
+  "Tek içerik (video/gönderi)":
+    "Single piece (video/post)",
+  "Tüm formatlar":
+    "All formats",
+  "Tüm hesaplar":
+    "All accounts",
+  "Veri az: önce gönderilerini çek ve ilham panosuna birkaç kaynak ekle, fikirler daha isabetli olur.":
+    "Not much data yet: pull your posts and add a few inspirations first for sharper ideas.",
+  "Verideki kalıplar":
+    "Patterns in your data",
+  "Veriler birkaç dakika önce güncellendi; biraz sonra tekrar dene.":
+    "Data was updated a few minutes ago; try again a bit later.",
+  "Yeni — metrikler oturuyor":
+    "New — metrics still settling",
+  "Yeniden analiz et":
+    "Analyze again",
+  "Yeniden incele":
+    "Review again",
+  "Yorum":
+    "Comments",
+  "Yükleniyor… {n}":
+    "Uploading… {n}",
+  "{n} fikir":
+    "{n} ideas",
+  "{n} gönderi okundu, {m} gönderinin metrikleri güncellendi.":
+    "{n} posts read, metrics updated for {m}.",
+  "ör. Ev yemekleri yapan hesap":
+    "e.g. A home-cooking account",
+  "ör. Soruyla açılan 30 sn'lik tarif videosu":
+    "e.g. 30-second recipe video that opens with a question",
+  "ör. hook, eğitici, kısa":
+    "e.g. hook, educational, short",
+  "İlham ekle":
+    "Add inspiration",
+  "İlham kaynağını düzenle":
+    "Edit inspiration",
+  "İlham panosu":
+    "Inspiration board",
+  "İlk 48 saatte metrikler hızla değiştiği için kıyasa girmez.":
+    "Excluded from comparison for the first 48 hours while metrics change quickly.",
+  "İzlenme":
+    "Views",
+  "İzlenme ve erişim verileri için bağlantıyı yenile (yeni izin).":
+    "Renew the connection for views and reach data (new permission).",
+  "İçerik":
+    "Content",
+  "İçerik fikri olarak ekle":
+    "Add as content idea",
+  "Şimdi güncelle":
+    "Update now",
+  "İzlenme ve erişim verileri bu kurulumda henüz açılmadı; şimdilik beğeni ve yorum sayıları gösteriliyor.":
+    "Views and reach data aren't enabled on this server yet; showing like and comment counts for now.",
 };

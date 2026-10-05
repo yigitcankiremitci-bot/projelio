@@ -75,6 +75,27 @@ export class SocialTokensService {
     }
   }
 
+  /**
+   * Jetonda bu izin var mı — jetonu ÇÖZMEDEN, yalnızca izin listesine bakar.
+   *
+   * İzin listesi bilinmiyorsa (Meta bağlanırken dönmediyse) `null`: çağıran
+   * denemeyi yapar ve kararı Meta'nın yanıtına bırakır. "Bilinmiyor"u "yok"
+   * saymak, izni olan hesaba boşuna "yeniden bağlan" dedirtirdi.
+   */
+  async izinVarMi(accountIds: string[], izin: string): Promise<Map<string, boolean | null>> {
+    const sonuc = new Map<string, boolean | null>();
+    if (accountIds.length === 0) return sonuc;
+    const { data, error } = await this.supabase.client
+      .from("social_account_tokens")
+      .select("account_id, scopes")
+      .in("account_id", accountIds);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      sonuc.set(row.account_id, Array.isArray(row.scopes) && row.scopes.length > 0 ? row.scopes.includes(izin) : null);
+    }
+    return sonuc;
+  }
+
   async remove(accountId: string): Promise<void> {
     const { error } = await this.supabase.client
       .from("social_account_tokens")

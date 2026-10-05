@@ -34,6 +34,7 @@ import Modal from "./Modal";
 import SocialAccountModal from "./SocialAccountModal";
 import SocialCredentialsModal from "./SocialCredentialsModal";
 import SocialPostComposer from "./SocialPostComposer";
+import IcerikAnaliziPanel from "./sosyalAnaliz/IcerikAnaliziPanel";
 import { IconChevronLeft, IconChevronRight, IconEdit, IconExternalLink, IconTrash } from "./icons";
 import { sekmeleriAc } from "../lib/topluLink";
 import { useDragScroll } from "../lib/useDragScroll";
@@ -49,7 +50,7 @@ interface Props {
   canWrite?: boolean;
 }
 
-type View = "calendar" | "accounts";
+type View = "calendar" | "accounts" | "analysis";
 
 /**
  * Sosyal Medya modülünün çalışma alanı.
@@ -62,6 +63,9 @@ type View = "calendar" | "accounts";
  *   Takvim    ay ızgarası; kart sürüklenerek başka güne taşınır
  *   Liste     durum sütunlu pano; toplu gözden geçirme ve onay için
  *   Hesaplar  kanal kimlikleri: kitle, ton, ritim, sorumlu
+ *
+ * Bir de Analiz sekmesi var (sosyalAnaliz/): bağlı Instagram hesabının
+ * metrikleri, ilham panosu ve Lio'nun fikir raporları — ayrı veri, ayrı istek.
  *
  * Veri kendi tablolarında (bkz. 054_social_media.sql), tek istekte gelir.
  */
@@ -1448,8 +1452,9 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
         {tab("calendar", t("Takvim ve akış"))}
         {tab("accounts", `${t("Hesaplar")} · ${accounts.length}`)}
+        {tab("analysis", t("Analiz ve fikirler"))}
 
-        {view !== "accounts" && (
+        {view === "calendar" && (
           <>
             <select
               value={platformFilter}
@@ -1509,6 +1514,25 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
 
       {loading ? (
         <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Yükleniyor…")}</span>
+      ) : view === "analysis" ? (
+        // Hesap yokken de açılır: ilham panosu bağlantı istemiyor.
+        <IcerikAnaliziPanel
+          scope={scope}
+          canWrite={canWrite}
+          onInstagramBagla={() => void connectInstagram()}
+          baglaniyor={connecting}
+          // Sessiz tazeleme: load() "Yükleniyor"a geçip analiz panelini
+          // söküyordu — kullanıcı açık raporunu ve alt sekmesini kaybediyordu.
+          onIcerikEklendi={() => {
+            socialMediaApi
+              .overview(scope)
+              .then((data) => {
+                setAccounts(data.accounts);
+                setPosts(data.posts);
+              })
+              .catch(() => undefined);
+          }}
+        />
       ) : accounts.length === 0 && posts.length === 0 ? (
         // Boş kutu yerine ilk adımı söylüyoruz: kanal olmadan içerik planlamak
         // anlamsız, kullanıcı ekrana bakıp nereden başlayacağını aramasın.

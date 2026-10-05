@@ -8,7 +8,10 @@ import { LioOneriService } from "./lio-oneri.service";
 import { SosyalLioService } from "./sosyal-lio.service";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { IcerikAnaliziController } from "./icerik-analizi.controller";
+import { IcerikAnaliziService } from "./icerik-analizi.service";
 import { InstagramController } from "./instagram.controller";
+import { InstagramInsightsService } from "./instagram-insights.service";
 import { InstagramOAuthService } from "./instagram-oauth.service";
 import { InstagramPublishService } from "./instagram-publish.service";
 import { InstagramService } from "./instagram.service";
@@ -43,7 +46,7 @@ import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
       signOptions: { expiresIn: getJwtExpiresIn() },
     }),
   ],
-  controllers: [SocialMediaController, InstagramController, SocialCredentialsController],
+  controllers: [SocialMediaController, InstagramController, SocialCredentialsController, IcerikAnaliziController],
   providers: [
     SocialMediaService,
     SocialTokensService,
@@ -55,6 +58,8 @@ import { getJwtSecret, getJwtExpiresIn } from "../../common/config/env";
     SocialPublishProcessor,
     LioOneriService,
     SosyalLioService,
+    InstagramInsightsService,
+    IcerikAnaliziService,
   ],
   exports: [SocialMediaService, SosyalLioService],
 })

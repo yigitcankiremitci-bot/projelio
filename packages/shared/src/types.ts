@@ -3034,6 +3034,163 @@ export interface SocialMediaOverview {
   posts: SocialPost[];
 }
 
+// ---------------------------------------------------------- İçerik analizi
+//
+// Bağlı Instagram hesabının kendi gönderileri + metrikleri, kullanıcının elle
+// eklediği ilham kaynakları ve Lio'nun fikir raporları (bkz.
+// 145_icerik_analizi.sql). Başka hesapların verisi OTOMATİK çekilmez.
+
+/** Instagram Insights'tan okunan metrikler. Okunamayan metrik boş kalır. */
+export interface SocialMediaMetrics {
+  likeCount?: number;
+  commentsCount?: number;
+  reach?: number;
+  views?: number;
+  saved?: number;
+  shares?: number;
+  totalInteractions?: number;
+  /** Yalnızca reels; milisaniye. */
+  avgWatchTimeMs?: number;
+  totalWatchTimeMs?: number;
+}
+
+/** Lio'nun kendi gönderin için "neden böyle gitti" analizi. */
+export interface SocialMediaAnalysis {
+  /** Lio'nun videoda/görselde gördüğü — analiz neye dayanıyor. */
+  gorulen?: string;
+  /** Açılışın (ilk saniyeler / ilk satır) değerlendirmesi. */
+  hook: string;
+  /** Performansın olası sebepleri, metriklere dayanarak. */
+  nedenler: string[];
+  /** Sonraki içeriklerde sürdürülecekler. */
+  tekrarla: string[];
+  /** Geliştirilebilecekler. */
+  gelistir: string[];
+  /** Harcanan Lio Bakiyesi (birim). */
+  kredi: number;
+}
+
+export interface SocialAccountMediaItem extends SocialMediaMetrics {
+  id: string;
+  accountId: string;
+  externalMediaId: string;
+  /** Projelio'dan yayımlandıysa ilgili içerik. */
+  postId?: string;
+  /** IMAGE | VIDEO | CAROUSEL_ALBUM */
+  mediaType?: string;
+  /** FEED | REELS | STORY */
+  mediaProductType?: string;
+  caption?: string;
+  permalink?: string;
+  /** Instagram CDN adresi — birkaç gün içinde geçersizleşebilir. */
+  thumbnailUrl?: string;
+  postedAt?: string;
+  metricsSyncedAt?: string;
+  metricsError?: string;
+  lioAnaliz?: SocialMediaAnalysis;
+  lioAnalizAt?: string;
+}
+
+/** Analiz ekranındaki bağlı hesap özeti. */
+export interface SocialAnalyticsAccount {
+  accountId: string;
+  handle: string;
+  displayName?: string;
+  avatarUrl?: string;
+  followerCount?: number;
+  connectionStatus: SocialConnectionStatus;
+  insightsSyncedAt?: string;
+  insightsError?: string;
+  /** Bağlantı Insights izni olmadan kurulmuş: metrikler için yeniden bağlanmalı. */
+  yenidenBaglanmali: boolean;
+}
+
+export type SocialInspirationKind = "account" | "post";
+
+/** Lio'nun bir ilham kaynağı için analizi: neden işliyor, sana nasıl uyar. */
+export interface SocialInspirationAnalysis {
+  gorulen?: string;
+  hook: string;
+  /** İçeriğin akışı: açılış → gelişme → kapanış. */
+  yapi: string;
+  nedenIsliyor: string[];
+  /** Kopyalamadan, kendi hesabına uyarlama önerileri. */
+  uyarla: string[];
+  kredi: number;
+}
+
+export interface SocialInspiration {
+  id: string;
+  kind: SocialInspirationKind;
+  platform: SocialPlatform;
+  url?: string;
+  handle?: string;
+  title: string;
+  note?: string;
+  /** Virgülle ayrılmış serbest etiketler. */
+  tags?: string;
+  fileId?: string;
+  fileName?: string;
+  fileMimeType?: string;
+  lioAnaliz?: SocialInspirationAnalysis;
+  lioAnalizAt?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SocialInspirationInput {
+  kind?: SocialInspirationKind;
+  platform?: string;
+  url?: string;
+  handle?: string;
+  title?: string;
+  note?: string;
+  tags?: string;
+  fileId?: string | null;
+  departmentId?: string;
+}
+
+export interface SocialIdeaPattern {
+  baslik: string;
+  aciklama: string;
+}
+
+export interface SocialIdea {
+  baslik: string;
+  /** Videonun ilk cümlesi / ilk sahnesi önerisi. */
+  hook: string;
+  /** "Reels · 20-30 sn", "Karusel · 6 kare" gibi. */
+  format: string;
+  /** Neden işe yarayabileceği — hangi veriye/ilhama dayandığı. */
+  neden: string;
+}
+
+export interface SocialIdeaReportContent {
+  ozet: string;
+  kaliplar: SocialIdeaPattern[];
+  fikirler: SocialIdea[];
+}
+
+export interface SocialIdeaReport extends SocialIdeaReportContent {
+  id: string;
+  accountId?: string;
+  istek?: string;
+  kredi: number;
+  createdAt: string;
+  createdByName?: string;
+}
+
+/** Analiz sekmesinin tek isteği. */
+export interface SocialAnalyticsOverview {
+  /** Instagram entegrasyonu bu kurulumda açık mı. */
+  ayarli: boolean;
+  hesaplar: SocialAnalyticsAccount[];
+  medya: SocialAccountMediaItem[];
+  ilhamlar: SocialInspiration[];
+  raporlar: SocialIdeaReport[];
+}
+
 // ---------------------------------------------------------- Hesap şifreleri
 //
 // Sosyal hesabın giriş bilgileri. Değerler veritabanında şifreli durur ve

@@ -308,6 +308,11 @@ export class SocialMediaService {
     await this.assertCanWrite(scope, userId);
   }
 
+  /** Okuma yetkisinin dışarıya açık hali (içerik analizi aynı kapıdan geçer). */
+  async assertReadable(scope: SocialScope, userId?: string): Promise<void> {
+    await this.assertCanRead(scope, userId);
+  }
+
   /** Kaydın sahibinden kapsamı türetir — dışarıdan da sorulabilsin diye açık. */
   scopeOfRow(row: { organization_id?: string | null; job_id?: string | null; department_id?: string | null }): SocialScope {
     return this.scopeOf(row);

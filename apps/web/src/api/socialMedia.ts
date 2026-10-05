@@ -1,6 +1,11 @@
 import type {
   SocialAccount,
+  SocialAccountMediaItem,
+  SocialAnalyticsOverview,
   SocialCaptionSuggestion,
+  SocialIdeaReport,
+  SocialInspiration,
+  SocialInspirationInput,
   SocialContentType,
   SocialMediaOverview,
   SocialPlatform,
@@ -163,4 +168,41 @@ export const socialMediaApi = {
    */
   lioOnerisi: (postId: string, istek?: string) =>
     api.post<SocialCaptionSuggestion>(`/social-posts/${postId}/lio-oneri`, { istek }, undefined, 5 * 60_000),
+
+  // ---------------------------------------------------------------- Analiz ve fikirler
+
+  /** Analiz sekmesinin tek isteği: bağlı hesaplar, gönderi metrikleri, ilhamlar, son raporlar. */
+  analiz: (scope: SocialScope) => {
+    if ("jobId" in scope) return api.get<SocialAnalyticsOverview>(`/jobs/${scope.jobId}/social-media/analiz`);
+    const q = scope.departmentId ? `?departmentId=${encodeURIComponent(scope.departmentId)}` : "";
+    return api.get<SocialAnalyticsOverview>(`/organizations/${scope.organizationId}/social-media/analiz${q}`);
+  },
+
+  /** Hesabın gönderilerini ve metriklerini Instagram'dan çeker (150 gönderiye kadar — sürebilir). */
+  analizSenkron: (accountId: string) =>
+    api.post<{ medya: number; metrik: number; atlandi?: true }>(
+      `/social-accounts/${accountId}/analiz/senkron`,
+      {},
+      undefined,
+      3 * 60_000
+    ),
+
+  /** Lio: "bu gönderi neden böyle gitti" — video indirilip karelere bölünür. */
+  gonderiAnalizi: (mediaId: string) =>
+    api.post<SocialAccountMediaItem>(`/social-account-media/${mediaId}/lio-analiz`, {}, undefined, 5 * 60_000),
+
+  ilhamEkle: (scope: SocialScope, body: SocialInspirationInput) =>
+    api.post<SocialInspiration>(`${base(scope)}/social-inspirations`, withScope(scope, body)),
+
+  ilhamGuncelle: (id: string, body: SocialInspirationInput) =>
+    api.patch<SocialInspiration>(`/social-inspirations/${id}`, body),
+
+  ilhamSil: (id: string) => api.delete<{ ok: true }>(`/social-inspirations/${id}`),
+
+  ilhamAnalizi: (id: string) =>
+    api.post<SocialInspiration>(`/social-inspirations/${id}/lio-analiz`, {}, undefined, 5 * 60_000),
+
+  /** Lio fikir raporu — metin modeli, birkaç bin token çıktı. */
+  fikirUret: (scope: SocialScope, body: { accountId?: string; istek?: string }) =>
+    api.post<SocialIdeaReport>(`${base(scope)}/social-media/fikirler`, withScope(scope, body), undefined, 3 * 60_000),
 };

@@ -33,6 +33,8 @@ Meta iki ayrı yol sunuyor:
    `https://<backend-adresiniz>/social/instagram/callback`
    Yerelde: `http://localhost:3000/social/instagram/callback`
 5. İzinler: `instagram_business_basic`, `instagram_business_content_publish`
+   ve içerik analizi için `instagram_business_manage_insights` (bkz. §9 — yalnızca
+   `INSTAGRAM_INSIGHTS=1` iken istenir)
 
 > **App Review:** Her iki izin de inceleme ister. İnceleme öncesinde entegrasyon yalnızca uygulamada **rolü olan** (yönetici/geliştirici/test kullanıcısı) Instagram hesaplarıyla çalışır. Yani geliştirme sırasında kendi hesabınızla test edebilirsiniz, müşterileriniz inceleme onaylanana kadar bağlayamaz.
 
@@ -43,6 +45,10 @@ INSTAGRAM_APP_ID=...
 INSTAGRAM_APP_SECRET=...
 INSTAGRAM_REDIRECT_URI=https://<backend>/social/instagram/callback
 SOCIAL_TOKEN_ENC_KEY=$(openssl rand -base64 32)
+# İsteğe bağlı: içerik analizinin izlenme/erişim metrikleri (§9).
+# İzin Meta panelinde eklenip (canlı uygulamada App Review'dan geçip) ancak
+# ondan SONRA açılmalı — aksi hâlde yetkilendirme ekranı herkes için düşer.
+INSTAGRAM_INSIGHTS=1
 ```
 
 `SOCIAL_TOKEN_ENC_KEY` yoksa entegrasyon **kapalı** sayılır: arayüzde "Instagram'ı bağla" düğmesi hiç görünmez. Jetonu saklayamayacakken düğme göstermek, "bağlandı ama yayımlayamıyor" gibi yarım bir duruma yol açardı.
@@ -173,8 +179,45 @@ Sık karşılaşılanlar:
 
 ## 8. Sıradaki adımlar
 
-1. **Insights senkronu** — yayımlanan gönderinin erişim/etkileşim sayıları `social_posts.reach/engagement/clicks` alanlarına otomatik yazılsın
+1. ~~**Insights senkronu**~~ — §9'da yapıldı (ayrı tabloya; `social_posts.reach/engagement` elle girilen alanlar olarak kaldı)
 2. **Story ve trial reels** — `media_type=STORIES` ve `trial_params` desteği
 3. **İlk yorum** — `instagram_business_manage_comments` izniyle otomatikleşir
 4. **PNG→JPEG çevirisi** — sharp bağımlılığı kabul edilirse
 5. **Diğer platformlar** — LinkedIn ve X aynı iskelete oturur: `SocialPublishService` platformdan bağımsız, yalnızca bir `switch` kazanır
+
+---
+
+## 9. İçerik analizi (Analiz ve fikirler sekmesi)
+
+Migration: `145_icerik_analizi.sql` · Kod: `instagram-insights.service.ts` (Meta),
+`icerik-analizi.service.ts` (uçlar + Lio), `icerik-analizi.ts` (saf kurallar),
+`packages/shared/src/icerikAnalizi.ts` (performans hesabı — arayüzle ortak),
+arayüz `apps/web/src/components/sosyalAnaliz/`.
+
+| Parça | Ne yapar |
+|---|---|
+| Senkron | Bağlı hesabın son 150 gönderisi (`/me/media`) + gönderi başına Insights. Her gece 05:15, bağlandıktan hemen sonra ve "Şimdi güncelle" ile (en sık 10 dk'da bir). Tur başına en fazla 60 Insights çağrısı — çağrı bütçesi yayınla ortak. |
+| Performans | Her gönderi **kendi hesabının medyanıyla** kıyaslanır ("normalin 3,2 katı"). İlk 48 saat kıyas dışı ("yeni"). |
+| Lio gönderi analizi | Videoyu Meta'dan taze adresle indirir, kare + ses → "neden böyle gitti, sürdür, geliştir". Sonuç `lio_analiz`'e yazılır (bakiye bir kez harcanır). |
+| İlham panosu | Kullanıcının **elle** eklediği hesap/içerik: bağlantı, not, etiket, isteğe bağlı referans dosyası. Lio "neden işliyor, sana nasıl uyar" der. |
+| Fikir raporu | Metin modeli: en iyi/en zayıf gönderiler + analizler + ilhamlar → kalıplar ve fikirler. `social_idea_reports`'a yazılır; her fikir takvime "fikir" durumunda içerik olarak eklenebilir. |
+
+**Başka hesapların verisi otomatik çekilmez.** Resmi yolu (Business Discovery,
+Hashtag Search) yalnızca Facebook Login yolunda var ve Sayfa istiyor (§1);
+kazıma Instagram koşullarına aykırı. İleride Facebook Login ikinci, isteğe bağlı
+bir bağlantı olarak eklenirse rakip takibi oraya oturur.
+
+**Metrik izni bayrakla açılır** (`INSTAGRAM_INSIGHTS=1`). Kapalıyken sekme
+çalışır ama yalnızca beğeni/yorum sayılarıyla. Açıldıktan sonra, önceden
+bağlanmış hesaplar "Yeniden bağla" uyarısı görür (jetonlarında izin yok);
+yayınları etkilenmez.
+
+Sık karşılaşılanlar:
+
+| Belirti | Sebep |
+|---|---|
+| "İçerik analizi bu sunucuda henüz etkin değil" | Migration 145 uygulanmamış |
+| "İzlenme ve erişim verileri bu kurulumda henüz açılmadı" | `INSTAGRAM_INSIGHTS` tanımsız |
+| "Yeniden bağla" uyarısı | Hesap bayrak açılmadan önce bağlanmış |
+| Tek gönderide "metrikleri okunamadı" | Gönderi hesap profesyonele geçmeden atılmış ya da Meta o tür için metriği desteklemiyor — diğerlerini etkilemez |
+

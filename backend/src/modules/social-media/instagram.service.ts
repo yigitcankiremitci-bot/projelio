@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
+import { InstagramInsightsService } from "./instagram-insights.service";
 import { InstagramOAuthService, type InstagramProfile, type InstagramStatePayload } from "./instagram-oauth.service";
 import { SocialMediaService, type SocialScope } from "./social-media.service";
 import { SocialTokensService } from "./social-tokens.service";
@@ -25,7 +26,8 @@ export class InstagramService {
     private supabase: SupabaseService,
     private oauth: InstagramOAuthService,
     private tokens: SocialTokensService,
-    private social: SocialMediaService
+    private social: SocialMediaService,
+    private insights: InstagramInsightsService
   ) {}
 
   isConfigured(): boolean {
@@ -89,6 +91,10 @@ export class InstagramService {
       last_synced_at: new Date().toISOString(),
       active: true,
     });
+
+    // Analiz sekmesi boş açılmasın: ilk senkron bağlantının hemen ardından,
+    // beklemeden. Düşerse gece işi tamamlar; bağlantının sonucunu etkilemez.
+    void this.insights.senkronEt(accountId).catch(() => undefined);
 
     return { next: payload.next, accountId, username: profile.username };
   }

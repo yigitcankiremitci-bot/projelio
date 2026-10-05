@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
+import { InstagramInsightsService } from "./instagram-insights.service";
 import { InstagramPublishService } from "./instagram-publish.service";
 import { InstagramService } from "./instagram.service";
 import { SocialPublishService } from "./social-publish.service";
@@ -12,6 +13,7 @@ import { SocialPublishService } from "./social-publish.service";
  *   her 5 dakikada  kuyruk turu — vakti gelmiş içerikleri yayımlar
  *   her gün 04:00   jeton yenileme — süresi yaklaşan bağlantılar uzatılır
  *   her gün 04:30   geçici medya süpürme — yarım kalan denemelerin artıkları
+ *   her gün 05:15   içerik analizi — bağlı hesapların gönderileri + metrikleri
  *
  * NEDEN 5 DAKİKA: sosyal medyada "19:00 gönderisi" 19:03'te çıkabilir, kimse
  * fark etmez; ama dakikada bir çalışan bir iş, tek kullanıcılı bir kurulumda
@@ -28,11 +30,13 @@ export class SocialPublishProcessor {
   private readonly logger = new Logger(SocialPublishProcessor.name);
   /** Bir tur bitmeden yenisi başlamasın: yavaş bir video yayını turları üst üste bindiriyordu. */
   private running = false;
+  private analizCalisiyor = false;
 
   constructor(
     private publish: SocialPublishService,
     private instagram: InstagramService,
-    private instagramPublish: InstagramPublishService
+    private instagramPublish: InstagramPublishService,
+    private insights: InstagramInsightsService
   ) {}
 
   @Cron("*/5 * * * *")
@@ -67,6 +71,27 @@ export class SocialPublishProcessor {
       if (refreshed || failed) this.logger.log(`Instagram jetonları: ${refreshed} yenilendi, ${failed} düştü`);
     } catch (err) {
       this.logger.error(`Jeton yenileme turu düştü: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * İçerik analizi senkronu.
+   *
+   * Jeton yenilemeden SONRA (04:00): süresi dolmak üzere olan bir jeton önce
+   * uzasın, sonra okunsun. Gece yapılıyor çünkü her gönderi ayrı bir Insights
+   * çağrısı ve gündüz yayın kuyruğuyla aynı çağrı bütçesini paylaşıyor.
+   */
+  @Cron("15 5 * * *")
+  async syncInsights(): Promise<void> {
+    if (this.analizCalisiyor) return;
+    this.analizCalisiyor = true;
+    try {
+      const { hesap, hata } = await this.insights.hepsiniSenkronEt();
+      if (hesap) this.logger.log(`İçerik analizi: ${hesap} hesap senkronlandı, ${hata} hata`);
+    } catch (err) {
+      this.logger.error(`İçerik analizi turu düştü: ${(err as Error).message}`);
+    } finally {
+      this.analizCalisiyor = false;
     }
   }
 

@@ -941,4 +941,34 @@ export const hatalar: TranslationDict = {
   "Video dosyası okunamadı.": "Couldn't read the video file.",
   "Videodan kare alınamadı; dosya bozuk ya da desteklenmeyen biçimde olabilir.":
     "Couldn't take frames from the video; the file may be damaged or in an unsupported format.",
+
+  // ─────────────────────────────────────────────── Sosyal medya: içerik analizi
+  "Bu hesap Instagram'a bağlı değil.":
+    "This account isn't connected to Instagram.",
+  "Fikir üretmek için önce Instagram hesabını bağlayıp verileri çek ya da ilham panosuna birkaç kaynak ekle.":
+    "To generate ideas, first connect your Instagram account and pull its data, or add a few sources to the inspiration board.",
+  "Geçersiz ilham türü":
+    "Invalid inspiration type",
+  "Instagram bağlantısı bulunamadı.":
+    "Instagram connection not found.",
+  "Instagram bağlantısının süresi dolmuş; hesabı yeniden bağlayın.":
+    "The Instagram connection has expired; reconnect the account.",
+  "Instagram verileri okunamadı, daha sonra tekrar denenecek.":
+    "Couldn't read Instagram data; it will be retried later.",
+  "Lio bir analiz üretemedi, tekrar dene.":
+    "Lio couldn't produce an analysis, try again.",
+  "Lio bir rapor üretemedi, tekrar dene.":
+    "Lio couldn't produce a report, try again.",
+  "Lio'nun inceleyebilmesi için bir not yaz ya da referans videosu/görseli ekle.":
+    "Write a note or add a reference video/image so Lio has something to review.",
+  "Metrikleri okumak için Instagram bağlantısının yenilenmesi gerekiyor (yeni izin: içerik istatistikleri).":
+    "The Instagram connection needs to be renewed to read metrics (new permission: content insights).",
+  "İlham kaydı bulunamadı":
+    "Inspiration not found",
+  "İlham kaynağına bir başlık, bağlantı ya da kullanıcı adı ver.":
+    "Give the inspiration a title, link or username.",
+  "İçerik analizi bu sunucuda henüz etkin değil (veritabanı güncellemesi bekleniyor).":
+    "Content analytics isn't enabled on this server yet (database update pending).",
+  "İzlenme ve erişim verileri bu kurulumda henüz açılmadı; şimdilik beğeni ve yorum sayıları gösteriliyor.":
+    "Views and reach data aren't enabled on this server yet; showing like and comment counts for now.",
 };

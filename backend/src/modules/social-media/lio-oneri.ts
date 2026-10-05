@@ -88,7 +88,7 @@ export function oneriCevabiniCoz(yanit: string): OkunanOneri {
 }
 
 /** Modelin metin yanıtından JSON'u ayıklar (fatura-okuma.ts'teki eşiyle aynı tolerans). */
-function jsonuAyikla(metin: string): unknown {
+export function jsonuAyikla(metin: string): unknown {
   const temiz = metin.trim();
   try {
     return JSON.parse(temiz);

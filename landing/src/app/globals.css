@@ -722,7 +722,9 @@ p {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding-block: clamp(52px, 7vw, 92px) clamp(56px, 8vw, 100px);
+  /* Üst boşluk bilerek küçük: menünün altındaki 52–92px'lik boşluk başlığı
+     ve düğmeleri ilk ekranın altına itiyordu. */
+  padding-block: clamp(24px, 3.5vw, 40px) clamp(56px, 8vw, 100px);
 }
 
 /* --- canlı arka plan: yavaşça sürüklenen ışıma kürleri + ızgara --------- */
@@ -1237,9 +1239,26 @@ p {
 }
 
 @media (min-width: 1040px) {
+  /* Geniş ekranda hero ilk ekranı (menünün altını) doldurur ve iki sütun
+     dikeyde ortalanır: Lio sohbeti sayfa açıldığında ekranın ortasında
+     durur, altı kesik görünmez. 71px = .site-header yüksekliği; 2 × 24px =
+     .hero'nun bu genişlikteki üst boşluğu ve sohbetin altındaki pay. */
+  .hero {
+    padding-top: 24px;
+  }
+
   .hero-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
     gap: 56px;
+    min-height: calc(100svh - 71px - 48px);
+  }
+
+  /* Sohbetin gövde dışındaki kısmı (başlık, öneriler, giriş, not) ~350px.
+     Gövde kalan alana göre kısalır ki kutunun tamamı ilk ekrana sığsın;
+     uzun ekranda eski 430px'i aşmaz, çok kısa ekranda 260px'in altına
+     inmez (orada sayfa zaten kaydırılarak okunur). */
+  .hero-product .demo-body {
+    height: clamp(260px, calc(100svh - 71px - 48px - 350px), 430px);
   }
 }
 

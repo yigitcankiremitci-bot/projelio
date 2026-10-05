@@ -628,4 +628,60 @@ export const sosyal: TranslationDict = {
     "{n} web searches · {birim} units",
   "İlham panosuna ekle":
     "Add to inspiration board",
+
+  // ─────────────────────────────────────────────── İlerleyiş grafikleri
+  "@{handle} takipçi":
+    "@{handle} followers",
+  "Bu gönderinin geçmişi henüz yok; her okumada bir nokta eklenir.":
+    "No history for this post yet; each reading adds a point.",
+  "Bütün gönderilerin o gün eklediği izlenme":
+    "Views all posts gained that day",
+  "Büyüme eğrisi":
+    "Growth curve",
+  "En az iki senkron gerekiyor; yarın sabah ilk çubuklar görünür.":
+    "At least two syncs are needed; the first bars appear tomorrow morning.",
+  "Geçmiş kaydı yeni başladı: Instagram eski günlerin değerini vermiyor, grafikler bundan sonraki her senkronla dolacak.":
+    "History tracking just started: Instagram doesn't provide past values, so the charts fill in with each sync from now on.",
+  "Geçmiş {tarih} tarihinden beri kaydediliyor; grafikler her gün dolacak.":
+    "History has been recorded since {tarih}; the charts fill in every day.",
+  "Grafik":
+    "Chart",
+  "Grafikler yüklenemedi":
+    "Couldn't load charts",
+  "Günlük kazanılan izlenme":
+    "Views gained per day",
+  "Haftalık yayın performansı":
+    "Weekly posting performance",
+  "Henüz gönderi verisi yok.":
+    "No post data yet.",
+  "O hafta paylaştığın gönderilerin bugünkü toplam izlenmesi":
+    "Today's total views of posts you shared that week",
+  "Paylaşımdan bu yana izlenme (yeni gönderiler ilk 72 saat saatte bir okunur)":
+    "Views since posting (new posts are read hourly for the first 72 hours)",
+  "Son {n} günde kazanılan izlenme":
+    "Views gained in the last {n} days",
+  "Takipçi sayısı her gün kaydediliyor; ikinci günden itibaren çizgi görünür.":
+    "Follower count is recorded daily; the line appears from the second day.",
+  "{n} g":
+    "{n} d",
+  "{n} gönderi":
+    "{n} posts",
+  "{n}. saat":
+    "Hour {n}",
+  "{tarih} haftası":
+    "Week of {tarih}",
+  "önceki 7 güne göre":
+    "vs. the previous 7 days",
+  "İlerleyiş":
+    "Progress",
+  "Takipçi":
+    "Followers",
+  "Tablo":
+    "Table",
+  "{n} gün":
+    "{n} days",
+  "{n}. gün":
+    "Day {n}",
+  "{n} sa":
+    "{n} h",
 };

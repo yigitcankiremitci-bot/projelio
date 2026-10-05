@@ -14,6 +14,7 @@ import { SocialPublishService } from "./social-publish.service";
  *   her gün 04:00   jeton yenileme — süresi yaklaşan bağlantılar uzatılır
  *   her gün 04:30   geçici medya süpürme — yarım kalan denemelerin artıkları
  *   her gün 05:15   içerik analizi — bağlı hesapların gönderileri + metrikleri
+ *   her saat :40    taze gönderi takibi — ilk 72 saatin büyüme eğrisi
  *
  * NEDEN 5 DAKİKA: sosyal medyada "19:00 gönderisi" 19:03'te çıkabilir, kimse
  * fark etmez; ama dakikada bir çalışan bir iş, tek kullanıcılı bir kurulumda
@@ -90,6 +91,24 @@ export class SocialPublishProcessor {
       if (hesap) this.logger.log(`İçerik analizi: ${hesap} hesap senkronlandı, ${hata} hata`);
     } catch (err) {
       this.logger.error(`İçerik analizi turu düştü: ${(err as Error).message}`);
+    } finally {
+      this.analizCalisiyor = false;
+    }
+  }
+
+  /**
+   * Yeni gönderilerin saatlik takibi (ilk 72 saat) — büyüme eğrisi için.
+   * Dakika 40: tam saatte çalışan yayın turlarıyla çakışmasın.
+   */
+  @Cron("40 * * * *")
+  async trackFreshMedia(): Promise<void> {
+    if (this.analizCalisiyor) return;
+    this.analizCalisiyor = true;
+    try {
+      const { hesap, okunan } = await this.insights.tazeleriTakipEt();
+      if (okunan) this.logger.log(`Saatlik takip: ${hesap} hesap, ${okunan} gönderi okundu`);
+    } catch (err) {
+      this.logger.error(`Saatlik takip turu düştü: ${(err as Error).message}`);
     } finally {
       this.analizCalisiyor = false;
     }

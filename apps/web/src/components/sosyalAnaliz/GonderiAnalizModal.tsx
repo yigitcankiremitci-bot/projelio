@@ -1,11 +1,12 @@
-import { useState } from "react";
-import type { PerformansSonucu, SocialAccountMediaItem } from "@projelio/shared";
-import { icerikTuru, kaydetPaylasOrani, safeExternalUrl } from "@projelio/shared";
+import { useEffect, useState } from "react";
+import type { PerformansSonucu, SocialAccountMediaItem, SocialMediaHistory } from "@projelio/shared";
+import { buyumeEgrisi, icerikTuru, kaydetPaylasOrani, safeExternalUrl } from "@projelio/shared";
 import { socialMediaApi } from "../../api/socialMedia";
 import { parseServerDate } from "../../lib/dates";
 import { useT } from "../../lib/i18n";
 import { bicimDili, yuzde } from "../../lib/i18n/depo";
 import Modal from "../Modal";
+import { CizgiGrafik } from "./grafikler";
 import { kisaSayi, MaddeListesi, PerformansRozeti, sureYazisi, turAdi, useAnalizStilleri } from "./ortak";
 
 interface Props {
@@ -31,6 +32,18 @@ export default function GonderiAnalizModal({ gonderi, performans, handle, canWri
   const [calisiyor, setCalisiyor] = useState(false);
   const [hata, setHata] = useState("");
   const [kapakYok, setKapakYok] = useState(false);
+  const [gecmis, setGecmis] = useState<SocialMediaHistory | null>(null);
+
+  useEffect(() => {
+    let iptal = false;
+    socialMediaApi
+      .medyaGecmisi(gonderi.id)
+      .then((g) => !iptal && setGecmis(g))
+      .catch(() => undefined);
+    return () => {
+      iptal = true;
+    };
+  }, [gonderi.id]);
 
   const tur = icerikTuru(gonderi);
   const oran = kaydetPaylasOrani(gonderi);
@@ -130,6 +143,20 @@ export default function GonderiAnalizModal({ gonderi, performans, handle, canWri
             </div>
           ))}
         </div>
+        <CizgiGrafik
+          baslik={t("Büyüme eğrisi")}
+          altBaslik={t("Paylaşımdan bu yana izlenme (yeni gönderiler ilk 72 saat saatte bir okunur)")}
+          noktalar={buyumeEgrisi(gecmis?.postedAt ?? gonderi.postedAt, gecmis?.noktalar ?? []).map((n) => ({
+            x: n.saat,
+            y: n.deger,
+            xYazi: n.saat < 72 ? t("{n}. saat", { n: Math.round(n.saat) }) : t("{n}. gün", { n: Math.round(n.saat / 24) }),
+          }))}
+          yBicim={kisaSayi}
+          xEtiket={(n) => (n.x < 72 ? t("{n} sa", { n: Math.round(n.x) }) : t("{n} g", { n: Math.round(n.x / 24) }))}
+          yukseklik={160}
+          bos={t("Bu gönderinin geçmişi henüz yok; her okumada bir nokta eklenir.")}
+        />
+
         {gonderi.metricsError && (
           <span style={{ fontSize: 12, color: c.textSecondary }}>
             {t("Bu gönderinin metrikleri okunamadı:")} {gonderi.metricsError}

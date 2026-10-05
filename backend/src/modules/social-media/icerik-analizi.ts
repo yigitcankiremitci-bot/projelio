@@ -34,6 +34,8 @@ export function metrikListeleri(mediaProductType?: string | null): string[][] {
       [
         "views",
         "reach",
+        "likes",
+        "comments",
         "saved",
         "shares",
         "total_interactions",
@@ -45,10 +47,14 @@ export function metrikListeleri(mediaProductType?: string | null): string[][] {
     ];
   }
   if (mediaProductType === "STORY") return [["views", "reach"], ["reach"]];
-  return [["views", "reach", "saved", "shares", "total_interactions"], temel];
+  // Beğeni/yorum Insights'tan da okunuyor: saatlik takip gönderi listesini
+  // çekmeden yalnızca bu uca gidiyor, büyüme eğrisinde onlar da olsun.
+  return [["views", "reach", "likes", "comments", "saved", "shares", "total_interactions"], ["views", "reach", "saved", "shares", "total_interactions"], temel];
 }
 
 export interface OkunanMetrikler {
+  likes?: number;
+  comments?: number;
   reach?: number;
   views?: number;
   saved?: number;
@@ -59,6 +65,8 @@ export interface OkunanMetrikler {
 }
 
 const METRIK_ALANI: Record<string, keyof OkunanMetrikler> = {
+  likes: "likes",
+  comments: "comments",
   reach: "reach",
   views: "views",
   saved: "saved",

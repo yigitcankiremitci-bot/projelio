@@ -40,6 +40,13 @@ const MAX_INSIGHTS_CAGRISI = 60;
 const TAZE_GUN = 30;
 const ESKI_TAZELEME_GUN = 7;
 
+/**
+ * Saatlik takip: ilk bu kadar saatteki gönderiler her saat okunur. Büyüme
+ * eğrisinin asıl şekli (ilk gün patlama mı, yavaş yükseliş mi) bu pencerede.
+ */
+export const TAKIP_SAATI = 72;
+const TAKIP_TAVANI = 10;
+
 /** Elle "şimdi güncelle" en fazla bu sıklıkta: çağrı bütçesi yayınla ortak. */
 export const ELLE_SENKRON_ARALIGI_DK = 10;
 
@@ -199,14 +206,84 @@ export class InstagramInsightsService {
       return { medya: liste.medya.length, metrik: 0 };
     }
 
-    const sirada = await this.metrikSirasi(accountId);
+    await this.hesapGorunusunuYaz(accountId, token.accessToken);
+
+    const { metrik, hesapHatasi } = await this.metrikleriGuncelle(
+      accountId,
+      token.accessToken,
+      await this.metrikSirasi(accountId)
+    );
+
+    await this.hesabiGuncelle(accountId, {
+      insights_synced_at: new Date().toISOString(),
+      insights_error: hesapHatasi,
+    });
+    return { medya: liste.medya.length, metrik };
+  }
+
+  /**
+   * Saatlik takip turu: bağlı hesapların ilk 72 saatteki gönderileri.
+   *
+   * Gönderi listesi ÇEKİLMEZ (yeni gönderiler gece ya da elle senkronda
+   * listeye giriyor); yalnızca Insights. Hesap başına en fazla 10 çağrı —
+   * yayın kuyruğuyla aynı çağrı bütçesini paylaşıyor.
+   */
+  async tazeleriTakipEt(): Promise<{ hesap: number; okunan: number }> {
+    if (!instagramInsightsAcik()) return { hesap: 0, okunan: 0 };
+    const sinir = new Date(Date.now() - TAKIP_SAATI * 3_600_000).toISOString();
+    const { data, error } = await this.supabase.client
+      .from("social_account_media")
+      .select("id, account_id, external_media_id, media_product_type, social_accounts!inner(provider, connection_status, archived_at)")
+      .gte("posted_at", sinir)
+      .eq("social_accounts.provider", "instagram_login")
+      .eq("social_accounts.connection_status", "connected")
+      .is("social_accounts.archived_at", null)
+      .order("posted_at", { ascending: false });
+    if (error) throw error;
+
+    const hesaplar = new Map<string, any[]>();
+    for (const r of data ?? []) {
+      const liste = hesaplar.get(r.account_id) ?? [];
+      if (liste.length < TAKIP_TAVANI) liste.push(r);
+      hesaplar.set(r.account_id, liste);
+    }
+
+    let okunan = 0;
+    for (const [accountId, satirlar] of hesaplar) {
+      if (this.calisan.has(accountId)) continue;
+      this.calisan.add(accountId);
+      try {
+        const token = await this.tokens.read(accountId);
+        if (!token || (token.scopes?.length && !token.scopes.includes(IG_INSIGHTS_SCOPE))) continue;
+        okunan += (await this.metrikleriGuncelle(accountId, token.accessToken, satirlar)).metrik;
+      } catch (err) {
+        this.logger.warn(`Saatlik takip düştü (${accountId}): ${(err as Error).message}`);
+      } finally {
+        this.calisan.delete(accountId);
+      }
+    }
+    return { hesap: hesaplar.size, okunan };
+  }
+
+  /**
+   * Gönderilerin metriklerini okur, son değeri yazar ve GEÇMİŞE bir anlık
+   * görüntü ekler. Hesap düzeyindeki hata (izin, jeton) turu durdurur.
+   */
+  private async metrikleriGuncelle(
+    accountId: string,
+    accessToken: string,
+    sirada: { id: string; external_media_id: string; media_product_type: string | null }[]
+  ): Promise<{ metrik: number; hesapHatasi: string | null }> {
     let metrik = 0;
     let hesapHatasi: string | null = null;
     for (const satir of sirada) {
-      const sonuc = await this.metrikleriOku(token.accessToken, satir.external_media_id, satir.media_product_type);
+      const sonuc = await this.metrikleriOku(accessToken, satir.external_media_id, satir.media_product_type);
       if ("metrikler" in sonuc) {
         metrik++;
+        const m = sonuc.metrikler;
         await this.medyaSatiriniGuncelle(satir.id, {
+          ...(m.likes !== undefined ? { like_count: m.likes } : {}),
+          ...(m.comments !== undefined ? { comments_count: m.comments } : {}),
           reach: sonuc.metrikler.reach ?? null,
           views: sonuc.metrikler.views ?? null,
           saved: sonuc.metrikler.saved ?? null,
@@ -217,6 +294,7 @@ export class InstagramInsightsService {
           metrics_synced_at: new Date().toISOString(),
           metrics_error: null,
         });
+        await this.goruntuYaz(satir.id, accountId, m);
         continue;
       }
       const tur = metaHataTuru(sonuc.hata);
@@ -238,12 +316,76 @@ export class InstagramInsightsService {
         metrics_synced_at: new Date().toISOString(),
       });
     }
+    return { metrik, hesapHatasi };
+  }
 
-    await this.hesabiGuncelle(accountId, {
-      insights_synced_at: new Date().toISOString(),
-      insights_error: hesapHatasi,
+  /**
+   * Geçmişe bir satır. Beğeni/yorum Insights'tan gelmediyse (eski metrik
+   * listesine düşülmüşse) satırdaki son değer kullanılır.
+   *
+   * Migration 147 uygulanmadan tablo yok: geçmiş yazılamıyor diye senkron
+   * düşmesin, yalnızca bir kez not düşülür.
+   */
+  private async goruntuYaz(mediaId: string, accountId: string, m: OkunanMetrikler): Promise<void> {
+    if (this.gecmisTablosuYok) return;
+    let like = m.likes;
+    let yorum = m.comments;
+    if (like === undefined || yorum === undefined) {
+      const { data } = await this.supabase.client
+        .from("social_account_media")
+        .select("like_count, comments_count")
+        .eq("id", mediaId)
+        .maybeSingle<any>();
+      like ??= data?.like_count ?? undefined;
+      yorum ??= data?.comments_count ?? undefined;
+    }
+    const { error } = await this.supabase.client.from("social_media_metric_snapshots").insert({
+      media_id: mediaId,
+      account_id: accountId,
+      views: m.views ?? null,
+      reach: m.reach ?? null,
+      like_count: like ?? null,
+      comments_count: yorum ?? null,
+      saved: m.saved ?? null,
+      shares: m.shares ?? null,
+      total_interactions: m.totalInteractions ?? null,
     });
-    return { medya: liste.medya.length, metrik };
+    if (error) this.gecmisHatasi(error);
+  }
+
+  /** Hesabın günlük takipçi/gönderi sayısı (günde tek satır, üzerine yazar). */
+  private async hesapGorunusunuYaz(accountId: string, accessToken: string): Promise<void> {
+    if (this.gecmisTablosuYok) return;
+    const yanit = await this.getJson(
+      `me?${new URLSearchParams({ fields: "followers_count,media_count", access_token: accessToken })}`
+    );
+    if (!yanit.ok) return;
+    const j = yanit.json as { followers_count?: number; media_count?: number };
+    const { error } = await this.supabase.client.from("social_account_snapshots").upsert(
+      {
+        account_id: accountId,
+        captured_on: new Date().toISOString().slice(0, 10),
+        follower_count: typeof j.followers_count === "number" ? j.followers_count : null,
+        media_count: typeof j.media_count === "number" ? j.media_count : null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "account_id,captured_on" }
+    );
+    if (error) this.gecmisHatasi(error);
+    if (typeof j.followers_count === "number") {
+      await this.hesabiGuncelle(accountId, { follower_count: j.followers_count });
+    }
+  }
+
+  private gecmisTablosuYok = false;
+
+  private gecmisHatasi(error: { code?: string; message?: string }): void {
+    if (error.code === "42P01" || error.code === "PGRST205") {
+      this.gecmisTablosuYok = true;
+      this.logger.warn("Metrik geçmişi tabloları yok (migration 147); geçmiş yazılmıyor");
+      return;
+    }
+    this.logger.warn(`Metrik geçmişi yazılamadı: ${error.message}`);
   }
 
   private async medyalariListele(accessToken: string): Promise<{ medya: IgMedya[] } | { hata: string }> {

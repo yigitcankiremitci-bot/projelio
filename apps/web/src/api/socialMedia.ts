@@ -6,6 +6,8 @@ import type {
   SocialDiscovery,
   SocialIdeaReport,
   SocialInspiration,
+  SocialMediaHistory,
+  SocialProgressData,
   SocialInspirationInput,
   SocialContentType,
   SocialMediaOverview,
@@ -206,6 +208,21 @@ export const socialMediaApi = {
   /** Lio fikir raporu — metin modeli, birkaç bin token çıktı. */
   fikirUret: (scope: SocialScope, body: { accountId?: string; istek?: string }) =>
     api.post<SocialIdeaReport>(`${base(scope)}/social-media/fikirler`, withScope(scope, body), undefined, 3 * 60_000),
+
+  /** İlerleyiş grafikleri: takipçi + günlük kazanılan izlenme (son `gun` gün). */
+  ilerleyis: (scope: SocialScope, gun: number, accountId?: string) => {
+    const q = new URLSearchParams({ gun: String(gun) });
+    if (accountId) q.set("accountId", accountId);
+    if (!("jobId" in scope) && scope.departmentId) q.set("departmentId", scope.departmentId);
+    const yol =
+      "jobId" in scope
+        ? `/jobs/${scope.jobId}/social-media/analiz/ilerleyis`
+        : `/organizations/${scope.organizationId}/social-media/analiz/ilerleyis`;
+    return api.get<SocialProgressData>(`${yol}?${q.toString()}`);
+  },
+
+  /** Tek gönderinin metrik geçmişi (büyüme eğrisi). */
+  medyaGecmisi: (mediaId: string) => api.get<SocialMediaHistory>(`/social-account-media/${mediaId}/gecmis`),
 
   /** "Benzer hesap bul" — Lio açık web'de arar; sunucu 3 dakikaya kadar bekliyor. */
   benzerHesapBul: (scope: SocialScope, body: { accountId?: string; istek?: string }) =>

@@ -23,3 +23,4 @@ export * from "./googleTakvim";
 export * from "./bildirimTercihleri";
 export * from "./bildirimSesleri";
 export * from "./icerikAnalizi";
+export * from "./ilerleyis";

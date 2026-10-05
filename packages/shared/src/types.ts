@@ -3218,6 +3218,34 @@ export interface SocialDiscovery {
   createdByName?: string;
 }
 
+/** Bir gönderinin metriklerinin bir andaki hâli (migration 147). */
+export interface SocialMetricSnapshot {
+  capturedAt: string;
+  views?: number;
+  reach?: number;
+  likeCount?: number;
+  commentsCount?: number;
+  saved?: number;
+  shares?: number;
+}
+
+/** Tek gönderinin büyüme geçmişi. */
+export interface SocialMediaHistory {
+  mediaId: string;
+  postedAt?: string;
+  noktalar: SocialMetricSnapshot[];
+}
+
+/** İlerleyiş grafikleri: takipçi ve günlük kazanılan izlenme (UTC günleri). */
+export interface SocialProgressData {
+  /** Hesap başına günlük takipçi; gün "YYYY-MM-DD". */
+  takipci: { accountId: string; gun: string; deger: number }[];
+  /** Bütün gönderilerin o gün KAZANDIĞI izlenme (artışların toplamı). */
+  gunlukIzlenme: { gun: string; deger: number }[];
+  /** Geçmişin ilk kaydı — "veri şu tarihten beri birikiyor" demek için. */
+  ilkKayit?: string;
+}
+
 /** Analiz sekmesinin tek isteği. */
 export interface SocialAnalyticsOverview {
   /** Instagram entegrasyonu bu kurulumda açık mı. */

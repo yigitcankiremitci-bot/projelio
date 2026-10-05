@@ -105,6 +105,39 @@ export class IcerikAnaliziController {
 
   // ============================================================ Tekil kayıtlar
 
+  /** İlerleyiş grafikleri: takipçi + günlük kazanılan izlenme. */
+  @Get("organizations/:organizationId/social-media/analiz/ilerleyis")
+  async orgProgress(
+    @Param("organizationId") organizationId: string,
+    @Query("departmentId") departmentId: string | undefined,
+    @Query("accountId") accountId: string | undefined,
+    @Query("gun") gun: string | undefined,
+    @Req() req: any
+  ) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    return this.analiz.ilerleyis({ organizationId, departmentId }, req.user.userId, {
+      accountId: accountId || undefined,
+      gun: Number(gun) || 30,
+    });
+  }
+
+  @Get("jobs/:jobId/social-media/analiz/ilerleyis")
+  async jobProgress(
+    @Param("jobId") jobId: string,
+    @Query("accountId") accountId: string | undefined,
+    @Query("gun") gun: string | undefined,
+    @Req() req: any
+  ) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
+    return this.analiz.ilerleyis({ jobId }, req.user.userId, { accountId: accountId || undefined, gun: Number(gun) || 30 });
+  }
+
+  /** Tek gönderinin metrik geçmişi (büyüme eğrisi). */
+  @Get("social-account-media/:id/gecmis")
+  mediaHistory(@Param("id") id: string, @Req() req: any) {
+    return this.analiz.medyaGecmisi(id, req.user.userId);
+  }
+
   /** "Şimdi güncelle": hesabın gönderilerini ve metriklerini Instagram'dan çeker. */
   @Post("social-accounts/:id/analiz/senkron")
   sync(@Param("id") id: string, @Req() req: any) {

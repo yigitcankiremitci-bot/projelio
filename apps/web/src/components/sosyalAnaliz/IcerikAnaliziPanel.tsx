@@ -15,6 +15,7 @@ import { useT } from "../../lib/i18n";
 import { bicimDili, yuzde } from "../../lib/i18n/depo";
 import FikirRaporlari from "./FikirRaporlari";
 import GonderiAnalizModal from "./GonderiAnalizModal";
+import IlerleyisPaneli from "./IlerleyisPaneli";
 import IlhamPanosu from "./IlhamPanosu";
 import { kisaSayi, PerformansRozeti, sureYazisi, turAdi, useAnalizStilleri } from "./ortak";
 
@@ -28,7 +29,7 @@ interface Props {
   onIcerikEklendi: () => void;
 }
 
-type AltSekme = "gonderiler" | "ilham" | "fikirler";
+type AltSekme = "gonderiler" | "ilerleyis" | "ilham" | "fikirler";
 type Siralama = "tarih" | "kat" | "izlenme" | "kaydet";
 
 /**
@@ -231,6 +232,7 @@ export default function IcerikAnaliziPanel({ scope, canWrite, onInstagramBagla, 
 
       <div style={{ display: "flex", gap: 16, borderBottom: `1px solid ${c.border}`, flexWrap: "wrap" }}>
         {altSekmeDugmesi("gonderiler", `${t("Gönderilerim")} · ${veri.medya.length}`)}
+        {altSekmeDugmesi("ilerleyis", t("İlerleyiş"))}
         {altSekmeDugmesi("ilham", `${t("İlham panosu")} · ${veri.ilhamlar.length}`)}
         {altSekmeDugmesi("fikirler", t("Fikirler"))}
       </div>
@@ -317,6 +319,8 @@ export default function IcerikAnaliziPanel({ scope, canWrite, onInstagramBagla, 
           </div>
         </>
       )}
+
+      {altSekme === "ilerleyis" && <IlerleyisPaneli scope={scope} hesaplar={hesaplar} medya={veri.medya} />}
 
       {altSekme === "ilham" && (
         <IlhamPanosu

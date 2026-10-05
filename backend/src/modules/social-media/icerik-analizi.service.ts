@@ -9,8 +9,10 @@ import type {
   SocialInspirationAnalysis,
   SocialInspirationInput,
   SocialMediaAnalysis,
+  SocialMediaHistory,
+  SocialProgressData,
 } from "@projelio/shared";
-import { hesapMedyanlari, normalizeSocialHandle, performanslar } from "@projelio/shared";
+import { gunleriDoldur, gunlukArtislar, hesapMedyanlari, normalizeSocialHandle, performanslar } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { requireSafeUrl } from "../../common/safe-url";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
@@ -46,6 +48,11 @@ import { calismaKlasoru, ffmpegVarMi, temizle, VideoIslenemedi } from "./video-k
 const MEDYA_TAVANI = 450;
 const ILHAM_TAVANI = 200;
 const RAPOR_SAYISI = 5;
+/**
+ * İlerleyiş için okunan geçmiş satırı tavanı. 90 günde tipik bir hesap:
+ * ~60 gönderi × 90 gece + taze gönderilerin saatlikleri ≈ 7-8 bin satır.
+ */
+const GECMIS_TAVANI = 20_000;
 
 /** Görsel analiz (kareler + JSON) için başlamadan önceki bakiye kontrolü. */
 const GORSEL_ANALIZ_TAHMINI = 80;
@@ -138,6 +145,113 @@ export class IcerikAnaliziService {
     }
     const sonuc = await this.insights.senkronEt(accountId);
     return { medya: sonuc.medya, metrik: sonuc.metrik };
+  }
+
+  // ============================================================ İlerleyiş
+
+  /**
+   * Takipçi ve günlük kazanılan izlenme — son `gun` gün (UTC).
+   *
+   * Günlük kazanç geçmiş tablosundaki ardışık okumaların farkı (bkz.
+   * packages/shared/src/ilerleyis.ts). Pencerenin bir gün öncesi de okunur:
+   * ilk günün farkı için taban gerekiyor.
+   */
+  async ilerleyis(
+    scope: SocialScope,
+    userId: string,
+    secenek: { accountId?: string; gun: number }
+  ): Promise<SocialProgressData> {
+    await this.social.assertReadable(scope, userId);
+    let hesaplar = await this.bagliHesaplar(scope);
+    if (secenek.accountId) hesaplar = hesaplar.filter((h) => h.id === secenek.accountId);
+    const ids = hesaplar.map((h) => h.id);
+    if (ids.length === 0) return { takipci: [], gunlukIzlenme: [] };
+
+    const gun = Math.min(Math.max(Math.round(secenek.gun) || 30, 7), 365);
+    const baslangic = new Date(Date.now() - (gun - 1) * 86_400_000).toISOString().slice(0, 10);
+    const tabanBaslangic = new Date(Date.parse(`${baslangic}T00:00:00Z`) - 86_400_000).toISOString();
+
+    const [takipci, goruntuler, ilk] = await Promise.all([
+      this.supabase.client
+        .from("social_account_snapshots")
+        .select("account_id, captured_on, follower_count")
+        .in("account_id", ids)
+        .gte("captured_on", baslangic)
+        .order("captured_on", { ascending: true }),
+      this.supabase.client
+        .from("social_media_metric_snapshots")
+        .select("media_id, captured_at, views, reach")
+        .in("account_id", ids)
+        .gte("captured_at", tabanBaslangic)
+        .order("captured_at", { ascending: true })
+        .limit(GECMIS_TAVANI),
+      this.supabase.client
+        .from("social_media_metric_snapshots")
+        .select("captured_at")
+        .in("account_id", ids)
+        .order("captured_at", { ascending: true })
+        .limit(1),
+    ]);
+    for (const r of [takipci, goruntuler, ilk]) {
+      // Migration 147 öncesi: grafikler boş, sekme düşmez.
+      if (r.error && (r.error.code === "42P01" || r.error.code === "PGRST205")) return { takipci: [], gunlukIzlenme: [] };
+      if (r.error) throw r.error;
+    }
+
+    const utcGun = (iso: string) => new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`).toISOString().slice(0, 10);
+    return {
+      takipci: (takipci.data ?? [])
+        .filter((r: any) => typeof r.follower_count === "number")
+        .map((r: any) => ({ accountId: r.account_id, gun: r.captured_on, deger: r.follower_count })),
+      gunlukIzlenme: gunleriDoldur(
+        gunlukArtislar(
+          (goruntuler.data ?? []).map((r: any) => ({
+            mediaId: r.media_id,
+            capturedAt: r.captured_at,
+            views: r.views,
+            reach: r.reach,
+          })),
+          utcGun,
+          baslangic
+        )
+      ),
+      ilkKayit: ilk.data?.[0]?.captured_at ?? undefined,
+    };
+  }
+
+  /** Tek gönderinin metrik geçmişi — büyüme eğrisi için. */
+  async medyaGecmisi(mediaId: string, userId: string): Promise<SocialMediaHistory> {
+    const { data: satir, error } = await this.supabase.client
+      .from("social_account_media")
+      .select("id, account_id, posted_at")
+      .eq("id", mediaId)
+      .maybeSingle<any>();
+    if (error) throw error;
+    if (!satir) throw new NotFoundException("Gönderi bulunamadı");
+    const hesap = await this.hesap(satir.account_id);
+    await this.social.assertReadable(this.social.scopeOfRow(hesap), userId);
+
+    const { data, error: gecmisHatasi } = await this.supabase.client
+      .from("social_media_metric_snapshots")
+      .select("captured_at, views, reach, like_count, comments_count, saved, shares")
+      .eq("media_id", mediaId)
+      .order("captured_at", { ascending: true })
+      .limit(2000);
+    if (gecmisHatasi && gecmisHatasi.code !== "42P01" && gecmisHatasi.code !== "PGRST205") throw gecmisHatasi;
+    return {
+      mediaId,
+      postedAt: satir.posted_at ? utcIso(satir.posted_at) : undefined,
+      noktalar: (data ?? []).map((r: any) => ({
+        // Ofsetsiz UTC → açık "Z": tarayıcı yerel saat sanıp eğriyi kaydırmasın.
+        capturedAt: utcIso(r.captured_at),
+        views: sayi(r.views),
+        reach: sayi(r.reach),
+        likeCount: sayi(r.like_count),
+        commentsCount: sayi(r.comments_count),
+        saved: sayi(r.saved),
+        shares: sayi(r.shares),
+      })),
+    };
   }
 
   // ============================================================ İlham panosu
@@ -708,6 +822,10 @@ function tabloHatasi(error: { code?: string; message?: string }): Error {
     return new BadRequestException("İçerik analizi bu sunucuda henüz etkin değil (veritabanı güncellemesi bekleniyor).");
   }
   return error as Error;
+}
+
+function utcIso(v: string): string {
+  return /[zZ]|[+-]\d{2}:?\d{2}$/.test(v) ? v : `${v}Z`;
 }
 
 /** Ofsetsiz veritabanı zamanını UTC olarak okur (bkz. migration 127). */

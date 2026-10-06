@@ -187,10 +187,26 @@ export class RakipTakibiService {
         access_token: uzun.access_token,
       })}`
     );
-    const adaylar = (sayfalar.data ?? []).filter((p) => p?.instagram_business_account?.id && p.access_token);
+    const tumSayfalar = sayfalar.data ?? [];
+    const adaylar = tumSayfalar.filter((p) => p?.instagram_business_account?.id && p.access_token);
+    // İki ayrı durum, iki ayrı çözüm — tek mesaj kullanıcıyı yanlış yere
+    // gönderiyordu (2026-10-06):
+    //   · hiç Sayfa gelmedi → izin ekranında Sayfa seçilmedi
+    //   · Sayfa geldi ama Instagram'sız → hesap Sayfaya Sayfa ayarlarından
+    //     bağlı değil (yalnızca Hesap Merkezi bağlantısı API'ye görünmüyor)
+    this.logger.log(
+      `Facebook bağlantısı: ${tumSayfalar.length} Sayfa, ${adaylar.length} tanesinde Instagram hesabı (${tumSayfalar
+        .map((p) => `${p.name ?? p.id}${p.instagram_business_account?.id ? "+ig" : ""}`)
+        .join(", ")})`
+    );
+    if (tumSayfalar.length === 0) {
+      throw new BadRequestException(
+        "Facebook hiçbir Sayfaya erişim vermedi. Tekrar bağlan ve izin ekranında Instagram'a bağlı Sayfanı seç (\"Tüm Sayfalar\" ya da Sayfanın kutusu)."
+      );
+    }
     if (adaylar.length === 0) {
       throw new BadRequestException(
-        "Bu Facebook hesabının yönettiği Sayfalarda bağlı bir Instagram profesyonel hesabı bulunamadı. Instagram hesabını bir Facebook Sayfasına bağlayıp tekrar dene."
+        `Erişim verilen Sayfalarda (${tumSayfalar.map((p) => p.name ?? p.id).join(", ")}) bağlı bir Instagram profesyonel hesabı görünmüyor. Instagram hesabını Sayfanın ayarlarından (Meta Business Suite → Ayarlar → Instagram hesapları) bağlayıp tekrar dene.`
       );
     }
     const kendi = await this.kapsamHandlelari(scope);

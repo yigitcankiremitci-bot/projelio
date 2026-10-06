@@ -696,8 +696,6 @@ export const sosyal: TranslationDict = {
     "Details",
   "Başka hesapların herkese açık verisi ve hashtag araması yalnızca Facebook ile bağlanınca açılıyor. Instagram hesabının bir Facebook Sayfasına bağlı olması gerekir. Bu bağlantı yalnızca okur; yayın mevcut Instagram bağlantısından sürer.":
     "Other accounts' public data and hashtag search only open up when you connect with Facebook. Your Instagram account must be linked to a Facebook Page. This connection only reads; publishing continues through your existing Instagram connection.",
-  "Bu Facebook hesabının yönettiği Sayfalarda bağlı bir Instagram profesyonel hesabı bulunamadı. Instagram hesabını bir Facebook Sayfasına bağlayıp tekrar dene.":
-    "No Instagram professional account is linked to the Pages this Facebook account manages. Link your Instagram account to a Facebook Page and try again.",
   "Bu hashtag zaten takipte.":
     "This hashtag is already tracked.",
   "Bu listede gönderi yok.":
@@ -856,4 +854,6 @@ export const sosyal: TranslationDict = {
     "Collect inspiration",
   "İçerikleri planla, sürükle, yayımla":
     "Plan, drag and publish content",
+  "Facebook hiçbir Sayfaya erişim vermedi. Tekrar bağlan ve izin ekranında Instagram'a bağlı Sayfanı seç (\"Tüm Sayfalar\" ya da Sayfanın kutusu).":
+    "Facebook didn't grant access to any Page. Reconnect and select the Page linked to your Instagram on the permission screen (\"All Pages\" or the Page's checkbox).",
 };

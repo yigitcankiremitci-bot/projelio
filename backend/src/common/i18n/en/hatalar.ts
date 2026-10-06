@@ -983,8 +983,6 @@ export const hatalar: TranslationDict = {
   // ─────────────────────────────────────────────── Sosyal medya: rakip ve hashtag takibi
   "Ayrıntı":
     "Details",
-  "Bu Facebook hesabının yönettiği Sayfalarda bağlı bir Instagram profesyonel hesabı bulunamadı. Instagram hesabını bir Facebook Sayfasına bağlayıp tekrar dene.":
-    "No Instagram professional account is linked to the Pages this Facebook account manages. Link your Instagram account to a Facebook Page and try again.",
   "Bu hashtag zaten takipte.":
     "This hashtag is already tracked.",
   "Durdur":
@@ -1042,4 +1040,6 @@ export const hatalar: TranslationDict = {
   "Abonelik iptal edilemedi.": "Couldn't cancel the subscription.",
   "Bülten listesi okunamadı.": "Couldn't read the newsletter list.",
   "Kayıt şu an alınamadı, biraz sonra tekrar deneyin.": "We couldn't save that right now; please try again shortly.",
+  "Facebook hiçbir Sayfaya erişim vermedi. Tekrar bağlan ve izin ekranında Instagram'a bağlı Sayfanı seç (\"Tüm Sayfalar\" ya da Sayfanın kutusu).":
+    "Facebook didn't grant access to any Page. Reconnect and select the Page linked to your Instagram on the permission screen (\"All Pages\" or the Page's checkbox).",
 };

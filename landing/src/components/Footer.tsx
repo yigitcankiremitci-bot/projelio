@@ -3,6 +3,7 @@ import Image from "next/image";
 import type { Dict, Locale } from "@/i18n";
 import { appLinks, path, site } from "@/lib/site";
 import GooglePlayBadge from "@/components/GooglePlayBadge";
+import NewsletterForm from "@/components/NewsletterForm";
 
 export default function Footer({ dict, locale }: { dict: Dict; locale: Locale }) {
   const year = new Date().getFullYear();
@@ -39,6 +40,8 @@ export default function Footer({ dict, locale }: { dict: Dict; locale: Locale })
   return (
     <footer className="site-footer">
       <div className="wrap">
+        <NewsletterForm dict={dict} locale={locale} />
+
         <div className="footer-grid">
           <div>
             <div className="footer-brand">

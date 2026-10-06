@@ -1035,4 +1035,11 @@ export const hatalar: TranslationDict = {
     "posts",
   "Önce Facebook ile bağlan.":
     "Connect with Facebook first.",
+
+  // ─────────────────────────────────────────────── Bülten (Admin > Bülten aboneleri)
+  "Abone bulunamadı.": "Subscriber not found.",
+  "Abone silinemedi.": "Couldn't delete the subscriber.",
+  "Abonelik iptal edilemedi.": "Couldn't cancel the subscription.",
+  "Bülten listesi okunamadı.": "Couldn't read the newsletter list.",
+  "Kayıt şu an alınamadı, biraz sonra tekrar deneyin.": "We couldn't save that right now; please try again shortly.",
 };

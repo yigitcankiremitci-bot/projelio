@@ -30,3 +30,9 @@ test("yabancı kaynak demo uçlarına açılmaz", () => {
 test("yol öneki birebir: /public/demo-x eşleşmez", () => {
   assert.equal(corsKarari("https://projelio.app", "/public/demox", app, landing).credentials, true);
 });
+
+test("landing bülten formuna da çerezsiz açılır", () => {
+  const k = corsKarari("https://projelio.app", "/public/bulten", app, landing);
+  assert.deepEqual(k.origin, ["https://projelio.app"]);
+  assert.equal(k.credentials, false);
+});

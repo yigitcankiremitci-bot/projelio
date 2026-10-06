@@ -15,6 +15,7 @@ import DemoZiyaretleriPanel from "../components/DemoZiyaretleriPanel";
 import DemoRandevuAdminPanel from "../components/demoRandevu/DemoRandevuAdminPanel";
 import WhatsappNumbersPanel from "../components/WhatsappNumbersPanel";
 import WhatsappLeadsPanel from "../components/WhatsappLeadsPanel";
+import BultenAdminPanel from "../components/BultenAdminPanel";
 import AdminEpostaPanel from "../components/adminEposta/AdminEpostaPanel";
 import AdminEpostaMaliyetPanel from "../components/adminEposta/AdminEpostaMaliyetPanel";
 import TabBar from "../components/TabBar";
@@ -35,6 +36,7 @@ type AdminTab =
   | "demoRandevu"
   | "demo"
   | "ziyaretler"
+  | "bulten"
   | "whatsapp";
 
 /**
@@ -57,6 +59,7 @@ const TABS: { key: AdminTab; label: string }[] = [
   { key: "demoRandevu", label: "Demo randevuları" }, // dil:anahtar
   { key: "demo", label: "Demo hesabı" }, // dil:anahtar
   { key: "ziyaretler", label: "Demo ziyaretleri" },
+  { key: "bulten", label: "Bülten aboneleri" },
   { key: "whatsapp", label: "WhatsApp numaraları" }, // dil:anahtar
 ];
 
@@ -180,6 +183,7 @@ export default function AdminPanel() {
     demoRandevu: () => <DemoRandevuAdminPanel />,
     demo: () => <DemoAdminPanel />,
     ziyaretler: () => <DemoZiyaretleriPanel />,
+    bulten: () => <BultenAdminPanel />,
     whatsapp: () => (
       <>
         <WhatsappLeadsPanel />

@@ -4,9 +4,10 @@
  * Genel kural değişmedi: uygulamanın kendi ön yüzleri (CORS_ORIGINS) çerezli
  * ve kimlikli her uca erişir.
  *
- * TEK İSTİSNA — tanıtım sitesinin demo takvimi: projelio.app'teki
- * "Canlı demo" sayfası takvimi tarayıcıdan doğrudan API'ye sorar. Bu yüzden
- * landing alan adları YALNIZCA `/public/demo/…` uçlarına ve ÇEREZSİZ
+ * TEK İSTİSNA — tanıtım sitesinin demo takvimi ve bülten formu: projelio.app'teki
+ * "Canlı demo" sayfası takvimi, alt bilgideki bülten formu aboneliği tarayıcıdan
+ * doğrudan API'ye gönderir. Bu yüzden landing alan adları YALNIZCA
+ * `/public/demo/…` ve `/public/bulten` uçlarına ve ÇEREZSİZ
  * (credentials: false) açılıyor. Landing'i CORS_ORIGINS'e eklemek aynı işi
  * görürdü ama o alan adına kimlikli uçların tamamını açardı; landing'de
  * oturum yok, ihtiyacı da yok.
@@ -23,7 +24,7 @@ export interface CorsKarari {
 }
 
 /** Landing'in herkese açık uçları: yalnızca bunlar landing'e açılır. */
-const LANDING_YOLLARI = ["/public/demo/"];
+const LANDING_YOLLARI = ["/public/demo/", "/public/bulten"];
 
 export function corsKarari(
   origin: string | undefined,

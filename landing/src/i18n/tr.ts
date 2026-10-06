@@ -713,6 +713,17 @@ export const tr = {
     demoCta: "Randevu al",
   },
 
+  newsletter: {
+    title: "Gelişmelerden haberdar olun",
+    lead: "Yeni özellikler, Lio'nun yeni yetenekleri ve ürün haberleri — ayda en fazla birkaç e-posta. İstediğiniz an ayrılabilirsiniz.",
+    placeholder: "E-posta adresiniz",
+    submit: "Bültene üye ol",
+    sending: "Gönderiliyor…",
+    consent: "Projelio'dan bülten ve ürün duyurusu e-postaları almayı kabul ediyorum.",
+    success: "Teşekkürler! Bültenimize kaydoldunuz.",
+    error: "Kayıt şu an alınamadı. Biraz sonra tekrar deneyin.",
+  },
+
   footer: {
     about:
       "Projelio, Türkiye'de çalışan ekipler için tasarlanmış iş yönetim platformudur. Yapay zekâ asistanı Lio işin takibini sizin yerinize üstlenir.",

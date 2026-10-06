@@ -4419,3 +4419,17 @@ export interface ShopifyOzeti {
   yapilandirildi: boolean;
   magazalar: ShopifyMagazaOzeti[];
 }
+
+/** Tanıtım sitesinin bülten abonesi (Admin > Bülten, migration 149). */
+export interface BultenAbonesi {
+  id: string;
+  eposta: string;
+  dil: string;
+  /** Formun gönderildiği sayfa, ör. "/tr/pricing". */
+  kaynak: string | null;
+  /** Açık rızanın (son) verildiği an. */
+  izinAt: string;
+  /** Doluysa abonelik iptal edilmiş; rıza kaydı yine durur. */
+  iptalAt: string | null;
+  createdAt: string;
+}

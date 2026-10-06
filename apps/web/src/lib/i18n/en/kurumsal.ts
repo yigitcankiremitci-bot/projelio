@@ -559,4 +559,16 @@ export const kurumsal: TranslationDict = {
   "Shopify gerekli izinleri vermedi; bağlantıyı yeniden deneyin": "Shopify didn't grant the required permissions; try connecting again",
   "Shopify bağlantı isteği geçersiz veya süresi dolmuş": "The Shopify connection request is invalid or has expired",
   "Shopify erişimi sona erdi; mağazayı yeniden bağlayın": "Shopify access has expired; reconnect the store",
+
+  // ─────────────────────────────────────────────── Admin > Bülten aboneleri
+  "Bülten aboneleri": "Newsletter subscribers",
+  "Tanıtım sitesindeki bülten formundan abone olan adresler. Hepsi formda açık onay verdi.":
+    "Addresses that subscribed via the newsletter form on the website. Each gave explicit consent on the form.",
+  "E-posta ara…": "Search email…",
+  "İptal edenleri de göster": "Show unsubscribed too",
+  "Henüz bülten abonesi yok.": "No newsletter subscribers yet.",
+  "iptal etti": "unsubscribed",
+  "{eposta} bülten listesinden çıkarılsın mı?": "Remove {eposta} from the newsletter list?",
+  "{eposta} kalıcı olarak silinsin mi? Rıza kaydı da gider.": "Permanently delete {eposta}? The consent record goes too.",
+  "İşlem yapılamadı.": "The action couldn't be completed.",
 };

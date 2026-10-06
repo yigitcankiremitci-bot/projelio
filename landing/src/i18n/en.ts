@@ -692,6 +692,17 @@ export const en: Dict = {
     demoCta: "Book a time",
   },
 
+  newsletter: {
+    title: "Stay in the loop",
+    lead: "New features, new things Lio can do and product news — a few emails a month at most. Unsubscribe any time.",
+    placeholder: "Your email address",
+    submit: "Subscribe",
+    sending: "Sending…",
+    consent: "I agree to receive newsletter and product announcement emails from Projelio.",
+    success: "Thanks! You're subscribed to our newsletter.",
+    error: "We couldn't sign you up right now. Please try again shortly.",
+  },
+
   footer: {
     about:
       "Projelio is a business management platform built for how teams actually work. Lio, the AI assistant, keeps track of the work for you.",

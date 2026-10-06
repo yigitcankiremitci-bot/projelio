@@ -816,4 +816,44 @@ export const sosyal: TranslationDict = {
     "Connect with Facebook first.",
   "İşlem tamamlanamadı":
     "Couldn't complete the action",
+
+  // ─────────────────────────────────────────────── Gezinme ve rehber (sadeleştirme)
+  "Analiz ve fikirler nasıl kullanılır?":
+    "How to use Analytics & ideas",
+  "Beğendiğin hesap ve videoları kaydet; \"Benzer hesap bul\" ile Lio sana yeni hesaplar önersin.":
+    "Save accounts and videos you like; let Lio suggest new ones with \"Find similar accounts\".",
+  "Beğendiğin hesapları panoya ekle ya da Lio'ya benzerlerini buldur.":
+    "Add accounts you like to the board, or have Lio find similar ones.",
+  "Fikir al, planla":
+    "Get ideas, plan",
+  "Fikirler'de Lio'dan öneri al, beğendiğini tek tıkla takvime ekle.":
+    "Get suggestions from Lio in Ideas and add the ones you like to the calendar in one click.",
+  "Gidişatı izle":
+    "Track progress",
+  "Gönderilerine bak":
+    "Review your posts",
+  "Hangi içeriğin normalinin üstünde gittiğini gör, Lio'ya nedenini sor.":
+    "See which content beat your normal and ask Lio why.",
+  "Instagram'daki gönderilerin, hesabının normaline göre sıralı. Bir gönderiye tıkla: metrikleri ve Lio'nun \"neden böyle gitti\" yorumu.":
+    "Your Instagram posts, ranked against your account's normal. Click a post for its metrics and Lio's \"why it performed this way\" take.",
+  "Kanalların, bağlantılar ve giriş bilgileri":
+    "Your channels, connections and logins",
+  "Lio verine, rakiplere ve ilham panona bakıp çekilecek içerik fikirleri üretir; beğendiğini takvime ekle.":
+    "Lio looks at your data, competitors and inspiration board to come up with content ideas; add the ones you like to the calendar.",
+  "Lio'dan fikir al":
+    "Get ideas from Lio",
+  "Meta'nın koyduğu sınırlar — dolarsa yeni istekler bir süre reddedilir.":
+    "Limits set by Meta — once full, new requests are rejected for a while.",
+  "Ne işliyor, rakipler, Lio'dan fikir":
+    "What works, competitors, ideas from Lio",
+  "Takip ettiğin hesapların büyümesi, öne çıkan gönderileri ve hashtag'lerin popüler içerikleri.":
+    "Growth and standout posts of accounts you track, plus top content for your hashtags.",
+  "Takipçi, günlük kazanılan izlenme ve haftalık yayın performansı — zaman içinde nasıl gidiyorsun.":
+    "Followers, views gained per day and weekly posting performance — how you're doing over time.",
+  "İlerleyiş'te takipçi ve izlenmenin gün gün değişimini takip et.":
+    "Follow day-by-day changes in followers and views under Progress.",
+  "İlham topla":
+    "Collect inspiration",
+  "İçerikleri planla, sürükle, yayımla":
+    "Plan, drag and publish content",
 };

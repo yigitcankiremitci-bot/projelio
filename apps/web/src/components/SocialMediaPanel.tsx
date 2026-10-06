@@ -35,7 +35,17 @@ import SocialAccountModal from "./SocialAccountModal";
 import SocialCredentialsModal from "./SocialCredentialsModal";
 import SocialPostComposer from "./SocialPostComposer";
 import IcerikAnaliziPanel, { type AltSekme } from "./sosyalAnaliz/IcerikAnaliziPanel";
-import { IconChevronLeft, IconChevronRight, IconEdit, IconExternalLink, IconTrash } from "./icons";
+import { AnaSekmeler, useBolumRenkleri } from "./sosyalAnaliz/gezinme";
+import {
+  IconActivity,
+  IconCalendar,
+  IconChevronLeft,
+  IconChevronRight,
+  IconEdit,
+  IconExternalLink,
+  IconTrash,
+  IconUser,
+} from "./icons";
 import { sekmeleriAc } from "../lib/topluLink";
 import { useDragScroll } from "../lib/useDragScroll";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -72,6 +82,7 @@ type View = "calendar" | "accounts" | "analysis";
 export default function SocialMediaPanel({ organizationId, departmentId, jobId, canWrite = true }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const bolumRenk = useBolumRenkleri();
   const isDesktop = useIsDesktop();
   const panoScrollRef = useDragScroll<HTMLDivElement>();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -1363,29 +1374,11 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     boxShadow: `0 1px 4px ${c.accent}55`,
   };
 
-  const tab = (value: View, text: string) => (
-    <button
-      key={value}
-      onClick={() => setView(value)}
-      style={{
-        fontSize: 12,
-        padding: "4px 10px",
-        borderRadius: 6,
-        cursor: "pointer",
-        border: `1px solid ${view === value ? c.primary : c.border}`,
-        background: view === value ? `${c.primary}18` : "transparent",
-        color: view === value ? c.primary : c.textSecondary,
-      }}
-    >
-      {text}
-    </button>
-  );
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Sosyal Medya")}</h5>
-
+      {/* Başlık sayfanın kendisinde ("Sosyal medya modülü") yazıyor; burada
+          ikinci kez yazılıyordu. Bu satır yalnızca eylemler için. */}
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginLeft: "auto", flexWrap: "wrap" }}>
           {!canWrite ? (
             <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Salt görüntüleme")}</span>
@@ -1450,8 +1443,39 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         </div>
       </div>
 
-      {!loading && (posts.length > 0 || accounts.length > 0) && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <AnaSekmeler
+        secili={view}
+        onSec={setView}
+        secenekler={[
+          {
+            deger: "calendar",
+            baslik: t("Takvim"),
+            aciklama: t("İçerikleri planla, sürükle, yayımla"),
+            ikon: <IconCalendar size={18} />,
+            renk: bolumRenk.takvim,
+          },
+          {
+            deger: "accounts",
+            baslik: t("Hesaplar"),
+            aciklama: t("Kanalların, bağlantılar ve giriş bilgileri"),
+            ikon: <IconUser size={18} />,
+            renk: bolumRenk.hesaplar,
+            rozet: accounts.length,
+          },
+          {
+            deger: "analysis",
+            baslik: t("Analiz ve fikirler"),
+            aciklama: t("Ne işliyor, rakipler, Lio'dan fikir"),
+            ikon: <IconActivity size={18} />,
+            renk: bolumRenk.analiz,
+          },
+        ]}
+      />
+
+      {/* Takvim göstergeleri yalnızca Takvim'de: Analiz'in tepesinde "Ekim
+          planı" görünmesi iki ekranı birbirine karıştırıyordu. */}
+      {view === "calendar" && !loading && (posts.length > 0 || accounts.length > 0) && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8 }}>
           {stats.map((s) => (
             <div
               key={s.label}
@@ -1459,25 +1483,21 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                 display: "flex",
                 flexDirection: "column",
                 gap: 2,
-                padding: "6px 12px",
-                borderRadius: 8,
-                background: c.background,
-                border: `1px solid ${c.border}`,
-                minWidth: 92,
+                padding: "8px 12px",
+                borderRadius: 10,
+                background: `${bolumRenk.takvim}10`,
+                border: `1px solid ${bolumRenk.takvim}33`,
+                borderLeft: `3px solid ${bolumRenk.takvim}`,
               }}
             >
               <span style={{ fontSize: 11, color: c.textSecondary }}>{s.label}</span>
-              <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{s.value}</span>
+              <span style={{ fontSize: 18, fontWeight: 600, color: c.textPrimary }}>{s.value}</span>
             </div>
           ))}
         </div>
       )}
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-        {tab("calendar", t("Takvim ve akış"))}
-        {tab("accounts", `${t("Hesaplar")} · ${accounts.length}`)}
-        {tab("analysis", t("Analiz ve fikirler"))}
-
         {view === "calendar" && (
           <>
             <select

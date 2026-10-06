@@ -7,6 +7,7 @@ import { useT } from "../../lib/i18n";
 import { bicimDili, yuzde } from "../../lib/i18n/depo";
 import Modal from "../Modal";
 import { CizgiGrafik } from "./grafikler";
+import { useBolumRenkleri } from "./gezinme";
 import { kisaSayi, MaddeListesi, PerformansRozeti, sureYazisi, turAdi, useAnalizStilleri } from "./ortak";
 
 interface Props {
@@ -29,6 +30,7 @@ interface Props {
 export default function GonderiAnalizModal({ gonderi, performans, handle, canWrite, onClose, onGuncellendi }: Props) {
   const t = useT();
   const { c, kart, ikincilDugme, birincilDugme } = useAnalizStilleri();
+  const bolumRengi = useBolumRenkleri().gonderiler;
   const [calisiyor, setCalisiyor] = useState(false);
   const [hata, setHata] = useState("");
   const [kapakYok, setKapakYok] = useState(false);
@@ -144,6 +146,7 @@ export default function GonderiAnalizModal({ gonderi, performans, handle, canWri
           ))}
         </div>
         <CizgiGrafik
+          renk={bolumRengi}
           baslik={t("Büyüme eğrisi")}
           altBaslik={t("Paylaşımdan bu yana izlenme (yeni gönderiler ilk 72 saat saatte bir okunur)")}
           noktalar={buyumeEgrisi(gecmis?.postedAt ?? gonderi.postedAt, gecmis?.noktalar ?? []).map((n) => ({

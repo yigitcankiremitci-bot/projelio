@@ -4,6 +4,8 @@ import { socialMediaApi, type SocialScope } from "../../api/socialMedia";
 import { parseServerDate } from "../../lib/dates";
 import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
+import { IconSparkle } from "../icons";
+import { BolumBasligi, useBolumRenkleri } from "./gezinme";
 import { useAnalizStilleri } from "./ortak";
 
 interface Props {
@@ -38,6 +40,7 @@ export default function FikirRaporlari({
 }: Props) {
   const t = useT();
   const { c, kart, alan, birincilDugme, ikincilDugme } = useAnalizStilleri();
+  const renk = useBolumRenkleri().fikirler;
   const [hesap, setHesap] = useState("");
   const [istek, setIstek] = useState("");
   const [calisiyor, setCalisiyor] = useState(false);
@@ -85,12 +88,15 @@ export default function FikirRaporlari({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {canWrite && (
-        <div style={{ ...kart, display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={{ fontSize: 13, color: c.textPrimary, lineHeight: 1.5 }}>
-            {t(
+        <div style={{ ...kart, display: "flex", flexDirection: "column", gap: 10, background: `${renk}0D`, borderColor: `${renk}40` }}>
+          <BolumBasligi
+            ikon={<IconSparkle size={15} />}
+            renk={renk}
+            baslik={t("Lio'dan fikir al")}
+            aciklama={t(
               "Lio en iyi ve en zayıf gönderilerine, önceki analizlerine ve ilham panona bakar; neyin işlediğini çıkarıp yeni içerik fikirleri önerir."
             )}
-          </span>
+          />
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {hesaplar.length > 1 && (
               <select value={hesap} onChange={(e) => setHesap(e.target.value)} style={{ ...alan, width: "auto", flex: "0 0 auto" }}>
@@ -112,9 +118,14 @@ export default function FikirRaporlari({
               type="button"
               onClick={() => void uret()}
               disabled={calisiyor}
-              style={{ ...birincilDugme, opacity: calisiyor ? 0.6 : 1, cursor: calisiyor ? "default" : "pointer" }}
+              style={{
+                ...birincilDugme,
+                background: renk,
+                opacity: calisiyor ? 0.6 : 1,
+                cursor: calisiyor ? "default" : "pointer",
+              }}
             >
-              {calisiyor ? t("Lio düşünüyor…") : t("Fikir üret")}
+              {calisiyor ? t("Lio düşünüyor…") : `✦ ${t("Fikir üret")}`}
             </button>
           </div>
           <span style={{ fontSize: 11, color: c.textSecondary }}>

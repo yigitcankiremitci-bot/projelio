@@ -6,6 +6,7 @@ import { parseServerDate } from "../../lib/dates";
 import { useT } from "../../lib/i18n";
 import { bicimDili, yuzde } from "../../lib/i18n/depo";
 import { CizgiGrafik, CubukGrafik } from "./grafikler";
+import { useBolumRenkleri } from "./gezinme";
 import { kisaSayi, useAnalizStilleri } from "./ortak";
 
 interface Props {
@@ -49,6 +50,7 @@ function pazartesi(iso: string): string {
 export default function IlerleyisPaneli({ scope, hesaplar, medya }: Props) {
   const t = useT();
   const { c, kart } = useAnalizStilleri();
+  const renk = useBolumRenkleri().ilerleyis;
   const [gun, setGun] = useState<(typeof DONEMLER)[number]>(30);
   const [hesap, setHesap] = useState("");
   const [veri, setVeri] = useState<SocialProgressData | null>(null);
@@ -134,7 +136,7 @@ export default function IlerleyisPaneli({ scope, hesaplar, medya }: Props) {
       <span style={{ fontSize: 11, color: c.textSecondary }}>{birikiyor}</span>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 8 }}>
-        <div style={{ ...kart, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ ...kart, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 2, background: `${renk}10`, borderColor: `${renk}33`, borderLeft: `3px solid ${renk}` }}>
           <span style={{ fontSize: 11, color: c.textSecondary }}>
             {t("Son {n} günde kazanılan izlenme", { n: ozet.gunSayisi || 7 })}
           </span>
@@ -153,7 +155,7 @@ export default function IlerleyisPaneli({ scope, hesaplar, medya }: Props) {
         {takipciSerileri.map(({ hesap: h, noktalar }) => {
           const fark = noktalar[noktalar.length - 1].deger - noktalar[0].deger;
           return (
-            <div key={h.accountId} style={{ ...kart, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+            <div key={h.accountId} style={{ ...kart, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 2, background: `${renk}10`, borderColor: `${renk}33`, borderLeft: `3px solid ${renk}` }}>
               <span style={{ fontSize: 11, color: c.textSecondary }}>
                 {t("@{handle} takipçi", { handle: h.handle })}
               </span>
@@ -173,6 +175,7 @@ export default function IlerleyisPaneli({ scope, hesaplar, medya }: Props) {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 10 }}>
         <CubukGrafik
+          renk={renk}
           baslik={t("Günlük kazanılan izlenme")}
           altBaslik={t("Bütün gönderilerin o gün eklediği izlenme")}
           noktalar={gunluk.map((n, i) => ({ x: i, y: n.deger, xYazi: gunYazisi(n.gun, true) }))}
@@ -182,6 +185,7 @@ export default function IlerleyisPaneli({ scope, hesaplar, medya }: Props) {
         />
         {takipciSerileri.length === 0 ? (
           <CizgiGrafik
+            renk={renk}
             baslik={t("Takipçi")}
             noktalar={[]}
             yBicim={kisaSayi}
@@ -191,6 +195,7 @@ export default function IlerleyisPaneli({ scope, hesaplar, medya }: Props) {
         ) : (
           takipciSerileri.map(({ hesap: h, noktalar }) => (
             <CizgiGrafik
+            renk={renk}
               key={h.accountId}
               baslik={takipciSerileri.length > 1 ? t("@{handle} takipçi", { handle: h.handle }) : t("Takipçi")}
               noktalar={noktalar.map((n) => ({
@@ -205,6 +210,7 @@ export default function IlerleyisPaneli({ scope, hesaplar, medya }: Props) {
           ))
         )}
         <CubukGrafik
+          renk={renk}
           baslik={t("Haftalık yayın performansı")}
           altBaslik={t("O hafta paylaştığın gönderilerin bugünkü toplam izlenmesi")}
           noktalar={haftalar.map((h, i) => ({

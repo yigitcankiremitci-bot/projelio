@@ -5,6 +5,8 @@ import { socialMediaApi, type SocialScope } from "../../api/socialMedia";
 import { parseServerDate } from "../../lib/dates";
 import { useT } from "../../lib/i18n";
 import { bicimDili, yuzde } from "../../lib/i18n/depo";
+import { IconActivity, IconLink, IconUser } from "../icons";
+import { BolumBasligi, useBolumRenkleri } from "./gezinme";
 import { CizgiGrafik } from "./grafikler";
 import { katYazisi, kisaSayi, useAnalizStilleri } from "./ortak";
 
@@ -39,6 +41,7 @@ function tarih(iso: string | undefined, saatli = false): string {
 export default function RakiplerPaneli({ scope, canWrite }: Props) {
   const t = useT();
   const { c, kart, ikincilDugme, birincilDugme, alan } = useAnalizStilleri();
+  const renk = useBolumRenkleri().rakipler;
   const [veri, setVeri] = useState<SocialCompetitorOverview | null>(null);
   const [hata, setHata] = useState("");
   const [bilgi, setBilgi] = useState("");
@@ -95,7 +98,7 @@ export default function RakiplerPaneli({ scope, canWrite }: Props) {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* ---------------- Bağlantı ---------------- */}
       <div style={{ ...kart, display: "flex", flexDirection: "column", gap: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>{t("Facebook bağlantısı")}</span>
+        <BolumBasligi ikon={<IconLink size={15} />} renk={renk} baslik={t("Facebook bağlantısı")} />
         {!veri.ayarli ? (
           <span style={{ fontSize: 12, color: c.textSecondary }}>
             {t("Sunucuda Facebook uygulaması tanımlı değil (FACEBOOK_APP_ID / FACEBOOK_APP_SECRET).")}
@@ -161,10 +164,14 @@ export default function RakiplerPaneli({ scope, canWrite }: Props) {
       {/* ---------------- Rakipler ---------------- */}
       <div style={{ ...kart, display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>{t("Takip edilen hesaplar")}</span>
-          <span style={{ fontSize: 11, color: c.textSecondary }}>
-            {t("Her gece güncellenir · yalnızca işletme ve içerik üreticisi hesapları")}
-          </span>
+          <div style={{ flex: "1 1 260px" }}>
+            <BolumBasligi
+              ikon={<IconUser size={15} />}
+              renk={renk}
+              baslik={t("Takip edilen hesaplar")}
+              aciklama={t("Her gece güncellenir · yalnızca işletme ve içerik üreticisi hesapları")}
+            />
+          </div>
           {canWrite && b && takipte.length > 0 && (
             <button
               type="button"
@@ -213,10 +220,12 @@ export default function RakiplerPaneli({ scope, canWrite }: Props) {
       {/* ---------------- Hashtagler ---------------- */}
       <div style={{ ...kart, display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>{t("Hashtag takibi")}</span>
-          <span style={{ fontSize: 11, color: c.textSecondary }}>
-            {t("En popüler ve son 24 saatin gönderileri · her gece güncellenir")}
-          </span>
+          <BolumBasligi
+            ikon={<span style={{ fontSize: 15, fontWeight: 700 }}>#</span>}
+            renk={renk}
+            baslik={t("Hashtag takibi")}
+            aciklama={t("En popüler ve son 24 saatin gönderileri · her gece güncellenir")}
+          />
         </div>
         {canWrite && b && (
           <form
@@ -287,6 +296,7 @@ function SinirlarKarti({
 }) {
   const t = useT();
   const { c, kart } = useAnalizStilleri();
+  const bolumRengi = useBolumRenkleri().rakipler;
   const uygulama = kullanim ? Math.max(kullanim.callCount ?? 0, kullanim.totalTime ?? 0, kullanim.totalCputime ?? 0) : null;
 
   const cubuk = (ad: string, deger: number | null, sinir: number, alt: string) => {
@@ -310,7 +320,12 @@ function SinirlarKarti({
 
   return (
     <div style={{ ...kart, display: "flex", flexDirection: "column", gap: 10 }}>
-      <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>{t("Sınırlar")}</span>
+      <BolumBasligi
+        ikon={<IconActivity size={15} />}
+        renk={bolumRengi}
+        baslik={t("Sınırlar")}
+        aciklama={t("Meta'nın koyduğu sınırlar — dolarsa yeni istekler bir süre reddedilir.")}
+      />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
         {cubuk(
           t("Haftalık hashtag hakkı"),
@@ -357,6 +372,7 @@ function RakipSatiri({
 }) {
   const t = useT();
   const { c, ikincilDugme } = useAnalizStilleri();
+  const bolumRengi = useBolumRenkleri().rakipler;
   const simdi = useMemo(() => new Date(), [r]);
   const ozet = useMemo(() => rakipOzeti(r.gonderiler, r.takipciGecmisi, r.profil?.takipci, simdi), [r, simdi]);
   const katlar = useMemo(() => rakipKatlari(r.gonderiler, simdi), [r, simdi]);
@@ -434,6 +450,7 @@ function RakipSatiri({
       {acik && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
           <CizgiGrafik
+            renk={bolumRengi}
             baslik={t("Takipçi")}
             noktalar={r.takipciGecmisi.map((n) => ({
               x: Date.parse(`${n.gun}T12:00:00Z`),

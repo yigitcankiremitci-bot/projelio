@@ -13,7 +13,9 @@ import { socialMediaApi, type SocialScope } from "../../api/socialMedia";
 import { parseServerDate } from "../../lib/dates";
 import { useT } from "../../lib/i18n";
 import { bicimDili, yuzde } from "../../lib/i18n/depo";
+import { IconActivity, IconLayers, IconSparkle, IconStar, IconUser } from "../icons";
 import FikirRaporlari from "./FikirRaporlari";
+import { AltSekmeler, IlkKullanimRehberi, useBolumRenkleri, type SekmeSecenegi } from "./gezinme";
 import GonderiAnalizModal from "./GonderiAnalizModal";
 import IlerleyisPaneli from "./IlerleyisPaneli";
 import IlhamPanosu from "./IlhamPanosu";
@@ -57,6 +59,7 @@ export default function IcerikAnaliziPanel({
 }: Props) {
   const t = useT();
   const { c, kart, ikincilDugme, birincilDugme } = useAnalizStilleri();
+  const renk = useBolumRenkleri();
   const [veri, setVeri] = useState<SocialAnalyticsOverview | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [hata, setHata] = useState("");
@@ -144,28 +147,68 @@ export default function IcerikAnaliziPanel({
   const hesaplar = veri.hesaplar;
   const handleOf = new Map(hesaplar.map((h) => [h.accountId, h.handle]));
 
-  const altSekmeDugmesi = (deger: AltSekme, yazi: string) => (
-    <button
-      key={deger}
-      type="button"
-      onClick={() => setAltSekme(deger)}
-      style={{
-        fontSize: 13,
-        padding: "6px 2px",
-        background: "transparent",
-        border: "none",
-        borderBottom: `2px solid ${altSekme === deger ? c.primary : "transparent"}`,
-        color: altSekme === deger ? c.primary : c.textSecondary,
-        fontWeight: altSekme === deger ? 600 : 400,
-        cursor: "pointer",
-      }}
-    >
-      {yazi}
-    </button>
-  );
+  // Sıra kullanım akışını izliyor: önce kendi gönderilerine bak, sonra
+  // gidişata, sonra başkalarına (rakip, ilham), en son Lio'dan fikir al.
+  const altSekmeler: SekmeSecenegi<AltSekme>[] = [
+    {
+      deger: "gonderiler",
+      baslik: t("Gönderilerim"),
+      rozet: veri.medya.length,
+      ikon: <IconLayers size={15} />,
+      renk: renk.gonderiler,
+      aciklama: t(
+        "Instagram'daki gönderilerin, hesabının normaline göre sıralı. Bir gönderiye tıkla: metrikleri ve Lio'nun \"neden böyle gitti\" yorumu."
+      ),
+    },
+    {
+      deger: "ilerleyis",
+      baslik: t("İlerleyiş"),
+      ikon: <IconActivity size={15} />,
+      renk: renk.ilerleyis,
+      aciklama: t("Takipçi, günlük kazanılan izlenme ve haftalık yayın performansı — zaman içinde nasıl gidiyorsun."),
+    },
+    ...(veri.rakipAcik
+      ? [
+          {
+            deger: "rakipler" as const,
+            baslik: t("Rakipler"),
+            ikon: <IconUser size={15} />,
+            renk: renk.rakipler,
+            aciklama: t("Takip ettiğin hesapların büyümesi, öne çıkan gönderileri ve hashtag'lerin popüler içerikleri."),
+          },
+        ]
+      : []),
+    {
+      deger: "ilham",
+      baslik: t("İlham panosu"),
+      rozet: veri.ilhamlar.length,
+      ikon: <IconStar size={15} />,
+      renk: renk.ilham,
+      aciklama: t("Beğendiğin hesap ve videoları kaydet; \"Benzer hesap bul\" ile Lio sana yeni hesaplar önersin."),
+    },
+    {
+      deger: "fikirler",
+      baslik: t("Fikirler"),
+      ikon: <IconSparkle size={15} />,
+      renk: renk.fikirler,
+      aciklama: t("Lio verine, rakiplere ve ilham panona bakıp çekilecek içerik fikirleri üretir; beğendiğini takvime ekle."),
+    },
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <IlkKullanimRehberi
+        anahtar="sosyal-analiz"
+        renk={renk.analiz}
+        baslik={t("Analiz ve fikirler nasıl kullanılır?")}
+        adimlar={[
+          { baslik: t("Gönderilerine bak"), aciklama: t("Hangi içeriğin normalinin üstünde gittiğini gör, Lio'ya nedenini sor.") },
+          { baslik: t("İlham topla"), aciklama: t("Beğendiğin hesapları panoya ekle ya da Lio'ya benzerlerini buldur.") },
+          { baslik: t("Gidişatı izle"), aciklama: t("İlerleyiş'te takipçi ve izlenmenin gün gün değişimini takip et.") },
+          { baslik: t("Fikir al, planla"), aciklama: t("Fikirler'de Lio'dan öneri al, beğendiğini tek tıkla takvime ekle.") },
+        ]}
+      />
+
       {/* Bağlantı durumu: hesap yok / yeniden bağlanmalı / senkron hatası */}
       {hesaplar.length === 0 ? (
         <div style={{ ...kart, borderStyle: "dashed", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -188,10 +231,31 @@ export default function IcerikAnaliziPanel({
           )}
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ ...kart, display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px" }}>
           {hesaplar.map((h) => (
             <div key={h.accountId} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 12 }}>
-              <span style={{ fontWeight: 500, color: c.textPrimary }}>@{h.handle}</span>
+              <span
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  overflow: "hidden",
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: `${renk.hesaplar}26`,
+                  color: renk.hesaplar,
+                  fontWeight: 700,
+                }}
+              >
+                {h.avatarUrl ? (
+                  <img src={h.avatarUrl} alt="" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  h.handle.slice(0, 1).toUpperCase()
+                )}
+              </span>
+              <span style={{ fontWeight: 600, fontSize: 13, color: c.textPrimary }}>@{h.handle}</span>
               {typeof h.followerCount === "number" && (
                 <span style={{ color: c.textSecondary }}>{t("{n} takipçi", { n: kisaSayi(h.followerCount) })}</span>
               )}
@@ -211,9 +275,15 @@ export default function IcerikAnaliziPanel({
                 type="button"
                 onClick={() => void senkronla(h.accountId)}
                 disabled={senkron !== null}
-                style={{ ...ikincilDugme, opacity: senkron !== null ? 0.6 : 1 }}
+                style={{
+                  ...ikincilDugme,
+                  marginLeft: "auto",
+                  borderColor: renk.analiz,
+                  color: renk.analiz,
+                  opacity: senkron !== null ? 0.6 : 1,
+                }}
               >
-                {senkron === h.accountId ? t("Instagram'dan okunuyor…") : t("Şimdi güncelle")}
+                {senkron === h.accountId ? t("Instagram'dan okunuyor…") : `↻ ${t("Şimdi güncelle")}`}
               </button>
               {h.yenidenBaglanmali ? (
                 <span style={{ color: c.warning, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
@@ -240,13 +310,7 @@ export default function IcerikAnaliziPanel({
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 16, borderBottom: `1px solid ${c.border}`, flexWrap: "wrap" }}>
-        {altSekmeDugmesi("gonderiler", `${t("Gönderilerim")} · ${veri.medya.length}`)}
-        {altSekmeDugmesi("ilerleyis", t("İlerleyiş"))}
-        {veri.rakipAcik && altSekmeDugmesi("rakipler", t("Rakipler"))}
-        {altSekmeDugmesi("ilham", `${t("İlham panosu")} · ${veri.ilhamlar.length}`)}
-        {altSekmeDugmesi("fikirler", t("Fikirler"))}
-      </div>
+      <AltSekmeler secili={altSekme} onSec={setAltSekme} secenekler={altSekmeler} />
 
       {hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}
 
@@ -270,7 +334,19 @@ export default function IcerikAnaliziPanel({
                   deger: ozet.enIyiSaat ? `${String(ozet.enIyiSaat.saat).padStart(2, "0")}:00` : "–",
                 },
               ].map((k) => (
-                <div key={k.ad} style={{ ...kart, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+                <div
+                  key={k.ad}
+                  style={{
+                    ...kart,
+                    padding: "8px 12px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                    background: `${renk.gonderiler}10`,
+                    borderColor: `${renk.gonderiler}33`,
+                    borderLeft: `3px solid ${renk.gonderiler}`,
+                  }}
+                >
                   <span style={{ fontSize: 11, color: c.textSecondary }}>{k.ad}</span>
                   <span style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary }}>{k.deger}</span>
                 </div>

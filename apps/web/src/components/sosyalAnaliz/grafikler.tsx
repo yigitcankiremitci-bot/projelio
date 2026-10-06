@@ -34,6 +34,8 @@ interface OrtakProps {
   xEtiket: (n: GrafikNoktasi) => string;
   bos: ReactNode;
   yukseklik?: number;
+  /** Seri rengi — bölümün rengi (varsayılan tema ana rengi). */
+  renk?: string;
 }
 
 const SOL = 44;
@@ -165,8 +167,9 @@ function Ipucu({ x, y, ust, alt }: { x: number; y: number; ust: string; alt: str
 }
 
 /** Zaman çizgisi: x sürekli (zaman/saat), 2 px çizgi, uç noktası işaretli. */
-export function CizgiGrafik({ baslik, altBaslik, noktalar, yBicim, xEtiket, bos, yukseklik = 180 }: OrtakProps) {
+export function CizgiGrafik({ baslik, altBaslik, noktalar, yBicim, xEtiket, bos, yukseklik = 180, renk }: OrtakProps) {
   const c = useThemeColors();
+  const seri = renk ?? c.primary;
   const [ref, genislik] = useGenislik<HTMLDivElement>();
   const [tablo, setTablo] = useState(false);
   const [secili, setSecili] = useState<number | null>(null);
@@ -230,7 +233,7 @@ export function CizgiGrafik({ baslik, altBaslik, noktalar, yBicim, xEtiket, bos,
           <polyline
             points={noktalar.map((n) => `${olcek.px(n.x)},${olcek.py(n.y)}`).join(" ")}
             fill="none"
-            stroke={c.primary}
+            stroke={seri}
             strokeWidth={2}
             strokeLinejoin="round"
             strokeLinecap="round"
@@ -240,7 +243,7 @@ export function CizgiGrafik({ baslik, altBaslik, noktalar, yBicim, xEtiket, bos,
             cx={olcek.px(noktalar[noktalar.length - 1].x)}
             cy={olcek.py(noktalar[noktalar.length - 1].y)}
             r={4}
-            fill={c.primary}
+            fill={seri}
             stroke={c.surface}
             strokeWidth={2}
           />
@@ -259,7 +262,7 @@ export function CizgiGrafik({ baslik, altBaslik, noktalar, yBicim, xEtiket, bos,
                 cx={olcek.px(noktalar[secili].x)}
                 cy={olcek.py(noktalar[secili].y)}
                 r={5}
-                fill={c.primary}
+                fill={seri}
                 stroke={c.surface}
                 strokeWidth={2}
               />
@@ -298,8 +301,10 @@ export function CubukGrafik({
   bos,
   yukseklik = 180,
   ekIpucu,
+  renk,
 }: OrtakProps & { ekIpucu?: (n: GrafikNoktasi) => string }) {
   const c = useThemeColors();
+  const seri = renk ?? c.primary;
   const [ref, genislik] = useGenislik<HTMLDivElement>();
   const [tablo, setTablo] = useState(false);
   const [secili, setSecili] = useState<number | null>(null);
@@ -348,7 +353,7 @@ export function CubukGrafik({
                 {h > 0 && (
                   <path
                     d={`M${orta - cubuk / 2},${UST + yIc} V${ust + r} Q${orta - cubuk / 2},${ust} ${orta - cubuk / 2 + r},${ust} H${orta + cubuk / 2 - r} Q${orta + cubuk / 2},${ust} ${orta + cubuk / 2},${ust + r} V${UST + yIc} Z`}
-                    fill={c.primary}
+                    fill={seri}
                     opacity={secili === null || secili === i ? 1 : 0.55}
                     pointerEvents="none"
                   />

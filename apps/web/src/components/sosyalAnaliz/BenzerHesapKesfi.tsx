@@ -10,6 +10,8 @@ import { socialMediaApi, type SocialScope } from "../../api/socialMedia";
 import { parseServerDate } from "../../lib/dates";
 import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
+import { IconSparkle } from "../icons";
+import { BolumBasligi, useBolumRenkleri } from "./gezinme";
 import { useAnalizStilleri } from "./ortak";
 
 interface Props {
@@ -61,6 +63,7 @@ export default function BenzerHesapKesfi({
 }: Props) {
   const t = useT();
   const { c, kart, alan, birincilDugme, ikincilDugme } = useAnalizStilleri();
+  const renk = useBolumRenkleri().ilham;
   const [hesap, setHesap] = useState("");
   const [istek, setIstek] = useState("");
   const [calisiyor, setCalisiyor] = useState(false);
@@ -111,15 +114,15 @@ export default function BenzerHesapKesfi({
   if (!acik && kesifler.length === 0) return null;
 
   return (
-    <div style={{ ...kart, display: "flex", flexDirection: "column", gap: 10, background: `${c.primary}06` }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary }}>{t("Benzer hesap bul")}</span>
-        <span style={{ fontSize: 12, color: c.textSecondary, lineHeight: 1.5 }}>
-          {t(
-            "Lio gönderilerinden nişini çıkarır ve açık web'de (listeler, haberler, bloglar) bu nişteki içerik üreticilerini arar. Instagram taranmaz; adayları profiline bakıp panoya ekleyen sensin."
-          )}
-        </span>
-      </div>
+    <div style={{ ...kart, display: "flex", flexDirection: "column", gap: 10, background: `${renk}0D`, borderColor: `${renk}40` }}>
+      <BolumBasligi
+        ikon={<IconSparkle size={15} />}
+        renk={renk}
+        baslik={t("Benzer hesap bul")}
+        aciklama={t(
+          "Lio gönderilerinden nişini çıkarır ve açık web'de (listeler, haberler, bloglar) bu nişteki içerik üreticilerini arar. Instagram taranmaz; adayları profiline bakıp panoya ekleyen sensin."
+        )}
+      />
 
       {acik && canWrite && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

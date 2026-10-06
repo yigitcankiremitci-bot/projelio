@@ -13,7 +13,12 @@ import { useThemeColors } from "../../theme/useThemeColors";
 /** 12400 → "12,4 B" (TR) / "12.4K" (EN). Küçük sayılar olduğu gibi. */
 export function kisaSayi(n: number | undefined | null): string {
   if (typeof n !== "number" || !Number.isFinite(n)) return "–";
-  return new Intl.NumberFormat(bicimDili(), { notation: n >= 10_000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(n);
+  // 100'ün üstünde kesir gürültü ("1.261,5 izlenme"); küçük sayılarda (oran,
+  // süre) bir hane anlamlı.
+  return new Intl.NumberFormat(bicimDili(), {
+    notation: n >= 10_000 ? "compact" : "standard",
+    maximumFractionDigits: n >= 100 && n < 10_000 ? 0 : 1,
+  }).format(n);
 }
 
 export function katYazisi(kat: number): string {

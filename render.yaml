@@ -25,7 +25,15 @@ services:
     branch: test-kopya
     autoDeploy: false
 
-    buildCommand: npm install && npm run build --workspace=backend
+    # Dockerfile.backend ile aynı adımlar. `npm install` DEĞİL `npm ci`: install
+    # kilit dosyasını yok sayıp daha yeni bir TypeScript çekti ve shared'in
+    # tsconfig'i (moduleResolution=node10) onda derlenmedi. --include=dev şart:
+    # NODE_ENV=production iken npm derleyiciyi (dev bağımlılık) atlıyor.
+    # Son adım Dockerfile'daki gibi shared'in girişini derlenmiş dosyaya çevirir.
+    buildCommand: >-
+      npm ci --include=dev &&
+      npm run build --workspace=backend &&
+      node -e "const fs=require('fs');const p='packages/shared/package.json';const j=JSON.parse(fs.readFileSync(p));j.main='dist/index.js';fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')"
     startCommand: node backend/dist/main
     healthCheckPath: /health
 

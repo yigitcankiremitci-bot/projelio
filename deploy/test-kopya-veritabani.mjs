@@ -10,9 +10,8 @@
 //      storage.objects'e doğrudan DELETE'i reddediyor, satırı silebilsek bile
 //      dosyanın kendisi S3'te sahipsiz kalırdı.
 //   2. public şemasını düşürüp Supabase'in varsayılan izinleriyle yeniden açar.
-//   3. database/migrations/*.sql'i dosya adı sırasıyla (migrate.sh ile aynı)
-//      tek tek, her biri kendi transaction'ında uygular ve schema_migrations'a
-//      yazar. İlk hatada durur.
+//   3. Canlının schema-only dökümünü (~/projelio-canli-sema.sql) uygular, tüm
+//      migration'ları schema_migrations'a "uygulanmış" yazar, kovaları kurar.
 //   4. PostgREST'in şema önbelleğini tazeler.
 //
 // Gizli değerler ekrana BASILMAZ. Okunan dosya: ~/projelio-test-kopya.env
@@ -106,42 +105,50 @@ try {
   `);
   console.log("public şeması sıfırlandı");
 
+  // Migration'lar boş veritabanını KURAMIYOR: organizations gibi temel tablolar
+  // zamanında Supabase panelinden elle açılmış, hiçbir dosyada yok (024'te
+  // durur). Şemanın kaynağı bu yüzden canlı yedekten alınmış schema-only döküm
+  // (~/projelio-canli-sema.sql, VERİ İÇERMEZ). supabase_admin'e ait varsayılan
+  // izin satırları Supabase'de postgres kullanıcısıyla çalıştırılamaz; atılıyor.
+  const sema = readFileSync(join(homedir(), "projelio-canli-sema.sql"), "utf8")
+    .split("\n")
+    .filter((s) => !s.includes("FOR ROLE supabase_admin") && !s.startsWith("\\"))
+    .join("\n");
+  if (/^(COPY|INSERT INTO) /m.test(sema)) throw new Error("Şema dökümünde VERİ var — durduruldu.");
+  await db.query("begin");
+  await db.query(sema);
+  // pg_dump search_path'i boşaltıyor; oturumun geri kalanı için düzelt.
+  await db.query("set search_path = public, extensions");
+  await db.query("commit");
+  console.log("canlı şema uygulandı");
+
+  // Şema canlıyla aynı olduğuna göre migration'ların hepsi "uygulanmış" sayılır.
   const dizin = join(kok, "database/migrations");
-  // migrate.sh'nin kabuk glob'u ile aynı sıra: bayt sırası.
   const dosyalar = readdirSync(dizin).filter((d) => d.endsWith(".sql")).sort();
   for (const ad of dosyalar) {
-    const icerik = readFileSync(join(dizin, ad), "utf8");
-    const basladi = Date.now();
-    try {
-      await db.query("begin");
-      await db.query(icerik);
-      await db.query("commit");
-    } catch (e) {
-      await db.query("rollback");
-      console.error(`HATA: ${ad}: ${e.message}`);
-      process.exitCode = 1;
-      break;
-    }
-    // 083'ten önce tablo yok; onları 083 uygulanınca toplu yazarız.
-    if (ad >= "083") {
-      if (ad.startsWith("083")) {
-        for (const once of dosyalar.filter((d) => d <= ad)) {
-          const sha = createHash("sha256").update(readFileSync(join(dizin, once))).digest("hex");
-          await db.query(
-            "insert into public.schema_migrations(version, checksum) values ($1,$2) on conflict do nothing",
-            [once, sha],
-          );
-        }
-      } else {
-        const sha = createHash("sha256").update(icerik).digest("hex");
-        await db.query(
-          "insert into public.schema_migrations(version, checksum, duration_ms) values ($1,$2,$3)",
-          [ad, sha, Date.now() - basladi],
-        );
-      }
-    }
-    console.log(`  ✓ ${ad}`);
+    const sha = createHash("sha256").update(readFileSync(join(dizin, ad))).digest("hex");
+    await db.query(
+      "insert into public.schema_migrations(version, checksum) values ($1,$2) on conflict do nothing",
+      [ad, sha],
+    );
   }
+
+  // Depo kovaları: altısı migration'larda, ikisi (organization/group) panelden
+  // açılmıştı. Hepsi canlıdaki gibi herkese açık; sınırları 063/141 koyuyor.
+  for (const kova of [
+    "job-covers", "project-covers", "organization-covers", "group-covers",
+    "avatars", "product-covers", "department-covers", "social-publish",
+  ]) {
+    await db.query(
+      "insert into storage.buckets (id, name, public) values ($1,$1,true) on conflict (id) do nothing",
+      [kova],
+    );
+  }
+  for (const ad of dosyalar.filter((d) => /^(063|141)_/.test(d))) {
+    await db.query(readFileSync(join(dizin, ad), "utf8"));
+  }
+  console.log("depo kovaları kuruldu");
+
   await db.query("notify pgrst, 'reload schema'");
   const { rows } = await db.query("select count(*)::int n from public.schema_migrations");
   console.log(`schema_migrations: ${rows[0].n}/${dosyalar.length}`);

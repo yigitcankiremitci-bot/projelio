@@ -34,7 +34,7 @@ import Modal from "./Modal";
 import SocialAccountModal from "./SocialAccountModal";
 import SocialCredentialsModal from "./SocialCredentialsModal";
 import SocialPostComposer from "./SocialPostComposer";
-import IcerikAnaliziPanel from "./sosyalAnaliz/IcerikAnaliziPanel";
+import IcerikAnaliziPanel, { type AltSekme } from "./sosyalAnaliz/IcerikAnaliziPanel";
 import { IconChevronLeft, IconChevronRight, IconEdit, IconExternalLink, IconTrash } from "./icons";
 import { sekmeleriAc } from "../lib/topluLink";
 import { useDragScroll } from "../lib/useDragScroll";
@@ -79,6 +79,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   const [members, setMembers] = useState<{ id: string; label: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("calendar");
+  const [analizIlkSekme, setAnalizIlkSekme] = useState<AltSekme | undefined>(undefined);
   const [cursor, setCursor] = useState(() => new Date());
   const [composer, setComposer] = useState<{ post?: SocialPost | null; date?: string } | null>(null);
   const [accountModal, setAccountModal] = useState<{ account?: SocialAccount | null } | null>(null);
@@ -188,6 +189,29 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
     if (kind === "connected") load();
 
     params.delete("instagram");
+    const query = params.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+  }, []);
+
+  /**
+   * Facebook Login'den dönüş (rakip takibi): `?facebook=connected:kullanici`
+   * ya da `?facebook=error:mesaj`. Kullanıcı Rakipler sekmesinden çıkmıştı;
+   * oraya geri açılır.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const value = params.get("facebook");
+    if (!value) return;
+    const [kind, ...rest] = value.split(":");
+    const detail = rest.join(":");
+    setBanner(
+      kind === "connected"
+        ? { kind: "ok", text: t("Facebook bağlandı (@{hesap}). Rakip ve hashtag takibi açıldı.", { hesap: detail }) }
+        : { kind: "error", text: detail || t("Facebook bağlantısı tamamlanamadı.") }
+    );
+    setView("analysis");
+    setAnalizIlkSekme("rakipler");
+    params.delete("facebook");
     const query = params.toString();
     window.history.replaceState({}, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
   }, []);
@@ -1521,6 +1545,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           canWrite={canWrite}
           onInstagramBagla={() => void connectInstagram()}
           baglaniyor={connecting}
+          ilkSekme={analizIlkSekme}
           // Sessiz tazeleme: load() "Yükleniyor"a geçip analiz panelini
           // söküyordu — kullanıcı açık raporunu ve alt sekmesini kaybediyordu.
           onIcerikEklendi={() => {

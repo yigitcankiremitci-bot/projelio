@@ -12,7 +12,16 @@ import type {
   SocialMediaHistory,
   SocialProgressData,
 } from "@projelio/shared";
-import { gunleriDoldur, gunlukArtislar, hesapMedyanlari, normalizeSocialHandle, performanslar } from "@projelio/shared";
+import {
+  etkilesim,
+  gunleriDoldur,
+  gunlukArtislar,
+  hesapMedyanlari,
+  icerikTuru,
+  normalizeSocialHandle,
+  performanslar,
+  rakipKatlari,
+} from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { requireSafeUrl } from "../../common/safe-url";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
@@ -37,6 +46,7 @@ import {
 } from "./icerik-analizi";
 import { IG_INSIGHTS_SCOPE, instagramInsightsAcik, InstagramOAuthService } from "./instagram-oauth.service";
 import { ELLE_SENKRON_ARALIGI_DK, InstagramInsightsService } from "./instagram-insights.service";
+import { RakipTakibiService } from "./rakip-takibi.service";
 import { SocialMediaService, type SocialScope } from "./social-media.service";
 import { SocialTokensService } from "./social-tokens.service";
 import { calismaKlasoru, ffmpegVarMi, temizle, VideoIslenemedi } from "./video-kareleri";
@@ -97,7 +107,8 @@ export class IcerikAnaliziService {
     private files: FilesService,
     private credits: AiCreditsService,
     private providers: LlmProviderRegistry,
-    private transcription: AiTranscriptionService
+    private transcription: AiTranscriptionService,
+    private rakip: RakipTakibiService
   ) {}
 
   // ============================================================ Okuma
@@ -136,6 +147,7 @@ export class IcerikAnaliziService {
       raporlar,
       kesifler,
       kesifAcik: this.providers.webSearchChoice("smart") !== null,
+      rakipAcik: this.rakip.ayarli() && (await this.rakip.izinli(userId)),
     };
   }
 
@@ -364,9 +376,10 @@ export class IcerikAnaliziService {
 
     let hesaplar = await this.bagliHesaplar(scope);
     if (secenek.accountId) hesaplar = hesaplar.filter((h) => h.id === secenek.accountId);
-    const [medya, ilhamlar] = await Promise.all([
+    const [medya, ilhamlar, rakipler] = await Promise.all([
       this.medyaListesi(hesaplar.map((h) => h.id)),
       this.ilhamListesi(scope),
+      this.rakipOzetleri(scope),
     ]);
     if (medya.length === 0 && ilhamlar.length === 0) {
       throw new BadRequestException(
@@ -398,6 +411,7 @@ export class IcerikAnaliziService {
             ilhamlar,
             istek,
             simdi: new Date(),
+            rakipler,
           }),
         },
       ],
@@ -419,6 +433,48 @@ export class IcerikAnaliziService {
       .single();
     if (error) throw error;
     return raporaCevir(data);
+  }
+
+  /**
+   * Fikir raporu için takipteki rakiplerin en iyi gönderileri. Migration 148
+   * öncesi ya da takip yoksa boş — rapor rakipsiz sürer.
+   */
+  private async rakipOzetleri(scope: SocialScope): Promise<NonNullable<Parameters<typeof fikirRaporuIstemi>[0]["rakipler"]>> {
+    const sorgu = this.supabase.client
+      .from("social_inspirations")
+      .select("id, handle, rakip_profil")
+      .eq("rakip_takip", true)
+      .not("handle", "is", null);
+    const { data, error } = await ("jobId" in scope ? sorgu.eq("job_id", scope.jobId) : sorgu.eq("organization_id", scope.organizationId));
+    if (error || !data?.length) return [];
+    const { data: medya } = await this.supabase.client
+      .from("social_competitor_media")
+      .select("inspiration_id, external_media_id, caption, media_type, media_product_type, posted_at, like_count, comments_count")
+      .in("inspiration_id", data.map((r: any) => r.id))
+      .order("posted_at", { ascending: false })
+      .limit(data.length * 30);
+    const simdi = new Date();
+    return data.map((r: any) => {
+      const gonderiler = (medya ?? [])
+        .filter((m: any) => m.inspiration_id === r.id)
+        .map((m: any) => ({
+          externalMediaId: m.external_media_id,
+          caption: m.caption ?? undefined,
+          mediaType: m.media_type ?? undefined,
+          mediaProductType: m.media_product_type ?? undefined,
+          postedAt: m.posted_at ? utcIso(m.posted_at) : undefined,
+          likeCount: m.like_count ?? undefined,
+          commentsCount: m.comments_count ?? undefined,
+        }));
+      const katlar = rakipKatlari(gonderiler, simdi);
+      const enIyiler = gonderiler
+        .map((g) => ({ g, kat: katlar.get(g.externalMediaId) ?? null }))
+        .filter((x): x is { g: (typeof gonderiler)[number]; kat: number } => x.kat !== null && x.kat >= 1.3)
+        .sort((a, b) => b.kat - a.kat)
+        .slice(0, 3)
+        .map(({ g, kat }) => ({ kat, etkilesim: etkilesim(g) ?? 0, aciklama: g.caption, tur: icerikTuru(g) }));
+      return { handle: r.handle, takipci: r.rakip_profil?.takipci, enIyiler };
+    });
   }
 
   // ============================================================ Lio ortak akış

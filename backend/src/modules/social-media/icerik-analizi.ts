@@ -351,6 +351,11 @@ export interface FikirRaporuBaglami {
   ilhamlar: SocialInspiration[];
   istek?: string | null;
   simdi: Date;
+  /**
+   * Takip edilen rakiplerin kendi normallerinin üstünde giden gönderileri
+   * (Business Discovery, migration 148). Etkileşim = beğeni + yorum; izlenme yok.
+   */
+  rakipler?: { handle: string; takipci?: number; enIyiler: { kat: number; etkilesim: number; aciklama?: string; tur?: string }[] }[];
 }
 
 export function fikirRaporuSistemi(dil: "tr" | "en"): string {
@@ -416,6 +421,19 @@ export function fikirRaporuIstemi(b: FikirRaporuBaglami): string {
     }
   } else {
     satirlar.push("", "İlham kaynağı kaydedilmemiş.");
+  }
+
+  const rakipler = (b.rakipler ?? []).filter((r) => r.enIyiler.length);
+  if (rakipler.length) {
+    satirlar.push("", "TAKİP EDİLEN RAKİPLERİN ÖNE ÇIKAN GÖNDERİLERİ (kendi normallerinin katı, etkileşim = beğeni+yorum):");
+    for (const r of rakipler.slice(0, 10)) {
+      satirlar.push(`- @${r.handle}${typeof r.takipci === "number" ? ` (${r.takipci} takipçi)` : ""}`);
+      for (const g of r.enIyiler.slice(0, 3)) {
+        satirlar.push(
+          `  ${g.kat}x · ${g.tur ?? ""} · ${g.etkilesim} etkileşim${g.aciklama ? ` · ${g.aciklama.replace(/\s+/g, " ").slice(0, 200)}` : ""}`
+        );
+      }
+    }
   }
 
   if (b.istek?.trim()) satirlar.push("", `Kullanıcının isteği: ${b.istek.trim().slice(0, 500)}`);

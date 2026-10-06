@@ -24,3 +24,4 @@ export * from "./bildirimTercihleri";
 export * from "./bildirimSesleri";
 export * from "./icerikAnalizi";
 export * from "./ilerleyis";
+export * from "./rakip";

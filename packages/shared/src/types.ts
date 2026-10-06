@@ -3246,6 +3246,90 @@ export interface SocialProgressData {
   ilkKayit?: string;
 }
 
+// ---------------------------------------------------------- Rakip + hashtag takibi
+//
+// Facebook Login bağlantısıyla (migration 148). Business Discovery yalnızca
+// işletme/içerik üreticisi hesaplarında çalışır ve beğeni/yorum verir —
+// izlenme/erişim rakip için YOK.
+
+/** Meta'nın çağrı kullanım başlıklarından okunan yüzdeler (0-100). */
+export interface SocialMetaUsage {
+  /** Uygulama düzeyi: x-app-usage. */
+  callCount?: number;
+  totalTime?: number;
+  totalCputime?: number;
+  /** İşletme düzeyi (Instagram): x-business-use-case-usage'ın en yükseği. */
+  isletme?: number;
+  /** Sınır aşıldıysa erişimin dönmesine kalan dakika. */
+  beklemeDk?: number;
+}
+
+export interface SocialFbConnection {
+  id: string;
+  igUsername?: string;
+  pageName?: string;
+  kullanim?: SocialMetaUsage;
+  kullanimAt?: string;
+  hata?: string;
+  createdAt: string;
+}
+
+export interface SocialCompetitorPost {
+  externalMediaId: string;
+  caption?: string;
+  mediaType?: string;
+  mediaProductType?: string;
+  permalink?: string;
+  postedAt?: string;
+  likeCount?: number;
+  commentsCount?: number;
+}
+
+export interface SocialCompetitor {
+  inspirationId: string;
+  handle: string;
+  title: string;
+  takip: boolean;
+  profil?: {
+    ad?: string;
+    biyografi?: string;
+    takipci?: number;
+    gonderi?: number;
+    resim?: string;
+  };
+  syncedAt?: string;
+  hata?: string;
+  /** Günlük takipçi, gün "YYYY-MM-DD", eskiden yeniye. */
+  takipciGecmisi: { gun: string; deger: number }[];
+  gonderiler: SocialCompetitorPost[];
+}
+
+export interface SocialHashtagPost extends SocialCompetitorPost {
+  tur: "top" | "recent";
+}
+
+export interface SocialHashtagTrack {
+  id: string;
+  hashtag: string;
+  aktif: boolean;
+  sonSorgu?: string;
+  hata?: string;
+  gonderiler: SocialHashtagPost[];
+}
+
+/** Rakipler sekmesinin tek isteği. */
+export interface SocialCompetitorOverview {
+  /** Bu kullanıcıya açık mı (şimdilik izinli e-posta listesi). */
+  acik: boolean;
+  /** Sunucuda Facebook uygulaması tanımlı mı. */
+  ayarli: boolean;
+  baglanti?: SocialFbConnection;
+  rakipler: SocialCompetitor[];
+  hashtagler: SocialHashtagTrack[];
+  /** Meta: bir hesap 7 günde en fazla 30 FARKLI hashtag sorgulayabilir. */
+  hashtagKullanimi: { kullanilan: number; sinir: number; yenilenme?: string };
+}
+
 /** Analiz sekmesinin tek isteği. */
 export interface SocialAnalyticsOverview {
   /** Instagram entegrasyonu bu kurulumda açık mı. */
@@ -3258,6 +3342,8 @@ export interface SocialAnalyticsOverview {
   kesifler: SocialDiscovery[];
   /** Bu kurulumda web araması yapabilen bir sağlayıcı var mı. */
   kesifAcik: boolean;
+  /** Rakipler sekmesi bu kullanıcıya açık mı (Facebook Login; şimdilik izinli e-postalar). */
+  rakipAcik?: boolean;
 }
 
 // ---------------------------------------------------------- Hesap şifreleri

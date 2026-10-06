@@ -979,4 +979,60 @@ export const hatalar: TranslationDict = {
     "Lio couldn't produce a result, try again.",
   "Lio'nun nişini anlayabilmesi için önce gönderilerini çek, ilham panosuna birkaç kaynak ekle ya da ne tür hesaplar aradığını yaz.":
     "So Lio can understand your niche, first pull your posts, add a few inspirations, or describe the kind of accounts you're looking for.",
+
+  // ─────────────────────────────────────────────── Sosyal medya: rakip ve hashtag takibi
+  "Ayrıntı":
+    "Details",
+  "Bu Facebook hesabının yönettiği Sayfalarda bağlı bir Instagram profesyonel hesabı bulunamadı. Instagram hesabını bir Facebook Sayfasına bağlayıp tekrar dene.":
+    "No Instagram professional account is linked to the Pages this Facebook account manages. Link your Instagram account to a Facebook Page and try again.",
+  "Bu hashtag zaten takipte.":
+    "This hashtag is already tracked.",
+  "Durdur":
+    "Pause",
+  "Facebook bağlantı isteği geçersiz veya süresi dolmuş.":
+    "The Facebook connection request is invalid or has expired.",
+  "Facebook bağlantısı":
+    "Facebook connection",
+  "Facebook bağlantısında gerekli izin yok; yeniden bağlayın.":
+    "The Facebook connection is missing a required permission; reconnect.",
+  "Facebook bağlantısının süresi dolmuş; yeniden bağlayın.":
+    "The Facebook connection has expired; reconnect.",
+  "Facebook ile bağlan":
+    "Connect with Facebook",
+  "Geçerli bir hashtag yaz (harf, rakam ya da alt çizgi).":
+    "Enter a valid hashtag (letters, digits or underscores).",
+  "Haftalık hashtag hakkı":
+    "Weekly hashtag quota",
+  "Hashtag takibi":
+    "Hashtag tracking",
+  "Hashtag takibi bulunamadı":
+    "Hashtag tracking not found",
+  "Hesap bulunamadı ya da işletme/içerik üreticisi hesabı değil (kişisel hesapların verisi alınamaz).":
+    "Account not found or not a business/creator account (personal accounts' data isn't available).",
+  "Instagram bu hashtag'i bulamadı.":
+    "Instagram couldn't find this hashtag.",
+  "Meta isteği reddetti.":
+    "Meta rejected the request.",
+  "Meta çağrı sınırına ulaşıldı; bir süre sonra tekrar denenecek.":
+    "Meta's call limit was reached; it will be retried later.",
+  "Rakip takibi bu sunucuda yapılandırılmamış.":
+    "Competitor tracking isn't configured on this server.",
+  "Rakip takibi şimdilik yalnızca izinli hesaplara açık.":
+    "Competitor tracking is only open to allowed accounts for now.",
+  "Son 24 saat":
+    "Last 24 hours",
+  "Sınırlar":
+    "Limits",
+  "Takibe al":
+    "Track",
+  "Takip":
+    "Track",
+  "Yalnızca kullanıcı adı olan 'hesap' türündeki ilham kaynakları takip edilebilir.":
+    "Only 'account' inspirations with a username can be tracked.",
+  "durduruldu":
+    "paused",
+  "gönderi":
+    "posts",
+  "Önce Facebook ile bağlan.":
+    "Connect with Facebook first.",
 };

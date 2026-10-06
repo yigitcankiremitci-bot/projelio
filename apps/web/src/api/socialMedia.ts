@@ -3,7 +3,10 @@ import type {
   SocialAccountMediaItem,
   SocialAnalyticsOverview,
   SocialCaptionSuggestion,
+  SocialCompetitor,
+  SocialCompetitorOverview,
   SocialDiscovery,
+  SocialHashtagTrack,
   SocialIdeaReport,
   SocialInspiration,
   SocialMediaHistory,
@@ -220,6 +223,39 @@ export const socialMediaApi = {
         : `/organizations/${scope.organizationId}/social-media/analiz/ilerleyis`;
     return api.get<SocialProgressData>(`${yol}?${q.toString()}`);
   },
+
+  // ---------------------------------------------------------------- Rakipler (Facebook Login)
+
+  rakipler: (scope: SocialScope) => {
+    if ("jobId" in scope) return api.get<SocialCompetitorOverview>(`/jobs/${scope.jobId}/social-media/rakipler`);
+    const q = scope.departmentId ? `?departmentId=${encodeURIComponent(scope.departmentId)}` : "";
+    return api.get<SocialCompetitorOverview>(`/organizations/${scope.organizationId}/social-media/rakipler${q}`);
+  },
+
+  facebookConnectUrl: (scope: SocialScope, next: string) => {
+    const params = new URLSearchParams({ next });
+    if (!("jobId" in scope) && scope.departmentId) params.set("departmentId", scope.departmentId);
+    return api.get<{ url: string }>(`${base(scope)}/social-media/facebook/connect-url?${params.toString()}`);
+  },
+
+  facebookKaldir: (scope: SocialScope) => {
+    const q = !("jobId" in scope) && scope.departmentId ? `?departmentId=${encodeURIComponent(scope.departmentId)}` : "";
+    return api.delete<{ ok: true }>(`${base(scope)}/social-media/facebook${q}`);
+  },
+
+  /** Takipteki rakipleri Meta'dan okur — rakip başına bir istek, sürebilir. */
+  rakipSenkron: (scope: SocialScope) =>
+    api.post<{ okunan: number; atlanan: number }>(`${base(scope)}/social-media/rakipler/senkron`, withScope(scope, {}), undefined, 3 * 60_000),
+
+  rakipTakip: (inspirationId: string, takip: boolean) =>
+    api.patch<SocialCompetitor[]>(`/social-inspirations/${inspirationId}/takip`, { takip }),
+
+  hashtagEkle: (scope: SocialScope, hashtag: string) =>
+    api.post<SocialHashtagTrack>(`${base(scope)}/social-media/hashtagler`, withScope(scope, { hashtag }), undefined, 60_000),
+
+  hashtagAyarla: (id: string, aktif: boolean) => api.patch<{ ok: true }>(`/social-hashtag-tracks/${id}`, { aktif }),
+
+  hashtagSil: (id: string) => api.delete<{ ok: true }>(`/social-hashtag-tracks/${id}`),
 
   /** Tek gönderinin metrik geçmişi (büyüme eğrisi). */
   medyaGecmisi: (mediaId: string) => api.get<SocialMediaHistory>(`/social-account-media/${mediaId}/gecmis`),

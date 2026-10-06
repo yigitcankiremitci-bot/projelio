@@ -684,4 +684,136 @@ export const sosyal: TranslationDict = {
     "Day {n}",
   "{n} sa":
     "{n} h",
+
+  // ─────────────────────────────────────────────── Rakip ve hashtag takibi
+  "#hashtag":
+    "#hashtag",
+  "#{etiket} takibi silinsin mi? Toplanan gönderiler de silinir.":
+    "Stop tracking #{etiket}? Collected posts are deleted too.",
+  "(açıklama yok)":
+    "(no caption)",
+  "Ayrıntı":
+    "Details",
+  "Başka hesapların herkese açık verisi ve hashtag araması yalnızca Facebook ile bağlanınca açılıyor. Instagram hesabının bir Facebook Sayfasına bağlı olması gerekir. Bu bağlantı yalnızca okur; yayın mevcut Instagram bağlantısından sürer.":
+    "Other accounts' public data and hashtag search only open up when you connect with Facebook. Your Instagram account must be linked to a Facebook Page. This connection only reads; publishing continues through your existing Instagram connection.",
+  "Bu Facebook hesabının yönettiği Sayfalarda bağlı bir Instagram profesyonel hesabı bulunamadı. Instagram hesabını bir Facebook Sayfasına bağlayıp tekrar dene.":
+    "No Instagram professional account is linked to the Pages this Facebook account manages. Link your Instagram account to a Facebook Page and try again.",
+  "Bu hashtag zaten takipte.":
+    "This hashtag is already tracked.",
+  "Bu listede gönderi yok.":
+    "No posts in this list.",
+  "Doldu · ilk hak {tarih} boşalır":
+    "Full · first slot frees up {tarih}",
+  "Durdur":
+    "Pause",
+  "En popüler ve son 24 saatin gönderileri · her gece güncellenir":
+    "Top posts and the last 24 hours · updated nightly",
+  "Facebook bağlandı (@{hesap}). Rakip ve hashtag takibi açıldı.":
+    "Facebook connected (@{hesap}). Competitor and hashtag tracking is on.",
+  "Facebook bağlantı isteği geçersiz veya süresi dolmuş.":
+    "The Facebook connection request is invalid or has expired.",
+  "Facebook bağlantısı":
+    "Facebook connection",
+  "Facebook bağlantısı kaldırılsın mı? Rakip ve hashtag geçmişi kalır, yeni veri gelmez.":
+    "Remove the Facebook connection? Competitor and hashtag history stays; no new data will come in.",
+  "Facebook bağlantısı tamamlanamadı.":
+    "Couldn't complete the Facebook connection.",
+  "Facebook bağlantısında gerekli izin yok; yeniden bağlayın.":
+    "The Facebook connection is missing a required permission; reconnect.",
+  "Facebook bağlantısının süresi dolmuş; yeniden bağlayın.":
+    "The Facebook connection has expired; reconnect.",
+  "Facebook ile bağlan":
+    "Connect with Facebook",
+  "Gece başına hesap başı 1 istek":
+    "1 request per account per night",
+  "Geçerli bir hashtag yaz (harf, rakam ya da alt çizgi).":
+    "Enter a valid hashtag (letters, digits or underscores).",
+  "Güncellendi {tarih}":
+    "Updated {tarih}",
+  "Haftada":
+    "Per week",
+  "Haftalık hashtag hakkı":
+    "Weekly hashtag quota",
+  "Hashtag takibi":
+    "Hashtag tracking",
+  "Hashtag takibi bulunamadı":
+    "Hashtag tracking not found",
+  "Hashtag takibi için önce Facebook ile bağlan.":
+    "Connect with Facebook first to track hashtags.",
+  "Henüz sorgulanmadı":
+    "Not queried yet",
+  "Henüz takip edilen hashtag yok.":
+    "No tracked hashtags yet.",
+  "Henüz ölçüm yok":
+    "No reading yet",
+  "Hepsi birkaç dakika önce güncellendi.":
+    "All were updated a few minutes ago.",
+  "Her gece güncellenir · yalnızca işletme ve içerik üreticisi hesapları":
+    "Updated nightly · business and creator accounts only",
+  "Hesap bulunamadı ya da işletme/içerik üreticisi hesabı değil (kişisel hesapların verisi alınamaz).":
+    "Account not found or not a business/creator account (personal accounts' data isn't available).",
+  "Instagram bu hashtag'i bulamadı.":
+    "Instagram couldn't find this hashtag.",
+  "Instagram işletme kullanımı":
+    "Instagram business usage",
+  "Kıyas için yeterli gönderi yok.":
+    "Not enough posts to compare.",
+  "Meta isteği reddetti.":
+    "Meta rejected the request.",
+  "Meta uygulama kullanımı":
+    "Meta app usage",
+  "Meta çağrı sınırına ulaşıldı; bir süre sonra tekrar denenecek.":
+    "Meta's call limit was reached; it will be retried later.",
+  "Meta'dan okunuyor…":
+    "Reading from Meta…",
+  "Meta: 7 günde en fazla {n} farklı hashtag":
+    "Meta: at most {n} different hashtags per 7 days",
+  "Normal etkileşim":
+    "Typical engagement",
+  "Normalinin üstünde giden gönderileri":
+    "Posts above their normal",
+  "Rakip takibi bu sunucuda yapılandırılmamış.":
+    "Competitor tracking isn't configured on this server.",
+  "Rakip takibi şimdilik yalnızca izinli hesaplara açık.":
+    "Competitor tracking is only open to allowed accounts for now.",
+  "Rakipler yüklenemedi":
+    "Couldn't load competitors",
+  "Saatlik pencere; %100'de istekler geçici reddedilir":
+    "Hourly window; at 100% requests are temporarily rejected",
+  "Sayfa: {ad}":
+    "Page: {ad}",
+  "Son 24 saat":
+    "Last 24 hours",
+  "Son ölçüm {tarih}":
+    "Last reading {tarih}",
+  "Sunucuda Facebook uygulaması tanımlı değil (FACEBOOK_APP_ID / FACEBOOK_APP_SECRET).":
+    "No Facebook app is configured on the server (FACEBOOK_APP_ID / FACEBOOK_APP_SECRET).",
+  "Sınır aşıldı · {n} dk sonra açılır":
+    "Limit exceeded · reopens in {n} min",
+  "Sınırlar":
+    "Limits",
+  "Takibe al":
+    "Track",
+  "Takip":
+    "Track",
+  "Takip edilecek hesap yok. İlham panosuna \"Takip ettiğim hesap\" türünde ve kullanıcı adıyla kayıt ekle ya da \"Benzer hesap bul\"dan ekle; burada takibe alabilirsin.":
+    "No accounts to track. Add an \"An account I follow\" entry with a username to the inspiration board, or add one from \"Find similar accounts\"; then track it here.",
+  "Takip edilen hesap":
+    "Tracked accounts",
+  "Takip edilen hesaplar":
+    "Tracked accounts",
+  "Takipçi sayısı her gece kaydediliyor; ikinci günden itibaren çizgi görünür.":
+    "Follower count is recorded nightly; the line appears from the second day.",
+  "Yalnızca kullanıcı adı olan 'hesap' türündeki ilham kaynakları takip edilebilir.":
+    "Only 'account' inspirations with a username can be tracked.",
+  "durduruldu":
+    "paused",
+  "gönderi":
+    "posts",
+  "{n} hesap güncellendi.":
+    "{n} accounts updated.",
+  "Önce Facebook ile bağlan.":
+    "Connect with Facebook first.",
+  "İşlem tamamlanamadı":
+    "Couldn't complete the action",
 };

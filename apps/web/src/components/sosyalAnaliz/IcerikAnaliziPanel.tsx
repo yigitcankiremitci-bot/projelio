@@ -17,6 +17,7 @@ import FikirRaporlari from "./FikirRaporlari";
 import GonderiAnalizModal from "./GonderiAnalizModal";
 import IlerleyisPaneli from "./IlerleyisPaneli";
 import IlhamPanosu from "./IlhamPanosu";
+import RakiplerPaneli from "./RakiplerPaneli";
 import { kisaSayi, PerformansRozeti, sureYazisi, turAdi, useAnalizStilleri } from "./ortak";
 
 interface Props {
@@ -27,9 +28,11 @@ interface Props {
   baglaniyor: boolean;
   /** Bir fikir takvime eklendi: üstteki takvim tazelensin. */
   onIcerikEklendi: () => void;
+  /** Açılışta seçili alt sekme (ör. Facebook bağlantısından dönüşte "rakipler"). */
+  ilkSekme?: AltSekme;
 }
 
-type AltSekme = "gonderiler" | "ilerleyis" | "ilham" | "fikirler";
+export type AltSekme = "gonderiler" | "ilerleyis" | "rakipler" | "ilham" | "fikirler";
 type Siralama = "tarih" | "kat" | "izlenme" | "kaydet";
 
 /**
@@ -44,13 +47,20 @@ type Siralama = "tarih" | "kat" | "izlenme" | "kaydet";
  * "İyi gitti mi" hesabı packages/shared/src/icerikAnalizi.ts'te; Lio'ya giden
  * özet de aynı koddan geçiyor, ekranla Lio aynı videoyu "yıldız" sayar.
  */
-export default function IcerikAnaliziPanel({ scope, canWrite, onInstagramBagla, baglaniyor, onIcerikEklendi }: Props) {
+export default function IcerikAnaliziPanel({
+  scope,
+  canWrite,
+  onInstagramBagla,
+  baglaniyor,
+  onIcerikEklendi,
+  ilkSekme,
+}: Props) {
   const t = useT();
   const { c, kart, ikincilDugme, birincilDugme } = useAnalizStilleri();
   const [veri, setVeri] = useState<SocialAnalyticsOverview | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [hata, setHata] = useState("");
-  const [altSekme, setAltSekme] = useState<AltSekme>("gonderiler");
+  const [altSekme, setAltSekme] = useState<AltSekme>(ilkSekme ?? "gonderiler");
   const [hesapFiltre, setHesapFiltre] = useState("");
   const [turFiltre, setTurFiltre] = useState("");
   const [siralama, setSiralama] = useState<Siralama>("kat");
@@ -233,6 +243,7 @@ export default function IcerikAnaliziPanel({ scope, canWrite, onInstagramBagla, 
       <div style={{ display: "flex", gap: 16, borderBottom: `1px solid ${c.border}`, flexWrap: "wrap" }}>
         {altSekmeDugmesi("gonderiler", `${t("Gönderilerim")} · ${veri.medya.length}`)}
         {altSekmeDugmesi("ilerleyis", t("İlerleyiş"))}
+        {veri.rakipAcik && altSekmeDugmesi("rakipler", t("Rakipler"))}
         {altSekmeDugmesi("ilham", `${t("İlham panosu")} · ${veri.ilhamlar.length}`)}
         {altSekmeDugmesi("fikirler", t("Fikirler"))}
       </div>
@@ -321,6 +332,8 @@ export default function IcerikAnaliziPanel({ scope, canWrite, onInstagramBagla, 
       )}
 
       {altSekme === "ilerleyis" && <IlerleyisPaneli scope={scope} hesaplar={hesaplar} medya={veri.medya} />}
+
+      {altSekme === "rakipler" && veri.rakipAcik && <RakiplerPaneli scope={scope} canWrite={canWrite} />}
 
       {altSekme === "ilham" && (
         <IlhamPanosu

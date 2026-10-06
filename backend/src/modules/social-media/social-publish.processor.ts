@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { InstagramInsightsService } from "./instagram-insights.service";
+import { RakipTakibiService } from "./rakip-takibi.service";
 import { InstagramPublishService } from "./instagram-publish.service";
 import { InstagramService } from "./instagram.service";
 import { SocialPublishService } from "./social-publish.service";
@@ -15,6 +16,7 @@ import { SocialPublishService } from "./social-publish.service";
  *   her gün 04:30   geçici medya süpürme — yarım kalan denemelerin artıkları
  *   her gün 05:15   içerik analizi — bağlı hesapların gönderileri + metrikleri
  *   her saat :40    taze gönderi takibi — ilk 72 saatin büyüme eğrisi
+ *   her gün 05:45   rakip + hashtag takibi (Facebook Login bağlantısı olanlar)
  *
  * NEDEN 5 DAKİKA: sosyal medyada "19:00 gönderisi" 19:03'te çıkabilir, kimse
  * fark etmez; ama dakikada bir çalışan bir iş, tek kullanıcılı bir kurulumda
@@ -37,7 +39,8 @@ export class SocialPublishProcessor {
     private publish: SocialPublishService,
     private instagram: InstagramService,
     private instagramPublish: InstagramPublishService,
-    private insights: InstagramInsightsService
+    private insights: InstagramInsightsService,
+    private rakip: RakipTakibiService
   ) {}
 
   @Cron("*/5 * * * *")
@@ -111,6 +114,20 @@ export class SocialPublishProcessor {
       this.logger.error(`Saatlik takip turu düştü: ${(err as Error).message}`);
     } finally {
       this.analizCalisiyor = false;
+    }
+  }
+
+  /**
+   * Rakip ve hashtag takibi. Kendi senkronumuzdan (05:15) sonra: aynı Meta
+   * uygulamasının çağrı bütçesini aynı anda zorlamasınlar.
+   */
+  @Cron("45 5 * * *")
+  async trackCompetitors(): Promise<void> {
+    try {
+      const { rakip, hashtag } = await this.rakip.geceTuru();
+      if (rakip || hashtag) this.logger.log(`Rakip takibi: ${rakip} hesap, ${hashtag} hashtag okundu`);
+    } catch (err) {
+      this.logger.error(`Rakip takibi turu düştü: ${(err as Error).message}`);
     }
   }
 

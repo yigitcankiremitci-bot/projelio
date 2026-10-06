@@ -204,10 +204,10 @@ arayüz `apps/web/src/components/sosyalAnaliz/`.
 | İlerleyiş | Migration 147: her metrik okumasında `social_media_metric_snapshots`'a bir satır, her gece `social_account_snapshots`'a günlük takipçi. İlk 72 saatteki gönderiler **saatte bir** (:40) okunur — büyüme eğrisi. Grafikler: günlük kazanılan izlenme (ardışık okumaların farkı), takipçi, haftalık yayın performansı, gönderi penceresinde büyüme eğrisi. Hesaplar `packages/shared/src/ilerleyis.ts`, grafikler `sosyalAnaliz/grafikler.tsx` (bağımlılıksız SVG). Instagram geçmiş değer vermediği için geçmiş migration'dan sonra birikir. |
 | Fikir raporu | Metin modeli: en iyi/en zayıf gönderiler + analizler + ilhamlar → kalıplar ve fikirler. `social_idea_reports`'a yazılır; her fikir takvime "fikir" durumunda içerik olarak eklenebilir. |
 
-**Başka hesapların verisi otomatik çekilmez.** Resmi yolu (Business Discovery,
-Hashtag Search) yalnızca Facebook Login yolunda var ve Sayfa istiyor (§1);
-kazıma Instagram koşullarına aykırı. İleride Facebook Login ikinci, isteğe bağlı
-bir bağlantı olarak eklenirse rakip takibi oraya oturur.
+**Başka hesapların verisi Instagram Login yolundan çekilmez.** Resmi yolu
+(Business Discovery, Hashtag Search) yalnızca Facebook Login yolunda var ve
+Sayfa istiyor (§1); kazıma Instagram koşullarına aykırı. Bu yüzden ikinci,
+isteğe bağlı bir **Facebook bağlantısı** eklendi — bkz. §10.
 
 **Metrik izni bayrakla açılır** (`INSTAGRAM_INSIGHTS=1`). Kapalıyken sekme
 çalışır ama yalnızca beğeni/yorum sayılarıyla. Açıldıktan sonra, önceden
@@ -222,4 +222,36 @@ Sık karşılaşılanlar:
 | "İzlenme ve erişim verileri bu kurulumda henüz açılmadı" | `INSTAGRAM_INSIGHTS` tanımsız |
 | "Yeniden bağla" uyarısı | Hesap bayrak açılmadan önce bağlanmış |
 | Tek gönderide "metrikleri okunamadı" | Gönderi hesap profesyonele geçmeden atılmış ya da Meta o tür için metriği desteklemiyor — diğerlerini etkilemez |
+
+---
+
+## 10. Rakip ve hashtag takibi (Facebook Login)
+
+Migration: `148_rakip_ve_hashtag_takibi.sql` · Kod: `rakip-takibi.service.ts`
+(OAuth + senkron), `rakip-takibi.ts` (saf kurallar), `rakip-takibi.controller.ts`
+(uçlar + `/social/facebook/callback`), istatistikler `packages/shared/src/rakip.ts`,
+arayüz `sosyalAnaliz/RakiplerPaneli.tsx`.
+
+| Parça | Ne yapar |
+|---|---|
+| Bağlantı | Facebook Login → uzun ömürlü kullanıcı jetonu → `me/accounts` → Sayfaya bağlı Instagram hesabı. Saklanan **Sayfa jetonu** (süresi dolmuyor), şifreli. Kapsam başına tek bağlantı; yayın etkilenmez. |
+| Rakip takibi | İlham panosundaki "hesap" kayıtları "Takip" ile işaretlenir (en çok 40). Her gece 05:45 Business Discovery: profil, takipçi (günlük `social_competitor_snapshots`), son 30 gönderinin beğeni/yorumu. **İzlenme rakip için yok.** Yalnızca işletme/içerik üreticisi hesapları. |
+| Hashtag takibi | `ig_hashtag_search` → etiket kimliği → her gece `top_media` + `recent_media`. **Meta: 7 günde en fazla 30 farklı hashtag** — etkin etiket her gün sorgulandığı için hakkını sürekli tutar; durdurulanınki 7 günde boşalır. |
+| Sınırlar kartı | Haftalık hashtag hakkı, takip edilen hesap sayısı ve Meta'nın `x-app-usage` / `x-business-use-case-usage` başlıklarından son çağrı kullanımı (%). |
+| Lio | Fikir raporuna takipteki rakiplerin kendi normallerinin üstünde giden gönderileri girer. |
+
+**Şimdilik yalnızca izinli kullanıcılara açık** (`RAKIP_TAKIP_EPOSTALARI`) —
+Meta uygulaması geliştirme modunda, bu izinler App Review'dan geçmedi.
+
+Kurulum (Meta paneli, Projelio Inst2 uygulaması):
+1. Kullanım durumları → Instagram API → **API setup with Facebook login** izinleri:
+   `instagram_basic`, `instagram_manage_insights`, `pages_show_list`,
+   `pages_read_engagement` + **Instagram Public Content Access** özelliği (hashtag).
+2. Facebook Login for Business → Ayarlar → Geçerli OAuth yönlendirme adresi:
+   `https://api.projelio.app/social/facebook/callback`. İş türü uygulamada
+   izinler bir **Yapılandırma** (Configurations) ile verilir → kimliği
+   `FACEBOOK_LOGIN_CONFIG_ID`.
+3. `backend/.env`: `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`
+   (Uygulama ayarları → Temel), `FACEBOOK_LOGIN_CONFIG_ID`,
+   `RAKIP_TAKIP_EPOSTALARI=<e-posta>`; isteğe bağlı `FACEBOOK_REDIRECT_URI`.
 

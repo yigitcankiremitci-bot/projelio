@@ -43,6 +43,7 @@ import {
 } from "../lib/tour/narrator";
 import { IconMic, IconSpeaker } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useGorunurAlan } from "../lib/useGorunurAlan";
 import { satinAlmaGosterilir } from "../lib/mobilKabuk";
 import { DOKUNMATIK_CIHAZ } from "../lib/dokunmatikCihaz";
 import { bicimDili } from "../lib/i18n/depo";
@@ -404,6 +405,22 @@ export default function AiAssistantPanel({
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, sending, confirmation, continuation]);
+
+  // Klavye açılıp mesaj alanı kısalınca son mesaj alttan kaybolmasın: kullanıcı
+  // zaten en alttaysa orada kalır; yukarıda eski bir mesajı okuyorsa elinden alınmaz.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let oncekiBoy = el.clientHeight;
+    const gozlemci = new ResizeObserver(() => {
+      const yeniBoy = el.clientHeight;
+      const altaUzaklik = el.scrollHeight - el.scrollTop - oncekiBoy;
+      if (yeniBoy < oncekiBoy && altaUzaklik < 80) el.scrollTop = el.scrollHeight;
+      oncekiBoy = yeniBoy;
+    });
+    gozlemci.observe(el);
+    return () => gozlemci.disconnect();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -956,6 +973,9 @@ export default function AiAssistantPanel({
   // Genişlik layout.ts'ten: Lio'nun bildirim şeridi panel açıkken bu değerin
   // soluna konumlanıyor (bkz. lioActivityAnchor).
   const panelWidth = isDesktop ? AI_PANEL_WIDTH : undefined;
+  // Telefonda klavye açıkken panel klavyenin üstünde kalan alana sığar
+  // (bkz. lib/useGorunurAlan.ts) — yoksa yazma kutusu klavyenin arkasında kalıyor.
+  const gorunurAlan = useGorunurAlan(open && !isDesktop);
 
   /**
    * Yazma kutusunun içine oturan yuvarlak düğmeler.
@@ -1004,9 +1024,8 @@ export default function AiAssistantPanel({
         aria-hidden={!open}
         style={{
           position: "fixed",
-          top: 0,
           right: 0,
-          bottom: 0,
+          ...(gorunurAlan ? { top: gorunurAlan.top, height: gorunurAlan.height } : { top: 0, bottom: 0 }),
           width: panelWidth ?? "100%",
           maxWidth: "100vw",
           background: c.surface,
@@ -1526,7 +1545,13 @@ export default function AiAssistantPanel({
         {/* Yazma alanı */}
         {/* Yazma alanı ekranın dibinde: alt dolguya gezinme çubuğu payı ekleniyor,
             yoksa gönder düğmesi hareket çizgisinin altında kalıyor. */}
-        <div style={{ padding: `14px 14px ${safeBottom(14)}`, borderTop: `1px solid ${c.border}`, flexShrink: 0, position: "relative" }}>
+        {/* Klavye açıkken gezinme çubuğu payı gereksiz — çubuk klavyenin arkasında.
+            Bazı WebView'ler klavye boyunu da bu paya katıp kutuyu yukarı fırlatıyordu
+            (bkz. index.css data-klavyede-alt-bosluk). */}
+        <div
+          data-klavyede-alt-bosluk
+          style={{ padding: `14px 14px ${safeBottom(14)}`, borderTop: `1px solid ${c.border}`, flexShrink: 0, position: "relative" }}
+        >
           {/* İliştirilmiş dosyalar. Okunanlar dökümüyle, okunmayı bekleyenler soluk görünür. */}
           {(attachments.length > 0 || attaching.length > 0) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>

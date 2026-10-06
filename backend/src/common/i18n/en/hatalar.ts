@@ -1042,4 +1042,8 @@ export const hatalar: TranslationDict = {
   "Kayıt şu an alınamadı, biraz sonra tekrar deneyin.": "We couldn't save that right now; please try again shortly.",
   "Facebook hiçbir Sayfaya erişim vermedi. Tekrar bağlan ve izin ekranında Instagram'a bağlı Sayfanı seç (\"Tüm Sayfalar\" ya da Sayfanın kutusu).":
     "Facebook didn't grant access to any Page. Reconnect and select the Page linked to your Instagram on the permission screen (\"All Pages\" or the Page's checkbox).",
+  "Gönderiler şu an çekilemedi; gece yeniden denenecek.":
+    "Couldn't fetch posts right now; will retry tonight.",
+  "Meta şu an yanıt vermedi; gece yeniden denenecek.":
+    "Meta didn't respond right now; will retry tonight.",
 };

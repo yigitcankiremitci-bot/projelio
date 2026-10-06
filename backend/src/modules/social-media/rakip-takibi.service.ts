@@ -38,6 +38,12 @@ const ELLE_ARALIK_DK = 10;
 const GECE_ATLAMA_SAAT = 20;
 const TAKIPCI_GECMISI_GUN = 120;
 const HASHTAG_GOSTERILEN = 18;
+/**
+ * Meta veri çağrılarının zaman aşımı. Varsayılan 20 sn hashtag uçlarına
+ * yetmedi (top_media canlıda 20 sn'yi aştı, 2026-10-06); Business Discovery de
+ * 30 gönderiyle ağır.
+ */
+const META_ZAMAN_ASIMI_MS = 60_000;
 
 interface FbState {
   typ: "facebook_oauth";
@@ -443,18 +449,34 @@ export class RakipTakibiService {
 
     if (takip) {
       const b = await this.baglanti(scope);
-      if (b) await this.rakibiOku(b, { id: inspirationId, handle: ilham.handle });
+      if (b) {
+        await this.rakibiOku(b, { id: inspirationId, handle: ilham.handle }).catch(async (err) => {
+          this.logger.warn(`Rakip okunamadı (@${ilham.handle}): ${(err as Error).message}`);
+          await this.supabase.client
+            .from("social_inspirations")
+            .update({ rakip_hata: "Meta şu an yanıt vermedi; gece yeniden denenecek." }) // dil:anahtar
+            .eq("id", inspirationId);
+        });
+      }
     }
     return this.rakipListesi(scope);
   }
 
-  /** "Şimdi güncelle": kapsamdaki takipteki bütün rakipler (kısa aralıkla tekrarlanırsa atlar). */
+  /**
+   * "Şimdi güncelle": takipteki rakipler + etkin hashtag'ler (kısa aralıkla
+   * tekrarlanırsa atlar). Hashtag'i yeniden sorgulamak yeni hak harcamaz.
+   */
   async rakipleriGuncelle(scope: SocialScope, userId: string): Promise<{ okunan: number; atlanan: number }> {
     await this.social.assertWritable(scope, userId);
     await this.assertIzinli(userId);
     const b = await this.baglanti(scope);
     if (!b) throw new BadRequestException("Önce Facebook ile bağlan.");
-    return this.kapsamiOku(b, ELLE_ARALIK_DK * 60_000);
+    const rakip = await this.kapsamiOku(b, ELLE_ARALIK_DK * 60_000);
+    const etiket = await this.hashtagleriOku(b, ELLE_ARALIK_DK * 60_000).catch((err) => {
+      this.logger.warn(`Hashtag güncellemesi düştü: ${(err as Error).message}`);
+      return 0;
+    });
+    return { okunan: rakip.okunan + etiket, atlanan: rakip.atlanan };
   }
 
   /** Gece işi: bütün bağlantılar. */
@@ -612,13 +634,24 @@ export class RakipTakibiService {
     const igId = (arama.json as any)?.data?.[0]?.id;
     if (!igId) throw new BadRequestException("Instagram bu hashtag'i bulamadı.");
 
+    // Arama hakkı bu anda harcandı: haftalık bütçe bu zamandan sayılır, gönderi
+    // çekme düşse bile.
+    const simdi = new Date().toISOString();
     const { data, error } = await this.supabase.client
       .from("social_hashtag_takipleri")
-      .insert({ connection_id: b.id, hashtag, ig_hashtag_id: igId, created_by: userId })
+      .insert({ connection_id: b.id, hashtag, ig_hashtag_id: igId, created_by: userId, ilk_sorgu: simdi, son_sorgu: simdi })
       .select("*")
       .single();
     if (error) throw error;
-    await this.hashtagiOku(b, data);
+    // Gönderi çekme yavaş/kırılgan (Meta): düşerse etiket yine eklenmiş sayılır,
+    // hata satıra yazılır, gece işi tamamlar.
+    await this.hashtagiOku(b, data).catch(async (err) => {
+      this.logger.warn(`Hashtag gönderileri çekilemedi (#${hashtag}): ${(err as Error).message}`);
+      await this.supabase.client
+        .from("social_hashtag_takipleri")
+        .update({ hata: "Gönderiler şu an çekilemedi; gece yeniden denenecek." }) // dil:anahtar
+        .eq("id", data.id);
+    });
     const liste = await this.hashtagListesi(b.id);
     return liste.liste.find((t) => t.id === data.id)!;
   }
@@ -760,7 +793,7 @@ export class RakipTakibiService {
    * göstergesi). Jeton adreste olduğu için adres LOG'A YAZILMAZ.
    */
   private async graphHam(b: any, yol: string): Promise<{ ok: boolean; json?: unknown; govde: string }> {
-    const res = await fetchWithTimeout(`${FB_GRAPH_HOST}/${FB_API_VERSION}/${yol}`);
+    const res = await fetchWithTimeout(`${FB_GRAPH_HOST}/${FB_API_VERSION}/${yol}`, {}, META_ZAMAN_ASIMI_MS);
     const kullanim = kullanimOku(res.headers);
     if (kullanim) await this.kullanimiYaz(b.id, kullanim);
     const govde = await res.text();

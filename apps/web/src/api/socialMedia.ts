@@ -248,10 +248,10 @@ export const socialMediaApi = {
     api.post<{ okunan: number; atlanan: number }>(`${base(scope)}/social-media/rakipler/senkron`, withScope(scope, {}), undefined, 3 * 60_000),
 
   rakipTakip: (inspirationId: string, takip: boolean) =>
-    api.patch<SocialCompetitor[]>(`/social-inspirations/${inspirationId}/takip`, { takip }),
+    api.patch<SocialCompetitor[]>(`/social-inspirations/${inspirationId}/takip`, { takip }, undefined, 2 * 60_000),
 
   hashtagEkle: (scope: SocialScope, hashtag: string) =>
-    api.post<SocialHashtagTrack>(`${base(scope)}/social-media/hashtagler`, withScope(scope, { hashtag }), undefined, 60_000),
+    api.post<SocialHashtagTrack>(`${base(scope)}/social-media/hashtagler`, withScope(scope, { hashtag }), undefined, 3 * 60_000),
 
   hashtagAyarla: (id: string, aktif: boolean) => api.patch<{ ok: true }>(`/social-hashtag-tracks/${id}`, { aktif }),
 

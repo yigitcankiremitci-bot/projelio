@@ -856,4 +856,20 @@ export const sosyal: TranslationDict = {
     "Plan, drag and publish content",
   "Facebook hiçbir Sayfaya erişim vermedi. Tekrar bağlan ve izin ekranında Instagram'a bağlı Sayfanı seç (\"Tüm Sayfalar\" ya da Sayfanın kutusu).":
     "Facebook didn't grant access to any Page. Reconnect and select the Page linked to your Instagram on the permission screen (\"All Pages\" or the Page's checkbox).",
+  "@{hesap} takibi bırakılsın mı? Toplanan geçmiş kalır, yeni veri gelmez.":
+    "Stop tracking @{hesap}? Collected history stays; no new data will come in.",
+  "Bu hesabı her gece okumaya başla":
+    "Start reading this account every night",
+  "Gönderiler şu an çekilemedi; gece yeniden denenecek.":
+    "Couldn't fetch posts right now; will retry tonight.",
+  "Meta şu an yanıt vermedi; gece yeniden denenecek.":
+    "Meta didn't respond right now; will retry tonight.",
+  "Okunuyor…":
+    "Reading…",
+  "Takibi bırak":
+    "Stop tracking",
+  "Takipte":
+    "Tracking",
+  "{n} kayıt güncellendi.":
+    "{n} items updated.",
 };

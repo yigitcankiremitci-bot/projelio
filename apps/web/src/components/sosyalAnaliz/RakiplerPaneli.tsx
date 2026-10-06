@@ -69,10 +69,13 @@ export default function RakiplerPaneli({ scope, canWrite }: Props) {
     try {
       await fn();
       if (basari) setBilgi(basari);
-      await yukle();
     } catch (err) {
       setHata(err instanceof Error ? err.message : t("İşlem tamamlanamadı"));
     } finally {
+      // Hata olsa da ekran tazelenir: işlem yarıda kalmış olabilir (ör. hashtag
+      // eklendi ama gönderileri çekilemedi) — kullanıcı ancak sayfayı yenileyince
+      // görüyordu.
+      await yukle();
       setMesgul(null);
     }
   };
@@ -172,7 +175,7 @@ export default function RakiplerPaneli({ scope, canWrite }: Props) {
               aciklama={t("Her gece güncellenir · yalnızca işletme ve içerik üreticisi hesapları")}
             />
           </div>
-          {canWrite && b && takipte.length > 0 && (
+          {canWrite && b && (takipte.length > 0 || veri.hashtagler.some((h) => h.aktif)) && (
             <button
               type="button"
               onClick={() =>
@@ -183,7 +186,7 @@ export default function RakiplerPaneli({ scope, canWrite }: Props) {
                     setBilgi(
                       s.okunan === 0 && s.atlanan > 0
                         ? t("Hepsi birkaç dakika önce güncellendi.")
-                        : t("{n} hesap güncellendi.", { n: s.okunan })
+                        : t("{n} kayıt güncellendi.", { n: s.okunan })
                     );
                   }
                 )
@@ -212,7 +215,12 @@ export default function RakiplerPaneli({ scope, canWrite }: Props) {
             onAc={() => setAcik(acik === r.inspirationId ? null : r.inspirationId)}
             takipEdilebilir={canWrite && !!b && (r.takip || takipte.length < MAX_RAKIP)}
             mesgul={mesgul === r.inspirationId}
-            onTakip={(takip) => void is(r.inspirationId, () => socialMediaApi.rakipTakip(r.inspirationId, takip))}
+            onTakip={(takip) => {
+              // Bırakmak tek tıkla olmasın: düğme "Takipte" yazarken basılınca bırakıyor.
+              if (!takip && !window.confirm(t("@{hesap} takibi bırakılsın mı? Toplanan geçmiş kalır, yeni veri gelmez.", { hesap: r.handle })))
+                return;
+              void is(r.inspirationId, () => socialMediaApi.rakipTakip(r.inspirationId, takip));
+            }}
           />
         ))}
       </div>
@@ -396,15 +404,25 @@ function RakipSatiri({
   return (
     <div style={{ borderTop: `1px solid ${c.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: c.textSecondary, cursor: takipEdilebilir ? "pointer" : "default" }}>
-          <input
-            type="checkbox"
-            checked={r.takip}
-            disabled={!takipEdilebilir || mesgul}
-            onChange={(e) => onTakip(e.target.checked)}
-          />
-          {t("Takip")}
-        </label>
+        {/* Tek başına "Takip" yazan bir kutucuk durum etiketi sanılıyordu
+            (2026-10-06): eylem açıkça yazılı bir düğme. */}
+        <button
+          type="button"
+          disabled={!takipEdilebilir || mesgul}
+          onClick={() => onTakip(!r.takip)}
+          title={r.takip ? t("Takibi bırak") : t("Bu hesabı her gece okumaya başla")}
+          style={{
+            ...ikincilDugme,
+            fontWeight: 600,
+            borderColor: bolumRengi,
+            background: r.takip ? `${bolumRengi}1F` : bolumRengi,
+            color: r.takip ? bolumRengi : c.surface,
+            opacity: !takipEdilebilir || mesgul ? 0.6 : 1,
+            cursor: !takipEdilebilir || mesgul ? "default" : "pointer",
+          }}
+        >
+          {mesgul ? t("Okunuyor…") : r.takip ? `✓ ${t("Takipte")}` : `+ ${t("Takibe al")}`}
+        </button>
         <a
           href={`https://www.instagram.com/${r.handle}/`}
           target="_blank"

@@ -417,8 +417,9 @@ export const api = {
   // indirme + kare + ses çözümleme 30 sn'yi rahatça aşıyor). Varsayılan 30 sn.
   post: <T>(path: string, body: unknown, signal?: AbortSignal, timeoutMs?: number) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body), signal, timeoutMs }),
-  patch: <T>(path: string, body: unknown, signal?: AbortSignal) =>
-    request<T>(path, { method: "PATCH", body: JSON.stringify(body), signal }).then((sonuc) =>
+  // timeoutMs: post'taki gibi; ör. rakibi takibe almak Meta'dan okuma da yapıyor.
+  patch: <T>(path: string, body: unknown, signal?: AbortSignal, timeoutMs?: number) =>
+    request<T>(path, { method: "PATCH", body: JSON.stringify(body), signal, timeoutMs }).then((sonuc) =>
       yazmaBitti(sonuc, "PATCH", path, body)
     ),
   // keepalive: true — sekme/pencere kapatılırken de isteğin tamamlanmasına izin

@@ -722,6 +722,7 @@ export const tr = {
     consent: "Projelio'dan bülten ve ürün duyurusu e-postaları almayı kabul ediyorum.",
     success: "Teşekkürler! Bültenimize kaydoldunuz.",
     error: "Kayıt şu an alınamadı. Biraz sonra tekrar deneyin.",
+    close: "Kapat",
   },
 
   footer: {

@@ -5,6 +5,7 @@ import { site } from "@/lib/site";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import WhatsappLio from "@/components/WhatsappLio";
+import NewsletterPopup from "@/components/NewsletterPopup";
 
 // Tarayıcı çubuğu da sitenin koyu zeminine uysun (bkz. globals.css --paper).
 export const viewport: Viewport = {
@@ -123,6 +124,7 @@ export default async function LangLayout({
         <main id="main">{children}</main>
         <Footer dict={dict} locale={locale} />
         <WhatsappLio dict={dict} />
+        <NewsletterPopup dict={dict} locale={locale} />
       </body>
     </html>
   );

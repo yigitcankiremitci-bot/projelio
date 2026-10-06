@@ -2615,6 +2615,78 @@ input[type="range"] {
   margin-bottom: 0;
 }
 
+/* Sağ alttaki açılır bülten kutusu (NewsletterPopup) — WhatsApp düğmesinin üstünde. */
+.newsletter-popup {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 58px + 14px);
+  z-index: 61;
+  width: min(360px, calc(100vw - 32px));
+  padding: 20px 20px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow), var(--shadow-glow);
+  animation: newsletter-popup-in 0.35s ease both;
+}
+
+@keyframes newsletter-popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .newsletter-popup {
+    animation: none;
+  }
+}
+
+.newsletter-popup h4 {
+  color: #fff;
+  font-size: 1.02rem;
+  margin: 0 28px 6px 0;
+}
+
+.newsletter-popup-lead {
+  font-size: 0.86rem;
+  color: var(--text-soft);
+  margin: 0 0 14px;
+}
+
+.newsletter-popup-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.newsletter-popup-close:hover {
+  background: var(--tint);
+  color: var(--text);
+}
+
+/* Kutunun içinde form tek sütun; alt bilgideki çizgi ve boşluklar yok. */
+.newsletter.newsletter-popup-body {
+  display: block;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

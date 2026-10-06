@@ -701,6 +701,7 @@ export const en: Dict = {
     consent: "I agree to receive newsletter and product announcement emails from Projelio.",
     success: "Thanks! You're subscribed to our newsletter.",
     error: "We couldn't sign you up right now. Please try again shortly.",
+    close: "Close",
   },
 
   footer: {

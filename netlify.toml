@@ -1,33 +1,48 @@
-# Projelio artık kendi sunucusunda: https://app.projelio.app
+# TEST KOPYASI — https://projelio-test-kopya.netlify.app
 #
-# BU SİTE ARTIK UYGULAMAYI SERVİS ETMİYOR. Yalnızca eski adresi bilenleri
-# yeni adrese gönderiyor — kullanıcıların yer imleri ve paylaşılmış bağlantılar
-# projelio.netlify.app'i gösteriyor, o yüzden burası bir süre daha ayakta
-# kalmalı. Birkaç hafta sonra site tamamen kapatılabilir.
+# Bu dosya YALNIZCA `test-kopya` dalında böyle. main'deki netlify.toml
+# projelio.netlify.app'in yönlendirme sitesini tarif ediyor; bu dal main'e
+# birleştirilirse o yönlendirme bozulur ve canlı arayüz yanlış API'ye bakan
+# bir paketle değişir. BU DALI MAIN'E BİRLEŞTİRME.
 #
-# Derleme bilerek boş: arayüzü burada üretmeye gerek yok, üstelik üretilseydi
-# API adresi yanlış olan (askıya alınmış Render'ı gösteren) bir paket çıkardı.
+# Site bilerek GitHub'a BAĞLI DEĞİL: hiçbir push onu tetiklemez. Yayın yalnızca
+# bu klasörden elle gider:
+#   npx netlify-cli deploy --build --prod --site projelio-test-kopya
+#
+# Arkasındaki backend canlı DEĞİL: ayrı Render servisi + ayrı (boş, sahte
+# verili) Supabase projesi. Canlıyla tek ortak noktası kaynak kodu.
 
 [build]
-  # Her push'ta yeniden derlemenin karşılığı yok: çıktı her seferinde AYNI
-  # sabit yönlendirme sayfası. ignore komutu 0 dönünce Netlify derlemeyi iptal
-  # edip önceki yayını olduğu gibi bırakıyor — yönlendirme çalışmaya devam
-  # ediyor, derleme dakikası (kredi) harcanmıyor.
-  # Yeniden derlemek gerekirse bu satırı geçici olarak kaldır.
-  ignore = "exit 0"
+  command = "npm run build --workspace=@projelio/shared --if-present && npm run build --workspace=@projelio/web"
+  publish = "apps/web/dist"
 
-  command = "mkdir -p yonlendirme && printf '%s' '<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=\"0;url=https://app.projelio.app\"><title>Projelio taşındı</title><p>Projelio yeni adresine taşındı: <a href=\"https://app.projelio.app\">app.projelio.app</a>' > yonlendirme/index.html"
-  publish = "yonlendirme"
+[build.environment]
+  NODE_VERSION = "22"
+  # Derleme anında pakete gömülür (bkz. apps/web/vite.config.ts). Test
+  # backend'inin adresi; ASLA api.projelio.app olmamalı.
+  VITE_API_URL = "https://projelio-test-kopya-api.onrender.com"
 
-# force = true şart: dosya eşleşse bile yönlendirme kazansın.
-# :splat sayesinde derin bağlantılar korunuyor —
-#   projelio.netlify.app/takip/<token>  ->  app.projelio.app/takip/<token>
+# SPA: derin bağlantılar index.html'e düşsün.
 [[redirects]]
   from = "/*"
-  to = "https://app.projelio.app/:splat"
-  status = 301
-  force = true
+  to = "/index.html"
+  status = 200
 
-# GÜVENLİK BAŞLIKLARI BURADAN KALDIRILDI, kaybolmadı: artık uygulamayı veren
-# origin Caddy (bkz. deploy/Caddyfile). Yönlendirmeden ibaret bir sitede
-# CSP/HSTS tanımlamanın bir karşılığı yok.
+# Güvenlik başlıkları canlıdaki Caddy ile BİREBİR (deploy/Caddyfile) — testlerin
+# canlıyı temsil etmesi için. Tek fark connect-src/frame-src'deki API adresi.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    # Arama motorları test kopyasını dizine eklemesin.
+    X-Robots-Tag = "noindex, nofollow"
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://projelio-test-kopya-api.onrender.com wss://projelio-test-kopya-api.onrender.com https://www.googleapis.com https://storage.googleapis.com https://graph.microsoft.com https://*.sharepoint.com https://api.onedrive.com; frame-src 'self' https://projelio-test-kopya-api.onrender.com https://docs.google.com https://drive.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://www.paytr.com; object-src 'none'"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
